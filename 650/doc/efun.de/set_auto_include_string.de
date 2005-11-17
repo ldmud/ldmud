@@ -1,0 +1,21 @@
+GESCHUETZT, VERALTET
+SYNOPSIS
+        void set_auto_include_string(string arg);
+
+BESCHREIBUNG
+        <arg> wird automatisch in jedes neu kompilierte LPC-Objekt
+        eingebunden. Das ist nuetzlich, um globale Definitionen, z.B.
+        #pragma combine_string oder #pragma_strict_types durchzusetzen.
+        Das aufrufende Objekt muss durch das Masterobjekt privilegiert
+        sein.
+
+        Der auto_include_string wird geloescht, wenn das Masterobjekt
+        neu geladen wird.
+
+AENDERUNGEN
+        LDMud 3.2.9 ersetzte set_auto_include_string() durch den Driver
+            Hook H_AUTO_INCLUDE. Diese alte Version ist nur verfuegbar,
+            wenn der Treiber mit USE_DEPRECATED kompiliert wurde.
+
+SIEHE AUCH
+        set_driver_hook(E), privilege_violation(E), pragma(LPC), master(M)

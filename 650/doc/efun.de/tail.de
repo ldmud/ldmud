@@ -1,0 +1,9 @@
+SYNOPSIS
+        void tail(string file);
+
+BESCHREIBUNG
+        Listet das Ende eines Files. Es gibt kein Zeilenlimit, es werden aber
+        maximal 1000 Bytes ausgegeben.
+
+SIEHE AUCH
+        cat(E), ed(E)

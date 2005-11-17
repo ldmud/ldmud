@@ -1,0 +1,711 @@
+Short: Evermore: bad stack at F_RETURN
+Date: Sat, 27 May 2000 17:35:48 +0200
+From: Heiko Kopp <hkopp@informatik.uni-rostock.de>
+Type: Bug
+State: Abandoned - no longer appears in 3.2.9-dev.390
+Driver: dev.203
+
+The problem lies further back than the instruction trace shows.
+
+Hallo Lars,
+
+Evermore hat uns heute bei dev203 mit einem Crash gegruesst.
+Folgende Infos hab ich:
+
+2000.05.27 13:30:30 Bad stack at F_RETURN, 2 values too high
+2000.05.27 13:30:30 Current object was
+domains/races/drow/quest/cl/M/apprentice#349
+global/server/events global/server/events.c line 113
+2b7510: 103        1 aggregate                 (3)	line 113
+2b7513: 105      258 m_caggregate              (3)
+2b7516:  89        3 push_local_variable_lvalue (1)
+2b7518:  60          (void)+=                  (2)
+2b7519:   7        8 cstring0                  (0)	line 114
+2b751b:   7        9 cstring0                  (1)
+2b751d:   7       12 cstring0                  (2)
+2b751f:   5        1 identifier                (3)
+2b7521: 121          call_other                (4)
+etc/shared etc/shared.c line 22
+19745f:  82          call_function_by_address  (0)	line 22
+197427: 106          previous_object0          (0)	line 6
+197428: 178          object_name               (1)
+197429:  22     7429 switch                    (1)
+19742c:  13          const1                    (0)	line 15
+19742d:  19          return                    (1)
+197463:  79      276 branch_when_non_zero      (1)	line 22
+197466:  12          const0                    (0)	line 24
+197467: 398          get_extra_wizinfo         (1)
+kernel/master kernel/master.c line 1345
+29fbdf:  24        0 local                     (0)	line 1345
+29fbe1:  22          switch                    (1)
+29fc07:  24        1 local                     (0)	line 1362
+29fc09: 178          object_name               (1)
+29fc0a:  22     2312 switch                    (1)
+29fc0d:  13          const1                    (0)	line 1365
+29fc0e:  19          return                    (1)
+etc/shared etc/shared.c line 24
+197469: 169          mappingp                  (1)	line 24
+19746a:  79          branch_when_non_zero      (1)
+197472:  24        1 local                     (0)	line 26
+197474:  12          const0                    (1)
+197475: 398          get_extra_wizinfo         (2)
+kernel/master kernel/master.c line 1345
+29fbdf:  24        0 local                     (0)	line 1345
+29fbe1:  22          switch                    (1)
+29fc07:  24        1 local                     (0)	line 1362
+29fc09: 178          object_name               (1)
+29fc0a:  22     2312 switch                    (1)
+29fc0d:  13          const1                    (0)	line 1365
+29fc0e:  19          return                    (1)
+etc/shared etc/shared.c line 26
+197477:  24        0 local                     (2)	line 26
+197479:  90          push_indexed_lvalue       (3)
+19747a:  35          (void)=                   (2)
+19747b:  20          return0                   (0)	line 27
+global/server/events global/server/events.c line 114
+2b7523:  71          pop_value                 (1)	line 114
+2b7524:  20          return0                   (0)	line 115
+domains/races/drow/quest/cl/M/apprentice#349 <lambda ?> line 0
+ffbea98a:  19          return                    (1)	line 0
+kernel/simul_efun kernel/simul/events.c line 47
+9e4105:  71          pop_value                 (1)	line 47
+9e4106:  20          return0                   (0)	line 48
+domains/races/drow/quest/cl/M/apprentice#349 basic/living/skills.c line 423
+2b701b:  71          pop_value                 (3)	line 423
+2b701c: 105        1 m_caggregate              (2)	line 424
+2b701f:  84        1 push_identifier_lvalue    (3)
+2b7021:  35          (void)=                   (4)
+2b7022: 105        1 m_caggregate              (2)	line 425
+2b7025:  84        3 push_identifier_lvalue    (3)
+2b7027:  35          (void)=                   (4)
+2b7028:  12          const0                    (2)	line 426
+2b7029:  12          const0                    (3)
+2b702a:  12          const0                    (4)
+2b702b: 103        3 aggregate                 (5)
+2b702e:  84        4 push_identifier_lvalue    (3)
+2b7030:  35          (void)=                   (4)
+2b7031:  20          return0                   (2)	line 427
+2b7032:  25   8   0  54  59 238   1   0
+' _call_out_stub' in 'basic/living/addons/walker.c'
+('domains/races/drow/guardserver/patrolmaintainer')line 52
+'        do_walk' in 'domains/races/drow/quest/cl/M/walkingtower.c'
+('domains/races/drow/quest/cl/M/walkingtower')line 152
+<lambda 0x1c0c91> in 'domains/races/drow/quest/cl/M/walkingtower.c'
+('domains/races/drow/quest/cl/M/walkingtower')offset 75
+'          reset' in '          std/room.c'
+('domains/races/drow/quest/cl/R/movingtower1')line 153
+'          reset' in '      basic/create.c'
+('domains/races/drow/quest/cl/R/movingtower1')line 75
+'        refresh' in 'domains/races/drow/inherits/room_town.c'
+('domains/races/drow/quest/cl/R/movingtower1')line 91
+'        refresh' in '          std/room.c'
+('domains/races/drow/quest/cl/R/movingtower1')line 143
+'       populate' in 'domains/races/drow/quest/cl/R/movingtower1.c'
+('domains/races/drow/quest/cl/R/movingtower1')line 74
+<lambda 0x197831> in 'domains/races/drow/quest/cl/R/movingtower1.c'
+('domains/races/drow/quest/cl/R/movingtower1')offset 128
+'          reset' in 'domains/races/drow/quest/cl/M/apprentice.c'
+('domains/races/drow/quest/cl/M/apprentice#349')line 57
+'          reset' in '       std/monster.c'
+('domains/races/drow/quest/cl/M/apprentice#349')line 114
+'          reset' in '      basic/create.c'
+('domains/races/drow/quest/cl/M/apprentice#349')line 74
+'         create' in 'domains/races/drow/quest/cl/M/apprentice.c'
+('domains/races/drow/quest/cl/M/apprentice#349')line 17
+'         create' in '           std/npc.c'
+('domains/races/drow/quest/cl/M/apprentice#349')line 15
+'         create' in '       std/monster.c'
+('domains/races/drow/quest/cl/M/apprentice#349')line 89
+'         create' in '      basic/living.c'
+('domains/races/drow/quest/cl/M/apprentice#349')line 622
+'         create' in 'basic/living/skills.c'
+('domains/races/drow/quest/cl/M/apprentice#349')line 427
+
+Gruss
+
+Heiko
+
+--__________________________________________
+Archwizard Bardioc@Evermore
+The Lands of Evermore - a fantasy mud
+Come and join us at telnet://mud.evermore.de
+Write me a mail at bardioc@evermore.de
+
+----------------------------------
+apprentice.c:
+
+/*
+ * apprentice of evilwiz
+ *
+ */
+
+#pragma strong_types
+#pragma combine_strings
+#include <domains.h>
+#include DROW_PATH "/paths.h"
+#include D_CLACKER "/clacker.h"
+inherit "/std/npc";
+#include <alignment.h>
+
+void create()
+{
+  if (!clonep()) return;
+  ::create();
+
+  set_id(({"apprentice"}));
+  set_name("apprentice");
+  set_level(20);
+  set_skill("punch",70,1);
+  set_skill("blindfight",90,1);
+  set_skill("kick",70,1);
+  set_skill("dodge",70,1);
+  set_skill("parry",60,1);
+  set_skill("sword",90,1);
+  set_skill("whip",80,1);
+
+  set_skill("erinn",100,1);
+  set_skill("common",0,1);
+  set_race("human");
+  set_vision(2);
+  set_al(AL_EVIL);
+  set_tongue("erinn");
+  set_short("wizard's apprentice");
+  set_long("\
+The evil apprentice of the evil wizard. He looks like he will protect his master \
+with his life.\n");
+
+  set_male();
+  set_resistence(([
+    "magic" : 70,
+    "fire" : 70,
+    "psionic" : 90,
+    "unholy" : 80,
+    "holy" : -10,
+    "poison" : 90,
+    "electric" : 50,
+  ]));
+
+  set_aggressive(1); // its too dark !!!!
+}
+
+void reset(int arg)
+{
+  ::reset(arg);
+  if (!present("whip")) {
+    move_object(clone_object(D_OBJW "whip"),this_object());
+  }
+  init_command("wield all");
+
+  if (!present("robe")) {
+    move_object(clone_object(D_OBJA "robe"),this_object());
+  }
+  init_command("wear all");
+}
+
+----------------------------------
+npc.c:
+
+/* Copyright TubMud 1997 */
+/* Many or some changes for Evermore 1997 */ 
+
+inherit "/basic/living/chatter";
+inherit "/std/monster";
+inherit "/basic/living/feeling";
+inherit "/basic/living/chat";
+inherit "/basic/living/reaction";
+inherit "/basic/living/mood";
+inherit "/basic/living/sequence";
+inherit "/basic/living/magic";
+
+void
+create() {
+  monster::create();
+  set_name("somenpc");
+}
+
+void
+refresh() {
+  monster::refresh();
+  mood::refresh();
+  chatter::refresh();
+}
+
+status
+query_busy() {
+  return 
+//    chatter::query_busy() || 
+    sequence::query_busy() ||
+    monster::query_busy();
+}
+
+// 'query_busy' means that the monster shouldn't do the default actions
+// (like running away) and 'query_blocking' shound mean that even no chat/
+//  feeling-reactions are allowed.
+
+status
+query_blocking() {
+  return 
+//    chatter::query_busy() || 
+    sequence::query_busy() ||
+    monster::query_busy();
+}
+
+set_defaults(int a) {
+  return chatter::set_defaults(a);
+}
+
+void
+heart_beat() {
+  object ob;
+  chatter::heart_beat();
+  sequence::heart_beat();
+  monster::heart_beat();
+
+}
+
+void
+catch_tell(string str) {
+  reaction::catch_tell(str);
+//  monster::catch_tell(str);
+}
+
+void
+init() {
+  reaction::init();
+  monster::init();
+}
+
+
+----------------------------------
+skills.c:
+
+/* Copyright Evermore 1997 */
+
+/*
+ * /basic/living/skills.c
+ */
+#pragma strong_types
+
+#include <server.h>
+#include <event.h>
+
+#include <skills.h>
+#include <wizlevels.h>
+#include <libs.h>
+#include <commands.h>
+
+
+// How much points does it need to learn a point by seeing if there
+// are no other modifiers
+#define WATCHING_QUOTIENT 3
+
+// Bandwidth for learning skills. Result of test_and_improve_skill
+// must be withing -bandwidth and +bandwidth
+#define L_BANDWIDTH 20
+
+// Maximum learning value on learning by doing
+#define MAX_LEARN 20
+
+inherit "basic/create";
+
+int query_age();
+int query_skill_value(string skill);
+int query_level();
+string query_profession();
+string query_race();
+int query_skill_value(string skillid);
+
+// Skill ID -> Learned level (0..100000) see x do x teach
+mapping skills;
+// Skill ID -> talent in %
+mapping talents;
+
+static mapping last_learn;
+
+static int *skill_slots; // Skill slots in use
+static int *slot_maxima; // own personalized version of slot maxima
+
+private void __recalculate_skill(string id,int see,int by_do,int teach)
+{
+
+  skill_slots[SE_SKILL->query_skill_category(id)]++;
+  // Really in correct order. Pass 2 will decrement slot count on killing.
+  if(!sizeof(SE_SKILL->query_skill_data(id)))
+    see = by_do = teach = 0;
+}
+
+void clear_skill(string skill);
+
+void __ditch_cleared_skill(string skill)
+{
+  if(!query_skill_value(skill)) clear_skill(skill);
+}
+
+// Pass 1 counts skill slots anew and zeroes all skills which are deleted.
+// Pass 2 will ditch zeroed skills.
+varargs void recalculate_skills(int *limits)
+{
+  skill_slots = ({ 0, 0, 0 });
+  walk_mapping(skills,#'__recalculate_skill);
+  map_indices(copy_mapping(skills),#'__ditch_cleared_skill);
+}
+
+varargs int raw_learn_skill(string skillid,int value,int what,
+     status ignore_lims)
+{
+  int *learn_limits;
+  int i;
+
+  if(!(learn_limits =
+     SE_SKILL->get_learn_limits(skillid,this_object(),ignore_lims)))
+    return 0;
+
+  if(!skills) skills = ([ ]);
+
+  // Unknown skills won't be learned
+  if(!member(skills,skillid)) return 0;
+
+  if(value <= 0) return 0;
+
+    
+
+  if(value+skills[skillid,0]+skills[skillid,1]+skills[skillid,2] > learn_limits[0])
+    value = learn_limits[0]-(skills[skillid,0]+skills[skillid,1]+skills[skillid,2]);
+
+  // Over 100%. Simulate set_skill(skill,100).
+  if(skills[skillid,0]+skills[skillid,1]+skills[skillid,2] > 100000)
+   {
+    skills[skillid,0] = 0;
+    skills[skillid,1] = 0;
+    skills[skillid,2] = 0;
+    value = 100000;
+    what = -1;
+   }
+
+  if(what >= 0 && what < 3)
+  {
+    if(value+skills[skillid,what] > learn_limits[what+1]) 
+      value = learn_limits[what+1] - skills[skillid,what];
+
+    if (value < 0) return 0;
+    skills[skillid,what] += value;
+   } else {
+    int newvalue;
+    newvalue = value;
+
+    // Looks like a 'bottle and different sized glasses'-problem:
+    // You have to divide something in equally shared portions, as long
+    // as the portions fit into their containers. If not, divide the surplus
+    // among the remaining containers.
+      while(newvalue > 0)
+       {
+        skills[skillid,0] += newvalue/3;
+        if(skills[skillid,0] > learn_limits[1])
+         {
+          newvalue += (skills[skillid,0] - learn_limits[1])*3/2;
+          skills[skillid,0] = learn_limits[1];
+	 }
+        skills[skillid,1] += newvalue/3;
+        if(skills[skillid,1] > learn_limits[2])
+         {
+          newvalue += skills[skillid,1] - learn_limits[2]*3;
+          skills[skillid,1] = learn_limits[2];
+	 }
+        skills[skillid,2] += newvalue/3;
+        newvalue = 0;
+        if(skills[skillid,2] > learn_limits[3])
+         {
+          newvalue = skills[skillid,2] - learn_limits[3];
+          skills[skillid,2] = learn_limits[3];
+	 }
+       }
+   }
+
+  return 0;
+}
+
+/*
+ * Queries the value triple of one skill
+ */
+
+int *query_skill_values(string skillid)
+{
+  if(!member(skills,skillid)) return 0;
+  return ({ skills[skillid,0], skills[skillid,1],skills[skillid,2] });
+}
+
+/*
+ * Queries the skill value of one skill
+ */
+
+int query_skill_value(string skillid)
+{
+  if(!member(skills,skillid)) return 0;
+  return skills[skillid,0]+skills[skillid,1]+skills[skillid,2];
+}
+
+/*
+ * Same as above goes for percentages -- please use these one
+ */
+
+int *query_skill_percents(string skillid)
+{
+  int *h,i;
+  mixed test;
+  
+  if(!(h = query_skill_values(skillid))) return 0;
+  return map(h, (: ($1 + 500 ) / 1000 :)); 
+}
+
+int query_skill_percent(string skillid)
+{
+  return (query_skill_value(skillid)+500)/1000;
+}
+
+/*
+ * Sets the talent value in percent. If somebody has a high talent,
+ * he can learn the skill faster than others.
+ */
+
+void set_talent_value(string skillid,int value)
+{
+  if(!talents) talents = ([ ]);
+  talents[skillid] = value;
+}
+
+/*
+ * Queries the talent value.
+ * If the talent is not registered, it will be regarded as default 100.
+ */
+
+int query_talent_value(string skillid)
+{
+  if(!talents || !member(talents,skillid)) return 100;
+  return talents[skillid];
+}
+
+/*
+ * Receive a learn event.
+ * If it isn't the own one, the player learns a wee bit by watching.
+ */
+
+void receive_learn_event(mapping e)
+{
+  mixed *skilldata;
+  int value, how;
+  string skillid;
+
+  if(!living(this_object())) return;
+  skillid = e[E_SKILLID];
+  value = e[E_VALUE];
+  how = e[E_HOW];
+  
+  if(this_object() != e[E_AGENT]) {
+    if(how == 2) return; // Can't see if someone did it by trainer
+    value /=WATCHING_QUOTIENT;
+    how = 0;
+    if(random(5)) return;
+  }
+  
+  skilldata = SE_SKILL->query_skill_data(skillid);
+  if(!skilldata) return;
+
+  value = (value*query_talent_value(skillid))/100; // Talent
+
+  value = (value*100)/SE_SKILL->get_learning_speed(skillid,this_object());
+  raw_learn_skill(skillid,value,how);
+}
+
+/*
+ * That does nothing else than sending the event, waiting for the own
+ * person and the surroundings to be caught.
+ */
+
+void learn_skill(string skillid,int value,int how)
+{
+  send_event(E_LEARNED,
+   ([ E_AGENT: this_object(),
+      E_SKILLID: skillid,
+      E_VALUE: value,
+      E_HOW: how ]),
+   environment(this_object()));
+
+}
+
+
+varargs string query_skill_tree(int displaywidth) 
+{
+   return "/global/commands/score"->query_skill_tree(displaywidth);
+}
+
+mapping query_skills() { return skills; }
+
+// Return own personalized version of slot maxima
+int *query_slot_maxima() { return slot_maxima; }
+
+varargs void recalculate_slots(int *limits)
+{
+  string prof;
+  
+  if(!limits)
+    limits = LIB_PROFESSION->query_slot_maxima(prof = query_profession());
+
+  // Enforce copying of the array
+  limits += ({ });
+
+  if(limits[SKC_COMBAT] < 0)
+    limits[SKC_COMBAT] += sizeof(SE_SKILL->query_leaves("combat"));
+
+  if(limits[SKC_MAGIC] < 0)
+   {
+    int bonus, h;
+
+    bonus = (prof != "Priest") && sizeof(SE_SKILL->query_leaves("magic/arts"));
+    h = bonus +
+      sizeof(SE_MAGIC->may_have_spells(this_object(),1));
+    limits[SKC_MAGIC] = h*(-limits[SKC_MAGIC])/100;
+   }
+  if(limits[SKC_OTHER] < 0)
+    limits[SKC_OTHER] +=
+      sizeof(SE_SKILL->query_leaves()) -
+      sizeof(SE_SKILL->query_leaves("combat")) -
+      sizeof(SE_SKILL->query_leaves("magic"));
+      
+  slot_maxima = limits;
+}
+
+int query_used_slots(int what)
+{
+  if(what == SKC_ALL)
+    return skill_slots[SKC_COMBAT] +
+           skill_slots[SKC_MAGIC] +
+           skill_slots[SKC_OTHER];
+   else return skill_slots[what];
+}
+
+int query_max_slots(int what)
+{
+  int base,low,high;
+  int race_bonus;
+  int h;
+
+  if(what == SKC_ALL) 
+    return query_max_slots(SKC_COMBAT) +
+           query_max_slots(SKC_MAGIC) +
+           query_max_slots(SKC_OTHER);
+
+  if (is_wizard(this_object()))
+    return 1000;
+  race_bonus = ((DSE_RACEDATA->
+            get_race_data(query_race(),"slot_boni")) || ({ 0,0,0 }))[what];
+
+  low = (LIB_PROFESSION->query_slot_minima(query_profession()))[what];
+  // We need to calculate the maxima personalized to the player. 
+  high = (query_slot_maxima())[what];
+  // Linear functions between two points, round down and up to avoid
+  // getting the very last slots only on reaching Level 49
+  base = low +
+    ((high-low)*(query_level()-1)+(PL_MAX_PLAYER_LEVEL-1)/2)/
+              (PL_MAX_PLAYER_LEVEL-1);
+
+  return base ? (((h = base + race_bonus) < 0) ? 0 : h) : 0;
+}
+
+int query_free_slots(int what)
+{
+  return query_max_slots(what) - query_used_slots(what);
+}
+
+  
+/*
+ * Maybe the heart of the skill system.
+ * Gets a skill ID and a value from 0 (easy for everyone) to
+ * 100 (Even masters have problems), the bandwidth
+ * (measurement upto which success/failure a player may learn from that
+ * attempt)
+ * and returns
+ * -99 (complete failure) over 0 (almost worked) to 99 (wonderful)
+ */
+ 
+varargs int test_and_improve_skill(string skillid,int difficulty,int bandwidth)
+{
+  int res;
+  int learn_value;
+  int age;
+  
+  if(!skillid)
+    raise_error("No Skill ID given.\n");
+
+  // Fails if you don't have the skill
+  if(!query_skill_value(skillid)) return -99;
+
+  if(!bandwidth) bandwidth = L_BANDWIDTH;
+  res = query_skill_percent(skillid)-difficulty-19+random(40);
+  if(res < -99) res = -99;
+  if(res > 99) res = 99;
+
+  // Success/failure within bandwidth?
+  if(res > -bandwidth && res < bandwidth)
+   {
+    if(!member(last_learn,skillid) || (last_learn[skillid]+2 < (age = query_age())))
+     {
+      // is a parabola with maximum at zero
+      learn_value = -(res-bandwidth)*(res+bandwidth);
+      // scale down
+      learn_value = learn_value*MAX_LEARN/(bandwidth*bandwidth);
+      learn_skill(skillid,learn_value,1); // Learning by doing
+      last_learn[skillid] = age;
+     }
+   }
+  return res;
+}
+
+#define GET_LEAVES(x) (SE_SKILL->query_leaves(x))
+
+void clear_skill(string skillid)
+{
+  if(member(skills,skillid))
+    {
+      m_delete(skills,skillid);
+    skill_slots[SE_SKILL->query_skill_category(skillid)]--;
+    }
+}
+
+varargs void set_skill(string skillid,int level)
+{
+  clear_skill(skillid);
+  if(level)
+   {
+    // raw_learn_skill requires the skill to be present
+    skills += ([ skillid: 0; 0; 0 ]);
+    // Let set_skill ignore the limits
+    raw_learn_skill(skillid,level*1000,-1,1);
+    skill_slots[SE_SKILL->query_skill_category(skillid)]++;
+   }
+}
+
+void set_skills(int level)
+{
+  level = (level-1)*19/10+5;
+  map(GET_LEAVES("combat/unarmed") || ({ }),#'set_skill,level);
+  map(GET_LEAVES("combat/defense") || ({ }),#'set_skill,level);
+  set_skill("twohanded",level);
+}
+
+void clear_skills()
+{
+  skills = ([ ]);
+  skill_slots = ({ 0, 0, 0 });
+}
+
+void create()
+{
+  listen_event(E_LEARNED,0,#'receive_learn_event);
+  skills = ([ ]);
+  last_learn = ([ ]);
+  skill_slots = ({ 0, 0, 0 });
+}
+
+
+
+----------------------------------
