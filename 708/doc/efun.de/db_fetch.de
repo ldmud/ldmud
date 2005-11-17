@@ -1,0 +1,23 @@
+OPTIONAL
+SYNOPSIS
+        mixed db_fetch(int handle)
+
+BESCHREIBUNG
+        Hole _eine_ Resultatzeile der letzten SQL-Aktion fuer Verbindung
+        <handle>. Sind keine weiteren Zeilen verfuegbar, wird 0
+        zurueckgegeben.
+
+        Die Funktion ist nur verfuegbar wenn der Driver mit
+        mySQL-Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __MYSQL__ definiert.
+
+        Die Efun ist privilegiert als ("mysql", "db_fetch").
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.9.
+        LDMud 3.2.11 machte die Efun privilegiert.
+
+SIEHE AUCH
+        db_affected_rows(E), db_conv_string(E), db_close(E), db_coldefs(E),
+        db_connect(E), db_error(E), db_exec(E), db_handles(E), db_insert_id(E),
+        mysql(C), privilege_violation(M)

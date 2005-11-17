@@ -1,0 +1,8 @@
+When tell_object() sends a message to a noninteractive player,
+it will get to the function catch_tell(string). This will enable
+communications between NPC's and from a player to an NPC.
+
+The only exception is shout, which the monster won't hear. The monster
+must be living, that is, call enable_commands().
+
+See also efun/enable_commands()
