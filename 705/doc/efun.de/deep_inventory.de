@@ -1,0 +1,21 @@
+SYNOPSIS
+        *object deep_inventory();
+        *object deep_inventory(object ob);
+
+BESCHREIBUNG
+        Gibt ein Array der Objekte zurueck, die in <obj> enthalten sind.
+        Wenn <obj> nicht angegeben wird, wird standardmaessig this_object()
+        verwendet. Ebenso werden alle Objekte angegeben, die sich im Inventory
+        der in <obj> enthaltenen Objekte befinden. Die Suche verlaeuft
+        rekursiv absteigend.
+
+        <ob>
+            ob1
+            ob2
+                ob21 -> deep_inventory(obj) == ({ob1,ob2,ob3,ob4,ob21,ob31})
+            ob3
+                ob31
+            ob4
+
+SIEHE AUCH
+        first_inventory(E), next_inventory(E), all_inventory(E)

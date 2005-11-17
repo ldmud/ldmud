@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Backup debug files and start a new Mud.
+
+cd /mud/save
+PRE=`date +%y.%m.%d-%T`
+mv --backup --version-control=numbered Wunderland.log $PRE.Wunderland.log
+mv --backup --version-control=numbered Wunderland.err $PRE.Wunderland.err
+mv --backup --version-control=numbered /mud/mudlib/*.debug.log $PRE.debug.log
+
+/mud/bin/driver --mudlib /mud/mudlib --debug-file Wunderland.debug.log --swap-file /mud/swapfiles/Mudswapfile --reset-time 5400 4711 4710 1> /mud/save/Wunderland.log 2> /mud/save/Wunderland.err

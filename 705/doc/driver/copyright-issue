@@ -1,0 +1,252 @@
+The question of the Copyright and Terms of Use for the driver is an old
+one. Here is what I could salvage from the amylaar-users mailing list.
+Important is Jacob's mail I received in 1999 which essentially casts
+the current copyright terms in stone.
+
+  -- Lars (not /Lars)
+
+-------------------------------------------------------------------------------
+Date: Sat, 13 Nov 1993 03:11:29 +0100 (MET)
+From: amylaar@meolyon.hanse.de (Joern Rennecke)
+Subject: LPmud Copyright
+To: busey@ux1.cso.uiuc.edu (busey andrew), lars@cd.chalmers.se,
+        croes@swi.psy.uva.nl, gusar@uniwa.uwa.OZ.AU, duening@ibr.cs.tu-bs.de,
+        jacob@cd.chalmers.se, r_behren@informatik.uni-kl.de,
+        mud@alijku05.edvz.uni-linz.ac.at, alcaman@cs.tu-berlin.de
+
+Motivation of this letter:
+There seems to be a potential for muds that run on dedicated machines
+that charge fees from player to make the mud economically feasible.
+The Copyright file says that LPmud can freely used iff it is not for
+monetary gain. Now the debate what constitutes monetary gain and if
+an individual license is an license to break the copyright,
+is an interpretation of the license in Copyright or gives rights
+independent the restrictions in Copyright has become a normal flame
+war in the rec.games.mud.* groups. That is to say, one of the worst
+thinkable.
+
+To allow muds to charge fees to cover costs, without going through
+such debates every time, I suggest to amend the Copyright file
+with terms under witch such a mud is considered to comply to the
+'no monetary gain clause' .
+
+Explanation of the recipient list and some individual messages:
+
+Busey Andrew: wants to set up a mud that charges fees to cover costs.
+  If the below rules won't make it into the Copyright, you can regard this
+  as a license - of course only for the code written by me.
+Lars Pensj|: original author.
+  Please forward this letter to other authors that have contributed to 3.1.2
+  who have a say in the copyright.
+Felix A. Croes: wrote the non-corrupting indentation code for ed.
+Sean A Reith: wrote Mud-sprintf() .
+Lars Duening: wrote the Amiga port.
+Reimer Behrends: wrote mergesort based sort_array() .
+Herp: wrote get_object_actions() .
+Jacob Hallen: is one of the people involved with the CD driver; the email
+ address was in the news recently...
+  Please forward this letter to the person holding the copyright for the
+  UDP connectivity(unless it's yourself :-) .
+Alexander Weidt:
+  Please try to forward this letter to my brother...
+
+I hope to finally get terms which all autors can agree on that can be included
+into the Copyright file. I suggest group replies, so that we can get some
+kind of discussion going (unless there is immediate approval from all
+authors :-) . When you have objections, please try to point out what is
+wrong with these terms. Even better would it be if you had a solution
+to the problem.
+
+        Joern Rennecke (Amylaar)
+
+Proposed Terms:
+1. A LPmud may charge fees from players to cover running and machine costs.
+2. Running costs in these terms are the cost for the network connection,
+   electric power to operate the host machine, wear of backup media,
+   repair costs for the host machine, and cost for a bank account.
+   For the costs of a bank account to be considered runnung costs,
+   they must not habe been considered according to 8. , and the
+   institute has to be choosen with at least usual consideration on
+   terms and costs of the account and that there must be no affiliaton
+   with the institute.
+3. Money to cover running costs for a maximum of 18 month may be accumulated
+   in advance from fees to smoothe fluctation and to ensure stability of
+   the mud. The spare money has to be kept separate from personal money
+   and should be invested in trustee investment if liquidity allows.
+   If the mud is permanently put down, this money has to be refounded to the
+   playeres.
+4. Machine costs are costs for buying, installation and upgrade of the host
+   machine. The costs have to appear on a bona fide purchase / service
+   contract with a person/institution that is not affiliated with the
+   person who sets up the mud.
+   When the host machine is put out of use, or parts of it are removed for
+   other than technical reasons, are parts are nor re-inserted after the
+   technical resons for removal and not re-inserting have become void,
+   the current value of the machine that has put out of use/the removed
+   parts is to be subtracted from the machine costs.
+   If thus more money has been paid for machine costs than there are
+   currently, the surplus amount has to be refounded to the mud players.
+5. The machine cost share in the fee may not be more than 1/2400th
+   of the machine costs per month. If the mud has less than 100 players,
+   it may be up to machine costs / 24 / number of players, but not more than
+   1/120th of the machine costs per month.
+6. When money has to be payed back to the mud players, only those that
+   have payed at least once a fee within the last 24 month are to be
+   considered. For these players, the money is distributed in the ratio
+   of the all fee shares ever payed to cover machine costs.
+7. All players pay equal fees.
+8. Banking costs that have to be paid by the mud administration and are
+   immediately connected to incoming money transactions can be subtracted
+   from the transferred amount before counting it as payment of fees,
+   provided that the institute was choosen with at least usual
+   consideration on terms and costs of the account, and that there is
+   no affiliaton with the institute.
+9. The amount of voluntary donations is unlimited. A donation is not
+   considered voluntary if it is connected with special features or
+   favours in the mud other than an hounarary mentioning of the donor,
+   or if the donor is made to believe that such a connection exists.
+   Reasonable measures have to be taken that there is no
+   misunderstanding on this point.
+
+Comments:
+3. You may not use the money of the mud to bridge personal inliquidity.
+   Don't gamble with other persons money, e.g. investing it in junk bonds.
+5. Fees should not be arbitrarily raised so that players can be driven
+   out. I considered a fixed minimal distributen of the costs to be
+   the best means to codify this.
+   Absolute figures are bound to become void by inflation.
+6. The 24 month period is introduced to allow to erease records of
+   clients after two years, and to keep overhead affordable.
+7. We don't want favourites to get a free lift, and others grudgingly
+   paying extra. If you think somebody needs free access, find someone
+   who pays for it, or make a found payed from voluntary donations.
+
+-------------------------------------------------------------------------------
+Date: Fri, 19 Nov 1993 17:10:44 +0100 (MET)
+From: Lars Pensj| <lars@cd.chalmers.se>
+Subject: Re: LPmud Copyright
+To: amylaar@meolyon.hanse.de (Joern Rennecke)
+Cc: busey@ux1.cso.uiuc.edu, lars@cd.chalmers.se, croes@swi.psy.uva.nl,
+        gusar@uniwa.uwa.OZ.AU, duening@ibr.cs.tu-bs.de, jacob@cd.chalmers.se,
+        r_behren@informatik.uni-kl.de, mud@alijku05.edvz.uni-linz.ac.at,
+        alcaman@cs.tu-berlin.de
+
+I agree that fix of the copyright is needed. I would prefer to use the
+Gnu Copyleft, as I don't care any longer if anyone makes money from it. The
+important thing is that it is free, which means noone will be able to make
+much money anyway.
+
+Any thoughts about it ?
+
+/Lars
+
+-------------------------------------------------------------------------------
+Date: Fri, 19 Nov 1993 20:14:10 +0100 (MET)
+From: Jacob Hallen <jacob@cd.chalmers.se>
+Subject: Re: LPmud Copyright
+To: amylaar@meolyon.hanse.de (Joern Rennecke)
+Cc: busey@ux1.cso.uiuc.edu, lars@cd.chalmers.se, croes@swi.psy.uva.nl,
+        gusar@uniwa.uwa.OZ.AU, duening@ibr.cs.tu-bs.de, jacob@cd.chalmers.se,
+        r_behren@informatik.uni-kl.de, mud@alijku05.edvz.uni-linz.ac.at,
+        alcaman@cs.tu-berlin.de
+
+> Jacob Hallen: is one of the people involved with the CD driver; the email
+>  address was in the news recently...
+>   Please forward this letter to the person holding the copyright for the
+>   UDP connectivity(unless it's yourself :-) .
+
+I represent everyone involved in the CD driver. The UDP stuff is to be
+considered public domain. All other parts are covered by the non-profit clause.
+Code origination from me, Johan Andersson (Commander), Ronny Wikh (Mrpr),
+Lennart Augustsson (Marvin) is covered by it. We have no intention of
+allowing people to charge money for the usage of our driver, or borrowed
+pieces thereof.
+We consider the acceptance of volontary donations as fair practice, and we
+can accept the charging for the use of extra equipment needed to allow
+people to access the mud, as long as there is a reasonable way to access the
+mud without being charged. (Providing modem access at a cost while allowing
+free access over the internet is an example of such a setup.)
+
+My personal view is that an elaborate setup of terms like the one in the
+original letter is unreasonable. It is designed for a very specific set of
+circumstances. It is impossible to check and it is very bureaucratic.
+It does not have my support.
+
+Jacob Hallen
+
+-------------------------------------------------------------------------------
+Date: Sat, 20 Nov 1993 23:35:12 +0100 (MET)
+From: Multi User Dungeon <mud@alijku05.edvz.uni-linz.ac.at>
+Subject: Re: LPmud Copyright
+To: lars@cd.chalmers.se (Lars Pensj|)
+Cc: busey@ux1.cso.uiuc.edu, croes@swi.psy.uva.nl, gusar@uniwa.uwa.OZ.AU,
+        duening@ibr.cs.tu-bs.de, jacob@cd.chalmers.se,
+        r_behren@informatik.uni-kl.de, alcaman@cs.tu-berlin.de
+
+Lars> important thing is that it is free, which means noone will be able to make
+Lars> much money anyway.
+
+You are speaking about the GD,correct ? Normally, many a site uses an unmodified
+GD based upon which is a more or less heavily or not heavily Mudlib. Based upon
+this Mudlib is the work of the `wizards' ... Sorry for repeating known stuff.
+
+This makes most Muds differ from each other. So, the fact that the GD itself
+is free, doesn't imply that you won't make money.
+
+Another point to argue: maintainig a Mud takes time .. a LOT of time. Usually,
+doing so is not fun at all. I experienced that the more players you have, the
+less fun it is fore the adminstrators. You spend a lot of time coding,
+searching and fixing bugs ... and I think, this can be regarded as a
+service for players (... and players really can be a pain sometimes ...)
+Would it be legal to charge money for that ?
+
+Another thought: Internet Muds. They run on internet, usually on computers
+owned by a school or university, some with, some without the knowledge of
+the site adminstrators. Would it be legal to charge money when you run
+a Mud on equipment not owned by yourself ? And, even if you own the computer,
+do you pay for the internet link ? If not, I fear you must not charge money
+for a Mud without speaking with the network adminstrator since you are using
+the network components (router/bridges, even cables :-> ...) for free.
+
+How difficult is charging money in European Muds ? Not that I plan
+to do so for HM (it's closed for players currently anyway), but isn't there a
+big difference according to the "accounting mechanism" (ugh, bad english :-)
+that is used in the States ? I heard that it is much more easy to make
+financial transactions within the States. So, I suspect the "Mud money charging"
+discussion arrives from the US :-)
+
+Greetings, Herp (mud@mud.uni-linz.ac.at)
+
+------------------------------------------------------------------------------
+From jacob@cd.chalmers.se Sun Oct 24 17:02:53 1999
+Newsgroups: rec.games.mud.admin
+Subject: Re: Newsgroups
+From: jacob@cd.chalmers.se (Jacob Hallen)
+Date: 24 Oct 1999 16:02:53 GMT
+
+In article <380f817d.35916528@news.earthlink.net>,
+Lars Duening <lars@bearnip.com> wrote:
+>On Thu, 21 Oct 1999 12:11:36 -0700, Ilya
+><ilya@spam.free.gamecommandos.com> wrote:
+>
+>>Hey Lars, what hope is there, if any, of getting
+>>something going in the LP world, using LDmud or
+>>whatever,  that can be used commercially?
+>
+>Unfortunately only slim hope: the parts written by the Genesis folks
+>are definitely non-commercial; but rewriting is difficult because
+>nobody remembers _which_ parts are concerned (and mailed requests
+>haven't been answered). And I haven't asked the other contributors
+>yet, either.
+
+I have a pretty good idea of who wrote what parts of the early version 3
+gamedrivers. All in all there have been about 30 people involved. Unless
+you recode the entire gamedriver from scratch, or build from assembled pieces
+with known copyright restrictions, there is no way you can come up with
+something that does not infringe on the rights of someone who will not
+allow commecial use.
+
+Jacob Hallén
+
+------------------------------------------------------------------------------
+
