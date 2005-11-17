@@ -1,0 +1,20 @@
+SYNOPSIS
+        int get_max_commands([object obj]);
+
+BESCHREIBUNG
+        Liefert die maximale Anzahl Kommandos, die der interaktive Benutzer
+        <obj> pro Sekunde ausfuehren darf. Ein negatives Ergebnis bedeutet
+        'unlimitiert'.
+
+        Wird <obj> nicht angegeben, so wird der momentane interaktive Benutzer
+        abgefragt. Fuer nicht interaktive Objekte liefert die Funktion 0.
+
+        Ein 'Kommando' ist in diesem Fall jedes empfangene Datenpaket, das
+        einen LPC-Aufruf verursacht, also sowohl Aktionen, wie auch Aufrufe an
+        input_to().
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.10.
+
+SIEHE AUCH
+        set_max_commands(E)
