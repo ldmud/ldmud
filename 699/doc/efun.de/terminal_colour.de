@@ -1,0 +1,127 @@
+SYNOPSIS
+        varargs string terminal_colour(string str,
+                                       null | mapping | closure map,
+                                       int wrap, int indent);
+BESCHREIBUNG
+        Ist <map> ein Wert ungleich 0, ersetzt diese Efun alle Farb-
+        Definitionen der Form "%^KEY%^" (siehe unten fuer Details) im
+        String <str> und ersetzt sie durch die entsprechenden Werte aus dem
+        unter <map> angegebenen Farbschluessel.
+
+        Ist <map> ein Mapping, muessen die Eintraege das Format
+        "KEY" : "wert" haben; Eintraege, die keine Strings enthalten,
+        werden ignoriert. Einzige Ausnahme dazu: enthaelt <map> einen
+        Eintrag der Form 0:wert, wird dieser fuer alle Farbdefinitionen
+        verwendet, die keinem anderen Schluessel zugeordnet werden koennen.
+        <wert> kann in diesem Fall ein String oder eine Closure sein. Handelt
+        es sich um eine Closure, erhaelt diese den <KEY> als Argument und
+        muss einen String zurueck liefern, der <KEY> ersetzt.
+
+        Ist <map> eine Closure, wird diese mit den Farbdefinitionen <KEY>
+        als Argument aufgerufen und muss einen String zurueck liefern, der
+        die <KEY>s ersetzt.
+
+        Die speziellen Schluessel "%^%^" und "%%^^" werden immer durch das
+        Literal "%^" ersetzt.
+
+        Die Parameter <wrap> und <indent> sind optional. Ist nur <wrap>
+        angegeben, wird <str> in der Spalte <wrap> umgebrochen. Ist
+        zusaetzlich <indent> angegeben, werden alle umgebrochenen Zeilen
+        um <indent> Spalten eingerueckt.
+
+        Der Zeilenumbruch ignoriert die Laenge der Farbmakros und ihrer
+        Inhalte. Er bricht <str> anhand der Laenge der uebrigen Zeichen
+        um, ist also farb-neutral.
+
+        Ist <map> als 0 angegeben, fuehrt die Efun kein Suchen und Ersetzen
+        von Farbdefinitionen durch. Die Funktionalitaet von Zeilenumbruch
+        und Einrueckung bleiben erhalten, wenn gewuenscht. Auf diese Weise
+        dupliziert terminal_colour() die Funktion von sprintf("%-=s") und
+        wirkt als einfache Zeilenumbruch Funktion.
+
+
+        ERKENNEN VON FARBDEFINITIONEN
+
+        Wie bereits erwaehnt, werden die speziellen Schluessel "%^%^" und
+        "%%^^" durch das Literal "%^" ersetzt und spielen im Weiteren
+        keine Rolle.
+
+        Fuer den Eingabestring wird das folgende Format vorausgesetzt:
+
+            text { '%^' colorkey '%^' text } [ '%^' colorkey ]
+
+        Oder in Worten: die Efun trennt den String bei jedem '%^', das
+        sie antrifft und behandelt anschliessend jeden zweiten Teilstring
+        als Farbschluessel.
+
+        Merke: dieses Verhalten unterscheidet sich von der Behandlung des
+        Eingabestrings unter MudOS. Dort lautet die Syntax:
+
+            key_oder_text { '%^' key_oder_text }
+
+        Oder in Worten: die MudOS Efun trennt den String bei jedem '%^'
+        und versucht dann jeden Teilstring als Farbschluessel zu behandeln.
+        Dieses Verhalten laesst sich auch unter LPC erreichen:
+
+          string mudos_terminal_colour(string str, mapping ext, int w, int i)
+          {
+            return terminal_colour("%^"+implode(explode(str, "%^")-({""})
+                                               ,"%^%^")
+                                  , ext, w, i);
+          }
+
+
+BEISPIELE
+        mapping trans;
+        string str;
+
+        trans = ([ "GREEN" : "ansi-green", "RED" : "", "BLUE" : 1 ]);
+
+        str = terminal_colour( "%^GREEN%^ and %^RED%^ and %^BLUE%^", trans );
+
+        Dies fuehrt zu str == "ansi-green and  and BLUE".
+
+        "%^GREEN^%" wird ersetzt durch "ansi-green", weil <trans> das so
+        definiert,
+        "%^RED%^" wird aus <str> entfernt, weil es mit "" ersetzt wird, und
+        "%^BLUE%^" wird um die "%^" verkuert, weil der Eintrag zu BLUE in
+        <trans> keinen gueltigen Wert enthaelt (d.h. kein String ist). Das
+        selbe wuerde passieren, wenn <str> "%^DEFINE%^" enthalten wuerde,
+        zu dem es keinen Eintrag in <trans> gibt.
+
+        Merke: um direkt benachbarte Schluessel zu ersetzen, soll die
+        Efun wie folgt verwendet werden:
+
+            str = terminal_colour( "%^GREEN%^%^RED%^", trans );
+
+        Eine Eingabe der Form
+
+            str = terminal_colour( "%^GREEN%^RED%^", trans );
+
+        fuehrt zum logischen, aber vielleicht unerwarteten Ergebnis
+        "ansi-greenRED".
+
+
+        Einige Worte zum Zeilenumbruch:
+
+        Ein String, der ohne Einrueckung umgebrochen wird (<indent> ist 0),
+        sieht so aus:
+
+            "dies ist die erste Zeile\nund dies ist die zweite Zeile"
+
+        Ein String, der mit <indent> 3 umgebrochen wird, sieht so aus:
+
+            "dies ist die erste Zeile\n   und dies ist die zweite Zeile"
+
+AENDERUNGEN
+        Die Idee fuer diese Efun und die erste Implementierung stammen
+        aus MudOS; die Strategie fuer das Erkennen von Schluesseln
+        (eingeschlossen die pure Zeilenumbruch Funktion) wurde in
+        LDMud 3.2.8 geglaettet.
+        LDMud 3.2.9 fuegte die Verwendung von Closures zur Definition
+        von Farbschluesseln hinzu. Es erklaerte zudem offiziell das
+        Verhalten betreffen "%%^^" aus Gruenden besserer Kompatibilitaet
+        mit MudOS.
+
+SIEHE AUCH
+        sprintf(E)

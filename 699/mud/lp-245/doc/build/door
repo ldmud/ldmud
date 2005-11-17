@@ -1,0 +1,102 @@
+There is a generic door available. To set up do:
+	#include "../../obj/door.h"
+	object obj_1, obj_2;
+
+	MAKE_DOORS( loc_1, dir_1, loc_2, dir_2, lock_type, lock_code,
+	            door_long, is_closed, is_locked, can_lock)
+
+The arguments expected are:
+   string loc_1, loc_2:	Locations for the two sides of the door.
+   string dir_1, dir_2:	The directions in the room where the door is e.g "west".
+   string lock_type:	The type the lock is made of e.g "metal"
+   string lock_code:	The key type which will lock/unlock the door.
+   string door_long:	Message printed when looking at any side of the door
+   int is_closed:	0 if door opened,
+   int is_locked:	0 if door unlocked.
+   int can_lock:	0 if door can't be locked.
+
+The call to MAKE_DOORS has to be on ONE line, due to the C-interpreter.
+The door consists of two objects (obj_1, obj_2). These objects are
+placed in their rooms when the call to MAKE_DOORS is done. Be sure to
+make the call to MAKE_DOORS in the room where it should be encountered
+first. Otherwise there will not be a door when the player arrives.
+
+For customization the following routines are available:
+
+set_door_long(desc)
+    string desc. Sets the long description for the door to desc.
+    Used for changing the description on one side of the door.
+
+If any of these routines are called at an object one must also call
+set_both_status() which will make the two doors have the same status:
+set_is_closed(value)
+    int value. Variable is_closed is set to value.
+
+set_locked(value)
+    int value. Variable is_locked is set to value.
+
+set_can_lock(value)
+    int value. Variable can_lock is set to value.
+
+If you want the door to make any kind of noise, such as knocking etc,
+you should call one of these routines:
+door_sound(message)
+    string message. This call causes the door to say "'message' is heard from
+    the <direction> door.". The noise is only heard on the side of the door
+    that is called with this function.
+
+both_door_sound(message)
+    string message. This call causes the door to say "'message' is heard from
+    the <direction> door.". The noise is heard on both sides of the door.
+
+Commands available to players defined by doors:
+ +  go [direction] door
+	 or
+    direction	if the door is opened the player is move to the other
+		side of the door.
+ +  open/close [direction] door
+		works if door is unlocked.
+ +  unlock/lock [direction] door with [type] key
+		works if door is set up to have a working lock.
+
+
+If the door is set up to have a working lock i.e can_lock != 0,
+you should make keys matching the lock. This is how it's done:
+	object key_obj;
+
+	MAKE_KEY( key_obj, key_type, key_code)
+
+The arguments expected are:
+	object key_obj:	 This will be the key.
+	string key_type: Description of key e.g 'golden'.
+	string key_code: The type of lock key should fit in.
+
+
+EXAMPLE:
+	We make a door between two rooms called "players/hebol/door_factory",
+	and "players/fatty/food_supply". The door is green and has a note
+	on Fatty's side. It has a sophisticated lock. It is initially closed,
+	and unlocked. Along with it we make a silver key that fits the lock.
+        After that a sound will be heard in Hebols room.
+
+    #include "../../obj/door.h"
+    object obj_1, obj_2, key_obj;
+
+    /*
+     * Set up the door.
+     */
+    MAKE_DOORS("players/hebol/door_factory", "north", "players/fatty/food_supply", "south", "sophisticated", "ymca", "This is a green door.\n", 1, 0, 1)
+    call_other( obj_2, "set_door_long", "This is a green door.\n" +
+                       "It has a note saying: Here lives Hebol.\n");
+
+    /*
+     * Set up the key. Put it in Hebols room.
+     */
+    MAKE_KEY( key_obj, "silver", "ymca")
+    move_object(key_obj, environment(obj_1));
+
+    /*
+     * Now make some noise.
+     */
+    call_other( obj_1, "both_door_sound", "A chewing sound");
+

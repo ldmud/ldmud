@@ -1,0 +1,19 @@
+OPTIONAL
+SYNOPSIS
+        int query_mccp()
+        int query_mccp(object player)
+
+BESCHREIBUNG
+        Diese Funktion gibt zurueck, ob <player> Netzwerkdatenkompression
+        verwendet oder nicht (default is this_player() ).
+
+        Das Resultat ist TELOPT_COMPRESS oder TELOPT_COMPRESS2 wenn
+        Kompression aktiv ist, oder 0.
+
+        Die Funktion ist nur verfuegbar wenn der Driver mit
+        MCCP-Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __MCCP__ definiert.
+
+SIEHE AUCH
+        end_mccp_compress(E), start_mccp_compress(E), query_mccp_stats(E),
+        mccp(C)

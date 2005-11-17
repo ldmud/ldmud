@@ -1,0 +1,9 @@
+SYNOPSIS
+        float sqrt(int value);
+        float sqrt(floag value);
+
+BESCHREIBUNG
+        Liefert die Quadratwurzel von <value>.
+
+AENDERUNGEN
+        LDMud 3.2.9 fuehrte integer als moegliche Argumente ein.

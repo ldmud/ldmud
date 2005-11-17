@@ -1,0 +1,55 @@
+GESCHUETZT
+SYNOPSIS
+        #include <sys/functionlist.h>
+        #include <sys/lpctypes.h>
+
+        mixed *functionlist(object ob, int flags = RETURN_FUNCTION_NAME)
+
+BESCHREIBUNG
+        Liefert ein Array mit Informationen zu den Lfuns von <ob>. Fuer jede
+        Funktion werden 1 bis 4 Werte (abhaengig von <flags>) in das Ergebnis
+        eingetragen, und zwar in folgender Reihenfolge:
+          - der Name der Funktion
+          - die Flags der Funktion (vergleiche weiter unten)
+          - den Rueckgabetyp (aufgelistet in mudlib/sys/lpctypes.h)
+          - die Anzahl Argumente, die die Funktion akzeptiert.
+
+        <ob> kann als echtes Objekt oder als Objektname uebergeben werden. Im
+        zweiten Fall versucht die Efun nicht, das Objekt vorher zu laden.
+
+        <flags> bestimmt sowohl, welche Informationen im Ergebnis gesammelt
+        werden, als auch, fuer welche Funktionen die Pruefung durchgefuehrt
+        wird. Der Wert von <flags> wird durch binaere Veroderung folgender
+        Konstanten aus mudlib/sys/functionlist.h festgelegt:
+
+        Festlegen der gesammelten Information:
+            RETURN_FUNCTION_NAME        liefert den Funktionsnamen
+            RETURN_FUNCTION_FLAGS       liefert die Flas der Funktion
+            RETURN_FUNCTION_TYPE        liefert den Rueckgabetyp der Funktion
+            RETURN_FUNCTION_NUMARG      liefert die Anzahl moeglicher
+                                        Argumente.
+
+            RETURN_FUNCTION_ARGTYPE     ist definiert, aber nicht
+                                        implementiert.
+
+        Festlegen der geprueften Funktionen:
+            NAME_INHERITED      geerbte Funktionen nicht beachten
+            TYPE_MOD_STATIC     static deklarierte Funktion nicht beachten
+            TYPE_MOD_PRIVATE    private deklarierte Funktionen nicht beachten
+            TYPE_MOD_PROTECTED  protected deklarierte Funktionen nicht
+                                beachten
+            NAME_HIDDEN         nur beachten, wenn sichtbar durch Vererbung
+
+        <flags> besteht aus der binaeren Veroderung der oben genannten Flags,
+        zusammen mit den folgenden:
+            TYPE_MOD_VARARGS    die Funktion ist varargs deklariert
+            NAME_UNDEFINED      die Funktion ist noch nicht definiert, aber
+                                referenziert
+            NAME_CROSS_DEFINED  die Funktion ist definiert, um in einem
+                                anderen Programm verwendet zu werden
+            TYPE_MOD_NOMASK     die Funktion ist nomask deklariert
+            TYPE_MOD_PUBLIC     die Funktion ist public deklariert
+
+SIEHE AUCH
+        inherit_list(E), function_exists(E), variable_list(E),
+        call_resolved(E)
