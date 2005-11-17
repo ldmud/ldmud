@@ -1,0 +1,11 @@
+SYNOPSIS
+        object *all_inventory()
+        object *all_inventory(object ob)
+
+DESCRIPTION
+        Returns an array of the objects contained in the inventory of
+        ob, or of this_object(), if no arg given.
+
+SEE ALSO
+        first_inventory(E), next_inventory(E), deep_inventory(E),
+        all_environment(E), environment(E)
