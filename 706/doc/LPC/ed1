@@ -1,0 +1,32 @@
+NAME
+        ed1
+
+DESCRIPTION
+        Commands that use a line range:
+        If no line is given, then curent line is printed.
+
+        p        Print line.
+        d        Delete line.
+        l        Print line with control characters.
+        r file        Read in a file after the line specified.
+        s        Substitute patterns. See special documentation.
+        z        Print 10 lines.
+        a        Start insert mode after specified line. Exit with
+                '.'<return>.
+        i        Start insert mode before specified line. Exit with
+                '.'<return>.
+
+        Commands used without line specification:
+
+        q        Quit. Won't work if file is changed.
+        Q        Quit and discard all changes if not saved.
+        w        Write the file out.
+        w file        Write the file out with name 'file'.
+        e file        Edit a file.
+        !cmd        Give a game command. For example "say Wait, I am busy".
+
+        As line numbers '.' is current line, and '$' is last line of
+        file. Thus '1,$p' will always print all of the file.
+
+SEE ALSO
+        ed2(LPC)

@@ -1,0 +1,8 @@
+SYNOPSIS
+        int query_idle(object ob)
+
+DESCRIPTION
+        Query how many seconds a user object has been idle
+
+SEE ALSO
+        interactive(E)

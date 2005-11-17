@@ -1,0 +1,19 @@
+SYNOPSIS
+        float floor(float arg);
+
+BESCHREIBUNG
+        Rundet das Argument <arg> ab auf die naechste ganze Zahl und gibt
+        diesen Wert zurueck. Wenn <arg> ein Integer ist, wird das Resultat
+        trotzdem als Float zurueckgegeben.
+
+BEISPIELE
+        floor(4.5)  --> liefert 4.0
+        floor(-4.5) --> liefert -5.0
+        floor(5)    --> liefert 5.0
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.7.
+        LDMud 3.2.9 erlaubt auch Integer als Argumente.
+
+SIEHE AUCH
+        abs(E), ceil(E)

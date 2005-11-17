@@ -1,0 +1,12 @@
+SYNOPSIS
+        int valid_query_snoop(object ob)
+
+DESCRIPTION
+        Should return 1 if previous_object() (the one that called the
+        efun query_snoop()) is allowed to query wether ob is being
+        snooped, 0 if not.
+
+        The master object is always allowed to use query_snoop().
+
+SEE ALSO
+        valid_snoop(M), query_snoop(E), snoop(E)

@@ -1,0 +1,10 @@
+When referencing to items, a number can be used to pick one item of
+a number of similar items.
+
+For example:
+
+sell knife 3
+exa corpse 2
+get axe from corpse 2
+
+etc.
