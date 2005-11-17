@@ -1,0 +1,36 @@
+SYNOPSIS
+        int notify_fail(string str)
+        int notify_fail(closure cl)
+
+BESCHREIBUNG
+        Der String <str> wird als Kommando-Fehlermeldung anstelle des default
+        "What?" gespeichert. Das Resultat ist stets 0.
+
+        Wird eine Closure als Argument gegeben, wird sie im Fehlerfall
+        (also erst wenn ein Kommando endgueltig fehlgeschlagen hat)
+        ausgefuehrt und hat die Fehlermeldung als Resultat
+        zurueckzugeben. Die Closure erhaelt als Argument den
+        originalen Befehlsgeber; in der Regel dies ist this_player(),
+        was aber vom MODIFY_CMD hook geaendert werden kann.
+
+        Wird notify_fail() mehr als einmal fuer ein Kommando
+        aufgerufen, wird lediglich der letzte Aufruf gewertet.
+        notify_fail() erkennt verschachtelte Kommandos (siehe Efun
+        command()), und ein notify_fail() in einem Unterkommando
+        hat keinen Einfluss auf das uebergeordnete Kommando.
+
+BEISPIEL
+        Verwendet man
+
+                return notify_fail(message);
+
+        anstelle von 
+
+                write(message); return 1;
+
+        erhalten andere Objekte ihre Chance, das Kommando
+        (erfolgreich) auszufuehren.
+
+SIEHE AUCH
+        add_action(E), command(E), query_verb(E), query_command(E),
+        query_notify_fail(E), hooks(C)

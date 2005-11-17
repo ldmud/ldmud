@@ -1,0 +1,29 @@
+SYNOPSIS
+        #include <functionlist.h>
+
+        string variable_exists(string str [, int flags]);
+        string variable_exists(string str, object obj [, int flags]);
+
+BESCHREIBUNG
+        Sucht eine Varialbe <str> in this_object() oder (falls angegeben)
+        im Objekt <obj>.
+
+        Das Resultat ist der Name des Programms, in dem die Variable definiert
+        ist. Das kann entweder object_name(obj) sein oder der Name eines
+        geerbten Programms. Wenn sich der Treiber nicht im Compat-Modus
+        befindet, beginnt der zurueck gelieferte Name immer mit '/'.
+
+        Wird <flags> NAME_HIDDEN gesetzt, so liefert variable_exists() auch
+        Informationen ueber Variablen vom Typ "static" und "protected" in
+        anderen Objekten. Es ist nicht moeglich, Informationen ueber "private"
+        deklarierte Variablen zu erhalten.
+
+        Wird die Variable nicht gefunden (weil sie nicht existiert oder weil
+        sie fuer das aufrufende Objekt nicht sichtbar sind), wird 0 zurueck
+        geliefert.
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.10.
+
+SIEHE AUCH
+        function_exists(E), variable_list(E)
