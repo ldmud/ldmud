@@ -1,0 +1,50 @@
+This directory contains the necessary files to adapt certain mudlibs
+to run under LDMud, or vice versa.
+
+The general structure for a mud Foo is this:
+
+  foo/           holds all files related to Foo
+  foo/INFO.txt : information about Foo and its relation to LDMud
+  foo/src/     : source files and patches if changes to LDMud are necessary.
+  foo/lib/     : source files and patches if changes to Foo's mudlib are
+                 necessary.
+  foo/...      : additional files, e.g. installation hints taken from
+                 the lib distribution.
+
+If a special 'settings' file exists for the driver configuration, it is
+stored in the main source tree as 'settings/foo'.
+
+
+An exception is lp-245/ which contains the complete mudlib from old
+LPMud 2.4.5. Think of it as a _very_ simple example mudlib, with the
+added bonus value of demonstrating a) a traditional compat-mode master
+with mudwho support, and b) how a mud can run in both compat and plain mode.
+
+
+The following muds run natively on LDMud:
+
+  OSB (LDMud 3.3)
+    <URL:telnet://osb.lpmud.com:4242>
+    <URL:ftp://osb.lpmud.com:4243/pub/lib/>
+
+  Deeper Trouble - The 2nd Generation  (after Nov 2001, LDMud 3.2.9-dev.349)
+    <URL:telnet://sunsite.auc.dk:4242/>
+
+  Ragnarok - currently converting to LDMud 3.2.9
+    <URL:telnet://rag.com:2222>
+    <URL:http://www.rag.com/>
+
+  Heaven7 v4  (LDMud 3.2.9)
+    <URL:http://www.heaven7mud.org/>
+
+TODO: Complete this list (Tubmud, PK-Mud, Unitopia, etc)
+
+
+Support exists for these muds:
+
+  MorgenGrauen 3.2.6  (LDMUD 3.2.9-dev.287)
+    <URL:ftp://mg.mud.de/>
+
+  StickLib - 0.99c (LDMud 3.2.7-dev.155)
+    <URL:http://www.hut.fi/~doomdark/proj/sticklib/sticklib.html>
+

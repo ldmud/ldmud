@@ -1,0 +1,22 @@
+SYNOPSIS
+        object environment();
+        object environment(object obj);
+        object environment(string obj);
+
+BESCHREIBUNG
+        Gibt das umgebende Objekt von <obj> wider. Das Objekt <obj> kann
+        direkt angegeben werden oder ueber seinen Namen als String. Wenn
+        kein Argument angegeben wird, wird die Umgebung des aktuellen
+        Objekts zurueck gegeben.
+
+        Zerstoerte Objekte haben kein Environment.
+
+BEISPIEL
+        object room;
+        room = environment(this_player());
+
+        Dies liefert den Raum, in dem sich der Spieler im Moment aufhaelt.
+
+SIEHE AUCH
+        first_inventory(E), next_inventory(E), all_inventory(E),
+        all_environment(E)

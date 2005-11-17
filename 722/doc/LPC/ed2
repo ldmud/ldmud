@@ -1,0 +1,25 @@
+NAME
+        ed2
+
+DESCRIPTION
+        Substitutions are very advanced.
+
+        First a simple example:
+
+        s/apa/bepa/
+        This will substitue the 'apa' in current line to 'bepa'.
+        If an 'p' is appended, you will also immediately see the result.
+
+        1,$s/apa/bepa/
+        Same, but all lines in file. Only first occurence on every line.
+
+        Any character can used instead of '/':
+        s!apa!bepa!g
+        The 'g' specifies that all occurences of apa on this line are
+        changed to bepa.
+
+        The pattern that are supposed to be replaced, can be a regular
+        expression. See ed3 about that.
+
+SEE ALSO
+        ed3(LPC)
