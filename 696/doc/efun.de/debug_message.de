@@ -1,0 +1,36 @@
+SYNOPSIS
+        #include <sys/debug_message.h>
+
+        void debug_message(string text);
+        void debug_message(string text, int flags);
+
+BESCHREIBUNG
+        Gibt <text> an die Ausgaenge stdout und stderr sowie an die Datei
+        <host>.debug.log, oder an eine beliebige Kombination dieser drei.
+
+        Das Argument <flag> bezeichnet durch eine Kombination von Bitflags das
+        Ziel und die Art, in der das Resultat geschrieben wird.
+
+        Die Ziel-Flags sind: DMSG_STDOUT, DMSG_STDERR und DMS_LOGFILE. Wird
+        zusaetzlich das Flag DMSG_STAMP gesetzt, erhaelt jeder Eintrag einen
+        Zeitstempel (Timestamp) im Format 'YYYY.MM.DD HH:MM:SS '.
+
+        Wenn <flags> 0 ist, weggelassen wird oder kein Ziel-Flag enthaelt,
+        wird <text> standardmaessig an stdout und ins Logfile ausgegeben.
+
+BEISPIEL
+        debug_message("Dieser Text geht an stdout und ins Logfile.\n");
+        debug_message("Dies geht an stderr.\n", DMSG_STDERR);
+        debug_message("Dies geht an stdout und stderr.\n", DMSG_STDOUT
+            | DMSG_STDERR);
+        debug_message("Dies geht an stdout und ins Logfile, mit Timestamp.\n",
+            DMSG_STAMP);
+        debug_message("Die geht an stdout, mit vorangestelltem Timestamp.\n",
+            DMSG_STDOUT | DMSG_STAMP);
+
+AENDERUNGEN
+        Eingefuehrt in 3.2.1@34.
+        LDMud 3.2.9 fuehrte das Argument <flags> ein.
+
+SIEHE AUCH
+        last_instructions(E)

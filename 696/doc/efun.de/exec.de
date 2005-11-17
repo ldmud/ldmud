@@ -1,0 +1,40 @@
+GESCHUETZT
+SYNOPSIS
+        int exec(object new, object old);
+
+BESCHREIBUNG
+        exec() schaltet die Verbindung um vom interaktiven Objekt <old> zum
+        Objekt <old>. Wenn <new> ebenfalls interaktiv ist, wird dessen
+        Verbindung zum Objekt <old> uebertragen, die Verbindungne von <old>
+        und <new> werden also ausgetauscht. Wenn <new> nicht interaktiv ist,
+        ist <old> nach der Ausfuehrung von exec() nicht mehr interaktiv.
+
+        Das Resultat von exec() ist 1 bei Erfolg, 0 sonst.
+
+        exec() wird verwendet, um unterschiedliche "user objects" zu laden
+        oder um User mit totem Netz wieder zu verbinden.
+
+        Um Sicherheitsmechanismen zu gewaehrleisten, wird im Masterobjekt
+        valid_exec(<laufendes Programm>, <new>, <old>) aufgerufen. Dieser
+        Aufruf muss etwas von 0 verschiedenes liefern, um den Aufruf von
+        exec() zu erlauben.
+
+        Wenn <old> this_player() war, enthaelt this_player() nach dem Aufruf
+        von exec() <new> und umgekehrt. Gleiches gilt fuer this_interactive().
+
+        Vorsicht ist geboten, wenn eine simul-efun() um exec() herum gebaut
+        wird: das <laufende Programm>, das an valid_exec() uebergeben wird,
+        ist das simul-efun Objekt. Um dieses Problem zu umgehen, kann mittels
+        bind_lambda() #'exec an das richtige Objekt gebunden und anschliessend
+        mit funcall() aufgerufen werden.
+
+BEISPIEL
+        ob = clone_object("std/player");
+        exec(ob, this_object());
+        destruct(this_object());
+
+AENDERUNGEN
+        LDMud 3.2.9 fuehrte den Austauschprozess fuer this_interactive() ein.
+
+SIEHE AUCH
+        connect(M), disconnect(M), logon(A), interactive(E)
