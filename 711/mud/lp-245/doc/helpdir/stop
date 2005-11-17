@@ -1,0 +1,6 @@
+command: stop
+no arguments
+
+Stop hunting a fleeing player. You can not stop being hunted though.
+
+See also: 'kill'.
