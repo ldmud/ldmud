@@ -1,0 +1,14 @@
+SYNOPSIS
+        string printf_obj_name(object ob)
+
+DESCRIPTION
+        Return a printable name for an object. This function is called
+        by sprintf() to print a meaningful name in addition to the
+        normal object_name().
+
+HISTORY
+        Renamed in LDMud 3.2.6 from object_name() due to the introduction
+        of an efun with this name.
+
+SEE ALSO
+        sprintf(E), object_name(E)

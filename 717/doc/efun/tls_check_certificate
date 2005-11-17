@@ -1,0 +1,33 @@
+PRELIMINARY
+SYNOPSIS
+        mixed *tls_check_certificate()
+        mixed *tls_check_certificate(object obj);
+
+DESCRIPTION
+        tls_check_certificate() checks the certificate of the secured
+        connection bound to <obj> (default is the current object).  If
+        <obj> is not interactive, or if TLS is not available, an error
+        is thrown.
+
+        If <obj> doesn't have a secure connection up and running, the
+        function returns 0. Otherwise, the result is an array with
+        these entries:
+
+          int [0]      : Result code: 0: The certificate is ok.
+                                      1: The certificate is not ok.
+                                      2: The certificate is self-signed.
+          string [1]   : Subject
+          int    [2..9]: Not used yet.
+          string [10]  : SHA-1 Fingerprint
+          string [11]  : Not used yet (reserved for MD5 Fingerprint)
+
+BUGS
+        Not supported when using GnuTLS.
+
+HISTORY
+        Introduced in LDMud 3.3.672/3.2.11.
+
+SEE ALSO
+        tls_init_connection(E), tls_deinit_connection(E), tls_error(E),
+        tls_query_connection_state(E), tls_query_connection_info(E),
+        tls_available(E)
