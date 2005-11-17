@@ -1,0 +1,23 @@
+XErq - Copyright 1995 by Brian Gerst (Garion@Timewarp).
+Based on the standard erq demon for LPmud 3.2.1 by Joern Rennecke.
+
+Source code herein refers to the source code, and any executables
+created from the same source code.
+
+All rights reserved.  Permission is granted to extend and modify the
+source code provided subject to the restriction that the source code may
+not be used in any way whatsoever for monetary gain.
+
+******************************
+
+This is a replacement for the erq demon that comes standard with the
+driver. It differs from the standard erq in that it doesn't make use
+of subservers, which can cause zombie processes.
+
+The socketd will need the following privileges from
+master->privilege_violation():
+  "erq"
+  "bind_lambda"
+
+Any bug/questions/comments, mail to bgerst@quark.gmi.edu or the
+maintainer of the driver.

@@ -1,0 +1,21 @@
+SYNOPSIS
+        *mixed input_to_info(object player);
+
+BESCHREIBUNG
+        Liefert ein Array aller fuer <player> haengigen input_to()s. Der
+        erste Eintrag im Array ist der aelteste haengige input_to()
+        (derjenige, welcher als erstes gestartet wurde), der letzte
+        Eintrag ist der neuste input_to().
+
+        Jeder Eintrag im Array ist wiederum ein Array von 2 oder mehr
+        Eintraegen, das folgende Elemente enthaelt:
+            0:   Das Objekt (nur, wenn die Funktion ein string ist)
+            1:   Die Funktion (String oder Closure)
+            2ff: Die Argumente
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.9.
+
+SIEHE AUCH
+        input_to(E), find_input_to(E), remove_input_to(E),
+        query_input_pending(E)
