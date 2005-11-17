@@ -1,0 +1,25 @@
+SYNOPSIS
+        void walk_mapping(mapping map, string fun, mixed extra, ...);
+        void walk_mapping(mapping map, string fun, string|object obj,
+            mixed extra, ...);
+        void walk_mapping(mapping map, closures cl, mixed extra, ...);
+
+BESCHREIBUNG
+        Ruft obj->fun(key, value1, ... valuen, extra, ...) fuer jeden Key
+        im Mapping <map> auf bzw. wendet die Closure <cl> auf jeden Key
+        im Mapping <map> an. Dies Keys werden als Wert uebergeben, die Values
+        als Referenz, entsprechend koennen sie in der Funktion veraendert
+        werden.
+
+        Es kann eine beliebige Anzahl zusaetzlicher Argumente <extra>
+        uebergeben werden. Diese Argumente duerfen allerdings keine
+        geschuetzten Referenzen wie &(i[]) enthalten.
+
+        Wird <obj> weggelassen oder enthaelt es weder einen String noch ein
+        Objekt, wird standardmaessig this_object() verwendet.
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2@61.
+
+SIEHE AUCH
+        map(E), filter(E)

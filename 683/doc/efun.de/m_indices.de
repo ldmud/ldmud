@@ -1,0 +1,9 @@
+SYNOPSIS
+        *mixed m_indices(mapping map);
+
+BESCHREIBUNG
+        Liefert ein Array mit den Indizes von <map>.
+
+SIEHE AUCH
+        mappingp(E), mkmapping(E), m_add(E), m_values(E), m_delete(E),
+        sizeof(E), widthof(E), unmkmapping(E)
