@@ -1,0 +1,17 @@
+OPTIONAL
+SYNOPSIS
+        int db_insert_id (int handle)
+
+BESCHREIBUNG
+        Nach dem Einfuegen einer Zeile in eine Tabelle mit einem
+        AUTO_INCREMENT-Feld, diese Efun kann dazu benutzt werden den neuen
+        Wert dieses Feldes zurueckzugeben.
+
+        Die Funktion ist nur verfuegbar wenn der Driver mit
+        mySQL-Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __MYSQL__ definiert.
+
+SIEHE AUCH
+        db_affected_rows(E), db_conv_string(E), db_close(E), db_coldefs(E),
+        db_connect(E), db_error(E), db_exec(E), db_fetch(E), db_handles(E),
+        mysql(C)

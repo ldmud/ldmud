@@ -1,0 +1,7 @@
+Command: force
+Argument: name 'to' cmd
+
+Force a player or monster 'name' to execute command 'cmd'.
+
+Bugs:
+Monsters don't have the command 'say' etc.

@@ -1,0 +1,36 @@
+NAME
+        for
+
+SYNTAX
+        for(init; expr2; expr3) statement;
+
+DESCRIPTION
+        Execute <init> once. Then, while <expr2> returns a non-zero
+        value, execute <statement>. Every time <statement> has been
+        executed, or a 'continue' statement has been executed, execute
+        <expr3> before next loop.
+
+        <init> is usually a series of one or more expressions (remember
+        that assignments are expressions, too), separated by commas.
+        Additionally it is also allowed to define new local variables
+        here and assign them an initial value. The scope of such variables
+        is the whole for statement.
+
+        Examples for legal <init> expressions are:
+
+           for (i = 0; ...
+           for (i = 0, j = 0; ...
+           for (i = 0, int j = i; ...
+           for (int j = 4; ...
+
+        Illegal <init> expressions are:
+
+           for (int i; ...      : no value assigned
+           for (int i += 4; ... : only plain assignments allowed
+
+        A 'break' in the 'statement' will terminate the loop. A
+        'continue' will continue the execution from the beginning of
+        the loop.
+
+SEE ALSO
+    foreach(LPC), if(LPC), do-while(LPC), while(LPC), switch(LPC)
