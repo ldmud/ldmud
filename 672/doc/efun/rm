@@ -1,0 +1,8 @@
+SYNOPSIS
+        int rm(string file)
+
+DESCRIPTION
+        Remove the file. Returns 0 for failure and 1 for success.
+
+SEE ALSO
+        mkdir(E), rmdir(E), rename(E)

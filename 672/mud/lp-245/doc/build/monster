@@ -1,0 +1,125 @@
+There is a generic monster avaliable. To set up do :
+	object mobj;
+
+	mobj = clone_object("obj/monster");
+
+For customization the folling routines are available :
+
+You should call this functions.
+set_name(n)
+    string n. Sets the name and short description to n.
+    Sets long description to "You see nothing special.\n"
+
+set_level(l)
+    int l. The monster gets the level l.
+    Hit points and ep is set as the same as player of level l.
+    Armour class to 0 and weapon class to that of hands.
+
+This are the optional functions.
+set_hp(hp)
+    int hp. Sets hit points to hp.
+
+set_ep(ep)
+    int ep. Sets ep to ep.
+
+set_al(al)
+    string al. Stets the alignment to al, negativ is evil, pos good.
+
+set_alias(n)
+    string n. Adds and alternate name for the monster.
+
+set_alt_name(n)
+    string n. Adds another alternate name for the monster.
+
+set_race(r)
+    string r. Adds an alternate generic name for the monster.
+
+set_short(sh)
+    string sh. Sort description is set to sh. Long to short + "\n"
+
+set_long(long)
+    string long. Long description is set to long.
+
+set_wc(wc)
+    int wc. Sets the weapon class, how much the damage it will do, to wc.
+    The damage inflicted is in the range 0..wc-1 .
+
+set_ac(ac)
+    int ac. Armour class is set to ac.
+
+set_aggressive(a)
+    int a. 0 means peaceful until attacked. 1 that it will attack everyone
+    it sees.
+
+set_move_at_reset()
+    If this routine is called the monster will do a random move at
+    every reset.
+
+set_frog()
+    If anyone kisses the monster he will turn into a frog.
+
+set_whimpy()
+    When monster get low on hp it will flee.
+
+init_command(string cmd)
+    Force the monster to do a command. The force_us() function isn't
+    always good, because it checks the level of the caller, and this function
+    can be called by a room.
+
+set_dead_ob(ob)
+    object ob. The function 'monster_died' in 'ob' will be called just
+    before the monster dies. The argument to 'monster_died' will be the
+    nearly dead monster object. The return value from 'monster_died'
+    determins the fate of the monster. A 1 means that the monster will
+    survive 0 that it will die.
+
+set_init_ob(ob)
+    object ob. The function 'monster_init' in 'ob' will be called from
+    init in the monster. The argument to 'monster_init' will be the
+    the monster object. The return value from 'monster_init' determins
+    if the monster will attack, if it's aggressive. A 1 means that
+    the monster will not attack, 0 that it will function as usually.
+
+These are the spell functions:
+set_spell_mess1(m)
+    string m. This is the message that the other players in the room
+    get when the monster cast's a spell.
+
+set_spell_mess2(m)
+    string m. This is the message that the victim of the monster's spell
+    get.
+
+set_chance(c)
+    int c. This is the percent chance of casting a spell.
+
+set_spell_dam(d)
+    int d. How much damage the spell will do if it hits.
+    The damage will be randomly 0 .. d-1 .
+
+These are the chat functions:
+    The chat options enables the monster to say something every heart beat.
+
+xxxxxxxxxxx (to be documented :-)
+
+Here are the catch talk functions.
+    Catch talk gives the the monster the possibility to act upon what it hears
+    and sees. All messages streams that are sent to the monster are compared
+    to a set of loadable strings. If a match occurs a function in a given
+    object is called with the matching string as an argument. You can have one
+    function per sentence or multiple senetence per function.
+
+xxxxxxxxxxx ( To be documented :-)
+
+EXAMPLE
+	dam = clone_object("obj/monster.talk");
+	call_other(dam, "set_name", "mary");
+	call_other(dam, "set_alias", "lady");
+	call_other(dam, "set_short", "An old lady is here");
+	call_other(dam, "set_ac", 0);
+	call_other(dam, "set_level",5);
+	call_other(dam, "set_al",200);
+	call_other(dam, "set_hp",30);
+	call_other(dam, "set_wc",7);
+	call_other(dam, "set_aggressive", 0);
+
+

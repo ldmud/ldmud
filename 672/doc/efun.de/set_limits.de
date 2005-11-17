@@ -1,0 +1,39 @@
+VORLAEUFIG, GESCHUETZT
+SYNOPSIS
+        #include <sys/rtlimits.h>
+
+        void set_limits(int tag, int value...);
+        void set_limits(int *limits);
+
+BESCHREIBUNG
+        Setzt die standardmaessigen Laufzeitlimiten entsprechend den
+        angegebenen Argumenten. Die neuen Limiten treten als 'max limits'
+        mit Beginn des naechsten Ausfuehrungszyklus in Kraft.
+
+        Die Argumente koennen in zwei Formen angegeben werden: als ein Array
+        (wie jenes, das query_limits() liefert) oder als eine Liste von Tags
+        und Werten. Dabei werden zwei spezielle Werte erkannt:
+
+            LIMIT_UNLIMITED:    das Limit wird deaktiviert
+            LIMIT_KEEP:         die letzte Einstellung wird beibehalten
+
+        Die Efun verursacht eine Schutzverletzung ("set_limits",
+        current_object, first).
+
+BEISPIELE
+        set_limits( ({ 200000 }) );
+        set_limits( LIMIT_EVAL, 200000 );
+            --> setzt das Limit fuer Eval-Kosten auf 200000.
+
+        set_limits( ({ LIMIT_UNLIMITED, LIMIT_KEEP, 5000 }) );
+        set_limits( LIMIT_EVAL, LIMIT_UNLIMITED, LIMIT_ARRAY, LIMIT_KEEP,
+                    LIMIT_MAPPING, 5000);
+            --> setzt die maximalen Eval-Kosten auf unlimitiert, behaelt das
+                Limit fuer die Array-Groesse und setzt die maximal
+                Mappinggroesse auf 5000.
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.7.
+
+SIEHE AUCH
+        limited(E), query_limits(E)
