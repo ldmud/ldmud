@@ -1,0 +1,7 @@
+Command: in
+argument 1: obj
+argument 2: command
+
+Execute a command 'command' in room 'ob'.
+
+See also: w/goto

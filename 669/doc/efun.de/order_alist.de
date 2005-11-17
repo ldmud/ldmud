@@ -1,0 +1,36 @@
+VERALTET
+SYNOPSIS
+        mixed *order_alist(mixed *keys, mixed *data, ...);
+        mixed *order_alist(mixed *list);
+
+BESCHREIBUNG
+        Diese Funktion erzeugt eine Alist.
+
+        Gibt man zwei oder mehr Argumente an, muss das erste Argument
+        ein Array von Keys enthalten, die nachfolgenden Argumente
+        sind Arrays von Datenelementen. Alle <data> Argumente muessen
+        die gleiche Groesse (also die gleiche Anzahl Elemente) wie <keys>
+        haben.
+
+        Gibt man nur ein Argument <list> an, so muss es sich dabei um ein
+        Array handeln, das als erste Element ein Array von Keys und als
+        weitere Elemente Arrays mit Datenelementen enthaelt. Alle Elemente
+        von <list> muessen die gleiche Groesse haben.
+
+        order_alist() liefert ein Array zurueck, das das sortierte <keys>
+        Array und die gleich sortierten <data> Arrays enthaelt. Auf die
+        <data> Arrays wird die gleiche Permutation wie auf das <key> Array
+        angewendet.
+
+        Die Komplexitaet ist O(n*lg(n)+n*m), wobei n die Anzahl Elemente im
+        <keys> Array darstellt, m die Anzahl <data> Arrays + 1.
+
+        Die Dimensionen der Arrays werden gegenueber LISP genau umgekehrt
+        verwendet, um ein schnelleres Suchen zu ermoeglichen.
+
+        Keys muessen vom Typ Integer, String oder Object sein. Die Typen
+        koennen auch gemischt sein.
+
+SIEHE AUCH
+        alists(LPC), mappings(LPC), insert_alist(E), assoc(E),
+        transpose_array(E)
