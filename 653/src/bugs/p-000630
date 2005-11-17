@@ -1,0 +1,203 @@
+Short: Morgengrauen diffs
+From: Lars
+Date 000630
+Type: Patch
+State: Mostly adapted in 3.2.9-dev.259
+
+These are the simul_efuns needed to run LDMud with the Morgengrauen lib:
+
+----------------------------------------------------
+int absolute_hb_count()
+{
+    return debug_info(DINFO_DATA, DID_STATUS, DID_ST_HBEAT_CALLS_TOTAL);
+}
+
+varargs string read_file (string name, int start, int len)
+{
+    if (!len)
+    {
+        len = query_limits(0)[LIMIT_FILE];
+    }
+    return len > 0 ? efun::read_file(name, start, len) 
+                   : efun::read_file(name, start);
+}
+
+mixed *object_info(object ob)
+{
+    mixed *info, *res;
+
+    res = allocate(20);
+    info = efun::object_info(ob, OINFO_BASIC);
+    
+    res[ 0] = info[OIB_HEART_BEAT];
+    res[ 1] = info[OIB_IS_WIZARD];
+    res[ 2] = info[OIB_ENABLE_COMMANDS];
+    res[ 3] = info[OIB_CLONE];
+    res[ 4] = info[OIB_DESTRUCTED];
+    res[ 5] = info[OIB_SWAPPED];
+    res[ 6] = info[OIB_ONCE_INTERACTIVE];
+    res[ 7] = 0; /* No O_APPROVED in LDMud */
+    res[ 8] = info[OIB_RESET_STATE];
+    res[ 9] = info[OIB_WILL_CLEAN_UP];
+    res[10] = info[OIB_TOTAL_LIGHT];
+    res[11] = info[OIB_NEXT_RESET];
+    res[12] = info[OIB_TIME_OF_REF];
+    res[13] = info[OIB_REF];
+    res[14] = info[OIB_GIGATICKS] * 1000000000 + info[OIB_TICKS];
+    res[15] = info[OIB_SWAP_NUM];
+    res[16] = info[OIB_NAME];
+    if (info[OIB_NEXT_ALL])
+        res[17] = efun::object_info(info[OIB_NEXT_ALL], OINFO_BASIC, OIB_NAME);
+    else
+        res[17] = "";
+    if (info[OIB_PREV_ALL])
+        res[18] = efun::object_info(info[OIB_PREV_ALL], OINFO_BASIC, OIB_NAME);
+    else
+        res[18] = "";
+    res[19] = efun::object_info(ob, OINFO_POSITION, OIP_POS);
+
+    return res;
+}
+
+int send_udp(string host, int port, mixed message)
+{
+    int a, b, c, d;
+
+    /* Non-numeric hostnames require a blocking hostname lookup
+     * in the main mud thread. As for our purposes fixed addresses
+     * are sufficient, disallow everything else.
+     */
+    if (sscanf(host, "%d.%d.%d.%d", a, b, c, d) != 4)
+        return 0;
+
+    return efun::send_udp(host, port, message);
+}
+
+int send_imp(string host, int port, mixed message)
+{
+    return send_udp(host, port, message);
+}
+
+----------------------------------------------------
+
+These are those diffs of the Morgengrauen driver 2000.01.18 against it's
+parent version, amylaar 3.2.1@141, which have no counterpart in LDMud..
+
+----------------------------------------------------
+Index: amylaar.2/Makefile.in
+--- amylaar.2/Makefile.in Mon, 02 Nov 1998 15:49:18 -0700 lars (lpmud/d/17_Makefile.i 1.2 644)
++++ amylaar.2(w)/Makefile.in Wed, 05 May 1999 02:22:24 -0600 u1000 (lpmud/d/17_Makefile.i 1.2 644)
+@@ -25,12 +25,15 @@
+ # Use the standard malloc on your system:
+ #MALLOC=sysmalloc
+ #
++# Which HASH-Source should we use?
++HASH=hosts/i386/hash.S
++#HASH=hash.c
+ # Set MUD_LIB to the directory which contains the mud data. Was formerly
+ # defined in config.h !
+@@ -74,7 +77,7 @@
+ #
+ SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
+     comm1.c ed.c regexp.c mapping.c wiz_list.c swap.c $(MALLOC).c\
+-    call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
++    call_out.c otable.c dumpstat.c stralloc.c $(HASH) port.c\
+     access_check.c parse_old.c parse.c prolang.y\
+     simul_efun.c sprintf.c gcollect.c closure.c random.c
+ OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
+@@ -87,7 +90,7 @@
+ 	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
+ 
+ install: driver
+-	$(INSTALL) -c $? $(BINDIR)/parse
++	$(INSTALL) $? $(BINDIR)/Parse.install
+ 
+ install.utils:
+ 	(cd util; $(MAKE) $(MFLAGS) install)
+@@ -170,7 +173,7 @@
+ gcollect.o : gcollect.c lint.h config.h machine.h interpret.h object.h exec.h \
+   sent.h comm.h smalloc.h instrs.h lang.h wiz_list.h stralloc.h
+ 
+-hash.o : hash.c
++hash.o : $(HASH)
+ 
+ interpret.o : interpret.c lint.h config.h machine.h interpret.h lang.h exec.h \
+   object.h wiz_list.h instrs.h comm.h sent.h switch.h smalloc.h stralloc.h
+----------------------------------------------------
+
+The random.c used by Morgengrauen. LDMud uses the Mersenne Twister which
+should be as good as this one, if not better.
+
+----------------------------------------------------
+#ifndef DRAND48
+#include<stdio.h>
+
+/* Period parameters */  
+#define N 624
+#define M 397
+#define MATRIX_A 0x9908b0df   /* constant vector a */
+#define UPPER_MASK 0x80000000 /* most significant w-r bits */
+#define LOWER_MASK 0x7fffffff /* least significant r bits */
+
+/* Tempering parameters */   
+#define TEMPERING_MASK_B 0x9d2c5680
+#define TEMPERING_MASK_C 0xefc60000
+#define TEMPERING_SHIFT_U(y)  (y >> 11)
+#define TEMPERING_SHIFT_S(y)  (y << 7)
+#define TEMPERING_SHIFT_T(y)  (y << 15)
+#define TEMPERING_SHIFT_L(y)  (y >> 18)
+
+static unsigned long mt[N]; /* the array for the state vector  */
+static int mti=N+1; /* mti==N+1 means mt[N] is not initialized */
+
+/* initializing the array with a NONZERO seed */
+void
+seed_random(seed)
+    unsigned long seed;
+{
+    /* setting initial seeds to mt[N] using         */
+    /* the generator Line 25 of Table 1 in          */
+    /* [KNUTH 1981, The Art of Computer Programming */
+    /*    Vol. 2 (2nd Ed.), pp102]                  */
+    mt[0]= seed & 0xffffffff;
+    for (mti=1; mti<N; mti++)
+        mt[mti] = (69069 * mt[mti-1]) & 0xffffffff;
+}
+
+unsigned long 
+random_number(unsigned int n)
+{
+    unsigned long y;
+    static unsigned long mag01[2]={0x0, MATRIX_A};
+    /* mag01[x] = x * MATRIX_A  for x=0,1 */
+
+    if (mti >= N) { /* generate N words at one time */
+        int kk;
+
+        if (mti == N+1)   /* if sgenrand() has not been called, */
+            seed_random(4357); /* a default initial seed is used   */
+
+        for (kk=0;kk<N-M;kk++) {
+            y = (mt[kk]&UPPER_MASK)|(mt[kk+1]&LOWER_MASK);
+            mt[kk] = mt[kk+M] ^ (y >> 1) ^ mag01[y & 0x1];
+        }
+        for (;kk<N-1;kk++) {
+            y = (mt[kk]&UPPER_MASK)|(mt[kk+1]&LOWER_MASK);
+            mt[kk] = mt[kk+(M-N)] ^ (y >> 1) ^ mag01[y & 0x1];
+        }
+        y = (mt[N-1]&UPPER_MASK)|(mt[0]&LOWER_MASK);
+        mt[N-1] = mt[M-1] ^ (y >> 1) ^ mag01[y & 0x1];
+
+        mti = 0;
+    }
+  
+    y = mt[mti++];
+    y ^= TEMPERING_SHIFT_U(y);
+    y ^= TEMPERING_SHIFT_S(y) & TEMPERING_MASK_B;
+    y ^= TEMPERING_SHIFT_T(y) & TEMPERING_MASK_C;
+    y ^= TEMPERING_SHIFT_L(y);
+
+    return y%n; 
+}
+#endif /* DRAND48 */
+----------------------------------------------------

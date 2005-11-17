@@ -1,0 +1,22 @@
+Short: Improve set_auto_include_string()
+Date: Fri, 5 May 2000 22:22:03 +0200
+From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
+Type: Feature
+State: Done - implemented in 3.2.9-dev.361
+
+Wie waere es, wenn man den auto-include-string so aendern koennte, dass
+man im Master eine Funktion aufruft, dort den Filenamen des zu
+compilierenden Files uebergibt und dann den auto-include-string
+zurueckgibt.
+
+Das waere z.B. praktisch, wenn ich allen Files, die in einem Pfad
+.../i/inheritfile.c sind, #pragma save_types uebergeben koennte, und die
+Programmierer nicht dran denken muessen.
+
+Man koennte auch einfach die Funktion set_auto_include_string() so
+abaendern, dass man eine Closure uebergibt oder man macht gleich einen
+Driver-Hook draus und schmiesst die Funtkion weg.
+
+Wahlweise sollte man da einen String uebergeben koennen, oder eine
+Closure, die dann mit dem zu compilierenden File als Parameter
+aufgerufen wird.

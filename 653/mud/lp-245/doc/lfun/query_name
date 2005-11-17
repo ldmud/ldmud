@@ -1,0 +1,5 @@
+string query_name()
+
+All living objects, weapons and armour must return the name of itself.
+
+See also lfun/short().
