@@ -1,0 +1,115 @@
+Short: MudOS compatibility
+Date: Mon, 21 Dec 1998 20:08:04 +0200 (EET)
+Type: Feature
+State: Unclassified
+
+Maybe introduce a special MudOS compat mode in the long run?
+In general, check which MudOS efuns might be useful for us.
+
+Following is '/include/sys/efuns.h' from Tatu's MurderMud, which achieves
+compatibility between MudOS and Amylaar (somewhat):
+
+--- clip clip ---
+
+#ifndef _SYS_EFUNS_H
+#define	_SYS_EFUNS_H
+
+#ifdef MUDOS
+
+#define	STRSTR2(x, y)		strsrch(x, y)
+#define	STRSTR3(x, y, z)	strsrch(x, y, z)
+#define	M_KEYS(x)		keys(x)
+#define	M_VALUES(x)		values(x)
+#define	PRINT_ERROR(x)		error(x)
+#define	MEMBER(x, y)		((mapp(x)) ? (!undefinedp(((mapping)x)[y])) :\
+				member_array(y, x))
+#define	USERP(x)		userp(x)
+#define	GET_EVAL_COST()		eval_cost()
+#define	MAPPINGP(x)		mapp(x)
+#define	FUNCTION_TYPE		function
+#define	FUNCTION(func)		(: func :)
+#define	FUNCTION2(func, ob)	(: ob, "func" :)
+#define	GET_FUNCTION(func)	(: this_object(), func :)
+#define	GET_FUNCTION2(func, ob)	(: ob, func :)
+#define	FUNCTIONP(x)		functionp(x)
+#define	FUNCTION_VALID(x)	!(functionp(x) & FP_OWNER_DESTED)
+#define	FUNCALL			evaluate
+#define	SORT_ARRAY_ASC(x)	sort_array(x, 1)
+#define	SORT_ARRAY_DESC(x)	sort_array(x, -1)
+#define	WALK_MAPPING(map, func)	map_mapping(map, (: this_object(), func :))
+#define	M_DELETE(map,key)	map_delete(map,key)
+#define	POINTER(var)		ref var
+#define	E_POINTER(var)		ref var
+#define	PBR_ARG(arg)		ref arg
+#define	IN_MAPPING(map, key)	!undefinedp(map[key])
+#define	IN_ARRAY(arr, key)	(member_array(key, arr) >= 0)
+#define	IN_STRING(str, char)	(strsrch(str, char) >= 0)
+#define	TO_OBJECT(func)		function_owner(func)
+#define	REST_ARGS(x)		array x
+#define	EXTERN_CALL()		(origin() != "local")
+#define	TRIM_LEADING_WS(x)	sscanf(x, "%*([ \t]+)%s", x)
+#define	COUNTED_WHITESPACE		"%*([\t ]+)"
+#define	COUNTED_OPTIONAL_WHITESPACE	"%*([\t ]*)"
+
+// Not sure if this can be done?
+#define	set_this_player(x)	(x)
+
+/* Is there no better way? */
+#define	COPY_MAPPING(x)		(x + ([ ]))
+
+// These aren't implemented; they were "own" efuns added to Amylaar:
+#define	SHARE_STRING(x)	(x)
+// Hash simply returns the internal hash value as calculated for
+// shared strings:
+#define	HASH(x)	(random(10))
+// And query_micros() just returns a microsecond counter:
+#define QUERY_MICROS() (1)
+
+#else
+
+#define	STRSTR2(x, y)		strstr(x, y)
+#define	STRSTR3(x, y, z)	strstr(x, y, z)
+#define	M_KEYS(x)		m_indices(x)
+#define	M_VALUES(x)		m_values(x)
+#define	PRINT_ERROR(x)		raise_error(x)
+#define	MEMBER(x, y)		member(x, y)
+#define	USERP(x)		query_once_interactive(x)
+#define	GET_EVAL_COST()		get_eval_cost()
+#define	MAPPINGP(x)		mappingp(x)
+#define	FUNCTION_TYPE		closure
+#define	FUNCTION(func)		symbol_function("func", this_object())
+#define	FUNCTION2(func, ob)	symbol_function("func", ob)
+#define	GET_FUNCTION(func)	symbol_function(func)
+#define	GET_FUNCTION2(func, ob)	symbol_function(func, ob)
+#define	FUNCTIONP(x)		closurep(x)
+#define	FUNCTION_VALID(x)	to_object(x)
+#define	FUNCALL			funcall
+#define	SORT_ARRAY_ASC(x)	sort_array(x, #'>)
+#define	SORT_ARRAY_DESC(x)	sort_array(x, #'<)
+#define	WALK_MAPPING(map, func)	walk_mapping(map, symbol_function(func, this_object()))
+#define	M_DELETE(map,key)	m_delete(map,key)
+#define POINTER(var)		& var
+#define	E_POINTER(var)		&(var)
+#define	PBR_ARG(arg)		arg
+#define	IN_MAPPING(map, key)	(member(map, key) > 0)
+#define	IN_ARRAY(arr, key)	(member(arr, key) >= 0)
+#define	IN_STRING(str, char)	(member(str, char) >= 0)
+#define	TO_OBJECT(func)		to_object(func)
+#define	REST_ARGS(x)		varargs mixed *x
+#define	EXTERN_CALL()		extern_call()
+#define	COUNTED_WHITESPACE		"%~t"
+#define	COUNTED_OPTIONAL_WHITESPACE	"%~.0t"
+#define	TRIM_LEADING_WS(x)	sscanf(x, "%t%s", x)
+
+#define	COPY_MAPPING(x)		copy_mapping(x)
+
+#define	SHARE_STRING(x)		share_string(x)
+// I added the hash-function as an 'overload' for ~ - operator. Kludgy!
+#define	HASH(x)			~(x)
+#define QUERY_MICROS() query_micros()
+
+#endif
+#endif
+
+--- clip clip ---
+

@@ -1,0 +1,19 @@
+SYNOPSIS
+        float floor (float arg)
+
+DESCRIPTION
+        Round the <arg>ument downwards the nearest whole number, returning
+        that value. If the <arg>ument is an integer, the result will be
+        the argument value, converted to float.
+
+EXAMPLES
+        floor(4.5)  - return 4.0
+        floor(-4.5) - return -5.0
+        floor(5)    - return 5.0
+
+HISTORY
+        Introduced in LDMud 3.2.7.
+        LDMud 3.2.9 added integers as argument values.
+
+SEE ALSO
+        abs(E), ceil(E)
