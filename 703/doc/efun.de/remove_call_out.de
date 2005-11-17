@@ -1,0 +1,36 @@
+SYNOPSIS
+        int remove_call_out(string fun);
+        int remove_call_out(closure fun);
+
+BESCHREIBUNG
+        Entfern den naechsten haengigen call_out() auf die Funktion <fun> im
+        aktuellen Objekt bzw. den naechsten haengigen call_out() auf die
+        Closure <fun>. Die verbleibende Zeit wird zurueck geliefert.
+
+        Wenn es keine haengigen call_out()s auf <fun> gibt, wird -1 zurueck
+        geliefert.
+
+BEISPIEL
+        Um alle call_out()s auf MeineFunktion() zu entfernen:
+
+        while(remove_call_out("MeineFunktion") != -1);      /* wiederhole */
+
+BUGS
+        Das Entfernen von call_out()s auf Closures funktioniert nur, wenn der
+        exakt gleiche Wert fuer die Closure verwendet wird.
+
+        Das funktioniert:
+            closure cl = symbol_function("main", obj);
+            call_out(cl, 2);
+            remove_call_out(cl);
+
+        Das funktioniert nicht:
+            call_out(symbol_function("main", obj), 2);
+            remove_call_out(symbol_function("main", obj));
+
+AENDERUNGEN
+        Das Entfernen eines call_out()s auf eine Closure wurde in 3.2.1@45
+        eingefuehrt.
+
+SIEHE AUCH
+        call_out(E), call_out_info(E), find_call_out(E)
