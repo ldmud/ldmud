@@ -1,0 +1,26 @@
+Short: Failed assignments leave behind empty mapping entries
+Date: Wed, 30 May 2001 12:08:00 +0200
+From: Daniel Fischer <dfischer@gmx.de>
+Type: Bug
+State: Acknowledged.
+
+Falls das schon bekannt ist, bitte ich um Entschuldigung:
+
+map = ([1:2]); map[0][5]=1;
+
+Fuehrt bei mir dazu, dass in map ein Key fuer den ersten Index angelegt wird
+(also Effekt wie ein map[0]=0), obwohl die Zuweisung map[0][5]=1 einen
+Fehler ausloest (Index out of bounds).
+
+(map[0])[5]=1 verhaelt sich uebrigens nicht so.
+
+---------------------------------
+The problem is in how the expressions are parsed. In 'map[0][5] = 1', the
+'map[0]' is parsed as possible lvalue, thus generating the opcodes
+'push_indexed_lvalue', followed by 'index_lvalue'.
+
+On the other hand '(map[0])[5]' parses the 'map[0]' as normal rvalue, leading
+to the opcode sequence 'index' followed by 'index_lvalue'.
+
+Given the obscurity in the parser when it comes to generating lvalues, I don't
+know how to fix this yet.

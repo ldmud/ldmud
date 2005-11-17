@@ -1,0 +1,47 @@
+Subject: sprintf() and colour strings
+From: Lars Duening, Alfe
+Date: 2001-10-16
+Type: Feature
+State: Acknowledged.
+See also: f-010223, f-011015-1, f-000905-1
+
+New format specifier  '%S' to format colour-coded strings, '%s' normal strings
+as usual.
+
+Optionally introduce an efun 
+
+  csprintf(mapping cntl, string format, mixed args...)
+
+which first applies sprintf(), and then replaces all colour strings in the
+result before returning it.
+
+Dafire also requested this formatting capability:
+
+
+From: "Bastian Hoyer" <dafire@dafire.de>
+Date: Tue, 16 Oct 2001 11:15:39 +0200
+
+
+Hallo Lars,
+
+was ich braeuchte waere ein leerzeichen das vorne am Wort klebt :)
+
+also ich mache eine liste die so aussieht:
+
+aaa: +bbb -ccc +ddd  eee  fff
+
+vor jedem wert hab ich ein + oder - oder ein leerzeichen :)
+
+wenn das jetzt umbricht sieht das evtl so aus :
+
+aaa: +bbb -ccc +ddd
+     eee  fff
+
+weil das Leerzeichen vor eee beim umbrechen wegfaellt :)
+
+Ich hoffe das war irgendwie verstaendlich :)
+Ich glaub bei html ist das ein &nbsp; :)
+
+Bastian
+
+

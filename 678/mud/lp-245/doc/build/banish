@@ -1,0 +1,4 @@
+It is important that monsters are not created that have the same name as
+players. To avoid this, a directory /banish contains one file for every
+reserved monster name. To enter new names, go to adventurers guild, and do
+"banish name". If there already exists such a player, the command will fail.
