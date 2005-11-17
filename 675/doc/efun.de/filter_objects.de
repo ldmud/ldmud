@@ -1,0 +1,11 @@
+SYNOPSIS
+        object *filter_objects(object *arr, string fun, mixed extra, ...);
+
+BESCHREIBUNG
+        Diese Efun ist aehnlich wie filter(), es wird aber
+        arr[n]->fun(extra,...) aufgerufen. Wenn der Aufruf einen Wert != 0
+        liefert, wird das Objekt arr[n] in das Resultat uebernommen.
+        0-Eintraege in <arr> werden ignoriert.
+
+SIEHE AUCH
+        filter(E), map(E), map_objects(E)

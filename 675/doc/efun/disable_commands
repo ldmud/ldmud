@@ -1,0 +1,11 @@
+SYNOPSIS
+        void disable_commands()
+
+DESCRIPTION
+        Disable this object to use commands normally accessible to
+        users.
+
+        This is the opposite to the efun enable_commands().
+
+SEE ALSO
+        enable_commands(E)
