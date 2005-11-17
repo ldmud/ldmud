@@ -1,0 +1,35 @@
+SYNOPSIS
+        string object_name();
+        string object_name(object ob);
+
+BESCHREIBUNG
+        Liefert den Namen des Objekts <ob> oder des aktuellen Objekts, wenn
+        <ob> nicht angegeben wurde.
+
+        Als Spezialfall liefert die Funktion 0, wenn <ob> 0 ist.
+
+        Dieser Name ist der Name, unter dem das Objekt in der mudinternen
+        Objekttabelle aufgelistet ist. Der Name wird bei der Erzeugung des
+        Objekts eingetragen. Fuer Blueprints entspricht der Name dem Filenamen
+        (ohne die Endung .c), fuer Clones ist es der Name des Blueprints
+        ergaenzt mit einer eindeutigen Nummer nach dem #. Diese Regeln gelten
+        auch fuer virtuelle Objekte - die realen Namen/Typen von virtuellen
+        Objekten werden nicht beruecksichtigt.
+
+        Der Name eines Objekts kann mit rename_object() geaendert werden.
+        object_name() beruecksichtigt alle diese Aenderungen.
+
+        Der zurueck gegebene Name beginnt immer mit '/' (absoluter Pfad),
+        ausser wenn der Driver im Compat Modus laeuft.
+
+BEISPIEL
+        find_object(object_name(ob)) == ob
+
+        Dies ist immer wahr fuer alle Objekte <ob>, die nicht zerstoert sind.
+
+AENDERUNGEN
+        0 als Argument wird seit 3.2.9 akzeptiert.
+
+SIEHE AUCH
+        clone_object(E), load_name(E), load_object(E), find_object(E),
+        object_time(E), program_name(E), rename_object(E)
