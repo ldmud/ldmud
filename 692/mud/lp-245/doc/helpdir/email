@@ -1,0 +1,5 @@
+Command: email
+optional argument: new email address
+
+Without arguments, print your current electric mail address.
+With arguments, set a new electric mail address.
