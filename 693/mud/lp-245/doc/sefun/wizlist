@@ -1,0 +1,13 @@
+SYNOPSIS
+	void wizlist()
+	void wizlist(string wizard)
+
+DESCRIPTION
+	Prints out the top score list of wizards. If a string is given
+	as argument then rearrange the list in a way that the score of
+	the wizard will also appear on it. If no wizard name is given,
+	this_player()->query_real_name() will be used. If the arg is
+	"ALL", the entire is list printed.
+
+SEE ALSO
+	add_worth(E), wizlist_info(E)
