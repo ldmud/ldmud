@@ -1,0 +1,9 @@
+SYNOPSIS
+        int caller_stack_depth(void)
+
+DESCRIPTION
+        Returns the number of previous objects on the stack. This
+        can be used for security checks.
+
+SEE ALSO
+        caller_stack(E), previous_object(E), call_other(E), call_resolved(E)

@@ -1,0 +1,30 @@
+NAME
+        ed3
+
+DESCRIPTION
+        Searching is done with:
+        /hello/
+        Find first line in of after current line.
+        Just // will repeat the search.
+
+        The patterns are regular expressions, where some characters
+        have a special meaning:
+        .        Match any character.
+        x*        Match any numbers of x (0 or more).
+        [abc]        Match 'a', 'b' or 'c'.
+        [0-9]        Match any digit 0 - 9.
+        [a-z]        Match any lowercase letter.
+        \x        Match 'x' where 'x' can be any character except '('
+                and ')'.
+
+EXAMPLE
+        s/ab.d/ABCD/
+        Substitute any string 'abXd' against 'ABCD' where X can be any
+        character.
+
+NOTE
+        This only half the truth, there is lots more magic in the
+        regexps.
+
+SEE ALSO
+        regexp(E), ed4(LPC)

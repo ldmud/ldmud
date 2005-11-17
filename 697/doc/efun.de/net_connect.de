@@ -1,0 +1,30 @@
+SYNOPSIS
+        int net_connect(string host, int port)
+
+BESCHREIBUNG
+        Oeffne eine nicht-blockierende TCP Netzverbindung zu
+        <host>:<port> .  Bei Erfolg wird die Verbindung zum
+        aufrufenden Objekt gebunden und die lfun logon() wird in dem
+        Objekt aufgerufen.
+
+        Resultat ist 0 bei Erfolg, und eine Unix ERRNO bei Misserfolg.
+
+        Ist der Driver fuer IPv6 konfiguriert, wird <host> erst als
+        IPv6-Name interpretiert, und wenn das fehlschlaegt, als
+        IPv4-Name.
+
+        Wenn die Verbindung nicht sofort erzeugt werden kann, gibt die
+        Funktion 'Erfolg' zurueck, und der Driver vollendet die
+        Funktion im Hintergrund. Sollte die Verbindungsaufbau im
+        Hintergrund fehlschlagen, wird logon(-1) im aktuellen Objekt
+        aufgerufen.
+
+        Die Funktion erzeugt eine privilege violation ("net_connect",
+        host, port).
+
+        WARNUNG: Ist <host> ein Name und keine IP, fuehrt die Funktion
+        einen DNS-Aufruf durch, der den Driver fuer einige Zeit
+        blockieren kann.
+
+SIEHE AUCH
+        logon(A)

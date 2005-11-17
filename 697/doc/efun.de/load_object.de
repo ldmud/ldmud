@@ -1,0 +1,23 @@
+SYNOPSIS
+        object load_object(string file);
+
+BESCHREIBUNG
+        Laedt und liefert das Objekt aus der Datei <file>. Wenn das Objekt
+        bereits existiert, wird es nur zurueckgeliefert.
+
+        Diese Efun laedt nur Blueprints. Fuer Clone muss clone_object()
+        verwendet werden.
+
+        Werden strikte EUIDs verlangt, muss das ladende Objekt eine EUID != 0
+        haben.
+
+BEISPIEL
+        // Erneuere das Standard Player-Objekt
+        destruct(find_object("/std/player"));
+        load_object("/std/player");
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.6.
+
+SIEHE AUCH
+        clone_object(E)
