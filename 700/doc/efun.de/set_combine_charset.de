@@ -1,0 +1,45 @@
+SYNOPSIS
+        void set_combine_charset(int *bitvector);
+        void set_combine_charset(string charset);
+        void set_combine_charset(0);
+
+BESCHREIBUNG
+        Setzt den Satz der zu einem einzelnen String kombinierbaren Zeichen,
+        wenn sie bereits en-bloc im Zeichenmodus vom interaktiven Benutzer
+        uebertragen worden sind.
+
+        Nicht kompatible und einzelne Zeichen werden als separate Strings
+        zurueck gegeben, wie gewohnt. Die Funktion muss mit dem interaktiven
+        Benutzer als Kommandogeber aufgerufen werden.
+
+        Der Zeilenumbruch "\n" und das Nullzeichen "\0" ist immer
+        inkompatibel.
+
+        Der Zeichensatz kann entweder direkt als String oder indirekt als
+        Bitvektor uebergeben werden. Wenn der Zeichensatz als 0 uebergeben
+        wird, wird der Standardzeichensatz wiederhergestellt.
+
+        Der Bitvektor wird interpretiert als Array von 8-Bit-Werten und
+        kann bis zu 32 Elemente enthalten. Das Zeichen n ist erlaubt,
+        wenn gilt:
+
+            sizeof(bitvektor) > n/8 && bitvektor[n/8] & (1 << n%8)
+
+BEISPIEL
+        In einem bildschirmorientierten Editor koennen die meisten
+        druckbaren Zeichen (abgesehen von Antworten auf Prompts wie 'j',
+        'n' oder 'q') in kombinierte Strings zusammengefasst werden.
+
+            set_combine_charset("abcdefghijklmoprstuvwxz0123456789"
+                                "ABCDEFGHIJKLMOPRSTUVWXZ");
+
+        Der Standard wird so wiederhergestellt:
+            set_combine_charset("");
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.8.
+        LDMued 3.2.10 ergaenzte die Funktion um die Moeglichkeit, den
+            Standard wiederherzustellen.
+
+SIEHE AUCH
+        get_combine_charset(E), input_to(E), set_connection_charset(E)

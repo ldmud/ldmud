@@ -1,0 +1,10 @@
+SYNOPSIS
+        int stringp(mixed arg)
+
+BESCHREIBUNG
+        Liefert 1, wenn das Argument eine Zeichenkette (String) ist,
+        ansonsten 0.
+
+SIEHE AUCH
+        closurep(E), floatp(E), mappingp(E), objectp(E), intp(E),
+        referencep(E), pointerp(E), symbolp(E), clonep(E)
