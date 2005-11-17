@@ -1,0 +1,13 @@
+SYNOPSIS
+        int rmember(mixed *array, mixed elem)
+        int rmember(string s, int elem)
+
+DESCRIPTION
+        For arrays and strings, returns the index of the last
+        occurance of second arg in the first arg, or -1 if none found.
+
+HISTORY
+        Introduced in LDMud 3.2.10.
+
+SEE ALSO
+        member(E)
