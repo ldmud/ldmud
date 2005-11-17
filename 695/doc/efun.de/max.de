@@ -1,0 +1,23 @@
+SYNOPSIS
+        string max(string arg, ...);
+        string max(string *arg);
+
+        int|float max(int|float arg, ...);
+        int|float max(int|float *arg);
+
+BESCHREIBUNG
+        Die Funktion liefert den groessten Wert aller <arg> und liefert ihn
+        zurueck. Wird max() nur mit einem Array aufgerufen wird (das nicht
+        leer sein darf), liefert die Funktion das groesste Element aus <arg>.
+
+BEISPIEL
+        max(1)                     - liefert 1
+        max(1, 1.1)                - liefert 1.1
+        max("foo", "bar")          - liefert "foo"
+        max( ({ "foo", "bar" }) )  - liefert "foo"
+
+AENDERUNGEN
+        Eingefuehrt in LDMued 3.2.9.
+
+SIEHE AUCH
+        min(E)

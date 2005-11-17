@@ -1,0 +1,4 @@
+int query_money()
+
+Objects that can carry money, should define this function to return
+the amount of gold coins.

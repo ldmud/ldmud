@@ -1,0 +1,15 @@
+SYNOPSIS
+        mixed funcall(closure cl, mixed arg, ...);
+
+BESCHREIBUNG
+        Wertet die Closure <cl> aus. Die Argumente <args> werden als Argumente
+        an die Closure uebergeben. Wenn <cl> keine Closure ist, wird <cl>
+        zurueck gegeben.
+
+AENDERUNGEN
+        Eingefuehrt in 3.2@70.
+        Das Zurueckgeben von <cl>, wenn es sich nicht um eine Closure handelt,
+            auch wenn Argumente angegeben wurden, wurde in 3.2.1 eingefuehrt.
+
+SIEHE AUCH
+        apply(E), quote(E)

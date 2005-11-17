@@ -1,0 +1,18 @@
+VERALTET
+SYNOPSIS
+        void add_verb(string str);
+
+BESCHREIBUNG
+        Diese Funktion haengt mit add_action() zusammen. add_verb setzt ein
+        Kommando str, das als Verb (d.h. als Ausloeser) fuer die letzte mit
+        add_action() definierte Funktion dient.
+
+        Diese Funktion ist inzwischen unnoetig, weil das Verb direkt als
+        Argument von add_action() angegeben werden kann. add_verb() wird nur
+        aus noch aus Gruenden der Kompatibilitaet unterstuetzt.
+
+        [marion Sun Jan 19 1992 Don't use it. This file is retained
+        because of somewhat nostalgic reasons.]
+
+SIEHE AUCH
+        add_action(E), query_verb(E), add_xverb(E), remove_action(E)

@@ -1,0 +1,13 @@
+SYNOPSIS
+	int add_worth(int amount)
+	int add_worth(int amount, object obj)
+
+DESCRIPTION
+	Add amount to the money/experience value shown in the wizlist
+	to the current user or to the one given as second argument.
+	The calling object must be privileged by the master object,
+	usually it is only allowed for objects with origin somewhere
+	under /std, /obj or /room, depending on your base object library.
+
+SEE ALSO
+	wizlist(E), get_extra_wizinfo(E), set_extra_wiz_info(E)
