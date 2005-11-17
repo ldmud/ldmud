@@ -1,0 +1,6 @@
+int query_value()
+
+Return the value of this object. If it is not possible to sell this
+object, then the value 0 should be returned.
+
+One gold coin corresponds to one experience point, as a reference.

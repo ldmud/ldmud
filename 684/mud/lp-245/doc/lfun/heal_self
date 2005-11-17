@@ -1,0 +1,5 @@
+void heal_self(h)
+int h;
+
+This routine is called when the object is allowed to heal by 'h' points.
+Of course, this is only interesting for living objects.
