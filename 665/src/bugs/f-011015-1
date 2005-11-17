@@ -1,0 +1,28 @@
+Short: Left, Center, and Flush formatting for terminal_colour()
+From: Slava Ignatjev
+Date: 2001-10-15
+Type: Feature
+State: New
+See also: f-011016-0
+
+Okay, I suggest to change format of the fun a bit, to the following:
+
+varargs string terminal_colour( string str
+                              , null|mapping|closure map
+                              , int wrap | string wrap
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^
+                              , int indent )
+
+where "int wrap" remains almost the same, except for it begins
+to serve right justification.
+
+"string wrap" will serve following:
+
+"n-" <- left justification
+"n|" <- centering
+"n$" <- flushing
+where 'n' is a number of columns
+
+I think, this is not too hard to implement. And is not against current
+ideology of the linewrapping in the function.
+

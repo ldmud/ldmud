@@ -1,0 +1,53 @@
+Short: 3.2.7 crash on filter_indices
+Date: Wed, 1 Mar 2000 14:33:37 +0100 (MET)
+From: Erzmagier des Wunderlandes <mud@hurrikap.rz.uni-leipzig.de>
+Type: Bug
+State: Done - fixed in 3.2.8-dev.157
+
+
+Hallo Mateese!
+
+Ich habe einen dummen Bug gefunden, den ich aber leider nicht richtig
+festnageln kann. Vielleicht kannst du da mehr rausfinden. In der Dev 164
+ist er auch auf diese Art nicht provozierbar, vielleicht hast du ihn ja
+(unwissentlich?) schon ausgebaut. Naja, trotzdem, folgende Situation habe
+ich als Minimalkonfiguration:
+
+---- file.c ----
+blah() { this_object()->x() }
+
+blub() {  
+  filter_indices(this_object()->nix(), "y");}
+}
+----
+
+Beim Aufruf von blub() kommt ein 'Bad argument 1 to get_extra_wizinfo()'
+in Zeile 4. Wichtig ist, dass die Null, die filter_indices() erhaelt von
+einem call_other() kommt. Weiterhin wichtig und mir vollkommen unver-
+staendlich ist Funktion blah(). Es muss eine Funktion vorhanden sein,
+die irgendein call_other() macht, und sie muss weiter vorne im Code
+stehen.
+
+Dann gibt es noch eine Abwandlung von dem Fehler, der zu einem Crash
+fuehrt. Dazu ist noch eine Zeile Code und eine Zusatzbedingung noetig:
+
+blah() { this_object()->x() }
+ 
+blub() {
+  query_once_interactive(find_object("/magier:fiona"));
+  filter_indices(this_object()->nix(""), "y");}
+}
+
+Also query_once_interactive() muss vorher ausgefuehrt werden, und zwar mit
+irgendeinem Argument, welches 1 liefert. Dieses Argument muss weder Magier
+noch interactive() sein. Zweitens muss an die nichtvorhandene Funktion
+nix() ein String uebergeben werden.
+
+So richtig schoen minimiert habe ich das nicht, aber weiter schaffe ich
+das einfach nicht.
+
+
+*knuddels*
+
+  Fiona @ Wunderland
+

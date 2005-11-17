@@ -1,0 +1,31 @@
+GESCHUETZT
+SYNOPSIS
+        void set_this_player(object ob);
+
+BESCHREIBUNG
+        Aendert den momentanen Kommandogeber zu <ob>. Dabei kann <ob> auch
+        0 sein, wenn der aktuelle Kommandogeber 'deaktiviert' werden soll.
+
+        Diese Funktion ist nicht geschuetzt und sollte deshalb von einer
+        simul_efun ueberlagert werden, die die Efun entweder komplett
+        abschaltet, oder mindestens gewisse Sicherheitschecks durchfuehrt.
+        Es ist sonst einfach, die Sicherheit eines Muds mit Hilfe dieser
+        Efun zu untergraben.
+
+        Die Efun ist nur in 3.2.1 verfuegbar. Eine moegliche Simulation fuer
+        3.2 koennte etwa so aussehen:
+
+            void set_this_player(object ob)
+            {
+                /* Insert your privilege checks here */
+                if (living(ob))
+                    funcall(bind_lambda(#'enable_commands, ob));
+            }
+            (suggested by Mark Lewis (Nostradamus@Zebedee))
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.1.
+        LDMud 3.2.6 fuehrte die 0 als moeglichen Parameter ein.
+
+SIEHE AUCH
+        set_this_object(E), this_player(E)

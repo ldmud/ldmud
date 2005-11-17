@@ -1,0 +1,25 @@
+IDEA BEHIND THIS GAME.
+
+I played Abermud a lot, and wanted to do something better (who don't).
+
+1. A wizard can extend the game.
+
+2. The game can be extended on fly, without rebooting the mud.
+
+3. There are no difference between objects. Rooms, players and things
+   are just objects.
+
+4. All objects are specified in interpreted C. The specifications are
+   compiled (loaded) first time they are referenced.
+
+5. There are no player parser. All commands are defined by the objects.
+   For example, the knife defines the command 'wield', and the
+   leather jacket defines 'wear'. An object defines a command by
+   associating it with a local function, defined in the object. When
+   the user types that command, the corresponding function will be called.
+   If the user types 'wear jacket', then "jacket" will be sent as an
+   argument to the wear function in the jacket object. If the user
+   types 'wear plate', the jacket wear function will detect that
+   "plate" != "jacket", and return false. Then, another 'wear' command
+   is tried, untill success. When the user drops the jacket, all commands
+   are removed that was associated with that object.
