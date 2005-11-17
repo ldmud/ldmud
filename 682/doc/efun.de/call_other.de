@@ -1,0 +1,94 @@
+SYNOPSIS
+        unknown call_other(object ob, string fun, mixed arg, ...);
+        unknown call_other(object *ob, string fun, mixed arg, ...);
+
+        ob->fun(mixed arg, ...);
+        ob->"fun"(mixed arg, ...);
+        ob->(fun)(mixed arg, ...);
+
+BESCHREIBUNG
+        Ruft die in einem anderen Objekt <ob> die Funktion <fun> mit den
+        Argumenten <arg...> auf und gibt den Wert zurueck, der von der
+        Funktion <fun> geliefert wird (oder 0 fuer nicht existierende oder
+        als void deklarierte  Funktionen).
+
+        Optional kann der Driver so konfigueriert werden, dass auch ein Array
+        von Objekten *<ob> akzeptiert wird. Die Funktion <fun> wird dann fuer
+        jedes Objekt <ob> im Array mit den Argumenten <arg...> aufgerufen.
+        Die einzelnen Resultate werden in einem Array zusammen gefasst und
+        dieses Array dann als Endresultat von call_other() zurueck gegeben.
+        Die Elemente von *<ob> koennen Objekte oder Namen von Objekten sein.
+        Zerstoerte Objekte und 0 als Element geben eine 0 zurueck, fuehren
+        aber nicht zu einem Fehler.
+
+        Damit auch Arrays von Objekten akzeptiert werden, muss das Makro
+        __LPC_ARRAY_CALLS__ gesetzt sein.
+
+        Das Objekt (bzw. die Objekte) kann direkt oder ueber einen String
+        (d.h. den Objektnamen) angegeben werden. Wenn ein String angegeben
+        wird und das Objekt noch nicht existiert, wird es geladen.
+
+        ob->fun(args) und "ob_name"->fun(args) sind aequivalent zu
+        call_other(ob, "fun", args). Heutzutage kann "ob_name" auch eine
+        Variable sein. ob->(fun)(args) ist aequivalent zu
+        call_other(ob, fun, args), wobei <fun> ein Runtime Ausdruck ist,
+        der den Funktionsnamen liefert.
+
+        Wenn das Objekt <ob> keine oeffentliche Funktion mit dem Namen <fun>
+        enthaelt, gibt call_other() den Wert 0 zurueck. Dies ist nicht
+        unterscheidbar von einer Funktion <fun>, die 0 zurueck liefert.
+        Oeffentlich bedeutet "public", wenn andere Objekte aufgerufen
+        werden und "public" oder "static", wenn der Aufruf an this_object()
+        ergeht. Funktionen, die "private" oder "protected" definiert sind,
+        koennen niemals von call_other() aufgerufen werden.
+
+        Der Rueckgabewert von call_other() ist standardmaessig 'any'. Falls
+        aber #pragma strict_types gesetzt ist, ist der Rueckgabewert
+        'unknown', und das Resultat des call_other() muss zuerst auf einen
+        zutreffenden Variablentyp gecastet werden, bevor man es fuer etwas
+        verwenden kann.
+
+BEISPIELE
+        Die nachfolgenden Beispiele rufen alle die Funktion "QueryProp" auf
+        mit dem Argument P_SHORT.
+
+            string str, fun;
+            str = (string)call_other(this_player(), "QueryProp", P_SHORT);
+            fun = "QueryProp";
+            str = (string)call_other(this_player(), fun, P_SHORT);
+
+            str = (string)this_player()->QueryProp(P_SHORT);
+            str = (string)this_player()->"QueryProp"(P_SHORT);
+            fun = "QueryProp";
+            str = (string)this_player()->(fun)(P_SHORT);
+
+        Solange #pragma strict_types gesetzt ist, muss man das Resultat von
+        call_other() explizit auf einen passenden Typ casten, weil
+        call_other() unknown liefert.
+
+        Das folgende Statement ruft die lfun short() in allen aktiven
+        Benutzern auf und speichert das gesammelte Resultat in einer
+        Variablen:
+
+            string * s;
+            s = (string *)users()->short();
+            !Compat: call_other("/users/luser/thing", "???", 0);
+            Compat: call_other("users/luser/thing", "???", 0);
+
+        Das sieht etwas merkwuerdig aus, wurde aber oft verwendet, um einfach
+        ein Objekt zu laden. Dazu wurde die (nicht existierende) Funktion
+        "???" im Objekt aufgerufen. Gluecklicherweise gibt es heute zu
+        diesem Zweck die Efun load_object().
+
+AENDERUNGEN
+        In LDMud 3.2.8 wurden die folgenden Verbesserungen eingefuehrt:
+          - die Formen x->"y"() und x->(y)() werden erkannt;
+          - die Form x->y() kollidiert nicht mehr mit einer lokalen Variablen,
+            die auch "y" heisst.
+          - eine simul_efun call_other() erwischt auch Aufrufe der Form ->().
+          - call_other kann auch auf Arrays von Objekten angewandt werden.
+        LDMud 3.2.10 machte den Aufruf von Objektarrays konfigurierbar.
+
+SIEHE AUCH
+        function_exists(E), call_resolved(E), create(A), pragma(LPC),
+        extern_call(E), functions(LPC)

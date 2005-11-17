@@ -1,0 +1,17 @@
+SYNOPSIS
+        void set_environment(object item, object env)
+
+DESCRIPTION
+        The item is moved into its new environment env, which may be 0.
+        This efun is to be used in the move_object() hook, as it does
+        nothing else than moving the item - no calls to init() or such.
+
+        Don't use it in your own objects!
+
+HISTORY
+        Introduced in 3.2.1@1 as 'efun308()', renamed to 'set_environment()'
+        in 3.2.6.
+
+SEE ALSO
+        remove(A), init(A), move_object(E), transfer(E), hooks(C),
+        native(C)
