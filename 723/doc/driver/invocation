@@ -1,0 +1,307 @@
+NAME
+    driver/invocation
+
+PURPOSE
+    Description of the invocation of the gamedriver, especially of the command
+    arguments. This document describes the commandline version of the driver
+    only; non-commandline versions are platform specific and described in
+    the related documentation.
+
+DESCRIPTION
+    The driver is invoked from the commandline as other normal programs.
+    Neither the current directory nor the directory the executable is in need
+    to be in any special relation the directory of the mudlib. Once the driver
+    is running, it emits two streams of outputs:
+
+      - driver-related messages on stderr; this unfortunately includes
+        LPC compiler diagnostics
+      - LPC runtime-related messages in the logfile <mudlib>/<host>.parse.log
+        (the name can be changed).
+
+    It is possible to start the driver without any commandline arguments as
+    suitable defaults are specified at compile time. The invocation syntax
+    is:
+
+        driver [options] [<portnumber>]...
+
+    <portnumber> the number of the port the driver shall use to accept
+    connections. The maximum number of ports is determined by MAXNUMPORTS
+    in the source file config.h.
+
+    The options modify the behaviour of the gamedriver. Some of them are only
+    available if a certain compile-time option was enabled (typically in
+    the source file config.h). The following options are recognized:
+
+      -P|--inherit <fd-number>
+        Inherit filedescriptor <fd-number> from the parent process
+        as socket to listen for connections.
+        Only available if compiled with MAXNUMPORTS.
+
+      -u|--udp <portnumber>
+        Specify the <portnumber> for the UDP port, overriding the compiled-in
+        default.
+        Only available if compiled with CATCH_UDP_PORT.
+
+      -D|--define <macro>[=<text>]
+        Add <macro> (optionally to be expanded to <text>) to the list of
+        predefined macros known by the LPC compiler.
+
+      -E|--eval-cost <ticks>
+        Set the number of <ticks> available for one evaluation thread.
+        If 0, execution is unlimited.
+
+      -M|--master <filename>
+        Use <filename> for the master object.
+
+      -m|--mudlib <pathname>
+        Use <pathname> as the top directory of the mudlib.
+
+      --debug-file <filename>
+        Log all debug output in <filename> instead of
+        <mudlib>/<host>.debug.log .
+
+      --hostname <name>
+        Use <name> as hostname instead of what the system says.
+
+      --hostaddr <addr>
+        Use <addr> as address of this machine, instead of what the
+        system says.  In particular this address will be used to open
+        the driver ports.
+
+      --no-compat
+      --compat
+        Select the mode (plain or compat) of the driver.
+        This choice does not affect the default name of the master object.
+
+      -d|--debug
+        Generate debug output; repeat the argument for even more output:
+          >= 1: log resets, clean ups, swaps, reception of urgend data,
+                   telnet negotiation states.
+                check_a_lot_of_refcounts() on startup when swapping of
+                   variables is disabled.
+          >= 2: log all add_message()s, name lookup failures, new players.
+          >= 3: progress of garbage collection
+          >= 4: even more junk from garbage collection
+
+      -c|--list-compiles
+        List the name of every compiled file on stderr.
+
+      -e|--no-preload
+        Pass a non-zero argument (the number of occurences of this option)
+        to master->preload(), which usually inhibits all preloads of castles
+        and other objects.
+
+      --erq <filename>
+      --erq "<filename> <erq args>"
+        Use <filename> instead of 'erq' as the basename of the ERQ executable.
+        If the name starts with a '/', it is take to be an absolute pathname,
+        otherwise it is interpreted relative to <bindir>. If not specified,
+        'erq' is used as the executable name.
+
+        By enclosing the argument value in quotes, it is possible to pass
+        arguments (e.g. --execdir) to the erq. These arguments however must
+        not contain embedded spaces.
+
+      -N|--no-erq
+        Don't start the erq demon (if it would be started at all).
+
+      -t|--no-heart
+        Disable heartbeats and call_outs.
+
+      -f|--funcall <word>
+        The lfun master->flag() is called with <word> as argument before the
+        gamedriver accepts netword connections.
+
+      --max-array <size>
+        The maximum number of elements an array can hold.
+        Set to 0, arrays of any size are allowed.
+
+      --max-mapping <size>
+        The maximum number of elements a mapping can hold.
+        Set to 0, mappings of any size are allowed.
+
+      --max-callouts <size>
+        The maximum number of callouts at one time.
+        Set to 0, any number is allowed.
+
+      --max-bytes <size>
+        The maximum number of bytes one read_bytes()/write_bytes() call
+        can handle.
+        Set to 0, reads and writes of any size are allowed.
+
+      --max-file <size>
+        The maximum number of bytes one read_file()/write_file() call
+        can handle.
+        Set to 0, reads and writes of any size are allowed.
+
+      --max-thread-pending <size>\n"
+        The maximum number of bytes to be kept pending by the socket write
+        thread.
+        Set to 0, an unlimited amount of data can be kept pending.
+
+        This option is ignored if pthreads are not used.
+
+      --cleanup-time <time>
+        The idle time in seconds for an object before the driver tries to
+        clean it up. It should be substantially longer than the reset time.
+        A time <= 0 disables the cleanup mechanism.
+
+      --reset-time <time>
+        The time in seconds before an object is reset. A time <= 0 disables
+        the reset mechanism.
+
+      -s <time>  | --swap-time <time>
+      -s v<time> | --swap-variables <time>
+        Time in seconds before an object (or its variables) are swapped out.
+        A time less or equal 0 disables swapping.
+
+      -s f<name> | --swap-file <name>
+        Swap into file <name> instead of <mudlib>/LP_SWAP.<host> .
+
+      -s c       | --swap-compact
+        Reuse free space in the swap file immediately.
+        Giving this option results in smaller, but also more fragmented
+        swapfiles, and the swap performance may degrade.
+
+      --max-malloc <size>
+        Restrict total memory allocations to <size> bytes.
+        A <size> of 0 or 'unlimited' removes any restriction.\n"
+
+      --min-malloc <size>
+      --min-small-malloc <size>
+        Determine the sizes for the explicite initial large resp. small chunk
+        allocation. A size of 0 disables the explicite initial allocations.
+
+      -r u<size> | --reserve-user <size>
+      -r m<size> | --reserve-master <size>
+      -r s<size> | --reserve-system <size>
+        Reserve <size> amount of memory for user/master/system allocations to
+        be held until main memory runs out.
+
+      --filename-spaces
+      --no-filename-spaces
+        Allow/disallow the use of spaces in filenames.
+
+      --strict-euids
+      --no-strict-euids
+        Enable/disable the enforced use of euids.
+
+      --pidfile <filename>\n"
+        Write the pid of the driver process into <filename>.\n"
+
+      --tls-key <pathname>
+          Use <pathname> as the x509 keyfile, default is 'key.pem'.
+          If relative, <pathname> is interpreted relative to <mudlib>.
+
+      --tls-cert <pathname>
+         Use <pathname> as the x509 certfile, default is 'cert.pem'.
+         If relative, <pathname> is interpreted relative to <mudlib>.
+
+      --tls-trustfile <pathname>
+        Use <pathname> as the filename holding your trusted PEM certificates.
+        If relative, <pathname> is interpreted relative to <mudlib>.
+      
+      --tls-trustdirectory <pathname>
+        Use <pathname> as the directory where your trusted
+        PEM certificates reside, default is '/etc/ssl/certs'.
+        If relative, <pathname> is interpreted relative to <mudlib>.
+
+      --wizlist-file <filename>
+      --no-wizlist-file
+        Read and save the wizlist in the named file (always interpreted
+        relative the mudlib); resp. don't read or save the wizlist.
+
+      --gcollect-outfd <filename>|<num>
+        Garbage collector output (like a log of all reclaimed memory blocks)
+        is sent to <filename> (or inherited fd <num>) instead of stderr.
+        Only available if compiled with MALLOC_smalloc.
+
+      --y|--yydebug
+        Enable debugging of the LPC compiler.
+        Only available if compiled with YYDEBUG.
+
+      --random-seed <num>
+        Seed value for the random number generator. If not given, the
+        driver chooses a seed value on its own.
+        This option is for debugging.
+
+      --check-state <lvl>
+        Perform a regular simplistic check of the virtual machine according
+        to <lvl>:
+          = 0: no check
+          = 1: once per backend loop
+          = 2: at various points in the backend loop
+        Only available if compiled with DEBUG.
+
+      --check-refcounts
+        Every backend cycle, all refcounts in the system are checked.
+        SLOW! Only available if compiled with DEBUG.
+
+      --gobble-descriptors <num>
+        <num> (more) filedescriptors are used up. You'll know when you need it.
+        Only available if compiled with DEBUG.
+
+      --check-strings
+        Every backend cycle, all shared strings in the system are checked.
+        SLOW! Only available if compiled with DEBUG and CHECK_STRINGS.
+
+      -V|--version
+        Print the version of the driver and exit.
+
+      --options
+        Print the version and compilation options of the driver and exit.
+
+      -h|-?|--help
+        Display a command help and exit.
+
+      --longhelp
+        Display a long command help and exit.
+
+      --args <filename>
+        The driver reads and parses the given file and treats its contents
+        as if given on the commandline right where the --args option
+        occured. The file itself can again contain --args options.
+
+
+DESCRIPTION -- Argument Parser
+    The parser analyses the commandline arguments given with the driver
+    invocation and distinguishes 'options', which start with a '-', from
+    proper arguments. Options are further distinguished by their name and
+    may take an additional value. In general, options and arguments can be
+    givein in any order.
+
+    Options are recognized in two forms. In the short form the option must
+    be given as a single '-' followed by a single letter. In the long form,
+    options start with '--' followed by a string of arbitrary length. The
+    short options are case sensitive, the long options aren't.
+    Most options can be specified in both the short and long form, but that
+    is not mandatory. Examples: '-r' and '--recursive'.
+
+    If an option takes a value, it must follow the option immediately after
+    a separating space or '='. Additionally, the value for a short option
+    may follow the option without separator. Examples are: '-fMakefile',
+    '-f Makefile', '--file=Makefile' and '--file Makefile'.
+
+    Short options may be collated into one argument, e.g. '-rtl', but
+    of these only the last may take a value.
+
+    The option '--' marks the end of options. All following command arguments
+    are considered proper arguments even if they start with a '-' or '--'.
+
+    The arguments are usually taken from the commandline; but the parser
+    is also able to read them from a textfiles, which can be nested. The
+    content of the textfiles is broken down into words delimited by whitespace,
+    which are then treated as given on the commandline at the place where
+    the instruction to read the textfile stood.
+
+    The file parser recognizes simple double-quoted strings, which must be
+    contained on a single line. Additionally, the '#' character given by
+    itself is a comment marker - everthing after the '#' until the end
+    of the current line is ignored.
+
+HISTORY
+    LDMud 3.2.9 added the --max-thread-pending, --hostname,
+    --hostaddr, --args and --random-seed options.
+    LDMud 3.2.10 added the --filename-spaces options.
+    LDMud 3.3.475/3.2.11 added --tls-key, --tls-cert.
+    LDMud 3.3.672/3.2.11 added --tls-trustfile, --tls-trustdirectory.

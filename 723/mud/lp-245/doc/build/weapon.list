@@ -1,0 +1,9 @@
+Recommended weapon classes. Never make a weapon with class higher than 20,
+unless the weapon is not permanent, or is deficient in some other way.
+
+Name		class	value	weight
+Knife		5	8	1
+Curved knife	7	15	1
+Hand axe	9	25	2
+Shortsword	15	700	3
+Sword of frost	20	2000	3
