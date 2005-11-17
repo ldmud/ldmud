@@ -1,0 +1,13 @@
+SYNOPSIS
+        int query_udp_port();
+
+BESCHREIBUNG
+        Liefert die Portnummer des UDP Sockets.
+
+AENDERUNGEN
+        LDMud 3.2.9 benannte query_imp_mud() zu diesem Namen um. Die alte
+        Version ist nur verfuegbar, wenn der Treiber mit USE_DEPRECATED
+        kompiliert wurde.
+
+SIEHE AUCH
+        send_udp(E), receive_udp(M)

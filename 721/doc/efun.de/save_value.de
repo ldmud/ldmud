@@ -1,0 +1,31 @@
+SYNOPSIS
+        string save_value(mixed wert [, int format]);
+
+BESCHREIBUNG
+        Schreibt <wert> in einen String, der sich mit restore_value()
+        auswerten laesst. Der String wird zurueck gegeben.
+
+        Das optionale Argument <format> bestimmt das Format des Strings:
+
+            -1: das normale Format des Treibers (Standard)
+             0: das Originalformat nach Amylaar's LPMud und LDMud <=3.2.8
+             1: LDMud >= 3.2.9: Non-Lambda Closures, Symbole und gequotete
+                Arrays koennen gespeichert werden
+
+        Der erzeugte String besteht aus zwei Zeilen, die jeweils mit einem
+        Zeilenumbruch enden. Die erste Zeile beschreibt das Format, in dem der
+        Wert gespeichert wird, in der '#x:y'-Schreibweise. Die zweite Zeile
+        stellt den eigentlichen Wert da.
+
+        Das Format zum Schreiben des Wertes in den String entspricht dem von
+        save_object() und restore_object() verwendeten Format.
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.8.
+        LDMud 3.2.9. ergaenzte die Funktion um die Moeglichkeit, Non-Lambda
+            Closures, Symbole und gequotete Arrays zu speichern. Dazu wurde
+            ein neues Format fuer den String eingefuehrt.
+        LDMud 3.2.10 fuehrte das Argument <format> ein.
+
+SIEHE AUCH
+        restore_value(E), restore_object(E), save_object(E)

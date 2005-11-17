@@ -1,0 +1,17 @@
+SYNOPSIS
+        quoted_array unquote(quoted_array arr);
+        string|symbol unquote(symbol sym);
+
+BESCHREIBUNG
+        Entfernt ein Quote von einem gequoteten Array oder Symbol. Wenn das
+        letzte Quote von einem Symbol entfernt wird, entsteht ein String.
+
+BEISPIELE:
+        unquote('foo);              ergibt: "foo"
+        unquote( '({1,2,3}) );      ergibt: ({1,2,3})
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.9.
+
+SIEHE AUCH
+        quote(E), symbolp(E)

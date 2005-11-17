@@ -1,0 +1,14 @@
+command: wimpy
+no arguments.
+
+Toggle wimpy mode. If you are in wimpy mode, your legs will run away
+if your hit points goes below one fifth of max.
+
+Default for a new player is brave mode.
+
+This is no secure thing. It might save you, if you have a slow connection,
+or slow fingers. Some monsters hack away more than 1/5 of your HP, and you
+might find yourself dead without warning. And some monsters runs as
+fast as your legs.
+
+See also 'brief'.
