@@ -1,0 +1,49 @@
+CONCEPT
+        references
+
+DESCRIPTION
+        Call by reference can be used to have a function that passes
+        more than one value to the caller, without using arrays that
+        have to be unpacked thereinafter.
+        There is nothing special to declare in the calling function,
+        you simply do an assignment to a parameter of the function.
+        The caller has to pass references explicitely; this is done by
+        prefixing an lvalue with '&' .
+        To pass a reference to an element of an array, you have to
+        enclose the indexed lvalue in round brackets.
+
+EXAMPLE
+
+        void assign(mixed destination, mixed source) {
+            destination = source;
+        }
+
+        void extract_number(int destination, string source) {
+            sscanf(source, "%d", destination);
+        }
+
+        void test() {
+            int i;
+            float f;
+            mixed *a;
+
+            extract_number(&i, "42 palantirs");
+            assign(&f, 3.141592653589793);
+            assign(&a, ({ i, f }));
+            assign(&(a[<0..<1]), ({1,2,3,"sink","x","y","x"}));
+            assign(&(a[5][0]), 'w');
+            assign(&(a[5][<1]), 'g');
+            printf("%O", a));
+        }
+
+        ({ /* sizeof() == 9 */
+          42,
+          3.14159,
+          1,
+          2,
+          3,
+          "wing",
+          "x",
+          "y",
+          "x"
+        })
