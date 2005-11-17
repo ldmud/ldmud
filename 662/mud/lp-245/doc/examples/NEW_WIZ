@@ -1,0 +1,525 @@
+
+BEING A WIZARD IN LPmud
+-----------------------
+
+Congratulations. That you are reading this probably means that you have just
+become a Wizard in a LPmud game. As a wizard, you have just received a
+portable castle from Leo the Archwizard. Drop it in a nice place somewhere
+in the world of LPmud, and watch it grow to a real castle. Then you can start
+to redesign it and fill it with monsters and treasures. Try to pick a good
+place to drop it so that you don't have to move it later. Moving the castle
+is not difficult but it confuses the players.
+
+
+First of all, try to remember this at all times
+-----------------------------------------------
+
+	As a wizard, you have immense powers. But, with those powers comes
+	responsibility - so always think before you do anything. For example,
+	it is possible to move other wizards' castles, to crash the game,
+	and to kill all the players. And it IS possible to do all these
+	things accidentally, so PLEASE be careful!
+
+	Remember that as far as the game is concerned you are NO LONGER
+	a part of it. Wizards do not play the game, they are above that
+	and participate only by adding new ideas, like quests and rooms.
+
+	If you don't know what you are doing, then you probably shouldn't
+	do it. If you know what you are doing, but not if you should do it,
+	then you probably shouldn't do that either.
+
+	There is a file called /doc/build/RULES, which you should read
+	immediately after finishing this scroll. It contains the rules
+	for how a wizards should behave in GENESIS.
+
+	You can look at it with the command "more /doc/build/RULES".
+	I will remind you later about this, don't worry! :)
+
+
+The file structure is a tree
+----------------------------
+
+LPmud mimics the file system hierarchy and file handling commands of UNIX.
+A directory is a set of files, where those "files" can be both normal
+files and other directories. Everything starts with the so-called root
+directory, the name of which is "/" (at least from inside LPmud!).
+
+As in UNIX, a file or a directory is referred to by its file name or its
+path name, i. e. for example "thing.c" and "/players/padrone/thing.c".
+The rooms in the "basic" LPmud world are in the directory "/room",
+and the objects (like the weapon and monster objects) are in "/obj".
+Each wizard has his own home directory, called for example "/players/padrone".
+
+Some commands for handling files:
+	ls - list the files in a directory
+	rm - remove a file
+	ed - edit a file using LPmud's built-in, line-oriented, editor
+	cat - print the contents of a file on the screen
+	more -- print the contents of a file, approx. one screenful at a time
+	tail -- print the last few lines of a file
+	cd -- change the current directory
+
+
+Where do I find the documentation?
+----------------------------------
+
+There is a directory called "/doc" (try the commands "ls" and "ls /doc"),
+that contains documentation. The subdirectory "/doc/LPC" contains files
+with information about the language LPC, and the subdirectory "/doc/build"
+contains files about how to build. In the directory "/doc/efun" you will
+find descriptions of the external functions, and "/doc/lfun" contains
+descriptions of commonly used local functions.
+
+It can happend that you won't find what you look for in the documentation.
+In that case, either ask another wizard, read the code (which actually
+contains some very useful comments), or find out by testing. You can also
+use the built in 'man' command defined by /obj/trace. It will list
+search for and list documentations.
+
+One of the first things you should do is to read the entire contents of
+/doc. This is not as much work as it seems and it really pays off very soon,
+since you later will remember where to look for explanations of commands
+and routines.
+
+Remember also that the Archwizards, i.e all wizards with level > 21, have
+as part of their duties the obligation to help other wizards with their
+problems in GENESIS.
+
+The best way of reading the documentation is to do "cd /doc" and then "ls"
+to see what you have there. Then you can change directory down into the
+different subdirectories and do "ls" in them to see what you can read there.
+I specially want to point out that the information on the editor "ed" can be
+found in "/doc/build" in the files ed0 - ed4. You read any file with the command
+"more" like "more /doc/build/ed0" or just "more ed0" if you already have written
+"cd /doc/build".
+
+
+Object-oriented programming in LPmud
+------------------------------------
+
+When you play LPmud, everything you encounter (weapons, monsters, players,
+rooms etc.) are OBJECTS. Each object is an INSTANCE of a CLASS of objects.
+One class can INHERIT part of its design from another class.
+
+In LPmud, an instance is either created by CLONING or LOADING the object
+class, and each class is described in a file, written in a C-like language
+called LPC.
+
+These "class descriptions" are the programs in LPmud. All program code
+that you write as a wizard, or that is part of the standard LPmud world,
+will be part of a description of an object class, a class of objects
+that can be loaded and cloned.
+
+
+Loading, cloning and updating
+-----------------------------
+
+"Loading an object" means the process of taking a class description
+file, for example "/obj/weapon.c", and reading it into the game.
+This is done as soon as that object is used in any way, for example
+if a function in the object is called from LPC, or if another object
+tries to enter it (as when a player walks into a room).
+
+When the object is loaded, one instance of the object class is created.
+If there should be only one instance, as for example for (most) rooms,
+this is enough.
+
+If you need to create several instances of a class of objects, you
+clone it. Objects can be cloned using the wizard command "clone",
+as in "clone /obj/torch", and with the LPC function clone_object(),
+as in
+	this_torch = clone_object("obj/torch");
+
+Cloning an object will cause it to be loaded, if it wasn't already loaded.
+
+When you have changed the description of an object by editing the file,
+and want to load the new version of the object, you can use the wizard
+command "update". Then load (or clone) the new version. If the object
+in question is a room, a "goto ROOMNAME" will load the room as well.
+
+
+LPC
+---
+
+LPC is a dialect of C and differs from C mainly in being simplified
+and in that it allows for handling the objects. It has only four data
+types (plus arrays of those data types), fewer operators and a simplified
+control structure.
+
+Note that before the contents of a file is read it is run through
+the standard C pre-processor. This program can be used to insert other
+files into the file being read, and to define constants and macros.
+Lines starting with "#", as the line (no blanks before the #!)
+
+#include "std.h"
+#define INSURANCE_LIMIT 1000
+#define CLONE(var, file) var = clone_object(file);
+	
+are all commands to the preprocessor.
+
+Read more about LPC in the files in the directory /doc/LPC !
+You can read more about the C preprocessor in any book about C,
+but that is hardly neccesary for the ordinary use of LPC.
+
+
+Functions:
+----------
+
+There exists two types of functions in LPC, called LOCAL and EXTERNAL
+functions.  A local function is defined in LPC code in an LPC file, and
+is contained in an object. A local function can be called from LPC code
+inside the object or from LPC code in another object.
+
+Objects communicate with each other by calling functions in each other.
+
+A local function can be declared STATIC, meaning that it can only be called
+from LPC code within the same object.  External function are "built in" in
+LPC, so it has no definition in LPC code.
+
+Examples of local functions are the functions set_value and query_value
+in "/obj/treasure.c". Examples of external functions are write(), time()
+and add_action().
+
+Read more about functions in the file "/doc/LPC/function".
+
+All external functions are documented in "/doc/efun/FUNCTION", where FUNCTION
+is the name of the function. Many local functions are documented in
+"/doc/lfun/FUNCTION". Not all can be documented, as they are unlimited.
+
+
+Error messages
+--------------
+
+If an error occurs when LPmud is trying to load one of your objects,
+an error message will be printed on the file "/log/PLAYERNAME"
+(where PLAYERNAME is your name).
+
+Those error messages, for all the wizards, and also some other error
+messages, are also written on the file "/lpmud.log". Sometimes you have
+to look at that file too to find awhat caused an error. That file will
+usually grow quickly, and the command "tail /lpmud.log" will prove useful.
+
+The last error is stored for every wizard. It can be obtained simply by
+doing 'ed'. If there was an error, it will be displayed with the offending
+line number, and the correct file will be edited.
+
+Also, don't forget to periodically check "/log/PLAYERNAME.rep". When
+a player files a bug report in one of your rooms, using "bug", "typo"
+or "idea", the message ends up in that file!
+
+
+Building
+--------
+
+Start by looking at the existing rooms. As a wizard, when you enter a room,
+LPmud prints the path name of the object that is the room, for example
+"/room/forest2". You can look at the definition of the room by using the
+command "more /room/forest2.c" or "cat /room/forest2.c".
+
+For most purposes it is sufficient to use the standard room routines that
+you get by inheriting "/room/room".
+
+Read more about how to build in the files in the directory "/doc/build".
+
+Remember also that there exists a special directory called "/doc/examples"
+which contains nothing but the introductory texts and examples of how to
+write objects in LPC. More about that later in this text.
+
+An example of a room
+--------------------
+
+This is an example of how a file describing a room can look like
+(This file exists and is called "/room/workroom.c"):
+
+/* Generic workroom, just change it to your fit your tastes */
+
+inherit "room/room";
+
+/*
+ * Function name: reset
+ * Description:   Reset the room
+ */
+reset(arg)
+{
+
+	if (arg)
+		return;
+
+	set_light(1);
+	short_desc = "Wizards workroom";
+	long_desc = "This is the workroom of a powerful wizard, the question is only who?\n" +
+		"Someday someone will come to claim this room for his own, and then all\n" +
+		"will change...\n";
+	no_castle_flag = 1;
+
+	dest_dir =
+	({
+		"room/church", "church",
+		"room/shop", "shop",
+		"room/adv_guild", "guild"
+		/* Just add on rooms as you if you need more exits */
+        });
+
+}
+
+When the first player enters the room after the game was started, the
+file is run through the C preprocessor, yielding a much larger code
+that is stored in a file called "/room/workroom.i". These ".i"-files
+makes the loading of the game after reboot much quicker. Don't touch
+them since they are created and modified by the program itself. Of course,
+if you remove or rename the c-file you can remove the .i-file since it
+won't be referenced any more. The .i-files are not listed by the 'ls'
+command.
+
+The code produced is much larger and contains a lot of other functions
+besides the "reset()" that was actually written above. Four of these
+local functions are of special interest, and many objects will have them
+locally defined:
+
+	reset():This function is called automatically, with the argument 0,
+		when the object is created (that is, loaded or cloned),
+		and after that every three hours or so, but then with the
+		argument 1. It is used to initialize things in an object,
+		and to periodically reset it (like putting new monsters
+		in the different rooms, when they have been killed by
+		all those brutal players).
+
+	long():	This function should print the long description of the
+		object, using the external function write.
+		If this function is defined the "long_desc" can just as
+		well be set to be = 0 since it won't be referenced.
+
+	init():	When a living object (a player or a monster) sees this object
+		(if he, she or it enters the object, or arrives in the same
+		room as the object, or the object is moved into the player
+		or monster, or the object is moved into the same room as the
+		player or object), the living object calls the function init
+		in this object, with the living object as current player.
+
+If you redefine functions that are automatically defined by the inherited
+objects, you will sometimes want to call that function in the inherited code.
+You do that with the operator "::". If you define the function "init()" in
+your room but still would like to call the "init()" in "/room/room" you do
+that with the command "::init();". Typically this IS something that you want
+to do but remember to put the call to the inherited function first.
+
+The example above was a special room called a "workroom". As a wizard you
+have a command called "home" that will bring you to your workroom if you
+have one. To get the workroom described above do like this:
+
+	> cd
+	> ed workroom.c
+	: r /room/workroom.c
+	: w workroom.c
+	: q
+
+And then just "home". You can change this room later to fit your own tastes.
+There will be some messages from ed while you do this, but ignore them and
+just write as it says above.
+
+
+Some more local functions that are defined in many objects
+----------------------------------------------------------
+
+	heart_beat():
+		For objects that have a heart beat, the local function
+		heart_beat will be called (automatically) every two seconds.
+		The heart beat is started by calling the external function
+		"set_heart_beat()", with a non-zero argument from the object.
+		This can be used to simulate that time is going between
+		events in the room, but usually the external function
+		"call_out()" is better to use for that purpose.
+
+	exit():	The opposite of init. Called when someone leaves the room.
+		Be very careful when using this function. If there is an
+		error in it, the occupants of the room can't quit, die, leave
+		the room or perform anything that involves them or anything
+		moving out of the room. And if this should happend to you
+		despite this warning (which it most problably will, *sigh*)
+		DON'T call for help. Anyone who enters the room will only
+		get stuck as well. The only thing you can do is hope for
+		a reboot of the game within the near future :) .
+
+	drop():	If an object has a local function called "drop", and it
+		returns a non-zero value, the object cannot be dropped.
+		If such a non-droppable object is held by a player that
+		quits, it is destructed automatically.
+
+	get():	For a player or monster to be able to pick up an object,
+		that object must have a local function called "get",
+		that returns a non-zero value.
+
+	query_value(), query_weight(), query_level(), query_npc(), etc:
+		Lots of different functions returning values of local
+		variables in the objects.
+
+	set_value(), set_weight(), set_level(), set_npc(), etc:
+		Lots of different functions for setting local variables
+		in the objects.
+
+To find all the available functions you should read the following files
+and try to understand them, since they are the most inherited and cloned
+objects in the game.
+
+	/obj/player.c	- For player functions.
+	/obj/monster.c	- For monster functions.
+	/obj/living.c	- For common monster and player functions.
+	/obj/weapon.c	- For weapon functions.
+	/obj/armour.c	- For armour functions.
+	/room/room.c	- For standard room functions.
+
+
+Player commands
+---------------
+
+A living object (a player or a monster) can perform commands.
+Every command has to be defined in an object, although some commands
+are defined by the player object itself, like "quit" and "look".
+All other commands, like "south", "north" and "buy" (in the shop)
+has to be defined in an object. If you look at the example of a room
+above, you can see how the external function add_action is used
+to add one commands. This is usually done in the local function "init".
+
+
+The "current player"
+--------------------
+
+The external function "this_player()" will return the current player.
+This is the player OR monster that performed the command that LPmud is
+now executing or caused the function "init()" in an object to be run.
+
+The external function "write()" will send the text it is given as argument
+to the current player. The function "say()" will send the text to all living
+objects that are in the same room as the current player (or that are inside
+the current player!), but NOT to the current player itself.
+
+
+When changing your rooms etc
+----------------------------
+
+ALWAYS, ALWAYS, ALWAYS test all changes that you make to your code, at least
+by doing update and clone or load on the object that you changed. Do this
+even after a trivial change, like correcting the spelling of a word in a
+message. It is very easy to accidentaly put a period or a semicolon somewhere
+in your code, and even if the your code is correct there can be bugs in the
+LPmud game itself that can cause it not to work.
+
+
+Some non-technical hints on how to be a good and/or popular wizard
+------------------------------------------------------------------
+
+In this section I will relate parts of the /doc/build/RULES file.
+I believe that some of the things discussed in the rules and guidelines
+can be of general interest to how a wizard should behave and what things
+he (or she or it) should build and not build. So here are some of the
+rules and guidelines:
+
+Do not harm a player directly!
+	This  means, among other things, that you should never attack or
+	kill a player. Also take care not to zap or teleport away (or heal)
+	a monster a player is currently fighting (stat the monster first).
+	Avoid teleporting a player without asking first.
+
+Do not help a player directly!
+	This means, for example, that you must not help by killing or
+	attacking monsters, healing players or giving away items (an
+	occasional beer	might be excused). Also take care not to leave
+	valuable items lying around, e. g. don't zap a monster and leave
+	its weapon-containing corpse to rot on the street.
+
+Remember that the business of players is their business only! A typical case
+is when one player kills another and the killed one starts yelling for blood.
+Let them sort it out on their own. You may NOT interfere and if you get really
+mad about it, tell or mail an Archwizard or administrator.
+
+Do not make deadly traps!
+	A player must never die because he didn't know what happens in the
+	next room. If some room is very dangerous, make some hint (like the
+	giant footprints outside the giant's lair). Deathtraps is about the
+	only case when Lars allowes a player to get back his previous level
+	and equipment, excluding bugs in the code. It also results in an
+	angry letter from him or an Archwizard, which you don't need or
+	want! :)
+
+Do not send killer-monsters out into the world!
+	This means that	if you create a monster that can walk out of the
+	castle, make it a nice monster (i. e. it should never attack players).
+
+Don't make too good things!
+	For example, don't create weapons with weapon class > 20 if there is
+	no big drawback with them. Weapons with wc 20 should be at least as
+	hard to get as the swords of the three giants in the giant conference.
+	Also, body armour (type "armour") should be max armour class 4, and
+	additional armour, like helmets, always class 1.
+
+	And don't make the monsters too easy to kill. A monster with much
+	treasure and/or many experience points should be big, dangerous and
+	very hard to kill.
+
+	Remember that the purpose of the game is for it to be fun and
+	enjoyable both for players and for wizards - not to have all players
+	converge on your castle just to get that wc 30 sword.
+
+Don't make healing too easily available!
+	It's an important part of the game that players have to wait for their
+	hit points to regenerate. Also, the pub is one of the main sources of
+	player interaction and role playing. Remember that even if you only
+	heal a few points per player command (like "drink from fountain"),
+	many players use macros and abbreviations and can still heal almost
+	instantly. Make the players drunk, the healing very limited, the cost
+	very high, or the place very hard to get to! Portable healing in the
+	way of potions and food upsets the balance of the game. If you create
+	such an object make sure they are rare and very expensive.
+
+Don't build lots and lots of extra pubs and shops!
+	The pub, as mentioned above, and also the shop, are natural meeting
+	points and important sources of player interaction. Therefore you
+	should try not to build your own pub or shop if you don't really need
+	it (for example in a quest or for a guild).
+
+Don't make your own "perfect tool". It seems that every wizard wants to make
+	a perfect tool that can do anything. Use /obj/trace instead,
+	and the quicktyper if are are a lazy typist.
+
+Prices of equipment.
+	Should be set with some sense. A player will NEVER be payed more than
+	1000 coins in a shop. The only reason to set a higher value is to
+	prevent another player from buying the same object back from the shop
+	at a too low price.
+
+
+It is very easy to create powerful magic items in LPmud, but this is generally
+NOT a good idea. The balance of the game must be kept and remember that
+NOTHING in the world is given away for free. It's very hard to write rules
+that define how magic may and may not be used, and becuace of that the
+wizard's own judgement must be trusted in almost all cases. There are
+however some things I'd like to warn about right now.
+
+Teleporting players is a nuisance.
+	It wreaks havoc with quests and is generally disliked. If you allow
+	a player to teleport it should only be to one or at most two
+	predifined locations, like the church or your guild, and the cost
+	in spellpoints should be high. At least 50 SP is the current ruling
+	by Lars.
+
+New magic spells for players.
+	Are very easy to write but it is very hard to judge what effect they
+	will have on the game in advance. A discussion about magic and how
+	it should be limited is currently on the way. Some very loose rules
+	exist and the best option is to ask an Archwizard FIRST and implement
+	the spell AFTERWARDS, if ever. If you happily make something and put
+	a lot of time into it only to be told in no-negotiation-possible-
+	terms to remove it, you will only get mad and frustrated. Use your
+	good judgement and in doubtful cases do something else or ask the
+	other wizards what they think first.
+
+Examples of rooms, monsters, objects etc.
+=========================================
+
+Read the files in the directory /doc/examples. They are all just documented
+examples of standard problems in LPmud. Like creating new rooms, monsters
+and equipment along with some general advice. The best thing might be to
+"go" there by typing "goto /doc/examples/path1" and walk around for a while,
+before actually viewing the code.
+
+NOW: Read /doc/build/RULES by typing "more /doc/build/RULES"  .

@@ -1,0 +1,27 @@
+These are the rules concerning portable alcoholic and non-alcoholic drinks:
+
+The total amount of sold healing per reset must not exceed 3000 hp.
+A maximum of 200 hp may be sold to one customer per reset. The cost
+of such healing is calculated using this formula:
+
+x = The amount of healing sold.
+
+Cost = 4*x + x^2/10
+
+This means that the more healing an item contains, the more expensive
+it gets. These items must have a weight of at least 1.
+
+The "strength" of the drink is equal to the amount of healing it makes to
+the player when he eats it. Typically this strength should not exceed 50.
+
+Use the file "obj/alco_drink" and "obj/soft_drink" for cloning and inherting
+purposes. Please read the file find out which functions to call.
+
+NB! "obj/alco_drink" should now be used instead of "obj/drink" for alcoholic
+beverages. The older file remains only for backward-compatibility purposes
+but it will be removed within a near future together with the connected call
+"drink_alcohol()".
+
+Examples of food and drink and an inn selling these items can be found in
+/doc/examples/apple_pie.c and /doc/examples/inn.c.
+Type "goto /doc/examples/inn" just to visit it.
