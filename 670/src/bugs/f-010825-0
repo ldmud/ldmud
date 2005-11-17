@@ -1,0 +1,14 @@
+Short: New shadows efuns
+From: Tomba@Batmud
+Date: 2001-08-25
+Type: Feature
+State: New
+
+
+call_shadow() works like call_other, but it does NOT call any shadows and
+so it always calls the functions in the object that was given as argument.
+
+all_shadows() returns an array of objects shadowing the given object.
+
+first_shadow, next_shadow, last_shadow are used to traverse shadows of an
+object.

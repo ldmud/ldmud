@@ -1,0 +1,18 @@
+NAME
+        status
+        status tables
+        status swap
+        status malloc
+
+DESCRIPTION
+        This command is hardcoded into the drivers input routine.
+        It displays information about the run status of the system.
+        If the O_IS_WIZARD flag is used in the mudlib (i.e. if
+        set_is_wizard() was called), this command is allowed only for
+        users that have this flag set.
+
+HISTORY
+        3.2.7 added the 'status malloc' variant.
+
+SEE ALSO
+        malloc(D), memory(C), objects(C), debug_info(E), set_is_wizard(E)

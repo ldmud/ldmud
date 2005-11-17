@@ -1,0 +1,16 @@
+SYNOPSIS
+        void log_error(string file, string err, int warn)
+
+DESCRIPTION
+        Announce a compiler-time error (warn == 0) or warning (warn != 0)
+        in the named file.
+
+        Whenever the LPC compiler detects an error or issues a warning,
+        this function is called. It should at least log the error in a file,
+        and also announce it to the active user.
+
+HISTORY
+        LDMud 3.2.8 added the 'warn' argument and the warnings in general.
+
+SEE ALSO
+        runtime_error(M)
