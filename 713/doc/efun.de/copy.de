@@ -1,0 +1,24 @@
+SYNOPSIS
+        mixed copy(mixed arg);
+
+BESCHREIBUNG
+        Erzegut eine flache Kopie von <arg> und liefert diese zurueck. Fuer
+        Arrays und Mappings heisst das, dass neue Arrays bzw. Mappings erzeugt
+        werden, die Kopien der Elemente des Originals enthalten. Eingebettete
+        Arrays und Mappings werden jedoch als Referenz uebergeben!
+
+        Fuer andere Werte von <arg> bewirkt diese Funktion nichts.
+
+BEISPIEL
+        mixed *a, *b;
+        a = ({ 1, ({ 21, 22 }) });
+        b = copy(a);
+        a[0] = -1; a[1][0] = -21;
+            --> a ist nun ({ -1, ({ -21, 22 }) })
+                b ist nun ({  1, ({ -21, 22 }) })
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.6
+
+SIEHE AUCH
+        deep_copy(E)

@@ -1,0 +1,7 @@
+string query_inf()
+
+Declare this function if the object has some information that is hidden.
+A scroll of identify would call query_info() to find out.
+
+The standard objects weapon.c, armour.c and treasure.c all have a function
+set_info(), to enable setting an information string.

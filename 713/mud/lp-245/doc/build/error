@@ -1,0 +1,11 @@
+If there are any errors when loading a new file, the object will not
+be loaded at all, and you will be thrown out to the void.
+
+To look at the error message, cat or edit the file /log/name, where 'name' is
+your name. Check this file regularly, and trim it if big (use rm).
+
+The line number specified by the error can be several lines wrong
+sometimes. Sorry for this.
+
+There can also be a run time error, for example if the room tries to
+move you to a room that does not exist. Again, look at lpmud.log.
