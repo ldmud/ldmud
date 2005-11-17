@@ -1,0 +1,24 @@
+OPTIONAL
+SYNOPSIS
+        int db_affected_rows(int handle)
+
+BESCHREIBUNG
+        Resultat ist die Anzaehl der Zeilen die vom letzten SQL-Befehl
+        beeinflusst wurden, welches zum SQL-server via <handle> gesendet
+        wurde. Diese Funktion ist nuetzlich lediglich fuer DELETE-
+        und UPDATE-Befehle.
+
+        Die Funktion ist nur verfuegbar wenn der Driver mit
+        mySQL-Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __MYSQL__ definiert.
+
+        Die Efun ist privilegiert als ("mysql", "db_affected_rows").
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.9.
+        LDMud 3.2.11 machte die Efun privilegiert.
+
+SIEHE AUCH
+        db_conv_string(E), db_close(E), db_coldefs(E), db_connect(E),
+        db_exec(E), db_error(E), db_fetch(E), db_insert_id(E), db_handles(E),
+        mysql(C), privilege_violation(M)

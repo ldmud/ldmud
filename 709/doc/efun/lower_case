@@ -1,0 +1,12 @@
+SYNOPSIS
+        string lower_case(string str)
+
+DESCRIPTION
+        Convert all characters in str to lower case, and return the
+        new string.
+
+EXAMPLES
+        lower_case("Heya!") -> "heya!"
+
+SEE ALSO
+        capitalize(E), upper_case(E)

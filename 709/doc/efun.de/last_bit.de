@@ -1,0 +1,19 @@
+SYNOPSIS
+        int last_bit(string str);
+
+BESCHREIBUNG
+        Liefert die Nummer des letzten gesetzten Bits im Bitstring <str>.
+
+        Jedes Zeichen enthaelt 6 Bits. Also kann in jedem Zeichen ein Wert von
+        0 bis 63 gespeichert werden (2^6=64). Das erste Zeichen ist der
+        Leerschlag " " mit dem Wert 0. Das erste Zeichen im String ist jenes
+        mit den niedrigsten Bits (0-5).
+
+BEISPIEL
+        string s;
+        s = set_bit("", 4); s = set_bit(s, 2);
+        last_bit(s) --> liefert 4
+
+SIEHE AUCH
+        set_bit(E), clear_bit(E), next_bit(E), test_bit(E), count_bits(E),
+        and_bits(E), or_bits(E), xor_bits(E), invert_bits(E), copy_bits(E)
