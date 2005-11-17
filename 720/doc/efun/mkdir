@@ -1,0 +1,9 @@
+SYNOPSIS
+        int mkdir(string path)
+
+DESCRIPTION
+        Make a directory named path. Return 1 for success and 0 for
+        failure.
+
+SEE ALSO
+        rmdir(E), rm(E), get_dir(E), file_size(E)

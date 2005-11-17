@@ -1,0 +1,22 @@
+OPTIONAL
+SYNOPSIS
+        int db_exec(int handle, string statement)
+
+DESCRIPTION
+        Execute the SQL-statement <statement> for the connection <handle> to
+        the SQL-server. The result is the handle if all went okay. If there
+        was an error in the statement, 0 is returned.
+
+        The function is available only if the driver is compiled with
+        mySQL support. In that case, __MYSQL__ is defined.
+
+        The efun triggers a privilege violation ("mysql", "db_exec").
+
+HISTORY
+        Added in 3.2.9 .
+        LDMud 3.2.11 added the privilege violation.
+
+SEE ALSO
+        db_affected_rows(E), db_conv_string(E), db_close(E), db_coldefs(E),
+        db_connect(E), db_error(E), db_fetch(E), db_handles(E),
+        db_insert_id(E), mysql(C), privilege_violation(M)

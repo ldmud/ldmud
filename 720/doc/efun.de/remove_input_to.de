@@ -1,0 +1,38 @@
+SYNOPSIS
+        int remove_input_to (object player);
+        int remove_input_to (object player, string fun);
+        int remove_input_to (object player, closure fun);
+        int remove_input_to (object player, object fun);
+        int remove_input_to (object player, object obj, string fun);
+
+BESCHREIBUNG
+        Entfernt ein haengiges input_to() aus dem interaktiven Playerobjekt.
+        Wenn <fun> nicht angegeben ist, wird der zuletzt aufgerufen input_to()
+        entfernt.
+
+        Wurde <fun> angegeben, entfernt remove_input_to das neueste auf <fun>
+        aufgerufene input_to. Je nach der Definition von <fun> wird nach
+        unterschiedlichen Kriterien gesucht:
+          - <fun> ist ein String: gesucht wird nach dem Funktionsnamen
+          - <fun> ist ein Objekt: gesucht wird nach dem Objekt, in dem
+            input_to() aufgerufen wurde
+          - <fun> ist eine Closure: gesucht wird nach der Closure, die
+            input_to() enthaelt
+          - <obj> und <fun> wurden angegeben: es wird nach Objekt und
+            Funktionsname gesucht. Beide muessen uebereinstimmen.
+
+        remove_input_to() liefert 1 bei Erfolg, sonst 0 (es wurde kein
+        input_to() gefunden, das Objekt ist nicht interaktiv oder es gibt
+        kein haengiges input_to() auf dem Objekt).
+
+BEISPIELE
+        Entfernt alle haengigen input_to()s des aktuellen Spielers, falls
+        vorhanden:
+            while(remove_input_to(this_interactive()));
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.9.
+
+SIEHE AUCH
+        input_to(E), find_input_to(E), input_to_info(E),
+        query_input_pending(E)
