@@ -1,0 +1,22 @@
+OPTIONAL
+SYNOPSIS
+        mixed db_fetch(int handle)
+
+DESCRIPTION
+        Retrieve _ONE_ line of result of the latest SQL-action to the server
+        based on the handle <handle>. If not more results are on the server,
+        0 is returned.
+
+        The function is available only if the driver is compiled with
+        mySQL support. In that case, __MYSQL__ is defined.
+
+        The efun triggers a privilege violation ("mysql", "db_fetch").
+
+HISTORY
+        Added in 3.2.9 .
+        LDMud 3.2.11 added the privilege violation.
+
+SEE ALSO
+        db_affected_rows(E), db_conv_string(E), db_close(E), db_coldefs(E),
+        db_connect(E), db_error(E), db_exec(E), db_handles(E), db_insert_id(E),
+        mysql(C), privilege_violation(M)

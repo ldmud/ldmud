@@ -1,0 +1,15 @@
+SYNOPSIS
+        int member(mixed *array, mixed elem);
+        int member(mapping map, mixed key);
+        int member(string s, int elem);
+
+BESCHREIBUNG
+        Fuer Arrays und String liefert member() den Index des ersten
+        Auftretens von <elem> in <arg>. Ist <elem> nicht in <arg> enthalten,
+        wird -1 zurueck gegeben.
+
+        Fuer Mapping prueft member(), ob <key> in <map> enthalten ist und
+        liefert 1 zurueck falls ja, 0 sonst.
+
+VERGLEICHE
+        rmember(E), mappings(LPC)

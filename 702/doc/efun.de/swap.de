@@ -1,0 +1,7 @@
+GESCHUETZT
+SYNOPSIS
+        void swap(object obj);
+
+BESCHREIBUNG
+        Lagert ein Objekt aus. Diese Efun ist nur fuer systeminternes
+        Debugging und kann einen Absturz verursachen.
