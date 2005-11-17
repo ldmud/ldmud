@@ -1,0 +1,12 @@
+NAME
+        malloc
+
+DESCRIPTION
+        This command is hardcoded into the driver's input parser.
+        It shows the statistics of the memory management module.
+
+HISTORY
+        Since 3.2.7, 'status malloc' has the same effect.
+
+SEE ALSO
+        status(D), memory(C), debug_info(E)

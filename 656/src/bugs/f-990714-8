@@ -1,0 +1,13 @@
+Short: New efun shuffle_array()
+From: Tubmud
+Type: Feature
+State: Unclassified
+
+        mixed *shuffle_array(mixed *arr);
+          shuffles the array randomly and returns the result:
+          shuffle_array(({ 1,2,3,4 }))
+          ==> ({ 4,1,3,2 })  (when I tested)
+
+        shuffle_array() and turn_array() also work for strings.
+
+

@@ -1,0 +1,63 @@
+Short: CRT doesn't work well in charmode
+From: Elric <elric@www.lpmud.com>
+Date: Thu, 07 Jun 2001 12:17:35 -0600
+Type: Bug
+State: New
+
+Elric wrote:
+> Hey Lars, I am making a full screen editor that acts and looks similar to
+> Pico. So far so good except for a problem when i press return. Ok I use
+> CRT in Windows to telnet (http://www.vandyke.com) and it only sends \r in
+> charmode. The problem is when I press return it doesn't send anything, I
+> press it again and receive chr(13) now if i press any key is sends the
+> missing chr(13) then the key i pressed. It's like it is buffering a
+> chr(13).
+> Charmode works fine when i use real pico so I think its something
+> with the driver, perhaps some negotiation or its just expecting \r\n and
+> only gets \r so it gets confused.
+
+If CRT expects some additional negotiation, I don't know which one. I 
+compared CRT against normal unix telnet, and while they get exactly 
+the same control messages, CRT insists on sending the CR only after 
+you type a second key (the driver then receives the CR and the next 
+key in one go). 
+
+I will have to read up on telnet linemode negotiation, but that'll 
+take time as the information is scattered over 10 RFCs.
+
+-----------------------------------------------------------------------
+Date: Mon, 16 Jul 2001 23:45:41 +0200 (MET DST)
+From: Niels Boehm <bohmmrwc@minet.uni-jena.de>
+
+Mir ist grad dieser bug aufgefallen, und da ich letztens grade ein bissel
+in den telnet RFCs gelesen hab ...
+
+Well, if CRT sends _only_ ascii 13, it is wrong in doing do. The reason
+is, that the telnet specification requires a single carriage return to be
+followed by ascii 0, i.e. every CR that is not part of a combined CR LF
+must actually be sent as CR NUL. (rfc 854 says: '...; the sequence "CR
+NUL" must be used where a carriage return alone is actually desired; and
+the CR character must be avoided in other contexts. ...')
+
+Why this requirement of the telnet protocol? Well, simple, it ensures that
+the receiving end can interpret a CR LF sequence unambigously as a single
+newline and not as a separate CR and a separate LF.
+
+And furthermore - and probably more importantly - it prevents such
+problems as this described with CRT from happening ... Imagine the telnet
+protocol wouldn't require a NUL to be appended to a single CR, then
+imagine the sending end would transmit a line of text plus a terminating
+CR (and only this, without NUL), the receiving end would indeed read that
+CR, but it could not take any action yet (for example advancing a line),
+since the next char could be an LF, which might require different action
+(since then it would be a CR LF, that is, a "newline"), and it can't tell
+if it won't be that unless the next char arrives.
+
+Also nochmal ganz kurz in deutsch: Wenn CRT _nur_ ein CR (also ascii 13)
+sendet, ist es dessen Fehler. Das telnet protocoll _verlangt_, daß einem
+einzelnen CR ein NUL (also ascii 0) folgt.
+
+
+Regargs,
+Niels Böhm
+
