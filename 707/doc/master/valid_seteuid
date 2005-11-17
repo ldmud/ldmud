@@ -1,0 +1,9 @@
+SYNOPSIS
+        int valid_seteuid(object ob, string newid)
+
+DESCRIPTION
+        Should return 1 if ob is allowed to set its euid to newid.
+        Objects are always allowed to set their euid to 0.
+
+SEE ALSO
+        seteuid(E), uids(C)
