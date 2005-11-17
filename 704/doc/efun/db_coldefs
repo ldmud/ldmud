@@ -1,0 +1,22 @@
+OPTIONAL
+SYNOPSIS
+        string * db_coldefs (int handle)
+
+DESCRIPTION
+        Return an array with the column names of the current table.
+        If the database didn't return a result, the result of this efun
+        is 0.
+
+        The function is available only if the driver is compiled with
+        mySQL support. In that case, __MYSQL__ is defined.
+
+        The efun triggers a privilege violation ("mysql", "db_coldefs").
+
+HISTORY
+        Added in 3.2.9 .
+        LDMud 3.2.11 added the privilege violation.
+
+SEE ALSO
+        db_affected_rows(E), db_conv_string(E), db_close(E), db_connect(E),
+        db_exec(E), db_error(E), db_fetch(E), db_handles(E), db_insert_id(E),
+        mysql(C), privilege_violation(M)

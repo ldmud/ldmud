@@ -1,0 +1,23 @@
+[COPYRIGHT]
+Copyright 1997-2004 by Lars Duening.
+
+LDMud is based on LPmud, which is
+Copyright 1989-1991 by Lars Pensj|, and, starting with version 3.1.2,
+Copyright 1991-1997 by Joern Rennecke.
+
+Source code herein refers to the source code, and any executables
+created from the same source code.
+
+All rights reserved.  Permission is granted to use, extend and modify the
+source code provided subject to the restriction that the source code may
+not be used in any way whatsoever for monetary gain.
+
+LDMud contains additional code which are copyright by their respective
+authors - see the files COPYRIGHT and CREDITS for details.
+
+[AUTHOR]
+Maintained by Lars Duening (lars@bearnip.com).
+
+[REPORTING BUGS]
+Bug reports and feature suggestions are tracked online at
+http://mantis.bearnip.com/ .

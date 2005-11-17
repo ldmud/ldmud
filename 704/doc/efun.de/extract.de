@@ -1,0 +1,12 @@
+VERALTET
+SYNOPSIS
+        string extract(string str, int from, int to);
+        string extract(string str, int from);
+
+BESCHREIBUNG
+        Extrahiert einen Teilstring aus einem String.
+        Dies ist die alte Schreibweise fuer str[from..to] und wird nur aus
+        historischen Gruenden (hysterical raisins) unterstuetzt.
+
+SIEHE AUCH
+        [](E)

@@ -1,0 +1,5 @@
+SYNOPSIS
+        *object users();
+
+BESCHREIBUNG
+        Liefert ein Array, das alle interaktiven Benutzer enthaelt.

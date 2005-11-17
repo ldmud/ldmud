@@ -1,0 +1,20 @@
+OPTIONAL
+SYNOPSIS
+        string db_conv_string(string str)
+
+BESCHREIBUNG
+        Wandele den String <str> in einen String um, der von der Datenbank
+        korrekt interpretiert werden kann; z.B. werden all Apostrophe
+        durch \' ersetzt.
+
+        Die Funktion ist nur verfuegbar wenn der Driver mit
+        mySQL-Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __MYSQL__ definiert.
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.9.
+
+SIEHE AUCH
+        db_affected_rows(E), db_close(E), db_coldefs(E), db_connect(E),
+        db_exec(E), db_error(E), db_fetch(E), db_handles(E), db_insert_id(E),
+        mysql(C)
