@@ -1,0 +1,8 @@
+Short: New efun strreplace()
+From: Lars
+Date: 2002-04-04
+Type: Feature
+State: New
+See also: f-981229-22
+
+strreplace("abcdef", "cd", "x") -> "abxef"

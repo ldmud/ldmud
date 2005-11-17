@@ -1,0 +1,5 @@
+This directory describes functions that may or may not be declared in an
+object. If they are declared, they will be called when apropriate.
+
+It might be important to declare some functions, so always check
+all of them.

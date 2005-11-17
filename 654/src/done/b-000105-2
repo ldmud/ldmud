@@ -1,0 +1,26 @@
+Date: Wed, 5 Jan 2000 20:13:46 +0100
+From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
+Short: foreach() and reserved words
+Type: Bug
+State: Done - fixed in 3.2.8-dev.176
+
+Hi,
+
+foreach hat wohl Probleme mit reserved words:
+
+mixed *a;
+a = ({ 1,2,3,4 });
+foreach(int command: a)
+    printf("Command:%O\n",command);
+
+liefert immer 0 ;)
+
+Command:0
+Command:0
+Command:0
+Command:0
+
+Analysis:
+When the shadowing if the global identifier is detected, the compiler
+used the ident* of the global to retrieve the number of the local -
+which of course resulted in random memory accesses.

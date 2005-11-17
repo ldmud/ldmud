@@ -1,0 +1,119 @@
+Date: Mon, 7 Feb 2000 22:58:39 +0200 (EET)
+From: =?ISO-8859-1?Q?Manu_M=E4ki?= <mtmaki@students.turkuai.fi>
+Short: COMMAND hook cores
+Type: Bug
+State: Done - fixed in 3.2.8-dev.196
+
+
+Ok, the mud started crashing as I started to test this H_COMMAND hook. I
+got the following output from gbd.
+
+#0  free_object_svalue (v=0x20696c6f) at interpret.c:846
+846         free_object(ob, "free_object_svalue");
+(gdb) p ob
+$1 = (object_t *) 0x0
+(gdb) pt ob
+type = struct object_s {
+    short unsigned int flags;
+    p_int ref;
+    short int total_light;
+    mp_int time_reset;
+    mp_int time_of_ref;
+    mp_int load_time;
+    p_int load_id;
+    p_int extra_ref;
+    program_t *prog;
+    char *name;
+    char *load_name;
+    object_t *next_all;
+    object_t *prev_all;
+    object_t *next_hash;
+    object_t *next_inv;
+    object_t *contains;
+    object_t *super;
+    sentence_t *sent;
+    wiz_list_t *user;
+    wiz_list_t *eff_user;
+    int extra_num_variables;
+    svalue_t *variables;
+    long unsigned int ticks;
+    long unsigned int gigaticks;
+} *
+(gdb) p *ob
+$2 = {flags = 20992, ref = 512, total_light = 501, time_reset = 1092,
+time_of_ref = 30971, load_time = 1092, load_id = 30960, 
+  extra_ref = 1936875888, prog = 0x65, name = 0x0, load_name = 0x0,
+next_all = 0x61702f2e, prev_all = 0x20657372, next_hash = 0x0, 
+  next_inv = 0x0, contains = 0x0, super = 0x0, sent = 0x0, user = 0x0,
+eff_user = 0x0, extra_num_variables = 0, variables = 0x0, 
+  ticks = 0, gigaticks = 0}
+
+
+The lambda closure that was used in H_COMMAND is the following...
+
+    set_driver_hook(H_COMMAND,
+     unbound_lambda( ({ 'cmd, 'cmd_giver }),
+       ({ #',,
+         ({ #'?,
+           ({ #'function_exists, "modify_command", 'cmd_giver }),
+           ({ #'=, 'cmd, ({ #'call_other, 'cmd_giver, "modify_command", 'cmd }) }),
+            0
+         }),
+         ({ #'=, 'usage_s,
+           ({ #'[,
+             ({ #'rusage }), 0,
+           }),
+         }),
+         ({ #'=, 'eval_s,
+           ({ #'get_eval_cost })
+         }),
+         ({ #'=, 'res, 
+           ({ #'execute_command, 'cmd, ({ #'this_object }), 'cmd_giver }),
+         }),
+         ({ #'=, 'eval_e,
+           ({ #'get_eval_cost })
+         }),
+         ({ #'=, 'usage_e,
+           ({ #'[,
+             ({ #'rusage }), 0,
+           }),
+         }),
+         ({ #'=, 'nf,
+           ({ #'query_notify_fail })
+         }),
+         ({ #'?!, 'res,
+           ({ #'write,
+             ({ #'?,
+               'nf,
+               ({ #'?,
+                 ({ #'closurep, 'nf }),
+                 ({ #'funcall, 'nf }),
+                 'nf,
+               }),
+               "What ?\n"
+             })
+           })
+         }),
+         ({ #'=, 'udif,
+           ({ #'-, 'usage_e, 'usage_s }),
+         }),
+         ({ #'=, 'edif,
+           ({ #'-, 'eval_s, 'eval_e }),
+         }),
+         ({ #'catch,
+           ({ #'call_other, "/players/cendor/rooms/cmdlagroom", "get_data", ({ #'this_object }), 'cmd, 'udif, 'edif })
+         }),
+         ({ #'return, 'res }),  
+       })));
+
+This works all OK except random crashes. :-) The purpose of this hook is
+to provide a way to measure execution time + evaluation cost of all
+commands executed in mud to find some possible laggers etc. Anyway, I hope
+this information helps with bugfixing. :-)
+
+
+  Manu aka Cendor@Winterkill
+
+Btw. the mud crashed thrice and every time it gave same output from GDB.
+:)
+
