@@ -1,0 +1,122 @@
+SYNOPSIS
+        #include <sys/input_to.h>
+
+        void input_to(string|closure fun);
+        void input_to(string|closure fun, int flag, ...);
+        void input_to(string|closure fun, int flag, string|closure prompt, ...);
+
+BESCHREIBUNG
+        Die naechste Zeile, die der Spieler eintippt, wird als Argument an die
+        Funktion <fun> uebergeben. Ausnahme: wenn die naechste Zeile mit einem
+        '!' beginnt, wird sie als Kommando ausgewertet bzw. an das letzte
+        input_to() uebergeben, das das INPUT_IGNORE_BANG Flag gesetzt hat.
+        Die Funktion <fun> kann "static" deklariert sein, nicht aber "private"
+        (sonst wird sie nicht gefunden).
+
+        Der Aufruf von <fun> erfolgt nicht sofort, sondern erst, wenn der
+        Spieler die Entertaste drueckt.
+
+        Wenn input_to() mehr als einmal pro Funktion aufgerufen wird,
+        wird nur das erste input_to() beruecksichtigt. Wird andererseits
+        waehrend einem laufenden input_to() (mittels "!" am Zeilenanfang)
+        eine neue Funktion aufgerufen, die wiederum ein input_to() enthaelt,
+        wird das urspruengliche input_to() so lange unterbrochen, bis das
+        neue input_to() abgearbeitet wurde, anschliessend wird es wieder aktiv.
+
+        Das optionale <flag> kann ein binaeres Oder (|) der folgenden
+        Werte sein:
+
+        INPUT_NOECHO (1):
+            Die vom Spieler eingegebene Zeile erzeugt kein Echo und wird auch
+            nicht erkannt, wenn der Spieler beobachtet wird.
+
+            Dieser Modus kann nur geaendert werden, wenn telnet enabled ist.
+
+        INPUT_CHARMODE (2):
+            Die Verbindung zum User wechselt von Zeilen- auf Zeichenmodus. So
+            wird nur ein einzelnes Zeichen (!) vom Spieler empfangen.
+
+            Ist telnet disabled, wird lediglich die Interpretation der
+            einkommenden Daten durch den Driver umgeschaltet - das
+            Clientprogramm des Spieler verbleibt im gerade aktiven Modus.
+
+            Nachdem die Funktion <fun> ausgefuehrt wurde, wechselt die
+            Verbindung zurueck in Zeilenmodus, ausser ein nachfolgendes
+            input_to( , 2) wurde gestartet.
+
+            Zeilenumbrueche werden je nach Client unterschiedlich empfangen,
+            entweder als "", als "\r" gefolgt von "" oder als "\r" (letzteres
+            kommt vor allem bei Windows Clients vor).
+
+            Das Frontend des Spielers kann dauernd im Zeilenmodus bleiben.
+            Auch wenn input_to() nur ein einzelnes Zeichen fordert, muss der
+            Spieler unter Umstaenden das Zeichen und einen Zeilenumbruch
+            druecken (und senden). Normalerweise erhaelt <fun> dann den
+            gesamten Input auf einmal.
+
+            Will man laenger im Zeichenmodus bleiben, kann der Overhead
+            reduziert werden, indem set_combine_charset() verwendet wird. So
+            koennen Zeichensequenzen als ein String anstelle von
+            Zeichen-fuer-Zeichen empfangen werden. In einem screenorientierten
+            Editor gilt dies fuer die meisten druckbaren Zeichen.
+
+        INPUT_PROMPT (4):
+            Das Argument nach dem <flag> wird als Prompt fuer die Eingabe
+            verwendet. Wenn dieses Argument nicht angegeben (und damit kein
+            Propmt definiert) ist, wird kein Prompt ausgegeben.
+
+        INPUT_NO_TELNET (8):
+            Modifiziert das INPUT_CHARMODE Argument: der Driver aendert
+            seine Behandlung von eingehenden Daten entsprechend dem _CHARMODE
+            Argument, sendet aber keine Telnetkommandos zur Anpassung
+            des Verhaltens des Clientprogrammes.
+
+        INPUT_IGNORE_BANG (128):
+            Eingaben, die mit ! beginnen, werden NICHT als Kommandi geparset,
+            sondern auch als Argument an die Funkion <fun> uebergeben. Die
+            Verwendung dieses Flags ist eingeschraenkt.
+
+        Alle nachfolgenden Argumente werden als zweites bzw. drittes usw.
+        Argument an <fun> uebergeben.
+
+BEISPIEL
+        void func()
+        {
+            ...
+            input_to("enter_name", INPUT_PROMPT, "Wie lautet dein Name?:");
+            /* Frueher erledigte man dies mit:
+             *   write("Wie lautet dein Name?:");
+             *   input_to("enter_name");
+             */
+             ...
+         }
+
+         enter_name(string str)
+         {
+            write("Heisst du wirklich '"+str+"'?? *kicher*\n");
+            ...
+        }
+
+        Bei der input_to() Anweisung fuehrt der Driver die Funktion
+        func() aus, erwartet aber gleichzeitig Input vom Spieler. Wenn
+        dieser etwas eingegeben UND DIE ENTERTASTE GEDRUECKT HAT, arbeitet
+        der Driver die Funktion enter_name() mit dem eingegebenen String
+        als Argument ab.
+
+AENDERUNGEN
+        Die Bedeutung von <flag> wurde in 3.2.1@93 erweitert.
+        Die Limitierung fuer das "stapeln" von input_to()s aus !-Kommandi
+            wurde in LDMud 3.2.8 implementiert.
+        Seit LDMud 3.2.8 kann <fun> in Form einer Closure angegeben werden.
+        LDMud 3.2.9 fuehrte das Flag INPUT_PROMPT samt zugehoerigem Argument
+            ein.
+        LDMud 3.2.11 fuehrte das INPUT_NO_TELNET Flag ein.
+
+BUGS
+        Im Zeichenmodus sollten Zeilenumbrueche eigentlich als "\n" zurueck
+        gegeben werden. Dies allerdings kann existierenden Code zerstoeren.
+
+SIEHE AUCH
+        call_other(E), sscanf(E), privilege_violation(M),
+        set_combine_charset(E), query_input_pending(E), find_input_to(E),
+        input_to_info(E), remove_input_to(E)
