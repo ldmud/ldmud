@@ -1,0 +1,14 @@
+SYNOPSIS
+        int program_time();
+        int program_time(object obj);
+
+BESCHREIBUNG
+        Gibt den Zeitpunkt an, zu dem das Objekt <obj> (bzw. this_object(),
+        wenn nichts angegeben wurde) erzeugt, d.h. kompiliert wurde.
+
+ANMERKUNG
+        Diese Efun swapt das Programm zurueck ins Objekt, wenn es ausgelagert
+        war.
+
+SIEHE AUCH
+        object_time(E), program_name(E)

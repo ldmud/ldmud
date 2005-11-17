@@ -1,0 +1,29 @@
+SYNOPSIS
+        int to_int(string arg);
+        int to_int(float arg);
+        int to_int(int arg);
+        int to_int(closure arg);
+
+        (int)<value>
+
+BESCHREIBUNG
+        Bei Floats werden die Nachkommastellen abgeschnitten, Strings mit
+        Ziffern am Anfang werden bis zum ersten Nicht-Ziffern-Zeichen in
+        Integers umgewandelt. Lfun-Closures werden in ihren Funktionsindex
+        konvertiert, Variablen-Closures in ihren Variablenindex. Integers
+        werden unveraendert zurueck gegeben.
+
+        Bezueglich Floats ist es wichtig, Rundungseffekte zu beachten:
+        to_int(3.1*10.0) ergibt nicht 31, sondern 30, weil intern das
+        Resultat der Multiplikation 30.999999 ergibt.
+
+BUGS
+        Die Cast-Schreibweise funktioniert nur, wenn der genaue Wert von
+        <value> zum Zeitpunkt der Kompilierung bekannt ist. Dies wird
+        nicht geaendert werden, da die Funktionsform verwendet werden kann.
+
+AENDERUNGEN
+        Eingefuehrt in 3.2.1@2
+
+SIEHE AUCH
+        to_string(E), sscanf(E)

@@ -1,0 +1,12 @@
+SYNOPSIS
+        object *all_inventory()
+        object *all_inventory(object ob)
+
+BESCHREIBUNG
+        Liefert ein Feld (Array) mit allen Objekten, die sich im Objekt ob
+        befinden (bzw. in this_object(), sofern kein Argument angegeben
+        wurde).
+
+SIEHE AUCH
+        first_inventory(E), next_inventory(E), deep_inventory(E),
+        all_environment(E), environment(E)
