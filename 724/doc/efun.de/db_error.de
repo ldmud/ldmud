@@ -1,0 +1,23 @@
+OPTIONAL
+SYNOPSIS
+        string db_error(int handle)
+
+BESCHREIBUNG
+        Result ist ein String, der den Fehler der letzten
+        Datenbanktransaktion beschreibt.  War die letzte Transaktion
+        erfolgreich, ist das Ergebnis 0.
+
+        Die Funktion ist nur verfuegbar wenn der Driver mit
+        mySQL-Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __MYSQL__ definiert.
+
+        Die Efun ist privilegiert als ("mysql", "db_error").
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.9.
+        LDMud 3.2.11 machte die Efun privilegiert.
+
+SIEHE AUCH
+        db_affected_rows(E), db_conv_string(E), db_close(E), db_coldefs(E),
+        db_connect(E), db_exec(E), db_fetch(E), db_handles(E), db_insert_id(E),
+        mysql(C), privilege_violation(M)

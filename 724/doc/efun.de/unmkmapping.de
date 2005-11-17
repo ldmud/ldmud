@@ -1,0 +1,27 @@
+SYNOPSIS
+        *mixed unmkmapping(mapping map);
+
+BESCHREIBUNG
+        Wandelt das Mapping <map> in ein Array von Arrays aus, das alle Keys
+        und Werte von <map> enthaelt und gibt dieses Array zurueck.
+
+        Das Resultat von unmkmapping() hat die Form ({ keys[], data0[],
+        data1[] ... }), wobei keys[] ein Array aller Keys ist, data0[] ein
+        Array mit allen Werten aus der ersten Spalte, data1[] ein Array mit
+        allen Werten aus der zweiten Spalte etc. Das heisst, dass die
+        Werte von key[x] in data0[x], data1[x] usw. gespeichert sind.
+
+        unmkmapping() ist die Umkehrfunktion von mkmapping(), sodass gilt:
+
+            apply(#'mkmapping, unmkmapping(m)) == m
+
+BEISPIEL
+        mapping m = ([ 1:10;20, 2:11;21 ]);
+        unmkmapping(m) ergibt: ({ ({1, 2}) , ({10, 11}) , ({20, 21}) })
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.6.
+
+SIEHE AUCH
+        mappings(LPC), mappingp(E), m_indices(E), m_values(E), m_delete(E),
+        sizeof(E), widthof(E).

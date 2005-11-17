@@ -1,0 +1,22 @@
+OPTIONAL
+SYNOPSIS
+        int db_exec(int handle, string statement)
+
+BESCHREIBUNG
+        Fuehre den SQL-Befehl <statement> fuer die Verbindung <handle> aus.
+        Resultat ist das Handle bei Erfolg, oder 0 bei einem Fehler.
+
+        Die Funktion ist nur verfuegbar wenn der Driver mit
+        mySQL-Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __MYSQL__ definiert.
+
+        Die Efun ist privilegiert als ("mysql", "db_exec").
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.9.
+        LDMud 3.2.11 machte die Efun privilegiert.
+
+SIEHE AUCH
+        db_affected_rows(E), db_conv_string(E), db_close(E), db_coldefs(E),
+        db_connect(E), db_error(E), db_fetch(E), db_handles(E),
+        db_insert_id(E), mysql(C), privilege_violation(M)

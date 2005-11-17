@@ -1,0 +1,12 @@
+NAME
+        ed4
+
+DESCRIPTION
+        How to copy from a standard file.
+
+        Enter ed. Then do 'r /room/vill_green.c'. Now you have
+        something in the buffer. Change it into what you want it to
+        be. Then 'w /players/peter/hall.c'. Or 'w hall.c'.
+
+SEE ALSO
+        ed5(LPC)
