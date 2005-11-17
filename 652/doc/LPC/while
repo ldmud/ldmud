@@ -1,0 +1,15 @@
+NAME
+        while
+
+SYNTAX
+        while (expr) statement;
+
+DESCRIPTION
+        While 'expr' evaluates to non 0, execute statement.
+
+        A 'break' in the 'statement' will terminate the loop. A
+        'continue' will continue the execution from the beginning of
+        the loop.
+
+SEE ALSO
+        for(LPC), foreach(LPC), do-while(LPC), if(LPC), switch(LPC)

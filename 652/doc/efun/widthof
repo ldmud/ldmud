@@ -1,0 +1,17 @@
+SYNOPSIS
+        int widthof (mapping map)
+
+DESCRIPTION
+        Returns the number of values per key of mapping <map>.
+        If <map> is 0, the result is 0.
+
+EXAMPLE
+        mapping m = ([ "foo": 1,2 ]);
+        widthof(m)  --> returns 2
+
+HISTORY
+        Introduced in LDMud 3.2.6.
+
+SEE ALSO
+        sizeof(E), mkmapping(E), m_reallocate(E), m_values(E),
+        unmkmapping(E)
