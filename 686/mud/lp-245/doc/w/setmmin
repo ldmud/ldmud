@@ -1,0 +1,7 @@
+Command: setmmin
+Argument: mess
+
+Set the message given when you teleport to a room.
+The message will have your name prepended.
+
+See also: w/setmout, w/setmin, w/setmmout

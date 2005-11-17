@@ -1,0 +1,16 @@
+SYNOPSIS
+        string getuid(object ob);
+
+BESCHREIBUNG
+        User-IDs werden im Compat Modus nicht verwendet.
+        Die Funktion liefert die UID des Objekts, also den Namen des Gottes
+        oder der Domain oder Gruppe, die fuer das Objekt verantwortlich ist.
+        Der Name entspricht dem Namen, der in der Wizlist verwendet wird.
+        Wird <ob> nicht angegeben, wird standardmaessig this_object()
+        genommen.
+
+AENDERUNGEN
+        Seit 3.2.1@47 ist diese Efun ein Alias fuer creator()
+
+SIEHE AUCH
+        seteuid(E), geteuid(E), export_uid(E), creator(E)
