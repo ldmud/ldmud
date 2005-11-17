@@ -1,0 +1,10 @@
+string extra_look()
+
+If this function returns a string, and the object is carried by a player,
+then the string returned by this function will be printed after the
+character data, but before the list of what the character is carrying.
+
+This can be used to introduce curses for players, that gives some
+visual result.
+
+See also lfun/short(), lfun/query_auto_load().

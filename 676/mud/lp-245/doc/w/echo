@@ -1,0 +1,5 @@
+Command: echo
+Argument: Any string
+
+The string is sent to all players in the same room. This should be used
+with great care, and is almost already illegal by the RULES.

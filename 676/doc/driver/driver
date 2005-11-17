@@ -1,0 +1,15 @@
+NAME
+        driver
+
+DESCRIPTION
+        This directory contains descriptions of miscellaneous
+        internals of Amylaar's version of the LPC parser/interpreter,
+        that might be useful to know.
+
+        One thing described here are the special hardcoded commands
+        of the interpreter for querying the status of the memory
+        management.
+
+SEE ALSO
+        efun(E), applied(A), concepts(C), master(M), lpc(LPC),
+        malloc(D), status(D)

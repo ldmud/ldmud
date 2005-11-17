@@ -1,0 +1,45 @@
+time_to_heal 10
+money 52735
+name "lars"
+msgin "arrives"
+msgout "leaves"
+is_npc 0
+brief 1
+level 1000
+hit_point 202
+max_hp 202
+max_sp 202
+experience 1006812
+mmsgout "leaves through a rift in the fabric of space"
+mmsgin "arrives through a rift in the fabric of space"
+ghost 0
+spell_points 202
+age 1238050
+is_invis 0
+frog 0
+whimpy 0
+auto_load ""
+dead 0
+flags 0
+alignment 1534
+gender 1
+Str 20
+Int 20
+Con 20
+Dex 20
+title "The Implementor"
+password "XiLOnaCpxoNX6"
+al_title "Busy ..."
+intoxicated 0
+stuffed 0
+soaked 0
+headache 0
+max_headache 0
+called_from_ip "129.16.125.130"
+quests "torchrunner#faston#orc_slayer#Bods#Mjoelner#adam#angmar#ingis#ultimate#surt#feanor#rincewind#padrone"
+mailaddr "lars@cd.chalmers.se"
+tot_value 0
+access_list 0
+stats_is_updated 1
+other_copy 0
+scar 0
