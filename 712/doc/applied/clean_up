@@ -1,0 +1,51 @@
+SYNOPSIS
+        int <lfun> (int refcount)
+        int <closure>(int ref, object ob)
+
+DESCRIPTION
+        The hook H_CLEAN_UP defines a lfun or a closure used to clean
+        up an object. In older drivers this was hardwired to the lfun
+        clean_up().
+
+        The function is applied by the driver when an object hasn't been
+        used for a long time, to give it a possibility to
+        self-destruct. The refcount <ref> passed as argument will be 0 for
+        clone objects, 1 for a simple loaded object, and greater when
+        the object is cloned or inherited by some existing object.  It
+        is recommended not to self_destruct the object when the
+        reference count is greater than one.
+
+        By convention, a refcount < 0 is used if some other object
+        asks the called object to clean_up.
+
+        If the function is a closure, the second argument <ob> is the
+        object to clean up.
+
+        If the hook specifies a non-existing lfun, or if the call
+        returns 0, no further attempt to clean up this object will be done.
+
+        Returning a non-zero value is only recommended when the reason
+        why the object can't self-destruct is likely to vanish without
+        the object being touched, that is, when no local function is
+        called in it, (and in compat mode also when the object is not
+        being moved around).
+
+        A typical mud configuration defines the time to wait for
+        clean_up() so long that you can assert reset() has been
+        called since the object has been touched last time.
+
+EXAMPLES
+        A clone of /std/drink defines clean_up() to self-destruct if
+        it is empty, not carried a living being and not touched for
+        a long time.
+
+        A room that inherits /std/room defines clean_up() to
+        self-destruct if it is neither inherited nor used as a
+        blueprint, is empty and was not entered for a long time.
+
+HISTORY
+        Before 3.2.1, the function was hardwired to the lfun clean_up().
+
+SEE ALSO
+        reset(A), heart_beat(A), call_out(E), destruct(E), remove(A),
+        hooks(C)

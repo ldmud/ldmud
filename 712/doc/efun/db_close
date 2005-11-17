@@ -1,0 +1,21 @@
+OPTIONAL
+SYNOPSIS
+        int db_close(int handle)
+
+DESCRIPTION
+        Close the server-connection with the handle <handle>
+        Return the handle-number on success.
+
+        The function is available only if the driver is compiled with
+        mySQL support. In that case, __MYSQL__ is defined.
+
+        The efun triggers a privilege violation ("mysql", "db_close").
+
+HISTORY
+        Added in 3.2.9 .
+        LDMud 3.2.11 added the privilege violation.
+
+SEE ALSO
+        db_affected_rows(E), db_conv_string(E), db_coldefs(E), db_connect(E),
+        db_exec(E), db_error(E), db_fetch(E), db_handles(E), db_insert_id(E),
+        mysql(C), privilege_violation(M)
