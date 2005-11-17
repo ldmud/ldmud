@@ -1,0 +1,125 @@
+Short: Virtual variables
+Date: 981208
+Type: Bug
+State: Done: Fixed
+From: Alfe
+See also: b-981201, p-990217
+
+Virtual variables don't work properly. A (German) description follows:
+,---------.
+|    From | Alfe
+|      To | Alfe, Amylaar, Arkon, Carador, Demos, Fangorn, Macbeth, Mentar,
+|         | Monst and Ugh
+|    Date | Thu Jun  6 00:01:43 1996
+| Subject | Der Virtual Bug!
+`---------'
+
+  P R O L O G     --     Die Entdeckung
+
+Nach langem Suchen ist es uns endlich gelungen, eine Minimalversion des
+beruechtigten Virtual-Bugs aus gewaltigen Files herauszuarbeiten und sogar
+ein wesentliches Merkmal zu entdecken!
+
+
+  T E I L   I     --     Der Bug
+
+Der ::-Operator (nur zur Compilezeit ueberhaupt von Bedeutung) ist der Dreh-
+und Angelpunkt des Fehlers. Definiert ist er so, dass der Bezeichner vor ihm
+dann weggelassen werden kann, wenn er die erste inheritete Klasse
+bezeichnet,
+die die Lfun hinter dem Operator definiert. Insbesondere also, wenn diese
+Lfun nur ein einziges Mal inheritet wird.
+
+An diese Definition haelt sich der Compiler leider nicht immer. Eine unguen-
+stige Kombination von virtual und objekt-globalen Variablen fuehrt dazu,
+dass eine gesamte Klasse bei der Lfun-Suche uebersprungen wird und statt ih-
+rer eine Klasse verwendet wird, die nicht direkte Basisklasse ist, sondern
+nur Basisklasse der Uebersprungenen!
+
+
+  T E I L   I I     --     Die Variable
+
+Wie sich herausstellte, ist eine kleine unscheinbare Variable schuld daran,
+dass dieser Fehler in Erscheinung tritt. Kommentiert man sie aus, ist der
+Fehler verschwunden.
+
+Diese Variable muss in der tiefsten der drei beteiligten Klassen definiert
+werden.
+
+Eine etwas ueberraschende Erkenntnis, dass eine Variable Einfluss auf die
+Abarbeitung von Funktionsaufrufen haben soll.
+
+
+  T E I L   I I I     --     Virtual
+
+Diese tiefste Klasse muss zusaetzlich von der mittleren `virtual' inheritet
+werden, was diesem Phaenomen seinen Namen gegeben hat.
+
+`virtual' setzt voraus, dass man in einem komplexen Vererbungsbaum keine
+Klasse an einer Stelle `virtual' und an einer anderen nicht `virtual' inhe-
+ritet; man muss es immer gleich machen. In diesem Fall wird diese Regel be-
+achtet, dennoch tritt der Fehler auf.
+
+Mit Entfernen des Schluesselwortes `virtual' verschwindet der Fehler jedoch.
+
+
+  T E I L   I V     --     Das Beispiel
+
+Unter ~alfe/virtual/{a,b,c}.c findet sich ein auf das Noetigste zurechtge-
+stutztes Beispiel. c inheritet b normal, b inheritet a virtuell. a enthaelt
+die entscheidende Variable.
+
+Zum Testen sollte in c die Lfun foo() aufgerufen werden, die von allen
+drei Klassen definiert wird. c ruft dann zuerst ::foo() auf, danach
+b::foo().
+Beide Aufrufe sollten das gleiche Ergebnis erzielen, doch die Debug-Ausgaben
+sprechen eine deutliche Sprache.
+
+::foo() ruft tatsaechlich a::foo() auf, obwohl a gar nicht direkt von c ge-
+erbt wird und b diese Funktion ueberlagert!
+
+
+  E P I L O G     --     Die Konsequenzen
+
+Endlose Fehlersuche, die haeufig mit unbefriedigenden Loesungen beendet wur-
+den, kann, sollte sie auf diesen Bug zurueckzufuehren sein, demnaechst ver-
+mieden werden; entweder, weil jetzt bekannt ist, dass der ::-Operator ohne
+vorangestelltes Argument fehlerhaft ist, oder weil der Fehler im Driver
+behoben wird.
+
+In jedem Fall wird die Aufklaerung dieses Phaenomens die Akzeptanz von
+`virtual' sicher erhoehen.
+                                        Ugh & Alfe
+
+PS: Die Files aus dem Beispiel:
+/players/alfe/virtual/a.c:
+        int i;
+
+        mixed foo() {
+          write("a!\n");
+        }
+
+/players/alfe/virtual/b.c:
+        virtual inherit "players/alfe/virtual/a";
+
+        mixed foo() {
+          write("  b!\n");
+        }
+
+/players/alfe/virtual/c.c:
+        inherit "players/alfe/virtual/b";
+
+        status foo() {
+          write("    c!\n"
+                "    calling ::foo();\n");
+          ::foo();
+          write("    c!\n"
+                "    calling b::foo();\n");
+          b::foo();
+        }
+
+----------------------------------------------------------------------------
+Christian Mudra                         Just remember what your mother
+c_mudra@informatik.uni-kl.de                   always told you:
+Universitaet Kaiserslautern        "When you open windows you let in bugs".
+

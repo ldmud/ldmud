@@ -1,0 +1,11 @@
+Recommended armour classes. Never make an armour with class higher than 4,
+unless the armour is not permanent, or is deficient in some other way.
+Armours of other types then "armour" (helmets etc) should not have a class
+higher than 1.
+
+Name		class	value	weight	type
+Helmet		1	75	1	helmet
+Ring of prot	1	200	1	ring
+Leather jacket	2	50	2	armour
+Leather armour	3	110	3	armour
+Chainmail	4	500	5	armour

@@ -1,0 +1,17 @@
+SYNOPSIS
+        closure lambda(mixed *arr, mixed);
+
+BESCHREIBUNG
+        Erzeugt eine Lambda Closure, entsprechend den Lamda Closures in LISP.
+        Die Closure ist an das Objekt gebunden, das sie erzeugt hat, und kann
+        deshalb Verweise auf globale Variablen enthalten.
+
+        Das erste Argument ist ein Array, das die Argumente (Symbole)
+        beschreibt, die der Closure bei ihrer Auswertung durch funcall()
+        oder apply() uebergeben werden.
+
+AENDERUNGEN
+        Eingefuehrt in 3.2@70.
+
+SIEHE AUCH
+        closures(LPC), unbound_lambda(E), apply(E), funcall(E), bind_lambda(E)
