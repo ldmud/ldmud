@@ -1,0 +1,8 @@
+SYNOPSIS
+        int rmdir(string dir)
+
+DESCRIPTION
+        Remove directory dir. Return 1 on success, 0 on failure.
+
+SEE ALSO
+        mkdir(E), rm(E), rename(E)

@@ -1,0 +1,28 @@
+OPTIONAL, VERALTET
+SYNOPSIS
+        mixed *insert_alist(mixed key, mixed data, ... , mixed *alist);
+        int    insert_alist(mixed key, mixed *keys);
+
+BESCHREIBUNG
+     1. Form: Einfuegen in eine Alist.
+        Der <key> und alle foglenden <data> Argumente werden in die Alist
+        eingefuegt. Wenn bereits ein Eintrag fuer <key> existiert, werden
+        nur die <data> Eintraege ersetzt. Natuerlich muss die Anzahl <data>
+        Argumente der Anzahl der Datenarrays in der Alist entsprechen.
+        Das Resultat dieser Operation ist die neue Alist.
+
+     2. Form: Einfuegen eines Keys
+        Der <key> wird in ein (geordnetes) Array von <keys> eingeordnet,
+        sodass nachfolgendes assoc()s schnell suchen koennen. Das Resultat
+        ist der Index, unter dem <key> eingefuegt oder bereits gefunden
+        wurde.
+
+ANMERKUNG
+        Wird mit String-Keys gearbeitet, kann der Index nach dem naechsten
+        Aufruf von insert_alist() nicht mehr gueltig sein.
+
+        Komplexitaet: O(lg(n) + a*n) fuer n gleich der Anzahl der Keys und
+        eine sehr kleine Konstante s (fuer Blockverschiebungen).
+
+SIEHE AUCH
+        alists(LPC), assoc(E), order_alist(E)

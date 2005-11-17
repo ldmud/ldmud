@@ -1,0 +1,37 @@
+The files in this directory hold collections of option settings, used
+when configuring the driver for compilation. To use the setting <foo>,
+start the configure script with argument --with-setting=<foo> or
+the settings file directly with './settings/<foo>' (for the latter the
+settings file must be marked as executable).
+
+The provided settings:
+
+  default:  an example file, documenting all available options
+
+  compat:   settings used for a generic compat-mode driver
+  native:   settings used for a generic native-mode driver
+
+  alatia:          settings for Alatia
+  avalon:          settings for Avalon
+  beutelland:      settings for Beutelland
+  carledon:        settings for Carledon
+  dt2:             settings for Deeper Trouble II
+  eotl:            settings for End of the Line
+  evermore:        settings for Evermore
+  evermore-native: settings for Evermore (Native version)
+  finalfrontier:   settings for FinalFrontier (generic driver only)
+  forgottendreams: settings for ForgottenDreams
+  heaven7:         settings for Heaven7
+  hyperborea:      settings for Hyperborea
+  morgengrauen:    settings for Morgengrauen
+  lethynna:        settings for Lethynna
+  osb:             settings for OSB
+  pkmud:           settings for PkMud
+  psycmuve:        settings for PSYC
+  quovadis:        settings for Quo Vadis
+  silberland:      settings for SilberLand
+  sticklib:        settings for StickLib
+  tubmud:          settings for TubMud
+  unitopia:        settings for UNItopia
+  wunderland:      settings for WunderLand
+
