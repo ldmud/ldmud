@@ -1,0 +1,7 @@
+Heaven7  --  <URL:http://www.heaven7mud.org/>
+
+Last tested: v 4 on LDMud-3.2.9
+
+Heaven7 has switched from Amylaar to LDMud as native driver, so getting it
+going is mostly a matter of configuring the driver with the heaven7 settings
+and the proper directories.

@@ -1,0 +1,8 @@
+Command: ls
+optional argument: path
+
+Give a list of all files in 'path'. If no argument is given, list the
+files in current directory, which is the hoe directory of the wizard.
+'ls /' will give a list of all files in the game home directory.
+
+See also w/cat, w/ed, w/rm
