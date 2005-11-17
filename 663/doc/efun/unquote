@@ -1,0 +1,17 @@
+SYNOPSIS
+        quoted_array  unquote(quoted_array)
+        string|symbol unquote(symbol)
+
+DESCRIPTION
+        Removes a quote from quoted arrays and symbols. When the
+        last quote from a symbol is removed, the result is a string.
+
+EXAMPLES
+        unquote('foo) -> "foo"
+        unquote( '({1,2,3}) ) -> ({1,2,3})
+
+HISTORY
+        Introduced in LDMud 3.2.9 .
+
+SEE ALSO
+        quote(E), symbolp(E)
