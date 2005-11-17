@@ -1,0 +1,11 @@
+SYNOPSIS
+        float exp(int|float zahl);
+
+BESCHREIBUNG
+        Die Exponentialfunktion. Liefert e^zahl.
+
+AENDERUNGEN
+        LDMud 3.2.9 fuehrte neu Integer als Argument ein.
+
+SIEHE AUCH
+        log(E), pow(E)

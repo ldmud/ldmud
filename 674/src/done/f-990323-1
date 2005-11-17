@@ -1,0 +1,14 @@
+Short: Better handling of reset and swap
+From: Lars
+Date: 990223
+Type: Feature
+State: Done - implemented in 3.2-dev.65
+
+It would be advantageous if the head _and_ the tail of the object list
+are marked. This would allow look_objects_for_swap() (which then again
+includes the reset handling) to move forward from the head as far as it
+can in one heart_beat, and then splice the processed head to the end
+of the list, making the current position the new head. The 'reset table'
+would no longer be necessary.
+
+Maybe this is even easier when the objlist is a real ring.

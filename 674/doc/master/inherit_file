@@ -1,0 +1,26 @@
+SYNOPSIS
+        mixed inherit_file (string file, string compiled_file)
+
+DESCRIPTION
+        Generate the pathname of an inherited object.
+
+        Arguments:
+          previous_object(): The object causing the compile.
+          file             : The name given in the inherit directive.
+          compiled_file    : The object file which is just compiled.
+                             (compat: name given without leading "/")
+
+        Result:
+          0: use the given filename as it is.
+
+          <path>: the full absolute pathname of the file to inherit,
+                  without parentdir parts ("/../"). Leading slashes ("/")
+                  are ignored.
+
+          else: The inherit directive is not legal.
+
+HISTORY
+        Introduced in LDMud 3.2.8.
+
+SEE ALSO
+        hooks(C), include_file(M)

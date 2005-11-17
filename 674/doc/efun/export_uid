@@ -1,0 +1,13 @@
+SYNOPSIS
+        void export_uid(object ob)
+
+DESCRIPTION
+        Set the uid of object ob to the current object's effective uid.
+        It is only possible when object ob has an effective uid of 0.
+
+HISTORY
+        Since 3.2.1@47, this efun is availabe only when using euids.
+        Since 3.2.7, this efun is always available.
+
+SEE ALSO
+        seteuid(E), getuid(E), geteuid(E), uids(C), native(C)

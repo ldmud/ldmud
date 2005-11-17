@@ -1,0 +1,11 @@
+From: "Gnomi" <gnomi@UNItopia.rus.uni-stuttgart.de>
+Short: foreach on empty array crashes
+Date: Mon, 28 Feb 2000 19:20:04 +0100
+Type: Bug
+State: Done - fixed in 3.2.8-dev.173
+
+Also der Bug tritt bei #'foreach auf mit einem leeren Array von Symbolen
+(ist verboten, sollte normalerweise aber nur eine Fehlermeldung ergeben),
+einem nicht leeren Array, ueber das iteriert wird, und mindestens einem
+Befehl.
+Beispiel: funcall(lambda(0,({#'foreach,({}),'({1}),({#',}) })));
