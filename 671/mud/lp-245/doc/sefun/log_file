@@ -1,0 +1,10 @@
+void log_file(file, message)
+string file;
+string message;
+
+Append a message to a log file. All log files are in the directory
+mudlib/log.
+
+'/log' is automatically prepended to the file name.
+
+See also: efun/write_file

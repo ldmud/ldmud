@@ -1,0 +1,4 @@
+This directory contains the documentation to the mudlib.
+
+For a running mud it should be complemented with the doc/-files
+taken from the driver distribution.

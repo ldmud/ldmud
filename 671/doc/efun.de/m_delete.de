@@ -1,0 +1,11 @@
+SYNOPSIS
+        mapping m_delete(mapping map, mixed key);
+
+BESCHREIBUNG
+        Loescht den Eintrag mit dem Index <key> aus dem Mapping <map> und
+        liefert das veraenderte Mapping zurueck. Wenn <map> keinen Eintag
+        mit dem Index <key> enthaelt, wird nichts veraendert.
+
+SIEHE AUCH
+        mappingp(E), mkmapping(E), m_add(E), m_indices(E), m_values(E),
+        sizeof(E), widthof(E)

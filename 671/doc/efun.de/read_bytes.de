@@ -1,0 +1,16 @@
+SYNOPSIS
+        string read_bytes(string file, int start, int anzahl);
+
+BESCHREIBUNG
+        Liest eine bestimmte Anzahl Bytes aus dem File <file>. Wenn <start>
+        nicht angegeben oder 0 ist, wird das File von Beginn weg gelesen,
+        sonst vom Byte mit der Nummer <start>. Wenn <start> negativ ist,
+        werden die Bytes vom Ende des Files her gezaehlt. <anzahl> ist die
+        Anzahl Bytes, die gelesen werden sollen. Werte von 0 oder negative
+        Werte sind zwar moeglich, aber wenig sinnvoll.
+
+        Wenn <start> ausserhalb der Groesse des Files liegt, liefert
+        read_byte() 0 zurueck anstelle eines Strings.
+
+SIEHE AUCH
+        read_file(E), write_bytes(E), write_file(E)
