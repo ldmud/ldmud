@@ -1,0 +1,24 @@
+SYNOPSIS
+        *mixed m_entry(mapping map, mixed key);
+
+BESCHREIBUNG
+        Durchsucht das Mapping <map> nach dem Eintrag mit Index <key> und
+        liefert alle Werte von <key> in einem Array zurueck.
+
+        Wenn <map> keinen Eintrag mit Index <key> enthaelt, liefert
+        m_entry() 0.
+
+BEISPIEL
+        mapping m = ([1:"bla":-1, 2:"fasel":-2 ])
+        m_entry(m, 0) -> 0
+        m_entry(m, 1) -> ({"bla", -1})
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.10.
+
+ANMEKRUNG
+        Mit der Efun m_add() koennen alle Werte eines Eintrages auf einmal
+        addiert werden.
+
+SIEHE AUCH
+        m_add(E), m_contains(E), mappings(LPC), member(E)

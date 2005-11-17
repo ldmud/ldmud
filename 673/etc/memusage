@@ -1,0 +1,96 @@
+#!/usr/bin/perl -w
+# originating from MorgenGrauen
+# 11.06.02 Fiona  more robust parsing
+
+$MUDLIBDIR = "/usr/mud/mudlib/";
+$HOMES     = "players";
+$DOMAINS   = "d";
+$OUTPUTDIR = $MUDLIBDIR."tmp/";
+
+$| = 1;
+printf("Creating Object-Lists ... ");
+%mem=(); %inst=(); %envs=(); %TotalMem=(); $MemSum=0;
+%wizobj=();%wizmem=();%domobj=();%dommem=();
+open(DUMP,$MUDLIBDIR."OBJ_DUMP");
+
+for (<DUMP>)
+{
+	chop;
+	#@line=split(' ');
+	print("matcherr: $_\n")
+		unless  $_ =~ /^([^ ]+) \D*(\d+)\D*(\d+)\D*\d+ +(HB)? +(\S*)/;
+	$env=$5;
+	$env.=' *HB*' if ($4);
+	@fname=split('#',$1);
+	$mem{$1}=$2;
+	$inst{$fname[0]}+=1;
+	$TotalMem{$fname[0]}+=$2;
+	$envs{$1}=$5;
+	$MemSum+=$2;
+	@path=split("/",$1);
+	if ($path[0] eq $HOMES)
+	{
+		$wizobj{$path[1]}++;
+		$wizmem{$path[1]}+=$2;
+	}
+	if ($path[0] eq $DOMAINS)
+	{
+		$wizobj{$path[2]}++;
+		$wizmem{$path[2]}+=$2;
+		$domobj{$path[1]}++;
+		$dommem{$path[1]}+=$2;
+	}
+}
+
+printf("done\nMEMORY list is being created ... sorting ... ");
+@keys=sort {$mem{$b} <=> $mem{$a}} keys %mem;
+
+print "dumping ... ";
+open(DUMP,">".$OUTPUTDIR."MEMORY_SORTED");
+printf DUMP "Memory usage according to OBJ_DUMP is %d bytes.\n",$MemSum;
+foreach $key (@keys)
+{
+  printf DUMP "%-30s: mem=%4d, env=%s\n", $key, $mem{$key}, $envs{$key};
+}
+close(DUMP);
+
+printf("done\nCOUNT_LIST is being created ... sorting ... ");
+@keys=sort {$inst{$b} <=> $inst{$a}} keys %inst;
+
+print "dumping ... ";
+open(DUMP,">".$OUTPUTDIR."COUNT_SORTED");
+foreach $key (@keys)
+{
+  printf DUMP "%3d instances using %4d Bytes: %s\n",$inst{$key},$TotalMem{$key},$key;
+}
+close(DUMP);
+
+printf("done\nTOTAL_MEM_LIST is being created ... sorting ... ");
+@keys=sort {$TotalMem{$b} <=> $TotalMem{$a}} keys %inst;
+
+print "dumping ... ";
+open(DUMP,">".$OUTPUTDIR."TOTAL_MEM");
+foreach $key (@keys)
+{
+  printf DUMP "%3d instances using %4d Bytes: %s\n",$inst{$key},$TotalMem{$key},$key;
+}
+close(DUMP);
+
+printf("done\nDumping OWNER list ... ");
+@keys=sort {$wizmem{$b} <=> $wizmem{$a}} keys %wizmem;
+
+open(DUMP,">".$OUTPUTDIR."BY_NAME");
+printf DUMP "How much Memory does each Wizard use ?\n";
+foreach $key (@keys)
+{
+	printf DUMP "%-14s: %4d objects using %9d bytes\n", $key,$wizobj{$key},$wizmem{$key};
+}
+printf DUMP "\n\nHow much Memory does each domain use ?\n";
+@keys=sort {$dommem{$b} <=> $dommem{$a}} keys %dommem;
+foreach $key (@keys)
+{
+	printf DUMP "%-14s: %4d objects using %9d bytes\n", $key,$domobj{$key},$dommem{$key};
+}
+close(DUMP);
+
+print "done\n";

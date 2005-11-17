@@ -1,0 +1,28 @@
+SYNOPSIS
+        string *explode(string str, string del)
+
+BESCHREIBUNG
+        Liefert ein Feld (Array) mit Zeichenketten (Strings), indem alle
+        Vorkommen von del (delimiter = Trenner) aus str herausgeschnitten
+        werden und so str in mehrere Zeichenketten zerlegt wird.
+
+        implode(explode(str, del), del) == str ist immer wahr.
+
+BEISPIELE
+        Funktion                    Rueckgabewert
+        -------------------------------------------------------------------
+        explode(" ab cd ef ", " ")  ({ "", "ab", "cd", "ef", "" })
+        explode("abc", "abc")       ({ "", "" })
+        explode("", "")             ({})
+        explode("abc", "xyz")       ({ "abc" })
+        explode("abc", "")          ({ "a", "b", "c" })
+
+AENDERUNGEN
+        Zeitpunkt der Aenderung unbekannt.
+        explode(" ab cd ef ", " ") lieferte frueher ({ "ab", "cd", "ef" })
+        anstatt ({ "", "ab", "cd", "ef", "" }), d. h., leere Zeichenketten
+        wurden ignoriert. Das neue Verhalten ist schoener, da nun
+        implode(explode(str, del), del) == str immer wahr ist.
+
+SIEHE AUCH
+        sscanf(E), extract(E), implode(E), regexplode(E)
