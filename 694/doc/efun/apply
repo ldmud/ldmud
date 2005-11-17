@@ -1,0 +1,35 @@
+SYNOPSIS
+        mixed apply(closure cl, ...)
+
+DESCRIPTION
+        Evaluates the closure <cl>.
+        If <cl> is not a closure, it will simply be returned (and all
+        other arguments are ignored).
+
+        One might wonder why there are two functions, funcall() and
+        apply(), to perform the seemingly same job, namely evaluating
+        a closure. Of course there is a subtle difference. If the last
+        argument to apply() is an array, then each of its elements
+        gets expanded to an additional paramater. The obvious use
+        would be #'call_other as in:
+
+        mixed eval(object ob,string func,mixed *args)
+        {
+          return apply(#'call_other,ob,func,args);
+        }
+
+        This will result in calling
+        ob->func(args[0],args[1],...,args[sizeof(args)-1]).
+        Using funcall() instead of apply() would have given us
+        ob->func(args).
+
+        One important application of apply() is the 'flattening' of
+        the argument array received in varargs functions.
+
+HISTORY
+        Introduced in 3.2@70
+        LDMud 3.2.8 adds the returning of a non-closure as first
+        argument.
+
+SEE ALSO
+        funcall(E), closures(LPC), varargs(LPC)

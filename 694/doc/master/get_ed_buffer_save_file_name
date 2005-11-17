@@ -1,0 +1,22 @@
+SYNOPSIS
+        string get_ed_buffer_save_file_name(string edited_file)
+
+DESCRIPTION
+        This function is called when an interactive user object is
+        destructed or looses connection through remove_interactive()
+        while editing with ed() the file edite_file (emergency save).
+        this_player() is set to the object that loosing connection.
+        The function should return a file name for the emergency save
+        file.
+
+EXAMPLE
+        string get_ed_buffer_save_file_name(string file) {
+          return "/players/"+getuid(this_player())+"/.dead_ed_files/"
+                 + explode(file, "/")[<1];
+        }
+
+        This breaks up file into its components and stores it in the
+        user's emergency save directory under the file's basename.
+
+SEE ALSO
+        ed(E), destruct(E), remove_interactive(E), valid_write(M)

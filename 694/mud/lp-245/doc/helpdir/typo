@@ -1,0 +1,11 @@
+command: typo
+argument: a string
+
+Store a message describing a spelling error. The game master will examine it.
+
+All messages are very welcome, so do not hesitate.
+
+If you are in a room created by a wizard, he will also get a copy of
+the message in a .rep file in /log.
+
+See also 'bug', 'idea'.

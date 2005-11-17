@@ -1,0 +1,17 @@
+SYNOPSIS
+	object find_living(string str)
+
+DESCRIPTION
+	Find the first "living" object in the table of livings, that
+	has str as living name, set with set_living_name(). The the
+	object to search for must also have called enable_commands().
+	There is a special hash table that speeds up the search for
+	such living objects (thus you cannot rely on the order of
+	livings, if there are more than one with the same name).
+
+EXAMPLE
+	object ob;
+	ob = find_living("Public Enenemy");
+
+SEE ALSO
+	find_player(E), enable_commands(E), set_living_name(E)
