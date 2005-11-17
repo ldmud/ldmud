@@ -1,0 +1,19 @@
+SYNOPSIS
+        mixed *call_out_info();
+
+BESCHREIBUNG
+        Liefert Informationen ueber alle haengigen call_out()s. Das Resultat
+        ist ein Array, bei dem jedes Element wiederum aus einem Array besteht,
+        das einen call_out() beschreibt. Jedes dieser Unter-Arrays enthaelt 3
+        oder mehr Elemente:
+
+        1. Das Objekt, in dem die Funktion oder die Closure aufgerufen wird.
+        2. Die Funktion oder Closure.
+        3. Der verbleibende Delay bis zum Aufruf.
+        4ff. Die (optionalen) Argumente.
+
+        call_out()s fuer zerstoerte Objekte werden nicht in der Liste
+        aufgefuehrt.
+
+SIEHE AUCH
+        call_out(E), remove_call_out(E), find_call_out(E)

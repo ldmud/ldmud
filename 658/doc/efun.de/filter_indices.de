@@ -1,0 +1,27 @@
+VERALTET
+SYNOPSIS
+        mapping filter_indices(mapping map, string func, string|object ob,
+            mixed extra ... );
+        mapping filter_indices(mapping map, closure cl, mixed extra ... );
+
+BESCHREIBUNG
+        Die Funktion ob->func() bzw. die Closure cl wird fuer jedes Element
+        von <map> aufgerufen. Das erste Argument von func() ist dabei der Key
+        von <map>, die restlichen Argumente von func() sind die <extra>
+        Argumente. Die Werte von <extra> duerfen keine geschuetzten
+        Referenzen wie &(i[0]) enthalten.
+
+        Wenn <func> TRUE liefert, wird das Element in das Resultat
+        uebernommen. Fuer <ob> kann man entweder ein Objekt oder den
+        Objektnamen uebergeben.
+
+        Wird <ob> nicht angegeben oder weder ein String noch ein Objekt, so
+        wird standardmaessig this_object() verwendet.
+
+AENDERUNGEN
+        In LDMud 3.2.6 umbenannt aus filter_mapping() und verallgemeinert in
+            der Efun filter().
+
+SIEHE AUCH
+        filter(E), map(E), map_indices(E), walk_mapping(E), member(E),
+        m_contains(E)
