@@ -1,0 +1,27 @@
+SYNOPSIS
+        string or_bits(string str1, string str2);
+
+BESCHREIBUNG
+        <str1> und <str2> sind beides Bitstrings. Das Resultat von or_bits()
+        ist ein Bitstring, der das binaere Oder von <str1> und <str2>
+        enthaelt, d.h. ein String, in dem ein Bit gesetzt ist, wenn es
+        in <str1> oder <str2> oder in beiden gesetzt ist.
+
+        Jedes Zeichen enthaelt 6 Bits. In jedem Zeichen kann deshalb eine
+        Zahl von 0 bis 63 gespeichert werde (2^6=64). Das erste Zeichen
+        ist der Leerschlag " " mit dem Wert 0. Das erste Zeichen im String
+        ist jenes mit den niedrigsten Bits (0-5).
+
+BEISPIEL
+        string s1, s2, s3;
+
+        s1 = set_bit("", 3); s1 = set_bit(s1, 15);  -> s1 is "( ("
+        s2 = set_bit("", 3); s2 = set_bit(s2, 4);   -> s2 is "8"
+
+        s3 = or_bits(s1, s2);
+
+        -> s3 is now "8 (", ie. a bitstring with bits 3, 4 and 15 set.
+
+SIEHE AUCH
+        clear_bit(E), set_bit(E), test_bit(E), next_bit(E), last_bit(E),
+        count_bits(E), and_bits(E), xor_bits(E), invert_bits(E), copy_bits(E)

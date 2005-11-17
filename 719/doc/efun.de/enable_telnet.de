@@ -1,0 +1,25 @@
+SYNOPSIS
+        int enable_telnet (int num, object obj = this_interactive() )
+
+BESCHREIBUNG
+        Aktiviere oder deaktiviere die Telnet-Maschine fuer das interaktive
+        Object <obj>. Resultat ist der vorherige Aktivierungszustand.
+        
+        <num> > 0 : aktiviere die Telnet-Maschine (default)
+              = 0 : deaktiviere die Telnet-Maschine
+              < 0 : gebe lediglich den aktuellen Aktivierungszustand zurueck.
+        <obj> : das interaktive Object, default ist this_interactive().
+                Fuer nicht-interaktive Objekte wird ein Laufzeitfehler erzeugt.
+        
+        Die Funktion erzeugt eine privilege_violation ("enable_telnet", obj,
+        num) wenn <num> is >= 0. Wird das Privileg verneint, wird der
+        Funktionsaufruf ignoriert.
+        
+        WARNUNG: Unvorsichtiger Gebrauch dieser Funktion kann sowohl Server
+        als auch Clients enorm verwirren! Diese Funktion existiert primaer
+        als Unterstuetzung fuer PSYCmuve, und kann wieder entfernt werden wenn
+        eine konsistentere Handhabung fuer Netzwerkverbindungen implementiert
+        wird.
+
+SIEHE AUCH
+        privilege_violation(M), input_to(E)
