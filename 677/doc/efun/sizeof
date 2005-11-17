@@ -1,0 +1,21 @@
+SYNOPSIS
+        int sizeof(mixed * val)
+        int sizeof(string  val)
+        int sizeof(mapping val)
+
+DESCRIPTION
+        Returns the number of elements of an array, the number of characters
+        in a string, or the number of keys in a mapping.
+
+        As a special case, the number 0 can be passed, and the function
+        will return 0.
+
+        Note: this efun is also available under the name 'm_sizeof(E)'.
+        Usage of that name however is deprecated.
+
+HISTORY
+        LDMud 3.2.9 added strings to the possible parameters.
+
+SEE ALSO
+        strlen(E), allocate(E), pointerp(E),
+        mappingp(E), m_allocate(E), widthof(E)

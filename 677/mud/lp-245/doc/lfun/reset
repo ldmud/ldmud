@@ -1,0 +1,11 @@
+void reset(flag)
+
+Reset is called everytime the object is resetted. The first time is when
+the object is loaded. If a room creates things when reset(), it should
+check that these objects has moved out before creating new.
+
+When reset is called for the first time, a null argument is passed. The
+second time reset is called, flag will have vaule 1.
+
+Every object will repetedly get resetted by a daemon. The game
+wouldn't be fun if no challenges remained.

@@ -1,0 +1,9 @@
+string query_gender_string()
+
+This function is defined by living monsters and players. It will return
+either "neuter", "male" or "female".
+
+There are other such query_functions, but they are not guaranteed to
+remain, so only use this one.
+
+See also: lfun/query_npc

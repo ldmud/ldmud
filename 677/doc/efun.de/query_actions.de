@@ -1,0 +1,37 @@
+SYNOPSIS
+        #include <sys/commands.h>
+
+        mixed *query_actions(object|string ob, mixed mask_or_verb);
+
+BESCHREIBUNG
+        Das erste Argument von query_actions() ist entweder ein Objekt
+        oder der Dateiname eines Objekts. Das zweite Argument muss
+        entweder eine Bitmaske (ein Integer) oder ein String sein.
+
+        Ist das zweite Argument ein String, liefert query_actions() ein
+        Array mit Informationen ueber das Verb oder 0 zurueck, wenn
+        das lebendige Objekt <ob> das Verb nicht verwenden kann.
+
+        Wenn das zweite Argument ein Integer ist, liefert query_actions()
+        ein flaches Array mir den Informationen entsprechend der Bitmaske
+        zu allen Verben von <ob>.
+
+            QA_VERB         ( 1):   das Verb,
+            QA_TYPE         ( 2):   der Typ,
+            QA_SHORT_VERB   ( 4):   das short_verb,
+            QA_OBJECT       ( 8):   das Objekt,
+            QA_FUNCTION     (16):   die Funktion.
+
+        Der Typ ist ein Wert wie in <sent.h> (bzw. /sys/sent.h) definiert,
+        der vom Parser Quellcode geliefert wird.
+
+            SENT_PLAIN       durch add_action(fun, cmd) hinzugefuegt
+            SENT_SHORT_VERB  durch add_action(fun, cmd, 1) hinzugefuegt
+            SENT_NO_SPACE    durch add_action(fun); add_xverb(cmd);
+            SENT_NO_VERB     nur eine Funktion mit add_action(fun), ohne Verb
+            SENT_MARKER      intern, ist nicht im Array enthalten
+            negativer Wert   das Verb muss nur in den ersten -<wert> Zeichen
+                             uebereinstimmen.
+
+SIEHE AUCH
+        add_action(E), init(A)
