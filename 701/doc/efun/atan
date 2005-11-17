@@ -1,0 +1,11 @@
+SYNOPSIS
+        float atan(int|float)
+
+DESCRIPTION
+        Returns the argument's arcus tangent.
+
+HISTORY
+        LDMud 3.2.9 added integers as arguments.
+
+SEE ALSO
+        atan2(E), sin(E), cos(E), tan(E), asin(E), acos(E)

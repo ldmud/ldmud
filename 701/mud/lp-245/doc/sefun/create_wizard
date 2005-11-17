@@ -1,0 +1,10 @@
+string create_wizard(name)
+string name;
+
+Create the environment and castle for a wizard. Do NOT use this if you
+are not sure about what you are doing !
+It will create a new directory for wizard with the name "name", and
+copy a definition of a castle to this directory. It will also
+set up automatic loading of this castle for the start of the game.
+
+It returns the name of the new castle. In case of error, false is returned.

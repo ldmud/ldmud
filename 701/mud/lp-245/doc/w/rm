@@ -1,0 +1,11 @@
+Command: rm
+Argument: file
+
+Remove the file 'file'.
+
+The file will be searched for in the current directory. 'rm castle.c' will
+remove the castle of the wizard (not to be recommended).
+
+Only Arch wizards and higher can remove files from other wizards.
+
+See also w/ls, w/ed, w/cat
