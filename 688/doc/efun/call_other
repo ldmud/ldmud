@@ -1,0 +1,94 @@
+SYNOPSIS
+        unknown call_other(object ob, string fun, mixed arg, ...)
+        unknown call_other(object *ob, string fun, mixed arg, ...)
+
+        ob->fun (mixed arg, ...)
+        ob->"fun" (mixed arg, ...)
+        ob->(fun) (mixed arg, ...)
+
+DESCRIPTION
+        Call a member function <fun> in another object <ob> with an
+        the argument(s) <arg...>. Result is the value returned from
+        the called function (or 0 for non-existing or void functions).
+
+        Optionally the driver can be configured to accept an array of
+        objects as <ob>: the function is called with the same
+        arguments in all the given objects.  The single results are
+        collected in an array and yield the final result.  Array
+        elements can be objects or the names of existing objects;
+        destructed objects and 0s will yield a '0' as result, but
+        don't cause an error.
+
+        If the array-calling mode is available, the macro
+        __LPC_ARRAY_CALLS__ is defined.
+
+        The object(s) can be given directly or via a string (i.e. its
+        object_name). If it is given by a string and the object does not
+        exist yet, it will be loaded.
+
+        ob->fun(args) and "ob_name"->fun(args) is equivalent to
+        call_other(ob, "fun", args). Nowadays the ob_name string can
+        also be a variable.
+
+        ob->fun(args) and ob->"fun"(args) are equivalent to
+        call_other(ob, "fun", args). ob->(fun)(args) are equivalent
+        to call_other(ob, fun, args) where fun is a runtime expression
+        returning the function name.
+
+        If ob does not define a publicly accessible function of the
+        specified name, call_other() will return 0, which is
+        indistinguishable from a function returning 0. "publicly
+        accessible" means "public" when calling other objects, and
+        "public" or "static" when calling this_object(). "private"
+        and "protected" function can never be called with call_other().
+
+        The return type of call_other() is 'any' be default. However,
+        if your LPC code uses #pragma strict_types, the return type is
+        'unknown', and the result of call_other() must be casted to
+        the appropriate type before you can use it for anything.
+
+EXAMPLES
+
+        // All the following statements call the lfun QueryProp()
+        // in the current player with the argument P_SHORT.
+        string str, fun;
+
+        str = (string)call_other(this_player(), "QueryProp", P_SHORT);
+        fun = "QueryProp";
+        str = (string)call_other(this_player(), fun, P_SHORT);
+
+        str = (string)this_player()->QueryProp(P_SHORT);
+        str = (string)this_player()->"QueryProp"(P_SHORT);
+        fun = "QueryProp";
+        str = (string)this_player()->(fun)(P_SHORT);
+
+        You have to do explicit type casting because of the unknown
+        return type, if you have set #pragma strict_types.
+
+        // This statement calls the lfun short() in all interactive users
+        // and stores the collected results in a variable.
+        string * s;
+
+        s = (string *)users()->short();
+
+
+        !Compat: call_other("/users/luser/thing", "???", 0);
+         Compat: call_other("users/luser/thing", "???", 0);
+
+        This looks a bit weird but it was used very often to just load
+        the object by calling a not existing function like "???".
+        Fortunately nowadays there is an efun load_object() for this
+        purpose.
+
+HISTORY
+        In LDMud 3.2.8 the following improvements were made:
+         - the forms x->"y"() and x->(y)() are recognized;
+         - the form x->y() no longer clashes with a local variable also
+           called "y";
+         - a simul_efun call_other() also catches ->() calls.
+         - call_other can be applied on arrays of objects.
+        LDMud 3.2.10 made the call on arrays of objects configurable.
+
+SEE ALSO
+        function_exists(E), call_resolved(E), create(A), pragma(LPC),
+        extern_call(E), functions(LPC)

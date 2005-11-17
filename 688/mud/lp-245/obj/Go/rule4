@@ -1,0 +1,5 @@
+If a stone is played so that the last liberty of an enemy group is removed,
+then all stones in that enemy group are removed.
+
+If a stone is played so that the last liberty of a group of the same colour
+is removed, then it is an illegal move.
