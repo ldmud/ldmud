@@ -1,0 +1,18 @@
+Welcome to the LPmud 2.4.5 mudlib.
+
+Take a look around and see how LPmud used to look like in its early days.
+
+For basic instructions, simply type 'help' after you logged in and explore
+from there. You move by giving directions (e.g. 'north', 'down', 'northwest'
+or their abbreviations 'n', 'd', 'nw').
+
+When you want to become a wizard, log out and use a text editor to change your
+level in the savefile (players/<yourname>.o) to 25 or higher. If you get bored
+with this welcome message, you can write your own in the file /WELCOME.
+
+To log in, enter the name of your game character at the prompt, or just
+'guest'. If this is your first time, a new character will be created and you
+will be asked a for your password and couple of other things.
+
+Enjoy!
+

@@ -1,0 +1,45 @@
+SYNOPSIS
+        mixed get_type_info(mixed arg, int flag);
+
+BESCHREIBUNG
+        Liefert Informationen uber den Typ von <arg>, wie von <flag>
+        angegeben.
+
+        Wenn <flag> keine Zahl ist, liefert get_type_info() ein Array, dessen
+        erstes Element ein Integer ist, der den Datentyp bezeichnet, wie in
+        <lpctypes.h> definiert. Der zweite Eintrag kann zusaetzliche
+        Informationen zu <arg> enthalten.
+
+        Ist <flag> 0, wird nur das erste Element (d.h. der Datentyp) geliefert.
+        Ist <flag> 1, wird nur das zweite Element geliefert.
+
+        Wenn <arg> eine Closure enthaelt, so kann get_type_info() das Objekt
+        der Closure liefern, wenn fuer <flag> 2 gesetzt ist. (Fuer 'alien
+        lfun closures' ist das das Objekt, in dem die Closure definiert ist,
+        nicht das Objekt, an das die Closure gebunden ist.)
+
+        Fuer jeden anderen Wert fuer <flag> liefert die Funktion -1.
+
+        Die zusaetzlichen Informationen (also der zweite Eintrag des Arrays)
+        beinhalten:
+          - fuer Mappings deren Breite, also die Anzahl Datenwerte pro Key.
+          - fuer Symbole und gequotete Arrays die Anzahl Quotes.
+          - fuer Closures den (internen) Typ der Closure.
+          - fuer gemeinsam verwendete Strings 0, ungleich 0 fuer andere Strings
+          - -1 fuer alle anderen Datentypen
+
+BUGS
+        Diese Funktion unterliegt haeufigen Veraenderungen im Zug der
+        Treiberentwicklung.
+
+AENDERUNGEN
+        Eingefuehrt in 3.2@127
+        Flagwert 2 eingefuehrt in 3.2.1@84
+        Zusatzinformationen zu Strings eingefuehrt in 3.2.7
+        Bis und mit 3.2.7 lieferte get_type_info(closure, 2) keine Objekte
+            von Lamda Closures und gebundenen Lambda Closures.
+        Bis und mit 3.2.7 lieferte get_type_info(closure, 2) keine Objekte von
+            Efun-, Simul-Efun- oder Operator-Closures.
+
+SIEHE AUCH
+        debug_info(E), typeof(E), to_object(E)

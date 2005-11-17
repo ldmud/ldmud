@@ -1,0 +1,15 @@
+SYNOPSIS
+        int get_eval_cost()
+
+DESCRIPTION
+        Returns the remaining evaluation cost the current
+        execution (the current command) may use up.
+
+        It starts at a driver given high value and
+        is reduced with each executed statement.
+
+HISTORY
+        The initial value was made available as macro in LDMud 3.2.6.
+
+SEE ALSO
+        rusage(E), command(E), query_limits(E)

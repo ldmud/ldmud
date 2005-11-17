@@ -1,0 +1,21 @@
+SYNOPSIS
+        void shutdown();
+        void shutdown(int exit_code);
+
+BESCHREIBUNG
+        Faehrt das Mud herunter. Diese Funktion darf nie verwendet werden!
+        Wenn das Mud heruntergefahren werden muss, so hat dies ueber den
+        Shutdownbefehl zu erfolgen.
+
+        Ist ein <exit_code> Argument gegeben, wird sein Wert als der
+        Unix-Resultatwert verwendet; andernfalls wird 0 verwendet.
+
+        Man fragt sich nun vielleicht, wozu es dann diese Funktion gibt,
+        wenn man sie nicht verwenden darf. Sorry, das darf hier nicht
+        bekannt gegeben werden. Streng geheim.
+
+AENDERUNGEN
+        LDMud 3.2.11 fuehrte das 'exit_code' Argument ein.
+
+SIEHE AUCH
+        break_point(E), swap(E)
