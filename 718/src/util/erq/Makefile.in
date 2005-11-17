@@ -1,0 +1,68 @@
+
+# These lines are needed on some machines.
+MAKE=make
+SHELL=@CONFIG_SHELL@
+INSTALL=@INSTALL@
+mkinstalldirs=$(SHELL) @top_srcdir@/mkinstalldirs
+#
+CC=@CC@
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+
+SUBDIRS = indent make_docs xerq
+SED = sed
+
+BINDIR=@bindir@
+MUD_LIB=@libdir@
+ERQ_DIR=@libexecdir@
+
+#PROFIL= -DOPCPROF -DVERBOSE_OPCPROF
+#PROFIL=-p -DMARK
+#PROFIL=-pg
+PROFIL=
+#Enable warnings from the compiler, if wanted.
+WARN= # no warning options - will work with all compilers :-)
+#WARN= -Wall -Wshadow -Dlint
+#WARN= -Wall -Wshadow -Wno-parentheses # gcc settings
+#
+# Optimization and source level debugging options.
+# adding a -fomit-frame-pointer on the NeXT (gcc version 1.93 (68k, MIT syntax))
+# will corrupt the driver.
+HIGH_OPTIMIZE = @OCFLAGS@ # high optimization
+MED_OPTIMIZE= @MCFLAGS@ # medium optimization
+LOW_OPTIMIZE = @LCFLAGS@ # minimal optimization
+NO_OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
+
+OPTIMIZE= $(@val_optimize@_OPTIMIZE)
+
+# The main debugging level is define in config.h
+# Add additional options here.
+DEBUG=
+#
+MPATH=-DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"' -DERQ_DIR='"$(ERQ_DIR)"'
+#
+TOPINC=-I@top_srcdir@
+#
+CFLAGS= @EXTRA_CFLAGS@ $(OPTIMIZE) $(DEBUG) $(WARN) $(MPATH) $(PROFIL) $(TOPINC)
+#
+LIBS=@ERQ_LIBS@
+#
+LDFLAGS=@LDFLAGS@
+
+
+
+all:	erq@EXEEXT@
+
+FORCE: install
+
+erq@EXEEXT@:	erq.c
+#	$(CC) erq.c -lresolv -o erq
+	$(CC) $(CFLAGS) $(LDFLAGS) erq.c -o erq@EXEEXT@ $(LIBS)
+
+install: erq@EXEEXT@
+	$(mkinstalldirs) $(BINDIR)
+	$(INSTALL) erq@EXEEXT@ $(BINDIR)/erq@EXEEXT@
+
+clean:
+	-rm -f *.o erq@EXEEXT@ *~
