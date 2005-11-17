@@ -1,0 +1,18 @@
+Command: clone
+Argument: file
+
+Clone a copy of an object. The "bluebrint" must not be used for anything
+else then cloning.
+
+If the object defined in 'file' isn't loaded, it will be. 'reset()' will
+also be called in the object.
+
+When the 'file' is loaded, a new copy of the object will be created, and moved
+to either the wizard giving the command, or to his room, depending on what
+'get()' says in the object. When the object is being copied, it will have
+a new 'reset()' again.
+
+Rooms and castles should never be cloned, because they should always
+exist singularly, not in several copies.
+
+See also w/load.
