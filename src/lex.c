@@ -4066,6 +4066,15 @@ yylex1 (void)
                         break;
 
                       default:
+                        /* There is something after a semicolon or
+                         * closing brace. So it may be a catch(...;nolog).
+                         * Count it only as a statement, if the semicolon
+                         * or brace is the last thing we see in this inline
+                         * closure.
+                         */
+                        if (level == 1 && isstatement && !lexwhite(yyp[-1]))
+                            isstatement = MY_FALSE;
+
                         startofline = MY_FALSE;
                         break;
                       } /* string-case */
