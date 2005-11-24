@@ -77,7 +77,7 @@ static unsigned char PADDING[64] = {
 
 /* ROTATE_LEFT rotates x left n bits.
  */
-#define ROTATE_LEFT(x, n) (((x) << (n)) | ((x) >> (32-(n))))
+#define ROTATE_LEFT(x, n) (((x) << (n)) | (((x) & 0xffffffffUL) >> (32-(n))))
 
 /* FF, GG, HH, and II transformations for rounds 1, 2, 3, and 4.
  * Rotation is separate from addition to prevent recomputation.
