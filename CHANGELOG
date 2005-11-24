@@ -3,6 +3,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 24-Nov-2005  (Lars Duening)
   - (md5.c) The ROTATE_LEFT macro wasn't 64-bit clean (Bug #413).
+  - (interpret.c) Using foreach(), when looping over a mapping with no values,
+      or with only the index being extracted, the loop actually loops over the
+      mapping and not just the indices copied into an array (Bug #388).
 
 24-Nov-2005  (Gnomi)
   - (actions.c) When re-using a sentence structure for marker_sent,

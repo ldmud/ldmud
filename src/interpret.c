@@ -15066,25 +15066,11 @@ again:
                 put_mapping(sp, m);
             }
 
-            if (m->num_values == 0 || nargs-1 == 1)
-            {
-                /* Special case: we can replace the mapping
-                 * by its indices only (and we also don't need to
-                 * created references).
-                 */
-                free_svalue(sp);
-                put_array(sp, indices);
-                gen_refs = MY_FALSE;
-            }
-            else
-            {
-                /* Normal case: push the indices array and
-                 * remember the fact in nargs.
-                 */
-                sp++;
-                put_array(sp, indices);
-                nargs = -nargs;
-            }
+            /* Push the indices array and remember the fact in nargs.
+             */
+            sp++;
+            put_array(sp, indices);
+            nargs = -nargs;
         }
 
         /* If this is a range foreach, drop the upper bound svalue
