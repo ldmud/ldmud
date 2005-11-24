@@ -5093,6 +5093,8 @@ f_set_environment (svalue_t *sp)
         /* First remove the item out of its current environment */
         Bool okey = MY_FALSE;
 
+        item->super->flags &= ~O_RESET_STATE;
+
         if (item->sent)
         {
             remove_environment_sent(item);
