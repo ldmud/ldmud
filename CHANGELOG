@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Nov-2005  (Gnomi)
+  - (actions.c) When re-using a sentence structure for marker_sent,
+       the shadow_ob member wasn't cleared out, causing crashes
+       down the road (Bug #0000414).
+
 09-Oct-2005  (Lars Duening)
   - (closure.c) replace_program_lambda_adjust() forgot to clear the
        object references from the auxiliary lambda it created (Bug #0000412).
