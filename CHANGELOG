@@ -8,6 +8,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (actions.c) When re-using a sentence structure for marker_sent,
        the shadow_ob member wasn't cleared out, causing crashes
        down the road (Bug #0000414).
+  - (closure.c) bind_lambda() doesn't ignore unbindable closures
+       when the second argument is missing (Bug #407).
 
 09-Oct-2005  (Lars Duening)
   - (closure.c) replace_program_lambda_adjust() forgot to clear the

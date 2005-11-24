@@ -5895,7 +5895,7 @@ v_bind_lambda (svalue_t *sp, int num_arg)
          * throw an error (unless <ob> has been omitted)
          */
         free_object(ob, "bind_lambda");
-        if (sp[1].type == T_NUMBER)
+        if (num_arg == 1)
             break;
         errorf("Bad arg 1 to bind_lambda(): unbindable closure\n");
         /* NOTREACHED */
