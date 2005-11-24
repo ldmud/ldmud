@@ -4,12 +4,14 @@ See the file HISTORY for a user-oriented summary of all the changes.
 24-Nov-2005  (Gnomi)
   - (lex.c) <code>(: catch(load_object($1);nolog) :)</code> no
        longer produces a syntax error (Bug #403).
-  - (interpret.c) Using foreach(), when looping over a mapping with no values,
-      or with only the index being extracted, the loop actually loops over the
-      mapping and not just the indices copied into an array (Bug #388).
 
 24-Nov-2005  (Lars Duening)
   - (md5.c) The ROTATE_LEFT macro wasn't 64-bit clean (Bug #413).
+  - (interpret.c) Using foreach(), when looping over a mapping with no values,
+      or with only the index being extracted, the loop actually loops over the
+      mapping and not just the indices copied into an array (Bug #388).
+  - (simulate.c) Efun set_environment(): clear the RESET_STATE flag of
+      of the moved object's original environment, if any (Bug #387).
 
 19-Oct-2005 (Lars Duening)
   - (pkg-tls.c) tls_check_certificate() now returns the low-level API
