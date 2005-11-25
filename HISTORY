@@ -29,6 +29,8 @@ For a detailed list of all changes see the file CHANGELOG.
     - Fixed Crashers:
        + An error during the fatal() processing will be treated
          as a double-fatal.
+       + Freeing a deeply nested value structure no longer overflows
+         the local stack.
 
     - Language:
        + foreach(): When looping over a mapping with no values, or with

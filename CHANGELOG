@@ -17,6 +17,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
       memory is actually allocated, throwing an error if not (Bug #397).
   - (simulate.c) Errors during the processing of a fatal() will be
       recognized and treated as double-fatal (Bug #408).
+  - (interpret.c) free_svalue() now recognizes the free of nested
+      structures and de-serializes them to avoid stack overflows (Bug #416).
 
 19-Oct-2005 (Lars Duening)
   - (pkg-tls.c) tls_check_certificate() now returns the low-level API
