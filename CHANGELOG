@@ -12,6 +12,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
       mapping and not just the indices copied into an array (Bug #388).
   - (simulate.c) Efun set_environment(): clear the RESET_STATE flag of
       of the moved object's original environment, if any (Bug #387).
+  - (efuns.c) Efun md5() can now hash arrays of numbers as well (Bug #411).
 
 19-Oct-2005 (Lars Duening)
   - (pkg-tls.c) tls_check_certificate() now returns the low-level API

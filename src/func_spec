@@ -532,7 +532,7 @@ mixed  *wizlist_info();
 
 string  copy_bits(string,string,void|int,void|int,void|int);
 string  make_shared_string(string);
-string  md5(string);
+string  md5(int*|string);
 string *regexplode(string, string);
 string  regreplace(string,string,closure|string,int);
 string  trim(string, ...);

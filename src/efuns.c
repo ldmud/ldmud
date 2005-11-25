@@ -731,7 +731,7 @@ f_md5(svalue_t *sp)
 
 /* TEFUN: md5()
  *
- *   string md5(string arg)
+ *   string md5(string|int * arg)
  *
  * Create and return a MD5 message digest from the string <arg>.
  */
@@ -739,14 +739,39 @@ f_md5(svalue_t *sp)
 {
     M_MD5_CTX context;
     unsigned char *digest, d[17];
+    unsigned char * input = NULL;
+    size_t inputlen = 0;
     int i;
 
-    TYPE_TEST1(sp, T_STRING);
+    if (sp->type != T_STRING && sp->type != T_POINTER)
+        bad_xefun_arg(1, sp);
+
+    if (sp->type == T_STRING)
+    {
+        input = (unsigned char *)sp->u.string;
+        inputlen = svalue_strlen(sp);
+    }
+    else
+    {
+        inputlen = VEC_SIZE(sp->u.vec);
+        xallocate(input, inputlen, "md5 input string");
+
+        for (i = 0; i < inputlen; ++i)
+        {
+            if (sp->u.vec->item[i].type != T_NUMBER)
+            {
+                xfree(input);
+                bad_xefun_arg(1, sp);
+            }
+
+            input[i] = (unsigned char)sp->u.vec->item[i].u.number & 0xFF;
+        }
+    }
 
     xallocate(digest, 33, "md5 result");
 
     MD5Init(&context);
-    MD5Update(&context, (unsigned char *)sp->u.string, svalue_strlen(sp));
+    MD5Update(&context, input, inputlen);
     MD5Final(&context, d);
 
     d[16]='\0';
@@ -755,7 +780,11 @@ f_md5(svalue_t *sp)
         sprintf((char *)digest+2*i, "%02x", d[i]);
 
     digest[32] = '\0';
-    free_string_svalue(sp);
+
+    if (sp->type != T_STRING)
+        xfree(input);
+
+    free_svalue(sp);
     put_malloced_string(sp, (char *)digest);
 
     return sp;

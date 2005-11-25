@@ -1,16 +1,21 @@
 SYNOPSIS
         string md5(string arg)
+        string md5(int *  arg)
 
 DESCRIPTION
-        Create and return a MD5 message digest from the string <arg>.
+        Create and return a MD5 message digest from <arg>.
+        <arg> may be a string, or an array of numbers (each considered to
+        be a character, ignoring all but the lowest byte).
 
 EXAMPLES
         string s;
 
-        s = md5("Hello, world!");
+        s = md5("Hello");
+        s = md5( ({ 'H', 'e', 'l', 'l', 'o' })
 
 HISTORY
         Introduced in LDMud 3.2.9
+        LDMud 3.2.12 added number arrays as argument.
 
 SEE ALSO
         crypt(E)
