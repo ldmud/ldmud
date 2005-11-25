@@ -132,9 +132,6 @@ TAGS: $(SRC)
 make-patchlevel:
 	./mk-patchlevel.sh
 
-version.sh: ../lpmud.prj
-	-which prcs > /dev/null && (cd ..; prcs rekey lpmud src/version.sh)
-
 make_func.c: make_func.y
 	$(YACC) make_func.y
 	@MOVE_YACC_TAB@ make_func.c
