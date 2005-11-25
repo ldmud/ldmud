@@ -225,6 +225,8 @@ For a detailed list of all changes see the file CHANGELOG.
           signals if the error is caught or not.
 
     - Fixed Crashers:
+       + Freeing a deeply nested value structure no longer overflows
+         the local stack.
        + An error during the fatal() processing will be treated
          as a double-fatal.
 
