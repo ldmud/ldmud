@@ -4,6 +4,12 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+xx-xxx-xxxx (Lars Duening) -- Release 3.4.1
+
+    - Changed efuns:
+       + sha1(): Accept number arrays as arguments as well.
+
+
 15-May-2005 (Lars Duening) -- Release 3.4.0
 
     - Changed efuns:
