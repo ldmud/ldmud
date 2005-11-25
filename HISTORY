@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-19-Jun-2005 (Lars Duening) -- Development Release 3.3
+24-Nov-2005 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -202,9 +202,10 @@ For a detailed list of all changes see the file CHANGELOG.
            the maxinum number of entries in a mapping.
 
 
-19-Oct-2005 (Lars Duening) -- Release 3.2.12
+24-Nov-2005 (Lars Duening) -- Release 3.2.12
 
     - Changed efuns:
+      + md5(): Accept number arrays as arguments as well.
       + tls_check_certificate(): Return the low-level API results, and throw
           an error if the connection is not secure.
 
@@ -213,6 +214,8 @@ For a detailed list of all changes see the file CHANGELOG.
           accepted as extra arguments.
       + restore_value(): Restoring one-character operator closures
           in arrays works again.
+      + set_environment(): Clear the RESET_STATE flag of
+          of the moved object's original environment, if any.
       + to_int(): No longer accepts "x<num>" as valid sedecimal notation.
 
     - New efuns:
@@ -222,8 +225,15 @@ For a detailed list of all changes see the file CHANGELOG.
           signals if the error is caught or not.
 
     - Fixed Crashers:
+       + Freeing a deeply nested value structure no longer overflows
+         the local stack.
+       + An error during the fatal() processing will be treated
+         as a double-fatal.
 
     - Language:
+       + foreach(): When looping over a mapping with no values, or with
+          only the index being extracted, the loop actually loops over the
+          mapping and not just the indices copied into an array.
 
     - Runtime:
 

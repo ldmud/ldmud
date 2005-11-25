@@ -1045,6 +1045,7 @@ parse_command (char *buff, Bool from_efun)
         marker_sent->sent.type = SENT_MARKER;
         marker_sent->verb = NULL;
         marker_sent->function = NULL;
+        marker_sent->shadow_ob = NULL;
 
         /* Push the argument and call the command function.
          */
@@ -1170,6 +1171,7 @@ parse_command (char *buff, Bool from_efun)
     marker_sent->sent.type = SENT_MARKER;
     marker_sent->verb = NULL;
     marker_sent->function = NULL;
+    marker_sent->shadow_ob = NULL;
     command_marker = marker_sent;
 
     /* If the command was not found, notify the failure */

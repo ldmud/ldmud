@@ -3446,7 +3446,7 @@ get_message (char *buff)
 
         } /* for (NextCmdGiver) */
 
-        /* If we come here, we couldn't find any commandsd:
+        /* If we got here, we couldn't find any commands:
          * loop and select (on timeout) again.
          */
 

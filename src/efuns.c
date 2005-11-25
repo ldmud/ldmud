@@ -343,8 +343,9 @@ f_md5 (svalue_t *sp)
 /* EFUN: md5()
  *
  *   string md5(string arg)
+ *   string md5(int *  arg)
  *
- * Create and return a MD5 message digest from the string <arg>.
+ * Create and return a MD5 message digest from the string/array <arg>.
  */
 
 {
@@ -352,6 +353,30 @@ f_md5 (svalue_t *sp)
     string_t *s_digest;
     unsigned char *digest, d[17];
     int i;
+
+    if (sp->type == T_POINTER)
+    {
+        string_t * arg;
+        char * argp;
+
+        memsafe(arg = alloc_mstring(VEC_SIZE(sp->u.vec)), VEC_SIZE(sp->u.vec)
+               , "md5 argument string");
+        argp = get_txt(arg);
+
+        for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
+        {
+            if (sp->u.vec->item[i].type != T_NUMBER)
+            {
+                free_mstring(arg);
+                errorf("Bad argument 1 to md5(): got mixed*, expected string/int*.\n");
+                /* NOTREACHED */
+            }
+            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+        }
+
+        free_svalue(sp);
+        put_string(sp, arg);
+    }
 
     memsafe(s_digest = alloc_mstring(32), 32, "md5 encryption result");
     digest = (unsigned char *)get_txt(s_digest);
@@ -365,7 +390,7 @@ f_md5 (svalue_t *sp)
     for (i = 0; i < 16; i++)
         sprintf((char *)digest+2*i, "%02x", d[i]);
 
-    free_string_svalue(sp);
+    free_svalue(sp);
     put_string(sp, s_digest);
 
     return sp;
@@ -435,8 +460,9 @@ f_sha1 (svalue_t *sp)
 /* EFUN: sha1()
  *
  *   string sha1(string arg)
+ *   string sha1(int *  arg)
  *
- * Create and return a SHA1 message digest from the string <arg>.
+ * Create and return a SHA1 message digest from the string/array <arg>.
  */
 
 {
@@ -444,6 +470,30 @@ f_sha1 (svalue_t *sp)
     string_t *s_digest;
     unsigned char *digest, d[SHA1HashSize + 1];
     int i;
+
+    if (sp->type == T_POINTER)
+    {
+        string_t * arg;
+        char * argp;
+
+        memsafe(arg = alloc_mstring(VEC_SIZE(sp->u.vec)), VEC_SIZE(sp->u.vec)
+               , "sha1 argument string");
+        argp = get_txt(arg);
+
+        for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
+        {
+            if (sp->u.vec->item[i].type != T_NUMBER)
+            {
+                free_mstring(arg);
+                errorf("Bad argument 1 to sha1(): got mixed*, expected string/int*.\n");
+                /* NOTREACHED */
+            }
+            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+        }
+
+        free_svalue(sp);
+        put_string(sp, arg);
+    }
 
     memsafe(s_digest = alloc_mstring(2 * SHA1HashSize)
            , 2 & SHA1HashSize, "sha1 encryption result");
@@ -458,7 +508,7 @@ f_sha1 (svalue_t *sp)
     for (i = 0; i < SHA1HashSize; i++)
         sprintf((char *)digest+2*i, "%02x", d[i]);
 
-    free_string_svalue(sp);
+    free_svalue(sp);
     put_string(sp, s_digest);
 
     return sp;

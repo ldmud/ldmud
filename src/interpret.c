@@ -1066,8 +1066,8 @@ free_protector_svalue (svalue_t *v)
 }
 
 /*-------------------------------------------------------------------------*/
-void
-free_svalue (svalue_t *v)
+static void
+int_free_svalue (svalue_t *v)
 
 /* Free the svalue <v>, which may be of any type.
  * Afterwards, the content of <v> is undefined.
@@ -1206,6 +1206,117 @@ free_svalue (svalue_t *v)
         } /* switch (v->u.lvalue->type) */
         break; /* case T_LVALUE */
 
+    }
+} /* int_free_svalue() */
+
+/*-------------------------------------------------------------------------*/
+
+/* Queue element to deserialize the freeing of complex svalues. */
+struct fs_queue_s {
+    struct fs_queue_s * next;
+    svalue_t                   value;
+};
+
+typedef struct fs_queue_s fs_queue_t;
+
+static fs_queue_t fs_queue_base;
+  /* Static fs_queue_t variable to avoid xallocs for the simple cases.
+   */
+
+static fs_queue_t * fs_queue_head = NULL;
+static fs_queue_t * fs_queue_tail = NULL;
+  /* Double-ended list of deserialized svalues to free.
+   */
+    
+void
+free_svalue (svalue_t *v)
+
+/* Free the svalue <v>, which may be of any type, while making sure that
+ * complex nested structures are deserialized (to avoid stack overflows).
+ * Afterwards, the content of <v> is undefined.
+ */
+
+{
+    Bool needs_deserializing = MY_FALSE;
+
+    switch (v->type)
+    {
+    case T_QUOTED_ARRAY:
+    case T_POINTER:
+        needs_deserializing = (v->u.vec->ref == 1);
+        break;
+
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+        needs_deserializing = (struct_ref(v->u.strct) == 1);
+        break;
+#endif /* USE_STRUCTS */
+
+    case T_MAPPING:
+        needs_deserializing = (v->u.map->ref == 1);
+        break;
+    }
+
+    /* If the value doesn't need de-serializing, it can be
+     * be freed immediately.
+     */
+    if (!needs_deserializing)
+    {
+        int_free_svalue(v);
+        return;
+    }
+
+    /* If there are elements in the queue, we are inside the freeing of a
+     * complex structure, and this element just needs to be queued up.
+     * When out of memory, however, just free it.
+     */
+    if (fs_queue_head != NULL)
+    {
+        fs_queue_t * tmp = xalloc(sizeof(*tmp));
+
+        if (NULL == tmp)
+        {
+            int_free_svalue(v);
+            return;
+        }
+
+        /* Copy the value over, invalidating this one. */
+        tmp->next = NULL;
+        tmp->value = *v;
+        v->type = T_INVALID;
+
+        /* Insert the element into the queue. */
+        fs_queue_tail->next = tmp;
+        fs_queue_tail = tmp;
+
+        return;
+    }
+
+    /* This is the first complex value to be freed - start the queue.
+     */
+    fs_queue_base.next = NULL;
+    fs_queue_base.value = *v;
+    v->type = T_INVALID;
+
+    fs_queue_head = fs_queue_tail = &fs_queue_base;
+
+    /* Now loop over the queue, successively freeing the values.
+     * If one of the values freed contains complex freeable structures
+     * itself, they will be added to the end of the queue and eventually
+     * picked up by this loop.
+     */
+    while (fs_queue_head != NULL)
+    {
+        fs_queue_t * current = fs_queue_head;
+
+        int_free_svalue(&(fs_queue_head->value));
+
+        fs_queue_head = fs_queue_head->next;
+        if (fs_queue_head == NULL)
+            fs_queue_tail = NULL;
+
+        if (current != &fs_queue_base)
+            xfree(current);
     }
 } /* free_svalue() */
 
@@ -15066,25 +15177,11 @@ again:
                 put_mapping(sp, m);
             }
 
-            if (m->num_values == 0 || nargs-1 == 1)
-            {
-                /* Special case: we can replace the mapping
-                 * by its indices only (and we also don't need to
-                 * created references).
-                 */
-                free_svalue(sp);
-                put_array(sp, indices);
-                gen_refs = MY_FALSE;
-            }
-            else
-            {
-                /* Normal case: push the indices array and
-                 * remember the fact in nargs.
-                 */
-                sp++;
-                put_array(sp, indices);
-                nargs = -nargs;
-            }
+            /* Push the indices array and remember the fact in nargs.
+             */
+            sp++;
+            put_array(sp, indices);
+            nargs = -nargs;
         }
 
         /* If this is a range foreach, drop the upper bound svalue

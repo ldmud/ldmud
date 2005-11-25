@@ -64,4 +64,4 @@ EXAMPLE
           ==> result 2, who = "ab", what = ""
 
 SEE ALSO
-        extract(E), explode(E), regexp(E)
+        explode(E), regexp(E)

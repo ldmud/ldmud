@@ -86,9 +86,17 @@ struct struct_type_s
 
 /* --- Macros --- */
 
+/* p_int struct_ref(struct *t)
+ * p_int struct_t_ref(struct_type_t *t)
+ *   Return the number of references to struct(type) <t>.
+ */
+#define struct_ref(t)   ((t)->type->ref)
+#define struct_t_ref(t) ((t)->ref)
+
+
 /* unsigned short struct_size(struct *t)
  * unsigned short struct_t_size(struct_type_t *t)
- *   Return the number of elemens in struct(type) <t>.
+ *   Return the number of elements in struct(type) <t>.
  */
 #define struct_size(t)   ((t)->type->num_members)
 #define struct_t_size(t) ((t)->num_members)

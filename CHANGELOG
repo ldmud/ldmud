@@ -1,6 +1,48 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Nov-2005  (Lars Duening)  (3.3.712)
+  - Created snapshot.
+  - (md5.c) The ROTATE_LEFT macro wasn't 64-bit clean (Bug #413).
+  - (interpret.c) Using foreach(), when looping over a mapping with no values,
+      or with only the index being extracted, the loop actually loops over the
+      mapping and not just the indices copied into an array (Bug #388).
+  - (object.c) Efun set_environment(): clear the RESET_STATE flag of
+      of the moved object's original environment, if any (Bug #387).
+  - (efuns.c) Efun md5()/sha1() can now hash arrays of numbers as well
+      (Bug #411).
+  - (xalloc.c) The string_copy() function checks if the requested
+      memory is actually allocated, throwing an error if not (Bug #397).
+  - (simulate.c) Errors during the processing of a fatal() will be
+      recognized and treated as double-fatal (Bug #408).
+  - (interpret.c) free_svalue() now recognizes the free of nested
+      structures and de-serializes them to avoid stack overflows (Bug #416).
+  - (Makefile.in, version.sh, patchlevel.h.in) Removed PRCS support.
+
+24-Nov-2005  (Gnomi)
+  - (actions.c) When re-using a sentence structure for marker_sent,
+       the shadow_ob member wasn't cleared out, causing crashes
+       down the road (Bug #0000414).
+  - (closure.c) bind_lambda() doesn't ignore unbindable closures
+       when the second argument is missing (Bug #407).
+
+09-Oct-2005  (Lars Duening)
+  - (closure.c) replace_program_lambda_adjust() forgot to clear the
+       object references from the auxiliary lambda it created (Bug #0000412).
+
+08-Oct-2005  (Lars Duening)
+  - (closure.c) When freeing bound unbound_lambdas, the code forgot to
+       remove the reference to the creator object of the unbound_lambda.
+  - (closure.c) Efun symbol_function() leaked an object reference (Bug
+       #0000412).
+  - (closure.c, object.h) Made the object reference logs a bit more
+       expressive.
+
+31-Oct-2005 (Philipp Hancke)
+  - (pkg-tls.c) When accepting a SSL connection, request a client
+       certificate. The driver itself won't check the correctness,
+       but the result will be available in the connection status.
+
 30-Oct-2005 (Lars Duening)  (3.3.711)
   - Created snapshot.
 

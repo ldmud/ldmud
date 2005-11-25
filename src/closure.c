@@ -1002,6 +1002,10 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
             memcpy(l->function.code, l2->function.code, (size_t)code_size2);
 
             /* Free the (now empty) memory */
+            if  (l2->ob)
+                free_object(l2->ob, "replace_program_lambda_adjust");
+            if  (l2->prog_ob)
+                free_object(l2->prog_ob, "replace_program_lambda_adjust");
             xfree(svp2);
             free_array(lrpp->args);
             free_svalue(&lrpp->block);
@@ -1031,7 +1035,7 @@ closure_init_lambda (lambda_t * l, object_t * obj)
     l->ref = 1;
     if (current_prog)
     {
-        l->prog_ob = ref_valid_object(current_prog->blueprint, "closure_literal");
+        l->prog_ob = ref_valid_object(current_prog->blueprint, "lambda creator");
         l->prog_pc = inter_pc - current_prog->program;
     }
     else
@@ -1041,7 +1045,7 @@ closure_init_lambda (lambda_t * l, object_t * obj)
     }
 
     if (obj)
-        l->ob = ref_object(obj, "closure");
+        l->ob = ref_object(obj, "lambda object");
     else
         l->ob = NULL;
 } /* closure_init_lambda() */
@@ -1171,7 +1175,7 @@ closure_lfun ( svalue_t *dest, object_t *obj
 {
     lambda_t *l;
 
-    /* Allocate an initialise a new lambda structure */
+    /* Allocate and initialise a new lambda structure */
 #ifndef USE_NEW_INLINES
     l = closure_new_lambda(obj, raise_error);
 #else /* USE_NEW_INLINES */
@@ -5271,7 +5275,7 @@ free_closure (svalue_t *svp)
         return;
 
     if (l->prog_ob)
-        free_object(l->prog_ob, "free_closure");
+        free_object(l->prog_ob, "free_closure: lambda creator");
 
     if (CLOSURE_HAS_CODE(type))
     {
@@ -5292,7 +5296,7 @@ free_closure (svalue_t *svp)
         return;
     }
 
-    free_object(l->ob, "free_closure");
+    free_object(l->ob, "free_closure: lambda object");
     if (type == CLOSURE_BOUND_LAMBDA)
     {
     	/* BOUND_LAMBDAs are indirections to UNBOUND_LAMBDA structures.
@@ -5308,6 +5312,10 @@ free_closure (svalue_t *svp)
 
         if (--l2->ref)
             return;
+
+        if (l2->prog_ob)
+            free_object(l2->prog_ob, "free_closure: unbound lambda creator");
+
         svp = (svalue_t *)l2;
         if ( (num_values = EXTRACT_UCHAR(l2->function.code)) == 0xff)
             num_values = svp[-0x100].u.number;
@@ -5319,7 +5327,7 @@ free_closure (svalue_t *svp)
 
     if (type == CLOSURE_LFUN)
     {
-        free_object(l->function.lfun.ob, "free_closure");
+        free_object(l->function.lfun.ob, "free_closure: lfun object");
     }
 
 #ifdef USE_NEW_INLINES
@@ -5887,7 +5895,7 @@ v_bind_lambda (svalue_t *sp, int num_arg)
          * throw an error (unless <ob> has been omitted)
          */
         free_object(ob, "bind_lambda");
-        if (sp[1].type == T_NUMBER)
+        if (num_arg == 1)
             break;
         errorf("Bad arg 1 to bind_lambda(): unbindable closure\n");
         /* NOTREACHED */
@@ -6137,6 +6145,8 @@ f_symbol_function (svalue_t *sp)
         /* The lambda was bound to the wrong object */
         free_object(sp->u.lambda->ob, "symbol_function");
         sp->u.lambda->ob = ref_object(current_object, "symbol_function");
+
+        free_object(ob, "symbol_function"); /* We adopted the reference */
 
         return sp;
     }

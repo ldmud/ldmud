@@ -225,6 +225,10 @@ Bool master_will_be_updated = MY_FALSE;
   /* TRUE if a master-update was requested.
    */
 
+static Bool in_fatal = MY_FALSE;
+  /* TRUE if fatal() is being processed.
+   */
+
 int num_error = 0;
   /* Number of recursive calls to errorf().
    */
@@ -594,7 +598,6 @@ fatal (const char *fmt, ...)
 {
     va_list va;
     char *ts;
-    static Bool in_fatal = MY_FALSE;
 
     /* Prevent double fatal. */
     if (in_fatal)
@@ -726,6 +729,12 @@ errorf (const char *fmt, ...)
        */
     mp_int    line_number = 0;
     va_list   va;
+
+    /* Errors during the fatal() processing will abort the process
+     * immediately.
+     */
+    if (in_fatal)
+        fatal("Error during fatal().");
 
     ts = time_stamp();
 
