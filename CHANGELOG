@@ -10,6 +10,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
       of the moved object's original environment, if any (Bug #387).
   - (efuns.c) Efun md5()/sha1() can now hash arrays of numbers as well
       (Bug #411).
+  - (xalloc.c) The string_copy() function checks if the requested
+      memory is actually allocated, throwing an error if not (Bug #397).
 
 24-Nov-2005  (Gnomi)
   - (actions.c) When re-using a sentence structure for marker_sent,

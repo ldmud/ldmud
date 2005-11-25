@@ -1623,7 +1623,7 @@ string_copy_traced (const char *str MTRACE_DECL)
     size_t len;
 
     len = strlen(str)+1;
-    p = xalloc_traced(len MTRACE_PASS);
+    memsafe(p = xalloc_traced(len MTRACE_PASS), len, "string_copy");
     if (p)
     {
         (void)memcpy(p, str, len);
