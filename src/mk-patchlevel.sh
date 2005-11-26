@@ -5,6 +5,7 @@
 . version.sh
 
 sed -e "s/\\\$VersionType\\\$/$version_type/g" \
+    -e "s/\\\$VersionLongType\\\$/$version_longtype/g" \
     -e "s/\\\$VersionMicro\\\$/$version_micro/g" \
     -e "s/\\\$VersionMinor\\\$/$version_minor/g" \
     -e "s/\\\$VersionMajor\\\$/$version_major/g" \
@@ -24,6 +25,6 @@ fi
 # This way version.sh will always represent the latest revision number/date.
 
 sed -e "s/version_stamp=\".*\"/version_stamp=\"$(date)\"/g" \
-    version.sh > version.sh.tmp
+    version.sh > version.sh.out
 
-mv version.sh.tmp version.sh
+mv version.sh.out version.sh

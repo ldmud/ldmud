@@ -7,13 +7,14 @@
  *--------------------------------------------------------------------------
  */
 
+#define RELEASE_TYPE "$VersionType$"
+#define RELEASE_LONGTYPE "$VersionLongType$"
+
 #define RELEASE_DATE "$VersionDate$"
 
-#define PROJ_VERSION "3.2-rev.$VersionRevision$"
+#define PROJ_VERSION "Build $VersionRevision$"
 
-#define GAME_VERSION "$VersionMajor$.$VersionMinor$.$VersionMicro$"
-
-#define LONG_VERSION "$VersionMajor$.$VersionMinor$.$VersionMicro$-rev.$VersionRevision$"
+#define DRIVER_VERSION "$VersionMajor$.$VersionMinor$.$VersionMicro$"
 
 #define VERSION_MAJOR "$VersionMajor$"
 
@@ -21,15 +22,9 @@
 
 #define VERSION_MICRO "$VersionMicro$"
 
-#define VERSION_PATCH "$VersionRevision$"
-
 #define LOCAL_LEVEL ""
-
-#define RELEASE_TYPE "$VersionType$"
 
 /* TODO: Add something like the perl local patchlevel management. */
 /* TODO: Add LPC defines for the various version number parts */
-
-#define IS_RELEASE (!strcmp("$VersionType$", "dev"))
 
 #endif /* PATCHLEVEL_H__ */

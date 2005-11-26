@@ -12,13 +12,14 @@ version_revision=$(echo "\$Revision$" | sed -e 's/[$]Revision: \([0-9][0-9]*\) *
 
 # The version type: dev, stable, maintenance, release
 version_type="dev"
+version_longtype="development"
 
 # A timestamp, to be used by bumpversion and other scripts.
 # It can be used, for example, to 'touch' this file on every build, thus
 # forcing revision control systems to add it on every checkin automatically.
-version_stamp="Thu Nov 24 23:38:26 MST 2005"
+version_stamp="Fri Nov 25 23:11:43 MST 2005"
 
 # The version number information
-version_micro=12
+version_micro=11
 version_minor=2
 version_major=3
