@@ -1601,20 +1601,10 @@ drivertag (void)
  */
 
 {
-    if (IS_STABLE_BRANCH)
-    {
-        if (IS_DEVELOPMENT)
-            return " (beta)";
+    if (strcmp(RELEASE_LONGTYPE, ""))
+        return " (" RELEASE_LONGTYPE ")";
 
-        return "";
-    }
-    else
-    {
-        if (IS_DEVELOPMENT)
-            return " (development)";
-
-        return " (maintenance)";
-    }
+    return "";
 } /* drivertag() */
 
 /*-------------------------------------------------------------------------*/
