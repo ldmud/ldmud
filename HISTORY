@@ -8,6 +8,7 @@ For a detailed list of all changes see the file CHANGELOG.
 
     - Changed efuns:
       + md5(): Accept number arrays as arguments as well.
+      + md5(): Accept the number of iterations as optional argument.
       + sscanf():  Added test whether the constant characters after
           a %-field also match - if not, the %-field is considered unmatched.
       + tls_check_certificate(): Return the low-level API results, and throw

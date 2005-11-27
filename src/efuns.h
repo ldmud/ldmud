@@ -15,7 +15,7 @@ extern Bool is_wizard_used;
 
 extern svalue_t *f_copy_bits (svalue_t *sp, int num_arg);
 extern svalue_t *f_make_shared_string(svalue_t *);
-extern svalue_t *f_md5(svalue_t *);
+extern svalue_t *f_md5(svalue_t *, int num_arg);
 extern svalue_t *f_trim(svalue_t *, int num_arg);
 extern svalue_t *f_upper_case(svalue_t *);
 extern char     *e_terminal_colour (char * text, mapping_t * map

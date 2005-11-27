@@ -727,13 +727,16 @@ f_make_shared_string (svalue_t *sp)
 
 /*--------------------------------------------------------------------*/
 svalue_t *
-f_md5(svalue_t *sp)
+f_md5 (svalue_t *sp, int num_arg)
 
 /* TEFUN: md5()
  *
- *   string md5(string|int * arg)
+ *   string md5(string arg [, int iterations ] )
+ *   string md5(int *  arg [, int iterations ] )
  *
  * Create and return a MD5 message digest from the string <arg>.
+ * If iterations is specified to number > 0, the digest is calculated
+ * using the given number of iterations.
  */
 
 {
@@ -742,9 +745,29 @@ f_md5(svalue_t *sp)
     unsigned char * input = NULL;
     size_t inputlen = 0;
     int i;
+    p_int iterations;
+
+    if (num_arg == 2)
+    {
+        if (sp->type != T_NUMBER)
+            bad_xefun_vararg(2, sp);
+        iterations = sp->u.number;
+        sp--;
+    }
+    else
+        iterations = 1;
+
+    if (iterations < 1)
+    {
+        errorf("Bad argument 2 to md5(): expected a number > 0, but got %ld\n"
+              , (long) iterations);
+        /* NOTREACHED */
+        return sp;
+    }
+
 
     if (sp->type != T_STRING && sp->type != T_POINTER)
-        bad_xefun_arg(1, sp);
+        bad_xefun_vararg(1, sp);
 
     if (sp->type == T_STRING)
     {
@@ -761,7 +784,7 @@ f_md5(svalue_t *sp)
             if (sp->u.vec->item[i].type != T_NUMBER)
             {
                 xfree(input);
-                bad_xefun_arg(1, sp);
+                bad_xefun_vararg(1, sp);
             }
 
             input[i] = (unsigned char)sp->u.vec->item[i].u.number & 0xFF;
@@ -773,6 +796,13 @@ f_md5(svalue_t *sp)
     MD5Init(&context);
     MD5Update(&context, input, inputlen);
     MD5Final(&context, d);
+
+    while (--iterations > 0)
+    {
+        MD5Init(&context);
+        MD5Update(&context, d, sizeof(d)-1);
+        MD5Final(&context, d);
+    }
 
     d[16]='\0';
 
