@@ -4,7 +4,17 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-24-Nov-2005 (Lars Duening) -- Development Release 3.3
+27-Nov-2005 (Lars Duening) -- Release 3.3.713
+
+    - Changed Efuns:
+       + present(): Modified the <n> search behaviour so that the
+          numbering is applied over both inventory and environment
+          together. Before, the numbering was individual in each
+          space, leading to situations where low-numbered objects in the
+          environment were hidden by those in the inventory.
+
+
+24-Nov-2005 (Lars Duening) -- Release 3.3.712
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -202,7 +212,7 @@ For a detailed list of all changes see the file CHANGELOG.
            the maxinum number of entries in a mapping.
 
 
-26-Nov-2005 (Lars Duening) -- Release 3.2.12
+27-Nov-2005 (Lars Duening) -- Release 3.2.12
 
     - Changed efuns:
       + md5(): Accept number arrays as arguments as well.
@@ -222,8 +232,6 @@ For a detailed list of all changes see the file CHANGELOG.
           of the moved object's original environment, if any.
       + to_int(): No longer accepts "x<num>" as valid sedecimal notation.
 
-    - New efuns:
-
     - Master Object:
        + runtime_error(), heart_beat_error(): A new argument 'caught'
           signals if the error is caught or not.
@@ -238,10 +246,6 @@ For a detailed list of all changes see the file CHANGELOG.
        + foreach(): When looping over a mapping with no values, or with
           only the index being extracted, the loop actually loops over the
           mapping and not just the indices copied into an array.
-
-    - Runtime:
-
-    - Other Changes:
 
 
 13-Feb-2005 (Lars Duening) -- Release 3.2.11

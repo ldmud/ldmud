@@ -4291,78 +4291,48 @@ f_move_object (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-object_present_in (string_t *str, object_t *ob, Bool hasNumber, p_int num)
+object_present_in (string_t *str, object_t *ob, p_int num, p_int * num_matched)
 
 /* <ob> is the first object in an environment: test all the objects there
  * if they match the id <str>.
  * If <hasNumber> is false, <str> may be of the form "<id> <num>" - then the
  * <num>th object with this <id> is returned, it it is found.
  * If <hasNumber> is true, the <num>th object with the given id is returned.
+ *
+ * If the object is not found, *<num_matched> (if not NULL) is set to the
+ * number of objects which did match the id.
  */
 
 {
     svalue_t *ret;
     p_int count = 0; /* return the <count+1>th object */
-    int   length;
-    char *p, *item;
-    string_t *sitem;
 
-    length = mstrsize(str);
-    item = get_txt(str);
+    if (num_matched)
+        *num_matched = 0;
 
-    if (!hasNumber)
-    {
-        /* Check if there is a number in the string.
-         * If yes parse it, and use the remainder as 'the' id string.
-         */
-        p = item + length - 1;
-        if (*p >= '0' && *p <= '9')
-        {
-            while(p > item && *p >= '0' && *p <= '9')
-                p--;
-
-            if (p > item && *p == ' ')
-            {
-                count = atoi(p+1) - 1;
-                length = p - item;
-            }
-        }
-    }
-    else
-        count = num-1;
-
-    if ((size_t)length != mstrsize(str))
-    {
-        memsafe(sitem = new_n_mstring(item, length), length, "id string");
-    }
-    else
-        sitem = ref_mstring(str);
-
-    push_string(inter_sp, sitem); /* free on error */
+    count = num-1;
 
     /* Now look for the object */
     for (; ob; ob = ob->next_inv)
     {
-        push_ref_string(inter_sp, sitem);
+        push_ref_string(inter_sp, str);
         ret = sapply(STR_ID, ob, 1);
         if (ob->flags & O_DESTRUCTED)
         {
-            free_mstring(sitem);
-            inter_sp--;
             return NULL;
         }
 
         if (ret == NULL || (ret->type == T_NUMBER && ret->u.number == 0))
             continue;
 
+        if (num_matched)
+            (*num_matched)++;
+
         if (count-- > 0)
             continue;
-        free_mstring(sitem);
-        inter_sp--;
+
         return ob;
     }
-    free_mstring(sitem);
-    inter_sp--;
 
     /* Not found */
     return NULL;
@@ -4370,17 +4340,21 @@ object_present_in (string_t *str, object_t *ob, Bool hasNumber, p_int num)
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-e_object_present (svalue_t *v, object_t *ob, Bool hasNumber, p_int num)
+e_object_present (svalue_t *v, object_t *ob, p_int num)
 
 /* Implementation of the efun present().
  *
- * Look for an object matching <v> in <ob> and return it if found.
+ * Look for the <num>th object matching <v> in <ob> and return it if found.
  */
 
 {
     svalue_t *ret;
     object_t *ret_ob;
+    p_int num_matched = 0;
     Bool specific = MY_FALSE;
+
+    if (num <= 0)
+        num = 1;
 
     /* Search where? */
     if (!ob)
@@ -4409,7 +4383,7 @@ e_object_present (svalue_t *v, object_t *ob, Bool hasNumber, p_int num)
     }
 
     /* Always search in the object's inventory */
-    ret_ob = object_present_in(v->u.str, ob->contains, hasNumber, num);
+    ret_ob = object_present_in(v->u.str, ob->contains, num, &num_matched);
     if (ret_ob)
         return ret_ob;
 
@@ -4428,7 +4402,8 @@ e_object_present (svalue_t *v, object_t *ob, Bool hasNumber, p_int num)
             return ob->super;
 
         /* No, search the other objects here. */
-        return object_present_in(v->u.str, ob->super->contains, hasNumber, num);
+        if (num_matched < num)
+            return object_present_in(v->u.str, ob->super->contains, num - num_matched, NULL);
     }
 
     /* Not found */
@@ -4464,7 +4439,7 @@ v_present (svalue_t *sp, int num_arg)
 {
     svalue_t *arg;
     object_t *ob;
-    p_int num = 0;
+    p_int num = 1;
     Bool hasNumber = MY_FALSE;
 
     arg = sp - num_arg + 1;
@@ -4499,8 +4474,45 @@ v_present (svalue_t *sp, int num_arg)
         num_arg--;
     }
 
+    /* If the string is in the form "<id> <number>" and no explicit
+     * number was given, parse the <number> out of the string.
+     */
+    if (!hasNumber && arg->type == T_STRING)
+    {
+        int   length;
+        char *p, *item;
+
+        length = mstrsize(arg->u.str);
+        item = get_txt(arg->u.str);
+
+        p = item + length - 1;
+        if (*p >= '0' && *p <= '9')
+        {
+            while(p > item && *p >= '0' && *p <= '9')
+                p--;
+
+            if (p > item && *p == ' ')
+            {
+                num = atoi(p+1);
+                length = p - item;
+                hasNumber = MY_TRUE;
+            }
+        }
+
+        /* If we found a number, replace the "<id> <number>" string on
+         * the stack with just "<id>".
+         */
+        if (hasNumber)
+        {
+            string_t * sitem;
+            memsafe(sitem = new_n_mstring(item, length), length, "id string");
+            free_mstring(arg->u.str);
+            arg->u.str = sitem;
+        }
+    }
+
     inter_sp = sp;
-    ob = e_object_present(arg, ob, hasNumber, num);
+    ob = e_object_present(arg, ob, num);
 
     free_svalue(arg);
     if (ob)
