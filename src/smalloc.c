@@ -3065,7 +3065,7 @@ smalloc_string_copy (const char *str, const char *file, int line)
 {
     char *p;
 
-    p = smalloc(strlen(str)+1, file, line);
+    memsafe(p = smalloc(strlen(str)+1, file, line), strlen(str)+1, "string_copy");
     if (p) {
         (void)strcpy(p, str);
     }

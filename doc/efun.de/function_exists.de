@@ -24,8 +24,15 @@ BESCHREIBUNG
         wird.
 
         FEXISTS_ALL (3):
-        Liefert ein Array mit der gesamten Information der anderen Flags.
-        Die anderen Flags sind Indizes in diesem Array.
+          Liefert ein Array mit der gesamten Information der anderen Flags,
+          sowie zusaetzlichen Informationen ueber die Funktion:
+          
+            string [FEXISTS_PROGNAME]: der Programmname
+            string [FEXISTS_FILENAME]: der Dateiname
+            int    [FEXISTS_LINENO]:   die Zeilennummer
+            int    [FEXISTS_NUMARG]:   die Anzahl der Funktionsargumente
+            int    [FEXISTS_TYPE]:     der Ergebnistyp der Funktion
+            int    [FEXISTS_FLAGS]:    die Funktionsflags
 
         <flags> kann mit einem binaren Oder mit NAME_HIDDEN ergaenzt
         werden, um Informationen ueber static und protected deklarierte
@@ -43,6 +50,8 @@ BEISPIELE
 AENDERUNGEN
         LDMud 3.2.10 erweiterte die Menge der zurueck gelieferten Werte und
             fuehrte das <flags> Argument ein.
+        LDMud 3.2.12 fuegte die zusaetzliche Funktionsinformation zum
+            FEXISTS_ALL Ergebnis hinzu.
 
 SIEHE AUCH
         call_other(E), call_resolved(E), functionlist(E), variable_exists(E)

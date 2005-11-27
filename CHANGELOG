@@ -1,10 +1,110 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-19-Mar-2005 (Lars Duening)  (3.2.11)
-  - The Release.
+27-Nov-2005  (Lars Duening)  (3.2.12)
+  - Created new release.
+  - (object.c) Efun function_exists(): The 'FEXISTS_ALL' result also contains
+      information about the function's type, flags, and number of
+      arguments (Bug #410).
 
-10-Mar-2005 (Lars Duening)  (3.2.11-dev.716)
+26-Nov-2005  (Lars Duening)
+  - (efuns.c) Efun sscanf(): Added test whether the constant characters after
+      a %-field also match - if not, the %-field is considered unmatched
+      (suggested by Largo).
+  - (efuns, func_spec) Efuns md5(): Accept the number of iterations as
+       optional argument (Bug #418).
+
+24-Nov-2005  (Gnomi)
+  - (lex.c) <code>(: catch(load_object($1);nolog) :)</code> no
+       longer produces a syntax error (Bug #403).
+
+24-Nov-2005  (Lars Duening)
+  - (md5.c) The ROTATE_LEFT macro wasn't 64-bit clean (Bug #413).
+  - (interpret.c) Using foreach(), when looping over a mapping with no values,
+      or with only the index being extracted, the loop actually loops over the
+      mapping and not just the indices copied into an array (Bug #388).
+  - (simulate.c) Efun set_environment(): clear the RESET_STATE flag of
+      of the moved object's original environment, if any (Bug #387).
+  - (efuns.c) Efun md5() can now hash arrays of numbers as well (Bug #411).
+  - (xalloc.c, smalloc.c) The string_copy() function checks if the requested
+      memory is actually allocated, throwing an error if not (Bug #397).
+  - (simulate.c) Errors during the processing of a fatal() will be
+      recognized and treated as double-fatal (Bug #408).
+  - (interpret.c) free_svalue() now recognizes the free of nested
+      structures and de-serializes them to avoid stack overflows (Bug #416).
+  - (Makefile.in, version.sh, patchlevel.h.in) Removed PRCS support.
+
+19-Oct-2005 (Lars Duening)
+  - (pkg-tls.c) tls_check_certificate() now returns the low-level API
+      values, and throws an error if the connection is not secure.
+
+11-Oct-2005 (Lars Duening)
+  - (erq/erq.c, erq/Makefile, xerq/socket.c) Corrected compilation warnings.
+  - (lex.c) to_int() no longer accepts "x<num>" as valid sedecimal
+       notation (Bug #0000402).
+
+04-Oct-2005 (Lars Duening)
+  - (doc/concepts/overloading) New man page (thanks, Coogan!).
+
+02-Oct-2005 (Lars Duening)  (3.2.12-rev.24)
+  - (main.c, lex.c, version.sh) Updated to display the correct revision
+      number.
+  - (interpret.c) put_c_string() incremented the target location pointer
+      before storing, causing memory corruption. Luckily it was used
+      just by the TLS package so far.
+
+28-Sep-2005 (Lars Duening)
+  - (doc/efun/clone_object) Clarified the variable initialisation.
+
+23-Aug-2005 (Lars Duening)
+  - (Makefile.in) The PRCS rules first check if PRCS is available.
+
+20-Jun-2005 (Lars Duening)  (3.2.12-dev.725)
+  - (patchlevel.h.in, version.sh, mk-patchlevel.sh, Makefiles)
+      Modified the version numbering system to be compatible between
+      Subversion and PRCS.
+
+13-Jun-2005 (Lars Duening)  (3.2.12-dev.724)
+  - (comm.c) Adapted for Mac OS X 10.4.
+
+15-May-2005 (Lars Duening)  (3.2.12-dev.723)
+  - (simulate.c) runtime_error() and heart_beat_error() received
+      a new argument 'caught' (Bug #0000385).
+
+15-May-2005 (Lars Duening)  (3.2.12-dev.722)
+  - (comm.c) Corrected the error messages for errors in the extra
+      arguments of input_tl(). (Bug #0000379).
+
+15-May-2005 (Lars Duening)  (3.2.12-dev.721)
+  - (call_out.c) Corrected the error messages for errors in the extra
+      arguments of call_out(). (Bug #0000379).
+
+15-May-2005 (Lars Duening)  (3.2.12-dev.720)
+  - (object.c) Single-character operator closures like #'- couldn't
+      be restored in arrays due to some outdated hack in the parser
+      (Bug #0000384 and #0000386).
+  - (configure) Link in the crypto libs only if actually needed (reported
+      by Coogan).
+
+24-Apr-2005 (Lars Duening)  (3.2.12-dev.719)
+  - (main.c, pkg-tls.c) Improved the documentation for the TLS commandline
+      options, removed a crasher when only one of the two cert locations
+      is specified (thanks, Coogan!).
+  - (configure) New configuration parameter '--with-tls-path' allows
+      to specifiy a non-standard location for the TLS installation.
+
+01-Apr-2005 (Lars Duening)  (3.2.12-dev.718)
+  - (pkg-tls.c) Added FreeBSD 5.4 compatibility (thanks, Ralph!).
+  - (simulate, many files) Renamed error() to errorf() due to a collision
+      with gnutls.h include files under newer compilers.
+  - (port.c) Corrected a C99 incompatibility (thanks, Ralph!).
+
+25-Mar-2005 (Lars Duening)  (3.2.12-dev.717)
+  - (simulate.c) Modified the callback setup so that efun callbacks
+       can take normal lvalues; and timed function/closure callbacks
+       take protected lvalues - but not vice versa.
+
+10-Mar-2005 (Lars Duening)  (3.2.11-dev.716 == 3.2.11)
   - (interpret.c) The efun tell_object() can now take an array as
       second argument, calling catch_msg() in the target in that case
       (Bug #0000354).

@@ -7,7 +7,7 @@ BESCHREIBUNG
         koennen ein object_name() oder ein Objekt sein.
 
         Seit 3.2.1 ist die Funktionalitaet von move_object() direkt in der
-        Mudlib enthalten und verwendet dort die M_MOVE_OBJECT Treiber Hooks.
+        Mudlib enthalten und verwendet dort die M_MOVE_OBJECT0/1 Treiber Hooks.
         move_object() kann so auch eine simul-efun sein.
 
         In der traditionellen Implemenierung war <item> im Compat Modus auf

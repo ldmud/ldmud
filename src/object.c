@@ -1026,6 +1026,7 @@ renumber_programs (void)
 static char *
 function_exists ( char *fun, object_t *ob, Bool show_hidden
                 , char ** prog_name, uint32 * prog_line
+                , int * num_arg,  funflag_t * fun_flags, int * fun_type
                 )
 
 /* Search for the function <fun> in the object <ob>. If existing, return
@@ -1051,6 +1052,10 @@ function_exists ( char *fun, object_t *ob, Bool show_hidden
         fatal("function_exists() on destructed object\n");
 #endif
 
+    memset(fun_type, 0, sizeof(*fun_type));
+    *num_arg = 0;
+    *fun_flags = 0;
+
     if (prog_name)
         *prog_name = NULL;
 
@@ -1059,7 +1064,7 @@ function_exists ( char *fun, object_t *ob, Bool show_hidden
     {
         ob->time_of_ref = current_time;
         if (load_ob_from_swap(ob) < 0)
-            error("Out of memory\n");
+            errorf("Out of memory\n");
     }
 
     shared_name = findstring(fun);
@@ -1071,6 +1076,7 @@ function_exists ( char *fun, object_t *ob, Bool show_hidden
 
     /* Is it visible for the caller? */
     flags = progp->functions[ix];
+    *fun_flags = (flags & ~INHERIT_MASK);
 
     if (!show_hidden
      && (   flags & TYPE_MOD_PRIVATE
@@ -1091,10 +1097,15 @@ function_exists ( char *fun, object_t *ob, Bool show_hidden
 
     funstart = progp->program  + (flags & FUNSTART_MASK);
 
+    /* Set the additional information */
+    *num_arg = FUNCTION_NUM_ARGS(funstart) & 0x7f;
+    *fun_type = flags & TYPE_MOD_MASK;
+
     /* And after all this, the function may be undefined */
     if (FUNCTION_CODE(funstart)[0] == F_ESCAPE
      && FUNCTION_CODE(funstart)[1] == F_UNDEF  - 0x100)
     {
+        *fun_flags |= NAME_UNDEFINED;
         return NULL;
     }
 
@@ -1133,8 +1144,17 @@ f_function_exists (svalue_t *sp, int num_arg)
  *   Return the line number within the source file.
  *
  * <flags> == FEXISTS_ALL (3):
- *   Return an array with all the above information. The above
- *   flag values are the indices into that array.
+ *   Return an array with all the above information, plus information
+ *   about the function type/flags/number of arguments.
+ *
+ *   The returned array contains this information:
+ *     string [FEXISTS_PROGNAME]: the program name
+ *     string [FEXISTS_FILENAME]: the filename
+ *     int    [FEXISTS_LINENO]:   the linenumber
+ *     int    [FEXISTS_NUMARG]:   the number of arguments to the function
+ *     int    [FEXISTS_TYPE]:     the return type of the function
+ *     int    [FEXISTS_FLAGS]:    the function flags
+ *
  *
  * The <flags> value can be or-ed to NAME_HIDDEN to return
  * information about static and protected functions in other objects.
@@ -1150,6 +1170,10 @@ f_function_exists (svalue_t *sp, int num_arg)
     svalue_t *argp;
     object_t *ob;
     p_int mode_flags;
+
+    funflag_t fun_flags;
+    int       fun_num_arg;
+    int       fun_type;
 
     /* Evaluate arguments */
     argp = sp - num_arg + 1;
@@ -1180,7 +1204,7 @@ f_function_exists (svalue_t *sp, int num_arg)
                )
             if (mode_flags != 0 && mode_flags != NAME_HIDDEN)
             {
-                error("Bad argument 2 to variable_exists(): "
+                errorf("Bad argument 2 to variable_exists(): "
                       "value %ld (%ld sans NAME_HIDDEN) out of range %d..%d.\n"
                      , (long)mode_flags, (long)(mode_flags & ~NAME_HIDDEN)
                      , FEXISTS_ALL, FEXISTS_LINENO
@@ -1216,7 +1240,7 @@ f_function_exists (svalue_t *sp, int num_arg)
            )
         if (mode_flags != 0 && mode_flags != NAME_HIDDEN)
         {
-            error("Bad argument 3 to function_exists(): "
+            errorf("Bad argument 3 to function_exists(): "
                   "value %ld (%ld sans NAME_HIDDEN) out of range %d..%d.\n"
                  , (long)mode_flags, (long)(mode_flags & ~NAME_HIDDEN)
                  , FEXISTS_ALL, FEXISTS_LINENO
@@ -1228,7 +1252,7 @@ f_function_exists (svalue_t *sp, int num_arg)
 
     if (ob->flags & O_DESTRUCTED)
     {
-        error("Bad argument to function_exists(): Object is destructed.\n");
+        errorf("Bad argument to function_exists(): Object is destructed.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -1236,7 +1260,8 @@ f_function_exists (svalue_t *sp, int num_arg)
     /* Get the information */
     prog_name = NULL;
     str = function_exists( argp->u.string, ob, (mode_flags & NAME_HIDDEN)
-                         , &prog_name, &prog_line);
+                         , &prog_name, &prog_line
+                         , &fun_num_arg, &fun_flags, &fun_type);
     sp = pop_n_elems(num_arg, sp);
 
     if (str)
@@ -1268,9 +1293,9 @@ f_function_exists (svalue_t *sp, int num_arg)
 
             if (!res)
             {
-                error("Out of memory\n");
+                errorf("Out of memory\n");
             }
-            vec = allocate_uninit_array(FEXISTS_LINENO+1);
+            vec = allocate_uninit_array(FEXISTS_FLAGS+1);
             put_malloced_string(vec->item+FEXISTS_PROGNAME, res);
             if (prog_name)
             {
@@ -1280,7 +1305,7 @@ f_function_exists (svalue_t *sp, int num_arg)
                     res = add_slash(prog_name);
                 if (!res)
                 {
-                    error("Out of memory\n");
+                    errorf("Out of memory\n");
                 }
                 put_malloced_string(vec->item+FEXISTS_FILENAME, res);
             }
@@ -1290,6 +1315,10 @@ f_function_exists (svalue_t *sp, int num_arg)
                 vec->item[FEXISTS_FILENAME].u.number = 0;
             }
             put_number(vec->item+FEXISTS_LINENO, prog_line);
+
+            put_number(vec->item+FEXISTS_NUMARG, fun_num_arg);
+            put_number(vec->item+FEXISTS_TYPE, fun_type);
+            put_number(vec->item+FEXISTS_FLAGS, (p_int)fun_flags);
 
             sp++;
             put_array(sp, vec);
@@ -1318,7 +1347,7 @@ f_function_exists (svalue_t *sp, int num_arg)
 
             if (!res)
             {
-                error("Out of memory\n");
+                errorf("Out of memory\n");
             }
             sp++;
             put_malloced_string(sp, res);
@@ -1336,7 +1365,7 @@ f_function_exists (svalue_t *sp, int num_arg)
                     res = add_slash(prog_name);
                 if (!res)
                 {
-                    error("Out of memory\n");
+                    errorf("Out of memory\n");
                 }
                 sp++;
                 put_malloced_string(sp, res);
@@ -1429,7 +1458,7 @@ f_variable_exists (svalue_t *sp, int num_arg)
 
             if (mode_flags != 0 && mode_flags != NAME_HIDDEN)
             {
-                error("Bad argument 2 to variable_exists(): "
+                errorf("Bad argument 2 to variable_exists(): "
                       "value %ld, expected 0 or %d (NAME_HIDDEN).\n"
                      , (long)mode_flags, NAME_HIDDEN
                     );
@@ -1461,7 +1490,7 @@ f_variable_exists (svalue_t *sp, int num_arg)
 
         if (mode_flags != 0 && mode_flags != NAME_HIDDEN)
         {
-            error("Bad argument 3 to variable_exists(): "
+            errorf("Bad argument 3 to variable_exists(): "
                   "value %ld, expected 0 or %d (NAME_HIDDEN).\n"
                  , (long)mode_flags, NAME_HIDDEN
                 );
@@ -1472,7 +1501,7 @@ f_variable_exists (svalue_t *sp, int num_arg)
 
     if (ob->flags & O_DESTRUCTED)
     {
-        error("Bad argument to variable_exists(): Object is destructed.\n");
+        errorf("Bad argument to variable_exists(): Object is destructed.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -1482,7 +1511,7 @@ f_variable_exists (svalue_t *sp, int num_arg)
     {
         ob->time_of_ref = current_time;
         if (load_ob_from_swap(ob) < 0)
-            error("Out of memory: unswap object '%s'\n", ob->name);
+            errorf("Out of memory: unswap object '%s'\n", ob->name);
     }
 
     /* Get the information */
@@ -1573,7 +1602,7 @@ f_variable_exists (svalue_t *sp, int num_arg)
 
         if (!res)
         {
-            error("Out of memory\n");
+            errorf("Out of memory\n");
         }
         sp++;
         put_malloced_string(sp, res);
@@ -1679,7 +1708,7 @@ f_variable_list (svalue_t *sp)
         if (sp[-1].type != T_STRING)
             bad_xefun_arg(1, sp);
         if (!(ob = find_object(sp[-1].u.string)))
-            error("Object '%s' not found.\n", sp[-1].u.string);
+            errorf("Object '%s' not found.\n", sp[-1].u.string);
     }
     else
         ob = sp[-1].u.ob;
@@ -1706,7 +1735,7 @@ f_variable_list (svalue_t *sp)
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0)
         {
-            error("Out of memory: unswap object '%s'\n", ob->name);
+            errorf("Out of memory: unswap object '%s'\n", ob->name);
             /* NOTREACHED */
             return NULL;
         }
@@ -1719,7 +1748,7 @@ f_variable_list (svalue_t *sp)
     vis_tags = alloca(num_variables);
     if (!vis_tags)
     {
-        error("Stack overflow in variable_list()");
+        errorf("Stack overflow in variable_list()");
         /* NOTREACHED */
         return NULL;
     }
@@ -2886,7 +2915,7 @@ f_save_object (svalue_t *sp, int numarg)
         {
             if (sp->u.number < -1 || sp->u.number > CURRENT_VERSION)
             {
-                error("Illegal value for arg 1 to save_object(): %ld, "
+                errorf("Illegal value for arg 1 to save_object(): %ld, "
                       "expected -1..%d\n"
                      , (long)sp->u.number, CURRENT_VERSION
                      );
@@ -2916,7 +2945,7 @@ f_save_object (svalue_t *sp, int numarg)
 
         if (sp->u.number < -1 || sp->u.number > CURRENT_VERSION)
         {
-            error("Illegal value for arg 1 to save_object(): %ld, "
+            errorf("Illegal value for arg 1 to save_object(): %ld, "
                   "expected -1..%d\n"
                  , (long)sp->u.number, CURRENT_VERSION
                  );
@@ -2961,7 +2990,7 @@ f_save_object (svalue_t *sp, int numarg)
         file = check_valid_path(file, ob, "save_object", MY_TRUE);
         if (file == NULL)
         {
-            error("Illegal use of save_object()\n");
+            errorf("Illegal use of save_object()\n");
             /* NOTREACHED */
             return sp;
         }
@@ -2976,7 +3005,7 @@ f_save_object (svalue_t *sp, int numarg)
                 char * tmp = alloca((size_t)len - 2);
                 if (!tmp)
                 {
-                    error("Stack overflow in save_object()\n");
+                    errorf("Stack overflow in save_object()\n");
                     /* NOTREACHED */
                     return sp;
                 }
@@ -2995,7 +3024,7 @@ f_save_object (svalue_t *sp, int numarg)
 
         if (!name)
         {
-            error("Stack overflow in save_object()\n");
+            errorf("Stack overflow in save_object()\n");
             /* NOTREACHED */
             return sp;
         }
@@ -3031,12 +3060,12 @@ f_save_object (svalue_t *sp, int numarg)
             if (buf)
             {
                 strcpy(buf, emsg);
-                error("Could not open %s for a save: %s.\n", tmp_name, buf);
+                errorf("Could not open %s for a save: %s.\n", tmp_name, buf);
             }
             else
             {
                 perror("save object");
-                error("Could not open %s for a save: errno %d.\n"
+                errorf("Could not open %s for a save: errno %d.\n"
                      , tmp_name, errno);
             }
             /* NOTREACHED */
@@ -3068,7 +3097,7 @@ f_save_object (svalue_t *sp, int numarg)
             close(f);
             unlink(tmp_name);
         }
-        error("(save_object) Out of memory for pointer table.\n");
+        errorf("(save_object) Out of memory for pointer table.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -3268,7 +3297,7 @@ f_save_value (svalue_t *sp, int numarg)
     ptable = new_pointer_table();
     if (!ptable)
     {
-        error("(save_value) Out of memory for pointer table.\n");
+        errorf("(save_value) Out of memory for pointer table.\n");
         return sp; /* flow control hint */
     }
 
@@ -3288,7 +3317,7 @@ f_save_value (svalue_t *sp, int numarg)
         {
             if (sp->u.number < -1 || sp->u.number > CURRENT_VERSION)
             {
-                error("Illegal value for arg 1 to save_object(): %ld, "
+                errorf("Illegal value for arg 1 to save_object(): %ld, "
                       "expected -1..%d\n"
                      , (long)sp->u.number, CURRENT_VERSION
                      );
@@ -3647,7 +3676,7 @@ restore_mapping (svalue_t *svp, char **str)
     {
         *svp = const0;
         free_shared_restored_values();
-        error("Illegal mapping size: %ld.\n", (long int)siz);
+        errorf("Illegal mapping size: %ld.\n", (long int)siz);
         return MY_FALSE;
     }
 
@@ -3658,7 +3687,7 @@ restore_mapping (svalue_t *svp, char **str)
     {
         *svp = const0;
         free_shared_restored_values();
-        error("(restore) Out of memory: mapping[%u, %u]\n"
+        errorf("(restore) Out of memory: mapping[%u, %u]\n"
              , siz, tmp_par.num_values);
         return MY_FALSE;
     }
@@ -3806,7 +3835,7 @@ restore_size (char **str)
             pt2 = strchr(pt, ':');
             if (!pt2)
                 return -1;
-            pt = &pt2[2];
+            pt = &pt2[1];
               /* 'pt = &pt2[1]' is the logical statement, but
                * would run afoul the '#e:,' operator closure.
                * Because every closure has at least one character
@@ -3873,7 +3902,7 @@ restore_array (svalue_t *svp, char **str)
     {
         *svp = const0;
         free_shared_restored_values();
-        error("Illegal array size: %ld.\n", (long int)siz);
+        errorf("Illegal array size: %ld.\n", (long int)siz);
         return MY_FALSE;
     }
 
@@ -4091,7 +4120,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                         res = apply_master(STR_PRIVILEGE, 3);
                         if (!res || res->type != T_NUMBER || res->u.number <= 0)
                         {
-                            error("Privilege violation: nomask simul_efun %s\n"
+                            errorf("Privilege violation: nomask simul_efun %s\n"
                                  , pp->name);
                             /* NOTREACHED */
                             efun_ok = MY_FALSE;
@@ -4438,7 +4467,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         {
             *svp = const0;
             free_shared_restored_values();
-            error("(restore) Out of memory (%lu bytes) for string.\n"
+            errorf("(restore) Out of memory (%lu bytes) for string.\n"
                  , (unsigned long) strlen(start));
         }
         break;
@@ -4565,7 +4594,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                     current_shared_restored--;
                     free_shared_restored_values();
                     *svp = const0;
-                    error("(restore) Out of memory (%lu bytes) for "
+                    errorf("(restore) Out of memory (%lu bytes) for "
                           "%lu shared values.\n"
                           , max_shared_restored * sizeof(svalue_t)
                           , max_shared_restored);
@@ -4650,7 +4679,7 @@ old_restore_string (svalue_t *v, char *str)
             {
                 *v = const0;
                 free_shared_restored_values();
-                error("(restore) Out of memory (%lu bytes) for string\n"
+                errorf("(restore) Out of memory (%lu bytes) for string\n"
                      , (unsigned long) strlen(str));
             }
             return MY_TRUE;
@@ -4802,7 +4831,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
         if (file == NULL)
         {
             nesting--;
-            error("Illegal use of restore_object()\n");
+            errorf("Illegal use of restore_object()\n");
             /* NOTREACHED */
             return sp;
         }
@@ -4816,7 +4845,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
         if (!name)
         {
             nesting--;
-            error("Stack overflow in restore_object()\n");
+            errorf("Stack overflow in restore_object()\n");
             /* NOTREACHED */
             return sp;
         }
@@ -4858,7 +4887,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
         {
             fclose(f);
             nesting--;
-            error("(restore) Out of memory (%lu bytes) for linebuffer.\n"
+            errorf("(restore) Out of memory (%lu bytes) for linebuffer.\n"
                  , (unsigned long) st.st_size+1);
             /* NOTREACHED */
             return sp;
@@ -4883,7 +4912,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
             fclose(f);
         FREE_BUFF();
         nesting--;
-        error("(restore) Out of memory (%lu bytes) for shared values.\n"
+        errorf("(restore) Out of memory (%lu bytes) for shared values.\n"
              , sizeof(svalue_t)*max_shared_restored);
         /* NOTREACHED */
         return sp;
@@ -4958,7 +4987,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
             free_shared_restored_values();
             FREE_BUFF();
             nesting--;
-            error("Illegal format (version line) when restoring %s.\n"
+            errorf("Illegal format (version line) when restoring %s.\n"
                   , file ? name : current_object->name);
             /* NOTREACHED */
             return sp;
@@ -5037,7 +5066,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
                         while (NULL != (tmp = tmp->next));
                     }
                     nesting--;
-                    error("Stack overflow in restore_object()\n");
+                    errorf("Stack overflow in restore_object()\n");
                     /* NOTREACHED */
                     return sp;
                 }
@@ -5077,7 +5106,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
             free_shared_restored_values();
             FREE_BUFF();
             nesting--;
-            error("Illegal format (value string) when restoring %s.\n"
+            errorf("Illegal format (value string) when restoring %s.\n"
                  , file ? name : current_object->name);
             /* NOTREACHED */
             return sp;
@@ -5146,7 +5175,7 @@ f_restore_value (svalue_t *sp)
         buff = alloca(len+1);
         if (!buff)
         {
-            error("(restore) Out of stack (%lu bytes).\n"
+            errorf("(restore) Out of stack (%lu bytes).\n"
                  , (unsigned long) len+1);
             /* NOTREACHED */
             return sp;
@@ -5171,7 +5200,7 @@ f_restore_value (svalue_t *sp)
         p = strchr(buff, '\n');
         if (!p)
         {
-            error("No data given.\n");
+            errorf("No data given.\n");
             return sp-1;
         }
         buff = p+1;
@@ -5190,7 +5219,7 @@ f_restore_value (svalue_t *sp)
     shared_restored_values = xalloc(sizeof(svalue_t)*max_shared_restored);
     if (!shared_restored_values)
     {
-        error("(restore) Out of memory (%lu bytes) for shared values.\n"
+        errorf("(restore) Out of memory (%lu bytes) for shared values.\n"
              , max_shared_restored * sizeof(svalue_t));
         return sp; /* flow control hint */
     }
@@ -5211,7 +5240,7 @@ f_restore_value (svalue_t *sp)
         /* Whoops, illegal format */
 
         free_shared_restored_values();
-        error("Illegal format when restoring a value.\n");
+        errorf("Illegal format when restoring a value.\n");
         /* NOTREACHED */
         return sp; /* flow control hint */
     }
@@ -5220,7 +5249,7 @@ f_restore_value (svalue_t *sp)
 
     if (*p != '\0')
     {
-        error("Illegal format when restoring a value: extraneous characters "
+        errorf("Illegal format when restoring a value: extraneous characters "
               "at the end.\n");
         /* NOTREACHED */
         return sp; /* flow control hint */

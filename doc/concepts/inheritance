@@ -172,5 +172,6 @@ AUTHOR
 
 SEE ALSO
         functions(LPC), initialisation(LPC), modifiers(LPC), pragma(LPC),
+        overloading(C),
         function_exists(efun), functionlist(efun), inherit_list(efun),
         symbol_variable(efun), variable_exists(efun), variable_list(efun).

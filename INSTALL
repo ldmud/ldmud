@@ -234,7 +234,9 @@ Windows 95/98/NT
   which is a port of gcc, bash, and other GNU/Unix programs. Once it
   is installed and running, the procedure is the same as under Unix.
 
-  CygWin is available from <URL:http://www.cygwin.com/>.
+  CygWin is available from <URL:http://www.cygwin.com/> or
+  <http://www.redhat.com/software/cygwin/>, and when installing make sure that
+  your installation includes gcc, bash, make, sed, awk, and bison.
 
   One common pitfall is if the installation does not create the '/bin'
   directory in which the CygWin executables are expected. A typical

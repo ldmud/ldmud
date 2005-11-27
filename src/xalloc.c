@@ -336,7 +336,7 @@ assert_stack_gap (void)
     if (condition == Normal)
     {
         condition = Error;
-        error("Out of memory: Gap between stack and heap: %ld.\n"
+        errorf("Out of memory: Gap between stack and heap: %ld.\n"
              , (long)gap);
         /* NOTREACHED */
     }
@@ -463,7 +463,7 @@ string_copy (const char *str)
 {
     char *p;
 
-    p = xalloc(strlen(str)+1);
+    memsafe(p = xalloc(strlen(str)+1), strlen(str)+1, "string_copy");
     if (p) {
         (void)strcpy(p, str);
     }

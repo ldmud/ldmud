@@ -791,10 +791,7 @@ init_lexer(void)
     add_permanent_define("__VERSION_MAJOR__", -1, string_copy(VERSION_MAJOR), MY_FALSE);
     add_permanent_define("__VERSION_MINOR__", -1, string_copy(VERSION_MINOR), MY_FALSE);
     add_permanent_define("__VERSION_MICRO__", -1, string_copy(VERSION_MICRO), MY_FALSE);
-    if (IS_RELEASE())
-        add_permanent_define("__VERSION_PATCH__", -1, string_copy("0"), MY_FALSE);
-    else
-        add_permanent_define("__VERSION_PATCH__", -1, string_copy(VERSION_PATCH), MY_FALSE);
+    add_permanent_define("__VERSION_PATCH__", -1, string_copy("0"), MY_FALSE);
 
     add_permanent_define("__HOST_NAME__", -1, (void *)get_hostname, MY_TRUE);
     add_permanent_define("__DOMAIN_NAME__", -1, (void *)get_domainname, MY_TRUE);
@@ -2896,7 +2893,6 @@ lex_parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
  *   <decimal>
  *   0o<octal>
  *   0x<sedecimal>
- *   x<sedecimal>
  *   0b<binary>
  *
  * with <cp> pointing to the first character.
@@ -2911,7 +2907,7 @@ lex_parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
 {
     char c = *cp;
     *p_overflow = MY_FALSE;
-    if (isdigit(c) || c == 'X' || c == 'x')
+    if (isdigit(c))
         return parse_number(cp, p_num, p_overflow);
     return cp;
 } /* lex_parse_number() */
@@ -4067,6 +4063,15 @@ yylex1 (void)
                         break;
 
                       default:
+                        /* There is something after a semicolon or
+                         * closing brace. So it may be a catch(...;nolog).
+                         * Count it only as a statement, if the semicolon
+                         * or brace is the last thing we see in this inline
+                         * closure.
+                         */
+                        if (level == 1 && isstatement && !lexwhite(yyp[-1]))
+                            isstatement = MY_FALSE;
+
                         startofline = MY_FALSE;
                         break;
                       } /* string-case */
@@ -5458,7 +5463,7 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
     p = make_shared_identifier(name, I_TYPE_DEFINE, 0);
     if (!p)
     {
-        error("Out of memory\n");
+        errorf("Out of memory\n");
     }
 
     /* If such a macro already exists with different meaning,
@@ -5470,7 +5475,7 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
          || p->u.define.special
          || strcmp(exps,p->u.define.exps.str) != 0)
         {
-            error("Permanent #define %s already defined\n", name);
+            errorf("Permanent #define %s already defined\n", name);
         }
         return;
     }
@@ -6524,7 +6529,7 @@ set_inc_list (vector_t *v)
     {
         if (svp->type != T_STRING)
         {
-            error("H_INCLUDE_DIRS argument has a non-string array element\n");
+            errorf("H_INCLUDE_DIRS argument has a non-string array element\n");
         }
 
         /* Set p to the beginning of the pathname, skipping leading
@@ -6543,21 +6548,21 @@ set_inc_list (vector_t *v)
         /* Is the path legal? */
         if (!legal_path(p))
         {
-            error("H_INCLUDE_DIRS path contains '..'\n");
+            errorf("H_INCLUDE_DIRS path contains '..'\n");
         }
         if (*p == '.' && !p[1])
-            error("H_INCLUDE_DIRS path is a single prefix dot\n");
+            errorf("H_INCLUDE_DIRS path is a single prefix dot\n");
 
         len = (mp_int)strlen(p);
         if (max < len)
             max = len;
         if (len >= 2 && p[len -1] == '.' && p[len - 2] == '/')
-            error("H_INCLUDE_DIRS path ends in single prefix dot\n");
+            errorf("H_INCLUDE_DIRS path ends in single prefix dot\n");
 
         /* Get and store our own copy of the pathname */
         p = string_copy(p);
         if (!p)
-            error("Out of memory\n");
+            errorf("Out of memory\n");
 
         free_svalue(svp);
         svp->type = T_STRING;
@@ -6686,20 +6691,12 @@ get_version(char ** args UNUSED)
 #endif
     char *buf;
     size_t len;
-    short bIsRelease;
 
-    bIsRelease = IS_RELEASE();
-    if (bIsRelease)
-        len = strlen(GAME_VERSION LOCAL_LEVEL);
-    else
-        len = strlen(LONG_VERSION LOCAL_LEVEL);
+    len = strlen(DRIVER_VERSION LOCAL_LEVEL);
     buf = xalloc(3 + len);
     if (!buf) return 0;
     buf[0] = '"';
-    if (bIsRelease)
-        strcpy(buf+1, GAME_VERSION LOCAL_LEVEL);
-    else
-        strcpy(buf+1, LONG_VERSION LOCAL_LEVEL);
+    strcpy(buf+1, DRIVER_VERSION LOCAL_LEVEL);
     buf[len+1] = '"';
     buf[len+2] = '\0';
     return buf;

@@ -195,7 +195,7 @@ extern int select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 
 #if defined(_AIX)
 typedef unsigned long length_t;
-#elif defined(__INTEL_COMPILER)
+#elif defined(__INTEL_COMPILER) || defined(__GNUC__)
 typedef socklen_t length_t;
 #else
 typedef int length_t;
@@ -2729,7 +2729,7 @@ get_message (char *buff)
                             current_object = NULL;
                             push_referenced_vector(v);
                             push_number(rest);
-                            cp = rp + 8;
+                            cp = (unsigned char *)rp + 8;
                             for (svp = v->item; --rest >=0; svp++)
                             {
                                 svp->u.number = *cp++;
@@ -3537,11 +3537,7 @@ refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
         {
             struct sockaddr_in addr;
             int port;
-#           ifndef _AIX
-              int length;
-#           else
-              size_t length;
-#           endif
+            length_t length;
 
             length = sizeof(addr);
             getsockname(this->socket, (struct sockaddr *)&addr, &length);
@@ -4195,7 +4191,7 @@ call_function_interactive (interactive_t *i, char *str)
                     , it->next ? it->next->local : MY_FALSE);
         i->input_to = it->next;
         free_input_to(it);
-        error("Out of memory: unswap object '%s'.\n", ob->name);
+        errorf("Out of memory: unswap object '%s'.\n", ob->name);
         return MY_FALSE;
     }
 
@@ -4400,7 +4396,7 @@ print_prompt (void)
             free_svalue(prompt);
             put_volatile_string(prompt, "> ");
             add_message("%s", prompt->u.string);
-            error("Prompt of %s was a closure bound to a now-destructed object - default prompt restored.\n", command_giver->name);
+            errorf("Prompt of %s was a closure bound to a now-destructed object - default prompt restored.\n", command_giver->name);
             /* NOTREACHED */
         }
 
@@ -5615,7 +5611,7 @@ start_erq_demon (char *suffix)
             if (erq_args)
                 execv((char *)path, erq_args);
             else
-                execl((char *)path, "erq", "--forked", 0);
+                execl((char *)path, "erq", "--forked", (char *)0);
         }
         write(1, "0", 1);  /* indicate failure back to the driver */
         _exit(1);
@@ -6524,7 +6520,7 @@ query_ip_name (svalue_t *sp, Bool lookup)
     if (!str)
     {
         inter_sp = sp - 1;
-        error("Out of memory for IP address\n");
+        errorf("Out of memory for IP address\n");
     }
     put_malloced_string(sp, str);
     return sp;
@@ -6649,7 +6645,7 @@ f_query_idle (svalue_t *sp)
     if (!O_IS_INTERACTIVE(ob))
     {
         inter_sp = sp;
-        error("query_idle() of non-interactive object.\n");
+        errorf("query_idle() of non-interactive object.\n");
         return sp;
     }
 
@@ -6739,7 +6735,7 @@ replace_interactive (object_t *ob, object_t * obfrom, char *name)
     }
 
     if (!(O_SET_INTERACTIVE(ip, obfrom)))
-        error("Bad argument 2 to exec()\n");
+        errorf("Bad argument 2 to exec()\n");
 
     /* When we have to have an out of memory error, have it before pointers
      * get changed.
@@ -7386,7 +7382,7 @@ f_get_combine_charset (svalue_t *sp)
     mode = sp->u.number;
     if (mode != CHARSET_VECTOR && mode != CHARSET_STRING)
     {
-        error("Bad arg 1 to get_combine_charset(): %ld, "
+        errorf("Bad arg 1 to get_combine_charset(): %ld, "
               "expected CHARSET_VECTOR (%d) or CHARSET_STRING (%d)\n"
              , (long) mode, CHARSET_VECTOR, CHARSET_STRING);
         /* NOTREACHED */
@@ -7517,7 +7513,7 @@ f_get_connection_charset (svalue_t *sp)
     if (mode != CHARSET_VECTOR && mode != CHARSET_STRING
      && mode != CHARSET_QUOTE_IAC)
     {
-        error("Bad arg 1 to get_connection_charset(): %ld, "
+        errorf("Bad arg 1 to get_connection_charset(): %ld, "
               "expected CHARSET_VECTOR (%d), _STRING (%d), "
               "or _QUOTE_IAC (%d)\n"
              , (long) mode, CHARSET_VECTOR, CHARSET_STRING, CHARSET_QUOTE_IAC);
@@ -7671,7 +7667,7 @@ f_set_prompt (svalue_t *sp)
         if (sp->type == T_CLOSURE && sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
         {
             inter_sp = sp;
-            error("Bad argument 1 for set_prompt(): unbound lambda closure\n");
+            errorf("Bad argument 1 for set_prompt(): unbound lambda closure\n");
             /* NOTREACHED */
         }
 
@@ -7683,7 +7679,7 @@ f_set_prompt (svalue_t *sp)
             if (!str)
             {
                 inter_sp = sp;
-                error("(set_prompt) Out of memory (%lu bytes) for prompt\n"
+                errorf("(set_prompt) Out of memory (%lu bytes) for prompt\n"
                      , (unsigned long) strlen(sp->u.string));
             }
             else
@@ -7811,7 +7807,7 @@ e_input_to (svalue_t *sp, int num_arg)
     {
         if (num_arg <= 2)
         {
-            error("Missing prompt argument to input_to().\n");
+            errorf("Missing prompt argument to input_to().\n");
             /* NOTREACHED */
         }
 
@@ -7888,7 +7884,7 @@ e_input_to (svalue_t *sp, int num_arg)
     if (error_index >= 0)
     {
         free_input_to(it);
-        bad_efun_vararg(error_index, arg - 1);
+        bad_efun_vararg(error_index+1, arg - 1);
         /* NOTREACHED */
     }
 
@@ -8566,7 +8562,7 @@ f_set_max_commands (svalue_t *sp)
 
     if (!O_SET_INTERACTIVE(ip, sp->u.ob))
     {
-        error("Bad arg 2 to set_max_commands(): Object is not interactive.\n");
+        errorf("Bad arg 2 to set_max_commands(): Object is not interactive.\n");
         /* NOTREACHED */
     }
 
@@ -8627,7 +8623,7 @@ f_enable_telnet (svalue_t *sp)
 
     if (!O_SET_INTERACTIVE(ip, sp->u.ob))
     {
-        error("Bad arg 2 to enable_telnet(): Object '%s' is not interactive.\n"
+        errorf("Bad arg 2 to enable_telnet(): Object '%s' is not interactive.\n"
              , sp->u.ob->name
              );
         /* NOTREACHED */

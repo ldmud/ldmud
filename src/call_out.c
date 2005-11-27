@@ -170,7 +170,7 @@ new_call_out (svalue_t *sp, short num_arg)
 
     if (max_callouts && max_callouts <= num_callouts)
     {
-        error("Too many callouts at once (max. %ld).\n", (long)max_callouts);
+        errorf("Too many callouts at once (max. %ld).\n", (long)max_callouts);
         /* NOTREACHED */
     }
 
@@ -202,7 +202,7 @@ new_call_out (svalue_t *sp, short num_arg)
     if (error_index >= 0)
     {
         pfree(cop); /* The callback structure was invalidated automatically. */
-        bad_efun_vararg(error_index+2, arg - 1);
+        bad_efun_vararg(error_index+3, arg - 1);
         /* NOTREACHED */
     }
 

@@ -24,6 +24,7 @@
 #  include <gnutls/gnutls.h>
 #  include <gcrypt.h>
 #  if defined(USE_PTHREADS) && defined(GCRY_THREAD_OPTION_PTHREAD_IMPL)
+#    include <pthread.h>
      GCRY_THREAD_OPTION_PTHREAD_IMPL;
 #  endif
 #endif
@@ -252,12 +253,33 @@ void tls_global_init (void)
           , time_stamp(), keyfile, certfile);
     debug_message("%s TLS: (OpenSSL) Keyfile '%s', Certfile '%s'\n"
                  , time_stamp(), keyfile, certfile);
-    if (trustfile != NULL || trustdirectory != NULL)
+    if (trustfile != NULL && trustdirectory != NULL)
     {
-        printf("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and '%s'\n"
+        printf("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and directory '%s'.\n"
               , time_stamp(), trustfile, trustdirectory);
-        debug_message("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and '%s'\n"
+        debug_message("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and directory '%s'.\n"
                      , time_stamp(), trustfile, trustdirectory);
+    }
+    else if (trustfile != NULL)
+    {
+        printf("%s TLS: (OpenSSL) trusted x509 certificates from '%s'.\n"
+              , time_stamp(), trustfile);
+        debug_message("%s TLS: (OpenSSL) trusted x509 certificates from '%s'.\n"
+                     , time_stamp(), trustfile);
+    }
+    else if (trustdirectory != NULL)
+    {
+        printf("%s TLS: (OpenSSL) trusted x509 certificates from directory '%s'.\n"
+              , time_stamp(), trustdirectory);
+        debug_message("%s TLS: (OpenSSL) trusted x509 certificates from directory '%s'.\n"
+                     , time_stamp(), trustdirectory);
+    }
+    else
+    {
+        printf("%s TLS: (OpenSSL) Trusted x509 certificates locations not specified.\n"
+              , time_stamp());
+        debug_message("%s TLS: (OpenSSL) trusted x509 certificates locations not specified.\n"
+                     , time_stamp());
     }
 
     SSL_load_error_strings();
@@ -731,7 +753,7 @@ f_tls_init_connection (svalue_t *sp, int num_arg)
     interactive_t *ip;
 
     if (!tls_available)
-        error("tls_init_connection(): TLS layer hasn't been initialized.\n");
+        errorf("tls_init_connection(): TLS layer hasn't been initialized.\n");
 
     if (num_arg > 0)
     {
@@ -746,7 +768,7 @@ f_tls_init_connection (svalue_t *sp, int num_arg)
     if (!O_SET_INTERACTIVE(ip, obj))
     {
         free_object(obj, "tls_init_connection");
-        error("Bad arg 1 to tls_init_connection(): "
+        errorf("Bad arg 1 to tls_init_connection(): "
               "object not interactive.\n");
     }
 
@@ -754,7 +776,7 @@ f_tls_init_connection (svalue_t *sp, int num_arg)
       /* ip has another reference to obj, so this is safe to do */
 
     if (ip->tls_status != TLS_INACTIVE)
-        error("tls_init_connection(): Interactive already has a secure "
+        errorf("tls_init_connection(): Interactive already has a secure "
               "connection.\n");
 
     /* Extract the callback information from the stack */
@@ -861,13 +883,12 @@ f_tls_check_certificate(svalue_t *sp)
  * <obj> is not interactive, or if TLS is not available, an error
  * is thrown.
  * 
- * If <obj> doesn't have a secure connection up and running, the
- * function returns 0. Otherwise, the result is an array with
- * these entries:
+ * If <obj> doesn't have a secure connection up and running, an
+ * error is thrown.
+ * Otherwise, the result is an array with these values:
  * 
- *   int [0]      : Result code: 0: The certificate is ok.
- *                               1: The certificate is not ok.
- *                               2: The certificate is self-signed.
+ *   int [0]      : Result code of SSL_get_verify_result (see man 1 verify
+ *                  subsection DIAGNOSTICS for possible values)
  *   string [1]   : Subject
  *   int    [2..9]: Not used yet.
  *   string [10]  : SHA-1 Fingerprint
@@ -883,32 +904,22 @@ f_tls_check_certificate(svalue_t *sp)
     interactive_t *ip;
     
     if (!tls_available)
-        error("tls_init_connection(): TLS layer hasn't been initialized.\n");
+        errorf("tls_check_certificate(): TLS layer hasn't been initialized.\n");
     if (!O_SET_INTERACTIVE(ip, sp->u.ob))
-        error("Bad arg 1 to tls_check_certificate(): "
+        errorf("Bad arg 1 to tls_check_certificate(): "
               "object not interactive.\n");
-    if (ip->tls_status == TLS_ACTIVE) 
+    if (ip->tls_status != TLS_ACTIVE) 
+        errorf("tls_check_certificate(): object doesn't have a secure connection.\n");
+    else
     {
-        v = allocate_array(12);
         peer = SSL_get_peer_certificate(ip->tls_session);
         if (peer != NULL)
         {
             int verify_result, i;
             char buf[257];
             
+            v = allocate_array(12);
             verify_result = SSL_get_verify_result(ip->tls_session);
-            switch(verify_result)
-            {
-            case X509_V_OK:
-                verify_result = 1;
-                break;
-            case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
-                verify_result = 2;
-                break;
-            default:
-                verify_result = 0;
-                break;
-            }
             put_number(&(v->item[0]), verify_result);
 
             /* fill the result with various information about 
@@ -934,7 +945,7 @@ f_tls_check_certificate(svalue_t *sp)
                 shabuf[sizeof(shabuf)-1] = '\0';
                 for (i = 0; i < SHA1HashSize; i++)
                     sprintf((char *)shabuf+2*i, "%02x", peer -> sha1_hash[i]);
-                put_c_string(&(v->item[10]), shabuf);
+                put_c_string(&(v->item[10]), (char *)shabuf);
             }
 
             /* TODO: md5 fingerprint 
@@ -944,7 +955,7 @@ f_tls_check_certificate(svalue_t *sp)
         }
     } /* if (tls active) */
 #elif defined(HAS_GNUTLS)
-    error("%s TLS: GNUTLS does not provide certificate checking yet"
+    errorf("%s TLS: GNUTLS does not provide certificate checking yet"
          , time_stamp());
 #endif
 
@@ -1011,7 +1022,7 @@ f_tls_deinit_connection(svalue_t *sp)
     interactive_t *ip;
 
     if (!O_SET_INTERACTIVE(ip, sp->u.ob))
-        error("Bad arg 1 to tls_deinit_connection(): "
+        errorf("Bad arg 1 to tls_deinit_connection(): "
               "object not interactive.\n");
 
     /* Flush the connection */

@@ -7,41 +7,24 @@
  *--------------------------------------------------------------------------
  */
 
-/* $Format: "#define RELEASE_DATE \"$ProjectDate$\""$ */
+#define RELEASE_TYPE "$VersionType$"
+#define RELEASE_LONGTYPE "$VersionLongType$"
+
 #define RELEASE_DATE "$VersionDate$"
 
-/* $Format: "#define PROJ_VERSION \"$ProjectVersion$\""$ */
-#define PROJ_VERSION "3.2-rev.$VersionRevision$"
+#define PROJ_VERSION "Build $VersionRevision$"
 
-/* $Format: "#define GAME_VERSION \"$ReleaseVersion$\""$ */
-#define GAME_VERSION "$VersionMajor$.$VersionMinor$.$VersionMicro$"
+#define DRIVER_VERSION "$VersionMajor$.$VersionMinor$.$VersionMicro$"
 
-/* $Format: "#define LONG_VERSION \"$ReleaseVersion$-$ReleaseType$.$ProjectMinorVersion$\""$ */
-#define LONG_VERSION "$VersionMajor$.$VersionMinor$.$VersionMicro$-rev.$VersionRevision$"
-
-/* $Format: "#define VERSION_MAJOR \"$ReleaseMajor$\""$ */
 #define VERSION_MAJOR "$VersionMajor$"
 
-/* $Format: "#define VERSION_MINOR \"$ReleaseMinor$\""$ */
 #define VERSION_MINOR "$VersionMinor$"
 
-/* $Format: "#define VERSION_MICRO \"$ReleaseMicro$\""$ */
 #define VERSION_MICRO "$VersionMicro$"
 
-/* $Format: "#define VERSION_PATCH \"$ProjectMinorVersion$\""$ */
-#define VERSION_PATCH "$VersionRevision$"
-
-/* $Format: "#define LOCAL_LEVEL \"\""$ */
 #define LOCAL_LEVEL ""
-
-/* $Format: "#define RELEASE_TYPE \"$ReleaseType$\""$ */
-#define RELEASE_TYPE "$VersionType$"
 
 /* TODO: Add something like the perl local patchlevel management. */
 /* TODO: Add LPC defines for the various version number parts */
 
-/* $Format: "#define IS_RELEASE (!strcmp(\"$ReleaseType$\", \"dev\"))"$ */
-#define IS_RELEASE (!strcmp("$VersionType$", "dev"))
-
 #endif /* PATCHLEVEL_H__ */
-

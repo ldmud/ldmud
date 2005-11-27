@@ -4,7 +4,7 @@
  *---------------------------------------------------------------------------
  * TODO: Rewrite the low-level functions (like allocate_array()) to return
  * TODO:: failure codes (errno like) instead of throwing errors. In addition,
- * TODO:: provide wrapper functions which do throw error()s, so that every
+ * TODO:: provide wrapper functions which do throw errorf()s, so that every
  * TODO:: caller can handle the errors himself (like the swapper).
  * The structure of an array ("vector") is defined in datatypes.h as this:
  *
@@ -139,7 +139,7 @@ vector_t null_vector = { VEC_HEAD(0), { { T_INVALID } } };
    */
 
 void (*allocate_array_error_handler) (char *, ...)
-  = error; /* from simulate.c */
+  = errorf; /* from simulate.c */
   /* This handler is called if an allocation fails.
    * Usually it points to simulate::error(), but the swapper
    * replaces it temporarily with its own dummy handler when
@@ -223,7 +223,7 @@ _allocate_array(mp_int n, char * file, int line)
  * maximum) and return the pointer.
  * The elements are initialised to the svalue 0.
  *
- * If the allocations fails (and error() does return), a 0 pointer
+ * If the allocations fails (and errorf() does return), a 0 pointer
  * may be returned. This is usually only possible when arrays
  * are allocated from the swapper.
  *
@@ -239,7 +239,7 @@ _allocate_array(mp_int n, char * file, int line)
     svalue_t *svp;
 
     if (n < 0 || (max_array_size && (size_t)n > max_array_size))
-        error("Illegal array size: %ld.\n", n);
+        errorf("Illegal array size: %ld.\n", n);
 
     if (n == 0) {
         p = ref_array(&null_vector);
@@ -289,7 +289,7 @@ _allocate_array_unlimited(mp_int n, char * file, int line)
 /* Allocate an array for <n> elements and return the pointer.
  * The elements are initialised to the svalue 0.
  *
- * If the allocations fails (and error() does return), a 0 pointer
+ * If the allocations fails (and errorf() does return), a 0 pointer
  * may be returned. This is usually only possible when arrays
  * are allocated from the swapper.
  *
@@ -305,7 +305,7 @@ _allocate_array_unlimited(mp_int n, char * file, int line)
     svalue_t *svp;
 
     if (n < 0)
-        error("Illegal array size: %ld.\n", n);
+        errorf("Illegal array size: %ld.\n", n);
 
     if (n == 0) {
         p = ref_array(&null_vector);
@@ -356,7 +356,7 @@ _allocate_uninit_array (mp_int n, char *file, int line)
 /* Allocate an array for <n> elements (but no more than the current
  * maximum) and return the pointer.
  * The elements are not initialised.
- * If the allocations fails (and error() does return), a 0 pointer
+ * If the allocations fails (and errorf() does return), a 0 pointer
  * may be returned.
  *
  * Allocating an array of size 0 will return a reference to the
@@ -369,7 +369,7 @@ _allocate_uninit_array (mp_int n, char *file, int line)
     vector_t *p;
 
     if (n < 0 || (max_array_size && (size_t)n > max_array_size))
-        error("Illegal array size: %ld.\n", n);
+        errorf("Illegal array size: %ld.\n", n);
 
     if (n == 0) {
         p = ref_array(&null_vector);
@@ -625,7 +625,7 @@ explode_string (char *str, char *del)
                 buff = xalloc(2);
                 if (!buff) {
                     free_array(ret);
-                    error("(explode_string) Out of memory (2 bytes)\n");
+                    errorf("(explode_string) Out of memory (2 bytes)\n");
                 }
                 buff[0] = *str;
                 buff[1] = '\0';
@@ -653,7 +653,7 @@ explode_string (char *str, char *del)
                 buff = xalloc((size_t)(len + 1));
                 if (!buff) {
                     free_array(ret);
-                    error("(explode_string) Out of memory (%ld bytes)\n"
+                    errorf("(explode_string) Out of memory (%ld bytes)\n"
                          , len+1);
                 }
                 memcpy(buff, str, (size_t)len);
@@ -667,7 +667,7 @@ explode_string (char *str, char *del)
             put_malloced_string(svp, string_copy(str));
             if ( !svp->u.string ) {
                 free_array(ret);
-                error("(explode_string) Out of memory (%lu bytes) for result.\n"
+                errorf("(explode_string) Out of memory (%lu bytes) for result.\n"
                      , (unsigned long)strlen(str));
             }
 
@@ -708,7 +708,7 @@ explode_string (char *str, char *del)
             buff = xalloc((size_t)bufflen + 1);
             if (!buff) {
                 free_array(ret);
-                error("(explode_string) Out of memory (%ld bytes) for buffer\n"
+                errorf("(explode_string) Out of memory (%ld bytes) for buffer\n"
                      , bufflen+1);
             }
             memcpy(buff, beg, (size_t)bufflen);
@@ -729,7 +729,7 @@ explode_string (char *str, char *del)
     put_malloced_string(ret->item + num, string_copy(beg));
     if ( !ret->item[num].u.string) {
         free_array(ret);
-        error("(explode_string) Out of memory (%lu bytes) for last fragment\n"
+        errorf("(explode_string) Out of memory (%lu bytes) for last fragment\n"
              , (unsigned long)strlen(beg));
     }
 
@@ -808,7 +808,7 @@ old_explode_string (char *str, char *del)
     if (!buff)
     {
         free_array(ret);
-        error("(old_explode) Out of memory (%lu bytes) for result.\n"
+        errorf("(old_explode) Out of memory (%lu bytes) for result.\n"
              , (unsigned long)strlen(str)+1);
         /* NOTREACHED */
         return NULL;
@@ -901,7 +901,7 @@ _implode_string (vector_t *arr, char *del, char *file, int line)
     p = xalloc_traced((size_t)size + 1, file, line);
 #endif
     if (!p) {
-        /* caller raises the error() */
+        /* caller raises the errorf() */
         return NULL;
     }
     q = p; /* Remember the start of the allocated string */
@@ -1384,7 +1384,7 @@ order_alist (svalue_t *inlists, int listnum, Bool reuse)
 
     if (!root || !sorted)
     {
-        error("Stack overflow in order_alist()");
+        errorf("Stack overflow in order_alist()");
         /* NOTREACHED */
         return NULL;
     }
@@ -1637,7 +1637,7 @@ x_filter_array (svalue_t *sp, int num_arg)
     flags = alloca((size_t)p_size+1);
     if (!flags)
     {
-        error("Stack overflow in filter_array()");
+        errorf("Stack overflow in filter_array()");
         /* NOTREACHED */
         return NULL;
     }
@@ -1657,7 +1657,7 @@ x_filter_array (svalue_t *sp, int num_arg)
 
         if (num_arg > 2) {
             inter_sp = sp;
-            error("Too many arguments to filter_array()\n");
+            errorf("Too many arguments to filter_array()\n");
         }
         m = arg[1].u.map;
 
@@ -1716,7 +1716,7 @@ x_filter_array (svalue_t *sp, int num_arg)
             if (!callback_object(&cb))
             {
                 inter_sp = sp;
-                error("object used by filter_array destructed");
+                errorf("object used by filter_array destructed");
             }
 
             push_svalue(w++);
@@ -1817,13 +1817,13 @@ x_map_array (svalue_t *sp, int num_arg)
 
         if (num_arg > 2) {
             inter_sp = sp;
-            error("Too many arguments to map_array()\n");
+            errorf("Too many arguments to map_array()\n");
         }
         m = arg[1].u.map;
 
         res = allocate_array(cnt);
         if (!res)
-            error("(map_array) Out of memory: array[%ld] for result\n", cnt);
+            errorf("(map_array) Out of memory: array[%ld] for result\n", cnt);
         push_referenced_vector(res); /* In case of errors */
 
         for (w = arr->item, x = res->item; --cnt >= 0; w++, x++)
@@ -1861,7 +1861,7 @@ x_map_array (svalue_t *sp, int num_arg)
 
         res = allocate_array(cnt);
         if (!res)
-            error("(map_array) Out of memory: array[%ld] for result\n", cnt);
+            errorf("(map_array) Out of memory: array[%ld] for result\n", cnt);
         push_referenced_vector(res); /* In case of errors */
 
         /* Loop through arr and res, mapping the values from arr */
@@ -1875,7 +1875,7 @@ x_map_array (svalue_t *sp, int num_arg)
 
             if (!callback_object(&cb))
             {
-                error("object used by map_array destructed");
+                errorf("object used by map_array destructed");
             }
 
             push_svalue(w);
@@ -2007,7 +2007,7 @@ f_sort_array (svalue_t * sp, int num_arg)
     dest = alloca(size*sizeof(svalue_t));
     if (!source || !dest)
     {
-        error("Stack overflow in sort_array()");
+        errorf("Stack overflow in sort_array()");
         /* NOTREACHED */
         return arg;
     }
@@ -2035,7 +2035,7 @@ f_sort_array (svalue_t * sp, int num_arg)
                 svalue_t *d;
 
                 if (!callback_object(&cb))
-                    error("object used by sort_array destructed");
+                    errorf("object used by sort_array destructed");
 
                 push_svalue(source+index1);
                 push_svalue(source+index2);
@@ -2149,7 +2149,7 @@ f_filter_objects (svalue_t *sp, int num_arg)
         flags = alloca((p_size+1)*sizeof(*flags));
         if (!flags)
         {
-            error("Stack overflow in filter_objects()");
+            errorf("Stack overflow in filter_objects()");
             /* NOTREACHED */
             return NULL;
         }
@@ -2218,7 +2218,7 @@ f_filter_objects (svalue_t *sp, int num_arg)
                         if ( !(v->u.string = string_copy(sv.u.string)) ) {
                             v->type = T_INVALID;
                             free_array(w);
-                            error("(map_array) Out of memory (%lu bytes) "
+                            errorf("(map_array) Out of memory (%lu bytes) "
                                   "for string\n"
                                  , (unsigned long)strlen(sv.u.string));
                         }
@@ -2645,7 +2645,7 @@ match_regexp (vector_t *v, char *pattern)
     if (!res)
     {
         REGFREE(reg);
-        error("Stack overflow in regexp()");
+        errorf("Stack overflow in regexp()");
         /* NOTREACHED */
         return NULL;
     }
@@ -2853,7 +2853,7 @@ f_regexplode (svalue_t *sp)
     reg = REGCOMP((unsigned char *)pattern, 0, MY_FALSE);
     if (reg == 0) {
         inter_sp = sp;
-        error("Unrecognized search pattern");
+        errorf("Unrecognized search pattern");
         /* NOTREACHED */
         return NULL;
     }
@@ -2870,7 +2870,7 @@ f_regexplode (svalue_t *sp)
         if (!match)
         {
             REGFREE(reg);
-            error("Stack overflow in regexplode()");
+            errorf("Stack overflow in regexplode()");
             /* NOTREACHED */
             return NULL;
         }
@@ -2890,7 +2890,7 @@ f_regexplode (svalue_t *sp)
     if (max_array_size && num_match > ((max_array_size-1) >> 1) ) {
         REGFREE(reg);
         inter_sp = sp;
-        error("Illegal array size");
+        errorf("Illegal array size");
         /* NOTREACHED */
         return NULL;
     }
@@ -2984,7 +2984,7 @@ f_include_list (svalue_t *sp, int num_arg)
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0)
         {
-            error("Out of memory: unswap object '%s'\n", ob->name);
+            errorf("Out of memory: unswap object '%s'\n", ob->name);
             /* NOTREACHED */
             return NULL;
         }
@@ -3046,7 +3046,7 @@ f_include_list (svalue_t *sp, int num_arg)
         pool = new_mempool(size_mempool(sizeof(*begin)));
         if (NULL == pool)
         {
-            error("Out of memory: memory pool\n");
+            errorf("Out of memory: memory pool\n");
             /* NOTREACHED */
             return NULL;
         }
@@ -3215,7 +3215,7 @@ f_include_list (svalue_t *sp, int num_arg)
         if (!str)
         {
             free_array(vec);
-            error("(include_list) Out of memory: (%lu bytes) for filename\n"
+            errorf("(include_list) Out of memory: (%lu bytes) for filename\n"
                  , (unsigned long)slen);
         }
         put_malloced_string(vec->item, str);
@@ -3291,7 +3291,7 @@ f_inherit_list (svalue_t *sp, int num_arg)
 
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0) {
-            error("Out of memory: unswap object '%s'\n", ob->name);
+            errorf("Out of memory: unswap object '%s'\n", ob->name);
             /* NOTREACHED */
             return NULL;
         }
@@ -3300,7 +3300,7 @@ f_inherit_list (svalue_t *sp, int num_arg)
     pool = new_mempool(size_mempool(sizeof(*begin)));
     if (NULL == pool)
     {
-        error("Out of memory: memory pool\n");
+        errorf("Out of memory: memory pool\n");
         /* NOTREACHED */
         return NULL;
     }
@@ -3313,7 +3313,7 @@ f_inherit_list (svalue_t *sp, int num_arg)
     if (NULL == begin)
     {
         mempool_delete(pool);
-        error("Out of memory: allocation from memory pool\n");
+        errorf("Out of memory: allocation from memory pool\n");
         /* NOTREACHED */
         return NULL;
     }
@@ -3352,7 +3352,7 @@ f_inherit_list (svalue_t *sp, int num_arg)
                 if (NULL == end->next)
                 {
                     mempool_delete(pool);
-                    error("Out of memory: allocation from memory pool\n");
+                    errorf("Out of memory: allocation from memory pool\n");
                     /* NOTREACHED */
                     return NULL;
                 }
@@ -3417,7 +3417,7 @@ f_inherit_list (svalue_t *sp, int num_arg)
             {
                 free_array(vec);
                 mempool_delete(pool);
-                error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
+                errorf("(inherit_list) Out of memory: (%lu bytes) for filename\n"
                      , (unsigned long)slen);
             }
             put_malloced_string(svp, str);
@@ -3471,7 +3471,7 @@ f_inherit_list (svalue_t *sp, int num_arg)
             {
                 free_array(vec);
                 mempool_delete(pool);
-                error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
+                errorf("(inherit_list) Out of memory: (%lu bytes) for filename\n"
                      , (unsigned long)slen);
             }
 
@@ -3603,7 +3603,7 @@ f_functionlist (svalue_t *sp)
         if (sp[-1].type != T_STRING)
             bad_xefun_arg(1, sp);
         if (!(ob = find_object(sp[-1].u.string)))
-            error("Object '%s' not found.\n", sp[-1].u.string);
+            errorf("Object '%s' not found.\n", sp[-1].u.string);
     }
     else
         ob = sp[-1].u.ob;
@@ -3615,7 +3615,7 @@ f_functionlist (svalue_t *sp)
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0)
         {
-            error("Out of memory: unswap object '%s'\n", ob->name);
+            errorf("Out of memory: unswap object '%s'\n", ob->name);
             /* NOTREACHED */
             return NULL;
         }
@@ -3628,7 +3628,7 @@ f_functionlist (svalue_t *sp)
     vis_tags = alloca(num_functions);
     if (!vis_tags)
     {
-        error("Stack overflow in functionlist()");
+        errorf("Stack overflow in functionlist()");
         /* NOTREACHED */
         return NULL;
     }
@@ -3934,7 +3934,7 @@ put_in (Mempool pool, struct unique **ulist
             slink = mempool_alloc(pool, sizeof(struct unique));
             if (!slink)
             {
-                error("(unique_array) Out of memory (%lu bytes pooled) "
+                errorf("(unique_array) Out of memory (%lu bytes pooled) "
                       "for comb.\n", (unsigned long)sizeof(struct unique));
                 /* NOTREACHED */
                 return 0;
@@ -3961,7 +3961,7 @@ put_in (Mempool pool, struct unique **ulist
     llink = mempool_alloc(pool, sizeof(struct unique));
     if (!llink)
     {
-        error("(unique_array) Out of memory (%lu bytes pooled) "
+        errorf("(unique_array) Out of memory (%lu bytes pooled) "
               "for comb.\n", (unsigned long)sizeof(struct unique));
         /* NOTREACHED */
         return 0;
@@ -4038,7 +4038,7 @@ make_unique (vector_t *arr, char *func, svalue_t *skipnum)
      */
     pool = new_mempool(size_mempool(sizeof(*head)));
     if (!pool)
-        error("(unique_array) Out of memory: (%lu bytes) for mempool\n"
+        errorf("(unique_array) Out of memory: (%lu bytes) for mempool\n"
              , (unsigned long)size_mempool(sizeof(*head)));
 
     /* Create the automatic cleanup structure */
@@ -4046,7 +4046,7 @@ make_unique (vector_t *arr, char *func, svalue_t *skipnum)
     if (!ucp)
     {
         mempool_delete(pool);
-        error("(unique_array) Out of memory: (%lu bytes) for cleanup structure\n"
+        errorf("(unique_array) Out of memory: (%lu bytes) for cleanup structure\n"
              , (unsigned long)sizeof(*ucp));
     }
 

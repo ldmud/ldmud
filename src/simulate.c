@@ -287,8 +287,12 @@ Bool master_will_be_updated = MY_FALSE;
   /* TRUE if a master-update was requested.
    */
 
+static Bool in_fatal = MY_FALSE;
+  /* TRUE if fatal() is being processed.
+   */
+
 int num_error = 0;
-  /* Number of recursive calls to error().
+  /* Number of recursive calls to errorf().
    */
 
 static char emsg_buf[ERROR_BUF_LEN];
@@ -400,7 +404,7 @@ catch_instruction ( int flags, uint offset
      */
     if (max_eval_cost && eval_cost + CATCH_RESERVED_COST >= max_eval_cost)
     {
-        error("Not enough eval time left for catch(): required %ld, available %ld\n"
+        errorf("Not enough eval time left for catch(): required %ld, available %ld\n"
              , (long)CATCH_RESERVED_COST, (long)(max_eval_cost - eval_cost)
              );
         /* NOTREACHED */
@@ -462,7 +466,7 @@ catch_instruction ( int flags, uint offset
         /* If we ran out of memory, throw a new error */
         if (!old_out_of_memory && out_of_memory)
         {
-            error("(catch) Out of memory detected.\n");
+            errorf("(catch) Out of memory detected.\n");
         }
 
         rc = MY_TRUE;
@@ -604,7 +608,6 @@ fatal (char *fmt, ...)
 {
     va_list va;
     char *ts;
-    static Bool in_fatal = MY_FALSE;
 
     /* Prevent double fatal. */
     if (in_fatal)
@@ -702,18 +705,18 @@ limit_error_format (char *fixed_fmt, size_t fixed_fmt_len, char *fmt)
 
 /*-------------------------------------------------------------------------*/
 void
-error (char *fmt, ...)
+errorf (char *fmt, ...)
 
 /* A system runtime error occured: generate a message from printf-style
  * <fmt> with a timestamp, and handle it.
  * If the error is caught, just dump the trace on stderr, and jump to the
  * error handler, otherwise call the mudlib's error functions (this may cause
- * recursive calls to error()) and jump back to wherever the current error
+ * recursive calls to errorf()) and jump back to wherever the current error
  * recovery context points to.
  *
  * The runtime context stack is unrolled as far as necessary.
  * TODO: Add a perrorf(<prefmt>, <postfmt>,...) function which translates the
- * TODO:: errno into a string and calls error(<prefmt><errmsg><postfmt>, ...).
+ * TODO:: errno into a string and calls errorf(<prefmt><errmsg><postfmt>, ...).
  */
 
 {
@@ -721,6 +724,9 @@ error (char *fmt, ...)
     char     *object_name = NULL;
     char     *ts;
     svalue_t *svp;
+    Bool      error_caught;
+      /* TRUE: User catches this error.
+       */
     Bool      published_catch;
       /* TRUE: this is a catch which wants runtime_error to be called
        */
@@ -733,6 +739,12 @@ error (char *fmt, ...)
     char      fixed_fmt[ERROR_FMT_LEN];
     mp_int    line_number = 0;
     va_list   va;
+
+    /* Errors during the fatal() processing will abort the process
+     * immediately.
+     */
+    if (in_fatal)
+        fatal("Error during fatal().");
 
     ts = time_stamp();
 
@@ -780,6 +792,7 @@ error (char *fmt, ...)
 
     emsg_buf[0] = '*';  /* all system errors get a * at the start */
 
+    error_caught = MY_FALSE;
     published_catch = MY_FALSE;
 
     if (rt->type >= ERROR_RECOVERY_CATCH)
@@ -787,6 +800,8 @@ error (char *fmt, ...)
         /* User catches this error */
 
         struct error_recovery_info * eri = (struct error_recovery_info *)rt;
+
+        error_caught = MY_TRUE;
 
         put_malloced_string(&catch_value, string_copy(emsg_buf));
           /* always reallocate */
@@ -952,7 +967,7 @@ error (char *fmt, ...)
 
     /* If the error is not caught at all, the stack must be brought in a
      * usable state. After the call to reset_machine(), all arguments to
-     * error() are invalid, and may not be used any more. The reason is that
+     * errorf() are invalid, and may not be used any more. The reason is that
      * some strings may have been on the stack machine stack, and have been
      * deallocated.
      */
@@ -1042,6 +1057,9 @@ error (char *fmt, ...)
             a++;
         }
 
+        push_number(error_caught ? 1 : 0);
+        a++;
+
         save_cmd = command_giver;
         apply_master(STR_RUNTIME, a);
         command_giver = save_cmd;
@@ -1065,6 +1083,9 @@ error (char *fmt, ...)
                 push_number(line_number);
                 a += 3;
             }
+
+            push_number(error_caught ? 1 : 0);
+            a++;
 
             svp = apply_master(STR_HEART_ERROR, a);
             command_giver = save_cmd;
@@ -1125,7 +1146,7 @@ error (char *fmt, ...)
         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
 
     fatal("Can't recover from error (longjmp failed)\n");
-} /* error() */
+} /* errorf() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1137,7 +1158,7 @@ warnf (char *fmt, ...)
  * Note: Both 'warn' and 'warning' are already taken on some systems.
  * TODO: Extend this to let the mudlib handle warnings.
  * TODO: Add a pwarnf(<prefmt>, <postfmt>,...) function which translates the
- * TODO:: errno into a string and calls error(<prefmt><errmsg><postfmt>, ...).
+ * TODO:: errno into a string and calls errorf(<prefmt><errmsg><postfmt>, ...).
  */
 
 {
@@ -1241,7 +1262,7 @@ throw_error()
     }
     free_svalue(&catch_value);
     catch_value.type = T_INVALID;
-    error("Throw with no catch.\n");
+    errorf("Throw with no catch.\n");
 } /* throw_error() */
 
 /*-------------------------------------------------------------------------*/
@@ -1310,7 +1331,7 @@ push_give_uid_error_context (object_t *ob)
     if (!ecp)
     {
         destruct(ob);
-        error("Out of memory (%lu bytes) for new object '%s' uids\n"
+        errorf("Out of memory (%lu bytes) for new object '%s' uids\n"
              , (unsigned long) sizeof(*ecp), ob->name);
     }
     ecp->head.type = T_ERROR_HANDLER;
@@ -1328,7 +1349,7 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
 /* Object <ob> was just created - call the driver_hook <hook> with <numarg>
  * arguments to give it its uid and euid.
  * Return TRUE on success - on failure, destruct <ob>ject and raise
- * an error; return FALSE in the unlikely case that error() does return.
+ * an error; return FALSE in the unlikely case that errorf() does return.
  */
 
 {
@@ -1408,7 +1429,7 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
     ob->eff_user = ob->user;
     put_object(&arg, ob);
     destruct_object(&arg);
-    error(err);
+    errorf(err);
     /* NOTREACHED */
     return MY_FALSE;
 } /* give_uid_to_object() */
@@ -1575,7 +1596,7 @@ load_object_error(const char *msg, const char *name, namechain_t *chain)
 /* Generate a compilation error message <msg>. If <name> is not NULL,
  * ": '<name>'" is appended to the message. If <chain> is not NULL,
  * " (inherited by <chain...>)" is appended to the message.
- * The message is then printed to stderr and an error() with it is thrown.
+ * The message is then printed to stderr and an errorf() with it is thrown.
  */
 
 {
@@ -1610,13 +1631,13 @@ load_object_error(const char *msg, const char *name, namechain_t *chain)
     /* Make a local copy of the message so as not to leak memory */
     buf = alloca(strlen(sbuf.buf)+1);
     if (!buf)
-        error("Out of stack memory (%lu bytes)\n"
+        errorf("Out of stack memory (%lu bytes)\n"
              , (unsigned long) strlen(sbuf.buf)+1);
     strcpy(buf, sbuf.buf);
     strbuf_free(&sbuf);
 
     fprintf(stderr, "%s %s", time_stamp(), buf);
-    error("%.*s", MIN(ERROR_BUF_LEN - 200, (int)strlen(buf)), buf);
+    errorf("%.*s", MIN(ERROR_BUF_LEN - 200, (int)strlen(buf)), buf);
 } /* load_object_error() */
 
 /*-------------------------------------------------------------------------*/
@@ -1690,7 +1711,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
 
     if (strict_euids && current_object && current_object->eff_user == 0
      && current_object->name)
-        error("Can't load objects when no effective user.\n");
+        errorf("Can't load objects when no effective user.\n");
 
     if (master_ob && master_ob->flags & O_DESTRUCTED)
     {
@@ -1707,7 +1728,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
                 /* The master has swapped this object and used up most
                  * memory... strange, but thinkable
                  */
-                error("Out of memory: unswap object '%s'\n", ob->name);
+                errorf("Out of memory: unswap object '%s'\n", ob->name);
             return ob;
         }
     }
@@ -1816,7 +1837,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
 
         if (current_file)
         {
-            error("Can't load '%s': compiler is busy with '%s'.\n"
+            errorf("Can't load '%s': compiler is busy with '%s'.\n"
                  , name, current_file);
         }
 
@@ -1824,7 +1845,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         if (fd <= 0)
         {
             perror(fname);
-            error("Could not read the file.\n");
+            errorf("Could not read the file.\n");
         }
         FCOUNT_COMP(fname);
 
@@ -1888,7 +1909,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
 
             if (strcmp(pInherited, name) == 0)
             {
-                error("Illegal to inherit self.\n");
+                errorf("Illegal to inherit self.\n");
             }
 
             if (depth >= MAX_LOAD_DEPTH)
@@ -1953,7 +1974,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
 #endif
 
     if (!ob)
-        error("Out of memory for new object '%s'\n", name);
+        errorf("Out of memory for new object '%s'\n", name);
 
     ob->name = string_copy(name);
     tot_alloc_object_size += strlen(ob->name)+1;
@@ -2093,7 +2114,7 @@ clone_object (char *str1)
     char *name;
 
     if (strict_euids && current_object && current_object->eff_user == NULL)
-        error("Illegal to call clone_object() with effective user 0\n");
+        errorf("Illegal to call clone_object() with effective user 0\n");
 
     ob = get_object(str1);
 
@@ -2113,7 +2134,7 @@ clone_object (char *str1)
     }
 
     if (ob->super)
-        error("Cloning a bad object: '%s' is contained in '%s'.\n"
+        errorf("Cloning a bad object: '%s' is contained in '%s'.\n"
              , ob->name, ob->super->name);
 
     name = ob->name;
@@ -2146,10 +2167,10 @@ clone_object (char *str1)
     }
 
     if ((ob->flags & O_SWAPPED) && load_ob_from_swap(ob) < 0)
-        error("Out of memory: unswap object '%s'\n", ob->name);
+        errorf("Out of memory: unswap object '%s'\n", ob->name);
 
     if (ob->prog->flags & P_NO_CLONE)
-        error("Cloning a bad object: '%s' sets '#pragma no_clone'.\n"
+        errorf("Cloning a bad object: '%s' sets '#pragma no_clone'.\n"
              , ob->name);
 
     ob->time_of_ref = current_time;
@@ -2172,7 +2193,7 @@ clone_object (char *str1)
      * TODO:: in the program.
      */
     if (!new_ob)
-        error("Out of memory for new clone '%s'\n", name);
+        errorf("Out of memory for new clone '%s'\n", name);
 
     new_ob->name = make_new_name(name);
     tot_alloc_object_size += strlen(new_ob->name)+1;
@@ -2275,7 +2296,7 @@ destruct_object (svalue_t *v)
     {
         ob = find_object(v->u.string);
         if (ob == 0)
-            error("destruct_object: Could not find %s\n", v->u.string);
+            errorf("destruct_object: Could not find %s\n", v->u.string);
     }
 
     if (ob->flags & O_DESTRUCTED)
@@ -2283,7 +2304,7 @@ destruct_object (svalue_t *v)
 
     if (ob->flags & O_SWAPPED)
         if (load_ob_from_swap(ob) < 0)
-            error("Out of memory: unswap object '%s'\n", ob->name);
+            errorf("Out of memory: unswap object '%s'\n", ob->name);
 
     if (d_flag)
     {
@@ -2294,17 +2315,17 @@ destruct_object (svalue_t *v)
     push_object(ob);
     result = apply_master(STR_PREP_DEST, 1);
     if (!result)
-        error("No prepare_destruct\n");
+        errorf("No prepare_destruct\n");
 
     if (result->type == T_STRING)
-        error(result->u.string);
+        errorf(result->u.string);
 
     if (result->type != T_NUMBER || result->u.number != 0)
         return;
 
     if (ob->contains)
     {
-        error("Master failed to clean inventory in prepare_destruct\n");
+        errorf("Master failed to clean inventory in prepare_destruct\n");
     }
 
     if (ob->flags & O_SHADOW)
@@ -3174,7 +3195,7 @@ check_valid_path (char *path, object_t *caller, char* call_fun, Bool writeflg)
     if (legal_path(path))
         return path;
 
-    error("Illegal path '%s' for %s() by %s\n", path, call_fun, caller->name);
+    errorf("Illegal path '%s' for %s() by %s\n", path, call_fun, caller->name);
     return NULL;
 } /* check_valid_path() */
 
@@ -3260,12 +3281,15 @@ free_callback (callback_t *cb)
 /*-------------------------------------------------------------------------*/
 static INLINE int
 setup_callback_args (callback_t *cb, int nargs, svalue_t * args
-                    , Bool allow_prot_lvalues)
+                    , Bool delayed_callback)
 
 /* Setup the function arguments in the callback <cb> to hold the <nargs>
- * arguments starting from <args>. If <allow_prot_lvalues> is FALSE, no
- * argument may be a protected lvalue. The arguments are transferred into the
- * callback structure.
+ * arguments starting from <args>. If <delayed_callback> is FALSE, 
+ * the callback will happen within the current LPC cycle:  no argument may be
+ * a protected lvalue, but normal lvalues are ok. If TRUE, the callback
+ * will happen at a later time: protected lvalues are ok, but not normal ones.
+ *
+ * The arguments are transferred into the callback structure.
  *
  * Result is -1 on success, or, when encountering an illegal argument,
  * the index of the faulty argument (but even then all caller arguments
@@ -3302,15 +3326,26 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
 
         while (--nargs >= 0)
         {
-            if (!allow_prot_lvalues && args->type == T_LVALUE
-             && (   args->u.lvalue->type == T_PROTECTED_CHAR_LVALUE
-                 || args->u.lvalue->type == T_PROTECTED_STRING_RANGE_LVALUE
-                 || args->u.lvalue->type == T_PROTECTED_POINTER_RANGE_LVALUE
-                 || args->u.lvalue->type == T_PROTECTED_LVALUE
-                )
-               )
+            Bool dontHandle = MY_FALSE;
+
+            if (args->type == T_LVALUE)
             {
-                /* We don't handle protected lvalues - abort the process.
+                /* Check if we are allowed to handle the lvalues. */
+                Bool isProtected
+                  = (   args->u.lvalue->type == T_PROTECTED_CHAR_LVALUE
+                     || args->u.lvalue->type == T_PROTECTED_STRING_RANGE_LVALUE
+                     || args->u.lvalue->type == T_PROTECTED_POINTER_RANGE_LVALUE
+                     || args->u.lvalue->type == T_PROTECTED_LVALUE
+                    );
+
+                dontHandle =    ( delayed_callback && !isProtected)
+                             || (!delayed_callback &&  isProtected)
+                             ;
+            }
+
+            if (dontHandle)
+            {
+                /* We don't handle the lvalue - abort the process.
                  * But to do that, we first have to free all
                  * remaining arguments from the caller.
                  */
@@ -3338,11 +3373,14 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
 /*-------------------------------------------------------------------------*/
 int
 setup_function_callback ( callback_t *cb, object_t * ob, char * fun
-                        , int nargs, svalue_t * args, Bool allow_prot_lvalues)
+                        , int nargs, svalue_t * args, Bool delayed_callback)
 
 /* Setup the empty/uninitialized callback <cb> to hold a function
  * call to <ob>:<fun> with the <nargs> arguments starting from <args>.
- * If <allow_prot_lvalues> is FALSE, no argument may be a protected lvalue.
+ * If <delayed_callback> is FALSE, the callback will happen within the current
+ * LPC cycle:  no argument may be a protected lvalue, but normal lvalues are
+ * ok. If TRUE, the callback will happen at a later time: protected lvalues
+ * are ok, but not normal ones.
  *
  * Both <ob> and <fun> are copied from the caller, but the arguments are
  * adopted (taken away from the caller).
@@ -3359,7 +3397,7 @@ setup_function_callback ( callback_t *cb, object_t * ob, char * fun
     cb->function.named.name = make_shared_string(fun);
     cb->function.named.ob = ref_object(ob, "callback");
 
-    error_index = setup_callback_args(cb, nargs, args, allow_prot_lvalues);
+    error_index = setup_callback_args(cb, nargs, args, delayed_callback);
     if (error_index >= 0)
     {
         free_object(cb->function.named.ob, "callback");
@@ -3374,11 +3412,14 @@ setup_function_callback ( callback_t *cb, object_t * ob, char * fun
 /*-------------------------------------------------------------------------*/
 int
 setup_closure_callback ( callback_t *cb, svalue_t *cl
-                       , int nargs, svalue_t * args, Bool allow_prot_lvalues)
+                       , int nargs, svalue_t * args, Bool delayed_callback)
 
 /* Setup the empty/uninitialized callback <cb> to hold a closure
  * call to <cl> with the <nargs> arguments starting from <args>.
- * If <allow_prot_lvalues> is FALSE, no argument may be a protected lvalue.
+ * If <delayed_callback> is FALSE, the callback will happen within the current
+ * LPC cycle:  no argument may be a protected lvalue, but normal lvalues are
+ * ok. If TRUE, the callback will happen at a later time: protected lvalues
+ * are ok, but not normal ones.
  *
  * Both <cl> and the arguments are adopted (taken away from the caller).
  *
@@ -3393,7 +3434,7 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
     cb->is_lambda = MY_TRUE;
     transfer_svalue_no_free(&(cb->function.lambda), cl);
 
-    error_index = setup_callback_args(cb, nargs, args, allow_prot_lvalues);
+    error_index = setup_callback_args(cb, nargs, args, delayed_callback);
     if (error_index >= 0)
     {
         free_svalue(&(cb->function.lambda));
@@ -4013,12 +4054,12 @@ validate_shadowing (object_t *ob)
 
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0)
-            error("Out of memory: unswap object '%s'\n", ob->name);
+            errorf("Out of memory: unswap object '%s'\n", ob->name);
 
     victim = ob->prog;
 
     if (victim->flags & P_NO_SHADOW)
-        error("shadow '%s' on '%s': Can't shadow a 'no_shadow' program.\n"
+        errorf("shadow '%s' on '%s': Can't shadow a 'no_shadow' program.\n"
              , cob->name, ob->name);
 
     if (cob->flags & O_SHADOW)
@@ -4026,23 +4067,23 @@ validate_shadowing (object_t *ob)
         shadow_t *shadow_sent = O_GET_SHADOW(cob);
 
         if (shadow_sent->shadowing)
-            error("shadow '%s' on '%s': Already shadowing.\n"
+            errorf("shadow '%s' on '%s': Already shadowing.\n"
                  , cob->name, ob->name);
         if (shadow_sent->shadowed_by)
-            error("shadow '%s' on '%s': Can't shadow when shadowed.\n"
+            errorf("shadow '%s' on '%s': Can't shadow when shadowed.\n"
                  , cob->name, ob->name);
     }
 
     if (cob->super)
-        error("shadow '%s' on '%s': The shadow resides inside another object ('%s').\n"
+        errorf("shadow '%s' on '%s': The shadow resides inside another object ('%s').\n"
              , cob->name, ob->name, cob->super->name);
 
     if (ob->flags & O_SHADOW && O_GET_SHADOW(ob)->shadowing)
-        error("shadow '%s' on '%s': Can't shadow a shadow.\n"
+        errorf("shadow '%s' on '%s': Can't shadow a shadow.\n"
              , cob->name, ob->name);
 
     if (ob == cob)
-        error("shadow '%s' on '%s': Can't shadow self.\n"
+        errorf("shadow '%s' on '%s': Can't shadow self.\n"
              , cob->name, ob->name);
 
     /* Make sure that we don't shadow 'nomask' functions.
@@ -4073,7 +4114,7 @@ validate_shadowing (object_t *ob)
         if ( (j = find_function(name, victim)) >= 0
          && victim->functions[j] & TYPE_MOD_NO_MASK )
         {
-            error("shadow '%s' on '%s: Illegal to shadow 'nomask' function \"%s\".\n"
+            errorf("shadow '%s' on '%s: Illegal to shadow 'nomask' function \"%s\".\n"
                  , ob->name, cob->name, name);
         }
     }
@@ -4328,7 +4369,7 @@ f_set_driver_hook (svalue_t *sp)
         }
         else
         {
-            error("Out of memory (%lu bytes) for driver hook\n"
+            errorf("Out of memory (%lu bytes) for driver hook\n"
                  , (unsigned long) strlen(sp->u.string));
         }
         break;
@@ -4450,7 +4491,7 @@ f_set_auto_include_string (svalue_t *sp)
         }
         else
         {
-            error("Out of memory (%lu bytes) for driver hook\n"
+            errorf("Out of memory (%lu bytes) for driver hook\n"
                  , (unsigned long) strlen(sp->u.string));
         }
 
@@ -4532,7 +4573,7 @@ f_rename_object (svalue_t *sp)
             if ( (c = *--p) < '0' || c > '9' )
             {
                 if (c == '#' && length - i > 1) {
-                    error("Illegal name to rename_object: '%s'.\n", name);
+                    errorf("Illegal name to rename_object: '%s'.\n", name);
                 }
                 break;
             }
@@ -4541,12 +4582,12 @@ f_rename_object (svalue_t *sp)
 
     if (lookup_object_hash(name))
     {
-        error("Attempt to rename to object '%s'\n", name);
+        errorf("Attempt to rename to object '%s'\n", name);
     }
 
     assert_master_ob_loaded();
     if (master_ob == ob)
-        error("Attempt to rename the master object\n");
+        errorf("Attempt to rename the master object\n");
 
     if (privilege_violation4("rename_object", ob, name, 0, sp)
      && check_object(ob))
@@ -4649,7 +4690,7 @@ extract_limits ( struct limits_context_s * result
         {
 
             if (svp[limit].type != T_NUMBER)
-                error("Illegal %s value: not a number\n", limitnames[limit]);
+                errorf("Illegal %s value: not a number\n", limitnames[limit]);
                 /* TODO: Give type and value */
             val = svp[limit].u.number;
             if (val >= 0)
@@ -4662,7 +4703,7 @@ extract_limits ( struct limits_context_s * result
                 case LIMIT_BYTE:     result->max_byte = val;    break;
                 case LIMIT_FILE:     result->max_file = val;    break;
                 case LIMIT_CALLOUTS: result->max_callouts = val; break;
-                default: error("Unimplemented limit #%d\n", limit);
+                default: errorf("Unimplemented limit #%d\n", limit);
                 }
             }
             else if (val == LIMIT_DEFAULT)
@@ -4681,11 +4722,11 @@ extract_limits ( struct limits_context_s * result
                                      break;
                 case LIMIT_CALLOUTS: result->max_callouts = def_callouts;
                                      break;
-                default: error("Unimplemented limit #%d\n", limit);
+                default: errorf("Unimplemented limit #%d\n", limit);
                 }
             }
             else if (val != LIMIT_KEEP)
-                error("Illegal %s value: %ld\n", limitnames[limit], val);
+                errorf("Illegal %s value: %ld\n", limitnames[limit], val);
         }
     }
     else
@@ -4698,14 +4739,14 @@ extract_limits ( struct limits_context_s * result
             int limit;
 
             if (svp[i].type != T_NUMBER)
-                error("Illegal limit tag: not a number.\n");
+                errorf("Illegal limit tag: not a number.\n");
                 /* TODO: Give type and value */
             limit = (int)svp[i].u.number;
             if (limit < 0 || limit >= LIMIT_MAX)
-                error("Illegal limit tag: %ld\n", (long)limit);
+                errorf("Illegal limit tag: %ld\n", (long)limit);
 
             if (svp[i+1].type != T_NUMBER)
-                error("Illegal %s value: not a number\n", limitnames[limit]);
+                errorf("Illegal %s value: not a number\n", limitnames[limit]);
                 /* TODO: Give type and value */
             val = svp[i+1].u.number;
             if (val >= 0)
@@ -4718,7 +4759,7 @@ extract_limits ( struct limits_context_s * result
                 case LIMIT_BYTE:     result->max_byte = val;    break;
                 case LIMIT_FILE:     result->max_file = val;    break;
                 case LIMIT_CALLOUTS: result->max_callouts = val;    break;
-                default: error("Unimplemented limit #%d\n", limit);
+                default: errorf("Unimplemented limit #%d\n", limit);
                 }
             }
             else if (val == LIMIT_DEFAULT)
@@ -4737,11 +4778,11 @@ extract_limits ( struct limits_context_s * result
                                      break;
                 case LIMIT_CALLOUTS: result->max_callouts = def_callouts;
                                      break;
-                default: error("Unimplemented limit #%d\n", limit);
+                default: errorf("Unimplemented limit #%d\n", limit);
                 }
             }
             else if (val != LIMIT_KEEP)
-                error("Illegal %s value: %ld\n", limitnames[limit], val);
+                errorf("Illegal %s value: %ld\n", limitnames[limit], val);
         }
     }
 } /* extract_limits() */
@@ -4779,7 +4820,7 @@ f_limited (svalue_t * sp, int num_arg)
     int cl_args;
 
     if (!num_arg)
-        error("No arguments given.\n");
+        errorf("No arguments given.\n");
 
     argp = sp - num_arg + 1;
     cl_args = 0;
@@ -4894,7 +4935,7 @@ f_set_limits (svalue_t * sp, int num_arg)
     struct limits_context_s limits;
 
     if (!num_arg)
-        error("No arguments given.\n");
+        errorf("No arguments given.\n");
 
     argp = sp - num_arg + 1;
 
@@ -4952,7 +4993,7 @@ f_query_limits (svalue_t * sp)
 
     vec = allocate_uninit_array(LIMIT_MAX);
     if (!vec)
-        error("(query_limits) Out of memory: array[%d] for result.\n"
+        errorf("(query_limits) Out of memory: array[%d] for result.\n"
              , LIMIT_MAX);
 
     put_number(vec->item+LIMIT_EVAL,     def ? def_eval_cost : max_eval_cost);
@@ -4994,7 +5035,7 @@ move_object (void)
         call_lambda(&driver_hook[H_MOVE_OBJECT0], 2);
     }
     else
-        error("Don't know how to move objects.\n");
+        errorf("Don't know how to move objects.\n");
     command_giver = check_object(save_command);
 } /* move_object() */
 
@@ -5024,7 +5065,7 @@ f_set_environment (svalue_t *sp)
     item = sp[-1].u.ob;
 
     if (item->flags & O_SHADOW && O_GET_SHADOW(item)->shadowing)
-        error("Can't move an object that is shadowing.\n");
+        errorf("Can't move an object that is shadowing.\n");
 
     if (sp->type != T_OBJECT)
     {
@@ -5038,7 +5079,7 @@ f_set_environment (svalue_t *sp)
         /* Recursive moves are not allowed. */
         for (ob = dest; ob; ob = ob->super)
             if (ob == item)
-                error("Can't move object inside itself.\n");
+                errorf("Can't move object inside itself.\n");
 
 #       ifdef USE_SET_LIGHT
             add_light(dest, item->total_light);
@@ -5052,6 +5093,8 @@ f_set_environment (svalue_t *sp)
     {
         /* First remove the item out of its current environment */
         Bool okey = MY_FALSE;
+
+        item->super->flags &= ~O_RESET_STATE;
 
         if (item->sent)
         {
@@ -6069,7 +6112,7 @@ f_copy_file (svalue_t *sp)
 
         if (lstat(from, &from_stats) != 0)
         {
-            error("%s: lstat failed\n", from);
+            errorf("%s: lstat failed\n", from);
             break;
         }
 
@@ -6078,13 +6121,13 @@ f_copy_file (svalue_t *sp)
             if (from_stats.st_dev == to_stats.st_dev
               && from_stats.st_ino == to_stats.st_ino)
             {
-                error("'%s' and '%s' are the same file\n", from, to);
+                errorf("'%s' and '%s' are the same file\n", from, to);
                 break;
             }
 
             if (S_ISDIR(to_stats.st_mode))
             {
-                error("%s: cannot overwrite directory\n", to);
+                errorf("%s: cannot overwrite directory\n", to);
                 break;
             }
 
@@ -6092,13 +6135,13 @@ f_copy_file (svalue_t *sp)
         else if (errno != ENOENT)
         {
             perror("copy_file");
-            error("%s: unknown error\n", to);
+            errorf("%s: unknown error\n", to);
             break;
         }
 
         if (!S_ISREG(from_stats.st_mode))
         {
-            error("cannot copy `%s': Not a regular file\n", from);
+            errorf("cannot copy `%s': Not a regular file\n", from);
             break;
         }
 

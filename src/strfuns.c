@@ -289,7 +289,7 @@ sort_string (const char * in, size_t len, long ** pos)
             xfree(out);
         if (tmp)
             xfree(tmp);
-        error("(sort_string) Out of memory (2 * %lu bytes) for temporaries.\n"
+        errorf("(sort_string) Out of memory (2 * %lu bytes) for temporaries.\n"
              , (unsigned long) len+1);
     }
     out[len] = '\0';
@@ -310,7 +310,7 @@ sort_string (const char * in, size_t len, long ** pos)
                 xfree(outpos);
             if (tmppos)
                 xfree(tmppos);
-            error("(sort_string) Out of memory (2 * %lu bytes) for positions.\n"
+            errorf("(sort_string) Out of memory (2 * %lu bytes) for positions.\n"
                  , (unsigned long) len*sizeof(*outpos)+1);
         }
     }

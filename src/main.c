@@ -186,6 +186,10 @@ int exit_code = 0; /* TODO: There are constants for this */
 
 /*-------------------------------------------------------------------------*/
 
+/* Forward declarations */
+
+static const char * drivertag (void);
+
 /* Forward declarations for the argument parser in the lower half */
 
 static int getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) );
@@ -335,12 +339,14 @@ main (int argc, char **argv)
         lpc_predefs = tmp;
     }
 
-    printf("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
-          , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
+    printf("%s LDMud " DRIVER_VERSION LOCAL_LEVEL
+           " (" PROJ_VERSION ")%s\n"
+          , time_stamp(), drivertag()
           );
-    debug_message("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
-          , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
-          );
+    debug_message("%s LDMud " DRIVER_VERSION LOCAL_LEVEL
+                  " (" PROJ_VERSION ")%s\n"
+                 , time_stamp(), drivertag()
+                 );
       /* This also assures the existance of the fd for the debug log */
 
     printf("%s Random seed: 0x%lx\n"
@@ -1141,6 +1147,20 @@ typedef struct InputSource {
 } InputSource;
 
 /*-------------------------------------------------------------------------*/
+static const char *
+drivertag (void)
+
+/* Return the driver's type tag string.
+ */
+
+{
+    if (strcmp(RELEASE_LONGTYPE, ""))
+        return " (" RELEASE_LONGTYPE ")";
+
+    return "";
+} /* drivertag() */
+
+/*-------------------------------------------------------------------------*/
 static void
 version (void)
 
@@ -1150,13 +1170,15 @@ version (void)
 {
   fputs("LDMud ", stdout);
 
-  if (IS_RELEASE())
-      fputs(GAME_VERSION, stdout);
-  else
-      fputs(LONG_VERSION, stdout);
+  fputs(DRIVER_VERSION, stdout);
 
   fputs(LOCAL_LEVEL " - a LPMud Game Driver.\n"
-        "\nRelease:  " PROJ_VERSION "; " RELEASE_DATE
+        "\nRelease:  " PROJ_VERSION
+       , stdout);
+
+  fputs(drivertag(), stdout);
+
+  fputs("; " RELEASE_DATE
         "\nCompiled: " __DATE__
 #ifdef __TIME__
         " " __TIME__
@@ -1818,11 +1840,11 @@ usage (void)
 "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
 "\n"
 "  --tls-trustfile <pathname>\n"
-"    Use <pathname> as the directory where your trusted certificate PEM resides.\n"
+"    Use <pathname> as the filename holding your trusted PEM certificates.\n"
 "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
 "\n"
 "  --tls-trustdirectory <pathname>\n"
-"    Use <pathname> as the directory where your trusted certificates reside,\n"
+"    Use <pathname> as the directory where your trusted PEM certificates reside,\n"
 "    default is '" TLS_DEFAULT_TRUSTDIRECTORY "'.\n"
 "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
 "\n"

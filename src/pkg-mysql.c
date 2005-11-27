@@ -25,6 +25,7 @@
 
 #include "my-alloca.h"
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <mysql.h>
@@ -167,7 +168,7 @@ Bool check_privilege (const char * efun_name, Bool raise_error, svalue_t * sp)
 
     if (raise_error)
     {
-        error("%s(): Privilege violation.\n", efun_name);
+        errorf("%s(): Privilege violation.\n", efun_name);
         /* NOTREACHED */
     }
 
@@ -191,7 +192,7 @@ allocate_new_dat(void)
         my_dat = pxalloc(sizeof(*my_dat));
        if ( !my_dat )
        {
-           error("Out of memory.\n");
+           errorf("Out of memory.\n");
            /* NOTREACHED */
            return NULL;
        }
@@ -208,7 +209,7 @@ allocate_new_dat(void)
     tmp = my_dat->prev = pxalloc(sizeof(db_dat_t));
     if ( !tmp )
     {
-       error("Out of memory.\n");
+       errorf("Out of memory.\n");
        return NULL;
     }
     tmp->next = my_dat; /* Put the new handle to the beginning */
@@ -348,7 +349,7 @@ raise_db_error (db_dat_t *dat)
 
     if ( !dat )
     {
-        error( "An unknown error occured during the current database-"
+        errorf( "An unknown error occured during the current database-"
                "operation\n");
         /* NOTREACHED */
        abort();
@@ -358,7 +359,7 @@ raise_db_error (db_dat_t *dat)
     strcpy(err_string, tmp);
     strcat(err_string, "\n");
     remove_dat(dat);
-    error(err_string);
+    errorf(err_string);
     /* NOTREACHED */
     abort();
 } /* raise_db_error() */
@@ -385,7 +386,7 @@ f_db_affected_rows (svalue_t *sp)
     check_privilege(instrs[F_DB_AFFECTED_ROWS].name, MY_TRUE, sp);
     handle = (unsigned int)sp->u.number;
     if ( !(dat = find_dat_by_handle(handle)) )
-        error("Illegal handle for database.\n");
+        errorf("Illegal handle for database.\n");
     rows = mysql_affected_rows(dat->mysql_dat);
     free_svalue(sp); /* Well, it's just a number */
     put_number(sp, rows);
@@ -414,7 +415,7 @@ f_db_conv_string (svalue_t *sp)
     buff = alloca(strlen(s)*2 +1);
     if ( !buff )
     {
-        error("Out of memory.\n");
+        errorf("Out of memory.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -449,7 +450,7 @@ f_db_close (svalue_t *sp)
     handle = sp->u.number;
     if ( !(dat = find_dat_by_handle((unsigned int)handle)) )
     {
-        error("Illegal handle for database.\n");
+        errorf("Illegal handle for database.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -507,7 +508,7 @@ f_db_connect (svalue_t *sp, int num_args)
         break;
       default:
         /* Compiler makes sure that we get at least one arg */
-        error("Too many arguments to db_connect()\n");
+        errorf("Too many arguments to db_connect()\n");
         /* NOTREACHED */
         return NULL;
     }
@@ -515,7 +516,7 @@ f_db_connect (svalue_t *sp, int num_args)
     tmp = allocate_new_dat();
     if ( !tmp )
     {
-        error("Out of memory.\n");
+        errorf("Out of memory.\n");
         /* NOTREACHED */
         return NULL;
     }
@@ -524,7 +525,7 @@ f_db_connect (svalue_t *sp, int num_args)
     if ( !tmp->mysql_dat )
     {
         remove_dat(tmp);
-        error("Out of memory.\n");
+        errorf("Out of memory.\n");
         /* NOTREACHED */
         return NULL;
     }
@@ -584,7 +585,7 @@ f_db_error (svalue_t *sp)
 
     if ( !(dat = find_dat_by_handle(handle)) )
     {
-        error("Illegal handle for database.\n");
+        errorf("Illegal handle for database.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -637,7 +638,7 @@ f_db_exec (svalue_t *sp)
 
     if ( !(dat = find_dat_by_handle(handle)) )
     {
-        error("Illegal handle for database.\n");
+        errorf("Illegal handle for database.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -721,7 +722,7 @@ f_db_fetch (svalue_t *sp)
     handle = (unsigned int)sp->u.number;
     if ( !(dat = find_dat_by_handle(handle)) )
     {
-        error("Illegal handle for database.\n");
+        errorf("Illegal handle for database.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -752,7 +753,7 @@ f_db_fetch (svalue_t *sp)
     v = allocate_array(num_cols);
     if (!v)
     {
-        error("Out of memory.\n");
+        errorf("Out of memory.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -799,7 +800,7 @@ f_db_handles (svalue_t *sp)
         v = allocate_array(0);
         if (!v)
         {
-            error("Out of memory.\n");
+            errorf("Out of memory.\n");
             /* NOTREACHED */
             return sp;
         }
@@ -818,7 +819,7 @@ f_db_handles (svalue_t *sp)
     v = allocate_array(elems);
     if (!v)
     {
-        error("Out of memory.\n");
+        errorf("Out of memory.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -858,7 +859,7 @@ f_db_insert_id (svalue_t *sp)
     check_privilege(instrs[F_DB_INSERT_ID].name, MY_TRUE, sp);
     handle = (unsigned int)sp->u.number;
     if ( !(dat = find_dat_by_handle(handle)) )
-        error("Illegal handle for database.\n");
+        errorf("Illegal handle for database.\n");
     insertid = mysql_insert_id(dat->mysql_dat);
     free_svalue(sp); /* Well, it's just a number */
     put_number(sp, insertid);
@@ -890,7 +891,7 @@ f_db_coldefs (svalue_t *sp)
     handle = (unsigned int)sp->u.number;
     if ( !(dat = find_dat_by_handle(handle)) )
     {
-        error("Illegal handle for database.\n");
+        errorf("Illegal handle for database.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -906,7 +907,7 @@ f_db_coldefs (svalue_t *sp)
     v = allocate_array(num_fields);
     if (!v)
     {
-        error("Out of memory for result array (%d elements).\n", num_fields);
+        errorf("Out of memory for result array (%d elements).\n", num_fields);
         /* NOTREACHED */
         return sp;
     }

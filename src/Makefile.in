@@ -89,7 +89,9 @@ OBJ = access_check.o actions.o array.o backend.o call_out.o closure.o comm.o \
       random.o regexp.o rxcache.o sha1.o simulate.o simul_efun.o stdstrings.o \
       stralloc.o strfuns.o sprintf.o swap.o wiz_list.o xalloc.o @ALLOCA@
 
-ldmud@EXEEXT@: $(OBJ) patchlevel.h
+all: make-patchlevel ldmud@EXEEXT@
+
+ldmud@EXEEXT@: $(OBJ)
 	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
 
 docs: ldmud@EXEEXT@
@@ -127,8 +129,8 @@ tags: $(SRC)
 TAGS: $(SRC)
 	etags $(SRC)
 
-patchlevel.h: ../lpmud.prj
-	-(cd ..; prcs rekey lpmud src/patchlevel.h)
+make-patchlevel:
+	./mk-patchlevel.sh
 
 make_func.c: make_func.y
 	$(YACC) make_func.y

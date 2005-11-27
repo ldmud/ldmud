@@ -712,7 +712,7 @@ hs_regcomp (unsigned char *expr, Bool excompat, Bool from_ed)
  * regexp structure with the program.
  *
  * If <from_ed> is true, error messages (also during regexp matching) are
- * sent directly to the interactive user. Otherwise, error()s are thrown.
+ * sent directly to the interactive user. Otherwise, errorf()s are thrown.
  *
  * We can't allocate space until we know how big the compiled form will be,
  * but we can't compile it (and thus know how big it is) until we've got a
@@ -1513,7 +1513,7 @@ hs_regerror (char *s)
     if (reg_from_ed)
         add_message("ed: %s\n", s );
     else
-        error("regexp error: %s\n", s);
+        errorf("regexp error: %s\n", s);
 } /* hs_regerror() */
 
 /*-------------------------------------------------------------------------*/
