@@ -7,6 +7,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
       together. Before, the numbering was individual in each
       space, leading to situations where low-numbered objects in the
       environment were hidden by those in the inventory (Bug #417).
+  - (object.c) Efun function_exists(): The 'FEXISTS_ALL' result also contains
+      information about the function's type, flags, and number of
+      arguments (Bug #410).
 
 26-Nov-2005  (Lars Duening)
   - (efuns.c) Efun sscanf(): Added test whether the constant characters after

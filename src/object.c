@@ -723,6 +723,8 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
 static string_t *
 function_exists (string_t *fun, object_t *ob, Bool show_hidden
                 , string_t ** prog_name, uint32 * prog_line
+                , int * num_arg,  uint32 * fun_flags
+                , vartype_t * fun_type
                 )
 
 /* Search for the function <fun> in the object <ob>. If existing, return
@@ -731,6 +733,9 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
  * If <prog_name> and <prog_line> are both non-NULL, they are set to
  * the name of the program _file_ and the line where the function is found.
  * The program file name will have one reference added.
+ *
+ * *<num_arg>, *<fun_flags>,  *<fun_type> are set to the number of
+ * arguments, the function flags and the function return type respectively.
  *
  * Visibility rules apply: static and protected functions can't be
  * found from the outside unless <show_hidden> is true.
@@ -747,6 +752,10 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
     if (ob->flags & O_DESTRUCTED)
         fatal("function_exists() on destructed object\n");
 #endif
+
+    memset(fun_type, 0, sizeof(*fun_type));
+    *num_arg = 0;
+    *fun_flags = 0;
 
     if (prog_name)
         *prog_name = NULL;
@@ -768,6 +777,7 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
 
     /* Is it visible for the caller? */
     flags = progp->functions[ix];
+    *fun_flags = (flags & ~INHERIT_MASK);
 
     if (!show_hidden
      && (   flags & TYPE_MOD_PRIVATE
@@ -788,9 +798,14 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
 
     funstart = progp->program  + (flags & FUNSTART_MASK);
 
+    /* Set the additional information */
+    *num_arg = FUNCTION_NUM_ARGS(funstart) & 0x7f;
+    memcpy(fun_type, FUNCTION_TYPEP(funstart), sizeof(*fun_type));
+
     /* And after all this, the function may be undefined */
     if (is_undef_function(funstart))
     {
+        *fun_flags |= NAME_UNDEFINED;
         return NULL;
     }
 
@@ -1437,8 +1452,16 @@ v_function_exists (svalue_t *sp, int num_arg)
  *   Return the line number within the source file.
  *
  * <flags> == FEXISTS_ALL (3):
- *   Return an array with all the above information. The above
- *   flag values are the indices into that array.
+ *   Return an array with all the above information, plus information
+ *   about the function type/flags/number of arguments.
+ *
+ *   The returned array contains this information:
+ *     string [FEXISTS_PROGNAME]: the program name
+ *     string [FEXISTS_FILENAME]: the filename
+ *     int    [FEXISTS_LINENO]:   the linenumber
+ *     int    [FEXISTS_NUMARG]:   the number of arguments to the function
+ *     int    [FEXISTS_TYPE]:     the return type of the function
+ *     int    [FEXISTS_FLAGS]:    the function flags
  *
  * The <flags> value can be or-ed to NAME_HIDDEN to return
  * information about static and protected functions in other objects.
@@ -1454,6 +1477,10 @@ v_function_exists (svalue_t *sp, int num_arg)
     uint32 flags;
     svalue_t *argp;
     object_t *ob;
+
+    uint32    fun_flags;
+    int       fun_num_arg;
+    vartype_t fun_type;
 
     /* Evaluate arguments */
     argp = sp - num_arg + 1;
@@ -1528,7 +1555,8 @@ v_function_exists (svalue_t *sp, int num_arg)
     /* Get the information */
     prog_name = NULL;
     str = function_exists(argp->u.str, ob, (flags & NAME_HIDDEN)
-                         , &prog_name, &prog_line);
+                         , &prog_name, &prog_line
+                         , &fun_num_arg, &fun_flags, &fun_type);
     sp = pop_n_elems(num_arg, sp);
 
     if (str)
@@ -1545,7 +1573,7 @@ v_function_exists (svalue_t *sp, int num_arg)
             {
                 errorf("Out of memory\n");
             }
-            vec = allocate_uninit_array(FEXISTS_LINENO+1);
+            vec = allocate_uninit_array(FEXISTS_FLAGS+1);
             put_string(vec->item+FEXISTS_PROGNAME, res);
             if (prog_name)
             {
@@ -1559,6 +1587,10 @@ v_function_exists (svalue_t *sp, int num_arg)
             else
                 put_number(vec->item+FEXISTS_FILENAME, 0);
             put_number(vec->item+FEXISTS_LINENO, prog_line);
+
+            put_number(vec->item+FEXISTS_NUMARG, fun_num_arg);
+            put_number(vec->item+FEXISTS_TYPE, fun_type.type);
+            put_number(vec->item+FEXISTS_FLAGS, (p_int)fun_flags);
 
             push_array(sp, vec);
             break;

@@ -7,6 +7,9 @@ For a detailed list of all changes see the file CHANGELOG.
 27-Nov-2005 (Lars Duening) -- Release 3.3.713
 
     - Changed Efuns:
+       + function_exists(): The 'FEXISTS_ALL' result also contains
+          information about the function's type, flags, and number of
+          arguments.
        + present(): Modified the <n> search behaviour so that the
           numbering is applied over both inventory and environment
           together. Before, the numbering was individual in each
@@ -217,6 +220,9 @@ For a detailed list of all changes see the file CHANGELOG.
     - Changed efuns:
       + md5(): Accept number arrays as arguments as well.
       + md5(): Accept the number of iterations as optional argument.
+      + function_exists(): The 'FEXISTS_ALL' result also contains
+         information about the function's type, flags, and number of
+         arguments.
       + tls_check_certificate(): Return the low-level API results, and throw
           an error if the connection is not secure.
       + sscanf():  Added test whether the constant characters after
