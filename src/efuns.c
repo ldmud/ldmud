@@ -338,14 +338,16 @@ f_make_shared_string (svalue_t *sp)
 
 /*--------------------------------------------------------------------*/
 svalue_t *
-f_md5 (svalue_t *sp)
+v_md5 (svalue_t *sp, int num_arg)
 
 /* EFUN: md5()
  *
- *   string md5(string arg)
- *   string md5(int *  arg)
+ *   string md5(string arg [, int iterations ] )
+ *   string md5(int *  arg [, int iterations ] )
  *
  * Create and return a MD5 message digest from the string/array <arg>.
+ * If iterations is specified to number > 0, the digest is calculated
+ * using the given number of iterations.
  */
 
 {
@@ -353,6 +355,24 @@ f_md5 (svalue_t *sp)
     string_t *s_digest;
     unsigned char *digest, d[17];
     int i;
+    p_int iterations;
+
+    if (num_arg == 2)
+    {
+        iterations = sp->u.number;
+        sp--;
+    }
+    else
+        iterations = 1;
+
+    if (iterations < 1)
+    {
+        errorf("Bad argument 2 to md5(): expected a number > 0, but got %ld\n"
+              , (long) iterations);
+        /* NOTREACHED */
+        return sp;
+    }
+
 
     if (sp->type == T_POINTER)
     {
@@ -370,6 +390,7 @@ f_md5 (svalue_t *sp)
                 free_mstring(arg);
                 errorf("Bad argument 1 to md5(): got mixed*, expected string/int*.\n");
                 /* NOTREACHED */
+                return sp;
             }
             argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
         }
@@ -378,12 +399,19 @@ f_md5 (svalue_t *sp)
         put_string(sp, arg);
     }
 
-    memsafe(s_digest = alloc_mstring(32), 32, "md5 encryption result");
-    digest = (unsigned char *)get_txt(s_digest);
-
     MD5Init(&context);
     MD5Update(&context, (unsigned char *)get_txt(sp->u.str), mstrsize(sp->u.str));
     MD5Final(&context, d);
+
+    while (--iterations > 0)
+    {
+        MD5Init(&context);
+        MD5Update(&context, d, sizeof(d)-1);
+        MD5Final(&context, d);
+    }
+
+    memsafe(s_digest = alloc_mstring(32), 32, "md5 encryption result");
+    digest = (unsigned char *)get_txt(s_digest);
 
     d[16]='\0';
 
@@ -455,14 +483,16 @@ f_md5_crypt(svalue_t *sp)
 
 /*--------------------------------------------------------------------*/
 svalue_t *
-f_sha1 (svalue_t *sp)
+v_sha1 (svalue_t *sp, int num_arg)
 
 /* EFUN: sha1()
  *
- *   string sha1(string arg)
- *   string sha1(int *  arg)
+ *   string sha1(string arg [, int iterations ] )
+ *   string sha1(int *  arg [, int iterations ] )
  *
  * Create and return a SHA1 message digest from the string/array <arg>.
+ * If iterations is specified to number > 0, the digest is calculated
+ * using the given number of iterations.
  */
 
 {
@@ -470,6 +500,25 @@ f_sha1 (svalue_t *sp)
     string_t *s_digest;
     unsigned char *digest, d[SHA1HashSize + 1];
     int i;
+    p_int iterations;
+
+    if (num_arg == 2)
+    {
+        iterations = sp->u.number;
+        sp--;
+    }
+    else
+        iterations = 1;
+
+    if (iterations < 1)
+    {
+        errorf("Bad argument 2 to md5(): expected a number > 0, but got %ld\n"
+              , (long) iterations);
+        /* NOTREACHED */
+        return sp;
+    }
+
+
 
     if (sp->type == T_POINTER)
     {
@@ -495,13 +544,20 @@ f_sha1 (svalue_t *sp)
         put_string(sp, arg);
     }
 
-    memsafe(s_digest = alloc_mstring(2 * SHA1HashSize)
-           , 2 & SHA1HashSize, "sha1 encryption result");
-    digest = (unsigned char *)get_txt(s_digest);
-
     SHA1Reset(&context);
     SHA1Input(&context, (unsigned char *)get_txt(sp->u.str), mstrsize(sp->u.str));
     SHA1Result(&context, d);
+
+    while (--iterations > 0)
+    {
+        SHA1Reset(&context);
+        SHA1Input(&context, d, sizeof(d)-1);
+        SHA1Result(&context, d);
+    }
+
+    memsafe(s_digest = alloc_mstring(2 * SHA1HashSize)
+           , 2 & SHA1HashSize, "sha1 encryption result");
+    digest = (unsigned char *)get_txt(s_digest);
 
     d[SHA1HashSize + 1]='\0';
 
@@ -512,7 +568,7 @@ f_sha1 (svalue_t *sp)
     put_string(sp, s_digest);
 
     return sp;
-} /* f_sha1() */
+} /* v_sha1() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

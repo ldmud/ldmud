@@ -1,11 +1,15 @@
 SYNOPSIS
-        string sha1 (string arg)
-        string sha1 (int  * arg)
+        string sha1 (string arg [ , int iterations ] )
+        string sha1 (int  * arg [ , int iterations ] )
 
 DESCRIPTION
         Create and return a SHA1 message digest from <arg>.
         <arg> may be a string, or an array of numbers (each considered to
         be a character, ignoring all but the lowest byte).
+
+        If <iterations> is given as a number greater than 0, it is
+        the number of iterations used in the digest calculation. If omitted,
+        the driver executes just one iteration.
 
 EXAMPLES
         string s;
@@ -15,7 +19,8 @@ EXAMPLES
 
 HISTORY
         Introduced in LDMud 3.3.523.
-        LDMud 3.3.712 added number arrays as argument.
+        LDMud 3.3.712 added number arrays as argument, and the number
+          of iterations.
 
 SEE ALSO
         crypt(E), md5(E), sha1(E)

@@ -206,6 +206,7 @@ For a detailed list of all changes see the file CHANGELOG.
 
     - Changed efuns:
       + md5(): Accept number arrays as arguments as well.
+      + md5(): Accept the number of iterations as optional argument.
       + tls_check_certificate(): Return the low-level API results, and throw
           an error if the connection is not secure.
       + sscanf():  Added test whether the constant characters after
