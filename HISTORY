@@ -202,12 +202,15 @@ For a detailed list of all changes see the file CHANGELOG.
            the maxinum number of entries in a mapping.
 
 
-24-Nov-2005 (Lars Duening) -- Release 3.2.12
+26-Nov-2005 (Lars Duening) -- Release 3.2.12
 
     - Changed efuns:
       + md5(): Accept number arrays as arguments as well.
       + tls_check_certificate(): Return the low-level API results, and throw
           an error if the connection is not secure.
+      + sscanf():  Added test whether the constant characters after
+          a %-field also match - if not, the %-field is considered unmatched.
+
 
     - Corrected efuns:
       + call_out(), input_to(): Local references are no longer
