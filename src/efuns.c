@@ -2203,6 +2203,9 @@ struct sscanf_info
       /* After the match: the next character in the in-string to match.
        * NULL for 'no match'.
        */
+    Bool           no_match;
+      /* After a match: TRUE if there was a mismatch in the non-% match.
+       */
     mp_uint        field;        /* Numbers: parsed fieldwidth */
     mp_uint        min;          /* Numbers: parsed precision */
     mp_uint        string_max;   /* Strings: parsed fieldwidth */
@@ -2439,6 +2442,8 @@ sscanf_match (char *str, char *fmt, struct sscanf_info *info)
     /* (Re)set the current argument */
     info->arg_current = info->arg_start;
 
+    info->no_match = MY_FALSE;
+
     /* Loop over the format string, matching characters */
     for (;;)
     {
@@ -2477,6 +2482,7 @@ sscanf_match (char *str, char *fmt, struct sscanf_info *info)
         else
         {
             info->match_end = NULL;
+            info->no_match = MY_TRUE;
             return;
         }
     }
@@ -3049,6 +3055,12 @@ match_skipped:
         if (!fmt[0]) /* End of format */
             break;
     }
+
+    /* If the characters after the last % specifiers didn't match
+     * undo the % match.
+     */
+    if (info.no_match && info.number_of_matches > 0)
+        info.number_of_matches--;
 
     return info.number_of_matches;
 }

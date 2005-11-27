@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Nov-2005  (Lars Duening)
+  - (efuns.c) Efun sscanf(): Added test whether the constant characters after
+      a %-field also match - if not, the %-field is considered unmatched
+      (suggested by Largo).
+
 24-Nov-2005  (Gnomi)
   - (lex.c) <code>(: catch(load_object($1);nolog) :)</code> no
        longer produces a syntax error (Bug #403).
