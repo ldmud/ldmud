@@ -1,7 +1,8 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-27-Nov-2005  (Lars Duening)
+27-Nov-2005  (Lars Duening)  (3.2.12)
+  - Created snapshot.
   - (object.c) Efun function_exists(): The 'FEXISTS_ALL' result also contains
       information about the function's type, flags, and number of
       arguments (Bug #410).
