@@ -8332,7 +8332,9 @@ again:
 #endif /* USE_NEW_INLINES */
 
         inhIndex = 0;
+#ifdef USE_NEW_INLINES
         context_size = 0;
+#endif /* USE_NEW_INLINES */
         LOAD_SHORT(tmp_ushort, pc);
 #ifdef USE_NEW_INLINES
         if (instruction == F_CONTEXT_CLOSURE)

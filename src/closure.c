@@ -6136,7 +6136,7 @@ f_symbol_function (svalue_t *sp)
         {
             inter_sp = sp - 1;
 #ifndef USE_NEW_INLINES
-            outofmem(sizeof(*l), "symbol_function");
+            outofmem(sizeof(lambda_t), "symbol_function");
 #else /* USE_NEW_INLINES */
             outofmem(SIZEOF_LAMBDA(0), "symbol_function");
 #endif /* USE_NEW_INLINES */
@@ -6286,7 +6286,7 @@ f_symbol_variable (svalue_t *sp)
     {
         inter_sp = sp - 1;
 #ifndef USE_NEW_INLINES
-        outofmem(sizeof(*l), "variable symbol");
+        outofmem(sizeof(lambda_t), "variable symbol");
 #else /* USE_NEW_INLINES */
         outofmem(SIZEOF_LAMBDA(0), "variable symbol");
 #endif /* USE_NEW_INLINES */
