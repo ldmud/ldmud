@@ -16,6 +16,11 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (simul_efun.c) Only public simul-efuns can be called. This was always
       valid for sefuns outside the 256-range, but now also applies to
       normal sefuns as well (Bug #419)
+  - (simul_efun, prolang.y, closure.c, interpret.c) The number of direct
+      callable simul-efuns is now configurable in the simul_efun.h. I
+      also increased it to 65536 from 256.
+  - (closure.c) Simul-efuns were still called with call_other instead
+      of call_direct.
 
 02-Dec-2005  (Lars Duening)
   - (gcollect.c) Added a log output when all objects are data-cleaned, as

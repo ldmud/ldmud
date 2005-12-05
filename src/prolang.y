@@ -12208,7 +12208,7 @@ function_call:
 
               $<function_call_head>$.simul_efun = real_name->u.global.sim_efun;
 
-              if (real_name->u.global.sim_efun & ~0xff)
+              if (real_name->u.global.sim_efun >= SEFUN_TABLE_SIZE)
               {
                   /* The simul-efun has to be called by name:
                    * prepare the extra args for the call_other
@@ -12267,7 +12267,7 @@ function_call:
               {
                   /* SIMUL EFUN */
 
-                  PREPARE_INSERT(5)
+                  PREPARE_INSERT(6)
 
                   function_t *funp;
 
@@ -12300,7 +12300,7 @@ function_call:
                    || has_ellipsis)
                       ap_needed = MY_TRUE;
 
-                  if (simul_efun & ~0xff)
+                  if (simul_efun >= SEFUN_TABLE_SIZE)
                   {
                       /* call-other: the number of arguments will be
                        * corrected at runtime.
@@ -12319,8 +12319,8 @@ function_call:
                           CURRENT_PROGRAM_SIZE++;
                       }
                       add_f_code(F_SIMUL_EFUN);
-                      add_byte(simul_efun);
-                      CURRENT_PROGRAM_SIZE += 2;
+                      add_short(simul_efun);
+                      CURRENT_PROGRAM_SIZE += 3;
                   }
                   $$.type = funp->type;
                   $$.type.typeflags &= TYPE_MOD_MASK;
@@ -12812,7 +12812,7 @@ function_call:
 
           if (!disable_sefuns
            && call_other_sefun >= 0
-           && call_other_sefun & ~0xff)
+           && call_other_sefun >= SEFUN_TABLE_SIZE)
           {
               /* The simul-efun has to be called by name:
                * insert the extra args for the call_other
@@ -12917,7 +12917,7 @@ function_call:
                   yyerrorf("Too many arguments to simul_efun %s"
                           , get_txt(funp->name));
 
-              if (call_other_sefun & ~0xff)
+              if (call_other_sefun >= SEFUN_TABLE_SIZE)
               {
                   /* call-other: the number of arguments will be
                    * detected and corrected at runtime.
@@ -12968,8 +12968,8 @@ function_call:
                       CURRENT_PROGRAM_SIZE++;
                   }
                   add_f_code(F_SIMUL_EFUN);
-                  add_byte(call_other_sefun);
-                  CURRENT_PROGRAM_SIZE += 2;
+                  add_short(call_other_sefun);
+                  CURRENT_PROGRAM_SIZE += 3;
               }
               $$.type = funp->type;
               $$.type.typeflags &= TYPE_MOD_MASK;

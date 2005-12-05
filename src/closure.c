@@ -4251,7 +4251,7 @@ compile_value (svalue_t *value, int opt_flags)
         default: /* SIMUL_EFUN closure */
           {
             /* This is compiled as:
-             *    sefun <= 0xff             sefun > 0xff
+             *    sefun <= 0xffff           sefun > 0xffff
              *
              *    opt. SAVE_ARG_FRAME       SAVE_ARG_FRAME
              *                              <sefun_object_name>
@@ -4259,7 +4259,7 @@ compile_value (svalue_t *value, int opt_flags)
              *    <arg1>                    <arg1>
              *    ...                       ...
              *    <argN>                    <argN>
-             *    SIMUL_EFUN <sefun>        CALL_OTHER
+             *    SIMUL_EFUN <sefun>        CALL_DIRECT
              *    opt. RESTORE_ARG_FRAME    RESTORE_ARG_FRAME
              */
 
@@ -4267,12 +4267,14 @@ compile_value (svalue_t *value, int opt_flags)
             mp_int num_arg;
             int i;
             Bool needs_ap;
+            Bool needs_call_direct;
 
             simul_efun = type - CLOSURE_SIMUL_EFUN;
 
             needs_ap = MY_FALSE;
+            needs_call_direct = (simul_efun >= SEFUN_TABLE_SIZE);
 
-            if (simul_efun > 0xff)
+            if (needs_call_direct)
             {
             	/* We have to call the sefun by name */
                 static svalue_t string_sv = { T_STRING };
@@ -4304,7 +4306,7 @@ compile_value (svalue_t *value, int opt_flags)
             /* Compile the arguments */
 
             num_arg = (mp_int)VEC_SIZE(block) - 1;
-            if (simul_efun <= 0xff)
+            if (!needs_call_direct)
             {
                 function_t *funp = &simul_efunp[simul_efun];
                 if (num_arg > funp->num_arg
@@ -4329,11 +4331,11 @@ compile_value (svalue_t *value, int opt_flags)
             if (current.code_left < 3)
                 realloc_code();
 
-            if (simul_efun > 0xff)
+            if (needs_call_direct)
             {
             	/* We need the call_other */
                 current.code_left -= 1;
-                STORE_CODE(current.codep, F_CALL_OTHER);
+                STORE_CODE(current.codep, F_CALL_DIRECT);
                 if (num_arg + 1 > 0xff)
                     lambda_error("Argument number overflow\n");
             }
@@ -4360,7 +4362,7 @@ compile_value (svalue_t *value, int opt_flags)
                     }
 
                     i = funp->num_arg - num_arg;
-                    if (i > 1 && current.code_left < i + 3)
+                    if (i > 1 && current.code_left < i + 4)
                         realloc_code();
                     current.code_left -= i;
                     while ( --i >= 0 ) {
@@ -4369,8 +4371,8 @@ compile_value (svalue_t *value, int opt_flags)
                 }
 
                 STORE_CODE(current.codep, F_SIMUL_EFUN);
-                STORE_UINT8(current.codep, (bytecode_t)simul_efun);
-                current.code_left -= 2;
+                STORE_SHORT(current.codep, (short)simul_efun);
+                current.code_left -= 3;
 
                 if (needs_ap)
                 {

@@ -717,7 +717,7 @@ statistic_t stat_eval_duration = { 0 };
 
 enum { APPLY_NOT_FOUND = 0, APPLY_FOUND, APPLY_DEFAULT_FOUND };
 static int int_apply(string_t *, object_t *, int, Bool, Bool);
-static void call_simul_efun(int code, object_t *ob, int num_arg);
+static void call_simul_efun(unsigned int code, object_t *ob, int num_arg);
 #ifdef DEBUG
 static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
 #endif
@@ -13041,6 +13041,7 @@ again:
         if (use_ap)
             fatal("Previous use_arg_frame hasn't been consumed.\n");
 #endif
+printf("DEBUG: F_USE_ARG_FRAME\n");
         use_ap = MY_TRUE;
         break;
       }
@@ -14463,13 +14464,10 @@ again:
          * through the ap pointer; otherwise the code assumes that the
          * compiler left the proper number of arguments on the stack.
          *
-         * <code> is an uint8 and indexes the function list *simul_efunp.
-         * TODO: Add a F_SIMUL_EFUN for codes > 0xff; right now this
-         * TODO:: is compiled as CALL_DIRECT. Affected are prolang.y and
-         * TODO:: simul_efun.c
+         * <code> is an ushort and indexes the function list *simul_efunp.
          */
 
-        int                 code;      /* the function index */
+        unsigned short      code;      /* the function index */
         fun_hdr_p           funstart;  /* the actual function */
         object_t           *ob;        /* the simul_efun object */
         int                 def_narg;  /* expected number of arguments */
@@ -14478,7 +14476,7 @@ again:
         ASSIGN_EVAL_COST  /* we're changing objects */
 
         /* Get the sefun code and the number of arguments on the stack */
-        code = (int)LOAD_UINT8(pc);
+        LOAD_SHORT(code, pc);
         def_narg = simul_efunp[code].num_arg;
 
         if (use_ap
@@ -18059,7 +18057,7 @@ secure_call_lambda (svalue_t *closure, int num_arg, Bool external)
 
 /*-------------------------------------------------------------------------*/
 static void
-call_simul_efun (int code, object_t *ob, int num_arg)
+call_simul_efun (unsigned int code, object_t *ob, int num_arg)
 
 /* Call the simul_efun <code> in the sefun object <ob> with <num_arg>
  * arguments on the stack. If it can't be found in the <ob>ject, the
