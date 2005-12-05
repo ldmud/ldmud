@@ -328,7 +328,7 @@ assert_simul_efun_object (void)
         }
 
         /* If the function is indeed visible, get its information */
-        if ( !(flags & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|NAME_UNDEFINED)) )
+        if ( !(flags & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|TYPE_MOD_PRIVATE|NAME_UNDEFINED)) )
         {
             string_t *function_name;
             ident_t *p;

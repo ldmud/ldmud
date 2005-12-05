@@ -13,6 +13,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
 04-Dec-2005  (Lars Duening)
   - (interpret.c) Calling an unbound lambda cleaned the control stack
       twice, causing errors (Bug #374).
+  - (simul_efun.c) Only public simul-efuns can be called. This was always
+      valid for sefuns outside the 256-range, but now also applies to
+      normal sefuns as well (Bug #419)
 
 02-Dec-2005  (Lars Duening)
   - (gcollect.c) Added a log output when all objects are data-cleaned, as

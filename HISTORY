@@ -19,6 +19,10 @@ For a detailed list of all changes see the file CHANGELOG.
     - Language:
        + Inherited private functions are now more invisible and
           can cleanly be hidden by publich functions.
+       + Simul-efuns can only be called when they are public. This
+          is to enable the construction of simul-efun objects via inheritance:
+          this way they can use protected functions internally without
+          having to make them available to everybody.
 
 
 24-Nov-2005 (Lars Duening) -- Release 3.3.712
