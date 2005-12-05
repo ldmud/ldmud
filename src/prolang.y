@@ -2887,8 +2887,8 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
         funp = FUNCTION(num);
 
-        if ((funp->flags & (NAME_INHERITED|TYPE_MOD_PRIVATE))
-         == (NAME_INHERITED|TYPE_MOD_PRIVATE))
+        if ((funp->flags & (NAME_INHERITED|TYPE_MOD_PRIVATE|NAME_HIDDEN|NAME_UNDEFINED))
+         == (NAME_INHERITED|TYPE_MOD_PRIVATE|NAME_HIDDEN))
         {
             break;
         }
@@ -14875,27 +14875,11 @@ copy_functions (program_t *from, funflag_t type)
          */
         switch (0) {
         default:
-            /* Test if the function is visible at all.
-             * For this test, 'private nomask' degenerates to 'private'
-             * if we didn't do that, the driver would crash on a second
-             * level inherit (possible on a multiple second-level inherit).
-             * TODO: Find out why it crashes.
+            /* Ignore cross defines.
+             * They are the only complete invisible entries.
              */
-            {
-                funflag_t fflags = fun.flags;
-
-                if ((fflags & (TYPE_MOD_PRIVATE|TYPE_MOD_NO_MASK))
-                 == (TYPE_MOD_PRIVATE|TYPE_MOD_NO_MASK)
-                   )
-                    fflags &= ~(TYPE_MOD_NO_MASK);
-
-                if ( (fflags & (NAME_HIDDEN|TYPE_MOD_NO_MASK|NAME_UNDEFINED) ) ==
-
-                     (NAME_HIDDEN|TYPE_MOD_NO_MASK) )
-                {
-                    break;
-                }
-            }
+            if (fun.flags & NAME_CROSS_DEFINED)
+                break;
 
             /* Visible: create a new identifier for it */
             p = make_global_identifier(get_txt(fun.name), I_TYPE_GLOBAL);
@@ -14954,7 +14938,6 @@ copy_functions (program_t *from, funflag_t type)
                         }
                         else if ((fun.flags | type) & TYPE_MOD_VIRTUAL
                               && OldFunction->flags & TYPE_MOD_VIRTUAL
-                          && !((fun.flags | OldFunction->flags) & NAME_HIDDEN)
                           &&    get_function_id(from, i)
   == get_function_id(INHERIT(OldFunction->offset.inherit).prog
                 , n - INHERIT(OldFunction->offset.inherit).function_index_offset
@@ -14967,108 +14950,75 @@ copy_functions (program_t *from, funflag_t type)
                              */
                             OldFunction->flags |= fun.flags &
                                 (TYPE_MOD_PUBLIC|TYPE_MOD_NO_MASK);
-                            OldFunction->flags &= fun.flags | ~TYPE_MOD_STATIC;
+                            OldFunction->flags &= fun.flags |
+				~(TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|NAME_HIDDEN);
                             cross_define( OldFunction, &fun
                                         , n - current_func_index );
                         }
+                        else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN|NAME_UNDEFINED))
+                                    == (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
+                        {
+                            /* There is already one function with this
+                            * name. Ignore the private one, as we
+                            * only need it for useful error messages.
+                            */
+
+                            break;
+                        }
+                        else if ( (OldFunction->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN|NAME_UNDEFINED))
+                                     == (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
+                        {
+                            /* The old one was invisible, ignore it
+                             * and take this one.
+                             */
+
+                            p->u.global.function = current_func_index;
+                        }
                         else if ( (fun.flags & OldFunction->flags & TYPE_MOD_NO_MASK)
-                             &&  !( (fun.flags|OldFunction->flags) & (TYPE_MOD_PRIVATE|NAME_UNDEFINED) ) )
+                             &&  !( (fun.flags|OldFunction->flags) & NAME_UNDEFINED ) )
                         {
                             yyerrorf(
                               "Illegal to inherit 'nomask' function '%s' twice",
                               get_txt(fun.name));
                         }
                         else if ((   fun.flags & TYPE_MOD_NO_MASK
-                                  || OldFunction->flags & (NAME_HIDDEN|NAME_UNDEFINED|TYPE_MOD_PRIVATE))
-                              && !(fun.flags & (NAME_HIDDEN|NAME_UNDEFINED))
+                                  || OldFunction->flags & NAME_UNDEFINED )
+                              && !(fun.flags & NAME_UNDEFINED)
                                 )
                         {
                             /* This function is visible and existing, but the
                              * inherited one is not, or this one is also nomask:
                              * prefer this one one.
                              */
-                            if (OldFunction->flags & TYPE_MOD_PRIVATE)
-                            {
-                                string_t * oldFrom = NULL;
-
-                                if (OldFunction->flags & NAME_INHERITED)
-                                {
-                                    oldFrom = INHERIT(OldFunction->offset.inherit).prog->name;
-                                }
-
-                                warn_function_shadow( from->name, fun.name
-                                                    , oldFrom, OldFunction->name
-                                                    );
-                            }
-
                             cross_define( &fun, OldFunction
                                         , current_func_index - n );
                             p->u.global.function = current_func_index;
                         }
-                        else if ( (fun.flags & TYPE_MOD_PRIVATE) == 0
-                              ||  (OldFunction->flags & TYPE_MOD_PRIVATE) == 0
-                              ||  ((OldFunction->flags|fun.flags)
-                                   & TYPE_MOD_VIRTUAL) != 0
-                                )
+                        else
                         {
                             /* At least one of the functions is visible
                              * or redefinable: prefer the first one.
-                             * TODO: The whole if-condition is more a kludge,
-                             * TODO:: developed iteratively from .367
-                             * TODO:: through .370. It should be reconsidered,
-                             * TODO:: which of course implies a deeper
-                             * TODO:: analysis of the going-ons here.
                              */
-
-                            /* Warn about private <-> public collisions;
-                             * however public <-> public and private <->
-                             * private are to be expected.
-                             */
-                            string_t * oldFrom = NULL;
-
-                            if (OldFunction->flags & NAME_INHERITED)
-                            {
-                                oldFrom = INHERIT(OldFunction->offset.inherit).prog->name;
-                            }
-
-                            if ((fun.flags & TYPE_MOD_PRIVATE)
-                             && !(OldFunction->flags & TYPE_MOD_PRIVATE))
-                            {
-                                warn_function_shadow( oldFrom, OldFunction->name
-                                                    , from->name, fun.name
-                                                    );
-                            }
-                            else if (!(fun.flags & TYPE_MOD_PRIVATE)
-                                  && (OldFunction->flags & TYPE_MOD_PRIVATE)
-                                )
-                            {
-                                warn_function_shadow( from->name, fun.name
-                                                    , oldFrom, OldFunction->name
-                                                    );
-                            }
 
                             cross_define( OldFunction, &fun
                                         , n - current_func_index );
                         }
                     } /* if (n < first_func_index) */
-                    else if ( !(fun.flags & NAME_CROSS_DEFINED) )
+                    else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN|NAME_UNDEFINED)) 
+                                != (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
                     {
                         /* This is the dominant definition in the superclass,
                          * inherit this one.
                          */
 #ifdef DEBUG
-                        /* The definition we picked before should be
-                         * cross-defined to the definition we have now; or
-                         * it should be nominally invisible so we can redefine
-                         * it.
+                        /* The definition we picked before can't be
+                         * cross-defined, because cross-defines won't
+                         * be registered as global identifiers.
+                         * So the previous definition should be
+                         * nominally invisible so we can redefine it.
                          */
-                        if ((   !(FUNCTION(n)->flags & NAME_CROSS_DEFINED)
-                             ||   FUNCTION(n)->offset.func
-                                != MAKE_CROSSDEF_OFFSET(((int32)current_func_index) - n)
-                            )
-                         && ((FUNCTION(n)->flags & TYPE_MOD_PRIVATE) == 0
-                            )
-                           )
+                        if ( (FUNCTION(n)->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN|NAME_UNDEFINED))
+                                != (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
                         {
                             fatal(
                               "Inconsistent definition of %s() within "
@@ -15083,7 +15033,8 @@ copy_functions (program_t *from, funflag_t type)
 
                 /* Handle the non-lfun aspects of the identifier */
                 {
-                    if ((n != I_GLOBAL_FUNCTION_OTHER || p->u.global.efun < 0)
+                    if (n != I_GLOBAL_FUNCTION_OTHER
+                     || (p->u.global.efun < 0 && p->u.global.sim_efun < 0)
                      || (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
                      || (fun.flags & (NAME_UNDEFINED)) != 0
                        )
@@ -15362,6 +15313,16 @@ copy_variables (program_t *from, funflag_t type)
                      && (*flagp & INHERIT_MASK) == inheritc )
                     {
                         funp->offset.inherit = inherit_index;
+
+                        if(funp != funp2)
+                        {
+                            /* I don't think, that this is a wise idea.
+                               Because the function index offset of this
+                               inherit is not correct for this function.
+                            */
+                            yywarnf("Adjusting inherit index because of virtual inherit %.*s!\n",
+                                    (int) from->name->size, from->name->txt);
+                        }
                     }
                     flagp++;
                 }

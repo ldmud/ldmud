@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-27-Nov-2005 (Lars Duening) -- Release 3.3.713
+04-Dec-2005 (Lars Duening) -- Release 3.3.713
 
     - Changed Efuns:
        + function_exists(): The 'FEXISTS_ALL' result also contains
@@ -15,6 +15,10 @@ For a detailed list of all changes see the file CHANGELOG.
           together. Before, the numbering was individual in each
           space, leading to situations where low-numbered objects in the
           environment were hidden by those in the inventory.
+
+    - Language:
+       + Inherited private functions are now more invisible and
+          can cleanly be hidden by publich functions.
 
 
 24-Nov-2005 (Lars Duening) -- Release 3.3.712

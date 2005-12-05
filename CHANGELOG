@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Dec-2005  (Gnomi)
+  - (prolang.y) Private lfuns no longer hide simul-efuns.
+  - (prolang.y) Private lfuns can be hidden by public functions without
+      warning, ie. the former are now really invisible to inheritors. This
+      also corrects a crasher with multi-level virtual inherits.
+  - (prolang.y) Multiple virtual inheritance of the same program with
+      changing visibility is now handled with a better calculation of
+      the final visibilities. (Bug #362)
+
 04-Dec-2005  (Lars Duening)
   - (interpret.c) Calling an unbound lambda cleaned the control stack
       twice, causing errors (Bug #374).
