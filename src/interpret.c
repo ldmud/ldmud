@@ -17821,9 +17821,10 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 
     case CLOSURE_UNBOUND_LAMBDA:
     case CLOSURE_PRELIMINARY:
-        /* no valid current_object ==> pop the control stack */
-        /* inter_sp == sp */
-        CLEAN_CSP
+        /* no valid current_object: fall out of the switch
+         * and let the error handling clean up the control
+         * stack.
+         */
         break;
 
     default: /* --- efun-, simul efun-, operator closure */

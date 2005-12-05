@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Dec-2005  (Lars Duening)
+  - (interpret.c) Calling an unbound lambda cleaned the control stack
+      twice, causing errors (Bug #374).
+
 02-Dec-2005  (Lars Duening)
   - (gcollect.c) Added a log output when all objects are data-cleaned, as
       it might be the cause for some observed slowdowns.
