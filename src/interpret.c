@@ -13041,7 +13041,6 @@ again:
         if (use_ap)
             fatal("Previous use_arg_frame hasn't been consumed.\n");
 #endif
-printf("DEBUG: F_USE_ARG_FRAME\n");
         use_ap = MY_TRUE;
         break;
       }
