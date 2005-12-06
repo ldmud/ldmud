@@ -1782,6 +1782,9 @@ options (void)
 #ifdef USE_PGSQL
                               , "PostgreSQL supported\n"
 #endif
+#ifdef USE_SQLITE
+                              , "SQLite3 supported\n"
+#endif
 #ifdef USE_PTHREADS
                               , "PThreads supported\n"
 #endif

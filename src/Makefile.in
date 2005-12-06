@@ -90,7 +90,7 @@ SRC = access_check.c actions.c array.c backend.c bitstrings.c call_out.c \
       lex.c main.c mapping.c md5.c mempools.c mregex.c mstrings.c object.c \
       otable.c\
       parser.c parse.c pkg-alists.c pkg-mccp.c pkg-mysql.c pkg-pcre.c \
-      pkg-pgsql.c pkg-tls.c \
+      pkg-pgsql.c pkg-sqlite.c pkg-tls.c \
       ptmalloc.c port.c ptrtable.c \
       random.c regexp.c sha1.c simulate.c simul_efun.c stdstrings.c \
       strfuns.c structs.c sprintf.c swap.c wiz_list.c xalloc.c 
@@ -101,7 +101,7 @@ OBJ = access_check.o actions.o array.o backend.o bitstrings.o call_out.o \
       lex.o main.o mapping.o md5.o mempools.o mregex.o mstrings.o object.o \
       otable.o \
       parser.o parse.o pkg-alists.o pkg-mccp.o pkg-mysql.o pkg-pcre.o \
-      pkg-pgsql.o pkg-tls.o \
+      pkg-pgsql.o pkg-sqlite.o pkg-tls.o \
       ptmalloc.o port.o ptrtable.o \
       random.o regexp.o sha1.o simulate.o simul_efun.o stdstrings.o \
       strfuns.o structs.o sprintf.o swap.o wiz_list.o xalloc.o @ALLOCA@ 
@@ -433,6 +433,11 @@ pkg-pgsql.o : ../mudlib/sys/pgsql.h xalloc.h stdstrings.h simulate.h \
     strfuns.h sent.h bytecode.h hash.h backend.h exec.h port.h config.h \
     hosts/unix.h hosts/be/be.h machine.h
 
+pkg-sqlite.o : xalloc.h stdstrings.h object.h svalue.h simulate.h \
+    mstrings.h interpret.h array.h my-alloca.h typedefs.h driver.h \
+    strfuns.h sent.h bytecode.h hash.h backend.h port.h config.h main.h \
+    hosts/unix.h hosts/be/be.h machine.h
+
 pkg-tls.o : ../mudlib/sys/tls.h xalloc.h svalue.h sha1.h object.h \
     mstrings.h main.h interpret.h comm.h array.h actions.h pkg-tls.h \
     machine.h driver.h strfuns.h typedefs.h my-stdint.h sent.h hash.h \
@@ -470,11 +475,11 @@ simulate.o : ../mudlib/sys/rtlimits.h ../mudlib/sys/regexp.h \
     ../mudlib/sys/files.h ../mudlib/sys/driver_hook.h \
     ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h swap.h \
     structs.h strfuns.h stdstrings.h simul_efun.h sent.h prolang.h \
-    pkg-tls.h otable.h object.h mstrings.h mregex.h mempools.h mapping.h \
-    main.h lex.h interpret.h heartbeat.h gcollect.h filestat.h ed.h comm.h \
-    closure.h call_out.h backend.h array.h actions.h simulate.h my-alloca.h \
-    typedefs.h driver.h hash.h exec.h ptrtable.h bytecode.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+    pkg-sqlite.h pkg-tls.h otable.h object.h mstrings.h mregex.h mempools.h \
+    mapping.h main.h lex.h interpret.h heartbeat.h gcollect.h filestat.h \
+    ed.h comm.h closure.h call_out.h backend.h array.h actions.h simulate.h \
+    my-alloca.h typedefs.h driver.h hash.h exec.h ptrtable.h bytecode.h \
+    port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 sprintf.o : xalloc.h swap.h svalue.h structs.h stdstrings.h simul_efun.h \
     simulate.h sent.h random.h ptrtable.h object.h mstrings.h mapping.h \
@@ -561,6 +566,8 @@ parser.o : lang.c stdstrings.h instrs.h
 pkg-mysql.o : stdstrings.h instrs.h
 
 pkg-pgsql.o : stdstrings.h instrs.h
+
+pkg-sqlite.o : stdstrings.h
 
 simul_efun.o : stdstrings.h
 

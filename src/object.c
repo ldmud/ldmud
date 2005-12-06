@@ -42,6 +42,7 @@
  *       sentence_t    * sent;
  *       wiz_list_t    * user;
  *       wiz_list_t    * eff_user;
+ *       Bool            open_sqlite_db (ifdef USE_SQLITE)
  *       int             extra_num_variables;  (ifdef DEBUG)
  *       svalue_t      * variables;
  *       unsigned long   ticks, gigaticks;
@@ -425,6 +426,9 @@ static mp_int last_id = 0;
     }
 #ifdef DEBUG
     ob->extra_num_variables = num_var;
+#endif
+#ifdef USE_SQLITE
+    ob->open_sqlite_db = MY_FALSE;
 #endif
     ob->variables = ob_vars;
 

@@ -1,0 +1,20 @@
+OPTIONAL
+SYNOPSIS
+        int sl_open(string filename)
+
+BESCHREIBUNG
+        Oeffnet die Datei <filename> als SQLite-Datenbank. Falls
+        sie noch nicht existiert, wird sie erstellt. Es ist nur
+        eine geoeffnete Datenbank pro Objekt erlaubt. Im Erfolgsfalle
+        liefert diese Funktion 1 zurueck, anderenfalls wird
+        normalerweise ein Fehler ausgeloest.
+
+        Diese Funktion ist nur verfuegbar, wenn der Driver mit SQLite-
+        Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __SQLITE__ definiert.
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.3.713.
+
+SIEHE AUCH
+        sl_exec(E), sl_insert_id(E), sl_close(E)

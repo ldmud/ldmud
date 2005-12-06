@@ -6,6 +6,10 @@ For a detailed list of all changes see the file CHANGELOG.
 
 04-Dec-2005 (Lars Duening) -- Release 3.3.713
 
+    - New Efuns:
+       + sl_close(), sl_open(), sl_exec(), sl_insert_id(): Optional SQLite
+          support.
+
     - Changed Efuns:
        + function_exists(): The 'FEXISTS_ALL' result also contains
           information about the function's type, flags, and number of
@@ -23,6 +27,8 @@ For a detailed list of all changes see the file CHANGELOG.
           is to enable the construction of simul-efun objects via inheritance:
           this way they can use protected functions internally without
           having to make them available to everybody.
+       + Preprocessor macro __SQLITE__ is defined if SQLite support is
+          available.
 
 
 24-Nov-2005 (Lars Duening) -- Release 3.3.712

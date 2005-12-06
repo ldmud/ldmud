@@ -4,6 +4,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 05-Dec-2005  (Lars Duening)
   - (configure, machine.h.in, config.h.in) Added a configuration check
       for SQLite3.
+  - (pkg-sqlite, many files) Added SQLite support (Bug #11).
 
 04-Dec-2005  (Gnomi)
   - (prolang.y) Private lfuns no longer hide simul-efuns.

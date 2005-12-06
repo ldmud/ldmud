@@ -50,6 +50,9 @@ struct object_s
     int extra_num_variables;
     /* amylaar : used to determine where to check ref counts at all... */
 #endif
+#ifdef USE_SQLITE
+    Bool open_sqlite_db;   /* does this object have an open sqlite db? */
+#endif 
     svalue_t *variables;
       /* All variables to this object: an array of svalues, allocated
        * in a separate block.

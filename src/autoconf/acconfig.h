@@ -99,6 +99,12 @@
 /* Does the machine offer PostgreSQL? */
 #undef HAS_PGSQL
 
+/* Does the machine offer SQLite3? */
+#undef HAS_SQLITE3
+
+/* Does SQLite3 use pthreads? */
+#undef SQLITE3_USES_PTHREADS
+
 /* Does the machine offer GnuTLS? */
 #undef HAS_GNUTLS
 #undef HAS_GNUTLS_VERSION

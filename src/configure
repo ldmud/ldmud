@@ -310,7 +310,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA YACC CPP EGREP ALLOCA val_optimize WCFLAGS OCFLAGS LCFLAGS MCFLAGS DCFLAGS EXTRA_CFLAGS OPTIMIZE_LINKING MOVE_YACC_TAB CLEAN_YACC_TAB YACCTAB CONFIG_SHELL cdef_erq_demon cdef_access_control cdef_access_log cdef_compat_mode cdef_strict_euids cdef_filename_spaces cdef_share_variables cdef_use_system_crypt cdef_use_ipv6 cdef_use_mysql cdef_use_pgsql cdef_use_pthreads cdef_use_alists cdef_use_mccp cdef_use_pcre cdef_use_builtin_pcre cdef_use_deprecated cdef_use_structs cdef_use_tls cdef_use_new_inlines cdef_use_set_light cdef_use_set_is_wizard cdef_use_parse_command cdef_use_process_string cdef_lpc_array_calls cdef_comm_stat cdef_trace_code cdef_apply_cache_stat cdef_malloc_sbrk cdef_malloc_check cdef_malloc_trace cdef_malloc_lpc_trace cdef_malloc_sbrk_trace cdef_dynamic_costs cdef_rxcache_table cdef_wizlist_file cdef_synchronous_heart_beat cdef_opcprof cdef_verbose_opcprof cdef_debug cdef_yydebug cdef_no_inlines cdef_debug_telnet cdef_debug_malloc_allocs cdef_check_object_stat cdef_check_mapping_total cdef_check_object_ref cdef_check_object_gc_ref cdef_dump_gc_refs val_access_file val_access_log val_erq_max_reply val_erq_max_send val_erq_debug val_pthreads_write_max_size val_read_file_max_size val_time_to_clean_up val_time_to_swap val_time_to_swap_variables val_time_to_reset val_alarm_time val_heart_beat_interval val_evaluator_stack_size val_max_user_trace val_max_trace val_compiler_stack_size val_max_bits val_portno val_maxnumports val_max_cost val_max_local val_catch_reserved_cost val_master_reserved_cost val_swap_file val_max_array_size val_max_mapping_keys val_max_mapping_size val_max_callouts val_max_players val_allowed_ed_cmds val_reserved_user_size val_reserved_master_size val_reserved_system_size val_htable_size val_itable_size val_otable_size val_defmax val_apply_cache_bits val_rxcache_table val_master_name val_input_escape val_max_byte_transfer val_udp_port val_set_buffer_size_max val_malloc val_min_malloced val_min_small_malloced val_max_malloced val_total_trace_length val_wizlist_file erq_sub PKGLIBS ERQ_LIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA YACC CPP EGREP ALLOCA val_optimize WCFLAGS OCFLAGS LCFLAGS MCFLAGS DCFLAGS EXTRA_CFLAGS OPTIMIZE_LINKING MOVE_YACC_TAB CLEAN_YACC_TAB YACCTAB CONFIG_SHELL cdef_erq_demon cdef_access_control cdef_access_log cdef_compat_mode cdef_strict_euids cdef_filename_spaces cdef_share_variables cdef_use_system_crypt cdef_use_ipv6 cdef_use_mysql cdef_use_pgsql cdef_use_sqlite cdef_use_pthreads cdef_use_alists cdef_use_mccp cdef_use_pcre cdef_use_builtin_pcre cdef_use_deprecated cdef_use_structs cdef_use_tls cdef_use_new_inlines cdef_use_set_light cdef_use_set_is_wizard cdef_use_parse_command cdef_use_process_string cdef_lpc_array_calls cdef_comm_stat cdef_trace_code cdef_apply_cache_stat cdef_malloc_sbrk cdef_malloc_check cdef_malloc_trace cdef_malloc_lpc_trace cdef_malloc_sbrk_trace cdef_dynamic_costs cdef_rxcache_table cdef_wizlist_file cdef_synchronous_heart_beat cdef_opcprof cdef_verbose_opcprof cdef_debug cdef_yydebug cdef_no_inlines cdef_debug_telnet cdef_debug_malloc_allocs cdef_check_object_stat cdef_check_mapping_total cdef_check_object_ref cdef_check_object_gc_ref cdef_dump_gc_refs val_access_file val_access_log val_erq_max_reply val_erq_max_send val_erq_debug val_pthreads_write_max_size val_read_file_max_size val_time_to_clean_up val_time_to_swap val_time_to_swap_variables val_time_to_reset val_alarm_time val_heart_beat_interval val_evaluator_stack_size val_max_user_trace val_max_trace val_compiler_stack_size val_max_bits val_portno val_maxnumports val_max_cost val_max_local val_catch_reserved_cost val_master_reserved_cost val_swap_file val_max_array_size val_max_mapping_keys val_max_mapping_size val_max_callouts val_max_players val_allowed_ed_cmds val_reserved_user_size val_reserved_master_size val_reserved_system_size val_htable_size val_itable_size val_otable_size val_defmax val_apply_cache_bits val_rxcache_table val_master_name val_input_escape val_max_byte_transfer val_udp_port val_set_buffer_size_max val_malloc val_min_malloced val_min_small_malloced val_max_malloced val_total_trace_length val_wizlist_file erq_sub PKGLIBS ERQ_LIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -13865,6 +13865,94 @@ fi
     fi
   fi
 
+  if test $enable_use_sqlite3 = yes; then
+      savelibs="$LIBS"
+      LIBS="$LIBS $PKGLIBS"
+
+      # Check if it uses pthreads
+
+      echo "$as_me:$LINENO: checking for pthread_create in -lsqlite3" >&5
+echo $ECHO_N "checking for pthread_create in -lsqlite3... $ECHO_C" >&6
+if test "${ac_cv_lib_sqlite3_pthread_create+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsqlite3  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+/* Override any gcc2 internal prototype to avoid an error.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+/* We use char because int might match the return type of a gcc2
+   builtin and then its argument prototype would still apply.  */
+char pthread_create ();
+int
+main ()
+{
+pthread_create ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_sqlite3_pthread_create=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_sqlite3_pthread_create=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_sqlite3_pthread_create" >&5
+echo "${ECHO_T}$ac_cv_lib_sqlite3_pthread_create" >&6
+if test $ac_cv_lib_sqlite3_pthread_create = yes; then
+  lp_cv_sqlite3_uses_pthreads=yes
+else
+  lp_cv_sqlite3_uses_pthreads=no
+
+fi
+
+
+      if test $lp_cv_sqlite3_uses_pthreads = yes ; then
+           cat >>confdefs.h <<\_ACEOF
+#define SQLITE3_USES_PTHREADS 1
+_ACEOF
+
+      fi
+
+      LIBS="$savelibs"
+  fi
+
   CFLAGS="$saveflags"
 else
   if test $enable_use_sqlite = yes; then
@@ -15808,6 +15896,7 @@ fi
 
 
 
+
                                                             ac_config_files="$ac_config_files Makefile config.h util/Makefile util/indent/Makefile util/xerq/Makefile util/erq/Makefile"
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -16462,6 +16551,7 @@ s,@cdef_use_system_crypt@,$cdef_use_system_crypt,;t t
 s,@cdef_use_ipv6@,$cdef_use_ipv6,;t t
 s,@cdef_use_mysql@,$cdef_use_mysql,;t t
 s,@cdef_use_pgsql@,$cdef_use_pgsql,;t t
+s,@cdef_use_sqlite@,$cdef_use_sqlite,;t t
 s,@cdef_use_pthreads@,$cdef_use_pthreads,;t t
 s,@cdef_use_alists@,$cdef_use_alists,;t t
 s,@cdef_use_mccp@,$cdef_use_mccp,;t t

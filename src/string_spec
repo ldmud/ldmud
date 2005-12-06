@@ -230,4 +230,8 @@ SUCCESS         "success"
 
 #endif
 
+#ifdef USE_SQLITE
+SQLITE_OPEN     "sl_open"
+#endif
+
 /***************************************************************************/

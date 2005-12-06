@@ -722,6 +722,15 @@ void     pg_close();
 
 #endif /* USE_PGSQL */
 
+#ifdef USE_SQLITE
+
+int      sl_open(string);
+mixed    sl_exec(string, ...);
+int      sl_insert_id();
+void     sl_close();
+
+#endif /* USE_SQLITE */
+
 #ifdef USE_TLS
 
 int     tls_query_connection_state(object default: F_THIS_OBJECT);

@@ -56,6 +56,9 @@
 #ifdef USE_TLS
 #include "pkg-tls.h"
 #endif
+#ifdef USE_SQLITE
+#include "pkg-sqlite.h"
+#endif
 #include "prolang.h"
 #include "sent.h"
 #include "simul_efun.h"
@@ -2544,6 +2547,10 @@ destruct (object_t *ob)
 #ifdef CHECK_OBJECT_REF
     xallocate(shadow, sizeof(*shadow), "destructed object shadow");
 #endif /* CHECK_OBJECT_REF */
+#ifdef USE_SQLITE
+    if (ob->open_sqlite_db)
+        sl_close(ob);
+#endif
     ob->time_reset = 0;
 
     /* We need the object in memory */

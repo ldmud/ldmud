@@ -1596,6 +1596,24 @@ if test $lp_cv_has_sqlite3 = yes; then
     fi
   fi
 
+  if test $enable_use_sqlite3 = yes; then
+      savelibs="$LIBS"
+      LIBS="$LIBS $PKGLIBS"
+      
+      # Check if it uses pthreads
+
+      AC_CHECK_LIB(sqlite3, pthread_create,
+      	   lp_cv_sqlite3_uses_pthreads=yes,
+      	   lp_cv_sqlite3_uses_pthreads=no
+      )
+
+      if test $lp_cv_sqlite3_uses_pthreads = yes ; then
+           AC_DEFINE(SQLITE3_USES_PTHREADS)
+      fi
+
+      LIBS="$savelibs"
+  fi
+
   CFLAGS="$saveflags"
 else
   if test $enable_use_sqlite = yes; then
@@ -2606,6 +2624,7 @@ AC_SUBST(cdef_use_system_crypt)
 AC_SUBST(cdef_use_ipv6)
 AC_SUBST(cdef_use_mysql)
 AC_SUBST(cdef_use_pgsql)
+AC_SUBST(cdef_use_sqlite)
 AC_SUBST(cdef_use_pthreads)
 AC_SUBST(cdef_use_alists)
 AC_SUBST(cdef_use_mccp)

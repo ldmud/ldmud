@@ -104,7 +104,7 @@ endif
            mstrings.c \
            object.c otable.c parser.c parse.c \
            pkg-alists.c pkg-mccp.c pkg-mysql.c pkg-pcre.c pkg-pgsql.c \
-           pkg-tls.c ptmalloc.c port.c ptrtable.c random.c \
+           pkg-sqlite.c pkg-tls.c ptmalloc.c port.c ptrtable.c random.c \
            regexp.c sha1.c simulate.c simul_efun.c stdstrings.c \
            strfuns.c structs.c sprintf.c swap.c wiz_list.c xalloc.c
 
@@ -609,6 +609,11 @@ $(OBJ)/pkg-pgsql.o : ../mudlib/sys/pgsql.h xalloc.h stdstrings.h simulate.h \
     strfuns.h sent.h bytecode.h hash.h backend.h exec.h port.h config.h \
     hosts/unix.h hosts/be/be.h machine.h
 
+$(OBJ)/pkg-sqlite.o : xalloc.h stdstrings.h object.h svalue.h simulate.h \
+    mstrings.h interpret.h array.h my-alloca.h typedefs.h driver.h \
+    strfuns.h sent.h bytecode.h hash.h backend.h port.h config.h main.h \
+    hosts/unix.h hosts/be/be.h machine.h
+
 $(OBJ)/pkg-tls.o : ../mudlib/sys/tls.h xalloc.h svalue.h sha1.h object.h \
     mstrings.h main.h interpret.h comm.h array.h actions.h pkg-tls.h \
     machine.h driver.h strfuns.h typedefs.h my-stdint.h sent.h hash.h \
@@ -646,11 +651,11 @@ $(OBJ)/simulate.o : ../mudlib/sys/rtlimits.h ../mudlib/sys/regexp.h \
     ../mudlib/sys/files.h ../mudlib/sys/driver_hook.h \
     ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h swap.h \
     structs.h strfuns.h stdstrings.h simul_efun.h sent.h prolang.h \
-    pkg-tls.h otable.h object.h mstrings.h mregex.h mempools.h mapping.h \
-    main.h lex.h interpret.h heartbeat.h gcollect.h filestat.h ed.h comm.h \
-    closure.h call_out.h backend.h array.h actions.h simulate.h my-alloca.h \
-    typedefs.h driver.h hash.h exec.h ptrtable.h bytecode.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+    pkg-sqlite.h pkg-tls.h otable.h object.h mstrings.h mregex.h mempools.h \
+    mapping.h main.h lex.h interpret.h heartbeat.h gcollect.h filestat.h \
+    ed.h comm.h closure.h call_out.h backend.h array.h actions.h simulate.h \
+    my-alloca.h typedefs.h driver.h hash.h exec.h ptrtable.h bytecode.h \
+    port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/sprintf.o : xalloc.h swap.h svalue.h structs.h stdstrings.h \
     simul_efun.h simulate.h sent.h random.h ptrtable.h object.h mstrings.h \
@@ -737,6 +742,8 @@ $(OBJ)/parser.o : lang.c stdstrings.h instrs.h
 $(OBJ)/pkg-mysql.o : stdstrings.h instrs.h
 
 $(OBJ)/pkg-pgsql.o : stdstrings.h instrs.h
+
+$(OBJ)/pkg-sqlite.o : stdstrings.h
 
 $(OBJ)/simul_efun.o : stdstrings.h
 
