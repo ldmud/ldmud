@@ -46,6 +46,14 @@
 #  define GC_SUPPORT 1
 #endif
 
+/* Do some of the selected packages require special treatment? */
+
+/* SQLite in the threadsafe mode needs a normal malloc() */
+#if defined(SBRK_OK) && defined(USE_SQLITE)
+#  undef SBRK_OK
+#endif
+
+
 /* When we have allocation tracing, the allocator annotates every
  * allocation with the source filename and line where the allocation
  * occured. To allow the annotation of the allocations of higher structures

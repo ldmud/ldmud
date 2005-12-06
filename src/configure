@@ -864,6 +864,8 @@ Optional Features:
         Enables mySQL support
   --enable-use-pgsql                  default=disabled
         Enables PostgreSQL support
+  --enable-use-sqlite                 default=disabled
+        Enables SQLite support
   --enable-use-pthreads               default=disabled
         enable using of threads for socket writes
   --enable-use-pcre                   default=enabled
@@ -1560,6 +1562,13 @@ DEFAULTenable_use_pgsql=no
 # Check whether --enable-use-pgsql or --disable-use-pgsql was given.
 if test "${enable_use_pgsql+set}" = set; then
   enableval="$enable_use_pgsql"
+
+fi;
+
+DEFAULTenable_use_sqlite=no
+# Check whether --enable-use-sqlite or --disable-use-sqlite was given.
+if test "${enable_use_sqlite+set}" = set; then
+  enableval="$enable_use_sqlite"
 
 fi;
 
@@ -2348,6 +2357,23 @@ else
   cdef_use_pgsql="#define"
   pgsql_path="$enable_use_pgsql"
   enable_use_pgsql="yes"
+fi
+
+if test "x$enable_use_sqlite" = "x" && test "x$DEFAULTenable_use_sqlite" != "x"; then
+  enable_use_sqlite=$DEFAULTenable_use_sqlite
+fi
+
+if test "x$enable_use_sqlite" = "x" || test "x$enable_use_sqlite" = "xyes"; then
+  cdef_use_sqlite="#define"
+  sqlite_path=
+  enable_use_sqlite="yes"
+elif test "x$enable_use_sqlite" = "xno"; then
+  cdef_use_sqlite="#undef"
+  sqlite_path=
+else
+  cdef_use_sqlite="#define"
+  sqlite_path="$enable_use_sqlite"
+  enable_use_sqlite="yes"
 fi
 
 if test "x$enable_use_tls" = "x" && test "x$DEFAULTenable_use_tls" != "x"; then
@@ -13399,6 +13425,456 @@ else
 fi
       cdef_use_pgsql="#undef"
       enable_use_pgsql=no
+  fi
+fi
+
+# --- SQLite3 ---
+
+# Note: Some compilers don't have /usr/local/include in their standard
+# searchpath.
+
+echo "$as_me:$LINENO: checking for SQLite3" >&5
+echo $ECHO_N "checking for SQLite3... $ECHO_C" >&6
+if test "${lp_cv_has_sqlite3+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  for TESTPATH in "" "$sqlite_path" "$sqlite_path/include" "/usr/local/include" ; do
+    saveflags="$CFLAGS"
+    if test "x$TESTPATH" != "x"; then
+        CFLAGS="$saveflags -I$TESTPATH"
+    fi
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+#include <sqlite3.h>
+
+sqlite3 * foo(void)
+{
+
+    return (sqlite3*)0;
+}
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_has_sqlite3=yes
+if test "x$TESTPATH" != "x"; then
+    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+fi
+break;
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+lp_cv_has_sqlite3=no
+CFLAGS="$saveflags"
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+done
+
+fi
+echo "$as_me:$LINENO: result: $lp_cv_has_sqlite3" >&5
+echo "${ECHO_T}$lp_cv_has_sqlite3" >&6
+
+# The system has the include files - now search for the libraries.
+if test $lp_cv_has_sqlite3 = yes; then
+  saveflags="$CFLAGS"
+  cat >>confdefs.h <<\_ACEOF
+#define HAS_SQLITE3 1
+_ACEOF
+
+
+  if test $enable_use_sqlite = yes; then
+    tmp=""
+
+    echo "$as_me:$LINENO: checking for main in -lsqlite3" >&5
+echo $ECHO_N "checking for main in -lsqlite3... $ECHO_C" >&6
+if test "${ac_cv_lib_sqlite3_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsqlite3  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_sqlite3_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_sqlite3_main=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_sqlite3_main" >&5
+echo "${ECHO_T}$ac_cv_lib_sqlite3_main" >&6
+if test $ac_cv_lib_sqlite3_main = yes; then
+  tmp="$PKGLIBS -lsqlite3"
+fi
+
+
+    if test "x$sqlite_path" == "x"; then
+        unset ac_cv_lib_sqlite3_main
+        if test -d "${sqlite_path}/lib/sqlite"; then
+            CFLAGS="$saveflags -L${sqlite_path}/lib/sqlite"
+            echo "$as_me:$LINENO: checking for main in -lsqlite3" >&5
+echo $ECHO_N "checking for main in -lsqlite3... $ECHO_C" >&6
+if test "${ac_cv_lib_sqlite3_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsqlite3  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_sqlite3_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_sqlite3_main=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_sqlite3_main" >&5
+echo "${ECHO_T}$ac_cv_lib_sqlite3_main" >&6
+if test $ac_cv_lib_sqlite3_main = yes; then
+  tmp="$PKGLIBS -L${sqlite_path}/lib/sqlite -lsqlite3"
+fi
+
+        elif test -d "${sqlite_path}/lib"; then
+            CFLAGS="$saveflags -L${sqlite_path}/lib"
+            echo "$as_me:$LINENO: checking for main in -lsqlite3" >&5
+echo $ECHO_N "checking for main in -lsqlite3... $ECHO_C" >&6
+if test "${ac_cv_lib_sqlite3_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsqlite3  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_sqlite3_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_sqlite3_main=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_sqlite3_main" >&5
+echo "${ECHO_T}$ac_cv_lib_sqlite3_main" >&6
+if test $ac_cv_lib_sqlite3_main = yes; then
+  tmp="$PKGLIBS -L${sqlite_path}/lib -lsqlite3"
+fi
+
+        elif test -d "${sqlite_patch}"; then
+            CFLAGS="$saveflags -L$sqlite_path"
+            echo "$as_me:$LINENO: checking for main in -lsqlite3" >&5
+echo $ECHO_N "checking for main in -lsqlite3... $ECHO_C" >&6
+if test "${ac_cv_lib_sqlite3_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsqlite3  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_sqlite3_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_sqlite3_main=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_sqlite3_main" >&5
+echo "${ECHO_T}$ac_cv_lib_sqlite3_main" >&6
+if test $ac_cv_lib_sqlite3_main = yes; then
+  tmp="$PKGLIBS -L$sqlite_path -lsqlite3"
+fi
+
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        unset ac_cv_lib_sqlite3_main
+        if test -d "/usr/local/lib"; then
+            CFLAGS="$saveflags -L/usr/local/pgsql/lib"
+            echo "$as_me:$LINENO: checking for main in -lsqlite3" >&5
+echo $ECHO_N "checking for main in -lsqlite3... $ECHO_C" >&6
+if test "${ac_cv_lib_sqlite3_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsqlite3  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_sqlite3_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_sqlite3_main=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_sqlite3_main" >&5
+echo "${ECHO_T}$ac_cv_lib_sqlite3_main" >&6
+if test $ac_cv_lib_sqlite3_main = yes; then
+  tmp="$PKGLIBS -L/usr/local/lib -lsqlite3"
+fi
+
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        echo "libsqlite3 library not found - disabling SQLite support"
+        if test "x$not_available" = "x"; then
+    not_available="use-sqlite"
+else
+    not_available="$not_available, use-sqlite"
+fi
+        cdef_use_sqlite="#undef"
+        enable_use_sqlite="no"
+        sqlite=
+        lp_cv_has_sqlite="no"
+    else
+        PKGLIBS="$tmp"
+    fi
+  fi
+
+  CFLAGS="$saveflags"
+else
+  if test $enable_use_sqlite = yes; then
+      if test "x$not_available" = "x"; then
+    not_available="use-sqlite"
+else
+    not_available="$not_available, use-sqlite"
+fi
+      cdef_use_sqlite="#undef"
+      enable_use_sqlite=no
   fi
 fi
 

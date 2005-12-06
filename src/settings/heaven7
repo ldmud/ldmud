@@ -1,8 +1,8 @@
 #!/bin/sh
 #
 # $Author: lars $
-# $Revision: 1.4 $
-# $Date: Sun, 18 Apr 2004 22:48:23 -0600 $
+# $Revision: 1.7 $
+# $Date: Thu, 15 Apr 2004 22:27:56 -0600 $
 # 
 # Purpose: This is the settings file to use when compiling LDMud for H7.
 # 

@@ -387,6 +387,21 @@ enable_use_mysql=no
 
 enable_use_pgsql=no
 
+# Enable support for SQLite-3 (assuming your system supports it).
+#
+#  'no'  : SQLite-3 support is not compiled in
+#  'yes' : SQLite-3 support is compiled in, the libmysqlclient is expected
+#          in the normal library search path.
+#  <path>: SQLite-3 support is compiled in, <path> is added to the link paths
+#          and should be the path to libpq, 
+#          e.g. enable_use_sqlite=/usr/local/sqlite .
+#          The include files are searched in /usr/local/sqlite/include,
+#          /usr/local/include, <path>, and <path>/include.
+#          The libraries are searched in the default path, <path>/lib/sqlite,
+#          <path>/lib, <path>, /usr/local/sqlite/lib, in this order.
+
+enable_use_sqlite=no
+
 # Enable support for MCCP (Mud Control Compression Protocol).
 
 enable_use_mccp=no

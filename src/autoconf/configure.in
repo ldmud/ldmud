@@ -120,6 +120,7 @@ AC_MY_ARG_ENABLE(use-alists,no,,[Enables alist support])
 AC_MY_ARG_ENABLE(use-mccp,no,,[Enables MCCP support])
 AC_MY_ARG_ENABLE(use-mysql,no,,[Enables mySQL support])
 AC_MY_ARG_ENABLE(use-pgsql,no,,[Enables PostgreSQL support])
+AC_MY_ARG_ENABLE(use-sqlite,no,,[Enables SQLite support])
 AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes])
 AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE: no/yes/builtin/no-builtin])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
@@ -303,6 +304,20 @@ else
   cdef_use_pgsql="#define"
   pgsql_path="$enable_use_pgsql"
   enable_use_pgsql="yes"
+fi
+
+AC_UPDATE_VAR(enable_use_sqlite)
+if test "x$enable_use_sqlite" = "x" || test "x$enable_use_sqlite" = "xyes"; then
+  cdef_use_sqlite="#define"
+  sqlite_path=
+  enable_use_sqlite="yes"
+elif test "x$enable_use_sqlite" = "xno"; then
+  cdef_use_sqlite="#undef"
+  sqlite_path=
+else
+  cdef_use_sqlite="#define"
+  sqlite_path="$enable_use_sqlite"
+  enable_use_sqlite="yes"
 fi
 
 AC_UPDATE_VAR(enable_use_tls)
@@ -1502,6 +1517,91 @@ else
       AC_NOT_AVAILABLE(use-pgsql)
       cdef_use_pgsql="#undef"
       enable_use_pgsql=no
+  fi
+fi
+
+# --- SQLite3 ---
+
+# Note: Some compilers don't have /usr/local/include in their standard
+# searchpath.
+
+AC_CACHE_CHECK(for SQLite3,lp_cv_has_sqlite3,
+for TESTPATH in "" "$sqlite_path" "$sqlite_path/include" "/usr/local/include" ; do
+    saveflags="$CFLAGS"
+    if test "x$TESTPATH" != "x"; then
+        CFLAGS="$saveflags -I$TESTPATH"
+    fi
+AC_TRY_COMPILE([
+#include <sqlite3.h>
+
+sqlite3 * foo(void)
+{
+
+    return (sqlite3*)0;
+}
+],,
+lp_cv_has_sqlite3=yes
+if test "x$TESTPATH" != "x"; then
+    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+fi
+break;
+,
+lp_cv_has_sqlite3=no
+CFLAGS="$saveflags"
+)
+done
+)
+
+# The system has the include files - now search for the libraries.
+if test $lp_cv_has_sqlite3 = yes; then
+  saveflags="$CFLAGS"
+  AC_DEFINE(HAS_SQLITE3)
+
+  if test $enable_use_sqlite = yes; then
+    tmp=""
+
+    AC_CHECK_LIB(sqlite3,main, tmp="$PKGLIBS -lsqlite3")
+
+    if test "x$sqlite_path" == "x"; then
+        unset ac_cv_lib_sqlite3_main
+        if test -d "${sqlite_path}/lib/sqlite"; then
+            CFLAGS="$saveflags -L${sqlite_path}/lib/sqlite"
+            AC_CHECK_LIB(sqlite3,main, tmp="$PKGLIBS -L${sqlite_path}/lib/sqlite -lsqlite3")
+        elif test -d "${sqlite_path}/lib"; then
+            CFLAGS="$saveflags -L${sqlite_path}/lib"
+            AC_CHECK_LIB(sqlite3,main, tmp="$PKGLIBS -L${sqlite_path}/lib -lsqlite3")
+        elif test -d "${sqlite_patch}"; then
+            CFLAGS="$saveflags -L$sqlite_path"
+            AC_CHECK_LIB(sqlite3,main, tmp="$PKGLIBS -L$sqlite_path -lsqlite3")
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        unset ac_cv_lib_sqlite3_main
+        if test -d "/usr/local/lib"; then
+            CFLAGS="$saveflags -L/usr/local/pgsql/lib"
+            AC_CHECK_LIB(sqlite3,main, tmp="$PKGLIBS -L/usr/local/lib -lsqlite3")
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        echo "libsqlite3 library not found - disabling SQLite support"
+        AC_NOT_AVAILABLE(use-sqlite)
+        cdef_use_sqlite="#undef"
+        enable_use_sqlite="no"
+        sqlite=
+        lp_cv_has_sqlite="no"
+    else
+        PKGLIBS="$tmp"
+    fi
+  fi
+
+  CFLAGS="$saveflags"
+else
+  if test $enable_use_sqlite = yes; then
+      AC_NOT_AVAILABLE(use-sqlite)
+      cdef_use_sqlite="#undef"
+      enable_use_sqlite=no
   fi
 fi
 

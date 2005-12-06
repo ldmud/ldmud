@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Dec-2005  (Lars Duening)
+  - (configure, machine.h.in, config.h.in) Added a configuration check
+      for SQLite3.
+
 04-Dec-2005  (Gnomi)
   - (prolang.y) Private lfuns no longer hide simul-efuns.
   - (prolang.y) Private lfuns can be hidden by public functions without
