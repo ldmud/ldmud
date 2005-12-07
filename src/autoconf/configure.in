@@ -1463,7 +1463,7 @@ if test $lp_cv_has_pgsql = yes; then
     fi
   fi
 
-  if test $enable_use_pgsql = yes; then
+  if test "x$enable_use_pgsql" = "xyes"; then
       # Some systems need additional libraries
       savelibs="$LIBS"
       LIBS="$LIBS $PKGLIBS"
@@ -1596,7 +1596,7 @@ if test $lp_cv_has_sqlite3 = yes; then
     fi
   fi
 
-  if test $enable_use_sqlite3 = yes; then
+  if test "x$enable_use_sqlite" = "xyes"; then
       savelibs="$LIBS"
       LIBS="$LIBS $PKGLIBS"
       
