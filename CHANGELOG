@@ -9,6 +9,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (driver.h, smalloc.c, slaballoc.c) If the machine uses a 8-Byte
       malloc alignment (e.g. all PowerPC machines), the allocator does
       not replace the system malloc().
+  - (mud/lp-245/) Since the recent change to how simul_efuns are called
+      (see Bug #419), the LP-245 lib was broken. This has been corrected.
 
 05-Dec-2005  (Lars Duening)
   - (configure, machine.h.in, config.h.in) Added a configuration check

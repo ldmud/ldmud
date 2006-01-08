@@ -836,6 +836,12 @@ init_interpret (void)
     invalid_entry.id = 0;
     invalid_entry.progp = (program_t *)1;
     invalid_entry.name = NULL;
+    
+    /* To silence the compiler: */
+    invalid_entry.variable_index_offset = 0;
+    invalid_entry.function_index_offset = 0;
+    invalid_entry.funstart = 0;
+    invalid_entry.flags = 0;
 
     for (i = 0; i < CACHE_SIZE; i++)
         cache[i] = invalid_entry;
