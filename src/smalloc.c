@@ -236,14 +236,12 @@
 
 #define MEM_ALIGN (SIZEOF_CHAR_P)
 
-/* If possible, request memory using sbrk(). But if using pthreads, do
- * not replace malloc() with our routines, even if the system allows it,
- * as smalloc is not threadsafe.
+/* If possible, request memory using sbrk().
  */
 
 #if defined(SBRK_OK)
 #  ifdef MALLOC_SBRK
-#      if !defined(USE_PTHREADS) && (!defined(USE_SQLITE) || !defined(SQLITE3_USES_PTHREADS))
+#      if MALLOC_ALIGN == 4
 #          define REPLACE_MALLOC
 #      else
 #          undef SBRK_OK

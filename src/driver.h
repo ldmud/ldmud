@@ -53,6 +53,10 @@
 #  undef SBRK_OK
 #endif
 
+/* PTHREADS need a normal malloc() */
+#if defined(SBRK_OK) && (defined(USE_PTHREADS) || defined(SQLITE3_USES_PTHREADS))
+#  undef SBRK_OK
+#endif
 
 /* When we have allocation tracing, the allocator annotates every
  * allocation with the source filename and line where the allocation

@@ -230,7 +230,7 @@
 
 #if defined(SBRK_OK)
 #  ifdef MALLOC_SBRK
-#      if !defined(USE_PTHREADS) && (!defined(USE_SQLITE) || !defined(SQLITE3_USES_PTHREADS))
+#      if MALLOC_ALIGN == 4
 #          define REPLACE_MALLOC
 #      else
 #          undef SBRK_OK
