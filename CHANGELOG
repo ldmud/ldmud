@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Jan-2006  (Lars Duening)
+  - (make_func.y) When parsing the func_spec file, the preprocessor
+      conditionals were handled in a buffer in a no-longer existing
+      stack frame. So far, we were lucky, but on a 64-bit machine
+      that space was needed by the Bison parser.
+  - (driver.h) If the machine uses a 8-Byte
+      malloc alignment (e.g. all PowerPC machines), the allocator does
+      not replace the system malloc().
+
 27-Nov-2005  (Lars Duening)  (3.2.12)
   - Created snapshot.
   - (object.c) Efun function_exists(): The 'FEXISTS_ALL' result also contains

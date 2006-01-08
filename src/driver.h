@@ -52,6 +52,11 @@
 #  endif
 #endif
 
+/* Don't replace system malloc under certain circumstances. */
+#if defined(SBRK_OK) && MALLOC_ALIGN != 4
+#    undef SBRK_OK
+#endif
+
 /* Do we have full GC support? */
 
 #if defined(MALLOC_smalloc)
