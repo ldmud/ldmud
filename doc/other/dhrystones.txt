@@ -192,6 +192,21 @@ Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.3.704, gcc 3.3:
   D, TC, MC, MT, ML              3413.0    6443.7    6674.9    6368.7
 
 
+Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.2.11, gcc 4.0:
+
+  Dhrystone2 (slaballoc)           o0        o1        o2        o4
+  -                              8391.8   18259.9   19433.1   19711.4
+  -  -   MC, MT, ML              8043.0   16959.6   15923.8   16147.1
+  D  -   MC, MT, ML              4989.4   11398.3   12058.0   12575.8
+  D, TC, MC, MT, ML              3571.2    7129.5    6028.9    6780.2
+
+  Dhrystone2 (sysmalloc)
+  -                              8314.9   17386.2   18553.4   18785.6
+  -  -   MC, MT, ML              8296.5   17311.2   18461.9   18820.6
+  D  -   MC, MT, ML              5111.7   12048.8   13163.8   13357.3
+  D, TC, MC, MT, ML              3498.6    7218.9    6747.8    7380.2
+
+
 Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.3.704, gcc 4.0:
 
   Dhrystone2 (slaballoc)           o0        o1        o2        o4
@@ -207,19 +222,20 @@ Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.3.704, gcc 4.0:
   D, TC, MC, MT, ML              3712.6    5572.3    7851.8    7878.6
 
 
-Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.2.11, gcc 4.0:
+Tarkin: G5/2.1 GHz/1.5 GByte, Mac OS X 10.4.2, LDMud 3.3.712, gcc 4.0:
 
-  Dhrystone2 (slaballoc)           o0        o1        o2        o4
-  -                              8391.8   18259.9   19433.1   19711.4
-  -  -   MC, MT, ML              8043.0   16959.6   15923.8   16147.1
-  D  -   MC, MT, ML              4989.4   11398.3   12058.0   12575.8
-  D, TC, MC, MT, ML              3571.2    7129.5    6028.9    6780.2
+  Dhrystone2 (64-Bit)              o0        o1        o2        o4
+  -                              9605.0   15798.7   22044.4   22348.1
+  -  -   MC, MT, ML             12534.5   22147.0   20508.8   20203.5
+  D  -   MC, MT, ML              7122.7   15758.9   24718.3   24614.4
+  D, TC, MC, MT, ML              8852.2   14604.0   12571.6   11996.9
 
-  Dhrystone2 (sysmalloc)
-  -                              8314.9   17386.2   18553.4   18785.6
-  -  -   MC, MT, ML              8296.5   17311.2   18461.9   18820.6
-  D  -   MC, MT, ML              5111.7   12048.8   13163.8   13357.3
-  D, TC, MC, MT, ML              3498.6    7218.9    6747.8    7380.2
+  Dhrystone2 (32-Bit)              o0        o1        o2        o4
+  -                             15930.4   33344.5   33329.7   33906.0
+  -  -   MC, MT, ML             15531.2   30969.4   33233.9   33868.0
+  D  -   MC, MT, ML             12993.2   26932.5   27164.1   28422.7
+  D, TC, MC, MT, ML              9102.5   16403.4   18696.3   19343.7
+
 
 Legend:
   D: DEBUG
