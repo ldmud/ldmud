@@ -3472,6 +3472,7 @@ remove_interactive (object_t *ob, Bool force)
     object_t *save = command_giver;
     int i;
     interactive_t *interactive;
+    object_t * curobj_save = current_object;
     int save_privilege;
 
     interactive = O_GET_INTERACTIVE(ob);
@@ -3636,7 +3637,7 @@ remove_interactive (object_t *ob, Bool force)
     free_object(ob, "remove_interactive");
 
     command_giver = check_object(save);
-    current_object = NULL;
+    current_object = curobj_save;
     malloc_privilege = save_privilege;
 } /* remove_interactive() */
 
