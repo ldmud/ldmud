@@ -22712,6 +22712,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
                 csp->funstart = EFUN_FUNSTART;
                 csp->num_local_variables = 0;
                 inter_fp = sp - num_arg + 1;
+                tracedepth++; /* Counteract the F_RETURN */
                 eval_instruction(code, sp);
                 /* The result is on the stack (inter_sp) */
                 return;
