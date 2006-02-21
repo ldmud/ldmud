@@ -4047,7 +4047,10 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
     }
     else
     {
-        if (!apply(cb->function.named.name, ob, num_arg + nargs))
+        if (toplevel)
+            tracedepth = 0;
+
+        if (!sapply(cb->function.named.name, ob, num_arg + nargs))
             transfer_svalue(&apply_return_value, &const0);
     }
 

@@ -17959,6 +17959,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 #ifdef USE_NEW_INLINES
                 inter_context = NULL;
 #endif /* USE_NEW_INLINES */
+                tracedepth++; /* Counteract the F_RETURN */
                 eval_instruction(code, sp);
                 /* The result is on the stack (inter_sp) */
                 return;

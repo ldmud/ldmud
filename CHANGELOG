@@ -8,6 +8,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
 20-Feb-2006  (Gnomi)
   - (comm.c) remove_interactive() clobbered the current_object, setting
       it to NULL. It is now preserved (Bug #431).
+  - (interpret.c) When executing an efun closure, the tracedepth wasn't
+      incremented accordingly (Bug #441).
+  - (simulate.c) When executing a non-toplevel callback, the tracedepth
+      should not be zeroed out (Bug #441).
 
 08-Jan-2006  (Lars Duening)
   - (make_func.y) When parsing the func_spec file, the preprocessor
