@@ -93,6 +93,9 @@
 /* Does the machine offer PCRE? */
 #undef HAS_PCRE
 
+/* Does the machine offer IDNA? */
+#undef HAS_IDN
+
 /* Does the machine offer mySQL? */
 #undef HAS_MYSQL
 

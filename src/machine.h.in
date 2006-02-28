@@ -93,6 +93,9 @@
 /* Does the machine offer PCRE? */
 #undef HAS_PCRE
 
+/* Does the machine offer IDNA? */
+#undef HAS_IDN
+
 /* Does the machine offer mySQL? */
 #undef HAS_MYSQL
 
@@ -132,6 +135,9 @@
 
 /* Define to 1 if using `alloca.c'. */
 #undef C_ALLOCA
+
+/* Does the machine offer idn libraries. */
+#undef HAS_IDN
 
 /* Define to 1 if you have `alloca', as a function or macro. */
 #undef HAVE_ALLOCA

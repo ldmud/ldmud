@@ -4,11 +4,13 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-20-Feb-2006 (Lars Duening) -- Release 3.3.713
+28-Feb-2006 (Lars Duening) -- Release 3.3.713
 
     - New Efuns:
        + sl_close(), sl_open(), sl_exec(), sl_insert_id(): Optional SQLite
           support.
+       + idna_stringprep(), idna_to_ascii(), idna_to_unicode():
+          Optional International Domain Name support.
 
     - Changed Efuns:
        + function_exists(): The 'FEXISTS_ALL' result also contains

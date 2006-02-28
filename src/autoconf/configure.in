@@ -1234,6 +1234,15 @@ if test "x$lp_cv_has_iconv_nonconst_in" = "xyes"; then
   AC_DEFINE(HAS_ICONV_NONCONST_IN)
 fi
 
+# --- libidn ---
+AC_CHECK_HEADER(idna.h, lp_cv_has_idn=yes,lp_cv_has_idn=no)
+AC_CHECK_HEADER(stringprep.h, lp_cv_has_idn=yes,lp_cv_has_idn=no)
+AC_CHECK_LIB(idn, stringprep_check_version,
+	     [lp_cv_has_idn=yes LIBS="${LIBS} -lidn"],lp_cv_has_idn=no)
+if test "x$lp_cv_has_idn" = "xyes"; then
+    AC_DEFINE(HAS_IDN, 1, [Does the machine offer idn libraries.])
+fi
+
 # --- mySQL ---
 
 # Note: Some compilers don't have /usr/local/include in their standard

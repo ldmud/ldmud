@@ -78,6 +78,7 @@ DESCRIPTION
     The following macros are defined if their associated package
     has been compiled into the driver:
 
+      __IDNA__ :      support for IDNA
       __IPV6__ :      support for IP v.6
       __MYSQL__ :     support for mySQL
       __PGSQL__ :     support for PostgreSQL
@@ -109,7 +110,7 @@ HISTORY
         __MCCP__, __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__, __PGSQL__,
         __PTHREADS__, __TLS__, __BOOT_TIME__, __ALARM_TIME__,
         __HEART_BEAT_INTERVAL__, __SYNCHRONOUS_HEART_BEAT__, and __PCRE__.
-    3.3.713 added __SQLITE__.
+    3.3.713 added __IDNA__, __SQLITE__.
 
 SEE ALSO
     pragma(LPC), preprocessor(LPC)

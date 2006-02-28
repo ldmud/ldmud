@@ -1770,6 +1770,9 @@ options (void)
     /* Print the package options, nicely indented. */
     {
         char * optstrings[] = { "" /* have at least one string in here */
+#ifdef HAS_IDN
+                              , "idna supported\n"
+#endif
 #ifdef USE_IPV6
                               , "IPv6 supported\n"
 #endif

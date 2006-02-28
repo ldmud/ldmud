@@ -815,6 +815,9 @@ init_lexer(void)
 #ifdef MSDOS_FS
     add_permanent_define("__MSDOS_FS__", -1, string_copy("1"), MY_FALSE);
 #endif
+#ifdef HAS_IDN
+    add_permanent_define("__IDNA__", -1, string_copy("1"), MY_FALSE);
+#endif
 #ifdef USE_IPV6
     add_permanent_define("__IPV6__", -1, string_copy("1"), MY_FALSE);
 #endif

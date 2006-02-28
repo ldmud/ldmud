@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Feb-2006  (Lars Duening)
+  - (pkg-idna) Added support for International Domain Names (provided
+      by Philipp - thanks!).
+
 20-Feb-2006  (Lars Duening)
   - (Makefile.in) Added a dependency to create patchlevel.h, even if
       the program is made with 'make ldmud'.
