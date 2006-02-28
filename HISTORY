@@ -37,6 +37,10 @@ For a detailed list of all changes see the file CHANGELOG.
          and callbacks.
        + Removing an interactive as part of a fatal comm error clobbered the
          current object.
+         
+    - Other:
+       + The makefile is able to install the driver's LPC header
+         files as well.
 
 
 24-Nov-2005 (Lars Duening) -- Release 3.3.712

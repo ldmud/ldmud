@@ -19,9 +19,11 @@ prefix= @prefix@
 exec_prefix= @exec_prefix@
 #
 #
-# Set MUD_LIB to the directory which contains the mud data. Was formerly
-# defined in config.h !
+# Set MUD_LIB to the directory which contains the mud data.
 MUD_LIB = @libdir@
+# Set MUD_LIB_INCLUDE to the directory where the driver include files
+# shall live.
+MUD_LIB_INCLUDE = @includedir@
 #
 # Set BINDIR to the directory where you want to install the executables.
 BINDIR = @bindir@
@@ -116,10 +118,21 @@ ldmud@EXEEXT@: $(OBJ)
 docs: ldmud@EXEEXT@
 	-help2man --name=ldmud -N --help-option=--longhelp --include=ldmud-man.txt --output=../doc/man/ldmud.1 ./ldmud@EXEEXT@
 	
-install: ldmud@EXEEXT@ docs
+install-all: install-driver install-headers install-utils
+
+install: install-driver
+	echo "To install header files, use 'make install-headers'."
+	echo "To install utility programs (incl. erq), use 'make install-utils'."
+	echo "To install everything in one go, use 'make install-all'."
+
+install-driver: ldmud@EXEEXT@ docs
 	$(mkinstalldirs) $(BINDIR) $(MANDIR)/man1
 	$(INSTALL) -c ldmud@EXEEXT@ $(BINDIR)/ldmud@EXEEXT@
 	$(INSTALL) -c ../doc/man/ldmud.1 $(MANDIR)/man1/ldmud.1
+
+install-headers: 
+	$(mkinstalldirs) $(MUD_LIB_INCLUDE)
+	$(INSTALL) -c ../mudlib/sys/* $(MUD_LIB_INCLUDE)
 
 install-utils:
 	(cd util; $(MAKE) $(MFLAGS) install)
