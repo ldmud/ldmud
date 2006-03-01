@@ -1855,7 +1855,7 @@ load_object (const char *lname, Bool create_super, int depth
         svalue_t *svp;
 
         push_c_string(inter_sp, fname);
-        svp = apply_master(STR_COMP_OBJ, 1);
+        svp = apply_master(STR_COMPILE_OBJECT, 1);
         if (svp && svp->type == T_OBJECT)
         {
             /* We got an object from the call, but is it what it
@@ -1867,7 +1867,17 @@ load_object (const char *lname, Bool create_super, int depth
                  * the one we received?
                  */
                 if (ob == svp->u.ob)
+                {
+                    /* If this object is a clone, clear the clone flag
+                     * but mark it as replaced.
+                     */
+                    if (ob->flags & O_CLONE)
+                    {
+                        ob->flags &= ~O_CLONE;
+                        ob->flags |= O_REPLACED;
+                    }
                     return ob;
+                }
             }
             else if (ob != master_ob)
             {
@@ -1879,6 +1889,15 @@ load_object (const char *lname, Bool create_super, int depth
                 free_mstring(ob->name);
                 ob->name = new_mstring(name);
                 enter_object_hash(ob);
+
+                /* If this object is a clone, clear the clone flag
+                 * but mark it as replaced.
+                 */
+                if (ob->flags & O_CLONE)
+                {
+                    ob->flags &= ~O_CLONE;
+                    ob->flags |= O_REPLACED;
+                }
                 return ob;
             }
             fname[name_length] = '.';
