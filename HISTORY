@@ -37,6 +37,9 @@ For a detailed list of all changes see the file CHANGELOG.
          and callbacks.
        + Removing an interactive as part of a fatal comm error clobbered the
          current object.
+       + Removed the stipulation that CATCH_RESERVED_COST must be twice as
+         much as MASTER_RESERVED_COST, since the master reserve is used
+         automatically anyway.
          
     - Other:
        + The makefile is able to install the driver's LPC header

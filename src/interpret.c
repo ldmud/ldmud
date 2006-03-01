@@ -9313,12 +9313,6 @@ again:
                        ));
             }
 
-            if (sp->u.number < MASTER_RESERVED_COST * 2)
-                ERRORF(("Illegal 'reserve' value for catch(): got %ld, "
-                        "required are at least %ld.\n"
-                       , sp->u.number
-                       , (long)MASTER_RESERVED_COST * 2L
-                       ));
             reserve_cost = sp->u.number;
             sp--;
         }

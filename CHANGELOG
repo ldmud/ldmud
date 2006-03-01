@@ -10,6 +10,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
       'clone' flag unset.
   - (string_spec, simulate.c) Renamed COMP_OBJ to the more intuitive
       COMPILE_OBJECT.
+  - (interpret.c) Removed the stipulation that CATCH_RESERVED_COST
+      must be twice as much as MASTER_RESERVED_COST, since the master
+      reserve is used automatically anyway (suggested by Gnomi).
 
 20-Feb-2006  (Lars Duening)
   - (Makefile.in) Added a dependency to create patchlevel.h, even if

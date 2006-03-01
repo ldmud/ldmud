@@ -456,7 +456,7 @@ with_set_buffer_size_max=65536
 # error can still be caught and handled.
 # To catch an evalcost-too-big in an object that called (recursive)
 # master functions, CATCH_RESERVED_COST should be greater than
-# MASTER_RESERVED_COST * 2.
+# MASTER_RESERVED_COST.
 
 with_catch_reserved_cost=2000
 
