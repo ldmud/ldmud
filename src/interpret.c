@@ -8456,6 +8456,9 @@ again:
          * corrected.
          */
         warnf("Missing 'return <value>' statement.\n");
+
+        /* Warn only once per missing return and program. */
+        PUT_UINT8(pc-1, F_RETURN0);
         /* FALLTHROUGH */
 
     CASE(F_RETURN0);                /* --- return0             --- */

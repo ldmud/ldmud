@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-28-Feb-2006 (Lars Duening) -- Release 3.3.713
+01-Mar-2006 (Lars Duening) -- Release 3.3.713
 
     - New Efuns:
        + sl_close(), sl_open(), sl_exec(), sl_insert_id(): Optional SQLite
@@ -43,6 +43,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Removed the stipulation that CATCH_RESERVED_COST must be twice as
          much as MASTER_RESERVED_COST, since the master reserve is used
          automatically anyway.
+       + Missing returns are logged at runtime only once per function
+         and occurance.
          
     - Other:
        + The makefile is able to install the driver's LPC header

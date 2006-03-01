@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+01-Mar-2006  (Lars Duening)
+  - (interpret.c) A missing return is noted at runtime only once per
+      function. This is achieved by runtime code modification, but we
+      do that for switch() as well (Bug #430).
+
 28-Feb-2006  (Lars Duening)
   - (pkg-idna) Added support for International Domain Names (provided
       by Philipp - thanks!).
