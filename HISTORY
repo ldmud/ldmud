@@ -21,6 +21,9 @@ For a detailed list of all changes see the file CHANGELOG.
           together. Before, the numbering was individual in each
           space, leading to situations where low-numbered objects in the
           environment were hidden by those in the inventory.
+       + sscanf(): The new modifier '+' requires the matching of
+          the characters after a field in order to consider the field
+          as matched.
 
     - Language:
        + Inherited private functions are now more invisible and

@@ -2914,6 +2914,9 @@ struct sscanf_info
       /* After the match: the next character in the in-string to match.
        * NULL for 'no match' or 'all matched'.
        */
+    Bool           match_req;
+      /* Before a match: TRUE if the subsequent chars need to match as well.
+       */
     Bool           no_match;
       /* After a match: TRUE if there was a mismatch in the non-% match.
        */
@@ -3026,11 +3029,16 @@ sscanf_match_percent (char *str, char *fmt, struct sscanf_info *info)
     info->min = 1;
     info->flags.do_assign = 1;
     info->flags.count_match = 1;
+    info->match_req = MY_FALSE;
 
     for (;;)
     {
         switch(c = *fmt++)
         {
+        case '+':
+            info->match_req = MY_TRUE;
+            continue;
+
         case '!':
             info->flags.count_match ^= 1;
             info->flags.do_assign ^= 1;
@@ -3170,6 +3178,7 @@ sscanf_match (char *str, char *fmt, struct sscanf_info *info)
         if (c == '%')
         {
             c = *fmt;
+
             if (c != '%')
             {
                 /* We have a format specifier! */
@@ -3768,7 +3777,7 @@ match_skipped:
     /* If the characters after the last % specifiers didn't match
      * undo the % match.
      */
-    if (info.no_match && info.number_of_matches > 0)
+    if (info.match_req && info.no_match && info.number_of_matches > 0)
         info.number_of_matches--;
 
     return info.number_of_matches;

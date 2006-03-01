@@ -13,6 +13,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (interpret.c) Removed the stipulation that CATCH_RESERVED_COST
       must be twice as much as MASTER_RESERVED_COST, since the master
       reserve is used automatically anyway (suggested by Gnomi).
+  - (efuns.c) sscanf(): The new modifier '+' requires the matching of
+      the characters after a field in order to consider the field
+      as matched.
 
 20-Feb-2006  (Lars Duening)
   - (Makefile.in) Added a dependency to create patchlevel.h, even if
