@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Mar-2006  (Lars Duening)
+  - (pkg-tls.c) tls_check_certificate() does more interpretation of
+      the result and returns better data (provided by Philipp).
+
 01-Mar-2006  (Lars Duening)
   - (interpret.c) A missing return is noted at runtime only once per
       function. This is achieved by runtime code modification, but we

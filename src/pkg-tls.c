@@ -19,6 +19,7 @@
 #  include <openssl/rand.h>
 #  include <openssl/err.h>
 #  include <openssl/x509.h>
+#  include <openssl/x509v3.h>
 #  include <sys/utsname.h>
 #elif defined(HAS_GNUTLS)
 #  include <gnutls/gnutls.h>
@@ -235,18 +236,24 @@ tls_xfree (void *p)
 static int
 tls_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) 
 
-/* This function will be called if the client did present a certificate.
- * Always returns MY_TRUE so that the handshake will succeed
+/* will be called, if the client did present a certificate
+ * always returns MY_TRUE so that the handshake will succeed
  * and the verification status can later be checked on mudlib level
- * See also: SSL_set_verify(3)
+ * see also: SSL_set_verify(3)
  */
 
 {
+    char buf[512];
+    printf("%s tls_verify_callback(%d, ...)\n", time_stamp(), preverify_ok);
+
+    X509_NAME_oneline(X509_get_issuer_name(ctx->current_cert), buf, sizeof buf);
+    printf("depth %d: %s\n", X509_STORE_CTX_get_error_depth(ctx), buf);
     return MY_TRUE;
-} /* tls_verify_callback() */
+}
 
 /*-------------------------------------------------------------------------*/
-void tls_global_init (void)
+void
+tls_global_init (void)
 
 /* Initialise the TLS package; to be called once at program startup.
  */
@@ -900,8 +907,8 @@ f_tls_check_certificate(svalue_t *sp)
 
 /* EFUN tls_check_certificate()
  *
- *   mixed *tls_check_certificate()
  *   mixed *tls_check_certificate(object obj);
+ *   mixed *tls_check_certificate(object obj, int extra);
  * 
  * tls_check_certificate() checks the certificate of the secured
  * connection bound to <obj> (default is the current object).  If
@@ -914,10 +921,22 @@ f_tls_check_certificate(svalue_t *sp)
  * 
  *   int [0]      : Result code of SSL_get_verify_result (see man 1 verify
  *                  subsection DIAGNOSTICS for possible values)
- *   string [1]   : Subject
- *   int    [2..9]: Not used yet.
- *   string [10]  : SHA-1 Fingerprint
- *   string [11]  : Not used yet (reserved for MD5 Fingerprint)
+ *   array [1]          : array with 3*n entries of extra x509 data.
+ *                       structure is:
+ *                       3*i    : numerical form of object name, e.g. "2.5.4.3"
+ *                       3*i + 1: long or short name if available, e.g. "commonName"
+ *                       3*i + 2: value
+ *   array [2]          : if extra is set:
+ *                       array with 3*n entries of x509 extension data
+ *                       data structure is:
+ *                       3*i    : numerical form of extension name
+ *                       3*i + 1: long or short name of extension name if available
+ *                       3*i + 2: array of strings with the data structure of [1]
+ *
+ * Note: a x509 certificate can have more than one object with the same name
+ *
+ * See associated documentation for code that generates more convient mapping
+ * data structures
  */
 
 {
@@ -925,9 +944,13 @@ f_tls_check_certificate(svalue_t *sp)
 #ifdef HAS_OPENSSL
     X509 *peer;
     X509_NAME *subject;
-    /* TODO: X509_NAME *issuer; */
     interactive_t *ip;
-    
+    int more;
+  
+    /* more information requested */
+    more = sp->u.number;
+    free_svalue(sp--);
+
     if (!tls_available)
         errorf("tls_check_certificate(): TLS layer hasn't been initialized.\n");
 
@@ -937,53 +960,125 @@ f_tls_check_certificate(svalue_t *sp)
 
     if (ip->tls_status != TLS_ACTIVE) 
         errorf("tls_check_certificate(): object doesn't have a secure connection.\n");
-    else
+
+    if (more < 0 || more > 1)
+        errorf("tls_check_certificate(): invalid flag passed as second argument.\n");
+
+    peer = SSL_get_peer_certificate(ip->tls_session);
+    if (peer != NULL)
     {
-        peer = SSL_get_peer_certificate(ip->tls_session);
-        if (peer != NULL)
+        int i, j, len;
+        char buf[256];
+        vector_t *extra = NULL;
+
+        v = allocate_array(2 + more);
+
+        /* the result of SSL verification, the most important thing here
+         * see verify(1) for more details
+         */
+        put_number(&(v->item[0]), SSL_get_verify_result(ip->tls_session));
+
+        subject = X509_get_subject_name(peer);
+
+        j = X509_NAME_entry_count(subject);
+        extra = allocate_array(3 * j);
+
+        /* iterate all objects in the certificate */
+        for (i = 0; i < j; i++)
         {
-            int verify_result, i;
-            char buf[257];
-            string_t *sha;
-            unsigned char *shabuf;
+            X509_NAME_ENTRY *entry;
+            ASN1_OBJECT *ob;
+
+            entry = X509_NAME_get_entry(subject, i);
+            ob = X509_NAME_ENTRY_get_object(entry);
+
+            len = OBJ_obj2txt(buf, sizeof buf, ob, 1);
+            put_c_n_string(&(extra->item[3 * i]), buf, len);
+
+            len = OBJ_obj2txt(buf, sizeof buf, ob, 0);
+            put_c_n_string(&(extra->item[3 * i + 1]), buf, len);
             
-            v = allocate_array(12);
-            verify_result = SSL_get_verify_result(ip->tls_session);
-            put_number(&(v->item[0]), verify_result);
-
-            /* fill the result with various information about 
-             * subject and issuer, fingerprint, etc
-             * TODO: this is incomplete
-             */
-            subject = X509_get_subject_name(peer);
-            X509_NAME_get_text_by_NID(subject, NID_commonName, buf, sizeof(buf)-1);
-            buf[sizeof(buf)-1] = '\0';
-            put_c_string(&(v->item[1]), buf);
-            
-#if 0
-            issuer = X509_get_issuer_name(peer);
-#endif
-            /* TODO: issued on (preferably seconds since epoch)
-             */
-            /* TODO: expires on
-             */
-            /* sha1 fingerprint
-             */
-            memsafe(sha = alloc_mstring(2 * SHA1HashSize), 
-                    2 & SHA1HashSize, "sha1 hash");
-            shabuf = (unsigned char *)get_txt(sha);
-            for (i = 0; i < SHA1HashSize; i++)
-                sprintf((char *)shabuf+2*i, "%02x", peer -> sha1_hash[i]);
-            put_string(&(v->item[10]), sha);
-
-            /* TODO: md5 fingerprint 
-             */
-
-            X509_free(peer);
+            put_c_string(&(extra->item[3 * i + 2])
+                        , (char *)ASN1_STRING_data(X509_NAME_ENTRY_get_data(entry)));
         }
-    } /* if (tls active) */
+        put_array(&(v->item[1]), extra);
+
+        /* also get all information from extensions like subjectAltName */
+        if (more == 1)
+        {
+            vector_t *extensions = NULL;
+            vector_t *extension = NULL;
+
+            j = X509_get_ext_count(peer);
+            extensions = allocate_array(3 * j);
+            for (i = X509_get_ext_by_NID(peer, NID_subject_alt_name, -1)
+                ; i != -1
+                ; i = X509_get_ext_by_NID(peer, NID_subject_alt_name, i))
+            {
+                int iter, count;
+
+                X509_EXTENSION *ext = NULL;
+                STACK_OF(GENERAL_NAME) *ext_vals = NULL;
+
+                ext = X509_get_ext(peer, i);
+                if (ext == NULL) {
+                    break;
+                }
+                /* extension name */
+                len = OBJ_obj2txt(buf, sizeof buf, ext->object, 1),
+                put_c_n_string(&(extensions->item[3 * i]), (char *)buf, len);
+
+                len = OBJ_obj2txt(buf, sizeof buf, ext->object, 0),
+                put_c_n_string(&(extensions->item[3 * i + 1]), (char *)buf, len);
+
+                /* extension values */
+                ext_vals = X509V3_EXT_d2i(ext);
+                if (ext_vals == NULL) {
+                    break;
+                }
+
+                count = sk_GENERAL_NAME_num(ext_vals);
+                extension = allocate_array(3 * count);
+
+                put_array(&(extensions->item[3 * i + 2]), extension);
+                for (iter = 0; iter < count; iter++) {
+                    GENERAL_NAME *ext_val = NULL;
+                    ASN1_STRING *value = NULL;
+
+                    ext_val = sk_GENERAL_NAME_value(ext_vals, iter);
+
+                    switch(ext_val->type) {
+                    case GEN_OTHERNAME:
+                        value = ext_val->d.otherName->value->value.asn1_string;
+
+                        len = OBJ_obj2txt(buf, sizeof buf, ext_val->d.otherName->type_id, 1),
+                        put_c_n_string(&(extension->item[3 * iter]), buf, len);
+                        len = OBJ_obj2txt(buf, sizeof buf, ext_val->d.otherName->type_id, 0),
+                        put_c_n_string(&(extension->item[3 * iter + 1]), buf, len);
+                        put_c_string(&(extension->item[3 * iter + 2])
+                                    , (char*)ASN1_STRING_data(value));
+                        break;
+                    /* TODO: the following are unimplemented 
+                     *                 and the structure is getting ugly 
+                     */
+                    case GEN_EMAIL:
+                    case GEN_DNS:
+                    case GEN_X400:
+                    case GEN_DIRNAME:
+                    case GEN_EDIPARTY:
+                    case GEN_URI:
+                    case GEN_IPADD:
+                    case GEN_RID:
+                    default:
+                        break;
+                    }
+                }
+            }
+            put_array(&(v->item[2]), extensions);
+        }
+        X509_free(peer);
+    }
 #elif defined(HAS_GNUTLS)
-printf("DEBUG: sp type %d\n", sp->type);
     errorf( "%s TLS: Gnu TLS does not provide certificate checking yet."
           , time_stamp());
 #endif

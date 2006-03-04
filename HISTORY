@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-01-Mar-2006 (Lars Duening) -- Release 3.3.713
+03-Mar-2006 (Lars Duening) -- Release 3.3.713
 
     - New Efuns:
        + sl_close(), sl_open(), sl_exec(), sl_insert_id(): Optional SQLite
@@ -24,6 +24,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + sscanf(): The new modifier '+' requires the matching of
           the characters after a field in order to consider the field
           as matched.
+      + tls_check_certificate(): Returns more informative results.
 
     - Language:
        + Inherited private functions are now more invisible and
