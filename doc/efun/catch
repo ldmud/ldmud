@@ -33,7 +33,17 @@ DESCRIPTION
                      of __CATCH_EVAL_COST__. The minimum required
                      are 2 * __MASTER_EVAL_COST__.
 
-        Catch is not really an efun, but a compiler directive.
+        catch() itself is not expensive as far as execution time is
+        concerned: it is about the same as a intra-object function call.
+
+        throw() is not very expensive either, but does include the
+        internal cleanup of several structures.
+
+        Real runtime errors on the other hand are expensive regardless
+        of whether they are caught or not, as they include the generation 
+        of the stack backtrace.
+
+        catch() is not really an efun, but a compiler directive.
 
 EXAMPLE
         object obj;
