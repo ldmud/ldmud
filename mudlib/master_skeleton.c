@@ -414,6 +414,11 @@ object connect ()
 //
 // The gamedriver will call the lfun 'logon()' in the login object after
 // binding the connection to it. That lfun has to return !=0 to succeed.
+//
+// If connect() initiates a secure connection without setting a callback,
+// and the connection is still handshaking at the time connect() returns,
+// the driver will delay the call to logon() until the handshake either
+// succeeds or fails.
 
 
 //---------------------------------------------------------------------------

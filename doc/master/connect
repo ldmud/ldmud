@@ -12,6 +12,15 @@ DESCRIPTION
         binding the connection to it. That lfun has to return != 0 to
         indicate success.
 
+        If connect() initiates a secure connection without setting a callback,
+        and the connection is still handshaking at the time connect() returns,
+        the driver will delay the call to logon() until the handshake either
+        succeeds or fails.
+
+HISTORY
+        LDMud 3.2.13 streamlined the handling of secure connections during
+        logon.
+
 SEE ALSO
         logon(A), disconnect(M), interactive(E), exec(E),
-        net_connect(E)
+        net_connect(E), tls_init_connection(E)

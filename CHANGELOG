@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Mar-2006  (Lars Duening)
+  - (backend, comm.c, object) The logon(obj) function moved from
+      backend.c into object.c, and was renamed logon_object() - it's
+      more sensical this way.
+  - (comm.c) If the master::connect() initiates a secure connection
+      which gets stuck in the handshake, neither logon() is called nor
+      is the prompt printed. Also, if the tls_init_connection() didn't
+      set a callback, the driver will provide a callback to logon().
+      This way logon() won't be called unless the connection is up
+      and running.
+  - (mudlib/psyc-tls.c) Example for using the tls_check_certificate()
+      efun (thanks, Philipp).
+
 28-Feb-2006  (Lars Duening)
   - (simulate.c) Virtual blueprint objects are guaranteed to have their
       'clone' flag unset.

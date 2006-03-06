@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-28-Feb-2006 (Lars Duening) -- Release 3.2.13
+06-Mar-2006 (Lars Duening) -- Release 3.2.13
 
     - Changed efuns:
        + sscanf(): The new modifier '+' requires the matching of
@@ -26,6 +26,12 @@ For a detailed list of all changes see the file CHANGELOG.
          and callbacks.
        + Removing an interactive as part of a fatal comm error clobbered the
          current object.
+      + If the master:;connect() initiates a secure connection
+          which gets stuck in the handshake, neither logon() is called nor
+          is the prompt printed. Also, if the tls_init_connection() didn't
+          set a callback, the driver will provide a callback to logon().
+          This way logon() won't be called unless the connection is up
+          and running.
 
     - Other Changes:
 
