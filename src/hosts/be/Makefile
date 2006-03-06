@@ -450,9 +450,10 @@ $(OBJ)/comm.o : util/erq/erq.h ../mudlib/sys/input_to.h \
     ../mudlib/sys/driver_hook.h ../mudlib/sys/comm.h xalloc.h wiz_list.h \
     swap.h svalue.h stdstrings.h simulate.h sent.h pkg-tls.h pkg-pgsql.h \
     pkg-mccp.h object.h mstrings.h main.h interpret.h gcollect.h filestat.h \
-    exec.h ed.h closure.h backend.h array.h actions.h access_check.h comm.h \
+    exec.h ed.h closure.h array.h actions.h access_check.h comm.h \
     ../mudlib/sys/telnet.h my-alloca.h typedefs.h driver.h strfuns.h \
-    bytecode.h hash.h config.h port.h hosts/unix.h hosts/be/be.h machine.h
+    bytecode.h hash.h backend.h config.h port.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 $(OBJ)/dumpstat.o : xalloc.h svalue.h structs.h stdstrings.h simulate.h \
     ptrtable.h object.h mstrings.h mapping.h instrs.h filestat.h exec.h \
@@ -586,6 +587,11 @@ $(OBJ)/pkg-alists.o : i-svalue_cmp.h xalloc.h svalue.h simulate.h \
     mstrings.h main.h interpret.h array.h my-alloca.h pkg-alists.h \
     typedefs.h driver.h closure.h strfuns.h sent.h bytecode.h hash.h \
     backend.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+
+$(OBJ)/pkg-idna.o : ../mudlib/sys/idn.h xalloc.h simulate.h mstrings.h \
+    interpret.h typedefs.h pkg-idna.h driver.h svalue.h strfuns.h sent.h \
+    bytecode.h hash.h backend.h port.h config.h main.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/pkg-mccp.o : ../mudlib/sys/telnet.h xalloc.h svalue.h object.h \
     mstrings.h comm.h array.h pkg-mccp.h typedefs.h driver.h strfuns.h \

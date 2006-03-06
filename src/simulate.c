@@ -3916,7 +3916,7 @@ setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs
     }
 
     return error_index;
-} /* setup_efun_callback() */
+} /* setup_efun_callback_base() */
 
 /*-------------------------------------------------------------------------*/
 void

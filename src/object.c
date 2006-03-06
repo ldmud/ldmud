@@ -907,6 +907,31 @@ reset_object (object_t *ob, int arg)
 
 /*-------------------------------------------------------------------------*/
 void
+logon_object (object_t *ob)
+
+/* Call the logon() lfun in the object <ob>.
+ *
+ * current_object is temporarily set to <ob> in order to allow logon()
+ * to be static (security measure). Doing so is harmless as there is no
+ * previous_object to consider.
+ */
+
+{
+    svalue_t *ret;
+    object_t *save = current_object;
+
+    current_object = ob;
+    ret = apply(STR_LOGON, ob, 0);
+    if (ret == 0)
+    {
+        errorf("Could not find %s() on the player %s\n", get_txt(STR_LOGON), get_txt(ob->name));
+        /* NOTREACHED */
+    }
+    current_object = save;
+} /* logon_object() */
+
+/*-------------------------------------------------------------------------*/
+void
 replace_programs (void)
 
 /* Called from the backend loop, this function

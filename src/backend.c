@@ -297,32 +297,6 @@ do_state_check (int minlvl, const char *where)
 #endif
 
 /*-------------------------------------------------------------------------*/
-void
-logon (object_t *ob)
-
-/* Call the logon() lfun in the object <ob>.
- *
- * current_object is temporarily set to <ob> in order to allow logon()
- * to be static (security measure). Doing so is harmless as there is no
- * previous_object to consider.
- *
- * TODO: This should go into simulate.c or comm.c
- */
-
-{
-    svalue_t *ret;
-    object_t *save = current_object;
-
-    current_object = ob;
-    ret = apply(STR_LOGON, ob, 0);
-    if (ret == 0) {
-        /* add_message("prog %s:\n", get_txt(ob->name)); */
-        errorf("Could not find logon() on the player %s\n", get_txt(ob->name));
-    }
-    current_object = save;
-} /* logon() */
-
-/*-------------------------------------------------------------------------*/
 static RETSIGTYPE
 handle_hup (int sig UNUSED)
 
