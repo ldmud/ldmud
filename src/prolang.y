@@ -15317,11 +15317,12 @@ copy_variables (program_t *from, funflag_t type)
                         if(funp != funp2)
                         {
                             /* I don't think, that this is a wise idea.
-                               Because the function index offset of this
-                               inherit is not correct for this function.
-                            */
-                            yywarnf("Adjusting inherit index because of virtual inherit %.*s!\n",
-                                    (int) from->name->size, from->name->txt);
+                             * Because the function index offset of this
+                             * inherit is not correct for this function.
+                             */
+                            yywarnf("Adjusting inherit index for %.*s::%s() because of virtual inherit!\n"
+                                   , (int) from->name->size, from->name->txt
+                                   , get_txt(funp->name));
                         }
                     }
                     flagp++;

@@ -364,6 +364,7 @@ tls_global_init (void)
 
     SSL_CTX_set_default_passwd_cb(context, no_passphrase_callback);
     SSL_CTX_set_mode(context, SSL_MODE_ENABLE_PARTIAL_WRITE);
+    SSL_CTX_set_session_id_context(context, (unsigned char*) "ldmud", 5);
 
     if (!SSL_CTX_use_PrivateKey_file(context, keyfile, SSL_FILETYPE_PEM))
     {
@@ -875,7 +876,8 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
         {
             SSL_set_accept_state(session);
             /* request a client certificate */
-            SSL_set_verify(session, SSL_VERIFY_PEER, tls_verify_callback);
+            SSL_set_verify( session, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE
+                          , tls_verify_callback);
         }
         ip->tls_session = session;
         
