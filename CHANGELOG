@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Mar-2006  (Lars Duening)
+  - (pkg-tls.c) Two modifications to increase reconnect stability (thanks,
+      Philipp!).
+
 06-Mar-2006  (Lars Duening)
   - (backend, comm.c, object) The logon(obj) function moved from
       backend.c into object.c, and was renamed logon_object() - it's
