@@ -132,44 +132,72 @@ static void _move_hook_fun (object item, object dest)
 {
   object *others;
   int i;
+  string name;
 
   /* PLAIN:
   if (item != this_object)
       raise_error("Illegal to move other object than this_object()\n");
   */
 
-  /* PLAIN: the call to exit() is needed in compat mode only */
   if (living(item) && environment(item))
   {
+      name = query_once_interactive(item) ? item->query_real_name()
+                                          : object_name(item);
+      /* PLAIN: the call to exit() is needed in compat mode only */
       efun::set_this_player(item);
-      environment(item)->exit(item);
+      object env = environment(item);
+      env->exit(item);
+      if (!item)
+          raise_error(sprintf("%O->exit() destructed item %s before move.\n"
+                             , env, name));
   }
+  else
+      name = object_name(item);
+
+  /* This is the actual move of the object. */
 
   efun::set_environment(item, dest);
+
+  /* Moving a living object will cause init() to be called in the new
+   * environment.
+   */
   if (living(item)) {
     efun::set_this_player(item);
     dest->init();
     if (!item)
-      raise_error(sprintf("%O->init() destructed moved item\n", dest));
+      raise_error(sprintf("%O->init() destructed moved item %s\n", dest, name));
     if (environment(item) != dest)
       return;
   }
-  others = all_inventory(dest);
-  others[member(others, item)] = 0;
-  for (i = 0; i < sizeof(others); i++)
+
+  /* Call init() in item once foreach living object in the new environment
+   * but only if the item is (still) in the same environment.
+   */
+  others = all_inventory(dest) - ({ item });
+  foreach (object obj : others)
   {
-    if (living(others[i])) {
-      efun::set_this_player(others[i]);
+    if (living(obj) && environment(obj) == environment(item)) {
+      efun::set_this_player(obj);
       item->init();
     }
     if (!item)
-      raise_error(sprintf("item->init() for %O (#%d) destructed moved item\n", others[i], i));
+      raise_error(sprintf("item->init() for %O destructed moved item %s\n", obj, name));
   }
+
+  /* Call init() in each of the  objects themselves, but only if item
+   * didn't move away already.
+   */
   if (living(item)) {
-    efun::set_this_player(item);
-    filter_objects(others, "init");
+    foreach (object obj : others)
+    {
+        efun::set_this_player(item); // In case something new was cloned
+        if (environment(obj) == environment(item))
+            obj->init();
+    }
   }
-  if (living(dest) && item) {
+
+  /* If the destination is alive as well, call item->init() for it. */
+  if (living(dest) && item && environment(item) == dest) {
     efun::set_this_player(dest);
     item->init();
   }
