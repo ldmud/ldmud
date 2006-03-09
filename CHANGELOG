@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Mar-2006  (Malcom Tester)
+  - (lp-245/obj/master.c) Made the move implementation more robust.
+
 07-Mar-2006  (Lars Duening)
   - (pkg-tls.c) Two modifications to increase reconnect stability (thanks,
       Philipp!).
