@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Mar-2006  (Lars Duening)
+  - (comm.c) Master function disconnect() receives the remaining input data is
+       passed as the second argument (suggested by Philipp).
+
 08-Mar-2006  (Malcom Tester)
   - (lp-245/obj/master.c) Made the move implementation more robust.
 

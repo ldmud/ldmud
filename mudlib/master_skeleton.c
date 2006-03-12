@@ -54,7 +54,7 @@
 // object connect ()
 //   Handle the request for a new connection.
 //
-// void disconnect (object obj)
+// void disconnect (object obj, string remaining)
 //   Handle the loss of an IP connection.
 //
 // void remove_player (object player)
@@ -426,12 +426,13 @@ object connect ()
 
 
 //---------------------------------------------------------------------------
-void disconnect (object obj)
+void disconnect (object obj, string remaining)
 
 // Handle the loss of an IP connection.
 //
 // Argument:
 //   obj: The (formerly) interactive object (player).
+//   remaining: The remaining unprocessed input data from the connection.
 //
 // This called by the gamedriver to handle the removal of an IP connection,
 // either because the connection is already lost ('netdeath') or due to

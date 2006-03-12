@@ -3494,11 +3494,24 @@ remove_interactive (object_t *ob, Bool force)
 
     if ( !(ob->flags & O_DESTRUCTED) )
     {
+        int numRemaining = interactive->text_end - interactive->command_start;
+
         command_giver = NULL;
         current_interactive = NULL;
         push_ref_object(inter_sp, ob, "remove_interactive");
+
+        if (numRemaining > 0)
+        {
+            string_t * remaining = NULL;
+            memsafe( remaining = new_n_mstring(interactive->text+interactive->command_start, numRemaining)
+                   , numRemaining, "buffer for remaining data from socket");
+            push_string(inter_sp, remaining);
+        }
+        else
+            push_ref_string(inter_sp, STR_EMPTY);
+
         malloc_privilege = MALLOC_MASTER;
-        callback_master(STR_DISCONNECT, 1);
+        callback_master(STR_DISCONNECT, 2);
         /* master might have used exec() */
         ob = interactive->ob;
     }
