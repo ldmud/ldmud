@@ -3,6 +3,9 @@ SYNOPSIS
 
 DESCRIPTION
         This function will be called automatically every 2 seconds.
+        The driver will call the function directly in the object, even if the
+        function is being shadowed.
+
         The start and stop of heart beat is controlled by the efun
         set_heart_beat(). Be careful not to have objects with heart
         beat running all the time, as it uses a lot of driver

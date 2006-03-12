@@ -1,8 +1,61 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Mar-2006 (Lars Duening)  (3.2.13)
+  - Created snapshot.
+
+08-Mar-2006  (Malcom Tester)
+  - (lp-245/obj/master.c) Made the move implementation more robust.
+
+07-Mar-2006  (Lars Duening)
+  - (pkg-tls.c) Two modifications to increase reconnect stability (thanks,
+      Philipp!).
+
+06-Mar-2006  (Lars Duening)
+  - (backend, comm.c, object) The logon(obj) function moved from
+      backend.c into object.c, and was renamed logon_object() - it's
+      more sensical this way.
+  - (comm.c) If the master::connect() initiates a secure connection
+      which gets stuck in the handshake, neither logon() is called nor
+      is the prompt printed. Also, if the tls_init_connection() didn't
+      set a callback, the driver will provide a callback to logon().
+      This way logon() won't be called unless the connection is up
+      and running.
+  - (mudlib/psyc-tls.c) Example for using the tls_check_certificate()
+      efun (thanks, Philipp).
+
+28-Feb-2006  (Lars Duening)
+  - (simulate.c) Virtual blueprint objects are guaranteed to have their
+      'clone' flag unset.
+  - (string_spec, simulate.c) Renamed COMP_OBJ to the more intuitive
+      COMPILE_OBJECT.
+  - (efuns.c) sscanf(): The new modifier '+' requires the matching of
+      the characters after a field in order to consider the field
+      as matched.
+
+20-Feb-2006  (Lars Duening)
+  - (Makefile.in) Added a dependency to create patchlevel.h, even if
+      the program is made with 'make ldmud'.
+
+20-Feb-2006  (Gnomi)
+  - (comm.c) remove_interactive() clobbered the current_object, setting
+      it to NULL. It is now preserved (Bug #431).
+  - (interpret.c) When executing an efun closure, the tracedepth wasn't
+      incremented accordingly (Bug #441).
+  - (simulate.c) When executing a non-toplevel callback, the tracedepth
+      should not be zeroed out (Bug #441).
+
+08-Jan-2006  (Lars Duening)
+  - (make_func.y) When parsing the func_spec file, the preprocessor
+      conditionals were handled in a buffer in a no-longer existing
+      stack frame. So far, we were lucky, but on a 64-bit machine
+      that space was needed by the Bison parser.
+  - (driver.h) If the machine uses a 8-Byte
+      malloc alignment (e.g. all PowerPC machines), the allocator does
+      not replace the system malloc().
+
 27-Nov-2005  (Lars Duening)  (3.2.12)
-  - Created new release.
+  - Created snapshot.
   - (object.c) Efun function_exists(): The 'FEXISTS_ALL' result also contains
       information about the function's type, flags, and number of
       arguments (Bug #410).

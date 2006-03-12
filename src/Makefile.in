@@ -129,6 +129,8 @@ tags: $(SRC)
 TAGS: $(SRC)
 	etags $(SRC)
 
+patchlevel.h : make-patchlevel
+
 make-patchlevel:
 	./mk-patchlevel.sh
 

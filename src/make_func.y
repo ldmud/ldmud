@@ -1957,8 +1957,10 @@ yylex1 (void)
                         strncmp(str, line_buffer, match_tmp) == 0)
 
         char line_buffer[MAKE_FUNC_MAXLINE+1];
+        char defbuf[MAKE_FUNC_MAXLINE + 1];
 
         line_buffer[MAKE_FUNC_MAXLINE] = '\0';
+        outp = defbuf + sizeof(defbuf) - 1;
 
         switch(c = getc(fpr))
         {

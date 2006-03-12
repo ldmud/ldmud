@@ -1774,7 +1774,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         svalue_t *svp;
 
         push_volatile_string(fname);
-        svp = apply_master(STR_COMP_OBJ, 1);
+        svp = apply_master(STR_COMPILE_OBJECT, 1);
         if (svp && svp->type == T_OBJECT)
         {
             /* We got an object from the call, but is it what it
@@ -1786,7 +1786,17 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
                  * the one we received?
                  */
                 if (ob == svp->u.ob)
+                {
+                    /* If this object is a clone, clear the clone flag
+                     * but mark it as replaced.
+                     */
+                    if (ob->flags & O_CLONE)
+                    {
+                        ob->flags &= ~O_CLONE;
+                        ob->flags |= O_REPLACED;
+                    }
                     return ob;
+                }
             }
             else if (ob != master_ob)
             {
@@ -1798,6 +1808,15 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
                 xfree(ob->name);
                 ob->name = string_copy(name);
                 enter_object_hash(ob);
+
+                /* If this object is a clone, clear the clone flag
+                 * but mark it as replaced.
+                 */
+                if (ob->flags & O_CLONE)
+                {
+                    ob->flags &= ~O_CLONE;
+                    ob->flags |= O_REPLACED;
+                }
                 return ob;
             }
             fname[name_length] = '.';
@@ -3670,7 +3689,10 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
     }
     else
     {
-        if (!apply(cb->function.named.name, ob, num_arg + nargs))
+        if (toplevel)
+            tracedepth = 0;
+
+        if (!sapply(cb->function.named.name, ob, num_arg + nargs))
             transfer_svalue(&apply_return_value, &const0);
     }
 

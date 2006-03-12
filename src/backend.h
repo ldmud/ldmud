@@ -28,7 +28,6 @@ extern Bool mud_is_up;
 
 extern void  clear_state (void);
 extern void check_alarm (void);
-extern void  logon (object_t *ob);
 extern void  backend (void);
 extern void  preload_objects (int eflag);
 extern svalue_t *f_debug_message (svalue_t *sp);

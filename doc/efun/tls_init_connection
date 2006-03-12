@@ -32,10 +32,17 @@ DESCRIPTION
         The driver automatically suppresses the printing of the prompt
         while the TLS handshake is in progress.
 
+        If tls_init_connection() is called in the master::connect() function,
+        the driver will either call the set callback in place of logon(), or
+        if not callback has been set, delay the call of logon() until the
+        state of the connection is clear.
+
 HISTORY
         Introduced in LDMud 3.3.474 and following, backported to 3.2.11.
+        LDMud 3.2.13 streamlined the handling of secure connections during
+          logon.
 
 SEE ALSO
         tls_deinit_connection(E), tls_error(E), tls_query_connection_state(E),
         tls_query_connection_info(E), tls_available(E),
-        tls_check_certificate(E)
+        tls_check_certificate(E), connect(M), logon(A)
