@@ -868,7 +868,10 @@ mem_dump_data (strbuf_t *sbuf)
  */
 
 {
-    t_stat sbrk_st, clib_st, perm_st, xalloc_st;
+    t_stat sbrk_st, perm_st, xalloc_st;
+#if defined(REPLACE_MALLOC)
+    t_stat clib_st;
+#endif
     t_stat l_alloc, l_free, l_wasted;
     t_stat s_alloc, s_free, s_slab, s_free_slab;
     unsigned long s_overhead;
@@ -883,7 +886,9 @@ mem_dump_data (strbuf_t *sbuf)
 #endif /* MALLOC_EXT_STATISTICS */
 
     sbrk_st = sbrk_stat;
+#if defined(REPLACE_MALLOC)
     clib_st = clib_alloc_stat;
+#endif
     xalloc_st = xalloc_stat;
     perm_st = perm_alloc_stat;
     l_alloc = large_alloc_stat; l_alloc.size *= SINT;
@@ -1152,8 +1157,13 @@ mem_dinfo_data (svalue_t *svp, int value)
     ST_NUMBER(DID_MEM_MINC_CALLS, malloc_increment_size_calls);
     ST_NUMBER(DID_MEM_MINC_SUCCESS, malloc_increment_size_success);
     ST_NUMBER(DID_MEM_MINC_SIZE, malloc_increment_size_total);
+#if defined(REPLACE_MALLOC)
     ST_NUMBER(DID_MEM_CLIB, clib_alloc_stat.counter);
     ST_NUMBER(DID_MEM_CLIB_SIZE, clib_alloc_stat.size);
+#else
+    ST_NUMBER(DID_MEM_CLIB, 0);
+    ST_NUMBER(DID_MEM_CLIB_SIZE, 0);
+#endif
     ST_NUMBER(DID_MEM_PERM, perm_alloc_stat.counter);
     ST_NUMBER(DID_MEM_PERM_SIZE, perm_alloc_stat.size);
     ST_NUMBER(DID_MEM_OVERHEAD, T_OVERHEAD * SINT);

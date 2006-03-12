@@ -1151,6 +1151,30 @@ f_pg_close (svalue_t *sp)
     return sp;
 } /* f_pg_close() */
 
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_pg_conv_string (svalue_t *sp)
+
+/* EFUN pg_escapeString
+ *
+ * string pg_conv_string(string input)
+ *
+ * Escape a string for use within an SQL command.
+ */
+{
+    string_t *escaped;
+    int size = mstrsize(sp->u.str);
+    memsafe(escaped = alloc_mstring(2 * size), 2 * size
+                                             , "escaped sql string");
+
+    // PQescapeString(char *to, char *from, size_t length);
+    PQescapeString( (unsigned char *)get_txt(escaped)
+                  , (unsigned char *)get_txt(sp->u.str), size);
+    free_string_svalue(sp);
+    put_string(sp, escaped);
+    return sp;
+} /* pg_conv_string() */
+
 /*=========================================================================*/
 
 /*                          GC SUPPORT                                     */

@@ -1,10 +1,130 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-15-May-2005 (Lars Duening)  (3.4.0 = 3.3.705)
-  - Release 3.4.0
+24-Nov-2005  (Lars Duening)  (3.3.712 = 3.4.1)
+  - Released as 3.4.1 on 12-Mar-2006.
+  - (md5.c) The ROTATE_LEFT macro wasn't 64-bit clean (Bug #413).
+  - (interpret.c) Using foreach(), when looping over a mapping with no values,
+      or with only the index being extracted, the loop actually loops over the
+      mapping and not just the indices copied into an array (Bug #388).
+  - (object.c) Efun set_environment(): clear the RESET_STATE flag of
+      of the moved object's original environment, if any (Bug #387).
+  - (efuns.c) Efun md5()/sha1() can now hash arrays of numbers as well
+      (Bug #411).
+  - (xalloc.c) The string_copy() function checks if the requested
+      memory is actually allocated, throwing an error if not (Bug #397).
+  - (simulate.c) Errors during the processing of a fatal() will be
+      recognized and treated as double-fatal (Bug #408).
+  - (interpret.c) free_svalue() now recognizes the free of nested
+      structures and de-serializes them to avoid stack overflows (Bug #416).
+  - (Makefile.in, version.sh, patchlevel.h.in) Removed PRCS support.
 
-15-May-2005 (Lars Duening)  (3.3.705)
+24-Nov-2005  (Gnomi)
+  - (actions.c) When re-using a sentence structure for marker_sent,
+       the shadow_ob member wasn't cleared out, causing crashes
+       down the road (Bug #0000414).
+  - (closure.c) bind_lambda() doesn't ignore unbindable closures
+       when the second argument is missing (Bug #407).
+
+09-Oct-2005  (Lars Duening)
+  - (closure.c) replace_program_lambda_adjust() forgot to clear the
+       object references from the auxiliary lambda it created (Bug #0000412).
+
+08-Oct-2005  (Lars Duening)
+  - (closure.c) When freeing bound unbound_lambdas, the code forgot to
+       remove the reference to the creator object of the unbound_lambda.
+  - (closure.c) Efun symbol_function() leaked an object reference (Bug
+       #0000412).
+  - (closure.c, object.h) Made the object reference logs a bit more
+       expressive.
+
+31-Oct-2005 (Philipp Hancke)
+  - (pkg-tls.c) When accepting a SSL connection, request a client
+       certificate. The driver itself won't check the correctness,
+       but the result will be available in the connection status.
+
+30-Oct-2005 (Lars Duening)  (3.3.711)
+  - Created snapshot.
+
+29-Oct-2005 (Lars Duening)
+  - (backend.c) The backend call to cleanup_all_objects() is now
+       controlled with a low/high watermark logic, to prevent
+       repeated calls in consecutive backend cycles: if one cleanup
+       didn't remove enough destructed objects, it is unlikely
+       that immediately following ones will.
+  - (pkg-tls.c) The OpenSSL read/writes are now retried when necessary.
+  - (configure) When searching for the mysqlclient library in the
+       usual places, the configure script forgot to clear out the 
+       cache flag.
+  - (smalloc.c) Removed a compilation error when SBRK_OK wasn't defined.
+  - (mstrings, many files) The find-in-table statistics were done
+       incompletely.
+  - (structs.c) The test for struct equivalence now recurses through
+       member structs; otherwise changes in an contained struct wouldn't
+       be reflected in the containing struct.
+  - (prolang.y) Clarified the 'Unknown type' error messages when
+       derefencing structs.
+
+19-Oct-2005 (Lars Duening)
+  - (pkg-tls.c) tls_check_certificate() now returns the low-level API
+      values, and throws an error if the connection is not secure.
+
+11-Oct-2005 (Lars Duening)
+  - (erq/erq.c, xerq/socket.c) Corrected compilation warnings.
+  - (lex.c) to_int() no longer accepts "x<num>" as valid sedecimal
+       notation (Bug #0000402).
+
+10-Oct-2005 (Lars Duening)
+  - (backend.c) Added a clear_state() at the beginning of the
+    process_objects() loop, so that errors during the cleanup find
+    a consistent machine state (Bug #0000405).
+
+09-Oct-2005 (Lars Duening)
+  - (simulate.c) If the catch() handling notices an out-of-memory
+      situation, the catch() is ignored. This also fixes an endless
+      recursion (Bug #0000406).
+
+04-Oct-2005 (Lars Duening)
+  - (doc/concepts/overloading) New man page (thanks, Coogan!).
+
+28-Sep-2005 (Lars Duening)
+  - (doc/efun/clone_object) Clarified the variable initialisation.
+
+23-Aug-2005 (Lars Duening)
+  - (Makefile.in) The PRCS rules first check if PRCS is available.
+
+20-Jun-2005 (Lars Duening)  (3.3.710)
+  - (patchlevel.h.in, version.sh, mk-patchlevel.sh, Makefiles)
+      Modified the version numbering system to be compatible between
+      Subversion and PRCS.
+
+20-Jun-2005 (Lars Duening)  (3.3.709)
+  - (xalloc.c) xalloc used REPLACE_MALLOC before it was defined,
+      leading to compilation errors on systems supporting it (Bug #0000393).
+
+19-Jun-2005 (Lars Duening)  (3.3.708)
+  - (pkg-pgsql, func_spec) Added new efun pg_conv_string(), courtesy
+      of Philipp.
+  - (efuns.c) Added new flag setting '4' to get_type_info() for closures
+      (Bug #0000392).
+  - (parse.c) Possibly corrected a refcounting bug in handling prepositions
+      (Bug #0000391).
+  - (closure.c) Since the operators #'&, #'|, #'^ and #'! are now considered
+      efuns, the closure compiler skipped the special treatment of these.
+      As an added bonus of the correction, #'| and #'^ can now take
+      an arbitrary number of arguments, too. (Bug #0000389)
+
+10-Jun-2005 (Lars Duening)  (3.3.707)
+  - (gcollect, backend.c) If the number of destructed pending objects
+      exceeds the number of active objects, a cleanup of all objects
+      is triggered. Also, the incremental cleanup in each cycle
+      cleans at least the number of objects destructed in the cycle.
+
+06-Jun-2005 (Lars Duening)  (3.3.706)
+  - (object.c, sprintf.c, structs.c) Removed a couple compilation warnings
+      on x86-64.
+
+15-May-2005 (Lars Duening)  (3.3.705 = 3.4.0)
   - (simulate.c) runtime_error(), runtime_warning() and heart_beat_error()
       received a new argument 'caught' (Bug #0000385).
 
@@ -556,7 +676,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 13-Nov-2004 (Lars Duening)  (3.3.613)
   - (lex.c, efuns.c) Embarassing: the number parsing method assumed that the
-       string at least started with a digit - this broken to_int().
+       string at least started with a digit - this broke to_int().
        (Bug #0000141)
 
 12-Nov-2004 (Lars Duening)  (3.3.612)

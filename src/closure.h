@@ -40,7 +40,7 @@ struct lambda_s
       /* Blueprint object and relative for the program creating this closure,
        * or NULL. Since this information is error reporting purposes only,
        * the lambda keeps a reference to the blueprint and not the program
-       * itself to not get in the way of swapping or otherwise.
+       * itself to not get in the way of swapping or other things.
        */
 
     union               /* Closure information: */

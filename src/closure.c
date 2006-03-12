@@ -1002,6 +1002,10 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
             memcpy(l->function.code, l2->function.code, (size_t)code_size2);
 
             /* Free the (now empty) memory */
+            if  (l2->ob)
+                free_object(l2->ob, "replace_program_lambda_adjust");
+            if  (l2->prog_ob)
+                free_object(l2->prog_ob, "replace_program_lambda_adjust");
             xfree(svp2);
             free_array(lrpp->args);
             free_svalue(&lrpp->block);
@@ -1031,7 +1035,7 @@ closure_init_lambda (lambda_t * l, object_t * obj)
     l->ref = 1;
     if (current_prog)
     {
-        l->prog_ob = ref_valid_object(current_prog->blueprint, "closure_literal");
+        l->prog_ob = ref_valid_object(current_prog->blueprint, "lambda creator");
         l->prog_pc = inter_pc - current_prog->program;
     }
     else
@@ -1041,7 +1045,7 @@ closure_init_lambda (lambda_t * l, object_t * obj)
     }
 
     if (obj)
-        l->ob = ref_object(obj, "closure");
+        l->ob = ref_object(obj, "lambda object");
     else
         l->ob = NULL;
 } /* closure_init_lambda() */
@@ -1171,7 +1175,7 @@ closure_lfun ( svalue_t *dest, object_t *obj
 {
     lambda_t *l;
 
-    /* Allocate an initialise a new lambda structure */
+    /* Allocate and initialise a new lambda structure */
 #ifndef USE_NEW_INLINES
     l = closure_new_lambda(obj, raise_error);
 #else /* USE_NEW_INLINES */
@@ -1717,7 +1721,7 @@ compile_value (svalue_t *value, int opt_flags)
                      *      LBRANCH_ZERO end
                      *      <arg i+1>
                      *
-                     * Analog for F_OR, here the branches are on _NON_ZERO.
+                     * Analog for F_LOR, here the branches are on _NON_ZERO.
                      */
                     mp_int *branchp;
                       /* Table storing the position of the branch/operator
@@ -3267,83 +3271,6 @@ compile_value (svalue_t *value, int opt_flags)
                     break;
                   }
 
-                /* ({#'!, <expr> })
-                 */
-                case F_NOT:
-                  {
-                    /* This is compiled as
-                     *
-                     *   <expr>
-                     *   NOT
-                     *
-                     * If the caller accepts reversed logic, the NOT is
-                     * omitted and the fact is stored in opt_flags:NEGATE_GIVEN.
-                     */
-
-                    if (block_size != 2)
-                        lambda_error("Wrong number of arguments to #'!\n");
-
-                    opt_flags |= compile_value(++argp, opt_flags & ~ZERO_ACCEPTED);
-                    if (opt_flags & (NEGATE_ACCEPTED|VOID_GIVEN) )
-                    {
-                        opt_flags ^= NEGATE_GIVEN;
-                    }
-                    else
-                    {
-                        if (current.code_left < 1)
-                            realloc_code();
-                        current.code_left--;
-                        STORE_CODE(current.codep, F_NOT);
-                    }
-                    break;
-                  }
-
-                /* ({#'&, <expr1>, ..., <exprn> })
-                 * ({#'&, <lvalue> })
-                 */
-                case F_AND:
-                  {
-                    int i;
-
-                    if ( (i = block_size - 2) > 0)
-                    {
-                    	/* This is compiled as:
-                    	 *
-                    	 *   <expr1>
-                    	 *   <expr2>
-                    	 *   AND
-                    	 *   ...
-                    	 *   <exprn>
-                    	 *   AND
-                    	 */
-                        compile_value(++argp, 0);
-                        do {
-                            compile_value(++argp, 0);
-                            if (current.code_left < 1)
-                                realloc_code();
-                            current.code_left--;
-                            STORE_CODE(current.codep, F_AND);
-                        } while (--i);
-                    }
-                    else if (!i)
-                    {
-                    	/* This is compiled as:
-                    	 *
-                    	 *   <lvalue>
-                    	 *
-                    	 * (easy, isn't it?)
-                    	 */
-                        if (opt_flags & REF_REJECTED)
-                            lambda_error("Reference value in bad position\n");
-                        compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
-                    }
-                    else
-                    {
-                        lambda_error("Missing argument(s) to #'&\n");
-                    }
-                    break;
-                  }
-
                 /* ({#'sscanf, <data>, <fmt>, <lvalue1>, ..., <lvalueN> })
                  */
                 case F_SSCANF:
@@ -3989,148 +3916,333 @@ compile_value (svalue_t *value, int opt_flags)
             }
             else /* it's an EFUN closure */
             {
-            	/* This is compiled as:
-            	 *
-                 *   optional <save_arg_frame>
-            	 *   <arg1>
-            	 *   <arg2>
-            	 *   ...
-            	 *   <argN>
-            	 *   <efun>
-                 *   optional <restore_arg_frame>
-            	 */
-            	
-                mp_int i;
-                bytecode_p p;
-                int f;
-                Bool needs_ap;
-                mp_int num_arg;
-                mp_int min;
-                mp_int max;
-                mp_int def;
+                mp_int block_size;  /* Number of entries */
 
-                /* Get the instruction code */
-                f = type - CLOSURE_EFUN;
-                min = instrs[f].min_arg;
-                max = instrs[f].max_arg;
+                block_size = (mp_int)VEC_SIZE(block);
 
-                /* Handle the arg frame for varargs efuns */
-                needs_ap = MY_FALSE;
-                if (f >= EFUNV_OFFSET || f == F_CALL_OTHER)
+                switch (type - CLOSURE_EFUN)
                 {
-                    needs_ap = MY_TRUE;
-                    if (current.code_left < 1)
-                        realloc_code();
-                    current.code_left--;
-                    STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
-                }
-
-                /* Compile the arguments */
-                num_arg = (mp_int)VEC_SIZE(block) - 1;
-                for (i = num_arg; --i >= 0; )
-                {
-                    compile_value(++argp, 0);
-                }
-
-                /* Get the instruction and check if it received the
-                 * correct number of arguments.
+                /* ({#'&, <expr1>, ..., <exprn> })
+                 * ({#'&, <lvalue> })
                  */
-                argp = block->item;
-                if (current.code_left < 8)
-                    realloc_code();
+                case F_AND:
+                  {
+                    int i;
+
+                    i = block_size - 2;
+
+                    if ( i > 0 )
+                    {
+                    	/* This is compiled as:
+                    	 *
+                    	 *   <expr1>
+                    	 *   <expr2>
+                    	 *   AND
+                    	 *   ...
+                    	 *   <exprn>
+                    	 *   AND
+                    	 */
+                        compile_value(++argp, 0);
+                        do {
+                            compile_value(++argp, 0);
+                            if (current.code_left < 1)
+                                realloc_code();
+                            current.code_left--;
+                            STORE_CODE(current.codep, F_AND);
+                        } while (--i);
+                    }
+                    else if (!i)
+                    {
+                    	/* This is compiled as:
+                    	 *
+                    	 *   <lvalue>
+                    	 *
+                    	 * (easy, isn't it?)
+                    	 */
+                        if (opt_flags & REF_REJECTED)
+                            lambda_error("Reference value in bad position\n");
+                        compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
+                    }
+                    else
+                    {
+                        lambda_error("Missing argument(s) to #'&\n");
+                    }
+                    break;
+                  }
+
+                /* ({#'|, <expr1>, ..., <exprn> })
+                 * ({#'|, <lvalue> })
+                 */
+                case F_OR:
+                  {
+                    int i;
+
+                    i = block_size - 2;
+
+                    if ( i > 0 )
+                    {
+                    	/* This is compiled as:
+                    	 *
+                    	 *   <expr1>
+                    	 *   <expr2>
+                    	 *   OR
+                    	 *   ...
+                    	 *   <exprn>
+                    	 *   OR
+                    	 */
+                        compile_value(++argp, 0);
+                        do {
+                            compile_value(++argp, 0);
+                            if (current.code_left < 1)
+                                realloc_code();
+                            current.code_left--;
+                            STORE_CODE(current.codep, F_OR);
+                        } while (--i);
+                    }
+                    else if (!i)
+                    {
+                    	/* This is compiled as:
+                    	 *
+                    	 *   <lvalue>
+                    	 *
+                    	 * (easy, isn't it?)
+                    	 */
+                        if (opt_flags & REF_REJECTED)
+                            lambda_error("Reference value in bad position\n");
+                        compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
+                    }
+                    else
+                    {
+                        lambda_error("Missing argument(s) to #'&\n");
+                    }
+                    break;
+                  }
+
+                /* ({#'^, <expr1>, ..., <exprn> })
+                 * ({#'^, <lvalue> })
+                 */
+                case F_XOR:
+                  {
+                    int i;
+
+                    i = block_size - 2;
+
+                    if ( i > 0 )
+                    {
+                    	/* This is compiled as:
+                    	 *
+                    	 *   <expr1>
+                    	 *   <expr2>
+                    	 *   OR
+                    	 *   ...
+                    	 *   <exprn>
+                    	 *   OR
+                    	 */
+                        compile_value(++argp, 0);
+                        do {
+                            compile_value(++argp, 0);
+                            if (current.code_left < 1)
+                                realloc_code();
+                            current.code_left--;
+                            STORE_CODE(current.codep, F_XOR);
+                        } while (--i);
+                    }
+                    else if (!i)
+                    {
+                    	/* This is compiled as:
+                    	 *
+                    	 *   <lvalue>
+                    	 *
+                    	 * (easy, isn't it?)
+                    	 */
+                        if (opt_flags & REF_REJECTED)
+                            lambda_error("Reference value in bad position\n");
+                        compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
+                    }
+                    else
+                    {
+                        lambda_error("Missing argument(s) to #'&\n");
+                    }
+                    break;
+                  }
+
+                /* ({#'!, <expr> })
+                 */
+                case F_NOT:
+                  {
+                    /* This is compiled as
+                     *
+                     *   <expr>
+                     *   NOT
+                     *
+                     * If the caller accepts reversed logic, the NOT is
+                     * omitted and the fact is stored in opt_flags:NEGATE_GIVEN.
+                     */
+
+                    if (block_size != 2)
+                        lambda_error("Wrong number of arguments to #'!\n");
+
+                    opt_flags |= compile_value(++argp, opt_flags & ~ZERO_ACCEPTED);
+                    if (opt_flags & (NEGATE_ACCEPTED|VOID_GIVEN) )
+                    {
+                        opt_flags ^= NEGATE_GIVEN;
+                    }
+                    else
+                    {
+                        if (current.code_left < 1)
+                            realloc_code();
+                        current.code_left--;
+                        STORE_CODE(current.codep, F_NOT);
+                    }
+                    break;
+                  }
+
+                default:
+                  {
+                    /* This is compiled as:
+                     *
+                     *   optional <save_arg_frame>
+                     *   <arg1>
+                     *   <arg2>
+                     *   ...
+                     *   <argN>
+                     *   <efun>
+                     *   optional <restore_arg_frame>
+                     */
+                    
+                    mp_int i;
+                    bytecode_p p;
+                    int f;
+                    Bool needs_ap;
+                    mp_int num_arg;
+                    mp_int min;
+                    mp_int max;
+                    mp_int def;
+
+                    /* Get the instruction code */
+                    f = type - CLOSURE_EFUN;
+                    min = instrs[f].min_arg;
+                    max = instrs[f].max_arg;
+
+                    /* Handle the arg frame for varargs efuns */
+                    needs_ap = MY_FALSE;
+                    if (f >= EFUNV_OFFSET || f == F_CALL_OTHER)
+                    {
+                        needs_ap = MY_TRUE;
+                        if (current.code_left < 1)
+                            realloc_code();
+                        current.code_left--;
+                        STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
+                    }
+
+                    /* Compile the arguments */
+                    num_arg = (mp_int)VEC_SIZE(block) - 1;
+                    for (i = num_arg; --i >= 0; )
+                    {
+                        compile_value(++argp, 0);
+                    }
+
+                    /* Get the instruction and check if it received the
+                     * correct number of arguments.
+                     */
+                    argp = block->item;
+                    if (current.code_left < 8)
+                        realloc_code();
 
 #ifdef USE_STRUCTS
-                /* The 'efun' #'-> needs a hidden argument
-                 * for the struct type index.
-                 */
-                if (f == F_S_INDEX)
-                {
-                    current.code_left--;
-                    STORE_CODE(current.codep, (bytecode_t)F_NCONST1);
-                }
+                    /* The 'efun' #'-> needs a hidden argument
+                     * for the struct type index.
+                     */
+                    if (f == F_S_INDEX)
+                    {
+                        current.code_left--;
+                        STORE_CODE(current.codep, (bytecode_t)F_NCONST1);
+                    }
 #endif /* USE_STRUCTS */
 
-                p = current.codep;
-                if (num_arg < min)
-                {
-                    /* Not enough arguments... probably */
-
-                    int g;
-
-                    if (num_arg == min-1 && 0 != (def = instrs[f].Default))
+                    p = current.codep;
+                    if (num_arg < min)
                     {
-                    	/* We have a default argument */
-                        if (instrs[def].prefix)
+                        /* Not enough arguments... probably */
+
+                        int g;
+
+                        if (num_arg == min-1 && 0 != (def = instrs[f].Default))
                         {
-                            STORE_CODE(p, instrs[def].prefix);
+                            /* We have a default argument */
+                            if (instrs[def].prefix)
+                            {
+                                STORE_CODE(p, instrs[def].prefix);
+                                current.code_left--;
+                                max--;
+                                min--;
+                            }
+                            STORE_CODE(p, instrs[def].opcode);
                             current.code_left--;
                             max--;
                             min--;
                         }
-                        STORE_CODE(p, instrs[def].opcode);
-                        current.code_left--;
-                        max--;
-                        min--;
+                        else
+                            /* Maybe there is a replacement efun */
+                             if ( (g = proxy_efun(f, num_arg)) < 0
+                         ||  (f = g, MY_FALSE) )
+                            /* No, there isn't */
+                            lambda_error("Too few arguments to %s\n", instrs[f].name);
                     }
-                    else
-                        /* Maybe there is a replacement efun */
-                         if ( (g = proxy_efun(f, num_arg)) < 0
-                     ||  (f = g, MY_FALSE) )
-                        /* No, there isn't */
-                        lambda_error("Too few arguments to %s\n", instrs[f].name);
-                }
-                else if (num_arg > max && max != -1)
-                {
-                    /* More arguments than the efun can handle */
-                    if (f == F_INDEX && num_arg == 3)
+                    else if (num_arg > max && max != -1)
                     {
-                    	/* Exception: indexing of wide mappings */
-                        f = F_MAP_INDEX;
+                        /* More arguments than the efun can handle */
+                        if (f == F_INDEX && num_arg == 3)
+                        {
+                            /* Exception: indexing of wide mappings */
+                            f = F_MAP_INDEX;
+                        }
+                        else
+                        {
+                            lambda_error(
+                              "Too many arguments to %s\n",
+                              instrs[f].name
+                            );
+                        }
                     }
-                    else
-                    {
-                        lambda_error(
-                          "Too many arguments to %s\n",
-                          instrs[f].name
-                        );
-                    }
-                }
 
-                /* Store function bytecode. */
-                if (instrs[f].prefix)
-                {
-                    STORE_CODE(p, instrs[f].prefix);
-                    current.code_left--;
-                }
-                STORE_CODE(p, instrs[f].opcode);
-                current.code_left--;
-
-                /* Note the type of the result, and add a CONST0 if
-                 * the caller expects one from a void efun. Always
-                 * add the CONST0 for void varargs efuns.
-                 */
-                if ( instrs[f].ret_type.typeflags == TYPE_VOID )
-                {
-                    if (f < EFUNV_OFFSET
-                     && (opt_flags & (ZERO_ACCEPTED|VOID_ACCEPTED)))
+                    /* Store function bytecode. */
+                    if (instrs[f].prefix)
                     {
-                        opt_flags = VOID_GIVEN;
-                    }
-                    else
-                    {
-                        STORE_CODE(p, F_CONST0);
+                        STORE_CODE(p, instrs[f].prefix);
                         current.code_left--;
                     }
-                }
-
-                /* Handle the arg frame for varargs efuns */
-                if (needs_ap)
-                {
+                    STORE_CODE(p, instrs[f].opcode);
                     current.code_left--;
-                    STORE_CODE(p, F_RESTORE_ARG_FRAME);
-                }
 
-                current.codep = p;
+                    /* Note the type of the result, and add a CONST0 if
+                     * the caller expects one from a void efun. Always
+                     * add the CONST0 for void varargs efuns.
+                     */
+                    if ( instrs[f].ret_type.typeflags == TYPE_VOID )
+                    {
+                        if (f < EFUNV_OFFSET
+                         && (opt_flags & (ZERO_ACCEPTED|VOID_ACCEPTED)))
+                        {
+                            opt_flags = VOID_GIVEN;
+                        }
+                        else
+                        {
+                            STORE_CODE(p, F_CONST0);
+                            current.code_left--;
+                        }
+                    }
+
+                    /* Handle the arg frame for varargs efuns */
+                    if (needs_ap)
+                    {
+                        current.code_left--;
+                        STORE_CODE(p, F_RESTORE_ARG_FRAME);
+                    }
+
+                    current.codep = p;
+                  } /* case default: */
+                } /* switch */
                 break;
             }
         } /* if (efun or operator closure) */
@@ -5163,7 +5275,7 @@ free_closure (svalue_t *svp)
         return;
 
     if (l->prog_ob)
-        free_object(l->prog_ob, "free_closure");
+        free_object(l->prog_ob, "free_closure: lambda creator");
 
     if (CLOSURE_HAS_CODE(type))
     {
@@ -5184,7 +5296,7 @@ free_closure (svalue_t *svp)
         return;
     }
 
-    free_object(l->ob, "free_closure");
+    free_object(l->ob, "free_closure: lambda object");
     if (type == CLOSURE_BOUND_LAMBDA)
     {
     	/* BOUND_LAMBDAs are indirections to UNBOUND_LAMBDA structures.
@@ -5200,6 +5312,10 @@ free_closure (svalue_t *svp)
 
         if (--l2->ref)
             return;
+
+        if (l2->prog_ob)
+            free_object(l2->prog_ob, "free_closure: unbound lambda creator");
+
         svp = (svalue_t *)l2;
         if ( (num_values = EXTRACT_UCHAR(l2->function.code)) == 0xff)
             num_values = svp[-0x100].u.number;
@@ -5211,7 +5327,7 @@ free_closure (svalue_t *svp)
 
     if (type == CLOSURE_LFUN)
     {
-        free_object(l->function.lfun.ob, "free_closure");
+        free_object(l->function.lfun.ob, "free_closure: lfun object");
     }
 
 #ifdef USE_NEW_INLINES
@@ -5779,7 +5895,7 @@ v_bind_lambda (svalue_t *sp, int num_arg)
          * throw an error (unless <ob> has been omitted)
          */
         free_object(ob, "bind_lambda");
-        if (sp[1].type == T_NUMBER)
+        if (num_arg == 1)
             break;
         errorf("Bad arg 1 to bind_lambda(): unbindable closure\n");
         /* NOTREACHED */
@@ -6030,6 +6146,8 @@ f_symbol_function (svalue_t *sp)
         free_object(sp->u.lambda->ob, "symbol_function");
         sp->u.lambda->ob = ref_object(current_object, "symbol_function");
 
+        free_object(ob, "symbol_function"); /* We adopted the reference */
+
         return sp;
     }
 
@@ -6120,9 +6238,6 @@ f_symbol_variable (svalue_t *sp)
              */
             string_t *str;
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
             str = find_tabled(sp->u.str);
             if (!str)
             {

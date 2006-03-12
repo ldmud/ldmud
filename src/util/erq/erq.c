@@ -91,8 +91,10 @@ time_t time(time_t *);
 #    define SIGTERM 15
 #endif
 
-#ifdef _AIX
-typedef unsigned long length_t;  /* *sigh* */
+#if defined(_AIX)
+typedef unsigned long length_t;
+#elif defined(__INTEL_COMPILER) || defined (__GNUC__)
+typedef socklen_t length_t;
 #else
 typedef int length_t;
 #endif

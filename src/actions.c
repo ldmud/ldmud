@@ -576,9 +576,6 @@ call_modify_command (char *buff)
             svalue_t sv;
             string_t * str;
 
-#ifdef EXT_STRING_STATS
-            stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
             if ( NULL != (str = find_tabled_str(buff)) )
             {
                 put_string(&sv, str);
@@ -1048,6 +1045,7 @@ parse_command (char *buff, Bool from_efun)
         marker_sent->sent.type = SENT_MARKER;
         marker_sent->verb = NULL;
         marker_sent->function = NULL;
+        marker_sent->shadow_ob = NULL;
 
         /* Push the argument and call the command function.
          */
@@ -1173,6 +1171,7 @@ parse_command (char *buff, Bool from_efun)
     marker_sent->sent.type = SENT_MARKER;
     marker_sent->verb = NULL;
     marker_sent->function = NULL;
+    marker_sent->shadow_ob = NULL;
     command_marker = marker_sent;
 
     /* If the command was not found, notify the failure */
@@ -1902,9 +1901,6 @@ f_remove_action (svalue_t *sp)
     verb = NULL;
     if (sp[-1].type == T_STRING)
     {
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
         verb = find_tabled(sp[-1].u.str);
         if (!verb)
             verb = (string_t *)f_remove_action; /* won't be found */
@@ -1978,9 +1974,6 @@ e_get_action (object_t *ob, string_t *verb)
     sentence_t *s;
     svalue_t *p;
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
     if ( !(verb = find_tabled(verb)) )
         return NULL;
 

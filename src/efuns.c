@@ -343,8 +343,9 @@ f_md5 (svalue_t *sp)
 /* EFUN: md5()
  *
  *   string md5(string arg)
+ *   string md5(int *  arg)
  *
- * Create and return a MD5 message digest from the string <arg>.
+ * Create and return a MD5 message digest from the string/array <arg>.
  */
 
 {
@@ -352,6 +353,30 @@ f_md5 (svalue_t *sp)
     string_t *s_digest;
     unsigned char *digest, d[17];
     int i;
+
+    if (sp->type == T_POINTER)
+    {
+        string_t * arg;
+        char * argp;
+
+        memsafe(arg = alloc_mstring(VEC_SIZE(sp->u.vec)), VEC_SIZE(sp->u.vec)
+               , "md5 argument string");
+        argp = get_txt(arg);
+
+        for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
+        {
+            if (sp->u.vec->item[i].type != T_NUMBER)
+            {
+                free_mstring(arg);
+                errorf("Bad argument 1 to md5(): got mixed*, expected string/int*.\n");
+                /* NOTREACHED */
+            }
+            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+        }
+
+        free_svalue(sp);
+        put_string(sp, arg);
+    }
 
     memsafe(s_digest = alloc_mstring(32), 32, "md5 encryption result");
     digest = (unsigned char *)get_txt(s_digest);
@@ -365,7 +390,7 @@ f_md5 (svalue_t *sp)
     for (i = 0; i < 16; i++)
         sprintf((char *)digest+2*i, "%02x", d[i]);
 
-    free_string_svalue(sp);
+    free_svalue(sp);
     put_string(sp, s_digest);
 
     return sp;
@@ -435,8 +460,9 @@ f_sha1 (svalue_t *sp)
 /* EFUN: sha1()
  *
  *   string sha1(string arg)
+ *   string sha1(int *  arg)
  *
- * Create and return a SHA1 message digest from the string <arg>.
+ * Create and return a SHA1 message digest from the string/array <arg>.
  */
 
 {
@@ -444,6 +470,30 @@ f_sha1 (svalue_t *sp)
     string_t *s_digest;
     unsigned char *digest, d[SHA1HashSize + 1];
     int i;
+
+    if (sp->type == T_POINTER)
+    {
+        string_t * arg;
+        char * argp;
+
+        memsafe(arg = alloc_mstring(VEC_SIZE(sp->u.vec)), VEC_SIZE(sp->u.vec)
+               , "sha1 argument string");
+        argp = get_txt(arg);
+
+        for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
+        {
+            if (sp->u.vec->item[i].type != T_NUMBER)
+            {
+                free_mstring(arg);
+                errorf("Bad argument 1 to sha1(): got mixed*, expected string/int*.\n");
+                /* NOTREACHED */
+            }
+            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+        }
+
+        free_svalue(sp);
+        put_string(sp, arg);
+    }
 
     memsafe(s_digest = alloc_mstring(2 * SHA1HashSize)
            , 2 & SHA1HashSize, "sha1 encryption result");
@@ -458,7 +508,7 @@ f_sha1 (svalue_t *sp)
     for (i = 0; i < SHA1HashSize; i++)
         sprintf((char *)digest+2*i, "%02x", d[i]);
 
-    free_string_svalue(sp);
+    free_svalue(sp);
     put_string(sp, s_digest);
 
     return sp;
@@ -1875,9 +1925,6 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 str = NULL;
             else
             {
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
                 str = find_tabled_str_n(parts[i], lens[i]);
             }
             if (str != NULL && map != NULL)
@@ -2587,9 +2634,6 @@ process_value (const char *str, Bool original)
     /* Check if the function exists at all. apply() will be delighted
      * over the shared string anyway.
      */
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
     if ( NULL == (func2 = find_tabled_str(func)) )
     {
         return NULL;
@@ -4312,9 +4356,6 @@ f_present_clone (svalue_t *sp)
         /* Now make the name sane */
         sane_name = (char *)make_name_sane(name0, !compat_mode);
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
         if (sane_name)
             name = find_tabled_str(sane_name);
         else
@@ -6178,6 +6219,10 @@ v_get_type_info (svalue_t *sp, int num_arg)
  * return the name of the program the closure was defined in. For other
  * closures, <flag> setting 3 returns 0.
  *
+ * If <arg> is a lfun or context closure, the <flag> setting 4 lets the efun
+ * return the base name of the function (without any program name adorments).
+ * For other closures, <flag> setting 4 returns 0.
+ *
  * For every other <flag> setting, -1 is returned.
  *
  * The secondary information is:
@@ -6199,11 +6244,15 @@ v_get_type_info (svalue_t *sp, int num_arg)
     mp_int i, j;
     string_t *str; /* != NULL: to use instead of j */
     svalue_t *argp;
+    p_int flag = -1;
 
     argp = sp - num_arg + 1;
     i = argp->type;
     j = -1;
     str = NULL;
+
+    if (num_arg == 2 && sp->type == T_NUMBER)
+        flag = sp->u.number;
 
     /* Determine the second return value */
     switch(i)
@@ -6215,7 +6264,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
         j = argp->u.map->num_values;
         break;
     case T_CLOSURE:
-        if (num_arg == 2 && sp->type == T_NUMBER && sp->u.number == 2)
+        if (flag == 2)
         {
             object_t *ob;
 
@@ -6247,7 +6296,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
             return sp;
             /* NOTREACHED */
         }
-        if (num_arg == 2 && sp->type == T_NUMBER && sp->u.number == 3)
+        if (flag == 3)
         {
             string_t  *progname = NULL;
 
@@ -6273,6 +6322,27 @@ v_get_type_info (svalue_t *sp, int num_arg)
             return sp;
             /* NOTREACHED */
         }
+        if (flag == 4)
+        {
+            string_t  *function_name = NULL;
+
+            sp--;
+            if (sp->x.closure_type == CLOSURE_LFUN)
+            {
+                program_t *prog;
+                Bool       is_inherited;
+
+                closure_lookup_lfun_prog(sp->u.lambda, &prog, &function_name, &is_inherited);
+            }
+
+            free_svalue(sp);
+            if (!function_name)
+                put_number(sp, 0);
+            else
+                put_string(sp, function_name);
+            return sp;
+            /* NOTREACHED */
+        }
         /* FALLTHROUGH */
 
     case T_SYMBOL:
@@ -6281,7 +6351,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
         break;
 #ifdef USE_STRUCTS
     case T_STRUCT:
-        if (num_arg == 2 && sp->type == T_NUMBER && sp->u.number == 2)
+        if (flag == 2)
         {
             sp--;
 
@@ -6306,14 +6376,12 @@ v_get_type_info (svalue_t *sp, int num_arg)
     /* Depending on flag, return the proper value */
     if (num_arg == 2)
     {
-        p_int flagvalue = sp->u.number;
-
         free_svalue(sp--);
         free_svalue(sp);
-        if (flagvalue == 2)
-        if (flagvalue != 1) /* 0 or else */
+        if (flag == 2)
+        if (flag != 1) /* 0 or else */
         {
-            if (flagvalue) /* neither 0 nor 1 */
+            if (flag) /* neither 0 nor 1 */
             {
                 j = -1;
             }

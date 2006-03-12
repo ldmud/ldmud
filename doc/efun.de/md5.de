@@ -1,17 +1,23 @@
 SYNOPSIS
-        string md5(string arg)
+        string md5 (string arg)
+        string md5 (int *  arg)
 
 BESCHREIBUNG
-        Berechnet den MD5-Hashwert des Strings <arg>.
+        Berechnet den MD5-Hashwert von <arg>.
+        Das Argument kann ein String, oder ein Array von Zahlen sein (von
+        welchen nur das unterste Byte betrachted wird).
+
         Das Ergebnis wird als 32-stelliger Hexadezimalwert geliefert.
 
 BEISPIEL
         string s;
 
-        s = md5("Hallo, Welt!");
+        s = md5("Hallo");
+        s = md5( ({ 'H', 'a', 'l', 'l', 'o' })
 
 AENDERUNGEN
         Eingefuehrt in LDMud 3.2.9
+        LDMud 3.2.12 fuehrte Zaehlenarrays als Argument ein.
 
 SIEHE AUCH
         crypt(E), md5_crypt(E), sha1(E)

@@ -4,13 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-xx-xxx-xxxx (Lars Duening) -- Release 3.4.1
-
-    - Changed efuns:
-       + sha1(): Accept number arrays as arguments as well.
-
-
-15-May-2005 (Lars Duening) -- Release 3.4.0
+12-Mar-2006 (Lars Duening) -- Release 3.4.1
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -46,7 +40,7 @@ xx-xxx-xxxx (Lars Duening) -- Release 3.4.1
        + garbage_collection(): An optional flag argument allows to change
             the name of the default GC log file.
        + get_type_info(): The name of the defining program of a lfun or
-            context closure can be returned.
+            context closure, or the function name itself can be returned.
        + map(): The efun can now map strings as well.
        + make_shared_string(): Deprecated.
        + member(), rmember(): The start position for the search can be
@@ -87,7 +81,7 @@ xx-xxx-xxxx (Lars Duening) -- Release 3.4.1
        + match_command(): Find all matching actions for a command.
        + md5_crypt(): Compute an Apache-compatible password encryption using
            the MD5 message digest algorithm.
-       + pg_connect(), pg_query(), pg_pending(), pg_close():
+       + pg_connect(), pg_query(), pg_pending(), pg_conv_string(), pg_close():
            Optional: PostgreSQL support.
        + regmatch(): To match a string against a regexp and optionally retrieve
            the match results for subexpressions.
@@ -132,6 +126,7 @@ xx-xxx-xxxx (Lars Duening) -- Release 3.4.1
        + Operators '|' and '|=' can compute the union of two arrays.
        + Operators '^' and '^=' can compute the symmetric difference of
            two arrays.
+       + Closure operators #'| and #'^ can take more than two arguments.
        + Support for structs; preprocessor symbol __LPC_STRUCTS__ is defined.
        + Preprocessor symbol __PCRE__ is always defined.
        + Real inline closures; preprocessor symbol __LPC_INLINE_CLOSURES__ is
@@ -207,15 +202,219 @@ xx-xxx-xxxx (Lars Duening) -- Release 3.4.1
            the maxinum number of entries in a mapping.
 
 
-15-May-2005 (Lars Duening) -- Release 3.2.12
+15-May-2005 (Lars Duening) -- Release 3.4.0
 
     - Changed efuns:
+       + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
+         allocate_mapping(), copy_mapping(), efun308(), extract(), file_name(),
+         filter_array(), filter_mapping(), m_sizeof(), map_array(),
+         map_mapping(), mapping_contains(), member_array(),
+         set_auto_include_string(), slice_array().
+       + catch(): If there is not enough time left (less than
+           __CATCH_EVAL_COST__), this is thrown as an error from inside
+           the catch instead of causing the catch to return 0.
+       + catch(): Modifier 'reserve <expr>' can be used to specify a computing
+           reserve different from __CATCH_EVAL_COST__.
+       + copy(), deep_copy(), get_type_info(), to_array(), to_string():
+           Added struct support.
+       + add_action(): Historical usage with just one argument no longer
+           supported.
+       + assoc(), insert_alist(), order_alist(), intersect_alist(): Optional
+           as package 'alists'.
+       + call_out():  The minimum delay can now be 0, meaning: as soon as
+           possible.
+       + debug_info(): Option DINFO_DUMP:"memory" to dump a list of
+           all allocated memory blocks (currently supported just by
+           smalloc).
+       + debug_info(): Added more data to the option DINFO_DATA:DID_MEMORY
+           result.
+       + debug_info(): DINFO_DATA:DID_ST_PACKETS_IN and DID_ST_PACKET_SIZE_IN
+           are the statistics for the incoming network traffic.
+       + deep_inventory(): The result can be restricted to a certain
+           depth.
+       + filter(): The efun can now filter strings as well.
+       + function_exists(): now also returns the filename and
+           linenumber of a function.
+       + garbage_collection(): An optional flag argument allows to change
+            the name of the default GC log file.
+       + get_type_info(): The name of the defining program of a lfun or
+            context closure, or the function name itself can be returned.
+       + map(): The efun can now map strings as well.
+       + make_shared_string(): Deprecated.
+       + member(), rmember(): The start position for the search can be
+            specified.
+       + mkmapping(): Convert structs to mappings, too.
+       + pg_*(): Postgres efuns trigger a privilege violation ("pgsql", "<efun
+           name>").
+       + process_string(): Spaces are now allowed in function arguments
+           and no longer terminate the function specification.
+       + regexp(), regexplode(): Optionally take RE interpretation options.
+       + regexplode(): New flag RE_OMIT_DELIM allows to omit the matched
+           delimiters from the result.
+       + send_erq(): ERQ callback closures can now accept the data as
+           a string instead of an array.
+       + sprintf(), printf(): Formats %O and %Q print floats always
+           with a decimal point.
+       + say(), tell_room(), tell_object(): The efuns can now take a mapping,
+           an object or a struct instead of an array to use with the
+           catch_msg() mechanism.
+       + transfer(): Available (in compat mode) only when USE_DEPRECATED
+           is in effect.
+       + unique_array(): The separator function can now be a closure,
+           and can also be given extra arguments.
+       + wizlist_info(): Added the number of mappings to the result.
+       + write_file(): Allowed to remove the file before writing.
+
+    - Corrected efuns:
+       + restore_object(): An exception during the restore no longer has the
+           danger of leaking values and memory.
+       + unique_array(): An exception during the process no longer has the
+           danger of leaking values and memory.
+
+    - New efuns:
+       + baseof(): Test the relation between two structs.
+       + call_direct(), call_direct_resolved(): To perform calls which
+           are not resolved by a default method.
+       + convert_charset(): Convert a string between character sets.
+       + match_command(): Find all matching actions for a command.
+       + md5_crypt(): Compute an Apache-compatible password encryption using
+           the MD5 message digest algorithm.
+       + pg_connect(), pg_query(), pg_pending(), pg_conv_string(), pg_close():
+           Optional: PostgreSQL support.
+       + regmatch(): To match a string against a regexp and optionally retrieve
+           the match results for subexpressions.
+       + regexp_package(): Returns the currently selected default
+           regexp package.
+       + reverse():  Reverse the content of an integer, a string or an array.
+       + sha1(): Compute the SHA1 message digest.
+       + struct_info(): Return information about a struct.
+       + structp(): Predicate efun to detect structs.
+       + to_struct(): Convert an array into a struct.
+
+    - Master Object:
+       + Function runtime_warning() is called for runtime warnings.
+       + privilege_violation(): For "set_limits" and "limited" the resulting
+           limits are passed as argument.
+       + During the compilation of the master object, simul-efuns are disabled
+           (so they won't be used by accident).
+
+    - Fixed Crashers:
+       + The driver crashed when a private lfun shadowing
+         a public sefun was virtually inherited twice in parallel.
+       + When walking over a mapping of width 1, deletions from the mapping
+         from within the walk_mapping callback could cause walk_mapping() to
+         pass invalid pointers to the callback on later iterations.
+
+    - Language:
+       + Strings can hold all characters, including '\0'.
+       + New operator '...' to flatten array arguments in function call
+           argument lists.
+       + foreach() can loop over references, allowing the loop to change
+           the base data.
+       + foreach() can loop over an integer expression, implementing a counted
+           loop.
+       + 'nosave' is now an official feature.
+       + New indexing method '[>]' to index either from the beginning or
+           the end, depending on the sign of the index value.
+       + New pragma 'range_check' allows to check array range indexing at
+           runtime.
+       + If a value of the wrong type is passed to switch(), the driver
+           no longer throws a runtime error, but instead jumpgs to
+           the default case.
+       + Operators '|' and '|=' can compute the union of two arrays.
+       + Operators '^' and '^=' can compute the symmetric difference of
+           two arrays.
+       + Closure operators #'| and #'^ can take more than two arguments.
+       + Support for structs; preprocessor symbol __LPC_STRUCTS__ is defined.
+       + Preprocessor symbol __PCRE__ is always defined.
+       + Real inline closures; preprocessor symbol __LPC_INLINE_CLOSURES__ is
+           defined.
+       + New macro __BOOT_TIME__ expands to the time() the driver was
+           started.
+       + Blueprint variables are now always initialized using
+           __INIT(). Clone variables are usually initialized the same
+           way, however with the pragmas 'share_variables' and
+           'init_variables' the programmer can instruct the driver on
+           a pre-program basis to initialize the variables of clone
+           from the current values of the corresponding variables in
+           the blueprint.
+       + If the function definitions in two inherits differ in their
+           visibility, the compiler emits a warning.
+       + Bugfix: The type recognition of the variables for a foreach()
+           no longer gets confused by visibility flags.
+
+    - Runtime:
+       + Revamped the string handling to use refcounted strings everywhere.
+       + If input is requested in CHARMODE, the NL characters are passed
+           verbatim to the caller (old drivers passed an empty string
+           instead).
+       + The driver hook H_DEFAULT_METHOD can be used to resolve
+          call_other()/call_resolved()s to non-existing functions.
+       + The driver hook H_DEFAULT_PROMPT can be used to specify a
+          default prompt different from "> ".
+       + The driver hook H_PRINT_PROMPT can be used to do special magic
+          when printing the prompt.
+       + The driver regularly checks the variables of all objects
+          for references to destructed objects and removes them; it is
+          therefore no longer necessary to "clean" mappings by hand.
+       + The driver can now warn about missing return statements for value
+           returning functions (this applies only for functions with a
+           specified return type). If possible the driver tries to detect this
+           situation at compile time, but also inserts a special 'return'
+           bytecode to catch certain pathological cases at runtime.
+           The check can be controlled the pragma '(no_)warn_missing_return'.
+       + New runtime 'limit' LIMIT_COST to control how much
+           a limited execution should cost.
+       + Both the traditional and PCRE regular expressions can be used
+           at runtime, with the selection being made by extra option
+           flags.
+       + The basic timing granularity and the heartbeat interval time
+           can be configured at compile time and with the commandline options
+           "--alarm-time" and "--heart-interval". The values are available in
+           LPC with the macros __ALARM_TIME__ and __HEART_BEAT_INTERVAL__.
+       + Heartbeats can be executed synchronously (all at the same time as far
+           as granularity allows, regardless of when inside one hb interval
+           they have executed last). The commandline options are
+           "--sync-heart" and "--async-heart"; if enabled, the macro
+           __SYNCHRONOUS_HEART_BEAT__ is defined.
+
+    - Other Changes:
+       + The input escape character can be configured at compile time to
+           something different from '!'.
+       + The MAX_MAPPING configuration parameter now determines the total
+           number of elements (keys + values) a mapping can hold, not just
+           the maximum number of keys.
+       + The driver can be configured to use either the traditional
+           regular expression code, or the PCRE package (default).
+       + The threadsafe ptmalloc is now available as allocator choice (
+           though it doesn't support GC yet).
+       + New commandline options '--share-variables' and
+           '--init-variables' to define the default for clone variable
+           initialization.
+       + New configuration option '--enable-malloc-sbrk' to selectively allow
+           the memory allocator to use sbrk() instead of malloc() where
+           available (default is to allow sbrk()).
+       + New commandline options '--tls-key' and '--tls-cert' to define the
+           x509 key- and certfile for the TLS package.
+       + New commandline option '--max-mapping-keys' to determine separately
+           the maxinum number of entries in a mapping.
+
+
+24-Nov-2005 (Lars Duening) -- Release 3.2.12
+
+    - Changed efuns:
+      + md5(): Accept number arrays as arguments as well.
+      + tls_check_certificate(): Return the low-level API results, and throw
+          an error if the connection is not secure.
 
     - Corrected efuns:
       + call_out(), input_to(): Local references are no longer
           accepted as extra arguments.
       + restore_value(): Restoring one-character operator closures
           in arrays works again.
+      + set_environment(): Clear the RESET_STATE flag of
+          of the moved object's original environment, if any.
+      + to_int(): No longer accepts "x<num>" as valid sedecimal notation.
 
     - New efuns:
 
@@ -224,8 +423,15 @@ xx-xxx-xxxx (Lars Duening) -- Release 3.4.1
           signals if the error is caught or not.
 
     - Fixed Crashers:
+       + Freeing a deeply nested value structure no longer overflows
+         the local stack.
+       + An error during the fatal() processing will be treated
+         as a double-fatal.
 
     - Language:
+       + foreach(): When looping over a mapping with no values, or with
+          only the index being extracted, the loop actually loops over the
+          mapping and not just the indices copied into an array.
 
     - Runtime:
 
