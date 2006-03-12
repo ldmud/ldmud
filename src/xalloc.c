@@ -329,6 +329,15 @@ mdb_log_sbrk (p_int size)
 #    warning ""
 #endif
 
+#if defined(USE_SQLITE) && defined(SQLITE3_USES_PTHREADS) && !defined(MEM_THREADSAFE) && !defined(MEM_MAIN_THREADSAFE)
+#    warning ""
+#    warning "-----------------------------------"
+#    warning "SQLite3 uses PThreads, but the allocator"
+#    warning "is not threadsafe!"
+#    warning "-----------------------------------"
+#    warning ""
+#endif
+
 #if defined(MALLOC_ptmalloc) && defined(GC_SUPPORT) && defined(__FreeBSD__)
 #    warning ""
 #    warning "-----------------------------------"

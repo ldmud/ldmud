@@ -1,0 +1,43 @@
+/*------------------------------------------------------------------
+ * FOO Efuns.
+ *
+ *------------------------------------------------------------------
+ * This file holds the efuns interfacing with FOO.
+ *
+ *   efun: foo_xxx()
+ *------------------------------------------------------------------
+ */
+
+#include "driver.h"
+
+#ifdef USE_FOO
+
+#include "pkg-foo.h" 
+
+#include "typedefs.h"
+
+/*-------------------------------------------------------------------------*/
+
+/*=========================================================================*/
+
+/*                           EFUNS                                         */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_foo_xxx (svalue_t *sp)
+
+/* EFUN foo_xxx()
+ *
+ *   int db_xxx(int handle)
+ *
+ * After inserting a line into a table with an AUTO_INCREMENT field,
+ * this efun can be used to return the (new) value of the AUTO_INCREMENT
+ * field.
+ */
+
+{
+    return sp;
+} /* f_foo_xxx() */
+
+/***************************************************************************/
+#endif /* USE_FOO */

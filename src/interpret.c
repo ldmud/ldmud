@@ -717,7 +717,7 @@ statistic_t stat_eval_duration = { 0 };
 
 enum { APPLY_NOT_FOUND = 0, APPLY_FOUND, APPLY_DEFAULT_FOUND };
 static int int_apply(string_t *, object_t *, int, Bool, Bool);
-static void call_simul_efun(int code, object_t *ob, int num_arg);
+static void call_simul_efun(unsigned int code, object_t *ob, int num_arg);
 #ifdef DEBUG
 static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
 #endif
@@ -836,6 +836,12 @@ init_interpret (void)
     invalid_entry.id = 0;
     invalid_entry.progp = (program_t *)1;
     invalid_entry.name = NULL;
+    
+    /* To silence the compiler: */
+    invalid_entry.variable_index_offset = 0;
+    invalid_entry.function_index_offset = 0;
+    invalid_entry.funstart = 0;
+    invalid_entry.flags = 0;
 
     for (i = 0; i < CACHE_SIZE; i++)
         cache[i] = invalid_entry;
@@ -8332,7 +8338,9 @@ again:
 #endif /* USE_NEW_INLINES */
 
         inhIndex = 0;
+#ifdef USE_NEW_INLINES
         context_size = 0;
+#endif /* USE_NEW_INLINES */
         LOAD_SHORT(tmp_ushort, pc);
 #ifdef USE_NEW_INLINES
         if (instruction == F_CONTEXT_CLOSURE)
@@ -8448,6 +8456,9 @@ again:
          * corrected.
          */
         warnf("Missing 'return <value>' statement.\n");
+
+        /* Warn only once per missing return and program. */
+        PUT_UINT8(pc-1, F_RETURN0);
         /* FALLTHROUGH */
 
     CASE(F_RETURN0);                /* --- return0             --- */
@@ -9305,12 +9316,6 @@ again:
                        ));
             }
 
-            if (sp->u.number < MASTER_RESERVED_COST * 2)
-                ERRORF(("Illegal 'reserve' value for catch(): got %ld, "
-                        "required are at least %ld.\n"
-                       , sp->u.number
-                       , (long)MASTER_RESERVED_COST * 2L
-                       ));
             reserve_cost = sp->u.number;
             sp--;
         }
@@ -14461,13 +14466,10 @@ again:
          * through the ap pointer; otherwise the code assumes that the
          * compiler left the proper number of arguments on the stack.
          *
-         * <code> is an uint8 and indexes the function list *simul_efunp.
-         * TODO: Add a F_SIMUL_EFUN for codes > 0xff; right now this
-         * TODO:: is compiled as CALL_DIRECT. Affected are prolang.y and
-         * TODO:: simul_efun.c
+         * <code> is an ushort and indexes the function list *simul_efunp.
          */
 
-        int                 code;      /* the function index */
+        unsigned short      code;      /* the function index */
         fun_hdr_p           funstart;  /* the actual function */
         object_t           *ob;        /* the simul_efun object */
         int                 def_narg;  /* expected number of arguments */
@@ -14476,7 +14478,7 @@ again:
         ASSIGN_EVAL_COST  /* we're changing objects */
 
         /* Get the sefun code and the number of arguments on the stack */
-        code = (int)LOAD_UINT8(pc);
+        LOAD_SHORT(code, pc);
         def_narg = simul_efunp[code].num_arg;
 
         if (use_ap
@@ -17819,9 +17821,10 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 
     case CLOSURE_UNBOUND_LAMBDA:
     case CLOSURE_PRELIMINARY:
-        /* no valid current_object ==> pop the control stack */
-        /* inter_sp == sp */
-        CLEAN_CSP
+        /* no valid current_object: fall out of the switch
+         * and let the error handling clean up the control
+         * stack.
+         */
         break;
 
     default: /* --- efun-, simul efun-, operator closure */
@@ -17953,6 +17956,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 #ifdef USE_NEW_INLINES
                 inter_context = NULL;
 #endif /* USE_NEW_INLINES */
+                tracedepth++; /* Counteract the F_RETURN */
                 eval_instruction(code, sp);
                 /* The result is on the stack (inter_sp) */
                 return;
@@ -18056,7 +18060,7 @@ secure_call_lambda (svalue_t *closure, int num_arg, Bool external)
 
 /*-------------------------------------------------------------------------*/
 static void
-call_simul_efun (int code, object_t *ob, int num_arg)
+call_simul_efun (unsigned int code, object_t *ob, int num_arg)
 
 /* Call the simul_efun <code> in the sefun object <ob> with <num_arg>
  * arguments on the stack. If it can't be found in the <ob>ject, the

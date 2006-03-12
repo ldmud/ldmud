@@ -395,17 +395,22 @@ string  convert_charset(string, string, string);
 #endif
 string  crypt(string, string|int default: F_CONST0);
 string *explode(string, string);
+#ifdef HAS_IDN
+string  idna_stringprep(string, int, int default: F_CONST0);
+string  idna_to_ascii(string);
+string  idna_to_unicode(string);
+#endif
 string  implode(string *, string);
 string  lower_case(string);
 string  make_shared_string(string) "no longer useful";
-string  md5(int*|string);
+string  md5(int*|string, void|int);
 string  md5_crypt(string, string|int default: F_CONST0);
 string *regexp(string *, string, int default: F_CONST0);
 string *regexplode(string, string, int default: F_CONST0);
 string  regreplace(string,string,closure|string,int);
 int     regexp_package();
 mixed   regmatch(string,string, void|int, void|int);
-string  sha1(int*|string);
+string  sha1(int*|string, void|int);
 void    printf(string, ...);
 string  sprintf(string, ...);
 int     strstr(string, string, int default: F_CONST0);
@@ -722,6 +727,15 @@ void     pg_close();
 
 #endif /* USE_PGSQL */
 
+#ifdef USE_SQLITE
+
+int      sl_open(string);
+mixed    sl_exec(string, ...);
+int      sl_insert_id();
+void     sl_close();
+
+#endif /* USE_SQLITE */
+
 #ifdef USE_TLS
 
 int     tls_query_connection_state(object default: F_THIS_OBJECT);
@@ -730,7 +744,7 @@ int     tls_init_connection(void|object, ...);
 void    tls_deinit_connection(object default: F_THIS_OBJECT);
 string  tls_error(int);
 int     tls_available();
-mixed  *tls_check_certificate(object default: F_THIS_OBJECT);
+mixed  *tls_check_certificate(object, int default: F_CONST0);
 
 #endif /* USE_TLS */
 

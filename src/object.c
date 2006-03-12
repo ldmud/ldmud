@@ -42,6 +42,7 @@
  *       sentence_t    * sent;
  *       wiz_list_t    * user;
  *       wiz_list_t    * eff_user;
+ *       Bool            open_sqlite_db (ifdef USE_SQLITE)
  *       int             extra_num_variables;  (ifdef DEBUG)
  *       svalue_t      * variables;
  *       unsigned long   ticks, gigaticks;
@@ -426,6 +427,9 @@ static mp_int last_id = 0;
 #ifdef DEBUG
     ob->extra_num_variables = num_var;
 #endif
+#ifdef USE_SQLITE
+    ob->open_sqlite_db = MY_FALSE;
+#endif
     ob->variables = ob_vars;
 
     ob->time_cleanup = current_time + ((time_to_cleanup > 0) ? time_to_cleanup
@@ -723,6 +727,8 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
 static string_t *
 function_exists (string_t *fun, object_t *ob, Bool show_hidden
                 , string_t ** prog_name, uint32 * prog_line
+                , int * num_arg,  uint32 * fun_flags
+                , vartype_t * fun_type
                 )
 
 /* Search for the function <fun> in the object <ob>. If existing, return
@@ -731,6 +737,9 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
  * If <prog_name> and <prog_line> are both non-NULL, they are set to
  * the name of the program _file_ and the line where the function is found.
  * The program file name will have one reference added.
+ *
+ * *<num_arg>, *<fun_flags>,  *<fun_type> are set to the number of
+ * arguments, the function flags and the function return type respectively.
  *
  * Visibility rules apply: static and protected functions can't be
  * found from the outside unless <show_hidden> is true.
@@ -747,6 +756,10 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
     if (ob->flags & O_DESTRUCTED)
         fatal("function_exists() on destructed object\n");
 #endif
+
+    memset(fun_type, 0, sizeof(*fun_type));
+    *num_arg = 0;
+    *fun_flags = 0;
 
     if (prog_name)
         *prog_name = NULL;
@@ -768,6 +781,7 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
 
     /* Is it visible for the caller? */
     flags = progp->functions[ix];
+    *fun_flags = (flags & ~INHERIT_MASK);
 
     if (!show_hidden
      && (   flags & TYPE_MOD_PRIVATE
@@ -788,9 +802,14 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
 
     funstart = progp->program  + (flags & FUNSTART_MASK);
 
+    /* Set the additional information */
+    *num_arg = FUNCTION_NUM_ARGS(funstart) & 0x7f;
+    memcpy(fun_type, FUNCTION_TYPEP(funstart), sizeof(*fun_type));
+
     /* And after all this, the function may be undefined */
     if (is_undef_function(funstart))
     {
+        *fun_flags |= NAME_UNDEFINED;
         return NULL;
     }
 
@@ -885,6 +904,31 @@ reset_object (object_t *ob, int arg)
     /* Object is reset now */
     ob->flags |= O_RESET_STATE;
 } /* reset_object() */
+
+/*-------------------------------------------------------------------------*/
+void
+logon_object (object_t *ob)
+
+/* Call the logon() lfun in the object <ob>.
+ *
+ * current_object is temporarily set to <ob> in order to allow logon()
+ * to be static (security measure). Doing so is harmless as there is no
+ * previous_object to consider.
+ */
+
+{
+    svalue_t *ret;
+    object_t *save = current_object;
+
+    current_object = ob;
+    ret = apply(STR_LOGON, ob, 0);
+    if (ret == 0)
+    {
+        errorf("Could not find %s() on the player %s\n", get_txt(STR_LOGON), get_txt(ob->name));
+        /* NOTREACHED */
+    }
+    current_object = save;
+} /* logon_object() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1437,8 +1481,16 @@ v_function_exists (svalue_t *sp, int num_arg)
  *   Return the line number within the source file.
  *
  * <flags> == FEXISTS_ALL (3):
- *   Return an array with all the above information. The above
- *   flag values are the indices into that array.
+ *   Return an array with all the above information, plus information
+ *   about the function type/flags/number of arguments.
+ *
+ *   The returned array contains this information:
+ *     string [FEXISTS_PROGNAME]: the program name
+ *     string [FEXISTS_FILENAME]: the filename
+ *     int    [FEXISTS_LINENO]:   the linenumber
+ *     int    [FEXISTS_NUMARG]:   the number of arguments to the function
+ *     int    [FEXISTS_TYPE]:     the return type of the function
+ *     int    [FEXISTS_FLAGS]:    the function flags
  *
  * The <flags> value can be or-ed to NAME_HIDDEN to return
  * information about static and protected functions in other objects.
@@ -1454,6 +1506,10 @@ v_function_exists (svalue_t *sp, int num_arg)
     uint32 flags;
     svalue_t *argp;
     object_t *ob;
+
+    uint32    fun_flags;
+    int       fun_num_arg;
+    vartype_t fun_type;
 
     /* Evaluate arguments */
     argp = sp - num_arg + 1;
@@ -1528,7 +1584,8 @@ v_function_exists (svalue_t *sp, int num_arg)
     /* Get the information */
     prog_name = NULL;
     str = function_exists(argp->u.str, ob, (flags & NAME_HIDDEN)
-                         , &prog_name, &prog_line);
+                         , &prog_name, &prog_line
+                         , &fun_num_arg, &fun_flags, &fun_type);
     sp = pop_n_elems(num_arg, sp);
 
     if (str)
@@ -1545,7 +1602,7 @@ v_function_exists (svalue_t *sp, int num_arg)
             {
                 errorf("Out of memory\n");
             }
-            vec = allocate_uninit_array(FEXISTS_LINENO+1);
+            vec = allocate_uninit_array(FEXISTS_FLAGS+1);
             put_string(vec->item+FEXISTS_PROGNAME, res);
             if (prog_name)
             {
@@ -1559,6 +1616,10 @@ v_function_exists (svalue_t *sp, int num_arg)
             else
                 put_number(vec->item+FEXISTS_FILENAME, 0);
             put_number(vec->item+FEXISTS_LINENO, prog_line);
+
+            put_number(vec->item+FEXISTS_NUMARG, fun_num_arg);
+            put_number(vec->item+FEXISTS_TYPE, fun_type.type);
+            put_number(vec->item+FEXISTS_FLAGS, (p_int)fun_flags);
 
             push_array(sp, vec);
             break;
@@ -4291,78 +4352,48 @@ f_move_object (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-object_present_in (string_t *str, object_t *ob, Bool hasNumber, p_int num)
+object_present_in (string_t *str, object_t *ob, p_int num, p_int * num_matched)
 
 /* <ob> is the first object in an environment: test all the objects there
  * if they match the id <str>.
  * If <hasNumber> is false, <str> may be of the form "<id> <num>" - then the
  * <num>th object with this <id> is returned, it it is found.
  * If <hasNumber> is true, the <num>th object with the given id is returned.
+ *
+ * If the object is not found, *<num_matched> (if not NULL) is set to the
+ * number of objects which did match the id.
  */
 
 {
     svalue_t *ret;
     p_int count = 0; /* return the <count+1>th object */
-    int   length;
-    char *p, *item;
-    string_t *sitem;
 
-    length = mstrsize(str);
-    item = get_txt(str);
+    if (num_matched)
+        *num_matched = 0;
 
-    if (!hasNumber)
-    {
-        /* Check if there is a number in the string.
-         * If yes parse it, and use the remainder as 'the' id string.
-         */
-        p = item + length - 1;
-        if (*p >= '0' && *p <= '9')
-        {
-            while(p > item && *p >= '0' && *p <= '9')
-                p--;
-
-            if (p > item && *p == ' ')
-            {
-                count = atoi(p+1) - 1;
-                length = p - item;
-            }
-        }
-    }
-    else
-        count = num-1;
-
-    if ((size_t)length != mstrsize(str))
-    {
-        memsafe(sitem = new_n_mstring(item, length), length, "id string");
-    }
-    else
-        sitem = ref_mstring(str);
-
-    push_string(inter_sp, sitem); /* free on error */
+    count = num-1;
 
     /* Now look for the object */
     for (; ob; ob = ob->next_inv)
     {
-        push_ref_string(inter_sp, sitem);
+        push_ref_string(inter_sp, str);
         ret = sapply(STR_ID, ob, 1);
         if (ob->flags & O_DESTRUCTED)
         {
-            free_mstring(sitem);
-            inter_sp--;
             return NULL;
         }
 
         if (ret == NULL || (ret->type == T_NUMBER && ret->u.number == 0))
             continue;
 
+        if (num_matched)
+            (*num_matched)++;
+
         if (count-- > 0)
             continue;
-        free_mstring(sitem);
-        inter_sp--;
+
         return ob;
     }
-    free_mstring(sitem);
-    inter_sp--;
 
     /* Not found */
     return NULL;
@@ -4370,17 +4401,21 @@ object_present_in (string_t *str, object_t *ob, Bool hasNumber, p_int num)
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-e_object_present (svalue_t *v, object_t *ob, Bool hasNumber, p_int num)
+e_object_present (svalue_t *v, object_t *ob, p_int num)
 
 /* Implementation of the efun present().
  *
- * Look for an object matching <v> in <ob> and return it if found.
+ * Look for the <num>th object matching <v> in <ob> and return it if found.
  */
 
 {
     svalue_t *ret;
     object_t *ret_ob;
+    p_int num_matched = 0;
     Bool specific = MY_FALSE;
+
+    if (num <= 0)
+        num = 1;
 
     /* Search where? */
     if (!ob)
@@ -4409,7 +4444,7 @@ e_object_present (svalue_t *v, object_t *ob, Bool hasNumber, p_int num)
     }
 
     /* Always search in the object's inventory */
-    ret_ob = object_present_in(v->u.str, ob->contains, hasNumber, num);
+    ret_ob = object_present_in(v->u.str, ob->contains, num, &num_matched);
     if (ret_ob)
         return ret_ob;
 
@@ -4428,7 +4463,8 @@ e_object_present (svalue_t *v, object_t *ob, Bool hasNumber, p_int num)
             return ob->super;
 
         /* No, search the other objects here. */
-        return object_present_in(v->u.str, ob->super->contains, hasNumber, num);
+        if (num_matched < num)
+            return object_present_in(v->u.str, ob->super->contains, num - num_matched, NULL);
     }
 
     /* Not found */
@@ -4464,7 +4500,7 @@ v_present (svalue_t *sp, int num_arg)
 {
     svalue_t *arg;
     object_t *ob;
-    p_int num = 0;
+    p_int num = 1;
     Bool hasNumber = MY_FALSE;
 
     arg = sp - num_arg + 1;
@@ -4499,8 +4535,45 @@ v_present (svalue_t *sp, int num_arg)
         num_arg--;
     }
 
+    /* If the string is in the form "<id> <number>" and no explicit
+     * number was given, parse the <number> out of the string.
+     */
+    if (!hasNumber && arg->type == T_STRING)
+    {
+        int   length;
+        char *p, *item;
+
+        length = mstrsize(arg->u.str);
+        item = get_txt(arg->u.str);
+
+        p = item + length - 1;
+        if (*p >= '0' && *p <= '9')
+        {
+            while(p > item && *p >= '0' && *p <= '9')
+                p--;
+
+            if (p > item && *p == ' ')
+            {
+                num = atoi(p+1);
+                length = p - item;
+                hasNumber = MY_TRUE;
+            }
+        }
+
+        /* If we found a number, replace the "<id> <number>" string on
+         * the stack with just "<id>".
+         */
+        if (hasNumber)
+        {
+            string_t * sitem;
+            memsafe(sitem = new_n_mstring(item, length), length, "id string");
+            free_mstring(arg->u.str);
+            arg->u.str = sitem;
+        }
+    }
+
     inter_sp = sp;
-    ob = e_object_present(arg, ob, hasNumber, num);
+    ob = e_object_present(arg, ob, num);
 
     free_svalue(arg);
     if (ob)

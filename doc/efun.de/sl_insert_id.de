@@ -1,0 +1,18 @@
+OPTIONAL
+SYNOPSIS
+        int sl_insert_id()
+
+BESCHREIBUNG
+        Nachdem eine Zeile in eine Tabelle mit einer AUTO_INCREMENT-Spalte
+        eingefuegt wurde, kann man mit dieser Funktion den (neuen) Wert
+        dieses AUTO_INCREMENT-Feldes der eingefuegten Zeile abfragen.
+
+        Diese Funktion ist nur verfuegbar, wenn der Driver mit SQLite-
+        Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __SQLITE__ definiert.
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.3.713.
+
+SIEHE AUCH
+        sl_open(E), sl_exec(E), sl_close(E)

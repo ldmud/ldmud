@@ -9,7 +9,7 @@ DESCRIPTION
 
         The match operators in the format string have one of these
         formats:
-          %[!|~][<size>[.<minmatch>]]<type>
+          %[+][!|~][<size>[.<minmatch>]]<type>
 
         <type> may be:
            d: matches any number.
@@ -26,8 +26,14 @@ DESCRIPTION
         numbers). Each of these both may be specified numerically, or
         as '*' - then the value of the variable at the current place
         in the argument list is used.
+
+        Specifying + will require that the characters after the field
+        match as well, or the match will be deemed unsuccessful (the variable
+        might still get assigned, though).
+
         Specifying ! will perform the match, but neither store the
         result nor count the match.
+
         Specifying ~ will perform and count the match, but not store
         the result.
 
@@ -62,6 +68,9 @@ EXAMPLE
 
         sscanf("ab ", "%s %s", who, what)
           ==> result 2, who = "ab", what = ""
+
+HISTORY
+        LDMud 3.3.713/3.2.13 introduced the '+' specifier.
 
 SEE ALSO
         explode(E), regexp(E)

@@ -1601,20 +1601,10 @@ drivertag (void)
  */
 
 {
-    if (IS_STABLE_BRANCH)
-    {
-        if (IS_DEVELOPMENT)
-            return " (beta)";
+    if (strcmp(RELEASE_LONGTYPE, ""))
+        return " (" RELEASE_LONGTYPE ")";
 
-        return "";
-    }
-    else
-    {
-        if (IS_DEVELOPMENT)
-            return " (development)";
-
-        return " (maintenance)";
-    }
+    return "";
 } /* drivertag() */
 
 /*-------------------------------------------------------------------------*/
@@ -1780,6 +1770,9 @@ options (void)
     /* Print the package options, nicely indented. */
     {
         char * optstrings[] = { "" /* have at least one string in here */
+#ifdef HAS_IDN
+                              , "idna supported\n"
+#endif
 #ifdef USE_IPV6
                               , "IPv6 supported\n"
 #endif
@@ -1791,6 +1784,9 @@ options (void)
 #endif
 #ifdef USE_PGSQL
                               , "PostgreSQL supported\n"
+#endif
+#ifdef USE_SQLITE
+                              , "SQLite3 supported\n"
 #endif
 #ifdef USE_PTHREADS
                               , "PThreads supported\n"

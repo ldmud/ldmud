@@ -116,7 +116,6 @@
 #include "access_check.h"
 #include "actions.h"
 #include "array.h"
-#include "backend.h"
 #include "closure.h"
 #include "ed.h"
 #include "exec.h"
@@ -3472,6 +3471,7 @@ remove_interactive (object_t *ob, Bool force)
     object_t *save = command_giver;
     int i;
     interactive_t *interactive;
+    object_t * curobj_save = current_object;
     int save_privilege;
 
     interactive = O_GET_INTERACTIVE(ob);
@@ -3494,11 +3494,24 @@ remove_interactive (object_t *ob, Bool force)
 
     if ( !(ob->flags & O_DESTRUCTED) )
     {
+        int numRemaining = interactive->text_end - interactive->command_start;
+
         command_giver = NULL;
         current_interactive = NULL;
         push_ref_object(inter_sp, ob, "remove_interactive");
+
+        if (numRemaining > 0)
+        {
+            string_t * remaining = NULL;
+            memsafe( remaining = new_n_mstring(interactive->text+interactive->command_start, numRemaining)
+                   , numRemaining, "buffer for remaining data from socket");
+            push_string(inter_sp, remaining);
+        }
+        else
+            push_ref_string(inter_sp, STR_EMPTY);
+
         malloc_privilege = MALLOC_MASTER;
-        callback_master(STR_DISCONNECT, 1);
+        callback_master(STR_DISCONNECT, 2);
         /* master might have used exec() */
         ob = interactive->ob;
     }
@@ -3636,7 +3649,7 @@ remove_interactive (object_t *ob, Bool force)
     free_object(ob, "remove_interactive");
 
     command_giver = check_object(save);
-    current_object = NULL;
+    current_object = curobj_save;
     malloc_privilege = save_privilege;
 } /* remove_interactive() */
 
@@ -3980,7 +3993,39 @@ new_player ( object_t *ob, SOCKET_T new_socket
     (void) lookup_ip_entry(new_interactive->addr.sin_addr, MY_TRUE);
     /* TODO: We could pass the retrieved hostname right to login */
 #endif
-    logon(ob);
+#ifdef USE_TLS
+    /* If we're using secure connections and the connect() triggered
+     * a handshake which is still going on, we call logon() as
+     * the default TLS callback. This way, logon() is callled only
+     * if the connection could be established, secure or not.
+     */
+    if (new_interactive->tls_status != TLS_HANDSHAKING)
+    {
+        /* Connection not secure, or already established: logon. */
+        logon_object(ob);
+    }
+    else if (new_interactive->tls_cb == NULL)
+    {
+        /* Connection in TLS handshake, but not callback: set a callback
+         * to the logon function.
+         */
+        if (find_function(STR_LOGON, current_interactive->prog) < 0)
+        {
+            errorf("Could not find %s() on the player %s\n", get_txt(STR_LOGON), get_txt(current_interactive->name));
+            /* NOTREACHED */
+        }
+
+        callback_t * cb;
+
+        xallocate(cb, sizeof(*cb), "logon tls-callback structure");
+        setup_function_callback(cb, current_interactive, STR_LOGON, 0, NULL, MY_TRUE);
+        new_interactive->tls_cb = cb;
+
+    }
+    /* else: Connection in TLS handshake and callback set by connect(). */
+#else
+    logon_object(ob);
+#endif /* USE_TLS */
     if (!(ob->flags & O_DESTRUCTED))
         print_prompt();
     flush_all_player_mess();
@@ -8969,7 +9014,7 @@ check_for_out_connections (void)
                  */
                 outconn[i].status = ocLoggingOn;
                 push_number(inter_sp, -1);
-                logon(outconn[i].curr_obj);
+                logon_object(outconn[i].curr_obj);
 
                 outconn[i].status = ocNotUsed;
                 free_object(outconn[i].curr_obj, "net_connect");

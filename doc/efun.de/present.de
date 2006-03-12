@@ -1,8 +1,11 @@
 SYNOPSIS
-        object present(mixed str);
-        object present(mixed str, int n)
-        object present(mixed str, object ob)
-        object present(mixed str, int n, object ob)
+        object present(string str)
+        object present(string str, int n)
+        object present(string str, object env)
+        object present(string str, int n, object env)
+
+        object present(object ob)
+        object present(object ob, object env)
 
 BESCHREIBUNG
         Wenn ein Objekt mit der Id <str> sich im Inventar oder in der Umgebung
@@ -25,26 +28,11 @@ BESCHREIBUNG
         wird. Nur das Inventory von <ob> wird durchsucht, nicht jedoch dessen
         Umgebung. Oftmals wird fuer <ob> this_player() gesetzt.
 
-        Wenn ein Objekt die Forum "<id> <n>" in Verbindung mit einem selbst
-        ueber add_action() gesetzten Verb unterstuetzen soll (damit z. B.
-        "oeffne Kiste 3" funktioniert), kann das folgendermassen geloest
-        werden:
-
-        init() { add_action("oeffne_kiste", "oeffne"); }
-
-        oeffne_kiste(str)
-        {
-            if(present(str) != this_object() )
-            {
-                return 0; /* nicht diese Kiste */
-                ...
-            }
-        }
 
 ANMERKUNG
-        Wenn das n-te Objekt <str> in this_object() UND in der Umgebung von
-        this_object() gefunden wird, so liefert present() das n-te Objekt aus
-        der Umgebung, nicht beide.
+        Wenn die efun sowohl in this_object() als auch dessen Umgebung
+        sucht, werden, soweit es die Numerierung betrifft, die beiden
+        Umgebungen zusammenhaengend betrachtet.
 
 BEISPIELE
         present("chest");
@@ -56,8 +44,36 @@ BEISPIELE
         present("chest 2", 1);
           --> findet das erste 'chest 2' Objekt
 
+        Wenn sich eine "chest" im this_object() befindet, und zwei
+        ausserhalb:
+          present("chest", 1) -> findet die chest im Objekt
+          present("chest", 2) -> findet die erste chest ausserhalb
+          present("chest", 3) -> findet die zweite chest ausserhalb
+        
+        Wenn ein Objekt die Forum "<id> <n>" in Verbindung mit einem selbst
+        ueber add_action() gesetzten Verb unterstuetzen soll (damit z. B.
+        "oeffne Kiste 3" funktioniert), kann das folgendermassen geloest
+        werden:
+
+            void init() { add_action("oeffne_kiste", "oeffne"); }
+
+            int oeffne_kiste(string str)
+            {
+                if(present(str) != this_object() )
+                {
+                    return 0; /* nicht diese Kiste */
+                    ...
+                }
+            }
+
 HISTORY
         LDMud 3.2.11/3.3.610 fuehrte die (str, n)-Form ein.
+        LDMud 3.3.713 aenderte die Numerierung wenn sowohl Inventory
+          als auch Umgebung durchsucht werden. In der vorherigen
+          Implementierung wurde eine Numerierung auf beiden Umgebungen
+          einzeln angewandt, was zur Folge hatte, dass niedere Objekte
+          in der aeusseren Umgebung nicht gefunden werden koennten, da
+          sie von den Objekten in Inneren verdeckt wurden.
 
 SIEHE AUCH
         move_object(E), environment(E), this_object(E), present_clone(E),

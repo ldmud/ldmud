@@ -5,6 +5,7 @@
 . version.sh
 
 sed -e "s/\\\$VersionType\\\$/$version_type/g" \
+    -e "s/\\\$VersionLongType\\\$/$version_longtype/g" \
     -e "s/\\\$VersionMicro\\\$/$version_micro/g" \
     -e "s/\\\$VersionMinor\\\$/$version_minor/g" \
     -e "s/\\\$VersionMajor\\\$/$version_major/g" \

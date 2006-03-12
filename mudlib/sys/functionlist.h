@@ -60,6 +60,10 @@
 #define FEXISTS_PROGNAME  (0)
 #define FEXISTS_FILENAME  (1)
 #define FEXISTS_LINENO    (2)
+#define FEXISTS_NUMARG    (3)
+#define FEXISTS_TYPE      (4)
+#define FEXISTS_FLAGS     (5)
+
 #define FEXISTS_ALL       (3)
 
 #endif /* LPC_FUNCTIONLIST_H */

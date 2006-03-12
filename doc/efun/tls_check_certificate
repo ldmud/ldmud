@@ -1,7 +1,7 @@
 PRELIMINARY
 SYNOPSIS
-        mixed *tls_check_certificate()
         mixed *tls_check_certificate(object obj);
+        mixed *tls_check_certificate(object obj, int extra);
 
 DESCRIPTION
         tls_check_certificate() checks the certificate of the secured
@@ -11,15 +11,28 @@ DESCRIPTION
 
         If <obj> doesn't have a secure connection up and running, an
         error is thrown.
-
-        Otherwise, the result is an array with these entries:
+        Otherwise, the result is an array with these values:
 
           int [0]      : Result code of SSL_get_verify_result (see man 1 verify
                          subsection DIAGNOSTICS for possible values)
-          string [1]   : Subject
-          int    [2..9]: Not used yet.
-          string [10]  : SHA-1 Fingerprint
-          string [11]  : Not used yet (reserved for MD5 Fingerprint)
+          array [1]    : array with 3*n entries of extra x509 data.
+                         structure is:
+                            3*i    : numerical form of object name,
+                                     e.g. "2.5.4.3"
+                            3*i + 1: long or short name if available,
+                                     e.g. "commonName"
+                            3*i + 2: value
+          array [2]    : if extra is set:
+                            array with 3*n entries of x509 extension data
+                            data structure is:
+                            3*i    : numerical form of extension name
+                            3*i + 1: long or short name of extension
+                                     name if available
+                            3*i + 2: array of strings with the data
+                                     structure of [1]
+
+        Note: a x509 certificate can have more than one object with
+        the same name
 
 BUGS
         Not supported when using GnuTLS.
@@ -33,4 +46,4 @@ HISTORY
 SEE ALSO
         tls_init_connection(E), tls_deinit_connection(E), tls_error(E),
         tls_query_connection_state(E), tls_query_connection_info(E),
-        tls_available(E)
+        tls_available(E), mudlib/psyc-tls.c

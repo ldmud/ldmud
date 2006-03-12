@@ -386,7 +386,7 @@ read_access_file (void)
 
         /* The rest of the line is the message to print.
          */
-        fgets(message, sizeof(message)-1, infp);
+        fgets(message, (int)sizeof(message)-1, infp);
         message[sizeof(message) - 1] = '\0';
 
         /* Check if this rule creates a new class. If yes, allocate

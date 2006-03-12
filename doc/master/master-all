@@ -43,7 +43,7 @@ DESCRIPTION
           - epilog() is called. If it returns an array of strings,
             they are given one at a time as argument to preload().
             Traditionally, these strings are the filenames of the objects to
-            preload, which preload() then does.
+            pre-load, which preload() then does.
           - The interpreter sets up the IP communication and enters
             the backend loop.
 

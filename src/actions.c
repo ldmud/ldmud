@@ -600,7 +600,7 @@ call_modify_command (char *buff)
     {
         if (svp->type == T_STRING)
         {
-            extract_cstr(buff, svp->u.str, COMMAND_FOR_OBJECT_BUFSIZE);
+            extract_cstr(buff, svp->u.str, (size_t)COMMAND_FOR_OBJECT_BUFSIZE);
         } else if (svp->type == T_NUMBER && svp->u.number) {
             return MY_TRUE;
         }
@@ -677,7 +677,7 @@ special_parse (char *buff)
             return 1;
         }
 #endif
-        if (strncmp(buff, "status", 6) == 0)
+        if (strncmp(buff, "status", (size_t)6) == 0)
         {
             Bool rc;
             strbuf_t sbuf;
@@ -1266,7 +1266,7 @@ execute_command (char *str, object_t *ob)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-e_add_action (svalue_t *func, svalue_t *cmd, int flag)
+e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
 
 /* Implementation of the efun add_action().
  *
