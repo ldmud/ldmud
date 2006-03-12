@@ -67,4 +67,4 @@ BEISPIEL
             ==> liefert 2, who = "ab", what = ""
 
 SIEHE AUCH
-        extract(E), explode(E), regexp(E)
+        explode(E), regexp(E)

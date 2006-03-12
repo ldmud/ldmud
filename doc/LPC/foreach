@@ -84,7 +84,7 @@ DESCRIPTION
            includes range assignments which change the size) don't
            have an effect on the loop.
 
-        If <expr> yields an mapping, the loop will run over the indices
+        If <expr> yields a mapping, the loop will run over the indices
         the mapping had at the begin of the loop. Deleted indices are silently
         skipped, new indices ignored, but changes of the data of existing
         indices are acknowledged.

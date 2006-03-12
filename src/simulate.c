@@ -225,6 +225,10 @@ Bool master_will_be_updated = MY_FALSE;
   /* TRUE if a master-update was requested.
    */
 
+static Bool in_fatal = MY_FALSE;
+  /* TRUE if fatal() is being processed.
+   */
+
 int num_error = 0;
   /* Number of recursive calls to errorf().
    */
@@ -594,7 +598,6 @@ fatal (const char *fmt, ...)
 {
     va_list va;
     char *ts;
-    static Bool in_fatal = MY_FALSE;
 
     /* Prevent double fatal. */
     if (in_fatal)
@@ -727,6 +730,12 @@ errorf (const char *fmt, ...)
     mp_int    line_number = 0;
     va_list   va;
 
+    /* Errors during the fatal() processing will abort the process
+     * immediately.
+     */
+    if (in_fatal)
+        fatal("Error during fatal().");
+
     ts = time_stamp();
 
     /* Find the last error recovery context, but do not yet unroll
@@ -780,42 +789,76 @@ errorf (const char *fmt, ...)
     {
         /* User catches this error */
 
-        struct error_recovery_info * eri = (struct error_recovery_info *)rt;
-
         error_caught = MY_TRUE;
 
-        put_c_string(&catch_value, emsg_buf);
-          /* always reallocate */
+        /* Try to copy the error message into the catch value.
+         * If we run out of memory here, we won't execute the catch.
+         */
+        {
+            string_t * str = new_mstring(emsg_buf);
+
+            if (NULL != str)
+                put_string(&catch_value, str);
+            else
+            {
+                error_caught = MY_FALSE;
+
+                /* Unroll the  context stack even further until the
+                 * previous non-catch error recovery frame.
+                 */
+                for ( 
+                    ; !ERROR_RECOVERY_CONTEXT(rt->type)
+                       && rt->type >= ERROR_RECOVERY_CATCH
+                    ; rt = rt->last) NOOP;
+            }
+        }
+    }
+
+    if (error_caught)
+    {
+        struct error_recovery_info * eri = (struct error_recovery_info *)rt;
 
         published_catch = (eri->flags & CATCH_FLAG_PUBLISH);
 
-        if (!(eri->flags & CATCH_FLAG_NOLOG))
+        if (!out_of_memory)
         {
-            /* Even though caught, dump the backtrace - it makes mudlib
-             * debugging much easier.
-             */
-            debug_message("%s Caught error: %s", ts, emsg_buf + 1);
-            printf("%s Caught error: %s", ts, emsg_buf + 1);
-            if (current_error_trace)
+            if (!(eri->flags & CATCH_FLAG_NOLOG))
             {
-                free_array(current_error_trace);
-                current_error_trace = NULL;
+                /* Even though caught, dump the backtrace - it makes mudlib
+                 * debugging much easier.
+                 */
+                debug_message("%s Caught error: %s", ts, emsg_buf + 1);
+                printf("%s Caught error: %s", ts, emsg_buf + 1);
+                if (current_error_trace)
+                {
+                    free_array(current_error_trace);
+                    current_error_trace = NULL;
+                }
+                object_name = dump_trace(MY_FALSE, &current_error_trace);
+                debug_message("%s ... execution continues.\n", ts);
+                printf("%s ... execution continues.\n", ts);
             }
-            object_name = dump_trace(MY_FALSE, &current_error_trace);
-            debug_message("%s ... execution continues.\n", ts);
-            printf("%s ... execution continues.\n", ts);
+            else
+            {
+                /* No dump of the backtrace into the log, but we want it
+                 * available for debug_info().
+                 */
+                if (current_error_trace)
+                {
+                    free_array(current_error_trace);
+                    current_error_trace = NULL;
+                }
+                object_name = collect_trace(NULL, &current_error_trace);
+            }
         }
-        else
+        else /* We're running low on memory. */
         {
-            /* No dump of the backtrace into the log, but we want it
-             * available for debug_info().
-             */
             if (current_error_trace)
             {
                 free_array(current_error_trace);
                 current_error_trace = NULL;
             }
-            object_name = collect_trace(NULL, &current_error_trace);
+            object_name = STR_UNKNOWN_OBJECT;
         }
 
         if (!published_catch)

@@ -495,9 +495,6 @@ found:
 
     /* Find callout by object/name */
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
     fun_name = find_tabled(fun->u.str);
 
     if (fun_name != NULL)

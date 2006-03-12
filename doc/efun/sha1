@@ -1,16 +1,21 @@
 SYNOPSIS
-        string sha1(string arg)
+        string sha1 (string arg)
+        string sha1 (int  * arg)
 
 DESCRIPTION
-        Create and return a SHA1 message digest from the string <arg>.
+        Create and return a SHA1 message digest from <arg>.
+        <arg> may be a string, or an array of numbers (each considered to
+        be a character, ignoring all but the lowest byte).
 
 EXAMPLES
         string s;
 
-        s = sha1("Hello, world!");
+        s = sha1("Hello");
+        s = sha1( ({ 'H', 'e', 'l', 'l', 'o' })
 
 HISTORY
         Introduced in LDMud 3.3.523.
+        LDMud 3.3.712 added number arrays as argument.
 
 SEE ALSO
         crypt(E), md5(E), sha1(E)

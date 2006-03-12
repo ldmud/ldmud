@@ -204,8 +204,8 @@ struct replace_ob_s
       object_t * tmp_ = o; \
       if (tmp_->ref == 2) dest_last_ref_gone = MY_TRUE; \
       tmp_->ref--;\
-      if (d_flag > 1) printf("Sub ref from object %s: %ld (%s)\n"\
-                            , get_txt(tmp_->name), tmp_->ref, from);\
+      if (d_flag > 1) printf("Sub ref from object %s: %ld (%s) %s %d\n"\
+                            , get_txt(tmp_->name), tmp_->ref, from, __FILE__, __LINE__);\
       if (tmp_->ref <= 0) dealloc_object(tmp_); \
     )
 #else
@@ -213,8 +213,8 @@ struct replace_ob_s
       object_t * tmp_ = o; \
       if (tmp_->ref == 2) dest_last_ref_gone = MY_TRUE; \
       tmp_->ref--;\
-      if (d_flag > 1) printf("Sub ref from object %s: %ld (%s)\n"\
-                            , get_txt(tmp_->name), tmp_->ref, from);\
+      if (d_flag > 1) printf("Sub ref from object %s: %ld (%s) %s %d\n"\
+                            , get_txt(tmp_->name), tmp_->ref, from, __FILE__, __LINE__);\
       if (tmp_->ref <= 0) dealloc_object(tmp_, __FILE__, __LINE__); \
     )
 #endif

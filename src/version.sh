@@ -2,21 +2,23 @@
 # version. It is meant to be modified by the bumpversion script.
 
 # The checkin date
-# $Format: "version_date=\"$ProjectDate$\""$ 
-version_date=$(echo "\$Date$" | sed -e 's/\$Date: \([0-9]*-[0-9]*-[0-9]*\) \([0-9]*:[0-9]*:[0-9]*\).*\$/\1 \2/')
+version_date=$(echo "\$Date$" | sed -e 's/[$]Date: \([0-9]*-[0-9]*-[0-9]*\).*\$/\1/')
+
+# The checkin time
+version_time=$(echo "\$Date$" | sed -e 's/[$]Date: \([0-9]*-[0-9]*-[0-9]*\) \([0-9]*:[0-9]*:[0-9]*\).*\$/\2/')
 
 # The checkin revision
-# $Format: "version_revision=\"$ProjectVersion$\""$ 
-version_revision=$(echo "\$Revision$" | sed -e 's/\$Revision: \([0-9][0-9]*\) *\$/\1/')
+version_revision=$(echo "\$Revision$" | sed -e 's/[$]Revision: \([0-9][0-9]*\) *\$/\1/')
 
 # The version type: dev, stable, maint release
-# $Format: "version_type=\"$ReleaseType$\""$ 
-version_type="dev"
+version_type="stable"
+
+# A timestamp, to be used by bumpversion and other scripts.
+# It can be used, for example, to 'touch' this file on every build, thus
+# forcing revision control systems to add it on every checkin automatically.
+version_stamp="Sun Mar 12 14:49:59 MST 2006"
 
 # The version number information
-# $Format: "version_micro=\"$ReleaseMicro$\""$ 
-version_micro=0
-# $Format: "version_minor=\"$ReleaseMinor$\""$ 
+version_micro=1
 version_minor=4
-# $Format: "version_major=\"$ReleaseMajor$\""$ 
 version_major=3

@@ -752,6 +752,10 @@ mstring_find_tabled (string_t * pStr)
     whash_t hash;
     size_t  size;
 
+#ifdef EXT_STRING_STATS
+    stNumTabledChecked++;
+#endif /* EXT_STRING_STATS */
+
     /* If pStr is tabled, our work is done */
     if (pStr->info.tabled)
     {

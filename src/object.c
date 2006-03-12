@@ -1450,7 +1450,8 @@ v_function_exists (svalue_t *sp, int num_arg)
 
 {
     string_t *str, *prog_name;
-    uint32 prog_line, flags;
+    uint32 prog_line = 0;
+    uint32 flags;
     svalue_t *argp;
     object_t *ob;
 
@@ -1597,7 +1598,7 @@ v_function_exists (svalue_t *sp, int num_arg)
 
         default:
             fatal("function_exists(): flags value %ld (from %ld) not implemented.\n"
-                 , flags & ~NAME_HIDDEN, flags);
+                 , (long)(flags & ~NAME_HIDDEN), (long)flags);
             /* NOTREACHED */
         }
     }
@@ -2027,9 +2028,6 @@ v_variable_exists (svalue_t *sp, int num_arg)
         int ix;
         typeflags_t flags;
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
         shared_name = find_tabled(argp->u.str);
         if (!shared_name)
             break;
@@ -5095,6 +5093,8 @@ f_set_environment (svalue_t *sp)
         /* First remove the item out of its current environment */
         Bool okey = MY_FALSE;
 
+        item->super->flags &= ~O_RESET_STATE;
+
         if (item->sent)
         {
             remove_environment_sent(item);
@@ -7785,9 +7785,6 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         /* If the variable exists, it must exist as shared
          * string.
          */
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
         s = find_tabled_str(name);
         if (!s)
         {
@@ -7861,9 +7858,6 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         /* If the function exists, it must exist as shared
          * string.
          */
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
         s = find_tabled_str(name);
         if (!s)
         {
@@ -8664,9 +8658,6 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
         do { /* A simple try.. environment */
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
             if ( NULL != (var = find_tabled_str(cur)) )
             {
                 /* The name exists in an object somewhere, now check if it
