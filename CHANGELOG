@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Mar-2006  (Gnomi)
+  - (closure, object.c, interpret, exec.h, gcollect.c) lfun closures now
+      keep track to which program they belong, to avoid ambiguities
+      in case of complex inheritance relationships. This also affects
+      the savefile format: lfun closures are saved with their inheritance
+      path (Bug #443, #444).
+
 12-Mar-2006  (Lars Duening)  (3.3.713)
   - Created snapshot.
   - (comm.c) Master function disconnect() receives the remaining input data is

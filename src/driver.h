@@ -137,7 +137,7 @@
 /* TODO: this ctype-stuff might go into lex.h (impl in efun_defs.c) */
 #define _MCTe 0x01 /* escaped character in save/restore object. */
 #define _MCTd 0x02 /* numeric digit                */
-
+#define _MCTt 0x04 /* delimiters in save/restore object. */
 
 #define _MCTs 0x10 /* whitespace EXCLUDING '\n'        */
 
@@ -145,6 +145,7 @@
 #define _MCTa 0x80 /* alphanumeric or '_'         */
 extern unsigned char _my_ctype[];
 #define isescaped(c) (_my_ctype[(unsigned char)(c)]&_MCTe)
+#define issavedel(c) (_my_ctype[(unsigned char)(c)]&_MCTt)
 #define isalunum( c) (_my_ctype[(unsigned char)(c)]&_MCTa)
 #define lexdigit( c) (_my_ctype[(unsigned char)(c)]&_MCTd)
 

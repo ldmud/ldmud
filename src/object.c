@@ -5926,7 +5926,6 @@ save_closure (svalue_t *cl, Bool writable)
             program_t      *prog;
             program_t      *inhProg = 0;
             int             ix;
-            unsigned short  inhIndex;
             funflag_t       flags;
             string_t       *function_name;
             char           *source, c;
@@ -5935,19 +5934,25 @@ save_closure (svalue_t *cl, Bool writable)
             l = cl->u.lambda;
             ob = l->function.lfun.ob;
             ix = l->function.lfun.index;
-            inhIndex = l->function.lfun.inhIndex;
+            inhProg = l->function.lfun.inhProg;
 
             prog = ob->prog;
 
-            if (inhIndex)
+            if (inhProg)
             {
-                inherit_t *inheritp;
+                /* An inherited lfun closure. Go to the inherit. */
+                while (prog != inhProg)
+                {
+                    inherit_t *inheritp;
 
-                inheritp = &prog->inherit[inhIndex-1];
-                inhProg = prog = inheritp->prog;
+                    SEARCH_FUNCTION_INHERIT(inheritp, prog, ix);
+                    ix -= inheritp->function_index_offset;
+                    prog = inheritp->prog;
+                }
             }
 
             flags = prog->functions[ix];
+            
             while (flags & NAME_INHERITED)
             {
                 inherit_t *inheritp;
@@ -5985,17 +5990,35 @@ save_closure (svalue_t *cl, Bool writable)
                 L_PUTC_EPILOG
             }
 
-            /* For inherited lfun closures, add the '-<inheritname>' */
-            if (l->function.lfun.inhIndex)
+            /* For inherited lfun closures, add the '|<inheritpath>' */
+            if (inhProg)
             {
-                string_t * progName = del_dotc(inhProg->name);
-                L_PUTC_PROLOG
-                source = get_txt(progName);
-                L_PUTC('-');
-                c = *source++;
-                do L_PUTC(c) while ( '\0' != (c = *source++) );
-                L_PUTC_EPILOG
-                free_mstring(progName);
+                prog = ob->prog;
+                ix = l->function.lfun.index;
+                
+                while(prog != inhProg)
+                {
+                    inherit_t *inheritp;
+                    string_t  *progName;
+                    
+                    SEARCH_FUNCTION_INHERIT(inheritp, prog, ix);
+                    ix -= inheritp->function_index_offset;
+                    prog = inheritp->prog;
+                    progName = del_dotc(prog->name);
+                    
+                    L_PUTC_PROLOG
+                    source = get_txt(progName);
+                    L_PUTC('|');
+                    c = *source++;
+                    do
+                    {
+                        if (issavedel(c))
+                            L_PUTC('\\');
+                        L_PUTC(c) 
+                    } while ( '\0' != (c = *source++) );
+                    L_PUTC_EPILOG
+                    free_mstring(progName);
+                }
             }
 
 #ifdef USE_NEW_INLINES
@@ -7803,7 +7826,8 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
             if ((   c == delimiter
                  && !(pt[-4] == '#' && pt[-3] == 'e' && pt[-2] == ':')
                 )
-             || (ct == 'c' && c == ':')
+             || (ct == 'c' && (c == ':' || c=='|' || c=='-'))
+             || (ct == 'l' && (c == '|' || c=='-'))
                ) break;
         }
 
@@ -7898,12 +7922,124 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
       {
         string_t *s;
         int i;
-        char *super;
-        unsigned short inhIndex;
-
+        program_t *inhProg = NULL;
+        int fun_ix_offs = 0;
 #ifdef USE_NEW_INLINES
         size_t context_size = 0;
+#endif
 
+        if (name_delim == '|' || name_delim == '-')
+        {
+            char progname_delim;
+            int last_fun_ix_offs = 0;
+            int last_num_functions = 0;
+            
+            /* An inherited lfun closure */
+            inhProg = current_object->prog;
+            
+            do
+            {
+                char *progname_start, *progname_dest;
+                int progname_length;
+                inherit_t *inheritp;
+                unsigned short inhCount;
+
+                progname_start = pt;
+                progname_dest = pt;
+                
+                for(;;)
+                {
+                    char c;
+                    
+                    if ( !(c = *pt++) )
+                    {
+                        *svp = const0;
+                        return MY_FALSE;
+                    }
+                    
+                    if (c == '\\')
+                        c = *pt++;
+                    else if (c==delimiter
+                          || (name_delim=='|' && c=='|')
+                          || (ct=='c' && c==':'))
+                        break;
+                    
+                    *progname_dest++ = c;
+                }
+                
+                progname_delim = pt[-1];
+                
+                if (inhProg) /* Not yet aborted. */
+                {
+                    last_fun_ix_offs = fun_ix_offs;
+                    last_num_functions = inhProg->num_functions;
+                
+                    *progname_dest = '\0';
+                    progname_length = progname_dest - progname_start;
+                
+                    /* Lookup the inherit */
+                    inheritp = inhProg->inherit;
+                
+                    for ( inhCount = inhProg->num_inherited;
+                          inhCount > 0; inheritp++, inhCount--)
+                    {
+                        int l;
+                    
+                        if (inheritp->inherit_type & INHERIT_TYPE_DUPLICATE)
+                            continue;
+                    
+                        l = mstrsize(inheritp->prog->name)-2;
+                        if (l != progname_length)
+                            continue;
+                        
+                        if (strncmp(progname_start,
+                                    get_txt(inheritp->prog->name),
+                                    progname_length) != 0)
+                            continue;
+                        
+                        /* Found the inherit. */
+                        inhProg = inheritp->prog;
+                        fun_ix_offs += inheritp->function_index_offset;
+                
+                        break;
+                    }
+                
+                    if (!inhCount)
+                    {
+                        /* No inherit found. Let the while loop go
+                         * to the end of the string. */
+                        inhProg = NULL;
+                        fun_ix_offs = -1;
+                    }
+                }
+            }
+            while (progname_delim == '|');
+            
+            /* Restore delimiter. */
+            pt[-1] = progname_delim;
+            *str = pt;
+
+            if(inhProg)
+            {
+                /* Security check. We only allow closures that
+                 * can be built by the current program and by the
+                 * child programs. That means, the child program
+                 * of inhProg must be or inherits the current program
+                 * somehow. This is checked using the function index
+                 * offset.
+                 */
+
+                if (function_index_offset < last_fun_ix_offs
+                 || function_index_offset + current_prog->num_functions
+                        > last_fun_ix_offs + last_num_functions)
+                {
+                    inhProg = NULL;
+                    fun_ix_offs = -1;
+                }
+            }
+        }
+
+#ifdef USE_NEW_INLINES
         if (ct == 'c')
         {
             svalue_t num = const0;
@@ -7914,46 +8050,34 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
              || num.u.number <= 0
                )
             {
+                free_svalue(&num);
                 *svp = const0;
-                break; /* switch(ct) */
+                return MY_FALSE;
             }
             context_size = num.u.number;
         }
 #endif
-        /* Check if it's an inherited lfun closure */
-        super = strchr(name, '-');
-        if (super)
-        {
-            *super = '\0';
-            super++;
-        }
 
         /* If the function exists, it must exist as shared
          * string.
          */
-        s = find_tabled_str(name);
-        if (!s)
-        {
-            *svp = const0;
-            break; /* switch(ct) */
-        }
-
-        inhIndex = 0;
-        if (super)
-        {
-            i = find_inherited_function(super, name, &inhIndex);
-            inhIndex++;
-        }
+        if (fun_ix_offs < 0) /* No need to lookup in case of an error. */
+            s = NULL;
         else
-        {
-            i = find_function(s, current_object->prog);
-        }
+            s = find_tabled_str(name);
+        /* Although s is NULL, we parse to the end. */
 
+        if (s)
+            i = find_function(s, inhProg?inhProg:current_object->prog);
+        else
+            i = -1;
+        
         /* If the function exists and is visible, create the closure.
          */
         if (i >= 0)
         {
-            closure_lfun(svp, current_object, (unsigned short)i, inhIndex
+            closure_lfun(svp, current_object, inhProg
+                        , (unsigned short)i + fun_ix_offs
 #ifdef USE_NEW_INLINES
                         , context_size
 #endif /* USE_NEW_INLINES */
@@ -7980,13 +8104,14 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
                 /* Parse the context information */
                 if (!restore_svalue(&context, str, delimiter)
                  || context.type != T_POINTER
+                 || VEC_SIZE(context.u.vec) != context_size
                    )
                 {
                     l->function.lfun.context_size = 0;
                     free_svalue(svp);
                     free_svalue(&context);
                     *svp = const0;
-                    break; /* switch(ct) */
+                    return MY_FALSE;
                 }
 
                 for (j = 0; (size_t)j < context_size; j++)
@@ -7998,6 +8123,17 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         else /* (i < 0) */
         {
             *svp = const0;
+
+            if (context_size > 0)
+            {
+                svalue_t context = const0;
+
+                /* Parse the string to its end. */
+                if (!restore_svalue(&context, str, delimiter))
+                    return MY_FALSE;
+                else
+                    free_svalue(&context);
+            }
         }
         break;
       } /* case 'c', 'l' */

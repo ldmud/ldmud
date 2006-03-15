@@ -481,8 +481,8 @@ closure_eq (svalue_t * left, svalue_t * right)
                     == right->u.lambda->function.lfun.ob)
                 && (   left->u.lambda->function.lfun.index
                     == right->u.lambda->function.lfun.index)
-                && (   left->u.lambda->function.lfun.inhIndex
-                    == right->u.lambda->function.lfun.inhIndex)
+                && (   left->u.lambda->function.lfun.inhProg
+                    == right->u.lambda->function.lfun.inhProg)
                 && (    left->u.lambda->function.lfun.context_size
                      == right->u.lambda->function.lfun.context_size)
                 ;
@@ -579,11 +579,11 @@ closure_cmp (svalue_t * left, svalue_t * right)
                         < right->u.lambda->function.lfun.index)
                        ? -1 : 1;
 
-            if (   left->u.lambda->function.lfun.inhIndex
-                != right->u.lambda->function.lfun.inhIndex
+            if (   left->u.lambda->function.lfun.inhProg
+                != right->u.lambda->function.lfun.inhProg
                )
-                return (  left->u.lambda->function.lfun.inhIndex
-                        < right->u.lambda->function.lfun.inhIndex)
+                return (  left->u.lambda->function.lfun.inhProg
+                        < right->u.lambda->function.lfun.inhProg)
                        ? -1 : 1;
 
 #ifdef USE_NEW_INLINES
@@ -823,51 +823,68 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
                  */
                 l = lrpp->l.u.lambda;
 
-                if (!l->function.lfun.inhIndex)
+                if (!l->function.lfun.inhProg)
                     i = l->function.lfun.index -= r_ob->fun_offset;
-                else
+                else if (l->function.lfun.inhProg == r_ob->new_prog)
                 {
-                    i = -1; /* Default for 'not found' */
+                    /* First possibility: the new program is the same
+                     * one the closure is pointing to.
+                     * In that case, convert the closure into a straight
+                     * lfun closure.
+                     */
+                     
+                     i = l->function.lfun.index -= r_ob->fun_offset;
 
-                    do {
-                        int j;
-                        inherit_t * oldInh;
-
-                        oldInh = &r_ob->ob->prog->inherit[l->function.lfun.inhIndex-1];
-
-                        /* First possibility: the new program is the same
-                         * one the closure is pointing to.
-                         * In that case, convert the closure into a straight
-                         * lfun closure.
-                         */
-                        if (oldInh->prog == r_ob->new_prog)
-                        {
-                            i = l->function.lfun.index;
-                            l->function.lfun.inhIndex = 0;
-                            break;
-                        }
-
-                        /* Second possibility: the new program still
-                         * inherits the program the closure is referencing.
-                         * In that case, just update the inhIndex.
-                         */
-                        for (j = 0; j < r_ob->new_prog->num_inherited; ++j)
-                        {
-                            if (r_ob->new_prog->inherit[j].prog == oldInh->prog)
-                            {
-                                i = l->function.lfun.index;
-                                l->function.lfun.inhIndex = j;
-                                break;
-                            }
-                        }
-                        if (i != -1)
-                            break;
-
-                        /* Lastly: the program is not found, so we fail
-                         * and keep the indicator i at -1.
-                         */
-                    } while(0);
+                     free_prog(l->function.lfun.inhProg, MY_TRUE);
+                     l->function.lfun.inhProg = NULL;
                 }
+                else if (l->function.lfun.index >= r_ob->fun_offset &&
+                         l->function.lfun.index <
+                            r_ob->fun_offset + r_ob->new_prog->num_functions)
+                {
+                    program_t *prog;
+                    
+                    /* Second possibility: the new program still
+                     * inherits the program the closure is referencing.
+                     * In that case, just update the inhIndex.
+                     */
+                     
+                    i = l->function.lfun.index -= r_ob->fun_offset;
+                    
+                    /* Checkt hat inhProg is still in the inherit chain.
+                     * If not, convert the closure into a straight
+                     * lfun closure.
+                     */
+                    
+                    prog = r_ob->new_prog;
+                    
+                    while(prog != l->function.lfun.inhProg)
+                    {
+                        inherit_t *inheritp;
+                        
+                        if (!prog->num_inherited)
+                        {
+                            /* Didn't find it. */
+                            l->function.lfun.inhProg = NULL;
+                            break;
+                        }
+                        
+                        SEARCH_FUNCTION_INHERIT(inheritp, prog, i);
+                        i-= inheritp->function_index_offset;
+                        prog = inheritp->prog;
+
+                        if (i >= prog->num_functions)
+                        {
+                            /* We didn't find inhProg. */
+                             l->function.lfun.inhProg = NULL;
+                            break;
+                        }
+                    }
+                    
+                    i = l->function.lfun.index;
+                }
+                else
+                    i = -1;
 
                 /* If the function vanished, replace it with a default */
                 if (i < 0 || i >= r_ob->new_prog->num_functions)
@@ -875,13 +892,16 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
                     assert_master_ob_loaded();
                     free_object( l->function.lfun.ob
                                , "replace_program_lambda_adjust");
+                    if(l->function.lfun.inhProg)
+                        free_prog(l->function.lfun.inhProg, MY_TRUE);
+
                     l->function.lfun.ob
                         = ref_object(master_ob
                                     , "replace_program_lambda_adjust");
                     i = find_function( STR_DANGLING_LFUN
                                      , master_ob->prog);
                     l->function.lfun.index = (unsigned short)(i < 0 ? 0 :i);
-                    l->function.lfun.inhIndex = 0;
+                    l->function.lfun.inhProg = NULL;
                 }
             }
             else /* CLOSURE_IDENTIFIER */
@@ -1150,23 +1170,25 @@ closure_identifier (svalue_t *dest, object_t * obj, int ix, Bool raise_error)
 /*-------------------------------------------------------------------------*/
 #ifndef USE_NEW_INLINES
 void
-closure_lfun ( svalue_t *dest, object_t *obj
-             , int ix, unsigned short inhIndex
+closure_lfun ( svalue_t *dest, object_t *obj, program_t *prog, int ix
              , Bool raise_error)
 #else /* USE_NEW_INLINES */
 void
-closure_lfun ( svalue_t *dest, object_t *obj
-             , int ix, unsigned short inhIndex, unsigned short num
+closure_lfun ( svalue_t *dest, object_t *obj, program_t *prog, int ix
+             , unsigned short num
              , Bool raise_error)
 #endif /* USE_NEW_INLINES */
 
 /* Create a literal lfun closure, bound to the object <obj>. The resulting
  * svalue is stored in *<dest>.
  *
- * The closure is defined by the index <ix>/<inhIndex>, for which the caller
+ * The closure is defined by the function index <ix>, for which the caller
  * has to make sure that all function offsets are applied before calling
- * this function. <num> indicates the number context
- * variables which are initialized to svalue-0.
+ * this function. <ix> is relative to the object's program. <prog> is
+ * the program used for the lookup of this function (but <ix> is nevertheless
+ * the index into the object's function table, not neccessarily into the
+ * function table of <prog>). <num> indicates the number of context variables
+ * which are initialized to svalue-0.
  *
  * The function may raise an error on out of memory if <raise_error> is TRUE,
  * or set *<dest> to svalue 0 else.
@@ -1203,7 +1225,9 @@ closure_lfun ( svalue_t *dest, object_t *obj
 
     l->function.lfun.ob = ref_object(obj, "closure");
     l->function.lfun.index = (unsigned short)ix;
-    l->function.lfun.inhIndex = inhIndex;
+    l->function.lfun.inhProg = prog;
+    if (prog)
+        reference_prog(prog, "closure_lfun");
 #ifdef USE_NEW_INLINES
     l->function.lfun.context_size = num;
 
@@ -1238,8 +1262,9 @@ closure_literal ( svalue_t *dest
  * The closure is defined by the index <ix>/<inhIndex>, which is to be
  * interpreted in the context of the current, possibly inherited, program:
  * values < CLOSURE_IDENTIFIER_OFFS are lfun indices, values above are
- * variable indices. For lfun closures, <num> indicates the number context
- * variables which are initialized to svalue-0.
+ * variable indices. For closures referencing inherited lfuns <inhIndex>
+ * is the index+1 in the inherit list of <prog>. For lfun closures, <num>
+ * indicates the number context variables which are initialized to svalue-0.
  *
  * The function may raise an error on out of memory.
  */
@@ -1259,18 +1284,44 @@ closure_literal ( svalue_t *dest
     else /* lfun closure */
     {
         funflag_t flags;
+        program_t *prog;
 
-        ix += function_index_offset;
-        flags = current_object->prog->functions[ix];
+        if (inhIndex)
+        {
+            /* inherited lfun closure */
+            inherit_t *inh, *vinh;
+            
+            inh = &current_prog->inherit[inhIndex-1];
+            /* Normalize pointers to functions of virtual inherits.
+             * This is just for comparability of the closures.
+             */
+            vinh = adjust_variable_offsets(inh, current_prog, current_object);
+            if (vinh)
+                inh = vinh;
+            
+            prog = inh->prog;
+            
+            flags = prog->functions[ix];
+            if (!vinh)
+                ix += function_index_offset;
+            ix += inh->function_index_offset;
+        }
+        else
+        {
+            ix += function_index_offset;
+            flags = current_object->prog->functions[ix];
+            prog = NULL;
+        }
+
         if (flags & NAME_CROSS_DEFINED)
         {
             ix += CROSSDEF_NAME_OFFSET(flags);
         }
 
 #ifndef USE_NEW_INLINES
-        closure_lfun(dest, current_object, ix, inhIndex, MY_TRUE);
+        closure_lfun(dest, current_object, prog, ix, MY_TRUE);
 #else
-        closure_lfun(dest, current_object, ix, inhIndex, num, MY_TRUE);
+        closure_lfun(dest, current_object, prog, ix, num, MY_TRUE);
 #endif /* USE_NEW_INLINES */
     }
 } /* closure_literal() */
@@ -4401,6 +4452,10 @@ compile_value (svalue_t *value, int opt_flags)
              *   FUNCALL N+1              CALL_FUNCTION <lfun-index> N
              *
              * alien-lfun: lambda->ob != lambda->function.lfun.ob
+             *
+             * For now inherited lfun closures are compiled as alien
+             * lfuns.
+             * TODO: Implement them using internal calls.
              */
 
             mp_int i;
@@ -4411,10 +4466,11 @@ compile_value (svalue_t *value, int opt_flags)
             l = argp->u.lambda;
             if (l->ob != current.lambda_origin
              || l->ob != l->function.lfun.ob
+             || l->function.lfun.inhProg
                )
             {
-            	/* Compile it like an alien lfun */
-            	
+                /* Compile it like an alien lfun */
+
                 if (current.code_left < 1)
                     realloc_code();
                 current.code_left -= 1;
@@ -4448,21 +4504,12 @@ compile_value (svalue_t *value, int opt_flags)
 
                 if (current.code_left < 6)
                     realloc_code();
-                if (l->function.lfun.inhIndex)
-                {
-                    STORE_CODE(current.codep, F_CALL_INHERITED);
-                    STORE_SHORT(current.codep, l->function.lfun.inhIndex-1);
-                    STORE_SHORT(current.codep, l->function.lfun.index);
-                    current.code_left -= 5;
-                }
-                else
-                {
-                    STORE_CODE(current.codep, F_CALL_FUNCTION);
-                    STORE_SHORT(current.codep, l->function.lfun.index);
-                    current.code_left -= 3;
-                }
+
+                STORE_CODE(current.codep, F_CALL_FUNCTION);
+                STORE_SHORT(current.codep, l->function.lfun.index);
                 STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
-                current.code_left--;
+                
+                current.code_left -= 4;
                 if (block_size > 0x100)
                     lambda_error("Too many arguments to lfun closure\n");
             }
@@ -5330,6 +5377,8 @@ free_closure (svalue_t *svp)
     if (type == CLOSURE_LFUN)
     {
         free_object(l->function.lfun.ob, "free_closure: lfun object");
+        if(l->function.lfun.inhProg)
+            free_prog(l->function.lfun.inhProg, MY_TRUE);
     }
 
 #ifdef USE_NEW_INLINES
@@ -5392,7 +5441,6 @@ closure_lookup_lfun_prog ( lambda_t * l
 {
     object_t       *ob;
     int             ix;
-    unsigned short  inhIndex;
     program_t      *prog;
     fun_hdr_p       fun;
     funflag_t       flags;
@@ -5403,7 +5451,6 @@ closure_lookup_lfun_prog ( lambda_t * l
 
     ob = l->function.lfun.ob;
     ix = l->function.lfun.index;
-    inhIndex = l->function.lfun.inhIndex;
 
     /* Get the program resident */
     if (O_PROG_SWAPPED(ob)) {
@@ -5415,13 +5462,40 @@ closure_lookup_lfun_prog ( lambda_t * l
     /* Find the true definition of the function */
     prog = ob->prog;
 
-    if (inhIndex)
+    if (l->function.lfun.inhProg)
     {
-        inheritp = &prog->inherit[inhIndex-1];
-        prog = inheritp->prog;
+        while (prog != l->function.lfun.inhProg)
+        {
+#ifdef DEBUG
+            if (!prog->num_inherited)
+                errorf("(closure_lookup_lfun_prog): Couldn't find "
+                       "program '%s' in object '%s' with function index %ld. "
+                       "Found program '%s' instead.\n"
+                     , get_txt(l->function.lfun.inhProg->name)
+                     , get_txt(ob->name)
+                     , (long) l->function.lfun.index
+                     , get_txt(prog->name)
+                     );
+#endif
+
+            SEARCH_FUNCTION_INHERIT(inheritp, prog, ix);
+            ix -= inheritp->function_index_offset;
+            prog = inheritp->prog;
+
+#ifdef DEBUG
+            if (ix >= prog->num_functions)
+                errorf("(closure_lookup_lfun_prog): ix %ld > number of "
+                       "functions %ld in program '%s'\n"
+                     , (long) ix
+                     , (long) prog->num_functions
+                     , get_txt(prog->name)
+                     );
+#endif
+        }
+
         is_inherited = MY_TRUE;
     }
-
+    
     flags = prog->functions[ix];
     while (flags & NAME_INHERITED)
     {
@@ -6129,9 +6203,10 @@ f_symbol_function (svalue_t *sp)
         inter_sp = sp-1;
 
 #ifndef USE_NEW_INLINES
-        closure_lfun(sp, ob, (unsigned short)i, 0, /* raise_error: */ MY_FALSE);
+        closure_lfun(sp, ob, NULL, (unsigned short)i
+                    , /* raise_error: */ MY_FALSE);
 #else /* USE_NEW_INLINES */
-        closure_lfun(sp, ob, (unsigned short)i, 0, 0
+        closure_lfun(sp, ob, NULL, (unsigned short)i, 0
                     , /* raise_error: */ MY_FALSE);
 #endif /* USE_NEW_INLINES */
         if (sp->type != T_CLOSURE)

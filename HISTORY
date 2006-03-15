@@ -4,6 +4,17 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+14-Mar-2006 (Lars Duening) -- Release 3.3.714
+
+    - Changed Efuns:
+       + save_value(), restore_value(), save_object(), restore_object():
+          lfun closures are now saved with their inheritance path to
+          allow proper restoration under complex circumstances.
+
+    - Fixed Crasher:
+       + Lfun closures now keep proper track of which program
+          they belong to.
+
 12-Mar-2006 (Lars Duening) -- Release 3.3.713
 
     - New Efuns:

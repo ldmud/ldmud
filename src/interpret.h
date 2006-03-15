@@ -195,6 +195,7 @@ extern svalue_t *secure_call_lambda(svalue_t *closure, int num_arg, Bool externa
 extern void remove_object_from_stack(object_t *ob);
 extern void int_call_lambda(svalue_t *lsvp, int num_arg, Bool allowRefs);
 #define call_lambda(lsvp, num_arg) int_call_lambda(lsvp, num_arg, MY_FALSE)
+extern inherit_t *adjust_variable_offsets(const inherit_t *inheritp, const program_t *prog, const object_t *obj);
 extern void free_interpreter_temporaries(void);
 extern void invalidate_apply_low_cache(void);
 extern void push_referenced_mapping(mapping_t *m);
