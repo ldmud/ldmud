@@ -14647,15 +14647,19 @@ cross_define (function_t *from, function_t *to, int32 offset)
 
 /*-------------------------------------------------------------------------*/
 static funflag_t *
-get_function_id (program_t *progp, int fx)
+get_virtual_function_id (program_t *progp, int fx)
 
-/* Return a pointer to the function flags of function <fx> in <progp>.
+/* Return a pointer to the flags of the first entry of function <fx> in <progp>
+ * that is inherited virtual (i.e. the first entry we encounter that doesn't have
+ * TYPE_MOD_VIRTUAL).
+ *
  * This function takes care of resolving cross-definitions and inherits
  * to the real function flag.
  */
 
 {
     funflag_t flags;
+    funflag_t *last;
 
     flags = progp->functions[fx];
 
@@ -14665,9 +14669,12 @@ get_function_id (program_t *progp, int fx)
         fx += CROSSDEF_NAME_OFFSET(flags);
         flags = progp->functions[fx];
     }
+    
+    /* This one is inherited virtual. We wont get called otherwise. */
+    last = &progp->functions[fx];
 
     /* Walk the inherit chain */
-    while(flags & NAME_INHERITED)
+    while((flags & (NAME_INHERITED|TYPE_MOD_VIRTUAL)) == (NAME_INHERITED|TYPE_MOD_VIRTUAL))
     {
         inherit_t *inheritp;
 
@@ -14679,7 +14686,7 @@ get_function_id (program_t *progp, int fx)
 
     /* This is the one */
     return &progp->functions[fx];
-} /* get_function_id() */
+} /* get_virtual_function_id() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef USE_STRUCTS
@@ -14936,25 +14943,6 @@ copy_functions (program_t *from, funflag_t type)
                                         , current_func_index - n );
                             p->u.global.function = current_func_index;
                         }
-                        else if ((fun.flags | type) & TYPE_MOD_VIRTUAL
-                              && OldFunction->flags & TYPE_MOD_VIRTUAL
-                          &&    get_function_id(from, i)
-  == get_function_id(INHERIT(OldFunction->offset.inherit).prog
-                , n - INHERIT(OldFunction->offset.inherit).function_index_offset
-                     )
-                                 )
-                        {
-                            /* Entries denote the same function. We have to use
-                             * cross_define nonetheless, to get consistant
-                             * redefinition (and we prefer the first one)
-                             */
-                            OldFunction->flags |= fun.flags &
-                                (TYPE_MOD_PUBLIC|TYPE_MOD_NO_MASK);
-                            OldFunction->flags &= fun.flags |
-				~(TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|NAME_HIDDEN);
-                            cross_define( OldFunction, &fun
-                                        , n - current_func_index );
-                        }
                         else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN|NAME_UNDEFINED))
                                     == (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
                         {
@@ -14973,6 +14961,55 @@ copy_functions (program_t *from, funflag_t type)
                              */
 
                             p->u.global.function = current_func_index;
+                        }
+                        else if ((fun.flags | type) & TYPE_MOD_VIRTUAL
+                              && OldFunction->flags & TYPE_MOD_VIRTUAL
+                          &&    get_virtual_function_id(from, i)
+  == get_virtual_function_id(INHERIT(OldFunction->offset.inherit).prog
+                , n - INHERIT(OldFunction->offset.inherit).function_index_offset
+                     )
+                                 )
+                        {
+                            /* Entries denote the same function and both
+                             * entries are visible. We have to use
+                             * cross_define nonetheless, to get consistant
+                             * redefinition (and to avoid the nomask
+                             * checking that comes next), and we prefer
+                             * the first one.
+                             *
+                             * It is important, that both entries are
+                             * indeed visible, because otherwise invisible
+                             * (i.e. private) functions would be made
+                             * visible again by another visible occurrence
+                             * of the same function. The originally invisible
+                             * occurrence would then be subject to
+                             * redefinition and nomask checking.
+                             */
+                            OldFunction->flags |= fun.flags &
+                                (TYPE_MOD_PUBLIC|TYPE_MOD_NO_MASK);
+                            OldFunction->flags &= fun.flags |
+				~(TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|NAME_HIDDEN);
+                            cross_define( OldFunction, &fun
+                                        , n - current_func_index );
+                        }
+                        else if ((fun.flags | type) & TYPE_MOD_VIRTUAL
+                              && OldFunction->flags & TYPE_MOD_VIRTUAL
+                          &&    get_virtual_function_id(from, i)
+  == get_virtual_function_id(INHERIT(OldFunction->offset.inherit).prog
+                , n - INHERIT(OldFunction->offset.inherit).function_index_offset
+                     )
+                                 )
+                        {
+                            /* Entries denote the same function. We have to use
+                             * cross_define nonetheless, to get consistant
+                             * redefinition (and we prefer the first one)
+                             */
+                            OldFunction->flags |= fun.flags &
+                                (TYPE_MOD_PUBLIC|TYPE_MOD_NO_MASK);
+                            OldFunction->flags &= fun.flags |
+				~(TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|NAME_HIDDEN);
+                            cross_define( OldFunction, &fun
+                                        , n - current_func_index );
                         }
                         else if ( (fun.flags & OldFunction->flags & TYPE_MOD_NO_MASK)
                              &&  !( (fun.flags|OldFunction->flags) & NAME_UNDEFINED ) )
@@ -15239,7 +15276,7 @@ copy_variables (program_t *from, funflag_t type)
                 inherit_t inherit, *inheritp2;
                 int k, inherit_index;
                 funflag_t *flagp;
-                function_t *funp, *funp2;
+                function_t *funp;
 
                 if (variables_initialized)
                     yyerror("illegal to inherit virtually after "
@@ -15280,8 +15317,8 @@ copy_variables (program_t *from, funflag_t type)
                 else
                     inherit.inherit_type |= INHERIT_TYPE_DUPLICATE;
 
-                inherit_index = (mem_block[A_INHERITS].current_size - j) /
-                   sizeof(inherit_t) - 1;
+                inherit_index = (mem_block[A_INHERITS].current_size) /
+                   sizeof(inherit_t);
                 inherit.function_index_offset += fun_index_offset;
                 add_to_mem_block(A_INHERITS, (char *)&inherit, sizeof inherit);
                   /* If a function is directly inherited from a program that
@@ -15293,37 +15330,20 @@ copy_variables (program_t *from, funflag_t type)
                    */
 
                 /* Update the offset.inherit in all these functions to point
-                 * to the first (virtual) inherit of the program.
+                 * to the new inherit_t structure. (But only, if it wasn't
+                 * already cross-defined to something else.)
                  */
                 flagp = from->functions + inheritp->function_index_offset;
                 funp = (function_t *)mem_block[A_FUNCTIONS].block +
                     inherit.function_index_offset;
-                funp2 = (function_t *)mem_block[A_FUNCTIONS].block +
-                    inheritp2->function_index_offset;
-                    /* Usually funp2 == funp, but if the program is inherited
-                     * virtually several times with differing visibilities,
-                     * the two pointers differ.
-                     */
-                for (k = inherit.prog->num_functions; --k >= 0; funp++, funp2++)
+                for (k = inherit.prog->num_functions; --k >= 0; funp++)
                 {
                     if ( !(funp->flags & NAME_CROSS_DEFINED)
-                     &&  !(funp2->flags & NAME_CROSS_DEFINED)
                      && (*flagp & (NAME_INHERITED|NAME_CROSS_DEFINED)) ==
                            NAME_INHERITED
                      && (*flagp & INHERIT_MASK) == inheritc )
                     {
                         funp->offset.inherit = inherit_index;
-
-                        if(funp != funp2)
-                        {
-                            /* I don't think, that this is a wise idea.
-                             * Because the function index offset of this
-                             * inherit is not correct for this function.
-                             */
-                            yywarnf("Adjusting inherit index for %.*s::%s() because of virtual inherit!\n"
-                                   , (int) from->name->size, from->name->txt
-                                   , get_txt(funp->name));
-                        }
                     }
                     flagp++;
                 }

@@ -7,6 +7,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
       in case of complex inheritance relationships. This also affects
       the savefile format: lfun closures are saved with their inheritance
       path (Bug #443, #444).
+  - (prolang.y) If a non-virtual baseclass was inherited multiple times
+      with a virtual class inside the inheritance tree, its members
+      were merged even though they shouldn't (Bug #422).
 
 12-Mar-2006  (Lars Duening)  (3.3.713)
   - Created snapshot.

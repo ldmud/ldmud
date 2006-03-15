@@ -11,9 +11,15 @@ For a detailed list of all changes see the file CHANGELOG.
           lfun closures are now saved with their inheritance path to
           allow proper restoration under complex circumstances.
 
-    - Fixed Crasher:
+    - Fixed Crashers:
        + Lfun closures now keep proper track of which program
           they belong to.
+
+    - Compiler:
+       + If a non-virtual baseclass was inherited multiple times
+          with a virtual class inside the inheritance tree, its members
+          were merged even though they shouldn't.
+
 
 12-Mar-2006 (Lars Duening) -- Release 3.3.713
 
