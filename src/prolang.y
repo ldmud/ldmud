@@ -871,10 +871,6 @@ static int current_struct;
    */
 #endif /* USE_STRUCTS */
 
-static fulltype_t current_type;
-  /* The current basic type (reference not counted).
-   */
-
 static p_uint last_expression;
   /* If >= 0, the address of the last instruction which by itself left
    * a value on the stack. If there is no such instruction, the value
@@ -987,6 +983,9 @@ static const fulltype_t Type_Ref_Number = { TYPE_NUMBER|TYPE_MOD_REFERENCE };
 /* Forward declarations */
 
 struct lvalue_s; /* Defined within YYSTYPE aka %union */
+
+static void define_local_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_star, struct lvalue_s *lv, Bool redeclare, Bool with_init);
+static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2);
 static Bool add_lvalue_code ( struct lvalue_s * lv, int instruction);
 static void insert_pop_value(void);
 static void arrange_protected_lvalue(p_int, int, p_int, int);
@@ -3411,6 +3410,179 @@ verify_declared (ident_t *p)
 } /* verify_declared() */
 
 /*-------------------------------------------------------------------------*/
+static int
+define_global_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_star, Bool with_init)
+
+/* This is called directly from a parser rule: <type> [*] <name>
+ * if with_init is true, then an initialization of this variable will follow.
+ * It creates the global variable and returns its index.
+ */
+
+{
+    int i;
+    
+    variables_defined = MY_TRUE;
+
+    if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                          | TYPE_MOD_PROTECTED)))
+    {
+        actual_type.typeflags |= default_varmod;
+    }
+
+    if (actual_type.typeflags & TYPE_MOD_VARARGS)
+    {
+        yyerror("can't declare a variable as varargs");
+            actual_type.typeflags &= ~TYPE_MOD_VARARGS;
+    }
+  
+    actual_type.typeflags |= opt_star;
+
+    if (!pragma_share_variables)
+        actual_type.typeflags |= VAR_INITIALIZED;
+
+    define_variable(name, actual_type);
+    i = verify_declared(name); /* Is the var declared? */
+
+    /* Initialize float values with 0.0. */
+    if (with_init
+       || (!(actual_type.typeflags & TYPE_MOD_POINTER)
+         && (actual_type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
+          ))
+    {
+
+        /* Prepare the init code */
+        transfer_init_control();
+
+        /* If this is the first variable initialization and
+         * pragma_share_variables is in effect, insert
+         * the check for blueprint/clone initialisation:
+         *    if (clonep(this_object())) return 1;
+         */
+        if (!variables_initialized && pragma_share_variables)
+        {
+            ins_f_code(F_THIS_OBJECT);
+            ins_f_code(F_CLONEP);
+            ins_f_code(F_BRANCH_WHEN_ZERO);
+            ins_byte(2);
+            ins_f_code(F_CONST1);
+            ins_f_code(F_RETURN);
+        }
+
+        /* Initialize floats with 0.0 */
+        if(!with_init)
+        {
+            PREPARE_INSERT(5)
+            /* Must come after the non-local program code inserts! */
+
+            add_f_code(F_FCONST0);
+
+#ifdef DEBUG
+            if (i & VIRTUAL_VAR_TAG)
+            {
+                /* When we want to allow 'late' initializers for
+                 * inherited variables, it must have a distinct syntax,
+                 * lest name clashs remain undetected, making LPC code
+                 * hard to debug.
+                 */
+                fatal("Newly declared variable is virtual\n");
+            }
+#endif
+            variables_initialized = MY_TRUE; /* We have __INIT code */
+            if (!pragma_share_variables)
+                VARIABLE(i)->type.typeflags |= VAR_INITIALIZED;
+
+            /* Push the variable reference and create the assignment */
+
+            if (i + num_virtual_variables > 0xff)
+            {
+                add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
+                add_short(i + num_virtual_variables);
+                CURRENT_PROGRAM_SIZE += 1;
+            }
+            else
+            {
+                add_f_code(F_PUSH_IDENTIFIER_LVALUE);
+                add_byte(i + num_virtual_variables);
+            }
+
+            /* Ok, assign */
+            add_f_code(F_VOID_ASSIGN);
+            CURRENT_PROGRAM_SIZE += 4;
+            add_new_init_jump();
+        } /* PREPARE_INSERT() block */
+    } /* if (float variable) */
+
+    return i;
+} /* define_global_variable() */
+
+/*-------------------------------------------------------------------------*/
+static void
+init_global_variable (int i, ident_t* name, fulltype_t actual_type
+                     , typeflags_t opt_star, int assign_op, fulltype_t exprtype)
+
+/* This is called directly from a parser rule: <type> [*] <name> = <expr>
+ * It will be called after the call to define_global_variable().
+ * It assigns the result of <expr> to the variable.
+ */
+
+{
+    PREPARE_INSERT(4)
+
+    if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                          | TYPE_MOD_PROTECTED)))
+    {
+        actual_type.typeflags |= default_varmod;
+    }
+
+    actual_type.typeflags |= opt_star;
+
+#ifdef DEBUG
+    if (i & VIRTUAL_VAR_TAG)
+    {
+        /* When we want to allow 'late' initializers for
+         * inherited variables, it must have a distinct syntax,
+         * lest name clashs remain undetected, making LPC code
+         * hard to debug.
+         */
+        fatal("Newly declared variable is virtual\n");
+    }
+#endif
+    variables_initialized = MY_TRUE; /* We have __INIT code */
+
+    /* Push the variable reference and create the assignment */
+
+    if (i + num_virtual_variables > 0xff)
+    {
+        add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
+        add_short(i + num_virtual_variables);
+        CURRENT_PROGRAM_SIZE += 1;
+    }
+    else
+    {
+        add_f_code(F_PUSH_IDENTIFIER_LVALUE);
+        add_byte(i + num_virtual_variables);
+    }
+
+    /* Only simple assigns are allowed */
+    if (assign_op != F_ASSIGN)
+       yyerror("Illegal initialization");
+
+    /* Do the types match? */
+    actual_type.typeflags &= TYPE_MOD_MASK;
+    if (!compatible_types(actual_type, exprtype, MY_TRUE))
+    {
+        yyerrorf("Type mismatch %s when initializing %s"
+                , get_two_types(actual_type, exprtype)
+                , get_txt(name->name));
+    }
+
+    /* Ok, assign */
+    add_f_code(F_VOID_ASSIGN);
+    CURRENT_PROGRAM_SIZE += 3;
+    add_new_init_jump();
+} /* init_global_variable() */
+
+/*-------------------------------------------------------------------------*/
 static void
 store_function_header ( p_int start
                       , string_t * name, fulltype_t returntype
@@ -5455,6 +5627,7 @@ delete_prog_string (void)
 %type <fulltype>     type
 %type <fulltype>     opt_basic_type basic_type
 %type <fulltype>     non_void_type opt_basic_non_void_type basic_non_void_type
+%type <fulltype>     name_list member_name_list local_name_list
 %type <inh_flags>    inheritance_qualifier inheritance_qualifiers
 %type <typeflags>    inheritance_modifier_list inheritance_modifier
 %ifdef USE_NEW_INLINES
@@ -5475,7 +5648,6 @@ delete_prog_string (void)
 %type <lrvalue>      parse_command
 %endif
 %type <lvalue>       lvalue name_lvalue local_name_lvalue foreach_var_lvalue
-%type <lvalue>       new_local_name
 %type <index>        index_range index_expr
 %type <case_label>   case_label
 %type <address>      optional_else
@@ -5622,10 +5794,8 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
 #endif /* USE_NEW_INLINES */
       }
 
-    | type name_list ';' /* Variable definition */
+    | name_list ';' /* Variable definition */
       {
-          if ($1.typeflags == 0)
-              yyerror("Missing type");
 #ifndef USE_NEW_INLINES
           if (first_inline_fun)
               insert_inline_fun_now = MY_TRUE;
@@ -5822,7 +5992,7 @@ inline_context_list:
 
 
 context_decl:
-      basic_type local_name_list
+      local_name_list
       { /* Empty action to void value from local_name_list */ }
 ; /* context_decl */
 
@@ -5938,31 +6108,42 @@ member_list:
 ; /* member_list */
 
 member:
-      basic_non_void_type member_name_list ';'
+      member_name_list ';'
       {
-          /* The member_name_list adds the struct members, using
-           * the value of current_type set by basic_non_void_type.
-           */
+          /* The member_name_list adds the struct members. */
       }
 ; /* member */
 
 member_name_list:
-      member_name
-    | member_name_list ',' member_name
-; /* member_name_list */
-
-member_name:
-      optional_star L_IDENTIFIER
+      basic_non_void_type optional_star L_IDENTIFIER
       {
+          fulltype_t actual_type = $1;
           vartype_t type;
-          current_type.typeflags |= $1;
-          assign_full_to_vartype(&type, current_type);
-          add_struct_member($2->name, type, NULL);
-          if ($2->type == I_TYPE_UNKNOWN)
-              free_shared_identifier($2);
+          
+          actual_type.typeflags |= $2;
+          
+          assign_full_to_vartype(&type, actual_type);
+          add_struct_member($3->name, type, NULL);
+          if ($3->type == I_TYPE_UNKNOWN)
+              free_shared_identifier($3);
+            
+          $$ = $1;
       }
-; /* member_name */
-
+    | member_name_list ',' optional_star L_IDENTIFIER
+      {
+          fulltype_t actual_type = $1;
+          vartype_t type;
+          
+          actual_type.typeflags |= $3;
+          
+          assign_full_to_vartype(&type, actual_type);
+          add_struct_member($4->name, type, NULL);
+          if ($4->type == I_TYPE_UNKNOWN)
+              free_shared_identifier($4);
+            
+          $$ = $1;
+      }
+; /* member_name_list */
 
 %endif /* USE_STRUCTS */
 
@@ -6378,14 +6559,12 @@ optional_star:
 type: type_modifier_list opt_basic_type
       {
           set_fulltype($$, $1 | $2.typeflags, $2.t_struct);
-          current_type = $$;
       } ;
 
 
 non_void_type: type_modifier_list opt_basic_non_void_type
       {
           set_fulltype($$, $1 | $2.typeflags, $2.t_struct);
-          current_type = $$;
       } ;
 
 
@@ -6416,15 +6595,15 @@ opt_basic_non_void_type:
 
 
 basic_non_void_type:
-      L_STATUS       { $$ = Type_Number; current_type = $$; }
-    | L_INT          { $$ = Type_Number;  current_type = $$; }
-    | L_STRING_DECL  { $$ = Type_String;  current_type = $$; }
-    | L_OBJECT       { $$ = Type_Object;  current_type = $$; }
-    | L_CLOSURE_DECL { $$ = Type_Closure; current_type = $$; }
-    | L_SYMBOL_DECL  { $$ = Type_Symbol;  current_type = $$; }
-    | L_FLOAT_DECL   { $$ = Type_Float;   current_type = $$; }
-    | L_MAPPING      { $$ = Type_Mapping; current_type = $$; }
-    | L_MIXED        { $$ = Type_Any;     current_type = $$; }
+      L_STATUS       { $$ = Type_Number;  }
+    | L_INT          { $$ = Type_Number;  }
+    | L_STRING_DECL  { $$ = Type_String;  }
+    | L_OBJECT       { $$ = Type_Object;  }
+    | L_CLOSURE_DECL { $$ = Type_Closure; }
+    | L_SYMBOL_DECL  { $$ = Type_Symbol;  }
+    | L_FLOAT_DECL   { $$ = Type_Float;   }
+    | L_MAPPING      { $$ = Type_Mapping; }
+    | L_MIXED        { $$ = Type_Any;     }
 %ifdef USE_STRUCTS
     | L_STRUCT identifier
       {
@@ -6443,7 +6622,6 @@ basic_non_void_type:
           }
 
           free_mstring($2);
-          current_type = $$;
       }
 %endif /* USE_STRUCTS */
 ; /* basic_non_void_type */
@@ -6451,7 +6629,7 @@ basic_non_void_type:
 
 basic_type:
       basic_non_void_type
-    | L_VOID         { $$ = Type_Void;    current_type = $$; }
+    | L_VOID         { $$ = Type_Void;    }
 ; /* basic_type */
 
 
@@ -6566,209 +6744,55 @@ new_arg_name:
 ; /* new_arg_name */
 
 
+
 name_list:
-      new_name
-    | name_list ',' new_name;
-
-
-new_name:
       /* Simple variable definition */
-      optional_star L_IDENTIFIER
+      type optional_star L_IDENTIFIER
       {
 %line
-          fulltype_t actual_type = current_type;
+          if ($1.typeflags == 0)
+              yyerror("Missing type");
 
-          variables_defined = MY_TRUE;
-
-          if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                              | TYPE_MOD_PROTECTED)))
-          {
-              actual_type.typeflags |= default_varmod;
-          }
-
-          if (actual_type.typeflags & TYPE_MOD_VARARGS)
-          {
-              yyerror("can't declare a variable as varargs");
-              actual_type.typeflags &= ~TYPE_MOD_VARARGS;
-          }
-
-          actual_type.typeflags |= $1;
-
-          if (!pragma_share_variables)
-              actual_type.typeflags |= VAR_INITIALIZED;
-
-          define_variable($2, actual_type);
-
-          if (!(actual_type.typeflags & TYPE_MOD_POINTER)
-           && (actual_type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
-             )
-          {
-              int i = verify_declared($2); /* Is the var declared? */
-
-              /* Prepare the init code */
-              transfer_init_control();
-
-              /* If this is the first variable initialization and
-               * pragma_share_variables is in effect, insert
-               * the check for blueprint/clone initialisation:
-               *    if (clonep(this_object())) return 1;
-               */
-              if (!variables_initialized && pragma_share_variables)
-              {
-                  ins_f_code(F_THIS_OBJECT);
-                  ins_f_code(F_CLONEP);
-                  ins_f_code(F_BRANCH_WHEN_ZERO);
-                  ins_byte(2);
-                  ins_f_code(F_CONST1);
-                  ins_f_code(F_RETURN);
-              }
-
-              {
-                  PREPARE_INSERT(5)
-                    /* Must come after the non-local program code inserts! */
-
-                  add_f_code(F_FCONST0);
-
-#ifdef DEBUG
-                  if (i & VIRTUAL_VAR_TAG)
-                  {
-                      /* When we want to allow 'late' initializers for
-                       * inherited variables, it must have a distinct syntax,
-                       * lest name clashs remain undetected, making LPC code
-                       * hard to debug.
-                       */
-                      fatal("Newly declared variable is virtual\n");
-                  }
-#endif
-                  variables_initialized = MY_TRUE; /* We have __INIT code */
-                  if (!pragma_share_variables)
-                      VARIABLE(i)->type.typeflags |= VAR_INITIALIZED;
-
-                  /* Push the variable reference and create the assignment */
-
-                  if (i + num_virtual_variables > 0xff)
-                  {
-                      add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
-                      add_short(i + num_virtual_variables);
-                      CURRENT_PROGRAM_SIZE += 1;
-                  }
-                  else
-                  {
-                      add_f_code(F_PUSH_IDENTIFIER_LVALUE);
-                      add_byte(i + num_virtual_variables);
-                  }
-
-                  /* Ok, assign */
-                  add_f_code(F_VOID_ASSIGN);
-                  CURRENT_PROGRAM_SIZE += 4;
-                  add_new_init_jump();
-              } /* PREPARE_INSERT() block */
-          } /* if (float variable) */
+          define_global_variable($3, $1, $2, MY_FALSE);
+          $$ = $1;
       }
 
     /* Variable definition with initialization */
 
-    | optional_star L_IDENTIFIER
+    | type optional_star L_IDENTIFIER
       {
-          fulltype_t actual_type = current_type;
+          if ($1.typeflags == 0)
+              yyerror("Missing type");
 
-          variables_defined = MY_TRUE;
-
-          if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                              | TYPE_MOD_PROTECTED)))
-          {
-              actual_type.typeflags |= default_varmod;
-          }
-
-          actual_type.typeflags |= $1;
-
-          define_variable($2, actual_type);
-          $<number>$ = verify_declared($2); /* Is the var declared? */
-
-          /* Prepare the init code */
-          transfer_init_control();
-
-          /* If this is the first variable initialization and
-           * pragma_share_variables is in effect, insert
-           * the check for blueprint/clone initialisation:
-           *    if (clonep(this_object())) return 1;
-           */
-          if (!variables_initialized && pragma_share_variables)
-          {
-              ins_f_code(F_THIS_OBJECT);
-              ins_f_code(F_CLONEP);
-              ins_f_code(F_BRANCH_WHEN_ZERO);
-              ins_byte(2);
-              ins_f_code(F_CONST1);
-              ins_f_code(F_RETURN);
-          }
+          $<number>$ = define_global_variable($3, $1, $2, MY_TRUE); 
       }
 
       L_ASSIGN expr0
-
       {
-          fulltype_t actual_type = current_type;
-          fulltype_t exprtype = $5.type;
-          int i = $<number>3;
-          PREPARE_INSERT(4)
-
-          if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                              | TYPE_MOD_PROTECTED)))
-          {
-              actual_type.typeflags |= default_varmod;
-          }
-
-          actual_type.typeflags |= $1;
-
-#ifdef DEBUG
-          if (i & VIRTUAL_VAR_TAG)
-          {
-              /* When we want to allow 'late' initializers for
-               * inherited variables, it must have a distinct syntax,
-               * lest name clashs remain undetected, making LPC code
-               * hard to debug.
-               */
-              fatal("Newly declared variable is virtual\n");
-          }
-#endif
-          variables_initialized = MY_TRUE; /* We have __INIT code */
-          if (!pragma_share_variables)
-              VARIABLE(i)->type.typeflags |= VAR_INITIALIZED;
-
-          /* Push the variable reference and create the assignment */
-
-          if (i + num_virtual_variables > 0xff)
-          {
-              add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
-              add_short(i + num_virtual_variables);
-              CURRENT_PROGRAM_SIZE += 1;
-          }
-          else
-          {
-              add_f_code(F_PUSH_IDENTIFIER_LVALUE);
-              add_byte(i + num_virtual_variables);
-          }
-
-          /* Only simple assigns are allowed */
-          if ($4 != F_ASSIGN)
-              yyerror("Illegal initialization");
-
-          /* Do the types match? */
-          actual_type.typeflags &= TYPE_MOD_MASK;
-          if (!compatible_types(actual_type, exprtype, MY_TRUE))
-          {
-              yyerrorf("Type mismatch %s when initializing %s"
-                      , get_two_types(actual_type, exprtype)
-                      , get_txt($2->name));
-          }
-
-          /* Ok, assign */
-          add_f_code(F_VOID_ASSIGN);
-          CURRENT_PROGRAM_SIZE += 3;
-          add_new_init_jump();
+          init_global_variable($<number>4, $3, $1, $2, $5, $6.type);
+          $$ = $1;
       }
 
-; /* new_name */
+    | name_list ',' optional_star L_IDENTIFIER
+      {
+          define_global_variable($4, $1, $3, MY_FALSE);
+          $$ = $1;
+      }
+
+    /* Variable definition with initialization */
+
+    | name_list ',' optional_star L_IDENTIFIER
+      {
+          $<number>$ = define_global_variable($4, $1, $3, MY_TRUE); 
+      }
+
+      L_ASSIGN expr0
+      {
+          init_global_variable($<number>5, $4, $1, $3, $6, $7.type);
+          $$ = $1;
+      }
+
+; /* name_list */
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6808,224 +6832,81 @@ block:
 
 statements:
       /* empty */
-    | statements basic_type local_name_list ';'
+    | statements local_name_list ';'
     | statements statement
 ;
 
 
 local_name_list:
-      new_local
-    | local_name_list ',' new_local
-;
-
-
-new_local:
-      new_local_name
+      basic_type optional_star L_IDENTIFIER
       {
-          /* If this is a float variable, we need to insert an appropriate
-           * initializer, as the default svalue-0 is not a valid float value.
-           */
-
-          Bool need_value = MY_FALSE;
-%line
-
-#ifdef USE_NEW_INLINES
-          /* When parsing context variables, the context_closure instruction
-           * expects a value on the stack. If we do a float initialization,
-           * we leave the 0.0 on the stack, otherwise we'll push a 0.
-           * For normal float locals, we'll create the bytecode to assign
-           * the float 0.
-           */
-          need_value = current_inline && current_inline->parse_context;
-#endif /* USE_NEW_INLINES */
-
-          if (!($1.type.typeflags & TYPE_MOD_POINTER)
-           && ($1.type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
-             )
-          {
-              ins_f_code(F_FCONST0);
-
-              if (!need_value)
-              {
-                  if (!add_lvalue_code(&$1, F_VOID_ASSIGN))
-                      YYACCEPT;
-              }
-              
-              need_value = MY_FALSE;
-          } /* if (float variable) */
-
-          if (need_value) /* If we still need a value... */
-          {
-              ins_number(0);
-          }
+          struct lvalue_s lv;
+          define_local_variable($3, $1, $2, &lv, MY_FALSE, MY_FALSE);
+          
+          $$ = $1;
       }
-
-    | new_local_name L_ASSIGN expr0
+    | basic_type optional_star L_LOCAL
       {
-          /* We got a "<name> = <expr>" type declaration. */
-
-          fulltype_t type2 = $3.type;
-
-%line
-#ifdef USE_NEW_INLINES
-#ifdef DEBUG_INLINES
-if (current_inline && current_inline->parse_context) printf("DEBUG: inline context decl: name = expr, program_size %d\n", CURRENT_PROGRAM_SIZE);
-#endif /* DEBUG_INLINES */
-#endif /* USE_NEW_INLINES */
-          type2.typeflags &= TYPEID_MASK;
-
-          /* Check the assignment for validity */
-          if (exact_types.typeflags && !compatible_types($1.type, type2, MY_TRUE))
-          {
-              yyerrorf("Bad assignment %s", get_two_types($1.type, type2));
-          }
-
-          if ($2 != F_ASSIGN)
-          {
-              yyerror("Only plain assignments allowed here");
-          }
-
-          if (type2.typeflags & TYPE_MOD_REFERENCE)
-              yyerror("Can't trace reference assignments");
-
-          /* If we're parsing a context variable, just leave the
-           * value on the stack for the context_closure instruction.
-           * For normal locals, add the bytecode to create the lvalue
-           * and do the assignment.
-           */
-#ifdef USE_NEW_INLINES
-          if (!current_inline || !current_inline->parse_context)
-#endif /* USE_NEW_INLINES */
-          {
-              if (!add_lvalue_code(&$1, F_VOID_ASSIGN))
-                  YYACCEPT;
-          } /* parsed context var */
+          struct lvalue_s lv;
+          define_local_variable($3, $1, $2, &lv, MY_TRUE, MY_FALSE);
+          
+          $$ = $1;
       }
-; /* new_local */
-
-new_local_name:
-      optional_star L_IDENTIFIER
+    | basic_type optional_star L_IDENTIFIER
       {
-          /* A new local variable */
-
-          block_scope_t *scope = block_scope + block_depth - 1;
-          ident_t *q;
-          fulltype_t actual_type = current_type;
-
-          actual_type.typeflags |= $1;
-
-#ifdef USE_NEW_INLINES
-          if (current_inline && current_inline->parse_context)
-          {
-#ifdef DEBUG_INLINES
-printf("DEBUG:   context name '%s'\n", get_txt($2->name));
-#endif /* DEBUG_INLINES */
-              q = add_context_name($2, actual_type, -1);
-              $$.u.simple[0] = F_PUSH_CONTEXT_LVALUE;
-              $$.u.simple[1] = q->u.local.context;
-          }
-          else
-          {
-              q = add_local_name($2, actual_type, block_depth);
-              if (use_local_scopes && scope->num_locals == 1)
-              {
-                  /* First definition of a local, so insert the
-                   * clear_locals bytecode and remember its position
-                   */
-                  scope->addr = mem_block[A_PROGRAM].current_size;
-                  ins_f_code(F_CLEAR_LOCALS);
-                  ins_byte(scope->first_local);
-                  ins_byte(0);
-              }
-
-              $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-              $$.u.simple[1] = q->u.local.num;
-          }
-#else /* USE_NEW_INLINES */
-          q = add_local_name($2, actual_type, block_depth, MY_FALSE);
-
-          if (use_local_scopes && scope->num_locals == 1)
-          {
-              /* First definition of a local, so insert the
-               * clear_locals bytecode and remember its position
-               */
-              scope->addr = mem_block[A_PROGRAM].current_size;
-              ins_f_code(F_CLEAR_LOCALS);
-              ins_byte(scope->first_local);
-              ins_byte(0);
-          }
-
-          $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-          $$.u.simple[1] = q->u.local.num;
-#endif /* USE_NEW_INLINES */
-          $$.length = 0;
-          $$.type = actual_type;
+          define_local_variable($3, $1, $2, &$<lvalue>$, MY_FALSE, MY_TRUE);
       }
-
-    | optional_star L_LOCAL
+      L_ASSIGN expr0
       {
-          /* A local name is redeclared. If this happens on a deeper
-           * level, it is even legal.
-           */
-
-          ident_t *q;
-          block_scope_t *scope = block_scope + block_depth - 1;
-          fulltype_t actual_type = current_type;
-
-          actual_type.typeflags |= $1;
-
-#ifdef USE_NEW_INLINES
-          if (current_inline && current_inline->parse_context)
-          {
-#ifdef DEBUG_INLINES
-printf("DEBUG:   context name '%s'\n", get_txt($2->name));
-#endif /* DEBUG_INLINES */
-              if (current_inline->block_depth+1 <= $2->u.local.depth)
-                 yyerrorf("Illegal to redeclare local name '%s'"
-                         , get_txt($2->name));
-
-              q = add_context_name($2, actual_type, -1);
-              $$.u.simple[0] = F_PUSH_CONTEXT_LVALUE;
-              $$.u.simple[1] = q->u.local.context;
-          }
-          else
-          {
-              q = redeclare_local($2, actual_type, block_depth);
-              if (use_local_scopes && scope->num_locals == 1)
-              {
-                  /* First definition of a local, so insert the
-                   * clear_locals bytecode and remember its position
-                   */
-                  scope->addr = mem_block[A_PROGRAM].current_size;
-                  ins_f_code(F_CLEAR_LOCALS);
-                  ins_byte(scope->first_local);
-                  ins_byte(0);
-              }
-
-              $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-              $$.u.simple[1] = q->u.local.num;
-          }
-#else /* USE_NEW_INLINES */
-          q = redeclare_local($2, actual_type, block_depth);
-
-          if (use_local_scopes && scope->num_locals == 1)
-          {
-              /* First definition of a local, so insert the
-               * clear_locals bytecode and remember its position
-               */
-              scope->addr = mem_block[A_PROGRAM].current_size;
-              ins_f_code(F_CLEAR_LOCALS);
-              ins_byte(scope->first_local);
-              ins_byte(0);
-          }
-
-          $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-          $$.u.simple[1] = q->u.local.num;
-#endif /* USE_NEW_INLINES */
-          $$.length = 0;
-          $$.type = actual_type;
+          init_local_variable($3, &$<lvalue>4, $5, $6.type);
+          
+          $$ = $1;
       }
-; /* new_local_name */
+    | basic_type optional_star L_LOCAL
+      {
+          define_local_variable($3, $1, $2, &$<lvalue>$, MY_TRUE, MY_TRUE);
+      }
+      L_ASSIGN expr0
+      {
+          init_local_variable($3, &$<lvalue>4, $5, $6.type);
+          
+          $$ = $1;
+      }
+    | local_name_list ',' optional_star L_IDENTIFIER
+      {
+          struct lvalue_s lv;
+          define_local_variable($4, $1, $3, &lv, MY_FALSE, MY_FALSE);
+          
+          $$ = $1;
+      }
+    | local_name_list ',' optional_star L_LOCAL
+      {
+          struct lvalue_s lv;
+          define_local_variable($4, $1, $3, &lv, MY_TRUE, MY_FALSE);
+          
+          $$ = $1;
+      }
+    | local_name_list ',' optional_star L_IDENTIFIER
+      {
+          define_local_variable($4, $1, $3, &$<lvalue>$, MY_FALSE, MY_TRUE);
+      }
+      L_ASSIGN expr0
+      {
+          init_local_variable($4, &$<lvalue>5, $6, $7.type);
+          
+          $$ = $1;
+      }
+    | local_name_list ',' optional_star L_LOCAL
+      {
+          define_local_variable($4, $1, $3, &$<lvalue>$, MY_TRUE, MY_TRUE);
+      }
+      L_ASSIGN expr0
+      {
+          init_local_variable($4, &$<lvalue>5, $6, $7.type);
+          
+          $$ = $1;
+      }
+; /* local_name_list */
 
 
 statement:
@@ -11521,8 +11402,14 @@ name_lvalue:
 
 
 local_name_lvalue:
-      basic_type new_local_name
-       { $$ = $2; }
+      basic_type optional_star L_IDENTIFIER
+      {
+          define_local_variable($3, $1, $2, &$$, MY_FALSE, MY_TRUE);
+      }
+    | basic_type optional_star L_LOCAL
+      {
+          define_local_variable($3, $1, $2, &$$, MY_TRUE, MY_TRUE);
+      }
 ; /* local_name_lvalue */
 
 
@@ -13823,6 +13710,178 @@ lvalue_list:
 #endif
 
 /*=========================================================================*/
+
+/*-------------------------------------------------------------------------*/
+static void
+define_local_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_star, struct lvalue_s *lv, Bool redeclare, Bool with_init)
+
+/* This is called directly from a parser rule: <type> [*] <name>
+ * if with_init is true, then an initialization of this variable will follow.
+ * if redeclare is true, then a local name is redeclared.
+ * It creates the local variable and returns the corresponding lvalue
+ * in lv.
+ */
+
+{
+    /* redeclare:
+     *    MY_FALSE: A new local variable
+     *    MY_TRUE:  A local name is redeclared. If this happens
+     *              on a deeper level, it is even legal.
+     */
+
+    block_scope_t *scope = block_scope + block_depth - 1;
+    ident_t *q;
+
+    actual_type.typeflags |= opt_star;
+
+#ifdef USE_NEW_INLINES
+    if (current_inline && current_inline->parse_context)
+    {
+#ifdef DEBUG_INLINES
+printf("DEBUG:   context name '%s'\n", get_txt(name->name));
+#endif /* DEBUG_INLINES */
+
+        if (redeclare && current_inline->block_depth+1 <= name->u.local.depth)
+            yyerrorf("Illegal to redeclare local name '%s'"
+                , get_txt(name->name));
+
+        q = add_context_name(name, actual_type, -1);
+        lv->u.simple[0] = F_PUSH_CONTEXT_LVALUE;
+        lv->u.simple[1] = q->u.local.context;
+    }
+    else
+    {
+        if(redeclare)
+            q = redeclare_local(name, actual_type, block_depth);
+        else
+            q = add_local_name(name, actual_type, block_depth);
+        if (use_local_scopes && scope->num_locals == 1)
+        {
+            /* First definition of a local, so insert the
+             * clear_locals bytecode and remember its position
+             */
+            scope->addr = mem_block[A_PROGRAM].current_size;
+            ins_f_code(F_CLEAR_LOCALS);
+            ins_byte(scope->first_local);
+            ins_byte(0);
+        }
+
+        lv->u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
+        lv->u.simple[1] = q->u.local.num;
+    }
+#else /* USE_NEW_INLINES */
+    if (redeclare)
+        q = redeclare_local(name, actual_type, block_depth);
+    else
+        q = add_local_name(name, actual_type, block_depth, MY_FALSE);
+
+    if (use_local_scopes && scope->num_locals == 1)
+    {
+        /* First definition of a local, so insert the
+         * clear_locals bytecode and remember its position
+         */
+        scope->addr = mem_block[A_PROGRAM].current_size;
+        ins_f_code(F_CLEAR_LOCALS);
+        ins_byte(scope->first_local);
+        ins_byte(0);
+    }
+
+    lv->u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
+    lv->u.simple[1] = q->u.local.num;
+#endif /* USE_NEW_INLINES */
+    lv->length = 0;
+    lv->type = actual_type;
+
+    if (!with_init)
+    {
+        /* If this is a float variable, we need to insert an appropriate
+         * initializer, as the default svalue-0 is not a valid float value.
+         */
+
+        Bool need_value = MY_FALSE;
+%line
+
+#ifdef USE_NEW_INLINES
+        /* When parsing context variables, the context_closure instruction
+         * expects a value on the stack. If we do a float initialization,
+         * we leave the 0.0 on the stack, otherwise we'll push a 0.
+         * For normal float locals, we'll create the bytecode to assign
+         * the float 0.
+         */
+        need_value = current_inline && current_inline->parse_context;
+#endif /* USE_NEW_INLINES */
+
+        if (!(actual_type.typeflags & TYPE_MOD_POINTER)
+         && (actual_type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
+          )
+        {
+            ins_f_code(F_FCONST0);
+
+            if (!need_value)
+            {
+                if (!add_lvalue_code(lv, F_VOID_ASSIGN))
+                    return;
+            }
+              
+            need_value = MY_FALSE;
+        } /* if (float variable) */
+
+        if (need_value) /* If we still need a value... */
+        {
+            ins_number(0);
+        }
+    }
+} /* define_local_variable() */
+
+/*-------------------------------------------------------------------------*/
+static void
+init_local_variable ( ident_t* name, struct lvalue_s *lv, int assign_op
+                    , fulltype_t type2)
+
+/* This is called directly from a parser rule: <type> [*] <name> = <expr>
+ * It will be called after the call to define_local_variable().
+ * It assigns the result of <expr> to the variable.
+ */
+
+{
+    /* We got a "<name> = <expr>" type declaration. */
+
+%line
+#ifdef USE_NEW_INLINES
+#ifdef DEBUG_INLINES
+if (current_inline && current_inline->parse_context) printf("DEBUG: inline context decl: name = expr, program_size %d\n", CURRENT_PROGRAM_SIZE);
+#endif /* DEBUG_INLINES */
+#endif /* USE_NEW_INLINES */
+    
+    type2.typeflags &= TYPEID_MASK;
+
+    /* Check the assignment for validity */
+    if (exact_types.typeflags && !compatible_types(lv->type, type2, MY_TRUE))
+    {
+        yyerrorf("Bad assignment %s", get_two_types(lv->type, type2));
+    }
+
+    if (assign_op != F_ASSIGN)
+    {
+        yyerror("Only plain assignments allowed here");
+    }
+
+    if (type2.typeflags & TYPE_MOD_REFERENCE)
+        yyerror("Can't trace reference assignments");
+
+    /* If we're parsing a context variable, just leave the
+     * value on the stack for the context_closure instruction.
+     * For normal locals, add the bytecode to create the lvalue
+     * and do the assignment.
+     */
+#ifdef USE_NEW_INLINES
+    if (!current_inline || !current_inline->parse_context)
+#endif /* USE_NEW_INLINES */
+    {
+        if (!add_lvalue_code(lv, F_VOID_ASSIGN))
+            return;
+    } /* parsed context var */
+} /* init_local_variable() */
 
 /*-------------------------------------------------------------------------*/
 static Bool

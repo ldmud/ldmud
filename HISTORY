@@ -19,6 +19,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + If a non-virtual baseclass was inherited multiple times
           with a virtual class inside the inheritance tree, its members
           were merged even though they shouldn't.
+       + The type tracking was improved so that variable initializations
+         like 'int i = to_int( ({float})0 );' compile correctly.
 
 
 12-Mar-2006 (Lars Duening) -- Release 3.3.713

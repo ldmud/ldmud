@@ -10,6 +10,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (prolang.y) If a non-virtual baseclass was inherited multiple times
       with a virtual class inside the inheritance tree, its members
       were merged even though they shouldn't (Bug #422).
+  - (prolang.y) The LPC compiler used a global variable for typetracking,
+      which caused errors when types changed inside a variable
+      initialisation (Bug #394).
 
 12-Mar-2006  (Lars Duening)  (3.3.713)
   - Created snapshot.
