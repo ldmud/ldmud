@@ -4006,6 +4006,8 @@ new_player ( object_t *ob, SOCKET_T new_socket
     }
     else if (new_interactive->tls_cb == NULL)
     {
+        callback_t * cb;
+
         /* Connection in TLS handshake, but not callback: set a callback
          * to the logon function.
          */
@@ -4014,8 +4016,6 @@ new_player ( object_t *ob, SOCKET_T new_socket
             errorf("Could not find %s() on the player %s\n", get_txt(STR_LOGON), get_txt(current_interactive->name));
             /* NOTREACHED */
         }
-
-        callback_t * cb;
 
         xallocate(cb, sizeof(*cb), "logon tls-callback structure");
         setup_function_callback(cb, current_interactive, STR_LOGON, 0, NULL, MY_TRUE);
