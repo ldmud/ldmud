@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-14-Mar-2006 (Lars Duening) -- Release 3.3.714
+18-Mar-2006 (Lars Duening) -- Release 3.3.714
 
     - Changed Efuns:
        + save_value(), restore_value(), save_object(), restore_object():
@@ -14,6 +14,8 @@ For a detailed list of all changes see the file CHANGELOG.
     - Fixed Crashers:
        + Lfun closures now keep proper track of which program
           they belong to.
+       + Apply cache entries for non-existing functions could lead
+          to memory corruption as result of garbage collection.
 
     - Compiler:
        + If a non-virtual baseclass was inherited multiple times

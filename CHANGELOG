@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Mar-2006 (Gnomi)
+  - (interpret.c) In apply cache entries for non-existing functions, the
+      garbage collector counted the reference to the string name twice,
+      causing the use of deallocated memory (Bug #463).
+
 16-Mar-2006  (Lars Duening)
   - (comm.c) Moved the declaration of a variable which was declared in the
       middle of a block - gcc doesn't complain, but it's not ISO-C (Bug #462).

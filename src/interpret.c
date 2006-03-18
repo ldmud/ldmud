@@ -19012,8 +19012,6 @@ count_interpreter_refs (void)
     int i;
 
     for (i = CACHE_SIZE; --i>= 0; ) {
-        if (!cache[i].progp)
-            note_malloced_block_ref(cache[i].name);
         if (cache[i].name)
             count_ref_from_string(cache[i].name);
     }
