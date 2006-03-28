@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Mar-2006 (Lars Duening)
+  - (pkg-tls.c) Added support for GEN_EMAIL, GEN_URI and GEN_DNS
+      certificates. tls_verify_callback() now prints diagnostics
+      only if the '-d' option was given (thanks, Philipp).
+      
 18-Mar-2006 (Gnomi)
   - (interpret.c) In apply cache entries for non-existing functions, the
       garbage collector counted the reference to the string name twice,

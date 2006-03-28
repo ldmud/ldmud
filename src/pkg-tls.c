@@ -243,13 +243,16 @@ tls_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
  */
 
 {
-    char buf[512];
-    printf("%s tls_verify_callback(%d, ...)\n", time_stamp(), preverify_ok);
+    if (d_flag)
+    {
+        char buf[512];
+        printf("%s tls_verify_callback(%d, ...)\n", time_stamp(), preverify_ok);
 
-    X509_NAME_oneline(X509_get_issuer_name(ctx->current_cert), buf, sizeof buf);
-    printf("depth %d: %s\n", X509_STORE_CTX_get_error_depth(ctx), buf);
+        X509_NAME_oneline(X509_get_issuer_name(ctx->current_cert), buf, sizeof buf);
+        printf("depth %d: %s\n", X509_STORE_CTX_get_error_depth(ctx), buf);
+    }
     return MY_TRUE;
-}
+} /* tls_verify_callback() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1060,15 +1063,35 @@ f_tls_check_certificate(svalue_t *sp)
                         put_c_string(&(extension->item[3 * iter + 2])
                                     , (char*)ASN1_STRING_data(value));
                         break;
+                    case GEN_DNS:
+                        value = ext_val->d.dNSName;
+                        put_c_n_string(&(extension->item[3 * iter]), "dNSName", 7);
+                        put_c_n_string(&(extension->item[3 * iter + 1]), "dNSName", 7);
+                        put_c_string(&(extension->item[3 * iter + 2])
+                                    , (char*)ASN1_STRING_data(value));
+
+                        break;
+                    case GEN_EMAIL:
+                        value = ext_val->d.rfc822Name;
+                        put_c_n_string(&(extension->item[3 * iter]), "rfc822Name", 10);
+                        put_c_n_string(&(extension->item[3 * iter + 1]), "rfc822Name", 10);
+                        put_c_string(&(extension->item[3 * iter + 2])
+                                    , (char*)ASN1_STRING_data(value));
+                        break;
+                    case GEN_URI:
+                        value = ext_val->d.uniformResourceIdentifier;
+                        put_c_n_string(&(extension->item[3 * iter]), "uniformResourceIdentifier", 25);
+                        put_c_n_string(&(extension->item[3 * iter + 1]), "uniformResourceIdentifier", 25);
+                        put_c_string(&(extension->item[3 * iter + 2])
+                                    , (char*)ASN1_STRING_data(value));
+                        break;
+
                     /* TODO: the following are unimplemented 
                      *                 and the structure is getting ugly 
                      */
-                    case GEN_EMAIL:
-                    case GEN_DNS:
                     case GEN_X400:
                     case GEN_DIRNAME:
                     case GEN_EDIPARTY:
-                    case GEN_URI:
                     case GEN_IPADD:
                     case GEN_RID:
                     default:
