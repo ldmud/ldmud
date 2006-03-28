@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Mar-2006 (Lars Duening)
+  - (comm.c, pkg-tls.c) Corrected compilation errors when TLS
+      was enabled (and nobody had noticed... :-) ).
+      
 12-Mar-2006 (Lars Duening)  (3.2.13)
   - Created snapshot.
 
