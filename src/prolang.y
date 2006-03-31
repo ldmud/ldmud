@@ -5627,7 +5627,7 @@ delete_prog_string (void)
 %type <fulltype>     type
 %type <fulltype>     opt_basic_type basic_type
 %type <fulltype>     non_void_type opt_basic_non_void_type basic_non_void_type
-%type <fulltype>     name_list member_name_list local_name_list
+%type <fulltype>     name_list local_name_list
 %type <inh_flags>    inheritance_qualifier inheritance_qualifiers
 %type <typeflags>    inheritance_modifier_list inheritance_modifier
 %ifdef USE_NEW_INLINES
@@ -5654,6 +5654,7 @@ delete_prog_string (void)
 %type <string>       anchestor
 %type <sh_string>    call_other_name identifier
 %ifdef USE_STRUCTS
+%type <fulltype>     member_name_list
 %type <struct_init_member> struct_init
 %type <struct_init_list>   opt_struct_init opt_struct_init2
 %type <sh_string>    struct_member_name

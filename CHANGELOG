@@ -4,6 +4,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 30-Mar-2006 (Lars Duening)
   - (prolang.y) Removed a dead branch.
   - (pkg-tls.c) Removed a possible compiler warning (Bug #464).
+  - (prolang.y) Removed a bison warning when structs aren't used.
 
 27-Mar-2006 (Lars Duening)
   - (pkg-tls.c) Added support for GEN_EMAIL, GEN_URI and GEN_DNS
