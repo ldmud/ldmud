@@ -1,8 +1,8 @@
 SYNOPSIS
         #include <sys/files.h>
 
-        string *get_dir(string str)
-        string *get_dir(string str, int mask)
+        mixed *get_dir(string str)
+        mixed *get_dir(string str, int mask)
 
 DESCRIPTION
         This function takes a path as argument and returns an array of file

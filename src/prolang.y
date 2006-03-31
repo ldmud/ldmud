@@ -15051,25 +15051,6 @@ copy_functions (program_t *from, funflag_t type)
                             cross_define( OldFunction, &fun
                                         , n - current_func_index );
                         }
-                        else if ((fun.flags | type) & TYPE_MOD_VIRTUAL
-                              && OldFunction->flags & TYPE_MOD_VIRTUAL
-                          &&    get_virtual_function_id(from, i)
-  == get_virtual_function_id(INHERIT(OldFunction->offset.inherit).prog
-                , n - INHERIT(OldFunction->offset.inherit).function_index_offset
-                     )
-                                 )
-                        {
-                            /* Entries denote the same function. We have to use
-                             * cross_define nonetheless, to get consistant
-                             * redefinition (and we prefer the first one)
-                             */
-                            OldFunction->flags |= fun.flags &
-                                (TYPE_MOD_PUBLIC|TYPE_MOD_NO_MASK);
-                            OldFunction->flags &= fun.flags |
-				~(TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|NAME_HIDDEN);
-                            cross_define( OldFunction, &fun
-                                        , n - current_func_index );
-                        }
                         else if ( (fun.flags & OldFunction->flags & TYPE_MOD_NO_MASK)
                              &&  !( (fun.flags|OldFunction->flags) & NAME_UNDEFINED ) )
                         {
