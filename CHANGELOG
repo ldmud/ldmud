@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Apr-2006 (Lars Duening)
+  - (mstring) The max hash length used is now available as macro constant.
+  - (otable.c) Both mstrings and C-strings are hashed with the same max
+      length. This corrects a bug with extremely long object names (Bug #466).
+  - (structs.c) The calculation of the first part of a struct's hash 
+      uses what the mstring code has already calculated.
+      
 30-Mar-2006 (Lars Duening)
   - (prolang.y) Removed a dead branch.
   - (pkg-tls.c) Removed a possible compiler warning (Bug #464).

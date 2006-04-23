@@ -52,6 +52,11 @@ struct string_s
       /* The string text follows here */
 };
 
+/* --- Constants --- */
+
+#define MSTRING_HASH_LENGTH (256)
+  /* The typical hashed length of a string. */
+
 /* --- Variables --- */
 
 extern mp_uint mstr_used;

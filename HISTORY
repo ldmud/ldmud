@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-27-Mar-2006 (Lars Duening) -- Release 3.3.714
+23-Apr-2006 (Lars Duening) -- Release 3.3.714
 
     - Changed Efuns:
        + save_value(), restore_value(), save_object(), restore_object():
