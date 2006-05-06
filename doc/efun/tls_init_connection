@@ -15,11 +15,13 @@ DESCRIPTION
                           background
             number == 0: the secure connection is active.
         
-        If the callback <fun>/<fun>:<fob> is specified, it will be called
-        once the fate of the secure connection has been determined. The
-        first argument will be the return code from the handshake
-        (errorcode < 0 on failure, or 0 on success), followed by the
-        interactive object <ob> and any <extra> arguments.
+        OpenSSL only:
+
+            If the callback <fun>/<fun>:<fob> is specified, it will be called
+            once the fate of the secure connection has been determined. The
+            first argument will be the return code from the handshake
+            (errorcode < 0 on failure, or 0 on success), followed by the
+            interactive object <ob> and any <extra> arguments.
 
         If the TLS setup fails, it is not necessary to call
         tls_deinit_connection().

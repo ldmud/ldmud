@@ -1,0 +1,36 @@
+SYNOPSIS
+        #include <sys/tls.h>
+
+        string hash(int method, string arg [, int iterations ] )
+        string hash(int method, int *  arg [, int iterations ] )
+
+BESCHREIBUNG
+        Berechne den Hash <method> vom Argument <arg>. Der Hash wird
+        mit <iterations> Wiederholungen berechnet, wird der Wert weggelassen,
+        wird eine Wiederholung verwendet.
+
+        <method> ist eine der TLS_HASH_-Konstanten in tls.h; nicht jede
+        beschriebene Methode ist in einem gegebenen Driver vorhanden:
+
+          TLS_HASH_SHA1      (1)
+          TLS_HASH_SHA224    (2)
+          TLS_HASH_SHA256    (3)
+          TLS_HASH_SHA384    (4)
+          TLS_HASH_SHA512    (5)
+          TLS_HASH_MD5       (6)
+          TLS_HASH_RIPEMD160 (7)
+
+        Diese Funktion ist nur verfuegbar wenn der Driver mit OpenSSL
+        compiliert wurde.
+
+BEISPIELE
+        string s;
+
+        s = hash(TLS_HASH_SHA1, "Hello", 2);
+        s = hash(TLS_HASH_SHA1, ({ 'H', 'e', 'l', 'l', 'o' }) )
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.3.714
+
+SIEHE AUCH
+        crypt(E), md5(E), md5_crypt(E), sha1(E), hmac(E)

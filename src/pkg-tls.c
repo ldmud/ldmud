@@ -21,6 +21,15 @@
 #  include <openssl/x509.h>
 #  include <openssl/x509v3.h>
 #  include <sys/utsname.h>
+#  include <openssl/opensslconf.h>
+
+#  include <openssl/sha.h>
+#  include <openssl/md5.h>
+#  include <openssl/ripemd.h>
+
+#  include <openssl/hmac.h>
+#  include <openssl/evp.h>
+
 #elif defined(HAS_GNUTLS)
 #  include <gnutls/gnutls.h>
 #  if defined(USE_PTHREADS) && defined(GCRY_THREAD_OPTION_PTHREAD_IMPL)
@@ -141,6 +150,28 @@ set_dhe1024 (void)
     return MY_TRUE;
 } /* set_dhe1024() */
                                                   
+/*-------------------------------------------------------------------------*/
+static int
+tls_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) 
+
+/* This function will be called if the client did present a certificate
+ * always returns MY_TRUE so that the handshake will succeed
+ * and the verification status can later be checked on mudlib level
+ * see also: SSL_set_verify(3)
+ */
+
+{
+    if (d_flag)
+    {
+        char buf[512];
+        printf("%s tls_verify_callback(%d, ...)\n", time_stamp(), preverify_ok);
+
+        X509_NAME_oneline(X509_get_issuer_name(ctx->current_cert), buf, sizeof buf);
+        printf("depth %d: %s\n", X509_STORE_CTX_get_error_depth(ctx), buf);
+    }
+    return MY_TRUE;
+} /* tls_verify_callback() */
+
 #elif defined(HAS_GNUTLS)
 
 /*-------------------------------------------------------------------------*/
@@ -231,28 +262,6 @@ tls_xfree (void *p)
 } /* tls_xfree() */
 
 #endif /* SSL Package */ 
-
-/*-------------------------------------------------------------------------*/
-static int
-tls_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) 
-
-/* will be called, if the client did present a certificate
- * always returns MY_TRUE so that the handshake will succeed
- * and the verification status can later be checked on mudlib level
- * see also: SSL_set_verify(3)
- */
-
-{
-    if (d_flag)
-    {
-        char buf[512];
-        printf("%s tls_verify_callback(%d, ...)\n", time_stamp(), preverify_ok);
-
-        X509_NAME_oneline(X509_get_issuer_name(ctx->current_cert), buf, sizeof buf);
-        printf("depth %d: %s\n", X509_STORE_CTX_get_error_depth(ctx), buf);
-    }
-    return MY_TRUE;
-} /* tls_verify_callback() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -537,9 +546,10 @@ tls_read (interactive_t *ip, char *buffer, int length)
  */
 
 {
-    int ret, err;
+    int ret = -11;
 
 #ifdef HAS_OPENSSL
+    int err;
 
     do {
         ret = SSL_read(ip->tls_session, buffer, length);
@@ -560,7 +570,6 @@ tls_read (interactive_t *ip, char *buffer, int length)
     }
 
 #elif defined(HAS_GNUTLS)
-
     do {
            ret = gnutls_record_recv(ip->tls_session, buffer, length);
     } while ( ret < 0 && (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN) );
@@ -591,9 +600,11 @@ tls_write (interactive_t *ip, char *buffer, int length)
  */
 
 {
-    int ret, err;
+    int ret = -1;
 
 #ifdef HAS_OPENSSL
+
+    int err;
 
     do {
         ret = SSL_write(ip->tls_session, buffer, length);
@@ -1351,6 +1362,266 @@ f_tls_available (svalue_t *sp)
   return sp;
 } /* f_tls_available() */
 
-#endif /* USE_TLS */
+
+/*------------------------------------------------------------------
+ * Interface to the openssl cryptography api
+ *------------------------------------------------------------------
+ */
+#ifdef HAS_OPENSSL
+
+static void
+get_digest (int num, const EVP_MD **md, int *len)
+
+/* Determine the proper digest descriptor <*md> and length <*len>
+ * from the designator <num>, which is one of the TLS_HASH_ constants.
+ *
+ * Return NULL for <*md> if the desired digest isn't available.
+ */
+
+{
+    switch(num)
+    {
+#ifndef OPENSSL_NO_SHA1
+# ifdef SHA_DIGEST_LENGTH
+    case TLS_HASH_SHA1:
+	(*len) = SHA_DIGEST_LENGTH;
+	(*md) = EVP_sha1();
+	break;
+# endif
+#endif
+#ifndef OPENSSL_NO_SHA256
+# ifdef SHA224_DIGEST_LENGTH
+    case TLS_HASH_SHA224:
+	(*len) = SHA224_DIGEST_LENGTH;
+	(*md) = EVP_sha224();
+	break;
+# endif
+# ifdef SHA256_DIGEST_LENGTH
+    case TLS_HASH_SHA256:
+	(*len) = SHA256_DIGEST_LENGTH;
+	(*md) = EVP_sha256();
+	break;
+# endif
+#endif
+#ifndef OPENSSL_NO_SHA512
+# ifdef SHA384_DIGEST_LENGTH
+    case TLS_HASH_SHA384:
+	(*len) = SHA384_DIGEST_LENGTH;
+	(*md) = EVP_sha384();
+	break;
+# endif
+# ifdef SHA512_DIGEST_LENGTH
+    case TLS_HASH_SHA512:
+	(*len) = SHA512_DIGEST_LENGTH;
+	(*md) = EVP_sha512();
+	break;
+# endif
+#endif
+#ifndef OPENSSL_NO_MD5
+# ifdef MD5_DIGEST_LENGTH
+    case TLS_HASH_MD5:
+	(*len) = MD5_DIGEST_LENGTH;
+	(*md) = EVP_md5();
+	break;
+# endif
+#endif
+#ifndef OPENSSL_NO_RIPEMD
+# ifdef RIPEMD160_DIGEST_LENGTH
+    case TLS_HASH_RIPEMD160:
+	(*len) = RIPEMD160_DIGEST_LENGTH;
+	(*md) = EVP_ripemd160();
+	break;
+# endif
+#endif
+    default:
+	(*md) = NULL;
+	break;
+    }
+} /* get_digest() */
+#endif /* HAS_OPENSSL */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_hash(svalue_t *sp, int num_arg)
+
+/* EFUN hash()
+ *
+ *   string hash(int method, string arg [, int iterations ] )
+ *   string hash(int method, int *  arg [, int iterations ] )
+ *
+ * Calculate the hash from <arg> as determined by <method>. The
+ * hash is calculated with <iterations> iterations, default is 1 iteration.
+ *
+ * <method> is one of the TLS_HASH_ constants defined in tls.h; not
+ * all recognized methods may be supported for a given driven.
+ */
+
+{
+#ifdef HAS_GNUTLS
+    errorf("GnuTLS does not provide the hash API.\n");
+    /* NOTREACHED */
+#else
+    EVP_MD_CTX ctx;
+    const EVP_MD *md = NULL;
+    char *tmp;
+    string_t *digest;
+    int i, hashlen;
+    unsigned int len;
+    p_int iterations;
+
+    if (num_arg == 3)
+    {
+        iterations = sp->u.number;
+        sp--;
+    }
+    else
+        iterations = 1;
+
+    if (iterations < 1)
+    {
+        errorf("Bad argument 3 to hash(): expected a number > 0, but got %ld\n"
+              , (long) iterations);
+        /* NOTREACHED */
+        return sp;
+    }
+
+    if (sp->type == T_POINTER)
+    {
+        string_t * arg;
+        char * argp;
+
+        memsafe(arg = alloc_mstring(VEC_SIZE(sp->u.vec)), VEC_SIZE(sp->u.vec)
+               , "hash argument string");
+        argp = get_txt(arg);
+
+        for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
+        {
+            if (sp->u.vec->item[i].type != T_NUMBER)
+            {
+                free_mstring(arg);
+                errorf("Bad argument 2 to hash(): got mixed*, expected string/int*.\n");
+                /* NOTREACHED */
+            }
+            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+        }
+
+        free_svalue(sp);
+        put_string(sp, arg);
+    }
+
+    get_digest(sp[-1].u.number, &md, &hashlen);
+
+    if (md == NULL)
+    {
+        errorf("Bad argument 1 to hash(): hash function %d unknown or unsupported by OpenSSL\n", (int) sp[-1].u.number);
+    }
+
+    memsafe(tmp = xalloc(hashlen), hashlen, "hash result");
+
+    EVP_DigestInit(&ctx, md);
+    EVP_DigestUpdate(&ctx, (unsigned char *)get_txt(sp->u.str), 
+		     mstrsize(sp->u.str));
+    EVP_DigestFinal(&ctx, (unsigned char*)tmp, &len);
+
+    while (--iterations > 0)
+    {
+        EVP_DigestInit(&ctx, md);
+        EVP_DigestUpdate(&ctx, tmp, len);
+	EVP_DigestFinal(&ctx, (unsigned char*)tmp, &len);
+    }
+
+    memsafe(digest = alloc_mstring(2 * len), 2 & len, "hex hash result");
+    for (i = 0; i < len; i++)
+        sprintf(get_txt(digest)+2*i, "%02x", tmp[i] & 0xff);
+    free_svalue(sp--);
+    free_svalue(sp);
+    put_string(sp, digest);
+#endif
+
+    return sp;
+} /* v_hash() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_hmac(svalue_t *sp)
+
+/* EFUN hmac()
+ *
+ *   string hmac(int method, string key, string arg)
+ *   string hmac(int method, string key, int * arg)
+ *
+ * Calculate the Hashed Message Authenication Code for <arg> based
+ * on the digest <method> and the password <key>. Return the HMAC.
+ *
+ * <method> is one of the TLS_HASH_ constants defined in tls.h; not
+ * all recognized methods may be supported for a given driven.
+ */
+
+{
+#ifdef HAS_GNUTLS
+    errorf("GnuTLS does not provide the hash API\n");
+    /* NOTREACHED */
+#elif defined(OPENSSL_NO_HMAC)
+    errorf("OpenSSL wasn't configured to provide the hmac() method.");
+    /* NOTREACHED */
+#else
+    HMAC_CTX ctx;
+    const EVP_MD *md = NULL;
+    char *tmp;
+    string_t *digest;
+    int i, hashlen;
+    unsigned int len;
+
+    if (sp->type == T_POINTER)
+    {
+        string_t * arg;
+        char * argp;
+
+        memsafe(arg = alloc_mstring(VEC_SIZE(sp->u.vec)), VEC_SIZE(sp->u.vec)
+               , "hash argument string");
+        argp = get_txt(arg);
+
+        for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
+        {
+            if (sp->u.vec->item[i].type != T_NUMBER)
+            {
+                free_mstring(arg);
+                errorf("Bad argument 2 to hash(): got mixed*, expected string/int*.\n");
+                /* NOTREACHED */
+            }
+            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+        }
+
+        free_svalue(sp);
+        put_string(sp, arg);
+    }
+
+    get_digest(sp[-2].u.number, &md, &hashlen);
+
+    if (md == NULL)
+    {
+        errorf("Bad argument 1 to hmac(): hash function %d unknown or unsupported by OpenSSL\n", (int) sp[-2].u.number);
+    }
+
+    memsafe(tmp = xalloc(hashlen), hashlen, "hash result");
+
+    HMAC_Init(&ctx, get_txt(sp[-1].u.str), mstrsize(sp[-1].u.str), md);
+    HMAC_Update(&ctx, (unsigned char*)get_txt(sp->u.str), mstrsize(sp->u.str));
+    HMAC_Final(&ctx, (unsigned char*)tmp, &len);
+
+    memsafe(digest = alloc_mstring(2 * hashlen)
+           , 2 & hashlen, "hmac result");
+    for (i = 0; i < len; i++)
+        sprintf(get_txt(digest)+2*i, "%02x", tmp[i] & 0xff);
+
+    free_svalue(sp--);
+    free_svalue(sp--);
+    free_svalue(sp);
+    put_string(sp, digest);
+#endif
+
+    return sp;
+} /* f_hmac */
 
 /***************************************************************************/
+#endif /* USE_TLS */

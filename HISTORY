@@ -4,7 +4,13 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-23-Apr-2006 (Lars Duening) -- Release 3.3.714
+06-May-2006 (Lars Duening) -- Release 3.3.714
+
+    - New Efuns:
+       + hash(): Available if OpenSSL is supported, this efun calculates
+          hashes for various methods.
+       + hmac(): Available if OpenSSL is supported, this efun calculates
+          HMACs for various methods.
 
     - Changed Efuns:
        + save_value(), restore_value(), save_object(), restore_object():
@@ -25,6 +31,8 @@ For a detailed list of all changes see the file CHANGELOG.
           were merged even though they shouldn't.
        + The type tracking was improved so that variable initializations
          like 'int i = to_int( ({float})0 );' compile correctly.
+       + New macros __OPENSSL__ and __GNUTLS__ offer insight as to
+         which TLS package is being used.
 
 
 12-Mar-2006 (Lars Duening) -- Release 3.3.713

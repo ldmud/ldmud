@@ -23,4 +23,4 @@ HISTORY
           of iterations.
 
 SEE ALSO
-        crypt(E), md5(E), sha1(E)
+        crypt(E), md5(E), md5_crypt(E), hash(E), hmac(E)

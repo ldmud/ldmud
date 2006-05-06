@@ -3,8 +3,6 @@
  *
  *---------------------------------------------------------------------------
  * For a full explanation, see make_func.y
- * TODO: Let func_spec be aware of machine.h, so that it could react
- * TODO:: on HAVE_LIBMYSQL and similar.
  *---------------------------------------------------------------------------
  */
 
@@ -745,6 +743,11 @@ void    tls_deinit_connection(object default: F_THIS_OBJECT);
 string  tls_error(int);
 int     tls_available();
 mixed  *tls_check_certificate(object, int default: F_CONST0);
+
+#ifdef HAS_OPENSSL
+string  hash(int, string|int *, void|int);
+string  hmac(int, string, string|int *);
+#endif
 
 #endif /* USE_TLS */
 
