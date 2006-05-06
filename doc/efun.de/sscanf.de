@@ -10,13 +10,13 @@ BESCHREIBUNG
         Die Operatoren im Format-String <fmt> haben eines der folgenden
         Formate:
 
-            %[+][!|~][<size>[. <minmatch>]]<type>
+            %[+][!|~][<size>[.<minmatch>]]<type>
 
         <type> kann folgendes sein:
             d: meldet eine Zahl
             D: meldet eine Zahl
             U:
-            s: meldet ein Zeichen
+            s: meldet eine Zeichenkette
             %: meldet das %-Zeichen
             t: meldet Whitespaces (also Leerschlaege und Tabulatoren),
                speichert diese aber nicht.

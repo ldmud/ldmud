@@ -13,7 +13,7 @@ BESCHREIBUNG
         Liefert 'wahr' bei Erfolg, 'falsch' bei Fehler.
 
         Das Abschalten eines bereits abgeschalteten Heartbeats (und umgekehrt
-        das Einschalten eines bereits eingeschlateten Heartbeats) zaehlt
+        das Einschalten eines bereits eingeschalteten Heartbeats) zaehlt
         als Fehler.
 
         heart_beat()s werden nur aufgerufen, wenn sich ein interaktiver

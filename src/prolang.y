@@ -646,8 +646,11 @@ struct inline_closure_s
     Bool parse_context;
       /* TRUE if the context variable definitions are parsed.
        */
-    int current_line;
-      /* Current line number, used to adjust the generated linenumbers.
+    int start_line;
+      /* Starting line number, used to adjust the generated linenumbers.
+       */
+    int end_line;
+      /* Ending line number, used to adjust the generated linenumbers.
        */
 
     /* --- Saved Globals --- */
@@ -4741,7 +4744,8 @@ printf("DEBUG: new inline #%d: prev %d\n", INLINE_CLOSURE_COUNT, ict.prev);
 #endif
     ict.num_args = 0;
     ict.parse_context = MY_FALSE;
-    ict.current_line  = current_loc.line;
+    ict.start_line = stored_lines;
+    ict.end_line = stored_lines;
 
 #ifdef DEBUG_INLINES
 printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_PROGRAM_SIZE, block_depth, current_number_of_locals, max_number_of_locals, current_break_stack_need, max_break_stack_need);
@@ -4798,6 +4802,8 @@ finish_inline_closure (Bool bAbort)
 
 {
     mp_uint backup_start, start, length, end;
+    int offset;
+    
 #ifdef DEBUG_INLINES
 {
     mp_int index = current_inline - &(INLINE_CLOSURE(0));
@@ -4836,6 +4842,8 @@ printf("DEBUG:   move code forward: from %ld, length %ld, to %ld\n", start+lengt
                );
     }
     CURRENT_PROGRAM_SIZE -= length + (start - end);
+    stored_bytes -= length + (start - end);
+    
 #ifdef DEBUG_INLINES
 printf("DEBUG:   program size: %ld\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
@@ -4852,7 +4860,21 @@ printf("DEBUG:   move li data to %ld, from %ld length %ld\n", backup_start, star
         add_to_mem_block( A_INLINE_PROGRAM, LINENUMBER_BLOCK+start, length);
         current_inline->li_start = backup_start;
     }
-
+    
+    /* Skip the lines with the closure. */
+    offset = current_inline->end_line - current_inline->start_line;
+    while (offset > 0)
+    {
+        int lines;
+        
+        lines = offset;
+        if (lines > LI_MAXEMPTY)
+            lines = LI_MAXEMPTY;
+        offset -= lines;
+        LINENUMBER_BLOCK[start++] = (char)(256 - lines);
+        length--;
+    }
+    
     if (start + length < LINENUMBER_SIZE)
     {
 #ifdef DEBUG_INLINES
@@ -4926,19 +4948,22 @@ printf("DEBUG:   #%d: start %ld, length %ld, function %d: new start %ld\n", ix, 
         if (ict->length != 0)
         {
             CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
+
+            store_line_number_info();
+            if (stored_lines > ict->start_line)
+                store_line_number_backward(stored_lines - ict->start_line);
+
             FUNCTION(ict->function)->offset.pc = CURRENT_PROGRAM_SIZE + FUNCTION_PRE_HDR_SIZE;
             add_to_mem_block(A_PROGRAM, INLINE_PROGRAM_BLOCK(ict->start)
                             , ict->length);
-
-            store_line_number_info();
-            if (current_loc.line > ict->current_line)
-                store_line_number_backward(current_loc.line - ict->current_line);
 #ifdef DEBUG_INLINES
 printf("DEBUG:        li_start %ld, li_length %ld, new li_start %ld\n", ict->li_start, ict->li_length, LINENUMBER_SIZE);
 #endif /* DEBUG_INLINES */
 
             add_to_mem_block(A_LINENUMBERS, INLINE_PROGRAM_BLOCK(ict->li_start)
                             , ict->li_length);
+            stored_lines = ict->end_line;
+            stored_bytes += ict->length;
         }
     }
 
@@ -5037,6 +5062,8 @@ printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[bloc
 printf("DEBUG:   Function index: %d\n", current_inline->function);
 #endif /* DEBUG_INLINES */
 
+    store_line_number_info();
+
     /* A function with code: align the function and
      * make space for the function header.
      */
@@ -5046,8 +5073,10 @@ printf("DEBUG:   program size: %ld align to %ld\n", CURRENT_PROGRAM_SIZE, align(
 #endif /* DEBUG_INLINES */
     CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
     current_inline->start = CURRENT_PROGRAM_SIZE;
-    store_line_number_info();
     current_inline->li_start = LINENUMBER_SIZE;
+    current_inline->start_line = stored_lines;
+    stored_bytes = CURRENT_PROGRAM_SIZE; /* Ignore the alignment. */
+    
     if (realloc_a_program(FUNCTION_HDR_SIZE))
     {
         CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE;
@@ -5113,6 +5142,7 @@ printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[bloc
 
     store_line_number_info();
     current_inline->li_length = LINENUMBER_SIZE - li_start;
+    current_inline->end_line = stored_lines;
 
     /* Add the code to push the values of the inherited local
      * variables onto the stack, followed by the F_CONTEXT_CLOSURE
@@ -15565,6 +15595,19 @@ store_line_number_info (void)
 
     /* Use up the excessive amounts of lines */
     stored_lines++;
+
+    while (stored_lines > current_loc.line)
+    {
+        int lines;
+
+        lines = stored_lines - current_loc.line;
+        if (lines > 256)
+            lines = 256;
+        stored_lines -= lines;
+        byte_to_mem_block(A_LINENUMBERS, LI_BACK);
+        byte_to_mem_block(A_LINENUMBERS, lines-1);
+    }
+    
     while (stored_lines < current_loc.line)
     {
         int lines;

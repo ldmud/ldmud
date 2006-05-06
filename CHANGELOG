@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-May-2006 (Gnomi)
+  - (prolang.y) Corrected the linenumber counting for inline closures.
+
 23-Apr-2006 (Lars Duening)
   - (mstring) The max hash length used is now available as macro constant.
   - (otable.c) Both mstrings and C-strings are hashed with the same max
