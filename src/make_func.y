@@ -2864,7 +2864,7 @@ create_efun_defs (void)
 
 {
     int i, j, k;
-    char c;
+    unsigned char c;
     char * pattern;
 
     if ((fpw = fopen(EFUN_DEFS, "w")) == NULL)

@@ -1,11 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-09-May-20006 (Lars Duening)
+12-Jun-2006 (Lars Duening)
+  - Oh dear, has it been that long?
+  - (make_func.y) Modified a case of undefined behaviour in the creation
+       of the character classification tables: only 'unsigned char' types have
+       a defined overflow behaviour (thanks, Erik!)
+  - (configure) -fno-force-mem is deprecated.
+
+09-May-2006 (Lars Duening)
   - (xalloc.c) If the driver runs low on memory, it also prints the
        current object and program in the low-on-memory message.
 
-06-May-20006 (Lars Duening)
+06-May-2006 (Lars Duening)
   - (pkg-tls) New efuns hash() and hmac() offer flexible hash and HMAC
        calculation if the driver is compiled to use OpenSSL (provided by
        Philipp).

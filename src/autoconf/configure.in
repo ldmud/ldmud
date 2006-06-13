@@ -2280,7 +2280,7 @@ for TESTFLAG in -qmaxmem=97204; do
     fi
   fi
 done
-for TESTFLAG in -g -fstrength-reduce -fno-force-mem -fno-force-addr -fomit-default-branch; do
+for TESTFLAG in -g -fstrength-reduce -fno-force-addr -fomit-default-branch; do
   if eval $tcomp; then
     OPTFLAGS="$OPTFLAGS $TESTFLAG"
     CFLAGS="$CFLAGS $TESTFLAG"
