@@ -2501,7 +2501,7 @@ create_efun_defs (void)
 
 {
     int i, j, k;
-    char c;
+    unsigned char c;
 
     if ((fpw = fopen(EFUN_DEFS, "w")) == NULL)
     {
