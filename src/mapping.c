@@ -3548,6 +3548,102 @@ map_intersect (mapping_t *m, svalue_t * val)
 } /* map_intersect() */
  
 /*-------------------------------------------------------------------------*/
+vector_t *
+map_intersect_array (vector_t *vec, mapping_t *map)
+
+/* OPERATOR & (array/map intersection)
+ *
+ * Perform an intersection of the vectors <vec> with the indices of
+ * mapping <map>.
+ *
+ * The result is a new vector with all elements which are present in both
+ * input vectors.
+ *
+ * Both <vec> and <map> are freed.
+ */
+
+{
+    Bool     *flags;       /* The result from match_arrays() */
+    size_t    result_size; /* Size of the result array */
+    vector_t *result;      /* Result array */
+    svalue_t *dest;        /* Pointer for storing the result elements */
+    size_t i;
+
+    size_t vec_size = VEC_SIZE(vec);
+
+    /* Handle empty arrays */
+
+    if (vec_size == 0)
+    {
+        free_mapping(map);
+        return shrink_array(vec, 0);
+          /* Fancy way of creating an empty array copy */
+    }
+
+    /* Non-trivial arrays: match them up */
+
+    xallocate(flags, vec_size * sizeof(Bool), "flag vector");
+    memset(flags, 0, vec_size * sizeof(Bool));
+
+    /* Walk through the vector and check for each element
+     * if it exists in the mapping.
+     * If it does, set the corresponding flag and count the
+     * result size.
+     */
+    result_size = 0;
+    for (i = 0; i < vec_size; ++i)
+    {
+        if (get_map_value(map, vec->item+i) != &const0)
+        {
+            flags[i] = MY_TRUE;
+            result_size++;
+        }
+    }
+
+    if (result_size == vec_size)
+    {
+        /* No elements to remove */
+        xfree(flags);
+        free_mapping(map);
+        return vec;
+    }
+
+    if (max_array_size && result_size > max_array_size)
+    {
+        xfree(flags);
+        free_mapping(map);
+        free_array(vec);
+        errorf("Illegal array size: %lu.\n", (unsigned long)result_size);
+    }
+
+    result = allocate_array(result_size);
+
+    /* Copy the elements to keep from vec into result.
+     * We count down result_size to be able to stop as early
+     * as possible.
+     */
+    for ( dest = result->item, i = 0
+        ; i < vec_size && result_size != 0
+        ; i++
+        )
+    {
+        if (flags[i])
+        {
+            assign_svalue_no_free(dest, vec->item+i);
+            dest++;
+            result_size--;
+        }
+    }
+
+    /* Cleanup and return */
+    xfree(flags);
+    free_array(vec);
+    free_mapping(map);
+
+    return result;
+} /* map_intersect_array() */
+
+/*-------------------------------------------------------------------------*/
 static void
 f_walk_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 

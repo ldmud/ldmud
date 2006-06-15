@@ -11113,6 +11113,15 @@ again:
             break;
         }
 
+        if (sp[-1].type == T_POINTER
+         && sp->type == T_MAPPING)
+        {
+            inter_sp = sp - 2;
+            (sp-1)->u.vec = map_intersect_array(sp[-1].u.vec, sp->u.map);
+            sp--;
+            break;
+        }
+
         if (sp->type == T_STRING && (sp-1)->type == T_STRING)
         {
             string_t * result;
@@ -12599,22 +12608,40 @@ again:
         {
             /* Intersect an array */
 
-            vector_t *vec1, *vec2;
-
-            if (sp[-1].type != T_POINTER)
+            if (sp[-1].type == T_POINTER)
             {
-                OP_ARG_ERROR(2, TF_POINTER, sp[-1].type);
+                vector_t *vec1, *vec2;
+
+                inter_sp = sp - 2;
+                vec1 = argp->u.vec;
+                vec2 = sp[-1].u.vec;
+                argp->type = T_NUMBER;
+                vec1 = intersect_array(vec1, vec2);
+                put_ref_array(argp, vec1);
+                sp--;
+                sp->u.vec = argp->u.vec;
+                free_svalue(sp+1);
+            }
+            else if (sp[-1].type == T_MAPPING)
+            {
+                vector_t *vec;
+                mapping_t * map;
+
+                inter_sp = sp - 2;
+                vec = argp->u.vec;
+                map = sp[-1].u.map;
+                argp->type = T_NUMBER;
+                vec = map_intersect_array(vec, map);
+                put_ref_array(argp, vec);
+                sp--;
+                put_array(sp, argp->u.vec);
+                free_svalue(sp+1);
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp[-1].type);
                 /* NOTREACHED */
             }
-            inter_sp = sp - 2;
-            vec1 = argp->u.vec;
-            vec2 = sp[-1].u.vec;
-            argp->type = T_NUMBER;
-            vec1 = intersect_array(vec1, vec2);
-            put_ref_array(argp, vec1);
-            sp--;
-            sp->u.vec = argp->u.vec;
-            free_svalue(sp+1);
             break;
         }
 

@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Jun-2006 (Lars Duening)
+  - (array.c) Removed a memory leak when array intersection or subtraction
+       failed.
+  - (mapping, array, interpret.c, prolang.y) Implemented the array/mapping
+       intersection.
+
 12-Jun-2006 (Lars Duening)
   - Oh dear, has it been that long?
   - (make_func.y) Modified a case of undefined behaviour in the creation

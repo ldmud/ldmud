@@ -8563,6 +8563,14 @@ expr0:
                           ok = MY_TRUE;
                       }
                       break;
+                  default:
+                      if ((type1.typeflags & TYPE_MOD_POINTER)
+                       && type2.typeflags == TYPE_MAPPING
+                         )
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
                   }
                   break;
 
@@ -8901,7 +8909,13 @@ expr0:
               }
               else if ( (first_type.typeflags | second_type.typeflags) & TYPE_MOD_POINTER)
               {
-                  if (first_type.typeflags  == TYPE_NUMBER
+                  if ((first_type.typeflags & TYPE_MOD_POINTER)
+                   && second_type.typeflags == TYPE_MAPPING
+                     )
+                  {
+                      $$.type = first_type;
+                  }
+                  else if (first_type.typeflags  == TYPE_NUMBER
                    || second_type.typeflags == TYPE_NUMBER)
                   {
                       yyerrorf("Incompatible types for arguments to & %s"
