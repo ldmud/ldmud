@@ -1682,7 +1682,11 @@ gc_count_ref_in_closure (svalue_t *csvp)
 
             ob->ref++;
             if (type == CLOSURE_LFUN)
+            {
                 l->function.lfun.ob->ref++;
+                if(l->function.lfun.inhProg)
+                    mark_program_ref(l->function.lfun.inhProg);
+            }
         }
     }
 
@@ -1779,7 +1783,12 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
         clear_object_ref(l->ob);
 
     if (type == CLOSURE_LFUN)
+    {
         clear_object_ref(l->function.lfun.ob);
+        if (l->function.lfun.inhProg)
+            clear_program_ref(l->function.lfun.inhProg, MY_TRUE);
+    }
+    
 #ifdef USE_NEW_INLINES
     if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
     {

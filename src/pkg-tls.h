@@ -54,6 +54,8 @@ extern svalue_t *f_tls_query_connection_state(svalue_t *sp);
 extern svalue_t *f_tls_query_connection_info(svalue_t *sp);
 extern svalue_t *f_tls_available (svalue_t *sp);
 extern svalue_t *f_tls_check_certificate(svalue_t *sp);
+extern svalue_t *v_hash(svalue_t *sp, int num_arg);
+extern svalue_t *f_hmac(svalue_t *sp);
 
 #endif /* USE_TLS */
 

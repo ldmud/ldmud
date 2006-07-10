@@ -26,4 +26,4 @@ AENDERUNGEN
           die Anzahl der Wiederholungen.
 
 SIEHE AUCH
-        crypt(E), md5_crypt(E), sha1(E)
+        crypt(E), md5_crypt(E), sha1(E), hash(E), hmac(E)

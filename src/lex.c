@@ -855,6 +855,12 @@ init_lexer(void)
 #endif
 #ifdef USE_TLS
     add_permanent_define("__TLS__", -1, string_copy("1"), MY_FALSE);
+#ifdef HAS_GNUTLS
+    add_permanent_define("__GNUTLS__", -1, string_copy("1"), MY_FALSE);
+#endif
+#ifdef HAS_OPENSSL
+    add_permanent_define("__OPENSSL__", -1, string_copy("1"), MY_FALSE);
+#endif
 #endif
     if (wizlist_name[0] != '\0')
     {

@@ -1,4 +1,4 @@
-# Wunderland Driver-Konfiguration fuer Driver ldmud-3.2.9
+# Wunderland Driver-Konfiguration fuer Driver ldmud-3.3.x
 #
 # Starte dieses Script (anstatt 'configure' direkt!) und dann
 # die restlichen Anweisungen in 'INSTALL' befolgen. Eventuell
@@ -6,49 +6,79 @@
 #
 # Holger@Wunderland 8/00
 #
-# letzte Aenderung: 13.02.03 Fiona
+# letzte Aenderung     : 01.12.2005 Holger (3.2 -> 3.3 Umstellung)
+# allerletzte Aenderung: 17.03.2006 Largo  (Angabe der Optionen flexibilisiert)
 #
 ./configure \
---prefix=/mud \
---exec-prefix=/mud \
---bindir=/mud/bin \
---libexecdir=/mud/bin/erq_dir \
---libdir=/mud/mudlib \
 --enable-erq=xerq \
 --disable-access-control \
 --disable-access-log \
 --enable-align-functions \
 --disable-compat-mode \
 --enable-strict-euids \
---enable-supply-parse-command \
---enable-initialization-by-__init \
+--disable-filename-spaces \
+--disable-share-variables \
+--enable-use-system-crypt \
 --enable-udp-send \
+--enable-use-ipv6 \
+--enable-use-alists \
+--disable-use-mccp \
+--disable-use-pthreads \
+--enable-use-pcre \
+--disable-use-deprecated \
+--enable-use-structs \
+--disable-use-tls \
+--enable-use-new-inlines \
+--disable-use-set-light \
+--enable-use-set-is-wizard \
+--disable-use-parse-command \
+--disable-use-process-string \
+--disable-lpc-array-calls \
 --enable-comm-stat \
 --enable-apply-cache_stat \
---disable-smalloc-trace \
---disable-smalloc-lpc-trace \
---enable-max-malloced \
---disable-min-malloced \
+--enable-malloc-sbrk \
+--enable-malloc-check \
+--disable-malloc-trace \
+--disable-malloc-lpc-trace \
+--disable-malloc-sbrk-trace \
 --disable-dynamic-costs \
---enable-catch-udp-port \
+--disable-trace-code \
 --enable-rxcache_table \
+--disable-synchronous-heart-beat \
+--disable-opcprof \
+--disable-verbose-opcprof \
+--disable-debug \
+--disable-yydebug \
+--disable-no-inlines \
+--disable-debug-telnet \
+--disable-debug-malloc-allocs \
+--disable-check-object-stat \
+--disable-check-mapping-total \
+--disable-check-object-ref \
+--enable-check-object-gc-ref \
+--disable-dump-gc-refs \
+\
 --with-access-file=ACCESS.ALLOW \
 --with-access-log=access.allow.log \
 --with-erq-max-reply=1024 \
 --with-erq-max-send=1024 \
---with-max-log-size=50000 \
+--with-erq-debug=0 \
 --with-read-file-max-size=50000 \
 --with-master-name=secure/master \
+--with-input-escape="!" \
 --with-time-to-clean_up=14400 \
 --with-time-to-swap=5400 \
 --with-time-to-swap-variables=7200 \
 --with-time-to-reset=5400 \
+--with-alarm-time=2 \
+--with-heart-beat-interval=2 \
 --with-evaluator-stack-size=2000 \
 --with-max-user-trace=60 \
 --with-max-trace=65 \
 --with-compiler-stack-size=400 \
 --with-max-bits=6144 \
 --with-portno=4711 \
+--with-udp-port=4246 \
 --with-maxnumports=3 \
 --with-max-cost=1000000 \
 --with-catch-reserved-cost=2000 \
@@ -57,6 +87,7 @@
 --with-max-array-size=5000 \
 --with-max-mapping-keys=5000 \
 --with-max-mapping-size=15000 \
+--with-max-callouts=0 \
 --with-max-players=60 \
 --with-max-local=50 \
 --with-allowed-ed-cmds=20 \
@@ -72,15 +103,10 @@
 --with-max-byte-transfer=200000 \
 --with-catch-udp-port=4246 \
 --with-set-buffer-size-max=65536 \
---with-min-malloced=0x1000000 \
+--with-malloc=default \
+--with-min-malloced=0 \
+--with-min-small-malloced=0 \
 --with-max-malloced=0x6000000 \
 --with-total-trace-length=0x1000 \
---enable-use-ipv6 \
---disable-use-mysql \
---disable-supply-parse-command \
---enable-use-pcre \
---disable-debug \
---disable-check-strings \
---disable-use-set-light \
---disable-use-process-string \
---disable-use-deprecated
+--with-wizlist-file=WIZLIST \
+$*

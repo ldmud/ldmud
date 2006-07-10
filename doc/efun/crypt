@@ -13,4 +13,4 @@ DESCRIPTION
         input_to() can be used with special argument.
 
 SEE ALSO
-        md5_crypt(E), md5(E), sha1(E), input_to(E)
+        md5(E), md5_crypt(E), sha1(E), hash(E), hmac(E)

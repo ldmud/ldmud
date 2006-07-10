@@ -189,7 +189,7 @@ hash_string (const char * const s, size_t size)
 {
     whash_t hash;
 
-    hash = whashmem(s, size, 256);
+    hash = whashmem(s, size, MSTRING_HASH_LENGTH);
     if (!hash)
         hash = 1 << (sizeof (hash) * CHAR_BIT - 1);
     return hash;

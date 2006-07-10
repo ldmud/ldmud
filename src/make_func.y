@@ -2069,6 +2069,26 @@ make_func_isescaped (char c)
 }
 
 /*-------------------------------------------------------------------------*/
+static Bool
+make_func_issavedel (char c)
+
+/* Return true if <c> is a delimiter in save/restore object (e.g. ',' or ';'),
+ * false if not.
+ */
+
+{
+    switch(c) {
+      case ',' : /* in Arrays   */
+      case ';' : /* in Mappings */
+      case ':' : /* in Mappings */
+      case '|' : /* in Closures */
+      case '\n':
+        return MY_TRUE;
+    }
+    return MY_FALSE;
+}
+
+/*-------------------------------------------------------------------------*/
 static int
 ident (char c)
 
@@ -2844,7 +2864,7 @@ create_efun_defs (void)
 
 {
     int i, j, k;
-    char c;
+    unsigned char c;
     char * pattern;
 
     if ((fpw = fopen(EFUN_DEFS, "w")) == NULL)
@@ -3048,6 +3068,7 @@ create_efun_defs (void)
             fprintf(fpw, "\n    ");
         fprintf(fpw, "%d,"
                ,  ( (isascii(c) && make_func_isescaped(c)) ? _MCTe : 0 )
+                | ( (isascii(c) && make_func_issavedel(c)) ? _MCTt : 0 )
                 | ( (isascii(c) && isdigit ((unsigned char)c))  ? _MCTd : 0 )
                 | ( (isascii(c) && isspace ((unsigned char)c) && c != '\n')
                     ? _MCTs : 0 )

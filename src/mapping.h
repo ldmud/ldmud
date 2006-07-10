@@ -206,6 +206,7 @@ extern void sub_from_mapping_filter(svalue_t *key, svalue_t *data, void *extra);
 extern void add_to_mapping(mapping_t *m1, mapping_t *m2);
 extern mapping_t *subtract_mapping(mapping_t *minuend, mapping_t *subtrahend);
 extern mapping_t *map_intersect(mapping_t *m, svalue_t * val);
+extern vector_t * map_intersect_array (vector_t *vec, mapping_t *map);
 extern svalue_t *x_filter_mapping(svalue_t *sp, int num_arg, Bool bFull);
 extern svalue_t *v_filter_indices (svalue_t *sp, int num_arg);
 extern svalue_t *x_map_mapping(svalue_t *sp, int num_arg, Bool bFull);

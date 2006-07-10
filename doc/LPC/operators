@@ -67,9 +67,13 @@ DESCRIPTION
                         Eventually the array behaviour will be changed
                         to match the string behaviour.
 
+                        Intersecting an array with a mapping is equivalent
+                        to intersecting the array with the indices of the
+                        mapping: array & mapping = array & m_indices(mapping)
+
                         Mappings can be intersected with another mapping
                         or an array. The resulting mapping holds all
-                        those entries from the first array, which are
+                        those entries from the first mapping, which are
                         also mentioned in the second mapping (as index)
                         resp. in the array.
 

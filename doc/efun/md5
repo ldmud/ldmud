@@ -24,4 +24,4 @@ HISTORY
         interations.
 
 SEE ALSO
-        crypt(E), md5_crypt(E), sha1(E)
+        crypt(E), md5_crypt(E), sha1(E), hash(E), hmac(E)

@@ -19,4 +19,4 @@ HISTORY
         Introduced in LDMud 3.3
 
 SEE ALSO
-        crypt(E), input_to(E), md5(E)
+        crypt(E), input_to(E), md5(E), md5_crypt(E), hash(E), hmac(E)

@@ -203,9 +203,9 @@ hash2 (string_t * pName, string_t * pProgName)
 {
     whash_t         hash;
 
-    hash = whashmem(get_txt(pName), mstrsize(pName), 100);
+    hash = mstr_get_hash(pName);
     hash = whashmem2("\n", 1, 1, hash);
-    hash = whashmem2(get_txt(pProgName), mstrsize(pProgName), 100, hash);
+    hash = whashmem2(get_txt(pProgName), mstrsize(pProgName), MSTRING_HASH_LENGTH, hash);
 
     return hash;
 } /* hash2() */

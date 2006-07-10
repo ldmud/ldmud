@@ -398,8 +398,8 @@ v_sl_exec (svalue_t * sp, int num_arg)
     
         for(col = 0; col < cols; col++)
         {
-            STORE_DOUBLE_USED;
             svalue_t * entry;
+            STORE_DOUBLE_USED;
 
             entry = this_row->row->item + col;
 

@@ -534,6 +534,21 @@ typedef uint32 funflag_t;  /* Function flags */
    * TODO: What is this exactly?
    */
 
+#define SEARCH_FUNCTION_INHERIT(inheritp, progp, fx) \
+    do{ \
+        int sf_inum = progp->num_inherited; \
+        for (inheritp = progp->inherit; \
+             sf_inum > 0 \
+          && (fx < inheritp->function_index_offset \
+           || fx >= inheritp->function_index_offset + inheritp->prog->num_functions); \
+             inheritp++, sf_inum--); \
+    } while(0)
+
+  /* Look for the right inherit index, which contains the function with
+   * the index <fx>. It is assumed, that progp has at least one inherit
+   * and that <fx> points indeed to a function in an inherit of <progp>.
+   */
+
 /* --- Function header ---
  *
  * The bytecode for every function is preceeded by a header with the name

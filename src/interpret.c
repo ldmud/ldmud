@@ -6868,7 +6868,7 @@ pop_control_stack (void)
 } /* pop_control_stack() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE inherit_t *
+inherit_t *
 adjust_variable_offsets ( const inherit_t * inheritp
                         , const program_t * prog
                         , const object_t  * obj
@@ -7228,23 +7228,72 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
 
 /*-------------------------------------------------------------------------*/
 static funflag_t
-setup_new_frame (int fx, unsigned short inhIndex)
+setup_new_frame (int fx, program_t *inhProg)
 
 /* Setup a call for function <fx> in the current program.
- * If <inhIndex> is not 0, it is the (inheritance index + 1) of the 
- * inherited function to call.
+ * If <inhProg> is not NULL, it is the program of the inherited function
+ * to call.
  * Result are the flags for the function.
  */
 
 {
     funflag_t flags;
 
-    if (inhIndex)
+    if (inhProg)
     {
-        inherit_t * inheritp = setup_inherited_call(inhIndex-1);
-        flags = setup_new_frame1(fx, inheritp->function_index_offset
-                                   , inheritp->variable_index_offset
-                                );
+        program_t *progp;
+        int       fun_ix_offs;
+        int       var_ix_offs;
+        
+        progp = current_prog;
+        fun_ix_offs = 0;
+        var_ix_offs = 0;
+        
+        while (progp != inhProg)
+        {
+            inherit_t      *inheritp, *inh;
+            
+#ifdef DEBUG
+            if (!progp->num_inherited)
+                errorf("(setup_new_frame): Couldn't find program '%s' "
+                       "in program '%s' with function index %ld. "
+                       "Found program '%s' instead.\n"
+                     , get_txt(inhProg->name)
+                     , get_txt(current_prog->name)
+                     , (long) fx
+                     , get_txt(progp->name)
+                     );
+#endif
+            SEARCH_FUNCTION_INHERIT(inheritp, progp, fx);
+            fx -= inheritp->function_index_offset;
+
+            inh = adjust_variable_offsets(inheritp, progp, current_object);
+            if (inh)
+            {
+                /* Virtual base class. Reset offsets. */
+                inheritp = inh;
+                fun_ix_offs = 0;
+                var_ix_offs = 0;
+            }
+
+            fun_ix_offs += inheritp->function_index_offset;
+            var_ix_offs += inheritp->variable_index_offset;
+            progp = inheritp->prog;
+
+#ifdef DEBUG
+            if (fx >= progp->num_functions)
+                errorf("(setup_new_frame): fx %ld > number of "
+                       "functions %ld in program '%s'\n"
+                     , (long) fx
+                     , (long) progp->num_functions
+                     , get_txt(progp->name)
+                     );
+#endif
+        }
+        
+        current_prog = inhProg;
+
+        flags = setup_new_frame1(fx, fun_ix_offs, var_ix_offs);
     }
     else
         flags = setup_new_frame1(fx, 0, 0);
@@ -11064,6 +11113,15 @@ again:
             break;
         }
 
+        if (sp[-1].type == T_POINTER
+         && sp->type == T_MAPPING)
+        {
+            inter_sp = sp - 2;
+            (sp-1)->u.vec = map_intersect_array(sp[-1].u.vec, sp->u.map);
+            sp--;
+            break;
+        }
+
         if (sp->type == T_STRING && (sp-1)->type == T_STRING)
         {
             string_t * result;
@@ -12550,22 +12608,40 @@ again:
         {
             /* Intersect an array */
 
-            vector_t *vec1, *vec2;
-
-            if (sp[-1].type != T_POINTER)
+            if (sp[-1].type == T_POINTER)
             {
-                OP_ARG_ERROR(2, TF_POINTER, sp[-1].type);
+                vector_t *vec1, *vec2;
+
+                inter_sp = sp - 2;
+                vec1 = argp->u.vec;
+                vec2 = sp[-1].u.vec;
+                argp->type = T_NUMBER;
+                vec1 = intersect_array(vec1, vec2);
+                put_ref_array(argp, vec1);
+                sp--;
+                sp->u.vec = argp->u.vec;
+                free_svalue(sp+1);
+            }
+            else if (sp[-1].type == T_MAPPING)
+            {
+                vector_t *vec;
+                mapping_t * map;
+
+                inter_sp = sp - 2;
+                vec = argp->u.vec;
+                map = sp[-1].u.map;
+                argp->type = T_NUMBER;
+                vec = map_intersect_array(vec, map);
+                put_ref_array(argp, vec);
+                sp--;
+                put_array(sp, argp->u.vec);
+                free_svalue(sp+1);
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp[-1].type);
                 /* NOTREACHED */
             }
-            inter_sp = sp - 2;
-            vec1 = argp->u.vec;
-            vec2 = sp[-1].u.vec;
-            argp->type = T_NUMBER;
-            vec1 = intersect_array(vec1, vec2);
-            put_ref_array(argp, vec1);
-            sp--;
-            sp->u.vec = argp->u.vec;
-            free_svalue(sp+1);
             break;
         }
 
@@ -17686,7 +17762,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         current_object = l->function.lfun.ob;
         current_prog = current_object->prog;
         /* inter_sp == sp */
-        flags = setup_new_frame(l->function.lfun.index, l->function.lfun.inhIndex);
+        flags = setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg);
 #ifdef USE_NEW_INLINES
         if (l->function.lfun.context_size > 0)
             inter_context = l->context;
@@ -18138,7 +18214,7 @@ call_function (program_t *progp, int fx)
 #endif
     csp->num_local_variables = 0;
     current_prog = progp;
-    flags = setup_new_frame(fx, 0);
+    flags = setup_new_frame(fx, NULL);
     funstart = current_prog->program + (flags & FUNSTART_MASK);
     csp->funstart = funstart;
     previous_ob = current_object;
@@ -18963,8 +19039,6 @@ count_interpreter_refs (void)
     int i;
 
     for (i = CACHE_SIZE; --i>= 0; ) {
-        if (!cache[i].progp)
-            note_malloced_block_ref(cache[i].name);
         if (cache[i].name)
             count_ref_from_string(cache[i].name);
     }
@@ -19607,6 +19681,22 @@ check_extra_ref_in_mapping_filter (svalue_t *key, svalue_t *data
     check_extra_ref_in_vector(data, (size_t)extra);
 }
 
+static void
+count_extra_ref_in_prog (program_t *prog)
+/* Count extra refs for <prog>.
+ */
+{
+    if (NULL != register_pointer(ptable, prog))
+    {
+        prog->extra_ref = 1;
+        if (prog->blueprint)
+        {
+            count_extra_ref_in_object(prog->blueprint);
+        }
+        count_inherits(prog);
+    }
+}
+
 /*-------------------------------------------------------------------------*/
 void
 count_extra_ref_in_object (object_t *ob)
@@ -19650,15 +19740,7 @@ count_extra_ref_in_object (object_t *ob)
 
     if (!O_PROG_SWAPPED(ob))
     {
-        if (NULL != register_pointer(ptable, ob->prog))
-        {
-            ob->prog->extra_ref = 1;
-            if (ob->prog->blueprint)
-            {
-                count_extra_ref_in_object(ob->prog->blueprint);
-            }
-            count_inherits(ob->prog);
-        }
+        count_extra_ref_in_prog(ob->prog);
     }
 
     if (was_swapped)
@@ -19707,12 +19789,22 @@ count_extra_ref_in_closure (lambda_t *l, ph_int type)
         else if (type == CLOSURE_LFUN)
         {
             count_extra_ref_in_object(l->function.lfun.ob);
+            if (l->function.lfun.inhProg)
+            {
+                l->function.lfun.inhProg->extra_ref++;
+                count_extra_ref_in_prog(l->function.lfun.inhProg);
+            }
         }
     }
 
     if (type != CLOSURE_UNBOUND_LAMBDA)
     {
         count_extra_ref_in_object(l->ob);
+    }
+    
+    if (l->prog_ob)
+    {
+        count_extra_ref_in_object(l->prog_ob);
     }
 } /* count_extra_ref_in_closure() */
 
