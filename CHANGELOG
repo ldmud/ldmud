@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Jul-2006 (Lars Duening)  (3.3.714)
+  - Created snapshot.
+
 14-Jun-2006 (Lars Duening)
   - (array.c) Removed a memory leak when array intersection or subtraction
        failed.
