@@ -3905,7 +3905,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
          */
         if (find_function(STR_LOGON, current_interactive->prog) < 0)
         {
-            errorf("Could not find %s() on the player %s\n", get_txt(STR_LOGON), get_txt(current_interactive->name));
+            errorf("Could not find %s() on the player %s\n", STR_LOGON, current_interactive->name);
             /* NOTREACHED */
         }
 

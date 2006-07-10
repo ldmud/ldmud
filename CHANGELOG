@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Jul-2006 (Lars Duening)  (3.2.14)
+  - Created snapshot.
+
+12-Jun-2006 (Lars Duening)
+  - Oh dear, has it been that long?
+  - (make_func.y) Modified a case of undefined behaviour in the creation
+       of the character classification tables: only 'unsigned char' types have
+       a defined overflow behaviour (thanks, Erik!)
+  - (configure) -fno-force-mem is deprecated.
+
+27-Mar-2006 (Lars Duening)
+  - (comm.c, pkg-tls.c) Corrected compilation errors when TLS
+      was enabled (and nobody had noticed... :-) ).
+      
 12-Mar-2006 (Lars Duening)  (3.2.13)
   - Created snapshot.
 

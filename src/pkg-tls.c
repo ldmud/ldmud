@@ -232,6 +232,28 @@ tls_xfree (void *p)
 #endif /* SSL Package */ 
 
 /*-------------------------------------------------------------------------*/
+static int
+tls_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) 
+
+/* will be called, if the client did present a certificate
+ * always returns MY_TRUE so that the handshake will succeed
+ * and the verification status can later be checked on mudlib level
+ * see also: SSL_set_verify(3)
+ */
+
+{
+    if (d_flag)
+    {
+        char buf[512];
+        printf("%s tls_verify_callback(%d, ...)\n", time_stamp(), preverify_ok);
+
+        X509_NAME_oneline(X509_get_issuer_name(ctx->current_cert), buf, sizeof buf);
+        printf("depth %d: %s\n", X509_STORE_CTX_get_error_depth(ctx), buf);
+    }
+    return MY_TRUE;
+} /* tls_verify_callback() */
+
+/*-------------------------------------------------------------------------*/
 void tls_global_init (void)
 
 /* Initialise the TLS package; to be called once at program startup.
