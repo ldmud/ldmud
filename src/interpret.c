@@ -11098,6 +11098,7 @@ again:
          *   int    & int    -> int
          *   string & string -> string
          *   vector & vector -> vector
+         *   vector & mapping  -> vector
          *   mapping & vector  -> mapping
          *   mapping & mapping -> mapping
          *
@@ -12563,8 +12564,9 @@ again:
          *   int    & int    -> int
          *   string & string -> string
          *   array  & array  -> array
-         *
-         * TODO: Extend this to mappings.
+         *   array  & mapping -> array
+         *   mapping & array -> mapping
+         *   mapping & mapping -> mapping
          */
 
         svalue_t *argp;
