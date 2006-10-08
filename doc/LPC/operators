@@ -63,7 +63,7 @@ DESCRIPTION
 
                         Mappings can be intersected with another mapping
                         or an array. The resulting mapping holds all
-                        those entries from the first array, which are
+                        those entries from the first mapping, which are
                         also mentioned in the second mapping (as index)
                         resp. in the array.
 
