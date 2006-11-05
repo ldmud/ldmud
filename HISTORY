@@ -4,7 +4,36 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-06-Mar-2006 (Lars Duening) -- Release 3.2.14
+05-Nov-2006 (Lars Duening) -- Upcoming Release 3.2.15
+
+    - Changed efuns:
+
+    - Corrected efuns:
+
+    - New efuns:
+       + tls_refresh_certs(): Reload the certificates and certificate
+          revocation information.
+
+    - Master Object:
+
+    - Fixed Crashers:
+
+    - Language:
+
+    - Runtime:
+
+    - Other Changes:
+       + New commandline options to handle certification revocations:
+          --tls-crlfile <pathname>
+            Use <pathname> as the filename holding your certificate revocation
+            lists.  If relative, <pathname> is interpreted relative to
+            <mudlib>.
+
+          --tls-crldirectory <pathname>
+            Use <pathname> as the directory where your certificate revocation
+            lists reside. If relative, <pathname> is interpreted relative to
+            <mudlib>.
+
 
 06-Mar-2006 (Lars Duening) -- Release 3.2.13
 
@@ -28,7 +57,7 @@ For a detailed list of all changes see the file CHANGELOG.
          and callbacks.
        + Removing an interactive as part of a fatal comm error clobbered the
          current object.
-      + If the master:;connect() initiates a secure connection
+       + If the master:;connect() initiates a secure connection
           which gets stuck in the handshake, neither logon() is called nor
           is the prompt printed. Also, if the tls_init_connection() didn't
           set a callback, the driver will provide a callback to logon().

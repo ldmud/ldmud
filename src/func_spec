@@ -659,6 +659,7 @@ int     tls_init_connection(void|object, ...);
 void    tls_deinit_connection(object default: F_THIS_OBJECT);
 string  tls_error(int);
 int     tls_available();
+void    tls_refresh_certs();
 mixed  *tls_check_certificate(object default: F_THIS_OBJECT);
 
 #endif /* USE_TLS */

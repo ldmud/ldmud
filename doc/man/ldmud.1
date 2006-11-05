@@ -198,6 +198,29 @@ Allow/disallow the use of spaces in filenames.
 .IP
 Enforce/don't enforce the proper use of euids.
 .HP
+\fB\-\-tls\-key\fR <pathname>
+.IP
+Use <pathname> as the x509 keyfile, default is 'key.pem'.
+If relative, <pathname> is interpreted relative to <mudlib>.
+.HP
+\fB\-\-tls\-cert\fR <pathname>
+.IP
+Use <pathname> as the x509 certfile, default is 'cert.pem'.
+If relative, <pathname> is interpreted relative to <mudlib>.
+.IP
+Use <pathname> as the filename holding your trusted PEM certificates.
+If relative, <pathname> is interpreted relative to <mudlib>.
+.IP
+Use <pathname> as the directory where your trusted PEM certificates reside,
+default is '/etc/ssl/certs'.
+If relative, <pathname> is interpreted relative to <mudlib>.
+.IP
+Use <pathname> as the filename holding your certificate revocation lists.
+If relative, <pathname> is interpreted relative to <mudlib>.
+.IP
+Use <pathname> as the directory where your certificate revocation lists reside.
+If relative, <pathname> is interpreted relative to <mudlib>.
+.HP
 \fB\-\-wizlist\-file\fR <filename>
 .HP
 \fB\-\-no\-wizlist\-file\fR
