@@ -1072,6 +1072,8 @@ typedef enum OptNumber {
  , cTLScert         /* --tls-cert           */
  , cTLStrustdir     /* --tls-trustdirectory */
  , cTLStrustfile    /* --tls-trustfile      */
+ , cTLScrlfile	    /* --tls-crlfile        */
+ , cTLScrldir       /* --tls-crldirectory   */
 #endif
 #ifdef DEBUG
  , cCheckRefs       /* --check-refcounts    */
@@ -1459,6 +1461,16 @@ static Option aOptions[]
       , "  --tls-trustdirectory <pathname>\n"
       , "    Use <pathname> as the directory where your trusted PEM certificates reside,\n"
         "    default is '" TLS_DEFAULT_TRUSTDIRECTORY "'.\n"
+        "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+      }
+    , { 0,      "tls-crlfile",       cTLScrlfile,     MY_TRUE
+      , "  --tls-crlfile <pathname>\n"
+      , "    Use <pathname> as the filename holding your certificate revocation lists.\n"
+        "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+      }
+    , { 0,      "tls-crldirectory",  cTLScrldir,      MY_TRUE
+      , "  --tls-crldirectory <pathname>\n"
+      , "    Use <pathname> as the directory where your certificate revocation lists reside.\n"
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
 #endif /* USE_TLS */
@@ -2604,6 +2616,16 @@ eval_arg (int eOption, const char * pValue)
             free(tls_trustfile);
         tls_trustfile = strdup(pValue);
         break;
+    case cTLScrlfile:
+	if (tls_crlfile != NULL)
+	    free(tls_crlfile);
+	tls_crlfile = strdup(pValue);
+	break;
+    case cTLScrldir:
+	if (tls_crldirectory != NULL)
+	    free(tls_crldirectory);
+	tls_crldirectory = strdup(pValue);
+	break;
 #endif
 
 #ifdef GC_SUPPORT

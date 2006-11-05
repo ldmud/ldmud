@@ -349,7 +349,7 @@ handle_usr2 (int sig UNUSED)
 #ifndef RETSIGTYPE_VOID
     return 0;
 #endif
-} /* handle_usr1() */
+} /* handle_usr2() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void

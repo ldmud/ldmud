@@ -1,0 +1,17 @@
+PRELIMINARY
+SYNOPSIS
+        void tls_refresh_certs()
+
+DESCRIPTION
+        Reload the certificates and certificate revocation information.
+
+BUGS
+        Not supported when using GnuTLS.
+
+HISTORY
+        Introduced in LDMud 3.3.714/3.2.15.
+
+SEE ALSO
+        tls_init_connection(E), tls_deinit_connection(E), tls_error(E),
+        tls_query_connection_state(E), tls_query_connection_info(E),
+        tls_available(E), tls_check_certificate(E), mudlib/psyc-tls.c

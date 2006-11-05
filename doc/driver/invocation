@@ -223,6 +223,15 @@ DESCRIPTION
          Use <pathname> as the x509 certfile, default is 'cert.pem'.
          If relative, <pathname> is interpreted relative to <mudlib>.
 
+      --tls-crlfile <pathname>
+        Use <pathname> as the filename holding your certificate revocation
+        lists.  If relative, <pathname> is interpreted relative to <mudlib>.
+
+      --tls-crldirectory <pathname>
+        Use <pathname> as the directory where your certificate revocation
+        lists reside. If relative, <pathname> is interpreted relative to
+        <mudlib>.
+
       --tls-trustfile <pathname>
         Use <pathname> as the filename holding your trusted PEM certificates.
         If relative, <pathname> is interpreted relative to <mudlib>.
@@ -333,3 +342,4 @@ HISTORY
     LDMud 3.3.475/3.2.11 added --tls-key, --tls-cert.
     LDMud 3.3.672/3.2.11 added --tls-trustfile, --tls-trustdirectory.
     LDMud 3.3.677 added --max-mapping-keys.
+    LDMud 3.3.714/3.2.15 added --tls-crlfile, --tls-crldirectory.
