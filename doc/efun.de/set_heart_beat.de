@@ -3,16 +3,17 @@ SYNOPSIS
 
 BESCHREIBUNG
         Schaltet den Heartbeat ein oder aus. Der Treiber wendet die
-        Lfun heart_beat() auf das aktuelle Objekt alle
-        __HEARTBEAT_INTERVAL__ Sekunden an, wenn der Heartbeat
-        eingeschaltet ist.  Der Heartbeat sollte immer ausgeschaltet
-        werden, wenn er nicht gebraucht wird. Das reduziert die
-        Systemauslastung.
+        Lfun heart_beat() auf das aktuelle Objekt alle __HEARTBEAT_INTERVAL__
+        Sekunden an, wenn der Heartbeat eingeschaltet ist. Ein Shadow
+        auf der Lfun wird ignoriert.
+        
+        Der Heartbeat sollte immer ausgeschaltet werden, wenn er nicht
+        gebraucht wird. Das reduziert die Systemauslastung.
 
         Liefert 'wahr' bei Erfolg, 'falsch' bei Fehler.
 
         Das Abschalten eines bereits abgeschalteten Heartbeats (und umgekehrt
-        das Einschalten eines bereits eingeschlateten Heartbeats) zaehlt
+        das Einschalten eines bereits eingeschalteten Heartbeats) zaehlt
         als Fehler.
 
         heart_beat()s werden nur aufgerufen, wenn sich ein interaktiver

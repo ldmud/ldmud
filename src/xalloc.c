@@ -24,11 +24,9 @@
 #include "interpret.h"
 #include "simulate.h"
 
-#ifdef MALLOC_LPC_TRACE
 #include "exec.h"
 #include "object.h"
 #include "mstrings.h"
-#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -129,9 +127,7 @@ static int going_to_exit = MY_FALSE;
 #ifdef MALLOC_SBRK_TRACE
 
 static size_t mdb_size;
-#    if defined(MALLOC_LPC_TRACE)
-         static object_t *mdb_object;
-#    endif
+static object_t *mdb_object;
 #    if defined(MALLOC_TRACE)
         static const char * mdb_file;
         static int mdb_line;
@@ -166,9 +162,38 @@ static void write_lpc_trace (int d, word_t *p, int oneline);
 static void print_block (int d, word_t *block);
 #endif /* GC_SUPPORT */
 
-/*-------------------------------------------------------------------------*/
 #ifdef MALLOC_SBRK_TRACE
 
+/*-------------------------------------------------------------------------*/
+static void
+mem_debug_log (const char * name, p_int size)
+
+/* Mem debug log function. Log the given <size> for function <name>
+ * to stdout together with the original allocation request size.
+ */
+
+{
+#if defined(MALLOC_TRACE)
+      dprintf4(1, "%s %s(%d) for %d"
+                , (p_int)current_time_stamp, (p_int)name
+                , (p_int)size, (p_int)mdb_size
+                );
+      dprintf3(1, " , '%s':%d , obj %s\n"
+                , (p_int)mdb_file, (p_int)mdb_line
+                , (p_int)(mdb_object ? ( mdb_object->name ? get_txt(mdb_object->name) : "<?>"): "<null>")
+                );
+#else
+      dprintf4(1, "%s %s(%d) for %d"
+                , (p_int)current_time_stamp, (p_int)name
+                , (p_int)size, (p_int)mdb_size
+                );
+      dprintf1(1, " , obj %s\n"
+                , (p_int)(mdb_object ? ( mdb_object->name ? get_txt(mdb_object->name) : "<?>"): "<null>")
+                );
+#endif /* MALLOC_TRACE */
+} /* mem_debug_log() */
+
+/*-------------------------------------------------------------------------*/
 static void
 mdb_log_sbrk (p_int size)
 
@@ -178,37 +203,7 @@ mdb_log_sbrk (p_int size)
  */
 
 {
-#if defined(MALLOC_TRACE)
-#  if defined(MALLOC_LPC_TRACE)
-      dprintf3(1, "%s esbrk(%d) for %d"
-                , (p_int)current_time_stamp, (p_int)size, (p_int)mdb_size
-                );
-      dprintf3(1, " , '%s':%d , obj %s\n"
-                , (p_int)mdb_file, (p_int)mdb_line
-                , (p_int)(mdb_object ? ( mdb_object->name ? get_txt(mdb_object->name) : "<?>"): "<null>")
-                );
-#  else
-      dprintf3(1, "%s sbrk(%d) for %d"
-                , (p_int)current_time_stamp, (p_int)size, (p_int)mdb_size
-                );
-      dprintf2(1, " , '%s':%d\n"
-                , (p_int)mdb_file, (p_int)mdb_line
-                );
-#  endif
-#else
-#  if defined(MALLOC_LPC_TRACE)
-      dprintf3(1, "%s esbrk(%d) for %d"
-                , (p_int)current_time_stamp, (p_int)size, (p_int)mdb_size
-                );
-      dprintf1(1, " , obj %s\n"
-                , (p_int)(mdb_object ? ( mdb_object->name ? get_txt(mdb_object->name) : "<?>"): "<null>")
-                );
-#  else
-      dprintf3(1, "%s esbrk(%d) for %d\n"
-                , (p_int)current_time_stamp, (p_int)size, (p_int)mdb_size
-                );
-#  endif
-#endif /* MALLOC_TRACE */
+    mem_debug_log("esbrk", size);
 } /* mdb_log_sbrk() */
 
 #else 
@@ -329,6 +324,15 @@ mdb_log_sbrk (p_int size)
 #    warning ""
 #endif
 
+#if defined(USE_SQLITE) && defined(SQLITE3_USES_PTHREADS) && !defined(MEM_THREADSAFE) && !defined(MEM_MAIN_THREADSAFE)
+#    warning ""
+#    warning "-----------------------------------"
+#    warning "SQLite3 uses PThreads, but the allocator"
+#    warning "is not threadsafe!"
+#    warning "-----------------------------------"
+#    warning ""
+#endif
+
 #if defined(MALLOC_ptmalloc) && defined(GC_SUPPORT) && defined(__FreeBSD__)
 #    warning ""
 #    warning "-----------------------------------"
@@ -398,13 +402,15 @@ retry_alloc (size_t size MTRACE_DECL)
         " bytes for ";
     static char mess_d3[] =
         " bytes request";
-#ifdef MALLOC_TRACE
     static char mess_d4[] =
         " (";
-    static char mess_d5[] =
-        " line ";
+    static char mess_d7[] =
+        ", prog ";
     static char mess_d6[] =
         ")";
+#if defined(MALLOC_TRACE)
+    static char mess_d5[] =
+        " line ";
 #endif
     static char mess_nl[] =
         "\n";
@@ -422,6 +428,11 @@ retry_alloc (size_t size MTRACE_DECL)
     writed(2, malloc_trace_line);
     writes(2, mess_d6);
 #endif
+    writes(2, mess_d4);
+    writes(2, current_object ? get_txt(current_object->name) : "<null>");
+    writes(2, mess_d7);
+    writes(2, current_prog ? get_txt(current_prog->name) : "<null>");
+    writes(2, mess_d6);
     writes(2, mess_nl);
 
     /* Free the next reserve, the try again */
@@ -516,12 +527,10 @@ xalloc_traced (size_t size MTRACE_DECL)
 
 #ifdef MALLOC_SBRK_TRACE
     mdb_size = size;
+    mdb_object = current_object;
 #ifdef MALLOC_TRACE
         mdb_file = malloc_trace_file;
         mdb_line = malloc_trace_line;
-#endif
-#ifdef MALLOC_LPC_TRACE
-        mdb_object = current_object;
 #endif
 #endif /* MALLOC_SBRK_TRACE */
 
@@ -716,12 +725,10 @@ rexalloc_traced (POINTER p, size_t size MTRACE_DECL
 
 #ifdef MALLOC_SBRK_TRACE
     mdb_size = size;
+    mdb_object = current_object;
 #ifdef MALLOC_TRACE
         mdb_file = malloc_trace_file;
         mdb_line = malloc_trace_line;
-#endif
-#ifdef MALLOC_LPC_TRACE
-        mdb_object = current_object;
 #endif
 #endif /* MALLOC_SBRK_TRACE */
 

@@ -73,4 +73,14 @@
 
 #define TLS_PROT_NAME(x) TLS_PROT_TABLE[(x)]
 
+/* Recognized hash() algorithms (not all may be supported at runtime) */
+
+#define TLS_HASH_SHA1      (1)
+#define TLS_HASH_SHA224    (2)
+#define TLS_HASH_SHA256    (3)
+#define TLS_HASH_SHA384    (4)
+#define TLS_HASH_SHA512    (5)
+#define TLS_HASH_MD5       (6)
+#define TLS_HASH_RIPEMD160 (7)
+
 #endif /* LPC_TLS_H */

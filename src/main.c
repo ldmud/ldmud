@@ -1072,6 +1072,8 @@ typedef enum OptNumber {
  , cTLScert         /* --tls-cert           */
  , cTLStrustdir     /* --tls-trustdirectory */
  , cTLStrustfile    /* --tls-trustfile      */
+ , cTLScrlfile	    /* --tls-crlfile        */
+ , cTLScrldir       /* --tls-crldirectory   */
 #endif
 #ifdef DEBUG
  , cCheckRefs       /* --check-refcounts    */
@@ -1461,6 +1463,16 @@ static Option aOptions[]
         "    default is '" TLS_DEFAULT_TRUSTDIRECTORY "'.\n"
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
+    , { 0,      "tls-crlfile",       cTLScrlfile,     MY_TRUE
+      , "  --tls-crlfile <pathname>\n"
+      , "    Use <pathname> as the filename holding your certificate revocation lists.\n"
+        "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+      }
+    , { 0,      "tls-crldirectory",  cTLScrldir,      MY_TRUE
+      , "  --tls-crldirectory <pathname>\n"
+      , "    Use <pathname> as the directory where your certificate revocation lists reside.\n"
+        "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+      }
 #endif /* USE_TLS */
 
     , { 0,   "wizlist-file",       cWizlistFile,    MY_TRUE
@@ -1601,20 +1613,10 @@ drivertag (void)
  */
 
 {
-    if (IS_STABLE_BRANCH)
-    {
-        if (IS_DEVELOPMENT)
-            return " (beta)";
+    if (strcmp(RELEASE_LONGTYPE, ""))
+        return " (" RELEASE_LONGTYPE ")";
 
-        return "";
-    }
-    else
-    {
-        if (IS_DEVELOPMENT)
-            return " (development)";
-
-        return " (maintenance)";
-    }
+    return "";
 } /* drivertag() */
 
 /*-------------------------------------------------------------------------*/
@@ -1780,6 +1782,9 @@ options (void)
     /* Print the package options, nicely indented. */
     {
         char * optstrings[] = { "" /* have at least one string in here */
+#ifdef HAS_IDN
+                              , "idna supported\n"
+#endif
 #ifdef USE_IPV6
                               , "IPv6 supported\n"
 #endif
@@ -1791,6 +1796,9 @@ options (void)
 #endif
 #ifdef USE_PGSQL
                               , "PostgreSQL supported\n"
+#endif
+#ifdef USE_SQLITE
+                              , "SQLite3 supported\n"
 #endif
 #ifdef USE_PTHREADS
                               , "PThreads supported\n"
@@ -2608,6 +2616,16 @@ eval_arg (int eOption, const char * pValue)
             free(tls_trustfile);
         tls_trustfile = strdup(pValue);
         break;
+    case cTLScrlfile:
+	if (tls_crlfile != NULL)
+	    free(tls_crlfile);
+	tls_crlfile = strdup(pValue);
+	break;
+    case cTLScrldir:
+	if (tls_crldirectory != NULL)
+	    free(tls_crldirectory);
+	tls_crldirectory = strdup(pValue);
+	break;
 #endif
 
 #ifdef GC_SUPPORT

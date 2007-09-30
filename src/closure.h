@@ -58,10 +58,10 @@ struct lambda_s
             object_t       *ob;          /* Originating object */
             unsigned short index;        /* Index in the object's function
                                           * table */
-            unsigned short inhIndex;     /* 0, or (1 + inheritance index)
-                                          * for closure referencing
-                                          * inherited functions (even if
-                                          * overloaded).
+            program_t      *inhProg;     /* NULL or the program containing
+                                          * the function for closure
+                                          * referencing inherited functions
+                                          * (even if overloaded).
                                           */
             unsigned short context_size; /* Number of context vars */
         } lfun;
@@ -119,11 +119,11 @@ extern void      replace_program_lambda_adjust(replace_ob_t *r_ob);
 extern void      closure_init_lambda (lambda_t * l, object_t * obj);
 #ifndef USE_NEW_INLINES
 extern void      closure_literal(svalue_t *dest, int ix, unsigned short inhIndex);
-extern void      closure_lfun (svalue_t *dest, object_t *obj, int ix, unsigned short inhIndex, Bool raise_error);
+extern void      closure_lfun (svalue_t *dest, object_t *obj, program_t *prog, int ix, Bool raise_error);
 extern lambda_t *closure_new_lambda (object_t * obj, Bool raise_error);
 #else /* USE_NEW_INLINES */
 extern lambda_t *closure_new_lambda (object_t * obj, unsigned short context_size, Bool raise_error);
-extern void      closure_lfun (svalue_t *dest, object_t *obj, int ix, unsigned short inhIndex, unsigned short num, Bool raise_error);
+extern void      closure_lfun (svalue_t *dest, object_t *obj, program_t *prog, int ix, unsigned short num, Bool raise_error);
 extern void      closure_literal(svalue_t *dest, int ix, unsigned short inhIndex, unsigned short num);
 #endif /* USE_NEW_INLINES */
 extern void      closure_identifier (svalue_t *dest, object_t * obj, int ix, Bool raise_error);

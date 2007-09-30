@@ -815,6 +815,9 @@ init_lexer(void)
 #ifdef MSDOS_FS
     add_permanent_define("__MSDOS_FS__", -1, string_copy("1"), MY_FALSE);
 #endif
+#ifdef HAS_IDN
+    add_permanent_define("__IDNA__", -1, string_copy("1"), MY_FALSE);
+#endif
 #ifdef USE_IPV6
     add_permanent_define("__IPV6__", -1, string_copy("1"), MY_FALSE);
 #endif
@@ -826,6 +829,9 @@ init_lexer(void)
 #endif
 #ifdef USE_PGSQL
     add_permanent_define("__PGSQL__", -1, string_copy("1"), MY_FALSE);
+#endif
+#ifdef USE_SQLITE
+    add_permanent_define("__SQLITE__", -1, string_copy("1"), MY_FALSE);
 #endif
 #ifdef USE_ALISTS
     add_permanent_define("__ALISTS__", -1, string_copy("1"), MY_FALSE);
@@ -849,6 +855,12 @@ init_lexer(void)
 #endif
 #ifdef USE_TLS
     add_permanent_define("__TLS__", -1, string_copy("1"), MY_FALSE);
+#ifdef HAS_GNUTLS
+    add_permanent_define("__GNUTLS__", -1, string_copy("1"), MY_FALSE);
+#endif
+#ifdef HAS_OPENSSL
+    add_permanent_define("__OPENSSL__", -1, string_copy("1"), MY_FALSE);
+#endif
 #endif
     if (wizlist_name[0] != '\0')
     {
@@ -5360,7 +5372,7 @@ yylex1 (void)
                 if ('\n' != *yyp && CHAR_EOF != *yyp)
                 {
                     char *cp;
-                    char lc; /* Since c is 'register' */
+                    char lc = 0; /* Since c is 'register' */
 
                     cp = parse_escaped_char(yyp, &lc);
                     if (!cp)
@@ -5521,7 +5533,7 @@ yylex1 (void)
 
                     default:
                       {
-                          char *cp, lc;
+                          char *cp, lc = 0;
 
                           cp = parse_escaped_char(p-1, &lc);
                           if (!cp)

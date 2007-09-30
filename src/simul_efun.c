@@ -21,9 +21,9 @@
  * If such a discarded simul-efun is re-implemented by a new simul-efun object,
  * the old table entry is reactivated.
  *
- * The first 256 simul-efuns of this table are mirrored in a second table
- * (simul_efun_table) from where they are called by index with the special
- * SIMUL_EFUN instruction.
+ * The first SEFUN_TABLE_SIZE simul-efuns of this table are mirrored in a
+ * second table (simul_efun_table) from where they are called by index with
+ * the special SIMUL_EFUN instruction.
  *---------------------------------------------------------------------------
  */
 
@@ -74,7 +74,7 @@ vector_t *simul_efun_vector  = NULL;
 
 #define SIZE_SEFUN_TABLE (sizeof simul_efun_table / sizeof simul_efun_table[0])
 
-simul_efun_table_t simul_efun_table[256];
+simul_efun_table_t simul_efun_table[SEFUN_TABLE_SIZE];
   /* The table holding the information for all simul-efuns which
    * can be called directly with the SIMUL_EFUN instruction.
    * A .funstart of NULL marks unused/discarded entries.
@@ -328,7 +328,7 @@ assert_simul_efun_object (void)
         }
 
         /* If the function is indeed visible, get its information */
-        if ( !(flags & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|NAME_UNDEFINED)) )
+        if ( !(flags & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|TYPE_MOD_PRIVATE|NAME_UNDEFINED)) )
         {
             string_t *function_name;
             ident_t *p;
@@ -406,7 +406,7 @@ assert_simul_efun_object (void)
 #endif
 
             /* If possible, make an entry in the simul_efun table */
-            if ((size_t)j < SIZE_SEFUN_TABLE)
+            if ((size_t)j < SEFUN_TABLE_SIZE)
             {
                 simul_efun_table[j].funstart = funstart;
                 simul_efun_table[j].program = inherit_progp;

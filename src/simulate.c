@@ -56,6 +56,9 @@
 #ifdef USE_TLS
 #include "pkg-tls.h"
 #endif
+#ifdef USE_SQLITE
+#include "pkg-sqlite.h"
+#endif
 #include "prolang.h"
 #include "sent.h"
 #include "simul_efun.h"
@@ -1852,7 +1855,7 @@ load_object (const char *lname, Bool create_super, int depth
         svalue_t *svp;
 
         push_c_string(inter_sp, fname);
-        svp = apply_master(STR_COMP_OBJ, 1);
+        svp = apply_master(STR_COMPILE_OBJECT, 1);
         if (svp && svp->type == T_OBJECT)
         {
             /* We got an object from the call, but is it what it
@@ -1864,7 +1867,17 @@ load_object (const char *lname, Bool create_super, int depth
                  * the one we received?
                  */
                 if (ob == svp->u.ob)
+                {
+                    /* If this object is a clone, clear the clone flag
+                     * but mark it as replaced.
+                     */
+                    if (ob->flags & O_CLONE)
+                    {
+                        ob->flags &= ~O_CLONE;
+                        ob->flags |= O_REPLACED;
+                    }
                     return ob;
+                }
             }
             else if (ob != master_ob)
             {
@@ -1876,6 +1889,15 @@ load_object (const char *lname, Bool create_super, int depth
                 free_mstring(ob->name);
                 ob->name = new_mstring(name);
                 enter_object_hash(ob);
+
+                /* If this object is a clone, clear the clone flag
+                 * but mark it as replaced.
+                 */
+                if (ob->flags & O_CLONE)
+                {
+                    ob->flags &= ~O_CLONE;
+                    ob->flags |= O_REPLACED;
+                }
                 return ob;
             }
             fname[name_length] = '.';
@@ -2544,6 +2566,10 @@ destruct (object_t *ob)
 #ifdef CHECK_OBJECT_REF
     xallocate(shadow, sizeof(*shadow), "destructed object shadow");
 #endif /* CHECK_OBJECT_REF */
+#ifdef USE_SQLITE
+    if (ob->open_sqlite_db)
+        sl_close(ob);
+#endif
     ob->time_reset = 0;
 
     /* We need the object in memory */
@@ -3890,7 +3916,7 @@ setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs
     }
 
     return error_index;
-} /* setup_efun_callback() */
+} /* setup_efun_callback_base() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -4040,7 +4066,10 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
     }
     else
     {
-        if (!apply(cb->function.named.name, ob, num_arg + nargs))
+        if (toplevel)
+            tracedepth = 0;
+
+        if (!sapply(cb->function.named.name, ob, num_arg + nargs))
             transfer_svalue(&apply_return_value, &const0);
     }
 

@@ -10,13 +10,13 @@ BESCHREIBUNG
         Die Operatoren im Format-String <fmt> haben eines der folgenden
         Formate:
 
-            %[!|~][<size>[. <minmatch>]]<type>
+            %[+][!|~][<size>[.<minmatch>]]<type>
 
         <type> kann folgendes sein:
             d: meldet eine Zahl
             D: meldet eine Zahl
             U:
-            s: meldet ein Zeichen
+            s: meldet eine Zeichenkette
             %: meldet das %-Zeichen
             t: meldet Whitespaces (also Leerschlaege und Tabulatoren),
                speichert diese aber nicht.
@@ -26,6 +26,11 @@ BESCHREIBUNG
         Strings und 1 fuer Nummern). Sowohl <size> als auch <minmatch> kann
         entweder numerisch oder mit '*' angegeben werden - im zweiten Fall
         wird die gueltige Variable in der Liste der Argumente benutzt.
+
+        Wird + angegeben, muessen die Zeichen nach dem Feld ebenfalls
+        matchen. Ist dies nicht der Fall, wird das Feld als Misserfolg
+        betrachted (auch wenn der Wert bereits an die zugehoerige Variable
+        zugewiesen wurde).
 
         Wird ! angegeben, wird zwar die Suche durchgefuehrt, aber Treffer
         werden weder gespeichert noch gezaehlt. Mit ~ als Argument wird
@@ -65,6 +70,9 @@ BEISPIEL
 
         sscanf("ab ", "%s %s", who, what)
             ==> liefert 2, who = "ab", what = ""
+
+GESCHICHTE
+        LDMud 3.3.713/3.2.13 fuehrte den '+'-Modifizierer ein.
 
 SIEHE AUCH
         explode(E), regexp(E)

@@ -1,0 +1,17 @@
+OPTIONAL
+SYNOPSIS
+        void sl_close()
+
+BESCHREIBUNG
+        Schliesst die SQLite-Datenbank, welche vom aktuellen Objekt
+        geoeffnet wurde.
+
+        Diese Funktion ist nur verfuegbar, wenn der Driver mit SQLite-
+        Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __SQLITE__ definiert.
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.3.713.
+
+SIEHE AUCH
+        sl_open(E), sl_exec(E), sl_insert_id(E)

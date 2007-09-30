@@ -54,7 +54,7 @@
 // object connect ()
 //   Handle the request for a new connection.
 //
-// void disconnect (object obj)
+// void disconnect (object obj, string remaining)
 //   Handle the loss of an IP connection.
 //
 // void remove_player (object player)
@@ -417,15 +417,22 @@ object connect ()
 //
 // The gamedriver will call the lfun 'logon()' in the login object after
 // binding the connection to it. That lfun has to return !=0 to succeed.
+//
+// If connect() initiates a secure connection without setting a callback,
+// and the connection is still handshaking at the time connect() returns,
+// the driver will delay the call to logon() until the handshake either
+// succeeds or fails.
+
 
 
 //---------------------------------------------------------------------------
-void disconnect (object obj)
+void disconnect (object obj, string remaining)
 
 // Handle the loss of an IP connection.
 //
 // Argument:
 //   obj: The (formerly) interactive object (player).
+//   remaining: The remaining unprocessed input data from the connection.
 //
 // This called by the gamedriver to handle the removal of an IP connection,
 // either because the connection is already lost ('netdeath') or due to

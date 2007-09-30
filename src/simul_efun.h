@@ -25,6 +25,12 @@ struct simul_efun_table_s
        */
 };
 
+/* --- Defines --- */
+
+#define SEFUN_TABLE_SIZE (65536UL)
+  /* The number of entries in the sefun table, directly callable.
+   */
+
 /* --- Variables --- */
 
 extern int num_simul_efun;

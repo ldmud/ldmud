@@ -717,7 +717,7 @@ statistic_t stat_eval_duration = { 0 };
 
 enum { APPLY_NOT_FOUND = 0, APPLY_FOUND, APPLY_DEFAULT_FOUND };
 static int int_apply(string_t *, object_t *, int, Bool, Bool);
-static void call_simul_efun(int code, object_t *ob, int num_arg);
+static void call_simul_efun(unsigned int code, object_t *ob, int num_arg);
 #ifdef DEBUG
 static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
 #endif
@@ -836,6 +836,12 @@ init_interpret (void)
     invalid_entry.id = 0;
     invalid_entry.progp = (program_t *)1;
     invalid_entry.name = NULL;
+    
+    /* To silence the compiler: */
+    invalid_entry.variable_index_offset = 0;
+    invalid_entry.function_index_offset = 0;
+    invalid_entry.funstart = 0;
+    invalid_entry.flags = 0;
 
     for (i = 0; i < CACHE_SIZE; i++)
         cache[i] = invalid_entry;
@@ -6862,7 +6868,7 @@ pop_control_stack (void)
 } /* pop_control_stack() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE inherit_t *
+inherit_t *
 adjust_variable_offsets ( const inherit_t * inheritp
                         , const program_t * prog
                         , const object_t  * obj
@@ -7222,23 +7228,72 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
 
 /*-------------------------------------------------------------------------*/
 static funflag_t
-setup_new_frame (int fx, unsigned short inhIndex)
+setup_new_frame (int fx, program_t *inhProg)
 
 /* Setup a call for function <fx> in the current program.
- * If <inhIndex> is not 0, it is the (inheritance index + 1) of the 
- * inherited function to call.
+ * If <inhProg> is not NULL, it is the program of the inherited function
+ * to call.
  * Result are the flags for the function.
  */
 
 {
     funflag_t flags;
 
-    if (inhIndex)
+    if (inhProg)
     {
-        inherit_t * inheritp = setup_inherited_call(inhIndex-1);
-        flags = setup_new_frame1(fx, inheritp->function_index_offset
-                                   , inheritp->variable_index_offset
-                                );
+        program_t *progp;
+        int       fun_ix_offs;
+        int       var_ix_offs;
+        
+        progp = current_prog;
+        fun_ix_offs = 0;
+        var_ix_offs = 0;
+        
+        while (progp != inhProg)
+        {
+            inherit_t      *inheritp, *inh;
+            
+#ifdef DEBUG
+            if (!progp->num_inherited)
+                errorf("(setup_new_frame): Couldn't find program '%s' "
+                       "in program '%s' with function index %ld. "
+                       "Found program '%s' instead.\n"
+                     , get_txt(inhProg->name)
+                     , get_txt(current_prog->name)
+                     , (long) fx
+                     , get_txt(progp->name)
+                     );
+#endif
+            SEARCH_FUNCTION_INHERIT(inheritp, progp, fx);
+            fx -= inheritp->function_index_offset;
+
+            inh = adjust_variable_offsets(inheritp, progp, current_object);
+            if (inh)
+            {
+                /* Virtual base class. Reset offsets. */
+                inheritp = inh;
+                fun_ix_offs = 0;
+                var_ix_offs = 0;
+            }
+
+            fun_ix_offs += inheritp->function_index_offset;
+            var_ix_offs += inheritp->variable_index_offset;
+            progp = inheritp->prog;
+
+#ifdef DEBUG
+            if (fx >= progp->num_functions)
+                errorf("(setup_new_frame): fx %ld > number of "
+                       "functions %ld in program '%s'\n"
+                     , (long) fx
+                     , (long) progp->num_functions
+                     , get_txt(progp->name)
+                     );
+#endif
+        }
+        
+        current_prog = inhProg;
+
+        flags = setup_new_frame1(fx, fun_ix_offs, var_ix_offs);
     }
     else
         flags = setup_new_frame1(fx, 0, 0);
@@ -8332,7 +8387,9 @@ again:
 #endif /* USE_NEW_INLINES */
 
         inhIndex = 0;
+#ifdef USE_NEW_INLINES
         context_size = 0;
+#endif /* USE_NEW_INLINES */
         LOAD_SHORT(tmp_ushort, pc);
 #ifdef USE_NEW_INLINES
         if (instruction == F_CONTEXT_CLOSURE)
@@ -8448,6 +8505,9 @@ again:
          * corrected.
          */
         warnf("Missing 'return <value>' statement.\n");
+
+        /* Warn only once per missing return and program. */
+        PUT_UINT8(pc-1, F_RETURN0);
         /* FALLTHROUGH */
 
     CASE(F_RETURN0);                /* --- return0             --- */
@@ -9305,12 +9365,6 @@ again:
                        ));
             }
 
-            if (sp->u.number < MASTER_RESERVED_COST * 2)
-                ERRORF(("Illegal 'reserve' value for catch(): got %ld, "
-                        "required are at least %ld.\n"
-                       , sp->u.number
-                       , (long)MASTER_RESERVED_COST * 2L
-                       ));
             reserve_cost = sp->u.number;
             sp--;
         }
@@ -11044,6 +11098,7 @@ again:
          *   int    & int    -> int
          *   string & string -> string
          *   vector & vector -> vector
+         *   vector & mapping  -> vector
          *   mapping & vector  -> mapping
          *   mapping & mapping -> mapping
          *
@@ -11055,6 +11110,15 @@ again:
         {
             inter_sp = sp - 2;
             (sp-1)->u.vec = intersect_array((sp-1)->u.vec, sp->u.vec);
+            sp--;
+            break;
+        }
+
+        if (sp[-1].type == T_POINTER
+         && sp->type == T_MAPPING)
+        {
+            inter_sp = sp - 2;
+            (sp-1)->u.vec = map_intersect_array(sp[-1].u.vec, sp->u.map);
             sp--;
             break;
         }
@@ -12500,8 +12564,9 @@ again:
          *   int    & int    -> int
          *   string & string -> string
          *   array  & array  -> array
-         *
-         * TODO: Extend this to mappings.
+         *   array  & mapping -> array
+         *   mapping & array -> mapping
+         *   mapping & mapping -> mapping
          */
 
         svalue_t *argp;
@@ -12545,22 +12610,40 @@ again:
         {
             /* Intersect an array */
 
-            vector_t *vec1, *vec2;
-
-            if (sp[-1].type != T_POINTER)
+            if (sp[-1].type == T_POINTER)
             {
-                OP_ARG_ERROR(2, TF_POINTER, sp[-1].type);
+                vector_t *vec1, *vec2;
+
+                inter_sp = sp - 2;
+                vec1 = argp->u.vec;
+                vec2 = sp[-1].u.vec;
+                argp->type = T_NUMBER;
+                vec1 = intersect_array(vec1, vec2);
+                put_ref_array(argp, vec1);
+                sp--;
+                sp->u.vec = argp->u.vec;
+                free_svalue(sp+1);
+            }
+            else if (sp[-1].type == T_MAPPING)
+            {
+                vector_t *vec;
+                mapping_t * map;
+
+                inter_sp = sp - 2;
+                vec = argp->u.vec;
+                map = sp[-1].u.map;
+                argp->type = T_NUMBER;
+                vec = map_intersect_array(vec, map);
+                put_ref_array(argp, vec);
+                sp--;
+                put_array(sp, argp->u.vec);
+                free_svalue(sp+1);
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp[-1].type);
                 /* NOTREACHED */
             }
-            inter_sp = sp - 2;
-            vec1 = argp->u.vec;
-            vec2 = sp[-1].u.vec;
-            argp->type = T_NUMBER;
-            vec1 = intersect_array(vec1, vec2);
-            put_ref_array(argp, vec1);
-            sp--;
-            sp->u.vec = argp->u.vec;
-            free_svalue(sp+1);
             break;
         }
 
@@ -14461,13 +14544,10 @@ again:
          * through the ap pointer; otherwise the code assumes that the
          * compiler left the proper number of arguments on the stack.
          *
-         * <code> is an uint8 and indexes the function list *simul_efunp.
-         * TODO: Add a F_SIMUL_EFUN for codes > 0xff; right now this
-         * TODO:: is compiled as CALL_DIRECT. Affected are prolang.y and
-         * TODO:: simul_efun.c
+         * <code> is an ushort and indexes the function list *simul_efunp.
          */
 
-        int                 code;      /* the function index */
+        unsigned short      code;      /* the function index */
         fun_hdr_p           funstart;  /* the actual function */
         object_t           *ob;        /* the simul_efun object */
         int                 def_narg;  /* expected number of arguments */
@@ -14476,7 +14556,7 @@ again:
         ASSIGN_EVAL_COST  /* we're changing objects */
 
         /* Get the sefun code and the number of arguments on the stack */
-        code = (int)LOAD_UINT8(pc);
+        LOAD_SHORT(code, pc);
         def_narg = simul_efunp[code].num_arg;
 
         if (use_ap
@@ -17684,7 +17764,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         current_object = l->function.lfun.ob;
         current_prog = current_object->prog;
         /* inter_sp == sp */
-        flags = setup_new_frame(l->function.lfun.index, l->function.lfun.inhIndex);
+        flags = setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg);
 #ifdef USE_NEW_INLINES
         if (l->function.lfun.context_size > 0)
             inter_context = l->context;
@@ -17819,9 +17899,10 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 
     case CLOSURE_UNBOUND_LAMBDA:
     case CLOSURE_PRELIMINARY:
-        /* no valid current_object ==> pop the control stack */
-        /* inter_sp == sp */
-        CLEAN_CSP
+        /* no valid current_object: fall out of the switch
+         * and let the error handling clean up the control
+         * stack.
+         */
         break;
 
     default: /* --- efun-, simul efun-, operator closure */
@@ -17953,6 +18034,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 #ifdef USE_NEW_INLINES
                 inter_context = NULL;
 #endif /* USE_NEW_INLINES */
+                tracedepth++; /* Counteract the F_RETURN */
                 eval_instruction(code, sp);
                 /* The result is on the stack (inter_sp) */
                 return;
@@ -18056,7 +18138,7 @@ secure_call_lambda (svalue_t *closure, int num_arg, Bool external)
 
 /*-------------------------------------------------------------------------*/
 static void
-call_simul_efun (int code, object_t *ob, int num_arg)
+call_simul_efun (unsigned int code, object_t *ob, int num_arg)
 
 /* Call the simul_efun <code> in the sefun object <ob> with <num_arg>
  * arguments on the stack. If it can't be found in the <ob>ject, the
@@ -18134,7 +18216,7 @@ call_function (program_t *progp, int fx)
 #endif
     csp->num_local_variables = 0;
     current_prog = progp;
-    flags = setup_new_frame(fx, 0);
+    flags = setup_new_frame(fx, NULL);
     funstart = current_prog->program + (flags & FUNSTART_MASK);
     csp->funstart = funstart;
     previous_ob = current_object;
@@ -18959,8 +19041,6 @@ count_interpreter_refs (void)
     int i;
 
     for (i = CACHE_SIZE; --i>= 0; ) {
-        if (!cache[i].progp)
-            note_malloced_block_ref(cache[i].name);
         if (cache[i].name)
             count_ref_from_string(cache[i].name);
     }
@@ -19603,6 +19683,22 @@ check_extra_ref_in_mapping_filter (svalue_t *key, svalue_t *data
     check_extra_ref_in_vector(data, (size_t)extra);
 }
 
+static void
+count_extra_ref_in_prog (program_t *prog)
+/* Count extra refs for <prog>.
+ */
+{
+    if (NULL != register_pointer(ptable, prog))
+    {
+        prog->extra_ref = 1;
+        if (prog->blueprint)
+        {
+            count_extra_ref_in_object(prog->blueprint);
+        }
+        count_inherits(prog);
+    }
+}
+
 /*-------------------------------------------------------------------------*/
 void
 count_extra_ref_in_object (object_t *ob)
@@ -19646,15 +19742,7 @@ count_extra_ref_in_object (object_t *ob)
 
     if (!O_PROG_SWAPPED(ob))
     {
-        if (NULL != register_pointer(ptable, ob->prog))
-        {
-            ob->prog->extra_ref = 1;
-            if (ob->prog->blueprint)
-            {
-                count_extra_ref_in_object(ob->prog->blueprint);
-            }
-            count_inherits(ob->prog);
-        }
+        count_extra_ref_in_prog(ob->prog);
     }
 
     if (was_swapped)
@@ -19703,12 +19791,22 @@ count_extra_ref_in_closure (lambda_t *l, ph_int type)
         else if (type == CLOSURE_LFUN)
         {
             count_extra_ref_in_object(l->function.lfun.ob);
+            if (l->function.lfun.inhProg)
+            {
+                l->function.lfun.inhProg->extra_ref++;
+                count_extra_ref_in_prog(l->function.lfun.inhProg);
+            }
         }
     }
 
     if (type != CLOSURE_UNBOUND_LAMBDA)
     {
         count_extra_ref_in_object(l->ob);
+    }
+    
+    if (l->prog_ob)
+    {
+        count_extra_ref_in_object(l->prog_ob);
     }
 } /* count_extra_ref_in_closure() */
 

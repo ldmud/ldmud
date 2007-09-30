@@ -1,6 +1,209 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Sep-2007 (Lars Duening)  (3.3.715 = 3.4.2)
+  - Released as 3.4.2.
+
+04-Nov-2006 (Lars Duening, Philip Hancke)
+  - (pkg-tls, main.c) Added new options --tls-crlfile and --tls-crldirectory
+       to hold the Certificate Revocation information.
+  - (pkg-tls, func_spec) New efun tls_refresh_certs() to reload the
+       certificates and certificate revocations.
+
+09-Jul-2006 (Lars Duening)  (3.3.714)
+  - Created snapshot.
+
+14-Jun-2006 (Lars Duening)
+  - (array.c) Removed a memory leak when array intersection or subtraction
+       failed.
+  - (mapping, array, interpret.c, prolang.y) Implemented the array/mapping
+       intersection.
+
+12-Jun-2006 (Lars Duening)
+  - Oh dear, has it been that long?
+  - (make_func.y) Modified a case of undefined behaviour in the creation
+       of the character classification tables: only 'unsigned char' types have
+       a defined overflow behaviour (thanks, Erik!)
+  - (configure) -fno-force-mem is deprecated.
+
+09-May-2006 (Lars Duening)
+  - (xalloc.c) If the driver runs low on memory, it also prints the
+       current object and program in the low-on-memory message.
+
+06-May-2006 (Lars Duening)
+  - (pkg-tls) New efuns hash() and hmac() offer flexible hash and HMAC
+       calculation if the driver is compiled to use OpenSSL (provided by
+       Philipp).
+  - (pkg-tls.c) Removed a compilation error occuring with GnuTLS.
+  - (lex.c) New macros __OPENSSL__ and __GNUTLS__ are set depending on
+       which TLS package is being used.
+
+06-May-2006 (Gnomi)
+  - (prolang.y) Corrected the linenumber counting for inline closures.
+
+23-Apr-2006 (Lars Duening)
+  - (mstring) The max hash length used is now available as macro constant.
+  - (otable.c) Both mstrings and C-strings are hashed with the same max
+      length. This corrects a bug with extremely long object names (Bug #466).
+  - (structs.c) The calculation of the first part of a struct's hash 
+      uses what the mstring code has already calculated.
+      
+30-Mar-2006 (Lars Duening)
+  - (prolang.y) Removed a dead branch.
+  - (pkg-tls.c) Removed a possible compiler warning (Bug #464).
+  - (prolang.y) Removed a bison warning when structs aren't used.
+
+27-Mar-2006 (Lars Duening)
+  - (pkg-tls.c) Added support for GEN_EMAIL, GEN_URI and GEN_DNS
+      certificates. tls_verify_callback() now prints diagnostics
+      only if the '-d' option was given (thanks, Philipp).
+      
+18-Mar-2006 (Gnomi)
+  - (interpret.c) In apply cache entries for non-existing functions, the
+      garbage collector counted the reference to the string name twice,
+      causing the use of deallocated memory (Bug #463).
+
+16-Mar-2006  (Lars Duening)
+  - (comm.c) Moved the declaration of a variable which was declared in the
+      middle of a block - gcc doesn't complain, but it's not ISO-C (Bug #462).
+
+14-Mar-2006  (Gnomi)
+  - (closure, object.c, interpret, exec.h, gcollect.c) lfun closures now
+      keep track to which program they belong, to avoid ambiguities
+      in case of complex inheritance relationships. This also affects
+      the savefile format: lfun closures are saved with their inheritance
+      path (Bug #443, #444).
+  - (prolang.y) If a non-virtual baseclass was inherited multiple times
+      with a virtual class inside the inheritance tree, its members
+      were merged even though they shouldn't (Bug #422).
+  - (prolang.y) The LPC compiler used a global variable for typetracking,
+      which caused errors when types changed inside a variable
+      initialisation (Bug #394).
+
+12-Mar-2006  (Lars Duening)  (3.3.713)
+  - Created snapshot.
+  - (comm.c) Master function disconnect() receives the remaining input data is
+       passed as the second argument (suggested by Philipp).
+
+08-Mar-2006  (Malcom Tester)
+  - (lp-245/obj/master.c) Made the move implementation more robust.
+
+07-Mar-2006  (Lars Duening)
+  - (pkg-tls.c) Two modifications to increase reconnect stability (thanks,
+      Philipp!).
+  - (prolang.y) Extended a LPC compiler warning when function indices
+      are adjusted.
+
+06-Mar-2006  (Lars Duening)
+  - (backend, comm.c, object) The logon(obj) function moved from
+      backend.c into object.c, and was renamed logon_object() - it's
+      more sensical this way.
+  - (comm.c) If the master::connect() initiates a secure connection
+      which gets stuck in the handshake, neither logon() is called nor
+      is the prompt printed. Also, if the tls_init_connection() didn't
+      set a callback, the driver will provide a callback to logon().
+      This way logon() won't be called unless the connection is up
+      and running.
+  - (mudlib/psyc-tls.c) Example for using the tls_check_certificate()
+      efun (thanks, Philipp).
+
+03-Mar-2006  (Lars Duening)
+  - (pkg-tls.c) tls_check_certificate() does more interpretation of
+      the result and returns better data (provided by Philipp).
+
+01-Mar-2006  (Lars Duening)
+  - (interpret.c) A missing return is noted at runtime only once per
+      function. This is achieved by runtime code modification, but we
+      do that for switch() as well (Bug #430).
+
+28-Feb-2006  (Lars Duening)
+  - (pkg-idna) Added support for International Domain Names (provided
+      by Philipp - thanks!).
+  - (configure, Makefile) Added a target 'install-headers' to install
+      all driver LPC header files.
+  - (simulate.c) Virtual blueprint objects are guaranteed to have their
+      'clone' flag unset.
+  - (string_spec, simulate.c) Renamed COMP_OBJ to the more intuitive
+      COMPILE_OBJECT.
+  - (interpret.c) Removed the stipulation that CATCH_RESERVED_COST
+      must be twice as much as MASTER_RESERVED_COST, since the master
+      reserve is used automatically anyway (suggested by Gnomi).
+  - (efuns.c) sscanf(): The new modifier '+' requires the matching of
+      the characters after a field in order to consider the field
+      as matched.
+
+20-Feb-2006  (Lars Duening)
+  - (Makefile.in) Added a dependency to create patchlevel.h, even if
+      the program is made with 'make ldmud'.
+
+20-Feb-2006  (Gnomi)
+  - (comm.c) remove_interactive() clobbered the current_object, setting
+      it to NULL. It is now preserved (Bug #431).
+  - (interpret.c) When executing an efun closure, the tracedepth wasn't
+      incremented accordingly (Bug #441).
+  - (simulate.c) When executing a non-toplevel callback, the tracedepth
+      should not be zeroed out (Bug #441).
+
+08-Jan-2006  (Lars Duening)
+  - (make_func.y) When parsing the func_spec file, the preprocessor
+      conditionals were handled in a buffer in a no-longer existing
+      stack frame. So far, we were lucky, but on a 64-bit machine
+      that space was needed by the Bison parser.
+  - (driver.h, smalloc.c, slaballoc.c) If the machine uses a 8-Byte
+      malloc alignment (e.g. all PowerPC machines), the allocator does
+      not replace the system malloc().
+  - (mud/lp-245/) Since the recent change to how simul_efuns are called
+      (see Bug #419), the LP-245 lib was broken. This has been corrected.
+
+05-Dec-2005  (Lars Duening)
+  - (configure, machine.h.in, config.h.in) Added a configuration check
+      for SQLite3.
+  - (pkg-sqlite, many files) Added SQLite support (Bug #11).
+
+04-Dec-2005  (Gnomi)
+  - (prolang.y) Private lfuns no longer hide simul-efuns.
+  - (prolang.y) Private lfuns can be hidden by public functions without
+      warning, ie. the former are now really invisible to inheritors. This
+      also corrects a crasher with multi-level virtual inherits.
+  - (prolang.y) Multiple virtual inheritance of the same program with
+      changing visibility is now handled with a better calculation of
+      the final visibilities. (Bug #362)
+
+04-Dec-2005  (Lars Duening)
+  - (interpret.c) Calling an unbound lambda cleaned the control stack
+      twice, causing errors (Bug #374).
+  - (simul_efun.c) Only public simul-efuns can be called. This was always
+      valid for sefuns outside the 256-range, but now also applies to
+      normal sefuns as well (Bug #419)
+  - (simul_efun, prolang.y, closure.c, interpret.c) The number of direct
+      callable simul-efuns is now configurable in the simul_efun.h. I
+      also increased it to 65536 from 256.
+  - (closure.c) Simul-efuns were still called with call_other instead
+      of call_direct.
+
+02-Dec-2005  (Lars Duening)
+  - (gcollect.c) Added a log output when all objects are data-cleaned, as
+      it might be the cause for some observed slowdowns.
+  - (closure.c, interpret.c) For completeness sake: removed the compilation
+      errors happening when disabling the new inline closures (Bug #423).
+
+27-Nov-2005  (Lars Duening)
+  - (object.c) Efun present(): Modified the <n> search behaviour so that the
+      numbering is applied over both inventory and environment
+      together. Before, the numbering was individual in each
+      space, leading to situations where low-numbered objects in the
+      environment were hidden by those in the inventory (Bug #417).
+  - (object.c) Efun function_exists(): The 'FEXISTS_ALL' result also contains
+      information about the function's type, flags, and number of
+      arguments (Bug #410).
+
+26-Nov-2005  (Lars Duening)
+  - (efuns.c) Efun sscanf(): Added test whether the constant characters after
+      a %-field also match - if not, the %-field is considered unmatched
+      (suggested by Largo).
+  - (efuns, func_spec) Efuns md5()/sha1(): Accept the number of iterations as
+       optional argument (Bug #418).
+
 24-Nov-2005  (Lars Duening)  (3.3.712 = 3.4.1)
   - Released as 3.4.1 on 12-Mar-2006.
   - (md5.c) The ROTATE_LEFT macro wasn't 64-bit clean (Bug #413).

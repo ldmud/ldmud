@@ -93,11 +93,20 @@
 /* Does the machine offer PCRE? */
 #undef HAS_PCRE
 
+/* Does the machine offer IDNA? */
+#undef HAS_IDN
+
 /* Does the machine offer mySQL? */
 #undef HAS_MYSQL
 
 /* Does the machine offer PostgreSQL? */
 #undef HAS_PGSQL
+
+/* Does the machine offer SQLite3? */
+#undef HAS_SQLITE3
+
+/* Does SQLite3 use pthreads? */
+#undef SQLITE3_USES_PTHREADS
 
 /* Does the machine offer GnuTLS? */
 #undef HAS_GNUTLS

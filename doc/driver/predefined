@@ -78,13 +78,17 @@ DESCRIPTION
     The following macros are defined if their associated package
     has been compiled into the driver:
 
+      __IDNA__ :      support for IDNA
       __IPV6__ :      support for IP v.6
       __MYSQL__ :     support for mySQL
       __PGSQL__ :     support for PostgreSQL
+      __SQLITE__ :    support for SQLite 3.
       __MCCP__:       support for MCCP http://www.randomly.org/projects/MCCP
       __ALISTS__:     support for alists
       __PCRE__:       support for PCRE (always defined)
       __TLS__:        support for TLS (internal)
+      __GNUTLS__:     if __TLS__: TLS support provided by GnuTLS.
+      __OPENSSL__:    if __TLS__: TLS support provided by OpenSSL.
       __PTHREADS__:   support for pthreads (internal)
       __DEPRECATED__: support for obsolete and deprecated efuns.
 
@@ -108,6 +112,8 @@ HISTORY
         __MCCP__, __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__, __PGSQL__,
         __PTHREADS__, __TLS__, __BOOT_TIME__, __ALARM_TIME__,
         __HEART_BEAT_INTERVAL__, __SYNCHRONOUS_HEART_BEAT__, and __PCRE__.
+    3.3.713 added __IDNA__, __SQLITE__.
+    3.3.714 added __OPENSSL__, __GNUTLS__.
 
 SEE ALSO
     pragma(LPC), preprocessor(LPC)

@@ -1,0 +1,20 @@
+#ifndef PKG_FOO_H_
+#define PKG_FOO_H_ 1
+
+#include "driver.h"
+
+#ifdef USE_FOO
+
+#ifndef HAS_FOO
+#error "pkg-foo configured even though the machine doesn't support FOO."
+#endif
+
+#include "typedefs.h"
+
+/* --- Prototypes --- */
+
+extern svalue_t *f_foo_xxx(svalue_t *sp);
+
+#endif /* USE_FOO */
+
+#endif /* PKG_FOO_H_ */

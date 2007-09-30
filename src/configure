@@ -310,7 +310,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA YACC CPP EGREP ALLOCA val_optimize WCFLAGS OCFLAGS LCFLAGS MCFLAGS DCFLAGS EXTRA_CFLAGS OPTIMIZE_LINKING MOVE_YACC_TAB CLEAN_YACC_TAB YACCTAB CONFIG_SHELL cdef_erq_demon cdef_access_control cdef_access_log cdef_compat_mode cdef_strict_euids cdef_filename_spaces cdef_share_variables cdef_use_system_crypt cdef_use_ipv6 cdef_use_mysql cdef_use_pgsql cdef_use_pthreads cdef_use_alists cdef_use_mccp cdef_use_pcre cdef_use_builtin_pcre cdef_use_deprecated cdef_use_structs cdef_use_tls cdef_use_new_inlines cdef_use_set_light cdef_use_set_is_wizard cdef_use_parse_command cdef_use_process_string cdef_lpc_array_calls cdef_comm_stat cdef_trace_code cdef_apply_cache_stat cdef_malloc_sbrk cdef_malloc_check cdef_malloc_trace cdef_malloc_lpc_trace cdef_malloc_sbrk_trace cdef_dynamic_costs cdef_rxcache_table cdef_wizlist_file cdef_synchronous_heart_beat cdef_opcprof cdef_verbose_opcprof cdef_debug cdef_yydebug cdef_no_inlines cdef_debug_telnet cdef_debug_malloc_allocs cdef_check_object_stat cdef_check_mapping_total cdef_check_object_ref cdef_check_object_gc_ref cdef_dump_gc_refs val_access_file val_access_log val_erq_max_reply val_erq_max_send val_erq_debug val_pthreads_write_max_size val_read_file_max_size val_time_to_clean_up val_time_to_swap val_time_to_swap_variables val_time_to_reset val_alarm_time val_heart_beat_interval val_evaluator_stack_size val_max_user_trace val_max_trace val_compiler_stack_size val_max_bits val_portno val_maxnumports val_max_cost val_max_local val_catch_reserved_cost val_master_reserved_cost val_swap_file val_max_array_size val_max_mapping_keys val_max_mapping_size val_max_callouts val_max_players val_allowed_ed_cmds val_reserved_user_size val_reserved_master_size val_reserved_system_size val_htable_size val_itable_size val_otable_size val_defmax val_apply_cache_bits val_rxcache_table val_master_name val_input_escape val_max_byte_transfer val_udp_port val_set_buffer_size_max val_malloc val_min_malloced val_min_small_malloced val_max_malloced val_total_trace_length val_wizlist_file erq_sub PKGLIBS ERQ_LIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA YACC CPP EGREP ALLOCA val_optimize WCFLAGS OCFLAGS LCFLAGS MCFLAGS DCFLAGS EXTRA_CFLAGS OPTIMIZE_LINKING MOVE_YACC_TAB CLEAN_YACC_TAB YACCTAB CONFIG_SHELL cdef_erq_demon cdef_access_control cdef_access_log cdef_compat_mode cdef_strict_euids cdef_filename_spaces cdef_share_variables cdef_use_system_crypt cdef_use_ipv6 cdef_use_mysql cdef_use_pgsql cdef_use_sqlite cdef_use_pthreads cdef_use_alists cdef_use_mccp cdef_use_pcre cdef_use_builtin_pcre cdef_use_deprecated cdef_use_structs cdef_use_tls cdef_use_new_inlines cdef_use_set_light cdef_use_set_is_wizard cdef_use_parse_command cdef_use_process_string cdef_lpc_array_calls cdef_comm_stat cdef_trace_code cdef_apply_cache_stat cdef_malloc_sbrk cdef_malloc_check cdef_malloc_trace cdef_malloc_lpc_trace cdef_malloc_sbrk_trace cdef_dynamic_costs cdef_rxcache_table cdef_wizlist_file cdef_synchronous_heart_beat cdef_opcprof cdef_verbose_opcprof cdef_debug cdef_yydebug cdef_no_inlines cdef_debug_telnet cdef_debug_malloc_allocs cdef_check_object_stat cdef_check_mapping_total cdef_check_object_ref cdef_check_object_gc_ref cdef_dump_gc_refs val_access_file val_access_log val_erq_max_reply val_erq_max_send val_erq_debug val_pthreads_write_max_size val_read_file_max_size val_time_to_clean_up val_time_to_swap val_time_to_swap_variables val_time_to_reset val_alarm_time val_heart_beat_interval val_evaluator_stack_size val_max_user_trace val_max_trace val_compiler_stack_size val_max_bits val_portno val_maxnumports val_max_cost val_max_local val_catch_reserved_cost val_master_reserved_cost val_swap_file val_max_array_size val_max_mapping_keys val_max_mapping_size val_max_callouts val_max_players val_allowed_ed_cmds val_reserved_user_size val_reserved_master_size val_reserved_system_size val_htable_size val_itable_size val_otable_size val_defmax val_apply_cache_bits val_rxcache_table val_master_name val_input_escape val_max_byte_transfer val_udp_port val_set_buffer_size_max val_malloc val_min_malloced val_min_small_malloced val_max_malloced val_total_trace_length val_wizlist_file erq_sub PKGLIBS ERQ_LIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -864,6 +864,8 @@ Optional Features:
         Enables mySQL support
   --enable-use-pgsql                  default=disabled
         Enables PostgreSQL support
+  --enable-use-sqlite                 default=disabled
+        Enables SQLite support
   --enable-use-pthreads               default=disabled
         enable using of threads for socket writes
   --enable-use-pcre                   default=enabled
@@ -1560,6 +1562,13 @@ DEFAULTenable_use_pgsql=no
 # Check whether --enable-use-pgsql or --disable-use-pgsql was given.
 if test "${enable_use_pgsql+set}" = set; then
   enableval="$enable_use_pgsql"
+
+fi;
+
+DEFAULTenable_use_sqlite=no
+# Check whether --enable-use-sqlite or --disable-use-sqlite was given.
+if test "${enable_use_sqlite+set}" = set; then
+  enableval="$enable_use_sqlite"
 
 fi;
 
@@ -2348,6 +2357,23 @@ else
   cdef_use_pgsql="#define"
   pgsql_path="$enable_use_pgsql"
   enable_use_pgsql="yes"
+fi
+
+if test "x$enable_use_sqlite" = "x" && test "x$DEFAULTenable_use_sqlite" != "x"; then
+  enable_use_sqlite=$DEFAULTenable_use_sqlite
+fi
+
+if test "x$enable_use_sqlite" = "x" || test "x$enable_use_sqlite" = "xyes"; then
+  cdef_use_sqlite="#define"
+  sqlite_path=
+  enable_use_sqlite="yes"
+elif test "x$enable_use_sqlite" = "xno"; then
+  cdef_use_sqlite="#undef"
+  sqlite_path=
+else
+  cdef_use_sqlite="#define"
+  sqlite_path="$enable_use_sqlite"
+  enable_use_sqlite="yes"
 fi
 
 if test "x$enable_use_tls" = "x" && test "x$DEFAULTenable_use_tls" != "x"; then
@@ -11795,6 +11821,373 @@ _ACEOF
 
 fi
 
+# --- libidn ---
+if test "${ac_cv_header_idna_h+set}" = set; then
+  echo "$as_me:$LINENO: checking for idna.h" >&5
+echo $ECHO_N "checking for idna.h... $ECHO_C" >&6
+if test "${ac_cv_header_idna_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_header_idna_h" >&5
+echo "${ECHO_T}$ac_cv_header_idna_h" >&6
+else
+  # Is the header compilable?
+echo "$as_me:$LINENO: checking idna.h usability" >&5
+echo $ECHO_N "checking idna.h usability... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+$ac_includes_default
+#include <idna.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_header_compiler=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_header_compiler=no
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
+echo "${ECHO_T}$ac_header_compiler" >&6
+
+# Is the header present?
+echo "$as_me:$LINENO: checking idna.h presence" >&5
+echo $ECHO_N "checking idna.h presence... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <idna.h>
+_ACEOF
+if { (eval echo "$as_me:$LINENO: \"$ac_cpp conftest.$ac_ext\"") >&5
+  (eval $ac_cpp conftest.$ac_ext) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } >/dev/null; then
+  if test -s conftest.err; then
+    ac_cpp_err=$ac_c_preproc_warn_flag
+    ac_cpp_err=$ac_cpp_err$ac_c_werror_flag
+  else
+    ac_cpp_err=
+  fi
+else
+  ac_cpp_err=yes
+fi
+if test -z "$ac_cpp_err"; then
+  ac_header_preproc=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+  ac_header_preproc=no
+fi
+rm -f conftest.err conftest.$ac_ext
+echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
+echo "${ECHO_T}$ac_header_preproc" >&6
+
+# So?  What about this header?
+case $ac_header_compiler:$ac_header_preproc:$ac_c_preproc_warn_flag in
+  yes:no: )
+    { echo "$as_me:$LINENO: WARNING: idna.h: accepted by the compiler, rejected by the preprocessor!" >&5
+echo "$as_me: WARNING: idna.h: accepted by the compiler, rejected by the preprocessor!" >&2;}
+    { echo "$as_me:$LINENO: WARNING: idna.h: proceeding with the compiler's result" >&5
+echo "$as_me: WARNING: idna.h: proceeding with the compiler's result" >&2;}
+    ac_header_preproc=yes
+    ;;
+  no:yes:* )
+    { echo "$as_me:$LINENO: WARNING: idna.h: present but cannot be compiled" >&5
+echo "$as_me: WARNING: idna.h: present but cannot be compiled" >&2;}
+    { echo "$as_me:$LINENO: WARNING: idna.h:     check for missing prerequisite headers?" >&5
+echo "$as_me: WARNING: idna.h:     check for missing prerequisite headers?" >&2;}
+    { echo "$as_me:$LINENO: WARNING: idna.h: see the Autoconf documentation" >&5
+echo "$as_me: WARNING: idna.h: see the Autoconf documentation" >&2;}
+    { echo "$as_me:$LINENO: WARNING: idna.h:     section \"Present But Cannot Be Compiled\"" >&5
+echo "$as_me: WARNING: idna.h:     section \"Present But Cannot Be Compiled\"" >&2;}
+    { echo "$as_me:$LINENO: WARNING: idna.h: proceeding with the preprocessor's result" >&5
+echo "$as_me: WARNING: idna.h: proceeding with the preprocessor's result" >&2;}
+    { echo "$as_me:$LINENO: WARNING: idna.h: in the future, the compiler will take precedence" >&5
+echo "$as_me: WARNING: idna.h: in the future, the compiler will take precedence" >&2;}
+    (
+      cat <<\_ASBOX
+## ------------------------------------------ ##
+## Report this to the AC_PACKAGE_NAME lists.  ##
+## ------------------------------------------ ##
+_ASBOX
+    ) |
+      sed "s/^/$as_me: WARNING:     /" >&2
+    ;;
+esac
+echo "$as_me:$LINENO: checking for idna.h" >&5
+echo $ECHO_N "checking for idna.h... $ECHO_C" >&6
+if test "${ac_cv_header_idna_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_cv_header_idna_h=$ac_header_preproc
+fi
+echo "$as_me:$LINENO: result: $ac_cv_header_idna_h" >&5
+echo "${ECHO_T}$ac_cv_header_idna_h" >&6
+
+fi
+if test $ac_cv_header_idna_h = yes; then
+  lp_cv_has_idn=yes
+else
+  lp_cv_has_idn=no
+fi
+
+
+if test "${ac_cv_header_stringprep_h+set}" = set; then
+  echo "$as_me:$LINENO: checking for stringprep.h" >&5
+echo $ECHO_N "checking for stringprep.h... $ECHO_C" >&6
+if test "${ac_cv_header_stringprep_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_header_stringprep_h" >&5
+echo "${ECHO_T}$ac_cv_header_stringprep_h" >&6
+else
+  # Is the header compilable?
+echo "$as_me:$LINENO: checking stringprep.h usability" >&5
+echo $ECHO_N "checking stringprep.h usability... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+$ac_includes_default
+#include <stringprep.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_header_compiler=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_header_compiler=no
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
+echo "${ECHO_T}$ac_header_compiler" >&6
+
+# Is the header present?
+echo "$as_me:$LINENO: checking stringprep.h presence" >&5
+echo $ECHO_N "checking stringprep.h presence... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <stringprep.h>
+_ACEOF
+if { (eval echo "$as_me:$LINENO: \"$ac_cpp conftest.$ac_ext\"") >&5
+  (eval $ac_cpp conftest.$ac_ext) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } >/dev/null; then
+  if test -s conftest.err; then
+    ac_cpp_err=$ac_c_preproc_warn_flag
+    ac_cpp_err=$ac_cpp_err$ac_c_werror_flag
+  else
+    ac_cpp_err=
+  fi
+else
+  ac_cpp_err=yes
+fi
+if test -z "$ac_cpp_err"; then
+  ac_header_preproc=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+  ac_header_preproc=no
+fi
+rm -f conftest.err conftest.$ac_ext
+echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
+echo "${ECHO_T}$ac_header_preproc" >&6
+
+# So?  What about this header?
+case $ac_header_compiler:$ac_header_preproc:$ac_c_preproc_warn_flag in
+  yes:no: )
+    { echo "$as_me:$LINENO: WARNING: stringprep.h: accepted by the compiler, rejected by the preprocessor!" >&5
+echo "$as_me: WARNING: stringprep.h: accepted by the compiler, rejected by the preprocessor!" >&2;}
+    { echo "$as_me:$LINENO: WARNING: stringprep.h: proceeding with the compiler's result" >&5
+echo "$as_me: WARNING: stringprep.h: proceeding with the compiler's result" >&2;}
+    ac_header_preproc=yes
+    ;;
+  no:yes:* )
+    { echo "$as_me:$LINENO: WARNING: stringprep.h: present but cannot be compiled" >&5
+echo "$as_me: WARNING: stringprep.h: present but cannot be compiled" >&2;}
+    { echo "$as_me:$LINENO: WARNING: stringprep.h:     check for missing prerequisite headers?" >&5
+echo "$as_me: WARNING: stringprep.h:     check for missing prerequisite headers?" >&2;}
+    { echo "$as_me:$LINENO: WARNING: stringprep.h: see the Autoconf documentation" >&5
+echo "$as_me: WARNING: stringprep.h: see the Autoconf documentation" >&2;}
+    { echo "$as_me:$LINENO: WARNING: stringprep.h:     section \"Present But Cannot Be Compiled\"" >&5
+echo "$as_me: WARNING: stringprep.h:     section \"Present But Cannot Be Compiled\"" >&2;}
+    { echo "$as_me:$LINENO: WARNING: stringprep.h: proceeding with the preprocessor's result" >&5
+echo "$as_me: WARNING: stringprep.h: proceeding with the preprocessor's result" >&2;}
+    { echo "$as_me:$LINENO: WARNING: stringprep.h: in the future, the compiler will take precedence" >&5
+echo "$as_me: WARNING: stringprep.h: in the future, the compiler will take precedence" >&2;}
+    (
+      cat <<\_ASBOX
+## ------------------------------------------ ##
+## Report this to the AC_PACKAGE_NAME lists.  ##
+## ------------------------------------------ ##
+_ASBOX
+    ) |
+      sed "s/^/$as_me: WARNING:     /" >&2
+    ;;
+esac
+echo "$as_me:$LINENO: checking for stringprep.h" >&5
+echo $ECHO_N "checking for stringprep.h... $ECHO_C" >&6
+if test "${ac_cv_header_stringprep_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_cv_header_stringprep_h=$ac_header_preproc
+fi
+echo "$as_me:$LINENO: result: $ac_cv_header_stringprep_h" >&5
+echo "${ECHO_T}$ac_cv_header_stringprep_h" >&6
+
+fi
+if test $ac_cv_header_stringprep_h = yes; then
+  lp_cv_has_idn=yes
+else
+  lp_cv_has_idn=no
+fi
+
+
+echo "$as_me:$LINENO: checking for stringprep_check_version in -lidn" >&5
+echo $ECHO_N "checking for stringprep_check_version in -lidn... $ECHO_C" >&6
+if test "${ac_cv_lib_idn_stringprep_check_version+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lidn  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+/* Override any gcc2 internal prototype to avoid an error.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+/* We use char because int might match the return type of a gcc2
+   builtin and then its argument prototype would still apply.  */
+char stringprep_check_version ();
+int
+main ()
+{
+stringprep_check_version ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_idn_stringprep_check_version=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_idn_stringprep_check_version=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_idn_stringprep_check_version" >&5
+echo "${ECHO_T}$ac_cv_lib_idn_stringprep_check_version" >&6
+if test $ac_cv_lib_idn_stringprep_check_version = yes; then
+  lp_cv_has_idn=yes LIBS="${LIBS} -lidn"
+else
+  lp_cv_has_idn=no
+fi
+
+if test "x$lp_cv_has_idn" = "xyes"; then
+
+cat >>confdefs.h <<\_ACEOF
+#define HAS_IDN 1
+_ACEOF
+
+fi
+
 # --- mySQL ---
 
 # Note: Some compilers don't have /usr/local/include in their standard
@@ -13137,7 +13530,7 @@ fi
     fi
   fi
 
-  if test $enable_use_pgsql = yes; then
+  if test "x$enable_use_pgsql" = "xyes"; then
       # Some systems need additional libraries
       savelibs="$LIBS"
       LIBS="$LIBS $PKGLIBS"
@@ -13399,6 +13792,544 @@ else
 fi
       cdef_use_pgsql="#undef"
       enable_use_pgsql=no
+  fi
+fi
+
+# --- SQLite3 ---
+
+# Note: Some compilers don't have /usr/local/include in their standard
+# searchpath.
+
+echo "$as_me:$LINENO: checking for SQLite3" >&5
+echo $ECHO_N "checking for SQLite3... $ECHO_C" >&6
+if test "${lp_cv_has_sqlite3+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  for TESTPATH in "" "$sqlite_path" "$sqlite_path/include" "/usr/local/include" ; do
+    saveflags="$CFLAGS"
+    if test "x$TESTPATH" != "x"; then
+        CFLAGS="$saveflags -I$TESTPATH"
+    fi
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+#include <sqlite3.h>
+
+sqlite3 * foo(void)
+{
+
+    return (sqlite3*)0;
+}
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_has_sqlite3=yes
+if test "x$TESTPATH" != "x"; then
+    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+fi
+break;
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+lp_cv_has_sqlite3=no
+CFLAGS="$saveflags"
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+done
+
+fi
+echo "$as_me:$LINENO: result: $lp_cv_has_sqlite3" >&5
+echo "${ECHO_T}$lp_cv_has_sqlite3" >&6
+
+# The system has the include files - now search for the libraries.
+if test $lp_cv_has_sqlite3 = yes; then
+  saveflags="$CFLAGS"
+  cat >>confdefs.h <<\_ACEOF
+#define HAS_SQLITE3 1
+_ACEOF
+
+
+  if test $enable_use_sqlite = yes; then
+    tmp=""
+
+    echo "$as_me:$LINENO: checking for main in -lsqlite3" >&5
+echo $ECHO_N "checking for main in -lsqlite3... $ECHO_C" >&6
+if test "${ac_cv_lib_sqlite3_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsqlite3  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_sqlite3_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_sqlite3_main=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_sqlite3_main" >&5
+echo "${ECHO_T}$ac_cv_lib_sqlite3_main" >&6
+if test $ac_cv_lib_sqlite3_main = yes; then
+  tmp="$PKGLIBS -lsqlite3"
+fi
+
+
+    if test "x$sqlite_path" == "x"; then
+        unset ac_cv_lib_sqlite3_main
+        if test -d "${sqlite_path}/lib/sqlite"; then
+            CFLAGS="$saveflags -L${sqlite_path}/lib/sqlite"
+            echo "$as_me:$LINENO: checking for main in -lsqlite3" >&5
+echo $ECHO_N "checking for main in -lsqlite3... $ECHO_C" >&6
+if test "${ac_cv_lib_sqlite3_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsqlite3  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_sqlite3_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_sqlite3_main=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_sqlite3_main" >&5
+echo "${ECHO_T}$ac_cv_lib_sqlite3_main" >&6
+if test $ac_cv_lib_sqlite3_main = yes; then
+  tmp="$PKGLIBS -L${sqlite_path}/lib/sqlite -lsqlite3"
+fi
+
+        elif test -d "${sqlite_path}/lib"; then
+            CFLAGS="$saveflags -L${sqlite_path}/lib"
+            echo "$as_me:$LINENO: checking for main in -lsqlite3" >&5
+echo $ECHO_N "checking for main in -lsqlite3... $ECHO_C" >&6
+if test "${ac_cv_lib_sqlite3_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsqlite3  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_sqlite3_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_sqlite3_main=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_sqlite3_main" >&5
+echo "${ECHO_T}$ac_cv_lib_sqlite3_main" >&6
+if test $ac_cv_lib_sqlite3_main = yes; then
+  tmp="$PKGLIBS -L${sqlite_path}/lib -lsqlite3"
+fi
+
+        elif test -d "${sqlite_patch}"; then
+            CFLAGS="$saveflags -L$sqlite_path"
+            echo "$as_me:$LINENO: checking for main in -lsqlite3" >&5
+echo $ECHO_N "checking for main in -lsqlite3... $ECHO_C" >&6
+if test "${ac_cv_lib_sqlite3_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsqlite3  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_sqlite3_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_sqlite3_main=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_sqlite3_main" >&5
+echo "${ECHO_T}$ac_cv_lib_sqlite3_main" >&6
+if test $ac_cv_lib_sqlite3_main = yes; then
+  tmp="$PKGLIBS -L$sqlite_path -lsqlite3"
+fi
+
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        unset ac_cv_lib_sqlite3_main
+        if test -d "/usr/local/lib"; then
+            CFLAGS="$saveflags -L/usr/local/pgsql/lib"
+            echo "$as_me:$LINENO: checking for main in -lsqlite3" >&5
+echo $ECHO_N "checking for main in -lsqlite3... $ECHO_C" >&6
+if test "${ac_cv_lib_sqlite3_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsqlite3  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_sqlite3_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_sqlite3_main=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_sqlite3_main" >&5
+echo "${ECHO_T}$ac_cv_lib_sqlite3_main" >&6
+if test $ac_cv_lib_sqlite3_main = yes; then
+  tmp="$PKGLIBS -L/usr/local/lib -lsqlite3"
+fi
+
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        echo "libsqlite3 library not found - disabling SQLite support"
+        if test "x$not_available" = "x"; then
+    not_available="use-sqlite"
+else
+    not_available="$not_available, use-sqlite"
+fi
+        cdef_use_sqlite="#undef"
+        enable_use_sqlite="no"
+        sqlite=
+        lp_cv_has_sqlite="no"
+    else
+        PKGLIBS="$tmp"
+    fi
+  fi
+
+  if test "x$enable_use_sqlite" = "xyes"; then
+      savelibs="$LIBS"
+      LIBS="$LIBS $PKGLIBS"
+
+      # Check if it uses pthreads
+
+      echo "$as_me:$LINENO: checking for pthread_create in -lsqlite3" >&5
+echo $ECHO_N "checking for pthread_create in -lsqlite3... $ECHO_C" >&6
+if test "${ac_cv_lib_sqlite3_pthread_create+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsqlite3  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+/* Override any gcc2 internal prototype to avoid an error.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+/* We use char because int might match the return type of a gcc2
+   builtin and then its argument prototype would still apply.  */
+char pthread_create ();
+int
+main ()
+{
+pthread_create ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_sqlite3_pthread_create=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_sqlite3_pthread_create=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_sqlite3_pthread_create" >&5
+echo "${ECHO_T}$ac_cv_lib_sqlite3_pthread_create" >&6
+if test $ac_cv_lib_sqlite3_pthread_create = yes; then
+  lp_cv_sqlite3_uses_pthreads=yes
+else
+  lp_cv_sqlite3_uses_pthreads=no
+
+fi
+
+
+      if test $lp_cv_sqlite3_uses_pthreads = yes ; then
+           cat >>confdefs.h <<\_ACEOF
+#define SQLITE3_USES_PTHREADS 1
+_ACEOF
+
+      fi
+
+      LIBS="$savelibs"
+  fi
+
+  CFLAGS="$saveflags"
+else
+  if test $enable_use_sqlite = yes; then
+      if test "x$not_available" = "x"; then
+    not_available="use-sqlite"
+else
+    not_available="$not_available, use-sqlite"
+fi
+      cdef_use_sqlite="#undef"
+      enable_use_sqlite=no
   fi
 fi
 
@@ -14804,7 +15735,7 @@ for TESTFLAG in -qmaxmem=97204; do
     fi
   fi
 done
-for TESTFLAG in -g -fstrength-reduce -fno-force-mem -fno-force-addr -fomit-default-branch; do
+for TESTFLAG in -g -fstrength-reduce -fno-force-addr -fomit-default-branch; do
   if eval $tcomp; then
     OPTFLAGS="$OPTFLAGS $TESTFLAG"
     CFLAGS="$CFLAGS $TESTFLAG"
@@ -15204,6 +16135,7 @@ fi
 val_malloc="$with_malloc"
 
 fi
+
 
 
 
@@ -15986,6 +16918,7 @@ s,@cdef_use_system_crypt@,$cdef_use_system_crypt,;t t
 s,@cdef_use_ipv6@,$cdef_use_ipv6,;t t
 s,@cdef_use_mysql@,$cdef_use_mysql,;t t
 s,@cdef_use_pgsql@,$cdef_use_pgsql,;t t
+s,@cdef_use_sqlite@,$cdef_use_sqlite,;t t
 s,@cdef_use_pthreads@,$cdef_use_pthreads,;t t
 s,@cdef_use_alists@,$cdef_use_alists,;t t
 s,@cdef_use_mccp@,$cdef_use_mccp,;t t

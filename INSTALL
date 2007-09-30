@@ -31,6 +31,9 @@ Unix or Unix-like system
                         defaults to ${PREFIX}/bin .
     --libdir=DIR:     the directory where the mudlib is found,
                         defaults to ${PREFIX}/lib .
+    --includedir=DIR: the directory where driver's LPC include files
+                        are supposed to live.
+                        defaults to ${PREFIX}/include (which is usually wrong).
     --libexecdir=DIR: the directory where the programs for the ERQ are found,
                         defaults to ${PREFIX}/libexec .
 
@@ -67,10 +70,12 @@ Unix or Unix-like system
 
   The compilation is done using make. Following targets are implemented:
 
-    <none>:        compile the driver, named 'ldmud'.
-    install:       compile the driver and install it in ${bindir}
-    utils:         compile the utilities, especially the ERQ demon
-    install-utils: compile and install the utilities in ${bindir}
+    <none>:          compile the driver, named 'ldmud'.
+    install:         compile the driver and install it in ${bindir}
+    utils:           compile the utilities, especially the ERQ demon
+    install-utils:   compile and install the utilities in ${bindir}
+    install-headers: install the driver header files in ${includedir}.
+    install-all:     compile and install everything.
 
   To actually run a mud, you need a mudlib. The driver comes with the
   source of the old 2.4.5 mudlib in mud/lp-245/, support for other mudlibs

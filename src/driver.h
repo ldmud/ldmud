@@ -46,6 +46,18 @@
 #  define GC_SUPPORT 1
 #endif
 
+/* Do some of the selected packages require special treatment? */
+
+/* SQLite in the threadsafe mode needs a normal malloc() */
+#if defined(SBRK_OK) && defined(USE_SQLITE)
+#  undef SBRK_OK
+#endif
+
+/* PTHREADS need a normal malloc() */
+#if defined(SBRK_OK) && (defined(USE_PTHREADS) || defined(SQLITE3_USES_PTHREADS))
+#  undef SBRK_OK
+#endif
+
 /* When we have allocation tracing, the allocator annotates every
  * allocation with the source filename and line where the allocation
  * occured. To allow the annotation of the allocations of higher structures
@@ -125,7 +137,7 @@
 /* TODO: this ctype-stuff might go into lex.h (impl in efun_defs.c) */
 #define _MCTe 0x01 /* escaped character in save/restore object. */
 #define _MCTd 0x02 /* numeric digit                */
-
+#define _MCTt 0x04 /* delimiters in save/restore object. */
 
 #define _MCTs 0x10 /* whitespace EXCLUDING '\n'        */
 
@@ -133,6 +145,7 @@
 #define _MCTa 0x80 /* alphanumeric or '_'         */
 extern unsigned char _my_ctype[];
 #define isescaped(c) (_my_ctype[(unsigned char)(c)]&_MCTe)
+#define issavedel(c) (_my_ctype[(unsigned char)(c)]&_MCTt)
 #define isalunum( c) (_my_ctype[(unsigned char)(c)]&_MCTa)
 #define lexdigit( c) (_my_ctype[(unsigned char)(c)]&_MCTd)
 

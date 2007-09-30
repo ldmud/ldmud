@@ -10,15 +10,16 @@ version_time=$(echo "\$Date$" | sed -e 's/[$]Date: \([0-9]*-[0-9]*-[0-9]*\) \([0
 # The checkin revision
 version_revision=$(echo "\$Revision$" | sed -e 's/[$]Revision: \([0-9][0-9]*\) *\$/\1/')
 
-# The version type: dev, stable, maint release
+# The version type: dev, stable, maintenance, release
 version_type="stable"
+version_longtype="development"
 
 # A timestamp, to be used by bumpversion and other scripts.
 # It can be used, for example, to 'touch' this file on every build, thus
 # forcing revision control systems to add it on every checkin automatically.
-version_stamp="Sun Mar 12 14:49:59 MST 2006"
+version_stamp="2007-09-30 00:57:49"
 
 # The version number information
-version_micro=1
+version_micro=2
 version_minor=4
 version_major=3

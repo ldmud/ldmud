@@ -788,18 +788,24 @@ cleanup_all_objects (void)
     return;
 #else
     cleanup_t      * context = NULL;
-#ifdef LOG_NEW_CLEANUP
+#ifdef LOG_NEW_CLEANUP_ALL
     struct timeval   t_begin, t_end;
-#endif /* LOG_NEW_CLEANUP */
+#endif /* LOG_NEW_CLEANUP_ALL */
     long             numObjects = 0;
     unsigned long    numValues = 0;
 
-#ifdef LOG_NEW_CLEANUP
+#ifdef LOG_NEW_CLEANUP_ALL
     if (gettimeofday(&t_begin, NULL))
     {
         t_begin.tv_sec = t_begin.tv_usec = 0;
     }
-#endif /* LOG_NEW_CLEANUP */
+    debug_message("%s Data-Clean: All Objects\n"
+                 , time_stamp()
+                 );
+    printf("%s Data-Clean: All Objects\n"
+          , time_stamp()
+          );
+#endif /* LOG_NEW_CLEANUP_ALL */
 
     context = cleanup_new(MY_TRUE);
     if (context != NULL)
@@ -825,7 +831,7 @@ cleanup_all_objects (void)
         cleanup_free(context);
     }
 
-#ifdef LOG_NEW_CLEANUP
+#ifdef LOG_NEW_CLEANUP_ALL
     if (t_begin.tv_sec == 0
      || gettimeofday(&t_end, NULL))
     {
@@ -853,7 +859,7 @@ cleanup_all_objects (void)
               , numValues
               );
     }
-#endif /* LOG_NEW_CLEANUP */
+#endif /* LOG_NEW_CLEANUP_ALL */
 
 #endif /* NEW_CLEANUP */
 } /* cleanup_all_objects() */
@@ -1676,7 +1682,11 @@ gc_count_ref_in_closure (svalue_t *csvp)
 
             ob->ref++;
             if (type == CLOSURE_LFUN)
+            {
                 l->function.lfun.ob->ref++;
+                if(l->function.lfun.inhProg)
+                    mark_program_ref(l->function.lfun.inhProg);
+            }
         }
     }
 
@@ -1773,7 +1783,12 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
         clear_object_ref(l->ob);
 
     if (type == CLOSURE_LFUN)
+    {
         clear_object_ref(l->function.lfun.ob);
+        if (l->function.lfun.inhProg)
+            clear_program_ref(l->function.lfun.inhProg, MY_TRUE);
+    }
+    
 #ifdef USE_NEW_INLINES
     if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
     {

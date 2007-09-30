@@ -646,8 +646,11 @@ struct inline_closure_s
     Bool parse_context;
       /* TRUE if the context variable definitions are parsed.
        */
-    int current_line;
-      /* Current line number, used to adjust the generated linenumbers.
+    int start_line;
+      /* Starting line number, used to adjust the generated linenumbers.
+       */
+    int end_line;
+      /* Ending line number, used to adjust the generated linenumbers.
        */
 
     /* --- Saved Globals --- */
@@ -871,10 +874,6 @@ static int current_struct;
    */
 #endif /* USE_STRUCTS */
 
-static fulltype_t current_type;
-  /* The current basic type (reference not counted).
-   */
-
 static p_uint last_expression;
   /* If >= 0, the address of the last instruction which by itself left
    * a value on the stack. If there is no such instruction, the value
@@ -987,6 +986,9 @@ static const fulltype_t Type_Ref_Number = { TYPE_NUMBER|TYPE_MOD_REFERENCE };
 /* Forward declarations */
 
 struct lvalue_s; /* Defined within YYSTYPE aka %union */
+
+static void define_local_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_star, struct lvalue_s *lv, Bool redeclare, Bool with_init);
+static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2);
 static Bool add_lvalue_code ( struct lvalue_s * lv, int instruction);
 static void insert_pop_value(void);
 static void arrange_protected_lvalue(p_int, int, p_int, int);
@@ -2887,8 +2889,8 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
         funp = FUNCTION(num);
 
-        if ((funp->flags & (NAME_INHERITED|TYPE_MOD_PRIVATE))
-         == (NAME_INHERITED|TYPE_MOD_PRIVATE))
+        if ((funp->flags & (NAME_INHERITED|TYPE_MOD_PRIVATE|NAME_HIDDEN|NAME_UNDEFINED))
+         == (NAME_INHERITED|TYPE_MOD_PRIVATE|NAME_HIDDEN))
         {
             break;
         }
@@ -3409,6 +3411,179 @@ verify_declared (ident_t *p)
 
     return r;
 } /* verify_declared() */
+
+/*-------------------------------------------------------------------------*/
+static int
+define_global_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_star, Bool with_init)
+
+/* This is called directly from a parser rule: <type> [*] <name>
+ * if with_init is true, then an initialization of this variable will follow.
+ * It creates the global variable and returns its index.
+ */
+
+{
+    int i;
+    
+    variables_defined = MY_TRUE;
+
+    if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                          | TYPE_MOD_PROTECTED)))
+    {
+        actual_type.typeflags |= default_varmod;
+    }
+
+    if (actual_type.typeflags & TYPE_MOD_VARARGS)
+    {
+        yyerror("can't declare a variable as varargs");
+            actual_type.typeflags &= ~TYPE_MOD_VARARGS;
+    }
+  
+    actual_type.typeflags |= opt_star;
+
+    if (!pragma_share_variables)
+        actual_type.typeflags |= VAR_INITIALIZED;
+
+    define_variable(name, actual_type);
+    i = verify_declared(name); /* Is the var declared? */
+
+    /* Initialize float values with 0.0. */
+    if (with_init
+       || (!(actual_type.typeflags & TYPE_MOD_POINTER)
+         && (actual_type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
+          ))
+    {
+
+        /* Prepare the init code */
+        transfer_init_control();
+
+        /* If this is the first variable initialization and
+         * pragma_share_variables is in effect, insert
+         * the check for blueprint/clone initialisation:
+         *    if (clonep(this_object())) return 1;
+         */
+        if (!variables_initialized && pragma_share_variables)
+        {
+            ins_f_code(F_THIS_OBJECT);
+            ins_f_code(F_CLONEP);
+            ins_f_code(F_BRANCH_WHEN_ZERO);
+            ins_byte(2);
+            ins_f_code(F_CONST1);
+            ins_f_code(F_RETURN);
+        }
+
+        /* Initialize floats with 0.0 */
+        if(!with_init)
+        {
+            PREPARE_INSERT(5)
+            /* Must come after the non-local program code inserts! */
+
+            add_f_code(F_FCONST0);
+
+#ifdef DEBUG
+            if (i & VIRTUAL_VAR_TAG)
+            {
+                /* When we want to allow 'late' initializers for
+                 * inherited variables, it must have a distinct syntax,
+                 * lest name clashs remain undetected, making LPC code
+                 * hard to debug.
+                 */
+                fatal("Newly declared variable is virtual\n");
+            }
+#endif
+            variables_initialized = MY_TRUE; /* We have __INIT code */
+            if (!pragma_share_variables)
+                VARIABLE(i)->type.typeflags |= VAR_INITIALIZED;
+
+            /* Push the variable reference and create the assignment */
+
+            if (i + num_virtual_variables > 0xff)
+            {
+                add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
+                add_short(i + num_virtual_variables);
+                CURRENT_PROGRAM_SIZE += 1;
+            }
+            else
+            {
+                add_f_code(F_PUSH_IDENTIFIER_LVALUE);
+                add_byte(i + num_virtual_variables);
+            }
+
+            /* Ok, assign */
+            add_f_code(F_VOID_ASSIGN);
+            CURRENT_PROGRAM_SIZE += 4;
+            add_new_init_jump();
+        } /* PREPARE_INSERT() block */
+    } /* if (float variable) */
+
+    return i;
+} /* define_global_variable() */
+
+/*-------------------------------------------------------------------------*/
+static void
+init_global_variable (int i, ident_t* name, fulltype_t actual_type
+                     , typeflags_t opt_star, int assign_op, fulltype_t exprtype)
+
+/* This is called directly from a parser rule: <type> [*] <name> = <expr>
+ * It will be called after the call to define_global_variable().
+ * It assigns the result of <expr> to the variable.
+ */
+
+{
+    PREPARE_INSERT(4)
+
+    if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                          | TYPE_MOD_PROTECTED)))
+    {
+        actual_type.typeflags |= default_varmod;
+    }
+
+    actual_type.typeflags |= opt_star;
+
+#ifdef DEBUG
+    if (i & VIRTUAL_VAR_TAG)
+    {
+        /* When we want to allow 'late' initializers for
+         * inherited variables, it must have a distinct syntax,
+         * lest name clashs remain undetected, making LPC code
+         * hard to debug.
+         */
+        fatal("Newly declared variable is virtual\n");
+    }
+#endif
+    variables_initialized = MY_TRUE; /* We have __INIT code */
+
+    /* Push the variable reference and create the assignment */
+
+    if (i + num_virtual_variables > 0xff)
+    {
+        add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
+        add_short(i + num_virtual_variables);
+        CURRENT_PROGRAM_SIZE += 1;
+    }
+    else
+    {
+        add_f_code(F_PUSH_IDENTIFIER_LVALUE);
+        add_byte(i + num_virtual_variables);
+    }
+
+    /* Only simple assigns are allowed */
+    if (assign_op != F_ASSIGN)
+       yyerror("Illegal initialization");
+
+    /* Do the types match? */
+    actual_type.typeflags &= TYPE_MOD_MASK;
+    if (!compatible_types(actual_type, exprtype, MY_TRUE))
+    {
+        yyerrorf("Type mismatch %s when initializing %s"
+                , get_two_types(actual_type, exprtype)
+                , get_txt(name->name));
+    }
+
+    /* Ok, assign */
+    add_f_code(F_VOID_ASSIGN);
+    CURRENT_PROGRAM_SIZE += 3;
+    add_new_init_jump();
+} /* init_global_variable() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -4569,7 +4744,8 @@ printf("DEBUG: new inline #%d: prev %d\n", INLINE_CLOSURE_COUNT, ict.prev);
 #endif
     ict.num_args = 0;
     ict.parse_context = MY_FALSE;
-    ict.current_line  = current_loc.line;
+    ict.start_line = stored_lines;
+    ict.end_line = stored_lines;
 
 #ifdef DEBUG_INLINES
 printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_PROGRAM_SIZE, block_depth, current_number_of_locals, max_number_of_locals, current_break_stack_need, max_break_stack_need);
@@ -4626,6 +4802,8 @@ finish_inline_closure (Bool bAbort)
 
 {
     mp_uint backup_start, start, length, end;
+    int offset;
+    
 #ifdef DEBUG_INLINES
 {
     mp_int index = current_inline - &(INLINE_CLOSURE(0));
@@ -4664,6 +4842,8 @@ printf("DEBUG:   move code forward: from %ld, length %ld, to %ld\n", start+lengt
                );
     }
     CURRENT_PROGRAM_SIZE -= length + (start - end);
+    stored_bytes -= length + (start - end);
+    
 #ifdef DEBUG_INLINES
 printf("DEBUG:   program size: %ld\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
@@ -4680,7 +4860,21 @@ printf("DEBUG:   move li data to %ld, from %ld length %ld\n", backup_start, star
         add_to_mem_block( A_INLINE_PROGRAM, LINENUMBER_BLOCK+start, length);
         current_inline->li_start = backup_start;
     }
-
+    
+    /* Skip the lines with the closure. */
+    offset = current_inline->end_line - current_inline->start_line;
+    while (offset > 0)
+    {
+        int lines;
+        
+        lines = offset;
+        if (lines > LI_MAXEMPTY)
+            lines = LI_MAXEMPTY;
+        offset -= lines;
+        LINENUMBER_BLOCK[start++] = (char)(256 - lines);
+        length--;
+    }
+    
     if (start + length < LINENUMBER_SIZE)
     {
 #ifdef DEBUG_INLINES
@@ -4754,19 +4948,22 @@ printf("DEBUG:   #%d: start %ld, length %ld, function %d: new start %ld\n", ix, 
         if (ict->length != 0)
         {
             CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
+
+            store_line_number_info();
+            if (stored_lines > ict->start_line)
+                store_line_number_backward(stored_lines - ict->start_line);
+
             FUNCTION(ict->function)->offset.pc = CURRENT_PROGRAM_SIZE + FUNCTION_PRE_HDR_SIZE;
             add_to_mem_block(A_PROGRAM, INLINE_PROGRAM_BLOCK(ict->start)
                             , ict->length);
-
-            store_line_number_info();
-            if (current_loc.line > ict->current_line)
-                store_line_number_backward(current_loc.line - ict->current_line);
 #ifdef DEBUG_INLINES
 printf("DEBUG:        li_start %ld, li_length %ld, new li_start %ld\n", ict->li_start, ict->li_length, LINENUMBER_SIZE);
 #endif /* DEBUG_INLINES */
 
             add_to_mem_block(A_LINENUMBERS, INLINE_PROGRAM_BLOCK(ict->li_start)
                             , ict->li_length);
+            stored_lines = ict->end_line;
+            stored_bytes += ict->length;
         }
     }
 
@@ -4865,6 +5062,8 @@ printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[bloc
 printf("DEBUG:   Function index: %d\n", current_inline->function);
 #endif /* DEBUG_INLINES */
 
+    store_line_number_info();
+
     /* A function with code: align the function and
      * make space for the function header.
      */
@@ -4874,8 +5073,10 @@ printf("DEBUG:   program size: %ld align to %ld\n", CURRENT_PROGRAM_SIZE, align(
 #endif /* DEBUG_INLINES */
     CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
     current_inline->start = CURRENT_PROGRAM_SIZE;
-    store_line_number_info();
     current_inline->li_start = LINENUMBER_SIZE;
+    current_inline->start_line = stored_lines;
+    stored_bytes = CURRENT_PROGRAM_SIZE; /* Ignore the alignment. */
+    
     if (realloc_a_program(FUNCTION_HDR_SIZE))
     {
         CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE;
@@ -4941,6 +5142,7 @@ printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[bloc
 
     store_line_number_info();
     current_inline->li_length = LINENUMBER_SIZE - li_start;
+    current_inline->end_line = stored_lines;
 
     /* Add the code to push the values of the inherited local
      * variables onto the stack, followed by the F_CONTEXT_CLOSURE
@@ -5455,6 +5657,7 @@ delete_prog_string (void)
 %type <fulltype>     type
 %type <fulltype>     opt_basic_type basic_type
 %type <fulltype>     non_void_type opt_basic_non_void_type basic_non_void_type
+%type <fulltype>     name_list local_name_list
 %type <inh_flags>    inheritance_qualifier inheritance_qualifiers
 %type <typeflags>    inheritance_modifier_list inheritance_modifier
 %ifdef USE_NEW_INLINES
@@ -5475,13 +5678,13 @@ delete_prog_string (void)
 %type <lrvalue>      parse_command
 %endif
 %type <lvalue>       lvalue name_lvalue local_name_lvalue foreach_var_lvalue
-%type <lvalue>       new_local_name
 %type <index>        index_range index_expr
 %type <case_label>   case_label
 %type <address>      optional_else
 %type <string>       anchestor
 %type <sh_string>    call_other_name identifier
 %ifdef USE_STRUCTS
+%type <fulltype>     member_name_list
 %type <struct_init_member> struct_init
 %type <struct_init_list>   opt_struct_init opt_struct_init2
 %type <sh_string>    struct_member_name
@@ -5622,10 +5825,8 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
 #endif /* USE_NEW_INLINES */
       }
 
-    | type name_list ';' /* Variable definition */
+    | name_list ';' /* Variable definition */
       {
-          if ($1.typeflags == 0)
-              yyerror("Missing type");
 #ifndef USE_NEW_INLINES
           if (first_inline_fun)
               insert_inline_fun_now = MY_TRUE;
@@ -5822,7 +6023,7 @@ inline_context_list:
 
 
 context_decl:
-      basic_type local_name_list
+      local_name_list
       { /* Empty action to void value from local_name_list */ }
 ; /* context_decl */
 
@@ -5938,31 +6139,42 @@ member_list:
 ; /* member_list */
 
 member:
-      basic_non_void_type member_name_list ';'
+      member_name_list ';'
       {
-          /* The member_name_list adds the struct members, using
-           * the value of current_type set by basic_non_void_type.
-           */
+          /* The member_name_list adds the struct members. */
       }
 ; /* member */
 
 member_name_list:
-      member_name
-    | member_name_list ',' member_name
-; /* member_name_list */
-
-member_name:
-      optional_star L_IDENTIFIER
+      basic_non_void_type optional_star L_IDENTIFIER
       {
+          fulltype_t actual_type = $1;
           vartype_t type;
-          current_type.typeflags |= $1;
-          assign_full_to_vartype(&type, current_type);
-          add_struct_member($2->name, type, NULL);
-          if ($2->type == I_TYPE_UNKNOWN)
-              free_shared_identifier($2);
+          
+          actual_type.typeflags |= $2;
+          
+          assign_full_to_vartype(&type, actual_type);
+          add_struct_member($3->name, type, NULL);
+          if ($3->type == I_TYPE_UNKNOWN)
+              free_shared_identifier($3);
+            
+          $$ = $1;
       }
-; /* member_name */
-
+    | member_name_list ',' optional_star L_IDENTIFIER
+      {
+          fulltype_t actual_type = $1;
+          vartype_t type;
+          
+          actual_type.typeflags |= $3;
+          
+          assign_full_to_vartype(&type, actual_type);
+          add_struct_member($4->name, type, NULL);
+          if ($4->type == I_TYPE_UNKNOWN)
+              free_shared_identifier($4);
+            
+          $$ = $1;
+      }
+; /* member_name_list */
 
 %endif /* USE_STRUCTS */
 
@@ -6378,14 +6590,12 @@ optional_star:
 type: type_modifier_list opt_basic_type
       {
           set_fulltype($$, $1 | $2.typeflags, $2.t_struct);
-          current_type = $$;
       } ;
 
 
 non_void_type: type_modifier_list opt_basic_non_void_type
       {
           set_fulltype($$, $1 | $2.typeflags, $2.t_struct);
-          current_type = $$;
       } ;
 
 
@@ -6416,15 +6626,15 @@ opt_basic_non_void_type:
 
 
 basic_non_void_type:
-      L_STATUS       { $$ = Type_Number; current_type = $$; }
-    | L_INT          { $$ = Type_Number;  current_type = $$; }
-    | L_STRING_DECL  { $$ = Type_String;  current_type = $$; }
-    | L_OBJECT       { $$ = Type_Object;  current_type = $$; }
-    | L_CLOSURE_DECL { $$ = Type_Closure; current_type = $$; }
-    | L_SYMBOL_DECL  { $$ = Type_Symbol;  current_type = $$; }
-    | L_FLOAT_DECL   { $$ = Type_Float;   current_type = $$; }
-    | L_MAPPING      { $$ = Type_Mapping; current_type = $$; }
-    | L_MIXED        { $$ = Type_Any;     current_type = $$; }
+      L_STATUS       { $$ = Type_Number;  }
+    | L_INT          { $$ = Type_Number;  }
+    | L_STRING_DECL  { $$ = Type_String;  }
+    | L_OBJECT       { $$ = Type_Object;  }
+    | L_CLOSURE_DECL { $$ = Type_Closure; }
+    | L_SYMBOL_DECL  { $$ = Type_Symbol;  }
+    | L_FLOAT_DECL   { $$ = Type_Float;   }
+    | L_MAPPING      { $$ = Type_Mapping; }
+    | L_MIXED        { $$ = Type_Any;     }
 %ifdef USE_STRUCTS
     | L_STRUCT identifier
       {
@@ -6443,7 +6653,6 @@ basic_non_void_type:
           }
 
           free_mstring($2);
-          current_type = $$;
       }
 %endif /* USE_STRUCTS */
 ; /* basic_non_void_type */
@@ -6451,7 +6660,7 @@ basic_non_void_type:
 
 basic_type:
       basic_non_void_type
-    | L_VOID         { $$ = Type_Void;    current_type = $$; }
+    | L_VOID         { $$ = Type_Void;    }
 ; /* basic_type */
 
 
@@ -6566,209 +6775,55 @@ new_arg_name:
 ; /* new_arg_name */
 
 
+
 name_list:
-      new_name
-    | name_list ',' new_name;
-
-
-new_name:
       /* Simple variable definition */
-      optional_star L_IDENTIFIER
+      type optional_star L_IDENTIFIER
       {
 %line
-          fulltype_t actual_type = current_type;
+          if ($1.typeflags == 0)
+              yyerror("Missing type");
 
-          variables_defined = MY_TRUE;
-
-          if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                              | TYPE_MOD_PROTECTED)))
-          {
-              actual_type.typeflags |= default_varmod;
-          }
-
-          if (actual_type.typeflags & TYPE_MOD_VARARGS)
-          {
-              yyerror("can't declare a variable as varargs");
-              actual_type.typeflags &= ~TYPE_MOD_VARARGS;
-          }
-
-          actual_type.typeflags |= $1;
-
-          if (!pragma_share_variables)
-              actual_type.typeflags |= VAR_INITIALIZED;
-
-          define_variable($2, actual_type);
-
-          if (!(actual_type.typeflags & TYPE_MOD_POINTER)
-           && (actual_type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
-             )
-          {
-              int i = verify_declared($2); /* Is the var declared? */
-
-              /* Prepare the init code */
-              transfer_init_control();
-
-              /* If this is the first variable initialization and
-               * pragma_share_variables is in effect, insert
-               * the check for blueprint/clone initialisation:
-               *    if (clonep(this_object())) return 1;
-               */
-              if (!variables_initialized && pragma_share_variables)
-              {
-                  ins_f_code(F_THIS_OBJECT);
-                  ins_f_code(F_CLONEP);
-                  ins_f_code(F_BRANCH_WHEN_ZERO);
-                  ins_byte(2);
-                  ins_f_code(F_CONST1);
-                  ins_f_code(F_RETURN);
-              }
-
-              {
-                  PREPARE_INSERT(5)
-                    /* Must come after the non-local program code inserts! */
-
-                  add_f_code(F_FCONST0);
-
-#ifdef DEBUG
-                  if (i & VIRTUAL_VAR_TAG)
-                  {
-                      /* When we want to allow 'late' initializers for
-                       * inherited variables, it must have a distinct syntax,
-                       * lest name clashs remain undetected, making LPC code
-                       * hard to debug.
-                       */
-                      fatal("Newly declared variable is virtual\n");
-                  }
-#endif
-                  variables_initialized = MY_TRUE; /* We have __INIT code */
-                  if (!pragma_share_variables)
-                      VARIABLE(i)->type.typeflags |= VAR_INITIALIZED;
-
-                  /* Push the variable reference and create the assignment */
-
-                  if (i + num_virtual_variables > 0xff)
-                  {
-                      add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
-                      add_short(i + num_virtual_variables);
-                      CURRENT_PROGRAM_SIZE += 1;
-                  }
-                  else
-                  {
-                      add_f_code(F_PUSH_IDENTIFIER_LVALUE);
-                      add_byte(i + num_virtual_variables);
-                  }
-
-                  /* Ok, assign */
-                  add_f_code(F_VOID_ASSIGN);
-                  CURRENT_PROGRAM_SIZE += 4;
-                  add_new_init_jump();
-              } /* PREPARE_INSERT() block */
-          } /* if (float variable) */
+          define_global_variable($3, $1, $2, MY_FALSE);
+          $$ = $1;
       }
 
     /* Variable definition with initialization */
 
-    | optional_star L_IDENTIFIER
+    | type optional_star L_IDENTIFIER
       {
-          fulltype_t actual_type = current_type;
+          if ($1.typeflags == 0)
+              yyerror("Missing type");
 
-          variables_defined = MY_TRUE;
-
-          if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                              | TYPE_MOD_PROTECTED)))
-          {
-              actual_type.typeflags |= default_varmod;
-          }
-
-          actual_type.typeflags |= $1;
-
-          define_variable($2, actual_type);
-          $<number>$ = verify_declared($2); /* Is the var declared? */
-
-          /* Prepare the init code */
-          transfer_init_control();
-
-          /* If this is the first variable initialization and
-           * pragma_share_variables is in effect, insert
-           * the check for blueprint/clone initialisation:
-           *    if (clonep(this_object())) return 1;
-           */
-          if (!variables_initialized && pragma_share_variables)
-          {
-              ins_f_code(F_THIS_OBJECT);
-              ins_f_code(F_CLONEP);
-              ins_f_code(F_BRANCH_WHEN_ZERO);
-              ins_byte(2);
-              ins_f_code(F_CONST1);
-              ins_f_code(F_RETURN);
-          }
+          $<number>$ = define_global_variable($3, $1, $2, MY_TRUE); 
       }
 
       L_ASSIGN expr0
-
       {
-          fulltype_t actual_type = current_type;
-          fulltype_t exprtype = $5.type;
-          int i = $<number>3;
-          PREPARE_INSERT(4)
-
-          if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                              | TYPE_MOD_PROTECTED)))
-          {
-              actual_type.typeflags |= default_varmod;
-          }
-
-          actual_type.typeflags |= $1;
-
-#ifdef DEBUG
-          if (i & VIRTUAL_VAR_TAG)
-          {
-              /* When we want to allow 'late' initializers for
-               * inherited variables, it must have a distinct syntax,
-               * lest name clashs remain undetected, making LPC code
-               * hard to debug.
-               */
-              fatal("Newly declared variable is virtual\n");
-          }
-#endif
-          variables_initialized = MY_TRUE; /* We have __INIT code */
-          if (!pragma_share_variables)
-              VARIABLE(i)->type.typeflags |= VAR_INITIALIZED;
-
-          /* Push the variable reference and create the assignment */
-
-          if (i + num_virtual_variables > 0xff)
-          {
-              add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
-              add_short(i + num_virtual_variables);
-              CURRENT_PROGRAM_SIZE += 1;
-          }
-          else
-          {
-              add_f_code(F_PUSH_IDENTIFIER_LVALUE);
-              add_byte(i + num_virtual_variables);
-          }
-
-          /* Only simple assigns are allowed */
-          if ($4 != F_ASSIGN)
-              yyerror("Illegal initialization");
-
-          /* Do the types match? */
-          actual_type.typeflags &= TYPE_MOD_MASK;
-          if (!compatible_types(actual_type, exprtype, MY_TRUE))
-          {
-              yyerrorf("Type mismatch %s when initializing %s"
-                      , get_two_types(actual_type, exprtype)
-                      , get_txt($2->name));
-          }
-
-          /* Ok, assign */
-          add_f_code(F_VOID_ASSIGN);
-          CURRENT_PROGRAM_SIZE += 3;
-          add_new_init_jump();
+          init_global_variable($<number>4, $3, $1, $2, $5, $6.type);
+          $$ = $1;
       }
 
-; /* new_name */
+    | name_list ',' optional_star L_IDENTIFIER
+      {
+          define_global_variable($4, $1, $3, MY_FALSE);
+          $$ = $1;
+      }
+
+    /* Variable definition with initialization */
+
+    | name_list ',' optional_star L_IDENTIFIER
+      {
+          $<number>$ = define_global_variable($4, $1, $3, MY_TRUE); 
+      }
+
+      L_ASSIGN expr0
+      {
+          init_global_variable($<number>5, $4, $1, $3, $6, $7.type);
+          $$ = $1;
+      }
+
+; /* name_list */
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6808,224 +6863,81 @@ block:
 
 statements:
       /* empty */
-    | statements basic_type local_name_list ';'
+    | statements local_name_list ';'
     | statements statement
 ;
 
 
 local_name_list:
-      new_local
-    | local_name_list ',' new_local
-;
-
-
-new_local:
-      new_local_name
+      basic_type optional_star L_IDENTIFIER
       {
-          /* If this is a float variable, we need to insert an appropriate
-           * initializer, as the default svalue-0 is not a valid float value.
-           */
-
-          Bool need_value = MY_FALSE;
-%line
-
-#ifdef USE_NEW_INLINES
-          /* When parsing context variables, the context_closure instruction
-           * expects a value on the stack. If we do a float initialization,
-           * we leave the 0.0 on the stack, otherwise we'll push a 0.
-           * For normal float locals, we'll create the bytecode to assign
-           * the float 0.
-           */
-          need_value = current_inline && current_inline->parse_context;
-#endif /* USE_NEW_INLINES */
-
-          if (!($1.type.typeflags & TYPE_MOD_POINTER)
-           && ($1.type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
-             )
-          {
-              ins_f_code(F_FCONST0);
-
-              if (!need_value)
-              {
-                  if (!add_lvalue_code(&$1, F_VOID_ASSIGN))
-                      YYACCEPT;
-              }
-              
-              need_value = MY_FALSE;
-          } /* if (float variable) */
-
-          if (need_value) /* If we still need a value... */
-          {
-              ins_number(0);
-          }
+          struct lvalue_s lv;
+          define_local_variable($3, $1, $2, &lv, MY_FALSE, MY_FALSE);
+          
+          $$ = $1;
       }
-
-    | new_local_name L_ASSIGN expr0
+    | basic_type optional_star L_LOCAL
       {
-          /* We got a "<name> = <expr>" type declaration. */
-
-          fulltype_t type2 = $3.type;
-
-%line
-#ifdef USE_NEW_INLINES
-#ifdef DEBUG_INLINES
-if (current_inline && current_inline->parse_context) printf("DEBUG: inline context decl: name = expr, program_size %d\n", CURRENT_PROGRAM_SIZE);
-#endif /* DEBUG_INLINES */
-#endif /* USE_NEW_INLINES */
-          type2.typeflags &= TYPEID_MASK;
-
-          /* Check the assignment for validity */
-          if (exact_types.typeflags && !compatible_types($1.type, type2, MY_TRUE))
-          {
-              yyerrorf("Bad assignment %s", get_two_types($1.type, type2));
-          }
-
-          if ($2 != F_ASSIGN)
-          {
-              yyerror("Only plain assignments allowed here");
-          }
-
-          if (type2.typeflags & TYPE_MOD_REFERENCE)
-              yyerror("Can't trace reference assignments");
-
-          /* If we're parsing a context variable, just leave the
-           * value on the stack for the context_closure instruction.
-           * For normal locals, add the bytecode to create the lvalue
-           * and do the assignment.
-           */
-#ifdef USE_NEW_INLINES
-          if (!current_inline || !current_inline->parse_context)
-#endif /* USE_NEW_INLINES */
-          {
-              if (!add_lvalue_code(&$1, F_VOID_ASSIGN))
-                  YYACCEPT;
-          } /* parsed context var */
+          struct lvalue_s lv;
+          define_local_variable($3, $1, $2, &lv, MY_TRUE, MY_FALSE);
+          
+          $$ = $1;
       }
-; /* new_local */
-
-new_local_name:
-      optional_star L_IDENTIFIER
+    | basic_type optional_star L_IDENTIFIER
       {
-          /* A new local variable */
-
-          block_scope_t *scope = block_scope + block_depth - 1;
-          ident_t *q;
-          fulltype_t actual_type = current_type;
-
-          actual_type.typeflags |= $1;
-
-#ifdef USE_NEW_INLINES
-          if (current_inline && current_inline->parse_context)
-          {
-#ifdef DEBUG_INLINES
-printf("DEBUG:   context name '%s'\n", get_txt($2->name));
-#endif /* DEBUG_INLINES */
-              q = add_context_name($2, actual_type, -1);
-              $$.u.simple[0] = F_PUSH_CONTEXT_LVALUE;
-              $$.u.simple[1] = q->u.local.context;
-          }
-          else
-          {
-              q = add_local_name($2, actual_type, block_depth);
-              if (use_local_scopes && scope->num_locals == 1)
-              {
-                  /* First definition of a local, so insert the
-                   * clear_locals bytecode and remember its position
-                   */
-                  scope->addr = mem_block[A_PROGRAM].current_size;
-                  ins_f_code(F_CLEAR_LOCALS);
-                  ins_byte(scope->first_local);
-                  ins_byte(0);
-              }
-
-              $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-              $$.u.simple[1] = q->u.local.num;
-          }
-#else /* USE_NEW_INLINES */
-          q = add_local_name($2, actual_type, block_depth, MY_FALSE);
-
-          if (use_local_scopes && scope->num_locals == 1)
-          {
-              /* First definition of a local, so insert the
-               * clear_locals bytecode and remember its position
-               */
-              scope->addr = mem_block[A_PROGRAM].current_size;
-              ins_f_code(F_CLEAR_LOCALS);
-              ins_byte(scope->first_local);
-              ins_byte(0);
-          }
-
-          $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-          $$.u.simple[1] = q->u.local.num;
-#endif /* USE_NEW_INLINES */
-          $$.length = 0;
-          $$.type = actual_type;
+          define_local_variable($3, $1, $2, &$<lvalue>$, MY_FALSE, MY_TRUE);
       }
-
-    | optional_star L_LOCAL
+      L_ASSIGN expr0
       {
-          /* A local name is redeclared. If this happens on a deeper
-           * level, it is even legal.
-           */
-
-          ident_t *q;
-          block_scope_t *scope = block_scope + block_depth - 1;
-          fulltype_t actual_type = current_type;
-
-          actual_type.typeflags |= $1;
-
-#ifdef USE_NEW_INLINES
-          if (current_inline && current_inline->parse_context)
-          {
-#ifdef DEBUG_INLINES
-printf("DEBUG:   context name '%s'\n", get_txt($2->name));
-#endif /* DEBUG_INLINES */
-              if (current_inline->block_depth+1 <= $2->u.local.depth)
-                 yyerrorf("Illegal to redeclare local name '%s'"
-                         , get_txt($2->name));
-
-              q = add_context_name($2, actual_type, -1);
-              $$.u.simple[0] = F_PUSH_CONTEXT_LVALUE;
-              $$.u.simple[1] = q->u.local.context;
-          }
-          else
-          {
-              q = redeclare_local($2, actual_type, block_depth);
-              if (use_local_scopes && scope->num_locals == 1)
-              {
-                  /* First definition of a local, so insert the
-                   * clear_locals bytecode and remember its position
-                   */
-                  scope->addr = mem_block[A_PROGRAM].current_size;
-                  ins_f_code(F_CLEAR_LOCALS);
-                  ins_byte(scope->first_local);
-                  ins_byte(0);
-              }
-
-              $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-              $$.u.simple[1] = q->u.local.num;
-          }
-#else /* USE_NEW_INLINES */
-          q = redeclare_local($2, actual_type, block_depth);
-
-          if (use_local_scopes && scope->num_locals == 1)
-          {
-              /* First definition of a local, so insert the
-               * clear_locals bytecode and remember its position
-               */
-              scope->addr = mem_block[A_PROGRAM].current_size;
-              ins_f_code(F_CLEAR_LOCALS);
-              ins_byte(scope->first_local);
-              ins_byte(0);
-          }
-
-          $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-          $$.u.simple[1] = q->u.local.num;
-#endif /* USE_NEW_INLINES */
-          $$.length = 0;
-          $$.type = actual_type;
+          init_local_variable($3, &$<lvalue>4, $5, $6.type);
+          
+          $$ = $1;
       }
-; /* new_local_name */
+    | basic_type optional_star L_LOCAL
+      {
+          define_local_variable($3, $1, $2, &$<lvalue>$, MY_TRUE, MY_TRUE);
+      }
+      L_ASSIGN expr0
+      {
+          init_local_variable($3, &$<lvalue>4, $5, $6.type);
+          
+          $$ = $1;
+      }
+    | local_name_list ',' optional_star L_IDENTIFIER
+      {
+          struct lvalue_s lv;
+          define_local_variable($4, $1, $3, &lv, MY_FALSE, MY_FALSE);
+          
+          $$ = $1;
+      }
+    | local_name_list ',' optional_star L_LOCAL
+      {
+          struct lvalue_s lv;
+          define_local_variable($4, $1, $3, &lv, MY_TRUE, MY_FALSE);
+          
+          $$ = $1;
+      }
+    | local_name_list ',' optional_star L_IDENTIFIER
+      {
+          define_local_variable($4, $1, $3, &$<lvalue>$, MY_FALSE, MY_TRUE);
+      }
+      L_ASSIGN expr0
+      {
+          init_local_variable($4, &$<lvalue>5, $6, $7.type);
+          
+          $$ = $1;
+      }
+    | local_name_list ',' optional_star L_LOCAL
+      {
+          define_local_variable($4, $1, $3, &$<lvalue>$, MY_TRUE, MY_TRUE);
+      }
+      L_ASSIGN expr0
+      {
+          init_local_variable($4, &$<lvalue>5, $6, $7.type);
+          
+          $$ = $1;
+      }
+; /* local_name_list */
 
 
 statement:
@@ -8651,6 +8563,14 @@ expr0:
                           ok = MY_TRUE;
                       }
                       break;
+                  default:
+                      if ((type1.typeflags & TYPE_MOD_POINTER)
+                       && type2.typeflags == TYPE_MAPPING
+                         )
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
                   }
                   break;
 
@@ -8989,7 +8909,13 @@ expr0:
               }
               else if ( (first_type.typeflags | second_type.typeflags) & TYPE_MOD_POINTER)
               {
-                  if (first_type.typeflags  == TYPE_NUMBER
+                  if ((first_type.typeflags & TYPE_MOD_POINTER)
+                   && second_type.typeflags == TYPE_MAPPING
+                     )
+                  {
+                      $$.type = first_type;
+                  }
+                  else if (first_type.typeflags  == TYPE_NUMBER
                    || second_type.typeflags == TYPE_NUMBER)
                   {
                       yyerrorf("Incompatible types for arguments to & %s"
@@ -11521,8 +11447,14 @@ name_lvalue:
 
 
 local_name_lvalue:
-      basic_type new_local_name
-       { $$ = $2; }
+      basic_type optional_star L_IDENTIFIER
+      {
+          define_local_variable($3, $1, $2, &$$, MY_FALSE, MY_TRUE);
+      }
+    | basic_type optional_star L_LOCAL
+      {
+          define_local_variable($3, $1, $2, &$$, MY_TRUE, MY_TRUE);
+      }
 ; /* local_name_lvalue */
 
 
@@ -12208,7 +12140,7 @@ function_call:
 
               $<function_call_head>$.simul_efun = real_name->u.global.sim_efun;
 
-              if (real_name->u.global.sim_efun & ~0xff)
+              if (real_name->u.global.sim_efun >= SEFUN_TABLE_SIZE)
               {
                   /* The simul-efun has to be called by name:
                    * prepare the extra args for the call_other
@@ -12267,7 +12199,7 @@ function_call:
               {
                   /* SIMUL EFUN */
 
-                  PREPARE_INSERT(5)
+                  PREPARE_INSERT(6)
 
                   function_t *funp;
 
@@ -12300,7 +12232,7 @@ function_call:
                    || has_ellipsis)
                       ap_needed = MY_TRUE;
 
-                  if (simul_efun & ~0xff)
+                  if (simul_efun >= SEFUN_TABLE_SIZE)
                   {
                       /* call-other: the number of arguments will be
                        * corrected at runtime.
@@ -12319,8 +12251,8 @@ function_call:
                           CURRENT_PROGRAM_SIZE++;
                       }
                       add_f_code(F_SIMUL_EFUN);
-                      add_byte(simul_efun);
-                      CURRENT_PROGRAM_SIZE += 2;
+                      add_short(simul_efun);
+                      CURRENT_PROGRAM_SIZE += 3;
                   }
                   $$.type = funp->type;
                   $$.type.typeflags &= TYPE_MOD_MASK;
@@ -12812,7 +12744,7 @@ function_call:
 
           if (!disable_sefuns
            && call_other_sefun >= 0
-           && call_other_sefun & ~0xff)
+           && call_other_sefun >= SEFUN_TABLE_SIZE)
           {
               /* The simul-efun has to be called by name:
                * insert the extra args for the call_other
@@ -12917,7 +12849,7 @@ function_call:
                   yyerrorf("Too many arguments to simul_efun %s"
                           , get_txt(funp->name));
 
-              if (call_other_sefun & ~0xff)
+              if (call_other_sefun >= SEFUN_TABLE_SIZE)
               {
                   /* call-other: the number of arguments will be
                    * detected and corrected at runtime.
@@ -12968,8 +12900,8 @@ function_call:
                       CURRENT_PROGRAM_SIZE++;
                   }
                   add_f_code(F_SIMUL_EFUN);
-                  add_byte(call_other_sefun);
-                  CURRENT_PROGRAM_SIZE += 2;
+                  add_short(call_other_sefun);
+                  CURRENT_PROGRAM_SIZE += 3;
               }
               $$.type = funp->type;
               $$.type.typeflags &= TYPE_MOD_MASK;
@@ -13825,6 +13757,178 @@ lvalue_list:
 /*=========================================================================*/
 
 /*-------------------------------------------------------------------------*/
+static void
+define_local_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_star, struct lvalue_s *lv, Bool redeclare, Bool with_init)
+
+/* This is called directly from a parser rule: <type> [*] <name>
+ * if with_init is true, then an initialization of this variable will follow.
+ * if redeclare is true, then a local name is redeclared.
+ * It creates the local variable and returns the corresponding lvalue
+ * in lv.
+ */
+
+{
+    /* redeclare:
+     *    MY_FALSE: A new local variable
+     *    MY_TRUE:  A local name is redeclared. If this happens
+     *              on a deeper level, it is even legal.
+     */
+
+    block_scope_t *scope = block_scope + block_depth - 1;
+    ident_t *q;
+
+    actual_type.typeflags |= opt_star;
+
+#ifdef USE_NEW_INLINES
+    if (current_inline && current_inline->parse_context)
+    {
+#ifdef DEBUG_INLINES
+printf("DEBUG:   context name '%s'\n", get_txt(name->name));
+#endif /* DEBUG_INLINES */
+
+        if (redeclare && current_inline->block_depth+1 <= name->u.local.depth)
+            yyerrorf("Illegal to redeclare local name '%s'"
+                , get_txt(name->name));
+
+        q = add_context_name(name, actual_type, -1);
+        lv->u.simple[0] = F_PUSH_CONTEXT_LVALUE;
+        lv->u.simple[1] = q->u.local.context;
+    }
+    else
+    {
+        if(redeclare)
+            q = redeclare_local(name, actual_type, block_depth);
+        else
+            q = add_local_name(name, actual_type, block_depth);
+        if (use_local_scopes && scope->num_locals == 1)
+        {
+            /* First definition of a local, so insert the
+             * clear_locals bytecode and remember its position
+             */
+            scope->addr = mem_block[A_PROGRAM].current_size;
+            ins_f_code(F_CLEAR_LOCALS);
+            ins_byte(scope->first_local);
+            ins_byte(0);
+        }
+
+        lv->u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
+        lv->u.simple[1] = q->u.local.num;
+    }
+#else /* USE_NEW_INLINES */
+    if (redeclare)
+        q = redeclare_local(name, actual_type, block_depth);
+    else
+        q = add_local_name(name, actual_type, block_depth, MY_FALSE);
+
+    if (use_local_scopes && scope->num_locals == 1)
+    {
+        /* First definition of a local, so insert the
+         * clear_locals bytecode and remember its position
+         */
+        scope->addr = mem_block[A_PROGRAM].current_size;
+        ins_f_code(F_CLEAR_LOCALS);
+        ins_byte(scope->first_local);
+        ins_byte(0);
+    }
+
+    lv->u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
+    lv->u.simple[1] = q->u.local.num;
+#endif /* USE_NEW_INLINES */
+    lv->length = 0;
+    lv->type = actual_type;
+
+    if (!with_init)
+    {
+        /* If this is a float variable, we need to insert an appropriate
+         * initializer, as the default svalue-0 is not a valid float value.
+         */
+
+        Bool need_value = MY_FALSE;
+%line
+
+#ifdef USE_NEW_INLINES
+        /* When parsing context variables, the context_closure instruction
+         * expects a value on the stack. If we do a float initialization,
+         * we leave the 0.0 on the stack, otherwise we'll push a 0.
+         * For normal float locals, we'll create the bytecode to assign
+         * the float 0.
+         */
+        need_value = current_inline && current_inline->parse_context;
+#endif /* USE_NEW_INLINES */
+
+        if (!(actual_type.typeflags & TYPE_MOD_POINTER)
+         && (actual_type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
+          )
+        {
+            ins_f_code(F_FCONST0);
+
+            if (!need_value)
+            {
+                if (!add_lvalue_code(lv, F_VOID_ASSIGN))
+                    return;
+            }
+              
+            need_value = MY_FALSE;
+        } /* if (float variable) */
+
+        if (need_value) /* If we still need a value... */
+        {
+            ins_number(0);
+        }
+    }
+} /* define_local_variable() */
+
+/*-------------------------------------------------------------------------*/
+static void
+init_local_variable ( ident_t* name, struct lvalue_s *lv, int assign_op
+                    , fulltype_t type2)
+
+/* This is called directly from a parser rule: <type> [*] <name> = <expr>
+ * It will be called after the call to define_local_variable().
+ * It assigns the result of <expr> to the variable.
+ */
+
+{
+    /* We got a "<name> = <expr>" type declaration. */
+
+%line
+#ifdef USE_NEW_INLINES
+#ifdef DEBUG_INLINES
+if (current_inline && current_inline->parse_context) printf("DEBUG: inline context decl: name = expr, program_size %d\n", CURRENT_PROGRAM_SIZE);
+#endif /* DEBUG_INLINES */
+#endif /* USE_NEW_INLINES */
+    
+    type2.typeflags &= TYPEID_MASK;
+
+    /* Check the assignment for validity */
+    if (exact_types.typeflags && !compatible_types(lv->type, type2, MY_TRUE))
+    {
+        yyerrorf("Bad assignment %s", get_two_types(lv->type, type2));
+    }
+
+    if (assign_op != F_ASSIGN)
+    {
+        yyerror("Only plain assignments allowed here");
+    }
+
+    if (type2.typeflags & TYPE_MOD_REFERENCE)
+        yyerror("Can't trace reference assignments");
+
+    /* If we're parsing a context variable, just leave the
+     * value on the stack for the context_closure instruction.
+     * For normal locals, add the bytecode to create the lvalue
+     * and do the assignment.
+     */
+#ifdef USE_NEW_INLINES
+    if (!current_inline || !current_inline->parse_context)
+#endif /* USE_NEW_INLINES */
+    {
+        if (!add_lvalue_code(lv, F_VOID_ASSIGN))
+            return;
+    } /* parsed context var */
+} /* init_local_variable() */
+
+/*-------------------------------------------------------------------------*/
 static Bool
 add_lvalue_code ( struct lvalue_s * lv, int instruction)
 
@@ -14647,15 +14751,19 @@ cross_define (function_t *from, function_t *to, int32 offset)
 
 /*-------------------------------------------------------------------------*/
 static funflag_t *
-get_function_id (program_t *progp, int fx)
+get_virtual_function_id (program_t *progp, int fx)
 
-/* Return a pointer to the function flags of function <fx> in <progp>.
+/* Return a pointer to the flags of the first entry of function <fx> in <progp>
+ * that is inherited virtual (i.e. the first entry we encounter that doesn't have
+ * TYPE_MOD_VIRTUAL).
+ *
  * This function takes care of resolving cross-definitions and inherits
  * to the real function flag.
  */
 
 {
     funflag_t flags;
+    funflag_t *last;
 
     flags = progp->functions[fx];
 
@@ -14665,9 +14773,12 @@ get_function_id (program_t *progp, int fx)
         fx += CROSSDEF_NAME_OFFSET(flags);
         flags = progp->functions[fx];
     }
+    
+    /* This one is inherited virtual. We wont get called otherwise. */
+    last = &progp->functions[fx];
 
     /* Walk the inherit chain */
-    while(flags & NAME_INHERITED)
+    while((flags & (NAME_INHERITED|TYPE_MOD_VIRTUAL)) == (NAME_INHERITED|TYPE_MOD_VIRTUAL))
     {
         inherit_t *inheritp;
 
@@ -14679,7 +14790,7 @@ get_function_id (program_t *progp, int fx)
 
     /* This is the one */
     return &progp->functions[fx];
-} /* get_function_id() */
+} /* get_virtual_function_id() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef USE_STRUCTS
@@ -14875,27 +14986,11 @@ copy_functions (program_t *from, funflag_t type)
          */
         switch (0) {
         default:
-            /* Test if the function is visible at all.
-             * For this test, 'private nomask' degenerates to 'private'
-             * if we didn't do that, the driver would crash on a second
-             * level inherit (possible on a multiple second-level inherit).
-             * TODO: Find out why it crashes.
+            /* Ignore cross defines.
+             * They are the only complete invisible entries.
              */
-            {
-                funflag_t fflags = fun.flags;
-
-                if ((fflags & (TYPE_MOD_PRIVATE|TYPE_MOD_NO_MASK))
-                 == (TYPE_MOD_PRIVATE|TYPE_MOD_NO_MASK)
-                   )
-                    fflags &= ~(TYPE_MOD_NO_MASK);
-
-                if ( (fflags & (NAME_HIDDEN|TYPE_MOD_NO_MASK|NAME_UNDEFINED) ) ==
-
-                     (NAME_HIDDEN|TYPE_MOD_NO_MASK) )
-                {
-                    break;
-                }
-            }
+            if (fun.flags & NAME_CROSS_DEFINED)
+                break;
 
             /* Visible: create a new identifier for it */
             p = make_global_identifier(get_txt(fun.name), I_TYPE_GLOBAL);
@@ -14952,123 +15047,100 @@ copy_functions (program_t *from, funflag_t type)
                                         , current_func_index - n );
                             p->u.global.function = current_func_index;
                         }
+                        else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN|NAME_UNDEFINED))
+                                    == (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
+                        {
+                            /* There is already one function with this
+                            * name. Ignore the private one, as we
+                            * only need it for useful error messages.
+                            */
+
+                            break;
+                        }
+                        else if ( (OldFunction->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN|NAME_UNDEFINED))
+                                     == (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
+                        {
+                            /* The old one was invisible, ignore it
+                             * and take this one.
+                             */
+
+                            p->u.global.function = current_func_index;
+                        }
                         else if ((fun.flags | type) & TYPE_MOD_VIRTUAL
                               && OldFunction->flags & TYPE_MOD_VIRTUAL
-                          && !((fun.flags | OldFunction->flags) & NAME_HIDDEN)
-                          &&    get_function_id(from, i)
-  == get_function_id(INHERIT(OldFunction->offset.inherit).prog
+                          &&    get_virtual_function_id(from, i)
+  == get_virtual_function_id(INHERIT(OldFunction->offset.inherit).prog
                 , n - INHERIT(OldFunction->offset.inherit).function_index_offset
                      )
                                  )
                         {
-                            /* Entries denote the same function. We have to use
+                            /* Entries denote the same function and both
+                             * entries are visible. We have to use
                              * cross_define nonetheless, to get consistant
-                             * redefinition (and we prefer the first one)
+                             * redefinition (and to avoid the nomask
+                             * checking that comes next), and we prefer
+                             * the first one.
+                             *
+                             * It is important, that both entries are
+                             * indeed visible, because otherwise invisible
+                             * (i.e. private) functions would be made
+                             * visible again by another visible occurrence
+                             * of the same function. The originally invisible
+                             * occurrence would then be subject to
+                             * redefinition and nomask checking.
                              */
                             OldFunction->flags |= fun.flags &
                                 (TYPE_MOD_PUBLIC|TYPE_MOD_NO_MASK);
-                            OldFunction->flags &= fun.flags | ~TYPE_MOD_STATIC;
+                            OldFunction->flags &= fun.flags |
+				~(TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|NAME_HIDDEN);
                             cross_define( OldFunction, &fun
                                         , n - current_func_index );
                         }
                         else if ( (fun.flags & OldFunction->flags & TYPE_MOD_NO_MASK)
-                             &&  !( (fun.flags|OldFunction->flags) & (TYPE_MOD_PRIVATE|NAME_UNDEFINED) ) )
+                             &&  !( (fun.flags|OldFunction->flags) & NAME_UNDEFINED ) )
                         {
                             yyerrorf(
                               "Illegal to inherit 'nomask' function '%s' twice",
                               get_txt(fun.name));
                         }
                         else if ((   fun.flags & TYPE_MOD_NO_MASK
-                                  || OldFunction->flags & (NAME_HIDDEN|NAME_UNDEFINED|TYPE_MOD_PRIVATE))
-                              && !(fun.flags & (NAME_HIDDEN|NAME_UNDEFINED))
+                                  || OldFunction->flags & NAME_UNDEFINED )
+                              && !(fun.flags & NAME_UNDEFINED)
                                 )
                         {
                             /* This function is visible and existing, but the
                              * inherited one is not, or this one is also nomask:
                              * prefer this one one.
                              */
-                            if (OldFunction->flags & TYPE_MOD_PRIVATE)
-                            {
-                                string_t * oldFrom = NULL;
-
-                                if (OldFunction->flags & NAME_INHERITED)
-                                {
-                                    oldFrom = INHERIT(OldFunction->offset.inherit).prog->name;
-                                }
-
-                                warn_function_shadow( from->name, fun.name
-                                                    , oldFrom, OldFunction->name
-                                                    );
-                            }
-
                             cross_define( &fun, OldFunction
                                         , current_func_index - n );
                             p->u.global.function = current_func_index;
                         }
-                        else if ( (fun.flags & TYPE_MOD_PRIVATE) == 0
-                              ||  (OldFunction->flags & TYPE_MOD_PRIVATE) == 0
-                              ||  ((OldFunction->flags|fun.flags)
-                                   & TYPE_MOD_VIRTUAL) != 0
-                                )
+                        else
                         {
                             /* At least one of the functions is visible
                              * or redefinable: prefer the first one.
-                             * TODO: The whole if-condition is more a kludge,
-                             * TODO:: developed iteratively from .367
-                             * TODO:: through .370. It should be reconsidered,
-                             * TODO:: which of course implies a deeper
-                             * TODO:: analysis of the going-ons here.
                              */
-
-                            /* Warn about private <-> public collisions;
-                             * however public <-> public and private <->
-                             * private are to be expected.
-                             */
-                            string_t * oldFrom = NULL;
-
-                            if (OldFunction->flags & NAME_INHERITED)
-                            {
-                                oldFrom = INHERIT(OldFunction->offset.inherit).prog->name;
-                            }
-
-                            if ((fun.flags & TYPE_MOD_PRIVATE)
-                             && !(OldFunction->flags & TYPE_MOD_PRIVATE))
-                            {
-                                warn_function_shadow( oldFrom, OldFunction->name
-                                                    , from->name, fun.name
-                                                    );
-                            }
-                            else if (!(fun.flags & TYPE_MOD_PRIVATE)
-                                  && (OldFunction->flags & TYPE_MOD_PRIVATE)
-                                )
-                            {
-                                warn_function_shadow( from->name, fun.name
-                                                    , oldFrom, OldFunction->name
-                                                    );
-                            }
 
                             cross_define( OldFunction, &fun
                                         , n - current_func_index );
                         }
                     } /* if (n < first_func_index) */
-                    else if ( !(fun.flags & NAME_CROSS_DEFINED) )
+                    else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN|NAME_UNDEFINED)) 
+                                != (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
                     {
                         /* This is the dominant definition in the superclass,
                          * inherit this one.
                          */
 #ifdef DEBUG
-                        /* The definition we picked before should be
-                         * cross-defined to the definition we have now; or
-                         * it should be nominally invisible so we can redefine
-                         * it.
+                        /* The definition we picked before can't be
+                         * cross-defined, because cross-defines won't
+                         * be registered as global identifiers.
+                         * So the previous definition should be
+                         * nominally invisible so we can redefine it.
                          */
-                        if ((   !(FUNCTION(n)->flags & NAME_CROSS_DEFINED)
-                             ||   FUNCTION(n)->offset.func
-                                != MAKE_CROSSDEF_OFFSET(((int32)current_func_index) - n)
-                            )
-                         && ((FUNCTION(n)->flags & TYPE_MOD_PRIVATE) == 0
-                            )
-                           )
+                        if ( (FUNCTION(n)->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN|NAME_UNDEFINED))
+                                != (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
                         {
                             fatal(
                               "Inconsistent definition of %s() within "
@@ -15083,7 +15155,8 @@ copy_functions (program_t *from, funflag_t type)
 
                 /* Handle the non-lfun aspects of the identifier */
                 {
-                    if ((n != I_GLOBAL_FUNCTION_OTHER || p->u.global.efun < 0)
+                    if (n != I_GLOBAL_FUNCTION_OTHER
+                     || (p->u.global.efun < 0 && p->u.global.sim_efun < 0)
                      || (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
                      || (fun.flags & (NAME_UNDEFINED)) != 0
                        )
@@ -15288,7 +15361,7 @@ copy_variables (program_t *from, funflag_t type)
                 inherit_t inherit, *inheritp2;
                 int k, inherit_index;
                 funflag_t *flagp;
-                function_t *funp, *funp2;
+                function_t *funp;
 
                 if (variables_initialized)
                     yyerror("illegal to inherit virtually after "
@@ -15329,8 +15402,8 @@ copy_variables (program_t *from, funflag_t type)
                 else
                     inherit.inherit_type |= INHERIT_TYPE_DUPLICATE;
 
-                inherit_index = (mem_block[A_INHERITS].current_size - j) /
-                   sizeof(inherit_t) - 1;
+                inherit_index = (mem_block[A_INHERITS].current_size) /
+                   sizeof(inherit_t);
                 inherit.function_index_offset += fun_index_offset;
                 add_to_mem_block(A_INHERITS, (char *)&inherit, sizeof inherit);
                   /* If a function is directly inherited from a program that
@@ -15342,21 +15415,15 @@ copy_variables (program_t *from, funflag_t type)
                    */
 
                 /* Update the offset.inherit in all these functions to point
-                 * to the first (virtual) inherit of the program.
+                 * to the new inherit_t structure. (But only, if it wasn't
+                 * already cross-defined to something else.)
                  */
                 flagp = from->functions + inheritp->function_index_offset;
                 funp = (function_t *)mem_block[A_FUNCTIONS].block +
                     inherit.function_index_offset;
-                funp2 = (function_t *)mem_block[A_FUNCTIONS].block +
-                    inheritp2->function_index_offset;
-                    /* Usually funp2 == funp, but if the program is inherited
-                     * virtually several times with differing visibilities,
-                     * the two pointers differ.
-                     */
-                for (k = inherit.prog->num_functions; --k >= 0; funp++, funp2++)
+                for (k = inherit.prog->num_functions; --k >= 0; funp++)
                 {
                     if ( !(funp->flags & NAME_CROSS_DEFINED)
-                     &&  !(funp2->flags & NAME_CROSS_DEFINED)
                      && (*flagp & (NAME_INHERITED|NAME_CROSS_DEFINED)) ==
                            NAME_INHERITED
                      && (*flagp & INHERIT_MASK) == inheritc )
@@ -15542,6 +15609,19 @@ store_line_number_info (void)
 
     /* Use up the excessive amounts of lines */
     stored_lines++;
+
+    while (stored_lines > current_loc.line)
+    {
+        int lines;
+
+        lines = stored_lines - current_loc.line;
+        if (lines > 256)
+            lines = 256;
+        stored_lines -= lines;
+        byte_to_mem_block(A_LINENUMBERS, LI_BACK);
+        byte_to_mem_block(A_LINENUMBERS, lines-1);
+    }
+    
     while (stored_lines < current_loc.line)
     {
         int lines;

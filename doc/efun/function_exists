@@ -24,8 +24,16 @@ DESCRIPTION
           Return the line number within the source file.
 
         <flags> == FEXISTS_ALL (3):
-          Return an array with all the above information. The above
-          flag values are the indices into that array.
+          Return an array with all the above information, plus information
+          about the function type/flags/number of arguments.
+          
+          The returned array contains this information:
+            string [FEXISTS_PROGNAME]: the program name
+            string [FEXISTS_FILENAME]: the filename
+            int    [FEXISTS_LINENO]:   the linenumber
+            int    [FEXISTS_NUMARG]:   the number of arguments to the function
+            int    [FEXISTS_TYPE]:     the return type of the function
+            int    [FEXISTS_FLAGS]:    the function flags
 
         The <flags> value can be or-ed to NAME_HIDDEN to return
         information about static and protected functions in other objects.
@@ -41,6 +49,8 @@ EXAMPLES
 HISTORY
         LDMud 3.2.10 broadened the range of returned values and introduced
           the <flags> argument.
+        LDMud 3.2.12/3.3.713 added the function type/flags/number of arguments
+          to the result of FEXISTS_ALL.
 
 SEE ALSO
         call_other(E), call_resolved(E), functionlist(E), variable_exists(E)

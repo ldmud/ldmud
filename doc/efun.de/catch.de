@@ -33,7 +33,16 @@ BESCHREIBUNG
                         von __CATCH_EVAL_COST__ verwendet wird. Das Minimum
                         ist 2 * __MASTER_EVAL_COST__ .
 
-        Catch ist nicht im eigentlichen Sinne eine Efun, sondern eine Compiler
+        catch() an sich ist nicht besonders laufzeit-intensiv: es braucht
+        nur etwas mehr Zeit als ein Intra-Objekt Funktionsaufruf.
+        
+        throw() ist ebenfalls nicht sehr teuer, da lediglich einige
+        interne Strukturen aufgeraeumt werden muessen.
+
+        Echte Laufzeitfehlers (ob nun mit oder ohne catch()) auf
+        der anderen Seite ist sehr zeitintensiv.
+
+        catch ist nicht im eigentlichen Sinne eine Efun, sondern eine Compiler
         Anweisung.
 
 BEISPIEL

@@ -333,7 +333,7 @@ void shout(string s)
 }
 
 //---------------------------------------------------------------------------
-protected void set_living_name(string name)
+void set_living_name(string name)
 {
     string old;
     mixed a;

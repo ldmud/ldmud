@@ -239,7 +239,6 @@ with_swap_file=LP_SWAP.3
 
 enable_use_ipv6=no
 
-
 # Enable the use of pthreads for background socket IO.
 
 enable_use_pthreads=no
@@ -282,7 +281,7 @@ enable_malloc_trace=no
 enable_malloc_lpc_trace=no, MALLOC_slaballoc
 
 # Define this to log all calls to esbrk() (the system memory allocator).
-# Works best if MALLOC_TRACE, or also MALLOC_LPC_TRACE, are defined.
+# Works best if MALLOC_TRACE is defined.
 # This define is useful if your mud keeps growing in total memory size
 # instead of re-using the memory already allocated.
 # Supported by: MALLOC_smalloc, MALLOC_slaballoc
@@ -387,6 +386,21 @@ enable_use_mysql=no
 
 enable_use_pgsql=no
 
+# Enable support for SQLite-3 (assuming your system supports it).
+#
+#  'no'  : SQLite-3 support is not compiled in
+#  'yes' : SQLite-3 support is compiled in, the libmysqlclient is expected
+#          in the normal library search path.
+#  <path>: SQLite-3 support is compiled in, <path> is added to the link paths
+#          and should be the path to libpq, 
+#          e.g. enable_use_sqlite=/usr/local/sqlite .
+#          The include files are searched in /usr/local/sqlite/include,
+#          /usr/local/include, <path>, and <path>/include.
+#          The libraries are searched in the default path, <path>/lib/sqlite,
+#          <path>/lib, <path>, /usr/local/sqlite/lib, in this order.
+
+enable_use_sqlite=no
+
 # Enable support for MCCP (Mud Control Compression Protocol).
 
 enable_use_mccp=no
@@ -442,7 +456,7 @@ with_set_buffer_size_max=65536
 # error can still be caught and handled.
 # To catch an evalcost-too-big in an object that called (recursive)
 # master functions, CATCH_RESERVED_COST should be greater than
-# MASTER_RESERVED_COST * 2.
+# MASTER_RESERVED_COST.
 
 with_catch_reserved_cost=2000
 

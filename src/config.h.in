@@ -268,7 +268,7 @@
 @cdef_malloc_lpc_trace@ MALLOC_LPC_TRACE
 
 /* Define this to log all calls to esbrk() (the system memory allocator).
- * Works best if MALLOC_TRACE, or also MALLOC_LPC_TRACE, are defined.
+ * Works best if MALLOC_TRACE is defined.
  * This define is useful if your mud keeps growing in total memory size
  * instead of re-using the memory already allocated.
  * Supported by: MALLOC_smalloc, MALLOC_slaballoc.
@@ -348,6 +348,11 @@
  */
 @cdef_use_pgsql@ USE_PGSQL
 
+/* Define this if you want SQLite support (assuming that your host
+ * actually offers this.
+ */
+@cdef_use_sqlite@ USE_SQLITE
+
 /* Define this if you want alist support.
  */
 @cdef_use_alists@ USE_ALISTS
@@ -382,8 +387,7 @@
  *
  * To catch an eval_cost too big error in an object that called recursive
  * master functions, CATCH_RESERVED_COST should be greater than
- * MASTER_RESERVED_COST * 2.
- * TODO: Check that at runtime.
+ * MASTER_RESERVED_COST.
  */
 #define CATCH_RESERVED_COST       @val_catch_reserved_cost@
 
@@ -558,11 +562,17 @@
  */
 #define NEW_CLEANUP
 
-/* Log the details of the automatic data cleanup. This is useful
- * if the cleanup is suspected to hog the CPU.
+/* Log the details of the automatic data cleanup for each individual object.
+ * This is useful if the cleanup is suspected to hog the CPU.
  * TODO: Remove this macro once it is proven stable.
  */
 #undef LOG_NEW_CLEANUP
+
+/* Log the details of the automatic data cleanup of all objects. This is
+ * useful if the cleanup is suspected to hog the CPU.
+ * TODO: Remove this macro once it is proven stable.
+ */
+#define LOG_NEW_CLEANUP_ALL
 
 /* Enable the use of freelists in the malloc AVL nodes.
  * Supported by: MALLOC_smalloc, MALLOC_slaballoc.

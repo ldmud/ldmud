@@ -129,7 +129,7 @@ VARINIT         "__INIT"
     /* Master lfuns */
 
 ABS_PATH        "make_path_absolute"
-COMP_OBJ        "compile_object"
+COMPILE_OBJECT  "compile_object"
 CONNECT         "connect"
 DANGLING_LFUN   "dangling_lfun_closure"
 DISCONNECT      "disconnect"
@@ -228,6 +228,10 @@ PGCONNECT	"pgconnect"
 PG_RESET_FAILED "Reset failed, connection aborted."
 SUCCESS         "success"
 
+#endif
+
+#ifdef USE_SQLITE
+SQLITE_OPEN     "sl_open"
 #endif
 
 /***************************************************************************/

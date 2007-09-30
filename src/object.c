@@ -42,6 +42,7 @@
  *       sentence_t    * sent;
  *       wiz_list_t    * user;
  *       wiz_list_t    * eff_user;
+ *       Bool            open_sqlite_db (ifdef USE_SQLITE)
  *       int             extra_num_variables;  (ifdef DEBUG)
  *       svalue_t      * variables;
  *       unsigned long   ticks, gigaticks;
@@ -426,6 +427,9 @@ static mp_int last_id = 0;
 #ifdef DEBUG
     ob->extra_num_variables = num_var;
 #endif
+#ifdef USE_SQLITE
+    ob->open_sqlite_db = MY_FALSE;
+#endif
     ob->variables = ob_vars;
 
     ob->time_cleanup = current_time + ((time_to_cleanup > 0) ? time_to_cleanup
@@ -723,6 +727,8 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
 static string_t *
 function_exists (string_t *fun, object_t *ob, Bool show_hidden
                 , string_t ** prog_name, uint32 * prog_line
+                , int * num_arg,  uint32 * fun_flags
+                , vartype_t * fun_type
                 )
 
 /* Search for the function <fun> in the object <ob>. If existing, return
@@ -731,6 +737,9 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
  * If <prog_name> and <prog_line> are both non-NULL, they are set to
  * the name of the program _file_ and the line where the function is found.
  * The program file name will have one reference added.
+ *
+ * *<num_arg>, *<fun_flags>,  *<fun_type> are set to the number of
+ * arguments, the function flags and the function return type respectively.
  *
  * Visibility rules apply: static and protected functions can't be
  * found from the outside unless <show_hidden> is true.
@@ -747,6 +756,10 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
     if (ob->flags & O_DESTRUCTED)
         fatal("function_exists() on destructed object\n");
 #endif
+
+    memset(fun_type, 0, sizeof(*fun_type));
+    *num_arg = 0;
+    *fun_flags = 0;
 
     if (prog_name)
         *prog_name = NULL;
@@ -768,6 +781,7 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
 
     /* Is it visible for the caller? */
     flags = progp->functions[ix];
+    *fun_flags = (flags & ~INHERIT_MASK);
 
     if (!show_hidden
      && (   flags & TYPE_MOD_PRIVATE
@@ -788,9 +802,14 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
 
     funstart = progp->program  + (flags & FUNSTART_MASK);
 
+    /* Set the additional information */
+    *num_arg = FUNCTION_NUM_ARGS(funstart) & 0x7f;
+    memcpy(fun_type, FUNCTION_TYPEP(funstart), sizeof(*fun_type));
+
     /* And after all this, the function may be undefined */
     if (is_undef_function(funstart))
     {
+        *fun_flags |= NAME_UNDEFINED;
         return NULL;
     }
 
@@ -885,6 +904,31 @@ reset_object (object_t *ob, int arg)
     /* Object is reset now */
     ob->flags |= O_RESET_STATE;
 } /* reset_object() */
+
+/*-------------------------------------------------------------------------*/
+void
+logon_object (object_t *ob)
+
+/* Call the logon() lfun in the object <ob>.
+ *
+ * current_object is temporarily set to <ob> in order to allow logon()
+ * to be static (security measure). Doing so is harmless as there is no
+ * previous_object to consider.
+ */
+
+{
+    svalue_t *ret;
+    object_t *save = current_object;
+
+    current_object = ob;
+    ret = apply(STR_LOGON, ob, 0);
+    if (ret == 0)
+    {
+        errorf("Could not find %s() on the player %s\n", get_txt(STR_LOGON), get_txt(ob->name));
+        /* NOTREACHED */
+    }
+    current_object = save;
+} /* logon_object() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1437,8 +1481,16 @@ v_function_exists (svalue_t *sp, int num_arg)
  *   Return the line number within the source file.
  *
  * <flags> == FEXISTS_ALL (3):
- *   Return an array with all the above information. The above
- *   flag values are the indices into that array.
+ *   Return an array with all the above information, plus information
+ *   about the function type/flags/number of arguments.
+ *
+ *   The returned array contains this information:
+ *     string [FEXISTS_PROGNAME]: the program name
+ *     string [FEXISTS_FILENAME]: the filename
+ *     int    [FEXISTS_LINENO]:   the linenumber
+ *     int    [FEXISTS_NUMARG]:   the number of arguments to the function
+ *     int    [FEXISTS_TYPE]:     the return type of the function
+ *     int    [FEXISTS_FLAGS]:    the function flags
  *
  * The <flags> value can be or-ed to NAME_HIDDEN to return
  * information about static and protected functions in other objects.
@@ -1454,6 +1506,10 @@ v_function_exists (svalue_t *sp, int num_arg)
     uint32 flags;
     svalue_t *argp;
     object_t *ob;
+
+    uint32    fun_flags;
+    int       fun_num_arg;
+    vartype_t fun_type;
 
     /* Evaluate arguments */
     argp = sp - num_arg + 1;
@@ -1528,7 +1584,8 @@ v_function_exists (svalue_t *sp, int num_arg)
     /* Get the information */
     prog_name = NULL;
     str = function_exists(argp->u.str, ob, (flags & NAME_HIDDEN)
-                         , &prog_name, &prog_line);
+                         , &prog_name, &prog_line
+                         , &fun_num_arg, &fun_flags, &fun_type);
     sp = pop_n_elems(num_arg, sp);
 
     if (str)
@@ -1545,7 +1602,7 @@ v_function_exists (svalue_t *sp, int num_arg)
             {
                 errorf("Out of memory\n");
             }
-            vec = allocate_uninit_array(FEXISTS_LINENO+1);
+            vec = allocate_uninit_array(FEXISTS_FLAGS+1);
             put_string(vec->item+FEXISTS_PROGNAME, res);
             if (prog_name)
             {
@@ -1559,6 +1616,10 @@ v_function_exists (svalue_t *sp, int num_arg)
             else
                 put_number(vec->item+FEXISTS_FILENAME, 0);
             put_number(vec->item+FEXISTS_LINENO, prog_line);
+
+            put_number(vec->item+FEXISTS_NUMARG, fun_num_arg);
+            put_number(vec->item+FEXISTS_TYPE, fun_type.type);
+            put_number(vec->item+FEXISTS_FLAGS, (p_int)fun_flags);
 
             push_array(sp, vec);
             break;
@@ -4291,78 +4352,48 @@ f_move_object (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-object_present_in (string_t *str, object_t *ob, Bool hasNumber, p_int num)
+object_present_in (string_t *str, object_t *ob, p_int num, p_int * num_matched)
 
 /* <ob> is the first object in an environment: test all the objects there
  * if they match the id <str>.
  * If <hasNumber> is false, <str> may be of the form "<id> <num>" - then the
  * <num>th object with this <id> is returned, it it is found.
  * If <hasNumber> is true, the <num>th object with the given id is returned.
+ *
+ * If the object is not found, *<num_matched> (if not NULL) is set to the
+ * number of objects which did match the id.
  */
 
 {
     svalue_t *ret;
     p_int count = 0; /* return the <count+1>th object */
-    int   length;
-    char *p, *item;
-    string_t *sitem;
 
-    length = mstrsize(str);
-    item = get_txt(str);
+    if (num_matched)
+        *num_matched = 0;
 
-    if (!hasNumber)
-    {
-        /* Check if there is a number in the string.
-         * If yes parse it, and use the remainder as 'the' id string.
-         */
-        p = item + length - 1;
-        if (*p >= '0' && *p <= '9')
-        {
-            while(p > item && *p >= '0' && *p <= '9')
-                p--;
-
-            if (p > item && *p == ' ')
-            {
-                count = atoi(p+1) - 1;
-                length = p - item;
-            }
-        }
-    }
-    else
-        count = num-1;
-
-    if ((size_t)length != mstrsize(str))
-    {
-        memsafe(sitem = new_n_mstring(item, length), length, "id string");
-    }
-    else
-        sitem = ref_mstring(str);
-
-    push_string(inter_sp, sitem); /* free on error */
+    count = num-1;
 
     /* Now look for the object */
     for (; ob; ob = ob->next_inv)
     {
-        push_ref_string(inter_sp, sitem);
+        push_ref_string(inter_sp, str);
         ret = sapply(STR_ID, ob, 1);
         if (ob->flags & O_DESTRUCTED)
         {
-            free_mstring(sitem);
-            inter_sp--;
             return NULL;
         }
 
         if (ret == NULL || (ret->type == T_NUMBER && ret->u.number == 0))
             continue;
 
+        if (num_matched)
+            (*num_matched)++;
+
         if (count-- > 0)
             continue;
-        free_mstring(sitem);
-        inter_sp--;
+
         return ob;
     }
-    free_mstring(sitem);
-    inter_sp--;
 
     /* Not found */
     return NULL;
@@ -4370,17 +4401,21 @@ object_present_in (string_t *str, object_t *ob, Bool hasNumber, p_int num)
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-e_object_present (svalue_t *v, object_t *ob, Bool hasNumber, p_int num)
+e_object_present (svalue_t *v, object_t *ob, p_int num)
 
 /* Implementation of the efun present().
  *
- * Look for an object matching <v> in <ob> and return it if found.
+ * Look for the <num>th object matching <v> in <ob> and return it if found.
  */
 
 {
     svalue_t *ret;
     object_t *ret_ob;
+    p_int num_matched = 0;
     Bool specific = MY_FALSE;
+
+    if (num <= 0)
+        num = 1;
 
     /* Search where? */
     if (!ob)
@@ -4409,7 +4444,7 @@ e_object_present (svalue_t *v, object_t *ob, Bool hasNumber, p_int num)
     }
 
     /* Always search in the object's inventory */
-    ret_ob = object_present_in(v->u.str, ob->contains, hasNumber, num);
+    ret_ob = object_present_in(v->u.str, ob->contains, num, &num_matched);
     if (ret_ob)
         return ret_ob;
 
@@ -4428,7 +4463,8 @@ e_object_present (svalue_t *v, object_t *ob, Bool hasNumber, p_int num)
             return ob->super;
 
         /* No, search the other objects here. */
-        return object_present_in(v->u.str, ob->super->contains, hasNumber, num);
+        if (num_matched < num)
+            return object_present_in(v->u.str, ob->super->contains, num - num_matched, NULL);
     }
 
     /* Not found */
@@ -4464,7 +4500,7 @@ v_present (svalue_t *sp, int num_arg)
 {
     svalue_t *arg;
     object_t *ob;
-    p_int num = 0;
+    p_int num = 1;
     Bool hasNumber = MY_FALSE;
 
     arg = sp - num_arg + 1;
@@ -4499,8 +4535,45 @@ v_present (svalue_t *sp, int num_arg)
         num_arg--;
     }
 
+    /* If the string is in the form "<id> <number>" and no explicit
+     * number was given, parse the <number> out of the string.
+     */
+    if (!hasNumber && arg->type == T_STRING)
+    {
+        int   length;
+        char *p, *item;
+
+        length = mstrsize(arg->u.str);
+        item = get_txt(arg->u.str);
+
+        p = item + length - 1;
+        if (*p >= '0' && *p <= '9')
+        {
+            while(p > item && *p >= '0' && *p <= '9')
+                p--;
+
+            if (p > item && *p == ' ')
+            {
+                num = atoi(p+1);
+                length = p - item;
+                hasNumber = MY_TRUE;
+            }
+        }
+
+        /* If we found a number, replace the "<id> <number>" string on
+         * the stack with just "<id>".
+         */
+        if (hasNumber)
+        {
+            string_t * sitem;
+            memsafe(sitem = new_n_mstring(item, length), length, "id string");
+            free_mstring(arg->u.str);
+            arg->u.str = sitem;
+        }
+    }
+
     inter_sp = sp;
-    ob = e_object_present(arg, ob, hasNumber, num);
+    ob = e_object_present(arg, ob, num);
 
     free_svalue(arg);
     if (ob)
@@ -5853,7 +5926,6 @@ save_closure (svalue_t *cl, Bool writable)
             program_t      *prog;
             program_t      *inhProg = 0;
             int             ix;
-            unsigned short  inhIndex;
             funflag_t       flags;
             string_t       *function_name;
             char           *source, c;
@@ -5862,19 +5934,25 @@ save_closure (svalue_t *cl, Bool writable)
             l = cl->u.lambda;
             ob = l->function.lfun.ob;
             ix = l->function.lfun.index;
-            inhIndex = l->function.lfun.inhIndex;
+            inhProg = l->function.lfun.inhProg;
 
             prog = ob->prog;
 
-            if (inhIndex)
+            if (inhProg)
             {
-                inherit_t *inheritp;
+                /* An inherited lfun closure. Go to the inherit. */
+                while (prog != inhProg)
+                {
+                    inherit_t *inheritp;
 
-                inheritp = &prog->inherit[inhIndex-1];
-                inhProg = prog = inheritp->prog;
+                    SEARCH_FUNCTION_INHERIT(inheritp, prog, ix);
+                    ix -= inheritp->function_index_offset;
+                    prog = inheritp->prog;
+                }
             }
 
             flags = prog->functions[ix];
+            
             while (flags & NAME_INHERITED)
             {
                 inherit_t *inheritp;
@@ -5912,17 +5990,35 @@ save_closure (svalue_t *cl, Bool writable)
                 L_PUTC_EPILOG
             }
 
-            /* For inherited lfun closures, add the '-<inheritname>' */
-            if (l->function.lfun.inhIndex)
+            /* For inherited lfun closures, add the '|<inheritpath>' */
+            if (inhProg)
             {
-                string_t * progName = del_dotc(inhProg->name);
-                L_PUTC_PROLOG
-                source = get_txt(progName);
-                L_PUTC('-');
-                c = *source++;
-                do L_PUTC(c) while ( '\0' != (c = *source++) );
-                L_PUTC_EPILOG
-                free_mstring(progName);
+                prog = ob->prog;
+                ix = l->function.lfun.index;
+                
+                while(prog != inhProg)
+                {
+                    inherit_t *inheritp;
+                    string_t  *progName;
+                    
+                    SEARCH_FUNCTION_INHERIT(inheritp, prog, ix);
+                    ix -= inheritp->function_index_offset;
+                    prog = inheritp->prog;
+                    progName = del_dotc(prog->name);
+                    
+                    L_PUTC_PROLOG
+                    source = get_txt(progName);
+                    L_PUTC('|');
+                    c = *source++;
+                    do
+                    {
+                        if (issavedel(c))
+                            L_PUTC('\\');
+                        L_PUTC(c) 
+                    } while ( '\0' != (c = *source++) );
+                    L_PUTC_EPILOG
+                    free_mstring(progName);
+                }
             }
 
 #ifdef USE_NEW_INLINES
@@ -7730,7 +7826,8 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
             if ((   c == delimiter
                  && !(pt[-4] == '#' && pt[-3] == 'e' && pt[-2] == ':')
                 )
-             || (ct == 'c' && c == ':')
+             || (ct == 'c' && (c == ':' || c=='|' || c=='-'))
+             || (ct == 'l' && (c == '|' || c=='-'))
                ) break;
         }
 
@@ -7825,12 +7922,124 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
       {
         string_t *s;
         int i;
-        char *super;
-        unsigned short inhIndex;
-
+        program_t *inhProg = NULL;
+        int fun_ix_offs = 0;
 #ifdef USE_NEW_INLINES
         size_t context_size = 0;
+#endif
 
+        if (name_delim == '|' || name_delim == '-')
+        {
+            char progname_delim;
+            int last_fun_ix_offs = 0;
+            int last_num_functions = 0;
+            
+            /* An inherited lfun closure */
+            inhProg = current_object->prog;
+            
+            do
+            {
+                char *progname_start, *progname_dest;
+                int progname_length;
+                inherit_t *inheritp;
+                unsigned short inhCount;
+
+                progname_start = pt;
+                progname_dest = pt;
+                
+                for(;;)
+                {
+                    char c;
+                    
+                    if ( !(c = *pt++) )
+                    {
+                        *svp = const0;
+                        return MY_FALSE;
+                    }
+                    
+                    if (c == '\\')
+                        c = *pt++;
+                    else if (c==delimiter
+                          || (name_delim=='|' && c=='|')
+                          || (ct=='c' && c==':'))
+                        break;
+                    
+                    *progname_dest++ = c;
+                }
+                
+                progname_delim = pt[-1];
+                
+                if (inhProg) /* Not yet aborted. */
+                {
+                    last_fun_ix_offs = fun_ix_offs;
+                    last_num_functions = inhProg->num_functions;
+                
+                    *progname_dest = '\0';
+                    progname_length = progname_dest - progname_start;
+                
+                    /* Lookup the inherit */
+                    inheritp = inhProg->inherit;
+                
+                    for ( inhCount = inhProg->num_inherited;
+                          inhCount > 0; inheritp++, inhCount--)
+                    {
+                        int l;
+                    
+                        if (inheritp->inherit_type & INHERIT_TYPE_DUPLICATE)
+                            continue;
+                    
+                        l = mstrsize(inheritp->prog->name)-2;
+                        if (l != progname_length)
+                            continue;
+                        
+                        if (strncmp(progname_start,
+                                    get_txt(inheritp->prog->name),
+                                    progname_length) != 0)
+                            continue;
+                        
+                        /* Found the inherit. */
+                        inhProg = inheritp->prog;
+                        fun_ix_offs += inheritp->function_index_offset;
+                
+                        break;
+                    }
+                
+                    if (!inhCount)
+                    {
+                        /* No inherit found. Let the while loop go
+                         * to the end of the string. */
+                        inhProg = NULL;
+                        fun_ix_offs = -1;
+                    }
+                }
+            }
+            while (progname_delim == '|');
+            
+            /* Restore delimiter. */
+            pt[-1] = progname_delim;
+            *str = pt;
+
+            if(inhProg)
+            {
+                /* Security check. We only allow closures that
+                 * can be built by the current program and by the
+                 * child programs. That means, the child program
+                 * of inhProg must be or inherits the current program
+                 * somehow. This is checked using the function index
+                 * offset.
+                 */
+
+                if (function_index_offset < last_fun_ix_offs
+                 || function_index_offset + current_prog->num_functions
+                        > last_fun_ix_offs + last_num_functions)
+                {
+                    inhProg = NULL;
+                    fun_ix_offs = -1;
+                }
+            }
+        }
+
+#ifdef USE_NEW_INLINES
         if (ct == 'c')
         {
             svalue_t num = const0;
@@ -7841,46 +8050,34 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
              || num.u.number <= 0
                )
             {
+                free_svalue(&num);
                 *svp = const0;
-                break; /* switch(ct) */
+                return MY_FALSE;
             }
             context_size = num.u.number;
         }
 #endif
-        /* Check if it's an inherited lfun closure */
-        super = strchr(name, '-');
-        if (super)
-        {
-            *super = '\0';
-            super++;
-        }
 
         /* If the function exists, it must exist as shared
          * string.
          */
-        s = find_tabled_str(name);
-        if (!s)
-        {
-            *svp = const0;
-            break; /* switch(ct) */
-        }
-
-        inhIndex = 0;
-        if (super)
-        {
-            i = find_inherited_function(super, name, &inhIndex);
-            inhIndex++;
-        }
+        if (fun_ix_offs < 0) /* No need to lookup in case of an error. */
+            s = NULL;
         else
-        {
-            i = find_function(s, current_object->prog);
-        }
+            s = find_tabled_str(name);
+        /* Although s is NULL, we parse to the end. */
 
+        if (s)
+            i = find_function(s, inhProg?inhProg:current_object->prog);
+        else
+            i = -1;
+        
         /* If the function exists and is visible, create the closure.
          */
         if (i >= 0)
         {
-            closure_lfun(svp, current_object, (unsigned short)i, inhIndex
+            closure_lfun(svp, current_object, inhProg
+                        , (unsigned short)i + fun_ix_offs
 #ifdef USE_NEW_INLINES
                         , context_size
 #endif /* USE_NEW_INLINES */
@@ -7907,13 +8104,14 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
                 /* Parse the context information */
                 if (!restore_svalue(&context, str, delimiter)
                  || context.type != T_POINTER
+                 || VEC_SIZE(context.u.vec) != context_size
                    )
                 {
                     l->function.lfun.context_size = 0;
                     free_svalue(svp);
                     free_svalue(&context);
                     *svp = const0;
-                    break; /* switch(ct) */
+                    return MY_FALSE;
                 }
 
                 for (j = 0; (size_t)j < context_size; j++)
@@ -7925,6 +8123,17 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         else /* (i < 0) */
         {
             *svp = const0;
+
+            if (context_size > 0)
+            {
+                svalue_t context = const0;
+
+                /* Parse the string to its end. */
+                if (!restore_svalue(&context, str, delimiter))
+                    return MY_FALSE;
+                else
+                    free_svalue(&context);
+            }
         }
         break;
       } /* case 'c', 'l' */

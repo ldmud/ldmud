@@ -1567,7 +1567,7 @@ name_to_type (char *name)
 {
     while (isspace((unsigned char)*name))
         name++;
-    if ( strncmp(name, "TYPE_", 5) )
+    if ( strncmp(name, "TYPE_", (size_t)5) )
         return -1;
     name += 5;
     if ( !strcmp(name, "ANY") )
@@ -1603,7 +1603,7 @@ name_to_hook(char *name)
 {
     while (isspace((unsigned char)*name))
         name++;
-    if ( strncmp(name, "H_", 2) )
+    if ( strncmp(name, "H_", (size_t)2) )
         return -1;
     name += 2;
     if ( !strcmp(name, "MOVE_OBJECT0") )
@@ -1705,7 +1705,7 @@ handle_map (char *str, int size, int (* name_to_index)(char *) )
             str++;
         if (*str == '\\')
         {
-            str = alloca(MAKE_FUNC_MAXLINE + 1);
+            str = alloca((size_t)MAKE_FUNC_MAXLINE + 1);
             if (!fgets(str, MAKE_FUNC_MAXLINE, fpr))
                 break;
             current_line++;
@@ -2069,6 +2069,26 @@ make_func_isescaped (char c)
 }
 
 /*-------------------------------------------------------------------------*/
+static Bool
+make_func_issavedel (char c)
+
+/* Return true if <c> is a delimiter in save/restore object (e.g. ',' or ';'),
+ * false if not.
+ */
+
+{
+    switch(c) {
+      case ',' : /* in Arrays   */
+      case ';' : /* in Mappings */
+      case ':' : /* in Mappings */
+      case '|' : /* in Closures */
+      case '\n':
+        return MY_TRUE;
+    }
+    return MY_FALSE;
+}
+
+/*-------------------------------------------------------------------------*/
 static int
 ident (char c)
 
@@ -2222,6 +2242,9 @@ yylex1 (void)
                         strncmp(str, line_buffer, match_tmp) == 0)
 
         char line_buffer[MAKE_FUNC_MAXLINE+1];
+        char defbuf[MAKE_FUNC_MAXLINE + 1];
+
+        outp = defbuf + sizeof(defbuf) - 1;
 
         line_buffer[MAKE_FUNC_MAXLINE] = '\0';
 
@@ -2631,7 +2654,7 @@ read_config_file (char *fname)
 
 #undef MATCH
 
-} /* read_config() */
+} /* read_config_file() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -2841,7 +2864,7 @@ create_efun_defs (void)
 
 {
     int i, j, k;
-    char c;
+    unsigned char c;
     char * pattern;
 
     if ((fpw = fopen(EFUN_DEFS, "w")) == NULL)
@@ -3045,6 +3068,7 @@ create_efun_defs (void)
             fprintf(fpw, "\n    ");
         fprintf(fpw, "%d,"
                ,  ( (isascii(c) && make_func_isescaped(c)) ? _MCTe : 0 )
+                | ( (isascii(c) && make_func_issavedel(c)) ? _MCTt : 0 )
                 | ( (isascii(c) && isdigit ((unsigned char)c))  ? _MCTd : 0 )
                 | ( (isascii(c) && isspace ((unsigned char)c) && c != '\n')
                     ? _MCTs : 0 )

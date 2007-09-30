@@ -357,9 +357,7 @@ i_shrink_array (vector_t *p, mp_int n)
     return res;
 }
 
-#ifdef USE_ALISTS
 vector_t * shrink_array (vector_t *p, mp_int n) { return i_shrink_array(p, n); }
-#endif
 
 #define shrink_array(p,n) i_shrink_array(p,n)
 
@@ -1393,6 +1391,8 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
     if (max_array_size && result_size > max_array_size)
     {
         xfree(flags);
+        free_array(minuend);
+        free_array(subtrahend);
         errorf("Illegal array size: %lu.\n", (unsigned long)result_size);
     }
 
@@ -1478,6 +1478,8 @@ intersect_array (vector_t *vec1, vector_t *vec2)
     if (max_array_size && result_size > max_array_size)
     {
         xfree(flags);
+        free_array(vec1);
+        free_array(vec2);
         errorf("Illegal array size: %lu.\n", (unsigned long)result_size);
     }
 
