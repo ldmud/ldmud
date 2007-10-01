@@ -4,6 +4,12 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+01-Oct-2007 (Lars Duening) -- 3.3.716
+    - Fixed Crashers:
+       + Size-changing mapping operations didn't fully check for destructed
+         objects as keys, sometimes derefencing invalid pointers in
+         the process (Bug #517).
+
 30-Sep-2007 (Lars Duening) -- 3.3.715
 
     - New Efuns:

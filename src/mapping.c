@@ -1450,6 +1450,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
     mapping_hash_t * hm, *hm2 = NULL;
     mapping_cond_t * cm, *cm2 = NULL;
     mp_int common_width;  /* == min(num_values, new_width) */
+    p_int  num_entries;
 
     /* Set the width variables */
     if (m->num_values >= new_width)
@@ -1475,6 +1476,8 @@ resize_mapping (mapping_t *m, mp_int new_width)
         }
 
     }
+    
+    num_entries = m->num_entries;
 
     /* Get the target mapping without a hash, but with a condensed block
      * big enough to hold all entries.
@@ -1531,39 +1534,42 @@ resize_mapping (mapping_t *m, mp_int new_width)
             map_chain_t *last = NULL, *mc, *mc2;
 
             for (mc = *mcp++; mc; mc = mc->next)
-            {
-                svalue_t *src, *dest;
-                p_int i;
-
-                mc2 = new_map_chain(m2);
-                if (!mc2)
+                if(destructed_object_ref(&(mc->data[0])))
+                    num_entries--;
+                else
                 {
-                    xfree(hm2);
-                    outofmem(SIZEOF_MCH(mc, new_width), "hash link");
-                    /* NOTREACHED */
-                    return NULL;
+                    svalue_t *src, *dest;
+                    p_int i;
+
+                    mc2 = new_map_chain(m2);
+                    if (!mc2)
+                    {
+                        xfree(hm2);
+                        outofmem(SIZEOF_MCH(mc, new_width), "hash link");
+                        /* NOTREACHED */
+                        return NULL;
+                    }
+
+                    /* Copy the key and the common values */
+                    for (src = &(mc->data[0]), dest = &(mc2->data[0]), i = common_width
+                        ; i >= 0
+                        ; --i, src++, dest++)
+                    {
+                        assign_svalue_no_free(dest, src);
+                    }
+
+                    /* Zero out any extraneous values */
+                    for (dest = &(mc2->data[common_width+1]), i = new_width - common_width
+                        ; i > 0
+                        ; --i, dest++)
+                    {
+                        put_number(dest, 0);
+                    }
+
+
+                    mc2->next = last;
+                    last = mc2;
                 }
-
-                /* Copy the key and the common values */
-                for (src = &(mc->data[0]), dest = &(mc2->data[0]), i = common_width
-                    ; i >= 0
-                    ; --i, src++, dest++)
-                {
-                    assign_svalue_no_free(dest, src);
-                }
-
-                /* Zero out any extraneous values */
-                for (dest = &(mc2->data[common_width+1]), i = new_width - common_width
-                    ; i > 0
-                    ; --i, dest++)
-                {
-                    put_number(dest, 0);
-                }
-
-
-                mc2->next = last;
-                last = mc2;
-            }
             *mcp2++ = last;
         } while (--size);
 
@@ -1595,7 +1601,23 @@ resize_mapping (mapping_t *m, mp_int new_width)
             ; src_ix < cm->size
             ; src_ix++, src_key++)
         {
-            if (src_key->type != T_INVALID)
+            if (src_key->type == T_INVALID)
+                ; // Do nothing
+            else if (destructed_object_ref(src_key))
+            {
+                // We have to fill the space.
+                // (Alternatively we could decrease m->cond->size.)
+                p_int i;
+
+                num_entries--;
+
+                dest_key->type = T_INVALID;
+                dest_key++;
+
+                for (i = new_width; i > 0; i--, dest_data++)
+                    put_number(dest_data, 0);
+            }
+            else
             {
                 p_int i;
 
@@ -1616,7 +1638,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
     /* --- Finalize the basis structure ---
      */
 
-    m2->num_entries = m->num_entries;
+    m2->num_entries = num_entries;
 
     /* That's it. */
     return m2;
