@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Oct-2007 (Lars Duening)
+  - (mapping.c, object.c) Removed C-99 features.
+
 01-Oct-2007 (Gnomi)
   - (mapping.c) resize_mapping() didn't check for destructed objects as keys,
       which made operations like map-([0]) after an object destruction

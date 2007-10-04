@@ -6006,17 +6006,19 @@ save_closure (svalue_t *cl, Bool writable)
                     prog = inheritp->prog;
                     progName = del_dotc(prog->name);
                     
-                    L_PUTC_PROLOG
-                    source = get_txt(progName);
-                    L_PUTC('|');
-                    c = *source++;
-                    do
                     {
-                        if (issavedel(c))
-                            L_PUTC('\\');
-                        L_PUTC(c) 
-                    } while ( '\0' != (c = *source++) );
-                    L_PUTC_EPILOG
+                        L_PUTC_PROLOG
+                        source = get_txt(progName);
+                        L_PUTC('|');
+                        c = *source++;
+                        do
+                        {
+                            if (issavedel(c))
+                                L_PUTC('\\');
+                            L_PUTC(c) 
+                        } while ( '\0' != (c = *source++) );
+                        L_PUTC_EPILOG
+                    }
                     free_mstring(progName);
                 }
             }

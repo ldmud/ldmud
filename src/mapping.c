@@ -1602,11 +1602,12 @@ resize_mapping (mapping_t *m, mp_int new_width)
             ; src_ix++, src_key++)
         {
             if (src_key->type == T_INVALID)
-                ; // Do nothing
+                ; /* Do nothing */
             else if (destructed_object_ref(src_key))
             {
-                // We have to fill the space.
-                // (Alternatively we could decrease m->cond->size.)
+                /* We have to fill the space.
+                 * (Alternatively we could decrease m->cond->size.)
+                 */
                 p_int i;
 
                 num_entries--;
