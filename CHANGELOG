@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Oct-2007 (Lars Duening)  (3.2.15)
+  - Created snapshot.
+
 04-Nov-2006 (Lars Duening, Philip Hancke)
   - (pkg-tls, main.c) Added new options --tls-crlfile and --tls-crldirectory
        to hold the Certificate Revocation information.
