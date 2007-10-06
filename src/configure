@@ -13570,6 +13570,18 @@ if test "${with_target+set}" = set; then
   EXTRA_CFLAGS="${EXTRA_CFLAGS} -D${withval}"
 fi;
 
+echo "$as_me:$LINENO: checking if tail accepts the -n parameter" >&5
+echo $ECHO_N "checking if tail accepts the -n parameter... $ECHO_C" >&6
+TAIL_N=""
+if tail -n +2 confdefs.h > /dev/null 2>&1; then
+    echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+    TAIL_N="-n"
+else
+    echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+fi
+
 echo "$as_me:$LINENO: checking if ${YACC} includes bogus malloc prototypes" >&5
 echo $ECHO_N "checking if ${YACC} includes bogus malloc prototypes... $ECHO_C" >&6
 cat > conftest.y <<EOF
@@ -13606,7 +13618,7 @@ if eval $ac_compile 2>&5 ; then
   echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6
 else
-  MOVE_YACC_TAB='tail +2 $(YACCTAB)c >'
+  MOVE_YACC_TAB='tail $TAIL_N +2 $(YACCTAB)c >'
   CLEAN_YACC_TAB='$(RM) $(YACCTAB)c'
   echo "$as_me:$LINENO: result: yes" >&5
 echo "${ECHO_T}yes" >&6

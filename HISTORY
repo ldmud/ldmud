@@ -9,6 +9,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
        + The mySQL configuration failed to handle less-standard standard
          paths correctly.
+       + The autoconfiguration of YACC was incompatible with gentoo Linux.
 
 
 05-Oct-2007 (Lars Duening) -- Release 3.2.15
