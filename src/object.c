@@ -1191,7 +1191,7 @@ f_function_exists (svalue_t *sp, int num_arg)
 
 {
     char *str, *prog_name;
-    uint32 prog_line;
+    uint32 prog_line = 0;
     svalue_t *argp;
     object_t *ob;
     p_int mode_flags;

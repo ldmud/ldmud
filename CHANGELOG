@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Oct-2007 (Lars Duening)
+  - (configure) The search for the mysqlclient library in less-standard
+       standard paths wasn't performed because the previous cached result
+       wasn't reset.
+  = (interpret.c, object.c, lex.c) Removed some compiler warnings.
+
 05-Oct-2007 (Lars Duening)  (3.2.15)
   - Created snapshot.
 

@@ -4470,7 +4470,7 @@ yylex1 (void)
                 if ('\n' != *yyp && CHAR_EOF != *yyp)
                 {
                     char *cp;
-                    char lc; /* Since c is 'register' */
+                    char lc = 0; /* Since c is 'register' */
 
                     cp = parse_escaped_char(yyp, &lc);
                     if (!cp)
@@ -4631,7 +4631,7 @@ yylex1 (void)
 
                     default:
                       {
-                          char *cp, lc;
+                          char *cp, lc = 0;
 
                           cp = parse_escaped_char(p-1, &lc);
                           if (!cp)

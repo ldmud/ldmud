@@ -11330,6 +11330,7 @@ if test $ac_cv_lib_mysqlclient_main = yes; then
 fi
 
         if test "x$tmp" = "x"; then
+            unset ac_cv_lib_mysqlclient_main
             if test -d "/usr/local/mysql/lib/mysql"; then
                 CFLAGS="$saveflags -L/usr/local/mysql/lib/mysql"
                 echo "$as_me:$LINENO: checking for main in -lmysqlclient" >&5

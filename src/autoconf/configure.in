@@ -1016,6 +1016,7 @@ if test $lp_cv_has_mysql = yes; then
     if test "x$mysql_path" = "x"; then
         AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -lmysqlclient")
         if test "x$tmp" = "x"; then
+            unset ac_cv_lib_mysqlclient_main
             if test -d "/usr/local/mysql/lib/mysql"; then
                 CFLAGS="$saveflags -L/usr/local/mysql/lib/mysql"
                 AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib/mysql -lmysqlclient")

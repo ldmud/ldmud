@@ -728,6 +728,13 @@ init_interpret (void)
     invalid_entry.id = 0;
     invalid_entry.progp = (program_t *)1;
 
+    /* To prevent 'uninitialized member' compiler warnings. */
+    invalid_entry.name = 0;
+    invalid_entry.flags = 0;
+    invalid_entry.funstart = 0;
+    invalid_entry.function_index_offset = 0;
+    invalid_entry.variable_index_offset = 0;
+
     for (i = 0; i < CACHE_SIZE; i++)
         cache[i] = invalid_entry;
 }
