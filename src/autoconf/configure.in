@@ -2366,6 +2366,16 @@ fi
 
 AC_ARG_WITH(target,[  --with-target    ??], EXTRA_CFLAGS="${EXTRA_CFLAGS} -D${withval}")
 
+# Some Unixes require the -n parameter for tail to work properly
+AC_MSG_CHECKING(if tail accepts the -n parameter)
+TAIL_N=""
+if tail -n +2 confdefs.h > /dev/null 2>&1; then
+    AC_MSG_RESULT(yes)
+    TAIL_N="-n"
+else
+    AC_MSG_RESULT(no)
+fi
+
 AC_MSG_CHECKING(if ${YACC} includes bogus malloc prototypes)
 cat > conftest.y <<EOF
 %{
@@ -2400,7 +2410,7 @@ if eval $ac_compile 2>&5; then
   CLEAN_YACC_TAB=''
   AC_MSG_RESULT(no)
 else
-  MOVE_YACC_TAB='tail +2 $(YACCTAB)c >'
+  MOVE_YACC_TAB='tail $TAIL_N +2 $(YACCTAB)c >'
   CLEAN_YACC_TAB='$(RM) $(YACCTAB)c'
   AC_MSG_RESULT(yes)
 fi

@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Oct-2007 (Lars Duening)
+  - (configure) gentoo Linux requires the '-n' argument for 'tail +2' to
+       work correctly (thanks, Juanjo!).
+
 03-Oct-2007 (Lars Duening)
   - (mapping.c, object.c) Removed C-99 features.
 

@@ -10,6 +10,9 @@ For a detailed list of all changes see the file CHANGELOG.
          objects as keys, sometimes derefencing invalid pointers in
          the process (Bug #517).
 
+    - Other:
+       + The autoconfiguration of YACC was incompatible with gentoo Linux.
+
 30-Sep-2007 (Lars Duening) -- 3.3.715
 
     - New Efuns:
