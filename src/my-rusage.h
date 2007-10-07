@@ -39,7 +39,7 @@
          extern int getpagesize();
 #    endif
 #    if defined(sun) || defined(ultrix)
-         extern int getrusage PROT((int, struct rusage *));
+         extern int getrusage (int, struct rusage *);
 #    endif
 
 #else /* !HAVE_GETRUSAGE */

@@ -46,9 +46,9 @@ extern int lstat(const char *, struct stat *);
 
 #ifdef SunOS4
 #    if !defined (__GNUC__) || __GNUC__ < 2 || __GNUC__ == 2 && __GNUC_MINOR__ < 7
-extern int lstat PROT((CONST char *, struct stat *));
+extern int lstat (CONST char *, struct stat *);
 #    endif
-extern int fchmod PROT((int, int));
+extern int fchmod(int, int);
 #endif
 
 #if defined(OS2) || defined(__EMX__)

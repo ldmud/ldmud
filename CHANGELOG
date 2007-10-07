@@ -26,6 +26,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
        the old program's blueprint pointer is NULLed out as it is no longer
        accurate. (Bug #483)
   - (mudlib/uni-crasher/crasher.c) 'New' version from Bug #91.
+  - (my-rusage.h, files.c) Removed obsolete macro PROT() (Bug #504).
 
 03-Oct-2007 (Lars Duening)
   - (mapping.c, object.c) Removed C-99 features.
