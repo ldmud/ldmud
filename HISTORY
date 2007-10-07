@@ -14,7 +14,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + The mySQL configuration failed to handle less-standard standard
          paths correctly.
        + The autoconfiguration of YACC was incompatible with gentoo Linux.
-       + Removed certain 64-bit issues (Bug #490).
+       + Removed certain 64-bit issues (Bug #490, #491).
 
 
 05-Oct-2007 (Lars Duening) -- Release 3.2.15

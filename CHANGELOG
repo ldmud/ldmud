@@ -11,7 +11,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (comm.c) Removed a crasher when running with --check-refcounts: References
        by snooping non-interactives weren't counted (Bug #492).
   - (sprintf.c) Removed a 64-bit issue (comparison of two values with
-    differing value ranges) (Bug #490)
+       differing value ranges) (Bug #490)
+  - (prolang.y) upd_long() and read_long() weren't 64-bit-safe (even though
+       ins_long() already was) (Bug 491).
 
 05-Oct-2007 (Lars Duening)  (3.2.15)
   - Created snapshot.
