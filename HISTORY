@@ -24,6 +24,10 @@ For a detailed list of all changes see the file CHANGELOG.
     - Compiler:
        + The lfuns backing the inline closures are again 'private nomask'.
 
+    - Runtime:
+       + foreach(int i: <num>) recognizes if <num> is negative and throws
+         an error. (Bug #503)
+
     - Other:
        + The autoconfiguration of YACC was incompatible with gentoo Linux.
        + Removed a few (partly fatal) 64-bit issues (Bug #490, #491).

@@ -27,6 +27,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
        accurate. (Bug #483)
   - (mudlib/uni-crasher/crasher.c) 'New' version from Bug #91.
   - (my-rusage.h, files.c) Removed obsolete macro PROT() (Bug #504).
+  - (interpret.c) foreach(int i : <negative number>) now throws an error
+      (Bug #503).
 
 03-Oct-2007 (Lars Duening)
   - (mapping.c, object.c) Removed C-99 features.

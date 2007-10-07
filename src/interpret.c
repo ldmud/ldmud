@@ -15167,6 +15167,8 @@ again:
         if (arg->type == T_NUMBER)
         {
             count = arg->u.number;
+            if (count < 0 && !use_range)
+                ERRORF(("foreach() got a %ld, expected a non-negative number.", count));
             vars_required = 1;
         }
         else if (arg->type == T_STRING)
