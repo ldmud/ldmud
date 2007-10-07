@@ -3025,12 +3025,31 @@ get_message (char *buff)
 
                 l = MAX_TEXT - ip->text_end;
 
+                /* In CHARMODE with combine-charset, the driver gets
+                 * confused when receiving MAX_TEXT or more combinable
+                 * characters.
+                 * I couldn't quite figure out what and why, but
+                 * reading less than MAX_TEXT characters works around
+                 * the issue.
+                 */
+#ifndef SIMULATE_CHARMODE
+                if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) == (CHARMODE_REQ|CHARMODE))
+#else
+                if (ip->noecho & (CHARMODE_REQ|CHARMODE))
+#endif
+                {
+                    l -= 2;
+                }
+
+                DTN(("text_end %d, can read %d chars\n", ip->text_end, l));
+
 #ifdef USE_TLS
                 if (ip->tls_status != TLS_INACTIVE)
                     l = tls_read(ip, ip->text + ip->text_end, (size_t)l);
                 else
 #endif
                     l = socket_read(ip->socket, ip->text + ip->text_end, (size_t)l);
+                DTN(("# chars read: %d\n", l));
                 if (l == -1) {
                     if (errno == ENETUNREACH) {
                         debug_message("%s Net unreachable detected.\n"
@@ -3211,7 +3230,7 @@ get_message (char *buff)
                          * At the moment it is TS_INVALID, so the next
                          * character received would be thrown away.
                          */
-                        DTN(("    save machine state %d (DATA)\n"
+                        DTN(("    Empty input: save machine state %d (DATA)\n"
                           , TS_DATA));
                         length = strlen(ip->text + ip->command_start) + 1;
                         ip->chars_ready = length;
@@ -3303,6 +3322,7 @@ get_message (char *buff)
                          * negative. We have to correct them then to point
                          * to ip->command_start.
                          */
+                        DTN(("    tn_start %d, command_end %d\n", ip->tn_start, ip->command_end));
                         if (ip->tn_start < 1)
                             ip->tn_start = 1;
                         if (ip->command_end < 1)
@@ -3324,7 +3344,7 @@ get_message (char *buff)
                     else
                         ip->numCmds++;
 
-                    DTN(("--- return with char command %02x '%c' ---\n", buff[0], buff[0]));
+                    DTN(("--- return with char command %02x '%c' length %d ---\n", buff[0], buff[0], destix));
 
                     return MY_TRUE;
                 }
@@ -5432,6 +5452,8 @@ telnet_neg (interactive_t *ip)
             if (from >= end)
             {
                 ip->text_end = ip->tn_end = ip->command_end = (short)(to - first);
+                 DTN(("t_n: (ts_data) from >= end by %d, text_end := %d\n (max %d)"
+                     , from-end, ip->text_end, MAX_TEXT));
                 *to = '\0';
                 if (ip->text_end >= MAX_TEXT)
                 {
@@ -5441,10 +5463,13 @@ telnet_neg (interactive_t *ip)
                      * In charmode, we must not reset command_end, otherwise
                      * it might fall under command_start.
                      */
-                    ip->text_end = ip->tn_end = 0;
-                    if (!(ip->noecho & CHARMODE_REQ))
-                        ip->command_end = 0;
                     ip->tn_state = TS_READY;
+                    ip->tn_end = 0;
+                    ip->text_end = 0;
+                    if (!(ip->noecho & (CHARMODE_REQ|CHARMODE)))
+                    {
+                        ip->command_end = 0;
+                    }
                     return;
                 }
                 return;
