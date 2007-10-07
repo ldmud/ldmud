@@ -5019,6 +5019,12 @@ prepare_inline_closure (fulltype_t returntype)
 
     ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
 
+    /* The lfuns implementing the inline closures should not
+     * be callable directly (without the CLOSURE svalue), and also not
+     * overrideable.
+     */
+    returntype.typeflags |= TYPE_MOD_NO_MASK | TYPE_MOD_PRIVATE;
+
     def_function_typecheck(returntype, ident, MY_TRUE);
 #ifdef DEBUG_INLINES
 printf("DEBUG: New inline closure name: '%s'\n", name);
