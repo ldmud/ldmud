@@ -1,6 +1,9 @@
 /*
 crasher: Standardversion (Menaures 07.12.01)
 
+Modified: 
+  14.07.2004 Menaures: Fuer den 3-3er wieder flottgemacht
+
 ANLEITUNG:
 
 1. Bei dem Define DEBUGGER den eigenen Real-Namen angeben
@@ -98,12 +101,12 @@ mixed efuns;
 mixed values;
 mixed names;
 
+mixed query() { return ({execute,efuns,values,names}); }
+
 void record(string file);
 
 void reset_all()
 {
-      catch(
-
       execute = 0,
 
       ( efuns =
@@ -233,7 +236,7 @@ void reset_all()
             #'funcall,
             #'function_exists,
             #'functionlist,
-            #'garbage_collection,
+//            #'garbage_collection,
             #'get_align_string,
             #'get_dir,
             #'get_error_file,
@@ -421,7 +424,7 @@ void reset_all()
             #'shorttimestr,
             #'shortvtimestr,
             #'shout,
-            #'shutdown,
+//            #'shutdown,
             #'sin,
             #'sizeof,
 //            #'slice_array,
@@ -593,7 +596,7 @@ void reset_all()
             touch("/obj/rucksack"),
             touch("/obj/rope"),
             touch("/secure/master"),
-            clone_object("/obj/schiff"),
+//            clone_object("/obj/schiff"),
             clone_object("/obj/player"),
             clone_object("/obj/tisch"),
 
@@ -601,7 +604,8 @@ void reset_all()
             (: :),
             (: (: 1 :) :),
             #'sizeof,
-            #'garbage_collection,
+//            #'garbage_collection,
+            #'efun::input_to,
             symbol_function("query_long", touch("/i/item")),
             lambda( ({'x, 'y}), ({#'?, ({#'>, 'x, 'y}), 'x, 'y}) ),
             unbound_lambda( ({'x}), ({#'==, 0, 'x}) ),
@@ -620,9 +624,8 @@ void reset_all()
             m_allocate(5,5),
             mkmapping(allocate(30), allocate(30, ({})), allocate(30, (:1:))),
 
-        }) )
+        }) );
 
-      ); // catch
 
       if(pointerp(values)) {
       values += ({0,0,0});
@@ -652,19 +655,18 @@ int execute_file(string file)
 
     DEBUG("Executing: "+file);
 
-    for(line = 0; (str=read_file(file, line, 2)) && strlen(str); line += 2)
+    for(line = 1; (str=read_file(file, line, 2)) && strlen(str); line += 2)
     {
+//        debug_message(sprintf("%#Q\n",str));
         restore = restore_value(str);
-
         rm("/save/crash/LAST_EXEC");
         write_file("/save/crash/LAST_EXEC",
           save_value( ({file, line}) ));
-
 #ifdef VERBOSE
         debug_message("File: "+file+" Line: "+line+"\n");
 #endif
-        debug_message(sprintf("REPLAY: %O %O -> %O %O\n", restore[0], restore[1], efuns[ restore[0] ], map( restore[1], (: values[$1] :) )));
-
+//        debug_message(sprintf("REPLAY: %#Q %#Q -> %#Q %#Q\n", restore[0], restore[1], efuns[ restore[0] ], map( restore[1], (: values[$1] :) )));
+        debug_message(sprintf("exec file %#Q line %#Q\n", file, line));
         catch(
           apply( efuns[ restore[0] ],
                  map( restore[1], (: values[$1] :) ) )

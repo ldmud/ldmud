@@ -25,6 +25,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (simulate.c) replace_program(): If the program of a blueprint is replaced,
        the old program's blueprint pointer is NULLed out as it is no longer
        accurate. (Bug #483)
+  - (mudlib/uni-crasher/crasher.c) 'New' version from Bug #91.
 
 03-Oct-2007 (Lars Duening)
   - (mapping.c, object.c) Removed C-99 features.
