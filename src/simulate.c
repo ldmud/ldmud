@@ -392,9 +392,10 @@ catch_instruction ( int flags, uint offset
          * the global <catch_value>.
          */
         svalue_t *sp;
+        svalue_t catch_value;
 
         /* Remove the catch context and get the old stackpointer setting */
-        sp = pull_error_context(INTER_SP);
+        sp = pull_error_context(INTER_SP, &catch_value);
 
         /* beware of errors after set_this_object() */
         current_object = csp->ob;
@@ -407,7 +408,6 @@ catch_instruction ( int flags, uint offset
 
         /* Push the catch return value */
         *(++sp) = catch_value;
-        catch_value.type = T_INVALID;
 
         *i_sp = (volatile svalue_t *)sp;
 
@@ -801,7 +801,12 @@ errorf (const char *fmt, ...)
             string_t * str = new_mstring(emsg_buf);
 
             if (NULL != str)
-                put_string(&catch_value, str);
+            {
+                svalue_t stmp;
+
+                put_string(&stmp, str);
+                transfer_error_message(&stmp, rt);
+            }
             else
             {
                 error_caught = MY_FALSE;
@@ -1325,21 +1330,21 @@ parse_error (Bool warning, const char *error_file, int line, const char *what
 
 /*-------------------------------------------------------------------------*/
 void
-throw_error()
+throw_error (svalue_t *v)
 
-/* The second part of the efun throw(): the caller stored the message
- * into catch_value, now our job is to do the proper longjmp.
+/* The efun throw(). We have to save the message <v> in the
+ * error context and then do the proper longjmp. <v> is freed.
  */
 
 {
     unroll_context_stack();
     if (rt_context->type >= ERROR_RECOVERY_CATCH)
     {
+        transfer_error_message(v, rt_context);
         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
         fatal("Throw_error failed!");
     }
-    free_svalue(&catch_value);
-    catch_value.type = T_INVALID;
+    free_svalue(v);
     errorf("Throw with no catch.\n");
 } /* throw_error() */
 

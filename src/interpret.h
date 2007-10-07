@@ -108,7 +108,6 @@ extern svalue_t *current_variables;
 extern int32  eval_cost;
 extern int32  assigned_eval_cost;
 extern svalue_t apply_return_value;
-extern svalue_t catch_value;
 extern svalue_t last_indexing_protector;
 
 #ifdef APPLY_CACHE_STAT
@@ -138,7 +137,8 @@ extern void push_control_stack(svalue_t *sp, bytecode_p pc, svalue_t *fp);
 extern void pop_control_stack(void);
 extern struct longjump_s *push_error_context(svalue_t *sp, int catch_flags);
 extern void pop_error_context (void);
-extern svalue_t *pull_error_context (svalue_t *sp);
+extern svalue_t *pull_error_context (svalue_t *sp, svalue_t *msg);
+extern void transfer_error_message (svalue_t *v, rt_context_t *rt);
 extern Bool destructed_object_ref (svalue_t *svp);
 extern void free_object_svalue(svalue_t *v);
 extern void zero_object_svalue(svalue_t *v);

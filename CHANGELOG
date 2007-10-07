@@ -7,6 +7,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
        'overlong command' confuses the charmode engine and causes the socket
        to close prematurely. Yes, this is more a workaround than a real fix
        (Bug #442).
+  - (simulate, interpret) The value thrown in a catch is now held in
+       the catch context could be leaked if a second error happens and
+       is caught in the master::runtime_error() handler (Bug #513).
 
 06-Oct-2007 (Lars Duening)
   - (configure) gentoo Linux requires the '-n' argument for 'tail +2' to

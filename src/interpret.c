@@ -269,6 +269,11 @@ struct catch_context
     svalue_t             * save_sp;
       /* The saved global values
        */
+
+    svalue_t catch_value;
+      /* Holds the value throw()n from within a catch() while the throw
+       * is executed.
+       */
 };
 
 /* --- struct cache: one entry of the apply cache
@@ -567,11 +572,6 @@ static svalue_t value_stack_array[SIZEOF_STACK+1];
    * dummy so that underflows can be detected in a portable way
    * (Standard C disallows indexing before an array). Instead, VALUE_STACK
    * is the real bottom of the stack.
-   */
-
-svalue_t catch_value = { T_INVALID } ;
-  /* Holds the value throw()n from within a catch() while the throw
-   * is executed.
    */
 
 
@@ -6699,6 +6699,7 @@ push_error_context (svalue_t *sp, int catch_flags)
     p->recovery_info.rt.last = rt_context;
     p->recovery_info.rt.type = ERROR_RECOVERY_CATCH;
     p->recovery_info.flags = catch_flags;
+    p->catch_value.type = T_INVALID;
     rt_context = (rt_context_t *)&p->recovery_info;
     return &p->recovery_info.con;
 } /* push_error_context() */
@@ -6733,7 +6734,7 @@ pop_error_context (void)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-pull_error_context (svalue_t *sp)
+pull_error_context (svalue_t *sp, svalue_t *msg)
 
 /* Restore the context saved by a catch() after a throw() or runtime error
  * occured. <sp> is the current stackpointer and is used to pop the elements
@@ -6742,6 +6743,8 @@ pull_error_context (svalue_t *sp)
  * The function pops the topmost recovery entry, which must be the catch
  * recovery entry, restores the important global variables and returns
  * the saved stack pointer.
+ *
+ * If <msg> is not NULL the caught error message is put there.
  */
 
 {
@@ -6780,6 +6783,12 @@ pull_error_context (svalue_t *sp)
     csp = p->save_csp;
     pop_n_elems(sp - p->save_sp);
     command_giver = p->save_command_giver;
+    
+    /* Save the error message */
+    if (msg)
+        transfer_svalue_no_free(msg, &p->catch_value);
+    else
+        free_svalue(&p->catch_value);
 
     /* Remove the context from the context stack */
     rt_context = p->recovery_info.rt.last;
@@ -6787,6 +6796,19 @@ pull_error_context (svalue_t *sp)
 
     return sp;
 } /* pull_error_context() */
+
+/*-------------------------------------------------------------------------*/
+void
+transfer_error_message (svalue_t *v, rt_context_t *rt)
+ /* Saves the message <v> in the error context <rt> assuming that
+  * it's a catch recovery context. <v> is freed afterwards.
+  */
+{
+    struct catch_context *p;
+
+    p = (struct catch_context *)rt;
+    transfer_svalue_no_free(&p->catch_value, v);
+}
 
 /*-------------------------------------------------------------------------*/
 void
@@ -15957,10 +15979,9 @@ again:
          */
 
         assign_eval_cost();
-        transfer_svalue_no_free(&catch_value, sp--);
-        inter_sp = sp;
+        inter_sp = --sp;
         inter_pc = pc;
-        throw_error(); /* do the longjump, with extra checks... */
+        throw_error(sp+1); /* do the longjump, with extra checks... */
         break;
 
     /* --- Efuns: Strings --- */
