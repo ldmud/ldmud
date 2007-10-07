@@ -6873,7 +6873,7 @@ count_comm_extra_refs (void)
         if ( NULL != (ob = all_players[i]->snoop_by) ) {
             interactive_t *ip;
 
-            if (!(O_SET_INTERACTIVE(ip, current_object)))
+            if (!(O_SET_INTERACTIVE(ip, ob)))
             {
                 /* snooping monster */
                 ob->extra_ref++;

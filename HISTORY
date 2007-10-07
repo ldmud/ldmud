@@ -6,6 +6,10 @@ For a detailed list of all changes see the file CHANGELOG.
 
 06-Oct-2007 (Lars Duening) -- Release 3.2.16
 
+    - Fixed Crashers:
+       +  Removed a crasher when running with --check-refcounts: References
+          by snooping non-interactives weren't counted (Bug #492).
+
     - Other Changes:
        + The mySQL configuration failed to handle less-standard standard
          paths correctly.
