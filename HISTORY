@@ -14,7 +14,7 @@ For a detailed list of all changes see the file CHANGELOG.
 
     - Other:
        + The autoconfiguration of YACC was incompatible with gentoo Linux.
-       + Removed certain 64-bit issues (Bug #490).
+       + Removed a few (partly fatal) 64-bit issues (Bug #490, #491).
 
 30-Sep-2007 (Lars Duening) -- 3.3.715
 

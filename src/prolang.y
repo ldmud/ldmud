@@ -2012,7 +2012,7 @@ ins_long (int32 l)
 
 /*-------------------------------------------------------------------------*/
 static void
-upd_long (mp_uint offset, long l)
+upd_long (mp_uint offset, int32 l)
 
 /* Store the 4-byte number <l> at <offset> in the A_PROGRAM are in
  * a fixed byteorder.
@@ -2026,7 +2026,7 @@ upd_long (mp_uint offset, long l)
 } /* upd_long() */
 
 /*-------------------------------------------------------------------------*/
-static long
+static int32
 read_long (mp_uint offset)
 
 /* Return the 4-byte number stored at <offset> in the A_PROGRAM area.
