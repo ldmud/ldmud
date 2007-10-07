@@ -180,7 +180,7 @@ unsigned long stNumTabledCheckedSearch = 0;
 
 /*-------------------------------------------------------------------------*/
 static INLINE whash_t
-hash_string (const char * const s, size_t size)
+hash_string_inl (const char * const s, size_t size)
 
 /* Compute the hash for string <s> of length <size> and return it.
  * The result will always be non-zero.
@@ -193,7 +193,13 @@ hash_string (const char * const s, size_t size)
     if (!hash)
         hash = 1 << (sizeof (hash) * CHAR_BIT - 1);
     return hash;
-} /* hash_string() */
+} /* hash_string_inl() */
+
+whash_t
+hash_string (const char * const s, size_t size)
+{
+    return hash_string_inl(s, size);
+}
 
 /*-------------------------------------------------------------------------*/
 static INLINE whash_t
@@ -204,7 +210,7 @@ get_hash (string_t * pStr)
 
 {
     if (!pStr->hash)
-        pStr->hash = hash_string(pStr->txt, pStr->size);
+        pStr->hash = hash_string_inl(pStr->txt, pStr->size);
 
     return pStr->hash;
 } /* get_hash() */
@@ -486,7 +492,7 @@ mstring_new_tabled (const char * const pTxt MTRACE_DECL)
     string_t * string;
 
     size = strlen(pTxt);
-    hash = hash_string(pTxt, size);
+    hash = hash_string_inl(pTxt, size);
 
     /* Check if the string has already been tabled */
     string = find_and_move(pTxt, size, hash);
@@ -516,7 +522,7 @@ mstring_new_n_tabled (const char * const pTxt, size_t size MTRACE_DECL)
     whash_t    hash;
     string_t * string;
 
-    hash = hash_string(pTxt, size);
+    hash = hash_string_inl(pTxt, size);
 
     /* Check if the string has already been tabled */
     string = find_and_move(pTxt, size, hash);
@@ -792,7 +798,7 @@ mstring_find_tabled_str (const char * const pTxt, size_t size)
 {
     whash_t hash;
 
-    hash = hash_string(pTxt, size);
+    hash = hash_string_inl(pTxt, size);
 
     return find_and_move(pTxt, size, hash);
 } /* mstring_find_tabled_str() */

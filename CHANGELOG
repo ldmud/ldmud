@@ -13,6 +13,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (prolang.y) With the corrections to the inheritance handling done some
        time ago, the lfuns backing inline closure can be again made 'private
        nomask' (Bug #511).
+  - (simulate.c) load_object(): The object filename to load must not be
+       empty (Bug #500).
+  - (mstrings, obtable.c) Made sure that otable uses the same hasher
+       as mstring (Bug #500).
 
 03-Oct-2007 (Lars Duening)
   - (mapping.c, object.c) Removed C-99 features.

@@ -51,10 +51,10 @@
 
 #if !( (OTABLE_SIZE) & (OTABLE_SIZE)-1 )
 #    define ObjHash(s)        (mstr_get_hash(s) & ((OTABLE_SIZE)-1) )
-#    define ObjHashStr(s,len) (whashmem(s, len, MSTRING_HASH_LENGTH) & ((OTABLE_SIZE)-1) )
+#    define ObjHashStr(s,len) (hash_string(s, len) & ((OTABLE_SIZE)-1) )
 #else
 #    define ObjHash(s)        (mstr_get_hash(s) % OTABLE_SIZE)
-#    define ObjHashStr(s,len) (whashmem(s, len, MSTRING_HASH_LENGTH) % OTABLE_SIZE)
+#    define ObjHashStr(s,len) (hash_string(s, len) % OTABLE_SIZE)
 #endif
 /* Hash the string <s> and compute the appropriate table index
  */

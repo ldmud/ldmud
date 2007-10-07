@@ -65,6 +65,7 @@ extern mp_uint mstr_used_size;
 /* --- Prototypes --- */
 
 extern void mstring_init (void);
+extern whash_t    hash_string (const char * const s, size_t size);
 extern whash_t    mstring_get_hash (string_t * pStr);
 extern string_t * mstring_alloc_string (size_t iSize MTRACE_DECL);
 extern string_t * mstring_new_string (const char * const pTxt MTRACE_DECL);
