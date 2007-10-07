@@ -4,6 +4,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
 06-Oct-2007 (Lars Duening)
   - (configure) gentoo Linux requires the '-n' argument for 'tail +2' to
        work correctly (thanks, Juanjo!).
+  - (comm.c) Removed a crasher when running with --check-refcounts: References
+       by snooping non-interactives weren't counted (Bug #492).
 
 03-Oct-2007 (Lars Duening)
   - (mapping.c, object.c) Removed C-99 features.

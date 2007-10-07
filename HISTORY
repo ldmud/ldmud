@@ -9,6 +9,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Size-changing mapping operations didn't fully check for destructed
          objects as keys, sometimes derefencing invalid pointers in
          the process (Bug #517).
+       +  Removed a crasher when running with --check-refcounts: References
+          by snooping non-interactives weren't counted (Bug #492).
 
     - Other:
        + The autoconfiguration of YACC was incompatible with gentoo Linux.
