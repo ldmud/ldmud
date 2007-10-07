@@ -1347,7 +1347,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
     char          format_char;     /* format type */
     unsigned int  nelemno;         /* next offset into array */
     unsigned int  fpos;            /* position in format_str */
-    unsigned int  fs;              /* field size */
+    p_uint        fs;              /* field size */
     int           pres;            /* precision */
     unsigned int  err_num;         /* error code */
     char         *pad;             /* fs pad string */
@@ -1676,9 +1676,9 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                             {
                                 if (carg->type != T_NUMBER)
                                     ERROR(ERR_INVALID_STAR);
-                                if ((int)(fs = carg->u.number) < 0)
+                                if ((p_int)(fs = carg->u.number) < 0)
                                 {
-                                    if (fs == PINT_MIN)
+                                    if (fs == (p_uint)PINT_MIN)
                                         fs = PINT_MAX;
                                     else
                                         fs = -fs;
