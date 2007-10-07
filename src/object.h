@@ -295,7 +295,7 @@ extern void dealloc_object(object_t *);
 extern void dealloc_object(object_t *, const char * file, int line);
 #endif
 extern object_t *get_empty_object(int num_var);
-extern void      init_object_variables (object_t *ob);
+extern void      init_object_variables (object_t *ob, object_t *templ);
 
 extern svalue_t *v_function_exists(svalue_t *sp, int num_arg);
 extern svalue_t *f_functionlist(svalue_t *sp);

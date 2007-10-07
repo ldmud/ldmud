@@ -7,12 +7,15 @@ DESCRIPTION
         the object <template>. In both cases, the new object is given
         an unique name and returned.
 
-        The original, called blueprint, used for cloning, should not be
+        The original used for cloning, called blueprint, should not be
         used in the system, just for cloning. The cloned objects
         contain only the data but the blueprint also the function code.
         The blueprint is the one without a unique number at the end of
         the object's name. The clone_object() function never
         returns a blue print.
+
+        If the <name> or <template> designates a cloned object itself,
+        the system looks up the blueprint object _by name_.
 
         If the blueprint exists and has a heart_beat(), clone_object()
         turns it off.
@@ -27,12 +30,15 @@ DESCRIPTION
         -- Variable Initialization --
 
         In general, variables are initialized for blueprints and clones alike
-        with a call to the internal lfun __INIT(). However, if #pragma
-        share_variables is in effect (either explicitely given in the source
-        or implicitely as runtime option), the values for a clone's variables
-        are taken from the _current_ variables of the object's blueprint.
+        with a call to the internal lfun __INIT().
+        
+        However, if #pragma share_variables is in effect (either explicitely
+        given in the source or implicitely as runtime option), the values for
+        a clone's uninitialized variables are taken from the _current_
+        variables of the object's blueprint.
 
-        Variables without explicit initializers are always initialized to 0.
+        In the absence of share_variables, variables without explicit
+        initializers are initialized to 0.
 
 EXAMPLE
         // Clone a torch (filename in non-compat format)

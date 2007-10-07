@@ -17,6 +17,14 @@ See the file HISTORY for a user-oriented summary of all the changes.
        empty (Bug #500).
   - (mstrings, obtable.c) Made sure that otable uses the same hasher
        as mstring (Bug #500).
+  - (object, simulate.c) clone_object(): When initializing a clone's variables
+       using #pragma share_variables, really use the variables from the
+       blueprint object being given, not relying on the program.
+       This allows the handling of inherited blueprint objects with replaced
+       programs. (Bug #483)
+  - (simulate.c) replace_program(): If the program of a blueprint is replaced,
+       the old program's blueprint pointer is NULLed out as it is no longer
+       accurate. (Bug #483)
 
 03-Oct-2007 (Lars Duening)
   - (mapping.c, object.c) Removed C-99 features.

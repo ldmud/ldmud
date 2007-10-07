@@ -2126,7 +2126,7 @@ load_object (const char *lname, Bool create_super, int depth
         {
             /* The master object is loaded with no current object */
             current_object = NULL;
-            init_object_variables(ob);
+            init_object_variables(ob, NULL);
             reset_object(ob, create_super ? H_CREATE_SUPER : H_CREATE_OB);
 
             /* If the master inherits anything -Ugh- we have to have
@@ -2137,7 +2137,7 @@ load_object (const char *lname, Bool create_super, int depth
         else
         {
             current_object = save_current;
-            init_object_variables(ob);
+            init_object_variables(ob, NULL);
             reset_object(ob, create_super ? H_CREATE_SUPER : H_CREATE_OB);
         }
     }
@@ -2346,7 +2346,7 @@ clone_object (string_t *str1)
     push_ref_object(inter_sp, ob, "clone_object");
     push_ref_string(inter_sp, new_ob->name);
     give_uid_to_object(new_ob, H_CLONE_UIDS, 2);
-    init_object_variables(new_ob);
+    init_object_variables(new_ob, ob);
     reset_object(new_ob, H_CREATE_CLONE);
     command_giver = check_object(save_command_giver);
 

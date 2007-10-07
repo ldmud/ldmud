@@ -448,11 +448,13 @@ static mp_int last_id = 0;
 
 /*-------------------------------------------------------------------------*/
 void
-init_object_variables (object_t *ob)
+init_object_variables (object_t *ob, object_t *templ)
 
 /* The variables of object <ob> are initialized.
+ *
  * First, if <ob> is a clone, all variables marked as !VAR_INITIALIZED are
- * copied over from the blueprint.
+ * copied over from the <templ>, if given. <templ> MUST be the blueprint
+ * object.
  * 
  * Then, for all <ob>, __INIT() is called in <ob> which initializes all
  * the variables marked as VAR_INITIALIZED in clones, and all variables
@@ -463,20 +465,14 @@ init_object_variables (object_t *ob)
     /* For clones, copy the shared variable values */
     if ((ob->flags & O_CLONE))
     {
-        object_t *bp;
         int i;
         variable_t *p_vars;
-        svalue_t *ob_vars, *bp_vars;
+        svalue_t *ob_vars, *templ_vars;
 
-        bp = ob->prog->blueprint;
-        if (!bp || bp->flags & O_DESTRUCTED)
-        {
-            if (bp) free_object(bp, "init_object_variables");
-            ob->prog->blueprint = NULL;
-            bp_vars = NULL;
-        }
+        if (!templ || templ->flags & O_DESTRUCTED)
+            templ_vars = NULL;
         else
-            bp_vars = bp->variables;
+            templ_vars = templ->variables;
 
         ob_vars = ob->variables;
         p_vars = ob->prog->variables;
@@ -485,10 +481,10 @@ init_object_variables (object_t *ob)
         {
             if (p_vars[i].type.typeflags & VAR_INITIALIZED)
                 continue;
-            if (!bp_vars)
-                errorf("Can't initialize object '%s': no blueprint.\n"
+            if (!templ_vars)
+                errorf("Can't initialize object '%s': no blueprint given.\n"
                      , get_txt(ob->name));
-            assign_svalue_no_free(&ob_vars[i], &bp_vars[i]);
+            assign_svalue_no_free(&ob_vars[i], &templ_vars[i]);
         }
     }
 
@@ -1064,6 +1060,17 @@ replace_programs (void)
             xfree(r_ob->ob->variables);
             r_ob->ob->variables = new_vars;
         } /* if (change in vars) */
+
+        /* If the object modified is a blueprint object, NULL out the pointer
+         * in its program, because after the replacement the blueprint nature
+         * will be lost.
+         */
+        if (r_ob->ob->prog->blueprint == r_ob->ob)
+        {
+            r_ob->ob->prog->blueprint = NULL;
+            remove_prog_swap(r_ob->ob->prog, MY_TRUE);
+            free_object(r_ob->ob, "replace_programs: blueprint reference");
+        }
 
         /* Replace the old program with the new one */
         old_prog = r_ob->ob->prog;
