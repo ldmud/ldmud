@@ -1208,11 +1208,11 @@ int main(void)
 
         tmp=""
 
-        AC_CHECK_LIB(iconv,main, tmp="$PKGLIBS -liconv")
+        AC_CHECK_LIB(iconv,libiconv_close, tmp="$PKGLIBS -liconv")
 
         if test "x$tmp" = "x"; then
             CFLAGS="$saveflags -L/usr/local/lib"
-            AC_CHECK_LIB(iconv,main, tmp="$PKGLIBS -L/usr/local/lib -liconv")
+            AC_CHECK_LIB(iconv,libiconv_close, tmp="$PKGLIBS -L/usr/local/lib -liconv")
         fi
 
         if test "x$tmp" = "x"; then

@@ -11667,9 +11667,9 @@ echo "${ECHO_T}$lp_cv_need_lib_iconv" >&6
 
         tmp=""
 
-        echo "$as_me:$LINENO: checking for main in -liconv" >&5
-echo $ECHO_N "checking for main in -liconv... $ECHO_C" >&6
-if test "${ac_cv_lib_iconv_main+set}" = set; then
+        echo "$as_me:$LINENO: checking for libiconv_close in -liconv" >&5
+echo $ECHO_N "checking for libiconv_close in -liconv... $ECHO_C" >&6
+if test "${ac_cv_lib_iconv_libiconv_close+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   ac_check_lib_save_LIBS=$LIBS
@@ -11681,11 +11681,17 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-
+/* Override any gcc2 internal prototype to avoid an error.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+/* We use char because int might match the return type of a gcc2
+   builtin and then its argument prototype would still apply.  */
+char libiconv_close ();
 int
 main ()
 {
-main ();
+libiconv_close ();
   ;
   return 0;
 }
@@ -11712,29 +11718,29 @@ if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
   ac_status=$?
   echo "$as_me:$LINENO: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  ac_cv_lib_iconv_main=yes
+  ac_cv_lib_iconv_libiconv_close=yes
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
 
-ac_cv_lib_iconv_main=no
+ac_cv_lib_iconv_libiconv_close=no
 fi
 rm -f conftest.err conftest.$ac_objext \
       conftest$ac_exeext conftest.$ac_ext
 LIBS=$ac_check_lib_save_LIBS
 fi
-echo "$as_me:$LINENO: result: $ac_cv_lib_iconv_main" >&5
-echo "${ECHO_T}$ac_cv_lib_iconv_main" >&6
-if test $ac_cv_lib_iconv_main = yes; then
+echo "$as_me:$LINENO: result: $ac_cv_lib_iconv_libiconv_close" >&5
+echo "${ECHO_T}$ac_cv_lib_iconv_libiconv_close" >&6
+if test $ac_cv_lib_iconv_libiconv_close = yes; then
   tmp="$PKGLIBS -liconv"
 fi
 
 
         if test "x$tmp" = "x"; then
             CFLAGS="$saveflags -L/usr/local/lib"
-            echo "$as_me:$LINENO: checking for main in -liconv" >&5
-echo $ECHO_N "checking for main in -liconv... $ECHO_C" >&6
-if test "${ac_cv_lib_iconv_main+set}" = set; then
+            echo "$as_me:$LINENO: checking for libiconv_close in -liconv" >&5
+echo $ECHO_N "checking for libiconv_close in -liconv... $ECHO_C" >&6
+if test "${ac_cv_lib_iconv_libiconv_close+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   ac_check_lib_save_LIBS=$LIBS
@@ -11746,11 +11752,17 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-
+/* Override any gcc2 internal prototype to avoid an error.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+/* We use char because int might match the return type of a gcc2
+   builtin and then its argument prototype would still apply.  */
+char libiconv_close ();
 int
 main ()
 {
-main ();
+libiconv_close ();
   ;
   return 0;
 }
@@ -11777,20 +11789,20 @@ if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
   ac_status=$?
   echo "$as_me:$LINENO: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  ac_cv_lib_iconv_main=yes
+  ac_cv_lib_iconv_libiconv_close=yes
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
 
-ac_cv_lib_iconv_main=no
+ac_cv_lib_iconv_libiconv_close=no
 fi
 rm -f conftest.err conftest.$ac_objext \
       conftest$ac_exeext conftest.$ac_ext
 LIBS=$ac_check_lib_save_LIBS
 fi
-echo "$as_me:$LINENO: result: $ac_cv_lib_iconv_main" >&5
-echo "${ECHO_T}$ac_cv_lib_iconv_main" >&6
-if test $ac_cv_lib_iconv_main = yes; then
+echo "$as_me:$LINENO: result: $ac_cv_lib_iconv_libiconv_close" >&5
+echo "${ECHO_T}$ac_cv_lib_iconv_libiconv_close" >&6
+if test $ac_cv_lib_iconv_libiconv_close = yes; then
   tmp="$PKGLIBS -L/usr/local/lib -liconv"
 fi
 

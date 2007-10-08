@@ -10,6 +10,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (simulate, interpret) The value thrown in a catch is now held in
        the catch context could be leaked if a second error happens and
        is caught in the master::runtime_error() handler (Bug #513).
+  - (configure) When testing for libiconv, reference a real libiconv method.
+       This catches situations where libiconv exists, but is of the
+       wrong architecture.
 
 06-Oct-2007 (Lars Duening)
   - (configure) gentoo Linux requires the '-n' argument for 'tail +2' to
