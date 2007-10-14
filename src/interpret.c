@@ -934,7 +934,10 @@ struct protected_lvalue
       /* .v.type: T_PROTECTED_LVALUE
        * .v.u.lvalue: the protected value
        */
-    svalue_t protector; /* protects .v.u.lvalue (or its holder) */
+    svalue_t protector;
+      /* additional reference .v.u.lvalue (or its holder) as means of
+       * protection
+       */
 };
 
 /* --- struct protected_char_lvalue: protect a char in a string
@@ -962,12 +965,12 @@ struct protected_range_lvalue {
        */
     svalue_t protector;  /* protects .lvalue */
     svalue_t *lvalue;    /* the original svalue holding the range */
-    int index1, index2;  /* first and last index of the range */
+    int index1, index2;  /* first and last index of the range in .lvalue */
     int size;            /* original size of .lvalue */
 
     /* On creation, .v.u.{vec,str} == .lvalue->u.{vec,str}.
-     * If that condition no longer holds, the target has been changed and
-     * the range information (index, size) is no longer valid.
+     * If that condition no longer holds, the target in .v has been changed
+     * and the range information (index, size) is no longer valid.
      */
 };
 
@@ -1812,8 +1815,8 @@ assign_svalue (svalue_t *dest, svalue_t *v)
 
 {
     /* Free the <dest> svalue.
-     * If <dest> is a lvalue, the loop will traverse the lvalue chain until
-     * the actual svalue is found.
+     * If <dest> is a (protected) lvalue, the loop will traverse the lvalue
+     * chain until the actual svalue is found.
      * If a T_xxx_LVALUE is found, the assignment will be done here
      * immediately.
      */
@@ -2318,7 +2321,9 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
     }
     else
     {
-        /* Not a pointer: just free it */
+        /* Not a pointer, or the protected range has changed in size before:
+         * just free it
+         */
         free_svalue(source);
     }
 
