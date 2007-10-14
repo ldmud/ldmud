@@ -200,6 +200,18 @@ assert_simul_efun_object (void)
 
     /* Get the name(s) of the simul_efun  object. */
     svp = apply_master(STR_GET_SEFUN, 0);
+
+    /* If a simul_efun_object appears during the GET_SEFUN call, it
+     * might have been due to a recursive get_simul_efun() call which may
+     * have gotten an old backup copy. This can lead to hard-to-debug
+     * variable and function definition inconsistencies.
+     */
+    if (simul_efun_object)
+    {
+        printf("%s simul_efun object appeared while asking for it.\n", time_stamp());
+        return MY_TRUE;
+    }
+
     if (svp == NULL)
     {
         printf("%s No simul_efun\n", time_stamp());

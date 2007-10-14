@@ -11,6 +11,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
        as that is where structs are defined. Searched in the local
        namespace can get the driver confused with references to
        undefined structs. (Bug #493)
+  - (simul_efun.c) If a simul_efun object appeared before being blessed
+       explicitely, it may be an old backup copy. This situation is
+       now rejected as the variable/function definitions may differ
+       subtly. (Bug #489)
 
 13-Oct-2007 (Lars Duening)
   - (interpret, simulate.c) Changed the apply cache counters to 'unsigned

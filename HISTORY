@@ -37,6 +37,9 @@ For a detailed list of all changes see the file CHANGELOG.
          input buffer could at one time. (Bug #442)
        + The Apply-Cache statistics counters should overflow less often
          (Bug #520).
+       + If a simul_efun object appears before being 'blessed', that
+         object is rejected to avoid variable/function inconsistency bugs.
+         (Bug #489).
 
     - Other:
        + The autoconfiguration of YACC was incompatible with gentoo Linux.
