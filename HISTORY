@@ -23,6 +23,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + An argument mismatch error during a lfun-closure call could
          crash the driver. (Bug #495).
        + The definition 'struct abc abc;' could crash the driver. (Bug #494) 
+       + The use of local undefined structs as 'struct abc abc = (<abc>)'
+         could crash the driver. (Bug #493)
 
     - Compiler:
        + The lfuns backing the inline closures are again 'private nomask'.

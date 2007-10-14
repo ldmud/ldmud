@@ -4118,6 +4118,11 @@ find_struct ( string_t * name )
     ident_t * p;
 
     p = find_shared_identifier(get_txt(name), I_TYPE_GLOBAL, 0);
+
+    /* Find the global struct identifier */
+    while (p != NULL && p->type != I_TYPE_GLOBAL)
+        p = p->inferior;
+
     if (p == NULL || p->u.global.struct_id < 0)
         return -1;
     if (STRUCT_DEF(p->u.global.struct_id).flags & NAME_HIDDEN)
