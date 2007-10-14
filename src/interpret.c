@@ -6321,13 +6321,14 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
 } /* setup_new_frame2() */
 
 /*-------------------------------------------------------------------------*/
-static funflag_t
+static void
 setup_new_frame (int fx, unsigned short inhIndex)
 
 /* Setup a call for function <fx> in the current program.
  * If <inhIndex> is not 0, it is the (inheritance index + 1) of the 
  * inherited function to call.
- * Result are the flags for the function.
+ * Result are the flags for the function. Global csp->funstart is set
+ * to the start of the function bytecode.
  */
 
 {
@@ -6343,10 +6344,12 @@ setup_new_frame (int fx, unsigned short inhIndex)
     else
         flags = setup_new_frame1(fx, 0, 0);
 
-    inter_sp = setup_new_frame2(
-      current_prog->program + (flags & FUNSTART_MASK), inter_sp
-      , MY_FALSE, MY_FALSE
-    );
+    /* Setting csp->funstart is not just convenient, but also
+     * required for proper error handling in setup_new_frame2()
+     */
+    csp->funstart = current_prog->program + (flags & FUNSTART_MASK);
+
+    inter_sp = setup_new_frame2(csp->funstart, inter_sp, MY_FALSE, MY_FALSE);
 #ifdef DEBUG
     if (!current_object->variables && variable_index_offset)
         fatal("%s Fatal: new frame for object %p '%s' w/o variables, "
@@ -6358,7 +6361,6 @@ setup_new_frame (int fx, unsigned short inhIndex)
     if (current_variables)
         current_variables += variable_index_offset;
     current_strings = current_prog->strings;
-    return flags;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -22318,8 +22320,6 @@ call_lambda (svalue_t *lsvp, int num_arg)
 
     case CLOSURE_LFUN:  /* --- lfun closure --- */
       {
-        funflag_t flags;
-        fun_hdr_p funstart;
 
         /* Can't call from a destructed object */
         if (l->ob->flags & O_DESTRUCTED)
@@ -22363,18 +22363,14 @@ call_lambda (svalue_t *lsvp, int num_arg)
 
         current_prog = current_object->prog;
         /* inter_sp == sp */
-        flags = setup_new_frame(l->function.lfun.index, l->function.lfun.inhIndex);
-        funstart = current_prog->program + (flags & FUNSTART_MASK);
-        csp->funstart = funstart;
-        eval_instruction(FUNCTION_CODE(funstart), inter_sp);
+        setup_new_frame(l->function.lfun.index, l->function.lfun.inhIndex);
+        eval_instruction(FUNCTION_CODE(csp->funstart), inter_sp);
         /* The result is on the stack (inter_sp) */
         return;
       }
 
     case CLOSURE_ALIEN_LFUN:  /* --- alien lfun closure --- */
       {
-        funflag_t flags;
-        fun_hdr_p funstart;
         Bool      extra_frame;
 
         /* Can't call from a destructed object */
@@ -22457,10 +22453,8 @@ call_lambda (svalue_t *lsvp, int num_arg)
         current_object = l->function.alien.ob;
         current_prog = current_object->prog;
         /* inter_sp == sp */
-        flags = setup_new_frame(l->function.alien.index, 0);
-        funstart = current_prog->program + (flags & FUNSTART_MASK);
-        csp->funstart = funstart;
-        eval_instruction(FUNCTION_CODE(funstart), inter_sp);
+        setup_new_frame(l->function.alien.index, 0);
+        eval_instruction(FUNCTION_CODE(csp->funstart), inter_sp);
 
         /* If l->ob selfdestructs during the call, l might have been
          * deallocated at this point!
@@ -22869,9 +22863,6 @@ call_function (program_t *progp, int fx)
  */
 
 {
-    funflag_t flags;
-    fun_hdr_p funstart;
-
     push_control_stack(inter_sp, inter_pc, inter_fp);
     csp->ob = current_object;
     csp->prev_ob = previous_ob;
@@ -22881,12 +22872,10 @@ call_function (program_t *progp, int fx)
 #endif
     csp->num_local_variables = 0;
     current_prog = progp;
-    flags = setup_new_frame(fx, 0);
-    funstart = current_prog->program + (flags & FUNSTART_MASK);
-    csp->funstart = funstart;
+    setup_new_frame(fx, 0);
     previous_ob = current_object;
     tracedepth = 0;
-    eval_instruction(FUNCTION_CODE(funstart), inter_sp);
+    eval_instruction(FUNCTION_CODE(csp->funstart), inter_sp);
     free_svalue(inter_sp--);  /* Throw away the returned result */
 } /* call_function() */
 

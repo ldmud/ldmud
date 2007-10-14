@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Oct-2007 (Lars Duening)
+  - (interpret.c) setup_new_frame() now updates the csp->funstart entry
+       by itself, instead of having the caller do it. This is not just
+       more convenient, but also avoids problems with possible errors
+       during its execution (as the error handling will try to create
+       a stack trace). (Bug #495)
+
 06-Oct-2007 (Lars Duening)
   - (configure) The search for the mysqlclient library in less-standard
        standard paths wasn't performed because the previous cached result
