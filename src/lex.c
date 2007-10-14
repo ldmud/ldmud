@@ -7793,7 +7793,7 @@ count_lex_refs (void)
             count_ident_refs(id);
             for (id2 = id->inferior; id2 != NULL; id2 = id2->next)
             {
-                count_ident_refs(id);
+                count_ident_refs(id2);
             }
         }
     }

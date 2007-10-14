@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-13-Oct-2007 (Lars Duening) -- 3.3.716
+14-Oct-2007 (Lars Duening) -- 3.3.716
     - Changed Efuns:
        + load_object(): The object name must not be empty (Bug #500).
 
@@ -22,6 +22,7 @@ For a detailed list of all changes see the file CHANGELOG.
          inherited blueprint objects with replaced programs. (Bug #483)
        + An argument mismatch error during a lfun-closure call could
          crash the driver. (Bug #495).
+       + The definition 'struct abc abc;' could crash the driver. (Bug #494) 
 
     - Compiler:
        + The lfuns backing the inline closures are again 'private nomask'.

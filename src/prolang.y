@@ -6091,7 +6091,6 @@ opt_base_struct:
           {
               /* Identifier -> no such struct encountered yet */
               yyerrorf("Unknown base struct '%s'", get_txt($2->name));
-              free_shared_identifier($2);
           }
           else
           {
@@ -6161,8 +6160,6 @@ member_name_list:
           
           assign_full_to_vartype(&type, actual_type);
           add_struct_member($3->name, type, NULL);
-          if ($3->type == I_TYPE_UNKNOWN)
-              free_shared_identifier($3);
             
           $$ = $1;
       }
@@ -6175,8 +6172,6 @@ member_name_list:
           
           assign_full_to_vartype(&type, actual_type);
           add_struct_member($4->name, type, NULL);
-          if ($4->type == I_TYPE_UNKNOWN)
-              free_shared_identifier($4);
             
           $$ = $1;
       }
@@ -6539,10 +6534,6 @@ inheritance_qualifier:
                       , get_txt(last_identifier->name));
               $$[0] = $$[1] = 0;
           }
-
-          /* Free the identifier again if this statement generated it */
-          if (last_identifier->type == I_TYPE_UNKNOWN)
-                free_shared_identifier(last_identifier);
       }
 ; /* inheritance_qualifier */
 
@@ -6696,8 +6687,6 @@ identifier:
 
           /* Extract the string from the ident structure */
           p = ref_mstring($1->name);
-          if ($1->type == I_TYPE_UNKNOWN)
-              free_shared_identifier($1);
           $$ = p;
       }
 
@@ -12289,11 +12278,6 @@ function_call:
                                            , $4, (bytecode_p)__PREPARE_INSERT__p
                                            );
 
-                      if ($1.real->type == I_TYPE_UNKNOWN)
-                      {
-                          free_shared_identifier($1.real);
-                      }
-
                       if (ix < 0)
                       {
                           switch(ix) {
@@ -13149,8 +13133,6 @@ anchestor:
       L_IDENTIFIER
       {
           $$ = ystring_copy(get_txt($1->name));
-          if ($1->type == I_TYPE_UNKNOWN)
-              free_shared_identifier($1);
       }
 
     | L_STRING L_STRING
@@ -15960,12 +15942,7 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
         if (!id)
             fatal("Out of memory: identifier '%s'.\n", get_txt(STR_CALL_OTHER));
 
-        if (id->type == I_TYPE_UNKNOWN)
-        {
-            /* No such identifier, therefor no such sefun */
-            free_shared_identifier(id);
-        }
-        else
+        if (id->type != I_TYPE_UNKNOWN)
         {
             /* This shouldn't be necessary, but just in case... */
             while (id && id->type > I_TYPE_GLOBAL)
@@ -16356,6 +16333,8 @@ epilog (void)
     }
 
     all_globals = NULL;
+    
+    remove_unknown_identifier();
 
     /* Now create the program structure */
     switch (0) { default:
