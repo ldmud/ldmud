@@ -4,6 +4,11 @@ See the file HISTORY for a user-oriented summary of all the changes.
 13-Oct-2007 (Lars Duening)
   - (interpret, simulate.c) Changed the apply cache counters to 'unsigned
        long' to reduce the possibility of an overflow (Bug #520).
+  - (interpret.c) setup_new_frame() now updates the csp->funstart entry
+       by itself, instead of having the caller do it. This is not just
+       more convenient, but also avoids problems with possible errors
+       during its execution (as the error handling will try to create
+       a stack trace). (Bug #495)
 
 07-Oct-2007 (Lars Duening)
   - (comm.c) When in charmode, don't attempt to read in as much data

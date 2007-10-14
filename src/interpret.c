@@ -7249,13 +7249,14 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
 } /* setup_new_frame2() */
 
 /*-------------------------------------------------------------------------*/
-static funflag_t
+static void
 setup_new_frame (int fx, program_t *inhProg)
 
 /* Setup a call for function <fx> in the current program.
  * If <inhProg> is not NULL, it is the program of the inherited function
  * to call.
- * Result are the flags for the function.
+ * Result are the flags for the function. Global csp->funstart is set
+ * to the start of the function bytecode.
  */
 
 {
@@ -7320,10 +7321,12 @@ setup_new_frame (int fx, program_t *inhProg)
     else
         flags = setup_new_frame1(fx, 0, 0);
 
-    inter_sp = setup_new_frame2(
-      current_prog->program + (flags & FUNSTART_MASK), inter_sp, MY_FALSE
-      , MY_FALSE
-    );
+    /* Setting csp->funstart is not just convenient, but also
+     * required for proper error handling in setup_new_frame2()
+     */
+    csp->funstart = current_prog->program + (flags & FUNSTART_MASK);
+
+    inter_sp = setup_new_frame2(csp->funstart, inter_sp, MY_FALSE, MY_FALSE);
 #ifdef DEBUG
     if (!current_object->variables && variable_index_offset)
         fatal("%s Fatal: new frame for object %p '%s' w/o variables, "
@@ -7335,7 +7338,6 @@ setup_new_frame (int fx, program_t *inhProg)
     if (current_variables)
         current_variables += variable_index_offset;
     current_strings = current_prog->strings;
-    return flags;
 } /* setup_new_frame() */
 
 /*-------------------------------------------------------------------------*/
@@ -17699,8 +17701,6 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 
     case CLOSURE_LFUN:  /* --- lfun closure --- */
       {
-        funflag_t flags;
-        fun_hdr_p funstart;
         Bool      extra_frame;
 
         /* Can't call from a destructed object */
@@ -17787,14 +17787,12 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         current_object = l->function.lfun.ob;
         current_prog = current_object->prog;
         /* inter_sp == sp */
-        flags = setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg);
+        setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg);
 #ifdef USE_NEW_INLINES
         if (l->function.lfun.context_size > 0)
             inter_context = l->context;
 #endif /* USE_NEW_INLINES */
-        funstart = current_prog->program + (flags & FUNSTART_MASK);
-        csp->funstart = funstart;
-        eval_instruction(FUNCTION_CODE(funstart), inter_sp);
+        eval_instruction(FUNCTION_CODE(csp->funstart), inter_sp);
 
         /* If l->ob selfdestructs during the call, l might have been
          * deallocated at this point!
@@ -18223,9 +18221,6 @@ call_function (program_t *progp, int fx)
  */
 
 {
-    funflag_t flags;
-    fun_hdr_p funstart;
-
 #ifdef USE_NEW_INLINES
     push_control_stack(inter_sp, inter_pc, inter_fp, inter_context);
 #else
@@ -18239,12 +18234,10 @@ call_function (program_t *progp, int fx)
 #endif
     csp->num_local_variables = 0;
     current_prog = progp;
-    flags = setup_new_frame(fx, NULL);
-    funstart = current_prog->program + (flags & FUNSTART_MASK);
-    csp->funstart = funstart;
+    setup_new_frame(fx, NULL);
     previous_ob = current_object;
     tracedepth = 0;
-    eval_instruction(FUNCTION_CODE(funstart), inter_sp);
+    eval_instruction(FUNCTION_CODE(csp->funstart), inter_sp);
     free_svalue(inter_sp--);  /* Throw away the returned result */
 } /* call_function() */
 

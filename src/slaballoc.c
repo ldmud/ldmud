@@ -180,7 +180,7 @@
  * Small free blocks:
  *
  *   The M_SIZE field in fact holds the offset to the slab holding this
- *   block.
+ *   block (this also holds true for the small allocated blocks).
  *
  *   The first word of the user area holds the 'next' link of the free
  *   list, which is NULL for the last block in the list.

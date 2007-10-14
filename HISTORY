@@ -20,6 +20,8 @@ For a detailed list of all changes see the file CHANGELOG.
          using #pragma share_variables, really use the variables from the
          blueprint object being given. This allows the handling of
          inherited blueprint objects with replaced programs. (Bug #483)
+       + An argument mismatch error during a lfun-closure call could
+         crash the driver. (Bug #495).
 
     - Compiler:
        + The lfuns backing the inline closures are again 'private nomask'.
