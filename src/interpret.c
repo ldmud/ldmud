@@ -611,8 +611,8 @@ static Bool runtime_array_range_check = MY_FALSE;
    */
 
 #ifdef APPLY_CACHE_STAT
-p_int apply_cache_hit  = 0;
-p_int apply_cache_miss = 0;
+p_uint apply_cache_hit  = 0;
+p_uint apply_cache_miss = 0;
   /* Number of hits and misses in the apply cache.
    */
 #endif

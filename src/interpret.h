@@ -111,8 +111,8 @@ extern svalue_t apply_return_value;
 extern svalue_t last_indexing_protector;
 
 #ifdef APPLY_CACHE_STAT
-extern p_int apply_cache_hit;
-extern p_int apply_cache_miss;
+extern p_uint apply_cache_hit;
+extern p_uint apply_cache_miss;
 #endif
 
 extern unsigned long total_evalcost;

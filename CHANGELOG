@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Oct-2007 (Lars Duening)
+  - (interpret, simulate.c) Changed the apply cache counters to 'unsigned
+       long' to reduce the possibility of an overflow (Bug #520).
+
 07-Oct-2007 (Lars Duening)
   - (comm.c) When in charmode, don't attempt to read in as much data
        as the buffer has left space: otherwise the handling of such an

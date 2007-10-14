@@ -3235,8 +3235,8 @@ status_parse (strbuf_t * sbuf, char * buff)
             strbuf_addf(sbuf
                        , "Calls to apply_low: %7lu\n"
                          "Cache hits:         %7lu (%.2f%%)\n"
-                       , (unsigned long)(apply_cache_hit+apply_cache_miss)
-                       , (unsigned long)apply_cache_hit
+                       , (apply_cache_hit+apply_cache_miss)
+                       , apply_cache_hit
                        , 100.*(float)apply_cache_hit/
                          (float)(apply_cache_hit+apply_cache_miss) );
 #endif
