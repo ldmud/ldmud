@@ -487,6 +487,14 @@ remove_shadow_actions (object_t *shadow, object_t *target)
 
 {
     object_t *item;
+    object_t *shadowing;
+
+    /* Get the real underlying object, just as add_action does. */
+    while ((target->flags & O_SHADOW)
+     && NULL != (shadowing = O_GET_SHADOW(target)->shadowing))
+    {
+        target = shadowing;
+    }
 
     remove_shadow_action_sent(shadow, target);
     for (item = target->contains; item; item = item->next_inv)
@@ -1888,7 +1896,7 @@ f_remove_action (svalue_t *sp)
  */
 
 {
-    object_t    *ob;
+    object_t    *ob, *shadow_ob;
     string_t    *verb;
     sentence_t **sentp;
     action_t    *s;
@@ -1917,14 +1925,33 @@ f_remove_action (svalue_t *sp)
         efun_gen_arg_error(1, sp[-1].type, sp);
         /* NOTREACHED */
     }
-
-    /* Now search and remove the sentence */
+    
     rc = 0;
     sentp = &ob->sent;
+
     ob = current_object;
+    shadow_ob = NULL;
+    
+    /* Look for the underlying object, just as add_action does. */
+    if (ob->flags & O_SHADOW && O_GET_SHADOW(ob)->shadowing)
+    {
+        object_t *shadowing;
+
+        shadow_ob = ob;
+
+        while ((ob->flags & O_SHADOW)
+         && NULL != (shadowing = O_GET_SHADOW(ob)->shadowing))
+        {
+            ob = shadowing;
+        }
+    }
+
+    /* Now search and remove the sentence */
     while ( NULL != (s = (action_t *)*sentp) )
     {
-        if (!SENT_IS_INTERNAL((*sentp)->type) && s->ob == ob && (!verb || s->verb == verb))
+        if (!SENT_IS_INTERNAL((*sentp)->type) && s->ob == ob 
+	 && (!verb || s->verb == verb)
+	 && (!shadow_ob || s->shadow_ob == shadow_ob))
         {
 #ifdef CHECK_OBJECT_REF
             if (sentp == &ob->sent)

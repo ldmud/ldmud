@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Nov-2007 (Gnomi)
+  - (actions.c) Improvements for the removal of actions added by shadows
+       (Bug #514).
+
 14-Oct-2007 (Lars Duening)  (3.3.716)
   - Created snapshot.
 
@@ -27,11 +31,6 @@ See the file HISTORY for a user-oriented summary of all the changes.
        more convenient, but also avoids problems with possible errors
        during its execution (as the error handling will try to create
        a stack trace). (Bug #495)
-  - (prolang.y, lex.c) UNKNOWN identifiers are kept around until the
-       end of the compilation, as some parser rules can look-ahead multiple
-       tokens pointing to the same UNKNOWN identifier, so an early free
-       will lead to references to invalid memory. Keeping them that
-       long is a bit of overkill, but more future-proof (Bug #494).
 
 07-Oct-2007 (Lars Duening)
   - (comm.c) When in charmode, don't attempt to read in as much data
