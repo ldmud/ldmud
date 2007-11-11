@@ -1105,7 +1105,7 @@ mstring_mstr_rn_str ( const string_t * const pStr, size_t start
     size_t left;
     char   first;
 
-    if (start >= mstrsize(pStr))
+    if (start > mstrsize(pStr))
         return NULL;
 
     /* Initialize 'characters remaining' and 'current position' */

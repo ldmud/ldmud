@@ -5,6 +5,10 @@ the host system.
 For a detailed list of all changes see the file CHANGELOG.
 
 11-Nov-2007 (Lars Duening) -- 3.3.717
+    - Changed Efuns:
+       + strrstr(): A starting position of the input string's length
+          led to the target string never being found (Bug #509).
+
     - Other:
        + Improved the removal of actions added by shadows (Bug #514).
 
