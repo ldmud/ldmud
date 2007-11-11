@@ -9,6 +9,10 @@ For a detailed list of all changes see the file CHANGELOG.
        + strrstr(): A starting position of the input string's length
           led to the target string never being found (Bug #509).
 
+    - Compiler:
+       + After two consecutive inline closures within the same
+          function, the line number information was incorrect (Bug #510).
+
     - Other:
        + Improved the removal of actions added by shadows (Bug #514).
 

@@ -4957,6 +4957,17 @@ printf("DEBUG:   #%d: start %ld, length %ld, function %d: new start %ld\n", ix, 
             store_line_number_info();
             if (stored_lines > ict->start_line)
                 store_line_number_backward(stored_lines - ict->start_line);
+	    else 
+                while (stored_lines < ict->start_line)
+                {
+                    int lines;
+
+                    lines = ict->start_line - stored_lines;
+                    if (lines > LI_MAXEMPTY)
+                        lines = LI_MAXEMPTY;
+                    stored_lines += lines;
+                    byte_to_mem_block(A_LINENUMBERS, 256 - lines);
+                }
 
             FUNCTION(ict->function)->offset.pc = CURRENT_PROGRAM_SIZE + FUNCTION_PRE_HDR_SIZE;
             add_to_mem_block(A_PROGRAM, INLINE_PROGRAM_BLOCK(ict->start)
