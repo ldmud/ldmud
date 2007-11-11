@@ -10,7 +10,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
        (Bug #514).
   - (prolang.y) After two consecutive inline closures within the same
        function, the line number information was incorrect (Bug #510).
-       
+  - (lex.c) Corrected an off-by-one error related to auto-includes
+       by moving the line number adjustment from the CHAR_EOF handling
+       to the add_auto_include() function (Bug #508).
 
 14-Oct-2007 (Lars Duening)  (3.3.716)
   - Created snapshot.

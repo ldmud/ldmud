@@ -2592,10 +2592,12 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
     if (auto_include_string != NULL)
     {
         /* The auto include string is handled like a normal include */
-        current_loc.line++; /* Make sure to restore to line 1 */
+        if (cur_file != NULL)   /* Otherwise we already are at line 1 */
+            current_loc.line++; /* Make sure to restore to line 1 */
         (void)start_new_include(-1, auto_include_string
                                , current_loc.file->name, "auto include", ')');
-        current_loc.line++; /* Make sure to start at line 1 */
+        if (cur_file == NULL)   /* Otherwise #include will increment it */
+            current_loc.line++; /* Make sure to start at line 1 */
     }
 } /* add_auto_include() */
 
@@ -4626,18 +4628,6 @@ yylex1 (void)
                 current_loc = p->loc;
                 if (!was_string_source)
                     current_loc.line++;
-                else
-                {
-                    /* 'string' includes are supposed to be inline
-                     * so correct the line number information to take out
-                     * the assumed newlines.
-                     * This has to be done after store_include_end()
-                     * since that function may remove all line number
-                     * information since the start of the include.
-                     */
-                    current_loc.line -= 1;
-                    store_line_number_backward(1);
-                }
 
                 yyin = p->yyin;
                 saved_char = p->saved_char;

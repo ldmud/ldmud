@@ -12,6 +12,8 @@ For a detailed list of all changes see the file CHANGELOG.
     - Compiler:
        + After two consecutive inline closures within the same
           function, the line number information was incorrect (Bug #510).
+       + Corrected an off-by-one linenumber error related to
+          auto-include strings (Bug #508)
 
     - Other:
        + Improved the removal of actions added by shadows (Bug #514).
