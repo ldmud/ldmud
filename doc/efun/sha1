@@ -11,6 +11,8 @@ DESCRIPTION
         the number of iterations used in the digest calculation. If omitted,
         the driver executes just one iteration.
 
+        The efun costs 5 ticks per iteration.
+
 EXAMPLES
         string s;
 
@@ -21,6 +23,7 @@ HISTORY
         Introduced in LDMud 3.3.523.
         LDMud 3.3.712 added number arrays as argument, and the number
           of iterations.
+        LDMud 3.3.717 added the iteration-based evaluation cost.
 
 SEE ALSO
         crypt(E), md5(E), md5_crypt(E), hash(E), hmac(E)

@@ -86,6 +86,10 @@ struct control_stack {
   /* The maximally useful shift (left or right) of a number in LPC.
    */
 
+/* Increase the evaluation cost(s) by a given amount.
+ */
+#define ADD_EVAL_COST(num) (eval_cost += (num), total_evalcost += (num))
+
 /* Reset the evaluation cost/time counter.
  */
 #define CLEAR_EVAL_COST (assigned_eval_cost = eval_cost = 0)

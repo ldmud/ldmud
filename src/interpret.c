@@ -7790,8 +7790,7 @@ again:
      * eval_cost < 0 signify a wrap-around - unlikely, but with these crazy
      * wizards everything is possible.
      */
-    ++eval_cost;
-    ++total_evalcost;
+    ADD_EVAL_COST(1);
     if (max_eval_cost && (eval_cost >= max_eval_cost || eval_cost < 0))
     {
         rt_context_t * context;

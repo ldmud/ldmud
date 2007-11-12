@@ -373,6 +373,12 @@ v_md5 (svalue_t *sp, int num_arg)
         return sp;
     }
 
+    ADD_EVAL_COST(iterations * 5);
+    if (EVALUATION_TOO_LONG())
+    {
+        // The interpreter loop will catch the exceeded evaluation cost.
+        return sp;
+    }
 
     if (sp->type == T_POINTER)
     {
@@ -518,7 +524,12 @@ v_sha1 (svalue_t *sp, int num_arg)
         return sp;
     }
 
-
+    ADD_EVAL_COST(iterations * 5);
+    if (EVALUATION_TOO_LONG())
+    {
+        // The interpreter loop will catch the exceeded evaluation cost.
+        return sp;
+    }
 
     if (sp->type == T_POINTER)
     {
@@ -662,8 +673,7 @@ f_regexp (svalue_t *sp)
             if (v->item[i].type != T_STRING)
                 continue;
 
-            eval_cost++;
-            total_evalcost++;
+            ADD_EVAL_COST(1);
             line = v->item[i].u.str;
             rc = rx_exec(reg, line, 0);
             if (rc == 0)
@@ -767,8 +777,7 @@ f_regexplode (svalue_t *sp)
     matchp = &matches;
     while ((rc = rx_exec(reg, text, start)) > 0)
     {
-        eval_cost++;
-        total_evalcost++;
+        ADD_EVAL_COST(1);
         match = (struct regexplode_match *)alloca(sizeof *match);
         if (!match)
         {
@@ -1017,8 +1026,7 @@ f_regreplace (svalue_t *sp)
     reslen = 0;
     while ((rc = rx_exec(reg, text, start)) > 0)
     {
-        eval_cost++;
-        total_evalcost++;
+        ADD_EVAL_COST(1);
         xallocate(match, sizeof(*match), "regreplace match structure");
         rx_get_match(reg, text, &(match->start), &(match->end));
         match->sub = NULL;
@@ -4039,8 +4047,7 @@ v_clones (svalue_t *sp, int num_arg)
     }
 
 #if defined(DYNAMIC_COSTS)
-    eval_cost += checked / 100 + found / 256;
-    total_evalcost += checked / 100 + found / 256;
+    ADD_EVAL_COST(checked / 100 + found / 256);
 #endif /* DYNAMIC_COSTS */
 
     /* Create the result and put it onto the stack */
@@ -5995,8 +6002,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
             size = (mp_int)VEC_SIZE(old);
             DYN_ARRAY_COST(size);
 #if defined(DYNAMIC_COSTS)
-            eval_cost += (depth+1) / 10;
-            total_evalcost += (depth+1) / 10;
+            ADD_EVAL_COST((depth+1) / 10);
 #endif
 
             /* Create a new array, assign it to dest, and store
@@ -6058,8 +6064,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
             size = (mp_int)struct_size(old);
             DYN_ARRAY_COST(size);
 #if defined(DYNAMIC_COSTS)
-            eval_cost += (depth+1) / 10;
-            total_evalcost += (depth+1) / 10;
+            ADD_EVAL_COST((depth+1) / 10);
 #endif
 
             /* Create a new array, assign it to dest, and store
@@ -6118,8 +6123,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
                */
             DYN_MAPPING_COST(size);
 #if defined(DYNAMIC_COSTS)
-            eval_cost += (depth+1) / 10;
-            total_evalcost += (depth+1) / 10;
+            ADD_EVAL_COST((depth+1) / 10);
 #endif
             info.depth = depth+1;
             info.width = old->num_values;
