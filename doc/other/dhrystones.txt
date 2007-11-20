@@ -224,13 +224,13 @@ Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.3.704, gcc 4.0:
 
 Tarkin: G5/2.1 GHz/1.5 GByte, Mac OS X 10.4.2, LDMud 3.3.712, gcc 4.0:
 
-  Dhrystone2 (64-Bit)              o0        o1        o2        o4
+  Dhrystone2 (32-Bit)              o0        o1        o2        o4
   -                              9605.0   15798.7   22044.4   22348.1
   -  -   MC, MT, ML             12534.5   22147.0   20508.8   20203.5
   D  -   MC, MT, ML              7122.7   15758.9   24718.3   24614.4
   D, TC, MC, MT, ML              8852.2   14604.0   12571.6   11996.9
 
-  Dhrystone2 (32-Bit)              o0        o1        o2        o4
+  Dhrystone2 (64-Bit)              o0        o1        o2        o4
   -                             15930.4   33344.5   33329.7   33906.0
   -  -   MC, MT, ML             15531.2   30969.4   33233.9   33868.0
   D  -   MC, MT, ML             12993.2   26932.5   27164.1   28422.7
@@ -244,4 +244,26 @@ Legend:
   MT: MALLOC_TRACE
   ML: MALLOC_LPC_TRACE
 
+
+Zathras: Core2Duo/2.3 GHz/2 GByte, Mac OS X 10.4.10, LDMud 3.3.715, gcc 4.0:
+
+  Dhrystone2 (32-Bit)              o0        o1        o2        o4
+  -                             22794.7   30791.4   26403.9   32705.0
+  -  -   MC, MT, ML             18986.2   29524.8   33557.0   30460.2
+  D  -   MC, MT, ML             18897.6   27930.4   29245.7   27847.6
+  D, TC, MC, MT, ML             19009.0   27759.9   29251.3   27956.5
+
+  Dhrystone2 (64-Bit)              o0        o1        o2        o4
+  -                             19909.8   36084.0   42523.3   42511.4
+  -  -   MC, MT, ML             18957.5   34743.4   39604.1   42863.6
+  D  -   MC, MT, ML             18533.6   28190.4   32467.8   33032.6
+  D, TC, MC, MT, ML             18639.5   28182.4   32474.8   33036.3
+
+
+Legend:
+  D: DEBUG
+  TC: TRACE_CODE
+  MC: MALLOC_CHECK
+  MT: MALLOC_TRACE
+  ML: MALLOC_LPC_TRACE
 
