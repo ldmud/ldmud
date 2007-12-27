@@ -132,6 +132,8 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-eval_cost.h"
+
 #include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/objectinfo.h"
@@ -373,9 +375,11 @@ v_md5 (svalue_t *sp, int num_arg)
         return sp;
     }
 
-    ADD_EVAL_COST(iterations * 5);
-    if (EVALUATION_TOO_LONG())
+    if (add_eval_cost_n(10, iterations))
     {
+        free_svalue(sp);
+        put_number(sp, 0);
+
         // The interpreter loop will catch the exceeded evaluation cost.
         return sp;
     }
@@ -524,10 +528,12 @@ v_sha1 (svalue_t *sp, int num_arg)
         return sp;
     }
 
-    ADD_EVAL_COST(iterations * 5);
-    if (EVALUATION_TOO_LONG())
+    if (add_eval_cost_n(10, iterations))
     {
-        // The interpreter loop will catch the exceeded evaluation cost.
+        free_svalue(sp);
+        put_number(sp, 0);
+
+        /* The interpreter loop will catch the exceeded evaluation cost. */
         return sp;
     }
 
@@ -630,7 +636,7 @@ f_regexp (svalue_t *sp)
     string_t * pattern;        /* The pattern passed in */
     int        opt;            /* The RE options passed in */
     int        rc;             /* Resultcode from the rx_exec() call */
-    mp_int i;
+    mp_int i, j;
 
     v = (sp-2)->u.vec;
     pattern = (sp-1)->u.str;
@@ -673,7 +679,14 @@ f_regexp (svalue_t *sp)
             if (v->item[i].type != T_STRING)
                 continue;
 
-            ADD_EVAL_COST(1);
+            if (add_eval_cost(1))
+            {
+                /* Evalution cost exceeded: we abort matching at this point
+                 * and let the interpreter detect the exception.
+                 */
+                break;
+            }
+
             line = v->item[i].u.str;
             rc = rx_exec(reg, line, 0);
             if (rc == 0)
@@ -694,11 +707,10 @@ f_regexp (svalue_t *sp)
 
         /* Create the result vector and copy the matching lines */
         ret = allocate_array(num_match);
-        for (num_match=i=0; i < v_size; i++) {
+        for (j=i=0; i < v_size && j < num_match; i++, j++) {
             if (!res[i])
                 continue;
-            assign_svalue_no_free(&ret->item[num_match], &v->item[i]);
-            num_match++;
+            assign_svalue_no_free(&ret->item[j], &v->item[i]);
         }
 
         free_regexp(reg);
@@ -777,7 +789,15 @@ f_regexplode (svalue_t *sp)
     matchp = &matches;
     while ((rc = rx_exec(reg, text, start)) > 0)
     {
-        ADD_EVAL_COST(1);
+        if (add_eval_cost(1))
+        {
+            /* Evaluation cost exceeded: terminate matching early, but
+             * let the interpreter loop handle the exception.
+             */
+            rc = 0;
+            break;
+        }
+
         match = (struct regexplode_match *)alloca(sizeof *match);
         if (!match)
         {
@@ -1026,7 +1046,15 @@ f_regreplace (svalue_t *sp)
     reslen = 0;
     while ((rc = rx_exec(reg, text, start)) > 0)
     {
-        ADD_EVAL_COST(1);
+        if (add_eval_cost(1))
+        {
+            /* Evaluation cost exceeded: terminate the matching early,
+             * but let the interpreter handle the exception.
+             */
+            rc = 0;
+            break;
+        }
+
         xallocate(match, sizeof(*match), "regreplace match structure");
         rx_get_match(reg, text, &(match->start), &(match->end));
         match->sub = NULL;
@@ -4047,7 +4075,7 @@ v_clones (svalue_t *sp, int num_arg)
     }
 
 #if defined(DYNAMIC_COSTS)
-    ADD_EVAL_COST(checked / 100 + found / 256);
+    (void)add_eval_cost(checked / 100 + found / 256);
 #endif /* DYNAMIC_COSTS */
 
     /* Create the result and put it onto the stack */
@@ -6002,7 +6030,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
             size = (mp_int)VEC_SIZE(old);
             DYN_ARRAY_COST(size);
 #if defined(DYNAMIC_COSTS)
-            ADD_EVAL_COST((depth+1) / 10);
+            (void)add_eval_cost((depth+1) / 10);
 #endif
 
             /* Create a new array, assign it to dest, and store
@@ -6064,7 +6092,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
             size = (mp_int)struct_size(old);
             DYN_ARRAY_COST(size);
 #if defined(DYNAMIC_COSTS)
-            ADD_EVAL_COST((depth+1) / 10);
+            (void)add_eval_cost((depth+1) / 10);
 #endif
 
             /* Create a new array, assign it to dest, and store
@@ -6123,7 +6151,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
                */
             DYN_MAPPING_COST(size);
 #if defined(DYNAMIC_COSTS)
-            ADD_EVAL_COST((depth+1) / 10);
+            (void)add_eval_cost((depth+1) / 10);
 #endif
             info.depth = depth+1;
             info.width = old->num_values;

@@ -242,6 +242,8 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-eval_cost.h"
+
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/trace.h"
@@ -7790,8 +7792,7 @@ again:
      * eval_cost < 0 signify a wrap-around - unlikely, but with these crazy
      * wizards everything is possible.
      */
-    ADD_EVAL_COST(1);
-    if (max_eval_cost && (eval_cost >= max_eval_cost || eval_cost < 0))
+    if (add_eval_cost(1))
     {
         rt_context_t * context;
 

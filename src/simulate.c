@@ -44,7 +44,6 @@
 #include "filestat.h"
 #include "gcollect.h"
 #include "heartbeat.h"
-#include "interpret.h"
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
@@ -71,6 +70,8 @@
 #include "svalue.h"
 #include "wiz_list.h"
 #include "xalloc.h"
+
+#include "i-eval_cost.h"
 
 #include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_hook.h"

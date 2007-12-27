@@ -62,6 +62,8 @@
 #include "wiz_list.h" /* wizlist_name[] */
 #include "xalloc.h"
 
+#include "i-eval_cost.h"
+
 #include "../mudlib/sys/driver_hook.h"
 
 /* TODO: Implement the # and ## operators. With this, #define X(a) (a + "a")

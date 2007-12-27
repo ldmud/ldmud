@@ -45,12 +45,13 @@
 #include <ctype.h>
 
 #include "regexp.h"
-#include "interpret.h" /* eval_cost macros */
 #include "simulate.h"
 #include "xalloc.h"
 #ifdef DEBUG
 #include "main.h"
 #endif
+
+#include "i-eval_cost.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -1158,8 +1159,7 @@ regmatch (unsigned char *prog)
                 /* Couldn't or didn't -- back up. */
                 no--;
                 reginput = save + no;
-                ADD_EVAL_COST(1);
-                if (EVALUATION_TOO_LONG())
+                if (add_eval_cost(1))
                     return RE_ERROR_BACKTRACK;
             }
             return RE_NOMATCH;

@@ -44,6 +44,8 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-eval_cost.h"
+
 #include "../mudlib/sys/debug_info.h"
 
 /*-------------------------------------------------------------------------*/

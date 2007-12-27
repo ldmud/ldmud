@@ -138,6 +138,8 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-eval_cost.h"
+
 #include "../mudlib/sys/comm.h"
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/input_to.h"

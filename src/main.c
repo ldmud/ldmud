@@ -76,6 +76,8 @@
 #include "pkg-mysql.h"
 #endif
 
+#include "i-eval_cost.h"
+
 #include "../mudlib/sys/regexp.h"
 
 /*-------------------------------------------------------------------------*/

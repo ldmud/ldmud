@@ -114,6 +114,8 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-eval_cost.h"
+
 #include "../mudlib/sys/driver_hook.h"
 
 #ifdef USE_NEW_INLINES

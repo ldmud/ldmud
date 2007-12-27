@@ -63,7 +63,7 @@
 #include "array.h"
 #include "backend.h"
 #include "closure.h"    /* closure_cmp(), closure_eq() */
-#include "interpret.h"  /* for the efuns */
+#include "interpret.h"
 #include "main.h"
 #include "mapping.h"
 #include "mempools.h"
