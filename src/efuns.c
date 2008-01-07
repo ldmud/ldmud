@@ -707,10 +707,10 @@ f_regexp (svalue_t *sp)
 
         /* Create the result vector and copy the matching lines */
         ret = allocate_array(num_match);
-        for (j=i=0; i < v_size && j < num_match; i++, j++) {
+        for (j=i=0; i < v_size && j < num_match; i++) {
             if (!res[i])
                 continue;
-            assign_svalue_no_free(&ret->item[j], &v->item[i]);
+            assign_svalue_no_free(&ret->item[j++], &v->item[i]);
         }
 
         free_regexp(reg);

@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Jan-2008 (Gnomi)
+  - (efuns.c) The target index in the final copy loop must be incremented
+       only for actually copied elements.
+
 27-Dec-2007 (Lars Duening)
   - (i-eval_cost.h, efuns.c, lots of files) Replaced the eval-cost
        increment macro with an inline function which does more checks
