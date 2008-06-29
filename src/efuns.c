@@ -838,7 +838,7 @@ f_regexplode (svalue_t *sp)
     if (max_array_size && arraysize > (long)max_array_size-1 ) {
         free_regexp(reg);
         inter_sp = sp;
-        errorf("Illegal array size");
+        errorf("Illegal array size: %d",arraysize);
         /* NOTREACHED */
         return sp;
     }
