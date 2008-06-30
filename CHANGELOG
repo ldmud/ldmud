@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Jun-2008 (Zesstra)
+  - (configure.in) Fix configure.in to work with autoconf 2.61 and later.
+      (patch from Fuchur, fixes bugs #541, #542)
+
+30-Jun-2008 (Zesstra)
+  - (efuns.c) Added actual array size to error message 'Illegal array size'
+     in f_regexplode().
+  - (hosts/GnuWin32/GnuWin32.h, hosts/GnuWin32/socket.h) 
+      Fixed #defines HOST_DEPENDENT_INIT and socket_number. 
+      (Bug #497, thanks to Zonk_FF)
+
 05-Jan-2008 (Gnomi)
   - (efuns.c) The target index in the final copy loop must be incremented
        only for actually copied elements.
