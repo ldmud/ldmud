@@ -4,7 +4,7 @@
 #define SOCKET_INC "hosts/GnuWin32/socket.c"
 
 #undef HOST_DEPENDENT_INIT
-#define HOST_DEPENDENT_INIT
+#define HOST_DEPENDENT_INIT \
   win32osi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO); \
   GetVersionEx(&win32osi); \
   GetSystemInfo(&win32si); \

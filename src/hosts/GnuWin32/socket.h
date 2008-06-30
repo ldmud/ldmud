@@ -5,9 +5,8 @@
 extern void set_socket_errno();
 
 #define SOCKET_T int
-#define socket_number(s) (s)
-
-socket_select(a,b,c,d,e) ({	\
+#define socket_number(s) (s) \
+  socket_select(a,b,c,d,e) ({	\
   int tmp=select(a,b,c,d,e);	\
   if (tmp < 0)			\
     set_socket_errno();		\
