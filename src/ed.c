@@ -2915,6 +2915,7 @@ docmd (Bool glob)
             free_mstring(fptr);
             return err;
         }
+        free_mstring(fptr);
         P_FCHANGED = TRUE;
         break;
 
