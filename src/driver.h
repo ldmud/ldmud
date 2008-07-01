@@ -14,6 +14,9 @@
 
 #include "config.h"
 
+/* Include the portability headers */
+#include "port.h"
+
 /* TODO: Some TODO defines */
 
 /* NO_NEGATIVE_RANGES: If defined, assignments to negative ranges
@@ -49,12 +52,12 @@
 /* Do some of the selected packages require special treatment? */
 
 /* SQLite in the threadsafe mode needs a normal malloc() */
-#if defined(SBRK_OK) && defined(USE_SQLITE)
+#if defined(SBRK_OK) && defined(USE_SQLITE) && defined(SQLITE3_USES_PTHREADS)
 #  undef SBRK_OK
 #endif
 
 /* PTHREADS need a normal malloc() */
-#if defined(SBRK_OK) && (defined(USE_PTHREADS) || defined(SQLITE3_USES_PTHREADS))
+#if defined(SBRK_OK) && defined(USE_PTHREADS)
 #  undef SBRK_OK
 #endif
 
@@ -130,9 +133,6 @@
 #ifdef USE_IPV6
 #    define __IPV6__
 #endif
-
-/* Include the portability headers */
-#include "port.h"
 
 /* TODO: this ctype-stuff might go into lex.h (impl in efun_defs.c) */
 #define _MCTe 0x01 /* escaped character in save/restore object. */
