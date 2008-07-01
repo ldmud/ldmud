@@ -7649,7 +7649,7 @@ v_input_to (svalue_t *sp, int num_arg)
 
         if (arg[2].type != T_STRING && arg[2].type != T_CLOSURE)
         {
-            vefun_bad_arg(3, arg-1);
+            vefun_bad_arg(3, sp);
             /* NOTREACHED */
         }
     }
@@ -7718,7 +7718,7 @@ v_input_to (svalue_t *sp, int num_arg)
     if (error_index >= 0)
     {
         free_input_to(it);
-        vefun_bad_arg(error_index, arg-1);
+        vefun_bad_arg(error_index + num_arg - extra + 1, arg-1);
         /* NOTREACHED */
         return arg-1;
     }

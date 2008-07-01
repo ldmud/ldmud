@@ -2,6 +2,8 @@ This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
 01-Jul-2008 (Gnomi)
+  - (comm.c) input_to could leak its parameters when it failed (Bug #486).
+  - (comm.c) Corrected the argument number in input_to error messages.
   - (driver.h) Corrected the check for SQLITE3_USES_PTHREADS when
        disabling SBRK_OK.
   - (ed.c) The 'r' command leaked the filename (Bug #488).
