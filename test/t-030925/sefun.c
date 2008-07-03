@@ -1,4 +1,3 @@
-public mixed get_variable(mixed tuple)
+public mixed bad_fun(mixed arg)
 {
 }
-

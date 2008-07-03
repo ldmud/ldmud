@@ -1,8 +1,5 @@
-private mixed does_auto_load = 1;
+private mixed var = 1;
 
-void set_auto_load(status yn) { does_auto_load = yn; }
-
-private mixed get_variable(mixed tuple)
+private mixed bad_fun(mixed arg)
 {
 }
-

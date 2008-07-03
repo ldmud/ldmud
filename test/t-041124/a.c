@@ -1,3 +1,4 @@
-int sub() {
-   debug_message("a::sub()\n"); 
+string sub()
+{
+    return "a";
 }
