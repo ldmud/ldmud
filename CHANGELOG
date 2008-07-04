@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Jul-2008 (Zesstra)
+  - (test/t-0000524.c) Added a test for Bug #524
+
 03-Jul-2008 (Gnomi)
   - (test/*) Added a testsuite and included existing test cases therein.
   - (test/t-0000532.c) Added a simple test for Bug #532 (Zesstra)
