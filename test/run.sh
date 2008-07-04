@@ -21,7 +21,7 @@ do
 	      -s-1 -sv-1 --max-malloc 0 --min-malloc 0 \
 	      -ru0 -rm0 -rs0 --no-strict-euids --no-wizlist-file \
 	      --check-refcounts --check-state 2 \
-	      -f test 65432 || { echo "Test FAILED."; FAILED="${FAILED}\n\t$testdir"; }
+	      -f test 65432 > /dev/null || { echo "Test $testdir FAILED."; FAILED="${FAILED}\n\t$testdir"; }
     elif [ -r "$testdir" ]
     then
 	${DRIVER} -u-1 -E 0 -M"$testdir" -m. --debug-file "./log/result.$testdir.log" --no-compat -e -N \
@@ -30,7 +30,7 @@ do
 	      -s-1 -sv-1 --max-malloc 0 --min-malloc 0 \
 	      -ru0 -rm0 -rs0 --no-strict-euids --no-wizlist-file \
 	      --check-refcounts --check-state 2 \
-	      -f test 65432 || { echo "Exiting because of a FAILURE."; FAILED="${FAILED}\n\t$testdir"; }
+	      -f test 65432 > /dev/null || { echo "Test $testdir FAILED."; FAILED="${FAILED}\n\t$testdir"; }
     fi
 done
 

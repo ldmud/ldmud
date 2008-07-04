@@ -5,7 +5,7 @@
 
 static void msg(string str, varargs mixed *par)
 {
-    debug_message(apply(#'sprintf, str,par), DMSG_STDOUT | DMSG_LOGFILE);
+    debug_message(apply(#'sprintf, str,par), DMSG_STDERR | DMSG_LOGFILE);
 }
 
 #endif
