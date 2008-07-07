@@ -22,6 +22,10 @@
 
 /* Error code to be returned if too many backtracks are detected.
  */
+#ifdef PCRE_ERROR_RECURSIONLIMIT
+#define RE_ERROR_BACKTRACK PCRE_ERROR_RECURSIONLIMIT
+#else
 #define RE_ERROR_BACKTRACK PCRE_ERROR_MATCHLIMIT
+#endif
 
 #endif /* PKG_PCRE_H_ */

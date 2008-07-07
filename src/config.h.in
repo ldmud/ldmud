@@ -434,6 +434,18 @@
 #define ALLOWED_ED_CMDS           @val_allowed_ed_cmds@
 /* TODO: ALLOWED_ED_CMDS: make this a runtime option */
 
+/* Limit the amount of recursion in the PCRE code. Setting it to low will
+ * prevent certain regexps to be executed properly, setting it too high can
+ * cause that regexps to crash the driver. Set it according to the
+ * available maximum stack size for the driver process. (Rule of thumb:
+ * The memory used for a recursion on the stack seems to be within 466 and
+ * 1008 bytes. If you have 8M of stack size, reserve half of it for LPC 
+ * recursions and choose about 3000 - 4000.) In doubt, increase the stack
+ * size limit for the driver process with ulimit & Co.)
+ * Defaults to 3000
+ */                                                                                       
+#define LD_PCRE_RECURSION_LIMIT    @val_pcre_recursion_limit@                                
+			
 
 /* --- Compiler --- */
 

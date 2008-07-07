@@ -408,6 +408,22 @@ rx_compile_pcre (string_t * expr, int opt, Bool from_ed, regdata_t * rdata)
             errorf("pcre: %s\n", pErrmsg);
         return 0;
     }
+    /* We have to ensure to have an initialized pHints structure for
+       setting the recursion limit later on */
+    if (pHints == NULL) 
+    {
+        pcre_malloc_err = "allocating memory for pHints section in regexp";
+        pHints = (pcre_extra *)pcre_xalloc(sizeof(pcre_extra));
+        if (pHints == NULL) 
+        {
+            if (from_ed)
+                add_message("pcre: Could not allocate memory for pHints\n");
+            else
+                errorf("pcre: Could not allocate memory for pHints\n");
+            return 0;
+        }
+        pHints->flags = 0;
+    }
 
     {
        int rc;
@@ -672,18 +688,28 @@ rx_exec (regexp_t *pRegexp, string_t * string, size_t start)
         if (prog->opt & RE_NOTEMPTY) pcre_opt |= PCRE_NOTEMPTY;
 
         pHints = prog->pHints;
-        if (pHints && max_eval_cost)
-        {
-            pHints->flags |= PCRE_EXTRA_MATCH_LIMIT;
-            if (max_eval_cost > eval_cost + 1)
-                pHints->match_limit = max_eval_cost - eval_cost - 1;
-            else
-                pHints->match_limit = 1;
-        }
-        else if (pHints)
-        {
-            pHints->flags &= ~PCRE_EXTRA_MATCH_LIMIT;
-        }
+        /* If LD_PCRE_RECURSION_LIMIT is defined we set a limit for match. If
+         * PCRE_EXTRA_MATCH_LIMIT_RECURSION is defined, we have a new libpcre,
+         * which supports limiting the recursions. Otherwise we have to limit
+         * the no of calls to match().
+         * TODO: Instead of the conditional compilation we should update the
+         * TODO::built-in pcre package.
+         */
+#ifdef LD_PCRE_RECURSION_LIMIT
+#ifdef PCRE_EXTRA_MATCH_LIMIT_RECURSION
+        pHints->flags |= PCRE_EXTRA_MATCH_LIMIT_RECURSION;
+        pHints->match_limit_recursion = LD_PCRE_RECURSION_LIMIT;
+#else
+        pHints->flags |= PCRE_EXTRA_MATCH_LIMIT;
+        pHints->match_limit = LD_PCRE_RECURSION_LIMIT;
+#endif /* PCRE_EXTRA_MATCH_LIMIT_RECURSION */
+#else  /* LD_PCRE_RECURSION_LIMIT */
+#ifdef PCRE_EXTRA_MATCH_LIMIT_RECURSION
+        pHints->flags &= ~PCRE_EXTRA_MATCH_LIMIT_RECURSION
+#else
+        pHints->flags &= ~PCRE_EXTRA_MATCH_LIMIT;
+#endif  /* PCRE_EXTRA_MATCH_LIMIT_RECURSION */
+#endif  /* LD_PCRE_RECURSION_LIMIT */
 
         rc = pcre_exec( prog->pProg, pHints
                       , get_txt(string), mstrsize(string), start, pcre_opt
@@ -735,18 +761,28 @@ rx_exec_str (regexp_t *pRegexp, char * string, char * start)
         if (prog->opt & RE_NOTEMPTY) pcre_opt |= PCRE_NOTEMPTY;
 
         pHints = prog->pHints;
-        if (pHints && max_eval_cost)
-        {
-            pHints->flags |= PCRE_EXTRA_MATCH_LIMIT;
-            if (max_eval_cost > eval_cost + 1)
-                pHints->match_limit = max_eval_cost - eval_cost - 1;
-            else
-                pHints->match_limit = 1;
-        }
-        else if (pHints)
-        {
-            pHints->flags &= ~PCRE_EXTRA_MATCH_LIMIT;
-        }
+        /* If LD_PCRE_RECURSION_LIMIT is defined we set a limit for match. If
+         * PCRE_EXTRA_MATCH_LIMIT_RECURSION is defined, we have a new libpcre,
+         * which supports limiting the recursions. Otherwise we have to limit
+         * the no of calls to match().
+         * TODO: Instead of the conditional compilation we should update the
+         * TODO::built-in pcre package.
+         */
+#ifdef LD_PCRE_RECURSION_LIMIT
+#ifdef PCRE_EXTRA_MATCH_LIMIT_RECURSION
+        pHints->flags |= PCRE_EXTRA_MATCH_LIMIT_RECURSION;
+        pHints->match_limit_recursion = LD_PCRE_RECURSION_LIMIT;
+#else
+        pHints->flags |= PCRE_EXTRA_MATCH_LIMIT;
+        pHints->match_limit = LD_PCRE_RECURSION_LIMIT;
+#endif /* PCRE_EXTRA_MATCH_LIMIT_RECURSION */
+#else  /* LD_PCRE_RECURSION_LIMIT */
+#ifdef PCRE_EXTRA_MATCH_LIMIT_RECURSION
+        pHints->flags &= ~PCRE_EXTRA_MATCH_LIMIT_RECURSION
+#else
+        pHints->flags &= ~PCRE_EXTRA_MATCH_LIMIT;
+#endif  /* PCRE_EXTRA_MATCH_LIMIT_RECURSION */
+#endif  /* LD_PCRE_RECURSION_LIMIT */
 
         rc = pcre_exec( prog->pProg, pHints
                       , start, strlen(start), string - start, pcre_opt

@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Jul-2008 (Zesstra)
+  - (mregex.c, pkg-pcre.h, config.h.in, autoconf/configure.in)
+       Introduced the compile-time constant LD_PCRE_RECURSION_LIMIT and code
+       for limiting the amount of recursions in the PCRE package. The purpose
+       is to prevent crashes from stack overflows, as the PCRE package may
+       recurse heavily. Default is 3000 recursions for systems with about 8MB
+       stack size per process. (Bug #524)
+
 04-Jul-2008 (Zesstra)
   - (test/t-0000524.c) Added a test for Bug #524
 
