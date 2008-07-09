@@ -121,9 +121,9 @@ docs: ldmud@EXEEXT@
 install-all: install-driver install-headers install-utils
 
 install: install-driver
-	echo "To install header files, use 'make install-headers'."
-	echo "To install utility programs (incl. erq), use 'make install-utils'."
-	echo "To install everything in one go, use 'make install-all'."
+	@echo "To install header files, use 'make install-headers'."
+	@echo "To install utility programs (incl. erq), use 'make install-utils'."
+	@echo "To install everything in one go, use 'make install-all'."
 
 install-driver: ldmud@EXEEXT@ docs
 	$(mkinstalldirs) $(BINDIR) $(MANDIR)/man1
