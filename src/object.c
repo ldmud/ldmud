@@ -8996,13 +8996,20 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
 /*-------------------------------------------------------------------------*/
 static void
-restore_value_cleanup ( svalue_t * arg UNUSED)
+restore_value_cleanup ( svalue_t * arg )
 
 /* The error handler during restore value cleanup: free all resources.
  */
 
 {
+    restore_cleanup_t * data = (restore_cleanup_t *) arg;
+
+    if (data->buff)
+        xfree(data->buff);
+
     free_shared_restored_values();
+
+    xfree(arg);
 } /* restore_value_cleanup() */
 
 svalue_t *
@@ -9021,7 +9028,7 @@ f_restore_value (svalue_t *sp)
     int        restored_version; /* Formatversion of the saved data */
     char      *buff;  /* The string to parse */
     char      *p;
-    svalue_t   rcp; /* T_ERROR_HANDLER value */
+    restore_cleanup_t *rcp; /* Cleanup structure */
 
     /* The restore routines will put \0s into the string, so we
      * need to make a copy of all but malloced strings.
@@ -9030,10 +9037,10 @@ f_restore_value (svalue_t *sp)
         size_t len;
 
         len = mstrsize(sp->u.str);
-        buff = alloca(len+1);
+        buff = xalloc(len+1);
         if (!buff)
         {
-            errorf("(restore) Out of stack (%lu bytes).\n"
+            errorf("(restore) Out of memory (%lu bytes).\n"
                  , (unsigned long) len+1);
             /* NOTREACHED */
             return sp;
@@ -9044,6 +9051,45 @@ f_restore_value (svalue_t *sp)
 
     restored_version = -1;
     restored_host = -1;
+
+    /* Initialise the shared value table */
+
+    max_shared_restored = 64;
+
+    if (shared_restored_values)
+    {
+        debug_message("(restore) Freeing lost shared_restored_values.\n");
+        free_shared_restored_values();
+    }
+
+    shared_restored_values = xalloc(sizeof(svalue_t)*max_shared_restored);
+    if (!shared_restored_values)
+    {
+        xfree(buff);
+        errorf("(restore) Out of memory (%lu bytes) for shared values.\n"
+             , max_shared_restored * sizeof(svalue_t));
+        return sp; /* flow control hint */
+    }
+
+    current_shared_restored = 0;
+
+    /* Place the result variable onto the stack */
+    inter_sp = ++sp;
+    *sp = const0;
+
+    /* Setup the error cleanup */
+    rcp = xalloc(sizeof(*rcp));
+    if (!rcp)
+    {
+        xfree(buff);
+        errorf("(restore) Out of memory (%lu bytes).\n"
+              , (unsigned long) sizeof(*rcp));
+        /* NOTREACHED */
+        return sp;
+    }
+    rcp->buff = buff;
+
+    push_error_handler(restore_value_cleanup, &(rcp->head));
 
     /* Check if there is a version line */
     if (buff[0] == '#')
@@ -9059,39 +9105,14 @@ f_restore_value (svalue_t *sp)
             errorf("No data given.\n");
             return sp-1;
         }
-        buff = p+1;
+        p++;
     }
+    else
+        p = buff; /* parse from beginning of buffer */
 
-    /* Initialise the shared value table */
-
-    max_shared_restored = 64;
-
-    if (shared_restored_values)
-    {
-        debug_message("(restore) Freeing lost shared_restored_values.\n");
-        free_shared_restored_values();
-    }
-
-    shared_restored_values = xalloc(sizeof(svalue_t)*max_shared_restored);
-    if (!shared_restored_values)
-    {
-        errorf("(restore) Out of memory (%lu bytes) for shared values.\n"
-             , max_shared_restored * sizeof(svalue_t));
-        return sp; /* flow control hint */
-    }
-
-    current_shared_restored = 0;
-
-    /* Place the result variable onto the stack */
-    inter_sp = ++sp;
-    *sp = const0;
-
-    /* Setup the error cleanup */
-    push_error_handler(restore_value_cleanup, &rcp);
 
     /* Now parse the value in buff[] */
 
-    p = buff;
     if ( (restored_version < 0 && p[0] == '\"')
          ? !old_restore_string(sp, p)
          : !restore_svalue(sp, &p, '\n')
