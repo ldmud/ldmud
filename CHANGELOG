@@ -8,6 +8,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
 10-Jul-2008 (Gnomi)
   - (pkg-sqlite.c, interpret.c, interpret.h) SQLite pragma statements
        are now possible but privileged.
+  - (mstrings.c) mstr_n_str() now finds an empty string at the end
+       of an input string (Bug #536).
 
 09-Jul-2008 (Fuchur)
   - (object.c) Use xalloc instead of alloca for allocating the parse buffer

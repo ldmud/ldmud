@@ -88,6 +88,17 @@ mixed *tests = ({
     ({ "asin 2", TF_ERROR, (: funcall(#'asin,"1.0") :) }),
     ({ "asin 3", TF_ERROR, (: asin(1.1) :) }),
     ({ "asin 4", TF_ERROR, (: asin(-1.1) :) }),
+    ({ "strstr 01", 0, (: strstr("","") == 0 :) }), /* Bug #536 */
+    ({ "strstr 02", 0, (: strstr("","", 1) == -1 :) }),
+    ({ "strstr 03", 0, (: strstr("abc","") == 0 :) }),
+    ({ "strstr 04", 0, (: strstr("abc","", 3) == 3 :) }),
+    ({ "strstr 05", 0, (: strstr("abc","", 4) == -1 :) }),
+    ({ "strstr 06", 0, (: strstr("abcdefa","a") == 0 :) }),
+    ({ "strstr 07", 0, (: strstr("abcdefa","a", 1) == 6 :) }),
+    ({ "strstr 08", 0, (: strstr("abcdefa","a", 6) == 6 :) }),
+    ({ "strstr 09", 0, (: strstr("abcdefa","a", 7) == -1 :) }),
+    ({ "strstr 10", 0, (: strstr("abcdefabc","a", 7) == -1 :) }),
+    ({ "strstr 11", 0, (: strstr("abcdefabc","c") == 2 :) }),
 });
 
 void run_test()
