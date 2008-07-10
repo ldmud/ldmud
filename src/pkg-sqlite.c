@@ -74,7 +74,7 @@ struct sqlite_dbs_s
 /* The list of database connections.
  */ 
 static sqlite_dbs_t *head = NULL;
-  
+
 /*-------------------------------------------------------------------------*/
 static sqlite_dbs_t *
 find_db (object_t * obj) 
@@ -150,29 +150,83 @@ remove_db(sqlite_dbs_t *db)
 
 /*-------------------------------------------------------------------------*/
 static int
-my_sqlite3_authorizer(void * data, int what, const char* arg1, const char* arg2,
+my_sqlite3_authorizer (void * data, int what, const char* arg1, const char* arg2,
         const char* dbname, const char* view)
 
 /* Callback function for SQLite to handle authorizations.
  */
 
 {
-    /* TODO: Check them via privilege_violation resp. valid_write.
-             (Don't know, whether sqlite can handle longjmps out of
-             its code in case of an error...)
-    */
-
+    struct error_recovery_info error_recovery_info;
+    svalue_t *save_sp, sarg1, sarg2;
+    struct control_stack *save_csp;
+    int val;
+    
     switch(what)
     {
         case SQLITE_PRAGMA:
-            if(!strcasecmp(arg1, "synchronous"))
-                return SQLITE_OK;
-            return SQLITE_DENY;
+            /* PRAGMA name [ = value ]
+             * PRAGMA function(arg)
+             *
+             *   arg1: name/function
+             *   arg2: value/arg
+             *   dbname/view: NULL
+             */
+            
+            error_recovery_info.rt.last = rt_context;
+            error_recovery_info.rt.type = ERROR_RECOVERY_APPLY;
+            rt_context = (rt_context_t *)&error_recovery_info;
+
+            save_sp = inter_sp;
+            save_csp = csp;
+            sarg1.type = T_INVALID;
+            sarg2.type = T_INVALID;
+
+            if (setjmp(error_recovery_info.con.text))
+            {
+                secure_apply_error(save_sp, save_csp, MY_FALSE);
+                val = SQLITE_DENY;
+            }
+            else
+            {
+                if(arg1)
+                    put_c_string(&sarg1, arg1);
+                else
+                    put_number(&sarg1, 0);
+                
+                if(arg2)
+                    put_c_string(&sarg2, arg2);
+                else
+                    put_number(&sarg2, 0);
+
+                if(privilege_violation2(STR_SQLITE_PRAGMA, &sarg1, &sarg2, inter_sp))
+                    val = SQLITE_OK;
+                else
+                    val = SQLITE_DENY;
+            }
+
+            free_svalue(&sarg1);
+            sarg1.type = T_INVALID;
+            free_svalue(&sarg2);
+            sarg2.type = T_INVALID;
+
+            rt_context = error_recovery_info.rt.last;
+
+            return val;
 
         case SQLITE_ATTACH:
-        case SQLITE_DETACH:
+            /* ATTACH "filename" AS "dbname"
+             *
+             *   arg1: filename
+             *   arg2, dbname, view: NULL
+             */
+
+            /* SQLite3 doesn't allow the filename to be changed,
+             * but at least we must convert an absolute pathname
+             * to a relative one. So we have to deactivate it...
+             */
             return SQLITE_DENY;
-    
+
         default:
             return SQLITE_OK;
     }
@@ -323,7 +377,7 @@ v_sl_exec (svalue_t * sp, int num_arg)
     db = find_db (current_object);
     if (!db)
         errorf("The current object doesn't have a database open.\n");
-
+    
     err = sqlite3_prepare(db->db, get_txt(argp->u.str), mstrsize(argp->u.str),
         &stmt, &tail);
     if(err)

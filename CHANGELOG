@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Jul-2008 (Gnomi)
+  - (pkg-sqlite.c, interpret.c, interpret.h) SQLite pragma statements
+       are now possible but privileged.
+
 09-Jul-2008 (Fuchur)
   - (object.c) Use xalloc instead of alloca for allocating the parse buffer
        in f_restore_value(). (Bug #532)

@@ -14,6 +14,10 @@ BESCHREIBUNG
         Array aus den einzelnen Zeilen (welche wieder Arrays der einzelnen
         Felder sind) zurueck.
 
+        Pragma-Befehle erzeugen eine privilege_violation ("sqlite_pragma",
+        ob, name, wert). Wird das Privileg verneint, wird ein Fehler
+        ausgeloest.
+
         Diese Funktion ist nur verfuegbar, wenn der Driver mit SQLite-
         Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
         __SQLITE__ definiert.

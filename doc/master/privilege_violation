@@ -51,6 +51,7 @@ DESCRIPTION
         set_this_object   Set this_object() to <arg>.
         shadow_add_action Add an action to function <arg2> of object <arg>
                           from the shadow <who> which is shadowing <arg>.
+        sqlite_pragma     Execute pragma statement in SQLite.
         symbol_variable   Attempt to make a symbol from a hidden
                           inherited variable. <arg> is the object in
                           question, <arg2> the number of the variable in
@@ -81,6 +82,7 @@ HISTORY
         LDMud 3.3.563 added the passing of the limits to the "limited"
            and "set_limits".
         LDMud 3.2.11/3.3.640 added the "mysql" violation.
+        LDMud 3.3.717 added the "sqlite_pragma" violation.
 
 
 SEE ALSO

@@ -17123,7 +17123,7 @@ apply (string_t *fun, object_t *ob, int num_arg)
 } /* apply() */
 
 /*-------------------------------------------------------------------------*/
-static void
+void
 secure_apply_error ( svalue_t *save_sp, struct control_stack *save_csp
                    , Bool clear_costs)
 

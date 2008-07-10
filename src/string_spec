@@ -232,6 +232,7 @@ SUCCESS         "success"
 
 #ifdef USE_SQLITE
 SQLITE_OPEN     "sl_open"
+SQLITE_PRAGMA   "sqlite_pragma"
 #endif
 
 /***************************************************************************/

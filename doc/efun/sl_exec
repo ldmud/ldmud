@@ -14,6 +14,10 @@ DESCRIPTION
         with each row (which is itself an array of columns) as 
         an element.
 
+        Pragma statements raise a privilege_violation ("sqlite_pragma",
+        ob, name, value). If the privilege is denied, an error is
+        thrown.
+
         The function is available only if the driver is compiled with
         SQLite support. In that case, __SQLITE__ is defined.
 
