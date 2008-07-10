@@ -2231,19 +2231,6 @@ for TESTFLAG in -O; do
     fi
   fi
 done
-for TESTFLAG in -qmaxmem=65536; do
-  if eval $tcomp; then
-    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
-      :
-      #the [e]grep option -v will not give a failure exit status on the atari
-    else
-      if eval $tcomp; then
-        CFLAGS="$CFLAGS $TESTFLAG"
-        break
-      fi
-    fi
-  fi
-done
 changequote([,])dnl
 for TESTFLAG in -g; do
   if eval $tcomp; then
@@ -2268,40 +2255,12 @@ for TESTFLAG in -O2 -O; do
     fi
   fi
 done
-for TESTFLAG in -qmaxmem=97204; do
-  if eval $tcomp; then
-    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
-      :
-      #the [e]grep option -v will not give a failure exit status on the atari
-    else
-      if eval $tcomp; then
-        OPTFLAGS="$OPTFLAGS $TESTFLAG"
-        CFLAGS="$CFLAGS $TESTFLAG"
-        break
-      fi
-    fi
-  fi
-done
-for TESTFLAG in -g -fstrength-reduce -fno-force-addr -fomit-default-branch; do
+for TESTFLAG in -g; do
   if eval $tcomp; then
     OPTFLAGS="$OPTFLAGS $TESTFLAG"
     CFLAGS="$CFLAGS $TESTFLAG"
   fi
 done
-#if using gcc, inlining is already handled explicit. When explicit inlining
-#is left out, this is usually done for a good reason. Use
-# -print-libgcc-filename to test for gcc.
-TESTFLAG='-print-libgcc-filename -O3 -fno-inline-functions'
-if eval $tcomp; then
-  if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
-    :
-  else
-    if eval $tcomp; then
-      OPTFLAGS="$OPTFLAGS -fno-inline-functions"
-      CFLAGS="$CFLAGS -fno-inline-functions"
-    fi
-  fi
-fi
 changequote([,])dnl
 MCFLAGS=$CFLAGS
 AC_MSG_RESULT($MCFLAGS)
