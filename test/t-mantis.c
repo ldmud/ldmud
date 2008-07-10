@@ -26,6 +26,10 @@ mixed *tests = ({
 	    return m[""] == 2;
 	:)
     }),
+  ({ "0000528", 0,
+  function int () {
+      return to_int(sprintf("%d",__INT_MAX__)) == __INT_MAX__;
+  } }),
 });
 
 void run_test()
