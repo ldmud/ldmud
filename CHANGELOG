@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Jul-2008 (Fuchur & Gnomi)
+  - (prolang.y) Incomplete variable clearance after an inner block
+       (Bug #537).
+
 10-Jul-2008 (Gnomi)
   - (pkg-sqlite.c, interpret.c, interpret.h) SQLite pragma statements
        are now possible but privileged.

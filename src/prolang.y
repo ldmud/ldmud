@@ -576,6 +576,10 @@ struct block_scope_s
 {
     int     first_local;  /* Number of first local defined in this scope */
     int     num_locals;   /* Number of locals defined in this scope */
+    int     num_cleared;
+      /* Number of locals that have been cleared by earlier CLEAR_LOCALS */
+    Bool    clobbered;
+      /* Local variables beyond num_locals may be clobbered */
     mp_uint addr;
       /* Address of CLEAR_LOCALS instruction, needed for backpatching */
 };
@@ -2772,6 +2776,8 @@ init_scope (int depth)
 {
     block_scope[depth-1].num_locals = 0;
     block_scope[depth-1].first_local = current_number_of_locals;
+    block_scope[depth-1].num_cleared = 0;
+    block_scope[depth-1].clobbered = MY_FALSE;
     block_scope[depth-1].addr = 0;
 } /* init_scope() */
 
@@ -2795,10 +2801,13 @@ enter_block_scope (void)
 
 /*-------------------------------------------------------------------------*/
 static void
-leave_block_scope (void)
+leave_block_scope (Bool dontclobber)
 
 /* Leave the current scope (if use_local_scopes requires it), freeing
  * all local names defined in that scope.
+ *
+ * <dontclobber> should be MY_TRUE if the stack of the to-be-left scope
+ * is independent of the outer scope (i.e. the scope of closures).
  */
 
 {
@@ -2806,6 +2815,13 @@ leave_block_scope (void)
     {
         free_local_names(block_depth);
         block_depth--;
+        if (block_depth && !dontclobber
+         && (block_scope[block_depth].num_locals
+          || block_scope[block_depth].clobbered))
+        {
+            /* the block we just left may have clobbered local variables */
+            block_scope[block_depth-1].clobbered = MY_TRUE;
+        }
     }
 } /* leave_block_scope() */
 
@@ -5142,8 +5158,8 @@ printf("DEBUG: Generate inline closure function:\n");
         yyerror("Implementation restriction: Inline closure must not span "
                 "include file limits");
         /* Clean up */
-        leave_block_scope();  /* Argument scope */
-        leave_block_scope();  /* Context scope */
+        leave_block_scope(MY_TRUE);  /* Argument scope */
+        leave_block_scope(MY_TRUE);  /* Context scope */
         finish_inline_closure(MY_TRUE);
         return;
     }
@@ -5248,8 +5264,8 @@ printf("DEBUG:     -> F_CONTEXT_CLOSURE %d %d\n", current_inline->function, cont
 
 
     /* Clean up */
-    leave_block_scope();  /* Argument scope */
-    leave_block_scope();  /* Context scope */
+    leave_block_scope(MY_TRUE);  /* Argument scope */
+    leave_block_scope(MY_TRUE);  /* Context scope */
     finish_inline_closure(MY_FALSE);
 } /* complete_inline_closure() */
 #endif /* USE_NEW_INLINES */
@@ -5969,6 +5985,12 @@ printf("DEBUG: After L_BEGIN_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
 
           if (!inline_closure_prototype(9))
               YYACCEPT;
+
+          /* Put the code block in its own scope apart from the
+           * parameters, so that define_local_variable doesn't
+           * assume that there are already 9 Variables.
+           */
+          enter_block_scope();
 #ifdef DEBUG_INLINES
 printf("DEBUG: Before comma_expr: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
@@ -5982,6 +6004,8 @@ printf("DEBUG: Before comma_expr: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #ifdef DEBUG_INLINES
 printf("DEBUG: After L_END_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
+         leave_block_scope(MY_FALSE);
+        
          $$.start = current_inline->end;
          $$.code = -1;
          $$.type = Type_Closure;
@@ -6860,17 +6884,17 @@ block:
           {
               block_scope_t *scope = block_scope + block_depth - 1;
 
-              if (use_local_scopes && scope->num_locals)
+              if (use_local_scopes && scope->num_locals > scope->num_cleared)
               {
                   mem_block[A_PROGRAM].block[scope->addr+2]
-                    = (char)scope->num_locals;
+                    = (char)(scope->num_locals - scope->num_cleared);
               }
           }
       }
 
       '}'
 
-      { leave_block_scope(); }
+      { leave_block_scope(MY_FALSE); }
 ; /* block */
 
 
@@ -7491,10 +7515,10 @@ for:
           {
               block_scope_t *scope = block_scope + block_depth - 1;
 
-              if (use_local_scopes && scope->num_locals)
+              if (use_local_scopes && scope->num_locals > scope->num_cleared)
               {
                   mem_block[A_PROGRAM].block[scope->addr+2]
-                    = (char)scope->num_locals;
+                    = (char)(scope->num_locals - scope->num_cleared);
               }
           }
       }
@@ -7583,7 +7607,7 @@ for:
           current_break_address    = $<numbers>3[1];
 
           /* and leave the for scope */
-          leave_block_scope();
+          leave_block_scope(MY_FALSE);
       }
 ; /* for */
 
@@ -7725,10 +7749,10 @@ foreach:
           {
               block_scope_t *scope = block_scope + block_depth - 1;
 
-              if (use_local_scopes && scope->num_locals)
+              if (use_local_scopes && scope->num_locals > scope->num_cleared)
               {
                   mem_block[A_PROGRAM].block[scope->addr+2]
-                    = (char)scope->num_locals;
+                    = (char)(scope->num_locals - scope->num_cleared);
               }
           }
 
@@ -7842,7 +7866,7 @@ foreach:
           current_break_address    = $<numbers>3[1];
 
           /* and leave the scope */
-          leave_block_scope();
+          leave_block_scope(MY_FALSE);
       }
 ; /* foreach */
 
@@ -13226,7 +13250,7 @@ inline_fun:
                                     );
 
            /* Restore the old locals information */
-           leave_block_scope();
+           leave_block_scope(MY_TRUE);
            use_local_scopes = pragma_use_local_scopes;
            all_locals = save_all_locals;
            current_number_of_locals = save_current_number_of_locals;
@@ -13806,14 +13830,24 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
             q = redeclare_local(name, actual_type, block_depth);
         else
             q = add_local_name(name, actual_type, block_depth);
-        if (use_local_scopes && scope->num_locals == 1)
+
+        if (use_local_scopes && scope->clobbered)
+        {
+            /* finish the previous CLEAR_LOCALS, if any */
+            if (scope->num_locals - 1 > scope->num_cleared)
+                mem_block[A_PROGRAM].block[scope->addr+2]
+                  = (char)(scope->num_locals - 1 - scope->num_cleared);
+            scope->clobbered = MY_FALSE;
+            scope->num_cleared = scope->num_locals - 1;
+        }
+        if (use_local_scopes && scope->num_locals == scope->num_cleared + 1)
         {
             /* First definition of a local, so insert the
              * clear_locals bytecode and remember its position
              */
             scope->addr = mem_block[A_PROGRAM].current_size;
             ins_f_code(F_CLEAR_LOCALS);
-            ins_byte(scope->first_local);
+            ins_byte(scope->first_local + scope->num_cleared);
             ins_byte(0);
         }
 
@@ -13826,14 +13860,24 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
     else
         q = add_local_name(name, actual_type, block_depth, MY_FALSE);
 
-    if (use_local_scopes && scope->num_locals == 1)
+    if (use_local_scopes && scope->clobbered)
+    {
+        /* finish the previous CLEAR_LOCALS, if any */
+        if (scope->num_locals - 1 > scope->num_cleared)
+            mem_block[A_PROGRAM].block[scope->addr+2]
+              = (char)(scope->num_locals - 1 - scope->num_cleared);
+        scope->clobbered = MY_FALSE;
+        scope->num_cleared = scope->num_locals - 1;
+    }
+
+    if (use_local_scopes && scope->num_locals == scope->num_cleared + 1)
     {
         /* First definition of a local, so insert the
          * clear_locals bytecode and remember its position
          */
         scope->addr = mem_block[A_PROGRAM].current_size;
         ins_f_code(F_CLEAR_LOCALS);
-        ins_byte(scope->first_local);
+        ins_byte(scope->first_local + scope->num_cleared);
         ins_byte(0);
     }
 
