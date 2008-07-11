@@ -1750,7 +1750,7 @@ f_write_file (svalue_t *sp)
             break;
 
         if (sp->u.number & 1)
-            if (remove(get_txt(file)))
+            if (remove(get_txt(file)) && errno != ENOENT)
             {
                 perror("write_file (remove)");
                 errorf("Could not remove %s: errno %d.\n", get_txt(file), errno);

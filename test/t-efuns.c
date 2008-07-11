@@ -2,6 +2,8 @@
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
 
+#define TESTFILE "/log/testfile"
+
 mixed *tests = ({
     // TODO: Add cases for indexing at string end ("abc"[3])
     ({ "[ 1", 0,        (: ({1,2,3,4,5})[4] == 5 :) }),
@@ -99,6 +101,47 @@ mixed *tests = ({
     ({ "strstr 09", 0, (: strstr("abcdefa","a", 7) == -1 :) }),
     ({ "strstr 10", 0, (: strstr("abcdefabc","a", 7) == -1 :) }),
     ({ "strstr 11", 0, (: strstr("abcdefabc","c") == 2 :) }),
+    ({ "write_file 1", 0, 
+        (:
+            int res;
+            rm(TESTFILE);
+            write_file(TESTFILE, "abc");
+            res = read_file(TESTFILE)=="abc";
+            rm(TESTFILE);
+            return res;
+        :)
+    }),
+    ({ "write_file 2", 0,
+        (:
+            int res;
+            rm(TESTFILE);
+            write_file(TESTFILE, "abc");
+            write_file(TESTFILE, "abc");
+            res = read_file(TESTFILE)=="abcabc";
+            rm(TESTFILE);
+            return res;
+        :)
+    }),
+    ({ "write_file 3", 0,
+        (:
+            int res;
+            write_file(TESTFILE, "abc");
+            write_file(TESTFILE, "abc", 1);
+            res = read_file(TESTFILE)=="abc";
+            rm(TESTFILE);
+            return res;
+        :)
+    }),
+    ({ "write_file 4", 0, /* Bug #512 */
+        (:
+            int res;
+            rm(TESTFILE);
+            write_file(TESTFILE, "abc", 1);
+            res = read_file(TESTFILE)=="abc";
+            rm(TESTFILE);
+            return res;
+        :)
+    }),
 });
 
 void run_test()
