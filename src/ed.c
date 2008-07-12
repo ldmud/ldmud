@@ -360,7 +360,7 @@ static void count_blanks(int line);
 static void _count_blanks(char *str, int blanks);
 static LINE *getptr(int num);
 static void putcntl(char c);
-static void prntln(char *str, int vflg, int lin);
+static void prntln(char *str, Bool vflg, int lin);
 static regexp_t *optpat(void);
 
 /*-------------------------------------------------------------------------*/

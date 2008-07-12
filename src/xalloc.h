@@ -140,7 +140,7 @@ extern Bool x_test_ref (POINTER p);
 
 #ifdef MALLOC_TRACE
 extern void store_print_block_dispatch_info(void *block, void (*func)(int, void *, int) );
-extern int is_freed(void *p, p_uint minsize);
+extern Bool is_freed(void *p, p_uint minsize);
 #endif /* MALLOC_TRACE */
 
 #ifdef CHECK_OBJECT_GC_REF

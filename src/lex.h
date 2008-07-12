@@ -240,7 +240,7 @@ struct inline_fun
 extern struct lpc_predef_s * lpc_predefs;
 extern int total_lines;
 extern source_loc_t current_loc;
-extern int pragma_strict_types;
+extern Bool pragma_strict_types;
 extern Bool pragma_use_local_scopes;
 extern Bool pragma_save_types;
 extern Bool pragma_combine_strings;

@@ -216,7 +216,7 @@ static void  reginsert (char op, unsigned char *opnd);
 static unsigned char *reg (Bool paren, int *flagp);
 
 static int regtry(regexp*, char *);
-static int regmatch(unsigned char *);
+static Bool regmatch(unsigned char *);
 static int regrepeat(unsigned char *);
 
 #ifdef DEBUG

@@ -5467,7 +5467,7 @@ f_transfer (svalue_t *sp)
 
 static Bool save_svalue(svalue_t *, char, Bool);
 static int restore_size(char **str);
-static int restore_svalue(svalue_t *, char **, char);
+static Bool restore_svalue(svalue_t *, char **, char);
 static void register_svalue(svalue_t *);
 
 /*-------------------------------------------------------------------------*/

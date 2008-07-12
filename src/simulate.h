@@ -229,8 +229,8 @@ extern mp_int current_error_line_number;
 extern vector_t *uncaught_error_trace;
 extern vector_t *current_error_trace;
 
-extern int game_is_being_shut_down;
-extern int master_will_be_updated;
+extern Bool game_is_being_shut_down;
+extern Bool master_will_be_updated;
 
 /* --- Prototypes --- */
 
