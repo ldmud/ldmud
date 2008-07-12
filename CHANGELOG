@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Jul-2008 (Zesstra)
+  - (interpret.h) removed duplicate and inconsistent prototype for
+      last_instructions and moved prototype for f_last_instructions() into the
+      #ifdef TRACE_CODE block.
+
 11-Jul-2008 (Gnomi)
   - (files.c) write_file doesn't raise an error if the flag is set
        and the file doesn't exist (Bug #512).

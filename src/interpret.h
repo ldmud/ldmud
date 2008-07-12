@@ -195,7 +195,6 @@ extern void push_error_handler(void (*errorhandler)(svalue_t *), svalue_t *arg);
 extern void m_indices_filter (svalue_t *key, svalue_t *data, void *extra);
 extern void m_values_filter (svalue_t *key, svalue_t *data, void *extra);
 extern void m_unmake_filter ( svalue_t *key, svalue_t *data, void *extra);
-extern int last_instructions(int length, Bool verbose, svalue_t **svpp);
 extern svalue_t *v_apply (svalue_t *sp, int num_arg);
 extern svalue_t *v_funcall (svalue_t *sp, int num_arg);
 extern svalue_t *v_call_direct_resolved (svalue_t *sp, int num_arg);
@@ -204,7 +203,6 @@ extern svalue_t *f_caller_stack_depth (svalue_t *sp);
 extern svalue_t *f_caller_stack (svalue_t *sp);
 extern svalue_t *f_get_eval_cost (svalue_t *sp);
 extern svalue_t *f_previous_object (svalue_t *sp);
-extern svalue_t *f_last_instructions(svalue_t *sp);
 extern svalue_t *f_set_this_object (svalue_t *sp);
 extern svalue_t *f_trace(svalue_t *sp);
 extern svalue_t *f_traceprefix(svalue_t *sp);
@@ -214,7 +212,8 @@ extern Bool opcdump(string_t *fname);
 #endif
 
 #ifdef TRACE_CODE
-extern int last_instructions(int length, int verbose, svalue_t **svpp);
+extern svalue_t *f_last_instructions(svalue_t *sp);
+extern int last_instructions(int length, Bool verbose, svalue_t **svpp);
 #endif
 
 #ifdef DEBUG
