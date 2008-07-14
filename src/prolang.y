@@ -6004,6 +6004,16 @@ printf("DEBUG: Before comma_expr: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #ifdef DEBUG_INLINES
 printf("DEBUG: After L_END_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
+
+         /* Complete the F_CLEAR_LOCALS at the baginning of the block. */
+         block_scope_t *scope = block_scope + block_depth - 1;
+
+         if (use_local_scopes && scope->num_locals > scope->num_cleared)
+         {
+              mem_block[A_PROGRAM].block[scope->addr+2]
+                = (char)(scope->num_locals - scope->num_cleared);
+         }
+
          leave_block_scope(MY_FALSE);
         
          $$.start = current_inline->end;
