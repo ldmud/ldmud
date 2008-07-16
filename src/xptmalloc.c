@@ -235,7 +235,8 @@ static Bool mem_is_freed (POINTER p, size_t minsize) {
  * See above for the *BSD situation.
  */
 
-#if !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__)
+#if defined(SBRK_OK) && \
+  !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__)
 #define REPLACE_MALLOC
 #endif
 
@@ -249,7 +250,9 @@ void ptmalloc_ref_unused(void)
 {
     in_malloc = 0;
     print_block(0, 0);
+#ifdef REPLACE_MALLOC
     count_up(clib_alloc_stat, 0);
+#endif
 }
 
 /***************************************************************************/

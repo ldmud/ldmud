@@ -49,17 +49,26 @@
 #  define GC_SUPPORT 1
 #endif
 
+
 /* Do some of the selected packages require special treatment? */
 
-/* SQLite in the threadsafe mode needs a normal malloc() */
-#if defined(SBRK_OK) && defined(USE_SQLITE) && defined(SQLITE3_USES_PTHREADS)
-#  undef SBRK_OK
-#endif
+/* ptmalloc only works correctly with SBRK_OK right now. */
+#ifdef MALLOC_ptmalloc
+#  ifndef SBRK_OK
+#    define SBRK_OK
+#  endif
+#else // no ptmalloc
+/* SQLite in the threadsafe mode needs a normal malloc() if the allocator is
+ * not ptmalloc*/
+#  if defined(SBRK_OK) && defined(USE_SQLITE) && defined(SQLITE3_USES_PTHREADS)
+#      undef SBRK_OK
+#  endif
+/* PTHREADS need a normal malloc() if the allocator is not ptmalloc */
+#  if defined(SBRK_OK) && defined(USE_PTHREADS)
+#      undef SBRK_OK
+#  endif
+#endif // MALLOC_ptmalloc
 
-/* PTHREADS need a normal malloc() */
-#if defined(SBRK_OK) && defined(USE_PTHREADS)
-#  undef SBRK_OK
-#endif
 
 /* When we have allocation tracing, the allocator annotates every
  * allocation with the source filename and line where the allocation

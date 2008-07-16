@@ -7,6 +7,13 @@ See the file HISTORY for a user-oriented summary of all the changes.
       (--with-max_net_connects), closes Bug #486.
   - (object.c) tell_room() sends message to the given environment itself as
     well, if it is marked interactive. Closes Bug #505.
+  - (xptmalloc.c)
+    use clib_alloc_stat only if REPLACE_MALLOC is set and define
+    REPLACE_MALLOC if SBRK_OK is defined.
+  - (driver.h)
+    SBRK_OK is enforced if ptmalloc is used as memory allocator. ptmalloc has
+    no problem with pthreads and does not work without REPLACE_MALLOC right
+    now.
 
 12-Jul-2008 (Zesstra)
   - (interpret.h) removed duplicate and inconsistent prototype for
