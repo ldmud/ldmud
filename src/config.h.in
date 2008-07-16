@@ -198,11 +198,14 @@
 
 /* If you want to use threads to write the data to the sockets 
  * define USE_PTHREADS.
- */
- 
+ */ 
 @cdef_use_pthreads@ USE_PTHREADS
 
- 
+/* maximum number of concurrent outgoing connection attempts by net_connect()
+ * (that is connections that are in progress but not fully established yet).
+ */
+#define MAX_OUTCONN @val_max_net_connects@
+
 
 /* ----------- Compilation Options ----------
  * To change these options, the config.h must be recreated and the

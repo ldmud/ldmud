@@ -444,8 +444,6 @@ static object_t *first_player_for_flush = NULL;
 
 /* Outgoing connections in-progress */
 
-#define MAX_OUTCONN 5 /* TODO: Move this into config.h */
-
 typedef enum {
       ocNotUsed    /* Entry not used */
     , ocUsed       /* Entry holds pending connection */
