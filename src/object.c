@@ -4908,6 +4908,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     object_t **curr_recipient;
     char *message;
     static svalue_t stmp = { T_OBJECT, } ;
+    interactive_t *ip;        
 
     /* Like in say(), collect the possible recipients.
      * First count how many there are.
@@ -4915,13 +4916,17 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
 
     for (ob = room->contains; ob; ob = ob->next_inv)
     {
-        interactive_t *ip;
-
         if ( ob->flags & O_ENABLE_COMMANDS
          ||  O_SET_INTERACTIVE(ip, ob))
         {
             num_recipients++;
         }
+    }
+    /* The room/environment itself? */
+    if (room->flags & O_ENABLE_COMMANDS
+        || O_SET_INTERACTIVE(ip, room)) 
+    {
+        num_recipients++;
     }
 
     /* Allocate the table */
@@ -4933,10 +4938,15 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
 
     /* Now fill the table */
     curr_recipient = recipients;
+    /* The room/environment itself? */
+    if (room->flags & O_ENABLE_COMMANDS
+        || O_SET_INTERACTIVE(ip, room)) 
+    {
+            *curr_recipient++ = room;
+    }
+    /* now the objects in the room/container */
     for (ob = room->contains; ob; ob = ob->next_inv)
     {
-        interactive_t *ip;
-
         if ( ob->flags & O_ENABLE_COMMANDS
          ||  O_SET_INTERACTIVE(ip, ob))
         {
@@ -5003,8 +5013,6 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
 
     for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
     {
-        interactive_t *ip;
-
         if (ob->flags & O_DESTRUCTED) continue;
         stmp.u.ob = ob;
         if (lookup_key(&stmp, avoid) >= 0) continue;
