@@ -1154,7 +1154,7 @@ errorf (const char *fmt, ...)
         if (O_SET_INTERACTIVE(i, current_interactive)
          && i->noecho & NOECHO_STALE)
         {
-            set_noecho(i, 0,  MY_FALSE);
+            set_noecho(i, 0,  MY_FALSE, MY_FALSE);
         }
     }
 

@@ -4053,7 +4053,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
 
 /*-------------------------------------------------------------------------*/
 void
-set_noecho (interactive_t *ip, char noecho, Bool local_change)
+set_noecho (interactive_t *ip, char noecho, Bool local_change, Bool external)
 
 /* Change the input mode <i>->noecho to the given <noecho>, performing all
  * necessary telnet negotiations. If the driverhook H_NOECHO is set,
@@ -4103,7 +4103,7 @@ set_noecho (interactive_t *ip, char noecho, Bool local_change)
                 push_ref_valid_object(inter_sp, ob, "set_no_echo");
                 push_number(inter_sp,  local_change ? 1 : 0);
                 if (driver_hook[H_NOECHO].type == T_STRING)
-                    secure_apply(driver_hook[H_NOECHO].u.str, ob, 3);
+                    secure_apply_ob(driver_hook[H_NOECHO].u.str, ob, 3, external);
                 else 
                 {
                     if (driver_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
@@ -4113,7 +4113,7 @@ set_noecho (interactive_t *ip, char noecho, Bool local_change)
                         driver_hook[H_NOECHO].u.lambda->ob
                           = ref_object(ob, "set_noecho");
                     }
-                    secure_callback_lambda(&driver_hook[H_NOECHO], 3);
+                    secure_call_lambda(&driver_hook[H_NOECHO], 3, external);
                 }
                 if (~confirm & old & CHARMODE_MASK)
                 {
@@ -4344,7 +4344,8 @@ call_function_interactive (interactive_t *i, char *str)
     {
         /* Sorry, the object has selfdestructed ! */
         set_noecho(i, it->next ? it->next->noecho : 0
-                    , it->next ? it->next->local : MY_FALSE);
+                    , it->next ? it->next->local : MY_FALSE
+                    , MY_TRUE);
         i->input_to = it->next;
         free_input_to(it);
         return MY_FALSE;
@@ -4354,7 +4355,8 @@ call_function_interactive (interactive_t *i, char *str)
      && load_ob_from_swap(ob) < 0)
     {
         set_noecho(i, it->next ? it->next->noecho : 0
-                    , it->next ? it->next->local : MY_FALSE);
+                    , it->next ? it->next->local : MY_FALSE
+                    , MY_TRUE);
         i->input_to = it->next;
         free_input_to(it);
         errorf("Out of memory: unswap object '%s'.\n", get_txt(ob->name));
@@ -4411,7 +4413,8 @@ call_function_interactive (interactive_t *i, char *str)
     if (i->noecho & NOECHO_STALE)
     {
         set_noecho(i, i->input_to ? i->input_to->noecho : 0
-                    , i->input_to ? i->input_to->local : MY_FALSE);
+                    , i->input_to ? i->input_to->local : MY_FALSE
+                    , MY_TRUE);
     }
 
     /* Done */
@@ -4467,7 +4470,7 @@ set_call ( object_t *ob, input_to_t *it, char noecho
     ip->set_input_to = MY_TRUE;
 
     if (noecho || ip->noecho)
-        set_noecho(ip, noecho, local_change);
+        set_noecho(ip, noecho, local_change, MY_FALSE);
     return MY_TRUE;
 } /* set_call() */
 
@@ -6521,7 +6524,8 @@ remove_stale_player_data (void)
                 {
                     set_noecho(all_players[i]
                               , it->next ? it->next->noecho : 0
-                              , it->next ? it->next->local : MY_FALSE);
+                              , it->next ? it->next->local : MY_FALSE
+                              , MY_TRUE);
                     all_players[i]->input_to = it->next;
                 }
                 else
@@ -8090,6 +8094,7 @@ v_remove_input_to (svalue_t *sp, int num_arg)
             ip->noecho |= NOECHO_STALE;
         set_noecho(ip, ip->input_to ? ip->input_to->noecho : ip->noecho
                      , ip->input_to ? ip->input_to->local : MY_FALSE
+                     , MY_FALSE
                   );
     }
 

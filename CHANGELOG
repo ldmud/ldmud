@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Jul-2008 (Gnomi)
+  - (comm, interpret, simulate.c) Added flag to set_noecho and secure_apply
+       to indicate external events (Bug #534).
+ 
 16-Jul-2008 (Zesstra)
   - (comm.c, autoconf/configure.in, config.h.in)
       MAX_OUTCONN is now configurable with an configure switch

@@ -410,7 +410,7 @@ extern void  add_message VARPROT((const char *, ...), printf, 1, 2);
 extern void  flush_all_player_mess(void);
 extern Bool get_message(char *buff);
 extern void remove_interactive(object_t *ob, Bool force);
-extern void set_noecho(interactive_t *i, char noecho, Bool local_change);
+extern void set_noecho(interactive_t *i, char noecho, Bool local_change, Bool external);
 extern int  find_no_bang (interactive_t *ip);
 extern Bool call_function_interactive(interactive_t *i, char *str);
 extern void remove_all_players(void);

@@ -17251,22 +17251,31 @@ secure_apply_error ( svalue_t *save_sp, struct control_stack *save_csp
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-secure_apply (string_t *fun, object_t *ob, int num_arg)
+secure_apply_ob (string_t *fun, object_t *ob, int num_arg, Bool external)
 
-/* Call function <fun> in <ob>ject with <num_arg> arguments pushed
+/* Aliases:
+ *   secure_apply(fun, ob, num_arg) == secure_apply_ob(fun, ob, num_arg, FALSE)
+ *   secure_callback(fun, ob, num_arg) == secure_apply_ob(fun, ob, num_arg, TRUE)
+ *
+ * Call function <fun> in <ob>ject with <num_arg> arguments pushed
  * onto the stack (<inter_sp> points to the last one). static and protected
  * functions can't be called from the outside.
- * secure_apply() takes care of calling shadows where necessary.
+ * secure_apply_ob() takes care of calling shadows where necessary.
  *
- * secure_apply() returns a pointer to the function result when the call was
- * successfull, or NULL on failure. The arguments are popped in any case.
+ * If <external> is TRUE, it means that this call is due to some external
+ * event (like an ERQ message) instead of being caused by a running program.
+ * The effect of this flag is that the error handling is like for a normal
+ * function call (clearing the eval costs before calling runtime_error()).
+ *
+ * secure_apply_ob() returns a pointer to the function result when the call
+ * was successfull, or NULL on failure. The arguments are popped in any case.
  * The result pointer, if returned, points to a static area which will be
- * overwritten with the next secure_apply().
+ * overwritten with the next secure_apply_ob().
  *
  * The function call will swap in the object and also unset its reset status.
  *
  * Errors during the execution are caught (this is the big difference
- * to sapply()/apply()) and cause secure_apply() to return NULL.
+ * to sapply()/apply()) and cause secure_apply_ob() to return NULL.
  */
 
 {
@@ -17285,7 +17294,7 @@ secure_apply (string_t *fun, object_t *ob, int num_arg)
     save_csp = csp;
     if (setjmp(error_recovery_info.con.text))
     {
-        secure_apply_error(save_sp - num_arg, save_csp, MY_FALSE);
+        secure_apply_error(save_sp - num_arg, save_csp, external);
         result = NULL;
     }
     else
@@ -17294,7 +17303,7 @@ secure_apply (string_t *fun, object_t *ob, int num_arg)
     }
     rt_context = error_recovery_info.rt.last;
     return result;
-} /* secure_apply() */
+} /* secure_apply_ob() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
