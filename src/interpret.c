@@ -7893,8 +7893,9 @@ again:
          * (defined) functions. Usually used by the compiler to
          * handle prototypes (in that case it is the first and only
          * instruction of the generated stub), it is also inserted
-         * into closures when the object the closure is bound to
-         * is destructed.
+         * into lambda closures when they referenced a function
+         * that went missing because of a replace_program.
+         *
          * Note: this instruction MUST be the first in the function.
          */
 
@@ -7909,10 +7910,8 @@ again:
         }
         else
         {
-            /* It is a vanished closure */
-            name = STR_CL_OBJ_DESTR;
-            /* TODO: Which object? This can also happen as result of
-             * TODO:: a replace_program */
+            /* It is a lambda closure after a replace_program. */
+            name = STR_DANGLING_LAMBDA;
         }
         ERRORF(("Undefined function: %s\n", get_txt(name)));
       }
@@ -17722,9 +17721,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            errorf("Object '%s' the closure was bound to has been "
-                  "destructed\n", get_txt(l->ob->name));
-            /* NOTREACHED */
+            push_number(inter_sp, 0);
             return;
         }
 
@@ -17740,9 +17737,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            errorf("Object '%s' holding the closure has been "
-                  "destructed\n", get_txt(l->function.lfun.ob->name));
-            /* NOTREACHED */
+            push_number(inter_sp, 0);
             return;
         }
 
@@ -17835,9 +17830,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         /* Don't use variables in a destructed object */
         if (l->ob->flags & O_DESTRUCTED)
         {
-            errorf("Object '%s' the closure was bound to has been destructed\n"
-                 , get_txt(l->ob->name));
-            /* NOTREACHED */
+            push_number(inter_sp, 0);
             return;
         }
 
@@ -17893,9 +17886,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            errorf("Object '%s' the closure was bound to has been "
-                  "destructed\n", get_txt(l->ob->name));
-            /* NOTREACHED */
+            push_number(inter_sp, 0);
             return;
         }
 
@@ -17950,9 +17941,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            errorf("Object '%s' the closure was bound to has been "
-                  "destructed\n", get_txt(current_object->name));
-            /* NOTREACHED */
+            push_number(inter_sp, 0);
             return;
         }
 
@@ -17983,8 +17972,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
                  * the closure should be zeroed out.
                  */
                 CLEAN_CSP
-                errorf("Object the closure was bound to has been destructed (this shouldn't happen)\n");
-                /* NOTREACHED */
+                push_number(inter_sp, 0);
                 return;
             }
 

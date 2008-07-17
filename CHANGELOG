@@ -4,6 +4,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
 17-Jul-2008 (Gnomi)
   - (comm, interpret, simulate.c) Added flag to set_noecho and secure_apply
        to indicate external events (Bug #534).
+  - (interpret.c, string_spec) Removed the 'closures was bound to
+       destructed object' error message and clarified the F_UNDEF error
+       message (Bug #523).
  
 16-Jul-2008 (Zesstra)
   - (comm.c, autoconf/configure.in, config.h.in)
