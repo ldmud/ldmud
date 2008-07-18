@@ -87,12 +87,7 @@ extern int errno;
 #if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
 #    include <memory.h>
 #endif
-#if 0
-/* TODO: Obsoleted by limits.h+floats.h - remove this and the config check */
-#ifdef HAVE_VALUES_H
-#    include <values.h>
-#endif
-#endif
+
 #ifdef HAVE_STDLIB_H
 #    include <stdlib.h>
 #endif
@@ -119,35 +114,6 @@ extern int errno;
 
 #ifdef HAVE_SYS_PARAM_H
 #    include <sys/param.h>
-#endif
-
-
-/*------------------------------------------------------------------
- * Limits for less-standard integral types:
- *
- *   LONGLONG_MIN, LONGLONG_MAX, ULONGLONG_MAX
- * TODO: Add SIZEOF_SIZET to configure, and SIZET_limits here.
- * TODO:: Then use SIZET_limits in smalloc::smalloc().
- */
-
-#if defined(HAVE_LONG_LONG) && !defined(LONGLONG_MIN)
-#    if defined(LONG_LONG_MAX)
-#        define LONGLONG_MIN   LONG_LONG_MIN
-#        define LONGLONG_MAX   LONG_LONG_MAX
-#        define ULONGLONG_MAX  ULONG_LONG_MAX
-#    elif SIZEOF_LONG_LONG == 8
-#        define LONGLONG_MIN   (-9223372036854775807LL - 1)
-#        define LONGLONG_MAX   (9223372036854775807LL)
-#        define ULONGLONG_MAX  (0xffffffffffffffffULL)
-#    elif SIZEOF_LONG_LONG == SIZEOF_LONG
-#        define LONGLONG_MIN   LONG_MIN
-#        define LONGLONG_MAX   LONG_MAX
-#        define ULONGLONG_MAX  ULONG_MAX
-#    elif SIZEOF_LONG_LONG == SIZEOF_INT
-#        define LONGLONG_MIN   INT_MIN
-#        define LONGLONG_MAX   INT_MAX
-#        define ULONGLONG_MAX  UINT_MAX
-#    endif
 #endif
 
 /*------------------------------------------------------------------
@@ -209,6 +175,8 @@ extern int errno;
 
 #define VARPROT(proto,like,form,var) proto FORMATDEBUG(like,form,var)
 
+// TODO: autoconf defines inline to some suitable keyword if the compiler does
+// not understand inline itself. Just use inline in code?
 #if defined(HAS_INLINE) && !defined(NO_INLINES)
 #    define INLINE inline
      /* configure made sure that 'inline' expands to the proper attribute */
@@ -234,102 +202,261 @@ extern int errno;
 #define MSDOS_FS
 #endif
 
+/*------------------------------------------------------------------
+ * Test for C99-compatible data types
+ * TODO: check if we can remove these checks once (if?) we require a C99
+ * compliant build environment.
+ */
+#if defined(HAVE_INTTYPES_H)
+    /* C99 compliant inttypes.h. */
+#   include <inttypes.h>
+#endif
+#if defined(HAVE_STDINT_H)
+    /* C99 compliant stdint.h available
+     * Usually it gets included also in inttypes.h, but it doesn't hurt to
+     * include it specifically. */
+#   include <stdint.h>
+#endif
+
+/* If stdint.h or inttypes.h don't have int8_t, int16_t, int32_t, int64_t,
+ * uint8_t, uint16_t, uint32_t, uint64_t, intmax_t, uintmax_t, intptr_t,
+ * or uintmax_t, autoconf will have them defined to a suitable type now.
+ * If Autoconf did not find suitable types, there is probably no sense in
+ * searching them ourself.
+ */
+#if !defined(HAVE_INTPTR_T) && !defined(intptr_t)
+    /* If there is no intptr_t in stdint.h and autoconf did not find a
+     * suitable type, we're out of luck (because in this case we are unlikely
+     * to find one). */
+#   error Autoconf didn't find an integer type with same size as a pointer
+    Thats it.
+#endif
+#if !defined(INT32_MAX) && !defined(int32_t)
+#   error Autoconf didn't find an integer type with exactly 32 bits.
+    Thats it.
+#endif
+
+/* If mode_t, off_t, pid_t, size_t or ssize_t are not defined by the standard
+ * headers on this system, autoconf will have them defined as well.
+ */
+
+
+/*------------------------------------------------------------------
+ * Limits for less-standard integral types:
+ *
+ *   LONGLONG_MIN, LONGLONG_MAX, ULONGLONG_MAX
+ * TODO: Add SIZEOF_SIZET to configure, and SIZET_limits here.
+ * TODO:: Then use SIZET_limits in smalloc::smalloc().
+ */
+#if defined(HAVE_LONG_LONG) && !defined(LONGLONG_MIN)
+#    if defined(LONG_LONG_MAX)
+#        define LONGLONG_MIN   LONG_LONG_MIN
+#        define LONGLONG_MAX   LONG_LONG_MAX
+#        define ULONGLONG_MAX  ULONG_LONG_MAX
+#    elif SIZEOF_LONG_LONG == 8
+#        define LONGLONG_MIN   (-9223372036854775807LL - 1)
+#        define LONGLONG_MAX   (9223372036854775807LL)
+#        define ULONGLONG_MAX  (0xffffffffffffffffULL)
+#    elif SIZEOF_LONG_LONG == SIZEOF_LONG
+#        define LONGLONG_MIN   LONG_MIN
+#        define LONGLONG_MAX   LONG_MAX
+#        define ULONGLONG_MAX  ULONG_MAX
+#    elif SIZEOF_LONG_LONG == SIZEOF_INT
+#        define LONGLONG_MIN   INT_MIN
+#        define LONGLONG_MAX   INT_MAX
+#        define ULONGLONG_MAX  UINT_MAX
+#    endif
+#endif
 
 /*------------------------------------------------------------------
  * Integral types:
- *   Bool, SBool, CBool: boolean type, sized as int/short/char.
+ *   Bool, SBool, CBool: boolean type, sized as _Bool or int, short, char.
  *   p_int  : an integer that has the same size as a pointer
  *   ph_int : an integer that has half the size of a pointer
  *   mp_int : an integer that has at least the size of a pointer
  *   int32  : an integer with 32 bits
  *   PTRTYPE: a type to use with constant pointer arithmetic.
  * The unsigned versions use 'uint' instead of 'int'.
+ * Additionally to the type themselves we define format specifiers for
+ * printing our types with sprintf() (PRN*) and scanning them with sscanf()
+ * (SCN*).
  * Changes here must be reflected in my-limits.h .
- * TODO: Add a type 'u/schar', '(u/s)int8' and '(u/s)int16'., unless not already
- * TODO:: defined by STDC.
- * TODO: inttypes.h, stdint.h, limits.h have many interesting types...
+ * Additional integral types from stdint.h/inttypes.h are available (s. above)
+ * TODO: check, if it is feasible to use the C99 data types instead of our own
+ * TODO::names in the future.
  */
 
 /* p_int : an integer that has the same size as a pointer */
-#define SIZEOF_PINT SIZEOF_CHAR_P
-
-#if SIZEOF_LONG == SIZEOF_CHAR_P
-     typedef long                p_int;
-     typedef unsigned long       p_uint;
-#    define PINT_MIN  LONG_MIN
-#    define PINT_MAX  LONG_MAX
-#    define PUINT_MAX ULONG_MAX
-
-#elif SIZEOF_INT == SIZEOF_CHAR_P
-     typedef int                 p_int;
-     typedef unsigned int        p_uint;
-#    define PINT_MIN  INT_MIN
-#    define PINT_MAX  INT_MAX
-#    define PUINT_MAX UINT_MAX
-
-#elif defined(HAVE_LONG_LONG) && SIZEOF_LONG_LONG == SIZEOF_CHAR_P
-     typedef long long           p_int;
-     typedef unsigned long long  p_uint;
-#    define PINT_MIN  LONGLONG_MIN
-#    define PINT_MAX  LONGLONG_MAX
-#    define PUINT_MAX ULONGLONG_MAX
-
+#if defined(HAVE_INTPTR_T) && SIZEOF_INT != SIZEOF_CHAR_P
+    /* just use intptr_t 
+     * BUT! glibc on ILP32 platforms unfortunately defines intptr_t as int,
+     * not as long. While this doesn't change things in principle, because they
+     * have equal size, gcc will output a bunch of warnings on
+     * sprintf("%ld",p_int) because %ld is the wrong format specifier for int.
+     * Therefore this little hack, which uses intptr_t for the time being
+     * only if sizeof(int) != sizeof(char*) (because then intptr_t cannot be
+     * an int). As it is not guaranteed that p_int will always be a long or
+     * have the size of a long, this %ld for outputting p_int are anyway a
+     * problem.
+     * TODO: As soon, as all the %ld for p_int are replaced, this hack should
+     * TODO::be removed!
+     */
+    typedef intptr_t                 p_int;
+    typedef uintptr_t                p_uint;
+#   define PINT_MIN  INTPTR_MIN
+#   define PINT_MAX  INTPTR_MAX
+#   define PUINT_MAX UINTPTR_MAX
+#   define SIZEOF_PINT SIZEOF_INTPTR_T
+#   define PRIdPINT  PRIdPTR
+#   define PRIuPINT  PRIuPTR
+#   define PRIxPINT  PRIxPTR
+#   define SCNdPINT SCNdPTR
+#   define SCNuPINT SCNuPTR
+#   define SCNxPINT SCNxPTR
+#   ifdef __PRIPTR_PREFIX
+#       define PRI_PINT_PREFIX __PRIPTR_PREFIX
+#   else
+    /* ugly - it is a pity that the format specifiers are standardized but not
+     * the length modifier. But we need one for sprintf.c. *sigh* */
+#       if SIZEOF_INTPTR_T == SIZEOF_LONG
+#           define PRI_PINT_PREFIX "l"
+#       elif SIZEOF_INTPTR_T == SIZEOF_INT
+#           define PRI_PINT_PREFIX
+#       elif HAVE_LONG_LONG && SIZEOF_INTPTR_T == SIZEOF_LONG_LONG
+#           define PRI_PINT_PREFIX "ll"
+#       else
+#           error Could not find a length modifier for intptr_t.
+            Thats it.
+#       endif
+#   endif
 #else
-#error cannot find an integer type with same size as a pointer
-Thats it.
-#endif
+  /* autoconf will have some type defined to intptr_t, but it won't define the
+   * limits and we won't have SIZEOF_INTPTR_T available. Therefore we have to
+   * search ourselves the old way. 
+   * TODO: remove once C99 support is required */
+#   define SIZEOF_PINT SIZEOF_CHAR_P
+#   if SIZEOF_LONG == SIZEOF_CHAR_P
+        typedef long                p_int;
+        typedef unsigned long       p_uint;
+#       define PINT_MIN  LONG_MIN
+#       define PINT_MAX  LONG_MAX
+#       define PUINT_MAX ULONG_MAX
+#       define PRI_PINT_PREFIX "l"
+#   elif SIZEOF_INT == SIZEOF_CHAR_P
+        typedef int                 p_int;
+        typedef unsigned int        p_uint;
+#       define PINT_MIN  INT_MIN
+#       define PINT_MAX  INT_MAX
+#       define PUINT_MAX UINT_MAX
+#       define PRI_PINT_PREFIX
+#   elif defined(HAVE_LONG_LONG) && SIZEOF_LONG_LONG == SIZEOF_CHAR_P
+        typedef long long           p_int;
+        typedef unsigned long long  p_uint;
+#       define PINT_MIN  LONGLONG_MIN
+#       define PINT_MAX  LONGLONG_MAX
+#       define PUINT_MAX ULONGLONG_MAX
+#       define PRI_PINT_PREFIX "ll"
+#   else
+        /* nearly impossible (s. intptr_t check above, but better safe than
+         * sorry. */
+#       error cannot find an integer type with same size as a pointer
+        Thats it.
+#   endif
+#   define PRIdPINT  PRI_PINT_PREFIX "d"
+#   define PRIuPINT  PRI_PINT_PREFIX "u"
+#   define PRIxPINT  PRI_PINT_PREFIX "x"
+#   define SCNdPINT  PRI_PINT_PREFIX "d"
+#   define SCNuPINT  PRI_PINT_PREFIX "u"
+#   define SCNxPINT  PRI_PINT_PREFIX "x"
+#endif // HAVE_INTPTR_T
 
-/* ph_int : an integer that has half the size of a pointer */
+
+/* ph_int : an integer that has half the size of a pointer.
+ * Unfortuntately C99 has nothing like this and therefore we have to find our
+ * own.
+ */
 #if SIZEOF_CHAR_P == SIZEOF_INT * 2
      typedef int                 ph_int;
      typedef unsigned int        ph_uint;
 #    define PHINT_MIN  INT_MIN
 #    define PHINT_MAX  INT_MAX
 #    define PHUINT_MAX UINT_MAX
-
+#    define PRI_PHINT_PREFIX
+#elif SIZEOF_CHAR_P == SIZEOF_SHORT * 2
+     typedef short               ph_int;
+     typedef unsigned short      ph_uint;
+#    define PHINT_MIN  SHRT_MIN
+#    define PHINT_MAX  SHRT_MAX
+#    define PHUINT_MAX USHRT_MAX
+#    define PRI_PHINT_PREFIX "h"
+#elif SIZEOF_CHAR_P == SIZEOF_LONG * 2
+     typedef long                 ph_int;
+     typedef unsigned long        ph_uint;
+#    define PHINT_MIN  LONG_MIN
+#    define PHINT_MAX  LONG_MAX
+#    define PHUINT_MAX ULONG_MAX
+#    define PRI_PHINT_PREFIX "l"
 #else
-#    if SIZEOF_CHAR_P == 4
-/* short is assumed to be always 2 bytes. */
-/* TODO: This is a dangerous assumption. */
-         typedef short               ph_int;
-         typedef unsigned short      ph_uint;
-#        define PHINT_MIN  SHORT_MIN
-#        define PHINT_MAX  SHORT_MAX
-#        define PHUINT_MAX USHORT_MAX
-#    endif
+#    error Cannot find an integer of half the size of a pointer.
+     Thats it.
 #endif
+#define PRIdPHINT  PRI_PHINT_PREFIX "d"
+#define PRIuPHINT  PRI_PHINT_PREFIX "u"
+#define PRIxPHINT  PRI_PHINT_PREFIX "x"
+#define SCNdPHINT  PRI_PHINT_PREFIX "d"
+#define SCNuPHINT  PRI_PHINT_PREFIX "u"
+#define SCNxPHINT  PRI_PHINT_PREFIX "x"
 
-/* mp_int : an integer that has at least the size of a pointer */
+/* mp_int : an integer that has at least the size of a pointer 
+ * TODO: use intmax_t intstead once the driver does not assume mp_ints to be
+ * TODO::longs? */
 typedef p_int        mp_int;
-typedef p_uint        mp_uint;
+typedef p_uint       mp_uint;
 #define MPINT_MIN  PINT_MIN
 #define MPINT_MAX  PINT_MAX
 #define MPUINT_MAX PUINT_MAX
+#define PRIdMPINT  PRIdPINT
+#define PRIuMPINT  PRIuPINT
+#define PRIxMPINT  PRIxPINT
+#define SCNdMPINT  PRIdPINT
+#define SCNuMPINT  PRIuPINT
+#define SCNxMPINT  PRIxPINT
 
 #ifndef __BEOS__
-/* int32 : an integer with 32 bits. */
-/* TODO: Add a configuration check for 'int32' typedef */
-#    if SIZEOF_LONG == 4
-#        if !defined(_AIX)
-typedef long                int32;
-#        endif
-typedef unsigned long       uint32;
-#    else
-#        if SIZEOF_INT == 4
-typedef int                 int32;
-typedef unsigned int        uint32;
-#        endif
-#    endif
+/* int32 : an integer with 32 bits.
+   TODO: just use (u)int32_t instead of (u)int32. */
+typedef int32_t   int32;
+typedef uint32_t  uint32;
 #endif /* __BEOS__ */
 
-/* Boolean datatype and values */
 
-typedef int    Bool;  /* naming it 'bool' clashes on some machines... */
+/* type to use with constant pointer arithmetic. */
+#define PTRTYPE char *
+
+
+/* Boolean datatype and values */
+#ifdef HAVE_STDBOOL_H
+#   include <stdbool.h>
+#else
+#   ifndef HAVE__BOOL
+        /* _Bool is not available - typedef our own with int. 
+         * naming it 'bool' clashes on some machines... */
+        typedef int    _Bool;
+#   endif
+    /* define true and false as stdbool.h does. */
+#   define false 0
+#   define true 1
+#   define __bool_true_false_are_defined 1
+#endif // HAVE_STDBOOL_H
+/* _Bool looks strange and we anyway used Bool until now. */
+typedef _Bool Bool;
+/* TODO: check if these two can be merged with Bool */
 typedef short SBool;
 typedef char  CBool;
 
-#define MY_TRUE  (1)
-#define MY_FALSE (0)
+#define MY_TRUE  (true)
+#define MY_FALSE (false)
+
 
 /* TODO: This should go into my-malloc.h? */
 #ifdef FREE_RETURNS_VOID
@@ -340,16 +467,10 @@ typedef char  CBool;
 #    define FREE_RETURN return 1;
 #endif
 
-#define PTRTYPE char *
-
 
 /*------------------------------------------------------------------
  * Provide functions, types and defines missing from the system headers.
  */
-
-#ifndef HAVE_SSIZE_T
-typedef signed long ssize_t;
-#endif
 
 #ifndef HAVE_MEMCPY
 /* The following 'implementation' is suitable for throwing away a value,

@@ -530,24 +530,67 @@ fi
 # Restore the CFLAGS
 CFLAGS=$save_cflags
 
-dnl check for ANSI-C  (for compiling LDMUD project)
-dnl TODO: check for 'c89' if CC="cc" and 'cc' not ANSI-C
-dnl
-AC_TRY_COMPILE([
-#ifndef __STDC__
-#error need STDC
-guarantee an compiling error here...
-#endif
-],,
-:,
-AC_MSG_ERROR(You need an ANSI-C compiler! sorry..)
-)
+# check for ANSI-C  (for compiling LDMUD project)
+AC_PROG_CC_STDC
+if test "${ac_cv_prog_cc_stdc}" = no; then
+  AC_MSG_ERROR(You need an ANSI-C89 or ISO-C (C99) compiler! sorry..)
+fi
 
 
-dnl Checking for programs
+# does the compile have an inline keyword?
+AC_C_INLINE
+if test "x$ac_cv_c_inline" != "xno"; then
+  AC_DEFINE(HAS_INLINE)
+fi
 
+# does the compile have an restrict keyword?
+# temporarily deactivated because it introduces an #if defined x into
+# machine.h and mkfunc.c can't deal with 'defined' without parentheses.
+#AC_C_RESTRICT
+
+# does the compile have an typeof keyword?
+AC_C_TYPEOF
+
+# does the preprocessor support the stringenizing operator?
+AC_C_STRINGIZE
+
+# check for some types
+AC_TYPE_INT8_T
+AC_TYPE_INT16_T
+AC_TYPE_INT32_T
+AC_TYPE_INT64_T
+AC_TYPE_INTMAX_T
+AC_TYPE_INTPTR_T
+AC_TYPE_UINT8_T
+AC_TYPE_UINT16_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT64_T
+AC_TYPE_UINTMAX_T
+AC_TYPE_UINTPTR_T
+AC_TYPE_LONG_LONG_INT
+AC_TYPE_UNSIGNED_LONG_LONG_INT
+AC_TYPE_LONG_DOUBLE
+AC_TYPE_LONG_DOUBLE_WIDER
+AC_TYPE_SSIZE_T
+AC_TYPE_SIZE_T
+AC_TYPE_OFF_T
+AC_TYPE_MODE_T
+AC_TYPE_PID_T
+AC_TYPE_SIGNAL
+
+# Check some sizes
+AC_CHECK_SIZEOF(char *)
+AC_CHECK_SIZEOF(int)
+AC_CHECK_SIZEOF(short)
+AC_CHECK_SIZEOF(long)
+AC_CHECK_SIZEOF(long long)
+AC_CHECK_SIZEOF(intptr_t)
+AC_CHECK_SIZEOF(intmax_t)
+
+
+# Checking for programs
 AC_PROG_INSTALL
-AC_CONFIG_HEADER(machine.h)
+AC_CONFIG_HEADERS(machine.h)
 AC_CHECK_PROGS(YACC, byacc "bison -y", yacc)
 AC_PROG_CPP
 
@@ -570,18 +613,22 @@ yes
 [ EXTRA_CFLAGS="${EXTRA_CFLAGS} -DMSWIN" ])
 
 dnl Checking for headers
-
-AC_HEADER_STDC
+AC_HEADER_STDBOOL
 AC_CHECK_HEADERS(sys/rusage.h sys/time.h unistd.h stdlib.h libc.h memory.h)
-AC_CHECK_HEADERS(values.h string.h bstring.h netdb.h crypt.h sys/param.h sys/termios.h)
+AC_CHECK_HEADERS(string.h bstring.h netdb.h crypt.h sys/param.h sys/termios.h)
+
 dnl extra check for <limits.h>; must be there!
 AC_CHECK_HEADERS(limits.h)
 AC_HEADER_DIRENT
 
-AC_CHECK_SIZEOF(char *)
-AC_CHECK_SIZEOF(int)
-AC_CHECK_SIZEOF(short)
-AC_CHECK_SIZEOF(long)
+
+dnl check for some functions
+AC_FUNC_MKTIME
+AC_FUNC_ALLOCA
+AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn)
+AC_CHECK_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
+AC_CHECK_FUNCS(fcntl getdomainname poll strtoul trunc)
+
 
 AC_CACHE_CHECK(for needed malloc() alignment,lp_cv_sys_malloc_align,
 AC_TRY_COMPILE([struct ts {double d; char *p; double e;};
@@ -591,45 +638,6 @@ lp_cv_sys_malloc_align=8,
 lp_cv_sys_malloc_align=4))
 AC_DEFINE_UNQUOTED(MALLOC_ALIGN,$lp_cv_sys_malloc_align)
 
-AC_CACHE_CHECK(for uint32_t and friends,lp_cv_inttypes,
-AC_TRY_COMPILE([#include <sys/types.h>
-uint32_t i;],,
-lp_cv_inttypes=yes,
-lp_cv_inttypes=no))
-if test $lp_cv_inttypes = yes; then
-  AC_DEFINE(HAVE_INTTYPES)
-fi
-
-AC_CACHE_CHECK(for ssize_t,lp_cv_type_ssize_t,
-AC_TRY_COMPILE([#include <sys/types.h>
-ssize_t i;],,
-lp_cv_type_ssize_t=yes,
-lp_cv_type_ssize_t=no))
-if test $lp_cv_type_ssize_t = yes; then
-  AC_DEFINE(HAVE_SSIZE_T)
-fi
-
-AC_CHECK_SIZEOF(long long) dnl Also checks for the existance
-if test $ac_cv_type_long_long = yes; then
-  AC_DEFINE(HAVE_LONG_LONG)
-fi
-
-AC_CACHE_CHECK(for bool,lp_cv_type_bool,
-AC_TRY_COMPILE([bool b;],,
-lp_cv_type_bool=yes,
-lp_cv_type_bool=no))
-if test $lp_cv_type_bool = yes; then
-  AC_DEFINE(HAVE_BOOL)
-fi
-
-AC_C_INLINE
-if test "x$ac_cv_c_inline" != "xno"; then
-  AC_DEFINE(HAS_INLINE)
-fi
-
-AC_TYPE_SIZE_T
-AC_TYPE_PID_T
-AC_TYPE_SIGNAL
 
 if test "x$ac_cv_type_signal" = "xvoid"; then
   cat >> confdefs.h <<EOF
@@ -696,12 +704,6 @@ if test "x$enable_use_system_crypt" = "x" || test "x$enable_use_system_crypt" = 
 
 fi
 
-# --- Check for functions ---
-
-AC_FUNC_ALLOCA
-AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn)
-AC_CHECK_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
-AC_CHECK_FUNCS(fcntl getdomainname poll strtoul trunc)
 
 AC_CACHE_CHECK(if inet_ntoa() ok,lp_cv_func_inet_ntoa_ok,
 AC_TRY_RUN([
@@ -2413,6 +2415,8 @@ SAVE_LIBS="${LIBS}"
 SAVE_CFLAGS="${CFLAGS}"
 CFLAGS=''
 for TESTFLAG in '' -static -Bstatic -n; do
+
+
 AC_MSG_CHECKING(malloc redefinition with linking flag ${TESTFLAG})
 LIBS="${SAVE_LIBS} ${TESTFLAG}"
 cat > conftest.data <<EOF

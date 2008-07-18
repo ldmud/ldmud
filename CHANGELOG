@@ -1,6 +1,37 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Jul-2008 (Zesstra)
+  - (autoconf/configure.in)
+     Removed check for values.h from configure.in and not used HAVE_VALUES from
+       port.h - obsoleted by limits+float.h (was TODO)
+     Removed self-written check for ANSI-C89 compliant compiler and used
+       AC_PROG_CC_STDC.
+     Removed self-written checks for uint32_t, ssize_t, size_t, off_t, long
+       long and added the corresponding autoconf macros
+     Removed obsolete AC_HEADER_STDC
+     Added checks for C99 datatypes: (u)int8_t, (u)int16_t, (u)int32_t,
+       (u)int64_t, (u)inptr_t, (u)intmax_t.
+     Added size checks for intptr_t, intmax_t, long long
+     Added some checks for compiler charactestics: stringenize operator in
+       preprocessor, typeof. (check for restrict due to problems with
+       mk_func.c still disabled)
+     Added header check for stdbool.h
+     Changed obsolete AC_CONFIG_HEADER to AC_CONFIG_HEADERS
+  - (port.h)
+     Fixed PHINT_MIN, PHINT_MAX and PHUINT_MAX in port.h. SIZEOF_CHAR_P ==
+       SIZEOF_SHORT * 2 they were defined to SHORT_MAX, SHORT_MIN, USHORT_MAX,
+       which should be SHRT_MIN, SHRT_MAX, USHRT_MAX.
+     Fixed selection of ph_int (short is not guaranteed to be 2 bytes)
+     Use inttypes.h and stdint.h if available.
+     Use stdbool.h and _Bool for our own Bool if available.
+     Removed own typedef for ssize_t as autoconf will provide is with a
+       suitable ssize_t if the standard headers don't have one, which is
+       anyway very unlikely.
+     Added defines for the right format specifiers for sprintf(), sscanf()
+       because we should discontinue to use hard-coded ones when working with
+       p_(u)int, mp_(u)int and ph_(u)int.
+
 17-Jul-2008 (Gnomi)
   - (comm, interpret, simulate.c) Added flag to set_noecho and secure_apply
        to indicate external events (Bug #534).
