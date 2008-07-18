@@ -346,7 +346,7 @@ dumpstat (string_t *fname)
 
         overhead += sizeof (object_t);
 
-        fprintf(f, "%-20s %5ld (%5ld) ref %2ld %s "
+        fprintf(f, "%-20s %5"PRIdMPINT" (%5"PRIdMPINT") ref %2"PRIdPINT" %s "
                  , get_txt(ob->name)
                  , compsize + overhead, totalsize + overhead
                  , ob->ref

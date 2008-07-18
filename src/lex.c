@@ -890,7 +890,7 @@ init_lexer(void)
     add_permanent_define("__FLOAT_MAX__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "(%g)", DBL_MIN);
     add_permanent_define("__FLOAT_MIN__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "%ld", get_current_time());
+    sprintf(mtext, "%"PRIdMPINT, get_current_time());
     add_permanent_define("__BOOT_TIME__", -1, string_copy(mtext), MY_FALSE);
 
     /* Add the permanent macro definitions given on the commandline */
@@ -3656,6 +3656,8 @@ parse_numeric_escape (char * cp, unsigned char * p_char)
 
         /* strtol() gets the sign bit wrong,
          * strtoul() isn't portable enough.
+         * TODO: strtoul should be portable enough today... Re-check if we
+         * TODO::require C99.
          */
         num_digits = 2;
         l = 0;

@@ -980,13 +980,14 @@ static svalue_t local_const0;
         }
         if (max_mapping_size && msize > (mp_int)max_mapping_size)
         {
-            errorf("Illegal mapping size: %ld elements (%ld x %ld)\n"
-                 , msize, (long)MAP_SIZE(m)+1, (long)m->num_values);
+            errorf("Illegal mapping size: %"PRIdMPINT" elements (%"
+                PRIdPINT" x %"PRIdPINT")\n"
+                 , msize, MAP_SIZE(m)+1, m->num_values);
             return NULL;
         }
         if (max_mapping_keys && MAP_SIZE(m) > (mp_int)max_mapping_keys)
         {
-            errorf("Illegal mapping size: %ld entries\n", msize+1);
+            errorf("Illegal mapping size: %"PRIdMPINT" entries\n", msize+1);
             return NULL;
         }
     }
@@ -1470,7 +1471,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
              && (SSIZE_MAX - sizeof(map_chain_t)) / new_width < sizeof(svalue_t))
            )
         {
-            errorf("Mapping width too big (%ld)\n", new_width);
+            errorf("Mapping width too big (%"PRIdMPINT")\n", new_width);
             /* NOTREACHED */
             return NULL;
         }

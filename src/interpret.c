@@ -19403,7 +19403,7 @@ f_last_instructions (svalue_t *sp)
     /* Test the arguments */
     num_instr = sp[-1].u.number;
     if (num_instr <= 0)
-        errorf("Illegal number of instructions: %ld.\n", num_instr);
+        errorf("Illegal number of instructions: %"PRIdMPINT".\n", num_instr);
 
     sp--;
     inter_sp = sp; /* Out of memory possible */

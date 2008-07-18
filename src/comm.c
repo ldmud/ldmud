@@ -8616,8 +8616,8 @@ f_set_connection_charset (svalue_t *sp)
     i = 0;
     if (sp[-1].type == T_POINTER && (i = (mp_int)VEC_SIZE(sp[-1].u.vec)) > 32)
     {
-        errorf("Bad arg 1 to set_connection_charset(): array too big (%ld)\n"
-             , i);
+        errorf("Bad arg 1 to set_connection_charset(): array too big (%"
+             PRIdMPINT")\n", i);
         /* NOTREACHED */
         return sp;
     }

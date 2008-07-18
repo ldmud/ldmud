@@ -133,7 +133,7 @@ _allocate_array(mp_int n MTRACE_DECL)
     svalue_t *svp;
 
     if (n < 0 || (max_array_size && (size_t)n > max_array_size))
-        errorf("Illegal array size: %ld.\n", n);
+        errorf("Illegal array size: %"PRIdMPINT".\n", n);
 
     if (n == 0) {
         p = ref_array(&null_vector);
@@ -145,10 +145,11 @@ _allocate_array(mp_int n MTRACE_DECL)
     p = ALLOC_VECTOR(n);
     if (!p) {
 #ifndef MALLOC_TRACE
-        (*allocate_array_error_handler)("Out of memory: array[%ld]\n", n);
+        (*allocate_array_error_handler)
+            ("Out of memory: array[%"PRIdMPINT"]\n", n);
 #else
         (*allocate_array_error_handler)
-            ("(%s:%d) Out of memory: array[%ld]\n"
+            ("(%s:%d) Out of memory: array[%"PRIdMPINT"]\n"
              MTRACE_PASS, n);
 #endif
         return 0;
@@ -191,7 +192,7 @@ _allocate_array_unlimited(mp_int n MTRACE_DECL)
     svalue_t *svp;
 
     if (n < 0)
-        errorf("Illegal array size: %ld.\n", n);
+        errorf("Illegal array size: %"PRIdMPINT".\n", n);
 
     if (n == 0) {
         p = ref_array(&null_vector);
@@ -204,10 +205,10 @@ _allocate_array_unlimited(mp_int n MTRACE_DECL)
     if (!p) {
 #ifndef MALLOC_TRACE
         (*allocate_array_error_handler)
-            ("Out of memory: unlimited array[%ld]\n", n);
+            ("Out of memory: unlimited array[%"PRIdMPINT"]\n", n);
 #else
         (*allocate_array_error_handler)
-            ("(%s:%d) Out of memory: unlimited array[%ld]\n"
+            ("(%s:%d) Out of memory: unlimited array[%"PRIdMPINT"]\n"
             MTRACE_PASS, n);
 #endif
         return 0;
@@ -247,7 +248,7 @@ _allocate_uninit_array (mp_int n MTRACE_DECL)
     vector_t *p;
 
     if (n < 0 || (max_array_size && (size_t)n > max_array_size))
-        errorf("Illegal array size: %ld.\n", n);
+        errorf("Illegal array size: %"PRIdMPINT".\n", n);
 
     if (n == 0) {
         p = ref_array(&null_vector);
@@ -260,10 +261,10 @@ _allocate_uninit_array (mp_int n MTRACE_DECL)
     if (!p) {
 #ifndef MALLOC_TRACE
         (*allocate_array_error_handler)
-            ("Out of memory: uninited array[%ld]\n", n);
+            ("Out of memory: uninited array[%"PRIdMPINT"]\n", n);
 #else
         (*allocate_array_error_handler)
-            ("(%s:%d) Out of memory: uninited array[%ld]\n"
+            ("(%s:%d) Out of memory: uninited array[%"PRIdMPINT"]\n"
             MTRACE_PASS, n);
 #endif
         return 0;
@@ -293,7 +294,8 @@ _free_vector (vector_t *p)
 
 #ifdef DEBUG
     if (p->ref > 0)
-        fatal("Vector with %ld refs passed to _free_vector()\n", p->ref);
+        fatal("Vector with %"PRIdPINT" refs passed to _free_vector()\n",
+              p->ref);
     if (p == &null_vector)
         fatal("Tried to free the zero-size shared vector.\n");
 #endif
@@ -1860,7 +1862,7 @@ v_allocate (svalue_t *sp, int num_arg)
             size = svp->u.number;
 
             if (size < 0 || (max_array_size && (size_t)size > max_array_size))
-                errorf("Illegal array size: %ld\n", (long)size);
+                errorf("Illegal array size: %"PRIdPINT"\n", size);
 
             if (size == 0 && dim < num_dim-1)
                 errorf("Only the last dimension can have empty arrays.\n");
@@ -2186,7 +2188,8 @@ x_map_array (svalue_t *sp, int num_arg)
 
         res = allocate_array(cnt);
         if (!res)
-            errorf("(map_array) Out of memory: array[%ld] for result\n", cnt);
+            errorf("(map_array) Out of memory: array[%"PRIdMPINT
+                "] for result\n", cnt);
         push_array(inter_sp, res); /* In case of errors */
 
         for (w = arr->item, x = res->item; --cnt >= 0; w++, x++)
@@ -2224,7 +2227,8 @@ x_map_array (svalue_t *sp, int num_arg)
 
         res = allocate_array(cnt);
         if (!res)
-            errorf("(map_array) Out of memory: array[%ld] for result\n", cnt);
+            errorf("(map_array) Out of memory: array[%"PRIdMPINT
+                "] for result\n", cnt);
         push_array(inter_sp, res); /* In case of errors */
 
         /* Loop through arr and res, mapping the values from arr */
