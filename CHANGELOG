@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Jul-2008 (Fuchur)
+  - (object.c)
+    remove tell_object_str(), and use tell_object() (#471)
+
 19-Jul-2008 (Zesstra)
   - (array.c, backend.c, comm.c, dumpstat.c, interpret.c, mapping.c, lex.c)
     Changed format specifiers for mp_int to PRI*MPINT and some for p_int to

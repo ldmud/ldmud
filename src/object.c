@@ -1299,34 +1299,6 @@ tell_object (object_t *ob, string_t *str)
 }
 
 /*-------------------------------------------------------------------------*/
-void
-tell_object_str (object_t *ob, const char *str)
-
-/* Send message <str> to object <ob>. If <ob> is an interactive player,
- * it will go to his screen (unless a shadow catches it - see shadow_catch_
- * message() ). If <ob> is not interactive, the message will go
- * to the lfun 'catch_tell()' via a call to tell_npc().
- */
-
-{
-    object_t *save_command_giver;
-    interactive_t *ip;
-
-    if (ob->flags & O_DESTRUCTED)
-        return;
-
-    if (O_SET_INTERACTIVE(ip, ob))
-    {
-        save_command_giver = command_giver;
-        command_giver = ob;
-        add_message("%s", str);
-        command_giver = save_command_giver;
-        return;
-    }
-    tell_npc_str(ob, str);
-}
-
-/*-------------------------------------------------------------------------*/
 Bool
 shadow_catch_message (object_t *ob, const char *str)
 
@@ -4607,7 +4579,7 @@ e_say (svalue_t *v, vector_t *avoid)
     object_t *ob;
     object_t *save_command_giver = command_giver;
     object_t *origin;
-    char *message;
+    string_t *message;
 #define INITIAL_MAX_RECIPIENTS 48
     int max_recipients = INITIAL_MAX_RECIPIENTS;
       /* Current size of the recipients table.
@@ -4626,7 +4598,6 @@ e_say (svalue_t *v, vector_t *avoid)
                  &first_recipients[INITIAL_MAX_RECIPIENTS-1];
       /* Last entry in the current table.
        */
-    object_t *save_again;
 
     /* Determine the command_giver to use */
     if (current_object->flags & O_ENABLE_COMMANDS)
@@ -4730,7 +4701,7 @@ e_say (svalue_t *v, vector_t *avoid)
     switch(v->type)
     {
     case T_STRING:
-        message = get_txt(v->u.str);
+        message = v->u.str;
         break;
 
     case T_OBJECT:
@@ -4777,22 +4748,12 @@ e_say (svalue_t *v, vector_t *avoid)
 
     for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
     {
-        interactive_t *ip;
-
         if (ob->flags & O_DESTRUCTED)
             continue;
         stmp.u.ob = ob;
         if (lookup_key(&stmp, avoid) >= 0)
             continue;
-        if (!(O_SET_INTERACTIVE(ip, ob)))
-        {
-            tell_npc_str(ob, message);
-            continue;
-        }
-        save_again = command_giver;
-        command_giver = ob;
-        add_message("%s", message);
-        command_giver = save_again;
+        tell_object (ob, message);
     }
 
     pop_stack(); /* free avoid alist */
@@ -4901,12 +4862,11 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
 
 {
     object_t *ob;
-    object_t *save_command_giver;
     int num_recipients = 0;
     object_t *some_recipients[20];
     object_t **recipients;
     object_t **curr_recipient;
-    char *message;
+    string_t *message;
     static svalue_t stmp = { T_OBJECT, } ;
     interactive_t *ip;        
 
@@ -4960,7 +4920,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     switch(v->type)
     {
     case T_STRING:
-        message = get_txt(v->u.str);
+        message = v->u.str;
         break;
 
     case T_OBJECT:
@@ -5016,15 +4976,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
         if (ob->flags & O_DESTRUCTED) continue;
         stmp.u.ob = ob;
         if (lookup_key(&stmp, avoid) >= 0) continue;
-        if (!(O_SET_INTERACTIVE(ip, ob)))
-        {
-            tell_npc_str(ob, message);
-            continue;
-        }
-        save_command_giver = command_giver;
-        command_giver = ob;
-        add_message("%s", message);
-        command_giver = save_command_giver;
+        tell_object(ob, message);
     }
 } /* e_tell_room() */
 
