@@ -1291,7 +1291,7 @@ tell_object (object_t *ob, string_t *str)
     {
         save_command_giver = command_giver;
         command_giver = ob;
-        add_message("%s", get_txt(str));
+        add_message(FMT_STRING, str);
         command_giver = save_command_giver;
         return;
     }
