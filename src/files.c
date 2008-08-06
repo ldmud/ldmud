@@ -74,10 +74,6 @@ extern int fchmod(int, int);
 
 #include "../mudlib/sys/files.h"
 
-/* TODO: The move/copy code is a derivate of the GNU fileutils. Rewrite
- * TODO:: it, replace it by the BSD code, or put the driver under the GPL.
- */
-
 /*-------------------------------------------------------------------------*/
 static Bool
 isdir (const char *path)
@@ -115,95 +111,81 @@ copy_file (const char *from, const char *to, int mode)
  */
 
 {
-    int ifd;
-    int ofd;
-    char buf[1024 * 8];
-    int len;                        /* Number of bytes read into `buf'. */
-
-    if (unlink(to) && errno != ENOENT)
+    int fromfd, tofd;
+    ssize_t count;
+    char buf[4096];
+    
+    fromfd = ixopen(from, O_RDONLY);
+    if (fromfd < 0)
     {
-        debug_message("copy_file(): cannot remove `%s'\n", to);
+        debug_message("copy_file(): can't open '%s': %s\n", from, strerror(errno));
+        return 1;
+    }
+    
+    /* We have to unlink 'to', because it may be a symlink.
+       O_CREAT won't remove that. */
+    if (unlink(to) < 0 && errno != ENOENT)
+    {
+        debug_message("copy_file(): can't unlink '%s': %s\n", to, strerror(errno));
+        close(fromfd);
+        return 1;
+    }
+    
+    tofd = ixopen3(to, O_WRONLY|O_CREAT|O_TRUNC, mode);
+    if (tofd < 0)
+    {
+        debug_message("copy_file(): can't open '%s': %s\n", to, strerror(errno));
+        close(fromfd);
         return 1;
     }
 
-    ifd = ixopen3(from, O_RDONLY | O_BINARY, 0);
-    if (ifd < 0)
+#ifdef HAVE_FCHMOD     
+    /* We have given the file mode to ixopen3, this is just to counter umask.
+       So don't worry if this fchmod fails. */
+    fchmod(tofd, mode);
+#endif                                                                                                                                                                           
+    
+    do
     {
-        debug_message("copy_file(): %s: open failed\n", from);
-        return errno;
-    }
-
-    ofd = ixopen3(to, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0600);
-    if (ofd < 0)
-    {
-        debug_message("copy_file(): %s: open failed\n", to);
-        close(ifd);
-        return 1;
-    }
-
-#ifdef HAVE_FCHMOD
-    if (fchmod(ofd, mode))
-    {
-        debug_message("copy_file(): %s: fchmod failed\n", to);
-        close(ifd);
-        close(ofd);
-        unlink(to);
-        return 1;
-    }
-#endif
+        ssize_t written;
+        
+        count = read(fromfd, buf, sizeof(buf));
+        if (count < 0)
+        {
+            debug_message("copy_file(): can't read from '%s': %s\n", from, strerror(errno));
+            close(fromfd);
+            close(tofd);
+            unlink(to);
+            return 1;
+        }
+        
+        written = 0;
+        while (written < count)
+        {
+            ssize_t len;
+            
+            len = write(tofd, buf + written, count - written);
+            if (len <= 0)
+            {
+                debug_message("copy_file(): can't write to '%s': %s\n", to, strerror(errno));
+                close(fromfd);
+                close(tofd);
+                unlink(to);
+                return 1;
+            }
+            
+            written += len;
+        }
+    } while (count > 0);
 
     FCOUNT_READ(from);
     FCOUNT_WRITE(to);
 
-    while ((len = read(ifd, buf, sizeof (buf))) > 0)
-    {
-        int wrote = 0;
-        char *bp = buf;
-
-        do
-        {
-            wrote = write(ofd, bp, len);
-            if (wrote < 0)
-            {
-                debug_message("copy_file(): %s: write failed\n", to);
-                close(ifd);
-                close(ofd);
-                unlink(to);
-                return 1;
-            }
-            bp += wrote;
-            len -= wrote;
-        } while (len > 0);
-    }
-
-    if (len < 0)
-    {
-        debug_message("copy_file(): %s: read failed\n", from);
-        close(ifd);
-        close(ofd);
-        unlink(to);
-        return 1;
-    }
-
-    if (close (ifd) < 0)
-    {
-        debug_message("copy_file(): %s: close failed\n", from);
-        close(ofd);
-        return 1;
-    }
-
-    if (close (ofd) < 0)
-    {
-        debug_message("copy_file(): %s: close failed\n", to);
-        return 1;
-    }
+    close(fromfd);
+    close(tofd);
 
 #ifndef HAVE_FCHMOD
-    if (chmod (to, mode))
-    {
-        debug_message("copy_file(): %s: chmod failed\n", to);
-        return 1;
-    }
+    chmod(to, mode);
 #endif
 
     return 0;
@@ -218,80 +200,55 @@ move_file (const char *from, const char *to)
  */
 
 {
-    struct stat to_stats, from_stats;
-
-    if (lstat(from, &from_stats) != 0)
+    struct stat fromstat, tostat;
+    
+    if (lstat(from, &fromstat) < 0)
     {
-        debug_message("move_file(): %s: lstat failed\n", from);
+        debug_message("move_file(): can't lstat '%s': %s\n", from, strerror(errno));
         return 1;
     }
-
-    if (lstat (to, &to_stats) == 0)
+    
+    if (!lstat(to, &tostat))
     {
-        if (from_stats.st_dev == to_stats.st_dev
-          && from_stats.st_ino == to_stats.st_ino)
+        if (fromstat.st_dev == tostat.st_dev
+         && fromstat.st_ino == tostat.st_ino)
         {
-            debug_message("move_file(): '%s' and '%s' are the same file\n", from, to);
+            /* Same file. */
+            debug_message("move_file(): '%s' and '%s' are the same.\n", from, to);
             return 1;
         }
-
-        if (S_ISDIR (to_stats.st_mode))
+        
+        if (S_ISDIR(tostat.st_mode))
         {
-            debug_message("move_file(): %s: cannot overwrite directory\n", to);
+            debug_message("move_file(): destination '%s' is a directory.\n", to);
+    	    return 1;    
+        }
+    }
+    
+    if (rename(from, to))
+    {
+        if (errno == EXDEV)
+        {
+            if (!S_ISREG(fromstat.st_mode))
+            {
+                debug_message("move_file(): can't move '%s' across filesystems: Not a regular file.\n", to);
+                return 1;
+            }
+            
+            if (copy_file(from, to, fromstat.st_mode & (S_IRWXU|S_IRWXG|S_IRWXO)))
+                return 1;
+            
+            unlink(from);
+        }
+        else
+        {
+            debug_message("move_file(): can't rename '%s' to '%s': %s\n", to, from, strerror(errno));
             return 1;
         }
-
-    }
-    else if (errno != ENOENT)
-    {
-        perror("do_move");
-        debug_message("move_file(): %s: unknown error\n", to);
-        return 1;
-    }
-#ifndef RENAME_HANDLES_DIRECTORIES
-    /* old SYSV */
-    if (isdir(from))
-    {
-        char cmd_buf[3*MAXPATHLEN+1];
-
-        if (strchr(from, '\'') || strchr(to, '\''))
-            return 0;
-        sprintf(cmd_buf, "/usr/lib/mv_dir '%s' '%s'", from, to);
-        return system(cmd_buf);
-    }
-    else
-#endif /* RENAME_HANDLES_DIRECTORIES */
-    if (rename (from, to) == 0)
-    {
-        FCOUNT_DEL(from);
-        return 0;
     }
 
-    if (errno != EXDEV)
-    {
-        debug_message("move_file(): cannot move '%s' to '%s'\n", from, to);
-        return 1;
-    }
-
-    /* rename failed on cross-filesystem link.  Copy the file instead. */
-
-    if (!S_ISREG(from_stats.st_mode))
-    {
-        debug_message("move_file(): cannot move '%s' across filesystems: "
-                      "Not a regular file\n", from);
-        return 1;
-    }
-
-    if (copy_file(from, to, from_stats.st_mode & 0777))
-       return 1;
-
-    if (unlink(from))
-    {
-        debug_message("move_file(): cannot remove '%s'\n", from);
-        return 1;
-    }
     FCOUNT_DEL(from);
-
+    
     return 0;
 } /* move_file() */
 
