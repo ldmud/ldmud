@@ -228,11 +228,11 @@ extern int errno;
     /* If there is no intptr_t in stdint.h and autoconf did not find a
      * suitable type, we're out of luck (because in this case we are unlikely
      * to find one). */
-#   error Autoconf didn't find an integer type with same size as a pointer
+#   error Autoconf did not find an integer type with same size as a pointer
     Thats it.
 #endif
 #if !defined(INT32_MAX) && !defined(int32_t)
-#   error Autoconf didn't find an integer type with exactly 32 bits.
+#   error Autoconf did not find an integer type with exactly 32 bits.
     Thats it.
 #endif
 
