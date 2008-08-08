@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Aug-2008 (Zesstra)
+  - (settings/morgengrauen) Updated file to include the settings currently
+    used in MorgenGrauen.
+
 06-Aug-2008 (Gnomi)
   - (files.c) Rewrote copy/move_file due to copyright issues.
 
