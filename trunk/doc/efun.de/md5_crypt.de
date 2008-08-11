@@ -1,0 +1,20 @@
+SYNOPSIS
+        string md5_crypt(string str, int seed)
+        string md5_crypt(string str, string seed)
+
+BESCHREIBUNG
+        Verschluesselt den String <str> mit dem Schluessel <seed>.
+        <seed> kann entweder ein Integer sein oder zwei Zeichen aus
+        dem String <seed>.  Wenn <seed> 0 ist, wird ein zufaelliger
+        Schluessel erzeugt.
+
+        Das Resultat enthaelt den Schluessel als die ersten beiden Zeichen.
+
+        Die Efun verwendet den MD5-Algorithmus, und das Resultat ist
+        kompatible mit der Passwordverschluesselung des Apache Webservers.
+
+        Fuer Passwortabfragen, die ohne Echo eingegeben werden koennen sollen,
+        bietet input_to() ein spezielles Flag.
+
+SIEHE AUCH
+        crypt(E), md5(E), sha1(E), input_to(E)

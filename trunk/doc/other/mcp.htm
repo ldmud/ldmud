@@ -1,0 +1,323 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<meta name="GENERATOR" content="Microsoft FrontPage 4.0">
+<meta name="ProgId" content="FrontPage.Editor.Document">
+<title>MUD Compression Protocol</title>
+<link rel="stylesheet" type="text/css" href="../common/master.css">
+</head>
+
+<body>
+<script language="JavaScript" SRC="/common/js_dynMenuFunctions.js">
+</script>
+<script language="JavaScript">
+<!--
+	var garyMenuData = new Array()
+	var garyMenuNames = new Array()
+	garyMenuData["News"] = new Array()
+	garyMenuNames.push( new Array("News", 12, 14, 95, 80) )
+	garyMenuData["News"].push( new Array("Privacy","/zuggsoft/privacy.htm") )
+	garyMenuData["News"].push( new Array("Press","/zmud/press.htm") )
+	garyMenuData["News"].push( new Array("About us","/zuggsoft/about.htm") )
+	garyMenuData["Products"] = new Array()
+	garyMenuNames.push( new Array("Products", 63, 65, 160, 145) )
+	garyMenuData["Products"].push( new Array("zMUD","/zmud/zmudinfo.htm") )
+	garyMenuData["Products"].push( new Array("AC Explorer","/ac/ac.asp") )
+	garyMenuData["Products"].push( new Array("DoctorZ","/doctorz/doctorzinfo.htm") )
+	garyMenuData["Products"].push( new Array("zMUD Developer's Kit","/devkit/devkitinfo.htm") )
+	garyMenuData["Products"].push( new Array("zChat","/zchat/zchatinfo.htm") )
+	garyMenuData["Buy"] = new Array()
+	garyMenuNames.push( new Array("Buy", 147, 149, 160, 145) )
+	garyMenuData["Buy"].push( new Array("zMUD","/zmud/order_zmud.htm") )
+	garyMenuData["Buy"].push( new Array("AC Explorer","/zmud/order_ac.htm") )
+	garyMenuData["Buy"].push( new Array("DoctorZ","/doctorz/register.htm") )
+	garyMenuData["Buy"].push( new Array("zMUD Developer's Kit","/zmud/order_devkit.htm") )
+	garyMenuData["Downloads"] = new Array()
+	garyMenuNames.push( new Array("Downloads", 224, 226, 105, 90) )
+	garyMenuData["Downloads"].push( new Array("zMUD","/zmud/down.asp#zMUD") )
+	garyMenuData["Downloads"].push( new Array("AC Explorer","/zmud/down.asp#ACX") )
+	garyMenuData["Downloads"].push( new Array("DoctorZ","/zmud/down.asp#DoctorZ") )
+	garyMenuData["Support"] = new Array()
+	garyMenuNames.push( new Array("Support", 322, 324, 160, 145) )
+	garyMenuData["Support"].push( new Array("Support Library","/library") )
+	garyMenuData["Support"].push( new Array("Bug reports","/zmud/bugs.htm") )
+	garyMenuData["Support"].push( new Array("Lost Registration code","/zuggsoft/regcode.htm") )	
+	garyMenuData["Support"].push( new Array("Links","/links/links.cfm") )
+	garyMenuData["Support"].push( new Array("MUDs","/muds/links.cfm") )
+	garyMenuData["Forums"] = new Array()
+	garyMenuNames.push( new Array("Forums", 396, 398, 120, 105) )
+	garyMenuData["Forums"].push( new Array("zMUD General","/forum/FORUM.asp?FORUM_ID=7&CAT_ID=1&Forum_Title=zMUD+General+Discussion") )
+	garyMenuData["Forums"].push( new Array("zMUD Beta","/forum/FORUM.asp?FORUM_ID=8&CAT_ID=1&Forum_Title=zMUD+Beta+Forum") )
+	garyMenuData["Forums"].push( new Array("AC Explorer","/forum/FORUM.asp?FORUM_ID=13&CAT_ID=3&Forum_Title=AC+Explorer+Discussion") )
+	garyMenuData["Forums"].push( new Array("DoctorZ","/forum/FORUM.asp?FORUM_ID=12&CAT_ID=3&Forum_Title=DoctorZ+Discussion") )
+	garyMenuData["Forums"].push( new Array("Developers","/forum/FORUM.asp?FORUM_ID=10&CAT_ID=1&Forum_Title=zMUD+Developers") )
+	garyMenuData["Contact"] = new Array()
+	garyMenuNames.push( new Array("Contact", 400, 403, 160, 145) )
+	garyMenuData["Contact"].push( new Array("Feedback","/zuggsoft/feedback.htm") )
+	garyMenuData["Contact"].push( new Array("Bug reports","/zmud/bugs.htm") )
+	garyMenuData["Contact"].push( new Array("Lost Registration code","/zuggsoft/regcode.htm") )	
+	garyMenuData["Contact"].push( new Array("Email","mailto:support@zuggsoft.com") )
+//-->
+</script>
+<script language="JavaScript">
+<!--
+	var gstrBrowserType = null
+	if( document.layers )   gstrBrowserType="Netscape";
+	else if( document.all )	gstrBrowserType="IE";
+	gstrMenuColor = "#F3E9EF"
+	gstrMenuColorOn = "#D2AEC4"
+	gstrBorderColor = "#993366"
+	var strAlignment = "left"
+	if( gstrBrowserType == "Netscape" )
+	{
+		for (var intCnt=0; intCnt<garyMenuNames.length; intCnt++) {
+			if( intCnt == (garyMenuNames.length - 1) ){
+				//All menus are left-aligned except the last menu
+				strAlignment = "right"
+			}
+			//Pass the menu name, the menu left position Netscape, the Netscape width, and the alignment of text in the menu
+			createNetscapeMenu(garyMenuNames[intCnt][0], garyMenuNames[intCnt][1], garyMenuNames[intCnt][3], strAlignment)
+		}
+	}
+	else if( gstrBrowserType == "IE" )
+	{
+		for (var intCnt=0; intCnt<garyMenuNames.length; intCnt++) {
+			if( intCnt == (garyMenuNames.length - 1) ){
+				//All menus are left-aligned except the last menu
+				strAlignment = "right"
+			}
+			//Pass the menu name, the menu left position for IE, the IE width, and the alignment of text in the menu
+			createIEMenu(garyMenuNames[intCnt][0], garyMenuNames[intCnt][2], garyMenuNames[intCnt][4], strAlignment)
+		}
+	}
+//-->
+</script>
+
+<table width="100%" border="0" cellpadding="0">
+  <tr>
+    <td>
+      <table border="0" cellpadding="0" width="100%" background="/common/background.gif">
+        <tr>
+          <td width="260"><a href="/zuggsoft/zuggsoft.htm" target="_top"><img border="0" src="/common/zs.gif" width="130" height="53"></a> <img border="0" src="/common/flag.gif" width="100" height="55"></td>
+          <td>
+            <font face="Verdana" size="2" color="#0000FF"><b>Customer&nbsp;driven&nbsp;Internet&nbsp;Software<br>
+            Upgrades&nbsp;are&nbsp;always&nbsp;FREE,&nbsp;FOREVER!</b></font>
+          </td>
+          <td valign="middle" align="right"><font size="-2" face="Arial">
+            [<a href="http://www.mudconnector.com/" target="_blank">The&nbsp;MUD&nbsp;Connector</a>]<br>
+            [<a href="http://www.themudjournal.com/" target="_blank">The&nbsp;MUD&nbsp;Journal</a>]<br>
+            [<a href="http://www.mudcompanion.com/" target="_blank">The&nbsp;MUD&nbsp;Companion</a>]</font></td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <table border="0" width="100%" cellpadding="0">
+        <tr>
+          <td width="48" valign="top">
+            <a href="/zuggsoft/whatsnew.htm" onmouseover="showMenu('News')" onmouseout="hideMenu('News')">
+            <img src="/common/newsbutton.gif" width="49" height="21" alt="" border="0"></a></td>
+          <td width="81" valign="top">
+            <a href="/zuggsoft/product.htm" onmouseover="showMenu('Products')" onmouseout="hideMenu('Products')">
+            <img src="/common/productbutton.gif" width="82" height="21" alt="" border="0"></a></td>
+          <td width="74" valign="top">
+            <a href="/zmud/register.htm" onmouseover="showMenu('Buy')" onmouseout="hideMenu('Buy')">
+            <img src="/common/buybutton.gif" width="75" height="21" alt="" border="0"></a></td>
+          <td width="95" valign="top">
+            <a href="/zmud/down.htm" onmouseover="showMenu('Downloads')" onmouseout="hideMenu('Downloads')">
+            <img src="/common/downloadbutton.gif" width="96" height="21" alt="" border="0"></a></td>
+          <td width="71" valign="top">
+            <a href="/library" onmouseover="showMenu('Support')" onmouseout="hideMenu('Support')">
+            <img src="/common/supportbutton.gif" width="72" height="21" alt="" border="0"></a></td>
+          <td width="67" valign="top">
+            <a href="/forum/default.asp" onmouseover="showMenu('Forums')" onmouseout="hideMenu('Forums')">
+            <img src="/common/forumbutton.gif" width="68" height="21" alt="" border="0"></a></td>
+          <td width="93" valign="top">
+            <a href="/zuggsoft/feedback.htm" onmouseover="showMenu('Contact')" onmouseout="hideMenu('Contact')">
+            <img src="/common/contactbutton.gif" width="94" height="21" alt="" border="0"></a></td>
+          <td width="9999" bgcolor="#9C3163" align="right">
+            <font size="-2" face="Arial" color="#FFFFDE">©&nbsp;2001&nbsp;Zugg&nbsp;Software&nbsp;</font>
+          </td>
+        </tr>
+        <noscript>
+          <tr>
+          <td bgcolor="#F5F5F5" width="48">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zuggsoft/privacy.htm">Privacy</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/press.htm">Press</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zuggsoft/about.htm">About&nbsp;us</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="81">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zmud/zmudinfo.htm">zMUD</a></font></td></tr>
+              <tr><td><font size="1"><a href="/ac/ac.asp">AC&nbsp;Explorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/doctorz/doctorzinfo.htm">DoctorZ</a></font></td></tr>
+              <tr><td><font size="1"><a href="/devkit/devkitinfo.htm">Developer's&nbsp;Kit</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zchat/zchatinfo.htm">zChat</a></font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="74">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zmud/order_zmud.htm">zMUD</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/order_ac.htm">AC&nbsp;Explorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/doctorz/register.htm">DoctorZ</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/order_devkit.htm">Developer's&nbsp;Kit</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="95">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zmud/down.asp#zMUD">zMUD</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/down.asp#ACX">AC&nbsp;Explorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/down.asp#DoctorZ">DoctorZ</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="71">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/library">Library</a></font></td></tr>
+              <tr><td><font size="1"><a href="/links/links.cfm">Links</a></font></td></tr>
+              <tr><td><font size="1"><a href="/muds/links.cfm">MUDs</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="67">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=7&amp;CAT_ID=1&amp;Forum_Title=zMUD+General+Discussion">zMUD&nbsp;General</a></font></td></tr>
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=8&amp;CAT_ID=1&amp;Forum_Title=zMUD+Beta+Forum">zMUD&nbsp;Beta</a></font></td></tr>
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=13&amp;CAT_ID=3&amp;Forum_Title=AC+Explorer+Discussion">AC&nbsp;Explorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=12&amp;CAT_ID=3&amp;Forum_Title=DoctorZ+Discussion">DoctorZ</a></font></td></tr>
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=10&amp;CAT_ID=1&amp;Forum_Title=zMUD+Developers">Developers</a></font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="93">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zuggsoft/suggest.cfm">Feedback</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/bugs.cfm">Bug&nbsp;reports</a></font></td></tr>
+              <tr><td><font size="1"><a href="mailto:support@zuggsoft.com">Email</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td width="9999" bgcolor="#F5F5F5">&nbsp;</td>
+          </tr>
+        </noscript>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td bgcolor="808080" height="2"><img border="0" src="/common/1x1.gif" width="1" height="2"></td>
+  </tr>
+</table>
+
+
+<p>(<b>Note</b>: This was taken from the <a href="http://abandoned.org/nemon/compress/protocol.html"><font color="blue">abandoned.org/nemon/compress/protocol.html</font></a>
+page.&nbsp; This page no longer seems to exist, so I wanted to preserve the spec
+here.&nbsp; --<i>Zugg</i>)</p>
+<h1>The Mud Client Compression Protocol - Specification - Version 2</h1>
+<ul>
+  <li>2000/05/30: Version 2: introduced COMPRESS2 to fix the missing IAC on the
+    option subnegotiation sequence for COMPRESS.</li>
+</ul>
+<p>This document describes version 2 of the protocol, using the COMPRESS2
+option. An earlier version described a protocol using the COMPRESS option --
+this is referred to as the version 1 protocol below.
+<p>The protocol used by mcclient is based on 'telnet' option negotiation. See
+RFCs <a href="http://www.freesoft.org/CIE/RFC/854/index.htm">854</a> and <a href="http://www.freesoft.org/CIE/RFC/855/index.htm">855</a>
+for an overview of the mechanism used.
+<p>Compression is currently unidirectional - only output from the mud server is
+compressed. This simplifies the implementation, and also avoids potential
+problems with hostile clients sending data intended to cause problems (via
+crashing or excessive memory/cpu use) with the decompressor. The compressor is
+entirely controlled by the server. While attacks on the client are potentially
+possible, this seems less of a problem as the client is not a shared resource.
+<p>Servers supporting version 2 (this version) of the protocol should indicate
+they support it by offering the COMPRESS2 option (number 86): <code><em>IAC WILL
+COMPRESS2</em></code>. They may also optionally offer the older version 1 option
+(number 85) to support older clients: <code><em>IAC WILL COMPRESS</em></code>.
+Servers should offer COMPRESS2 before COMPRESS to allow newer clients to support
+any extra features added to COMPRESS2 in the future while still supporting
+COMPRESS.
+<p>Clients should respond to the COMPRESS2 option with <code><em>IAC DO
+COMPRESS2</em></code> if they want the server to enable compression. To support
+older servers, clients may respond to the COMPRESS option with <code><em>IAC DO
+COMPRESS</em></code>, although it is recommended that the COMPRESS option is
+refused with <code><em>IAC DONT COMPRESS</em></code> if COMPRESS2 has been
+previously offered by the server.
+<p>There is no requirement for either server or client to support the version 1
+protocol.
+<p>Once either COMPRESS or COMPRESS2 is negotiated, the server may enable
+compression. Since the start point of the compression stream needs to be known,
+the server prefixes the start of the stream with a suboption negotiation packet.
+This is <code><em>IAC SB COMPRESS WILL SE</em></code> for the obsolete COMPRESS
+option (note that this is not a valid suboption negotiation sequence according
+to RFC854/855 -- the terminating SE isn't correctly escaped), or <code><em>IAC
+SB COMPRESS2 IAC SE</em></code> for the COMPRESS2 option.
+<p>Immediately following this, a zlib stream (as defined in <a href="http://www.freesoft.org/CIE/RFC/Orig/rfc1950.txt">RFC
+1950</a> - see also the <a href="http://www.info-zip.org/pub/infozip/zlib/">zlib
+home page</a>) begins.
+<p>In summary, negotiation between server and client takes one of these forms:
+<pre>  version 1 server                      version 1 client
+  IAC WILL COMPRESS
+                                        IAC DO COMPRESS
+  IAC SB COMPRESS WILL SE
+  (compressed stream)
+
+  version 2 server (supporting v1)      version 1 client
+  IAC WILL COMPRESS2
+  IAC WILL COMPRESS
+                                        (nothing) or IAC DONT COMPRESS2
+                                        IAC DO COMPRESS
+  IAC SB COMPRESS WILL SE
+  (compressed stream)
+    
+  version 2 server (not supporting v1)  version 1 client
+  IAC WILL COMPRESS2
+                                        (nothing) or IAC DONT COMPRESS2
+  (uncompressed connection continues)
+    
+  version 1 server                      version 2 client (supporting v1)
+  IAC WILL COMPRESS        
+                                        IAC DO COMPRESS
+  IAC SB COMPRESS WILL SE
+  (compressed stream)
+  
+  version 1 server                      version 2 client (not supporting v1)
+  IAC WILL COMPRESS        
+                                        IAC DONT COMPRESS
+  (uncompressed connection continues)
+  
+  version 2 server                      version 2 client
+  IAC WILL COMPRESS2
+  IAC WILL COMPRESS
+                                        IAC DO COMPRESS2
+                                        IAC DONT COMPRESS
+  IAC SB COMPRESS2 IAC SE
+  (compressed stream)
+</pre>
+<p>The compressed data should be transmitted unescaped. IAC should be sent
+as-is. Telnet option negotiation and IAC escaping continues as normal for the
+uncompressed data stream -- the entire telnet TCP stream is compressed,
+negotiation and all.
+<p>Compression can only be terminated by the server - a normal end to the
+compression stream is assumed to mean &quot;revert to uncompressed mode&quot;.
+It may be desirable for the server to automatically terminate compression when
+an <code><em>IAC DONT COMPRESS</em></code> sequence is received from the client.
+<p>Any decompression errors are unrecoverable, and should result in a
+disconnection. Given that TCP is a reliable transport mechanism, bug-free
+implementations should never encounter compression errors, so this should not
+affect normal operation. When an error <em>is</em> encountered, something has
+gone badly wrong, and it seems hard to recover. Allowing raw (uncompressed)
+option negotiation to reset compression is one possibility, but would require
+that option negotiation take place outside the compressed stream.
+<address>
+  &nbsp;
+</address>
+<address>
+  Oliver Jowett &lt;<a href="mailto:icecube@ihug.co.nz">icecube@ihug.co.nz</a>&gt;,
+  2000/05/30
+</address>
+
+</body>
+
+</html>

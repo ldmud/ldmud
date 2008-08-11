@@ -1,0 +1,19 @@
+OPTIONAL
+SYNOPSIS
+        void pg_close()
+
+DESCRIPTION
+        Close the database connection for the current object, if there is one.
+
+        The function is available only if the driver is compiled with
+        PostgreSQL support. In that case, __PGSQL__ is defined.
+
+        The efun triggers a privilege violation ("pgsql", "pg_close").
+
+HISTORY
+        Added in 3.3.445.
+        LDMud 3.3.640 added the privilege violation.
+
+SEE ALSO
+        pgsql(C), pg_connect(E), pg_conv_string(E), pg_query(E), pg_pending(E),
+        privilege_violation(M)

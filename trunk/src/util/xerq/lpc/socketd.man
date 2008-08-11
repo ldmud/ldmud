@@ -1,0 +1,278 @@
+CONCEPT
+        Sockets and the socket daemon
+
+DESCRIPTION
+        If you want to connect to another computer on the internet
+        you would like to use sockets. Sockets are not part of the
+        driver so there has to be someting in the lib. Here it
+        is: the socket daemon.
+
+        It helps you to create and maintain state of your connection
+        with various protocols and different computers.
+
+        What sockets are and how you use them is not subject of this
+        text. Maybe the examples help you but be encouraged to read
+        some real text on them.
+
+        Creating a socket
+        ~~~~~~~~~~~~~~~~~
+        You could create internet domain sockets with tcp or udp
+        protocol. Listening and sending of data is possible. Also
+        there is on protocol overlying tcp available: mudmode.
+
+        To create a socket you call the daemon which will return you
+        a socket object. All further handling is done by that
+        object:
+
+          #include <daemon/socket.h>
+
+          sock_ob = (object) SOCKETD->New(...);
+
+        The full prototype of New() is as follows:
+        object New(int type, string host, int port, closure cb, int opts)
+
+        The Type is one of:
+          TCP_OPEN      An outgoing tcp connection.
+          TCP_LISTEN    Listen on a tcp port for incoming connections.
+          UDP           An incoming or outgoing udp connections.
+
+        The Host of the destination could be specified as an IP address
+        like "139.18.11.86" or via a DNS name which will be resolved
+        first "wl.mud.de". Note that it is used only for TCP_OPEN and has
+        to be zero for the other types.
+
+        The Port is an Integer:
+          TCP_OPEN      The port on the remote computer we want to
+                        connect to. Its not possible to choose the packet's
+                        source port, a random number will be used.
+          TCP_LISTEN    The port on which we will await connections.
+          UDP           The port on which we will listen and also the
+                        port to send packets _from_.
+                        It is not possible to send udp packets without
+                        listening at the port we want as source.
+
+        The callback closure cb gets all the data and status or error
+        messages of that socket. It is described further down.
+
+        The Opts may be
+        SOCKET_ASCII    which is also the default. Its not possible to
+                        receive data with embedded \000 which are filtered.
+                        You will get the data as strings.
+        SOCKET_BINARY   Here is all data possible. Because its not (yet)
+                        possible to have \000 in strings in lpc you will
+                        get the data as array of chars (ints).
+        SOCKET_MUDMODE  This is a layer over TCP whichs allows you to send
+                        complex LPC data types rather than limited strings.
+                        The receiver is most likely also a mud where the
+                        same data is reconstructed. It is possible to send
+                        mapbe ({ 3, 3.0, "hi" }) over the network and the
+                        receiver will just get that (the mixed* array)
+                        rather than a string. Mind that it is not possible
+                        to send objectpointer. Also be careful with
+                        double references which are not guaranteed to be
+                        restored correctly.
+        
+        Using a socket
+        ~~~~~~~~~~~~~~
+        To handle the socket you could call the following functions
+        in your socket object. They will return 1 if all seems to
+        be correct but real errors are reported via callback.
+
+        int Write(mixed data)
+          The given data is written to the socket. If nothing goes wrong
+          it will end up on the far partner's computer. The data may
+          be a string or an array of integers (which may contain zeros).
+          If the socket is in SOCKET_MUDMODE any lpc structure may be
+          written (without object pointer).
+          Note that SOCKET_ASCII/SOCKET_BINARY is not interpreted here.
+
+        int Send(string host, int port, mixed msg)
+          This is the same but used on UDP sockets only. Because UDP is
+          connectionless you have to give your destination on each Send().
+          Host and port are specified like for New().
+          The UDP packet size is limited to MAX_SEND bytes. If the msg
+          requires more space (quite unpredictable in MUDMODE) it is
+          split into several packages. The receiver must handle that
+          or you should not send that big a message.
+          Sending MUDMODE UDP is not (yet) possible.
+
+        object Accept(closure acc_cb)
+          Opens a pending connection on a listend to socket. You have to
+          call it in the main listen socket object.
+          It returns you a new socket object for that connection.
+          All data and status messages of the new connection will be
+          handled via acc_cb, which may be the same function as your
+          main callback function.
+          The listening socket could be closed after the new connection
+          is fully established, if you want to handle only one connection
+          at a time.
+
+        int Close()
+          The connection is ended and the socket object removed.
+          If you use remove() on the socket object an emergency Close()
+          is called but it is better to do this right and never call
+          remove() on the socket object.
+
+        mixed* State()
+          Returns you an array with Information on that connection.
+          S_SOCKOBJ   The object itself (really useless info, isn't it?)
+          S_TYPE      The type of the socket. Additional to TCP_OPEN,
+                      TCP_LISTEN and UDP there is TCP_ACCEPT. That is the
+                      type of accepted connections.
+          S_TICKET    An integer array holding the ticket of that object
+                      for xerq communication. Not needed in normal cases.
+          S_STATE     The state of the socket:
+                        S_UNCONNECTED  No connection (yet) maybe we wait
+                                       for the DNS resolving.
+                        S_CONNECTED    We are connected (yeah!).
+                        S_LISTEN       The socket listens for connections.
+                        S_UDP          The socket listens for connections
+                                       and we may send packages out.
+                        S_CLOSING      The socket is or will be closed in
+                                       short time. Don't do anything but
+                                       clear up anymore.
+          S_OPTS      The opts as described above. Mind that the opts
+                      are bits and setting SOCKET_MODMODE will set
+                      SOCKET_BINARY automatically.
+          S_HOST      The remote host.
+          S_PORT      The remote port.
+          S_LPORT     The local port.
+          S_CALLBACK  The callback closure.
+          S_OBJECT    The object the callback closure is bound to. This
+                      is the only one which could call the functions in
+                      the socket object.
+          S_PENDING   Pending data or number of data to be sent. Don't use.
+                      (It's the preconnection data buffer.)
+          S_OWNER     The uid of S_OBJECT.
+          S_LISTEN_FD Used internally on accepted connections. The file
+                      descriptor of the listening socket. Is overwritten
+                      with S_PORT after connect.
+          S_TO_WRITE  How many packets are to be written to the erq.
+                      Note that the erq could handle only small chunks of
+                      data so this is not the number of Write()s or
+                      Send()s.
+          S_WRITTEN   How many of the S_TO_WRITE packets were acknoledged
+                      by the erq with SOCKET_WRITTEN. If both numbers are
+                      equal all data should be in the erq's queue.
+          S_RECEIVED  How many data packets were received from the erq.
+          S_WAITS     The sockets wait state as follows:
+                        S_WAITS_NOT    no waiting
+                        S_WAITS_ERQ    packet send to erq, waiting for reply
+                        S_WAITS_INCOM  erq replied SOCKET_INCOMPLETE,
+                                       waiting for socket to unblock
+                        S_WAITS_BLOCK  erq replied ERQ_E_WOULDBLOCK
+                                       waiting for socket to unblock
+
+        The callback system
+        ~~~~~~~~~~~~~~~~~~~
+          
+        Whenever something happens to your sockets it will be send to
+        your callback closure. It should have the following prototype:
+        void cb(object sock_obj, int action, extra1, extra2, extra3)
+
+        The sock_obj specifies the connection on which the action took
+        place. This is handy if you handle multiple sockets over one
+        callback.
+
+        The following actions exist:
+          SOCKET_READY:      The socket is ready to receive or send data.
+                             No extra info is given except when the socket
+                             is one opened by Accept():
+                             extra1: The listening socket object (stupid).
+                             extra2: The remote host (string).
+                             extra3: The remote port (int).
+
+          SOCKET_ACCEPT:     A listen port detected an incoming connection.
+                             you could accept it with Accept().
+
+          SOCKET_READ:       Incoming data is ready.
+                             extra1: The data.
+                             extra2: The remote host (UDP only).
+                             extra3: The remote port (UDP only).
+
+          SOCKET_WRITTEN:    Some data was sent out successful.
+                             Note that your data will be chunkized so that
+                             one Write() may result in several callbacks.
+                             If all pending data is written, extra1 is
+                             set to 1.
+                             extra1: All data written if set.
+
+          SOCKET_INCOMPLETE: Not all data could be written. The xerq is
+                             buffering the rest and will notify us with
+                             SOCKET_WRITTEN if the writing is complete.
+                             This is informational only, you do not need
+                             to take any action or notice.
+                             extra1: Amount of data of the actual chunk
+                                     which could be written.
+                             extra2: Amount of data of whole LPC chunk
+                                     which could be written.
+                             Note that there might be several such callbacks
+                             until the packet is written completely.
+
+          SOCKET_CLOSE:      This is called when the connection is closed
+                             either from you or the other side.
+
+          SOCKET_ERROR:      An error occured.
+                             extra1: Short error message (of the xerq)(string)
+                             extra2: The xerq packet with the error or zero
+                             extra3: Description of the error ERQ_E_UNKNOWN.
+                             If extra2 is an array (of int) you will find the
+                             xerq error code in extra2[0]. See erq(C) also.
+
+          SOCKET_NOPEND:     You tried to accept on a listening socket
+                             where no pending connection is (anymore). This
+                             is sent to the socket object you got from the
+                             Accept(). That object will be destroyed
+                             afterwards.
+
+        Principle of operation
+        ~~~~~~~~~~~~~~~~~~~~~~
+
+        Here is a raw sketch of how sockets are supposed to work.
+        All three szenarios are described. Its only a sketch NOT code!
+
+        * outgoing connection
+
+          socket = New(TCP_OPEN)
+            callback SOCKET_READY
+          socket->Write("hello\n")
+            callback SOCKET_WRITTEN 1
+            callback SOCKET_READ, "hi you\n"
+          socket->Close()
+            callback SOCKET_CLOSE
+
+        * incoming connection
+
+          socket = New(TCP_LISTEN)
+            callback SOCKET_READY
+            callback SOCKET_ACCEPT
+          sock_2 = socket->Accept()
+            callbac2 SOCKET_READY
+          sock_2->Write("hello\n")
+            callbac2 SOCKET_WRITTEN 1
+            callback SOCKET_ACCEPT                (but we ignore that)
+            callbac2 SOCKET_READ, "hi you\n"
+          sock_2->Write("bye\n");
+          sock_2->Close();
+          socket->Close();
+            callbac2 SOCKET_WRITTEN 1             (see the callbacks are
+            callbac2 SOCKET_CLOSE                  asynchronous)
+            callback SOCKET_CLOSE
+
+          We could have done sock_3 = socket->Accept() after the second
+          SOCKET_ACCEPT to handle to connections at a time.
+
+        * UDP connection
+
+          socket = New(UDP)
+            callback SOCKET_READY
+          socket->Send("whos there", host1, port1);
+            callback SOCKET_WRITTEN 1
+          socket->Send("and there?\n\n", host2, port2);
+            callback SOCKET_WRITTEN 1
+            callback SOCKET_READ, "hi you\n", host1, port1
+          socket->Close()
+            callback SOCKET_CLOSE
+
+SEE ALSO
+        erq(C)

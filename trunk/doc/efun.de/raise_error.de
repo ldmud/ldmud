@@ -1,0 +1,18 @@
+SYNOPSIS
+        void raise_error(string arg);
+
+BESCHREIBUNG
+        Bricht die Ausfuehrung des laufenden Programms ab. Wenn das Programm
+        durch catch() aufgerufen wurde, liefert dieses catch() <arg> als
+        Fehlercode, sonst wird <arg> als Fehlermeldung ausgegeben.
+
+        raise_error() gleich in der Funktion throw(), aber waehrend throw()
+        aus catch() heraus aufgerufen werden soll, kann raise_error() von
+        ueberall her aufgerufen werden.
+
+        Da raise_error() sich wie andere 'echte' Laufzeitfehler verhaelt,
+        einschliesslich der Erzeugung eines Stack Backtraces, ist diese
+        Funktion sehr zeitintensiv.
+
+SIEHE AUCH
+        catch(E), throw(E)

@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Settings for the Hyperborea mudlib.
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/home/games/hyperborea --with-setting=hyperborea $*
+exit 1
+
+# --- The actual settings ---
+
+enable_use_alists=yes
+enable_compat_mode=yes
+enable_use_system_crypt=no
+with_master_name=obj/master
+with_portno=2000
+with_max_players=35
+enable_malloc_trace=yes
+enable_malloc_lpc_trace=yes
+enable_use_pcre=no
+

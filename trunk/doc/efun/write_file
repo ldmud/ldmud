@@ -1,0 +1,16 @@
+SYNOPSIS
+        int write_file(string file, string str)
+        int write_file(string file, string str, int flags)
+
+DESCRIPTION
+        Append the string <str> to the file <file>. Returns 1 for success
+        and 0 if any failure occured.
+
+        If <flags> is 1, the file is removed first; thus making the
+        'append' effectively an 'overwrite'. Default for <flags> is 0.
+
+HISTORY
+        LDMud 3.3.523 added the <flags> parameter.
+
+SEE ALSO
+        file_size(E), cat(E), write_bytes(E), read_file(E), rm(E)

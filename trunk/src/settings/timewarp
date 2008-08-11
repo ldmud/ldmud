@@ -1,0 +1,55 @@
+#!/bin/sh
+
+exec ./configure --prefix=/home/timewarp/timewarp --bindir=/home/timewarp/timewarp/bin --libdir=/home/timewarp/timewarp/mudlib --libexec=/home/timewarp/timewarp/bin/xerq --with-setting=timewarp
+exit 1
+
+
+#----------- Commandline Argument Defaults ----------
+
+with_max_array_size=15000
+with_max_mapping_keys=20000
+with_max_mapping_size=60000
+
+with_read_file_max_size=100000
+with_max_byte_transfer=100000
+
+with_max_callouts=512
+
+with_malloc=smalloc
+
+enable_strict_euids=no
+
+with_max_cost=1000000
+
+with_portno=2000
+with_udp_port=2002
+
+enable_erq=xerq
+
+enable_compat_mode=yes
+with_master_name=secure/master
+
+with_swap_file=../LP_SWAP.3
+with_wizlist_file=WIZLIST
+
+enable_access_control=no
+
+enable_supply_parse_command=no
+enable_initialization_by___init=no
+enable_use_system_crypt=no
+enable_lpc_nosave=yes
+enable_use_mysql=/home/timewarp/mysql/mysql-standard-4.1.8-pc-linux-i686
+enable_use_deprecated=yes
+
+enable_dynamic_costs=no
+
+with_max_players=200
+
+
+with_time_to_clean_up=5400
+
+with_time_to_swap=1800
+with_time_to_swap_variables=3600
+
+with_time_to_reset=3600 # seconds
+

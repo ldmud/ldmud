@@ -1,0 +1,4 @@
+string sub()
+{
+    return "b";
+}

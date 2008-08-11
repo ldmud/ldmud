@@ -1,0 +1,29 @@
+OPTIONAL
+SYNOPSIS
+        mixed* sl_exec(string statement, ...)
+
+BESCHREIBUNG
+        Fuehrt den SQL-Befehl <statement> in der aktuell geoeffneten
+        SQLite-Datenbank aus. Dieser SQL-Befehl kann Wildcards wie '?'
+        nd '?nnn', wobei 'nnn' eine Zahl ist, enthalten. Diese Wildcards
+        koennen als weitere Parameter an sl_exec uebergeben werden.
+        Mit '?nnn' kann direkt die Nummer eines bestimmten Parameters
+        angegeben werden, der erste Parameter hat die Nummer 1.
+
+        Falls der SQL-Befehl Daten zurueckliefert, liefert sl_exec ein
+        Array aus den einzelnen Zeilen (welche wieder Arrays der einzelnen
+        Felder sind) zurueck.
+
+        Pragma-Befehle erzeugen eine privilege_violation ("sqlite_pragma",
+        ob, name, wert). Wird das Privileg verneint, wird ein Fehler
+        ausgeloest.
+
+        Diese Funktion ist nur verfuegbar, wenn der Driver mit SQLite-
+        Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __SQLITE__ definiert.
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.3.713.
+
+SIEHE AUCH
+        sl_open(E), sl_insert_id(E), sl_close(E)

@@ -1,0 +1,43 @@
+SYNOPSIS
+        string copy_bits(string src, string dest
+                         [, int srcstart [, int deststart [, int copylen ]]]
+                        )
+
+DESCRIPTION
+        Copy the bitrange [<srcstart>..<srcstart>+<copylen>[ from
+        bitstring <src> and copy it into the bitstring <dest> starting
+        at <deststart>, overwriting the original bits at those positions.
+
+        The resulting combined string is returned, the input strings remain
+        unaffected.
+
+        If <srcstart> is not given, <src> is copied from the start.
+        If <srcstart> is negative, it is counted from one past the last set
+        bit in the string (ie. '-1' will index the last set bit).
+
+        If <deststart> is not given, <dest> will be overwritten from the start.
+        If <deststart> is negative, it is counted from one past the last set
+        bit in the string (ie. '-1' will index the last set bit).
+
+        If <copylen> is not given, it is assumed to be infinite, ie. the result
+        will consist of <dest> up to position <deststart>, followed by
+        the data copied from <src>.
+        If <copylen> is negative, the function will copy the abs(<copylen>)
+        bits _before_ <srcstart> in to the result.
+
+        None of the range limits can become negative.
+
+EXAMPLES
+        copy_bits(src, dest, 10)    === src[10..]
+        copy_bits(src, dest, 10, 5) === dest[0..4] + src[10..]
+        copy_bits(src, dest, 10, 5, 3)
+                                    === dest[0..4] + src[10..12] + dest[8..]
+
+          (The src[]/dest[] is just for explanatory purposes!)
+
+HISTORY
+        Introduced in LDMud 3.3.166
+
+SEE ALSO
+        clear_bit(E), set_bit(E), test_bit(E), next_bit(E), last_bit(E),
+        count_bits(E), or_bits(E), xor_bits(E), invert_bits(E), and_bits(E)

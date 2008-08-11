@@ -1,0 +1,12 @@
+SYNOPSIS
+        int closurep(mixed)
+
+DESCRIPTION
+        Returns 1 if the argument is a closure.
+
+HISTORY
+        Introduced in 3.2@70
+
+SEE ALSO
+        clonep(E), floatp(E), mappingp(E), objectp(E), intp(E),
+        referencep(E), pointerp(E), stringp(E), symbolp(E), structp(E)

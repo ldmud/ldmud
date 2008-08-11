@@ -1,0 +1,36 @@
+SYNOPSIS
+        *object deep_inventory();
+        *object deep_inventory(object ob);
+        object *deep_inventory(object ob, int depth)
+
+BESCHREIBUNG
+        Gibt ein Array der Objekte zurueck, die in <obj> enthalten sind.
+        Wenn <obj> nicht angegeben wird, wird standardmaessig this_object()
+        verwendet. Ebenso werden alle Objekte angegeben, die sich im Inventory
+        der in <obj> enthaltenen Objekte befinden. Die Suche verlaeuft
+        rekursiv absteigend.
+
+        Ist <depth> angegeben und ungleich 0, ist das Resultat wie folgt
+        gefiltert:
+          <depth> > 0: Nur die Objekte in den ersten <depth> Ebenen
+                       werden zurueckgegeben.
+          <depth> < 0: Nur die Objekte in der -<depth>ten Ebene werden
+                       zurueckgegeben.
+
+BEISPIEL
+        ob
+        +- ob1
+        +- ob2
+        |   +- ob21
+        |  ob3
+        |   +- ob31
+        +- ob4
+
+
+        deep_inventory(ob) => ({ob1, ob2, ob3, ob4, ob21, ob31})
+        deep_inventory(ob, 1) => ({ob1, ob2, ob3, ob4})
+        deep_inventory(ob, 2) => ({ob1, ob2, ob3, ob4, ob21, ob31})
+        deep_inventory(ob, -2) => ({ob21, ob31})
+
+SIEHE AUCH
+        first_inventory(E), next_inventory(E), all_inventory(E)

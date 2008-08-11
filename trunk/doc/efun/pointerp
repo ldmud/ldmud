@@ -1,0 +1,9 @@
+SYNOPSIS
+        int pointerp(mixed arg)
+
+DESCRIPTION
+        Return 1 if arg is a pointer, i.e. an array.
+
+SEE ALSO
+        clonep(E), closurep(E), floatp(E), mappingp(E), objectp(E),
+        intp(E), referencep(E), stringp(E), symbolp(E), structp(E)

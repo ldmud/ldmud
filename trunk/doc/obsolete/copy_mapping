@@ -1,0 +1,15 @@
+REMOVED EFUN
+SYNOPSIS
+        mapping copy_mapping(mapping)
+
+DESCRIPTION
+        This efun is needed to create copies of mappings instead of
+        just passing a reference, like adding/subtraction from a
+        mapping do.
+
+HISTORY
+        Superseeded by the copy() efun.
+        Removed in LDMud 3.3.
+
+SEE ALSO
+        mappings(LPC), copy(E)

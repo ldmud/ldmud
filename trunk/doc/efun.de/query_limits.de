@@ -1,0 +1,47 @@
+VORLAEUFIG
+SYNOPSIS
+        #include <sys/rtlimits.h>
+
+        int *query_limits();
+        int *query_limits(int default);
+
+BESCHREIBUNG
+        Liefert ein Array mit den momentan gueltigen Laufzeit Limiten bzw.
+        die standardmaessigen Laufzeit Limiten, wenn <default> wahr ist.
+        Die Eintraege im gelieferten Array bedeuten:
+
+        int[LIMIT_EVAL]:        die maximalen Eval Kosten
+        int[LIMIT_ARRAY]:       die maximale Anzahl Array Eintraege
+        int[LIMIT_MAPPING]:     die maximale Anzahl Mapping Eintraege
+        int[LIMIT_BYTE]:        die maximale Anzahl Bytes, die mit read_bytes()
+                                /write_bytes() bearbeitet werden koennen
+        int[LIMIT_FILE]:        die maximale Anzahl Bytes, die mit read_file()
+                                /write_file() bearbeitet werden koennen
+        int[LIMIT_CALLOUTS]:    die maximale Anzahl gleichzeitiger call_out()s
+        int[LIMIT_COST]:        wie die aktuellen Kosten einzurechnen sind
+
+        Ausser fuer LIMIT_COST ein Limit von '0' (auch LIMIT_UNLIMITED)
+        bedeutet 'keine Limit'.
+
+        LIMIT_COST hat diese Bedeutungen:
+          
+          wert > 0: Maximal <wert> fuer als Kosten fuer die aktuelle Ausfuehrung
+                    verwendet, ungeachtet wie lange sie tatsaechlich dauert.
+               = 0: ist die derzeite LIMIT_EVAL groesser als die vorherige
+                    LIMIT_EVAL, kostet die aktuelle Ausfuehrung nur 10
+                    Ticks; andernfalls werden die gesamten Kosten angerechnet.
+                < 0: (-wert)% der aktuellen Ausfuehrungskosten werden
+                     angerechnet.
+
+BEISPIELE
+        query_limits()
+        --> liefert die momentan gueltigen Laufzeit Limiten.
+        query_limits(1)
+        --> liefert die standardmaessigen Laufzeit Limiten.
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.7.
+        LIMIT_CALLOUTS wurde in LDMud 3.2.9 eingefuehrt.
+
+SIEHE AUCH
+        limited(E), set_limits(E)

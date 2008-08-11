@@ -1,0 +1,38 @@
+SYNOPSIS
+        #include <sys/driver_hooks.h>
+
+        set_driver_hook(H_INCLUDE_DIRS, value)
+
+        <value> being:
+
+          string *<dirs>
+          string <closure>(string include_name, string current_file)
+
+DESCRIPTION
+        Semi-mandatory hook specifying the directories where <>-type
+        include files are searched (this includes ""-includes not
+        found as specified).  Hook setting may be any closure or a
+        string array. If not set, only ""-type includes may be used in LPC
+        programs.
+
+        The hook is called only if a call to master::include_file()
+        does not return a usable filename.
+
+        If the hook setting is a string array, it has to contain the
+        path names of those directories where <>-type includes are to
+        be searched. The directories are searched in the order they
+        appear in the array. The directory name and the name of the
+        actual include file are concatenated, therefore the directory
+        names have to end in '/'. Leading slashes may be omitted.
+
+        If the setting is a closure, it is called with the name of the
+        desired include file as first, and the name of the compiled
+        LPC file as second argument.  Result has to be the complete
+        path name of the include file to use. Leading slashes may be
+        omitted.  If the closure is a lambda closure, it is bound to
+        this_object() prior to execution.
+
+HISTORY
+
+SEE ALSO
+        hooks(C), auto_include(H), include_file(M)

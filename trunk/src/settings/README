@@ -1,0 +1,45 @@
+The files in this directory hold collections of option settings, used
+when configuring the driver for compilation. To use the setting <foo>,
+start the configure script with argument --with-setting=<foo> or
+the settings file directly with './settings/<foo>' (for the latter the
+settings file must be marked as executable).
+
+The provided settings:
+
+  default:  an example file, documenting all available options
+
+  compat:   settings used for a generic compat-mode driver
+  native:   settings used for a generic native-mode driver
+
+  alatia:          settings for Alatia
+  aoh:             settings for Age of Heroes
+  avalon:          settings for Avalon
+  bat:             settings for BatMUD
+  beutelland:      settings for Beutelland
+  carledon:        settings for Carledon
+  dragonfire:      settings for Dragonfire
+  dt2:             settings for Deeper Trouble II
+  eotl:            settings for End of the Line
+  evermore:        settings for Evermore (Native version)
+  evermore-cross:  settings for Evermore (transition version)
+  finalfrontier:   settings for FinalFrontier (generic driver only)
+  forgottendreams: settings for ForgottenDreams
+  gestrandet:      settings for Gestrandet
+  heaven7:         settings for Heaven7
+  hyperborea:      settings for Hyperborea
+  lethynna:        settings for Lethynna
+  lpmud.net:       settings for lpmud.net's "2.4.6" mudlib
+  morgengrauen:    settings for Morgengrauen
+  osb:             settings for OSB
+  pkmud:           settings for PkMud
+  psycmuve:        settings for PSYC
+  quovadis:        settings for Quo Vadis
+  silberland:      settings for SilberLand
+  sticklib:        settings for StickLib
+  theland:         settings for The Land
+  timewarp:        settings for TimeWarp
+  traumland:       settings for Traumland
+  tubmud:          settings for TubMud
+  unitopia:        settings for UNItopia
+  wunderland:      settings for WunderLand
+

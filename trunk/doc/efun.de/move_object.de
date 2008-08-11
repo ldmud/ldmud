@@ -1,0 +1,18 @@
+GESCHUETZT
+SYNOPSIS
+        void move_object(mixed item, mixed dest);
+
+BESCHREIBUNG
+        <item> wird in die neue Umgebung <dest> bewegt. <item> und <dest>
+        koennen ein object_name() oder ein Objekt sein.
+
+        Seit 3.2.1 ist die Funktionalitaet von move_object() direkt in der
+        Mudlib enthalten und verwendet dort die M_MOVE_OBJECT0/1 Treiber Hooks.
+        move_object() kann so auch eine simul-efun sein.
+
+        In der traditionellen Implemenierung war <item> im Compat Modus auf
+        das aufrufende Objekt beschraenkt.
+
+SIEHE AUCH
+        remove(A), init(A), transfer(E), native(C), hooks(C),
+        set_environment(E)

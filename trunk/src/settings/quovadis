@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Settings for the lpmud 2.4.5 mudlib.
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/home/dale --libexec=/home/dale/erq --libdir=/home/dale/mudlib --with-setting=quovadis $*
+exit 1
+
+# --- The actual settings ---
+
+enable_compat_mode=yes
+enable_strict_euids=no
+
+enable_use_parse_command=yes
+enable_share_variables=no
+enable_use_system_crypt=no
+enable_use_mysql=no
+enable_use_pcre=no
+enable_erq=xerq
+
+enable_lpc_nosave=no
+enable_use_alists=yes
+
+with_time_to_clean_up=3600
+with_time_to_swap=900
+with_time_to_swap_variables=1800
+with_time_to_reset=1800
+
+with_portno=2345
+with_udp_port=2346
+
+with_master_name=secure/master
+
+with_swap_file=etc/LP_SWAP.3
+
+enable_access_control=yes
+
+with_access_file=etc/ACCESS.ALLOW
+with_wizlist_file=etc/WIZLIST
+
+enable_catch_udp_port=yes
+enable_udp_send=yes
+
+enable_erq=xerq
+
+with_max_players=100
+
+with_max_array_size=0

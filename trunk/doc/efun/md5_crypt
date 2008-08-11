@@ -1,0 +1,22 @@
+SYNOPSIS
+        string md5_crypt(string str, int seed)
+        string md5_crypt(string str, string seed)
+
+DESCRIPTION
+        Crypt the string <str> the first two characters
+        from the string <seed> as a seed. If <seed> is an integer, then
+        a random seed is used.
+
+        The result has the first two characters as the seed.
+
+        The efun uses the MD5 algorithm for encryption, and the result
+        is compatible with the Apache password encryption.
+
+        If you want to let enter password information without echo,
+        input_to() can be used with special argument.
+
+HISTORY
+        Introduced in LDMud 3.3
+
+SEE ALSO
+        crypt(E), input_to(E), md5(E), md5_crypt(E), hash(E), hmac(E)

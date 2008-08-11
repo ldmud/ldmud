@@ -1,0 +1,49 @@
+PRELIMINARY
+SYNOPSIS
+        mixed *tls_check_certificate(object obj);
+        mixed *tls_check_certificate(object obj, int extra);
+
+DESCRIPTION
+        tls_check_certificate() checks the certificate of the secured
+        connection bound to <obj> (default is the current object).  If
+        <obj> is not interactive, or if TLS is not available, an error
+        is thrown.
+
+        If <obj> doesn't have a secure connection up and running, an
+        error is thrown.
+        Otherwise, the result is an array with these values:
+
+          int [0]      : Result code of SSL_get_verify_result (see man 1 verify
+                         subsection DIAGNOSTICS for possible values)
+          array [1]    : array with 3*n entries of extra x509 data.
+                         structure is:
+                            3*i    : numerical form of object name,
+                                     e.g. "2.5.4.3"
+                            3*i + 1: long or short name if available,
+                                     e.g. "commonName"
+                            3*i + 2: value
+          array [2]    : if extra is set:
+                            array with 3*n entries of x509 extension data
+                            data structure is:
+                            3*i    : numerical form of extension name
+                            3*i + 1: long or short name of extension
+                                     name if available
+                            3*i + 2: array of strings with the data
+                                     structure of [1]
+
+        Note: a x509 certificate can have more than one object with
+        the same name
+
+BUGS
+        Not supported when using GnuTLS.
+
+HISTORY
+        Introduced in LDMud 3.3.672/3.2.11.
+        LDMud 3.3.711/3.2.12 modified the behaviour to return the
+        low-level API result value, and to throw an error if the connection
+        is not secure.
+
+SEE ALSO
+        tls_init_connection(E), tls_deinit_connection(E), tls_error(E),
+        tls_query_connection_state(E), tls_query_connection_info(E),
+        tls_available(E), tls_refresh_certs(E), mudlib/psyc-tls.c

@@ -1,0 +1,30 @@
+NAME
+        master
+
+DESCRIPTION
+        This directory contains descriptions for the functions that
+        Amylaar's version of the LPC parser, expects to find in the
+        master object (similar to lfuns, but for the master object
+        only). The name of the master object is hardcoded in the
+        parser (to "secure/master").
+
+        The master is the gateway between the interpreter and the
+        mudlib to perform actions with mudlib specific effects. Calls
+        to the master by the interpreter have an automatic catch() in
+        effect. Functions to be called by the driver can be public
+        or static, but not private.
+
+        Note that the master is loaded first of all objects. Thus you
+        shouldn't inherit an other object, nor is the compiler able to
+        search include files (read: they must be specified with full
+        path).
+
+        Amylaar says: actually, you can inherit, but the file will be
+        loaded then before the master, which isn't good for most
+        files.
+
+        Refer to 'master-all' for the survey of the masters internals.
+
+SEE ALSO
+        master-all(M)
+        efun(E), applied(A), concepts(C), driver(D), lpc(LPC)

@@ -1,0 +1,269 @@
+Normal: 1000 Iterations.
+
+486/33MHz/16MB, Win95, Cygwin
+
+  3.2.8-dev.155, -DDEBUG -DTRACE_CODE -O0:   6.7
+  3.2.8-dev.155, -O1                     :  31.1
+
+  3.2.6,         -DDEBUG -DTRACE_CODE -O0:   7.1
+  3.2.6,         -O1                     :  42.1
+
+UNItopia: PII/350MHz/100MHz Frontsidebus/256MB, RH Linux 5.1
+
+  3.2.8-dev.154, -DDEBUG -DTRACE_CODE -O0: 209.8
+  3.2.7-dev.104: -O0                       500.0  (500 Iterations)
+
+
+Evermore: Sun Ultra Sparc 1/256 MByte RAM
+
+  3.2.8-dev.154: ???:                      355.9 
+
+
+AMD K6-III/400MHz/196MByte
+
+  3.2.8-dev.154: -O4 -f*:                  833.3 
+
+
+PK-Mud : i586/?/?, Linux 2.0, gcc 2.7.2.1
+
+  3.2.8-dev.155, -DDEBUG -DTRACE_CODE -O4:  78.7
+
+
+OSB: HPPA/?/?, HP-UX 9.04, gcc 2.7.2.1
+
+  3.2.8-dev.155, -DDEBUG -DTRACE_CODE -O4:  52.9
+
+
+Camelot: SUN Sparc/?/?, Solaris 5.7, gcc 2.8
+
+  3.2.8-dev.155,                      -O4:              142.9
+  3.2.8-dev.155, -DDEBUG -DTRACE_CODE -O4:               58.8
+  3.2.8-dev.155, -DDEBUG -DTRACE_CODE -DNO_INLINES -O4:  51.3
+  3.2.8-dev.155, -DDEBUG -DTRACE_CODE -O0:               28.3
+
+
+Themis: IBM RS6000/?/?, AIX 3.4, xlc
+
+  3.2.8-dev.164,                      -O4:              476.2
+  3.2.8-dev.164,                      -O4/-O:           384.6
+  3.2.8-dev.164, -DDEBUG -DTRACE_CODE -O4/-O:            82.2
+
+
+New Themis: IBM RS6000/?/?, AIX 3.4, xlc
+
+  3.2.9-dev.263,                      -O2:             1260.5
+  3.2.9-dev.263, -DDEBUG -DTRACE_CODE -O2:              616.1
+  3.2.9-dev.263, -DDEBUG -DTRACE_CODE -DCHKSTRG -O2:    536.7
+  3.2.9-dev.263,                      -O4:             1322.1
+  3.2.9-dev.263, -DDEBUG -DTRACE_CODE -O4:              656.5
+  3.2.9-dev.263, -DDEBUG -DTRACE_CODE -DCHKSTRG -O4:    575.0
+
+  3.3.25,                             -O2:             1186.0
+  3.3.25,        -DDEBUG -DTRACE_CODE -O2:              645.2
+  3.3.25,                             -O4:             1260.6
+  3.3.25,        -DDEBUG -DTRACE_CODE -O4:              681.9
+
+
+New Themis: IBM RS6000/?/?, AIX 3.4, LDMud 3.3.206
+
+                                      o0        o2        o4
+  Gcc 3.1                           473.9     877.2     877.2
+  Gcc 3.1, DEBUG                    366.3     621.1     625.0
+  Gcc 3.1, DEBUG, TRACE,            227.8     436.7     438.6
+  Gcc 3.1, DEBUG, TRACE, MTRACE     223.7     432.9     434.8
+  Gcc 3.1, DEBUG, TRACE, malloc     226.2     432.9     432.9
+
+                                      o0        o2        o4
+  xlc                               473.9     934.6     990.1
+  xlc, DEBUG                        381.7     684.9     709.2
+  xlc, DEBUG, TRACE,                250.0     510.2     568.2
+  xlc, DEBUG, TRACE, MTRACE         250.0     510.2     546.4
+  xlc, DEBUG, TRACE, malloc         250.0     485.4     540.5
+
+                                      o0        o2        o4
+  xlc ipa                           854.7    1000.0     970.9
+  xlc ipa, DEBUG                    641.0     746.3     714.3
+  xlc ipa, DEBUG, TRACE,            454.5     591.7     568.2
+  xlc ipa, DEBUG, TRACE, MTRACE     446.4     584.8     543.5
+  xlc ipa, DEBUG, TRACE, malloc     452.5     574.7     540.5
+
+
+
+Needa: PIII/766MHz/768MByte, Beos 5.0, LDMud 3.3.206:
+
+                                         o0        o1        o2        o4
+  Gcc 2.95.2                           829.2    1067.2    1059.3    1082.3
+  Gcc 2.95.2, DEBUG                    712.8     932.0     926.4     854.0
+  Gcc 2.95.2, DEBUG, TRACE,            464.0     598.8     576.7     564.0
+  Gcc 2.95.2, DEBUG, TRACE, MTRACE     433.5     572.4     540.5     517.6
+  Gcc 2.95.2, DEBUG, TRACE, malloc     438.6     575.7     549.5     539.1
+
+
+Tarkin: G4/800MHz/1GByte, Mac OS X 10.2.4, LDMud 3.3.444, gcc 3.1:
+
+                                         o0        o1        o2        o4
+  s: -                                 555.6    1100.0    1250.0     909.1
+  s: D                                 476.2     769.2     909.1     909.1
+  s: D, TC                             330.0     588.2     714.3     625.0
+  s: D, TC, MC                         333.3     588.2     625.0     588.2
+  s: D, TC, MC, MT                     322.6     500.0     588.2     588.2
+  s: D, TC, MC, MT, ML                 320.0     530.0     588.2     625.0
+
+  m: -                                 526.3     833.3     909.1     909.1
+  m: D                                 454.5     909.1     769.2     833.3
+  m: D, TC                             322.6     555.6     555.6     588.2
+  m: D, TC, MC                         312.5     555.6     588.2     555.6
+  m: D, TC, MC, MT                     312.5     526.3     526.3     588.2
+  m: D, TC, MC, MT, ML                 333.3     526.3     555.6     555.6
+
+  p: -                                 555.6     909.1     909.1     909.1
+  p: D                                 400.0     769.2     769.2     729.2
+  p: D, TC                             277.8     500.0     526.3     588.2
+  p: D, TC, MC                         263.2     500.0     555.6     526.3
+  p: D, TC, MC, MT                     256.4     454.5     526.3     500.0
+  p: D, TC, MC, MT, ML                 250.0     400.0     416.7     434.8
+
+
+Legend:
+  D: DEBUG
+  TC: TRACE_CODE
+  MC: MALLOC_CHECK
+  MT: MALLOC_TRACE
+  ML: MALLOC_LPC_TRACE
+  m: malloc
+  s: smalloc
+  p: ptmalloc
+
+
+Dhrystone, 3.2.9.585, Hurrikap (K6 350, 256 MB), Mai 2003:
+ldmud -N -e -m. -Mtest_master.c -s-1 -f dhry -sv-1 6666
+
+  DTSLO          Dhry 1 (stones/s)      Dhry 2 (stones/s)     relativ
+  ----*          566.9 584.1 584.1      853.2 862.1 848.9       105 %
+  -----          540.5 540.5 566.3      837.5 815.7 841.8       100 %
+  *----          400.3 401.9 388.2      571.4 571.4 572.7        72 %
+  -*---           71.5  96.7  73.3       83.6  81.7  87.1        12 %
+  **---           73.7  76.8  74.2       95.4  83.1  82.0        12 %
+  **--*           82.4  74.8  73.9       91.7 100.6  85.6        13 %
+  ****-           93.9  84.7  84.3       78.7 106.8  82.1        12 %
+
+  D = enable-debug
+  T = enable-trace-code
+  S = enable-smalloc-trace
+  L = enable-smalloc-lpc-trace
+  O = with-optimize=high (- = med)
+
+
+Tarkin: G4/800MHz/1GByte, Mac OS X 10.3.6, LDMud 3.3.704, gcc 3.3:
+
+  Dhrystone                        o0        o1        o2        o4
+  -                              4967.7    8992.4    9037.3    8909.5
+  -  -   MC                      5069.0    9068.5    8937.3    9097.5
+  -  -   MC, MT                  4910.7    8609.7    8878.7    8855.6
+  -  -   MC, MT, ML              4870.6    8851.0    8798.3    8670.7
+  D  -   MC, MT, ML              4225.8    7444.8    7773.7    7501.8
+  D, TC, MC, MT, ML              2830.6    4808.6    5397.5    5061.2
+
+  Dhrystone2
+  -                              6772.9   11673.5   11545.0   11721.3
+  -  -   MC                      6850.2   12146.1   11719.1   11677.5
+  -  -   MC, MT                  6834.0   11858.1   11583.4   11677.5
+  -  -   MC, MT, ML              6787.6   11859.2   11364.6   11279.6
+  D  -   MC, MT, ML              5736.3    9741.7    9901.0    9496.2
+  D, TC, MC, MT, ML              3533.7    6343.2    6727.3    6356.3
+
+
+Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.3.704, gcc 3.3:
+
+  Dhrystone                        o0        o1        o2        o4
+  -                              5016.0    9208.6    9085.8    9061.0
+  -  -   MC                      5049.0    9259.8    9042.2    9004.2
+  -  -   MC, MT                  4982.8    9044.9    9017.8    9012.5
+  -  -   MC, MT, ML              4946.0    8918.8    8943.1    8853.0
+  D  -   MC, MT, ML              4235.8    7703.2    7870.8    7657.8
+  D, TC, MC, MT, ML              2754.7    4861.4    5246.9    5155.8
+
+  Dhrystone2
+  -                              6863.4   11961.9   11737.2   11787.9
+  -  -   MC                      6934.8   12106.7   11862.6   11750.9
+  -  -   MC, MT                  6885.5   11853.1   11787.9   11677.2
+  -  -   MC, MT, ML              6843.1   11732.5   11709.8   11393.9
+  D  -   MC, MT, ML              5710.0    9842.7   10070.6    9609.4
+  D, TC, MC, MT, ML              3413.0    6443.7    6674.9    6368.7
+
+
+Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.2.11, gcc 4.0:
+
+  Dhrystone2 (slaballoc)           o0        o1        o2        o4
+  -                              8391.8   18259.9   19433.1   19711.4
+  -  -   MC, MT, ML              8043.0   16959.6   15923.8   16147.1
+  D  -   MC, MT, ML              4989.4   11398.3   12058.0   12575.8
+  D, TC, MC, MT, ML              3571.2    7129.5    6028.9    6780.2
+
+  Dhrystone2 (sysmalloc)
+  -                              8314.9   17386.2   18553.4   18785.6
+  -  -   MC, MT, ML              8296.5   17311.2   18461.9   18820.6
+  D  -   MC, MT, ML              5111.7   12048.8   13163.8   13357.3
+  D, TC, MC, MT, ML              3498.6    7218.9    6747.8    7380.2
+
+
+Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.3.704, gcc 4.0:
+
+  Dhrystone2 (slaballoc)           o0        o1        o2        o4
+  -                              6628.5   13152.3   13748.9   14111.1
+  -  -   MC, MT, ML              6600.7   12690.5   13477.3   13680.1
+  D  -   MC, MT, ML              5324.9   10787.8   11312.4   10842.2
+  D, TC, MC, MT, ML              3711.7    7029.6    7878.9    8143.8
+
+  Dhrystone2 (sysmalloc)
+  -                              6640.2   12739.3   13642.7   13940.8
+  -  -   MC, MT, ML              6593.5   12335.6   13216.0   13642.2
+  D  -   MC, MT, ML              5324.8   10745.2   11295.3   10799.2
+  D, TC, MC, MT, ML              3712.6    5572.3    7851.8    7878.6
+
+
+Tarkin: G5/2.1 GHz/1.5 GByte, Mac OS X 10.4.2, LDMud 3.3.712, gcc 4.0:
+
+  Dhrystone2 (32-Bit)              o0        o1        o2        o4
+  -                              9605.0   15798.7   22044.4   22348.1
+  -  -   MC, MT, ML             12534.5   22147.0   20508.8   20203.5
+  D  -   MC, MT, ML              7122.7   15758.9   24718.3   24614.4
+  D, TC, MC, MT, ML              8852.2   14604.0   12571.6   11996.9
+
+  Dhrystone2 (64-Bit)              o0        o1        o2        o4
+  -                             15930.4   33344.5   33329.7   33906.0
+  -  -   MC, MT, ML             15531.2   30969.4   33233.9   33868.0
+  D  -   MC, MT, ML             12993.2   26932.5   27164.1   28422.7
+  D, TC, MC, MT, ML              9102.5   16403.4   18696.3   19343.7
+
+
+Legend:
+  D: DEBUG
+  TC: TRACE_CODE
+  MC: MALLOC_CHECK
+  MT: MALLOC_TRACE
+  ML: MALLOC_LPC_TRACE
+
+
+Zathras: Core2Duo/2.3 GHz/2 GByte, Mac OS X 10.4.10, LDMud 3.3.715, gcc 4.0:
+
+  Dhrystone2 (32-Bit)              o0        o1        o2        o4
+  -                             22794.7   30791.4   26403.9   32705.0
+  -  -   MC, MT, ML             18986.2   29524.8   33557.0   30460.2
+  D  -   MC, MT, ML             18897.6   27930.4   29245.7   27847.6
+  D, TC, MC, MT, ML             19009.0   27759.9   29251.3   27956.5
+
+  Dhrystone2 (64-Bit)              o0        o1        o2        o4
+  -                             19909.8   36084.0   42523.3   42511.4
+  -  -   MC, MT, ML             18957.5   34743.4   39604.1   42863.6
+  D  -   MC, MT, ML             18533.6   28190.4   32467.8   33032.6
+  D, TC, MC, MT, ML             18639.5   28182.4   32474.8   33036.3
+
+
+Legend:
+  D: DEBUG
+  TC: TRACE_CODE
+  MC: MALLOC_CHECK
+  MT: MALLOC_TRACE
+  ML: MALLOC_LPC_TRACE
+

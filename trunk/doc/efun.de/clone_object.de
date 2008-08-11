@@ -1,0 +1,71 @@
+SYNOPSIS
+        object clone_object(string name);
+        object clone_object(object template);
+
+BESCHREIBUNG
+        Clont ein neues Objekt aus der Definiton <name> oder alternativ aus
+        dem Objekt <template>. In beiden Faellen wird dem Clon ein
+        individueller Name zugeordnet, dann wird der Clon zurueck gegeben.
+
+        Das Original, Blueprint genannt, wird nur fuer das Clonen verwendet
+        und sollte deshalb nicht im Spiel genutzt werden. Die geclonten
+        Objekte enthalten nur Daten, der Blueprint hingegen auch den
+        Funktionscode.
+
+        Den Blueprint erkennt man daran, dass er keine Nummer im Objektnamen
+        traegt. clone_object() liefert niemals einen Blueprint zurueck.
+
+        Wenn der Blueprint existiert und einen heart_beat() aufweist, schaltet
+        clone_object() diesen aus.
+
+        Die Pfadangabe muss komplett sein. Relative Pfade sind nicht gestattet.
+        Wenn strikte EUIDs gefordert werden, muss das clonende Objekt eine
+        EUID != 0 haben.
+
+
+        -- Variablen Initialisierung --
+
+        Allgemein werden die Variablen in Blueprints und Clones gleichermassen
+        durch Aufruf der internen lfun __INIT() initialisiert.
+
+        Ist allerdings das #pragma share_variables in Effekt (entweder
+        explizit im Objekt angegeben, oder als allgemeine Laufzeitoption),
+        werden die Werte fuer die Klonvariable aus den _aktuellen_ Variablen
+        der Blueprint kopiert.
+
+        Variablen ohne explizite Initialisierung sind hiervon unbetroffen und
+        werden stets auf 0 gesetzt.
+
+
+BEISPIELE
+        // Clone eine Fackel (Name des Files nicht im Compat Format)
+        object fackel;
+        fackel = clone_object("/obj/fackel");
+
+        // Clone zwei Schluessel (Name des Files im Compat Format)
+        object key1, key2;
+        key1 = clone_object(load_object("obj/key"));
+        key2 = clone_object(key1);
+
+        // Create a specialized weapons blueprint.
+        --- std/weapon.c: --- 
+        #pragma share_variables
+        int weapon_class = 1;
+
+        --- broadsword.c: ---
+        inherit "/std/weapon";
+
+        int create() {
+            weapon_class = 2;
+            replace_program("/std/weapon");
+        }
+
+
+AENDERUNGEN
+        Modifiziert in LDMud 3.2.6: es werden auch Objekte als Argument
+            akzeptiert.
+        LDMud 3.3.378 fuehrte das pragma share_variables ein.
+
+SIEHE AUCH
+        blueprint(E), clonep(E), destruct(E), clones(E), load_name(E),
+        load_object(E), move_object(E), uids(C), program_name(E), pragma(LPC)

@@ -1,0 +1,93 @@
+NAME
+	doc/README
+
+
+DESCRIPTION
+	These man pages are organised in chapters, that are stored in
+	separate directories. A reference to foo(X) means the function
+	foo as descibed in chapter X, where X is one of:
+
+	A for applied/    member functions (lfuns) that the driver applies
+                          to objects
+	C for concepts/   general concepts of LPMUD and LPC
+	D for driver/     some info about internal operation of the driver
+	E for efun/       the ``system calls'' of LPC
+              efun.de/    german translations of the efun/ manpages.
+        H for hook/       the driver hooks
+	LPC for LPC/      about parts of the LPC language
+	M for master/     lfuns that are applied to the master object only
+        O for obsolete/   docs for features removed from the driver
+        OTHER for other/  other useful MUD-related documents
+
+ 	This collection does not contain anything about mudlib specific
+	object classes or lfuns, and also not about any simulated
+	efuns (from the simul_efun object), because all these are not
+	specific for the driver but for the particular installation.
+
+	Man-pages for the functions in the installation's simul_efun
+	object could go e.g. into the chapter SE (directory sefun/),
+	man pages for the standard objects (base classes) of the mudlib
+	would e.g. fit into chapter S (directory std/).
+
+
+	The man pages generally adhere to the following format, which
+	was inspired by the Unix man pages.
+
+	<manpage> ::= <section>+
+
+	There are one or more sections in a man page.
+
+	<section> ::= <section-name><newline><section-text><newline>
+
+	The section names are always at the beginning of a line, and
+	in all capital letters (debatable uglyness).
+
+	<section-name> ::=   'NAME' | 'CONCEPT' | 'SYNOPSIS'
+			   | 'LAST UPDATED'
+			   | 'SYNTAX' | 'DESCRIPTION' | 'AUTHOR' | 'BUGS'
+			   | 'CAVEATS' | 'WARNING' | 'NOTE' | 'NOTES'
+			   | 'EXAMPLE' | 'EXAMPLES' | 'HISTORY'
+			   | 'SEE ALSO'
+
+	If a NAME or CONCEPT section occurs, it should give the name of
+	the man page.
+	If a SYNOPSIS section occurs, the name of the man page can be
+	derived from the function name, that appears in the line after
+	SYNOPSIS, which looks as follows:
+
+	<returntype><space>['*']<function-name>'('<parameter-prototypes>
+
+	SEE ALSO is followed by one or more lines that contain
+	crossreferences of the form
+
+	<crossreferences> ::=
+		<crossref>[','<white-space><crossref>]*<white-space><EOF>
+	<crossref> ::= <man-page-name>'('<chapter-abbrev>')'
+
+	The names of the referenced man pages are followed in brackets
+	by an abbreveiation for the chaper (i.e. directory) the man
+	page is in. The abbrevs are
+
+	If you want to process these man pages by some converter
+	program, you can use these to map the chapter names to file
+	names or whatever. There should be some sample awk scripts or
+	the like near this README file.
+
+HISTORY
+        Most of the documentation is based on the 'driver-docs' collected
+        by Stefan 'Pepel' Petri up to Amylaar LPMud 3.2.1@141 and 3.2@316.
+        It was collectect from the original 2.4.5 docs, from the installed
+        docs of Nightfall, TubMud and MorgenGrauen.
+
+	Collection, correction and completion was done by Pepel@Nightfall,
+	with assistance and support by the LPC wizards of Nightfall,
+	TubMud, MorgenGrauen and TAPPMud, namely Hyp, Macbeth,
+	Mateese, and Marcus. Also to mention are Bumblebee, Boing,
+	Deepthought, Demos, Hate, Jof, Symmetry@TMI2.
+
+        The documentation was integrated into the driver distribution
+        in LDMud 3.2.6.
+
+SEE ALSO
+	efun(E), applied(A), concepts(C), lpc(LPC), master(M), driver(D)
+        obsolete(O)

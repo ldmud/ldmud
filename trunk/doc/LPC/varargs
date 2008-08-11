@@ -1,0 +1,75 @@
+CONCEPT
+    varargs
+
+DESCRIPTION
+    A function uses "varargs", short for "variable arguments", if
+    it intentionally may be called with less or more arguments
+    than formally specified.
+
+    The proper order to define a function call is:
+
+        [ modifier ] [ varargs ] [ return type ] function( args...)
+
+     Any other order will result in an error.
+
+
+    Given a function definition like this:
+
+        void fun (string arg1, int arg2, int arg3)
+
+    fun() has to be called with exactly three parameters: one
+    string and two integers.
+
+
+    If the function is defined as
+
+        varargs void fun (string arg1, int arg2, int arg3)
+
+    it is possible to call the function with just arg1, or arg1
+    and arg2. The remaining unspecified arguments (arg2 and arg3,
+    resp. arg3) are in these cases assumed to be 0.
+
+
+    To pass more arguments than specified, the functions last
+    parameter must be defined as following:
+
+        void fun (string arg1, int arg2, varargs int * arg3)
+
+    This allows fun() to be called with three or more arguments.
+    The arguments, except those assigned to the other parameters,
+    in this case arg1 and arg2, and collected into an array which
+    is then passed as arg3. For example
+
+        fun("foo", 1)       -> arg3 == ({ })
+        fun("foo", 1, 2)    -> arg3 == ({ 2 })
+        fun("foo", 1, 2, 3) -> arg3 == ({ 2, 3 })
+
+    The type of the varargs argument has to be an array of the
+    expected type (int*, object*, string*, ...); in this example,
+    only integers are allowed. To accept arguments of any kind,
+    define the parameter as 'varargs mixed' or 'varargs mixed*'.
+
+    To 'flatten' the received argument array in your own function
+    calls, use the efun apply(); e.g.:
+
+        apply(#'call_out, "bar", 1, arg3)
+
+    or the 'flatten arguments' operator:
+
+       call_out("bar", 1, arg3...)
+
+    The two varargs variants can of course be combined:
+
+        varargs void fun (string arg1, int arg2, varargs int* arg3)
+
+    defines a function which may be called with any number of
+    arguments.
+
+
+HISTORY
+    The possibility to pass more arguments than formally specified
+    was introduced in 3.2.1@132. Before, the excess arguments were
+    silently ignored.
+
+SEE ALSO
+    pragma(LPC), apply(E), modifiers(LPC)

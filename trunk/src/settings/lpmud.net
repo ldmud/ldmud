@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# Settings for the lpmud.net mudlib.
+# See: http://www.lpmud.net/lpmud_resources.html
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/usr/home/elric/lpmud.net --libexec=/usr/home/elric/lpmud.net/erq --libdir=/usr/home/elric/lpmud.net/mudlib --with-setting=lpmud.net $*
+exit 1
+
+# --- The actual settings ---
+
+enable_compat_mode=no
+enable_strict_euids=no
+
+enable_use_alists=yes
+enable_use_parse_command=no
+enable_share_variables=no
+enable_use_system_crypt=no
+enable_malloc_trace=no
+enable_malloc_lpc_trace=no
+
+enable_use_mysql=/usr/local/lib/mysql
+
+enable_erq=xerq
+
+with_portno=2345
+with_udp_port=2346
+
+with_swap_file=etc/LP_SWAP.3
+
+with_wizlist_file=etc/WIZLIST
+
+enable_catch_udp_port=yes
+enable_udp_send=yes
+

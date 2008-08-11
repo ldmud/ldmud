@@ -1,0 +1,22 @@
+SYNOPSIS
+        void catch_tell(string)
+
+DESCRIPTION
+        When a message is sent to an non-interactive object, via say(),
+        tell_object, tell_room() or write(), it will get to the function
+        catch_tell(string). The idea is to enable communications between
+        NPCs and from a user to an NPC.
+
+        Messages sent to an interactive object are also passed to that
+        object's catch_tell() lfun, _if it has one_. If the receiver
+        (or one of its shadows) doesn't have that lfun, the text is sent
+        to the socket directly. Only messages sent by an interactive
+        object to itself inside a catch_tell always written to the socket
+        immediately.
+
+        This allows to filter and process text before it is written
+        to a player.
+
+SEE ALSO
+        enable_commands(E), say(E), tell_object(E), tell_room(E),
+        write(E), snoop(E), catch_msg(A)

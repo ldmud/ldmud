@@ -1,0 +1,16 @@
+SYNOPSIS
+        void receive_udp(string host, string msg, int hostport)
+
+DESCRIPTION
+        Handle a received UDP message.
+
+        This function is called for every message received on the UDP
+        port. Usually it is passed on to some object that handles
+        inter mud communications.
+
+HISTORY
+        The 'hostport' argument was added in 3.2.1.
+        LDMud 3.2.9 renamed this method from receive_imp().
+
+SEE ALSO
+        send_udp(E), query_udp_port(E)

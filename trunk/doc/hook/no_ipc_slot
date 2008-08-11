@@ -1,0 +1,22 @@
+SYNOPSIS
+        #include <sys/driver_hooks.h>
+
+        set_driver_hook(H_NO_IPC_SLOT, value)
+
+        <value> being:
+
+          0
+          string <msg>
+
+DESCRIPTION
+        Optional hook specifying the message given to logins
+        rejected due to space limitations (MAX_PLAYER).
+        Hook setting has to be string.
+
+        If set to 0, the default message "Lpmud is full. Come back
+        later." is issued.
+
+HISTORY
+
+SEE ALSO
+        hooks(C)

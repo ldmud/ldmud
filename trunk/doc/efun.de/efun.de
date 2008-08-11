@@ -1,0 +1,45 @@
+NAME
+        efun
+
+BESCHREIBUNG
+        Dieses Directory enthaelt die Beschreibungen fuer die Efuns in
+        LDMud 3.3 .
+
+        Diese Funktionen werden vom Driver zur Verfuegung gestellt und koennen
+        von jedem LPC-Objekt verwendet werden.
+
+        Spezielle Arten dieser Efuns sind:
+
+         - 'Optional'
+
+           Es steht dem Mud-Betreiber frei, diese Efuns zu deaktivieren.
+
+             assoc()
+             break_point()
+             db_*()
+             insert_alist()
+             intersect_alist()
+             parse_command()
+             process_string()
+             rusage()
+             set_is_wizard()
+             set_light()
+             transfer()
+
+         - 'Vorlaeufig'
+
+           Das Verhalten dieser Efuns kann sich in spaeteren Driverversionene
+           aendern.
+
+
+         - 'Obsolet' or 'Veraltet'
+
+             make_shared_string()
+
+           Diese Efuns sollten nicht weiter verwendet werden. Sie stehen
+           lediglich aus Kompatibilitaetsgruenden zur Verfuegung, und
+           werden in einer spaeteren Drivervariante entfernt werden.
+
+
+SIEHE AUCH
+        efuns(LPC), applied(A), master(M), lpc(LPC), concepts(C), driver(D)

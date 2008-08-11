@@ -1,0 +1,132 @@
+NAME
+        foreach
+
+SYNTAX
+        foreach (<var> : <expr>) <statement>;
+        foreach (<var>, <var2>, ... ,<varN> : <expr>) <statement>;
+
+        foreach (<var> : <expr1> .. <expr2>) <statement>;
+        foreach (<var>, <var2>, ... ,<varN> : <expr1>..<expr2> ) <statement>;
+
+        /* MudOS compatibility only - not for new code: */
+        foreach (<var> in <expr>) <statement>;
+        foreach (<var>, <var2>, ... ,<varN> in <expr>) <statement>;
+
+DESCRIPTION
+        The instruction evaluates its range specification - either a
+        simple <expr> which can yield an array, a struct, a string, a
+        mapping or an integer, or an integer range <expr1> through
+        <expr2> - and executes <statement> once for each value in the
+        range. The respective value is assigned to <var> right before
+        <statement> is executed.
+
+        A 'break' in the <statement> will terminate the loop. A
+        'continue' will continue the execution from the beginning of
+        the loop.
+
+        Every <var> specification can declare a new local variable, whose
+        scope is the whole foreach() statement.
+
+
+        The normal form (one <expr>):
+
+            <expr> is evaluated and has to yield an array, a struct, a
+            string or a mapping (or reference to the former), or an
+            integer.
+
+            If <expr> is a array, struct, or string, the values of
+            <expr> (in case of the string, the integer values of the
+            characters) are then assigned one by one in order of
+            occurence to <var>, and <statement> is executed for every
+            assignment.
+
+            If <expr> is a mapping, the keys are assigned one by one
+            to <var>, and the values for each key are assigned in
+            order to <var2>..<varN>.  If there are more values than
+            variable, the extraneous values are ignored. Due to the
+            nature of mappings, a specific order of the keys can not
+            be guaranteed.
+
+            If <expr> evaluates to a reference to an array, mapping, or
+            string, the loop will assign references to the values into
+            the variables. This allows the loop body to change the contents
+            of the original data.
+
+            If <expr> evalutes to an integer, the loop will count up <var>
+            from 0 to <expr>-1, basically implementing a count loop.
+
+            If there are more variables than necessary, the unneeded ones
+            are not changed.
+
+
+        The ranged form (<expr1> .. <expr2>):
+
+            <expr1> and <expr2> are evaluated and must yield integers.
+            The loop will count up <var> from <expr1> to <expr2>, basically
+            implementing a counted loop.
+
+            If <expr1> is less than <expr2>, the loop will terminate at once.
+
+            If there are more than variable, the unneeded ones are not
+            changed.
+
+
+
+        WHAT HAPPENS IF <expr> IS CHANGED IN THE LOOP?
+
+        If <expr> yields an array or struct:
+         - assignments to single elements or to array ranges effect
+           the values assigned to the variable:
+             a = ({1, 2, 3})
+             foreach(x : a) { a[1..2] = ({4, 5}); write(x+" "); }
+           will write ("1 4 5 ").
+         - operations which implicitely copy the array or struct (this
+           includes range assignments which change the size) don't
+           have an effect on the loop.
+
+        If <expr> yields a mapping, the loop will run over the indices
+        the mapping had at the begin of the loop. Deleted indices are silently
+        skipped, new indices ignored, but changes of the data of existing
+        indices are acknowledged.
+
+        If <expr> yields a string, the value used at the start of the loop
+        remains.
+
+
+WARNING
+        The additional syntax forms using "in" as keyword are meant
+        to make re-engineering of MudOS objects easier. Do not use them
+        for newly written code, as they may not be available in future.
+
+
+EXAMPLES
+        // Call quit() in all interactive users
+        foreach(o : users()) o->quit();
+        foreach(object o : users()) o->quit();
+
+        // Print the contents of a mapping <m>
+        foreach(key, value : m) printf("%O:%O\n", key, value);
+        foreach(mixed key, mixed value : m) printf("%O:%O\n", key, value);
+
+        // Don't change the content of a string: s remains "FOOBAR".
+        s = "FOOBAR";
+        foreach(i : s) i += 32;
+
+        // Do change the content of a string: s will become "foobar".
+        s = "FOOBAR";
+        foreach(i : &s) i += 32;
+
+        // Count from 0 to 5
+        foreach(i : 6) printf("%d\n", i);
+
+        // Count from 1 to 6
+        foreach(i : 1 .. 6) printf("%d\n", i);
+
+HISTORY
+        LDMud 3.3.44 introduced the use of references, the loop over
+          an integer expression, and the loop over an integer range.
+        LDMud 3.3.266 added support for structs.
+
+
+SEE ALSO
+        for(LPC)

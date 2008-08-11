@@ -1,0 +1,227 @@
+CONCEPT
+        structs
+
+INTRODUCTION
+        structs are, next to arrays and mappings, a way to group a
+        collection of value together.
+
+        A struct holds a fixed number of values, called 'members', and
+        allows to access them by their given name. The name is resolved
+        when the LPC code is compiled, making struct member access as fast
+        as array member access.
+
+        structs are passed by reference.
+
+
+DEFINITION
+        A new struct type has to be defined at the top level of an
+        object. For example
+
+            struct Foo {
+              int        one, *two;
+              struct Bar three;
+            };
+
+        defines the new struct 'Foo' with three members: integer 'one',
+        integer array 'two', and struct Bar 'three'
+
+        It is possible to 'inherit' structs from each other. Given above
+        definition of struct Foo, the following definition
+
+            struct Quux (Foo) {
+              int four;
+            };
+
+        is equivalent to the definition
+
+            struct Quux {
+              int        one, *two;
+              struct Bar three;
+              int four;
+            };
+
+
+        The usual visibility modifiers apply, e.g.
+
+            protected struct Bang {...};
+
+
+        struct definitions are promoted through inheritance like functions,
+        with the difference that all structs live in the same flat namespace.
+        This means: a struct defined in a program is visible in _all_
+        inherited programs, regardless of how deep the inheritance is
+        nested.  This also means that in one program there must not be
+        two structs, inherited or not, with the same name.
+
+
+        To declare a struct without defining it, write:
+
+            struct Quux;
+
+        This notation is useful if you have two structs referencing
+        each other:
+
+            struct Quux;
+
+            struct Bar {
+              struct Quux quux;
+            };
+            struct Quux {
+              struct Bar bar;
+            };
+
+
+USAGE
+        To use a struct, its definition must be visible - either because it
+        is defined in the object compiled, or it has been inherited.
+        (Note: #include'ing structs does not what you think it does: in
+        LPC it constructs a new struct type whereever it is included).
+
+
+        A variable to hold a struct is defined like this:
+
+            struct Foo var;
+
+        and similar for function arguments:
+
+            void fun (struct Foo arg)
+
+
+        Just writing 'struct Foo var' however does not _create_ a struct,
+        it just creates a variable capable of holding one. To assign a value
+        to the variable upon creation, assign it with a struct value, either
+        from another variable or from a literal struct:
+
+            struct Foo var = (<Foo>);
+
+
+        Literal structs are written using (<>) as delimiters:
+
+            (<Foo>)
+                creates an empty instance of struct Foo
+
+            (<Foo> 1, ({ 2 }), bar)
+                creates an instance of struct Foo, and assigns 1 to member
+                'one', ({ 2 }) to member 'two', and the content of variable
+                bar to member 'three'.
+
+            (<Foo> two: ({ 2 }) )
+               creates an instance of struct Foo which is all empty except
+               for member 'two' which is assigned the value ({ 2 }).
+
+        It is not possible to use both named and unnamed initializers
+        in the same literal.
+
+
+        A struct member is accessed using the -> operator:
+
+            struct Foo var = ...;
+
+            var->one = 1;
+
+
+        It is possible to compute struct lookups at runtime:
+
+            struct Foo bar = ...;
+            string member = "one";
+
+            bar->(member) = 1; // sets bar->one to 1
+            bar->(0) = 1;      // sets bar->one to 1
+
+
+        When using struct values held in variables/expressions of type
+        'mixed', the 'mixed' value should to be casted to the struct
+        value. The cast can be omitted if the looked-up member exists
+        in only one struct (and its children) known to the compiler:
+
+            struct Foo { int one; };
+            struct Bar { int two; };
+            struct Baz { int two; };
+            mixed var;
+
+                        var->one  // looks up Foo->one
+            (struct Foo)var->one  // looks up Foo->one
+                        var->two  // ERROR: ambiguous lookup
+            (struct Bar)var->one  // looks up Bar->one
+
+
+USAGE IN CLOSURES
+        The #'(< operator can be used in lambda closures to create a
+        struct; the type of the struct is given by the 'template'
+        struct passed as first argument. The content of the template
+        struct is irrelevant, so an empty struct suffices. For
+        example, to create an instance of struct Foo:
+        
+            ({ #'(<, (<Foo>), 1, ({ 2 }), (<Bar>) })
+
+        The order of the member values is the order in which they
+        appear in the struct definition.
+
+        To access a struct member in a lambda closure, use the #'->
+        operator with the name of the member as double-quoted symbol
+        or literal string:
+
+            ({ #'->, struct-expression, ''one })
+            ({ #'->, struct-expression, "one" })
+
+
+MISCELLANEOUS
+        Internally structs can be identified by the ID string
+        returned from get_type_info(). This string contains the name
+        of the struct, the name of the program its type was defined in,
+        and the ID number of the program. However, do not rely on
+        a particular format of this string!
+
+        Support for structs is signaled by the macro __LPC_STRUCTS__.
+
+        Since structs are tied to the program they are defined in,
+        re-compiling a program creates new struct types which are
+        in principle incompatible to the old ones. However, the LPC
+        compiler checks if the newly compiled structs have the same
+        structure as their older counterparts of the same name
+        (and defining program). If the structures conform, the existing
+        older struct types are used instead of the new ones. This way
+        an accidental of for example /std/types.c doesn't break
+        the whole mud.
+
+
+EXAMPLES
+        Suppose we have two objects: a monster, and a monster
+        coordinate tracker, and we want to use a struct to store the
+        coordinate:
+
+          -- monster_coordinate.c --
+            struct Coordinate { int x; int y; };
+
+          -- monster_tracker.c --
+            inherit "monster_coordinate";
+
+            void track (struct Coordinate coord) { ... }
+
+          -- monster.c --
+            inherit "monster_coordinate";
+
+            int move (..) {
+              ...
+              "monster_tracker"->track( (<Coordinate> my_x, my_y) );
+            }
+
+        Note that using '#include "monster_coordinate.c"' instead of inherit
+        won't work. While the objects would compile, the first call to
+        track() would cause a runtime error of the type 
+
+          Illegal type to struct->(): struct Coordinate (/monster.c #234),
+                                      expected struct Coordinate
+                                      (/monster_tracker.c #552)
+
+
+HISTORY
+        structs were fully implemented first in LDMud 3.3.246.
+        The implementation was revised in LDMud 3.3.344.
+        The reactivation of unchanged structs in object updates was
+        implemented in LDMud 3.3.417.
+
+
+SEE ALSO
+        mappings(LPC), get_type_info(E), structp(E), to_mapping(E),
+        to_struct(E), struct_info(E), baseof(E)

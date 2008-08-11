@@ -1,0 +1,62 @@
+SYNOPSIS
+        #include <sys/driver_hooks.h>
+
+        set_driver_hook(H_TELNET_NEG, value)
+
+        <value> being:
+
+          void|mixed <name>(int action, int option [, int * opts ] )
+          void|mixed <closure>(int action, int option [, int * opts ] )
+
+DESCRIPTION
+        Optional hook to specifiy how to perform a single telnet
+        negotiation.  Hook setting may be any closure or a string.  If
+        not set, most telnet options are rejected (read: only a very
+        minimal negotiation takes place).
+
+        The hook is called whenever the driver receives a demand for
+        option negotiation for:
+
+            SB:               Suboption negotiation
+            TELOPT_LINEMODE:  linemode
+            TELOPT_NAWS:      window size
+            TELOPT_TTYPE:     terminal type
+            TELOPT_TM:        timing mark
+            TELOPT_NEWENV:    remote environment variables
+            TELOPT_ENVIRON:   remote environment variables
+            TELOPT_XDISPLOC:  remote X display address
+            TELOPT_TSPEED:    terminal speed
+            TELOPT_BINARY:    binary data, needed for non-ASCII charsets
+            TELOPT_EOR:       TinyFugue prompt marker (together with EOR)
+
+            TELOPT_COMPRESS:  Mud Compression Protocol
+            TELOPT_COMPRESS2: Mud Compression Protocol
+            TELOPT_MSP:       Mud Sound Protocol
+            TELOPT_MXP:       Mud Extension Protocol
+
+        The hook has then to perform the negotiation using the efun
+        binary_message().
+
+        Alternatively, if H_NOECHO is set, this hook is called for
+        _all_ telnet data received.
+
+        If the setting is a string, it used as name of an lfun to call
+        in this_player(). Closures are just called, with unbound
+        lambda-closures being bound to this_player() prior to
+        execution.
+
+        The hook is called for a 'DO/DONT/WILL/WONT <opt>' with the action
+        (DO/DONT/...) as the first, and <opt> as the second argument.
+
+        For example:, if the driver receives the sequence
+
+          IAC SB <opt> <opts>...
+
+        followed by IAC SB/SE,  the hook is called with 'SB' as first
+        argument, <opt> as second, and <opts> as an array of integers as
+        third argument.
+
+HISTORY
+
+SEE ALSO
+        hooks(C), telnet(C), no_echo(H)

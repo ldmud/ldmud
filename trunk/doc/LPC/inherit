@@ -1,0 +1,9 @@
+NAME
+        inherit
+
+DESCRIPTION
+        The concept of inheritance and the inherit statement are
+        explained in detail in the man page for ``inheritance''.
+
+SEE ALSO
+        inheritance(C)

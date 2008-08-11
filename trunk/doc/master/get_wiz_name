@@ -1,0 +1,12 @@
+SYNOPSIS
+        string get_wiz_name(string file)
+
+DESCRIPTION
+        Argument is a file name, which we want to get the owner of.
+        This used for the wizlist, to determine who gets the score for
+        the file being used.
+
+        This call is used only to score errors to the right wizard.
+
+SEE ALSO
+        wizlist(E), get_wiz_info(E), query_creator(M), getuid(E)

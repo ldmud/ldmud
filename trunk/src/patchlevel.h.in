@@ -1,0 +1,30 @@
+#ifndef PATCHLEVEL_H__
+#define PATCHLEVEL_H__ 1
+
+/*--------------------------------------------------------------------------
+ * Various version numbers and strings, collected here so that we have
+ * to modify only one file.
+ *--------------------------------------------------------------------------
+ */
+
+#define RELEASE_TYPE "$VersionType$"
+#define RELEASE_LONGTYPE "$VersionLongType$"
+
+#define RELEASE_DATE "$VersionDate$"
+
+#define PROJ_VERSION "Build $VersionRevision$"
+
+#define DRIVER_VERSION "$VersionMajor$.$VersionMinor$.$VersionMicro$"
+
+#define VERSION_MAJOR "$VersionMajor$"
+
+#define VERSION_MINOR "$VersionMinor$"
+
+#define VERSION_MICRO "$VersionMicro$"
+
+#define LOCAL_LEVEL ""
+
+/* TODO: Add something like the perl local patchlevel management. */
+/* TODO: Add LPC defines for the various version number parts */
+
+#endif /* PATCHLEVEL_H__ */

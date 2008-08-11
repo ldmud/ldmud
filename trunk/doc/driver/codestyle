@@ -1,0 +1,247 @@
+    The LPMud gamedriver is by nature the result of the cooperative work
+    of multiple programmers, often separated by large oceans and years
+    of time. In order to keep the appearance of the driver source consistent
+    (and with that maintainable), the following guidelines should be followed
+    for all code contributions.
+
+    For a quick start in how good driver source should look like, take
+    a look at comm.{c,h}, object.{c,h} and mapping.{c.h}.
+
+    The guidelines have a strong emphasis on code layout and commenting,
+    stemming from the fact that proper layout and comments gave the
+    incentive for LDMud in the first place. Right now, 50% of all lines
+    are comments, and that has been proven to be a Good Thing.
+
+    Any reader of the "real programmers don't write comments"-school
+    of thought is asked to take his or her incompetence elsewhere.
+
+
+Language
+--------
+    The language is ISO Standard C (also known as 'C89' or 'ANSI C').
+    Common compiler extensions or features from the new C99 standard are
+    permitted if their addition is transparent for other C89 compilers.
+    For example: the 'inline' keyword permitted through the use of the
+    INLINE macro; so are the Metrowerks-pragmas and GNU-attributes. Not
+    permitted are GNU's local functions.
+
+    System/Platform specifics are to be detected by the configure script
+    and provided with transparent implementations in port.{c,h} (or for
+    module-specific dependencies in the respective modules).
+
+    Adherence to the Standard has the following implications:
+
+     - All functions must be fully prototyped.
+     - Standard types like size_t, ssize_t or ptrdiff_t are to be used
+       whereever possible.
+     - Unixisms like
+         {
+           a = malloc(20);
+           b = malloc(20);
+           c = b-a;
+         }
+       are not legal and shouldn't be used.
+     - Don't make assumptions about the size of the base types (e.g.
+       a char might have more than 8 bits). If such an assumption
+       is unavoidable, comment it clearly and if possible add a test
+       to raise a compile or runtime error if the assumption is not met.
+
+
+Style
+-----
+    All modules (.c-files) have to have their interface in an accompaning
+    .h-file. The header file must be guarded against repeated inclusion
+    with the normal
+        #ifndef HEADERNAME_H
+        #define HEADERNAME_H 1
+          ...
+        #endif /* HEADERNAME_H */
+    construct. To use a module, its headerfile must be included - no random
+    'extern' declarations.
+
+    Every module must include "driver.h" which in turn includes the
+    portability headers and provides common defines.
+
+    Use the driver-provided types and macros like Bool or p_int.
+
+    Code should be written defensively and readable. This is not the IOCCC.
+
+    No magic numbers - use #defines to give them names.
+
+    Add sanity checks where useful. If the checks are costly, enclose
+    them in a #ifdef DEBUG...#endif bracket.
+
+    Comment questionable code or opportunities for possible extensions with a
+    'TODO: ...' comment. For multiline comments, use 'TODO::' on the second
+    and following lines (this makes reading a grep easier).
+
+    Comment temporary debug code with a 'DEBUG:' comment. Similar, debug
+    output should always begin with 'DEBUG:'.
+
+    Variable identifiers should start with a lowercase letter, function
+    identifiers may start with upper or lowercase, constant identifiers
+    should start with an uppercase letter. Macro identifiers should be
+    all UPPERCASE, other identifiers may be under_scored or SkudlyCaps.
+    Hungarian notation is accepted only in a very light form: pFoo for
+    pointers, ppFoo for pointer to pointers, iFoo for integer types,
+    sFoo for string pointers, aFoo for complex types - you get the
+    idea. But no alpzsFoo and friends.
+
+    f_xxx() function names are reserved for efun implementations.
+    typedef'd typenames should end in _t (e.g. 'mapping_t'), struct
+    names should end in _s (e.g. 'struct instrs_s').
+
+    Indentation is 4 spaces per level. No tab characters anywhere!
+
+    The indentation style is a variant of the 'Allman style':
+
+        if (foo)
+        {
+            ...body...
+        } /* if (foo) */
+
+    Note the comment at the closing brace!
+
+    One line bodies may be written as
+
+        if (foo) body;
+
+    or
+
+        if (foo)
+            body;
+
+    _if_ it improves the readability.
+
+    Similar, the typical layout of a function is:
+
+        static int
+        function_name ( arg1 , arg2)
+
+        /* Twiddle <arg1> with <arg2> and return the result.
+         */
+
+        {
+            ....
+        } /* function_name() */
+
+    If an expression (argument list, ...) extends over several, the first
+    literal element on a line should be an operator or syntactical marker:
+
+        if (condition1
+         && (   condition2
+             || condition3)
+           )
+
+        printf( "..."
+              , arg1, arg2, arg3
+              );
+
+    Be generous with whitespace - both horizontal and vertical.
+
+    [ The reasoning behind this style is to use the language elements
+      to create strong visual structures for the eyes to follow. By doing so,
+      the structure of the program becomes obvious without much
+      conscious thought.
+    ]
+
+
+Commenting
+----------
+    The comments also follow the idea of giving strong visual clues of
+    how the program is structured.
+
+    Horizontal lines should be created as
+
+        /*------...-------*/
+        /*======...=======*/
+        /* - - -... - - - */
+
+    The '---' line is the normal separator between the components of a
+    source file (includes, variable declarations, macro declarations,
+    the separate functions). The '===' line can be used to separate
+    larger sections of a source file (e.g. the lowlevel routines from
+    the efun implementations). '- -' lines, which usally span less than
+    the whole line, can be used to subdivide large functions (though then
+    it's often better to split the function into several small ones).
+
+    A '***' line is reserved for the end of every source file.
+
+    A '/* --- Subsection --- */' is also good to separate subsections.
+
+    Vertical lines are to be constructed as
+
+      /*
+       *
+       */
+
+    No box comments.
+
+    Every function must have a head comment explaining the meaning
+    of the arguments, what the function does, and the possible results.
+    For efun implementations, this comment should be identical to the
+    man page.
+
+    Within a function, every variable should be commented as
+
+       int foo;  /* short comment */
+       int bar;
+         /* long comment which doesn't fit on one line.
+          */
+
+    The major steps in a function should be preceeded by a comment
+    explaining them. Also, wherever a critical design decision has
+    been made, a comment should line out the whats and whys:
+
+        /* Duplicate the stored arguments for the function call.
+         * (It's tempting to use the stored arguments directly
+         *  in the last pass; however it's not guaranteed that
+         *  the last pass actually comes this far.)
+         */
+
+
+    A typical file layout, commentwise, looks like this:
+
+        /*------------------------------------------------------
+         * Gamedriver Bouncing module.
+         *
+         * <reserved for future copyright notice>
+         *------------------------------------------------------
+         * 'Big picture' description of the module and its
+         * relation to the other gamedriver parts.
+         *
+         * Tricky design discussions also belong in here.
+         *------------------------------------------------------
+         */
+
+        #include "driver.h"
+        #include "typedefs.h"
+
+        #include <stdlib.h>
+
+        #include "bounce.h"
+        #include "backend.h"
+
+        /*--------------------------------------------------------*/
+
+        /* --- User information --- */
+        interactive_t *all_bouncers[MAX_PLAYERS];
+
+        /* ---  Statistics --- */
+
+        p_int number_of_calls;
+
+        /*--------------------------------------------------------*/
+        void
+        add_bouncer (interactive_t *bouncer)
+
+        /* This function adds <bouncer> to the all_bouncers[].
+         */
+        {
+            int i;  /* search index */
+
+            ....
+        } /* add_bouncer() */
+
+        /**********************************************************/
+

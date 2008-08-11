@@ -1,0 +1,74 @@
+SYNOPSIS
+        object clone_object(string name)
+        object clone_object(object template)
+
+DESCRIPTION
+        Clone a new object from definition <name>, or alternatively from
+        the object <template>. In both cases, the new object is given
+        an unique name and returned.
+
+        The original used for cloning, called blueprint, should not be
+        used in the system, just for cloning. The cloned objects
+        contain only the data but the blueprint also the function code.
+        The blueprint is the one without a unique number at the end of
+        the object's name. The clone_object() function never
+        returns a blue print.
+
+        If the <name> or <template> designates a cloned object itself,
+        the system looks up the blueprint object _by name_.
+
+        If the blueprint exists and has a heart_beat(), clone_object()
+        turns it off.
+
+        Note that the pathname must be complete, which means there are no
+        relative paths allowed.
+
+        If strict euids are enforced, the cloning object must have
+        a non-zero euid.
+
+
+        -- Variable Initialization --
+
+        In general, variables are initialized for blueprints and clones alike
+        with a call to the internal lfun __INIT().
+        
+        However, if #pragma share_variables is in effect (either explicitely
+        given in the source or implicitely as runtime option), the values for
+        a clone's uninitialized variables are taken from the _current_
+        variables of the object's blueprint.
+
+        In the absence of share_variables, variables without explicit
+        initializers are initialized to 0.
+
+EXAMPLE
+        // Clone a torch (filename in non-compat format)
+        object torch;
+        torch = clone_object("/obj/torch");
+
+        // Clone two keys (filename in compat format)
+        object key1, key2;
+        key1 = clone_object(load_object("obj/key"));
+        key2 = clone_object(key1);
+
+        // Create a specialized weapons blueprint.
+        --- std/weapon.c: --- 
+        #pragma share_variables
+        int weapon_class = 1;
+
+        --- broadsword.c: ---
+        inherit "/std/weapon";
+
+        int create() {
+            weapon_class = 2;
+            replace_program("/std/weapon");
+        }
+
+
+HISTORY
+        Modified in LDMud 3.2.6 to take an object as argument.
+        LDMud 3.3.378 consolidated the variable initialization with the
+        share_variables pragma.
+
+SEE ALSO
+        blueprint(E), clonep(E), destruct(E), clones(E), load_name(E),
+        load_object(E), move_object(E), uids(C), program_name(E), pragma(LPC)

@@ -1,0 +1,28 @@
+SYNOPSIS
+        int logon (void)
+        int logon (int flag)
+
+DESCRIPTION
+        When the driver created a new connection (either by accepting
+        it or by creating it with net_connect()) and bound it to an
+        object, it then calls logon() in that object.
+
+        The method should return 0 on failure, and everything else on
+        success.
+
+        If the driver attempted to create a connection in the
+        background and failed, it will call logon(-1) in the intended
+        object to inform the mudlib about the failure.
+
+        If the master attempted a secure connection in connect(E) and
+        did not set an explicit TLS callback, the call to logon() won't
+        happen until the TLS handshake is complete. If the master set
+        a TLS callback, that will be executed in place of logon().
+
+HISTORY
+        LDMud 3.2.10 added the extended meaning for net_connect().
+        LDMud 3.2.13/3.3.713 streamlined the handling of secure connections
+        during logon.
+
+SEE ALSO
+        connect(M), net_connect(E), exec(E), tls_init_connection(E)

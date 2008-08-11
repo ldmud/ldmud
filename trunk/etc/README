@@ -1,0 +1,29 @@
+Miscellaneous files for the driver:
+
+  icon-32x32.xpm : The 'official' icon for the driver.
+  icon-16x16.xpm
+
+  ldmud-16x16.ico : The icon in .ICO format.
+  ldmud-32x32.ico
+
+  pb-ldmud.jpg   : A neat 'powered by' button by Elric - some editing required.
+  pb-ldmud329.jpg: Another 'powered by' button by Elric.
+  PoweredByLDMud.gif: And another nifty butty by Elric.
+                   
+  lpc-mode.el : LPC mode for EMACS, by Vivek Dasmohapatra <vivek@etla.org>
+  lpc.xml     : LPC syntax highlighting for Kate, by <Andreas.Klauer@epost.de>
+  lpc.vim     : LPC syntax highlighting for vim, maintained by Shizhu
+                  Pan <poet@mudbuilder.net>
+
+  patch-o-matic: A bash script to automatically up/downgrade the driver
+                 with the latest patches from the bearnip.com website.
+
+  savefile-parse.pl: A perl snippet which reads a LPMud savefile and
+                 transforms it into a Perl datastructure.
+
+The following scripts are just working examples - use them to roll your own:
+
+  memusage    : A script to analyze OBJ_DUMP.
+  startmud.pl : A simple start/keep-alive script
+  start_mud, mudloop: A slightly more advance start/keep-alive script combo.
+

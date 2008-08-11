@@ -1,0 +1,789 @@
+/*---------------------------------------------------------------------------
+ * Specification of the virtual machine codes and instructions.
+ *
+ *---------------------------------------------------------------------------
+ * For a full explanation, see make_func.y
+ *---------------------------------------------------------------------------
+ */
+
+/*
+ * This file specifies types and arguments for efuns.
+ * An argument can have two different types with the syntax 'type1 | type2'.
+ * An argument is marked as optional if it also takes the type 'void'.
+ * The type alternative 'null' denotes arguments which may take the
+ * number 0 instead of values of the other types.
+ *
+ * Look at the end for the list of functions that are optionally available.
+ * If you don't want them, simply comment out them. All other functions must
+ * remain defined.
+ */
+
+/*---------------------------------------------------------------------------
+ * The basic machine codes.
+ */
+
+%codes
+
+  /* This code should come first, to detect corrupted code */
+        illegal
+        undef
+
+  /* prefix bytes for the multi-byte codes
+   */
+        efun0
+        efun1
+        efun2
+        efun3
+        efun4
+        efunv
+
+  /* These are the predefined functions and statements that have a direct
+   * counterpart in LPC.
+   *
+   * The compiler needs to treat sscanf and parse_command specially because
+   * these two 'efuns' take lvalues as part of their arguments.
+   */
+        identifier
+        string
+        cstring0
+        cstring1
+        cstring2
+        cstring3
+        number
+        const0
+        const1
+        nconst1
+        clit
+        nclit
+        fconst0
+        float
+        closure
+        symbol
+        return
+        return0
+        default_return
+        break
+        switch
+        sscanf
+#ifdef USE_PARSE_COMMAND
+        parse_command
+#endif
+        local
+        catch
+"++"    inc
+"--"    dec
+"x++"   post_inc
+"x--"   post_dec
+"++x"   pre_inc
+"--x"   pre_dec
+"&&"    land
+"||"    lor
+"="     assign
+"(void)="  void_assign
+"+"     add       binary
+"-"     subtract  binary
+"*"     multiply  binary
+"/"     divide    binary
+"%"     mod       binary
+">"     gt        binary
+">="    ge        binary
+"<"     lt        binary
+"<="    le        binary
+"=="    eq        binary
+"!="    ne        binary
+"~"     compl     unary
+"&"     and       binary
+"|"     or        binary
+"^"     xor       binary
+"<<"    lsh       binary
+">>"    rsh       binary
+">>>"   rshl      binary
+"!"     not       unary
+        index     binary
+        rindex    binary
+        aindex    binary
+        map_index ternary
+#ifdef USE_STRUCTS
+        s_index   binary
+#endif /* USE_STRUCTS */
+".."    range     ternary
+"..<"   nr_range  ternary
+"<.."   rn_range  ternary
+"<..<"  rr_range  ternary
+"..>"   na_range  ternary
+"<..>"  ra_range  ternary
+">.."   an_range  ternary
+">..<"  ar_range  ternary
+">..>"  aa_range  ternary
+        nx_range  binary
+        rx_range  binary
+        ax_range  binary
+"(void)+=" void_add_eq
+"+="    add_eq
+"-="    sub_eq
+"/="    div_eq
+"*="    mult_eq
+"%="    mod_eq
+"&="    and_eq
+"|="    or_eq
+"^="    xor_eq
+"<<="   lsh_eq
+">>="   rsh_eq
+">>>="  rshl_eq
+
+  /* These two operators don't exist as implemented machine instructions,
+   * but are required as operator-closure values for the closure compiler.
+   */
+"&&="   land_eq
+"||="   lor_eq
+
+/*---------------------------------------------------------------------------
+/* These values are used by the stack machine, and can not be directly
+ * called from LPC.
+ */
+
+        pop_value
+        dup
+        ldup
+        swap_values
+        clear_locals
+        save_arg_frame
+        restore_arg_frame
+        use_arg_frame
+        flatten_xarg
+        fbranch
+        lbranch
+        lbranch_when_zero
+        lbranch_when_non_zero
+        branch
+        branch_when_zero
+        branch_when_non_zero
+        bbranch_when_zero
+        bbranch_when_non_zero
+        call_function
+        call_inherited
+        call_inherited_noargs
+#ifdef USE_NEW_INLINES
+        context_closure
+        context_identifier
+        push_context_lvalue
+        context_identifier16
+        push_context16_lvalue
+#endif /* USE_NEW_INLINES */
+        push_identifier_lvalue
+        virtual_variable
+        push_virtual_variable_lvalue
+        identifier16
+        push_identifier16_lvalue
+        push_local_variable_lvalue
+        push_indexed_lvalue
+        push_rindexed_lvalue
+        push_aindexed_lvalue
+#ifdef USE_STRUCTS
+        push_indexed_s_lvalue
+#endif /* USE_STRUCTS */
+        index_lvalue
+        rindex_lvalue
+        aindex_lvalue
+#ifdef USE_STRUCTS
+        index_s_lvalue
+#endif /* USE_STRUCTS */
+        range_lvalue
+        nr_range_lvalue
+        rn_range_lvalue
+        rr_range_lvalue
+        na_range_lvalue
+        ra_range_lvalue
+        an_range_lvalue
+        ar_range_lvalue
+        aa_range_lvalue
+        nx_range_lvalue
+        rx_range_lvalue
+        ax_range_lvalue
+        push_protected_indexed_lvalue
+        push_protected_rindexed_lvalue
+        push_protected_aindexed_lvalue
+        push_protected_indexed_map_lvalue
+#ifdef USE_STRUCTS
+        push_protected_indexed_s_lvalue
+#endif /* USE_STRUCTS */
+        protected_index_lvalue
+        protected_rindex_lvalue
+        protected_aindex_lvalue
+#ifdef USE_STRUCTS
+        protected_index_s_lvalue
+#endif /* USE_STRUCTS */
+        protected_range_lvalue
+        protected_nr_range_lvalue
+        protected_rn_range_lvalue
+        protected_rr_range_lvalue
+        protected_na_range_lvalue
+        protected_ra_range_lvalue
+        protected_an_range_lvalue
+        protected_ar_range_lvalue
+        protected_aa_range_lvalue
+        protected_nx_range_lvalue
+        protected_rx_range_lvalue
+        protected_ax_range_lvalue
+        simul_efun
+        aggregate
+        m_aggregate
+        m_caggregate
+#ifdef USE_STRUCTS
+        s_aggregate
+        s_m_aggregate
+#endif /* USE_STRUCTS */
+        previous_object0
+        lambda_cconstant
+        lambda_constant
+        push_indexed_map_lvalue
+        foreach
+        foreach_ref
+        foreach_range
+        foreach_next
+        foreach_end
+        end_catch
+        break_continue
+        breakn_continue
+        jump
+        no_warn_deprecated
+        array_range_check
+
+/*---------------------------------------------------------------------------
+ * efuns with a single-byte code.
+ *
+ * These efuns share the code space with the normal codes, and like these
+ * are implemented directly in the interpreter-switch().
+ */
+
+%efuns
+
+        /* Miscellaneous */
+
+int     clonep(mixed default: F_THIS_OBJECT);
+int     closurep(mixed);
+int     floatp(mixed);
+int     intp(mixed);
+int     mappingp(mixed);
+int     objectp(mixed);
+int     pointerp(mixed);
+int     referencep(mixed &);
+int     stringp(mixed);
+#ifdef USE_STRUCTS
+int     structp(mixed);
+#endif
+int     symbolp(mixed);
+int     typeof(mixed|mixed &);
+
+mixed   negate(int|float);
+  /* TODO: Mainly used by the compiler to implement the unary '-' */
+void    raise_error(string);
+void    throw(mixed);
+
+        /* Strings */
+
+int     strlen(null|string);
+
+        /* Arrays and Mapings */
+
+#ifdef USE_STRUCTS
+int     sizeof(null|string|mixed|mixed *|mapping|struct);
+#else
+int     sizeof(null|string|mixed|mixed *|mapping);
+#endif /* USE_STRUCTS */
+
+        /* Functions and Closures */
+
+unknown call_other(object|string|object *|string *, string, ...);
+unknown call_direct(object|string|object *|string *, string, ...);
+          /* The lexer switches the return type between 'unknown'
+           * and 'any' depending on the _types pragmas.
+           */
+int     extern_call();
+
+        /* Objects */
+
+object  master(int default: F_CONST0);
+object  this_interactive();
+object  this_object();
+object  this_player();
+
+        /* Technical efuns */
+
+/* void break_point(); */
+#if 0
+void swap(object);
+#endif
+
+        /* Obsolete and deprecated functions */
+
+#ifdef USE_DEPRECATED
+
+#endif /* USE_DEPRECTED */
+
+/*---------------------------------------------------------------------------
+ * The tabled efuns.
+ */
+
+%tefuns
+
+        /* Miscellaneous */
+
+mixed   abs(int|float);
+float   sin(int|float);
+float   asin(float);
+float   cos(int|float);
+float   acos(float);
+float   tan(int|float);
+float   atan(int|float);
+float   atan2(int|float,int|float);
+float   log(int|float);
+float   exp(int|float);
+float   sqrt(int|float);
+float   ceil(int|float);
+float   floor(int|float);
+float   pow(int|float,int|float);
+mixed   reverse(int|string|mixed *|mixed *&);
+
+mixed   max(mixed|mixed*, ...);
+mixed   min(mixed|mixed*, ...);
+int     sgn(int|float);
+
+int     to_int(int|string|float|closure);
+float   to_float(float|string|int);
+string  to_string(mixed);
+#ifdef USE_STRUCTS
+int     baseof(struct, struct);
+mixed  *to_array(string|mixed*|symbol|quoted_array|struct);
+mixed   to_struct(mapping|mixed*|struct, void|struct);
+mixed  *struct_info(struct, int);
+#else
+mixed  *to_array(string|mixed*|symbol|quoted_array);
+#endif /* USE_STRUCTS */
+object  to_object(null|object|string|closure);
+
+mixed   copy(mixed);
+mixed   deep_copy(mixed);
+int     ed(void|string, void|null|string);
+mixed   get_type_info(mixed, void|int);
+mixed   quote(mixed *|quoted_array|symbol|string);
+mixed   unquote(quoted_array|symbol);
+
+string  save_value(mixed, void|int);
+mixed   restore_value(string);
+
+string  ctime(int*|int default: F_TIME);
+int     random(int);
+int     time();
+int*    utime();
+mixed  *gmtime(int*|int default: F_TIME);
+mixed  *localtime(int*|int default: F_TIME);
+
+mixed  *wizlist_info();
+mixed   get_extra_wizinfo(null|object|string);
+void    set_extra_wizinfo(null|object|string, mixed);
+void    set_extra_wizinfo_size(int);
+
+
+        /* Strings */
+
+string  capitalize(string);
+#ifdef HAS_ICONV
+string  convert_charset(string, string, string);
+#endif
+string  crypt(string, string|int default: F_CONST0);
+string *explode(string, string);
+#ifdef HAS_IDN
+string  idna_stringprep(string, int, int default: F_CONST0);
+string  idna_to_ascii(string);
+string  idna_to_unicode(string);
+#endif
+string  implode(string *, string);
+string  lower_case(string);
+string  make_shared_string(string) "no longer useful";
+string  md5(int*|string, void|int);
+string  md5_crypt(string, string|int default: F_CONST0);
+string *regexp(string *, string, int default: F_CONST0);
+string *regexplode(string, string, int default: F_CONST0);
+string  regreplace(string,string,closure|string,int);
+int     regexp_package();
+mixed   regmatch(string,string, void|int, void|int);
+string  sha1(int*|string, void|int);
+void    printf(string, ...);
+string  sprintf(string, ...);
+int     strstr(string, string, int default: F_CONST0);
+int     strrstr(string, string, int default: F_NCONST1);
+string  terminal_colour(string, null|mapping|closure, void|int, void|int );
+string  trim(string, void|int, void|int|string);
+string  upper_case(string);
+
+string  clear_bit(string, int);
+string  set_bit(string, int);
+int     test_bit(string, int);
+string  or_bits(string, string);
+string  and_bits(string, string);
+string  xor_bits(string, string);
+string  invert_bits(string);
+int     last_bit(string);
+int     next_bit(string, int, int default: F_CONST0);
+int     count_bits(string);
+string  copy_bits(string,string,void|int,void|int,void|int);
+
+
+        /* Arrays and Mappings */
+
+mixed  *allocate(int|int*, void|mixed);
+mixed  *filter_objects(mixed *, string, ...);
+mixed  *map_objects(mixed *, string, ...);
+mixed  *sort_array(mixed *,string|closure, ...);
+mixed  *transpose_array(mixed *);
+mixed  *unique_array(mixed *, string|closure, ...);
+
+mixed   filter(mapping|mixed *|string, string|closure|mapping, ...);
+mapping filter_indices(mapping, string|closure,  ...);
+
+#ifdef USE_STRUCTS
+mixed   map(mixed *|mapping|struct|string, mapping|string|closure, ...);
+#else
+mixed   map(mixed *|mapping, mapping|string|closure, ...);
+#endif /* USE_STRUCTS */
+mapping map_indices(mapping, string|closure, ...);
+
+mapping m_allocate(int, int default: F_CONST1);
+int     m_contains(mixed & | mapping, mixed & | mixed, ...);
+mapping m_add(mapping, mixed, ...);
+mapping m_delete(mapping, mixed);
+mixed * m_entry(mapping, mixed);
+mixed  *m_indices(mapping);
+mapping m_reallocate(mapping, int);
+mixed  *m_values(mapping, int default: F_CONST0);
+#ifdef USE_STRUCTS
+mapping mkmapping(mixed *|struct, ...);
+#else
+mapping mkmapping(mixed *, ...);
+#endif
+int     member(mixed *|string|mapping, mixed, void|int);
+int     rmember(mixed *|string, mixed, void|int);
+mixed  *unmkmapping(mapping);
+void    walk_mapping(mapping, string|closure, ...);
+int     widthof(null|mapping);
+
+
+        /* Functions and Closures */
+
+mixed   apply(mixed|closure, ...);
+mixed   funcall(mixed|closure, ...);
+
+closure bind_lambda(closure, object|void);
+closure lambda(null|mixed *, mixed);
+closure symbol_function(symbol|string, null|string|object default: F_CONST0);
+closure symbol_variable(symbol|string|int);
+closure unbound_lambda(null|mixed *, mixed);
+
+void    call_out(string|closure, int, void|mixed, ...);
+mixed  *call_out_info();
+int     find_call_out(string|closure);
+int     remove_call_out(string|closure);
+
+object *caller_stack(int default: F_CONST0);
+int     caller_stack_depth();
+int     call_resolved(mixed &, null|object|string, string, ...);
+int     call_direct_resolved(mixed &, null|object|string, string, ...);
+object  previous_object(int);
+
+mixed  *heart_beat_info();
+int     set_heart_beat(int);
+
+
+        /* Objects */
+
+object  blueprint(string|object default: F_THIS_OBJECT); /* PRELIMINARY */
+object  clone_object(string|object);
+object *clones(void|int|string|object, void|int);
+void    destruct(null|object);
+int     exec(object, object);
+object  find_object(string);
+mixed  *functionlist(object|string, int default: F_CONST1);
+mixed   function_exists(string, void|int|object, void|int);
+string *include_list(void|object, void|int);
+string *inherit_list(void|object, void|int);
+int     input_to(string|closure, void|int, ...);
+int     interactive(object default: F_THIS_OBJECT);
+string  load_name(null|string|object default: F_THIS_OBJECT);
+object  load_object(string);
+mixed  *object_info(object, int, void|int);
+string  object_name(null|object default: F_THIS_OBJECT);
+int     object_time(object default: F_THIS_OBJECT);
+object  present_clone(object|string, object default: F_THIS_OBJECT); /* PRELIMINARY */
+string  program_name(null|object default: F_THIS_OBJECT);
+int     program_time(object default: F_THIS_OBJECT);
+void    replace_program(void|string);
+mixed   query_editing(object);
+int     query_idle(object);
+int     query_once_interactive(object);
+object  query_shadowing(object);
+object  query_snoop(object);
+int     find_input_to(object, object|string|closure, void|string);
+mixed * input_to_info(object);
+int     remove_input_to(object, void|object|string|closure, void|string);
+void    remove_interactive(object);
+void    rename_object(object, string);
+int     restore_object(string);
+mixed   save_object(void|string|int, void|int);
+int     set_next_reset(int);
+void    set_this_object(object);
+object  shadow(object, int);
+int     snoop(object, void|object);
+#ifdef USE_STRUCTS
+void    tell_object(object|string, string|mixed*|mapping|struct|object);
+#else
+void    tell_object(object|string, string|mixed*|mapping|object);
+#endif /* USE_STRUCTS */
+void    unshadow();
+string  variable_exists(string, void|int|object, void|int);
+mixed  *variable_list(object|string, int default: F_CONST1);
+
+
+        /* Network IO */
+
+int     binary_message(int *|string, int default: F_CONST0);
+
+int     net_connect(string, int default: F_QUERY_UDP_PORT);
+
+int     query_udp_port();
+int     send_udp(string, int, string|int*);
+
+object  query_input_pending(object);
+string  query_ip_name(null|object default: F_THIS_PLAYER);
+string  query_ip_number(null|object|mixed &  default: F_THIS_PLAYER);
+int     query_mud_port(int|object default: F_THIS_PLAYER);
+int     set_buffer_size(int);
+mixed   get_combine_charset(int);
+void    set_combine_charset(int *|string|null);
+mixed   get_connection_charset(int);
+void    set_connection_charset(int *|string|null, int default: F_CONST1);
+mixed   set_prompt(string|closure|int, object default: F_THIS_PLAYER);
+int     get_max_commands(object default: F_THIS_INTERACTIVE);
+void    set_max_commands(int, object default: F_THIS_INTERACTIVE);
+int     enable_telnet(int, object default: F_THIS_INTERACTIVE);
+
+void    write(mixed);
+object *users();
+
+#ifdef ERQ_DEMON
+int     attach_erq_demon(object|string, int default: F_CONST0);
+int     send_erq(int, int*|string, null|closure default: F_CONST0);
+#endif
+
+
+        /* Files */
+
+int     cat(string, void|int, void|int);
+int     copy_file(string, string);
+int     file_size(string);
+mixed  *get_dir(string, int default: F_CONST1);
+int     mkdir(string);
+string  read_bytes(string, void|int, void|int);
+string  read_file(string, void|int, void|int);
+int     rename(string, string);
+int     rm(string);
+int     rmdir(string);
+int     tail(string);
+int     write_bytes(string, int, string);
+int     write_file(string, string, int default: F_CONST0);
+
+
+        /* Driver and System functions */
+
+mixed   debug_info(int, ...);
+void    debug_message(string, int default: F_CONST0);
+string  expand_define(string, null|string default: F_CONST0);
+void    garbage_collection(void|string, void|int);
+mixed  *get_error_file(string, int default: F_CONST1);
+int     get_eval_cost();
+#ifdef TRACE_CODE
+string *last_instructions(int, int default: F_CONST1);
+#endif
+mixed  *query_limits(int default: F_CONST0);
+string  query_load_average();
+mixed  *rusage();
+mixed   limited(closure, ...);
+void    set_limits(int|int*, ...);
+void    set_driver_hook(int, closure|int|string|mapping|string*);
+void    shutdown(int default: F_CONST0);
+int     trace(int);
+string  traceprefix(string|int);
+
+
+        /* Inventories (TODO: should be optional) */
+
+object *all_environment(void|null|object);
+object *all_inventory(object default: F_THIS_OBJECT);
+object *deep_inventory(void|object, void|int);
+object  environment(void|object|string);
+object  first_inventory(object|string default: F_THIS_OBJECT);
+object  next_inventory(object default: F_THIS_OBJECT);
+void    move_object(object|string, object|string);
+object  present(object|string, void|int|object, void|object);
+#ifdef USE_STRUCTS
+void    say(string|mixed *|object|mapping|struct, void|object|object *);
+#else
+void    say(string|mixed *|object|mapping, void|object|object *);
+#endif /* USE_STRUCTS */
+void    set_environment(object, null|object);
+#ifdef USE_STRUCTS
+void    tell_room(object|string, string|mixed *|object|mapping|struct, void|object *);
+#else
+void    tell_room(object|string, string|mixed *|object|mapping, void|object *);
+#endif /* USE_STRUCTS */
+
+
+        /* Verbs and Commands (TODO: should be optional) */
+
+void    add_action(string, string, void|int);
+int     command(string, void|object);
+mixed  *command_stack();
+int     command_stack_depth();
+void    disable_commands();
+void    enable_commands();
+mixed * match_command(string, object);
+int     execute_command(string, object, object);
+int     living(null|object);
+int     notify_fail(string|closure);
+mixed  *query_actions(object|string, int|object|string default: F_CONST1);
+string  query_command();
+mixed   query_notify_fail(int default: F_CONST0);
+string  query_verb(int default: F_CONST0);
+int     remove_action(int|string, object default: F_THIS_PLAYER);
+void    set_this_player(null|object);
+object  set_modify_command(null|object|string default: F_THIS_OBJECT);
+
+
+        /* uids and euids */
+
+void    export_uid(object);
+string  geteuid(object default: F_THIS_OBJECT);
+int     seteuid(string|null);
+string  getuid(object default: F_THIS_OBJECT);
+
+
+        /* Technical efuns */
+
+
+        /* Functions only used in compatibility mode.
+         * When running in native mode, both are invisible.
+         */
+
+string  creator F_GETUID (object);
+
+
+        /* --- Packages --- */
+
+#ifdef USE_ALISTS
+
+mixed   assoc(mixed, mixed *, mixed|void, mixed|void);
+mixed   insert_alist(mixed, mixed, ...);
+mixed  *intersect_alist(mixed *,mixed *);
+mixed  *order_alist(mixed *, void|mixed *, ...);
+
+#endif /* USE_ALISTS */
+
+
+#ifdef USE_MCCP
+
+mixed   query_mccp(object default: F_THIS_PLAYER);
+int    *query_mccp_stats(object default: F_THIS_PLAYER);
+int     start_mccp_compress(int);
+int     end_mccp_compress();
+
+#endif /* USE_MCCP */
+
+
+#ifdef USE_MYSQL
+
+int     db_affected_rows(int);
+string *db_coldefs(int);
+string  db_conv_string(string);
+int     db_close(int);
+int     db_connect(string, void|string, void|string);
+string  db_error(int);
+int     db_exec(int, string);
+mixed   db_fetch(int);
+int    *db_handles();
+int     db_insert_id(int);
+
+#endif /* USE_MYSQL */
+
+
+#ifdef USE_PGSQL
+
+int      pg_connect(string, string|closure, ...);
+string   pg_conv_string(string);
+int      pg_pending(object default: F_THIS_OBJECT);
+int      pg_query(string, void|int);
+void     pg_close();
+
+#endif /* USE_PGSQL */
+
+#ifdef USE_SQLITE
+
+int      sl_open(string);
+mixed    sl_exec(string, ...);
+int      sl_insert_id();
+void     sl_close();
+
+#endif /* USE_SQLITE */
+
+#ifdef USE_TLS
+
+int     tls_query_connection_state(object default: F_THIS_OBJECT);
+int    *tls_query_connection_info(object default: F_THIS_OBJECT);
+int     tls_init_connection(void|object, ...);
+void    tls_deinit_connection(object default: F_THIS_OBJECT);
+string  tls_error(int);
+int     tls_available();
+void    tls_refresh_certs();
+mixed  *tls_check_certificate(object, int default: F_CONST0);
+
+#ifdef HAS_OPENSSL
+string  hash(int, string|int *, void|int);
+string  hmac(int, string, string|int *);
+#endif
+
+#endif /* USE_TLS */
+
+/* The following functions are optional and can be configured out.
+ */
+
+        /* Arrays and Mappings */
+
+        /* Strings */
+
+#ifdef USE_PROCESS_STRING
+string  process_string(string);
+#endif
+
+        /* Objects */
+
+#ifdef USE_SET_LIGHT
+int     set_light(int);
+#endif
+
+#ifdef USE_SET_IS_WIZARD
+int     set_is_wizard(object, int default: F_CONST1);
+#endif
+
+
+        /* Obsolete and deprecated functions */
+
+#ifdef USE_DEPRECATED
+
+        /* Functions only used in compatibility mode.
+         */
+
+int     transfer(object, object|string) "replace by a simul-efun";
+
+#endif /* USE_DEPRECATED */
+
+
+/***************************************************************************/

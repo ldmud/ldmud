@@ -1,0 +1,37 @@
+SYNOPSIS
+        int net_connect(string host, int port)
+
+DESCRIPTION
+        Open a non-blocking TCP network connection to <host> and
+        <port>.  On success, the connection is bound to the current
+        object and the lfun logon() is called in the object.
+
+        Return 0 on success, and a Unix ERRNO on failure.
+
+        If the driver is configured to support IPv6, <host> is first
+        interpreted as IPv6 hostname. If that fails, <host> is then
+        interpretd as IPv4 hostname.
+
+        If the connection can't be established immediately, the efun
+        returns 'success' and the driver will check in the background
+        for the progress of the connection. When it is established,
+        logon() will be called in the object. If the connection fails,
+        logon(-1) will be called in the object.
+
+        The efun raises a privilege violation ("net_connect", host, port).
+
+BUGS
+        A non-blocking connect() doesn't imply a non-blocking
+        forward name resolution. If you provide a hostname instead
+        of an IP address to connect to, the driver will block until
+        the name is resolved. This may be an issue, depending on how
+        fast your nameserver replies. Non-blocking forward DNS
+        resolution can currently only be achieved using ERQ_LOOKUP.
+
+HISTORY
+        First version 1992 by Snake and LynX for Nemesis.
+        Improved 1993 by Junky.
+        Added to LDMud 3.2.10.
+
+SEE ALSO
+        logon(A)

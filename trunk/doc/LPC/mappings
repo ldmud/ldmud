@@ -1,0 +1,474 @@
+CONCEPT
+        mappings
+
+LAST UPDATE
+        Mon, 15 Mar 1999
+
+DESCRIPTION
+
+  A step-by-step introduction to mappings:
+  ----------------------------------------
+
+  1. What is a mapping?
+
+    A mapping is a datatype which allows to store data associated to a key.
+  In other languages  they are also  known  as 'dictionaries' or  'alists'.
+  There are also alists in LPC but they are not a separate datatype but are
+  implemented on  top of arrays.  Alists are  the predecessors of mappings.
+  The keys and the values  can be of  any type.  But most common  datatypes
+  for keys are strings, integers and objects.  Others like arrays, mappings
+  or closures aren't a good choice because comparision between i.e.  arrays
+  often returns false  even if they equal  in content.  This is because the
+  driver compares i.e. two arrays by their internal pointers and not by
+  their content. The reason for this is simple: speed.
+
+    Mappings  are allways  treated  as references    when passing  them  to
+  functions. This means when you pass a mapping  to another object and this
+  object modifies the mapping the modification will  take place in a global
+  scope - visible to all objects holding this mapping in a variable.
+
+
+  2. What are mappings good for?
+
+    The term 'dictionary'  probably describes the  use  of a mapping  best.
+  Opposed  to arrays mappings don't have  a specific  order. They provide a
+  mechanism to   create  a set  of associations  between  values.  Such  an
+  association consists of a unique  key and data  that is identified by the
+  key. Think of  a dictionary  where you have  a  word and a definition  of
+  it. You use the word to lookup its definition.
+
+    Mappings can be used i.e.  to hold  aliases for commands. The key would
+  then be the  name of  the alias and  the  data the command(s) behind   an
+  alias.  Or they can be used for  the exits of a  room.  The keys would be
+  the directions where one can go  to and the associated  data would be the
+  file names of the  rooms.  But mappings can  also be used  as a kind of a
+  sparse array.   A  sparse array is  an  array where most of  the elements
+  aren't used  (occupied by 0).  I.e.  if  you want to  store values at the
+  position 0, 13  and 37642 of an  array you would  have to create an array
+  with a size of at least 37643.  This  costs a lot  of memory so a mapping
+  would be  more useful because you would  then use the  numbers 0,  13 and
+  37642 as a key and not as an index to a position  (actually the keys of a
+  mapping are sometimes  called indices  but this  is just  because the way
+  data is accessed in a mapping is similar to  arrays: by the [] operator).
+  This also allows to  query all occupied   positions of a sparse array  by
+  querying for all  the keys of  the mapping opposed  to an array where you
+  have to iterate over all elements.
+
+
+  3. How do I create a mapping?
+
+    There are several ways to do so. The most convenient is the following:
+
+      mapping map;
+      map = ([ key0: value00; ...; value0n,
+               ... : ...    ; ...; ...    ,
+               keyn: valuen0; ...; valuenn ]);
+
+    As you can see, a key may  have more than  one value assigned.  But the
+  amount of values per key must always be equal.  It  is  even  possible to
+  have mappings without any values!
+    Another  method is  to use the   efun mkmapping().  This  efun gets two
+  arguments with the first beeing an array of keys and the following beeing
+  arrays of values:
+
+      mapping map;
+      map = mkmapping (({ key0   , ..., keyn    }),
+                       ({ value00, ..., value0n }),
+                       ({ ...    , ..., ...     }),
+                       ({ valuen0, ..., valuenn }));
+
+    If the efun only gets one argument, then this argument will be taken as
+  an array of keys and a mapping  without values will  be returned.
+
+    An empty mapping can be created by using the above described methods by
+  simply ommitting the keys and values:
+
+      mapping map;
+      map = ([]);
+  or:
+      map = mkmapping(({}), ({}));
+
+    Or  by  using the efun   m_allocate().  This efun gets  as  first
+  argument the  amount  of keys which will  be  added soon and  an optional
+  second argument specifying the width of the mapping:
+
+      map = m_allocate(n, width);
+
+    The value <n>  may be a bit  confusing  since mappings shrink and  grow
+  dynamically. This value just tells the driver how 'long' this  mapping is
+  going to be  so proper memory  allocations  will be  performed to  reduce
+  the overhead of memory reallocation.  I.e.  if you want to read in a file
+  and store the  read data in  a mapping  you probably  know  the amount of
+  keys.  So you allocate  a mapping with this  efun and tell the driver how
+  much memory should  be allocated  by specifing  a proper <n>  value.
+  Thus causing  a    speedup when adding  the  read   data to the   mapping
+  afterwards.    The <width> just specifies how   many  values per key this
+  mapping is   going to have. If  no  width is given, 1  will  be  taken as
+  default.
+
+  An empty mapping created with '([])' will always have a width of 1. To
+  create empty mappings with other widths, write it as
+
+      map = ([:width ]);
+
+  <width> can be any expression returning an integer value (including
+  function calls), and in fact this notation is just a fancy way of
+  writing
+
+      map = m_allocate(0, width);
+
+
+
+  4. How can I modify the data of a mapping?
+
+    Adding a  new key is similiar to   modifying the associated  data of an
+  existing key:
+
+      map += ([ key: value0; ...; valuen ]);
+
+    Or in case only a single value should be modified:
+
+      map[key, n] = valuen;
+
+    If  <n> is out of  range or if <key> doesn't  exists and <n> is greater
+  than 0 an "Illegal index" error will be reported. If <n> is equal to 0 or
+  the mapping only has a single value per key one can abbreviate it with:
+
+      map[key] = value;
+
+    If there is no <key> (and <n> is equal to 0 or  not specified at all) a
+  new one will be added automatically.
+
+    Deletion   of a key    is  done with    the  -=  operator or  the  efun
+  m_delete(). A mapping can only be substracted by one without any values:
+
+      map -= ([ key ]);
+  or:
+      map -= ([ key0, ..., keyn ]);
+
+  The efun takes a mapping as first and a key as second argument:
+
+      m_delete(map, key);
+
+    The  efun   m_delete() returns  the mapping   but because  mappings are
+  handled as references there is no need of an assignment like:
+
+      map = m_delete(map, key);
+
+
+  5. How can I access the data stored in a mapping?
+
+    This can be done by:
+
+      valuen = map[key, n];
+
+    Or in case of a mapping with just one value per key:
+
+      value0 = map[key];
+
+    If there is no  <key> in the mapping  and <n> is  0 or not specified at
+  all (which is the same) a 0 will be returned or if <n>  is greater than 0
+  an "Illegal index" error will be reported.
+
+
+  6. How can I test for the existance of a key?
+
+    A  return value of 0 is  sufficient for most applications but sometimes
+  the ambiguity  between an existing value of  0 and  a nonexisting key can
+  lead   to  a  problem.  Therefore   one  can use   the  efun member()  or
+  mapping_contains() to check if there actually is a key in the mapping:
+
+      if (member(map, key)) {
+        ...
+      }
+  or:
+      if (mapping_contains(&value0, ..., &valuen, map, key)) {
+        ...
+      }
+
+    This also shows how  one can retrieve all values   associated to a  key
+  from a mapping in a single step. The '&' is  the reference operator which
+  is neccesary to let the efun store the values in the variables.
+
+    In case   of  mappings   with   no  values,   the  efun   member()  and
+  mapping_contains() are equal in their behaviour  and their way of calling
+  because mapping_contains() won't get any reference variables to store the
+  values in (obviously, because there aren't any).
+
+     Also normally member() is known to return the postion of an element in
+  a list (i.e.  a  character in a  string or data   in an array) and if  an
+  element couldn't be  found -1 is returned.   But in the case  of mappings
+  there are no such things as order and postion. So member() only returns 0
+  or 1.
+
+
+  7. How can I copy a mapping?
+
+    A  mapping can  be  copied   with  the  +  operator   or by the    efun
+  copy_mapping():
+
+      newmap = ([]) + map;
+  or:
+      newmap = copy_mapping(map);
+
+    A mapping should only be copied when it is neccesary to get an own copy
+  of it that  must not be  shared by other objects.
+
+
+  8. How can I get all keys of a mapping?
+
+    The  efun m_indices() gets a mapping  as argument  and returns an array
+  holding all keys defined in this mapping:
+
+      keys = m_indices(map);
+
+
+  9. How can I get all the values of a mapping?
+
+    The efun m_values() gets  a mapping as  argument  and returns  an array
+  holding all the first (second, ...) values of it.
+
+      values0 = m_values(map);     returns the first values
+      values0 = m_values(map, 0);  dito
+      values1 = m_values(map, 1);  returns the second values
+        etc
+
+
+  10. How can I determine the size of a mapping?
+
+    Because a mapping is a kind of rectangle it has two sizes: a length and
+  a width.  There are three different efuns  to query these values. The first
+  two are the  efuns sizeof(), which returns the  amount of key-value
+  associations (the length of  a mapping), and widthof(), which returns the
+  number of values per key (the width). The third is the efun get_type_info().
+  get_type_info() is meant  to be a function  to identify a datatype.   Its
+  return value is an  array of two  numerical values.  The first  specifies
+  the datatype   of the argument and   the second is a   datatype dependend
+  value. In the case of a mapping the first value  is T_MAPPING (which is a
+  value defined in  <lpctypes.h>) and the  second the amount of values  per
+  key (a.k.a.  columns or the width  of the mapping  - actually it would be
+  correct to say that the width of a mapping is the  amount of columns plus
+  one for the keys but this is uncommon).
+
+
+  11. What is the best method to iterate over a mapping?
+
+    First of all the main purpose of a mapping is not meant to  be a set of
+  data to iterate over. Afterall the keys in a mapping have no specific but
+  a random order (at least on the LPC side).  But  still it is possible and
+  sometimes even neccesary to do so.
+
+    If all key-value associations  should be processed  then one should use
+  walk_mapping().  If all keys of a mapping should be processed to create a
+  new mapping being a subset of the given one, then filter_mapping() should
+  be  used.  If all  keys  are going to  be  processed and  to create a new
+  mapping with the  same set of keys as  the given mapping, then one  would
+  use map_mapping().  But in the case of an  iteration that should/can stop
+  even if not all data is processed it is probably wise to iterate over the
+  mapping by first querying for the keys and then to iterate over them with
+  a for() or a while() loop and querying the values by 'hand'.
+
+    The efun walk_mapping() gets  a mapping as  first argument and the name
+  of a function  as second one. All the  following arguments are treated as
+  extras which  will  be  passed to the   function specified  with the  2nd
+  argument. Instead of a string for the name of a function a closure can be
+  used, too. Nothing will be returned:
+
+      ...
+      walk_mapping(map, "func", xarg0, ..., xargn);
+      ...
+
+      void func(mixed key, mixed value0, ..., mixed valuen,
+                mixed xarg0, ..., mixed xargn) {
+        ...
+      }
+
+    func() will be called for all key-value associations  and gets as first
+  argument the key.  The next arguments are the  values behind the key  and
+  are passed as references.  The  rest  of the  passed arguments are  those
+  specified as extras. Because the values are passed as references (opposed
+  to  copies) it is possible  to modify them  from  inside func() by simply
+  assigning new value to the variables <value0>, ..., <valuen>.
+
+    The efun filter_mapping() calls  a function for  each key in  a mapping
+  and creates a new mapping  which only contains key-value associations for
+  which the called function returned true (not  equal 0 that is). The first
+  argument is the mapping to iterate over and the second is a function name
+  given as a string or a closure:
+
+      ...
+      submap = filter_mapping(map, "func", xarg0, ..., xargn);
+      ...
+
+      int func(mixed key, mixed xarg0, ..., mixed xargn) {
+        ...
+      }
+
+    func() gets  as first argument the key  and the others are those passed
+  as extras to filter_mapping().
+
+    The efun map_mapping() gets a mapping as first argument and a string as
+  a function name (or again a closure) as  second argument.  Any additional
+  arguments are again used  as extras that will  be passed to the iteration
+  function. This efun returns a new mapping with the same keys as the given
+  one.  The values  returned by the function  that is invoked  for each key
+  will be used as the associated data behind each key of the new mapping:
+
+      ...
+      newmap = map_mapping(map, "func", xarg0, ..., xargn);
+      ...
+
+      mixed func(mixed key, mixed xarg0, ..., mixed xargn) {
+        ...
+      }
+
+    func() gets  as first argument the key  and the others are those passed
+  as extras to map_mapping().
+
+    Because a function can only return  a single value  (even when it is an
+  array) it restricts the use  of map_mapping() to  only allow creation  of
+  mappings with a single value per key.
+
+
+  12. Is it possible to join/intersect/cut mappings with another?
+
+    Joining mappings is only possible, if  they have the same width (amount
+  of values per key). One can use the + and += operator:
+
+      map = map1 + map2 + ... + mapn;
+      map += map1 + map2 + ... + mapn;
+
+    Intersection     of   two   mappings is    only      possible by  using
+  filter_mapping(). There is  no efun or operator  which features this. The
+  'easiest' way may be the following function:
+
+      mapping intersect_mapping(mapping map1, mapping map2) {
+        closure cl;
+
+        cl = lambda(({ 'key }), ({ #'member, map2, 'key }));
+        return filter_mapping(map1, cl, map2);
+      }
+
+    This function returns a  new mapping which   consists of all  key-value
+  associations   of  <map1>  for which  an  equal  key  could   be found in
+  <map2>. This function uses  a closure which returns 0  or 1  depending on
+  wether a key from <map1> is contained in <map2> or not.
+
+    Cutting out  all key-value associations of a   mapping for which  a key
+  could be  found in another mapping  can  be done  by using  the  - and -=
+  operator:
+
+      mapping cut_mapping(mapping map1, mapping map2) {
+        return map1 - mkmapping(m_indices(map2));
+      }
+
+    Because a maping can  only be substracted by one  without any values we
+  first have to create such by using m_indices() and mkmapping().
+
+
+  13. What are those mappings without any values (besides keys) good for?
+
+    Because the way how the driver  searches for a  key in a mapping is
+  rather fast, those mappings can be used as a  set of elements with a fast
+  method for testing if an element is  contained in the set. This technique
+  is called hashing (further  explanation   would lead  too far)  which  is
+  faster  than searching for  values  in array  (which  is done in a linear
+  fashion).
+
+    Another (maybe  more pratical) use  of these  mappings  are to create a
+  array of unique values out of an array with several equal values:
+
+      uniques = m_indices(mkmapping(array));
+
+    mkmapping() uses  <array> to  create  a mapping without any  values but
+  just keys. And  because a mapping can only  have unique keys all multiple
+  values in <array> are taken as one.  The call of m_indices() then returns
+  an  array  of  these  unique keys.  Actually we  only  make  use of those
+  mappings temporarily.
+
+
+  14. How can I convert an alist into a  mapping and vice versa?
+
+    There are no special efuns which handle such conversions. But it can be
+  done by the following functions:
+
+      mapping alist_to_mapping(mixed *alist) {
+        return apply(#'mkmapping, alist);
+      }
+
+    The efun apply() takes a closure and an array of values and passes each
+  element of the  array as an  argument  to the  closure. Because  an alist
+  consists of an array of arrays with the first beeing the list of keys and
+  the others the values associated to each key passing them as arguments to
+  the efun closure #'mkmapping via apply() causes the creation of a mapping
+  out of an alist.
+
+      mixed *mapping_to_alist(mapping map) {
+        mixed *alist;
+        symbol *vars;
+        string var;
+        closure cl;
+        int width;
+
+        width = get_type_info(map)[1];
+        alist = allocate(width + 1);
+        vars  = allocate(width + 2);
+        for (var = "a"; width; var[0]++, width--) {
+          alist[width] = ({});
+          vars[width]  = quote(var);
+        }
+        alist[0] = ({});
+        vars[0]  = 'key;
+        vars[<1] = 'alist;
+        cl = lambda(vars, ({ #'=, 'alist, ({ #'insert_alist }) + vars }));
+        walk_mapping(map, cl, &alist);
+        return alist;
+      }
+
+    This function is  a bit more  complicated  than the other  and detailed
+  description would lead   too far of   the topic.  This  function has  one
+  restriction:  it can only turn a  mappings with up to  26  values per key
+  into an  alist.    But  this  should  be   sufficient for probably    all
+  applications which use mappings.
+
+  And Hyps further comment on this:
+        The function mapping_to_alist() is also not that
+        clever because insert_alist() allways creates a new
+        alist.  A second (optional) argument to m_values() to
+        specify the value column would be better. Besides
+        this, the conversion of a mapping into an alist could
+        be done by to_array().
+
+  15. Dirty Mappings
+
+  'Dirty mappings' are nothing the LPC programmer directly is involved
+  with, however, as it relates to the way mappings are implemented
+  internally by the gamedriver. However, as this term shows up in
+  various driver statistics, it is explained here.
+
+  There are two fundamental approaches to implement mappings:
+
+    1. Store all data entries in an array-like structure, in sorted order. 
+    2. Store all data in a hashtable, each entry allocaed separately.
+
+  Method 1 is very space efficient, as it doesn't need much overhead
+  per entry; however, insertions and deletions of entries are
+  relatively slow as all other entries need to be moved.     
+  Method 2 is very fast as nothing needs to be moved in memory,
+  however it has a large overhead.
+
+  The gamedriver uses a hybrid method: at the basis is a mapping
+  implementation based on arrays. However the driver uses a hash table
+  in addition to handle all the ongoing insertions and deletions.
+  Every once in a while, the contents of the hash table are sorted
+  into the base array, reasoning that any entry surviving for longer
+  time in the hash table is worth keeping in a more space-efficient
+  manner. 'Dirty' mappings are such mappings with both an array and a
+  hash part, 'clean' mappings are those with just an array part.
+
+HISTORY
+        The ([:width ]) notation was added in LDMud 3.2.9/3.3.208 .
+
+SEE ALSO
+        alists(LPC), closures(LPC), structs(LPC), mkmapping(E),
+        walk_mapping(E)

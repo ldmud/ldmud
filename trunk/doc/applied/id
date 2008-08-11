@@ -1,0 +1,16 @@
+SYNOPSIS
+        int id(string str)
+
+DESCRIPTION
+        Let the object identify itself. If str matches an id of the
+        current object then return a none zero value.
+
+        This lfun is applied for the efun present().
+
+EXAMPLE
+        int id(string str) {
+           return "sword" == str || "sword of fire" == str;
+        }
+
+SEE ALSO
+        present(E)

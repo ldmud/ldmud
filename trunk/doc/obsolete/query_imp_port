@@ -1,0 +1,15 @@
+REMOVED EFUN
+SYNOPSIS
+        int query_imp_port(void)
+
+DESCRIPTION
+        Returns the port number that is used for the inter mud
+        protocol.
+
+HISTORY
+        LDMud 3.2.9 renamed this efun to query_udp_port(). This version
+        is available if the driver is compiled with USE_DEPRECATED.
+        Removed in LDMud 3.3.
+
+SEE ALSO
+        send_udp(E), receive_udp(M)

@@ -1,0 +1,281 @@
+The program was originally written by
+
+Lars Pensj|, April 1989 (lars@cd.chalmers.se (no longer valid)).
+
+Lars gives the following credit:
+
+  The regexp package was made by Henry Spencer.
+
+  The ed package was not done by me. See the file ed.c for information.
+
+  Bit manipulations was implemented by pell AT lysator DOT liu DOT se who also found
+  several bugs that had eluded me for months.
+
+  Valuable help and hints from: Mark Nagel, James Seidman, Moonchilde and more.
+
+  Roland Dunkerley III fixed for-loops, do-while and the operators ++ and --.
+
+  Sean T Barrett made smalloc DOT c.
+
+  Lennart Augustsson convinced me to implement a compiler for a virtual
+  stack machine DOT  He also implemented the built-in preprocessor.
+
+  John S DOT  Price found and fixed many bugs.
+
+  The shadow idea was "forwarded" to me by John S DOT  Price from Team Cthulhu
+  (Bill Burdick, Roy Riggs, Mitch Adler).
+
+  Michael Malone, Michael O'Reilly, Klaus Rennecke, J|rn Rennecke and
+  Germano Caronni found and fixed a large amount of bugs.
+
+  Petri Wessman fixed changes for SCO unix and AIX.
+
+ -----------------------------------------------------------------------------
+
+Joern Rennecke ( amylaar AT cs DOT tu-berlin DOT de ) gives this credit:
+
+  The non-corrupting indentation code for ed was written by Felix A DOT  Croes,
+  aka Dworkin (<felix AT dworkin DOT nl>) and originates from his DGD.
+
+  Mud-sprintf() is from Lynscar (Sean A Reith, <gusar AT uniwa DOT oz DOT au> and
+  was donated into the Public Domain.
+
+  The alist based mapping implementation was supplied by Dworkin.
+
+  The idea for query_actions and an implementation that has been partially used
+  is from Peter Eriksson (aka lpd) pen AT lysator DOT liu DOT se
+
+  The port to Amiga was done by Mateese ( Lars Duening )
+
+  The udp connectivity is from the CD driver, and was fitted in by deepthought.
+
+  Demos, Freaky, Hurl, Hyp, Mateese, Pepel and Jof did a lot of alpha
+  testing.
+
+  Reimer Behrends located a lot of bugs DOT  He also supplied a portable macro to
+  test numbers for having but a single bit set, a mergesort based
+  sort_array() and variadic function support.
+
+  get_object_actions() was supplied by herp.
+
+  Marcus Meissner found and fixed many bugs.
+
+  Carl White, Mark (ec179 AT city DOT ac DOT uk), Archimedes (Robert Fuller), Eric Blade,
+  Mitchell Brandsma, Sam Bobroff, Jim Cogbill, Ben Fennema,
+  Sorva (Ed Zielinski), Loke AT Wonderland (Solem), Claus S DOT  Jensen, Nils Magnus,
+  samo AT MorgenGrauen, Frobozz (Bryan Schuler), Sique AT Nightfall, APJ,
+  Deathknight, Tero Jyri Michael Pelander (tpeland AT utu DOT fi),
+  Willem van der Oord (willem AT marble DOT dcr DOT net), Hate AT MorgenGrauen,
+  Bob Farmer, Randor AT EoP, Trevor Phillips, Robert M DOT  Zigweid, Inspiral,
+  Brian Gerst, Rasmus H DOT  Hansen, Demodian (John Kurtz), William J DOT  Burton,
+  Patrick Li, Niilo Paasivirta, Frank Stolze, Penelope AT Avalon,
+  Nathan AT Unholy Lands, mubo AT SiliconDream, Sunblood AT Tubmud, Alfe AT Tubmud,
+  Tatu Saloranta, Chameloid AT Tubmud and Martin Brenner (deepthought) reported bugs.
+
+  Foslay did the OS/2 port.
+
+  Ray Gilbert originally did the MSDOS port, which was modified later by
+  Rasmus Hellbug Hansen.
+
+  Marcus Meissner contributed regreplace().
+
+  Slider AT Tubmud supplied GnuWin32 patches.
+
+ -----------------------------------------------------------------------------
+
+Lars Duening thanks:
+
+ - Dana Durkee and the magnificient Wessex for enhancing my life.
+ - the citizens of One Step Beyond, PK-Mud and UNItopia for enduring my
+     driver experiments.
+ - Malcom Tester (malcom DOT tester AT comcast DOT net) for providing me with access to
+     a Solaris system for testing.
+ - Elric (elric AT lpmud DOT com) for providing me with access to
+     a FreeBSD system for testing.
+ - Blackcat (?) for providing me with access to a Linux system for testing.
+ - Freaky for providing me with access to an Irix system for testing, numerous
+     bug reports, and lots of patience when new versions crashed even faster
+     than the old ones.
+ - Kees Leune for providing me with access to a Linux/Sparc system for
+     testing.
+ - Stefan Petri and contributors for the extensive documentation of the
+     Amylaar driver (see also doc/README).
+ - the MudOS programmers for the efun terminal_colour() and Michael Schaefer
+     for adapting it for LDMud.
+ - Martin Brenner: initial multi-port implementation, inetd compatibility
+     code.
+ - Brian Gerst (bgerst AT quark DOT vpplus DOT com) for the xerq daemon.
+ - Reinhard Pfau (Reinhard DOT Pfau AT unix-ag DOT org, Mubo AT SiliconDream) brought
+     the autoconf mechanism up to date.
+ - Ron Koerner (ron DOT koerner AT gmx DOT de, Righ AT FinalFrontier) provided the
+     initial implementation of inline closures modelled after MudOS' syntax.
+ - Uwe (uwe AT 6bone DOT informatik DOT uni-leipzig DOT de) provided the basic IPv6 support.
+ - Mark Daniel Reidel (Karm AT Nightfall) did the first implementation of
+     the mySQL efuns.
+ - Dennis VanHoey (devanhoe AT usol DOT com) did the compiling and testing for the
+     Darwin port.
+ - Bart van Driessche (bart AT multi DOT franken DOT de, Hunter AT FinalFrontier) did the
+     new OS/2 port.
+ - Menaures added the tab character conversion to the editor, and gleefully
+     found new ways to crash the driver.
+ - Adam Helps donated the LPC implementation of the A* pathfinding algorithm.
+ - Christian Welzel adapted ptmalloc (a threadsafe variant of Doug Lea's
+     allocator) for LDMud and extended it to support garbage collection.
+ - for bug reports, critics, fixes, patches and other support:
+     Adam Helps (ahelps AT cs DOT byu DOT edu, acius AT simud DOT org)
+     Alex AT TubMud (at16 AT st-andrews DOT ac DOT uk)
+     Alexander Fetke (alfebtcd AT cs DOT tu-berlin DOT de, Alfe AT Tubmud)
+     Alexander Dobrinescu (ad AT artifacts DOT de, Lev AT FinalFrontier)
+     Anders Strandloev Elkjaer (ase AT cs DOT auc DOT dk)
+     Andre Meiske (guandalug AT magellan DOT tat DOT physik DOT uni-tuebingen DOT de)
+     Andreas Grammlich (andreas DOT grammlich AT prepress DOT de, Gum AT Wunderland)
+     Andre Grosse (ag17 AT irz DOT inf DOT tu-dresden DOT de, Patryn AT Morgengrauen)
+     Andreas Fischer (andreas DOT fischer AT physik DOT tu-chemnitz DOT de)
+     Andreas Klauer (menaures AT metamorpher DOT de, Menaures AT Unitopia)
+     Andreas Weller (aw6 AT informatik DOT uni-ulm DOT de, Zwirch AT Carledon)
+     Andres Cvitkovich (ac AT twig DOT mond DOT at, ac AT zwerg DOT at, Woody AT Silberland)
+     Andrew Weisz (elarke01 AT snet DOT net)
+     Andy Zeneski (jaz AT zsolv DOT com)
+     Arne  AT  Elridion
+     Athanasia Steele (azurite AT mail1 DOT nai DOT net)
+     Baba AT Avalon
+     Bastian Hoyer (hoyer AT wisc DOT de, dafire AT dafire DOT de)
+     Ben Fennema (bfennema AT ix DOT netcom DOT com)
+     Bertram Felgenhauer (bf3 AT irz DOT inf DOT uni-dresden DOT de, Fuchur AT Wunderland)
+     Bill Andrulonis (bill DOT andrulonis AT citrix DOT com, Bofin AT Realmsmud)
+     Billy Pembroke (wpem AT comcast DOT net)
+     Blackcat AT PK-Mud (amuelle1 AT htwm DOT de)
+     Brandon (pothole AT darkspyre DOT quad DOT net)
+     Brandon Mathis (brandon DOT mathis AT medsolutions DOT com)
+     Bruce Mitchell (mitchell AT manly DOT delconet DOT com, Klahn AT Manly Mud)
+     Carlo von Loesch (cvl AT symlynX DOT com, lynx AT high DOT impact DOT pages DOT de)
+     Carsten Pluntke (su0289 AT studserver DOT uni-dortmund DOT de, Vejar AT ForgottenDreams)
+     Casey Zacek (cz AT netspire DOT net, zippo AT eotl)
+     Chris Bender (chris DOT bender AT attbi DOT com)
+     Christian "Leonidas" Becker (cbecker AT informatik DOT hu-berlin DOT de)
+     Christian Fiedler (fido2 AT gmx DOT net)
+     Christian Kirschbaum (chrissy AT cs DOT tu-berlin DOT de, Chameloid AT Tubmud)
+     Christian Mudra (c_mudra AT informatik DOT uni-kl DOT de, Coogan AT Tubmud)
+     Christian Welzel (gawain AT wh9 DOT tu-dresden DOT de, Sir_Gawain AT camlann DOT de,
+        Gawain AT Regenbogen)
+     Craig Venz (Craig Venz AT citrix DOT com, Kilan AT Realmsmud)
+     croft AT UNItopia DOT rus DOT uni-stuttgart DOT de
+     Collin Baillie (sanac AT optushome DOT com DOT au)
+     Dale "Elric" Perkins (dale_perkins AT mac DOT com, dale AT lpmud DOT com)
+     Daniel von Dincklage (daniel AT ozet DOT de, Sunblade AT SiliconDream),
+     Daniel Fischer (dfischer AT gmx DOT de, Dan AT Gueldenland)
+     Daniel Sloan (sloand AT alphalink DOT com DOT au)
+     Daryth Kendrickson (stavros AT deadofnight DOT com)
+     David Gibbs (ishara AT btinternet DOT com)
+     David 'Greyelk' Gibby (oop_apprentice AT yahoo DOT com)
+     Dennis VanHoey (dvanhoe AT usol DOT com)
+     Derek Baron (dbaron_ks AT hotmail DOT com)
+     Dominik Zanettin (zhan AT opossum DOT htu DOT tuwien DOT ac DOT at, Zhan AT Beutelland)
+     Edward S DOT  Marshall (esm AT logic DOT net)
+     Enrico Bauermeister (ebauermeister AT t-online DOT de, Enrico AT FinalFrontier)
+     Eivind (ekj AT ekj DOT vestdata DOT no)
+     Erik Meusel (emeusel AT prinz-atm DOT CS DOT Uni-Magdeburg DOT De)
+     Fantom (Fantom AT Tharsis-Gate DOT org)
+     Fini Jastrow (Fiona AT Wunderland, ujastrow AT mail DOT desy DOT de)
+     Florian Heinz (ctx AT amail DOT dereference DOT de)
+     Frank Kirschner (freaky AT unitopia DOT uni-stuttgart DOT de)
+     Frank Stolze (fstolze AT iName DOT com)
+     Frank Syse (syseworks AT mac DOT com)
+     Gerhard Schmidt (estartu AT augusta DOT de)
+     Gimli AT Unitopa (gimli AT schlumpf DOT net)
+     "Gnomi" (gnomi AT UNItopia DOT rus DOT uni-stuttgart DOT de)
+     Gunnar Kreitz (gunnark AT chello DOT se)
+     Heiko Kopp (hkopp AT informatik DOT uni-rostock DOT de, bardioc AT bardioc DOT com,
+       Bardioc AT Evermore)
+     Henk Stokhorst (Tha AT wxs DOT nl)
+     Holger Kremss (jur94ewp AT studserv DOT uni-leipzig DOT de, Holger AT web DOT de,
+       Holger AT Wunderland)
+     Jaroslaw Sitek (aron AT bobas DOT nowytarg DOT pl)
+     Jason Hitt (jhitt25 AT swbell DOT net)
+     Jean-Stephane Jokeit (jokeit AT gmx DOT de, xtian AT avalon)
+     Joern Rennecke (amylaar AT cygnus DOT co DOT uk)
+     Jose Manuel Roman (roman AT wol DOT es, Theuzifan uzi AT simauria DOT upv DOT es)
+     Joseph Graham (randalar AT earthlink DOT net)
+     Josh Rollyson (jrollyson AT sosdg DOT org)
+     Juanjo Montiel
+     Juergen Weickert (Sissi AT UNItopia)
+     Karl N DOT  Matthias (karmat AT matthias DOT org)
+     Kathrin Paschen (paschen AT ira DOT uka DOT de)
+     Kees Leune (c DOT j DOT leune AT kub DOT nl)
+     Kent Chilson (kentiepoo AT hotmail DOT com)
+     Kirnan AT Avalon
+     Krystal-Anne Rubenstein (punkette AT hotmail DOT com)
+     Kirnan AT Avalon
+     Largo AT Wunderland (emeusel AT csmd DOT cs DOT uni-magdeburg DOT de)
+     Lasse Fuglsang Pedersen (volmer AT qeep DOT dk, Zordiac AT DeeperTrouble2)
+     Lee Salzman (lee DOT salzman AT lvdi DOT net)
+     Logic (logic AT logic DOT net)
+     "Mammi" (mammi AT unitopia DOT uni-stuttgart DOT de)
+     Manu Mäki (mtmaki AT pultti DOT turkuai DOT fi, Cendor AT Winterkill)
+     Mark Daniel Reidel (Karm AT Nightfall,
+       reidelm AT rbg DOT informatik DOT tu-darmstadt DOT de)
+     Markus Peter (warp AT spin DOT de, warp AT hip DOT spin DOT de)
+     Martin (mandragon AT morgengrauen)
+     Mat AT Maethos
+     Mats Carlberg (matca AT lysator DOT liu DOT se)
+     Matthew Julius (julius DOT 2 AT wright DOT edu)
+     Michael Fedrowitz (mfedrowi AT ix DOT urz DOT uni-heidelberg DOT de,
+       Michael_Fedrowiz AT gmx DOT net, Rhodry AT ForgottenDreams)
+     Michael Sporn (sporn AT mathematik DOT hu-berlin DOT de, sunblood AT tubmud)
+     Mike Conley (mpc AT sgi DOT net, Tamarindo AT Sovereign)
+     mudder AT Furtual DOT ORG
+     "Nathan AT Unholy Lands" (mud AT pc181 DOT iaee DOT tuwien DOT ac DOT at)
+     Neil McBride (neil AT castinian DOT org)
+     Nepomuck AT UNItopia
+     Nick Derewianka (nickd AT e-media DOT com DOT au)
+     Nico Ehemann (n DOT ehemann AT wzl DOT rwth-aachen DOT de)
+     Niels Boehm (bohmmrwc AT minet DOT uni-jena DOT de, Mariko AT Regenbogen)
+     Nuutti Kotivuori (naked AT iki DOT fi)
+     Oskar Linde (d98-oli AT nada DOT kth DOT se)
+     Parsec
+     Patrick May (patrick DOT may AT cedelgroup DOT com)
+     Paul Apgar (tiresius AT usa DOT net, tiresius AT Cosmos)
+     Philipp Hancke (fippo AT goodadvice DOT pages DOT de)
+     Rainer Doerntge (rainer DOT doerntge AT dlh DOT de)
+     Rajko Albrecht (ral AT alwins-word DOT de, Alwin AT Avalon)
+     Ralph (ralphi AT vkr DOT k-net DOT dk)
+     Ralph Zitz (RZ AT zitz DOT dk, Nostradamus AT OSB)
+     Reimer Behrends (Macbeth AT Tubmud)
+     Reinhard Pfau (reinhard AT netlab1 DOT hrz DOT uni-siegen DOT de, mubo AT SiliconDream),
+     Reinhard Vicinus (vicinus AT rhrk DOT uni-kl DOT de, Risky AT Unitopia)
+     "Remsgost" (remsgost AT blitzstrahl, radm AT remsnet DOT de)
+     Robb Townsend (meecham AT infonline DOT net)
+     Robert Forshaw (postmaster AT rbf DOT org DOT uk)
+     Robert Reither (mud AT klein DOT htu DOT tuwien DOT ac DOT at, Nathan AT Unholy DOT Lands)
+     Robert Treml (robert AT des DOT glaubst DOT net)
+     Rodney Quaye (sark AT oberon DOT krans DOT com)
+     Ron Dawson (rondawson AT syd DOT eastlink DOT ca, rdawson AT cgc DOT ns DOT ca, Caper AT PixieMud)
+     Sebastian Huss (huss AT informatik DOT hu-berlin DOT de, baba AT avalon)
+     Shinarae Lluminus AT Batmud (shinarae_lluminus AT hotmail DOT com)
+     Slava "DieHARD" Ignatjev (root AT impar DOT com, slava AT intersfera DOT lt)
+     Sieni (sampsa AT netsonic DOT fi)
+     Simon Fischer (firebat AT redcrown DOT de)
+     Stefan Budweiser (Stefan DOT Budweiser AT compaq DOT com)
+     Stefan Riemer (stefan DOT riemer AT bauing DOT uni-weimar DOT de, Peng AT FinalFrontier)
+     Stephan Lichtenhagen (stephan AT lichtenhagen DOT de, Tiamak AT Morgengrauen)
+     Steve Goucher (su2996 AT eclipse DOT co DOT uk)
+     Steve Willoughby (steve AT alchemy DOT com, Ragnarok)
+     Tatu P DOT  Saloranta (doomdark AT cc DOT hut DOT fi)
+     Terry Penn (terry AT simaril DOT net)
+     TheFinn (thefinn AT ar DOT com DOT au)
+     Thomas Feldmeier (tfeldmei AT student DOT informatik DOT uni-ulm DOT de, Zora AT Carledon,
+       zora AT alpha DOT universalware DOT de)
+     Thorsten Klose (Thorsten DOT Klose AT infineon DOT com, Avatar AT avalon)
+     Tiberian AT Unitopia
+     Tmm AT UNItopia? (Tmm AT gmx DOT de)
+     Tobias Josefowitz (tobij AT goodadvice DOT pages DOT de)
+     Tomas (Vandergnome AT aol DOT com)
+     Tomi Valkeinen (tomi DOT valkeinen AT taikatech DOT com, Tomba AT Batmud)
+     Tucita AT UNItopia
+     Urv (urv AT hispeed DOT ch)
+     Volker Behr (Sorcerer AT AbendDaemmerung, vrbehr AT cip DOT physik DOT uni-wuerzburg DOT de)
+     Wayne Woods (w DOT woods AT optusnet DOT com DOT au)
+     Willem van der Oort (willem AT dcr DOT net)
+     Wolf Dieter Dallinger (Pulami AT Unitopia, wolf DOT dieter AT dallinger DOT de)
+     Zonk AT FinalFrontier (zonk AT finalfrontier DOT mud DOT de, rueschi AT berit-broese DOT de)
+     The Wizards of Evermore

@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Settings for the OSB mudlib.
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/usr/home/osb --libexec=/usr/home/osb/erq --libdir=/usr/home/osb/mudlib --with-setting=osb $*
+exit 1
+
+# --- The actual settings ---
+
+with_max_local=50
+with_max_cost=1000000
+
+with_apply_cache_bits=14
+with_rxcache_table=4096
+
+enable_compat_mode=no
+enable_strict_euids=no
+
+enable_use_alists=yes
+enable_use_parse_command=no
+enable_share_variables=no
+enable_use_system_crypt=no
+enable_malloc_trace=yes
+enable_malloc_lpc_trace=yes
+
+enable_use_mysql=/usr/local/lib/mysql
+enable_use_pcre=yes
+enable_use_mccp=yes
+
+enable_erq=xerq
+

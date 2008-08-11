@@ -1,0 +1,18 @@
+REMOVED MASTER APPLY
+SYNOPSIS
+        string *define_include_dirs(void)
+
+DESCRIPTION
+        Return an array of string patterns giving the absolut paths
+        where to search an include file. The patterns have to have a
+        %s at the place where the name given in the #include statement
+        has to be inserted.
+
+EXAMPLE
+        define_include_dirs() { return ({ "sys/%s", "lib/%s" }); }
+
+HISTORY
+        Dropped in 3.2.1, replaced by H_INCLUDE_DIRS hook.
+
+SEE ALSO
+        master(M)

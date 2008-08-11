@@ -1,0 +1,24 @@
+SYNOPSIS
+        #include <sys/driver_hooks.h>
+
+        set_driver_hook(H_DEFAULT_PROMPT, value)
+
+        <value> being:
+
+          string <prompt>
+          string <closure>()
+
+DESCRIPTION
+        Optional hook for the command prompt. If this hook is not used,
+        the driver will use "> " as the command prompt.
+
+        The hook can be given as string or as closure. If it is a
+        closure, it is called with the commandgiver being the calling
+        object. If the result is a string, it will be printed,
+        otherwise ignored.
+
+HISTORY
+        Introduced in LDMud 3.3.163.
+
+SEE ALSO
+        hooks(C), print_prompt(H)

@@ -1,0 +1,15 @@
+PRELIMINARY
+SYNOPSIS
+        string tls_error(int errorno)
+
+DESCRIPTION
+        tls_error() returns a string describing the error behind the
+        error number errorno.
+
+HISTORY
+        Introduced in LDMud 3.3.474 and following, backported to 3.2.11.
+
+SEE ALSO
+        tls_init_connection(E), tls_deinit_connection(E), 
+        tls_query_connection_state(E), tls_query_connection_info(E),
+        tls_available(E), tls_check_certificate(E), tls_refresh_certs(E)

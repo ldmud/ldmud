@@ -1,0 +1,20 @@
+SYNOPSIS
+        int sizeof(mixed * val)
+        int sizeof(string  val)
+        int sizeof(mapping val)
+        int sizeof(struct xxx val)
+
+DESCRIPTION
+        Returns the number of elements of an array or struct, the number of
+        characters in a string, or the number of keys in a mapping.
+
+        As a special case, the number 0 can be passed, and the function
+        will return 0.
+
+HISTORY
+        LDMud 3.2.9 added strings to the possible parameters.
+        LDMud 3.3 added support for structs.
+
+SEE ALSO
+        strlen(E), allocate(E), pointerp(E), mappingp(E), m_allocate(E),
+        widthof(E)

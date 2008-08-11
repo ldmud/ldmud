@@ -1,0 +1,35 @@
+SYNOPSIS
+        #include <sys/tls.h>
+
+        string hmac(int method, string key, string arg )
+        string hmac(int method, string key, int *  arg )
+
+BESCHREIBUNG
+        Berechnet den Hashed Message Authenication Code fuer <arg>
+        nach Methode <method> und fuer das Password <key>.
+
+        <method> ist eine der TLS_HASH_-Konstanten in tls.h; nicht jede
+        beschriebene Methode ist in einem gegebenen Driver vorhanden:
+
+          TLS_HASH_SHA1      (1)
+          TLS_HASH_SHA224    (2)
+          TLS_HASH_SHA256    (3)
+          TLS_HASH_SHA384    (4)
+          TLS_HASH_SHA512    (5)
+          TLS_HASH_MD5       (6)
+          TLS_HASH_RIPEMD160 (7)
+
+        Diese Funktion ist nur verfuegbar wenn der Driver mit OpenSSL
+        compiliert wurde.
+
+BEISPIELE
+        string s;
+
+        s = hmac(TLS_HASH_SHA1, "secret", "Hello");
+        s = hmac(TLS_HASH_SHA1, "secret", ({ 'H', 'e', 'l', 'l', 'o' }) )
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.3.714
+
+SIEHE AUCH
+        crypt(E), md5(E), md5_crypt(E), sha1(E), hmac(E)

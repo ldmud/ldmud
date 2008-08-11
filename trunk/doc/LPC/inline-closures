@@ -1,0 +1,128 @@
+CONCEPT
+        inline closures
+
+SYNTAX
+        function <returntype> ( <arguments> ) : <context> { <code> }
+
+        (: <statements> ; <expr>, ... , <expr> :)
+
+
+DESCRIPTION
+        Inline closures are a way to program closures which are
+        compiled at the time an object is loaded, but can access
+        values from their enclosing function at runtime.
+
+        Example:
+
+          closure factory (int arg) {
+            return function int (int val) { return val * arg; };
+          }
+
+          closure f1 = factory(2);
+          closure f2 = factory(3);
+          funcall(f1, 3) -> will yield 6.
+          funcall(f2, 3) -> will yield 9.
+
+        The closure here 'inherits' the current value of the local
+        variable 'arg' at the time the closure is created. These
+        values are called the "context" of the closures - they are
+        stored in a special set of variables in the closure.
+
+        One specific feature of the closure context is that it can be
+        changed from within the closure, and that these changes remain
+        permanent:
+
+          closure factory (int arg) {
+            return function int (int val) { return val * arg++; };
+          }
+
+          closure f = factory(2);
+          funcall(f, 3) -> will yield 6.
+          funcall(f, 3) -> will now yield 9!
+
+        In addition to the implicite context inherited from the
+        defining function, additional context variables can be defined
+        in the closure:
+
+          closure factory (int arg) {
+            return function int (int val) : int x = 2 * arg
+                                          { return val * x; };
+          }
+
+          closure f = factory(2);
+          funcall(f, 3) -> will yield 12.
+
+        It is possible to define multiple context variables with and
+        without initialisation:
+
+          closure factory (int arg) {
+            return function int (int val) : int y, x = 2 * arg;
+                                            int z
+                                          { return val * x; };
+          }
+
+        These explicite context variables are useful when the closures
+        needs to keep a state, or to improve performance:
+
+          mapping m = ...;
+          closure slow (int arg) {
+            return function mixed () { return m[arg]; }
+          }
+          closure fast (int arg) {
+            return function mixed () : mixed val = m[arg] { return val; }
+          }
+
+        In the above example, the fast() function executes the lookup
+        m[arg] only once when the inline closure is created; the
+        slow() function on the other hand returns a closures which
+        looks up m[arg] every time it is called. A second effect is
+        that the results of the slow closure change when m changes;
+        the result of the fast closure is always the same.
+
+
+        In the definition of an inline closure, some elements are
+        optional:
+
+          <returntype>     defaults to 'mixed'
+          ( <arguments> )  defaults to '(mixed $1 ...  mixed $9)'
+          : <context>      no default
+
+
+        The special (: :) form is meant for simple expressions (and
+        MudOS compatibility). The form
+
+          (: <statements> ; <expr>, ..., <expr> :)
+
+        is the shorthand notation for
+
+          function { <statements>; return <expr>, ..., <expr>; }
+
+        For example the two statements
+
+          sort_array(arr, function { return $1 < $2; } )
+          sort_array(arr, (: $1 < $2 :) )
+
+        do the same. The example also demonstrates that both the <statements>
+        and the <expr> part in this form are optional.
+
+
+
+NOTES
+        The macro __LPC_INLINE_CLOSURES__ is defined when the
+        inline closures as described here are available. If not
+        defined, the driver implements a more restricted version
+        ('(: :)' syntax only, no context variables) for backwards
+        compatibility.
+
+        Inline closures are not to be confused with inline functions
+        known from other languages.
+
+HISTORY
+        LDMud 3.2.7 implemented the older, restricted form of inline
+        closures.
+        LDMud 3.3.271 implemented the full form of inline closures.
+        LDMud 3.3.275 re-allowed statements in the (: :) form.
+
+SEE ALSO
+        closures-abstract(LPC), closures-example(LPC), closure_guide(LPC)
+        closures(LPC)

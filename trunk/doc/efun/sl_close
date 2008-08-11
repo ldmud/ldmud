@@ -1,0 +1,16 @@
+OPTIONAL
+SYNOPSIS
+        void sl_close()
+
+DESCRIPTION
+        Closes the SQLite database that is associated with the
+        current object.
+
+        The function is available only if the driver is compiled with
+        SQLite support. In that case, __SQLITE__ is defined.
+
+HISTORY
+        Added in LDMud 3.3.713.
+
+SEE ALSO
+        sl_open(E), sl_exec(E), sl_insert_id(E)

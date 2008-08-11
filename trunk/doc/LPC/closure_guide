@@ -1,0 +1,730 @@
+Closure Guide for LPC
+
+Table of Contents
+
+        1 Indroduction, Overview and Efun-Closures
+
+        2 Lfun-, Inline and Lambda-Closures
+        2.1 Lfun-Closures
+        2.2 Inline-Closures
+        2.3 Lambda-Closures
+        2.3.1 Advantages of Lambda-Closures
+        2.3.2 Free Variables in Lambda-Closure Constructs
+        2.3.3 Special Efun-Closures and Operator-Closures for Lambdas
+        2.4 Closures with Strange Names
+        2.5 Operator-Closures
+        2.6 Variable-Closures
+
+        3 Examples
+        3.1 Lfun-Closure
+        3.2 Lambda-Closure
+
+1 Introduction, Overview and Efun-Closures
+
+  A closure is a pointer to a function. That means that it is data like an
+  int or a string are. It may be assigned to a variable or given to anoth-
+  er function as argument.
+
+  To create a closure that points to an efun like write() you can write
+  the name of the efun prepended with "hash-tick": #'. #'write is a clo-
+  sure that points to the efun write().
+
+  I very often put parentheses around such a closure-notation because
+  otherwise my editor gets confused by the hashmark: (#'write). This is
+  especially of interest within lambda-closures (see below).
+
+  A closure can be evaluated (which means that the function it points to
+  is called) using the efuns funcall() or apply(), which also allow to
+  give arguments to the function. Example:
+
+    funcall(#'write,"hello");
+
+  This will result in the same as write("hello"); alone. The string
+  "hello" is given as first (and only) argument to the function the clo-
+  sure #'write points to.
+
+  The return value of the function the closure points to is returned by
+  the efun funcall() or apply(). (Since write() always returns 0 the re-
+  turn value of the example above will be 0.)
+
+  What are closures good for? With closures you can make much more univer-
+  sally usable functions. A good example is the function filter().
+  It gets an array and a closure as arguments. Then it calls the function
+  the closure points to for each element of the array:
+
+    filter(({ "bla","foo","bar" }),#'write);
+
+  This will call write("bla"), write("foo") and write("bar") in any order;
+  the order is undefined.
+  (In the current implementation the given closure is evaluated for all
+  elements from the first to the last, so the output will be "blafoobar".)
+
+  Furthermore the efun filter() examines the return value of each
+  call of the function the closure points to (the return value of the
+  write()s). If the value is true (not 0) then this element is put into
+  another array which filter() builds up. If the return value is
+  false (== 0) then this element is _not_ put into this array. When all
+  calls are done the slowly built up array is returned. Thus,
+  filter() filters from the given array all elements that the given
+  closure evaluates "true" for and returns an array of those. (The array
+  given to filter() itself is _not_ changed!)
+
+  A more sensical example for filterwould be this:
+
+    x = filter(users(),#'query_is_wizard);
+
+  users() is an efun that gets no arguments and returns an array of all
+  logged in players (wizards and players). query_is_wizard() is a
+  simul_efun that gets an object as first (and only) argument and returns
+  true (1) if this object is a wizard and 0 otherwise.
+
+  So, for each element of the array returned by users() the function
+  query_is_wizard() is called and only those for which 1 was returned are
+  collected into the result and then put into the variable x.
+
+  We now have all logged in wizards stored as array in the variable x.
+
+  Another example: We want to filter out all numbers that are greater than
+  42 from the array a of integers:
+
+    x = filter(({ 10,50,30,70 }),#'>,42);
+
+  (x will now be ({ 50,70 }).)
+
+  Here two things are new: first: we create a closure that points to an
+  operator; second: we use the possibility to give extra arguments to
+  filter().
+
+  Like all efuns the usual operators can be pointed to with a closure by
+  prepending #' to them. funcall(#'>,4,5) is exactly the same as (4>5).
+
+  The extra arguments given as third to last argument (as many as you
+  like) to filter() are given as second to last argument to the
+  function pointed to by the closure each time it is called.
+
+  Thus we now call (({ 10,50,30,70 })[0]>42), (({ 10,50,30,70 })[1]>42) ...
+  (which is (10>42), (50>42) ...) and return an array of all elements this
+  returns true for and store it into x.
+
+  If you want to create a closure to an efun of which you have the name
+  stored in a string you can create such an efun-closure with the efun
+  symbol_function():
+
+    symbol_function("write") // this will return #'write
+
+    funcall(symbol_function("write"),"foobar");  // == write("foobar");
+
+  This function does not very often occur in normal code but it is very
+  useful for tool-programming (eg the robe uses symbol_function() to allow
+  you call any efun you give).
+
+2 Lfun- and Lambda-Closures
+
+  Very often the possibilities closures to efuns offer are not sufficient
+  for the purpose one has. In nearly all cases three possibilities exist in
+  such cases: use an lfun- or inline-closure, or a lambda-closure.
+
+2.1 Lfun-Closures
+
+    The first possibility is rather easy: like with the efun-closures you
+    can create a pointer to a function in the same object you are by using
+    the #' to prepend it to a function name of a function declared above.
+    Example:
+
+      status foo(int x) {
+        return ((x*2) > 42);
+      }
+
+      int *bar() {
+        return filter(({ 10,50,30,70 }),#'foo);
+      }
+
+    Thus, #'foo is used like there was an efun of this name and doing the
+    job that is done in foo().
+
+2.2 Inline Closure
+
+    Inline closures are a variant of lfun closures, the difference being
+    that the function text is written right where the closure is used,
+    enclosed in a pair of '(:' and ':)'. The compiler will then take care
+    of creating a proper lfun and lfun-closure. The arguments passed to
+    such an inline closure are accessible by position: $1 would be the
+    first argument, $2 the second, and so on. With this, the
+    above example would read:
+
+      int * bar() {
+        return filter(({ 10,50,30,70 }), (: ($1 * 2) > 42 :));
+      }
+
+    or alternatively:
+
+      int * bar() {
+        return filter(({ 10,50,30,70 }), (: return ($1 * 2) > 42; :));
+      }
+
+    The difference between the two versions is that in the first form the text
+    of the inline closure must be an expression only, whereas in the second
+    form any legal statement is allowed. The compiler distinguishes the two
+    forms by the last character before the ':)': if it's a ';' or '}', the
+    compiler treats the closure as statement(s), otherwise as expression.
+
+    Inline closures may also nested, so that the following (not very useful)
+    example is legal, too:
+
+      return filter( ({ 10, 50, 30, 70 })
+                         , (: string *s;
+                              s = map(users(), (: $1->query_name() :));
+                              return s[random(sizeof(s))] + ($1 * 2);
+                            :));
+
+    The notation of inline closures is modelled after the MudOS functionals,
+    but there are a few important differences in behaviour.
+
+
+2.3 Lambda-Closures
+
+    Lambda-Closures take the idea of 'define it where you use it' one step
+    further. On first glance they may look like inline closures with an uglier
+    notation, but they offer a few increased possibilities. But first things
+    first.
+
+    The efun lambda() creates a function temporarily and returns a closure
+    pointing to this function. lambda() therefor gets two arrays as
+    arguments, the first is a list of all arguments the function shall expect
+    and the second array is the code of the function (in a more or less
+    complicated form; at least not in C- or LPC-syntax). The closure #'foo
+    from the example above could be notated as lambda-closure:
+
+      lambda(({ 'x }),({ (#'>),
+                         ({ (#'*),'x,2 }),
+                         42
+                      }))
+
+    Now, the first argument is ({ 'x }), an array of all arguments the
+    function shall expect: 1 argument (called 'x) is expected. Notice the
+    strange notation for this argument with one single leading tick. Like
+    The hash-tick to denote closures the leading tick is used to denote
+    things called "symbols". They do not differ much from strings and if
+    you do not want to have a deeper look into closures you can leave it
+    this way.
+
+    The second argument is an array. The first element of such an array
+    must be an efun- or an lfun-closure, the further elements are the
+    arguments for the function this closure points to. If such an argu-
+    ment is an array, it is treated alike; the first element must be a
+    closure and the remaining elements are arguments (which of course
+    also might be arrays ...).
+
+    This leads to a problem: sometimes you want to give an array as an
+    argument to a function. But arrays in an array given to lambda() are
+    interpreted as code-arrays. To allow you to give an array as an argu-
+    ment within an array given to lambda(), you can use the function
+    quote() to make your array to a quoted array (a quoted array is for
+    an array what a symbol is for a string):
+
+      lambda(0,({ (#'sizeof),
+                  quote(({ 10,50,30,70 }))
+               }))
+
+    For array constants, you can also use a single quote to the same
+    effect:
+
+      lambda(0,({ (#'sizeof),
+                  '({ 10,50,30,70 })
+               }))
+
+    This lambda-closure points to a function that will return 4 (it will
+    call sizeof() for the array ({ 10,50,30,70 })). Another thing: if
+    we want to create a function that expects no arguments, we can give
+    an empty array as first argument to lambda() but we can give 0 as
+    well to attain this. This is just an abbreviation.
+
+    Lambda-closure constructs can become quite large and hard to read. The
+    larger they become the harder the code is to read and you should avoid
+    extreme cases. Very often the possibility to use an lfun or an inline
+    instead of a large lambda shortens the code dramatically. Example:
+
+      status foo(object o) {
+        return environment(o)->query_level()>WL_APPRENTICE;
+      }
+
+      x=filter(a,#'foo);
+
+    does the same as
+
+      x=filter(a,lambda(({ 'o }),
+                              ({ (#'>),
+                                 ({ (#'call_other),
+                                    ({ (#'environment),'o }),
+                                    "query_level"
+                                 }),
+                                 WL_APPRENTICE
+                              })));
+
+    (Note that the syntax with the arrow "->" for call_other()s cannot be
+    used, #'-> does not exist. You have to use #'call_other for this and
+    give the name of the lfun to be called as a string.)
+
+    This example also demonstrates the two disadvantages of lambda closures.
+    First, they are very difficult to read, even for a simple example like
+    this. Second, the lambda closure is re-created everytime the
+    filter() is executed, even though the created code is always the
+    same.
+
+    'Why use lambdas at all then?' you may ask now. Well, read on.
+
+
+2.3.1 Advantages of Lambda Closures
+
+    The advantages of lambdas stem from the fact that they are created
+    at runtime from normal arrays.
+
+    This means that the behaviour of a lambda can be made dependant on data
+    available only at runtime. For example:
+
+      closure c;
+      c = lambda(0, ({#'-, ({ #'time }), time() }) );
+
+    Whenever you now call this closure ('funcall(c)') it will return the
+    elapsed time since the closure was created.
+
+    The second advantage of lambdas is that the arrays from which they
+    are compiled can be constructed at runtime. Imagine a customizable prompt
+    which can be configured to display the time, the environment, or both:
+
+      mixed code;
+
+      code = ({ "> " });
+      if (user_wants_time)
+        code = ({ #'+, ({ #'ctime }), code });
+      if (user_wants_environment)
+        code = ({ #'+, ({#'to_string, ({#'environment, ({#'this_player }) }) })
+                     , code });
+      set_prompt(lambda(0, code));
+
+
+2.3.2 Free Variables in Lambda-Closure Constructs
+
+      You can use local variables in lambda constructs without declaring
+      them, just use them. The only limitation is that you at first have
+      to assign something to them. Give them as symbols like you do with
+      the arguments. This feature does not make much sense without the use
+      of complexer flow controlling features described below.
+
+      The closure #'= is used to assign a value to something (like the
+      LPC-operator = is).
+
+2.3.3 Special Efun-Closures and Operator-Closures for Lambdas
+
+      There are some special closures that are supposed to be used only
+      within a lambda construct. With them you can create nearly all code
+      you can with regular LPC-code like loops and conditions.
+
+      #'? acts like the "if" statement in LPC. The first argument is the
+          condition, the second is the code to be executed if the condition
+          returns true. The following arguments can also be such couples of
+          code-arrays that state a condition and a possible result. If at
+          the end there is a single argument, it is used as the else-case
+          if no condition returned true.
+
+          lambda(({ 'x }),({ (#'?),             // if
+                             ({ (#'>),'x,5 }),  //    (x > 5)
+                             ({ (#'*),'x,2 }),  //       result is x * 2;
+                             ({ (#'<),'x,-5 }), // else if (x < -5)
+                             ({ (#'/),'x,2 }),  //    result is x/2;
+                             'x                 // else result is x;
+                          }))
+
+      #'?! is like the #'? but it negates all conditions after evaluation
+           and thus is like an ifnot in LPC (if there were one).
+
+      #', (which looks a bit strange) is the equivalent of the comma-operator
+          in LPC and says: evaluate all arguments and return the value of
+          the last. It is used to do several things inside a lambda-closure.
+
+          lambda(({ 'x }),({ (#',),  // two commas necessary!
+                                     // one for the closure and one as
+                                     // delimiter in the array
+                             ({ (#'write),"hello world!" }),
+                             ({ (#'say),"Foobar." })
+                          }))
+
+      #'while acts like the LPC statement "while" and repeats executing one
+              code-array while another returns true.
+              #'while expects two or more arguments: the condition as first
+              argument, then the result the whole expression shall have after
+              the condition turns false (this is in many cases of no interest)
+              and as third to last argument the body of the loop.
+
+              lambda(0,({ (#',),            // several things to do ...
+                          ({ (#'=),'i,0 }),    // i is a local variable of this
+                                               // lambda-closure and is
+                                               // initialized with 0 now.
+                          ({ (#'while),
+                             ({ (#'<),'i,10 }),   // condition: i < 10
+                             42,                  // result is not interesting,
+                                                  // but we must give one
+                             ({ (#'write),'i }),  // give out i
+                             ({ (#'+=),'i,1 })    // increase i
+                          })
+                       }))
+
+               The function this closure points to will give out the
+               numbers from 0 to 9 and then return 42.
+
+      #'do is like the do-while statement in LPC and is very much like the
+           #'while. The difference is that #'while tests the condition al-
+           ready before the body is evaluated for the first time, this means
+           that the body might not be evaluated even once. #'do evaluates
+           the body first and then the condition, thus the body is evaluated
+           at least one time.
+           Furthermore, the arguments for #'do are changed in order. #'do
+           expects as first to last but two the body of the loop, then the
+           condition (as last-but-one'th argument) and the result value as
+           last argument. So #'do must have at least two arguments: the
+           condition and the result.
+
+           lambda(0,({ (#',),          // several things to do ...
+                       ({ (#'=),'i,0 }),  // i is a local variable of this
+                                          // lambda-closure and is initialized
+                                          // with 0 now.
+                       ({ (#'do),
+                          ({ (#'write),'i }),  // give out i
+                          ({ (#'+=),'i,1 })    // increase i
+                          ({ (#'<),'i,10 }),   // condition: i < 10
+                          42                   // result is not interesting
+                       })
+                    }))
+
+      NOTE: There is no #'for in LPC, you should use #'while for this.
+
+      #'foreach is like the foreach() statement in LPC. It evaluates one or
+           more bodies repeatedly for every value in a giving string, array
+           or mapping. The result of the closure is 0.
+
+           #'foreach expects two or more arguments:
+            - a single variable symbol, or an array with several variable
+              symbols
+            - the value to iterate over
+            - zero or more bodes to evaluate in each iteration.
+
+           The single values retrieved from the given value are assigned
+           one after another to the variable(s), then the bodies are executed
+           for each assignment.
+
+           lambda(0, ({#'foreach, 'o, ({#'users})
+                                    , ({#'call_other, 'o, "die" })
+                     }));
+
+           lambda(0, ({#'foreach, ({'k, 'v}), ({ ...mapping...})
+                                    , ({#'printf, "%O:%O\n", 'k, 'v })
+                     }));
+
+      #'return gets one argument and acts like the "return" statement in LPC
+               in the function that is created by lambda(). It aborts the
+               execution of this function and returns the argument.
+
+               lambda(0,({ (#'while),// loop
+                           1,        // condition is 1 ==> endles loop
+                           42,       // return value (which will never be used)
+                           ({ (#'write),"grin" })
+                           ({ (#'?!),               // ifnot
+                              ({ (#'random),10 }),  //       (random(10))
+                              ({ (#'return),100 })  //   return 100;
+                           })
+                        }))
+
+                This function will enter an endles loop that will in each
+                turn give out "grin" and if random(10) returns 0 (which will
+                of course happen very soon) it will leave the function with
+                "return 100". The value 42 that is given as result of the
+                loop would be returned if the condition would evaluate to 0
+                which cannot be. (1 is never 0 ;-)
+
+      #'break is used like the "break" statement in LPC and aborts the exe-
+              cution of loops and switches.
+              It must not appear outside a loop or switch of the lambda
+              closure itself, it cannot abort the execution of the function
+              the closure points to!
+
+                lambda(0,({ (#'?),
+                            ({ (#'random),2 }),
+                            ({ (#'break) }), // this will cause the error
+                                             // "Unimplemented operator break
+                                             // for lambda()"
+                            "random was false!"
+                         }));
+
+              You can use ({ #'return,0 }) instead of ({ #'break }) in such
+              cases.
+
+      #'continue is used like the "continue" statement in LPC and jumps to
+                 the end of the current loop and continues with the loop
+                 condition.
+
+      #'default may be used within a #'switch-construct but be careful!
+                To call symbol_function("default") (which is done usually
+                by tools that allow closure-creation) might crash the
+                driver! So please do only use it within your LPC-files.
+                (NOTE: This driver bug is fixed somewhere below 3.2.1@131.)
+
+      #'.. may be used within a #'switch-construct but is not implemented
+           yet (3.2.1@131). But #'[..] works well instead of it.
+
+      #'switch is used to create closures which behave very much like the
+               switch-construct in LPC. To understand the following you
+               should already know the syntax and possibilities of the
+               latter one (which is mightier than the C-version of switch).
+
+               I will confront some LPC versions and the corresponding clo-
+               sure versions below.
+
+               LPC:                  Closure:
+                 switch (x) {          lambda(0,({ (#'switch), x,
+                 case 5:                           ({ 5 }),
+                   return "five";                  ({ (#'return),"five" }),
+                                                   (#',),
+                 case 6..9:                        ({ 6, (#'[..]), 9 }),
+                   return "six to nine";           ({ (#'return),
+                                                      "six to nine" }),
+                                                   (#',),
+                 case 1:                           ({ 1 }),
+                   write("one");                   ({ (#'write),"one" }),
+                   // fall through                 (#',),
+                 case 2:                           ({ 2,
+                 case 10:                             10 }),
+                   return "two or ten";            ({ (#'return),
+                                                      "two or ten" }),
+                                                   (#',),
+                 case 3..4:                        ({ 3, (#'[..]), 4 }),
+                   write("three to four");         ({ (#'write),
+                                                      "three to four" }),
+                   break;  // leave switch         (#'break),
+                 default:                          ({ (#'default) }),
+                   write("something else");        ({ (#'write),
+                                                      "something else" }),
+                   break;                          (#'break)
+                 }                              }))
+
+      #'&& evaluates the arguments from the first on and stops if one evalu-
+           ates to 0 and returns 0. If none evaluates to 0 it returns the
+           result of the last argument.
+
+      #'|| evaluates the arguments from the first on and stops if one evalu-
+           ates to true (not 0) and returns it. If all evaluate to 0 it
+           returns 0.
+
+      #'catch executes the closure given as argument, but catches any
+           runtime error (see catch(E)). Optionally the symbols 'nolog,
+           'publish and 'reserve may be given as additional arguments to
+           modify the behaviour of the catch.
+
+      #'sscanf acts similar to how a funcall would, but passes the third
+           and following arguments as lvalues, that is, values which can
+           be assigned to.
+
+      #'= and the #'<op>= variants are also special because the first
+           argument has to be an lvalue.
+
+2.4 Closures with Strange Names
+
+    #'negate is the unary minus that returns -x for the argument x.
+
+             map(({ 1,2,3 }),#'negate)
+
+             This returns ({ -1,-2,-3 }).
+
+    #'[ is used for the things that in LPC are done with
+             the []-operator (it indexes an array or a mapping).
+
+             lambda(0,({ #'[,quote(({ 10,50,30,70 })),2 })) ==> 30
+             lambda(0,({ #'[,([ "x":10;50, "y":30;70 ]),"x",1 })) ==> 50
+
+    #'[< is the same as #'[ but counts the elements from the
+               end (like indexing with [] and the "<").
+
+    #'[..] returns a subarray of the argument from the one
+             given index to the other given index, both counted from the
+             beginning of the array.
+
+    #'[..<]
+    #'[<..]
+    #'[<..<] same as above, but the indexes are counted from the end,
+
+                lambda(0,({ #'[..<],
+                            quote(({ 0,1,2,3,4,5,6,7 })),2,3
+                         }))
+
+                This will return ({ 2,3,4,5 }).
+    #'[..
+    #'[<.. same as above, but only the first index is given, the
+               subarray will go till the end of the original (like with
+               [x..]).
+
+    #'({ is used to create arrays (as with ({ }) in LPC). All arguments
+             become the elements of the array.
+
+             lambda(0,({ #'({,
+                         ({ (#'random),10 }),
+                         ({ (#'random),50 }),
+                         ({ (#'random),30 }),
+                         ({ (#'random),70 })
+                      }))
+
+             This returns ({ random(10),random(50),random(30),random(70) }).
+
+    #'([ is used to create mappings out of single entries (with seve-
+               ral values) like the ([ ]) in LPC. Very unusual is the fact
+               that this closure gets arrays as argument that are not eval-
+               uated, although they are not quoted.
+
+               lambda(0,({ #'([,
+                           ({ "x",1,2,3 }),
+                           ({ "y",4,5,6 })
+                        }));
+
+               This returns ([ "x": 1;2;3,
+                               "y": 4;5;6 ]).
+
+               However, the elements of the arrays are evaluated as lambda
+               expressions, so if you want to create a mapping from values
+               evaluated at call time, write them as lambda closures:
+
+               lambda(0, ({ #'([, ({ 1, ({ #'ctime }) }) }) )
+
+               will return ([ 1: <result of ctime() at call time ]).
+
+               Arrays can be put into the mapping by quoting:
+
+               lambda(0, ({ #'([, ({ 1, '({ 2 }) }) }) )
+
+               will return ([ 1: ({ 2 }) ])
+
+
+    #'[,] is nearly the same as #'[. The only difference
+                     shows up if you want to index a mapping with a width
+                     greater than 1 (with more than just one value per
+                     key) directly with funcall(). Example:
+                     funcall(#'[,([ 0:1;2, 3:4;5 ]),0,1)
+                     This will not work. Use #'[,] and it will
+                     work. If you want to use it in a lambda closure you
+                     do not have to use #'[,] and #'[ will
+                     do fine. On the other hand, #'[,] cannot
+                     work with arrays, so in nearly all cases use #'[
+                     and just in the described special case, use
+                     #'[,].
+                     This is a strange thing and I deem it a bug, so it
+                     might change in the future.
+
+2.5 Operator-Closures
+
+    Most of the closures that are used for things which are done by opera-
+    tors are in fact not operator-closures but efun-closures. But there are
+    a few which do not have the state of efun-closures but are called
+    "operator-closures". #'return is an example, a complete list of them is
+    given below.
+
+    These closures cannot be called directly using funcall() or apply() (or
+    other efuns like filter()), but must appear only in lambda-con-
+    structs.
+
+      funcall(#'return,4);  // does not work! This will raise an
+                            // Uncallable-closure error.
+      funcall(lambda(0,     // this is a correct example
+                     ({ (#'return),4 })
+                    ));
+
+    All operator-closures:
+    #'&&
+    #'||
+    #',
+    #'?
+    #'?!
+    #'=
+    #'<op>=
+    #'++
+    #'--
+    #'break
+    #'catch
+    #'continue
+    #'default
+    #'do
+    #'foreach
+    #'return
+    #'sscanf
+    #'switch
+    #'while
+    #'({
+    #'([
+
+    #'.. is very likely to be an operator closure too, but since it is
+    not implemented yet, I cannot say for sure.
+
+2.6 Variable-Closures
+
+    All object-global variables might be "closured" by prepending a #' to
+    them to allow access and/or manipulation of them. So if your object has
+    a global variable x you can use #'x within a closure.
+
+    Normally you will treat those expressions like lfun-closures: put them
+    into an array to get the value:
+
+    object.c:
+              int x;
+              int foo() {
+                return lambda(0,({ (#'write),({ (#'x) }) }));
+              }
+
+    Anybody who now calls object->foo() will get a closure which will, when
+    evaluated, write the actual value of object's global variable x.
+
+    Variable closures do not accept arguments.
+
+3 Examples
+
+  In this section I will give and explain some examples coming out of
+  praxis. If the explanation seems to be in some cases too detailed this
+  can be explained by the trial to allow the reader to read the examples
+  section first ;-)
+
+3.1 Lfun-Closure
+
+    An item with a complex long-description like a watch that shall always
+    show the actual time will usually base upon the complex/item-class and
+    give an lfun-closure as argument to the set_long()-method.
+
+    watch.c:
+             inherit "complex/item";
+
+             string my_long() {
+               return ("The watch is small and has a strange otherworldly"
+                       " aura about it.\n"
+                       "The current time is: "+ctime()+".\n");
+             }
+
+             void create() {
+               set_short("a little watch");
+               set_id(({ "watch","little watch" }));
+               set_long(#'my_long);  // the lfun-closure to the lfun my_long()
+             }
+
+3.2 Lambda-Closure
+
+    The example from 3.1 can also be written using a lambda-closure.
+
+    watch.c:
+             inherit "complex/item";
+
+             void create() {
+               set_short("a little watch");
+               set_id(({ "watch","little watch" }));
+               set_long(lambda(0,({ (#'+),
+                                    "The watch is small and has a strange"
+                                    " otherworldly aura about it.\n"
+                                    "The current time is: ",
+                                    ({ (#'+),
+                                       ({ (#'ctime) }),
+                                       ".\n"
+                                    })
+                                 })));
+             }

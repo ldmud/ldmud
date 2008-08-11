@@ -1,0 +1,20 @@
+PRELIMINARY
+SYNOPSIS
+        void tls_deinit_connection(object ob)
+
+DESCRIPTION
+        tls_deinit_connection() shuts down a TLS connection to
+        the interactive object <ob> (or this_object() if <ob> is not
+        given) but the connection is not closed.
+
+        Under normal circumstances there is no need to use this efun: most
+        clients operate in either secure or unsecure mode, but don't allow
+        switching connection security on the fly.
+
+HISTORY
+        Introduced in LDMud 3.3.474 and following, backported to 3.2.11.
+
+SEE ALSO
+        tls_init_connection(E), tls_error(E), tls_query_connection_state(E),
+        tls_query_connection_info(E), tls_available(E),
+        tls_check_certificate(E), tls_refresh_certs(E)

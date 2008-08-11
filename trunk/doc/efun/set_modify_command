@@ -1,0 +1,34 @@
+SYNOPSIS
+        object set_modify_command(object)
+        object set_modify_command(string)
+        object set_modify_command(int)
+
+DESCRIPTION
+        All commands for the current object (that must obviously be
+        interactive) will be passed to ob->modify_command() before
+        actually being executed. The argument can be passed an object
+        or an object_name.
+
+        When set_modify_command() was called, the parser won't expand
+        the standard abbreviations n,e,s,w,nw,sw,ne,se for that user
+        anymore, nor use any hook set for this.
+
+        0 as argument will stop the command modification and reinstall
+        the standard abbreviations.
+        -1 as argument will just return the object previously set.
+
+        The return value is the object that was previously set with
+        set_modify_command(), if any.
+
+        This mechanism is intended to expand aliases on quicktypers
+        or the like. The name of the lfun called can be changed
+        from modify_command() to something else using the
+        H_MODIFY_COMMAND_FNAME hook.
+
+HISTORY
+        Up to 3.2.1@108 the lfun called was hardcoded as
+        'modify_command'. The hook H_MODIFY_COMMAND_FNAME introduced
+        in 3.2.1@109 allows to change the name.
+
+SEE ALSO
+        command(E), hooks(C), modify_command(A)

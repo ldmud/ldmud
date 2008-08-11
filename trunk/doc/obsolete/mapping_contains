@@ -1,0 +1,20 @@
+REMOVED EFUN
+SYNOPSIS
+        int mapping_contains(mixed &data1, ..., &dataN, map, key)
+
+DESCRIPTION
+        If the mapping contains the key map, the corresponding values
+        are assigned to the data arguments, which massed be passed by
+        reference, and 1 is returned. If key is not in map, 0 is
+        returned and the data args are left unchanged.
+        It is possible to use this function for a 0-value mapping, in
+        which case it has the same effect as member(E).
+
+HISTORY
+        Renamed to 'm_contains()' in LDMud 3.2.6.
+        Since LDMud 3.2.9, not available if driver is compiled without
+          USE_DEPRECATED.
+        Removed in LDMud 3.3.
+
+SEE ALSO
+        mappings(LPC), member(E)

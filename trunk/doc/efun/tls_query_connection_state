@@ -1,0 +1,16 @@
+PRELIMINARY
+SYNOPSIS
+        int tls_query_connection_state(object ob)
+
+DESCRIPTION
+        tls_query_connection_state() returns a positive number if <ob>'s
+        connection is TLS secured, 0 if it's unsecured, and a negative number
+        if the TLS connection setup is still being set-up.
+
+HISTORY
+        Introduced in LDMud 3.3.474 and following, backported to 3.2.11.
+
+SEE ALSO
+	tls_init_connection(E), tls_deinit_connection(E), tls_error(E), 
+	tls_query_connection_info(E), tls_available(E),
+        tls_check_certificate(E), tls_refresh_certs(E)

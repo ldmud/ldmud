@@ -1,0 +1,627 @@
+#!/bin/sh
+#
+#-------------------------------------------------------------------------
+# Example configuration settings file
+#-------------------------------------------------------------------------
+# configure --with-<foo> allows to specify a lot of options in one go by
+# evaluation the file settings/<foo>. Since configure provides defaults
+# for all options, the file needs to list only those options which are
+# to set differently.
+#
+# This file documents the available options and their default values.
+#
+# On/off options must be specified like this:
+#     enable_<option>=yes   to enable it
+#     enable_<option>=no
+#  or disable_<option>      to disable it
+#
+# Value options must be specified like this:
+#     with_<option>=<value>
+#
+# Number values can be given in decimal or sedecimal. Strings must
+# be given without surrounding quotes.
+#
+# In both cases no whitespace is allowed around the '=' and nothing
+# else may appear on the line, except a trailing comment!
+#
+# Configure will strip everything from this file which doesn't match one
+# of its option specification patterns, allowing us to make the files
+# self-executable.
+#-------------------------------------------------------------------------
+
+exec ./configure --with-setting=default $*
+
+exit 1
+
+#----------- Commandline Argument Defaults ----------
+# These options provide default settings for those options which can
+# also be set on the commandline.
+
+# Enable this if you are using a 2.4.5 mudlib or one of its derivates.
+
+enable_compat_mode=no
+
+# The name of the master object.
+
+with_master_name=secure/master
+
+# Define ALLOW_FILENAME_SPACES if the driver should accept space characters
+# in filenames. If it is not defined, a hardcoded test for space characters
+# is activated.
+
+enable_filename_spaces=no
+
+
+# --- Runtime limits ---
+
+# Maximum size of array. If 0, any size is allowed.
+
+with_max_array_size=5000
+
+# Maximum number of entries in a mapping. If 0, any size is allowed.
+
+with_max_mapping_keys=5000
+
+# Maximum number of values in a mapping. If 0, any size is allowed.
+
+with_max_mapping_size=15000
+
+# Maximum size of a file to be read with read_file()
+# If 0, any size is allowed.
+
+with_read_file_max_size=50000
+
+# Maximum number of bytes read or written with read/write_bytes().
+# If 0, any size is allowed.
+
+with_max_byte_transfer=50000
+
+# Maximum number of callouts at one time.
+# If 0, any number is allowed.
+
+with_max_callouts=0
+
+# If PThreads are used, this is the max amount of data held pending
+# for writing. If the amount is exceeded, the oldest data blocks
+# are discarded.
+# If 0, any amount of data is allowed.
+
+with_pthread_write_max_size=100000
+
+
+# --- Timing ---
+
+# If an object is left alone for this time, it will be 'cleaned up'.
+# The time should be substantially longer than the swapping time.
+
+with_time_to_clean_up=3600
+
+# If an object is left alone for this time, its program and variables
+# are swapped into a file to conserve memory.
+# The time to swap variables should be longer than the time to swap
+# programs, because swapping variables is quite expensive.
+# Both times should be shorter than the cleanup time and are given
+# in seconds.
+# A swapping time <= 0 disables that particular swapping feature.
+
+with_time_to_swap=900
+with_time_to_swap_variables=1800
+
+# This time determines the interval before an object is reset again.
+# The actual length of the intervals is determined somewhat randomly
+# to make the game less predictable.
+
+with_time_to_reset=1800 # seconds
+
+
+# --- Memory ---
+
+# These three options determine how much memory is held in reserve.
+# There must be enough memory to allow the garbage collector to swap
+# in all objects one at a time.
+
+with_reserved_user_size=700000
+with_reserved_master_size=100000
+with_reserved_system_size=200000
+
+# This value gives the upper limits for the total allocated memory.
+# A value of 0 means 'unlimited'.
+
+with_max_malloced=0x4000000 
+
+# If these values are >0, the driver will reserve this amount of memory
+# on startup for large resp. small blocks, reducing the block fragmentation.
+# The value should be a significantly large multiple of the large resp.
+# small chunk size.
+# As a rule of thumb, reserve enough memory for the first couple of days
+# of uptime.
+
+with_min_malloced=0
+with_min_small_malloced=0
+
+# The granularity of the timing in seconds. No two timed events can
+# happen faster after each other than this time.
+with_alarm_time=2
+
+# The time to elapse between two heartbeats. If this time is not an
+# even multiple of ALARM_TIME, the next even multiple will be used.
+with_heart_beat_interval=2
+
+# If synchronous heartbeats are enabled, all heartbeats happen at
+# the same time, regardless of when within one ALARM_TIME granule
+# they have been started.
+# If this is disabled, heartbeats are executed as soon as possible (for
+# example some objects would beat on even seconds, others on odd).
+enable_synchronous_heart_beat=yes
+
+# --- Interpreter ---
+
+# If strict-euids is enabled, the driver enforces the (correct) use
+# of euids, ie. load_object() and clone_object() require the current
+# object to have a non-zero euid.
+
+enable_strict_euids=no
+
+# The maximum number of eval-ticks for one execution. If this
+# is exceeded, the execution is aborted.
+
+with_max_cost=1000000
+
+
+# --- Communication ---
+
+# The Input escape character.
+# If this character is typed as first on the line, the normal input_to()s
+# are bypassed.
+
+with_input_escape="!"
+
+# The TCP port to listen for connections on.
+# This value is used only when no ports are given on the commandline.
+
+with_portno=4242
+
+# This is the number of the UDP port to use.
+# If set to -1, and no number is given on the commandline, the port will
+# not be created.
+
+with_udp_port=4246
+
+# The maximum number of ports to listen for connections on.
+
+with_maxnumports=20
+
+# Select the ERQ service to use.
+#   'no':   the driver is compiled without erq support.
+#   'erq':  the driver is compiled with erq support, the Makefiles
+#           are set up to compile the standard erq.
+#   'xerq': the driver is compiled with erq support, the Makefiles
+#           are set up to compile Brian's xerq.
+
+enable_erq=erq
+
+# Max size of a packet received from/send to the ERQ.
+# TODO: Do the current erqs compile this in?
+
+with_erq_max_reply=1024 
+with_erq_max_send=1024 
+
+
+#----------- Compilation Options ----------
+# To change these options, the config.h must be recreated and the
+# driver recompiled.
+
+# The optimization level in the generated Makefile
+# Settings: no, low, med, high
+
+with_optimize=med
+
+# If TRACE_CODE is enable, the driver keeps a log of TOTAL_TRACE_LENGTH
+# most recently execute bytecode instructions.
+
+enable_trace_code=yes
+with_total_trace_length=4096
+
+# Enable these for runtime statistics:
+#    COMM_STAT: number and size of outgoing packets
+#    APPLY_CACHE_STAT: number of hits and misses in the apply cache
+
+enable_comm_stat=yes
+enable_apply_cache_stat=yes
+
+# The name of the swapfile used by the driver to swap out objects (if
+# enabled), relative to the mudlib directory. The driver will append
+# '.<hostname>' to the file.
+
+with_swap_file=LP_SWAP.3
+
+# Enable support for IPv6 (assuming your system supports it).
+
+enable_use_ipv6=no
+
+# Enable the use of pthreads for background socket IO.
+
+enable_use_pthreads=no
+
+
+# --- Memory ---
+
+# Which memory manager to use. Possible defines are
+#   default:   slaballoc is selected.
+#   smalloc:   Satoria's malloc. Second fastest, uses the least memory,
+#              supports garbage collection, not fully threadsafe.
+#   slaballoc: Slab allocator. Fastest, reduces fragmentation,
+#              supports garbage collection, not fully threadsafe.
+#   ptmalloc:  ptmalloc from www.malloc.de, supports GC, threadsafe.
+#   sysmalloc: the normal system malloc(), threadsafe.
+
+with_malloc=default
+
+# Define this to let the memory allocator request memory from the system
+# directly using sbrk() (assuming the system supports it).
+# If not defined, the memory allocator will use malloc().
+# Supported by: MALLOC_smalloc, MALLOC_slaballoc
+
+enable_malloc_sbrk=yes
+
+# Define this to annotate all allocations with a magic word to find
+# simple misuses of memory (like multiple frees).
+# Supported by: MALLOC_smalloc, MALLOC_slaballoc
+
+enable_malloc_check=yes
+
+# Enable this to annotate all allocations with 'file:line' of the
+# driver source allocating it.
+
+enable_malloc_trace=no
+
+# Enable this in addition to SMALLOC_TRACE to also annotate all allocations
+# with file:line of the lpc program responsible for it.
+
+enable_malloc_lpc_trace=no, MALLOC_slaballoc
+
+# Define this to log all calls to esbrk() (the system memory allocator).
+# Works best if MALLOC_TRACE is defined.
+# This define is useful if your mud keeps growing in total memory size
+# instead of re-using the memory already allocated.
+# Supported by: MALLOC_smalloc, MALLOC_slaballoc
+enable_malloc_sbrk_trace=no
+
+# --- Wizlist ---
+
+# The name of the file (relative to the mudlib) to hold the Wizlist
+# information. The driver reads it on startup.
+# If disabled ('with_wizlist_file=no'), a wizlist file can still be
+# given on the commandline.
+
+with_wizlist_file=WIZLIST
+
+# --- Access Control ---
+
+# Enable this to have access control.
+
+enable_access_control=yes
+
+# The name of the file from where the access permissions are read.
+
+with_access_file=ACCESS.ALLOW
+
+# Enable this to log all connection attempts.
+
+enable_access_log=no
+
+# The name of the file where all connections are logged.
+
+with_access_log=access.allow.log
+
+
+# --- Language ---
+
+# Enable this if you want the efun parse_command().
+
+enable_use_parse_command=yes
+
+# Enable this if you want the efun set_light() and the simple 2.4.5 light
+# system.
+
+enable_use_set_light=yes
+
+# Enable this if you want the efun set_is_wizard().
+
+enable_use_set_is_wizard=yes
+
+# Enable this if you want the efun process_string().
+
+enable_use_process_string=yes
+
+# Enable SHARE_VARIABLES if a clone's variables are to be assigned
+# from the current blueprint's variables. Undefine it if clones
+# should be initialized by __INIT().
+
+enable_share_variables=no
+
+# Define USE_SYSTEM_CRYPT if you want crypt() to be implemented by your
+# operating system (assuming it offers this function). This makes your
+# programm smaller and may even let you take advantage of improvements
+# of your OS, but may also prohibit transporting encrypted date like
+# passwords between different systems.
+# Undefine USE_SYSTEM_CRYPT if you want to use the driver's portable
+# crypt() implementation.
+
+enable_use_system_crypt=yes
+
+# Define USE_LPC_NOSAVE if you want to use the keyword 'nosave' to
+# specify variables not be save by save_object(). The old keyword 'static'
+# works in either case.
+
+enable_lpc_nosave=yes
+
+# Enable support for mySQL (assuming your system supports it).
+#
+#  'no'  : mySQL support is not compiled in
+#  'yes' : mySQL support is compiled in, the libmysqlclient is expected
+#          in the normal library search path.
+#  <path>: mySQL support is compiled in, <path> is added to the link paths
+#          and should be the path to libmysqlclient, 
+#          e.g. enable_use_mysql=/usr/local/lib/mysql .
+#          The include files are searched in /usr/local/mysql/include,
+#          /usr/local/include, <path>, and <path>/include.
+#          The libraries are searched in the default path, <path>/lib/mysql,
+#          <path>/lib and <path>, in this order.
+
+enable_use_mysql=no
+
+# Enable support for PostgreSQL (assuming your system supports it).
+#
+#  'no'  : PostgreSQL support is not compiled in
+#  'yes' : PostgreSQL support is compiled in, the libmysqlclient is expected
+#          in the normal library search path.
+#  <path>: PostgreSQL support is compiled in, <path> is added to the link paths
+#          and should be the path to libpq, 
+#          e.g. enable_use_syql=/usr/local/pgsql .
+#          The include files are searched in /usr/local/pgsql/include,
+#          /usr/local/include, <path>, and <path>/include.
+#          The libraries are searched in the default path, <path>/lib/pgsql,
+#          <path>/lib, <path>, /usr/local/pgsql/lib, in this order.
+
+enable_use_pgsql=no
+
+# Enable support for SQLite-3 (assuming your system supports it).
+#
+#  'no'  : SQLite-3 support is not compiled in
+#  'yes' : SQLite-3 support is compiled in, the libmysqlclient is expected
+#          in the normal library search path.
+#  <path>: SQLite-3 support is compiled in, <path> is added to the link paths
+#          and should be the path to libpq, 
+#          e.g. enable_use_sqlite=/usr/local/sqlite .
+#          The include files are searched in /usr/local/sqlite/include,
+#          /usr/local/include, <path>, and <path>/include.
+#          The libraries are searched in the default path, <path>/lib/sqlite,
+#          <path>/lib, <path>, /usr/local/sqlite/lib, in this order.
+
+enable_use_sqlite=no
+
+# Enable support for MCCP (Mud Control Compression Protocol).
+
+enable_use_mccp=no
+
+# Enable support for TLS (Transport Layer Security).
+#
+#  'no': TLS support is not compiled it
+#  'gnu': TLS support using GnuTLS is compiled in if found.
+#  'ssl': TLS support using OpenSSL is compiled in if found.
+#  'yes': TLS support using either OpenSSL or GnuTLS is compiled in if found.
+#         The configuration script looks first for OpenSSL, then GnuTLS.
+#         If both are available, OpenSSL is used.
+
+enable_use_tls=no
+
+# The optional path to the TLS installation. When set, the configuration
+# script will add {tls_path}/include and {tls_path}/lib to the include resp.
+# library search paths.
+
+with_tls_path=
+
+# Enable support for alists.
+
+enable_use_alists=no
+
+# Enable call_other()s on arrays of objects.
+
+enable_lpc_array_calls=yes
+
+# Enable PCRE instead of traditional regexps
+#  'no':         use traditional regexps by default
+#  'no-builtin': use traditional regexps by default, or the builtin PCRE
+#                package if PCRE is requested
+#  'builtin':    use PCRE package by default, using the builtin package
+#  'yes':        use the system's PCRE package if available, otherwise the
+#                the builtin package
+
+enable_use_pcre=yes
+
+# Enable obsolete and deprecated efuns.
+
+enable_use_deprecated=yes
+
+
+# --- Runtime limits ---
+
+# Maximum size of a socket send buffer.
+
+with_set_buffer_size_max=65536 
+
+# CATCH_RESERVED_COST is the default value added to the eval cost for the time
+# executing code guarded by a catch() statement, so that an eval_cost-too-big
+# error can still be caught and handled.
+# To catch an evalcost-too-big in an object that called (recursive)
+# master functions, CATCH_RESERVED_COST should be greater than
+# MASTER_RESERVED_COST.
+
+with_catch_reserved_cost=2000
+
+# MASTER_RESERVED_COST is the total reserve available for master applies.
+# It is halved for every descent into another master apply.
+
+with_master_reserved_cost=512
+
+# With this option enable, expensive operations like string additions
+# have additional evalcosts depending on the amount of data handled.
+
+enable_dynamic_costs=no
+
+# Define the maximum stack size of the virtual machine. It must be big
+# enough to hold all local variables, arguments and temporary values.
+
+with_evaluator_stack_size=2000
+
+# Maximum function call depth for normal program execution
+
+with_max_user_trace=60
+
+# Maximum function call depth during error handling.
+# It must be bigger than MAX_USER_TRACE (check at compile time).
+
+with_max_trace=65
+
+# Maximum number of bits in a bit string.
+# The limit is more based on considerations of speed than memory consumption.
+
+with_max_bits=6144
+
+# Maximum number of players in the game
+
+with_max_players=50
+
+# Allowed number of ed commands per backend cycle (for faster file upload).
+
+with_allowed_ed_cmds=20
+
+# --- Compiler ---
+
+# Compiler stack size. This value affects the complexity the compiler can
+# parse.
+
+with_compiler_stack_size=400
+
+# Maximum number of local variables
+
+with_max_local=50
+
+# Maximum size of an expanded preprocessor definition.
+
+with_defmax=65000
+
+
+# --- Internal Tables ---
+
+# Define the size of the shared string hash table (max: 65536).
+# If you set it to about 1/5 of the number of distinct strings, you will
+# get a hit ratio very close to 1. If the size is a power of two,
+# hashing will be faster.
+
+with_htable_size=4096
+
+# Size of the object hash table (max: 65536). Set it to about 1/4 of
+# the number of objects in the game, though this value is not very critical.
+
+with_otable_size=1024
+
+# Size of the hash table for defines, reserved words, identifiers, and
+# efun names. This should be several times smaller than HTABLE_SIZE.
+# Max: 65536.
+
+with_itable_size=256
+
+# Size of the apply cache, expressed in the bitsize of its indices.
+# The number of entries is 2**cache_bits.
+
+with_apply_cache_bits=12 
+
+# Select whether compiled regular expressions shall be cached, and
+# how big the cache shall be (max: 65536).
+
+enable_rxcache_table=yes
+with_rxcache_table=8192
+
+
+# --- Current Developments ---
+# These options can be used to disable developments-in-progress if their
+# code turns out to be interrrupting.
+
+# Define this to enable LPC structs.
+enable_use_structs=yes
+
+# Define this to enable the new inline closure syntax.
+enable_use_new_inlines=yes
+
+
+# --- Profiling ---
+# For profiling of the VM instruction implementations, refer to the Makefile
+
+# Enable usage statistics of VM instructions.
+enable_opcprof=no
+
+# If opcprof is enabled, this option includes the instruction names
+# into the statistic.
+enable_verbose_opcprof=no
+
+# --- Standard Debugging ---
+# These options are 'standard' debugging options.
+
+# Enable basic run time sanity checks. This will use more time
+# and space, but nevertheless you are strongly encouraged to keep
+# it defined.
+enable_debug=yes
+
+# Enable debug output from the LPC compiler.
+enable_yydebug=no
+
+# Disable inlining. Use this to debug obscure crashes, or for
+# speed tests.
+enable_no_inlines=no
+
+# Activate debug prints in the telnet machine (lots of output).
+enable_debug_telnet=no
+
+# Activate allocation debug prints in the malloc module (lots of output).
+# Supported by: MALLOC_smalloc, MALLOC_slaballoc
+enable_debug_malloc_allocs=no
+
+# The DEBUG level for the ERQ daemon:
+#   0 : no debug output
+#   1 : standard debug output
+#   2 : verbose debug output
+with_erq_debug=0
+
+
+# --- Specific Debugging ---
+# These options have been introduced to debug specific problems and will
+# be removed again later.
+
+# Trace changes to the tot_alloc_object and tot_alloc_object_size statistics,
+# in order to find the status bugs (enables commandline option
+# --check-object-stat). Will produce a decent amount of output on stderr.
+enable_check_object_stat=no
+
+# Activate total mapping size consistency check code. It has a small impact on
+# the execution speed. This define was used to find the inaccuracy in the
+# mapping statistic.
+enable_check_mapping_total=no
+
+# Activate object refcount check code. It will produce a decent amount of log
+# output. It will also fatal() the driver as soon as it detects an
+# inconsistency in the list of destructed objects.
+enable_check_object_ref=no
+
+# Activate object referencing checking code during the GC. It will print error
+# messages to gcout when an object or program is referenced as something else.
+# No penalty for using.  Requires MALLOC_TRACE to work. Incompatible with
+# DUMP_GC_REFS.
+enable_check_object_gc_ref=yes
+
+# Sometimes the GC stumbles over invalid references to memory blocks (namely
+# 'Program referenced as something else'). Define this macro to get a detailed
+# dump of all found references (Warning: LOTS of output!).
+# Incompatible with CHECK_OBJECT_GC_REF.
+enable_dump_gc_refs=no

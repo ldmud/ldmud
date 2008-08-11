@@ -1,0 +1,35 @@
+SYNOPSIS
+        #include <sys/driver_hooks.h>
+
+        set_driver_hook(H_CREATE_SUPER, value)
+
+        <value> being:
+
+          void <name> (0)
+          int <closure> ( void )
+          int <closure> (object obj_to_init)
+
+DESCRIPTION
+        Optional hooks to initialize a blueprint which is loaded by
+        inheritance after creation.
+        Hook setting can be unbound lambda closures, or the name of
+        the function (static or public) to call in the object.
+
+        If the hook is a closure expecting an argument, it is bound
+        to the current object and called with the created object as
+        argument. If the hook as a closure without arguments, it is bound to
+        the object to be initalized and called.
+
+        If the result of the closure call is a non-zero number, it is used
+        as the interval to wait before the first reset(), else the default
+        interval computed from TIME_TO_RESET is used.
+
+        If the hook is defined as the name of an lfun in the object,
+        it is called in the object with 0 as argument, and any result
+        is ignored.
+
+HISTORY
+        LDMud 3.2.10 allowed static functions to be given by name.
+
+SEE ALSO
+        hooks(C), create_ob(H), create_clone(H)

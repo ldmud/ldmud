@@ -1,0 +1,22 @@
+This directory holds a LPC object which runs a stress test against the driver:
+it calls random efuns with random arguments and keeps a log of what has been
+called.
+
+It was written for the Unitopia mudlib (and thusly uses some of their
+simul-efuns). To use it, copy secure.inc into the secure/simul_efun
+directory first.
+
+  crasher.c  : the test object
+  crashleak.c: a variant of the crasher object looking for memory leaks.
+  secure.inc : a replacement for the original secure/simul_efun/secure.inc,
+               so that the security-sensitive functions can be tested, too.
+
+Mudlib modifications:
+ - /secure/simul_efun/ run: echo // > secure.inc (remove nomask simul efun)
+ - /secure/master/ edit compiler_control.inc and add a "return 1;" at the
+   beginning of the privileg_violation" function.  create new directory
+   /save/crash/ 
+
+Load crasher.c, let it run and wait for the crash... 
+
+Written by Andreas "Menaures"  Klauer.

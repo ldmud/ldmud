@@ -1,0 +1,144 @@
+CONCEPT
+        driver hooks
+
+DESCRIPTION
+        To allow a greater flexibility of the muds, the gamedrivers
+        since 3.2.1 moved several once hardcoded 'underground'
+        activities from the driver into the mudlib. This includes for
+        example the differences between compat and native mode.
+
+        The hooks are set with the privileged efun set_driver_hook().
+        Some of the hooks are mandatory, some not. Most hooks accept
+        unbound lambda closures as values, some also lfun closures or
+        even strings.
+        The hooks are identified by an ordinal number, for which
+        symbolic names are defined in /sys/driverhooks.h.
+
+        H_MOVE_OBJECT0
+        H_MOVE_OBJECT1
+          Mandatory hooks to implement the efun void move_object().
+
+
+        H_LOAD_UIDS
+        H_CLONE_UIDS
+          Mandatory hooks to determine the uid and euid of loaded or cloned
+          objects.
+
+
+        H_CREATE_SUPER
+        H_CREATE_OB
+        H_CREATE_CLONE
+          Optional hooks to initialize an object after creation.
+
+          H_CREATE_SUPER is called for blueprints implicitely loaded
+          by inheritance, H_CREATE_OB for explicitely loaded
+          blueprints/objects, and H_CREATE_CLONE for cloned objects.
+
+
+        H_RESET
+          Optional hook to reset an object.
+
+
+        H_CLEAN_UP
+          Optional hook to clean up an object.
+
+
+        H_DEFAULT_METHOD
+          Optional hook to provide default implementation for unresolved
+          calls.
+
+
+        H_DEFAULT_PROMPT
+          Optional hook for the command prompt. If this hook is not used,
+          the driver will use "> " as the command prompt.
+
+
+        H_PRINT_PROMPT
+          Optional hook to print the current command prompt. If this hook is
+          not set, the driver will just print the prompt to the user.
+
+
+        H_COMMAND
+          Optional hook to parse and execute commands. If this hook is used,
+          it bypasses the normal command parsing done by the driver (including
+          the MODIFY_COMMAND and NOTIFY_FAIL hooks).
+
+
+        H_MODIFY_COMMAND
+          Optional hook to modify commands (both entered or given by a
+          call to command()) before the parser sees them (this includes
+          special commands like 'status').
+
+
+        H_MODIFY_COMMAND_FNAME
+          Mandatory hook specifying the name of the 'modify_command'
+          lfun to call for newly entered commands as result of a
+          set_modify_command().
+
+
+        H_NOTIFY_FAIL
+          Mandatory hook to issue the default message if an entered
+          command couldn't be parsed and no notify_fail() command is
+          in effect.
+
+
+        H_SEND_NOTIFY_FAIL
+          Optional hook to send the notify fail message, regardless
+          of how it was determined, to the player. If the hook is not
+          set, the message is delivered using tell_object() internally.
+
+
+        H_NO_IPC_SLOT
+          Optional hook specifying the message given to logins
+          rejected due to space limitations (MAX_PLAYER).
+
+
+        H_INCLUDE_DIRS
+          Semi-mandatory hook specifying the directories where <>-type
+          include files are searched (this includes ""-includes not
+          found as specified).
+
+
+        H_AUTO_INCLUDE
+          Optional hook specifying a string to be included before
+          the source of every compiled LPC object.
+
+
+        H_TELNET_NEG
+          Optional hook to specifiy how to perform a single telnet
+          negotiation.  If not set, most telnet options are rejected (read:
+          only a very minimal negotiation takes place).
+
+
+        H_NOECHO
+          Optional hook to specifiy how to perform the telnet actions
+          to switch the echo mode (used for e.g. password input_to()s).
+          If not set, a default handling is performed.
+
+          IMPORTANT: If this hook is used, the control of all telnet
+          negotiation is transferred to the mudlib (you must combine it
+          with H_TELNET_NEG to conform to the telnet protocol).
+
+
+        H_ERQ_STOP
+          Optional hook to notify the mudlib about the termination of
+          the erq demon.
+
+
+HISTORY
+        The hooks concept was introduced in 3.2.1
+        H_MOVE_OBJECT0/1 were introduced in 3.2.1@1
+        H_CLEAN_UP was introduced in 3.2.1@34
+        H_MODIFY_COMMAND was introduced in 3.2.1@51.
+        H_MODIFY_COMMAND_FNAME was 'hooked' in 3.2.1@109.
+        H_NOTIFY_FAILE and H_NO_IPC_SLOT were introduced in 3.2.1@55.
+        H_INCLUDE_DIRS was introduced in 3.2.1@57.
+        H_TELNET_NEG was introduced in 3.2.1@60.
+        H_NOECHO and H_ERQ_STOP were introduced in 3.2.1@85.
+        H_COMMAND was introduced in 3.2.7.
+        H_SEND_NOTIFY_FAIL and H_AUTO_INCLUDE were introduced in 3.2.9.
+        H_DEFAULT_METHOD was introduced in 3.3.113.
+        H_DEFAULT_PROMPT and H_PRINT_PROMPT were introduced in 3.3.163.
+
+SEE ALSO
+        native(C), set_driver_hook(E), all in (H)

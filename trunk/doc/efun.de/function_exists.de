@@ -1,0 +1,57 @@
+SYNOPSIS
+        #include <functionlist.h>
+
+        mixed function_exists(string str [, int flags]);
+        mixed function_exists(string str, object ob [, int flags]);
+
+BESCHREIBUNG
+        Sucht eine Funktion <str> im aktuellen Objekt bzw. im Objekt <ob>. Je
+        nach den angegeben <flags> werden folgende Informationen angezeigt:
+
+        FEXISTS_PROGNAME (0, default):
+        Liefert den Namen des Programms, in dem die Funktion definiert ist.
+        Das kann entweder der Objektname object_name(ob) sein, oder der
+        Name eines geerbten Programms. Wenn der Driver nicht im Compat-Modus
+        laeuft, beginnt der Name immer mit einem '/'.
+
+        FEXISTS_FILENAME (1):
+        Liefert den Namen der Datei, in der die Funktion definiert ist. Das
+        kann auch ein Inlcude-File sein. Wenn der Driver nicht im Compat-
+        Modus laeuft, beginnt der Name mit einem '/'.
+
+        FEXISTS_LINENO (2):
+        Liefert die Zeilennummer im Quellcode, in der die Funktion definiert
+        wird.
+
+        FEXISTS_ALL (3):
+          Liefert ein Array mit der gesamten Information der anderen Flags,
+          sowie zusaetzlichen Informationen ueber die Funktion:
+          
+            string [FEXISTS_PROGNAME]: der Programmname
+            string [FEXISTS_FILENAME]: der Dateiname
+            int    [FEXISTS_LINENO]:   die Zeilennummer
+            int    [FEXISTS_NUMARG]:   die Anzahl der Funktionsargumente
+            int    [FEXISTS_TYPE]:     der Ergebnistyp der Funktion
+            int    [FEXISTS_FLAGS]:    die Funktionsflags
+
+        <flags> kann mit einem binaren Oder mit NAME_HIDDEN ergaenzt
+        werden, um Informationen ueber static und protected deklarierte
+        Funktionen in anderen Objekten zu erhalten. Es ist nicht moeglich,
+        Informationen ueber private deklarierte Funktionen zu erhalten.
+
+        Wenn die Funktion nicht gefunden werden kann (weil sie nicht
+        existiert oder fuer den Aufrufer nicht sichtbar ist), liefert
+        die Funktion 0.
+
+BEISPIELE
+        function_exists("create");
+        function_exists("create", that_object, NAME_HIDDEN|FEXISTS_ALL);
+
+AENDERUNGEN
+        LDMud 3.2.10 erweiterte die Menge der zurueck gelieferten Werte und
+            fuehrte das <flags> Argument ein.
+        LDMud 3.2.12/3.3.713 fuegte die zusaetzliche Funktionsinformation zum
+            FEXISTS_ALL Ergebnis hinzu.
+
+SIEHE AUCH
+        call_other(E), call_resolved(E), functionlist(E), variable_exists(E)

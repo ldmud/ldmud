@@ -1,0 +1,49 @@
+REMOVED EFUN
+SYNOPSIS
+        mixed *map_array(mixed *arr, string fun, string|object ob, mixed extra)
+        mixed *map_array(mixed *arr, closure cl, mixed extra)
+
+DESCRIPTION
+        Returns an array holding the items of arr mapped through
+        ob->fun(element, extra) resp. the closure cl. The function fun
+        in ob is called for each element in arr with that element as
+        parameter. A second parameter extra is sent in each call if
+        given. ob can be an object or a string. Principal function:
+
+        foreach (index) arr[index] = ob->fun(arr[index],extra);
+
+        The value returned by ob->fun(array[index],extra) replaces the
+        existing element in the array. If arr is not an array, then 0
+        will be returned.
+
+        The extra argument is optional and must not be a protected reference
+        like &(i[0]). If <ob> is omitted, or neither a string nor an object,
+        it defaults to this_object().
+
+
+EXAMPLE
+        string ask_for_uid(object obj) {
+           return getuid(obj);
+        }
+
+        void func() {
+           string *names;
+           names = map_array(users(), "ask_for_uid", this_object());
+           /* equivalent but a bit smaller and faster is the following */
+           names = map_array(users(), #'getuid );
+           ...
+        }
+
+        This will create an array holding all uids of the current
+        users.
+
+HISTORY
+        Since LDMud 3.2.6 obsoleted by map().
+        Since LDMud 3.2.9, not available if driver is compiled without
+          USE_DEPRECATED.
+        Removed in LDMud 3.3.
+
+SEE ALSO
+        filter(E), filter_objects(E), assoc(E),
+        intersect_alist(E), insert_alist(E), map(E), map_objects(E),
+        member(E), order_alist(E), sort_array(E), unique_array(E)
