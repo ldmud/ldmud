@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Aug-2008 (Lars)
+  - The 3.3 branch is now considered stable.
+
 08-Aug-2008 (Zesstra)
   - (settings/morgengrauen) Updated file to include the settings currently
     used in MorgenGrauen.

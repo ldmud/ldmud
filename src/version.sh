@@ -11,8 +11,8 @@ version_time=$(echo "\$Date$" | sed -e 's/[$]Date: \([0-9]*-[0-9]*-[0-9]*\) \([0
 version_revision=$(echo "\$Revision$" | sed -e 's/[$]Revision: \([0-9][0-9]*\) *\$/\1/')
 
 # The version type: dev, stable, maintenance, release
-version_type="dev"
-version_longtype="development"
+version_type="stable"
+version_longtype="stable"
 
 # A timestamp, to be used by bumpversion and other scripts.
 # It can be used, for example, to 'touch' this file on every build, thus
