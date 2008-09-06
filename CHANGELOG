@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Sep-2008 (Zesstra)
+  - (lex.c, object.h, swap.c)  
+    Changed format specifiers for mp_int to PRI*MPINT and for p_int to
+    PRI*PINT and removed some casts to long and used the correct format
+    specifiers for the actual datatype (e.g z for size_t).
+
 10-Aug-2008 (Lars Duening)  (3.3.717)
   - Created snapshot.
 

@@ -163,7 +163,7 @@ struct replace_ob_s
 
 #    define ref_object(o,from) (\
      (o)->ref++,\
-     d_flag > 1 ? printf("Add ref to object %s: %ld (%s) %s %d\n" \
+     d_flag > 1 ? printf("Add ref to object %s: %"PRIdPINT" (%s) %s %d\n" \
                         , get_txt((o)->name), (o)->ref, from, __FILE__, __LINE__) : 0, \
      (o))
 
@@ -207,7 +207,7 @@ struct replace_ob_s
       object_t * tmp_ = o; \
       if (tmp_->ref == 2) dest_last_ref_gone = MY_TRUE; \
       tmp_->ref--;\
-      if (d_flag > 1) printf("Sub ref from object %s: %ld (%s) %s %d\n"\
+      if (d_flag > 1) printf("Sub ref from object %s: %"PRIdPINT" (%s) %s %d\n"\
                             , get_txt(tmp_->name), tmp_->ref, from, __FILE__, __LINE__);\
       if (tmp_->ref <= 0) dealloc_object(tmp_); \
     )
@@ -216,7 +216,7 @@ struct replace_ob_s
       object_t * tmp_ = o; \
       if (tmp_->ref == 2) dest_last_ref_gone = MY_TRUE; \
       tmp_->ref--;\
-      if (d_flag > 1) printf("Sub ref from object %s: %ld (%s) %s %d\n"\
+      if (d_flag > 1) printf("Sub ref from object %s: %"PRIdPINT" (%s) %s %d\n"\
                             , get_txt(tmp_->name), tmp_->ref, from, __FILE__, __LINE__);\
       if (tmp_->ref <= 0) dealloc_object(tmp_, __FILE__, __LINE__); \
     )
@@ -236,7 +236,7 @@ struct replace_ob_s
 #else
 
 #    define deref_object(o,from) (--(o)->ref, \
-       d_flag > 1 ? printf("Sub ref from object %s: %ld (%s)\n" \
+       d_flag > 1 ? printf("Sub ref from object %s: %"PRIdPINT" (%s)\n" \
                           , get_txt((o)->name), (o)->ref, from) : 0)
 
 #endif

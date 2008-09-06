@@ -796,7 +796,7 @@ init_lexer(void)
     sprintf(mtext, "%d", ERQ_MAX_REPLY);
     add_permanent_define("__ERQ_MAX_REPLY__", -1, string_copy(mtext), MY_FALSE);
 #endif
-    sprintf(mtext, "%ld", (long)max_malloced);
+    sprintf(mtext, "%"PRIdMPINT, max_malloced);
     add_permanent_define("__MAX_MALLOC__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", (long)def_eval_cost);
     add_permanent_define("__MAX_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
@@ -882,9 +882,9 @@ init_lexer(void)
         add_permanent_define("__WIZLIST__", -1, string_copy(mtext), MY_FALSE);
     }
 
-    sprintf(mtext, "(%ld)", PINT_MAX);
+    sprintf(mtext, "(%"PRIdPINT")", PINT_MAX);
     add_permanent_define("__INT_MAX__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "(%ld)", PINT_MIN);
+    sprintf(mtext, "(%"PRIdPINT")", PINT_MIN);
     add_permanent_define("__INT_MIN__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "(%g)", DBL_MAX);
     add_permanent_define("__FLOAT_MAX__", -1, string_copy(mtext), MY_FALSE);
@@ -2069,8 +2069,8 @@ realloc_defbuf (void)
         defbuf_len <<= 1;
     }
     if (comp_flag)
-        fprintf(stderr, "%s (reallocating defbuf from %ld (%ld left) to %ld) "
-               , time_stamp(), (long)old_defbuf_len, (long)(old_outp-defbuf)
+        fprintf(stderr, "%s (reallocating defbuf from %zu (%td left) to %zu) "
+               , time_stamp(), old_defbuf_len, (ptrdiff_t)(old_outp-defbuf)
                , defbuf_len);
     defbuf = xalloc(defbuf_len);
     memcpy(defbuf+defbuf_len-old_defbuf_len, old_defbuf, old_defbuf_len);

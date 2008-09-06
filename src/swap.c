@@ -603,8 +603,8 @@ store_swap_block (void * buffer, mp_int size)
     /* Seek and write the data */
     if (fseek(swap_file, offset, 0) == -1)
     {
-        debug_message("%s Couldn't seek the swap file, errno %d, offset %ld.\n"
-                     , time_stamp(), errno, offset);
+        debug_message("%s Couldn't seek the swap file, errno %d, "
+            "offset %"PRIdMPINT".\n", time_stamp(), errno, offset);
         return -1;
     }
 
@@ -655,8 +655,8 @@ store_swap_block2 ( void * buffer1, mp_int size1
     /* Seek and write the data */
     if (fseek(swap_file, offset, 0) == -1)
     {
-        debug_message("%s Couldn't seek the swap file, errno %d, offset %ld.\n"
-                     , time_stamp(), errno, offset);
+        debug_message("%s Couldn't seek the swap file, errno %d, "
+            "offset %"PRIdMPINT".\n", time_stamp(), errno, offset);
         return -1;
     }
 
@@ -691,8 +691,9 @@ swap_program (object_t *ob)
 
     if (d_flag > 1)
     {
-        debug_message("%s Swap object %s (obj ref %ld, prog ref %ld)\n"
-                     , time_stamp(), get_txt(ob->name), ob->ref, ob->prog->ref);
+        debug_message("%s Swap object %s (obj ref %"PRIdPINT
+            ", prog ref %"PRIdPINT")\n",
+            time_stamp(), get_txt(ob->name), ob->ref, ob->prog->ref);
     }
 
     prog = ob->prog;
@@ -1329,7 +1330,7 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
             p += sizeof size;
             memcpy(&user, p, sizeof user);
             p += sizeof user;
-            fprintf(stderr, " array: %ld values\n", (long)size);
+            fprintf(stderr, " array: %zu values\n", size);
             p = dump_swapped_values(size, p, indent+2);
             if (!p)
                 return NULL;
@@ -1371,8 +1372,8 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
             p += sizeof num_keys;
             memcpy(&user, p, sizeof user);
             p += sizeof user;
-            fprintf(stderr, " mapping: %ld keys, %ld values\n"
-                          , (long)num_keys, (long)num_values);
+            fprintf(stderr, " mapping: %"PRIdPINT" keys, %"PRIdPINT" values\n"
+                          , num_keys, num_values);
             p = dump_swapped_values(num_keys*(1+num_values), p, indent+2);
             if (!p)
                 return NULL;
@@ -1645,8 +1646,9 @@ swap_variables (object_t *ob)
             if (fseek(swap_file, last_variable_swap_num + sizeof(p_int), 0) ==
                                                                             -1)
             {
-                fatal("Couldn't seek the swap file, errno %d, offset %ld.\n",
-                      errno, last_variable_swap_num + sizeof(p_int));
+                fatal("Couldn't seek the swap file, errno %d, offset %"
+                    PRIdMPINT".\n",
+                    errno, last_variable_swap_num + sizeof(p_int));
             }
             if (fwrite(
                   last_variable_block,
@@ -1664,12 +1666,14 @@ swap_variables (object_t *ob)
 #ifdef CHECK_OBJECT_STAT
         if (check_object_stat)
         {
-            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapout( %p '%s') gc %d vars : %ld -> (%ld:%ld)\n"
-                          , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
-                          , num_variables
-                          , (long)(num_variables * sizeof (svalue_t))
-                          , tot_alloc_object, tot_alloc_object_size - (num_variables * sizeof (svalue_t))
-                          );
+            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapout( %p '%s') gc %d "
+                "vars : %ld -> (%ld:%ld)\n",
+                tot_alloc_object, tot_alloc_object_size, ob, 
+                ob->name ? get_txt(ob->name) : "<null>",
+                num_variables, (long)(num_variables * sizeof (svalue_t)),
+                tot_alloc_object, 
+                tot_alloc_object_size - (num_variables * sizeof (svalue_t))
+                );
         }
 #endif
         tot_alloc_object_size -= num_variables * sizeof (svalue_t);
@@ -1688,8 +1692,8 @@ swap_variables (object_t *ob)
         if (swapfile_size <= swap_num)
             fatal("Attempt to swap in from beyond the end of the swapfile.\n");
         if (fseek(swap_file, swap_num, 0) == -1)
-            fatal("Couldn't seek the swap file, errno %d, offset %ld.\n",
-                  errno, swap_num);
+            fatal("Couldn't seek the swap file, errno %d, offset %"
+                PRIdPINT".\n", errno, swap_num);
         if (fread(&num_variables, sizeof num_variables, 1, swap_file)
             != 1)
         {
@@ -1746,12 +1750,14 @@ swap_variables (object_t *ob)
 #ifdef CHECK_OBJECT_STAT
     if (check_object_stat)
     {
-        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapout( %p '%s') %d vars : %ld -> (%ld:%ld)\n"
-                      , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
-                      , num_variables
-                      , (long)(num_variables * sizeof (svalue_t))
-                      , tot_alloc_object, tot_alloc_object_size - (num_variables * sizeof (svalue_t))
-                      );
+        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapout( %p '%s') %d "
+            "vars : %ld -> (%ld:%ld)\n",
+            tot_alloc_object, tot_alloc_object_size, ob, 
+            ob->name ? get_txt(ob->name) : "<null>",
+            num_variables, (long)(num_variables * sizeof (svalue_t)),
+            tot_alloc_object, 
+            tot_alloc_object_size - (num_variables * sizeof (svalue_t))
+            );
     }
 #endif
     tot_alloc_object_size -= num_variables * sizeof (svalue_t);
@@ -2152,12 +2158,12 @@ load_ob_from_swap (object_t *ob)
         if (swapfile_size <= swap_num)
             fatal("Attempt to swap in from beyond the end of the swapfile.\n");
         if (fseek(swap_file, swap_num, 0) == -1)
-            fatal("Couldn't seek the swap file, errno %d, offset %ld.\n",
-                  errno, swap_num);
+            fatal("Couldn't seek the swap file, errno %d, offset %"
+                PRIdPINT".\n", errno, swap_num);
         if (d_flag > 1)
         {
-            debug_message("%s Unswap object %s (ref %ld)\n", time_stamp()
-                         , get_txt(ob->name), ob->ref);
+            debug_message("%s Unswap object %s (ref %"PRIdPINT")\n", 
+                time_stamp(), get_txt(ob->name), ob->ref);
         }
 
         /* The size of the program is unkown, so read first part to
@@ -2217,8 +2223,8 @@ load_ob_from_swap (object_t *ob)
         if (swapfile_size <= swap_num)
             fatal("Attempt to swap in from beyond the end of the swapfile.\n");
         if (fseek(swap_file, swap_num, 0) == -1)
-            fatal("Couldn't seek the swap file, errno %d, offset %ld.\n",
-                  errno, swap_num);
+            fatal("Couldn't seek the swap file, errno %d, offset %"
+                PRIdPINT".\n", errno, swap_num);
         if (d_flag > 1)
         {
             debug_message("%s Unswap variables of %s\n", time_stamp()
@@ -2263,12 +2269,15 @@ load_ob_from_swap (object_t *ob)
 #ifdef CHECK_OBJECT_STAT
             if (check_object_stat)
             {
-                fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapin( %p '%s') %d vars : %ld -> (%ld:%ld)\n"
-                              , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
-                              , ob->prog->num_variables
-                              , (long)(ob->prog->num_variables * sizeof (svalue_t))
-                              , tot_alloc_object, tot_alloc_object_size + (ob->prog->num_variables * sizeof (svalue_t))
-                              );
+                fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapin( %p '%s') %d "
+                    "vars : %ld -> (%ld:%ld)\n",
+                    tot_alloc_object, tot_alloc_object_size, ob, 
+                    ob->name ? get_txt(ob->name) : "<null>",
+                    ob->prog->num_variables,
+                    (long)(ob->prog->num_variables * sizeof (svalue_t)),
+                    tot_alloc_object, tot_alloc_object_size + 
+                      (ob->prog->num_variables * sizeof (svalue_t))
+                    );
             }
 #endif
             tot_alloc_object_size += ob->prog->num_variables * sizeof (svalue_t);
@@ -2297,10 +2306,11 @@ load_ob_from_swap (object_t *ob)
 #ifdef CHECK_OBJECT_STAT
             if (check_object_stat)
             {
-                fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapin( %p '%s') %d vars failed\n"
-                              , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
-                              , ob->prog->num_variables
-                              );
+                fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapin( %p '%s') %d "
+                    "vars failed\n",
+                    tot_alloc_object, tot_alloc_object_size, ob, 
+                    ob->name ? get_txt(ob->name) : "<null>",
+                    ob->prog->num_variables);
             }
 #endif
 
@@ -2339,8 +2349,8 @@ load_line_numbers_from_swap (program_t *prog)
     if (swapfile_size <= swap_num)
         fatal("Attempt to swap in from beyond the end of the swapfile.\n");
     if (fseek(swap_file, swap_num, 0) == -1)
-        fatal("Couldn't seek the swap file, errno %d, offset %ld.\n",
-              errno, swap_num);
+        fatal("Couldn't seek the swap file, errno %d, offset %"
+            PRIdPINT".\n", errno, swap_num);
     if (fread((char *)&tmp_numbers, sizeof tmp_numbers, 1, swap_file) != 1) {
         fatal("Couldn't read the swap file.\n");
     }
@@ -2401,8 +2411,8 @@ remove_prog_swap (program_t *prog, Bool load_line_numbers)
         linenumbers_t tmp_lines;
 
         if (fseek(swap_file, swap_num + prog->total_size, 0 ) == -1)
-            fatal("Couldn't seek the swap file, errno %d, offset %ld.\n",
-                  errno, swap_num);
+            fatal("Couldn't seek the swap file, errno %d, offset %"
+                PRIdPINT".\n", errno, swap_num);
         if (fread(&tmp_lines, sizeof tmp_lines, 1, swap_file) != 1)
         {
             fatal("Couldn't read the swap file.\n");
@@ -2493,9 +2503,9 @@ swap_status (strbuf_t *sbuf)
                , (double)swap_free_searchlength /
                  ( swap_free_searches ? swap_free_searches : 1 )
     );
-    strbuf_addf(sbuf, "Overhead: %ld blocks using %ld bytes.\n"
-               , num_swap_structs, num_swap_structs * sizeof(swap_block_t)
-               );
+    strbuf_addf(sbuf, "Overhead: %"PRIdMPINT" blocks using %"
+        PRIdMPINT" bytes.\n",
+        num_swap_structs, num_swap_structs * sizeof(swap_block_t) );
     strbuf_addf(sbuf, "Mode: %s - Freespace recycling: %s\n"
                , swap_compact_mode ? "compact" : "non-compact"
                , (recycle_free_space || !swap_compact_mode) ? "on" : "off"
