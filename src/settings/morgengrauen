@@ -10,11 +10,11 @@
 
 MUDHOME=/home/mud
 
-exec ./configure --prefix=${MUDHOME}/ --libdir=${MUDHOME}/mudlib --bindir=${MUDHOME}/bin.install --libexecdir=${MUDHOME}/bin/erq.d --with-setting=morgengrauen $*
-exit 1
+exec ./configure --prefix=${MUDHOME}/ --libdir=${MUDHOME}/mudlib --bindir=${MUDHOME}/bin.install --libexecdir=${MUDHOME}/bin/erq.d --with-swap-file=${MUDHOME}/swapfiles/swapfile
+ --with-setting=morgengrauen $*
+exit $?
 
 # --- The actual settings ---
-with_swap_file=${MUDHOME}/swapfiles/swapfile
 with_portno=4711
 enable_debug=yes
 enable_erq=no

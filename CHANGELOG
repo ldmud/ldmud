@@ -1,4 +1,4 @@
-This file lists all changes made to the game driver in all gory detail.
+This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
 06-Sep-2008 (Zesstra)
@@ -6,6 +6,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
     Changed format specifiers for mp_int to PRI*MPINT and for p_int to
     PRI*PINT and removed some casts to long and used the correct format
     specifiers for the actual datatype (e.g z for size_t).
+  - (sprintf.c)
+    changed argument num of num_add() to p_int.
+    inserted the correct length modifier for the p_int type into the format
+    string for the system sprintf() call. (#528)
 
 10-Aug-2008 (Lars Duening)  (3.3.717)
   - Created snapshot.

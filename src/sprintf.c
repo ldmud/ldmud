@@ -455,7 +455,7 @@ stradd (fmt_state_t *st, sprintf_buffer_t **buffer, char *add)
 
 /*-------------------------------------------------------------------------*/
 static void
-numadd (fmt_state_t *st, sprintf_buffer_t **buffer, int num)
+numadd (fmt_state_t *st, sprintf_buffer_t **buffer, p_int num)
 
 /* Add the <num>ber to the <buffer>.
  */
@@ -2243,7 +2243,8 @@ add_table_now:
                   }
                   else
                   {
-                    char cheat[6];  /* Synthesized format for sprintf() */
+                    /* Synthesized format for sprintf() */
+                    char cheat[6+sizeof(PRI_PINT_PREFIX)-1];
                     char temp[1024];
                       /* The buffer must be big enough to hold the biggest float
                        * in non-exponential representation. 1 KByte is hopefully
@@ -2253,15 +2254,14 @@ add_table_now:
                     double value;   /* The value to print */
                     int    numdig;  /* (Estimated) number of digits before the '.' */
                     Bool zeroCharHack = MY_FALSE;
-
+                    char *p = cheat; /* pointer to the format buffer */
                     int tmpl;
-                    p_uint i = 1;
 
-                    *cheat = '%';
+                    *(p++) = '%';
                     switch (finfo & INFO_PP)
                     {
-                        case INFO_PP_SPACE: cheat[i++] = ' '; break;
-                        case INFO_PP_PLUS:  cheat[i++] = '+'; break;
+                        case INFO_PP_SPACE: *(p++) = ' '; break;
+                        case INFO_PP_PLUS:  *(p++) = '+'; break;
                     }
                     if ((finfo & INFO_T) == INFO_T_FLOAT)
                     {
@@ -2269,10 +2269,10 @@ add_table_now:
                         {
                             ERROR1(ERR_INCORRECT_ARG, format_char);
                         }
-                        cheat[i++] = '.';
-                        cheat[i++] = '*';
-                        cheat[i++] = format_char;
-                        cheat[i] = '\0';
+                        *(p++) = '.';
+                        *(p++) = '*';
+                        *(p++) = format_char;
+                        *p = '\0';
 
                         value = READ_DOUBLE(carg);
 
@@ -2301,18 +2301,27 @@ add_table_now:
                             ERROR1(ERR_INCORRECT_ARG, format_char);
                         }
 
-                        /* System sprintf() can handle ("%c", 0), but LDMud
+                        /* System sprintf() can't handle ("%c", 0), but LDMud
                          * strings can. So in that case we format with
                          * character 0x01 and convert to 0 afterwards.
                          */
-                        if (format_char == 'c' && carg->u.number == 0)
-                        {
+                        if (format_char == 'c') {
+                            if (carg->u.number == 0)
+                            {
                             carg->u.number = 1;
                             zeroCharHack = MY_TRUE;
+                            }
                         }
-
-                        cheat[i++] = format_char;
-                        cheat[i] = '\0';
+                        /* insert the correct length modifier for a p_int
+                         * type. (If the prefix is an empty string, this will
+                         * be probably optimized by the compiler anyway. */
+                        else {
+                            p = memcpy(p, PRI_PINT_PREFIX,
+                                          strlen(PRI_PINT_PREFIX));
+                            p += strlen(PRI_PINT_PREFIX);
+                        }
+                        *(p++) = format_char;
+                        *p = '\0';
                         sprintf(temp, cheat, carg->u.number);
                         tmpl = strlen(temp);
                         if ((size_t)tmpl >= sizeof(temp))
