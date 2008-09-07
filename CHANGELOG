@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Sep-2008 (Zesstra)
+  - (closure.c, efuns.c)
+    Changed format specifiers for mp_int to PRI*MPINT and for p_int to
+    PRI*PINT and changed some specifiers to the native datatype of the
+    variable and removed the casts. Corrected some format specifiers which
+    were signed but the argument were unsigned.
+  - (efuns.c) Corrected typo in error message in v_sha1() which reported
+    itself as md5().
+
 06-Sep-2008 (Zesstra)
   - (lex.c, object.h, swap.c)  
     Changed format specifiers for mp_int to PRI*MPINT and for p_int to

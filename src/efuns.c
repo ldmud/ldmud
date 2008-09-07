@@ -369,8 +369,8 @@ v_md5 (svalue_t *sp, int num_arg)
 
     if (iterations < 1)
     {
-        errorf("Bad argument 2 to md5(): expected a number > 0, but got %ld\n"
-              , (long) iterations);
+        errorf("Bad argument 2 to md5(): expected a number > 0, but got %"
+               PRIdPINT"\n", iterations);
         /* NOTREACHED */
         return sp;
     }
@@ -522,8 +522,8 @@ v_sha1 (svalue_t *sp, int num_arg)
 
     if (iterations < 1)
     {
-        errorf("Bad argument 2 to md5(): expected a number > 0, but got %ld\n"
-              , (long) iterations);
+        errorf("Bad argument 2 to sha1(): expected a number > 0, but got %"
+               PRIdPINT"\n", iterations);
         /* NOTREACHED */
         return sp;
     }
@@ -1268,9 +1268,9 @@ v_regmatch (svalue_t *sp, int num_arg)
             startpos = (size_t)argp[3].u.number;
             if (startpos > mstrsize(text))
             {
-                errorf("regmatch(): Start index out of range: %ld, "
-                      "should be in [0..%ld]\n"
-                     , (long)argp[3].u.number, (long)mstrsize(text)
+                errorf("regmatch(): Start index out of range: %zu, "
+                      "should be in [0..%zu]\n",
+                      startpos, mstrsize(text)
                      );
                 /* NOTREACHED */
                 startpos = 0;
@@ -1535,7 +1535,7 @@ v_trim (svalue_t *sp, int num_arg)
       = { '\t', ' ', '\0' };
     char *strip;         /* String of characters to strip */
     size_t strip_l;      /* Length of *strip */
-    int  where;
+    p_int  where;
 
     /* Get and test the arguments */
     argp = sp - num_arg + 1;
@@ -1548,20 +1548,21 @@ v_trim (svalue_t *sp, int num_arg)
     {
         where = argp[1].u.number;
         if (!where)
-            where = TRIM_LEFT|TRIM_RIGHT;
-        if (where & ~(TRIM_LEFT|TRIM_RIGHT))
-            errorf("Bad argument 2 to trim(): illegal value %ld\n", (long)where);
+            where = TRIM_BOTH;
+        if (where > TRIM_BOTH)
+            errorf("Bad argument 2 to trim(): illegal value %"PRIdPINT"\n",
+                   where);
     }
     else
-        where = TRIM_LEFT|TRIM_RIGHT;
+        where = TRIM_BOTH;
 
     if (num_arg > 2)
     {
         if (argp[2].type == T_NUMBER)
         {
             if (argp[2].u.number <= 0 || argp[2].u.number >= 1 << CHAR_BIT)
-                errorf("Bad argument 3 to trim(): %ld is not a character\n"
-                     , argp[2].u.number);
+                errorf("Bad argument 3 to trim(): %"PRIdPINT
+                       " is not a character\n", argp[2].u.number);
             def_ch[0] = (char)argp[2].u.number;
             def_ch[1] = '\0';
             strip = def_ch;
@@ -2338,10 +2339,10 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
             if (pt - tmpmem + ((l < 0) ? -l : l) >= (ptrdiff_t)tmpmem_size)
             {
-                errorf("Partial string '%s' too long (%ld+%ld >= %ld).\n"
+                errorf("Partial string '%s' too long (%td+%"PRIdPINT" >= %zu).\n"
                      , p
-                     , (long)(pt - tmpmem), (long)((l < 0) ? -l : l)
-                     , (long)tmpmem_size);
+                     , (ptrdiff_t)(pt - tmpmem), ((l < 0) ? -l : l)
+                     , tmpmem_size);
                 /* NOTREACHED */
                 return NULL;
             }
@@ -2552,12 +2553,12 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
      && (!indent_overflows || (long)(cp - get_txt(deststr)) != wrap)
        ) {
       fatal("Length miscalculated in terminal_colour()\n"
-            "    Expected: %i (or %i) Was: %ld\n"
+            "    Expected: %i (or %i) Was: %td\n"
             "    In string: %.*s\n"
             "    Out string: %.*s\n"
             "    Indent: %i Wrap: %i, indent overflow: %s\n"
            , j, wrap
-           , (long)(cp - get_txt(deststr))
+           , (ptrdiff_t)(cp - get_txt(deststr))
            , (int)mstrsize(text), get_txt(text)
            , (int)mstrsize(deststr), get_txt(deststr)
            , indent, wrap
@@ -4082,7 +4083,7 @@ v_clones (svalue_t *sp, int num_arg)
     if (max_array_size && found > max_array_size)
     {
         xfree(ores);
-        errorf("Illegal array size: %ld\n", (long)found);
+        errorf("Illegal array size: %zu\n", found);
         /* NOTREACHED */
         return sp;
     }
@@ -4090,8 +4091,8 @@ v_clones (svalue_t *sp, int num_arg)
     if (!res)
     {
         xfree(ores);
-        errorf("(clones) Out of memory: array[%lu] for result.\n"
-             ,(unsigned long)  found);
+        errorf("(clones) Out of memory: array[%zu] for result.\n",
+               found);
         /* NOTREACHED */
         return sp;
     }
@@ -4206,7 +4207,7 @@ v_object_info (svalue_t *sp, int num_args)
     } else {}
 
     default:
-        errorf("Illegal value %ld for object_info().\n", sp->u.number);
+        errorf("Illegal value %"PRIdPINT" for object_info().\n", sp->u.number);
         /* NOTREACHED */
         return sp;
 
@@ -4529,8 +4530,8 @@ f_set_is_wizard (svalue_t *sp)
     switch (sp->u.number)
     {
         default:
-            errorf("Bad arg to set_is_wizard(): got %ld, expected -1..1\n"
-                 , sp->u.number);
+            errorf("Bad arg to set_is_wizard(): got %"PRIdPINT
+                   ", expected -1..1\n", sp->u.number);
             /* NOTREACHED */
         case  0: *flagp &= ~O_IS_WIZARD; is_wizard_used = MY_TRUE; break;
         case  1: *flagp |=  O_IS_WIZARD; is_wizard_used = MY_TRUE; break;
@@ -4734,7 +4735,7 @@ f_abs (svalue_t *sp)
     {
         if (sp->u.number == PINT_MIN)
         {
-            errorf("Numeric overflow: abs(%ld)\n", (long)sp->u.number);
+            errorf("Numeric overflow: abs(%"PRIdPINT")\n", sp->u.number);
             /* NOTREACHED */
             return NULL;
         }
@@ -4896,7 +4897,7 @@ f_atan (svalue_t *sp)
     {
         d = atan((double)(sp->u.number));
         if (d < (-DBL_MAX) || d > DBL_MAX)
-            errorf("Numeric overflow: atan(%ld)\n", (long)sp->u.number);
+            errorf("Numeric overflow: atan(%"PRIdPINT")\n", sp->u.number);
     }
     else
     {
@@ -4993,7 +4994,7 @@ f_exp (svalue_t *sp)
     {
         d = exp((double)sp->u.number);
         if (d < (-DBL_MAX) || d > DBL_MAX)
-            errorf("Numeric overflow: exp(%ld)\n", (long)sp->u.number);
+            errorf("Numeric overflow: exp(%"PRIdPINT")\n", sp->u.number);
     }
     else
     {
@@ -5313,7 +5314,7 @@ f_to_string (svalue_t *sp)
         break;
 
     case T_NUMBER:
-        sprintf(buf,"%ld", sp->u.number);
+        sprintf(buf,"%"PRIdPINT, sp->u.number);
         if (buf[sizeof(buf)-1] != '\0')
             fatal("Buffer overflow in to_string(): "
                   "int number too big.\n");
@@ -5596,7 +5597,8 @@ v_to_struct (svalue_t *sp, int num_arg)
                      , typename(argp[1].type));
             if (VEC_SIZE(argp->u.vec) > struct_size(argp[1].u.strct))
             {
-                errorf("Too many elements for struct %s: %ld, expected %ld\n"
+                errorf("Too many elements for struct %s: %"PRIdPINT
+                       ", expected %ld\n"
                      , get_txt(struct_name(argp[1].u.strct))
                      , VEC_SIZE(argp->u.vec)
                      , (long)struct_size(argp[1].u.strct)
@@ -5633,7 +5635,8 @@ v_to_struct (svalue_t *sp, int num_arg)
                      , typename(argp[1].type));
             if (VEC_SIZE(argp->u.vec) > struct_size(argp[1].u.strct))
             {
-                errorf("Too many elements for struct %s: %ld, expected %ld\n"
+                errorf("Too many elements for struct %s: %"PRIdPINT
+                       ", expected %ld\n"
                      , get_txt(struct_name(argp[1].u.strct))
                      , VEC_SIZE(argp->u.vec)
                      , (long)struct_size(argp[1].u.strct)
@@ -6610,7 +6613,7 @@ v_member (svalue_t *sp, int num_arg)
 
     if (hasStart && startpos < 0)
     {
-        errorf("Illegal arg 3 to member(): %ld, expected positive number.\n"
+        errorf("Illegal arg 3 to member(): %"PRIdPINT", expected positive number.\n"
              , startpos);
         /* NOTREACHED */
         return sp;
@@ -6837,7 +6840,7 @@ v_rmember (svalue_t *sp, int num_arg)
 
     if (hasStart && startpos < 0)
     {
-        errorf("Illegal arg 3 to rmember(): %ld, expected positive number.\n"
+        errorf("Illegal arg 3 to rmember(): %"PRIdPINT", expected positive number.\n"
              , startpos);
         /* NOTREACHED */
         return sp;
@@ -7952,19 +7955,20 @@ v_debug_info (svalue_t *sp, int num_arg)
         add_message("O_REPLACED        : %s\n",
           flags&O_REPLACED        ?"TRUE":"FALSE");
 #ifdef USE_SET_LIGHT
-        add_message("total light : %d\n", ob->total_light);
+        add_message("total light : %d\n", (int)ob->total_light);
 #endif
-        add_message("time_reset  : %ld\n", (long)ob->time_reset);
-        add_message("time_of_ref : %ld\n", (long)ob->time_of_ref);
-        add_message("ref         : %ld\n", ob->ref);
+        add_message("time_reset  : %"PRIdMPINT"\n", ob->time_reset);
+        add_message("time_of_ref : %"PRIdMPINT"\n", ob->time_of_ref);
+        add_message("ref         : %"PRIdPINT"\n", ob->ref);
 #ifdef DEBUG
-        add_message("extra_ref   : %ld\n", ob->extra_ref);
+        add_message("extra_ref   : %"PRIdPINT"\n", ob->extra_ref);
 #endif
         if (ob->gigaticks)
-            add_message("evalcost   :  %lu%09lu\n", ob->gigaticks, ob->ticks);
+            add_message("evalcost   :  %"PRIuMPINT"%09"PRIuMPINT"\n", 
+                        (mp_uint)ob->gigaticks, (mp_uint)ob->ticks);
         else
-            add_message("evalcost   :  %lu\n", ob->ticks);
-        add_message("swap_num    : %ld\n", O_SWAP_NUM(ob));
+            add_message("evalcost   :  %"PRIdMPINT"\n", (mp_uint)ob->ticks);
+        add_message("swap_num    : %"PRIdPINT"\n", O_SWAP_NUM(ob));
         add_message("name        : '%s'\n", get_txt(ob->name));
         add_message("load_name   : '%s'\n", get_txt(ob->load_name));
         obj2 = ob->next_all;
@@ -7997,23 +8001,26 @@ v_debug_info (svalue_t *sp, int num_arg)
         if ((sp->u.ob->flags & O_SWAPPED) && load_ob_from_swap(sp->u.ob) < 0)
             errorf("Out of memory: unswap object '%s'\n", get_txt(sp->u.ob->name));
         pg = sp->u.ob->prog;
-        add_message("program ref's %3ld\n",        pg->ref);
+        add_message("program ref's %3"PRIdPINT"\n", pg->ref);
         add_message("Name: '%s'\n",                get_txt(pg->name));
-        add_message("program size    %6ld\n"
-          ,(long)(PROGRAM_END(*pg) - pg->program));
-        add_message("num func's:  %3d (%4ld)\n", pg->num_functions
-          , (long)(pg->num_functions * sizeof(uint32) +
-                  pg->num_function_names * sizeof(short)));
-        add_message("num vars:    %3d (%4ld)\n", pg->num_variables
-          , (long)(pg->num_variables * sizeof(variable_t)));
+        add_message("program size    %6"PRIuPINT"\n"
+          ,(p_uint)(PROGRAM_END(*pg) - pg->program));
+        add_message("num func's:  %3u (%4"PRIuPINT")\n", 
+                    (unsigned int)pg->num_functions,
+                    (p_uint)(pg->num_functions * sizeof(uint32) +
+                              pg->num_function_names * sizeof(short)));
+        add_message("num vars:    %3u (%4"PRIuPINT")\n", 
+                    (unsigned int)pg->num_variables,
+                    (p_uint)(pg->num_variables * sizeof(variable_t)));
 
         v1 = program_string_size(pg, &v0, &v2);
-        add_message("num strings: %3d (%4ld) : overhead %ld + data %ld (%ld)\n"
-                   , pg->num_strings
-                   , (long)(v0 + v1)
-                   , (long)v0
-                   , (long)v1
-                   , (long)v2
+        add_message("num strings: %3u (%4"PRIdMPINT") : overhead %"PRIdMPINT
+                    "+ data %"PRIdMPINT" (%"PRIdMPINT")\n"
+                   , (unsigned int)pg->num_strings
+                   , v0 + v1
+                   , v0
+                   , v1
+                   , v2
                    );
 
         {
@@ -8028,14 +8035,15 @@ v_debug_info (svalue_t *sp, int num_arg)
                    )
                     cnt++;
             }
-            add_message("num inherits %3d (%4ld)\n", cnt
-                , (long)(pg->num_inherited * sizeof(inherit_t)));
+            add_message("num inherits %3d (%4"PRIuPINT")\n", cnt
+                , (p_uint)(pg->num_inherited * sizeof(inherit_t)));
         }
-        add_message("total size      %6ld\n"
+        add_message("total size      %6"PRIdPINT"\n"
           ,pg->total_size);
 
         v1 = data_size(sp->u.ob, &v2);
-        add_message("data size       %6ld (%6ld)\n", v1, v2);
+        add_message("data size       %6"PRIdMPINT" (%6"PRIdMPINT")\n",
+                    v1, v2);
         break;
       }
 
@@ -8363,13 +8371,14 @@ v_debug_info (svalue_t *sp, int num_arg)
             strbuf_free(&sbuf);
         }
         else
-            errorf("bad arg 2 to debug_info(): %ld, expected 0..2\n"
+            errorf("bad arg 2 to debug_info(): %"PRIdPINT", expected 0..2\n"
                  , sp->u.number);
         break;
       }
 
     default:
-        errorf("Bad debug_info() request value: %ld\n", arg[0].u.number);
+        errorf("Bad debug_info() request value: %"PRIdPINT"\n", 
+               arg[0].u.number);
         /* NOTREACHED */
         break;
     }
@@ -8399,9 +8408,10 @@ x_gm_localtime (svalue_t *sp, Bool localTime)
     if (sp->type != T_NUMBER)
     {
         if (VEC_SIZE(sp->u.vec) != 2)
-            errorf("Bad arg 1 to %s(): Invalid array size %ld, expected 2.\n"
+            errorf("Bad arg 1 to %s(): Invalid array size %"PRIdPINT
+                   ", expected 2.\n"
                  , localTime ? "localtime" : "gmtime"
-                 , (long)VEC_SIZE(sp->u.vec));
+                 , VEC_SIZE(sp->u.vec));
         if (sp->u.vec->item[0].type != T_NUMBER)
             errorf("Bad arg 1 to %s(): Element 0 is '%s', expected 'int'.\n"
                  , localTime ? "localtime" : "gmtime"
@@ -8639,8 +8649,8 @@ f_ctime(svalue_t *sp)
     if (sp->type != T_NUMBER)
     {
         if (VEC_SIZE(sp->u.vec) != 2)
-            errorf("Bad arg 1 to ctime(): Invalid array size %ld, expected 2.\n"
-                 , (long)VEC_SIZE(sp->u.vec));
+            errorf("Bad arg 1 to ctime(): Invalid array size %"PRIdPINT
+                   ", expected 2.\n", VEC_SIZE(sp->u.vec));
         if (sp->u.vec->item[0].type != T_NUMBER)
             errorf("Bad arg 1 to ctime(): Element 0 is '%s', expected 'int'.\n"
                  , efun_arg_typename(sp->u.vec->item[0].type));

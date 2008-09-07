@@ -1345,8 +1345,9 @@ realloc_values (void)
 
     new_values = xalloc(new_max * sizeof(*new_values));
     if (!new_values)
-        lambda_error("Out of memory (%lu bytes) for %ld new values\n"
-                    , new_max, new_max * sizeof(*new_values));
+        lambda_error("Out of memory (%"PRIdMPINT
+                     " bytes) for %"PRIdMPINT" new values\n",
+                     new_max, new_max * sizeof(*new_values));
 
     current.values_left += current.value_max;
     memcpy( (current.valuep = new_values + current.value_max)
@@ -1378,7 +1379,8 @@ realloc_code (void)
     new_max = current.code_max * 2;
     new_code = rexalloc(current.code, (size_t)new_max);
     if (!new_code)
-        lambda_error("Out of memory (%ld bytes) for new code\n", new_max);
+        lambda_error("Out of memory (%"PRIdMPINT" bytes) for new code\n", 
+                     new_max);
 
     current.code_left += current.code_max;
     current.code_max = new_max;
@@ -1593,7 +1595,7 @@ make_symbol (string_t *name)
         if (!symp) {
             current.symbol_max /= 2;
             xfree(sym);
-            lambda_error("Out of memory (%ld bytes) for symbol table\n"
+            lambda_error("Out of memory (%"PRIdMPINT" bytes) for symbol table\n"
                         , current.symbol_max);
         }
         current.symbol_mask = i = current.symbol_max - (long)sizeof sym;
@@ -5198,8 +5200,8 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
     current.code_left = CODE_BUFFER_START_SIZE-3;
     current.levels_left = MAX_LAMBDA_LEVELS;
     if ( !(current.code = current.codep = xalloc((size_t)current.code_max)) )
-       lambda_error("Out of memory (%ld bytes) for initial codebuffer\n"
-                   , current.code_max);
+       lambda_error("Out of memory (%"PRIdMPINT
+                    " bytes) for initial codebuffer\n", current.code_max);
 
     /* Store the lambda code header */
     STORE_UINT8(current.codep, 0);          /* dummy for num values */
@@ -5210,8 +5212,9 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
     if ( !(current.values =
         xalloc(current.value_max * sizeof current.values[0])) )
     {
-        lambda_error("Out of memory (%lu bytes) for initial value buffer\n"
-                    , current.value_max * sizeof current.values[0]);
+        lambda_error("Out of memory (%"PRIdMPINT
+                     " bytes) for initial value buffer\n",
+                     current.value_max * sizeof current.values[0]);
     }
     current.valuep = current.values + current.value_max;
 
