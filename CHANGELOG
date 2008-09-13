@@ -1,6 +1,31 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Sep-2008 (Zesstra)
+  - (interpret.c)
+    Changed format specifiers for mp_int to PRI*MPINT and for p_int to
+      PRI*PINT and changed some specifiers to the native datatype of the
+      variable and removed the casts.
+    Corrected some unchecked assignments of (m)p_(u)int to int by using the
+      driver type instead of int or adding range checks before the
+      assignments. Changed some longs to p_int as well.
+    Added some precompiler sanity checks for MAX_TRACE, SIZEOF_STACK,
+      TOTAL_TRACE_LENGTH and CACHE_SIZE which have to fit into int.
+    get_arg() used a static buffer with length of 10 but writes a long
+      with %ld. Increased buffer length to 12 and used snprintf()
+      instead of sprintf().
+    get_line_number_if_any(): changed calculation of pointers to the beginning
+      of lambdas to use the more portable offsetof() and to use (PTRTYPE)
+      instead of (char*) and (unsigned long) casts for the pointers.
+  - (port.h)
+    Added check for pre-defined PRId32 to port.h for the (u)int32 type. If it
+      is not defined, define our own.
+  - (closure.h)
+    Include <stddef.h> which defines offsetof() in case it is not a compiler
+      builtin (uses by LAMBDA_VALUE_OFFSET).
+  - (doc/efun.de/call_other.de)
+    Rephrased misleading sentence about __LPC_ARRAY_CALLS__.
+
 07-Sep-2008 (Zesstra)
   - (closure.c, efuns.c)
     Changed format specifiers for mp_int to PRI*MPINT and for p_int to

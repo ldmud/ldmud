@@ -20,9 +20,9 @@ BESCHREIBUNG
         Die Elemente von *<ob> koennen Objekte oder Namen von Objekten sein.
         Zerstoerte Objekte und 0 als Element geben eine 0 zurueck, fuehren
         aber nicht zu einem Fehler.
-
-        Damit auch Arrays von Objekten akzeptiert werden, muss das Makro
-        __LPC_ARRAY_CALLS__ gesetzt sein.
+        
+        Falls Arrays von Objekten akzeptiert werden, ist das Makro
+        __LPC_ARRAY_CALLS__ gesetzt.
 
         Das Objekt (bzw. die Objekte) kann direkt oder ueber einen String
         (d.h. den Objektnamen) angegeben werden. Wenn ein String angegeben

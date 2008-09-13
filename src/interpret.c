@@ -336,10 +336,18 @@ struct cache
 #endif
   /* Number of entries in the apply cache.
    */
-
+#if CACHE_SIZE > INT_MAX
+#error CACHE_SIZE is > INT_MAX.
+#endif
+  /* sanity check - some function rely that CACHE_SIZE fits into int */
 
 /*-------------------------------------------------------------------------*/
 /* Tracing */
+
+#if TOTAL_TRACE_LENGTH > INT_MAX
+#error TOTAL_TRACE_LENGTH is > INT_MAX.
+#endif
+/* sanity check - some function rely that TOTAL_TRACE_LENGTH fits into int */
 
 int tracedepth;
   /* Current depth of traced functions.
@@ -562,6 +570,10 @@ svalue_t apply_return_value = { T_NUMBER };
    */
 
 #define SIZEOF_STACK (EVALUATOR_STACK_SIZE<<1)
+#if SIZEOF_STACK > INT_MAX
+#error SIZEOF_STACK is > INT_MAX.
+#endif
+/* sanity check - some function rely that SIZEOF_STACK fits into int */
 
 static svalue_t value_stack_array[SIZEOF_STACK+1];
 #define VALUE_STACK (value_stack_array+1)
@@ -576,7 +588,9 @@ static svalue_t value_stack_array[SIZEOF_STACK+1];
    * is the real bottom of the stack.
    */
 
-
+#if MAX_TRACE > INT_MAX
+#error MAX_TRACE is > INT_MAX.
+#endif
 #if MAX_USER_TRACE >= MAX_TRACE
 #error MAX_USER_TRACE value must be smaller than MAX_TRACE!
 #endif
@@ -1551,7 +1565,7 @@ inl_copy_svalue_no_free (svalue_t *to, svalue_t *from)
             DYN_MAPPING_COST(MAP_SIZE(old));
             new = copy_mapping(old);
             if (!new)
-                errorf("Out of memory: mapping[%lu] for copy.\n"
+                errorf("Out of memory: mapping[%"PRIdPINT"] for copy.\n"
                      , MAP_SIZE(old));
             free_mapping(old);
             to->u.map = new;
@@ -1570,8 +1584,8 @@ inl_copy_svalue_no_free (svalue_t *to, svalue_t *from)
             DYN_ARRAY_COST(size);
             new = allocate_uninit_array((int)size);
             if (!new)
-                errorf("Out of memory: array[%lu] for copy.\n"
-                     , (unsigned long) size);
+                errorf("Out of memory: array[%zu] for copy.\n"
+                     , size);
             for (i = 0; i < size; i++)
                 assign_svalue_no_free( &new->item[i]
                                      , &old->item[i]);
@@ -2137,8 +2151,8 @@ transfer_pointer_range (svalue_t *source)
 
 #ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
-            errorf("Illegal range [%ld..%ld] for assignment.\n"
-                 , index1, index2-1
+            errorf("Illegal range [%"PRIdMPINT"..%"PRIdMPINT
+                   "] for assignment.\n", index1, index2-1
                  );
 #endif /* NO_NEGATIVE_RANGES */
 
@@ -2253,8 +2267,8 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
 
 #ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
-            errorf("Illegal range [%ld..%ld] for assignment.\n"
-                 , index1, index2-1
+            errorf("Illegal range [%"PRIdMPINT"..%"PRIdMPINT
+                   "] for assignment.\n", index1, index2-1
                  );
 #endif /* NO_NEGATIVE_RANGES */
 
@@ -2364,8 +2378,8 @@ assign_string_range (svalue_t *source, Bool do_free)
 
 #ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
-            errorf("Illegal range [%ld..%ld] for assignment.\n"
-                 , index1, index2-1
+            errorf("Illegal range [%"PRIdMPINT"..%"PRIdMPINT
+                   "] for assignment.\n", index1, index2-1
                  );
 #endif /* NO_NEGATIVE_RANGES */
 
@@ -2437,8 +2451,8 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
 
 #ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
-            errorf("Illegal range [%ld..%ld] for assignment.\n"
-                 , index1, index2-1
+            errorf("Illegal range [%"PRIdMPINT"..%"PRIdMPINT
+                   "] for assignment.\n", index1, index2-1
                  );
 #endif /* NO_NEGATIVE_RANGES */
 
@@ -2613,7 +2627,7 @@ inter_add_array (vector_t *q, vector_t **vpp)
 
     if (max_array_size && p_size + q_size > max_array_size)
     {
-        errorf("Illegal array size: %ld.\n", (long)(p_size + q_size));
+        errorf("Illegal array size: %"PRIdPINT".\n", (p_size + q_size));
     }
 
     /* The optimized array-adding will transfer elements around, rendering
@@ -2814,7 +2828,8 @@ _pop_stack (void)
 {
 #ifdef DEBUG
     if (inter_sp < VALUE_STACK)
-        fatal("VM Stack underflow: %ld too low.\n", (long)(VALUE_STACK - inter_sp));
+        fatal("VM Stack underflow: %"PRIdMPINT" too low.\n", 
+              (mp_int)(VALUE_STACK - inter_sp));
 #endif
     free_svalue(inter_sp--);
 }
@@ -2857,8 +2872,8 @@ stack_overflow (svalue_t *sp, svalue_t *fp, bytecode_p pc)
 
 {
     if (sp >= &VALUE_STACK[SIZEOF_STACK])
-        fatal("Fatal stack overflow: %ld too high.\n"
-             , (long)(sp - &VALUE_STACK[SIZEOF_STACK])
+        fatal("Fatal stack overflow: %"PRIdMPINT" too high.\n"
+             , (mp_int)(sp - &VALUE_STACK[SIZEOF_STACK])
              );
     sp = _pop_n_elems(sp-fp, sp);
     ERROR("stack overflow\n");
@@ -3028,7 +3043,7 @@ get_vector_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
  */
 
 {
-    int ind;
+    p_int ind;
     svalue_t * item;
 
     if (i->type != T_NUMBER)
@@ -3049,8 +3064,9 @@ get_vector_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
         }
         if (ind >= VEC_SIZE(vec))
         {
-            ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
-                   , (long)ind, VEC_SIZE(vec)));
+            ERRORF(("Index for [] out of bounds: %"PRIdPINT
+                    ", vector size: %"PRIdPINT"\n"
+                   , ind, VEC_SIZE(vec)));
             /* NOTREACHED */
             return NULL;
         }
@@ -3077,7 +3093,7 @@ get_vector_r_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
  */
 
 {
-    int ind;
+    p_int ind;
     svalue_t * item;
 
     if (i->type != T_NUMBER)
@@ -3092,12 +3108,12 @@ get_vector_r_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
         ERROR("Illegal index for [<]: not a positive number.\n");
         return NULL;
     }
-    if ( (ind = (mp_int)VEC_SIZE(vec) - ind) < 0
-     ||  ind >= (mp_int)VEC_SIZE(vec)
+    if ( (ind = VEC_SIZE(vec) - ind) < 0
+     ||  ind >= VEC_SIZE(vec)
        )
     {
-        ERRORF(("Index out of bounds for [<]: %ld, vector size: %lu.\n"
-               , (long)(i->u.number), VEC_SIZE(vec)));
+        ERRORF(("Index out of bounds for [<]: %"PRIdPINT", vector size: %"
+                PRIdPINT".\n", i->u.number, VEC_SIZE(vec)));
         return NULL;
     }
 
@@ -3122,7 +3138,7 @@ get_vector_a_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
  */
 
 {
-    int ind;
+    p_int ind;
     svalue_t * item;
 
     if (i->type != T_NUMBER)
@@ -3133,11 +3149,12 @@ get_vector_a_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
         return NULL;
     }
     if (0 > (ind = i->u.number))
-        ind = (mp_int)VEC_SIZE(vec) + ind;
-    if (ind < 0 || ind >= (mp_int)VEC_SIZE(vec))
+        ind = VEC_SIZE(vec) + ind;
+    if (ind < 0 || ind >= VEC_SIZE(vec))
     {
-        ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
-               , (long)(i->u.number), VEC_SIZE(vec)));
+        ERRORF(("Index out of bounds for [>]: %"PRIdPINT", vector size: %"
+                PRIdPINT".\n"
+               , i->u.number, VEC_SIZE(vec)));
         return NULL;
     }
 
@@ -3188,8 +3205,9 @@ get_string_item ( svalue_t * svp, svalue_t * i, Bool make_singular
 
         if (ind > (mp_int)mstrsize(svp->u.str) )
         {
-            ERRORF(("Index out for [] of bounds: %ld, string length: %ld.\n"
-                   , (long)ind, (long)mstrsize(svp->u.str)));
+            ERRORF(("Index out for [] of bounds: %"PRIdMPINT
+                    ", string length: %zu.\n"
+                   , ind, mstrsize(svp->u.str)));
             return NULL;
         }
 
@@ -3197,14 +3215,15 @@ get_string_item ( svalue_t * svp, svalue_t * i, Bool make_singular
         {
             if (!allow_one_past)
             {
-                ERRORF(("Index out of bounds for []: %ld, string length: %ld.\n"
-                       , (long)ind, (long)mstrsize(svp->u.str)));
+                ERRORF(("Index out of bounds for []: %"PRIdMPINT
+                        ", string length: %zu.\n"
+                       , ind, mstrsize(svp->u.str)));
                 return NULL;
             }
             else if (!runtime_no_warn_deprecated)
                 warnf( "Warning: Indexing past string end is deprecated: "
-                       "index %ld, string length: %ld.\n"
-                     , (long)ind, (long)mstrsize(svp->u.str)
+                       "index %"PRIdMPINT", string length: %zu.\n"
+                     , ind, mstrsize(svp->u.str)
                      );
         }
     }
@@ -3270,8 +3289,9 @@ get_string_r_item (svalue_t * svp, svalue_t * i, Bool make_singular
          ||  ind > (mp_int)mstrsize(svp->u.str)
            )
         {
-            ERRORF(("Index out of bounds for [<]: %ld, string length: %ld\n"
-                   , (long) i->u.number, (long)mstrsize(svp->u.str)));
+            ERRORF(("Index out of bounds for [<]: %"PRIdPINT
+                    ", string length: %zu\n"
+                   , i->u.number, mstrsize(svp->u.str)));
             return NULL;
         }
 
@@ -3279,14 +3299,15 @@ get_string_r_item (svalue_t * svp, svalue_t * i, Bool make_singular
         {
             if (!allow_one_past)
             {
-                ERRORF(("Index out for [<] of bounds: %ld, string length: %ld.\n"
-                       , (long)ind, (long)mstrsize(svp->u.str)));
+                ERRORF(("Index out for [<] of bounds: %"PRIdMPINT
+                        ", string length: %zu.\n"
+                       , ind, mstrsize(svp->u.str)));
                 return NULL;
             }
             else if (!runtime_no_warn_deprecated)
                 warnf( "Warning: Indexing past string end is deprecated: "
-                       "index %ld, string length: %ld.\n"
-                     , (long)ind, (long)mstrsize(svp->u.str)
+                       "index %"PRIdMPINT", string length: %zu.\n"
+                     , ind, mstrsize(svp->u.str)
                      );
         }
     }
@@ -3347,8 +3368,9 @@ get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
         }
         if (ind < 0 || ind > (mp_int)mstrsize(svp->u.str))
         {
-            ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
-                   , (long) i->u.number, (long)mstrsize(svp->u.str)));
+            ERRORF(("Index out of bounds for [>]: %"PRIdPINT
+                    ", string length: %zu\n"
+                   , i->u.number, mstrsize(svp->u.str)));
             return NULL;
         }
 
@@ -3356,14 +3378,15 @@ get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
         {
             if (!allow_one_past)
             {
-                ERRORF(("Index out for [>] of bounds: %ld, string length: %ld.\n"
-                       , (long)ind, (long)mstrsize(svp->u.str)));
+                ERRORF(("Index out for [>] of bounds: %"PRIdMPINT
+                        ", string length: %zu.\n"
+                       , ind, mstrsize(svp->u.str)));
                 return NULL;
             }
             else if (!runtime_no_warn_deprecated)
                 warnf( "Warning: Indexing past string end is deprecated: "
-                       "index %ld, string length: %ld.\n"
-                     , (long)ind, (long)mstrsize(svp->u.str)
+                       "index %"PRIdMPINT", string length: %zu.\n"
+                     , ind, mstrsize(svp->u.str)
                      );
         }
     }
@@ -3419,8 +3442,8 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
     if (sp[off_type].u.number >= 0
      && sp[off_type].u.number >= current_prog->num_structs)
     {
-        ERRORF(("Too big struct index: %ld, max %hu\n"
-               , (long)sp[off_type].u.number, current_prog->num_structs
+        ERRORF(("Too big struct index: %"PRIdPINT", max %hu\n"
+               , sp[off_type].u.number, current_prog->num_structs
               ));
     }
 
@@ -3523,7 +3546,7 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc)
  */
 
 {
-    int ind;
+    p_int ind;
     svalue_t * item;
 
     if (i->type == T_SYMBOL || i->type == T_STRING)
@@ -3562,9 +3585,9 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc)
         if (ind >= struct_size(st))
         {
             ERRORF(("Illegal struct '%s'->: out of bounds: "
-                    "%ld, struct sized: %lu.\n"
+                    "%"PRIdPINT", struct sized: %lu.\n"
                    , get_txt(struct_name(st))
-                   , (long)ind
+                   , ind
                    , (unsigned long)struct_size(st)
                   ));
             /* NOTREACHED */
@@ -4096,8 +4119,8 @@ push_protected_indexed_map_lvalue (svalue_t *sp, bytecode_p pc)
             /* using uints automagically checks for negative indices */
            )
         {
-            ERRORF(("Too big subindex for []: value %ld, width %ld.\n"
-                 , sp->u.number, (long)m->num_values));
+            ERRORF(("Too big subindex for []: value %"PRIdPINT", width %"
+                    PRIdPINT".\n", sp->u.number, m->num_values));
             return NULL;
         }
 
@@ -5147,8 +5170,9 @@ range_lvalue (int code, svalue_t *sp)
     if (++ind2 < 0 || ind2 > size+1)
     {
         inter_sp = sp;
-        errorf("Upper range index out of bounds: %ld, size: %ld.\n"
-             , (long)i->u.number, (long)size);
+        errorf("Upper range index out of bounds: %"PRIdPINT
+               ", size: %"PRIdMPINT".\n"
+             , i->u.number, size);
         return NULL;
     }
 
@@ -5181,8 +5205,9 @@ range_lvalue (int code, svalue_t *sp)
     if (ind1 < 0 || ind1 > size)
     {   /* Appending (ind1 == size) is allowed */
         inter_sp = sp;
-        errorf("Lower range index out of bounds: %ld, size: %ld.\n"
-             , (long)i->u.number, (long)size);
+        errorf("Lower range index out of bounds: %"PRIdPINT
+               ", size: %"PRIdMPINT".\n"
+             , i->u.number, size);
         return NULL;
     }
 
@@ -5192,8 +5217,9 @@ range_lvalue (int code, svalue_t *sp)
     if (ind2 < ind1)
     {
         inter_sp = sp;
-        errorf("Range of negative size given: %ld..%ld .\n"
-             , (long)i->u.number, (long)(i+1)->u.number);
+        errorf("Range of negative size given: %"PRIdPINT
+               "..%"PRIdPINT" .\n"
+             , i->u.number, (i+1)->u.number);
         return NULL;
     }
 
@@ -5202,8 +5228,9 @@ range_lvalue (int code, svalue_t *sp)
     else if (ind2 > size)
     {
         inter_sp = sp;
-        errorf("Upper range index out of bounds: %ld, size: %ld.\n"
-             , (long)(i+1)->u.number, (long)size);
+        errorf("Upper range index out of bounds: %"PRIdPINT
+               ", size: %"PRIdMPINT".\n"
+             , (i+1)->u.number, size);
         return NULL;
     }
 
@@ -5358,8 +5385,9 @@ protected_range_lvalue (int code, svalue_t *sp)
 
     if (++ind2 < 0 || ind2 > size) {
         inter_sp = sp;
-        errorf("Upper range index out of bounds: %ld, size: %ld.\n"
-             , (long)i->u.number, (long)size);
+        errorf("Upper range index out of bounds: %"PRIdPINT
+               ", size: %"PRIdMPINT".\n"
+             , i->u.number, size);
         return NULL;
     }
 
@@ -5393,8 +5421,9 @@ protected_range_lvalue (int code, svalue_t *sp)
     {
         /* Appending (ind1 == size) is allowed */
         inter_sp = sp;
-        errorf("Lower range index out of bounds: %ld, size: %ld.\n"
-             , (long)i->u.number, (long)size);
+        errorf("Lower range index out of bounds: %"PRIdPINT
+               ", size: %"PRIdMPINT".\n"
+             , i->u.number, size);
         return NULL;
     }
 
@@ -6027,15 +6056,18 @@ efun_arg_typename (long type)
  * string and return it. The type encoding is the one used in
  * efun_lpc_types[].
  * Result is a pointer to a static buffer.
+ * TODO: this function should use snprintf() for preventing buffer overflows,
+ * TODO::especially changing svalue_typename is otherwise risky.
  */
 
 {
     static char result[400];
     int numtypes, i;
-
+  
+    /* TODO: better write into result and return the static buffer */
     if (type == TF_ANYTYPE)
         return "mixed";
-
+  
     result[0] = '\0';
     numtypes = sizeof(svalue_typename)/sizeof(svalue_typename[0]);
 
@@ -6838,8 +6870,9 @@ push_control_stack ( svalue_t   *sp
     {
         if (!num_error || csp == &CONTROL_STACK[MAX_TRACE-1])
         {
-            ERRORF(("Too deep recursion: depth %ld, limit %d user/%d max.\n"
-                   , (long)(csp - CONTROL_STACK + 1)
+            ERRORF(("Too deep recursion: depth %"PRIdMPINT
+                    ", limit %d user/%d max.\n"
+                   , (mp_int)(csp - CONTROL_STACK + 1)
                    , MAX_USER_TRACE, MAX_TRACE));
         }
     }
@@ -8580,11 +8613,11 @@ again:
          */
 #ifdef DEBUG
         if (efp > sp)
-            fatal("Bad stack at F_RETURN, %ld values too low\n"
-                 , (long)(efp - sp));
+            fatal("Bad stack at F_RETURN, %"PRIdMPINT" values too low\n"
+                 , (mp_int)(efp - sp));
         else if (efp < sp)
-            fatal("Bad stack at F_RETURN, %ld values too high\n"
-                 , (long)(sp - efp));
+            fatal("Bad stack at F_RETURN, %"PRIdMPINT" values too high\n"
+                 , (mp_int)(sp - efp));
 #endif
         while (sp != fp)
         {
@@ -9388,7 +9421,8 @@ again:
 
             if (sp->u.number <= 0)
             {
-                ERRORF(("Illegal 'reserve' value for catch(): got %ld, expected a positive value.\n"
+                ERRORF(("Illegal 'reserve' value for catch(): got %"PRIdPINT
+                        ", expected a positive value.\n"
                        , sp->u.number
                        ));
             }
@@ -9462,7 +9496,8 @@ again:
         {
             if (svp->u.number == PINT_MAX)
             {
-                ERRORF(("Numeric overflow: (%ld)++\n", (long)svp->u.number));
+                ERRORF(("Numeric overflow: (%"PRIdPINT")++\n", 
+                        svp->u.number));
                 /* NOTREACHED */
                 break;
             }
@@ -9524,7 +9559,8 @@ again:
         {
             if (svp->u.number == PINT_MIN)
             {
-                ERRORF(("Numeric overflow: (%ld)--\n", (long)svp->u.number));
+                ERRORF(("Numeric overflow: (%"PRIdPINT")--\n", 
+                        svp->u.number));
                 /* NOTREACHED */
                 break;
             }
@@ -9587,7 +9623,8 @@ again:
         {
             if (svp->u.number == PINT_MAX)
             {
-                ERRORF(("Numeric overflow: (%ld)++\n", (long)svp->u.number));
+                ERRORF(("Numeric overflow: (%"PRIdPINT")++\n", 
+                        svp->u.number));
                 /* NOTREACHED */
                 break;
             }
@@ -9649,7 +9686,8 @@ again:
         {
             if (svp->u.number == PINT_MIN)
             {
-                ERRORF(("Numeric overflow: (%ld)--\n", (long)svp->u.number));
+                ERRORF(("Numeric overflow: (%"PRIdPINT")--\n", 
+                        svp->u.number));
                 /* NOTREACHED */
                 break;
             }
@@ -9710,7 +9748,8 @@ again:
         {
             if (svp->u.number == PINT_MAX)
             {
-                ERRORF(("Numeric overflow: ++(%ld)\n", (long)svp->u.number));
+                ERRORF(("Numeric overflow: ++(%"PRIdPINT")\n", 
+                        svp->u.number));
                 /* NOTREACHED */
                 break;
             }
@@ -9770,7 +9809,8 @@ again:
         {
             if (svp->u.number == PINT_MIN)
             {
-                ERRORF(("Numeric overflow: --(%ld)\n", (long)svp->u.number));
+                ERRORF(("Numeric overflow: --(%"PRIdPINT")\n", 
+                        svp->u.number));
                 /* NOTREACHED */
                 break;
             }
@@ -9930,8 +9970,8 @@ again:
                 DYN_STRING_COST(mstrsize(left) + mstrsize(right))
                 res = mstr_add(left, right);
                 if (!res)
-                    ERRORF(("Out of memory (%lu bytes)\n"
-                           , (unsigned long) mstrsize(left) + mstrsize(right)
+                    ERRORF(("Out of memory (%zu bytes)\n"
+                           , mstrsize(left) + mstrsize(right)
                            ));
                 free_string_svalue(sp);
                 sp--;
@@ -9948,16 +9988,14 @@ again:
 
                 left = (sp-1)->u.str;
                 buff[sizeof(buff)-1] = '\0';
-                sprintf(buff, "%ld", sp->u.number);
+                sprintf(buff, "%"PRIdPINT, sp->u.number);
                 if (buff[sizeof(buff)-1] != '\0')
                     FATAL("Buffer overflow in F_ADD: int number too big.\n");
                 len = mstrsize(left)+strlen(buff);
                 DYN_STRING_COST(len)
                 res = mstr_add_txt(left, buff, strlen(buff));
                 if (!res)
-                    ERRORF(("Out of memory (%lu bytes)\n"
-                           , (unsigned long) len
-                           ));
+                    ERRORF(("Out of memory (%zu bytes)\n", len ));
                 pop_n_elems(2);
                 push_string(sp, res);
                 break;
@@ -9978,9 +10016,7 @@ again:
                 DYN_STRING_COST(len)
                 res = mstr_add_txt(left, buff, strlen(buff));
                 if (!res)
-                    ERRORF(("Out of memory (%lu bytes)\n"
-                           , (unsigned long) len
-                           ));
+                    ERRORF(("Out of memory (%zu bytes)\n", len));
                 sp--;
                 free_string_svalue(sp);
                 put_string(sp, res);
@@ -10005,16 +10041,14 @@ again:
 
                 right = sp->u.str;
                 buff[sizeof(buff)-1] = '\0';
-                sprintf(buff, "%ld", (sp-1)->u.number);
+                sprintf(buff, "%"PRIdPINT, (sp-1)->u.number);
                 if (buff[sizeof(buff)-1] != '\0')
                     FATAL("Buffer overflow in F_ADD: int number too big.\n");
                 len = mstrsize(right)+strlen(buff);
                 DYN_STRING_COST(len)
                 res = mstr_add_to_txt(buff, strlen(buff), right);
                 if (!res)
-                    ERRORF(("Out of memory (%lu bytes)\n"
-                           , (unsigned long) len
-                           ));
+                    ERRORF(("Out of memory (%zu bytes)\n", len));
                 free_string_svalue(sp);
                 sp--;
                 /* Overwrite the number at sp */
@@ -10032,8 +10066,8 @@ again:
                  || (left < 0 && right < 0 && PINT_MIN - left > right)
                    )
                 {
-                    ERRORF(("Numeric overflow: %ld + %ld\n"
-                           , (long)left, (long)right));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" + %"PRIdPINT"\n"
+                           , left, right));
                     /* NOTREACHED */
                     break;
                 }
@@ -10050,8 +10084,8 @@ again:
 
                 sum = (double)((sp-1)->u.number) + READ_DOUBLE(sp);
                 if (sum < (-DBL_MAX) || sum > DBL_MAX)
-                    ERRORF(("Numeric overflow: %ld + %g\n"
-                           , (long)(sp-1)->u.number, READ_DOUBLE(sp)));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" + %g\n"
+                           , (sp-1)->u.number, READ_DOUBLE(sp)));
                 STORE_DOUBLE(sp-1, sum);
                 sp--;
                 sp->type = T_FLOAT;
@@ -10084,8 +10118,8 @@ again:
             {
                 sum = READ_DOUBLE(sp-1) + (double)(sp->u.number);
                 if (sum < (-DBL_MAX) || sum > DBL_MAX)
-                    ERRORF(("Numeric overflow: %g + %ld\n"
-                           , READ_DOUBLE(sp-1), (long)sp->u.number));
+                    ERRORF(("Numeric overflow: %g + %"PRIdPINT"\n"
+                           , READ_DOUBLE(sp-1), sp->u.number));
                 STORE_DOUBLE(sp-1, sum);
                 sp--;
                 break;
@@ -10105,9 +10139,7 @@ again:
                 DYN_STRING_COST(len)
                 res = mstr_add_to_txt(buff, strlen(buff), right);
                 if (!res)
-                    ERRORF(("Out of memory (%lu bytes)\n"
-                           , (unsigned long) len
-                           ));
+                    ERRORF(("Out of memory (%zu bytes)\n", len));
                 free_string_svalue(sp);
                 sp--;
                 /* Overwrite the number at sp */
@@ -10152,10 +10184,13 @@ again:
             {
                 check_map_for_destr(m);
                 if (max_mapping_size && MAP_TOTAL_SIZE(m) > (p_int)max_mapping_size)
-                    ERRORF(("Illegal mapping size: %ld elements (%ld x %ld)\n"
+                    ERRORF(("Illegal mapping size: %"PRIdPINT
+                            " elements (%"PRIdPINT" x %"PRIdPINT")\n"
                            , MAP_TOTAL_SIZE(m), MAP_SIZE(m), m->num_values));
+              
                 if (max_mapping_keys && MAP_SIZE(m) > (p_int)max_mapping_keys)
-                    ERRORF(("Illegal mapping size: %ld entries\n", MAP_SIZE(m)));
+                    ERRORF(("Illegal mapping size: %"PRIdPINT" entries\n", 
+                            MAP_SIZE(m)));
             }
             break;
           }
@@ -10195,8 +10230,8 @@ again:
                  || (left < 0 && right >= 0 && PINT_MIN + right > left)
                    )
                 {
-                    ERRORF(("Numeric overflow: %ld - %ld\n"
-                           , (long)left, (long)right));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" - %"PRIdPINT"\n"
+                           , left, right));
                     /* NOTREACHED */
                     break;
                 }
@@ -10213,8 +10248,8 @@ again:
 
                 diff = (double)((sp-1)->u.number) - READ_DOUBLE(sp);
                 if (diff < (-DBL_MAX) || diff > DBL_MAX)
-                    ERRORF(("Numeric overflow: %ld - %g\n"
-                           , (long)(sp-1)->u.number, READ_DOUBLE(sp)));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" - %g\n"
+                           , (sp-1)->u.number, READ_DOUBLE(sp)));
                 sp--;
                 STORE_DOUBLE(sp, diff);
                 sp->type = T_FLOAT;
@@ -10242,8 +10277,8 @@ again:
             {
                 diff = READ_DOUBLE(sp-1) - (double)(sp->u.number);
                 if (diff < (-DBL_MAX) || diff > DBL_MAX)
-                    ERRORF(("Numeric overflow: %g - %ld\n"
-                           , READ_DOUBLE(sp-1), (long)sp->u.number));
+                    ERRORF(("Numeric overflow: %g - %"PRIdPINT"\n"
+                           , READ_DOUBLE(sp-1), sp->u.number));
                 sp--;
                 STORE_DOUBLE(sp, diff);
                 break;
@@ -10331,8 +10366,8 @@ again:
                      || (right != 0 && PINT_MAX / right < left)
                        )
                     {
-                        ERRORF(("Numeric overflow: %ld * %ld\n"
-                               , (long)left, (long)right));
+                        ERRORF(("Numeric overflow: %"PRIdPINT" * %"PRIdPINT"\n"
+                               , left, right));
                         /* NOTREACHED */
                         break;
                     }
@@ -10343,8 +10378,9 @@ again:
                      || (right != 0 && PINT_MAX / right > left)
                        )
                     {
-                        ERRORF(("Numeric overflow: %ld * %ld\n"
-                               , (long)left, (long)right));
+                        ERRORF(("Numeric overflow: %"PRIdPINT
+                                " * %"PRIdPINT"\n"
+                               , left, right));
                         /* NOTREACHED */
                         break;
                     }
@@ -10355,8 +10391,9 @@ again:
                      || (right > 0 && PINT_MIN / right > left)
                        )
                     {
-                        ERRORF(("Numeric overflow: %ld * %ld\n"
-                               , (long)left, (long)right));
+                        ERRORF(("Numeric overflow: %"PRIdPINT
+                                " * %"PRIdPINT"\n"
+                               , left, right));
                         /* NOTREACHED */
                         break;
                     }
@@ -10373,8 +10410,8 @@ again:
 
                 product = (sp-1)->u.number * READ_DOUBLE(sp);
                 if (product < (-DBL_MAX) || product > DBL_MAX)
-                    ERRORF(("Numeric overflow: %ld * %g\n"
-                           , (long)(sp-1)->u.number, READ_DOUBLE(sp)));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" * %g\n"
+                           , (sp-1)->u.number, READ_DOUBLE(sp)));
                 sp--;
                 STORE_DOUBLE(sp, product);
                 sp->type = T_FLOAT;
@@ -10395,14 +10432,14 @@ again:
                  || (   sp[-1].u.number != 0
                      && PINT_MAX / sp[-1].u.number < (p_int)slen)
                    )
-                    ERRORF(("Result string too long (%lu * %ld).\n"
-                           , (unsigned long)slen, (long)sp[-1].u.number
+                    ERRORF(("Result string too long (%zu * %"PRIdPINT").\n"
+                           , slen, sp[-1].u.number
                            ));
 
                 result = mstr_repeat(sp->u.str, (size_t)sp[-1].u.number);
                 if (!result)
-                    ERRORF(("Out of memory (%ld bytes).\n"
-                           , (long)(mstrsize(sp->u.str) * sp[-1].u.number)));
+                    ERRORF(("Out of memory (%"PRIdPINT" bytes).\n"
+                           , (p_int)mstrsize(sp->u.str) * sp[-1].u.number));
 
                 DYN_STRING_COST(mstrsize(result))
                 free_svalue(sp);
@@ -10479,8 +10516,8 @@ again:
             {
                 product = READ_DOUBLE(sp-1) * sp->u.number;
                 if (product < (-DBL_MAX) || product > DBL_MAX)
-                    ERRORF(("Numeric overflow: %g * %ld\n"
-                           , READ_DOUBLE(sp-1), (long)sp->u.number));
+                    ERRORF(("Numeric overflow: %g * %"PRIdPINT"\n"
+                           , READ_DOUBLE(sp-1), sp->u.number));
                 STORE_DOUBLE(sp-1, product);
                 sp--;
                 break;
@@ -10505,14 +10542,13 @@ again:
                  || (   sp->u.number != 0
                      && PINT_MAX / sp->u.number < (p_int)slen)
                    )
-                    ERRORF(("Result string too long (%ld * %lu).\n"
-                           , (long)sp->u.number, (unsigned long)slen
-                           ));
+                    ERRORF(("Result string too long (%"PRIdPINT" * %zu).\n"
+                           , sp->u.number, slen));
 
                 result = mstr_repeat(sp[-1].u.str, (size_t)sp->u.number);
                 if (!result)
-                    ERRORF(("Out of memory (%ld bytes).\n"
-                           , (long)(mstrsize(sp[-1].u.str) * sp->u.number)));
+                    ERRORF(("Out of memory (%"PRIdMPINT" bytes).\n"
+                           , (mp_int)mstrsize(sp[-1].u.str) * sp->u.number));
 
                 DYN_STRING_COST(mstrsize(result))
 
@@ -10604,8 +10640,8 @@ again:
                 if (sp->u.number == 0)
                     ERROR("Division by zero\n");
                 if ((sp-1)->u.number == PINT_MIN && sp->u.number == -1)
-                    ERRORF(("Numeric overflow: %ld / -1\n"
-                           , (long)(sp-1)->u.number
+                    ERRORF(("Numeric overflow: %"PRIdPINT" / -1\n"
+                           , (sp-1)->u.number
                            ));
                 i = (sp-1)->u.number / sp->u.number;
                 sp--;
@@ -10623,8 +10659,8 @@ again:
                 sp--;
                 dtmp = (double)sp->u.number / dtmp;
                 if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
-                    ERRORF(("Numeric overflow: %ld / %g\n"
-                           , (long)(sp)->u.number, READ_DOUBLE(sp+1)));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" / %g\n"
+                           , (sp)->u.number, READ_DOUBLE(sp+1)));
                 STORE_DOUBLE(sp, dtmp);
                 sp->type = T_FLOAT;
                 break;
@@ -10662,8 +10698,8 @@ again:
                 sp--;
                 dtmp = READ_DOUBLE(sp) / dtmp;
                 if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
-                    ERRORF(("Numeric overflow: %g / %ld\n"
-                           , READ_DOUBLE(sp), (long)(sp+1)->u.number));
+                    ERRORF(("Numeric overflow: %g / %"PRIdPINT"\n"
+                           , READ_DOUBLE(sp), (sp+1)->u.number));
                 STORE_DOUBLE(sp, dtmp);
                 break;
             }
@@ -11388,9 +11424,9 @@ again:
             /* Slice a range from an array */
 
             vector_t *v;
-            int size, i1, i2;
+            p_int size, i1, i2;
 
-            size = (int)VEC_SIZE(sp[-2].u.vec);
+            size = VEC_SIZE(sp[-2].u.vec);
 
             if (instruction == F_RANGE
              || instruction == F_NR_RANGE
@@ -11433,21 +11469,25 @@ again:
                 if (i1 < 0 || i1 >= size)
                 {
                     if (i2 < 0 || i2 >= size)
-                        WARNF(("Warning: Out-of-bounds range limits: [%ld..%ld], size %ld.\n"
-                              , (long)i1, (long)i2, (long)size));
+                        WARNF(("Warning: Out-of-bounds range limits: [%"
+                               PRIdPINT"..%"PRIdPINT"], size %"PRIdPINT".\n"
+                              , i1, i2, size));
                     else
-                        WARNF(("Warning: Out-of-bounds lower range limits: %ld, size %ld.\n"
-                              , (long)i1, (long)size));
+                        WARNF(("Warning: Out-of-bounds lower range limits: %"
+                               PRIdPINT", size %"PRIdPINT".\n"
+                              , i1, size));
                 }
                 else if (i2 < 0 || i2 >= size)
                 {
-                    WARNF(("Warning: Out-of-bounds upper range limits: %ld, size %ld.\n"
-                          , (long)i2, (long)size));
+                    WARNF(("Warning: Out-of-bounds upper range limits: %"
+                           PRIdPINT", size %"PRIdPINT".\n"
+                          , i2, size));
                 }
                 else if (i1 > i2)
                 {
-                    WARNF(("Warning: Ranges of negative size: %ld..%ld .\n"
-                          , (long)i1, (long)i2));
+                    WARNF(("Warning: Ranges of negative size: %"PRIdPINT
+                           "..%"PRIdPINT".\n"
+                          , i1, i2));
                 }
             }
 
@@ -11475,10 +11515,10 @@ again:
         {
             /* Slice a range from string */
 
-            long len, from, to;
+            p_int len, from, to;
             string_t *res;
 
-            len = (long)mstrsize(sp[-2].u.str);
+            len = mstrsize(sp[-2].u.str);
             if (instruction == F_RANGE
              || instruction == F_NR_RANGE
              || instruction == F_NX_RANGE
@@ -11539,7 +11579,7 @@ again:
 
             if (res == NULL)
             {
-                ERRORF(("Out of memory (%ld bytes).\n", to-from+1));
+                ERRORF(("Out of memory (%"PRIdPINT" bytes).\n", to-from+1));
             }
             pop_n_elems(3);
             push_string(sp, res);
@@ -11611,9 +11651,7 @@ again:
                 DYN_STRING_COST(len)
                 new_string = mstr_add(left, right);
                 if (!new_string)
-                    ERRORF(("Out of memory (%lu bytes)\n"
-                           , (unsigned long) len
-                           ));
+                    ERRORF(("Out of memory (%zu bytes)\n", len));
                 free_string_svalue(sp-1);
                 sp -= 2;
             }
@@ -11648,7 +11686,7 @@ again:
                 DYN_STRING_COST(len)
                 new_string = mstr_add_txt(argp->u.str, buff, strlen(buff));
                 if (!new_string)
-                    ERRORF(("Out of memory (%lu bytes).\n", (unsigned long)len));
+                    ERRORF(("Out of memory (%zu bytes).\n", len));
                 sp -= 2;
             }
             else
@@ -11673,8 +11711,8 @@ again:
                  || (left < 0 && right < 0 && PINT_MIN - left > right)
                    )
                 {
-                    ERRORF(("Numeric overflow: %ld += %ld\n"
-                           , (long)left, (long)right));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" += %"PRIdPINT"\n"
+                           , left, right));
                     /* NOTREACHED */
                     break;
                 }
@@ -11695,8 +11733,8 @@ again:
 
                 sum = (double)(argp->u.number) + READ_DOUBLE(sp-1);
                 if (sum < (-DBL_MAX) || sum > DBL_MAX)
-                    ERRORF(("Numeric overflow: %ld + %g\n"
-                           , (long)argp->u.number, READ_DOUBLE(sp-1)));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" + %g\n"
+                           , argp->u.number, READ_DOUBLE(sp-1)));
                 argp->type = T_FLOAT;
                 STORE_DOUBLE(argp, sum);
                 if (instruction == F_VOID_ADD_EQ)
@@ -11718,16 +11756,14 @@ again:
 
                 right = (sp-1)->u.str;
                 buff[sizeof(buff)-1] = '\0';
-                sprintf(buff, "%ld", argp->u.number);
+                sprintf(buff, "%"PRIdPINT, argp->u.number);
                 if (buff[sizeof(buff)-1] != '\0')
                     FATAL("Buffer overflow in F_ADD_EQ: int number too big.\n");
                 len = mstrsize(right)+strlen(buff);
                 DYN_STRING_COST(len)
                 res = mstr_add_to_txt(buff, strlen(buff), right);
                 if (!res)
-                    ERRORF(("Out of memory (%lu bytes)\n"
-                           , (unsigned long) len
-                           ));
+                    ERRORF(("Out of memory (%zu bytes)\n", len));
                 free_string_svalue(sp-1);
 
                 /* Overwrite the number in argp */
@@ -11761,8 +11797,8 @@ again:
                  || (left < 0 && right < 0 && PINT_MIN - left > right)
                    )
                 {
-                    ERRORF(("Numeric overflow: %ld += %ld\n"
-                           , (long)left, (long)right));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" += %"PRIdPINT"\n"
+                           , left, right));
                     /* NOTREACHED */
                     break;
                 }
@@ -11801,13 +11837,13 @@ again:
                 {
                     check_map_for_destr(argp->u.map);
                     if (max_mapping_size && MAP_TOTAL_SIZE(argp->u.map) > (p_int)max_mapping_size)
-                        ERRORF(("Illegal mapping size: %ld elements "
-                                "(%ld x %ld)\n"
-                               , MAP_TOTAL_SIZE(argp->u.map)
+                        ERRORF(("Illegal mapping size: %"PRIdMPINT" elements "
+                                "(%"PRIdPINT" x %"PRIdPINT")\n"
+                               , (mp_int)MAP_TOTAL_SIZE(argp->u.map)
                                , MAP_SIZE(argp->u.map)
                                , argp->u.map->num_values));
                     if (max_mapping_keys && MAP_SIZE(argp->u.map) > (p_int)max_mapping_keys)
-                        ERRORF(("Illegal mapping size: %ld entries\n"
+                        ERRORF(("Illegal mapping size: %"PRIdPINT" entries\n"
                                , MAP_SIZE(argp->u.map)
                               ));
                 }
@@ -11862,8 +11898,8 @@ again:
 
                 d = READ_DOUBLE(argp) + (double)sp[-1].u.number;
                 if (d < (-DBL_MAX) || d > DBL_MAX)
-                    ERRORF(("Numeric overflow: %g + %ld\n"
-                           , READ_DOUBLE(argp), (long)(sp-1)->u.number));
+                    ERRORF(("Numeric overflow: %g + %"PRIdPINT"\n"
+                           , READ_DOUBLE(argp), (sp-1)->u.number));
                 STORE_DOUBLE(argp, d);
                 sp -= 2;
             }
@@ -11934,8 +11970,8 @@ again:
                  || (left < 0 && right >= 0 && PINT_MIN + right > left)
                    )
                 {
-                    ERRORF(("Numeric overflow: %ld -= %ld\n"
-                           , (long)left, (long)right));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" -= %"PRIdPINT"\n"
+                           , left, right));
                     /* NOTREACHED */
                     break;
                 }
@@ -11952,8 +11988,8 @@ again:
                 sp--;
                 diff = (double)(argp->u.number) - READ_DOUBLE(sp);
                 if (diff < (-DBL_MAX) || diff > DBL_MAX)
-                    ERRORF(("Numeric overflow: %ld - %g\n"
-                           , (long)argp->u.number, READ_DOUBLE(sp)));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" - %g\n"
+                           , argp->u.number, READ_DOUBLE(sp)));
                 STORE_DOUBLE(sp, diff);
                 sp->type = T_FLOAT;
                 assign_svalue_no_free(argp, sp);
@@ -11980,8 +12016,8 @@ again:
                  || (left < 0 && right >= 0 && PINT_MIN + right > left)
                    )
                 {
-                    ERRORF(("Numeric overflow: %ld -= %ld\n"
-                           , (long)left, (long)right));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" -= %"PRIdPINT"\n"
+                           , left, right));
                     /* NOTREACHED */
                     break;
                 }
@@ -12065,8 +12101,8 @@ again:
                 sp--;
                 d = READ_DOUBLE(argp) - (double)sp->u.number;
                 if (d < (-DBL_MAX) || d > DBL_MAX)
-                    ERRORF(("Numeric overflow: %g + %ld\n"
-                           , READ_DOUBLE(argp), (long)sp->u.number));
+                    ERRORF(("Numeric overflow: %g + %"PRIdPINT"\n"
+                           , READ_DOUBLE(argp), sp->u.number));
                 STORE_DOUBLE(argp, d);
                 *sp = *argp;
             }
@@ -12162,8 +12198,9 @@ again:
                      || (right != 0 && PINT_MAX / right < left)
                        )
                     {
-                        ERRORF(("Numeric overflow: %ld *= %ld\n"
-                               , (long)left, (long)right));
+                        ERRORF(("Numeric overflow: %"PRIdPINT" *= %"
+                                PRIdPINT"\n"
+                               , left, right));
                         /* NOTREACHED */
                         break;
                     }
@@ -12174,8 +12211,9 @@ again:
                      || (right != 0 && PINT_MAX / right > left)
                        )
                     {
-                        ERRORF(("Numeric overflow: %ld *= %ld\n"
-                               , (long)left, (long)right));
+                        ERRORF(("Numeric overflow: %"PRIdPINT" *= %"
+                                PRIdPINT"\n"
+                               , left, right));
                         /* NOTREACHED */
                         break;
                     }
@@ -12186,8 +12224,9 @@ again:
                      || (right > 0 && PINT_MIN / right > left)
                        )
                     {
-                        ERRORF(("Numeric overflow: %ld *= %ld\n"
-                               , (long)left, (long)right));
+                        ERRORF(("Numeric overflow: %"PRIdPINT" *= %"
+                                PRIdPINT"\n"
+                               , left, right));
                         /* NOTREACHED */
                         break;
                     }
@@ -12203,8 +12242,8 @@ again:
 
                 product = argp->u.number * READ_DOUBLE(sp);
                 if (product < (-DBL_MAX) || product > DBL_MAX)
-                    ERRORF(("Numeric overflow: %ld * %g\n"
-                           , (long)argp->u.number, READ_DOUBLE(sp)));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" * %g\n"
+                           , argp->u.number, READ_DOUBLE(sp)));
                 STORE_DOUBLE(sp, product);
                 sp->type = T_FLOAT;
                 assign_svalue_no_free(argp, sp);
@@ -12234,8 +12273,8 @@ again:
                      || (right != 0 && PINT_MAX / right < left)
                        )
                     {
-                        ERRORF(("Numeric overflow: %ld *= %ld\n"
-                               , (long)left, (long)right));
+                        ERRORF(("Numeric overflow: %"PRIdPINT" *= %"
+                                PRIdPINT"\n", left, right));
                         /* NOTREACHED */
                         break;
                     }
@@ -12246,8 +12285,8 @@ again:
                      || (right != 0 && PINT_MAX / right > left)
                        )
                     {
-                        ERRORF(("Numeric overflow: %ld *= %ld\n"
-                               , (long)left, (long)right));
+                        ERRORF(("Numeric overflow: %"PRIdPINT" *= %"
+                                PRIdPINT"\n", left, right));
                         /* NOTREACHED */
                         break;
                     }
@@ -12258,8 +12297,8 @@ again:
                      || (right > 0 && PINT_MIN / right > left)
                        )
                     {
-                        ERRORF(("Numeric overflow: %ld *= %ld\n"
-                               , (long)left, (long)right));
+                        ERRORF(("Numeric overflow: %"PRIdPINT" *= %"
+                                PRIdPINT"\n", left, right));
                         /* NOTREACHED */
                         break;
                     }
@@ -12288,8 +12327,8 @@ again:
             {
                 d = READ_DOUBLE(argp) * (double)sp->u.number;
                 if (d < (-DBL_MAX) || d > DBL_MAX)
-                    ERRORF(("Numeric overflow: %g * %ld\n"
-                           , READ_DOUBLE(argp), (long)sp->u.number));
+                    ERRORF(("Numeric overflow: %g * %"PRIdPINT"\n"
+                           , READ_DOUBLE(argp), sp->u.number));
                 STORE_DOUBLE(argp, d);
                 *sp = *argp;
             }
@@ -12327,14 +12366,14 @@ again:
              || (   sp->u.number != 0
                  && PINT_MAX / sp->u.number < (p_int)len)
                )
-                ERRORF(("Result string too long (%ld * %lu).\n"
-                       , (long)sp->u.number, (unsigned long)len
+                ERRORF(("Result string too long (%"PRIdPINT" * %zu).\n"
+                       , sp->u.number, len
                        ));
 
             reslen = (size_t)sp->u.number * len;
             result = mstr_repeat(argp->u.str, (size_t)sp->u.number);
             if (!result)
-                ERRORF(("Out of memory (%lu bytes).\n", (unsigned long)reslen));
+                ERRORF(("Out of memory (%zu bytes).\n", reslen));
 
             DYN_STRING_COST(reslen)
 
@@ -12348,7 +12387,7 @@ again:
         {
             vector_t *result;
             mp_int reslen;
-            size_t len;
+            p_uint len;
 
             sp--;
             if (sp->type != T_NUMBER)
@@ -12371,7 +12410,7 @@ again:
 
             if (sp->u.number > 0 && len)
             {
-                size_t left;
+                p_uint left;
                 svalue_t *from, *to;
 
                 /* Seed result[] with one copy of the array.
@@ -12439,8 +12478,8 @@ again:
                 if (sp->u.number == 0)
                     ERROR("Division by zero\n");
                 if (argp->u.number == PINT_MIN && sp->u.number == -1)
-                    ERRORF(("Numeric overflow: %ld / -1\n"
-                           , (long)argp->u.number
+                    ERRORF(("Numeric overflow: %"PRIdPINT" / -1\n"
+                           , argp->u.number
                            ));
                 sp->u.number = argp->u.number /= sp->u.number;
                 break;
@@ -12456,8 +12495,8 @@ again:
                     ERROR("Division by zero\n");
                 dtmp = (double)argp->u.number / dtmp;
                 if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
-                    ERRORF(("Numeric overflow: %ld / %g\n"
-                           , (long)argp->u.number, READ_DOUBLE(sp)));
+                    ERRORF(("Numeric overflow: %"PRIdPINT" / %g\n"
+                           , argp->u.number, READ_DOUBLE(sp)));
                 STORE_DOUBLE(sp, dtmp);
                 sp->type = T_FLOAT;
                 assign_svalue_no_free(argp, sp);
@@ -12509,8 +12548,8 @@ again:
                     ERROR("Division by zero\n");
                 d = READ_DOUBLE(argp) / (double)i;
                 if (d < (-DBL_MAX) || d > DBL_MAX)
-                    ERRORF(("Numeric overflow: %g / %ld\n"
-                           , READ_DOUBLE(argp), (long)sp->u.number));
+                    ERRORF(("Numeric overflow: %g / %"PRIdPINT"\n"
+                           , READ_DOUBLE(argp), sp->u.number));
                 STORE_DOUBLE(argp, d);
                 *sp = *argp;
             }
@@ -13169,17 +13208,17 @@ again:
 
             vector_t *vec;  /* the array */
             svalue_t *svp;  /* pointer into the array */
-            long i;         /* (remaining) vector size */
+            p_int i;         /* (remaining) vector size */
 
             vec = sp->u.vec;
-            i = (long)VEC_SIZE(vec);
+            i = VEC_SIZE(vec);
 
             /* Check if there is enough space on the stack.
              */
             if (i + (sp - VALUE_STACK) >= EVALUATOR_STACK_SIZE)
             {
-                errorf("VM Stack overflow: %ld too high.\n"
-                     , (long)(i + (sp - VALUE_STACK) - EVALUATOR_STACK_SIZE) );
+                errorf("VM Stack overflow: %"PRIdMPINT" too high.\n"
+                     , ((mp_int)i + (sp - VALUE_STACK) - EVALUATOR_STACK_SIZE) );
                 /* NOTREACHED */
                 break;
             }
@@ -14679,9 +14718,9 @@ again:
 #ifdef DEBUG
             if (!ob->variables && entry->variable_index_offset)
                 fatal("%s Fatal: call sefun for object %p '%s' w/o variables, "
-                      "but offset %ld\n"
+                      "but offset %"PRIdPINT"\n"
                      , time_stamp(), ob, get_txt(ob->name)
-                     , (long)(entry->variable_index_offset));
+                     , (entry->variable_index_offset));
 #endif
             current_variables = ob->variables;
             if (current_variables)
@@ -14792,11 +14831,11 @@ again:
             num_values = num[1];
         }
 
-        if (max_mapping_size && i * (1+num_values) > (p_int)max_mapping_size)
-            ERRORF(("Illegal mapping size: %ld elements (%ld x %ld)\n"
-                   , (long)(i * (1+num_values)), (long)i, (long)num_values));
-        if (max_mapping_keys && i > (p_int)max_mapping_keys)
-            ERRORF(("Illegal mapping size: %ld entries\n", (long)i));
+        if (max_mapping_size && (p_uint)i * (1+num_values) > (p_uint)max_mapping_size)
+            ERRORF(("Illegal mapping size: %"PRIuPINT" elements (%u x %u)\n"
+                   , ((p_uint)i * (1+num_values)), i, num_values));
+        if (max_mapping_keys && (p_uint)i > (p_uint)max_mapping_keys)
+            ERRORF(("Illegal mapping size: %u entries\n", i));
 
         /* Get the mapping */
         m = allocate_mapping(i, num_values);
@@ -15026,8 +15065,8 @@ again:
 
         if (n < 0 || n >= m->num_values)
         {
-            ERRORF(("Illegal sub-index %ld, mapping width is %ld.\n"
-                 , (long)n, (long)m->num_values));
+            ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
+                    PRIdPINT".\n", n, m->num_values));
         }
 
         sp--; /* the key */
@@ -15077,8 +15116,8 @@ again:
         n = sp->u.number;
         if (n < 0 || n >= m->num_values)
         {
-            ERRORF(("Illegal sub-index %ld, mapping width is %ld.\n"
-                    , (long)n, (long)m->num_values));
+            ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
+                    PRIdPINT".\n", n, m->num_values));
         }
 
         sp--; /* the key */
@@ -15196,12 +15235,13 @@ again:
         {
             count = arg->u.number;
             if (count < 0 && !use_range)
-                ERRORF(("foreach() got a %ld, expected a non-negative number.", count));
+                ERRORF(("foreach() got a %"PRIdPINT", expected a non-negative "
+                        "number.", count));
             vars_required = 1;
         }
         else if (arg->type == T_STRING)
         {
-            count = (p_int)mstrsize(arg->u.str);
+            count = mstrsize(arg->u.str);
             vars_required = 1;
 
             if (gen_refs)
@@ -15230,7 +15270,7 @@ again:
         else if (arg->type == T_POINTER)
         {
             check_for_destr(arg->u.vec);
-            count = (p_int)VEC_SIZE(arg->u.vec);
+            count = VEC_SIZE(arg->u.vec);
             vars_required = 1;
 
             if (gen_refs)
@@ -15249,7 +15289,7 @@ again:
         else if (arg->type == T_STRUCT)
         {
             struct_check_for_destr(arg->u.strct);
-            count = (p_int)struct_size(arg->u.strct);
+            count = struct_size(arg->u.strct);
             vars_required = 1;
 
             if (gen_refs)
@@ -15274,7 +15314,7 @@ again:
             vars_required = 1 + m->num_values;
             indices = m_indices(m);
 
-            count = (p_int)MAP_SIZE(m);
+            count = MAP_SIZE(m);
               /* after m_indices(), else we'd count destructed entries */
 
             if (gen_refs)
@@ -15389,7 +15429,7 @@ again:
             mapping_t *m;
             vector_t  *indices;
             svalue_t  *values;
-            int        left;
+            p_int        left;
 
             lvalue = sp + sp[-1].x.generic - 2;
 
@@ -15503,7 +15543,7 @@ again:
             }
             else if (sp[-2].type == T_POINTER)
             {
-                if (ix >= (p_int)VEC_SIZE(sp[-2].u.vec))
+                if (ix >= VEC_SIZE(sp[-2].u.vec))
                     break;
                     /* Oops, this array shrunk while we're looping over it.
                      * We stop processing and continue with the following
@@ -15537,7 +15577,7 @@ again:
 #ifdef USE_STRUCTS
             else if (sp[-2].type == T_STRUCT)
             {
-                if (ix >= (p_int)struct_size(sp[-2].u.strct))
+                if (ix >= struct_size(sp[-2].u.strct))
                     break;
                     /* Oops, somehow the struct managed to shring while
                      * we're looping over it.
@@ -15569,10 +15609,14 @@ again:
                     lvalue->u.lvalue = &prot->v;
                 }
             }
-#endif /* USE_STRUCTS */
             else
-                fatal("foreach() requires a string, array or mapping.\n");
-                /* If this happens, the check in F_FOREACH failed. */
+              fatal("foreach() requires a string, array, struct or mapping.\n");
+              /* If this happens, the check in F_FOREACH failed. */
+#else /* USE_STRUCTS */
+            else
+              fatal("foreach() requires a string, array or mapping.\n");
+              /* If this happens, the check in F_FOREACH failed. */
+#endif /* USE_STRUCTS */
         }
 
         /* All that is left is to branch back. */
@@ -15938,7 +15982,7 @@ again:
         if (sp->type == T_NUMBER)
         {
             if (sp->u.number == PINT_MIN)
-                ERRORF(("Numeric overflow: - %ld\n", sp->u.number));
+                ERRORF(("Numeric overflow: - %"PRIdPINT"\n", sp->u.number));
             sp->u.number = - sp->u.number;
             break;
         }
@@ -16007,7 +16051,7 @@ again:
         {
             i = mstrsize(sp->u.str);
             free_string_svalue(sp);
-            put_number(sp, (p_int)i);
+            put_number(sp, i);
             break;
         }
         if (sp->type == T_NUMBER && sp->u.number == 0)
@@ -16031,11 +16075,11 @@ again:
          * will return 0.
          */
 
-        long i;
+        p_int i;
 
         if (sp->type == T_STRING)
         {
-            i = (long)mstrsize(sp->u.str);
+            i = mstrsize(sp->u.str);
             free_svalue(sp);
             put_number(sp, i);
             break;
@@ -16043,7 +16087,7 @@ again:
 
         if (sp->type == T_POINTER)
         {
-            i = (long)VEC_SIZE(sp->u.vec);
+            i = VEC_SIZE(sp->u.vec);
             free_svalue(sp);
             put_number(sp, i);
             break;
@@ -16052,7 +16096,7 @@ again:
 #ifdef USE_STRUCTS
         if (sp->type == T_STRUCT)
         {
-            i = (long)struct_size(sp->u.strct);
+            i = struct_size(sp->u.strct);
             free_svalue(sp);
             put_number(sp, i);
             break;
@@ -16063,7 +16107,7 @@ again:
         {
             mapping_t *m = sp->u.map;
             check_map_for_destr(m); /* Don't count the destructed keys! */
-            i = (long)MAP_SIZE(m);
+            i = MAP_SIZE(m);
             free_svalue(sp);
             put_number(sp, i);
             break;
@@ -16271,9 +16315,9 @@ again:
                     continue;
                 }
                 else
-                    ERRORF(("Bad arg for call_other() at index %ld: "
+                    ERRORF(("Bad arg for call_other() at index %"PRIdMPINT": "
                             "got %s, expected string/object\n"
-                           , (long)(svp - arg->u.vec->item)
+                           , (mp_int)(svp - arg->u.vec->item)
                            , typename(svp->type)
                            ));
 
@@ -16514,13 +16558,13 @@ again:
         /* sp ist just at then end of the stack area */
         stack_overflow(sp, fp, pc);
     }
-    else if ((long)(sp - VALUE_STACK) > (long)(SIZEOF_STACK - 1))
+    else if ((mp_int)(sp - VALUE_STACK) > (mp_int)(SIZEOF_STACK - 1))
     {
         /* When we come here, we already overwrote the bounds
          * of the stack :-(
          */
-        fatal("Fatal stack overflow: %ld too high\n"
-             , (long)(sp - VALUE_STACK - (SIZEOF_STACK - 1))
+        fatal("Fatal stack overflow: %"PRIdMPINT" too high\n"
+             , (mp_int)(sp - VALUE_STACK - (SIZEOF_STACK - 1))
              );
     }
 
@@ -16528,18 +16572,18 @@ again:
     if (expected_stack && expected_stack != sp)
     {
         fatal( "Bad stack after evaluation.\n"
-               "sp: %lx expected: %lx\n"
+               "sp: %p expected: %p\n"
                "Instruction %d(%s), num arg %d\n"
-             , (long)sp, (long)expected_stack
+             , sp, expected_stack
              , instruction, get_f_name(instruction), num_arg);
     }
 
     if (sp < fp + csp->num_local_variables - 1)
     {
         fatal( "Bad stack after evaluation.\n"
-               "sp: %lx minimum expected: %lx\n"
+               "sp: %p minimum expected: %p\n"
                "Instruction %d(%s), num arg %d\n"
-             , (long)sp, (long)(fp + csp->num_local_variables - 1)
+             , sp, (fp + csp->num_local_variables - 1)
              , instruction, get_f_name(instruction), num_arg);
     }
 #endif /* DEBUG */
@@ -18184,11 +18228,11 @@ call_simul_efun (unsigned int code, object_t *ob, int num_arg)
         /* Function not found: try the alternative sefun objects */
         if (simul_efun_vector)
         {
-            long i;
+            p_int i;
             svalue_t *v;
 
-            i = (long)VEC_SIZE(simul_efun_vector);
-            for (v = simul_efun_vector->item+1; MY_TRUE; v++)
+            i = VEC_SIZE(simul_efun_vector);
+            for (v = simul_efun_vector->item+1 ; ; v++)
             {
                 if (--i <= 0 || v->type != T_STRING)
                 {
@@ -18270,7 +18314,7 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
         int super_line;         /* Line number within parent file */
     };
 
-    int offset;            /* (Remaining) program offset to resolve */
+    p_int offset;          /* (Remaining) program offset to resolve */
     int i;                 /* Current line number */
     include_t *includes;   /* Pointer to the next include info */
     struct incinfo *inctop = NULL;  /* The include information stack. */
@@ -18314,13 +18358,14 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
     }
 
     /* Get the offset within the program */
-    offset = (int)(p - progp->program);
+    offset = (p - progp->program);
     if (p < progp->program || p > PROGRAM_END(*progp))
     {
-        printf("%s get_line_number(): Illegal offset %d in object %s\n"
+        printf("%s get_line_number(): Illegal offset %"PRIdPINT" in object %s\n"
               , time_stamp(), offset, get_txt(progp->name));
-        debug_message("%s get_line_number(): Illegal offset %d in object %s\n"
-                     , time_stamp(), offset, get_txt(progp->name));
+        debug_message("%s get_line_number(): Illegal offset %"PRIdPINT
+                      " in object %s\n",
+                      time_stamp(), offset, get_txt(progp->name));
         *namep = ref_mstring(STR_UNDEFINED);
         return 0;
     }
@@ -18561,14 +18606,13 @@ get_line_number_if_any (string_t **name)
             string_t * location, *tmp;
             lambda_t * l;
 
-            sprintf(name_buffer, "<lambda 0x%6lx>", (long)csp->funstart);
+            sprintf(name_buffer, "<lambda 0x%6p>", csp->funstart);
             memsafe(*name = new_mstring(name_buffer), strlen(name_buffer)
                    , "lambda name");
-            l = NULL;
-            l = (lambda_t *)((unsigned long)(csp->funstart)
-                             - ((char *)&(l->function.code) - (char *)l)
-                             - 1
-                            );
+            /* Find the beginning of the lambda structure.*/
+            l = (lambda_t *)( (PTRTYPE)(csp->funstart - 1) 
+                             - offsetof(lambda_t, function.code));
+
             location = closure_location(l);
 
             tmp = mstr_add(*name, location);
@@ -18582,7 +18626,7 @@ get_line_number_if_any (string_t **name)
         }
         return get_line_number(inter_pc, current_prog, name);
     }
-
+  
     *name = ref_mstring(STR_EMPTY);
     return 0;
 } /* get_line_number_if_any() */
@@ -18953,8 +18997,8 @@ dump_trace (Bool how, vector_t ** rvec)
 #ifdef DEBUG
         (void)last_instructions(200, MY_TRUE, NULL);
         if (inter_pc)
-            printf("%6lx: %3d %3d %3d %3d %3d %3d %3d %3d\n"
-                  , (long)inter_pc
+            printf("%6p: %3d %3d %3d %3d %3d %3d %3d %3d\n"
+                  , inter_pc
                   , inter_pc[0], inter_pc[1], inter_pc[2], inter_pc[3]
                   , inter_pc[4], inter_pc[5], inter_pc[6], inter_pc[7] );
         else
@@ -18986,7 +19030,7 @@ invalidate_apply_low_cache (void)
 
 {
     int i;
-
+  
     for (i = 0; i < CACHE_SIZE; i++)
     {
         cache[i].id = 0;
@@ -19143,7 +19187,7 @@ get_arg (int a)
  */
 
 {
-    static char buff[10];
+    static char buff[12];
     bytecode_p from, to;
     int b;
 
@@ -19156,7 +19200,7 @@ get_arg (int a)
 
     if (to - from == 2)
     {
-        sprintf(buff, "%d", GET_CODE(from+1));
+        snprintf(buff, sizeof(buff), "%d", GET_CODE(from+1));
         return buff;
     }
 
@@ -19165,7 +19209,7 @@ get_arg (int a)
         short arg;
 
         GET_SHORT(arg, from+1);
-        sprintf(buff, "%d", arg);
+        snprintf(buff, sizeof(buff), "%hd", arg);
         return buff;
     }
 
@@ -19174,7 +19218,7 @@ get_arg (int a)
         int32 arg;
 
         GET_INT32(arg, from+1);
-        sprintf(buff, "%ld", (long)arg);
+        snprintf(buff, sizeof(buff), "%"PRId32, arg);
         return buff;
     }
 
@@ -19332,7 +19376,7 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
                  || (old_file && !mstreq(file, old_file))
                    )
                 {
-                    sprintf(buf, "%.170s %.160s line %d"
+                    snprintf(buf, sizeof(buf), "%.170s %.160s line %d"
                                , get_txt(previous_objects[i]->name)
                                , get_txt(file), line
                     );
@@ -19346,16 +19390,16 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
                 if (file)
                     free_mstring(file);
             }
-            sprintf(buf, "%6lx: %3d %8s %-26s (%ld:%3ld)"
-                   , (long)previous_pc[i]
+            snprintf(buf, sizeof(buf)-40, "%6p: %3d %8s %-26s (%td:%3td)"
+                   , previous_pc[i]
                    , previous_instruction[i] /* instrs.h has these numbers */
                    , get_arg(i)
                    , get_f_name(previous_instruction[i])
-                   , (long) (stack_size[i] + 1)
-                   , (long) (abs_stack_size[i])
+                   , (stack_size[i] + 1)
+                   , (abs_stack_size[i])
             );
             if (verbose && line != old_line)
-                sprintf(buf + strlen(buf), "\tline %d", old_line = line);
+                snprintf(buf + strlen(buf), 40, "\tline %d", old_line = line);
             last_instr_output(buf, svpp);
         }
     } while (i != last);
@@ -19441,6 +19485,7 @@ f_last_instructions (svalue_t *sp)
 #endif /* TRACE_CODE */
 
 /*-------------------------------------------------------------------------*/
+
 svalue_t *
 f_caller_stack_depth (svalue_t *sp)
 
@@ -19458,6 +19503,8 @@ f_caller_stack_depth (svalue_t *sp)
     struct control_stack *p;
 
     /* Determine the depth of the call stack */
+    /* TODO: create a short static function for this as the code is 
+     * duplicated in f_caller_stack(). */
     p = csp;
     for (depth = 0, done = MY_FALSE; ; depth++)
     {
@@ -19658,8 +19705,9 @@ count_inherits (program_t *progp)
         progp2 = progp->inherit[i].prog;
         progp2->extra_ref++;
         if (progp2 == check_a_lot_ref_counts_search_prog)
-            printf("%s Found prog, inherited by %s, new total ref %ld\n"
-                  , time_stamp(), get_txt(progp->name), progp2->ref);
+            printf("%s Found prog, inherited by %s, new total ref %"
+                   PRIdPINT"\n",
+                   time_stamp(), get_txt(progp->name), progp2->ref);
         if (NULL == register_pointer(ptable, progp2))
         {
             continue;
@@ -19982,7 +20030,8 @@ check_a_lot_ref_counts (program_t *search_prog)
     {
         if (ob->flags & O_DESTRUCTED)
         {
-            /* This shouldn't happen */
+            /* This shouldn't happen 
+             * TODO: remove check? enclose in #ifdef DEBUG? */
             debug_message("%s Found destructed object '%s' where it shouldn't "
                           "be.\n", time_stamp(), get_txt(ob->name));
             continue;
@@ -20061,8 +20110,8 @@ check_a_lot_ref_counts (program_t *search_prog)
 
         if (ob->ref != ob->extra_ref)
         {
-             debug_message("%s Bad ref count in object %s: listed %ld - "
-                           "counted %ld\n"
+             debug_message("%s Bad ref count in object %s: listed %"
+                           PRIdPINT" - counted %"PRIdPINT"\n"
                           , time_stamp(), get_txt(ob->name)
                           , ob->ref, ob->extra_ref);
         }
@@ -20075,7 +20124,7 @@ check_a_lot_ref_counts (program_t *search_prog)
                  && ob->prog->ref > ob->prog->extra_ref)
                 {
                     debug_message("%s high ref count in prog %s: "
-                                  "listed %ld - counted %ld\n"
+                                  "listed %"PRIdPINT" - counted %"PRIdPINT"\n"
                                  , time_stamp()
                                  , get_txt(ob->prog->name), ob->prog->ref
                                  , ob->prog->extra_ref);
@@ -20083,15 +20132,15 @@ check_a_lot_ref_counts (program_t *search_prog)
                 else
                 {
                     check_a_lot_ref_counts(ob->prog);
-                    debug_message("%s Bad ref count in prog %s: listed %ld - "
-                                  "counted %ld\n"
+                    debug_message("%s Bad ref count in prog %s: "
+                                  "listed %"PRIdPINT" - counted %"PRIdPINT"\n"
                                  , time_stamp()
                                  , get_txt(ob->prog->name)
                                  , ob->prog->ref, ob->prog->extra_ref);
                 }
             }
         } /* !SWAPPED */
-        check_extra_ref_in_vector(ob->variables, (size_t)ob->extra_num_variables);
+        check_extra_ref_in_vector(ob->variables, ob->extra_num_variables);
     } /* for */
 
     check_extra_ref_in_vector(VALUE_STACK, (size_t)(inter_sp - VALUE_STACK + 1));
@@ -20171,8 +20220,8 @@ v_apply (svalue_t *sp, int num_arg)
         case CLOSURE_BOUND_LAMBDA:
             if (num_arg + (sp - VALUE_STACK) < EVALUATOR_STACK_SIZE)
                 break;
-            errorf("VM Stack overflow: %ld too high.\n"
-                 , (long)(num_arg + (sp - VALUE_STACK) - EVALUATOR_STACK_SIZE) );
+            errorf("VM Stack overflow: %zu too high.\n",
+                 (size_t)(num_arg + (sp - VALUE_STACK) - EVALUATOR_STACK_SIZE) );
             break;
         }
 
@@ -20444,7 +20493,7 @@ f_get_eval_cost (svalue_t *sp)
  */
 
 {
-    push_number(sp, (max_eval_cost ? max_eval_cost : LONG_MAX) - eval_cost);
+    push_number(sp, (max_eval_cost ? max_eval_cost : PINT_MAX) - eval_cost);
 
     return sp;
 } /* f_get_eval_cost() */

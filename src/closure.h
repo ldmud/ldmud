@@ -9,6 +9,10 @@
 #include "svalue.h"
 #endif /* USE_NEW_INLINES */
 
+/* In case offsetof() is not a compiler builtin include stddef.h which
+ * supplies a define as fallback. Needed for LAMBDA_VALUE_OFFSET */
+#include <stddef.h>
+
 /* --- Types --- */
 
 /* --- struct lambda_s:  ---
