@@ -19485,10 +19485,38 @@ f_last_instructions (svalue_t *sp)
 #endif /* TRACE_CODE */
 
 /*-------------------------------------------------------------------------*/
+static INLINE int
+caller_stack_depth(void)
+/* static helper function for f_caller_stack_depth() and f_caller_stack() for
+ * calculating the stack depth. It is a separate function because the code
+ * is used at two places and the compiler will probably inline it anyway.
+ */
+{
+  int depth;
+  Bool done;
+  struct control_stack *p;
+  
+  /* Determine the depth of the call stack */
+  p = csp;
+  for (depth = 0, done = MY_FALSE; ; depth++)
+  {
+    do {
+      if (p == CONTROL_STACK)
+      {
+        done = MY_TRUE;
+        break;
+      }
+    } while ( !(--p)[1].extern_call );
+    if (done)
+      break;
+  }
+  
+  return depth;
+} /* caller_stack_depth() */
 
+/*-------------------------------------------------------------------------*/
 svalue_t *
 f_caller_stack_depth (svalue_t *sp)
-
 /* EFUN caller_stack_depth()
  *
  *   int caller_stack_depth(void)
@@ -19498,28 +19526,7 @@ f_caller_stack_depth (svalue_t *sp)
  */
 
 {
-    int depth;
-    Bool done;
-    struct control_stack *p;
-
-    /* Determine the depth of the call stack */
-    /* TODO: create a short static function for this as the code is 
-     * duplicated in f_caller_stack(). */
-    p = csp;
-    for (depth = 0, done = MY_FALSE; ; depth++)
-    {
-        do {
-            if (p == CONTROL_STACK)
-            {
-                done = MY_TRUE;
-                break;
-            }
-        } while ( !(--p)[1].extern_call );
-        if (done)
-            break;
-    }
-
-    push_number(sp, depth);
+    push_number(sp, caller_stack_depth());
 
     return sp;
 } /* f_caller_stack_depth() */
@@ -19550,20 +19557,8 @@ f_caller_stack (svalue_t *sp)
     svalue_t *svp;
 
     /* Determine the depth of the call stack */
-    p = csp;
-    for (depth = 0, done = MY_FALSE; ; depth++)
-    {
-        do {
-            if (p == CONTROL_STACK)
-            {
-                done = MY_TRUE;
-                break;
-            }
-        } while ( !(--p)[1].extern_call );
-        if (done)
-            break;
-    }
-
+    depth = caller_stack_depth();
+  
     /* Allocate and fill in the result array */
     v = allocate_uninit_array(depth + (sp->u.number ? 1 : 0));
     p = csp;
