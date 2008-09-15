@@ -15,6 +15,11 @@
  * TODO:: The pool is not absolutely required, but would reduce overhead if
  * TODO:: MALLOC_TRACE is in effect.
  *
+ * TODO: Check if the use of mp_int is reasonable for values for num_values
+ * TODO::and num_entries (which are in the struct p_int). And check as
+ * TODO::the wild mixture of mp_int, p_int, size_t (and maybe still int?)
+ * TODO::used for iterating over mapping structures.
+ *
  * Mappings, or 'associative arrays', are similar to normal arrays, with
  * the principal difference that they can use every value to index their
  * stored data, whereas arrays only index with integer values. On the
@@ -370,7 +375,8 @@ get_new_hash ( mapping_t *m, mp_int hash_size)
  *
  * Return the new structure, or NULL when out of memory.
  */
-
+/* TODO: hash_size of mp_int seems unnecessarily large to me, because 
+ * TODO::mappings can only have p_int values? */
 {
     mapping_hash_t *hm;
     map_chain_t **mcp;
@@ -439,7 +445,8 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
  *
  * Return the new mapping, or NULL when out of memory.
  */
-
+/* TODO: hash_size of mp_int seems unnecessarily large to me, because 
+ * TODO::mappings can only have p_int values? */
 {
     mapping_cond_t *cm;
     mapping_hash_t *hm;
@@ -588,7 +595,8 @@ _free_mapping (mapping_t *m, Bool no_data)
         fatal("No wizlist pointer for mapping");
 
     if (!no_data && m->ref > 0)
-        fatal("Mapping with %ld refs passed to _free_mapping().\n", m->ref);
+        fatal("Mapping with %"PRIdPINT" refs passed to _free_mapping().\n", 
+              m->ref);
 #endif
 
     num_mappings--;
@@ -624,11 +632,11 @@ _free_mapping (mapping_t *m, Bool no_data)
     if ( NULL != (hm = m->hash) )
     {
         map_chain_t **mcp, *mc, *next;
-        int i;
+        p_int i;
 
 #ifdef DEBUG
         if (hm->ref)
-            fatal("Ref count in freed hash mapping: %ld\n", hm->ref);
+            fatal("Ref count in freed hash mapping: %"PRIdPINT"\n", hm->ref);
 #endif
         LOG_SUB("free_mapping hash", SIZEOF_MH(hm));
         m->user->mapping_total -= SIZEOF_MH(hm);
@@ -694,8 +702,9 @@ free_protector_mapping (mapping_t *m)
         }
 #endif
         dump_trace(MY_FALSE, NULL);
-        printf("%s free_protector_mapping() : no hash %s\n"
+/*        printf("%s free_protector_mapping() : no hash %s\n"
               , time_stamp(), m->hash ? "reference" : "part");
+ */
         free_mapping(m);
     }
 #endif /* DEBUG */
@@ -1189,7 +1198,7 @@ check_map_for_destr (mapping_t *m)
  */
 
 {
-    int             num_values;
+    p_int             num_values;
     mapping_cond_t *cm;
     mapping_hash_t *hm;
 
@@ -1211,7 +1220,7 @@ check_map_for_destr (mapping_t *m)
 
             if (destructed_object_ref(entry))
             {
-                int i;
+                p_int i;
                 svalue_t * data = COND_DATA(cm, ix, num_values);
 
                 /* Destructed key: remove the whole entry */
@@ -1471,7 +1480,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
              && (SSIZE_MAX - sizeof(map_chain_t)) / new_width < sizeof(svalue_t))
            )
         {
-            errorf("Mapping width too big (%"PRIdMPINT")\n", new_width);
+            errorf("Mapping width too big (%"PRIdPINT")\n", new_width);
             /* NOTREACHED */
             return NULL;
         }
@@ -1494,7 +1503,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
         m2 = get_new_mapping(current_object->user, new_width, 0, cm_size);
         if (!m2)
         {
-            outofmem(sizeof *m2 + sizeof(svalue_t) * m->num_entries * new_width
+            outofmem(sizeof *m2 + (mp_int)sizeof(svalue_t) * m->num_entries * new_width
                     , "result mapping base structure");
             /* NOTREACHED */
             return NULL;
@@ -1695,8 +1704,9 @@ add_mapping (mapping_t *m1, mapping_t *m2)
             return copy_mapping(m1);
         }
 
-        errorf("Mappings to be added are of different width: %ld vs. %ld\n"
-             , (long)num_values, (long)m2->num_values);
+        errorf("Mappings to be added are of different width: %"PRIdPINT
+               " vs. %"PRIdPINT"\n",
+               num_values, m2->num_values);
     }
 
 
@@ -1754,7 +1764,8 @@ add_mapping (mapping_t *m1, mapping_t *m2)
             ; cm1_ix < cm1size && cm2_ix < cm2size
             ; NOOP )
         {
-            int cmp, i;
+            int cmp;
+            p_int i;
 
             if (src1_key->type == T_INVALID
              || destructed_object_ref(src1_key)
@@ -1817,7 +1828,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
         for ( ; cm1_ix < cm1size; cm1_ix++, src1_key++)
         {
             svalue_t *data = COND_DATA(cm1, cm1_ix, num_values);
-            int i;
+            p_int i;
 
             if (src1_key->type != T_INVALID
              && !destructed_object_ref(src1_key))
@@ -1835,7 +1846,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
         for ( ; cm2_ix < cm2size; cm2_ix++, src2_key++)
         {
             svalue_t *data = COND_DATA(cm2, cm2_ix, num_values);
-            int i;
+            p_int i;
 
             if (src2_key->type != T_INVALID
              && !destructed_object_ref(src2_key))
@@ -1858,7 +1869,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
 
         for ( ; (p_int)num_entries < cm3size; num_entries++)
         {
-            int i;
+            p_int i;
 
             dest_key->type = T_INVALID; dest_key++;
 
@@ -1888,7 +1899,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
             for (mc = *mcp++; mc; mc = mc->next)
             {
                 svalue_t * src, * dest;
-                int i;
+                p_int i;
 
                 src = &(mc->data[0]);
                 dest = get_map_lvalue_unchecked(m3, src);
@@ -1918,7 +1929,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
             for (mc = *mcp++; mc; mc = mc->next)
             {
                 svalue_t * src, * dest;
-                int i;
+                p_int i;
 
                 src = &(mc->data[0]);
                 dest = get_map_lvalue_unchecked(m3, src);
@@ -2084,7 +2095,8 @@ compact_mapping (mapping_t *m, Bool force)
     cm = m->cond;
 
     if (hm && hm->ref) {
-        fatal("compact_mapping(): remaining protector ref count %ld!\n", hm->ref);
+        fatal("compact_mapping(): remaining protector ref count %"
+              PRIdPINT"!\n", hm->ref);
     }
 
     /* Test if the mapping is dirty at all.
@@ -2208,7 +2220,7 @@ compact_mapping (mapping_t *m, Bool force)
 
                 if (last_hash)
                 {
-                    p_int d = svalue_cmp(&(mcp->data[0]), &(last_hash->data[0]));
+                    int d = svalue_cmp(&(mcp->data[0]), &(last_hash->data[0]));
 
                     if (d < 0) {
                         last_hash->next = hook1;
@@ -2284,7 +2296,7 @@ compact_mapping (mapping_t *m, Bool force)
             {
                 /* Sort the next runlength elements onto out1 */
                 while (1) {
-                    p_int d = svalue_cmp(&(hook1->data[0]), &(hook2->data[0]));
+                    int d = svalue_cmp(&(hook1->data[0]), &(hook2->data[0]));
 
                     if (d > 0)
                     {
@@ -2376,7 +2388,7 @@ compact_mapping (mapping_t *m, Bool force)
 
                     map_chain_t *temp;
                     svalue_t    *src;
-                    int i;
+                    p_int i;
 
                     *dest_key++ = hook1->data[0];
 
@@ -2391,7 +2403,7 @@ compact_mapping (mapping_t *m, Bool force)
                 {
                     /* Take entry from the old condensed part */
 
-                    int i;
+                    p_int i;
 
                     *dest_key++ = *src_key++;
 
@@ -2413,7 +2425,7 @@ compact_mapping (mapping_t *m, Bool force)
                 {
                     if (src_key->type != T_INVALID)
                     {
-                        int i;
+                        p_int i;
 
                         *dest_key++ = *src_key++;
 
@@ -2436,7 +2448,7 @@ compact_mapping (mapping_t *m, Bool force)
                 {
                     map_chain_t *temp;
                     svalue_t    *src;
-                    int i;
+                    p_int i;
 
                     *dest_key++ = hook1->data[0];
 
@@ -2577,7 +2589,7 @@ mapping_overhead (mapping_t *m)
  */
 struct set_mapping_user_locals
 {
-    int        num_values;  /* Number of values per key */
+    p_int        num_values;  /* Number of values per key */
     object_t  *owner;       /* Owner to set */
     svalue_t **hairy;
       /* Next free entry in the array of keys which need manual tweaking */
@@ -2599,7 +2611,7 @@ set_mapping_user_filter (svalue_t *key, svalue_t *data, void *extra)
  */
 
 {
-    int i;
+    p_int i;
     struct set_mapping_user_locals *locals;
     object_t *owner;
 
@@ -2632,7 +2644,7 @@ set_mapping_user (mapping_t *m, object_t *owner)
  */
 
 {
-    int num_values;
+    p_int num_values;
     mp_int total;
     wiz_list_t *user;
     struct set_mapping_user_locals locals;
@@ -2981,11 +2993,11 @@ clean_stale_mappings (void)
             if (!cm2)
             {
                 fprintf(stderr, "%s Unable to compact stale mapping: Out of memory "
-                                "for new condensed block (%ld bytes).\n"
-                              , time_stamp(), (long)size);
+                                "for new condensed block (%zu bytes).\n"
+                              , time_stamp(), size);
                 debug_message("%s Unable to compact stale mapping: Out of memory "
-                              "for new condensed block (%ld bytes).\n"
-                             , time_stamp(), (long)size);
+                              "for new condensed block (%zu bytes).\n"
+                             , time_stamp(), size);
 
                 /* No use in even trying to compact the much bigger data
                  * block either.
@@ -3107,19 +3119,20 @@ f_m_allocate (svalue_t *sp)
     p_int width = sp[0].u.number;
 
     if (size < 0)
-        errorf("Illegal mapping size: %ld\n", size);
+        errorf("Illegal mapping size: %"PRIdPINT"\n", size);
     if (width < 0)
-        errorf("Illegal mapping width: %ld\n", width);
+        errorf("Illegal mapping width: %"PRIdPINT"\n", width);
 
     if (max_mapping_size
      && size * (1 + width) > (p_int)max_mapping_size)
-        errorf("Illegal mapping size: %ld elements (%ld x %ld).\n"
-             , size * (1+width)
-             , size, width);
+        errorf("Illegal mapping size: %"PRIdMPINT
+               " elements (%"PRIdPINT" x %"PRIdPINT").\n",
+               (mp_int)size * (1+width),
+               size, width);
 
     if (max_mapping_keys
      && size > (p_int)max_mapping_keys)
-        errorf("Illegal mapping size: %ld entries.\n", size);
+        errorf("Illegal mapping size: %"PRIdPINT" entries.\n", size);
 
     sp--;
 
@@ -3129,7 +3142,8 @@ f_m_allocate (svalue_t *sp)
         /* sp points to a number-typed svalue, so freeing won't
          * be a problem.
          */
-        errorf("Out of memory for mapping[%ld,%ld].\n", size, width);
+        errorf("Out of memory for mapping[%"PRIdPINT",%"PRIdPINT"].\n", 
+               size, width);
         /* NOTREACHED */
     }
     sp->type = T_MAPPING;
@@ -3157,7 +3171,7 @@ v_m_add (svalue_t *sp, int num_arg)
     mapping_t *m;
     svalue_t *argp;
     svalue_t *entry;
-    int num_values;
+    p_int num_values;
 
     argp = sp - num_arg + 1;
     m = argp->u.map;
@@ -3236,7 +3250,7 @@ m_indices (mapping_t *m)
     mp_int size;
 
     check_map_for_destr(m);
-    size = (mp_int)MAP_SIZE(m);
+    size = MAP_SIZE(m);
     v = allocate_array(size); /* might cause error */
     svp = v->item;
     walk_mapping(m, m_indices_filter, &svp);
@@ -3289,8 +3303,8 @@ f_m_values (svalue_t *sp)
     mapping_t *m;
     vector_t *v;
     struct mvf_info vip;
-    mp_int size;
-    int num;
+    p_int size;
+    p_int num;
 
     /* Get and check the arguments */
     num = sp->u.number;
@@ -3299,12 +3313,12 @@ f_m_values (svalue_t *sp)
 
     m = sp->u.map;
     if (num < 0 || num >= m->num_values)
-        errorf("Illegal index %d to m_values(): should be in 0..%ld.\n"
-             , num, (long)m->num_values-1);
+        errorf("Illegal index %"PRIdPINT" to m_values(): should be in 0..%"
+               PRIdPINT".\n", num, m->num_values-1);
 
     /* Get the size of the mapping */
     check_map_for_destr(m);
-    size = (mp_int)MAP_SIZE(m);
+    size = MAP_SIZE(m);
 
     if (size > 0 && m->num_values < 1)
         errorf("m_values() applied on mapping with no values.\n");
@@ -3333,7 +3347,7 @@ add_to_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 
 {
     svalue_t *data2;
-    int i;
+    p_int i;
 
     data2 = get_map_lvalue_unchecked((mapping_t *)extra, key);
     if (!data2)
@@ -3400,8 +3414,9 @@ add_to_mapping (mapping_t *m1, mapping_t *m2)
         }
         else
         {
-            errorf("Mappings to be added are of different width: %ld vs. %ld\n"
-                 , (long)m1->num_values, (long)m2->num_values);
+            errorf("Mappings to be added are of different width: %"PRIdPINT
+                   " vs. %"PRIdPINT"\n",
+                   m1->num_values, m2->num_values);
             return;
         }
     }
@@ -3474,9 +3489,9 @@ map_intersect_filter (svalue_t *key, svalue_t *data UNUSED, void *extra)
     src = get_map_value(m, key);
     if (src != &const0)
     {
-        int num_values = m->num_values;
+        p_int num_values = m->num_values;
         svalue_t * dest;
-        int j;
+        p_int j;
 
         dest = get_map_lvalue(rc, key);
         if (!dest)
@@ -3510,9 +3525,9 @@ map_intersect (mapping_t *m, svalue_t * val)
     if (val->type == T_POINTER)
     {
         vector_t * vec = val->u.vec;
-        size_t     vecsize = VEC_SIZE(vec);
-        int        num_values = m->num_values;
-        size_t     i;
+        p_int      vecsize = VEC_SIZE(vec);
+        p_int      num_values = m->num_values;
+        p_int      i;
 
         rc = allocate_mapping(vecsize, num_values);
         if (!rc)
@@ -3529,7 +3544,7 @@ map_intersect (mapping_t *m, svalue_t * val)
             if (src != &const0)
             {
                 svalue_t * dest;
-                int j;
+                p_int j;
 
                 dest = get_map_lvalue(rc, &vec->item[i]);
                 if (!dest)
@@ -3547,7 +3562,7 @@ map_intersect (mapping_t *m, svalue_t * val)
     else if (val->type == T_MAPPING)
     {
         mapping_t              * map = val->u.map;
-        int                      num_values = m->num_values;
+        p_int                    num_values = m->num_values;
         struct map_intersect_s   data;
 
         rc = allocate_mapping(MAP_SIZE(map), num_values);
@@ -3588,12 +3603,12 @@ map_intersect_array (vector_t *vec, mapping_t *map)
 
 {
     Bool     *flags;       /* The result from match_arrays() */
-    size_t    result_size; /* Size of the result array */
+    p_int    result_size; /* Size of the result array */
     vector_t *result;      /* Result array */
     svalue_t *dest;        /* Pointer for storing the result elements */
-    size_t i;
+    p_int i;
 
-    size_t vec_size = VEC_SIZE(vec);
+    p_int vec_size = VEC_SIZE(vec);
 
     /* Handle empty arrays */
 
@@ -3637,7 +3652,7 @@ map_intersect_array (vector_t *vec, mapping_t *map)
         xfree(flags);
         free_mapping(map);
         free_array(vec);
-        errorf("Illegal array size: %lu.\n", (unsigned long)result_size);
+        errorf("Illegal array size: %"PRIdPINT".\n", result_size);
     }
 
     result = allocate_array(result_size);
@@ -3832,7 +3847,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
     callback_t cb;
     int error_index;
     mapping_t *m;            /* Mapping to walk */
-    int num_values;          /* Number of values per entry */
+    p_int num_values;        /* Number of values per entry */
     svalue_t *read_pointer;  /* Prepared mapping values */
     mp_int i;
 
@@ -3870,7 +3885,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
      */
     while (--i >= 0)
     {
-        int j;
+        p_int j;
         svalue_t *sp2, *data;
 
         if (!callback_object(&cb))
@@ -3938,12 +3953,12 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
     mapping_t *m;            /* Mapping to filter */
     int         error_index;
     callback_t  cb;
-    int num_values;          /* Width of the mapping */
+    p_int num_values;        /* Width of the mapping */
     vector_t *dvec;          /* Values of one key */
     svalue_t *dvec_sp;       /* Stackentry of dvec */
     svalue_t *read_pointer;  /* Prepared mapping values */
     svalue_t *v;
-    int i, j;
+    p_int i, j;
 
     /* Locate the arguments on the stack and extract them */
     arg = sp - num_arg + 1;
@@ -4166,11 +4181,11 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
     svalue_t *arg;           /* Begin of arguments on the stack */
     mapping_t *arg_m;        /* Mapping to map */
     mapping_t *m;            /* Result mapping */
-    int num_values;          /* Width of the mapping */
+    p_int num_values;        /* Width of the mapping */
     vector_t *vec;           /* Indices of m */
     svalue_t *dvec_sp;       /* Stackentry of dvec */
     vector_t *dvec;          /* Values of one key */
-    long i;
+    p_int i;
     svalue_t *key;
     callback_t cb;
     int error_index;
@@ -4226,7 +4241,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
         dvec_sp = sp;
     }
 
-    m = allocate_mapping((i = (long)VEC_SIZE(vec)), 1);
+    m = allocate_mapping((i = VEC_SIZE(vec)), 1);
     if (!m)
     {
         inter_sp = sp;
@@ -4277,7 +4292,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
             }
             else
             {
-                int j;
+                p_int j;
                 svalue_t *svp;
 
                 v = get_map_value(arg_m, key);
@@ -4356,7 +4371,7 @@ v_m_contains (svalue_t *sp, int num_arg)
  *   int m_contains(mixed &data1, ..., &dataN, map, key)
  *
  * If the mapping contains the key map, the corresponding values
- * are assigned to the data arguments, which massed be passed by
+ * are assigned to the data arguments, which must be passed by
  * reference, and 1 is returned. If key is not in map, 0 is
  * returned and the data args are left unchanged.
  * It is possible to use this function for a 0-value mapping, in
@@ -4374,8 +4389,8 @@ v_m_contains (svalue_t *sp, int num_arg)
     if (sp[-1].type != T_MAPPING)
         vefun_arg_error(num_arg-1, T_MAPPING, sp[-1].type, sp);
     if (sp[-1].u.map->num_values != num_arg - 2)
-        errorf("Not enough lvalues: given %ld, required %ld.\n"
-             , (long)num_arg-2, (long)sp[-1].u.map->num_values);
+        errorf("Not enough lvalues: given %d, required %"PRIdPINT".\n",
+               num_arg-2, sp[-1].u.map->num_values);
 
     item = get_map_value(sp[-1].u.map, sp);
     if (item == &const0)
@@ -4433,8 +4448,8 @@ f_m_entry (svalue_t *sp)
     data = get_map_value(sp[-1].u.map, sp);
     if (&const0 != data)
     {
-        int num_values = sp[-1].u.map->num_values;
-        int i;
+        p_int num_values = sp[-1].u.map->num_values;
+        p_int i;
 
         rc = allocate_array(num_values);
 
@@ -4472,7 +4487,7 @@ f_m_reallocate (svalue_t *sp)
  */
 
 {
-    int        new_width;  /* Requested width of the target mapping */
+    p_int      new_width;  /* Requested width of the target mapping */
     mapping_t *m;          /* Argument mapping */
     mapping_t *new_m;      /* New mapping */
 
@@ -4480,7 +4495,7 @@ f_m_reallocate (svalue_t *sp)
     new_width = sp->u.number;
     if (new_width < 0)
     {
-        errorf("Illegal width to m_reallocate(): %ld\n", (long)new_width);
+        errorf("Illegal width to m_reallocate(): %"PRIdPINT"\n", new_width);
         /* NOTREACHED */
         return sp;
     }
@@ -4571,26 +4586,28 @@ v_mkmapping (svalue_t *sp, int num_arg)
 
     if (sp[-num_arg+1].type == T_POINTER)
     {
-        long i, length, num_values;
+        int i, num_values;   /* contains num_arg, which is int */
+        p_int length;     /* VEC_SIZE, array sizes */
         svalue_t *key;
 
         /* Check the arguments and set length to the size of
          * the shortest array.
          */
-        length = LONG_MAX;
+        length = PINT_MAX;
         for (i = -num_arg; ++i <= 0; )
         {
             if ( sp[i].type != T_POINTER )
                 vefun_arg_error(i+num_arg, T_POINTER, sp[i].type, sp);
-            if (length > (long)VEC_SIZE(sp[i].u.vec))
-                length = (long)VEC_SIZE(sp[i].u.vec);
+            if (length > VEC_SIZE(sp[i].u.vec))
+                length = VEC_SIZE(sp[i].u.vec);
         }
 
-        if (max_mapping_size && length * num_arg > (p_int)max_mapping_size)
-            errorf("Illegal mapping size: %ld elements (%ld x %ld)\n"
-                 , length * num_arg, length, (long)num_arg);
+        if (max_mapping_size && (mp_int)length * num_arg > (mp_int)max_mapping_size)
+            errorf("Illegal mapping size: %"PRIdMPINT
+                   " elements (%"PRIdPINT" x %d)\n"
+                 , (mp_int)length * num_arg, length, num_arg);
         if (max_mapping_keys && length > (p_int)max_mapping_keys)
-            errorf("Illegal mapping size: %ld entries\n", length);
+            errorf("Illegal mapping size: %"PRIdPINT" entries\n", length);
 
         /* Allocate the mapping */
         num_values = num_arg - 1;
@@ -4657,14 +4674,14 @@ f_unmkmapping (svalue_t *sp)
     vector_t *v;
     struct mvf_info vip;
     mp_int size;
-    int i;
+    p_int i;
 
     /* Get the arguments */
     m = sp->u.map;
 
     /* Determine the size of the mapping and allocate the result vector */
     check_map_for_destr(m);
-    size = (mp_int)MAP_SIZE(m);
+    size = MAP_SIZE(m);
     v = allocate_array(m->num_values+1);
 
     /* Allocate the sub vectors */
@@ -4702,7 +4719,7 @@ f_widthof (svalue_t *sp)
  */
 
 {
-    int width;
+    p_int width;
 
     if (sp->type == T_NUMBER && sp->u.number == 0)
         return sp;

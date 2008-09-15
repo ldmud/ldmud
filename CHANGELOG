@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Sep-2008 (Zesstra)
+  - (mapping.c)
+    corrected a lot of format specifiers
+    changed a bunch of int which are assigned a p_int to p_int (f_m_values(),
+        add_to_mapping_filter(), resize_mapping(), map_intersect(),
+        v_walk_mapping, x_filter_mapping(), x_map_mapping(), f_m_entry(),
+        f_unmkmapping(), _free_mapping(), check_map_for_destr(),
+        add_mapping(), compact_mapping(), struct set_mapping_user_locals,
+        set_mapping_user_filter(), set_mapping_user(), v_m_add(),
+        map_intersect_filter(), map_intersect(), v_mkmapping(),
+        f_m_reallocate(), f_widthof().
+  - (i-svalue_cmp.h)
+    changed d in svalue_cmp() to p_int instead of int.
+
 14-Sep-2008 (Zesstra)
   - (interpret.c)
     Moved duplicate code for calculating the caller stack depth in a small

@@ -37,7 +37,7 @@ svalue_cmp (svalue_t *left, svalue_t *right)
  */
 
 {
-    register int d;
+    register p_int d;
 
     if ( 0 != (d = left->type - right->type) ) return d;
 
