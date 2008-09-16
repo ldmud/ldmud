@@ -97,7 +97,7 @@ time_string (mp_int t)
         time_t ti = (time_t)t;
         last_time = t;
         tm = localtime(&ti);
-        strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S %Y", tm);
+        strftime(result, sizeof(result), "%a %b %d %H:%M:%S %Y", tm);
     }
     return result;
 } /* time_string() */
@@ -120,9 +120,9 @@ utime_string (mp_int t, mp_int ut)
         last_t= t;
         last_ut= ut;
         tm = localtime(&ti);
-        len = strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S:", tm);
-        sprintf(result+len, "%06ld", ut);
-        strftime(result+len+6, sizeof(result)-7-len, " %Y", tm);
+        len = strftime(result, sizeof(result), "%a %b %d %H:%M:%S:", tm);
+        len += snprintf(result+len, sizeof(result)-len, "%06"PRIdMPINT, ut);
+        strftime(result+len, sizeof(result)-len, " %Y", tm);
     }
     return result;
 } /* utime_string() */
@@ -151,8 +151,8 @@ time_stamp (void)
         time_t ti = (time_t)t;
         last_time = t;
         tm = localtime(&ti);
-        strftime( current_time_stamp, sizeof(current_time_stamp)-1
-                , "%Y.%m.%d %H:%M:%S", tm);
+        strftime( current_time_stamp, sizeof(current_time_stamp),
+                  "%Y.%m.%d %H:%M:%S", tm);
     }
     return current_time_stamp;
 } /* time_stamp() */

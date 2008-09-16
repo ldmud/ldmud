@@ -1,6 +1,21 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Sep-2008 (Zesstra)
+  - (port.c)
+    Corrected 3 strftime() calls, the given buffer length was one smaller than
+    necessary.
+    Corrected a format specifier for an mp_int.
+  - (ptrtable.c)
+    Changed mp_int in find_add_pointer() to p_int because it stores anyway a
+    void*
+    Correct two format specifiers.
+  - (swap.c)
+    Corrected some format specifiers.
+    Increased field width for the numbers in 'status swap' a bit.
+  - (strfuns.c, lex.c)
+    Corrected some format specifiers, changed/removed some unneccessary casts.
+
 15-Sep-2008 (Zesstra)
   - (mapping.c)
     corrected a lot of format specifiers

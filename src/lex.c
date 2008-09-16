@@ -798,19 +798,19 @@ init_lexer(void)
 #endif
     sprintf(mtext, "%"PRIdMPINT, max_malloced);
     add_permanent_define("__MAX_MALLOC__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "%ld", (long)def_eval_cost);
+    sprintf(mtext, "%"PRId32, def_eval_cost);
     add_permanent_define("__MAX_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", (long)CATCH_RESERVED_COST);
     add_permanent_define("__CATCH_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", (long)MASTER_RESERVED_COST);
     add_permanent_define("__MASTER_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "%ld", (long)time_to_reset);
+    sprintf(mtext, "%ld", time_to_reset);
     add_permanent_define("__RESET_TIME__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "%ld", (long)time_to_cleanup);
+    sprintf(mtext, "%ld", time_to_cleanup);
     add_permanent_define("__CLEANUP_TIME__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "%ld", (long)alarm_time);
+    sprintf(mtext, "%ld", alarm_time);
     add_permanent_define("__ALARM_TIME__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "%ld", (long)heart_beat_interval);
+    sprintf(mtext, "%ld", heart_beat_interval);
     add_permanent_define("__HEART_BEAT_INTERVAL__", -1, string_copy(mtext), MY_FALSE);
     if (synch_heart_beats)
         add_permanent_define("__SYNCHRONOUS_HEART_BEAT__", -1, string_copy("1"), MY_FALSE);
@@ -1915,8 +1915,8 @@ make_global_identifier (char *s, int n)
         {
             ip = xalloc(sizeof(ident_t));
             if (!ip) {
-                yyerrorf("Out of memory: identifier (%lu bytes)"
-                        , (unsigned long) sizeof(ident_t));
+                yyerrorf("Out of memory: identifier (%zu bytes)",
+                         sizeof(ident_t));
                 return NULL;
             }
             ip->name = ref_mstring(q->name);
@@ -3927,8 +3927,8 @@ add_lex_string (char *str, size_t slen)
     new = mstr_add_txt(last_lex_string, str, slen);
     if (!new)
     {
-        lexerrorf("Out of memory for string concatenation (%lu bytes)"
-                , (unsigned long)len1+slen);
+        lexerrorf("Out of memory for string concatenation (%zu bytes)",
+                  len1+slen);
     }
     free_mstring(last_lex_string);
     last_lex_string = make_tabled(new);
@@ -3955,8 +3955,8 @@ string (char *str, size_t slen)
         last_lex_string = new_n_tabled(str, slen);
         if (!last_lex_string)
         {
-            lexerrorf("Out of memory for string literal (%lu bytes)"
-                    , (unsigned long)slen);
+            lexerrorf("Out of memory for string literal (%zu bytes)",
+                      slen);
         }
     }
     return L_STRING;

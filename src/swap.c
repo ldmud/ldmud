@@ -1127,10 +1127,10 @@ check_swapped_values (mp_int num, unsigned char * p)
         if (start + swapsize != p) \
         { \
             fprintf(stderr \
-                 , "--- Incorrect swapsize on check: expected %lu bytes, " \
-                   "read %lu (%p .. %p)\n" \
-                 , (unsigned long)swapsize \
-                 , (unsigned long)(p - start), start, p \
+                 , "--- Incorrect swapsize on check: expected %zu bytes, " \
+                   "read %zu (%p .. %p)\n" \
+                 , swapsize \
+                 , (size_t)(p - start), start, p \
                 ); \
             return NULL; \
         }
@@ -1276,11 +1276,11 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
         if (start + swapsize != p) \
         { \
             fprintf(stderr \
-                 , "%.*s--- Incorrect swapsize: expected %lu bytes, " \
-                   "read %lu (%p .. %p)\n" \
+                 , "%.*s--- Incorrect swapsize: expected %zu bytes, " \
+                   "read %zu (%p .. %p)\n" \
                  , indent, "               " \
-                 , (unsigned long)swapsize \
-                 , (unsigned long)(p - start), start, p \
+                 , swapsize \
+                 , (size_t)(p - start), start, p \
                 ); \
         }
 
@@ -1291,9 +1291,9 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
 
         sv.type = *p & ~T_MOD_SWAPPED; /* get the original type */
 
-        fprintf(stderr, "%.*s%08lx (%6ld) [%3ld]: type %d"
+        fprintf(stderr, "%.*s%16p (%6zu) [%3"PRIdMPINT"]: type %d"
                       , indent, "                "
-                      , (unsigned long)p, (unsigned long)(p - block)
+                      , p, (size_t)(p - block)
                       , max_num  - num - 1
                       , sv.type
                );
@@ -1465,9 +1465,9 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         if (start + swapsize != p) \
         { \
             dump_swapped_values(max_num, block, 0); \
-            fatal("svalue type %d: expected %lu bytes, read %lu (%p .. %p)\n" \
-                 , (int)svp->type, (unsigned long)swapsize \
-                 , (unsigned long)(p - start), start, p \
+            fatal("svalue type %d: expected %zu bytes, read %zu (%p .. %p)\n" \
+                 , (int)svp->type, swapsize \
+                 , (size_t)(p - start), start, p \
                 ); \
         }
 
@@ -1844,9 +1844,9 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         if (start + swapsize != p) \
         { \
             dump_swapped_values(max_num, block, 0); \
-            fatal("svalue type %d: expected %lu bytes, read %lu (%p .. %p)\n" \
-                 , (int)svp->type, (unsigned long)swapsize \
-                 , (unsigned long)(p - start), start, p \
+            fatal("svalue type %d: expected %zu bytes, read %zu (%p .. %p)\n" \
+                 , (int)svp->type, swapsize \
+                 , (size_t)(p - start), start, p \
                 ); \
         }
 
@@ -2478,12 +2478,12 @@ swap_status (strbuf_t *sbuf)
  */
 
 {
-    /* maximum seen so far: 10664 var blocks swapped,    5246112 bytes */
-    strbuf_addf(sbuf, "%6ld prog blocks swapped,%10ld bytes\n"
-                      "%6ld prog blocks unswapped,%8ld bytes\n"
-                      "%6ld var blocks swapped,%11ld bytes\n"
-                      "%6ld free blocks in swap,%10ld bytes\n"
-                      "Swapfile size:%23ld bytes\n"
+    /* maximum seen so far: 28574 var blocks swapped,   32754860 bytes */
+    strbuf_addf(sbuf, "%10"PRIdMPINT" prog blocks swapped, %13"PRIdMPINT" bytes\n"
+                      "%10"PRIdMPINT" prog blocks unswapped,%12"PRIdMPINT" bytes\n"
+                      "%10"PRIdMPINT" var blocks swapped,%15"PRIdMPINT" bytes\n"
+                      "%10"PRIdMPINT" free blocks in swap,%14"PRIdMPINT" bytes\n"
+                      "Swapfile size:%31"PRIdMPINT" bytes\n"
                 , num_swapped - num_unswapped
                 , total_bytes_swapped - total_bytes_unswapped
                 , num_unswapped, total_bytes_unswapped
@@ -2491,11 +2491,11 @@ swap_status (strbuf_t *sbuf)
                 , num_swapfree, total_bytes_swapfree
                 , swapfile_size
     );
-    strbuf_addf(sbuf, "Total reused space:%18ld bytes\n\n"
+    strbuf_addf(sbuf, "Total reused space:%26"PRIdMPINT" bytes\n\n"
                     , total_swap_reused);
     strbuf_addf(sbuf
-               , "Swap: searches: %5ld average search length: %3.1f\n"
-                 "Free: searches: %5ld average search length: %3.1f\n"
+               , "Swap: searches: %10ld average search length: %3.1f\n"
+                 "Free: searches: %10ld average search length: %3.1f\n"
                , swap_num_searches
                , (double)swap_total_searchlength /
                  ( swap_num_searches ? swap_num_searches : 1 )

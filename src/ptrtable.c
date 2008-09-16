@@ -127,7 +127,7 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, Bool bAdd)
  */
 
 {
-    mp_int key;     /* The <pointer> as a normal int */
+    p_int key;     /* The <pointer> as a normal int */
     int hash;       /* hash computed from <key> aka <pointer> */
     int mask;       /* mask for <hash> in to <usage_p> */
     char *usage_p;  /* First usage vector byte for entry <hash> */
@@ -135,7 +135,7 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, Bool bAdd)
     struct pointer_record *new;      /* New record to add */
     struct pointer_record **insert;  /* Pointer to hashed table entry */
 
-    key = (mp_int)pointer;
+    key = (p_int)pointer;
 
     /* Compute the hash value, and the index and mask for
      * the usage vector
@@ -214,8 +214,8 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, Bool bAdd)
 
             table = mempool_alloc(ptable->pool, sizeof *table);
             if (!table)
-                errorf("(pointertable) Out of memory (%lu bytes pooled) "
-                      "for subtable.\n", (unsigned long) sizeof *table);
+                errorf("(pointertable) Out of memory (%zu bytes pooled) "
+                      "for subtable.\n", sizeof *table);
             *insert = (struct pointer_record *)table;
             memset(table->used, 0, sizeof table->used);
 
@@ -247,8 +247,8 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, Bool bAdd)
     usage_p[0] |= mask;
     new = mempool_alloc(ptable->pool, sizeof *new);
     if (!new)
-        errorf("(pointertable) Out of memory (%lu bytes pooled) for "
-              "new entry.\n", (unsigned long) sizeof *new);
+        errorf("(pointertable) Out of memory (%zu bytes pooled) for "
+              "new entry.\n", sizeof *new);
     *insert = new;
     new->key = key;
     new->next = old;

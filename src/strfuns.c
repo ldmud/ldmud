@@ -328,7 +328,7 @@ trim_all_spaces (const string_t * txt)
 
     dest = alloca(mstrsize(txt));
     if (dest == NULL)
-        errorf("Stack overflow (%ld bytes)\n", (long)mstrsize(txt));
+        errorf("Stack overflow (%zu bytes)\n", mstrsize(txt));
 
     src = get_txt(txt);
     srclen = mstrsize(txt);
@@ -484,20 +484,23 @@ f_convert_charset (svalue_t *sp)
 
             if (errno == EILSEQ)
             {
-                errorf("convert_charset(): Invalid character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
+                errorf("convert_charset(): Invalid character sequence at "
+                       "index %td\n", 
+                       (ptrdiff_t)(pIn - get_txt(in_str)));
                 /* NOTREACHED */
                 return sp;
             }
 
             if (errno == EINVAL)
             {
-                errorf("convert_charset(): Incomplete character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
+                errorf("convert_charset(): Incomplete character sequence at "
+                       "index %td\n", (ptrdiff_t)(pIn - get_txt(in_str)));
                 /* NOTREACHED */
                 return sp;
             }
 
-            errorf("convert_charset(): Error %d at index %ld\n"
-                 , errno, (long)(pIn - get_txt(in_str))
+            errorf("convert_charset(): Error %d at index %td\n"
+                 , errno, (ptrdiff_t)(pIn - get_txt(in_str))
                  );
             /* NOTREACHED */
             return sp;
@@ -544,20 +547,22 @@ f_convert_charset (svalue_t *sp)
 
             if (errno == EILSEQ)
             {
-                errorf("convert_charset(): Invalid character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
+                errorf("convert_charset(): Invalid character sequence at "
+                       "index %td\n", (ptrdiff_t)(pIn - get_txt(in_str)));
                 /* NOTREACHED */
                 return sp;
             }
 
             if (errno == EINVAL)
             {
-                errorf("convert_charset(): Incomplete character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
+                errorf("convert_charset(): Incomplete character sequence at "
+                       "index %td\n", (ptrdiff_t)(pIn - get_txt(in_str)));
                 /* NOTREACHED */
                 return sp;
             }
 
-            errorf("convert_charset(): Error %d at index %ld\n"
-                 , errno, (long)(pIn - get_txt(in_str))
+            errorf("convert_charset(): Error %d at index %td\n"
+                 , errno, (ptrdiff_t)(pIn - get_txt(in_str))
                  );
             /* NOTREACHED */
             return sp;
@@ -620,8 +625,8 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
             xfree(out);
         if (tmp)
             xfree(tmp);
-        errorf("(sort_string) Out of memory (2 * %lu bytes) for temporaries.\n"
-             , (unsigned long) len+1);
+        errorf("(sort_string) Out of memory (2 * %zu bytes) for temporaries.\n"
+             , len+1);
     }
     out[len] = '\0';
     tmp[len] = '\0';
@@ -641,8 +646,8 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
                 xfree(outpos);
             if (tmppos)
                 xfree(tmppos);
-            errorf("(sort_string) Out of memory (2 * %lu bytes) for positions.\n"
-                 , (unsigned long) len*sizeof(*outpos)+1);
+            errorf("(sort_string) Out of memory (2 * %zu bytes) for positions.\n"
+                 , len*sizeof(*outpos)+1);
         }
     }
     else
@@ -1054,7 +1059,7 @@ x_map_string (svalue_t *sp, int num_arg)
     arg = sp - num_arg + 1;
 
     str = arg->u.str;
-    len = (mp_int)mstrsize(str);
+    len = mstrsize(str);
 
     if (arg[1].type == T_MAPPING)
     {
@@ -1070,7 +1075,9 @@ x_map_string (svalue_t *sp, int num_arg)
 
         res = alloc_mstring(len);
         if (!res)
-            errorf("(map_string) Out of memory: string[%ld] for result\n", len);
+            errorf("(map_string) Out of memory: string[%"PRIdMPINT
+                   "] for result\n", len);
+      
         push_string(inter_sp, res); /* In case of errors */
 
         for (src = get_txt(str), dest = get_txt(res); --len >= 0; src++, dest++)
@@ -1116,7 +1123,9 @@ x_map_string (svalue_t *sp, int num_arg)
 
         res = alloc_mstring(len);
         if (!res)
-            errorf("(map_string) Out of memory: string[%ld] for result\n", len);
+            errorf("(map_string) Out of memory: string[%"PRIdMPINT
+                   "] for result\n", len);
+        
         push_string(inter_sp, res); /* In case of errors */
 
         for (src = get_txt(str), dest = get_txt(res); --len >= 0; src++, dest++)
