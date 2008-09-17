@@ -437,8 +437,9 @@ catch_instruction ( int flags, uint offset
 
         if (max_eval_cost && eval_cost >= max_eval_cost)
         {
-            errorf("Not enough eval time left for catch(): required %ld, available %ld\n"
-                 , (long)reserve_cost, (long)(max_eval_cost - eval_cost + reserve_cost)
+            errorf("Not enough eval time left for catch(): required %"PRId32
+                   ", available %"PRId32"\n", reserve_cost, 
+                   (max_eval_cost - eval_cost + reserve_cost)
                  );
             /* NOTREACHED */
             return MY_TRUE;
@@ -921,7 +922,7 @@ errorf (const char *fmt, ...)
         printf("%s error in function call: %s", ts, emsg_buf+1);
         if (curobj)
         {
-            printf("%s program: %s, object: %s line %ld\n"
+            printf("%s program: %s, object: %s line %"PRIdMPINT"\n"
                   , ts, get_txt(file), get_txt(curobj->name)
                   , line_number
                   );
@@ -1248,7 +1249,7 @@ warnf (char *fmt, ...)
     if (curobj)
     {
         line_number = get_line_number_if_any(&file);
-        debug_message("%s program: %s, object: %s line %ld\n"
+        debug_message("%s program: %s, object: %s line %"PRIdMPINT"\n"
                      , ts, get_txt(file), get_txt(curobj->name)
                      , line_number);
     }
@@ -1415,8 +1416,8 @@ push_give_uid_error_context (object_t *ob)
     if (!ecp)
     {
         destruct(ob);
-        errorf("Out of memory (%lu bytes) for new object '%s' uids\n"
-             , (unsigned long) sizeof(*ecp), get_txt(ob->name));
+        errorf("Out of memory (%zu bytes) for new object '%s' uids\n"
+             , sizeof(*ecp), get_txt(ob->name));
     }
     ecp->new_object = ob;
     push_error_handler(give_uid_error_handler, &(ecp->head));
@@ -1714,8 +1715,8 @@ load_object_error(const char *msg, const char *name, namechain_t *chain)
     /* Make a local copy of the message so as not to leak memory */
     buf = alloca(strbuf_length(&sbuf)+1);
     if (!buf)
-        errorf("Out of stack memory (%lu bytes)\n"
-             , (unsigned long) strlen(sbuf.buf)+1);
+        errorf("Out of stack memory (%zu bytes)\n"
+             , strlen(sbuf.buf)+1);
     strbuf_copy(&sbuf, buf);
     strbuf_free(&sbuf);
 
@@ -2075,7 +2076,7 @@ load_object (const char *lname, Bool create_super, int depth
 #ifdef CHECK_OBJECT_STAT
     if (check_object_stat)
     {
-        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) load( %p '%s') name: %ld -> (%ld:%ld)\n"
+        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) load( %p '%s') name: %zu -> (%ld:%ld)\n"
                       , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
                       , mstrsize(ob->name)
                       , tot_alloc_object
@@ -2161,8 +2162,8 @@ load_object (const char *lname, Bool create_super, int depth
 
 #if 0 && defined(CHECK_OBJECT_REF)
     if (strchr(get_txt(ob->name), '#') == NULL)
-        printf("DEBUG: new_object(%p '%s') ref %ld flags %x\n"
-              , ob, get_txt(ob->name), (long)ob->ref, ob->flags);
+        printf("DEBUG: new_object(%p '%s') ref %"PRIdPINT" flags %x\n"
+              , ob, get_txt(ob->name), ob->ref, ob->flags);
 #endif
     return ob;
 } /* load_object() */
@@ -2321,7 +2322,7 @@ clone_object (string_t *str1)
 #ifdef CHECK_OBJECT_STAT
     if (check_object_stat)
     {
-        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) clone( %p '%s') name: %ld -> (%ld:%ld)\n"
+        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) clone( %p '%s') name: %zu -> (%ld:%ld)\n"
                       , tot_alloc_object, tot_alloc_object_size, new_ob, new_ob->name ? get_txt(new_ob->name) : "<null>"
                       , mstrsize(new_ob->name)
                       , tot_alloc_object
@@ -2474,7 +2475,7 @@ destruct_object (svalue_t *v)
 
     if (d_flag)
     {
-        debug_message("%s destruct_object: %s (ref %ld)\n"
+        debug_message("%s destruct_object: %s (ref %"PRIdPINT")\n"
                      , time_stamp(), get_txt(ob->name), ob->ref);
     }
 
@@ -2752,7 +2753,8 @@ check_object_shadow (object_t *ob, object_shadow_t *sh)
     if ((sh->flags & O_DESTRUCTED) != (ob->flags & O_DESTRUCTED)
      || sh->sent != ob->sent
        )
-        fatal("DEBUG: Obj %p '%s': ref %ld, flags %x, sent %p; shadow ref %ld, flags %x, sent %p\n"
+        fatal("DEBUG: Obj %p '%s': ref %"PRIdPINT", flags %x, sent %p;"
+              "shadow ref %"PRIdPINT", flags %x, sent %p\n"
              , ob, get_txt(ob->name), ob->ref, ob->flags, ob->sent
              , sh->ref, sh->flags, sh->sent
              );
@@ -2795,7 +2797,7 @@ update_object_sent(object_t *obj, sentence_t *new_sent)
                 break;
     if (sh == NULL)
     {
-        fatal("DEBUG: Obj %p '%s': ref %ld, flags %x, sent %p; no shadow found\n"
+        fatal("DEBUG: Obj %p '%s': ref %"PRIdPINT", flags %x, sent %p; no shadow found\n"
              , obj, get_txt(obj->name), obj->ref, obj->flags, obj->sent
              );
     }
@@ -2837,7 +2839,7 @@ remove_object (object_t *ob
 #endif
     if (d_flag > 1)
     {
-        debug_message("%s remove_object: object %s (ref %ld)\n"
+        debug_message("%s remove_object: object %s (ref %"PRIdPINT")\n"
                      , time_stamp(), get_txt(ob->name), ob->ref);
     }
 
@@ -3168,17 +3170,19 @@ status_parse (strbuf_t * sbuf, char * buff)
             res += reserved_system_size;
         if (!verbose)
         {
-            strbuf_addf(sbuf, "Actions:\t\t\t%8ld %9ld\n"
+            strbuf_addf(sbuf, "Actions:\t\t\t%8"PRIdPINT" %9"PRIdPINT"\n"
                             , alloc_action_sent
                             , alloc_action_sent * sizeof (action_t));
-            strbuf_addf(sbuf, "Shadows:\t\t\t%8ld %9ld\n"
+            strbuf_addf(sbuf, "Shadows:\t\t\t%8"PRIdPINT" %9"PRIdPINT"\n"
                             , alloc_shadow_sent
                             , alloc_shadow_sent * sizeof (shadow_t));
-            strbuf_addf(sbuf, "Objects:\t\t\t%8ld %9d (%lu destructed; %ld swapped: %ld Kbytes)\n"
+            strbuf_addf(sbuf, "Objects:\t\t\t%8ld %9ld (%ld destructed;"
+                              " %"PRIdMPINT" swapped: %"PRIdMPINT" Kbytes)\n"
                             , tot_alloc_object, tot_alloc_object_size
-                            , num_destructed
+                            , num_destructed  
                             , num_vb_swapped, total_vb_bytes_swapped / 1024);
-            strbuf_addf(sbuf, "Prog blocks:\t\t\t%8ld %9ld (%ld swapped: %ld Kbytes)\n"
+            strbuf_addf(sbuf, "Prog blocks:\t\t\t%8"PRIdMPINT" %9"PRIdMPINT
+                              " (%"PRIdMPINT" swapped: %"PRIdMPINT" Kbytes)\n"
                             , total_num_prog_blocks + num_swapped - num_unswapped
                             , total_prog_block_size + total_bytes_swapped
                                                     - total_bytes_unswapped
@@ -3186,19 +3190,20 @@ status_parse (strbuf_t * sbuf, char * buff)
                             , (total_bytes_swapped - total_bytes_unswapped) / 1024);
             strbuf_addf(sbuf, "Arrays:\t\t\t\t%8ld %9ld\n"
                             , (long)num_arrays, total_array_size() );
-            strbuf_addf(sbuf, "Mappings:\t\t\t%8ld %9ld (%ld hybrid, %ld hash)\n"
+            strbuf_addf(sbuf, "Mappings:\t\t\t%8"PRIdMPINT" %9"PRIdMPINT
+                              " (%"PRIdMPINT" hybrid, %"PRIdMPINT" hash)\n"
                             , num_mappings, total_mapping_size()
                             , num_dirty_mappings, num_hash_mappings
                             );
-            strbuf_addf(sbuf, "Memory reserved:\t\t\t %9d\n", res);
+            strbuf_addf(sbuf, "Memory reserved:\t\t\t %9zu\n", res);
         }
         if (verbose) {
 /* TODO: Add these numbers to the debug_info statistics. */
             strbuf_add(sbuf, "\nVM Execution:\n");
             strbuf_add(sbuf,   "-------------\n");
             strbuf_addf(sbuf
-                      , "Last:    %7lu ticks, %3ld.%06ld s\n"
-                        "Average: %7.0lf ticks, %10.6lf s\n"
+                      , "Last:    %10lu ticks, %3ld.%06ld s\n"
+                        "Average: %10.0lf ticks, %10.6lf s\n"
                       , last_total_evalcost
                       , last_eval_duration.tv_sec, last_eval_duration.tv_usec
                       , stat_total_evalcost.weighted_avg
@@ -3214,14 +3219,14 @@ status_parse (strbuf_t * sbuf, char * buff)
             strbuf_add(sbuf, "\nNetwork IO:\n");
             strbuf_add(sbuf,   "-----------\n");
             strbuf_addf(sbuf
-                       , "In:  Packets: %7lu - Sum: %7lu - "
+                       , "In:  Packets: %10lu - Sum: %10lu - "
                          "Average packet size: %7.2f\n"
                        , inet_packets_in
                        , inet_volume_in
                        , inet_packets_in ? (float)inet_volume_in/(float)inet_packets_in : 0.0
             );
             strbuf_addf(sbuf
-                       , "Out: Packets: %7lu - Sum: %7lu - "
+                       , "Out: Packets: %10lu - Sum: %10lu - "
                          "Average packet size: %7.2f\n"
                          "     Calls to add_message: %lu\n"
                        , inet_packets
@@ -3234,8 +3239,8 @@ status_parse (strbuf_t * sbuf, char * buff)
             strbuf_add(sbuf, "\nApply Cache:\n");
             strbuf_add(sbuf,   "------------\n");
             strbuf_addf(sbuf
-                       , "Calls to apply_low: %7lu\n"
-                         "Cache hits:         %7lu (%.2f%%)\n"
+                       , "Calls to apply_low: %10"PRIuPINT"\n"
+                         "Cache hits:         %10"PRIuPINT" (%.2f%%)\n"
                        , (apply_cache_hit+apply_cache_miss)
                        , apply_cache_hit
                        , 100.*(float)apply_cache_hit/
@@ -3250,70 +3255,70 @@ status_parse (strbuf_t * sbuf, char * buff)
         if (verbose)
         {
 #ifdef DEBUG
-            long count;
+            unsigned long count;
             object_t *ob;
 #endif
 
             strbuf_add(sbuf, "\nObject status:\n");
             strbuf_add(sbuf, "--------------\n");
             strbuf_addf(sbuf, "Objects total:\t\t\t %8ld\n"
-                             , (long)tot_alloc_object);
+                             , tot_alloc_object);
 #ifndef DEBUG
-            strbuf_addf(sbuf, "Objects in list:\t\t %8ld\n"
-                             , (long)num_listed_objs);
+            strbuf_addf(sbuf, "Objects in list:\t\t %8lu\n"
+                             , (unsigned long)num_listed_objs);
             strbuf_addf(sbuf, "Objects newly destructed:\t\t %8ld\n"
-                             , (long)num_newly_destructed);
+                             , num_newly_destructed);
             strbuf_addf(sbuf, "Objects destructed:\t\t %8ld\n"
-                             , (long)num_destructed);
+                             , num_destructed);
 #else
             for (count = 0, ob = obj_list; ob != NULL; ob = ob->next_all)
                 count++;
             if (count != (long)num_listed_objs)
             {
-                debug_message("DEBUG: num_listed_objs mismatch: listed %ld, counted %ld\n"
-                             , (long)num_listed_objs, count);
-                strbuf_addf(sbuf, "Objects in list:\t\t %8ld (counted %ld)\n"
-                                 , (long)num_listed_objs, count);
+                debug_message("DEBUG: num_listed_objs mismatch: listed %lu, counted %lu\n"
+                             , (unsigned long)num_listed_objs, count);
+                strbuf_addf(sbuf, "Objects in list:\t\t %8lu (counted %lu)\n"
+                                 , (unsigned long)num_listed_objs, count);
             }
             else
-                strbuf_addf(sbuf, "Objects in list:\t\t %8ld\n"
-                                 , (long)num_listed_objs);
+                strbuf_addf(sbuf, "Objects in list:\t\t %8lu\n"
+                                 , (unsigned long)num_listed_objs);
             for (count = 0, ob = newly_destructed_objs; ob != NULL; ob = ob->next_all)
                 count++;
             if (count != num_newly_destructed)
             {
-                debug_message("DEBUG: num_newly_destructed mismatch: listed %ld, counted %ld\n"
-                             , (long)num_newly_destructed, count);
-                strbuf_addf(sbuf, "Objects newly destructed:\t\t %8ld (counted %ld)\n"
-                                 , (long)num_newly_destructed, count);
+                debug_message("DEBUG: num_newly_destructed mismatch: listed %ld, counted %lu\n"
+                             , num_newly_destructed, count);
+                strbuf_addf(sbuf, "Objects newly destructed:\t\t %8ld (counted %lu)\n"
+                                 , num_newly_destructed, count);
             }
             else
                 strbuf_addf(sbuf, "Objects newly destructed:\t %8ld\n"
-                                 , (long)num_newly_destructed);
+                                 , num_newly_destructed);
             for (count = 0, ob = destructed_objs; ob != NULL; ob = ob->next_all)
                 count++;
             if (count != num_destructed)
             {
-                debug_message("DEBUG: num_destructed mismatch: listed %ld, counted %ld\n"
-                             , (long)num_destructed, count);
-                strbuf_addf(sbuf, "Objects destructed:\t\t %8ld (counted %ld)\n"
-                                 , (long)num_destructed, count);
+                debug_message("DEBUG: num_destructed mismatch: listed %ld, counted %lu\n"
+                             , num_destructed, count);
+                strbuf_addf(sbuf, "Objects destructed:\t\t %8ld (counted %lu)\n"
+                                 , num_destructed, count);
             }
             else
                 strbuf_addf(sbuf, "Objects destructed:\t\t %8ld\n"
-                                 , (long)num_destructed);
+                                 , num_destructed);
 #endif
 
             strbuf_addf(sbuf, "Objects processed in last cycle: "
-                               "%8ld (%5.1lf%% - avg. %5.1lf%%)\n"
-                       , (long)num_last_processed
+                               "%8lu (%5.1lf%% - avg. %5.1lf%%)\n"
+                       , (unsigned long)num_last_processed
                        , (float)num_last_processed / (float)num_listed_objs * 100.0
                        , 100.0 * relate_statistics(stat_last_processed, stat_in_list)
                        );
 #ifdef NEW_CLEANUP
             strbuf_addf(sbuf, "Objects data-cleaned in last cycle: "
-                               "%5ld (%5.1lf%% - avg. %5.1lf : %5.1lf%%)\n"
-                       , (long)num_last_data_cleaned
+                               "%5lu (%5.1lf%% - avg. %5.1lf : %5.1lf%%)\n"
+                       , (unsigned long)num_last_data_cleaned
                        , (double)num_last_data_cleaned / (double)num_listed_objs * 100.0
                        , stat_last_data_cleaned.weighted_avg
                        , 100.0 * relate_statistics(stat_last_data_cleaned, stat_in_list)
@@ -3344,7 +3349,7 @@ status_parse (strbuf_t * sbuf, char * buff)
             other += swap_overhead();
             other += num_simul_efun * sizeof(function_t);
             other += interpreter_overhead();
-            strbuf_addf(sbuf, "Other structures\t\t\t %9lu\n", other);
+            strbuf_addf(sbuf, "Other structures\t\t\t %9zu\n", other);
             tot += other;
         }
         tot += mb_status(sbuf, verbose);
@@ -3353,7 +3358,7 @@ status_parse (strbuf_t * sbuf, char * buff)
         if (!verbose) {
             strbuf_add(sbuf, "\t\t\t\t\t ---------\n");
             strbuf_add(sbuf, "Total:\t\t\t\t\t ");
-            strbuf_addf(sbuf, "%9d\n", tot);
+            strbuf_addf(sbuf, "%9zu\n", tot);
         }
         return MY_TRUE;
     }
@@ -4337,12 +4342,12 @@ print_svalue (svalue_t *arg)
     else if (arg->type == T_OBJECT)
         add_message("OBJ(%s)", get_txt(arg->u.ob->name));
     else if (arg->type == T_NUMBER)
-        add_message("%ld", arg->u.number);
+        add_message("%"PRIdPINT, arg->u.number);
     else if (arg->type == T_FLOAT)
     {
         char buff[120];
 
-        sprintf(buff, "%g", READ_DOUBLE( arg ) );
+        snprintf(buff, sizeof(buff), "%g", READ_DOUBLE( arg ) );
         add_message(buff);
     }
     else if (arg->type == T_POINTER)
@@ -4352,7 +4357,7 @@ print_svalue (svalue_t *arg)
     else if (arg->type == T_CLOSURE)
         add_message("<CLOSURE>");
     else
-        add_message("<OTHER:%d>", arg->type);
+        add_message("<OTHER:%"PRIdPHINT">", arg->type);
 } /* print_svalue() */
 
 /*=========================================================================*/
@@ -4781,7 +4786,7 @@ f_set_driver_hook (svalue_t *sp)
 
     if (n < 0 || n >= NUM_DRIVER_HOOKS)
     {
-        errorf("Bad hook number: %ld, expected 0..%ld\n"
+        errorf("Bad hook number: %"PRIdPINT", expected 0..%ld\n"
              , n, (long)NUM_DRIVER_HOOKS-1);
         /* NOTREACHED */
         return sp;
@@ -4812,9 +4817,9 @@ f_set_driver_hook (svalue_t *sp)
              && sp->u.number != RE_TRADITIONAL
                )
             {
-                errorf("Bad value for hook %ld: got 0x%lx, expected RE_PCRE (0x%lx) "
-                      "or RE_TRADITIONAL (0x%lx).\n"
-                     , n, (long)sp->u.number
+                errorf("Bad value for hook %"PRIdPINT": got 0x%"PRIxPINT
+                       ", expected RE_PCRE (0x%lx) or RE_TRADITIONAL (0x%lx).\n"
+                     , n, sp->u.number
                      , (long)RE_PCRE, (long)RE_TRADITIONAL
                      );
                 break;
@@ -4823,7 +4828,7 @@ f_set_driver_hook (svalue_t *sp)
         }
         else
         {
-            errorf("Bad value for hook %ld: got number, expected %s or 0.\n"
+            errorf("Bad value for hook %"PRIdPINT": got number, expected %s or 0.\n"
                  , n
                  , efun_arg_typename(hook_type_map[n]));
             break;
@@ -4835,7 +4840,7 @@ f_set_driver_hook (svalue_t *sp)
         string_t *str;
 
         if ( !((1 << T_STRING) & hook_type_map[n]) )
-            errorf("Bad value for hook %ld: got string, expected %s.\n"
+            errorf("Bad value for hook %"PRIdPINT": got string, expected %s.\n"
                  , n
                  , efun_arg_typename(hook_type_map[n]));
 
@@ -4851,7 +4856,7 @@ f_set_driver_hook (svalue_t *sp)
         if (!sp->u.map->num_values
          ||  sp->u.map->ref != 1 /* add_to_mapping() could zero num_values */)
         {
-            errorf("Bad value for hook %ld: mapping is empty "
+            errorf("Bad value for hook %"PRIdPINT": mapping is empty "
                   "or has other references.\n", n);
             return sp;
         }
@@ -4891,7 +4896,7 @@ f_set_driver_hook (svalue_t *sp)
         }
         else if (!CLOSURE_IS_LFUN(sp->x.closure_type))
         {
-            errorf("Bad value for hook %ld: unbound lambda or "
+            errorf("Bad value for hook %"PRIdPINT": unbound lambda or "
                   "lfun closure expected.\n", n);
         }
         /* FALLTHROUGH */
@@ -4900,7 +4905,7 @@ f_set_driver_hook (svalue_t *sp)
 default_test:
         if ( !((1 << sp->type) & hook_type_map[n]) )
         {
-            errorf("Bad value for hook %ld: got %s, expected %s.\n"
+            errorf("Bad value for hook %"PRIdPINT": got %s, expected %s.\n"
                  , n, typename(sp->type), efun_arg_typename(hook_type_map[n]));
             break; /* flow control hint */
         }
@@ -5044,7 +5049,7 @@ set_single_limit ( struct limits_context_s * result
             }
         }
         else if (val != LIMIT_KEEP)
-            errorf("Illegal %s value: %ld\n", limitnames[limit], val);
+            errorf("Illegal %s value: %"PRIdPINT"\n", limitnames[limit], val);
     }
 } /* set_single_limit() */
 
@@ -5091,14 +5096,14 @@ extract_limits ( struct limits_context_s * result
 
         for (i = 0; i < num - 1; i += 2)
         {
-            int limit;
+            p_int limit;
 
             if (svp[i].type != T_NUMBER)
                 errorf("Illegal limit value: got a %s, expected a number\n"
                      , typename(svp[i].type));
-            limit = (int)svp[i].u.number;
+            limit = svp[i].u.number;
             if (limit < 0 || limit >= LIMIT_MAX)
-                errorf("Illegal limit tag: %ld\n", (long)limit);
+                errorf("Illegal limit tag: %"PRIdPINT"\n", limit);
 
             set_single_limit(result, limit, svp+i+1);
         }
@@ -5183,7 +5188,7 @@ v_limited (svalue_t * sp, int num_arg)
         limits.max_file = 0;
         limits.use_cost = 1; /* smallest we can do */
     }
-    else if (argp[1].type == T_POINTER)
+    else if (argp[1].type == T_POINTER && VEC_SIZE(argp[1].u.vec) < INT_MAX)
     {
         extract_limits(&limits, argp[1].u.vec->item
                       , (int)VEC_SIZE(argp[1].u.vec)
@@ -5315,7 +5320,7 @@ v_set_limits (svalue_t * sp, int num_arg)
 
     argp = sp - num_arg + 1;
 
-    if (num_arg == 1 && argp->type == T_POINTER)
+    if (num_arg == 1 && argp->type == T_POINTER && VEC_SIZE(argp->u.vec) < INT_MAX)
         extract_limits(&limits, argp->u.vec->item, (int)VEC_SIZE(argp->u.vec)
                       , MY_FALSE);
     else if (num_arg % 2 == 0)

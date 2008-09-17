@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Sep-2008 (Zesstra)
+  - (simulate.c)
+    Corrected format specifiers, removed not needed casts, corrected some
+    casts.
+    Changed int to p_int in extract_limits(), added range check in
+    v_limited() and v_set_limits().
+  - (ptrtable.c)
+    find_add_pointer(): p_uint is the better choice for converting a pointer
+
 16-Sep-2008 (Zesstra)
   - (port.c)
     Corrected 3 strftime() calls, the given buffer length was one smaller than

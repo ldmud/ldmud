@@ -127,7 +127,7 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, Bool bAdd)
  */
 
 {
-    p_int key;     /* The <pointer> as a normal int */
+    p_uint key;     /* The <pointer> as a normal int */
     int hash;       /* hash computed from <key> aka <pointer> */
     int mask;       /* mask for <hash> in to <usage_p> */
     char *usage_p;  /* First usage vector byte for entry <hash> */
@@ -135,7 +135,7 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, Bool bAdd)
     struct pointer_record *new;      /* New record to add */
     struct pointer_record **insert;  /* Pointer to hashed table entry */
 
-    key = (p_int)pointer;
+    key = (p_uint)pointer;
 
     /* Compute the hash value, and the index and mask for
      * the usage vector
