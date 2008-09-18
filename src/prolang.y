@@ -1191,8 +1191,8 @@ add_string_constant (void)
     tmp = mstr_add(last_string_constant, last_lex_string);
     if (!tmp)
     {
-        yyerrorf("Out of memory for string literal (%ld bytes)"
-                , (long)(mstrsize(last_string_constant)
+        yyerrorf("Out of memory for string literal (%zu bytes)"
+                , (mstrsize(last_string_constant)
                          +mstrsize(last_lex_string))
                 );
         return;
@@ -1202,7 +1202,8 @@ add_string_constant (void)
     last_string_constant = make_tabled(tmp);
     if (!last_string_constant)
     {
-        yyerror("Out of memory for string literal (%ld bytes)");
+        yyerrorf("Out of memory for string literal (%zu bytes)",
+                mstrsize(tmp));
     }
 } /* add_string_constant() */
 
@@ -1524,8 +1525,8 @@ get_type_name (fulltype_t type)
     }
 
     if (type.typeflags >= sizeof type_name / sizeof type_name[0])
-        fatal("Bad type %ld: %s line %d\n"
-             , (long)type.typeflags,  current_loc.file->name, current_loc.line);
+        fatal("Bad type %"PRIu32": %s line %d\n"
+             , type.typeflags,  current_loc.file->name, current_loc.line);
 
     strcat(buff, type_name[type.typeflags]);
 
@@ -1885,7 +1886,7 @@ ins_byte (unsigned char b)
     {
         if (!realloc_a_program(1))
         {
-            yyerrorf("Out of memory: program size %lu\n"
+            yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                     , mem_block[A_PROGRAM].current_size + 1);
             return;
         }
@@ -1935,7 +1936,7 @@ ins_short (long l)
     }
     else
     {
-        yyerrorf("Out of memory: program size %lu\n"
+        yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                 , mem_block[A_PROGRAM].current_size + 2);
     }
 } /* ins_short() */
@@ -1997,7 +1998,7 @@ ins_long (int32 l)
 
 /* Add the 4-byte number <l> to the A_PROGRAM area in a fixed byteorder.
  */
-
+/* TODO: check callers for assumptions that a long is always 4 bytes. */
 {
     if (realloc_a_program(4))
     {
@@ -2011,7 +2012,7 @@ ins_long (int32 l)
     }
     else
     {
-        yyerrorf("Out of memory: program size %lu\n"
+        yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                 , mem_block[A_PROGRAM].current_size + 4);
     }
 } /* ins_long() */
@@ -2023,6 +2024,7 @@ upd_long (mp_uint offset, int32 l)
 /* Store the 4-byte number <l> at <offset> in the A_PROGRAM are in
  * a fixed byteorder.
  */
+/* TODO: check callers for assumptions that a long is always 4 bytes. */
 
 {
     char *dest;
@@ -2037,6 +2039,7 @@ read_long (mp_uint offset)
 
 /* Return the 4-byte number stored at <offset> in the A_PROGRAM area.
  */
+/* TODO: this should probably read in a int32. */
 
 {
     long l;
@@ -2242,8 +2245,8 @@ fix_branch (int ltoken, p_int dest, p_int loc)
         upd_short(loc, offset+2);
 
         if (offset > 0x7ffd)
-            yyerrorf("Compiler limit: Too much code to branch over: %ld bytes"
-                    , offset);
+            yyerrorf("Compiler limit: Too much code to branch over: %"
+                      PRIdPINT" bytes", offset);
 
         return MY_TRUE;
     }
@@ -2269,7 +2272,7 @@ yyget_space (p_int size)
         CURRENT_PROGRAM_SIZE += size;
         return PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE - size;
     }
-    yyerrorf("Out of memory: program size %lu\n"
+    yyerrorf("Out of memory: program size %"PRIdMPINT"\n"
             , mem_block[A_PROGRAM].current_size + size);
     return NULL;
 } /* yyget_space() */
@@ -2311,7 +2314,7 @@ yymove_switch_instructions (int len, p_int blocklen)
     }
     else
     {
-        yyerrorf("Out of memory: program size %lu\n"
+        yyerrorf("Out of memory: program size %"PRIdMPINT"\n"
                 , mem_block[A_PROGRAM].current_size + len);
     }
 } /* yymove_switch_instructions() */
@@ -2380,7 +2383,7 @@ update_lop_branch ( p_uint address, int instruction )
         upd_short(address+1, offset+3);
         if (offset > 0x7ffc)
             yyerrorf("Compiler limit: Too much code to skip for ||/&&:"
-                     " %ld bytes" , offset);
+                     " %"PRIdPINT" bytes" , offset);
         p[0]  = F_POP_VALUE;
     }
     else
@@ -2528,7 +2531,10 @@ add_local_name (ident_t *ident, fulltype_t type, int depth
              */
 #ifdef USE_NEW_INLINES
 #ifdef DEBUG_INLINES
-if (current_inline && current_inline->block_depth+2 == block_depth && ident->type != I_TYPE_GLOBAL) printf("DEBUG: redeclare local '%s' as inline arg, depth %d\n", get_txt(ident->name), block_depth);
+if (current_inline && current_inline->block_depth+2 == block_depth 
+    && ident->type != I_TYPE_GLOBAL)
+    printf("DEBUG: redeclare local '%s' as inline arg, depth %d\n", 
+           get_txt(ident->name), block_depth);
 #endif /* DEBUG_INLINES */
             if (ident->type != I_TYPE_GLOBAL
              && !(current_inline && current_inline->block_depth+2 == block_depth)
@@ -2638,7 +2644,8 @@ add_context_name (ident_t *ident, fulltype_t type, int num)
     block = & block_scope[depth-1];
 
 #ifdef DEBUG_INLINES
-printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n", get_txt(ident->name), num, depth, block->num_locals);
+printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n", 
+       get_txt(ident->name), num, depth, block->num_locals);
 #endif /* DEBUG_INLINES */
     if (block->num_locals >= 256
      || block->num_locals >= MAX_LOCAL /* size of type recording array */
@@ -4750,7 +4757,7 @@ new_inline_closure (void)
         ict.prev = current_inline - &(INLINE_CLOSURE(0));
     }
 #ifdef DEBUG_INLINES
-printf("DEBUG: new inline #%d: prev %d\n", INLINE_CLOSURE_COUNT, ict.prev);
+printf("DEBUG: new inline #%"PRIuMPINT": prev %"PRIdMPINT"\n", INLINE_CLOSURE_COUNT, ict.prev);
 #endif /* DEBUG_INLINES */
 
     /* Initialize the other fields */
@@ -4771,7 +4778,9 @@ printf("DEBUG: new inline #%d: prev %d\n", INLINE_CLOSURE_COUNT, ict.prev);
     ict.end_line = stored_lines;
 
 #ifdef DEBUG_INLINES
-printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_PROGRAM_SIZE, block_depth, current_number_of_locals, max_number_of_locals, current_break_stack_need, max_break_stack_need);
+printf("DEBUG:   start: %"PRIuMPINT", depth %d, locals: %d/%d, break: %d/%d\n", 
+       CURRENT_PROGRAM_SIZE, block_depth, current_number_of_locals, 
+       max_number_of_locals, current_break_stack_need, max_break_stack_need);
 #endif /* DEBUG_INLINES */
     ict.block_depth          = block_depth;
     ict.break_stack_size     = current_break_stack_need;
@@ -4784,7 +4793,8 @@ printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_P
     ict.full_context_type_start = type_of_context - &(LOCAL_TYPE(0));
     ict.full_local_type_size    = mem_block[A_LOCAL_TYPES].current_size;
 #ifdef DEBUG_INLINES
-printf("DEBUG:   local types: %d, context types: %d\n", ict.full_local_type_start, ict.full_context_type_start);
+printf("DEBUG:   local types: %"PRIuMPINT", context types: %"PRIuMPINT"\n", 
+       ict.full_local_type_start, ict.full_context_type_start);
 #endif /* DEBUG_INLINES */
 
     /* Extend the type memblocks */
@@ -4798,7 +4808,8 @@ printf("DEBUG:   local types: %d, context types: %d\n", ict.full_local_type_star
         type_of_context = &(LOCAL_TYPE(type_count));
         type_of_locals = &(LOCAL_TYPE(type_count+MAX_LOCAL));
 #ifdef DEBUG_INLINES
-printf("DEBUG:   type ptrs: %p, %p\n", type_of_locals, type_of_context );
+printf("DEBUG:   type ptrs: %p, %p\n", 
+       type_of_locals, type_of_context );
 #endif /* DEBUG_INLINES */
     }
 
@@ -4830,8 +4841,15 @@ finish_inline_closure (Bool bAbort)
 #ifdef DEBUG_INLINES
 {
     mp_int index = current_inline - &(INLINE_CLOSURE(0));
-printf("DEBUG: %s inline #%d: prev %d, end %ld, start %ld, length %ld, function %d pc %ld\n", bAbort ? "abort" : "finish", index, current_inline->prev, current_inline->end, current_inline->start, current_inline->length, current_inline->function, FUNCTION(current_inline->function)->offset.pc);
-printf("DEBUG:   depth %d, locals: %d/%d, break: %d/%d\n", current_inline->block_depth, current_inline->num_locals, current_inline->max_num_locals, current_inline->break_stack_size, current_inline->max_break_stack_size);
+printf("DEBUG: %s inline #%"PRIdMPINT": prev %"PRIdMPINT", end %"PRIuMPINT
+       ", start %"PRIuMPINT", length %"PRIuMPINT", function %d pc %"PRIu32"\n", 
+       bAbort ? "abort" : "finish", index, current_inline->prev, 
+       current_inline->end, current_inline->start, current_inline->length, 
+       current_inline->function, FUNCTION(current_inline->function)->offset.pc);
+printf("DEBUG:   depth %d, locals: %d/%d, break: %d/%d\n", 
+       current_inline->block_depth, current_inline->num_locals, 
+       current_inline->max_num_locals, current_inline->break_stack_size, 
+       current_inline->max_break_stack_size);
 }
 #endif /* DEBUG_INLINES */
 
@@ -4844,7 +4862,7 @@ printf("DEBUG:   depth %d, locals: %d/%d, break: %d/%d\n", current_inline->block
     {
         backup_start = INLINE_PROGRAM_SIZE;
 #ifdef DEBUG_INLINES
-printf("DEBUG:   move code to backup %ld\n", backup_start);
+printf("DEBUG:   move code to backup %"PRIuMPINT"\n", backup_start);
 #endif /* DEBUG_INLINES */
         add_to_mem_block( A_INLINE_PROGRAM, PROGRAM_BLOCK+start, length);
         current_inline->start = backup_start;
@@ -4857,7 +4875,9 @@ printf("DEBUG:   move code to backup %ld\n", backup_start);
     if (start + length < CURRENT_PROGRAM_SIZE)
     {
 #ifdef DEBUG_INLINES
-printf("DEBUG:   move code forward: from %ld, length %ld, to %ld\n", start+length, CURRENT_PROGRAM_SIZE - length - start, end);
+printf("DEBUG:   move code forward: from %"PRIuMPINT", length %"PRIuMPINT
+       ", to %"PRIuMPINT"\n", 
+       start+length, CURRENT_PROGRAM_SIZE - length - start, end);
 #endif /* DEBUG_INLINES */
         memmove( PROGRAM_BLOCK+end
                , PROGRAM_BLOCK+start+length
@@ -4868,7 +4888,7 @@ printf("DEBUG:   move code forward: from %ld, length %ld, to %ld\n", start+lengt
     stored_bytes -= length + (start - end);
     
 #ifdef DEBUG_INLINES
-printf("DEBUG:   program size: %ld\n", CURRENT_PROGRAM_SIZE);
+printf("DEBUG:   program size: %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
 
     /* Move the linenumber data into the backup storage */
@@ -4878,7 +4898,9 @@ printf("DEBUG:   program size: %ld\n", CURRENT_PROGRAM_SIZE);
     {
         backup_start = INLINE_PROGRAM_SIZE;
 #ifdef DEBUG_INLINES
-printf("DEBUG:   move li data to %ld, from %ld length %ld\n", backup_start, start, length);
+printf("DEBUG:   move li data to %"PRIuMPINT", from %"PRIuMPINT" length %"
+        PRIuMPINT"\n", 
+        backup_start, start, length);
 #endif /* DEBUG_INLINES */
         add_to_mem_block( A_INLINE_PROGRAM, LINENUMBER_BLOCK+start, length);
         current_inline->li_start = backup_start;
@@ -4901,7 +4923,9 @@ printf("DEBUG:   move li data to %ld, from %ld length %ld\n", backup_start, star
     if (start + length < LINENUMBER_SIZE)
     {
 #ifdef DEBUG_INLINES
-printf("DEBUG:   move li data forward: from %ld, length %ld, to %ld\n", start+length, LINENUMBER_SIZE - length - start, start);
+printf("DEBUG:   move li data forward: from %"PRIuMPINT", length %"PRIuMPINT
+       ", to %"PRIuMPINT"\n", 
+       start+length, LINENUMBER_SIZE - length - start, start);
 #endif /* DEBUG_INLINES */
         memmove( LINENUMBER_BLOCK+start
                , LINENUMBER_BLOCK+start+length
@@ -4921,7 +4945,8 @@ printf("DEBUG:   move li data forward: from %ld, length %ld, to %ld\n", start+le
     exact_types              = current_inline->exact_types;
 
 #ifdef DEBUG_INLINES
-printf("DEBUG:   local types: %d, context types: %d\n", current_inline->full_local_type_start, current_inline->full_context_type_start);
+printf("DEBUG:   local types: %"PRIuMPINT", context types: %"PRIuMPINT"\n", 
+       current_inline->full_local_type_start, current_inline->full_context_type_start);
 #endif /* DEBUG_INLINES */
     type_of_locals = &(LOCAL_TYPE(current_inline->full_local_type_start));
     type_of_context = &(LOCAL_TYPE(current_inline->full_context_type_start));
@@ -4959,14 +4984,18 @@ insert_pending_inline_closures (void)
 {
     mp_int ix;
 #ifdef DEBUG_INLINES
-if (INLINE_CLOSURE_COUNT != 0) printf("DEBUG: insert_inline_closures(): %d pending\n", INLINE_CLOSURE_COUNT);
+if (INLINE_CLOSURE_COUNT != 0) printf("DEBUG: insert_inline_closures(): %"
+                                      PRIuMPINT" pending\n", 
+                                      INLINE_CLOSURE_COUNT);
 #endif /* DEBUG_INLINES */
 
     for (ix = 0; (size_t)ix < INLINE_CLOSURE_COUNT; ix++)
     {
         inline_closure_t * ict = &(INLINE_CLOSURE(ix));
 #ifdef DEBUG_INLINES
-printf("DEBUG:   #%d: start %ld, length %ld, function %d: new start %ld\n", ix, ict->start, ict->length, ict->function, CURRENT_PROGRAM_SIZE);
+printf("DEBUG:   #%"PRIdMPINT": start %"PRIuMPINT", length %"PRIuMPINT
+       ", function %d: new start %"PRIuMPINT"\n", 
+       ix, ict->start, ict->length, ict->function, CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
         if (ict->length != 0)
         {
@@ -4991,7 +5020,9 @@ printf("DEBUG:   #%d: start %ld, length %ld, function %d: new start %ld\n", ix, 
             add_to_mem_block(A_PROGRAM, INLINE_PROGRAM_BLOCK(ict->start)
                             , ict->length);
 #ifdef DEBUG_INLINES
-printf("DEBUG:        li_start %ld, li_length %ld, new li_start %ld\n", ict->li_start, ict->li_length, LINENUMBER_SIZE);
+printf("DEBUG:        li_start %"PRIuMPINT", li_length %"PRIuMPINT
+       ", new li_start %"PRIuMPINT"\n", 
+       ict->li_start, ict->li_length, LINENUMBER_SIZE);
 #endif /* DEBUG_INLINES */
 
             add_to_mem_block(A_LINENUMBERS, INLINE_PROGRAM_BLOCK(ict->li_start)
@@ -5109,7 +5140,8 @@ printf("DEBUG:   Function index: %d\n", current_inline->function);
      */
     current_inline->end = CURRENT_PROGRAM_SIZE;
 #ifdef DEBUG_INLINES
-printf("DEBUG:   program size: %ld align to %ld\n", CURRENT_PROGRAM_SIZE, align(CURRENT_PROGRAM_SIZE));
+printf("DEBUG:   program size: %"PRIuMPINT" align to %"PRIuMPINT"\n", 
+       CURRENT_PROGRAM_SIZE, align(CURRENT_PROGRAM_SIZE));
 #endif /* DEBUG_INLINES */
     CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
     current_inline->start = CURRENT_PROGRAM_SIZE;
@@ -5123,7 +5155,7 @@ printf("DEBUG:   program size: %ld align to %ld\n", CURRENT_PROGRAM_SIZE, align(
     }
     else
     {
-        yyerrorf("Out of memory: program size %lu\n"
+        yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                 , mem_block[A_PROGRAM].current_size + FUNCTION_HDR_SIZE);
         finish_inline_closure(MY_TRUE);
         return MY_FALSE;
@@ -5217,7 +5249,8 @@ printf("DEBUG:   %d context vars, depth %d\n", context->num_locals, depth);
                 ; id = id->next_all)
             {
 #ifdef DEBUG_INLINES
-if (id->u.local.depth == depth) printf("DEBUG:     '%s': local %d, context %d\n", get_txt(id->name), id->u.local.num, id->u.local.context);
+if (id->u.local.depth == depth) printf("DEBUG:     '%s': local %d, context %d\n", 
+                                       get_txt(id->name), id->u.local.num, id->u.local.context);
 #endif /* DEBUG_INLINES */
                 if (id->u.local.depth == depth
                  && id->u.local.context >= 0
@@ -5898,7 +5931,7 @@ function_body:
           }
           else
           {
-              yyerrorf("Out of memory: program size %lu\n"
+              yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                       , mem_block[A_PROGRAM].current_size + FUNCTION_HDR_SIZE);
               YYACCEPT;
           }
@@ -5921,7 +5954,7 @@ inline_func:
 
       {
 #ifdef DEBUG_INLINES
-printf("DEBUG: After inline_opt_type: program size %ld\n", CURRENT_PROGRAM_SIZE);
+printf("DEBUG: After inline_opt_type: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
           if (!prepare_inline_closure($2))
               YYACCEPT;
@@ -5931,7 +5964,7 @@ printf("DEBUG: After inline_opt_type: program size %ld\n", CURRENT_PROGRAM_SIZE)
 
       {
 #ifdef DEBUG_INLINES
-printf("DEBUG: After inline_opt_args: program size %ld\n", CURRENT_PROGRAM_SIZE);
+printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
           current_inline->parse_context = MY_TRUE;
       }
@@ -5940,7 +5973,7 @@ printf("DEBUG: After inline_opt_args: program size %ld\n", CURRENT_PROGRAM_SIZE)
 
       {
 #ifdef DEBUG_INLINES
-printf("DEBUG: After inline_opt_context: program size %ld\n", CURRENT_PROGRAM_SIZE);
+printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
           current_inline->parse_context = MY_FALSE;
           if (!inline_closure_prototype($4))
@@ -5951,7 +5984,7 @@ printf("DEBUG: After inline_opt_context: program size %ld\n", CURRENT_PROGRAM_SI
 
       {
 #ifdef DEBUG_INLINES
-printf("DEBUG: After inline block: program size %ld\n", CURRENT_PROGRAM_SIZE);
+printf("DEBUG: After inline block: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
          $$.start = current_inline->end;
          $$.code = -1;
@@ -5967,7 +6000,7 @@ printf("DEBUG: After inline block: program size %ld\n", CURRENT_PROGRAM_SIZE);
           int i;
 
 #ifdef DEBUG_INLINES
-printf("DEBUG: After L_BEGIN_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
+printf("DEBUG: After L_BEGIN_INLINE: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
           if (!prepare_inline_closure(Type_Any))
               YYACCEPT;
@@ -5992,7 +6025,7 @@ printf("DEBUG: After L_BEGIN_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
            */
           enter_block_scope();
 #ifdef DEBUG_INLINES
-printf("DEBUG: Before comma_expr: program size %ld\n", CURRENT_PROGRAM_SIZE);
+printf("DEBUG: Before comma_expr: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
       }
 
@@ -6002,7 +6035,7 @@ printf("DEBUG: Before comma_expr: program size %ld\n", CURRENT_PROGRAM_SIZE);
 
       {
 #ifdef DEBUG_INLINES
-printf("DEBUG: After L_END_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
+printf("DEBUG: After L_END_INLINE: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
 
          /* Complete the F_CLEAR_LOCALS at the baginning of the block. */
@@ -7027,7 +7060,7 @@ statement:
               ins_long(current_break_address & BREAK_ADDRESS_MASK);
               current_break_address = CURRENT_PROGRAM_SIZE - 4;
               if (current_break_address > BREAK_ADDRESS_MASK)
-                  yyerrorf("Compiler limit: (L_BREAK) value too large: %ld"
+                  yyerrorf("Compiler limit: (L_BREAK) value too large: %"PRIdPINT
                           , current_break_address);
           }
       }
@@ -7342,7 +7375,7 @@ do:
           current = CURRENT_PROGRAM_SIZE;
           if (!realloc_a_program(3))
           {
-              yyerrorf("Out of memory: program size %lu\n", current+3);
+              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+3);
               YYACCEPT;
           }
 
@@ -8038,8 +8071,8 @@ switch:
         /* Save the previous switch state */
         if ( !(statep = yalloc(sizeof(case_state_t))) )
         {
-            yyerrorf("Out of memory: case state (%lu bytes)"
-                    , (unsigned long) sizeof(case_state_t));
+            yyerrorf("Out of memory: case state (%zu bytes)"
+                    , sizeof(case_state_t));
             YYACCEPT;
         }
         *statep = case_state;
@@ -8277,7 +8310,7 @@ condStart:
           current = CURRENT_PROGRAM_SIZE;
           if (!realloc_a_program(2))
           {
-              yyerrorf("Out of memory: program size %lu\n", current+3);
+              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+3);
               YYACCEPT;
           }
           current_code = PROGRAM_BLOCK + current;
@@ -9183,8 +9216,8 @@ expr0:
               sum = mstr_add(str1, str2);
               if (!sum)
               {
-                  yyerrorf("Out of memory for string literal (%ld bytes)"
-                          , (unsigned long)(mstrsize(str1)+mstrsize(str2))
+                  yyerrorf("Out of memory for string literal (%zu bytes)"
+                          , (mstrsize(str1)+mstrsize(str2))
                           );
                   YYACCEPT;
               }
@@ -9722,7 +9755,7 @@ expr0:
                   length = $2.end - start + 1;
                   if (!realloc_a_program(length))
                   {
-                      yyerrorf("Out of memory: program size %lu\n"
+                      yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                               , current+length);
                       YYACCEPT;
                   }
@@ -9751,7 +9784,8 @@ expr0:
 
                   if (!realloc_a_program(3))
                   {
-                      yyerrorf("Out of memory: program size %lu\n", current+3);
+                      yyerrorf("Out of memory: program size %"PRIuMPINT"\n",
+                               current+3);
                       YYACCEPT;
                   }
                   p = PROGRAM_BLOCK + start;
@@ -9773,7 +9807,8 @@ expr0:
           {
               if (!realloc_a_program(2))
               {
-                  yyerrorf("Out of memory: program size %lu\n", current+2);
+                  yyerrorf("Out of memory: program size %"PRIuMPINT"\n", 
+                           current+2);
                   YYACCEPT;
               }
               p = PROGRAM_BLOCK + start;
@@ -9829,7 +9864,8 @@ expr0:
           current = CURRENT_PROGRAM_SIZE;
           if (!realloc_a_program(2))
           {
-              yyerrorf("Out of memory: program size %lu\n", current+2);
+              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", 
+                       current+2);
               YYACCEPT;
           }
           p = PROGRAM_BLOCK + current;
@@ -10554,7 +10590,7 @@ expr4:
 
           if (!realloc_a_program(3))
           {
-              yyerrorf("Out of memory: program size %lu\n", current+3);
+              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+3);
               YYACCEPT;
           }
           p = PROGRAM_BLOCK + current;
@@ -10608,7 +10644,8 @@ expr4:
           $$.code = -1;
           if (!realloc_a_program(2))
           {
-              yyerrorf("Out of memory: program size %lu\n", current+2);
+              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", 
+                       current+2);
               YYACCEPT;
           }
           p = PROGRAM_BLOCK + current;
@@ -10806,7 +10843,7 @@ expr4:
 
           if (!realloc_a_program(3))
           {
-              yyerrorf("Out of memory: program size %lu\n", current+3);
+              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+3);
               YYACCEPT;
           }
           p = PROGRAM_BLOCK + current;
@@ -10863,7 +10900,7 @@ expr4:
           $$.end = 0;
           if (!realloc_a_program(2))
           {
-              yyerrorf("Out of memory: program size %lu\n", current+2);
+              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+2);
               YYACCEPT;
           }
           p = PROGRAM_BLOCK + current;
@@ -11570,7 +11607,7 @@ index_range :
 
           if (!realloc_a_program(1))
           {
-              yyerrorf("Out of memory: program size %lu\n", current+1);
+              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+1);
               YYACCEPT;
           }
 
@@ -11613,7 +11650,7 @@ index_range :
 
           if (!realloc_a_program(1))
           {
-              yyerrorf("Out of memory: program size %lu\n", current+1);
+              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+1);
               YYACCEPT;
           }
 
@@ -11656,7 +11693,7 @@ index_range :
 
           if (!realloc_a_program(1))
           {
-              yyerrorf("Out of memory: program size %lu\n", current+1);
+              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+1);
               YYACCEPT;
           }
 
@@ -12186,8 +12223,10 @@ function_call:
               /* It's a real simul-efun */
 
               $<function_call_head>$.simul_efun = real_name->u.global.sim_efun;
-
-              if (real_name->u.global.sim_efun >= SEFUN_TABLE_SIZE)
+              /* real_name->u.global.sim_efun is >=0 (see above), so it can
+               * be casted to unsigned long before comparison (SEFUN_TABLE_SIZE
+               * is unsigned long) */
+              if ((unsigned long)real_name->u.global.sim_efun >= SEFUN_TABLE_SIZE)
               {
                   /* The simul-efun has to be called by name:
                    * prepare the extra args for the call_other
@@ -12279,7 +12318,8 @@ function_call:
                    || has_ellipsis)
                       ap_needed = MY_TRUE;
 
-                  if (simul_efun >= SEFUN_TABLE_SIZE)
+                  /* simul_efun is >= 0, see above) */
+                  if ((unsigned long)simul_efun >= SEFUN_TABLE_SIZE)
                   {
                       /* call-other: the number of arguments will be
                        * corrected at runtime.
@@ -12749,7 +12789,7 @@ function_call:
 
               if (!realloc_a_program(1))
               {
-                  yyerrorf("Out of memory: program size %lu\n"
+                  yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                           , mem_block[A_PROGRAM].current_size + 2);
                   YYACCEPT;
               }
@@ -12786,7 +12826,7 @@ function_call:
 
           if (!disable_sefuns
            && call_other_sefun >= 0
-           && call_other_sefun >= SEFUN_TABLE_SIZE)
+           && (unsigned long)call_other_sefun >= SEFUN_TABLE_SIZE)
           {
               /* The simul-efun has to be called by name:
                * insert the extra args for the call_other
@@ -12796,7 +12836,7 @@ function_call:
 
               if (!realloc_a_program(6))
               {
-                  yyerrorf("Out of memory: program size %lu\n"
+                  yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                           , mem_block[A_PROGRAM].current_size + 2);
                   YYACCEPT;
               }
@@ -12891,7 +12931,8 @@ function_call:
                   yyerrorf("Too many arguments to simul_efun %s"
                           , get_txt(funp->name));
 
-              if (call_other_sefun >= SEFUN_TABLE_SIZE)
+              /* call_other_sefun is >= 0 (see above) */
+              if ((unsigned long)call_other_sefun >= SEFUN_TABLE_SIZE)
               {
                   /* call-other: the number of arguments will be
                    * detected and corrected at runtime.
@@ -12916,7 +12957,7 @@ function_call:
                       {
                           if (!realloc_a_program(i+2))
                           {
-                              yyerrorf("Out of memory: program size %lu\n"
+                              yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                                       , mem_block[A_PROGRAM].current_size + i+2);
                               YYACCEPT;
                           }
@@ -13355,7 +13396,7 @@ catch:
 
               if (!realloc_a_program(5))
               {
-                  yyerrorf("Out of memory: program size %lu\n"
+                  yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                           , CURRENT_PROGRAM_SIZE + 5);
                   YYACCEPT;
               }
@@ -13954,7 +13995,9 @@ init_local_variable ( ident_t* name, struct lvalue_s *lv, int assign_op
 %line
 #ifdef USE_NEW_INLINES
 #ifdef DEBUG_INLINES
-if (current_inline && current_inline->parse_context) printf("DEBUG: inline context decl: name = expr, program_size %d\n", CURRENT_PROGRAM_SIZE);
+if (current_inline && current_inline->parse_context) 
+  printf("DEBUG: inline context decl: name = expr, program_size %"PRIuMPINT"\n", 
+         CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
 #endif /* USE_NEW_INLINES */
     
@@ -14018,7 +14061,7 @@ add_lvalue_code ( struct lvalue_s * lv, int instruction)
         current_size = CURRENT_PROGRAM_SIZE;
         if (!realloc_a_program(2))
         {
-            yyerrorf("Out of memory: program size %lu"
+            yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                     , current_size+2);
             return MY_FALSE;
         }
@@ -14200,7 +14243,7 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
             /* Get enough memory */
             if (!realloc_a_program(length))
             {
-                yyerrorf("Out of memory: program size %lu\n"
+                yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                         , CURRENT_PROGRAM_SIZE + length);
                 return;
             }
@@ -14270,7 +14313,7 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
 
             if (!realloc_a_program(2))
             {
-                yyerrorf("Out of memory: program size %lu\n"
+                yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                         , CURRENT_PROGRAM_SIZE + 2);
                 return;
             }
@@ -14310,7 +14353,7 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
 
         if (!realloc_a_program(2))
         {
-            yyerrorf("Out of memory: program size %lu\n"
+            yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                     , CURRENT_PROGRAM_SIZE + 2);
             return;
         }
@@ -15233,8 +15276,8 @@ copy_functions (program_t *from, funflag_t type)
 
                             q = xalloc(sizeof(efun_shadow_t));
                             if (!q) {
-                                yyerrorf("Out of memory: efun shadow (%lu bytes)"
-                                        , (unsigned long) sizeof(efun_shadow_t));
+                                yyerrorf("Out of memory: efun shadow (%zu bytes)"
+                                        , sizeof(efun_shadow_t));
                                 break;
                             }
                             q->shadow = p;
@@ -16041,7 +16084,8 @@ epilog (void)
  */
 
 {
-    int          size, i;
+    int          i;
+    p_int        size;
     mp_int       num_functions;
     mp_int       num_strings;
     mp_int       num_variables;
@@ -16185,7 +16229,7 @@ epilog (void)
                 CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
                 if (!realloc_a_program(FUNCTION_HDR_SIZE + 2))
                 {
-                    yyerrorf("Out of memory: program size %lu\n"
+                    yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                             , CURRENT_PROGRAM_SIZE + FUNCTION_HDR_SIZE + 2);
                 }
                 else
@@ -16420,14 +16464,15 @@ epilog (void)
     {
         struct_type_t * ptype;
         ptype = STRUCT_DEF(i).type;
-        printf("DEBUG: [%d] struct %s: (%s #%ld) ref %ld, %d members, base %s, flags %lx\n"
+        printf("DEBUG: [%d] struct %s: (%s #%"PRId32") ref %"PRIdPINT
+               ", %hd members, base %s, flags %"PRIx32"\n"
               , i, get_txt(ptype->name)
               , ptype->prog_name ? get_txt(ptype->prog_name) : "<none>"
-              , (long)ptype->prog_id
-              , (long)ptype->ref
+              , ptype->prog_id
+              , ptype->ref
               , ptype->num_members
               , ptype->base ? get_txt(ptype->base->name) : "<none>"
-              , (long)STRUCT_DEF(i).flags
+              , STRUCT_DEF(i).flags
               );
         fflush(stdout);
 #if 1
@@ -16478,7 +16523,8 @@ epilog (void)
         /* Get the program structure */
         if ( !(p = xalloc(size)) )
         {
-            yyerrorf("Out of memory: program structure (%u bytes)", size);
+            yyerrorf("Out of memory: program structure (%"PRIdPINT" bytes)", 
+                     size);
             break;
         }
 
@@ -16648,8 +16694,8 @@ epilog (void)
                 total_prog_block_size -= prog->total_size + mstrsize(prog->name)+1;
                 total_num_prog_blocks -= 1;
                 xfree(prog);
-                yyerrorf("Out of memory: linenumber structure (%lu bytes)"
-                        , (unsigned long)linenumber_size);
+                yyerrorf("Out of memory: linenumber structure (%zu bytes)"
+                        , linenumber_size);
                 break;
             }
             total_prog_block_size += linenumber_size;

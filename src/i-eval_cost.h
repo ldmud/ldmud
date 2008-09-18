@@ -39,7 +39,7 @@ add_eval_cost_n (int32 added_cost, uint repetitions)
             return MY_TRUE;
 
         if (max_eval_cost - eval_cost < added_cost
-         || (max_eval_cost - eval_cost) / repetitions < added_cost
+         || (int32)((max_eval_cost - eval_cost) / repetitions) < added_cost
            )
         {
             total_evalcost += max_eval_cost - eval_cost + 1;

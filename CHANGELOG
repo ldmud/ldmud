@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Sep 2008 (Zesstra)
+  - (prolang.y)
+    add_string_constant(): Added size to be allocated to an error message
+    Corrected a bunch of format specifiers
+    Added a missing line break in an error message in add_lvalue_code()
+    epilog(): changed size from int to p_int.
+    Changed some comparisons between signed and unsigned types in (lines
+      12229, 12322, 12935).
+  - (lex.c)
+    parse_numeric_escape(): Removed a comparison of unsigned long < 0 which is
+      never true and in this case not needed.
+  - (i-eval_cost.h)
+    add_eval_cost_n(): changed a comparison between signed and unsigned types
+    
 17-Sep-2008 (Zesstra)
   - (simulate.c)
     Corrected format specifiers, removed not needed casts, corrected some

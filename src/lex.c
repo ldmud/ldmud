@@ -3674,7 +3674,10 @@ parse_numeric_escape (char * cp, unsigned char * p_char)
         /* Parse a normal number from here */
 
         l = c - '0';
-        if  (l < 0 || l > base)
+        /* l is unsigned. So any c smaller than '0' will be wrapped into 
+         * positive values and be larger then base as well. Therefore an 
+         * additional comparison of l < 0 is not explicitly needed here. */
+        if  (l > base)
         {
             yywarn("Character constant used with no valid digits");
             return NULL;
