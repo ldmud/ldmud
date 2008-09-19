@@ -2069,7 +2069,7 @@ realloc_defbuf (void)
         defbuf_len <<= 1;
     }
     if (comp_flag)
-        fprintf(stderr, "%s (reallocating defbuf from %zu (%td left) to %zu) "
+        fprintf(stderr, "%s (reallocating defbuf from %zu (%td left) to %lu) "
                , time_stamp(), old_defbuf_len, (ptrdiff_t)(old_outp-defbuf)
                , defbuf_len);
     defbuf = xalloc(defbuf_len);

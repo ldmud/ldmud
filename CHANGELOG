@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Sep 2008 (Zesstra)
+  - (slaballoc.c)
+    Changed malloc_increment_size_calls, malloc_increment_size_success,
+    malloc_increment_size_total, num_avl_nodes to 'unsigned long' instead of
+    'long', they were anyway already printed as unsigned.
+    check_free_block(): added some details to an error message.
+    Added missing initializers to INIT_SLABENTRY, dummy and dummy2
+    mem_dump_extdata(): changed i to unsigned int (removed a warning
+      concerning comparison between signed and unsigned types).
+  - (interpret.c, lex.c)
+    Corrected two format specifier.
+
 18-Sep 2008 (Zesstra)
   - (prolang.y)
     add_string_constant(): Added size to be allocated to an error message

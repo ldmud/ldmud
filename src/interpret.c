@@ -2627,7 +2627,7 @@ inter_add_array (vector_t *q, vector_t **vpp)
 
     if (max_array_size && p_size + q_size > max_array_size)
     {
-        errorf("Illegal array size: %"PRIdPINT".\n", (p_size + q_size));
+        errorf("Illegal array size: %zu.\n", (p_size + q_size));
     }
 
     /* The optimized array-adding will transfer elements around, rendering

@@ -508,7 +508,7 @@ struct slabentry_s
     unsigned long numBlocks;     /* Desired number of blocks per slab. */
 };
 
-#define INIT_SLABENTRY   { 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+#define INIT_SLABENTRY   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 #define INIT_SLABENTRY2  INIT_SLABENTRY, INIT_SLABENTRY
 #define INIT_SLABENTRY4  INIT_SLABENTRY2, INIT_SLABENTRY2
 #define INIT_SLABENTRY8  INIT_SLABENTRY4, INIT_SLABENTRY4
@@ -569,20 +569,20 @@ static t_stat perm_alloc_stat = {0,0};
    * figure is a subset of {small,large}_alloc_stat.
    */
 
-static long malloc_increment_size_calls = 0;
+static unsigned long malloc_increment_size_calls = 0;
   /* Number of calls to malloc_increment_size().
    */
 
-static long malloc_increment_size_success = 0;
+static unsigned long malloc_increment_size_success = 0;
   /* Number of successfull calls to malloc_increment_size().
    */
 
-static long malloc_increment_size_total = 0;
+static unsigned long malloc_increment_size_total = 0;
   /* Total memory allocated through to malloc_increment_size().
    */
 
 #ifdef USE_AVL_FREELIST
-static long num_avl_nodes = 0;
+static unsigned long num_avl_nodes = 0;
   /* Number of nodes in the AVL tree managing the large free blocks.
    */
 #endif /* USE_AVL_FREELIST */
@@ -904,37 +904,37 @@ mem_dump_data (strbuf_t *sbuf)
 #   define dump_stat(str,stat) strbuf_addf(sbuf, str,stat.counter,stat.size)
 
     strbuf_add(sbuf, "Type                   Count      Space (bytes)\n");
-    dump_stat("xallocs:           %8u        %10lu\n\n", xalloc_st);
-    dump_stat("sbrk requests:     %8u        %10lu (a)\n",sbrk_st);
-    dump_stat("large blocks:      %8u        %10lu (b)\n",l_alloc);
+    dump_stat("xallocs:           %8lu        %10lu\n\n", xalloc_st);
+    dump_stat("sbrk requests:     %8lu        %10lu (a)\n",sbrk_st);
+    dump_stat("large blocks:      %8lu        %10lu (b)\n",l_alloc);
     strbuf_addf(sbuf
-               , "large net avail:                   %10ld\n"
+               , "large net avail:                   %10lu\n"
                , l_alloc.size - l_alloc.counter * ML_OVERHEAD * SINT
                );
-    dump_stat("large free blocks: %8u        %10lu (c)\n",l_free);
-    dump_stat("large wasted:      %8u        %10lu (d)\n\n",l_wasted);
-    dump_stat("small slabs:       %8u        %10lu (e)\n",s_slab);
-    dump_stat("small blocks:      %8u        %10lu (f)\n",s_alloc);
+    dump_stat("large free blocks: %8lu        %10lu (c)\n",l_free);
+    dump_stat("large wasted:      %8lu        %10lu (d)\n\n",l_wasted);
+    dump_stat("small slabs:       %8lu        %10lu (e)\n",s_slab);
+    dump_stat("small blocks:      %8lu        %10lu (f)\n",s_alloc);
     strbuf_addf(sbuf
-               , "small net avail:                   %10d\n"
+               , "small net avail:                   %10lu\n"
                , s_alloc.size - s_alloc.counter * M_OVERHEAD * SINT
                );
-    dump_stat("small free blocks: %8u        %10lu (g)\n",s_free);
-    dump_stat("small free slabs:  %8u        %10lu    \n",s_free_slab);
+    dump_stat("small free blocks: %8lu        %10lu (g)\n",s_free);
+    dump_stat("small free slabs:  %8lu        %10lu    \n",s_free_slab);
     strbuf_addf(sbuf
                , "small overhead:                    %10lu (h)\n"
                , s_overhead
                );
 
-    dump_stat("\npermanent blocks:  %8u        %10lu\n", perm_st);
+    dump_stat("\npermanent blocks:  %8lu        %10lu\n", perm_st);
 #ifdef SBRK_OK
-    dump_stat("clib allocations:  %8u        %10lu\n", clib_st);
+    dump_stat("clib allocations:  %8lu        %10lu\n", clib_st);
 #else
     strbuf_addf(sbuf, "clib allocations:       n/a               n/a\n");
 #endif
     strbuf_add(sbuf, "\n");
 #ifdef USE_AVL_FREELIST
-    strbuf_addf(sbuf, "AVL nodes:         %8u                 -\n", num_avl_nodes);
+    strbuf_addf(sbuf, "AVL nodes:         %8lu                 -\n", num_avl_nodes);
     strbuf_add(sbuf, "\n");
 #endif /* USE_AVL_FREELIST */
 
@@ -979,7 +979,7 @@ mem_dump_extdata (strbuf_t *sbuf)
 
 {
 #ifdef MALLOC_EXT_STATISTICS
-    int i;
+    unsigned int i;
 
     strbuf_add(sbuf,
       "Detailed Block Statistics:\n\n"
@@ -1886,31 +1886,28 @@ sfree (POINTER ptr)
     if (slab->magic == sfmagic[ix % NELEM(sfmagic)])
     {
         in_malloc = 0;
-        fatal("mem_free: block %lx size %lu (user %lx) freed in free slab %lx\n"
-             , (unsigned long)block, (unsigned long)(ix * SINT)
-             , (unsigned long)ptr, (unsigned long) slab);
+        fatal("mem_free: block %p size %"PRIuPINT" (user %p) freed in free slab %p\n"
+             , block, (ix * SINT), ptr, slab);
     }
     if (slab->magic != samagic[ix % NELEM(samagic)])
     {
         in_malloc = 0;
-        fatal("mem_free: block %p magic match failed for slab %lx: "
-              "size %lu, expected %lx, found %lx\n"
-             , block, (unsigned long)slab
-             , (unsigned long)(ix * SINT), samagic[ix], slab->magic);
+        fatal("mem_free: block %p magic match failed for slab %p: "
+              "size %"PRIuPINT", expected %"PRIuPINT", found %"PRIuPINT"\n"
+             , block, slab, (ix * SINT), (p_uint)samagic[ix], slab->magic);
     }
     if (block[M_MAGIC] == sfmagic[ix % NELEM(sfmagic)])
     {
         in_malloc = 0;
-        fatal("mem_free: block %lx size %lu (user %lx) freed twice\n"
-             , (unsigned long)block, (unsigned long)(ix * SINT)
-             , (unsigned long)ptr);
+        fatal("mem_free: block %p size %"PRIuPINT" (user %p) freed twice\n"
+             , block, (ix * SINT), ptr);
     }
     if (block[M_MAGIC] != samagic[ix % NELEM(samagic)])
     {
         in_malloc = 0;
         fatal("mem_free: block %p magic match failed: "
-              "size %lu, expected %lx, found %lx\n"
-             , block, (unsigned long)(ix * SINT), samagic[ix], block[M_MAGIC]);
+              "size %"PRIuPINT", expected %"PRIuPINT", found %"PRIuPINT"\n"
+             , block, (ix * SINT), (p_uint)samagic[ix], block[M_MAGIC]);
     }
 #endif
 
@@ -2131,6 +2128,7 @@ static struct free_block dummy =
 #ifdef USE_AVL_FREELIST
         , /* prev */ 0, /* next */ 0
 #endif /* USE_AVL_FREELIST */
+        , /* align_dummy */ 0
         };
 
        struct free_block dummy2 =
@@ -2139,6 +2137,7 @@ static struct free_block dummy =
 #ifdef USE_AVL_FREELIST
         , /* prev */ 0, /* next */ 0
 #endif /* USE_AVL_FREELIST */
+        , /* align_dummy */ 0
         };
 
 static struct free_block *free_tree = &dummy2;
@@ -2278,7 +2277,8 @@ check_free_block (void *m)
         if (!contains(free_tree, (struct free_block *)(p+size+T_OVERHEAD)) )
         {
             in_malloc = 0;
-            fatal("not found\n");
+            fatal("Memory at %p, size: %"PRIuPINT" (user: %p) was not found in the free_tree\n",
+                  p, size, m);
         }
     }
     return 0;
@@ -2305,11 +2305,9 @@ remove_from_free_list (word_t *ptr)
     {
         in_malloc = 0;
         fatal("remove_from_free_list: block %p, "
-              "magic match failed: expected %lx, "
-              "found %lx\n"
-             , ptr
-             , (unsigned long)LFMAGIC
-             , (unsigned long)ptr[M_MAGIC]
+              "magic match failed: expected %"PRIuPINT", "
+              "found %"PRIuPINT"\n"
+             , ptr, (p_uint)LFMAGIC, ptr[M_MAGIC]
              );
     }
 #endif
@@ -2338,7 +2336,9 @@ remove_from_free_list (word_t *ptr)
 #ifdef DEBUG
             if (p->parent)
             {
-                fatal("(remove_from_free_list) Node %p (size %ld) is the AVL tree root, but has a parent\n", p, (long)p->size);
+                fatal("(remove_from_free_list) Node %p (size %"PRIuPINT
+                      ") is the AVL tree root, but has a parent\n", 
+                      p, p->size);
             }
 #endif
             free_tree = p->next;
@@ -2348,7 +2348,9 @@ remove_from_free_list (word_t *ptr)
 #ifdef DEBUG
             if (!p->parent)
             {
-                fatal("(remove_from_free_list) Node %p (size %ld) has neither a parent nor is it the AVL tree root.\n", p, (long)p->size);
+                fatal("(remove_from_free_list) Node %p (size %"PRIuPINT
+                      ") has neither a parent nor is it the AVL tree root.\n", 
+                      p, p->size);
             }
 #endif
             if (p->parent->left == p)
@@ -3398,19 +3400,17 @@ large_free (char *ptr)
     if (p[M_MAGIC] == LFMAGIC)
     {
         in_malloc = 0;
-        fatal("large_free: block %lx size %lu, (user %lx) freed twice\n"
-             , (unsigned long)p, (unsigned long)(size * SINT)
-             , (unsigned long)ptr);
+        fatal("large_free: block %p size %"PRIuPINT", (user %p) freed twice\n"
+             , p, (size * SINT), ptr);
     }
     if (p[M_MAGIC] != LAMAGIC)
     {
         in_malloc = 0;
-        fatal("large_free(%p): block %p magic match failed: size %lu, "
-              "expected %lx, found %lx\n"
-             , ptr, p
-             , (unsigned long)(size * SINT)
-             , (unsigned long)LAMAGIC
-             , (unsigned long)p[M_MAGIC]
+        fatal("large_free(%p): block %p magic match failed: size %"PRIuPINT", "
+              "expected %"PRIuPINT", found %"PRIuPINT"\n"
+             , ptr, p, (size * SINT)
+             , (p_uint)LAMAGIC
+             , p[M_MAGIC]
              );
     }
 #endif
@@ -3859,8 +3859,8 @@ mem_clear_ref_flags (void)
         if (p + *p > heap_end)
         {
             in_malloc = 0;
-            fatal("pointer larger than brk: %p + %lx = %p > %p\n"
-                  , p, *p, p + *p , last);
+            fatal("pointer larger than brk: %p + %"PRIuPINT" = %p > %p\n"
+                  , p, (p_uint)(*p), p + *p , last);
         }
         p += *p;
     }
