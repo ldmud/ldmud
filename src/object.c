@@ -255,7 +255,7 @@ dealloc_object ( object_t *ob, const char * file, int line)
 
 #if 0 && defined(CHECK_OBJECT_REF)
     if (strchr(get_txt(ob->name), '#') == NULL)
-        printf("DEBUG: (%s:%d) free_object(%p '%s') ref %ld flags %x\n"
+        printf("DEBUG: (%s:%d) free_object(%p '%s') ref %"PRIdPINT" flags %x\n"
               , file, line, ob, get_txt(ob->name), ob->ref, ob->flags);
 #elif defined(CHECK_OBJECT_REF)
 #   ifdef __MWERKS__
@@ -269,14 +269,14 @@ dealloc_object ( object_t *ob, const char * file, int line)
     /* Freeing a non-destructed object should never happen */
 
     if (!(ob->flags & O_DESTRUCTED)) {
-        fatal("Object 0x%lx %s ref count 0, but not destructed.\n"
-             , (long)ob, get_txt(ob->name));
+        fatal("Object %p %s ref count 0, but not destructed.\n"
+             , ob, get_txt(ob->name));
     }
 
 #endif /* DEBUG */
 
     if (ob->sent)
-        fatal("free_object: Object '%s' (ref %ld, flags %08x) "
+        fatal("free_object: Object '%s' (ref %"PRIdPINT", flags %08x) "
               "still has sentences.\n"
              , get_txt(ob->name), ob->ref, ob->flags);
 
@@ -289,12 +289,12 @@ dealloc_object ( object_t *ob, const char * file, int line)
 #ifdef CHECK_OBJECT_STAT
         if (check_object_stat)
         {
-            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free( %p '%s') with %d vars : %ld -> (%ld:%ld)\n"
+            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free( %p '%s') with %hu vars : %"PRIuPINT" -> (%ld:%ld)\n"
                           , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
                           , prog->num_variables
-                          , (long)(prog->num_variables * sizeof (svalue_t) + sizeof (object_t))
-                          , (long)tot_alloc_object
-                          , (long)(tot_alloc_object_size - (prog->num_variables * sizeof (svalue_t) + sizeof (object_t)))
+                          , (p_uint)(prog->num_variables * sizeof (svalue_t) + sizeof (object_t))
+                          , tot_alloc_object
+                          , (tot_alloc_object_size - (prog->num_variables * sizeof (svalue_t) + sizeof (object_t)))
                           );
         }
 #endif
@@ -326,7 +326,7 @@ dealloc_object ( object_t *ob, const char * file, int line)
 #ifdef CHECK_OBJECT_STAT
         if (check_object_stat)
         {
-            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free( %p '%s') with name : %ld -> (%ld:%ld)\n"
+            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free( %p '%s') with name : %zu -> (%ld:%ld)\n"
                           , tot_alloc_object, tot_alloc_object_size, ob, get_txt(ob->name)
                           , mstrsize(ob->name)
                           , tot_alloc_object-1
@@ -400,12 +400,12 @@ static mp_int last_id = 0;
 #ifdef CHECK_OBJECT_STAT
     if (check_object_stat)
     {
-        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) new( %p ) with %d vars : %ld -> (%ld:%ld)\n"
+        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) new( %p ) with %d vars : %zu -> (%ld:%"PRIuPINT")\n"
                       , tot_alloc_object, tot_alloc_object_size, ob
                       , num_var
-                      , (long)(size2+size)
+                      , (size2+size)
                       , tot_alloc_object+1
-                      , tot_alloc_object_size + size + size2
+                      , (p_uint)tot_alloc_object_size + size + size2
                       );
     }
 #endif
@@ -535,7 +535,7 @@ reference_prog (program_t *progp, char *from)
 {
     progp->ref++;
     if (d_flag)
-        printf("%s reference_prog: %s ref %ld (%s)\n"
+        printf("%s reference_prog: %s ref %"PRIdPINT" (%s)\n"
               , time_stamp(), get_txt(progp->name), progp->ref, from);
 }
 
@@ -624,13 +624,15 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
 
 #if 0 && defined(CHECK_OBJECT_REF)
     if (strchr(get_txt(progp->name), '#') == NULL)
-        printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %ld\n"
+        printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %"PRIdPINT"\n"
               , file, line, progp, get_txt(progp->name), progp->ref);
 #endif
     if (d_flag)
         printf("%s free_prog: %s\n", time_stamp(), get_txt(progp->name));
     if (progp->ref < 0)
-        fatal("Negative ref count for prog ref.\n");
+        fatal("Negative ref count (%"PRIdPINT") for prog ref "
+              "(program %p '%s').\n",
+              progp->ref, progp, get_txt(progp->name));
 
     if (free_all && progp->blueprint)
     {
@@ -639,7 +641,8 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
         remove_prog_swap(progp, MY_TRUE);
 #if 0 && defined(CHECK_OBJECT_REF)
     if (strchr(get_txt(blueprint->name), '#') == NULL)
-        printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %ld : blueprint (%p '%s') ref %ld, flags %x\n"
+        printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %"PRIdPINT" : "
+               "blueprint (%p '%s') ref %"PRIdPINT", flags %hx\n"
               , file, line, progp, get_txt(progp->name), progp->ref
               , blueprint, get_txt(blueprint->name), blueprint->ref, blueprint->flags);
 #elif defined(CHECK_OBJECT_REF)
@@ -920,7 +923,8 @@ logon_object (object_t *ob)
     ret = apply(STR_LOGON, ob, 0);
     if (ret == 0)
     {
-        errorf("Could not find %s() on the player %s\n", get_txt(STR_LOGON), get_txt(ob->name));
+        errorf("Could not find %s() on the player %s\n", get_txt(STR_LOGON), 
+               get_txt(ob->name));
         /* NOTREACHED */
     }
     current_object = save;
@@ -1000,10 +1004,10 @@ replace_programs (void)
 #ifdef CHECK_OBJECT_STAT
             if (check_object_stat)
             {
-                fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) rprog( %p '%s') sub %d vars : %ld -> (%ld:%ld)\n"
+                fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) rprog( %p '%s') sub %d vars : %"PRIuPINT" -> (%ld:%ld)\n"
                               , tot_alloc_object, tot_alloc_object_size, r_ob, r_ob->ob->name ? get_txt(r_ob->ob->name) : "<null>"
                               , i
-                              , (long)(i * sizeof(svalue_t))
+                              , (p_uint)(i * sizeof(svalue_t))
                               , tot_alloc_object, tot_alloc_object_size - (i * sizeof(svalue_t))
                               );
             }
@@ -1189,7 +1193,7 @@ search_inherited (string_t *str, program_t *prg, int *offpnt)
         debug_message("%s search_inherited started\n", ts);
         debug_message("%s searching for PRG(%s) in PRG(%s)\n"
                      , ts, get_txt(str), get_txt(prg->name));
-        debug_message("%s num_inherited=%d\n", ts, prg->num_inherited);
+        debug_message("%s num_inherited=%hu\n", ts, prg->num_inherited);
     }
 #endif
 
@@ -1482,7 +1486,7 @@ v_function_exists (svalue_t *sp, int num_arg)
 {
     string_t *str, *prog_name;
     uint32 prog_line = 0;
-    uint32 flags;
+    p_int flags;
     svalue_t *argp;
     object_t *ob;
 
@@ -1513,8 +1517,9 @@ v_function_exists (svalue_t *sp, int num_arg)
              || (flags & ~NAME_HIDDEN) > FEXISTS_ALL
                )
             {
-                errorf("Bad argument 2 to function_exists(): value %ld (%ld sans NAME_HIDDEN) out of range %d..%d .\n"
-                     , (long)flags, (long)(flags & ~NAME_HIDDEN)
+                errorf("Bad argument 2 to function_exists(): value %"PRIdPINT
+                       " (%"PRIdPINT" sans NAME_HIDDEN) out of range %d..%d .\n"
+                     , flags, (flags & ~NAME_HIDDEN)
                      , FEXISTS_ALL, FEXISTS_LINENO);
                 /* NOTREACHED */
                 return sp;
@@ -1545,8 +1550,8 @@ v_function_exists (svalue_t *sp, int num_arg)
          || ((flags & ~NAME_HIDDEN) > FEXISTS_ALL)
            )
         {
-            errorf("Bad argument 3 to function_exists(): eff. value %ld (sans NAME_HIDDEN) out of range %d..%d .\n"
-                 , (long)(flags & ~NAME_HIDDEN)
+            errorf("Bad argument 3 to function_exists(): eff. value %"PRIdPINT" (sans NAME_HIDDEN) out of range %d..%d .\n"
+                 , (flags & ~NAME_HIDDEN)
                  , FEXISTS_PROGNAME, FEXISTS_ALL);
             /* NOTREACHED */
             return sp;
@@ -1637,8 +1642,8 @@ v_function_exists (svalue_t *sp, int num_arg)
             break;
 
         default:
-            fatal("function_exists(): flags value %ld (from %ld) not implemented.\n"
-                 , (long)(flags & ~NAME_HIDDEN), (long)flags);
+            fatal("function_exists(): flags value %"PRIdPINT" (from %"PRIdPINT") not implemented.\n"
+                 , (flags & ~NAME_HIDDEN), flags);
             /* NOTREACHED */
         }
     }
@@ -2002,8 +2007,8 @@ v_variable_exists (svalue_t *sp, int num_arg)
             if (mode_flags != 0 && mode_flags != NAME_HIDDEN)
             {
                 errorf("Bad argument 2 to variable_exists(): "
-                      "value %ld, expected 0 or %d (NAME_HIDDEN).\n"
-                     , (long)mode_flags, NAME_HIDDEN
+                      "value %"PRIdPINT", expected 0 or %d (NAME_HIDDEN).\n"
+                     , mode_flags, NAME_HIDDEN
                     );
                 /* NOTREACHED */
                 return sp;
@@ -2034,8 +2039,8 @@ v_variable_exists (svalue_t *sp, int num_arg)
         if (mode_flags != 0 && mode_flags != NAME_HIDDEN)
         {
             errorf("Bad argument 3 to variable_exists(): "
-                  "value %ld, expected 0 or %d (NAME_HIDDEN).\n"
-                 , (long)mode_flags, NAME_HIDDEN
+                  "value %"PRIdPINT", expected 0 or %d (NAME_HIDDEN).\n"
+                 , mode_flags, NAME_HIDDEN
                 );
             /* NOTREACHED */
             return sp;
@@ -2666,8 +2671,8 @@ v_include_list (svalue_t *sp, int num_arg)
         if (!str)
         {
             free_array(vec);
-            errorf("(include_list) Out of memory: (%lu bytes) for filename\n"
-                 , (unsigned long)slen);
+            errorf("(include_list) Out of memory: (%zu bytes) for filename\n"
+                 , slen);
         }
 
         put_string(vec->item, str);
@@ -2849,8 +2854,8 @@ v_inherit_list (svalue_t *sp, int num_arg)
             {
                 free_array(vec);
                 mempool_delete(pool);
-                errorf("(inherit_list) Out of memory: (%lu bytes) for filename\n"
-                     , (unsigned long)slen);
+                errorf("(inherit_list) Out of memory: (%zu bytes) for filename\n"
+                     , slen);
             }
             put_string(svp, str);
         }
@@ -2898,8 +2903,8 @@ v_inherit_list (svalue_t *sp, int num_arg)
             if (!str)
             {
                 mempool_delete(pool);
-                errorf("(inherit_list) Out of memory: (%lu bytes) for filename\n"
-                     , (unsigned long)slen);
+                errorf("(inherit_list) Out of memory: (%zu bytes) for filename\n"
+                     , slen);
             }
 
             /* If this child has no inherits, we just copy the
@@ -3041,8 +3046,8 @@ f_load_name (svalue_t *sp)
         len = (size_t)(hash - get_txt(s));
         p = mem = xalloc(len+1);
         if (!p)
-            errorf("(load_name) Out of memory (%lu bytes) for filename."
-                 , (long)len+1);
+            errorf("(load_name) Out of memory (%zu bytes) for filename."
+                 , len+1);
         strncpy(p, get_txt(s), len);
         p[len] = '\0';
 
@@ -3328,7 +3333,7 @@ f_rename_object (svalue_t *sp)
 
     m_name = new_mstring(name);
     if (!m_name)
-        errorf("Out of memory for object name (%ld bytes)\n", (long)strlen(name));
+        errorf("Out of memory for object name (%zu bytes)\n", strlen(name));
 
     if (lookup_object_hash(m_name))
     {
@@ -5761,7 +5766,7 @@ save_mapping (mapping_t *m)
 
         MY_PUTC(':')
         source = number_buffer;
-        (void)sprintf(source, "%ld", (long)m->num_values);
+        (void)sprintf(source, "%"PRIdPINT, m->num_values);
         c = *source++;
         do MY_PUTC(c) while ( '\0' != (c = *source++) );
     }
@@ -5778,7 +5783,7 @@ save_array (vector_t *v)
  */
 
 {
-    long i;
+    p_int i;
     svalue_t *val;
 
     /* Recall the array from the pointer table.
@@ -5796,7 +5801,7 @@ save_array (vector_t *v)
     }
 
     /* ... the values ... */
-    for (i = (long)VEC_SIZE(v), val = v->item; --i >= 0; )
+    for (i = VEC_SIZE(v), val = v->item; --i >= 0; )
     {
         save_svalue(val++, ',', MY_FALSE);
     }
@@ -6208,7 +6213,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         char * source, c;
 
         source = number_buffer;
-        (void)sprintf(source, "#%hd:", v->x.quotes);
+        (void)sprintf(source, "#%"PRIdPHINT":", v->x.quotes);
         c = *source++;
         do L_PUTC(c) while ( '\0' != (c = *source++) );
         L_PUTC_EPILOG
@@ -6231,7 +6236,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         char *source, c;
 
         source = number_buffer;
-        (void)sprintf(source, "%ld", v->u.number);
+        (void)sprintf(source, "%"PRIdPINT, v->u.number);
         c = *source++;
         do L_PUTC(c) while ( '\0' != (c = *source++) );
         L_PUTC(delimiter);
@@ -6250,7 +6255,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         char *source, c;
 
         source = number_buffer;
-        (void)sprintf(source, "%.12e=%x:%lx"
+        (void)sprintf(source, "%.12e=%"PRIxPHINT":%"PRIxPINT
                      , READ_DOUBLE(v), v->x.exponent & 0xffff
                      , v->u.mantissa);
         c = *source++;
@@ -6318,13 +6323,13 @@ register_array (vector_t *vec)
 
 {
     svalue_t *v;
-    long i;
+    p_int i;
 
     if (NULL == register_pointer(ptable, vec))
         return;
 
     v = vec->item;
-    for (i = (long)VEC_SIZE(vec); --i >= 0; v++)
+    for (i = VEC_SIZE(vec); --i >= 0; v++)
     {
         register_svalue(v);
     }
@@ -6364,7 +6369,7 @@ register_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
  */
 
 {
-    int i;
+    p_int i;
 
     register_svalue(key);
 
@@ -6385,7 +6390,7 @@ register_mapping (mapping_t *map)
 {
     if (NULL == register_pointer(ptable, map))
         return;
-    walk_mapping(map, register_mapping_filter, (void *)(p_int)map->num_values);
+    walk_mapping(map, register_mapping_filter, (void *)map->num_values);
 } /* register_mapping() */
 
 /*-------------------------------------------------------------------------*/
@@ -6552,9 +6557,9 @@ v_save_object (svalue_t *sp, int numarg)
         {
             if (sp->u.number < -1 || sp->u.number > CURRENT_VERSION)
             {
-                errorf("Illegal value for arg 1 to save_object(): %ld, "
+                errorf("Illegal value for arg 1 to save_object(): %"PRIdPINT", "
                       "expected -1..%d\n"
-                     , (long)sp->u.number, CURRENT_VERSION
+                     , sp->u.number, CURRENT_VERSION
                      );
                 /* NOTREACHED */
                 return sp;
@@ -6582,9 +6587,9 @@ v_save_object (svalue_t *sp, int numarg)
 
         if (sp->u.number < -1 || sp->u.number > CURRENT_VERSION)
         {
-            errorf("Illegal value for arg 1 to save_object(): %ld, "
+            errorf("Illegal value for arg 1 to save_object(): %"PRIdPINT", "
                   "expected -1..%d\n"
-                 , (long)sp->u.number, CURRENT_VERSION
+                 , sp->u.number, CURRENT_VERSION
                  );
             /* NOTREACHED */
             return sp;
@@ -6942,9 +6947,9 @@ v_save_value (svalue_t *sp, int numarg)
         {
             if (sp->u.number < -1 || sp->u.number > CURRENT_VERSION)
             {
-                errorf("Illegal value for arg 1 to save_object(): %ld, "
+                errorf("Illegal value for arg 1 to save_object(): %"PRIdPINT", "
                       "expected -1..%d\n"
-                     , (long)sp->u.number, CURRENT_VERSION
+                     , sp->u.number, CURRENT_VERSION
                      );
                 /* NOTREACHED */
                 return sp;
@@ -7059,6 +7064,9 @@ restore_map_size (struct rms_parameters *parameters)
  *
  * The function calls itself and restore_size() recursively
  * for embedded arrays and mappings.
+ *
+ * TODO: this function assumes that num_values and num_entries of mappings
+ * TODO::are 'int'. Should be changed to p_int.
  */
 
 {
@@ -7286,6 +7294,9 @@ restore_mapping (svalue_t *svp, char **str)
  * set to const0 in that case).
  * On a successful return, *<str> is set to point after the mapping
  * restored.
+ *
+ * TODO: this function assumes that num_values and num_entries of mappings
+ * TODO::are 'int'. Should be changed to p_int.
  */
 
 {
@@ -7308,10 +7319,10 @@ restore_mapping (svalue_t *svp, char **str)
     if (max_mapping_size && siz * (1+tmp_par.num_values) > (p_int)max_mapping_size)
     {
         *svp = const0;
-        errorf("Illegal mapping size: %ld elements (%ld x %ld).\n"
-             , (long int)siz * (1+tmp_par.num_values)
-             , (long int)siz
-             , (long int)1+tmp_par.num_values );
+        errorf("Illegal mapping size: %ld elements (%d x %d).\n"
+             , (long)siz * (1+tmp_par.num_values)
+             , siz
+             , 1+tmp_par.num_values );
         return MY_FALSE;
     }
 
@@ -7321,7 +7332,7 @@ restore_mapping (svalue_t *svp, char **str)
     if (!z)
     {
         *svp = const0;
-        errorf("(restore) Out of memory: mapping[%u, %u]\n"
+        errorf("(restore) Out of memory: mapping[%d, %d]\n"
              , siz, tmp_par.num_values);
         return MY_FALSE;
     }
@@ -7375,6 +7386,9 @@ restore_size (char **str)
  *
  * The function calls itself and restore_map_size() recursively
  * for embedded arrays and mappings.
+ *
+ * TODO: this function assumes that the size of arrays and mappings is 
+ * TODO::< INT_MAX. Should be changed to p_int.
  */
 
 {
@@ -7522,6 +7536,9 @@ restore_array (svalue_t *svp, char **str)
  * set to const0 in that case).
  * On a successful return, *<str> is set to point after the array text
  * restored.
+ *
+ * TODO: this function assumes that the size of arrays is < INT_MAX. Should 
+ * TODO::be changed to p_int.
  */
 
 {
@@ -8235,8 +8252,8 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         if (!svp->u.str)
         {
             *svp = const0;
-            errorf("(restore) Out of memory (%lu bytes) for string.\n"
-                 , (unsigned long) strlen(start));
+            errorf("(restore) Out of memory (%zu bytes) for string.\n"
+                 , strlen(start));
         }
         break;
       }
@@ -8309,12 +8326,9 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         svp->type = T_FLOAT;
         if ( NULL != (cp = strchr(cp, '=')) &&  restored_host == CURRENT_HOST)
         {
-            int tmp;
-
             cp++;
-            if (sscanf(cp, "%x:%lx", &tmp, &svp->u.mantissa) != 2)
+            if (sscanf(cp, "%"SCNxPHINT":%"SCNxPINT, &svp->x.exponent, &svp->u.mantissa) != 2)
                 return 0;
-            svp->x.exponent = (short)tmp;
         }
         else
         {
@@ -8375,8 +8389,8 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                     current_shared_restored--;
                     *svp = const0;
                     errorf("(restore) Out of memory (%lu bytes) for "
-                          "%lu shared values.\n"
-                          , max_shared_restored * sizeof(svalue_t)
+                          "%ld shared values.\n"
+                          , (unsigned long)max_shared_restored * sizeof(svalue_t)
                           , max_shared_restored);
                     return MY_FALSE;
                 }
@@ -8458,8 +8472,8 @@ old_restore_string (svalue_t *v, char *str)
             if (!v->u.str)
             {
                 *v = const0;
-                errorf("(restore) Out of memory (%lu bytes) for string\n"
-                     , (unsigned long) strlen(str));
+                errorf("(restore) Out of memory (%zu bytes) for string\n"
+                     , strlen(str));
             }
             return MY_TRUE;
         }
@@ -8700,8 +8714,10 @@ static int nesting = 0;  /* Used to detect recursive calls */
         {
             fclose(f);
             nesting--;
-            errorf("(restore) Out of memory (%lu bytes) for linebuffer.\n"
-                 , (unsigned long) st.st_size+1);
+            /* TODO: st_size is off_t which is most often int64_t or int32_t.
+             * TODO:: PRIdMAX or PRId64 should be used, I think. */
+            errorf("(restore) Out of memory (%ld bytes) for linebuffer.\n"
+                 , (long) st.st_size+1);
             /* NOTREACHED */
             return sp;
         }
@@ -8727,7 +8743,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
         FREE_BUFF();
         nesting--;
         errorf("(restore) Out of memory (%lu bytes) for shared values.\n"
-             , sizeof(svalue_t)*max_shared_restored);
+             , sizeof(svalue_t)*(unsigned long)max_shared_restored);
         /* NOTREACHED */
         return sp;
     }
@@ -8741,8 +8757,8 @@ static int nesting = 0;  /* Used to detect recursive calls */
             fclose(f);
         FREE_BUFF();
         nesting--;
-        errorf("(restore) Out of memory: (%lu bytes) for cleanup structure\n"
-             , (unsigned long)sizeof(*rcp));
+        errorf("(restore) Out of memory: (%zu bytes) for cleanup structure\n"
+             , sizeof(*rcp));
         /* NOTREACHED */
         return sp;
     }
@@ -9000,8 +9016,8 @@ f_restore_value (svalue_t *sp)
         buff = xalloc(len+1);
         if (!buff)
         {
-            errorf("(restore) Out of memory (%lu bytes).\n"
-                 , (unsigned long) len+1);
+            errorf("(restore) Out of memory (%zu bytes).\n"
+                 , len+1);
             /* NOTREACHED */
             return sp;
         }
@@ -9027,7 +9043,7 @@ f_restore_value (svalue_t *sp)
     {
         xfree(buff);
         errorf("(restore) Out of memory (%lu bytes) for shared values.\n"
-             , max_shared_restored * sizeof(svalue_t));
+             , (unsigned long)max_shared_restored * sizeof(svalue_t));
         return sp; /* flow control hint */
     }
 
@@ -9042,8 +9058,8 @@ f_restore_value (svalue_t *sp)
     if (!rcp)
     {
         xfree(buff);
-        errorf("(restore) Out of memory (%lu bytes).\n"
-              , (unsigned long) sizeof(*rcp));
+        errorf("(restore) Out of memory (%zu bytes).\n"
+              , sizeof(*rcp));
         /* NOTREACHED */
         return sp;
     }

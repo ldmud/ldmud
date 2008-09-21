@@ -1,6 +1,31 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Sep 2008 (Zesstra)
+  - (actions.c)
+    f_execute_command(): added length of command to error message 'command too
+      long'
+    Corrected format specifiers
+  - (comm.c)
+    Corrected format specifiers
+    interactive_cleanup(): removed variable e
+    add_message(): fixed a potential crash due to a buffer overflow on the
+      stack using vsnprint() instead of vsprintf() (and spared the client a
+      comm_fatal()).
+    f_binary_message(): replaced a fatal() by an errorf() if a string could
+      not be allocated. Replaced the error message text as well, because that
+      is not a stack overflow (memory for the string is allocated on heap).
+  - (xalloc.h)
+    Corrected format specifiers.
+  - (object.c)
+    Corrected format specifiers, removed unneeded casts.
+    free_prog(): added refcount, program address and program name to message
+      for fatal() in case of negativ refcounts
+    v_function_exists(): changed flags to p_int.
+    save_array(), register_array(), register_mapping_filter(): changed i to 
+      p_int
+    restore_svalue(): removed variable tmp while restoring a float.
+
 19-Sep 2008 (Zesstra)
   - (slaballoc.c)
     Changed malloc_increment_size_calls, malloc_increment_size_success,

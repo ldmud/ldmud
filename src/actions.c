@@ -1381,8 +1381,8 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
             if ((size_t)(-flag) >= mstrsize(p->verb))
             {
                 free_action_sent(p);
-                errorf("Bad arg 3 to add_action(): value %ld larger than verb '%s'.\n"
-                     , (long)flag, get_txt(p->verb));
+                errorf("Bad arg 3 to add_action(): value %"PRIdPINT" larger than verb '%s'.\n"
+                     , flag, get_txt(p->verb));
                 /* NOTREACHED */
                 return MY_TRUE;
             }
@@ -1395,8 +1395,8 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
         else
         {
             free_action_sent(p);
-            errorf("Bad arg 3 to add_action(): value %ld too big.\n"
-                 , (long)flag);
+            errorf("Bad arg 3 to add_action(): value %"PRIdPINT" too big.\n"
+                 , flag);
             /* NOTREACHED */
             return MY_TRUE;
         }
@@ -1569,7 +1569,8 @@ f_execute_command (svalue_t *sp)
 
     len = mstrsize(argp->u.str);
     if (len >= sizeof(buf) - 1)
-        errorf("Command too long: '%.200s...'\n", get_txt(argp->u.str));
+        errorf("Command too long (size: %zu): '%.200s...'\n", 
+               len, get_txt(argp->u.str));
     strncpy(buf, get_txt(argp->u.str), len);
     buf[len+1] = '\0';
 
@@ -2256,7 +2257,7 @@ f_disable_commands (svalue_t *sp)
         return sp;
 
     if (d_flag > 1) {
-        debug_message("%s Disable commands %s (ref %ld)\n"
+        debug_message("%s Disable commands %s (ref %"PRIdPINT")\n"
                      , time_stamp(), get_txt(current_object->name)
                      , current_object->ref);
     }
@@ -2286,7 +2287,7 @@ f_enable_commands (svalue_t *sp)
         return sp;
 
     if (d_flag > 1) {
-        debug_message("%s Enable commands %s (ref %ld)\n"
+        debug_message("%s Enable commands %s (ref %"PRIdPINT")\n"
                      , time_stamp(), get_txt(current_object->name)
                      , current_object->ref);
     }
@@ -2520,8 +2521,8 @@ f_set_modify_command (svalue_t *sp)
         else
         {
             if (sp->u.number != -1)
-                errorf("Bad num arg 1 to set_modify_command(): got %ld, "
-                      "expected 0 or -1\n", sp->u.number);
+                errorf("Bad num arg 1 to set_modify_command(): got %"PRIdPINT
+                       ", expected 0 or -1\n", sp->u.number);
             if (old) ref_object(old, "set_modify_command");
         }
     }

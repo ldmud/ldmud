@@ -162,6 +162,10 @@ struct input_to_s {
  *
  * When changing struct members, take care that you don't introduce
  * unnecessary padding.
+ *
+ * If the CBool members should ever be changed to C99's _Bool, take care of
+ * checking who is relying on a specific size (e.g. some printf())
+ *
  */
 
 struct interactive_s {

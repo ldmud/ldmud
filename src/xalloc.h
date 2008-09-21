@@ -16,8 +16,8 @@
 
 #define xallocate(dest,size,txt) \
     if (NULL == ((dest) = xalloc(size))) {\
-        errorf("(%s:%d) Out of memory (%lu bytes) for %s\n"\
-              , __FILE__, __LINE__, (unsigned long)(size), txt); \
+        errorf("(%s:%d) Out of memory (%zu bytes) for %s\n"\
+              , __FILE__, __LINE__, (size_t)(size), txt); \
     } else {}
 
 
@@ -41,12 +41,12 @@
     errorf("(%s:%d) Out of memory for %s\n", __FILE__, __LINE__, txt)
 
 #define outofmem(size,txt) \
-    errorf("(%s:%d) Out of memory (%lu bytes) for %s\n"\
-          , __FILE__, __LINE__, (unsigned long)(size), txt)
+    errorf("(%s:%d) Out of memory (%zu bytes) for %s\n"\
+          , __FILE__, __LINE__, (size_t)(size), txt)
 
 #define outofmem1(size,txt,arg1) \
-    errorf("(%s:%d) Out of memory (%lu bytes) for " txt "\n"\
-          , __FILE__, __LINE__, (unsigned long)(size), arg1)
+    errorf("(%s:%d) Out of memory (%zu bytes) for " txt "\n"\
+          , __FILE__, __LINE__, (size_t)(size), arg1)
 
 
 /* void memsafe(void * expr, size_t size, const char * txt)
@@ -59,8 +59,8 @@
     do { \
         size_t memsafe_size = size; \
         if (NULL == (expr)) {\
-            errorf("(%s:%d) Out of memory (%lu bytes) for %s\n"\
-                  , __FILE__, __LINE__, (unsigned long)(memsafe_size), txt); \
+            errorf("(%s:%d) Out of memory (%zu bytes) for %s\n"\
+                  , __FILE__, __LINE__, (size_t)(memsafe_size), txt); \
         } else {} \
     } while(0)
 
