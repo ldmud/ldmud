@@ -6739,7 +6739,7 @@ push_error_context (svalue_t *sp, int catch_flags)
     p->recovery_info.rt.type = ERROR_RECOVERY_CATCH;
     p->recovery_info.flags = catch_flags;
     p->catch_value.type = T_INVALID;
-    rt_context = (rt_context_t *)&p->recovery_info;
+    rt_context = (rt_context_t *)&p->recovery_info.rt;
     return &p->recovery_info.con;
 } /* push_error_context() */
 
@@ -17332,7 +17332,7 @@ secure_apply_ob (string_t *fun, object_t *ob, int num_arg, Bool external)
 
     error_recovery_info.rt.last = rt_context;
     error_recovery_info.rt.type = ERROR_RECOVERY_APPLY;
-    rt_context = (rt_context_t *)&error_recovery_info;
+    rt_context = (rt_context_t *)&error_recovery_info.rt;
     save_sp = inter_sp;
     save_csp = csp;
     if (setjmp(error_recovery_info.con.text))
@@ -17413,7 +17413,7 @@ apply_master_ob (string_t *fun, int num_arg, Bool external)
     /* Setup the the error recovery and call the function */
     error_recovery_info.rt.last = rt_context;
     error_recovery_info.rt.type = ERROR_RECOVERY_APPLY;
-    rt_context = (rt_context_t *)&error_recovery_info;
+    rt_context = (rt_context_t *)&error_recovery_info.rt;
     save_sp = inter_sp;
     save_csp = csp;
     if (setjmp(error_recovery_info.con.text))
@@ -18184,7 +18184,7 @@ secure_call_lambda (svalue_t *closure, int num_arg, Bool external)
 
     error_recovery_info.rt.last = rt_context;
     error_recovery_info.rt.type = ERROR_RECOVERY_APPLY;
-    rt_context = (rt_context_t *)&error_recovery_info;
+    rt_context = (rt_context_t *)&error_recovery_info.rt;
     save_sp = inter_sp;
     save_csp = csp;
 

@@ -937,7 +937,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
 
     error_recovery_info.rt.last = rt_context;
     error_recovery_info.rt.type = ERROR_RECOVERY_BACKEND;
-    rt_context = (rt_context_t *)&error_recovery_info;
+    rt_context = (rt_context_t *)&error_recovery_info.rt;
     if (setjmp(error_recovery_info.con.text))
     {
         bytecode_p p;

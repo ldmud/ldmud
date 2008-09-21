@@ -1480,7 +1480,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
              && (SSIZE_MAX - sizeof(map_chain_t)) / new_width < sizeof(svalue_t))
            )
         {
-            errorf("Mapping width too big (%"PRIdPINT")\n", new_width);
+            errorf("Mapping width too big (%"PRIdMPINT")\n", new_width);
             /* NOTREACHED */
             return NULL;
         }
@@ -1704,7 +1704,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
             return copy_mapping(m1);
         }
 
-        errorf("Mappings to be added are of different width: %"PRIdPINT
+        errorf("Mappings to be added are of different width: %"PRIdMPINT
                " vs. %"PRIdPINT"\n",
                num_values, m2->num_values);
     }

@@ -4393,7 +4393,7 @@ call_function_interactive (interactive_t *i, char *str)
 
     error_recovery_info.rt.last = rt_context;
     error_recovery_info.rt.type = ERROR_RECOVERY_BACKEND;
-    rt_context = (rt_context_t *)&error_recovery_info;
+    rt_context = (rt_context_t *)&error_recovery_info.rt;
 
     if (setjmp(error_recovery_info.con.text))
     {

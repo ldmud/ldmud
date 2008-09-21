@@ -25,6 +25,22 @@ See the file HISTORY for a user-oriented summary of all the changes.
     save_array(), register_array(), register_mapping_filter(): changed i to 
       p_int
     restore_svalue(): removed variable tmp while restoring a float.
+  - (efuns.c, mapping.c, prolang.y, simulate.c, structs.c, object.c, dumpstat.c)
+    Corrected format specifiers
+  - (interpret.c, heartbeat.c, simulate.c, call_out.c, comm.c, actions.c,
+     backend.c)
+      secure_call_lambda(), apply_master_ob(), secure_apply_ob(),
+      push_error_context(), errorf(), call_heart_beat(), call_out(),
+      replace_program_lambda_adjust(), call_function_interactive(),
+      execute_command(), process_objects(): 
+      take the address for rt_context from the rt member of the struct
+      error_recovery_info, not from the beginning of the struct. Removes
+      compiler warning "dereferencing type-punned pointer will break
+      strict-aliasing rules".
+  - (structs.c)
+    struct_t_unique_name(): sprintf -> snprintf
+  - (dumpstat.c)
+    dumpstat(): length of buffer given to strftime() was one too short.
 
 19-Sep 2008 (Zesstra)
   - (slaballoc.c)

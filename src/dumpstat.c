@@ -358,14 +358,15 @@ dumpstat (string_t *fname)
             fprintf(f, "-- ");
 
         if (ob->gigaticks)
-            fprintf(f, " (%lu%09lu)", ob->gigaticks, ob->ticks);
+            fprintf(f, " (%"PRIuMPINT"%09"PRIuMPINT")", 
+                    (mp_uint)ob->gigaticks, (mp_uint)ob->ticks);
         else
-            fprintf(f, " (%lu)", ob->ticks);
+            fprintf(f, " (%"PRIuMPINT")", (mp_uint)ob->ticks);
         fprintf(f, " %s",
                 swapstrings[(O_PROG_SWAPPED(ob)?1:0) | (O_VAR_SWAPPED(ob)?2:0)]
         );
         tm = localtime((time_t *)&ob->load_time);
-        strftime(timest, sizeof(timest)-1, "%Y.%m.%d-%H:%M:%S", tm);
+        strftime(timest, sizeof(timest), "%Y.%m.%d-%H:%M:%S", tm);
         fprintf(f, " %s\n", timest);
     }
     fclose(f);
@@ -404,7 +405,7 @@ dumpstat_dest(string_t *fname)
         if (!(ob->flags & O_DESTRUCTED)) /* TODO: Can't happen */
             continue;
 #endif
-        fprintf(f, "%-20s ref %2ld NEW\n"
+        fprintf(f, "%-20s ref %2"PRIdPINT" NEW\n"
                  , get_txt(ob->name)
                  , ob->ref
         );
@@ -416,7 +417,7 @@ dumpstat_dest(string_t *fname)
         if (!(ob->flags & O_DESTRUCTED)) /* TODO: Can't happen */
             continue;
 #endif
-        fprintf(f, "%-20s ref %2ld\n"
+        fprintf(f, "%-20s ref %2"PRIdPINT"\n"
                  , get_txt(ob->name)
                  , ob->ref
         );

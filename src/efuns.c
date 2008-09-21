@@ -5929,7 +5929,7 @@ f_copy (svalue_t *sp)
             check_map_for_destr(old);
             new = copy_mapping(old);
             if (!new)
-                errorf("(copy) Out of memory: mapping[%lu] for copy.\n"
+                errorf("(copy) Out of memory: mapping[%"PRIdPINT"] for copy.\n"
                      , MAP_SIZE(old));
             free_mapping(old);
             sp->u.map = new;
@@ -5944,6 +5944,7 @@ f_copy (svalue_t *sp)
 /*-------------------------------------------------------------------------*/
 
 /* Data packet passed to deep_copy_mapping() during a mapping walk.
+ * TODO: change width to p_int, because mappings can have p_int values
  */
 struct csv_info {
     int depth;                     /* Depth of the copy procedure */
@@ -6160,7 +6161,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
             info.width = old->num_values;
             new = allocate_mapping(size, info.width);
             if (!new)
-                errorf("(copy) Out of memory: new mapping[%lu, %u].\n"
+                errorf("(copy) Out of memory: new mapping[%"PRIdMPINT", %u].\n"
                      , size, info.width);
             put_mapping(dest, new);
             rec->data = new;

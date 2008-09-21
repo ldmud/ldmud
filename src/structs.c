@@ -309,10 +309,10 @@ add_type (struct_type_t * pSType)
 
 #ifdef DEBUG
      if (find_by_type(pSType))
-         fatal("struct type %s (%s %ld) already in table.\n"
+         fatal("struct type %s (%s %"PRId32") already in table.\n"
               , get_txt(struct_t_name(pSType))
               , get_txt(struct_t_pname(pSType))
-              , (long)struct_t_pid(pSType)
+              , struct_t_pid(pSType)
               );
 #endif
 
@@ -773,8 +773,8 @@ struct_new_anonymous (int num_members)
         pType->member[i].name = new_tabled(buf);
         if (!pType->member[i].name)
         {
-            debug_message("(%s:%d) Out of memory (%lu bytes) for member name\n"
-                         , __FILE__, __LINE__, (unsigned long)strlen(buf)
+            debug_message("(%s:%d) Out of memory (%zu bytes) for member name\n"
+                         , __FILE__, __LINE__, strlen(buf)
                          );
             gotError = MY_TRUE;
             break;
@@ -839,7 +839,7 @@ struct_free (struct_t *pStruct)
         fatal("No wizlist pointer for struct in struct_free().");
 
     if (pStruct->ref != 0)
-        fatal("Struct with %ld refs passed to struct_free().\n"
+        fatal("Struct with %"PRIdPINT" refs passed to struct_free().\n"
               , pStruct->ref);
 #endif
 
@@ -868,7 +868,7 @@ struct_free_type (struct_type_t *pSType)
         fatal("NULL pointer passed to struct_free_type().\n");
 
     if (pSType->ref != 0)
-        fatal("struct typeobject with %ld refs passed to struct_free_type().\n"
+        fatal("struct typeobject with %"PRIdPINT" refs passed to struct_free_type().\n"
              , pSType->ref);
 #endif
 
@@ -982,7 +982,8 @@ total_struct_size (strbuf_t *sbuf, Bool verbose)
 {
     if (!verbose)
     {
-        strbuf_addf(sbuf, "Structs:\t\t\t%8ld %9ld (%ld types: %ld)\n"
+        strbuf_addf(sbuf, "Structs:\t\t\t%8"PRIdMPINT" %9"PRIdMPINT
+                          " (%"PRIdMPINT" types: %"PRIdMPINT")\n"
                         , num_struct, size_struct
                         , num_struct_type, size_struct_type
                    );
@@ -1034,10 +1035,10 @@ struct_t_unique_name (struct_type_t *pSType)
     if (pSType->unique_name)
         return pSType->unique_name;
 
-    sprintf(name, "%s %s #%ld"
+    snprintf(name, sizeof(name), "%s %s #%"PRId32
                 , get_txt(struct_t_name(pSType))
                 , get_txt(struct_t_pname(pSType))
-                , (long)struct_t_pid(pSType)
+                , struct_t_pid(pSType)
            );
     pSType->unique_name = new_mstring(name);
 
@@ -1331,7 +1332,7 @@ x_map_struct (svalue_t *sp, int num_arg)
 
         res = struct_new(st->type);
         if (!res)
-            errorf("(map_struct) Out of memory: struct[%ld] for result\n", cnt);
+            errorf("(map_struct) Out of memory: struct[%"PRIdMPINT"] for result\n", cnt);
         push_struct(inter_sp, res); /* In case of errors */
 
         for (w = st->member, x = res->member; --cnt >= 0; w++, x++)
@@ -1369,7 +1370,7 @@ x_map_struct (svalue_t *sp, int num_arg)
 
         res = struct_new(st->type);
         if (!res)
-            errorf("(map_struct) Out of memory: struct[%ld] for result\n", cnt);
+            errorf("(map_struct) Out of memory: struct[%"PRIdMPINT"] for result\n", cnt);
         push_struct(inter_sp, res); /* In case of errors */
 
         /* Loop through arr and res, mapping the values from arr */
@@ -1547,7 +1548,7 @@ f_struct_info (svalue_t *sp)
           }
         default:
             free_svalue(&result);
-            errorf("Bad arg 2 to struct_info(): illegal value %ld\n"
+            errorf("Bad arg 2 to struct_info(): illegal value %"PRIdPINT"\n"
                  , sp->u.number);
             /* NOTREACHED */
             return sp;

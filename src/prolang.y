@@ -11607,7 +11607,7 @@ index_range :
 
           if (!realloc_a_program(1))
           {
-              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+1);
+              yyerrorf("Out of memory: program size %"PRIdPINT"\n", current+1);
               YYACCEPT;
           }
 
@@ -11650,7 +11650,7 @@ index_range :
 
           if (!realloc_a_program(1))
           {
-              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+1);
+              yyerrorf("Out of memory: program size %"PRIdPINT"\n", current+1);
               YYACCEPT;
           }
 
@@ -11693,7 +11693,7 @@ index_range :
 
           if (!realloc_a_program(1))
           {
-              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+1);
+              yyerrorf("Out of memory: program size %"PRIdPINT"\n", current+1);
               YYACCEPT;
           }
 

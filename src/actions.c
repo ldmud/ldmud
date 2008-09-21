@@ -1221,7 +1221,7 @@ execute_command (char *str, object_t *ob)
     /* Save the current context */
     save_command_context(&context);
     context.rt.last = rt_context;
-    rt_context = (rt_context_t *)&context;
+    rt_context = (rt_context_t *)&context.rt;
 
     /* Default settings */
     command_giver = ob;

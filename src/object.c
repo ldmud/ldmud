@@ -251,7 +251,8 @@ dealloc_object ( object_t *ob, const char * file, int line)
     /* Check the reference count */
 
     if (ob->ref > 0)
-        fatal("Object with %ld refs passed to _free_object()\n", ob->ref);
+        fatal("Object with %"PRIdPINT" refs passed to _free_object()\n", 
+              ob->ref);
 
 #if 0 && defined(CHECK_OBJECT_REF)
     if (strchr(get_txt(ob->name), '#') == NULL)

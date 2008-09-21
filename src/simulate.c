@@ -146,7 +146,7 @@ struct error_recovery_info toplevel_context
  };
 
 rt_context_t * rt_context
- = (rt_context_t *)&toplevel_context;
+ = (rt_context_t *)&toplevel_context.rt;
 
 /*-------------------------------------------------------------------------*/
 
@@ -901,7 +901,7 @@ errorf (const char *fmt, ...)
     if (curobj)
     {
         line_number = get_line_number_if_any(&file);
-        debug_message("%s program: %s, object: %s line %ld\n"
+        debug_message("%s program: %s, object: %s line %"PRIdMPINT"\n"
                      , ts, get_txt(file), get_txt(curobj->name)
                      , line_number);
         if (current_prog && num_error < 3)
@@ -5246,7 +5246,7 @@ v_limited (svalue_t * sp, int num_arg)
         /* Save the current runtime limits and set the new ones */
         save_limits_context(&context);
         context.rt.last = rt_context;
-        rt_context = (rt_context_t *)&context;
+        rt_context = (rt_context_t *)&context.rt;
 
         max_eval_cost = limits.max_eval ? limits.max_eval + eval_cost : 0;
           /* Make sure that we get the requested amount of ticks, but remember
