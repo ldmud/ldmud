@@ -4,7 +4,8 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/home/tubmud --bindir=/home/tubmud/mudbin --libdir=/home/tubmud/mudlib --libexec=/home/tubmud/mudbin/erqdir --with-setting=tubmud $*
+exec ./configure --prefix=/home/tubmud --bindir=/home/tubmud/mudbin --libdir=/ho
+me/tubmud/mudlib --libexec=/home/tubmud/mudbin/erqdir --with-setting=tubmud $*
 exit 1
 
 # --- Commandline argument defaults ---
@@ -15,8 +16,8 @@ enable_filename_spaces=no
 # --- Runtime limits ---
 with_max_array_size=0
 with_max_mapping_size=0
-with_catch_reserved_cost=0x8000
-with_master_reserved_cost=0x2000
+with_catch_reserved_cost=0x10000
+with_master_reserved_cost=0x4000
 enable_dynamic_costs=no
 with_max_user_trace=110
 with_max_trace=120
@@ -34,7 +35,7 @@ with_max_malloced=0x06000000
 
 # --- Interpreter ---
 enable_strict_euids=no
-with_max_cost=1000000
+with_max_cost=1300000
 
 # --- Communication ---
 with_portno=7680
@@ -50,13 +51,18 @@ enable_trace_code=no
 
 # --- Language ---
 enable_use_parse_command=no
-enable_share_variables=yes
+enable_share_variables=no
+enable_initialization_by___init=no
+enable_lpc_nosave=yes
 enable_use_deprecated=no
 enable_use_pcre=no
 enable_use_set_light=yes
+enable_use_process_string=no
 enable_use_mccp=yes
 enable_use_tls=yes
-with_tls_path=/usr/local/ssl
+with_tls_path=/usr
+enable_use_alists=yes
+enable_lpc_array_calls=yes
 
 # --- Compiler ---
 with_max_local=50
@@ -68,13 +74,11 @@ with_otable_size=4096
 # --- Standard Debugging ---
 enable_debug=yes
 enable_no_inlines=no
+#enable_check_strings=no
 enable_debug_telnet=no
 with_erq_debug=0
 
 # -- Specific Debugging ---
 enable_check_object_gc_ref=no
 enable_dump_gc_refs=no
-
-# --- this is for ldmud-3.3 ---
-enable_use_alists=yes
 
