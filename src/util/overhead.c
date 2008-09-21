@@ -23,6 +23,7 @@
 #ifdef HAVE_LIBC_H
 #  include <libc.h>
 #endif
+#include <string.h>
 
 /*-------------------------------------------------------------------------*/
 int
