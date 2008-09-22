@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Sep-2008 (Gnomi)
+  - (object.c) Use xalloc instead of alloca for allocating the parse buffer
+       in f_restore_value(). (Bug #553/#532)
+  - (prolang.y) Incomplete variable clearance after an inner block
+       (Bug #553/#537).
+
 13-Oct-2007 (Lars Duening)
   - (interpret.c) setup_new_frame() now updates the csp->funstart entry
        by itself, instead of having the caller do it. This is not just

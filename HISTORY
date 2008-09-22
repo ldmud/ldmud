@@ -11,12 +11,15 @@ For a detailed list of all changes see the file CHANGELOG.
          by snooping non-interactives weren't counted (Bug #492).
        + An argument mismatch error during a lfun-closure call could
          crash the driver. (Bug #495).
+       + Removed a possible stack overflow in restore_value (Bug #532).
 
     - Other Changes:
        + The mySQL configuration failed to handle less-standard standard
          paths correctly.
        + The autoconfiguration of YACC was incompatible with gentoo Linux.
        + Removed certain 64-bit issues (Bug #490, #491).
+       + Removed an issue with local variable initialization after an
+         inner block (Bug #537).
 
 
 05-Oct-2007 (Lars Duening) -- Release 3.2.15
