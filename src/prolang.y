@@ -435,6 +435,10 @@ struct block_scope_s
 {
     int     first_local;  /* Number of first local defined in this scope */
     int     num_locals;   /* Number of locals defined in this scope */
+    int     num_cleared;
+      /* Number of locals that have been cleared by earlier CLEAR_LOCALS */
+    Bool    clobbered;
+      /* Local variables beyond num_locals may be clobbered */
     mp_uint addr;
       /* Address of CLEAR_LOCALS instruction, needed for backpatching */
 };
@@ -1842,6 +1846,8 @@ init_scope (int depth)
 {
     block_scope[depth-1].num_locals = 0;
     block_scope[depth-1].first_local = current_number_of_locals;
+    block_scope[depth-1].num_cleared = 0;
+    block_scope[depth-1].clobbered = MY_FALSE;
     block_scope[depth-1].addr = 0;
 } /* init_scope() */
 
@@ -1865,10 +1871,13 @@ enter_block_scope (void)
 
 /*-------------------------------------------------------------------------*/
 static void
-leave_block_scope (void)
+leave_block_scope (Bool dontclobber)
 
 /* Leave the current scope (if use_local_scopes requires it), freeing
  * all local names defined in that scope.
+ *
+ * <dontclobber> should be MY_TRUE if the stack of the to-be-left scope
+ * is independent of the outer scope (i.e. the scope of closures).
  */
 
 {
@@ -1876,6 +1885,13 @@ leave_block_scope (void)
     {
         free_local_names(block_depth);
         block_depth--;
+        if (block_depth && !dontclobber
+         && (block_scope[block_depth].num_locals
+          || block_scope[block_depth].clobbered))
+        {
+            /* the block we just left may have clobbered local variables */
+            block_scope[block_depth-1].clobbered = MY_TRUE;
+        }
     }
 } /* leave_block_scope() */
 
@@ -4182,17 +4198,17 @@ block:
           {
               block_scope_t *scope = block_scope + block_depth - 1;
 
-              if (use_local_scopes && scope->num_locals)
+              if (use_local_scopes && scope->num_locals > scope->num_cleared)
               {
                   mem_block[A_PROGRAM].block[scope->addr+2]
-                    = (char)scope->num_locals;
+                    = (char)(scope->num_locals - scope->num_cleared);
               }
           }
       }
 
       '}'
 
-      { leave_block_scope(); }
+      { leave_block_scope(MY_FALSE); }
 ; /* block */
 
 
@@ -4326,14 +4342,23 @@ new_local_name:
 
           q = add_local_name($2, current_type | $1, block_depth);
 
-          if (use_local_scopes && scope->num_locals == 1)
+          if (use_local_scopes && scope->clobbered)
+          {
+              /* Finish the previous CLEAR_LOCALS, if any */
+              if (scope->num_locals - 1 > scope->num_cleared)
+                  mem_block[A_PROGRAM].block[scope->addr+2]
+                    = (char)(scope->num_locals - 1 - scope->num_cleared);
+              scope->clobbered = MY_FALSE;
+              scope->num_cleared = scope->num_locals - 1;
+          }
+          if (use_local_scopes && scope->num_locals == scope->num_cleared + 1)
           {
               /* First definition of a local, so insert the
                * clear_locals bytecode and remember its position
                */
               scope->addr = mem_block[A_PROGRAM].current_size;
               ins_f_code(F_CLEAR_LOCALS);
-              ins_byte(scope->first_local);
+              ins_byte(scope->first_local + scope->num_cleared);
               ins_byte(0);
           }
 
@@ -4354,14 +4379,23 @@ new_local_name:
 
           q = redeclare_local($2, current_type | $1, block_depth);
 
-          if (use_local_scopes && scope->num_locals == 1)
+          if (use_local_scopes && scope->clobbered)
+          {
+              /* Finish the previous CLEAR_LOCALS, if any */
+              if (scope->num_locals - 1 > scope->num_cleared)
+                  mem_block[A_PROGRAM].block[scope->addr+2]
+                    = (char)(scope->num_locals - 1 - scope->num_cleared);
+              scope->clobbered = MY_FALSE;
+              scope->num_cleared = scope->num_locals - 1;
+          }
+          if (use_local_scopes && scope->num_locals == scope->num_cleared + 1)
           {
               /* First definition of a local, so insert the
                * clear_locals bytecode and remember its position
                */
               scope->addr = mem_block[A_PROGRAM].current_size;
               ins_f_code(F_CLEAR_LOCALS);
-              ins_byte(scope->first_local);
+              ins_byte(scope->first_local + scope->num_cleared);
               ins_byte(0);
           }
 
@@ -4903,10 +4937,10 @@ for:
           {
               block_scope_t *scope = block_scope + block_depth - 1;
 
-              if (use_local_scopes && scope->num_locals)
+              if (use_local_scopes && scope->num_locals > scope->num_cleared)
               {
                   mem_block[A_PROGRAM].block[scope->addr+2]
-                    = (char)scope->num_locals;
+                    = (char)(scope->num_locals - scope->num_cleared);
               }
           }
       }
@@ -4995,7 +5029,7 @@ for:
           current_break_address    = $<numbers>3[1];
 
           /* and leave the for scope */
-          leave_block_scope();
+          leave_block_scope(MY_FALSE);
       }
 ; /* for */
 
@@ -5198,10 +5232,10 @@ foreach:
           {
               block_scope_t *scope = block_scope + block_depth - 1;
 
-              if (use_local_scopes && scope->num_locals)
+              if (use_local_scopes && scope->num_locals > scope->num_cleared)
               {
                   mem_block[A_PROGRAM].block[scope->addr+2]
-                    = (char)scope->num_locals;
+                    = (char)(scope->num_locals - scope->num_cleared);
               }
           }
 
@@ -5298,7 +5332,7 @@ foreach:
           current_break_address    = $<numbers>3[1];
 
           /* and leave the scope */
-          leave_block_scope();
+          leave_block_scope(MY_FALSE);
       }
 ; /* foreach */
 
@@ -9483,7 +9517,7 @@ inline_fun:
                                     );
 
            /* Restore the old locals information */
-           leave_block_scope();
+           leave_block_scope(MY_TRUE);
            use_local_scopes = pragma_use_local_scopes;
            all_locals = save_all_locals;
            current_number_of_locals = save_current_number_of_locals;
