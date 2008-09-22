@@ -5180,8 +5180,11 @@ f_restore_value (svalue_t *sp)
 
 {
     int restored_version; /* Formatversion of the saved data */
+    Bool allocated_buff;  /* buff is xallocated. */
     char *buff;  /* The string to parse */
     char *p;
+
+#define FREE_BUFF() MACRO( if (allocated_buff) xfree(buff); )
 
     if (sp->type != T_STRING)
     {
@@ -5197,7 +5200,7 @@ f_restore_value (svalue_t *sp)
         size_t len;
 
         len = strlen(sp->u.string);
-        buff = alloca(len+1);
+        buff = xalloc(len+1);
         if (!buff)
         {
             errorf("(restore) Out of stack (%lu bytes).\n"
@@ -5207,9 +5210,13 @@ f_restore_value (svalue_t *sp)
         }
         memcpy(buff, sp->u.string, len);
         buff[len] = '\0';
+        allocated_buff = MY_TRUE;
     }
     else
+    {
         buff = sp->u.string;
+        allocated_buff = MY_FALSE;
+    }
 
     restored_version = -1;
     restored_host = -1;
@@ -5225,11 +5232,14 @@ f_restore_value (svalue_t *sp)
         p = strchr(buff, '\n');
         if (!p)
         {
+            FREE_BUFF();
             errorf("No data given.\n");
             return sp-1;
         }
-        buff = p+1;
+        p++;
     }
+    else
+        p = buff; /* parse from beginning of buffer */
 
     /* Initialise the shared value table */
 
@@ -5244,6 +5254,7 @@ f_restore_value (svalue_t *sp)
     shared_restored_values = xalloc(sizeof(svalue_t)*max_shared_restored);
     if (!shared_restored_values)
     {
+        FREE_BUFF();
         errorf("(restore) Out of memory (%lu bytes) for shared values.\n"
              , max_shared_restored * sizeof(svalue_t));
         return sp; /* flow control hint */
@@ -5256,7 +5267,6 @@ f_restore_value (svalue_t *sp)
 
     /* Now parse the value in buff[] */
 
-    p = buff;
     if ( (restored_version < 0 && p[0] == '\"')
          ? !old_restore_string(sp, p)
          : !restore_svalue(sp, &p, '\n')
@@ -5265,6 +5275,7 @@ f_restore_value (svalue_t *sp)
         /* Whoops, illegal format */
 
         free_shared_restored_values();
+        FREE_BUFF();
         errorf("Illegal format when restoring a value.\n");
         /* NOTREACHED */
         return sp; /* flow control hint */
@@ -5274,6 +5285,7 @@ f_restore_value (svalue_t *sp)
 
     if (*p != '\0')
     {
+        FREE_BUFF();
         errorf("Illegal format when restoring a value: extraneous characters "
               "at the end.\n");
         /* NOTREACHED */
@@ -5282,11 +5294,15 @@ f_restore_value (svalue_t *sp)
 
     /* Restore complete - now clean up and return the result */
 
+    FREE_BUFF();
+
     inter_sp = --sp;
     free_string_svalue(sp);
     *sp = sp[1];
 
     return sp;
+
+#undef FREE_BUFF
 } /* f_restore_value() */
 
 /***************************************************************************/
