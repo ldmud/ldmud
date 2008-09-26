@@ -122,9 +122,9 @@ uint num_last_data_cleaned = 0;
   /* Number of object data-cleaned in last process_objects().
    */
 
-statistic_t stat_last_processed = { 0 };
-statistic_t stat_last_data_cleaned = { 0 };
-statistic_t stat_in_list = { 0 };
+statistic_t stat_last_processed = { 0, 0, 0.0 };
+statistic_t stat_last_data_cleaned = { 0, 0, 0.0 };
+statistic_t stat_in_list = { 0, 0, 0.0 };
   /* Decaying average number of objects processed and objects in the list.
    */
 
@@ -149,12 +149,12 @@ Bool mud_is_up = MY_FALSE;
    * used by the driver, but can be useful for printf()-style debugging.
    */
 
-statistic_t stat_load = { 0 };
+statistic_t stat_load = { 0, 0, 0.0 };
   /* The load average (player commands/second), weighted over the
    * last period of time.
    */
 
-statistic_t stat_compile = { 0 };
+statistic_t stat_compile = { 0, 0, 0.0 };
   /* The average of compiled lines/second, weighted over the last period
    * of time.
    */
