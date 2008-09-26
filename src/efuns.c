@@ -798,7 +798,7 @@ f_regexplode (svalue_t *sp)
             break;
         }
 
-        match = (struct regexplode_match *)alloca(sizeof *match);
+        match = alloca(sizeof *match);
         if (!match)
         {
             free_regexp(reg);
