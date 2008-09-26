@@ -1,6 +1,26 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Sep 2008 (Zesstra)
+  - (interpret.c, interpret.h)
+    Changed return type of push_error_handler() to svalue_t *.
+    Added a simple generic error handler structure for holding a single
+      buffer, an error handling function for freeing the buffer and a function
+      for allocating memory on the heap and simultaneously pushing the
+      corresponding error handler onto the value stack.
+  - (efuns.c)
+    removed unneeded cast.
+  - (efuns.c, pkg-sqlite.c)
+    Used new return value of push_error_handler().
+  - (backend.c)
+    added missing initializers to some statistic_t variables.
+  - (strfuns.c)
+    x_filter_string(): 
+      Removed crash in efun filter() due to stack overflow in case of very
+      large strings. (Bug #575)
+      Don't return a 0 as result if memory for the result could not be 
+      allocated due to an out-of-memory condition.
+
 21-Sep 2008 (Zesstra)
   - (actions.c)
     f_execute_command(): added length of command to error message 'command too

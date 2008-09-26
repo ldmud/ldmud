@@ -896,14 +896,6 @@ x_filter_string (svalue_t *sp, int num_arg)
     str = arg->u.str;
     slen = (mp_int)mstrsize(str);
 
-    flags = alloca((size_t)slen+1);
-    if (!flags)
-    {
-        errorf("Stack overflow in filter()");
-        /* NOTREACHED */
-        return sp;
-    }
-
     /* Every element in flags is associated by index number with an
      * element in the vector to filter. The filter function is evaluated
      * for every string character, and the associated flag is set to 0
@@ -920,11 +912,21 @@ x_filter_string (svalue_t *sp, int num_arg)
         mapping_t *m;
 
         if (num_arg > 2) {
-            inter_sp = sp;
             errorf("Too many arguments to filter(array)\n");
         }
-        m = arg[1].u.map;
+        /* Allocate memory for the flag array. Simultaneously an error
+         * handler is pushed onto the stack (after the arguments) for freeing
+         * the buffer in case of runtime errors. */
+        flags = xalloc_with_error_handler((size_t)slen + 1);
+        if (!flags)
+        {
+          errorf("Out of memory (%zu bytes) for temporary buffer in filter().\n",
+                 (size_t)slen + 1);
+        }
+        sp = inter_sp;
 
+        m = arg[1].u.map;
+        
         for (src = get_txt(str), cnt = slen; --cnt >= 0; src++)
         {
             svalue_t key;
@@ -939,9 +941,6 @@ x_filter_string (svalue_t *sp, int num_arg)
             res++;
         }
 
-        free_svalue(arg+1); /* the mapping */
-        sp = arg;
-
     } else {
 
         /* --- Filter by function call --- */
@@ -951,19 +950,33 @@ x_filter_string (svalue_t *sp, int num_arg)
         mp_int cnt;
 
         assign_eval_cost();
-        inter_sp = sp;
 
+        /* setup_efun_callback() will adopt and therefore remove the 
+         * arguments from arg+1 on to arg+num_arg from the stack and update 
+         * inter_sp. New top-of-stack will be arg. */
         error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
-
         if (error_index >= 0)
         {
             vefun_bad_arg(error_index+2, arg);
             /* NOTREACHED */
             return arg;
         }
-        inter_sp = sp = arg+1;
+        /* push the callback structure onto the stack. */
+        sp = arg + 1;
         put_callback(sp, &cb);
 
+        /* Allocate memory for the flag array. Simultaneously an error
+         * handler is pushed onto the stack (after the arguments) for freeing
+         * the buffer in case of runtime errors. */
+        inter_sp = sp;
+        flags = xalloc_with_error_handler((size_t)slen + 1);
+        if (!flags)
+        {
+            errorf("Out of memory (%zu bytes) for temporary buffer in filter().\n",
+                   (size_t)slen + 1);
+        }
+        sp = inter_sp;
+        
         /* Loop over all elements in p and call the filter.
          * w is the current element filtered.
          */
@@ -994,32 +1007,37 @@ x_filter_string (svalue_t *sp, int num_arg)
             flags[cnt] = 1;
             res++;
         }
-
-        free_callback(&cb);
     }
 
     /* flags[] holds the filter results, res is the number of
      * elements to keep. Now create the result vector.
      */
     rc = alloc_mstring(res);
-    if (rc)
+    if (!rc)
     {
-        for (src = get_txt(str), dest = get_txt(rc), flags = &flags[slen]
-            ; res > 0 ; src++)
+        errorf("Out of memory (%zu bytes) for result in filter().\n",slen+1);
+    }
+  
+    for (src = get_txt(str), dest = get_txt(rc), flags = &flags[slen]
+       ; res > 0 ; src++)
+    {
+        if (*--flags)
         {
-            if (*--flags)
-            {
-                *dest++ = *src;
-                res--;
-            }
+            *dest++ = *src;
+            res--;
         }
     }
+  
+    /* Cleanup. Arguments for the closure have already been removed. On the
+     * stack are now the string, the mapping or callback structure and the
+     * error handler. (Not using pop_n_elems() for 2 elements for saving loop 
+     * and function call overhead.) */
+    free_svalue(sp--);  /* errorhandler, buffer and flags are freed by this. */
+    free_svalue(sp--);  /* mapping or callback structure. */
+    free_mstring(str);  /* string, at arg == sp */
+    sp->u.str = rc;     /* put result here */
 
-    /* Cleanup (everything but the string has been removed already) */
-    free_mstring(str);
-    arg->u.str = rc;
-
-    return arg;
+    return sp;
 } /* x_filter_string() */
 
 /*-------------------------------------------------------------------------*/
