@@ -2720,6 +2720,7 @@ inter_add_array (vector_t *q, vector_t **vpp)
     return r;
 } /* inter_add_array() */
 
+
 /*=========================================================================*/
 
 /*                           S T A C K                                     */
@@ -6417,6 +6418,55 @@ test_efun_args (int instr, int args, svalue_t *argp)
             raise_arg_error(instr, i, *typep, argp->type);
     }
 } /* test_efun_args() */
+
+
+/*-------------------------------------------------------------------------*/
+/* general errorhandler */
+static void
+generic_error_handler( svalue_t * arg)
+/* The error handler: free the allocated buffer and the errorhandler structure.
+ * Note: it is static, but the compiler will have to emit a function and 
+ * symbol for this because the address of the function is taken and it is 
+ * therefore not suitable to be inlined.
+ */
+{
+  errorhandler_t *handler = (errorhandler_t *)arg;
+  if (handler->buff)
+    xfree(handler->buff);
+  xfree(handler);
+} /* general_error_handler() */
+
+/*-------------------------------------------------------------------------*/
+void *
+xalloc_with_error_handler(size_t size)
+/* Allocates <size> bytes from the heap. Additionally an error handler is
+ * pushed onto the value stack so that the requested memory is safely freed,
+ * either by manually freeing the svalue on the stack or during stack 
+ * unwinding during errorf().
+ * inter_sp has to point to the top-of-stack before calling and is updated to
+ * point to the error handler svalue (new top-of-stack)!
+ */
+{
+  void *buffer;
+  errorhandler_t *handler;
+  /* get the memory for the handler first and fail if out-of-memory */
+  handler = xalloc(sizeof(*handler));
+  if (!handler)
+  {
+    return NULL;
+  }
+  /* then get the requested memory - upon error de-allocate the handler */
+  buffer = xalloc(size);
+  if (!buffer)
+  {
+    xfree(handler);
+    return NULL;
+  }
+  handler->buff = buffer;
+  /* now push error handler onto the value stack */
+  push_error_handler(generic_error_handler, &(handler->head));
+  return buffer;
+} /* alloc_with_error_handler */
 
 
 /*=========================================================================*/

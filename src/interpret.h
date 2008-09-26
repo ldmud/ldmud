@@ -80,6 +80,16 @@ struct control_stack {
        */
 };
 
+/* a general error handler structure. head is assigned as payload to an 
+ * T_LVALUE svalue of type T_ERROR_HANDLER and pushed onto the value stack.
+ * If the stack is unrolled during runtime errors the error_handler function
+ * is called and frees buff. */
+typedef struct errorhandler_s {
+  svalue_t head;        /* The T_ERROR_HANDLER structure */
+  char     * buff;      /* The allocated buffer to free. */
+} errorhandler_t;
+
+
 /* --- Macros --- */
 
 #define MAX_SHIFT ((sizeof(p_int) << 3) - 1)
@@ -147,6 +157,11 @@ extern void push_svalue(svalue_t *v);
 extern void push_svalue_block(int num, svalue_t *v);
 extern svalue_t *pop_n_elems (int n, svalue_t *sp);
 extern void pop_stack(void);
+extern void push_apply_value(void);
+extern void pop_apply_value (void);
+extern void push_referenced_mapping(mapping_t *m);
+extern svalue_t *push_error_handler(void (*errorhandler)(svalue_t *), svalue_t *arg);
+extern void *xalloc_with_error_handler(size_t size);
 
 extern void init_interpret(void);
 extern const char *typename(int type);
@@ -161,8 +176,7 @@ extern void vefun_exp_arg_error (int arg, long expected, int got, svalue_t *sp) 
 extern Bool privilege_violation(string_t *what, svalue_t *arg, svalue_t *sp);
 extern Bool privilege_violation2(string_t *what, svalue_t *arg, svalue_t *arg2, svalue_t *sp);
 extern Bool privilege_violation4(string_t *what, object_t *whom, string_t *how_str, int how_num, svalue_t *sp);
-extern void push_apply_value(void);
-extern void pop_apply_value (void);
+
 extern svalue_t *sapply_int(string_t *fun, object_t *ob, int num_arg, Bool b_ign_prot, Bool b_use_default);
 #define sapply(f,o,n) sapply_int(f,o,n, MY_FALSE, MY_TRUE)
 #define sapply_ign_prot(f,o,n) sapply_int(f,o,n, MY_TRUE, MY_TRUE)
@@ -193,8 +207,6 @@ extern void int_call_lambda(svalue_t *lsvp, int num_arg, Bool allowRefs);
 extern inherit_t *adjust_variable_offsets(const inherit_t *inheritp, const program_t *prog, const object_t *obj);
 extern void free_interpreter_temporaries(void);
 extern void invalidate_apply_low_cache(void);
-extern void push_referenced_mapping(mapping_t *m);
-extern svalue_t * push_error_handler(void (*errorhandler)(svalue_t *), svalue_t *arg);
 extern void m_indices_filter (svalue_t *key, svalue_t *data, void *extra);
 extern void m_values_filter (svalue_t *key, svalue_t *data, void *extra);
 extern void m_unmake_filter ( svalue_t *key, svalue_t *data, void *extra);
