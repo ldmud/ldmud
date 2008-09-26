@@ -428,8 +428,7 @@ v_sl_exec (svalue_t * sp, int num_arg)
     rec_data->rows = NULL;
     rec_data->stmt = stmt;
     
-    push_error_handler(sl_exec_cleanup, &(rec_data->head));
-    sp = inter_sp;
+    sp = push_error_handler(sl_exec_cleanup, &(rec_data->head));
     
     while((err = sqlite3_step(stmt)) == SQLITE_ROW)
     {
