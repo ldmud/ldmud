@@ -9,6 +9,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
     buffer in case of errors. Minor changes in error handling in
     f_restore_object() by pushing the handler earlier onto the stack and using
     it more often. Fixes crash with large filenames. (Bug #576)
+  - (comm.c)
+    Allocate memory for temporary buffers in send_erq() and send_udp() on the
+    heap and not on the stack. Fixes crashes with large arguments. (Bug #577)
 
 26-Sep 2008 (Zesstra)
   - (interpret.c, interpret.h)

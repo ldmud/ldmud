@@ -3400,6 +3400,10 @@ get_message (char *buff)
                  */
 
                 DTN(("telnet machine ready\n"));
+                /* buffer overflows here are impossible even with strcpy(),
+                 * because buff is allocated in backend() as MAX_TEXT+4 and
+                 * ip->text is allocated as MAX_TEXT+2. Ok, as long as nobody
+                 * changes buff in backend() withour changing ip->text ... */
                 strcpy(buff, ip->text);
                 command_giver = ip->ob;
                 trace_level = ip->trace_level;
@@ -3441,6 +3445,10 @@ get_message (char *buff)
                     }
                     else
                     {
+                        /* buff is limited to MAX_TEXT+4. Additionally,
+                         * get_message() is usually not called recursively or
+                         * from a very high stack depth, so alloca() is 
+                         * probably ok. */
                         char *snoop_message = alloca(strlen(buff) + 4);
                         sprintf(snoop_message, "%% %s\n", buff);
                         tell_npc_str(snooper, snoop_message);
@@ -6197,13 +6205,17 @@ f_send_erq (svalue_t *sp)
         vector_t *v;
         svalue_t *svp;
         char *cp;
-        mp_int j;
+        p_int j;
 
         v = sp[-1].u.vec;
         arglen = VEC_SIZE(v);
-        cp = arg = alloca(arglen);
+        cp = arg = xalloc(arglen);
+        if (!arg) {
+            errorf("Out of memory (%zu bytes) in send_erq() for allocating "
+                   "temporary buffer.\n", arglen);
+        }
         svp = &v->item[0];
-        for (j = (mp_int)arglen; --j >= 0; )
+        for (j = (p_int)arglen; --j >= 0; )
             *cp++ = (char)(*svp++).u.number;
     }
 
@@ -6251,7 +6263,11 @@ failure:
         i = 0;
         free_svalue(sp);
     }
-
+    /* cleanup */
+    if (sp[-1].type != T_STRING) {
+        /* free arg only if sp-1 is not a string */
+        xfree(arg);
+    }
     free_svalue(--sp);
     (*--sp).u.number = i;
 
@@ -7051,7 +7067,7 @@ f_send_udp (svalue_t *sp)
  */
 
 {
-    char *to_host;
+    char *to_host = NULL;
     int to_port;
     char *msg;
     size_t msglen;
@@ -7061,7 +7077,10 @@ f_send_udp (svalue_t *sp)
     struct sockaddr_in name;
     struct hostent *hp;
     int ret = 0;
-
+    svalue_t *firstarg; /* store the first argument */
+    
+    firstarg = sp-2;  /* hostname */
+    
     switch(0) { default: /* try {...} */
 
         /* Set msg/msglen to the data of the message to send */
@@ -7076,21 +7095,26 @@ f_send_udp (svalue_t *sp)
             vector_t *v;
             svalue_t *svp;
             char *cp;
-            mp_int j;
+            p_int j;
 
             v = sp->u.vec;
             msglen = VEC_SIZE(v);
-            cp = msg = alloca(msglen);
-            if (!msg)
-                break;
+            /* allocate memory and push error handler onto stack */
+            cp = msg = xalloc_with_error_handler(msglen);
+            if (!msg) {
+                errorf("Out of memory (%zu bytes) in send_udp() for "
+                       "temporary buffer.\n", msglen);
+            }
+            sp = inter_sp;
+            
             svp = &v->item[0];
-            for (j = (mp_int)msglen; --j >= 0; )
+            for (j = (p_int)msglen; --j >= 0; )
                 *cp++ = (char)(*svp++).u.number;
         }
 
         /* Is this call valid? */
 
-        if (!privilege_violation(STR_SEND_UDP, sp-2, sp))
+        if (!privilege_violation(STR_SEND_UDP, firstarg, firstarg + 2))
             break;
 
         if (udp_s < 0)
@@ -7101,16 +7125,17 @@ f_send_udp (svalue_t *sp)
         {
             size_t adrlen;
 
-            adrlen = mstrsize((sp-2)->u.str);
-            to_host = alloca(adrlen+1);
+            adrlen = mstrsize(firstarg->u.str);
+            /* as there are no runtime error raised below, we just xallocate
+             * and don't bother with an error handler. */
+            to_host = xalloc(adrlen+1);
             if (!to_host)
             {
-                inter_sp = sp;
-                errorf("Out of stack (%zu bytes) for host address\n"
+                errorf("Out of memory (%zu bytes) in send_udp() for host address\n"
                      , (adrlen+1));
                 /* NOTREACHED */
             }
-            memcpy(to_host, get_txt((sp-2)->u.str), adrlen);
+            memcpy(to_host, get_txt(firstarg->u.str), adrlen);
             to_host[adrlen] = '\0';
         }
         to_port = (sp-1)->u.number;
@@ -7156,14 +7181,18 @@ f_send_udp (svalue_t *sp)
             break;
         ret = 1;
     }
-
-    /* Return the result */
-
-    free_svalue(sp);
-    free_svalue(--sp);
-    free_svalue(--sp);
+    /* Cleanup - an allocated buffer for the message will be on the stack 
+     * above the arguments, therefore clean everything from the first argument
+     * (including) to sp.
+     */
+    sp = pop_n_elems((sp-firstarg)+1, sp);
+    xfree(to_host);
+    
+    /*Return the result */
+    sp++;
     put_number(sp, ret);
     return sp;
+    
 } /* f_send_udp() */
 
 /*-------------------------------------------------------------------------*/
