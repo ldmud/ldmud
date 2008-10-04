@@ -6599,7 +6599,8 @@ v_save_object (svalue_t *sp, int numarg)
         save_version = sp->u.number >= 0 ? sp->u.number
                                          : CURRENT_VERSION;
 
-        /* The main code wants sp == filename */
+        /* The main code wants sp == filename (T_NUMBER svalues need no free.)
+         */
         sp--;
         numarg--;
         break;
@@ -6651,18 +6652,19 @@ v_save_object (svalue_t *sp, int numarg)
 
 
         /* Create the final and the temporary filename */
-
         len = (long)mstrsize(sfile);
-        name = alloca(len + (sizeof save_file_suffix) +
-                      len + (sizeof save_file_suffix) + 4);
-
+        inter_sp = sp;
+        name = xalloc_with_error_handler(len + (sizeof save_file_suffix) +
+                                        len + (sizeof save_file_suffix) + 4);
         if (!name)
         {
             free_mstring(sfile);
-            errorf("Stack overflow in save_object('%s')\n", get_txt(sp->u.str));
+            errorf("Out of memory (%ld bytes) in save_object('%s')\n", 
+                   2*len+2*sizeof(save_file_suffix)+4, get_txt(sp->u.str));
             /* NOTREACHED */
             return sp;
         }
+        sp = inter_sp;
 
         tmp_name = name + len + sizeof save_file_suffix;
         strcpy(name, get_txt(sfile));
@@ -6804,8 +6806,9 @@ v_save_object (svalue_t *sp, int numarg)
             close(f);
             unlink(tmp_name);
             add_message("Failed to save to file '%s'. Disk could be full.\n", file);
-            if (numarg)
-                sp = pop_n_elems(numarg, sp);
+            /* free the error handler and the arguments (numarg + 1  from sp).
+             */
+            sp = pop_n_elems(numarg + 1, sp);
             sp++;
             put_number(sp, 1);
             return sp;
@@ -6836,21 +6839,24 @@ v_save_object (svalue_t *sp, int numarg)
         unlink(tmp_name);
 #endif
 
-        if (numarg)
-            sp = pop_n_elems(numarg, sp);
+        /* free the error handler and the arguments (numarg + 1  from sp) and
+         * push result on the stack.
+         */
+        sp = pop_n_elems(numarg + 1, sp);
         sp++;
         put_number(sp, i);
-    }
+    } /* if (file) */
     else
     {
         /* Finish up the operation. Note that there propably is some
          * data pending in the save_buffer.
          */
 
-        if (numarg)
-            sp = pop_n_elems(numarg, sp);
+        /* free the error handler and the arguments (numarg + 1  from sp).
+         */
+        sp = pop_n_elems(numarg + 1, sp);
+      
         sp++; /* for the result */
-
         if (failed)
             put_number(sp, 0); /* Shouldn't happen */
         else if (buf_left != SAVE_OBJECT_BUFSIZE)
@@ -8497,7 +8503,8 @@ typedef struct restore_cleanup_s {
     int      * pNesting;  /* The nesting counter */
     char     * buff;      /* The optional allocated line buffer. */
     FILE     * f;         /* The optional input file */
-    struct discarded * dp; 
+    struct discarded * dp;
+    char     * filename;  /* optional buffer for the filename */
       /* List of values for which the variables no longer exist. */
 } restore_cleanup_t;
 
@@ -8531,6 +8538,10 @@ restore_object_cleanup ( svalue_t * arg)
     (*data->pNesting)--;
 
     free_shared_restored_values();
+  
+    if (data->filename)
+        xfree(data->filename);
+  
     xfree(arg);
 } /* restore_object_cleanup() */
 
@@ -8576,6 +8587,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
     size_t len;
     FILE *f;
     struct stat st;  /* stat() info of the savefile */
+    svalue_t *arg;   /* pointer to the argument on the stack - for convenience */
 
     int var_rest;    /* Number of variables left after rover */
     int num_var;     /* Number of variables in the object */
@@ -8584,17 +8596,29 @@ static int nesting = 0;  /* Used to detect recursive calls */
        * to restore is searched from here, taking advantage of
        * the locality of save_object().
        */
-
     restore_cleanup_t * rcp;
       /* Cleanup structure */
-
-#define FREE_BUFF() MACRO( \
-          if (nesting > 1) xfree(buff); else mb_free(mbFile); \
-        )
-      /* Free buff correctly.
-       */
-
-
+    
+    arg = sp;
+    
+    /* Allocate memory for the error cleanup structure first. We need it 
+     * anway and if we can't allocate it, then this is anyway a lost cause. */
+    rcp = xalloc(sizeof(*rcp));
+    if (!rcp)
+    {
+      errorf("(restore) Out of memory: (%zu bytes) for cleanup structure\n"
+             , sizeof(*rcp));
+      /* NOTREACHED */
+      return sp;
+    }
+    rcp->pNesting = &nesting;
+    rcp->buff = NULL;
+    rcp->f = NULL;
+    rcp->dp = NULL;
+    rcp->filename = NULL;
+    /* Push it on top of the argument on the stack. */
+    sp = push_error_handler(restore_object_cleanup, &(rcp->head));
+  
     /* Keep track of recursive calls */
     nesting++;
 
@@ -8605,17 +8629,18 @@ static int nesting = 0;  /* Used to detect recursive calls */
     ob = current_object;
     if (ob->flags & O_DESTRUCTED)
     {
-        free_svalue(sp);
+        sp = pop_n_elems(2, sp); /* pop and free error handler + argument */
+        sp++;
         put_number(sp, 0);
-        nesting--;
         return sp;
     }
 
+    /* no need to restore objects without variables */
     if (ob->prog->num_variables == 0)
     {
-        free_svalue(sp);
+        sp = pop_n_elems(2, sp); /* pop and free error handler + argument */
+        sp++;
         put_number(sp, 1);
-        nesting--;
         return sp;
     }
 
@@ -8625,24 +8650,25 @@ static int nesting = 0;  /* Used to detect recursive calls */
     file = NULL;
     f = NULL;
     lineno = 0;
-    if (get_txt(sp->u.str)[0] == '#')
+    if (get_txt(arg->u.str)[0] == '#')
     {
         /* We need a copy of the value string because we're
          * going to modify it a bit.
          */
-        len = mstrsize(sp->u.str);
+        len = mstrsize(arg->u.str);
         buff = (nesting > 1) ? xalloc(len+1) : mb_alloc(mbFile, len+1);
         if (buff == NULL)
         {
-            nesting--;
             outofmem(len+1, "copy of value string");
         }
-        memcpy(buff, get_txt(sp->u.str), len);
+        /* keep track of buff in the cleanup structure. */
+        rcp->buff = buff;
+        memcpy(buff, get_txt(arg->u.str), len);
         buff[len] = '\0';
     }
     else
     {
-        file = get_txt(sp->u.str);
+        file = get_txt(arg->u.str);
     }
 
     /* If restoring from a file, set it up */
@@ -8653,29 +8679,26 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
         /* Get a valid filename */
 
-        sfile = check_valid_path(sp->u.str, ob, STR_RESTORE_OBJECT, MY_FALSE);
+        sfile = check_valid_path(arg->u.str, ob, STR_RESTORE_OBJECT, MY_FALSE);
         if (sfile == NULL)
         {
-            nesting--;
-            errorf("Illegal use of restore_object('%s')\n", get_txt(sp->u.str));
+            errorf("Illegal use of restore_object('%s')\n", get_txt(arg->u.str));
             /* NOTREACHED */
             return sp;
         }
 
-
         /* Create the full filename */
-
         len = mstrsize(sfile);
-        name = alloca(len + (sizeof save_file_suffix));
-
+        name = xalloc(len + (sizeof save_file_suffix));
         if (!name)
         {
             free_mstring(sfile);
-            nesting--;
-            errorf("Stack overflow in restore_object('%s')\n", get_txt(sp->u.str));
+            errorf("Out of memory (%zu bytes) for filename buffer in "
+                   "restore_object('%s')\n", get_txt(arg->u.str), len);
             /* NOTREACHED */
             return sp;
         }
+        rcp->filename = name;  /* in case of errrors -> cleanup structure */
 
         strcpy(name, get_txt(sfile));
         if (name[len-2] == '.' && name[len-1] == 'c')
@@ -8685,22 +8708,21 @@ static int nesting = 0;  /* Used to detect recursive calls */
         free_mstring(sfile);
 
         /* Open the file and gets its length */
-
         f = fopen(name, "r");
         if (!f || fstat(fileno(f), &st) == -1) {
             if (f)
                 fclose(f);
-            free_svalue(sp);
+            sp = pop_n_elems(2, sp); /* pop and free error handler + argument */
+            sp++;
             put_number(sp, 0);
-            nesting--;
             return sp;
         }
+        rcp->f = f;    /* keep track of f in case of errors */
         if (st.st_size == 0)
         {
-            fclose(f);
-            free_svalue(sp);
+            sp = pop_n_elems(2, sp); /* pop and free error handler + argument */
+            sp++;
             put_number(sp, 0);
-            nesting--;
             return sp;
         }
         FCOUNT_REST(name);
@@ -8708,13 +8730,10 @@ static int nesting = 0;  /* Used to detect recursive calls */
         /* Allocate the linebuffer. Unfortunately, the whole file
          * can be one single line.
          */
-
         buff = (nesting > 1) ? xalloc((size_t)(st.st_size + 1))
                              : mb_alloc(mbFile, (size_t)(st.st_size+1));
         if (!buff)
         {
-            fclose(f);
-            nesting--;
             /* TODO: st_size is off_t which is most often int64_t or int32_t.
              * TODO:: PRIdMAX or PRId64 should be used, I think. */
             errorf("(restore) Out of memory (%ld bytes) for linebuffer.\n"
@@ -8722,6 +8741,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
             /* NOTREACHED */
             return sp;
         }
+        rcp->buff = buff;
     } /* if (file) */
 
     /* Initialise the variables */
@@ -8739,37 +8759,12 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
     if (!shared_restored_values)
     {
-        if (f)
-            fclose(f);
-        FREE_BUFF();
-        nesting--;
         errorf("(restore) Out of memory (%lu bytes) for shared values.\n"
              , sizeof(svalue_t)*(unsigned long)max_shared_restored);
         /* NOTREACHED */
         return sp;
     }
-
-    /* Setup the error cleanup */
-    inter_sp = sp;
-    rcp = xalloc(sizeof(*rcp));
-    if (!rcp)
-    {
-        if (f)
-            fclose(f);
-        FREE_BUFF();
-        nesting--;
-        errorf("(restore) Out of memory: (%zu bytes) for cleanup structure\n"
-             , sizeof(*rcp));
-        /* NOTREACHED */
-        return sp;
-    }
-
-    rcp->pNesting = &nesting;
-    rcp->buff = buff;
-    rcp->f = f;
-    rcp->dp = NULL;
-    push_error_handler(restore_object_cleanup, &(rcp->head));
-
+  
     num_var = ob->prog->num_variables;
     var_rest = 0;
     restored_version = -1;
@@ -8829,7 +8824,8 @@ static int nesting = 0;  /* Used to detect recursive calls */
             }
 
             /* No version line: illegal format.
-             * Deallocate what we allocated so far and return.
+             * Most of the cleanup will be done by the error handler during
+             * stack unwinding.
              */
             if (file)
                 errorf("Illegal format (version line) when restoring %s "
@@ -8962,13 +8958,11 @@ static int nesting = 0;  /* Used to detect recursive calls */
                      , time_stamp(), get_txt(ob->name)
                      , file ? name : "passed value");
 
-    free_svalue(inter_sp--); /* calls the cleanup handler */
-
-    free_svalue(inter_sp);
-    put_number(inter_sp, 1);
+    free_svalue(sp--); /* calls the cleanup handler */
+    free_svalue(sp);  /* frees the argument */
+    put_number(sp, 1);
     return sp;
 
-#undef FREE_BUFF
 } /* f_restore_object() */
 
 /*-------------------------------------------------------------------------*/

@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Oct 2008 (Zesstra)
+  - (object.c)
+    Allocate memory for the filename in f_save_object() and f_restore_object()
+    on the heap instead of the stack. Use the generic error handler in
+    save_object() and the already existing one in restore_object() to free the
+    buffer in case of errors. Minor changes in error handling in
+    f_restore_object() by pushing the handler earlier onto the stack and using
+    it more often. Fixes crash with large filenames. (Bug #576)
+
 26-Sep 2008 (Zesstra)
   - (interpret.c, interpret.h)
     Changed return type of push_error_handler() to svalue_t *.
