@@ -8694,7 +8694,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
         {
             free_mstring(sfile);
             errorf("Out of memory (%zu bytes) for filename buffer in "
-                   "restore_object('%s')\n", get_txt(arg->u.str), len);
+                   "restore_object('%s')\n", len, get_txt(arg->u.str));
             /* NOTREACHED */
             return sp;
         }
