@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Nov-2008 (Gnomi)
+  - (comm.c) add_message(): fixed a potential crash due to a buffer overflow
+      on the stack using vsnprint() instead of vsprintf() (Backport of
+      Zesstra's Patch for 3.3)
+
 22-Sep-2008 (Gnomi)
   - (object.c) Use xalloc instead of alloca for allocating the parse buffer
        in f_restore_value(). (Bug #553/#532)

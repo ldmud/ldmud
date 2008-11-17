@@ -1870,15 +1870,20 @@ add_message (char *fmt, ...)
         }
         else
         {
-            buff[(sizeof buff) - 1] = '\0'; /* Overrun sentinel */
-            vsprintf(buff+1,fmt,va);
+            size_t len;
+            len = vsnprintf(buff+1, sizeof(buff)-1, fmt,va);
             va_end(va);
-            if (buff[(sizeof buff) - 1])
+            /* old sprintf() implementations returned -1 if the output was
+             * truncated. Since size_t is an unsigned type, the check for
+             * len == -1 is implicitly included by >= sizeof(...)-1, because
+             * -1 will be wrapped to SIZE_T_MAX which is the maximum sizeof()
+             * can return and can never be valid as return value here. */
+            if (len >= sizeof(buff)-1)
             {
-                debug_message("%s Message too long: '%.200s...'\n"
-                             , time_stamp(), buff);
-                comm_fatal(ip, "Mssage too long!\n");
-                return;
+                char err[] = "\n*** Message truncated ***\n";
+                debug_message("%s Message too long (Length: %zu): '%.200s...'\n"
+                             , time_stamp(), len, buff);
+                (void)memcpy(buff+(sizeof(buff)-sizeof(err)), err, sizeof(err));
             }
             source = buff+1;
         }
