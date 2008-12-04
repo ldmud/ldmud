@@ -14,7 +14,7 @@ DESCRIPTION
                 inherit "<model-class>";
                 
         at the beginning of your new file. This must come before any local
-        ariables or functions. Once inherited your class will behave just
+        variables or functions. Once inherited your class will behave just
         like the model class, because all the public methods are available
         to the outside world. Now it is in your hands to change such an
         inherited behaviour. You have the following tools to do so:

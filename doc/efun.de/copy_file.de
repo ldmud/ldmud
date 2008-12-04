@@ -4,7 +4,7 @@ SYNOPSIS
 BESCHREIBUNG
         Die Efun copy_file() kopiert die Datei <from> nach <to>. Wenn <to> ein
         existierendes Verzeichnis ist, wird <from> in dieses Verzeichnis
-        verschoben und behaelt seinen Namen.
+        kopiert und behaelt seinen Namen.
 
         Die Funktion erfordert Lesezugriff auf <from> und Schreibrechte fuer
         <to>.
