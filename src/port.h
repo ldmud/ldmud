@@ -571,7 +571,7 @@ typedef char  CBool;
 
 extern char current_time_stamp[];
 extern mp_int get_current_time(void);
-extern char * time_string(mp_int);
+extern char * time_fstring(mp_int t, const char* str, Bool localized);
 extern char * utime_string(mp_int, mp_int);
 extern char * time_stamp(void);
 extern char *xmemmem(const char *, size_t, const char *, size_t);

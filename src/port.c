@@ -19,6 +19,7 @@
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
+#include <locale.h>
 #include <time.h>
 
 #include "backend.h"
@@ -83,24 +84,30 @@ get_current_time (void)
 
 /*-------------------------------------------------------------------------*/
 char *
-time_string (mp_int t)
-
-/* Return a textual representation of the time <t>. */
-
+time_fstring (mp_int t, const char* str, Bool localized)
+  
+/* Return a textual representation of the time <t> according to the format
+ * string <str>. Doesn't cache because it would be necessary to 
+ * save the format string and compare.
+ * If localized is true, this function sets the locale according to the 
+ * environment variable before calling strftime and resets it afterwards.
+ * TODO: It would be nicer to allocate the result buffer dynamically
+ * TODO::for using longer format strings. */
 {
-    static char result[80];
-    struct tm *tm;
-    mp_int last_time = -1;
-
-    if (t != last_time)
-    {
-        time_t ti = (time_t)t;
-        last_time = t;
-        tm = localtime(&ti);
-        strftime(result, sizeof(result), "%a %b %d %H:%M:%S %Y", tm);
+    static char result[512];
+    struct tm *tm; // broken-down time struct    
+    time_t ti = (time_t)t;
+    tm = localtime(&ti);
+    if (!localized) {
+        setlocale(LC_TIME, "C");
+        strftime(result, sizeof(result)-1, str, tm);
+        setlocale(LC_TIME, "");
     }
+    else
+       strftime(result, sizeof(result)-1, str, tm);
+    
     return result;
-} /* time_string() */
+} /* time_fstring() */
 
 /*-------------------------------------------------------------------------*/
 char *
@@ -112,18 +119,13 @@ utime_string (mp_int t, mp_int ut)
     static char result[80];
     struct tm *tm;
     size_t len;
-    mp_int last_t = -1, last_ut = -1;
 
-    if (t != last_t || ut != last_ut)
-    {
-        time_t ti = (time_t)t;
-        last_t= t;
-        last_ut= ut;
-        tm = localtime(&ti);
-        len = strftime(result, sizeof(result), "%a %b %d %H:%M:%S:", tm);
-        len += snprintf(result+len, sizeof(result)-len, "%06"PRIdMPINT, ut);
-        strftime(result+len, sizeof(result)-len, " %Y", tm);
-    }
+    time_t ti = (time_t)t;
+    tm = localtime(&ti);
+    len = strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S:", tm);
+    sprintf(result+len, "%06"PRIdMPINT, ut);
+    strftime(result+len+6, sizeof(result)-7-len, " %Y", tm);
+
     return result;
 } /* utime_string() */
 

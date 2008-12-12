@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Dec 2008 (Zesstra)
+  - (port.h, port.c, efuns.h, efuns.c, func_spec, gcollect.c)
+       added mkime(), an efun which converts a date/time information as
+       returned by local_time() to a unix timestamp (integer value).
+       added strftime(), an efun which converts a timestamp to a formatted
+       string using a format string with a variety of format specifiers.
+       changed caching behavious for ctime(): cache is now in the efun, not in
+       port.c which spares the driver to search for the shared string and
+       saves about 85% of execution time in case of cache hits. Removed
+       caching in case of millisecond precision as cache hits are rather
+       unlikely.
+       Added handlers for the garbage collection which take care of the cache
+       for ctime().
+   - (main.c)
+       use also locale defined in LC_TIME.
+
 04-Oct 2008 (Zesstra)
   - (object.c)
     Allocate memory for the filename in f_save_object() and f_restore_object()

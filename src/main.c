@@ -267,6 +267,7 @@ main (int argc, char **argv)
 
     boot_time = (mp_int)time(NULL);
     setlocale(LC_CTYPE, ""); /* Use the locale defined in the LANG env var */
+    setlocale(LC_TIME, "");
     get_stack_direction();
     mb_init();
     init_interpret();

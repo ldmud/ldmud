@@ -94,6 +94,7 @@
 #include "closure.h"
 #include "comm.h"
 #include "ed.h"
+#include "efuns.h"
 #include "filestat.h"
 #include "heartbeat.h"
 #include "interpret.h"
@@ -2061,6 +2062,7 @@ garbage_collection(void)
     mstring_clear_refs();
     clear_ref_from_wiz_list();
     clear_ref_from_call_outs();
+    clear_ref_from_efuns();
 #if defined(USE_PARSE_COMMAND)
     clear_parse_refs();
 #endif
@@ -2268,6 +2270,7 @@ garbage_collection(void)
 
     count_ref_from_wiz_list();
     count_ref_from_call_outs();
+    count_ref_from_efuns();
 
     if (master_ob)
         master_ob->ref++;

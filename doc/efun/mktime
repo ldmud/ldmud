@@ -1,0 +1,36 @@
+SYNOPSIS
+        #include <sys/time.h>
+
+        int mktime(int *ts);
+
+BESCHREIBUNG
+        If the argument <ts> is an array with 9 elements (int) according to
+        the result of local_time()/gm_time(), this function returns the number
+        of seconds passed since the epoch (00:00:00 UTC, January 1, 1970).
+        This can be used to store a date or time as an integer value or to
+        compute differences betweens two different dates or times.
+
+        The array <ts> has to have the following structure:
+            int TM_SEC    (0):  seconds (0..59)
+            int TM_MIN    (1):  minutes (0..59)
+            int TM_HOUR   (2):  hours (0..23)
+            int TM_MDAY   (3):  day of month (1..31)
+            int TM_MON    (4):  day of year (0..11)
+            int TM_YEAR   (5):  year (e.g. 2001)
+            int TM_WDAY   (6):  day of week (0..6, sunday = 0)
+            int TM_YDAY   (7):  day of year (0..365)
+            inz TM_ISDST  (8):  TRUE: summer time is in effect.
+
+      TM_YDAY and TM_WDAY are ignored and can contain arbitrary integer
+      values.
+
+BEISPIEL
+      A date and time (user input) shall be stored as unix timestamp:
+      // "Wed Oct 24 10:48:00 2007" corresponds to the returned time stamp:
+      int unixtime = mktime( ({0, 48, 09, 24, 09, 2007, 0, 01, 0}) );
+      
+AENDERUNGEN
+        Introduced in LDMud 3.3.718
+
+SIEHE AUCH
+    ctime(E), gmtime(E), local_time(E), time(E), utime(E)

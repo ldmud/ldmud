@@ -373,6 +373,8 @@ string  save_value(mixed, void|int);
 mixed   restore_value(string);
 
 string  ctime(int*|int default: F_TIME);
+string  strftime(string|int|void, int|void, int|void);
+int     mktime(int*);
 int     random(int);
 int     time();
 int*    utime();

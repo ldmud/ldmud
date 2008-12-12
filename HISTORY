@@ -3,6 +3,12 @@ impact on its behaviour both towards the mudlib as well as towards
 the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
+xx-xxx-xxxx () -- 3.3.718
+    - New Efuns:
+       + mkime(): convert a date/time information as returned by local_time()
+                  to a unix timestamp (integer value).
+       + strftime(): convert a timestamp to a formatted string using a format
+                     string with a variety of format specifiers.
 
 10-Aug-2008 (Lars Duening) -- 3.3.717
     - Changed Efuns:

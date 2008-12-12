@@ -107,6 +107,7 @@
 #include "comm.h"
 #include "dumpstat.h"
 #include "exec.h"
+#include "gcollect.h"
 #include "heartbeat.h"
 #include "interpret.h"
 #include "lex.h"
@@ -140,6 +141,11 @@
 #include "../mudlib/sys/regexp.h"
 #include "../mudlib/sys/strings.h"
 #include "../mudlib/sys/time.h"
+
+/* Variables */
+string_t *last_ctime_result = NULL;
+  /* points to the result of the last f_ctime() call. If the caller asks for 
+   * the same timestamp, it will be returned. */
 
 /* Forward declarations */
 static void copy_svalue (svalue_t *dest, svalue_t *, struct pointer_table *, int);
@@ -8636,18 +8642,24 @@ f_ctime(svalue_t *sp)
  *
  * Interpret the argument clock as number of seconds since Jan,
  * 1st, 1970, 0.00 and convert it to a nice date and time string.
+ * In this case, the result string will be cached and tabled.
  *
  * Alternatively, accept an array of two ints: the first is <clock>
  * value as in the first form, the second int is the number of
  * microseconds elapsed in the current second.
+ * In this case the result will not be cached as the value is very
+ * unlikely to be the same in 2 consecutive calls.
  */
 
 {
     char *ts, *cp;
     string_t *rc;
+    
+    static mp_int last_time = -1;  // letzte Uhrzeit
 
     if (sp->type != T_NUMBER)
     {
+      /* utime case */
         if (VEC_SIZE(sp->u.vec) != 2)
             errorf("Bad arg 1 to ctime(): Invalid array size %"PRIdPINT
                    ", expected 2.\n", VEC_SIZE(sp->u.vec));
@@ -8657,28 +8669,65 @@ f_ctime(svalue_t *sp)
         if (sp->u.vec->item[1].type != T_NUMBER)
             errorf("Bad arg 1 to ctime(): Element 1 is '%s', expected 'int'.\n"
                  , efun_arg_typename(sp->u.vec->item[1].type));
+        
         ts = utime_string( sp->u.vec->item[0].u.number
                          , sp->u.vec->item[1].u.number);
+        
+        /* If the string contains nl characters, extract the substring
+         * before the first one. Else just copy the (volatile) result
+         * we got.
+         */
+        cp = strchr(ts, '\n');
+        if (cp)
+        {
+            int len = cp - ts;
+            memsafe(rc = new_n_mstring(ts, len), len, "ctime() result");
+        }
+        else
+        {
+            memsafe(rc = new_mstring(ts), strlen(ts), "ctime() result");
+        }
     }
     else
     {
-        ts = time_string(sp->u.number);
-    }
-
-    /* If the string contains nl characters, extract the substring
-     * before the first one. Else just copy the (volatile) result
-     * we got.
-     */
-    cp = strchr(ts, '\n');
-    if (cp)
-    {
-        int len = cp - ts;
-        memsafe(rc = new_n_mstring(ts, len), len, "ctime() result");
-    }
-    else
-    {
-        memsafe(rc = new_mstring(ts), strlen(ts), "ctime() result");
-    }
+      /* second-precision case */
+        // test if string for this time is cached
+        if (last_time != sp->u.number)
+        {
+          /* cache is outdated */
+            ts = time_fstring(sp->u.number, "%a %b %d %H:%M:%S %Y", 0);
+            
+            /* If the string contains nl characters, extract the substring
+             * before the first one. Else just copy the (volatile) result
+             * we got.
+             * Table strings, because they are probably used more then once. 
+             */
+            cp = strchr(ts, '\n');
+            if (cp)
+            {
+                int len = cp - ts;
+                memsafe(rc = new_n_tabled(ts, len), len,
+                        "ctime() result");
+            }
+            else
+            {
+                memsafe(rc = new_tabled(ts), strlen(ts),
+                        "ctime() result");
+            }
+            /* fill cache, free last (invalid) string first and don't forget 
+             * to increase the ref count for the cache. */
+            free_mstring(last_ctime_result);
+            last_ctime_result = rc;
+            ref_mstring(rc);
+            last_time = sp->u.number;
+        }
+        else {
+            // return last result (and increase ref count)
+            rc = last_ctime_result;
+            ref_mstring(rc);
+        }
+    }  // if (sp->type != T_NUMBER)
+    
     free_svalue(sp);
     put_string(sp, rc);
     return sp;
@@ -8744,5 +8793,172 @@ f_utime (svalue_t *sp)
     return sp;
 } /* f_utime() */
 
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_mktime (svalue_t *sp)
+
+/* EFUN mktime()
+ *
+ *   int time(int* datum)
+ *
+ * Return the unix timestamp (number of seconds ellapsed since 1. Jan 1970, 
+ * 0.0:0 GMT) of the date given in the array datum. datum being an array
+ * like the one localtime() or gmtime() return:
+ *   int TM_SEC   (0) : Seconds (0..59)
+ *   int TM_MIN   (1) : Minutes (0..59)
+ *   int TM_HOUR  (2) : Hours (0..23)
+ *   int TM_MDAY  (3) : Day of the month (1..31)
+ *   int TM_MON   (4) : Month of the year (0..11)
+ *   int TM_YEAR  (5) : Year (e.g.  2001)
+ *   int TM_WDAY  (6) : Day of the week (Sunday = 0)
+ *   int TM_YDAY  (7) : Day of the year (0..365)
+ *   int TM_ISDST (8) : TRUE: Daylight saving time
+ * TM_YDAY and TM_WDAY are ignored (but must also be ints).
+ *
+ */
+{
+    struct tm * pTm; // broken-down time structure for mktime()
+    time_t      clk; // unix timestamp corresponding to datum
+    vector_t  * v;   // just for convenience, stores argument array 
+    int i; 
+
+    v = sp->u.vec;
+    if (VEC_SIZE(v) != 9)
+        errorf("Bad arg 1 to mktime(): Invalid array size %ld, expected 9.\n"
+                 , (long)VEC_SIZE(v));
+    // all elements must be ints.
+    for(i=0; i<VEC_SIZE(v); i++) 
+    {
+        if ( v->item[i].type != T_NUMBER)
+            errorf("Bad arg 1 to ctime(): Element %d is '%s', expected 'int'.\n"
+                 ,i, efun_arg_typename(v->item[0].type));
+    }
+
+    // create the time structure
+    xallocate(pTm, sizeof(*pTm), "broken-down time structure for mktime()");
+    pTm->tm_sec   = v->item[TM_SEC].u.number;
+    pTm->tm_min   = v->item[TM_MIN].u.number;
+    pTm->tm_hour  = v->item[TM_HOUR].u.number;
+    pTm->tm_mday  = v->item[TM_MDAY].u.number;
+    pTm->tm_mon   = v->item[TM_MON].u.number;
+    pTm->tm_year  = v->item[TM_YEAR].u.number - 1900;
+    pTm->tm_isdst = v->item[TM_ISDST].u.number;
+    
+    clk = mktime(pTm);
+
+    // free time structure first
+    xfree(pTm);
+    
+    if (clk == -1)
+        errorf("Specified date/time cannot be represented as unix timestamp.\n");
+    
+    // free argument and put result.
+    free_svalue(sp);
+    put_number(sp, (p_int)clk);
+    
+    return sp;
+} /* f_mktime() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_strftime(svalue_t *sp, int num_arg)
+/* EFUN strftime()
+ *
+ *   string strftime()
+ *   string strftime(string fmt)
+ *   string strftime(int clock)
+ *   string strftime(string fmt, int clock)
+ *   string strftime(string fmt, int clock, int localized)
+ *
+ * Interpret the argument clock as number of seconds since Jan,
+ * 1st, 1970, 0.00 and convert it to a nice date and time string.
+ * The formatstring must be given in fmt and may contain the placeholders
+ * defined in 'man 3 strftime'.
+ * If localized == MY_TRUE then the time string will be created with the
+ * locale set in the environment variable LC_TIME
+ * Defaults: fmt="%c", clock=current_time, localized=MY_TRUE
+ * NOTE: the returned string will have at most 511 Characters.
+ * TODO: Implement proper caching of the result.
+ */
+
+{
+    char *ts;
+    string_t *rc = NULL;  // ergebnisstring
+    
+    /* Begin of arguments on the stack */
+    svalue_t *arg = sp - num_arg + 1;
+    
+    // defaults:
+    Bool localized = MY_TRUE;
+    mp_int clk = current_time;
+    char *cfmt = "%c";
+    
+    // evaluate arguments
+    switch(num_arg) {
+        case 3:
+            localized = (Bool)arg[2].u.number;
+            // fall-through
+        case 2:
+            if (arg[1].u.number < 0)
+                errorf("Bad arg 2 to strftime(): got %ld, expected 0 .. %ld\n",
+                        arg[1].u.number, PINT_MAX);
+            clk = arg[1].u.number;
+            // fall-through
+        case 1:
+            // empty strings default to "%c" => only set fmt if non-empty
+            if (arg[0].type == T_STRING && mstrsize(arg[0].u.str)) {
+                cfmt = get_txt(arg[0].u.str);
+            }
+            else if (arg[0].type == T_NUMBER) {
+                if (num_arg>1) // bei > 1 argument nur strings erlaubt
+                    vefun_exp_arg_error(1, TF_STRING, sp->type, sp);
+                else if (arg[0].u.number >= 0)
+                    clk = arg[0].u.number;
+                else
+                    errorf("Bad argument 1 to strftime(): got %ld, expected 0 .. %ld\n",
+                        arg[0].u.number, PINT_MAX);
+            }
+            break;
+    }
+
+    ts = time_fstring(clk,cfmt,localized); 
+    memsafe(rc = new_tabled(ts), strlen(ts)+sizeof(string_t), "strftime() result");
+    
+    sp = pop_n_elems(num_arg, sp);
+    push_string(sp, rc);
+    
+    return sp;
+} /* f_strftime() */
+
 /***************************************************************************/
+
+/*-------------------------------------------------------------------------*/
+#ifdef GC_SUPPORT
+
+void
+clear_ref_from_efuns (void)
+
+/* GC support: Clear the refs for the memory containing the (ctime) cache.
+ */
+
+{
+  if (last_ctime_result)
+      clear_string_ref(last_ctime_result);
+} /* clear_ref_from_efuns() */
+
+/*-------------------------------------------------------------------------*/
+void
+count_ref_from_efuns (void)
+
+/* GC support: Count the refs for the memory containing the (ctime) cache.
+ */
+
+{
+  if (last_ctime_result)
+      count_ref_from_string(last_ctime_result);
+} /* count_ref_from_wiz_list() */
+
+#endif /* GC_SUPPORT */
+
+/*-------------------------------------------------------------------------*/
 

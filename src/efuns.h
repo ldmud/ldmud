@@ -82,12 +82,18 @@ extern svalue_t *f_set_is_wizard(svalue_t *sp);  /* optional */
 extern svalue_t *tell_room(svalue_t *sp);
 
 extern svalue_t *f_ctime(svalue_t *);
+extern svalue_t *v_strftime(svalue_t *, int num_arg);
 extern svalue_t *v_debug_info(svalue_t *sp, int num_arg);
 extern svalue_t *f_rusage(svalue_t *sp);
 extern svalue_t *f_random(svalue_t *);
 extern svalue_t *f_shutdown(svalue_t *sp);
 extern svalue_t *f_time(svalue_t *);
+extern svalue_t *f_mktime(svalue_t *);
 extern svalue_t *f_utime(svalue_t *);
+#ifdef GC_SUPPORT
+extern void clear_ref_from_efuns(void);
+extern void count_ref_from_efuns(void);
+#endif /* GC_SUPPORT */
 
 #endif /* EFUNS_H__ */
 
