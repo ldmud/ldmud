@@ -226,8 +226,13 @@
 #define TRACE_PROGRAM 2
 #define TRACE_OBJECT  3
 #define TRACE_LOC     4
+#ifdef __EVAL_COST_TRACE__
+#define TRACE_EVALCOST 5
 
+#define TRACE_MAX     6
+#else
 #define TRACE_MAX     5
+#endif
 
 /* Values for entry TRACE_TYPE */
 

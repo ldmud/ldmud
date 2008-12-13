@@ -78,6 +78,10 @@ struct control_stack {
        * TODO: This should be mirrored in the current_object global variable,
        * TODO:: to avoid accesses to wrong functions/variables.
        */
+#ifdef EVAL_COST_TRACE
+    int32 eval_cost;
+      /* The eval cost at that moment. */
+#endif
 };
 
 /* a general error handler structure. head is assigned as payload to an 

@@ -36,6 +36,7 @@ with_time_to_swap=25200
 with_time_to_swap_variables=39600
 with_time_to_reset=3600
 enable_dynamic_costs=yes
+enable_eval_cost_trace=yes
 with_max_cost=1500000
 with_catch_reserved_cost=4000
 with_master_reserved_cost=1024

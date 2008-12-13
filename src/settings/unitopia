@@ -68,6 +68,7 @@ enable_lpc_array_calls=yes
 with_catch_reserved_cost=0x10000
 with_master_reserved_cost=0x4000
 enable_dynamic_costs=yes
+enable_eval_cost_trace=yes
 with_max_trace=80
 with_max_players=200
 

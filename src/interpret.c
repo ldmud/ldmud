@@ -6946,6 +6946,9 @@ push_control_stack ( svalue_t   *sp
     csp->function_index_offset = function_index_offset;
     csp->current_variables = current_variables;
     csp->break_sp = break_sp;
+#ifdef EVAL_COST_TRACE
+    csp->eval_cost = eval_cost;
+#endif
 } /* push_control_stack() */
 
 /*-------------------------------------------------------------------------*/
@@ -18720,7 +18723,14 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
     } *first_entry, *last_entry;
     size_t num_entries;
 
-#define NEW_ENTRY(var, type, progname) \
+#ifdef EVAL_COST_TRACE
+#define PUT_EVAL_COST(var, cost) \
+        put_number(var->vec->item+TRACE_EVALCOST, cost);
+#else
+#define PUT_EVAL_COST(var, cost)
+#endif
+
+#define NEW_ENTRY(var, type, progname, cost) \
         struct traceentry * var; \
         var = alloca(sizeof(*var)); \
         if (!var) \
@@ -18736,7 +18746,8 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
         num_entries++; \
         put_number(var->vec->item+TRACE_TYPE, type); \
         put_ref_string(var->vec->item+TRACE_PROGRAM, progname); \
-        put_ref_string(entry->vec->item+TRACE_OBJECT, ob->name);
+        put_ref_string(entry->vec->item+TRACE_OBJECT, ob->name); \
+	PUT_EVAL_COST(var, cost)
 
 #define PUT_LOC(entry, val) \
         put_number(entry->vec->item+TRACE_LOC, (p_int)(val))
@@ -18784,6 +18795,9 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
     do {
         bytecode_p  dump_pc;  /* the frame's pc */
         program_t  *prog;     /* the frame's program */
+#ifdef EVAL_COST_TRACE
+        int32       dump_eval_cost; /* The eval cost at that frame. */
+#endif
 
         /* Note: Under certain circumstances the value of file carried over
          * from the previous iteration is reused in this one.
@@ -18815,11 +18829,17 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
         {
             dump_pc = pc;
             prog = current_prog;
+#ifdef EVAL_COST_TRACE
+            dump_eval_cost = eval_cost;
+#endif
         }
         else
         {
             dump_pc = p[1].pc;
             prog = p[1].prog;
+#ifdef EVAL_COST_TRACE
+            dump_eval_cost = p[1].eval_cost;
+#endif
         }
 
         /* Use some heuristics first to see if it could possibly be a CATCH.
@@ -18871,11 +18891,16 @@ not_catch:  /* The frame does not point at a catch here */
              * TODO:: should never be reached.
              */
             if (sbuf)
+#ifndef EVAL_COST_TRACE
                 strbuf_addf(sbuf, "<function symbol> in '%20s' ('%20s')\n"
+#else
+                strbuf_addf(sbuf, "%8d <function symbol> in '%20s' ('%20s')\n"
+                           , dump_eval_cost
+#endif
                            , get_txt(ob->prog->name), get_txt(ob->name));
             if (rvec)
             {
-                NEW_ENTRY(entry, TRACE_TYPE_SYMBOL, ob->prog->name);
+                NEW_ENTRY(entry, TRACE_TYPE_SYMBOL, ob->prog->name, dump_eval_cost);
             }
             continue;
         }
@@ -18885,11 +18910,16 @@ not_catch:  /* The frame does not point at a catch here */
         {
             if (sbuf)
                 strbuf_addf( sbuf
+#ifndef EVAL_COST_TRACE
                            , "<simul_efun closure> bound to '%20s' ('%20s')\n"
+#else
+                           , "%8d <simul_efun closure> bound to '%20s' ('%20s')\n"
+                           , dump_eval_cost
+#endif
                            , get_txt(ob->prog->name), get_txt(ob->name));
             if (rvec)
             {
-                NEW_ENTRY(entry, TRACE_TYPE_SEFUN, ob->prog->name);
+                NEW_ENTRY(entry, TRACE_TYPE_SEFUN, ob->prog->name, dump_eval_cost);
             }
             continue;
         }
@@ -18903,14 +18933,19 @@ not_catch:  /* The frame does not point at a catch here */
             if (iname)
             {
                 if (sbuf)
+#ifndef EVAL_COST_TRACE
                     strbuf_addf(sbuf, "#\'%-14s for '%20s' ('%20s')\n"
+#else
+                    strbuf_addf(sbuf, "%8d #\'%-14s for '%20s' ('%20s')\n"
+                               , dump_eval_cost
+#endif
                                , iname, get_txt(ob->prog->name)
                                , get_txt(ob->name));
                 if (rvec)
                 {
                     string_t *tmp;
 
-                    NEW_ENTRY(entry, TRACE_TYPE_EFUN, ob->prog->name);
+                    NEW_ENTRY(entry, TRACE_TYPE_EFUN, ob->prog->name, dump_eval_cost);
                     memsafe(tmp = new_mstring(iname), strlen(iname)
                            , "instruction name");
                     put_string(entry->vec->item+TRACE_NAME, tmp);
@@ -18919,12 +18954,17 @@ not_catch:  /* The frame does not point at a catch here */
             else
             {
                 if (sbuf)
+#ifndef EVAL_COST_TRACE
                     strbuf_addf( sbuf, "<efun closure %d> for '%20s' ('%20s')\n"
+#else
+                    strbuf_addf( sbuf, "%8d <efun closure %d> for '%20s' ('%20s')\n"
+                               , dump_eval_cost
+#endif
                                , p[0].instruction, get_txt(ob->prog->name)
                                , get_txt(ob->name));
                 if (rvec)
                 {
-                    NEW_ENTRY(entry, TRACE_TYPE_EFUN, ob->prog->name);
+                    NEW_ENTRY(entry, TRACE_TYPE_EFUN, ob->prog->name, dump_eval_cost);
                     put_number(entry->vec->item+TRACE_NAME, p[0].instruction);
                 }
             }
@@ -18937,7 +18977,12 @@ not_catch:  /* The frame does not point at a catch here */
         {
             if (sbuf)
                 strbuf_addf( sbuf
+#ifndef EVAL_COST_TRACE
                            , "<lambda 0x%6lx> in '%20s' ('%20s') offset %ld\n"
+#else
+                           , "%8d <lambda 0x%6lx> in '%20s' ('%20s') offset %ld\n"
+                           , dump_eval_cost
+#endif
                            , (long)p[0].funstart
                            , get_txt(ob->prog->name)
                            , get_txt(ob->name)
@@ -18945,7 +18990,7 @@ not_catch:  /* The frame does not point at a catch here */
                            );
             if (rvec)
             {
-                NEW_ENTRY(entry, TRACE_TYPE_LAMBDA, ob->prog->name);
+                NEW_ENTRY(entry, TRACE_TYPE_LAMBDA, ob->prog->name, dump_eval_cost);
                 put_number(entry->vec->item+TRACE_NAME, (p_int)p[0].funstart);
                 PUT_LOC(entry, (FUNCTION_FROM_CODE(dump_pc) - p[0].funstart));
             }
@@ -18968,17 +19013,27 @@ name_computed: /* Jump target from the catch detection */
         if (sbuf)
         {
             if (file != NULL)
+#ifndef EVAL_COST_TRACE
                 strbuf_addf(sbuf, "'%15s' in '%20s' ('%20s') line %d\n"
+#else
+                strbuf_addf(sbuf, "%8d '%15s' in '%20s' ('%20s') line %d\n"
+                           , dump_eval_cost
+#endif
                            , get_txt(name), get_txt(file)
                            , get_txt(ob->name), line);
             else
+#ifndef EVAL_COST_TRACE
                 strbuf_addf(sbuf, "'%15s' in %22s ('%20s')\n"
+#else
+                strbuf_addf(sbuf, "%8d '%15s' in %22s ('%20s')\n"
+                           , dump_eval_cost
+#endif
                            , get_txt(name), "", get_txt(ob->name));
         }
 
         if (rvec)
         {
-            NEW_ENTRY(entry, TRACE_TYPE_LFUN, file != NULL ? file : STR_EMPTY);
+            NEW_ENTRY(entry, TRACE_TYPE_LFUN, file != NULL ? file : STR_EMPTY, dump_eval_cost);
             put_ref_string(entry->vec->item+TRACE_NAME, name);
             PUT_LOC(entry, line);
         }

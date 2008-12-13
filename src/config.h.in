@@ -405,6 +405,10 @@
  */
 @cdef_dynamic_costs@ DYNAMIC_COSTS
 
+/* Show the evaluation costs in the stacktrace.
+ */
+@cdef_eval_cost_trace@ EVAL_COST_TRACE
+
 /* Define the maximum stack size of the stack machine. This stack will also
  * contain all local variables and arguments.
  */

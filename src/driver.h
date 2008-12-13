@@ -175,4 +175,10 @@ extern unsigned char _my_ctype[];
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #endif /* MIN */
 
+/* For the use of mudlib/sys/debug_info.h.
+ */
+#ifdef EVAL_COST_TRACE
+#define __EVAL_COST_TRACE__
+#endif
+
 #endif /* DRIVER_H__ */
