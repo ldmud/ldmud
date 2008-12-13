@@ -972,8 +972,8 @@ x_filter_string (svalue_t *sp, int num_arg)
         flags = xalloc_with_error_handler((size_t)slen + 1);
         if (!flags)
         {
-            errorf("Out of memory (%zu bytes) for temporary buffer in filter().\n",
-                   (size_t)slen + 1);
+            errorf("Out of memory (%"PRIdMPINT" bytes) for temporary buffer "
+                "in filter().\n", slen + 1);
         }
         sp = inter_sp;
         
@@ -1015,7 +1015,8 @@ x_filter_string (svalue_t *sp, int num_arg)
     rc = alloc_mstring(res);
     if (!rc)
     {
-        errorf("Out of memory (%zu bytes) for result in filter().\n",slen+1);
+        errorf("Out of memory (%"PRIdMPINT" bytes) for result in filter().\n",
+            slen+1);
     }
   
     for (src = get_txt(str), dest = get_txt(rc), flags = &flags[slen]

@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Dec 2008 (Zesstra)
+  - (pkg-mysql.c)
+    Allocate temporary memory for the temporary string in f_db_conv_string()
+    on the heap, because the string is user supplied and calling the
+    function with a large string may cause a crash due to stack overflow.
+    (Bug #582)
+  - (efuns.c, strfuns.c)
+    Corrected format specifiers in errorf() calls.
+
 12-Dec 2008 (Zesstra)
   - (port.h, port.c, efuns.h, efuns.c, func_spec, gcollect.c)
        added mkime(), an efun which converts a date/time information as

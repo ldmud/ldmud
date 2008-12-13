@@ -8900,8 +8900,9 @@ v_strftime(svalue_t *sp, int num_arg)
             // fall-through
         case 2:
             if (arg[1].u.number < 0)
-                errorf("Bad arg 2 to strftime(): got %ld, expected 0 .. %ld\n",
-                        arg[1].u.number, PINT_MAX);
+                errorf("Bad arg 2 to strftime(): got %"PRIdPINT
+                    ", expected 0 .. %"PRIdPINT"\n",
+                     arg[1].u.number, PINT_MAX);
             clk = arg[1].u.number;
             // fall-through
         case 1:
@@ -8915,7 +8916,8 @@ v_strftime(svalue_t *sp, int num_arg)
                 else if (arg[0].u.number >= 0)
                     clk = arg[0].u.number;
                 else
-                    errorf("Bad argument 1 to strftime(): got %ld, expected 0 .. %ld\n",
+                    errorf("Bad argument 1 to strftime(): got %"PRIdPINT
+                        ", expected 0 .. %"PRIdPINT"\n",
                         arg[0].u.number, PINT_MAX);
             }
             break;

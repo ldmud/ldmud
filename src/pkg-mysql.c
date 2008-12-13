@@ -377,15 +377,17 @@ f_db_conv_string (svalue_t *sp)
     char *buff;
 
     s = sp->u.str;
-    buff = alloca(mstrsize(s)*2 +1);
+    buff = xalloc(mstrsize(s)*2 +1);
     if ( !buff )
     {
-        errorf("Out of memory.\n");
+        errorf("Out of memory (%zu bytes) in db_conv_string().\n",
+               mstrsize(s)*2 + 1);
         /* NOTREACHED */
         return sp;
     }
     mysql_escape_string(buff, get_txt(s), strlen(get_txt(s)) );
-
+    
+    xfree(buff);
     free_string_svalue(sp);
     put_c_string(sp, buff);
     return sp;
