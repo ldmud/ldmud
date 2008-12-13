@@ -60,27 +60,27 @@ val_[$1]="$with_[$1]"]
 
 AC_DEFUN([AC_FORM_HELP],[  --$1[]dnl
 ifelse([$2],,,dnl
-builtin(format,%[.]builtin(eval,(len([$1])<32)*(32-len([$1])))s,)  [default=$2])[]dnl
+builtin(format,%[.]builtin(eval,(len([$1])<50)*(50-len([$1])))s,)  [default=$2])[]dnl
 ifelse([$3],,,[
 ]patsubst([$3],[^],[        ]))[]dnl
 ])
 
 
-AC_DEFUN(AC_MY_ARG_ENABLE,
+AC_DEFUN([AC_MY_ARG_ENABLE],
 [DEFAULTenable_[]translit([$1],[-],[_])=ifelse($2,,no,[$2])
 AC_ARG_ENABLE([$1],AC_FORM_HELP([enable-$1]ifelse($3,,,[=($3)]),
 ifelse([$2],,[disabled],[$2],no,[disabled],[$2],yes,[enabled],[enabled($2)]),
 [$4]),[$5],[$6])
 ])
 
-AC_DEFUN(AC_MY_ARG_WITH,
+AC_DEFUN([AC_MY_ARG_WITH],
 [DEFAULTwith_[]translit([$1],[-],[_])=ifelse($2,,no,[$2])
 AC_ARG_WITH([$1],AC_FORM_HELP([with-$1]ifelse($3,,[=VALUE],[=$3]),
 [$2],
 [$4]),[$5],[$6])
 ])
 
-AC_DEFUN(AC_NOT_AVAILABLE,
+AC_DEFUN([AC_NOT_AVAILABLE],
 [if test "x$not_available" = "x"; then
     not_available="$1"
 else
@@ -212,7 +212,7 @@ AC_MY_ARG_WITH(rxcache-table,8192,,)
 AC_MY_ARG_WITH(max-byte-transfer,50000,,)
 AC_MY_ARG_WITH(catch-udp-port,4246,,)
 AC_MY_ARG_WITH(set-buffer-size-max,65536,,)
-AC_MY_ARG_WITH(malloc,default,[default/smalloc/slaballoc/sysmalloc/ptmalloc],[memory manager to use])
+AC_MY_ARG_WITH(malloc,default,,[default/smalloc/slaballoc/sysmalloc/ptmalloc],[memory manager to use])
 AC_MY_ARG_WITH(min-malloced,0,,)
 AC_MY_ARG_WITH(min-small-malloced,0,,)
 AC_MY_ARG_WITH(max-malloced,0x4000000,,)
@@ -248,7 +248,7 @@ AC_UPDATE_VAR(enable_erq)
 if test "x$enable_erq" = "xerq" || test "x$enable_erq" = "xyes"; then
   cdef_erq_demon="#define"
   erq_sub=erq
-  AC_DEFINE(ERQ_INCLUDE,"util/erq/erq.h")
+  AC_DEFINE(ERQ_INCLUDE,"util/erq/erq.h",[define the erq include file.])
 elif test "x$enable_erq" = "xxerq"; then
   cdef_erq_demon="#define"
   erq_sub=xerq
@@ -540,7 +540,7 @@ fi
 # does the compile have an inline keyword?
 AC_C_INLINE
 if test "x$ac_cv_c_inline" != "xno"; then
-  AC_DEFINE(HAS_INLINE)
+  AC_DEFINE(HAS_INLINE, 1, [Does the compiler provide inline functions?])
 fi
 
 # does the compile have an restrict keyword?
@@ -636,13 +636,14 @@ int i = 96/(sizeof(struct ts)-20);
 ],,
 lp_cv_sys_malloc_align=8,
 lp_cv_sys_malloc_align=4))
-AC_DEFINE_UNQUOTED(MALLOC_ALIGN,$lp_cv_sys_malloc_align)
+AC_DEFINE_UNQUOTED(MALLOC_ALIGN,$lp_cv_sys_malloc_align,[word alignment])
 
 
 if test "x$ac_cv_type_signal" = "xvoid"; then
-  cat >> confdefs.h <<EOF
-#define RETSIGTYPE_VOID 1
-EOF
+  AC_DEFINE(RETSIGTYPE_VOID, 1,                                                                                                                                                                                    
+    [Set in response to the signal handler return type, since not all                                                                                                                                              
+     compilers understand direct definition comparisons.                                                                                                                                                           
+    ])                                                                                                                                                                                                             
 fi
 
 # --- Check for common system libraries ---
@@ -748,7 +749,8 @@ use inet_ntoa() from the library.
 lp_cv_func_inet_ntoa_ok=yes
 )))
 if test $lp_cv_func_inet_ntoa_ok = yes ; then
-  AC_DEFINE(INET_NTOA_OK)
+dnl TODO: Is there any platform where this is not the case?
+  AC_DEFINE(INET_NTOA_OK, 1, [Is the library function inet_ntoa() compatible with the compiler?])
 fi
 
 # --- IPV6 ---
@@ -771,7 +773,7 @@ struct sockaddr_in6 foo(void)
     CFLAGS="$saveflags"
 ))
 if test $lp_cv_has_ipv6 = yes; then
-    AC_DEFINE(HAS_IPV6)
+    AC_DEFINE(HAS_IPV6, 1, [Does the machine offer IPv6?])
     if test $enable_use_ipv6 = yes; then
         AC_CACHE_CHECK(if -linet6 is needed, lp_cv_need_lib_inet6,
             AC_TRY_RUN([
@@ -842,7 +844,7 @@ if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
     if test $lp_cv_has_openssl = yes; then
         has_tls=yes
         tls_package=ssl
-        AC_DEFINE(HAS_OPENSSL)
+        AC_DEFINE(HAS_OPENSSL, 1, [Does the machine offer OpenSSL/SSL?])
 
         if test "$enable_use_tls" = "yes"; then
             AC_CACHE_CHECK(if -lssl or similar is needed, lp_cv_need_lib_ssl,
@@ -914,7 +916,7 @@ if test "$tls_package" = "any" -o "$tls_package" = "gnu"; then
     if test $lp_cv_has_gnutls = yes; then
         has_tls=yes
         tls_package=gnu
-        AC_DEFINE(HAS_GNUTLS)
+        AC_DEFINE(HAS_GNUTLS, 1, [Does the machine offer GnuTLS?])
 
         if test "$enable_use_tls" = "yes"; then
             AC_CACHE_CHECK(if -lgnutls or similar is needed, lp_cv_need_lib_gnutls,
@@ -959,7 +961,7 @@ if test "$tls_package" = "any" -o "$tls_package" = "gnu"; then
                 lp_cv_has_gnutls_version=7
             ))
             LIBS="$savelibs"
-            AC_DEFINE_UNQUOTED(HAS_GNUTLS_VERSION, $lp_cv_has_gnutls_version)
+            AC_DEFINE_UNQUOTED(HAS_GNUTLS_VERSION, $lp_cv_has_gnutls_version, [version of GNUTLS library])
         fi
 
     else
@@ -1006,7 +1008,7 @@ if test $lp_cv_has_pthreads = yes; then
     saveflags="$CFLAGS"
     savelibs="$LIBS"
 
-    AC_DEFINE(HAS_PTHREADS)
+    AC_DEFINE(HAS_PTHREADS, 1, [Does the machine offer pthreads?])
 
     AC_CACHE_CHECK(if -lpthread or similar is needed, lp_cv_need_lib_pthread,
         AC_TRY_RUN([
@@ -1053,7 +1055,7 @@ int main (void) {
         )
     )
     if test $lp_cv_has_pthread_atfork = yes; then
-        AC_DEFINE(HAS_PTHREAD_ATFORK)
+        AC_DEFINE(HAS_PTHREAD_ATFORK, 1, [Does the machine offer pthread_atfork()?])
     fi
 
     CFLAGS="$saveflags"
@@ -1098,7 +1100,7 @@ int main(void)
     CFLAGS="$saveflags"
 
     if test $lp_cv_has_pcre = yes; then
-        AC_DEFINE(HAS_PCRE)
+        AC_DEFINE(HAS_PCRE, 1, [Does the machine offer PCRE?])
         PKGLIBS="$PKGLIBS -lpcre"
     else
         if test $enable_use_builtin_pcre = no ; then
@@ -1233,11 +1235,11 @@ int main(void)
 fi
 
 if test "x$lp_cv_has_iconv" = "xyes"; then
-  AC_DEFINE(HAS_ICONV)
+  AC_DEFINE(HAS_ICONV, 1, [Does the machine offer iconv?])
 fi
 
 if test "x$lp_cv_has_iconv_nonconst_in" = "xyes"; then
-  AC_DEFINE(HAS_ICONV_NONCONST_IN)
+  AC_DEFINE(HAS_ICONV_NONCONST_IN, 1, [Does the machine's iconv take a non-const 'char**' as first arg?])
 fi
 
 # --- libidn ---
@@ -1246,7 +1248,7 @@ AC_CHECK_HEADER(stringprep.h, lp_cv_has_idn=yes,lp_cv_has_idn=no)
 AC_CHECK_LIB(idn, stringprep_check_version,
 	     [lp_cv_has_idn=yes LIBS="${LIBS} -lidn"],lp_cv_has_idn=no)
 if test "x$lp_cv_has_idn" = "xyes"; then
-    AC_DEFINE(HAS_IDN, 1, [Does the machine offer idn libraries.])
+    AC_DEFINE(HAS_IDN, 1, [Does the machine offer IDNA?])
 fi
 
 # --- mySQL ---
@@ -1289,7 +1291,7 @@ done
 # The system has the include files - now search for the libraries.
 if test $lp_cv_has_mysql = yes; then
   saveflags="$CFLAGS"
-  AC_DEFINE(HAS_MYSQL)
+  AC_DEFINE(HAS_MYSQL, 1, [Does the machine offer mySQL?])
 
   if test $enable_use_mysql = yes; then
     tmp=""
@@ -1437,7 +1439,7 @@ done
 # The system has the include files - now search for the libraries.
 if test $lp_cv_has_pgsql = yes; then
   saveflags="$CFLAGS"
-  AC_DEFINE(HAS_PGSQL)
+  AC_DEFINE(HAS_PGSQL, 1, [Does the machine offer PostgreSQL?])
 
   if test $enable_use_pgsql = yes; then
     tmp=""
@@ -1570,7 +1572,7 @@ done
 # The system has the include files - now search for the libraries.
 if test $lp_cv_has_sqlite3 = yes; then
   saveflags="$CFLAGS"
-  AC_DEFINE(HAS_SQLITE3)
+  AC_DEFINE(HAS_SQLITE3, 1, [Does the machine offer SQLite3?])
 
   if test $enable_use_sqlite = yes; then
     tmp=""
@@ -1623,7 +1625,7 @@ if test $lp_cv_has_sqlite3 = yes; then
       )
 
       if test $lp_cv_sqlite3_uses_pthreads = yes ; then
-           AC_DEFINE(SQLITE3_USES_PTHREADS)
+           AC_DEFINE(SQLITE3_USES_PTHREADS, 1, [Does SQLite3 use pthreads?])
       fi
 
       LIBS="$savelibs"
@@ -1668,7 +1670,7 @@ main() {
 lp_cv_sys_rename_handles_directories=yes,
 lp_cv_sys_rename_handles_directories=no))
 if test $lp_cv_sys_rename_handles_directories = yes; then
-  AC_DEFINE(RENAME_HANDLES_DIRECTORIES)
+  AC_DEFINE(RENAME_HANDLES_DIRECTORIES, 1, [Can rename handle directories?])
 fi
 rmdir conftestdirfrom conftestdirto 2> /dev/null
 
@@ -1705,7 +1707,7 @@ AC_TRY_COMPILE([
     *v++ = rus.ru_nivcsw;
 ],lp_cv_struct_rusage_full=yes,lp_cv_struct_rusage_full=no))
 if test $lp_cv_struct_rusage_full = no; then
-  AC_DEFINE(GETRUSAGE_RESTRICTED)
+  AC_DEFINE(GETRUSAGE_RESTRICTED, 1, [If so, is it restricted to user and system time?])
 fi
 AC_CACHE_CHECK(struct rusage timeval members with tv_usec,
 lp_cv_struct_rusage_usec,
@@ -1727,7 +1729,7 @@ AC_TRY_COMPILE([
     *v++ = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
 ], lp_cv_struct_rusage_usec=yes, lp_cv_struct_rusage_usec=no))
 if test $lp_cv_struct_rusage_usec = yes; then
-  AC_DEFINE(RUSAGE_USEC)
+  AC_DEFINE(RUSAGE_USEC, 1, [Can ru_utime / ru_stime be accessed as a timeval with tv_sec and tv_usec?])
 fi
 else
 AC_CACHE_CHECK(for getrusage() via syscall(),
@@ -1744,7 +1746,8 @@ struct rusage rus;
 syscall(SYS_GETRUSAGE, RUSAGE_SELF, rus);
 ], lp_cv_func_getrusage_via_syscall=yes, lp_cv_func_getrusage_via_syscall=no))
 if test $lp_cv_func_getrusage_via_syscall=yes; then
-  AC_DEFINE(GETRUSAGE_VIA_SYSCALL) AC_DEFINE(HAVE_GETRUSAGE)
+  AC_DEFINE(HAVE_GETRUSAGE, 1, [Does the system have a getrusage call?])
+  AC_DEFINE(GETRUSAGE_VIA_SYSCALL, 1, [Is it available as a subfunction of syscall()?])
 fi
 fi
 
@@ -1764,7 +1767,7 @@ AC_TRY_COMPILE([
 void free();
 ],, lp_cv_prop_free_returns_void=yes, lp_cv_prop_free_returns_void=no))
 if test $lp_cv_prop_free_returns_void = yes; then
-  AC_DEFINE(FREE_RETURNS_VOID)
+  AC_DEFINE(FREE_RETURNS_VOID, 1, [does free() have void as its returntype?])
 fi
 
 AC_CACHE_CHECK(if void* or char* from malloc,
@@ -1794,7 +1797,7 @@ int free PROT((POINTER));
 #endif
 ],,lp_cv_prop_malloc_return_type="void *",
 lp_cv_prop_malloc_return_type="char *"))
-AC_DEFINE_UNQUOTED(POINTER,$lp_cv_prop_malloc_return_type)
+AC_DEFINE_UNQUOTED(POINTER,$lp_cv_prop_malloc_return_type,[what kind of pointer is used by malloc() et al])
 
 AC_CACHE_CHECK(if CHAR_BIT == 8 or undef,
 lp_cv_prop_charbits_eq_8,
@@ -1809,7 +1812,7 @@ AC_TRY_COMPILE([
 int i=[1/(CHAR_BIT-8)];
 ],,lp_cv_prop_charbits_eq_8=no, lp_cv_prop_charbits_eq_8=yes))
 if test $lp_cv_prop_charbits_eq_8 = yes; then
-  AC_DEFINE(CHARBIT_MASK, 0xff)
+  AC_DEFINE(CHARBIT_MASK, 0xff, [A mask that allows to extract an unsigned char from a signed])
 else
 dnl TODO: this is something I don't really understand... am I too stupid?
 dnl TODO:: bitmask set to number of bits ?????? *shudder* [Mubo]
@@ -1833,7 +1836,7 @@ int main() {
 ], lp_cv_prop_strtol_broken=no,
 lp_cv_prop_strtol_broken=yes))
 if test $lp_cv_prop_strtol_broken = yes; then
-  AC_DEFINE(STRTOL_BROKEN)
+  AC_DEFINE(STRTOL_BROKEN, 1, [the atari strtol() used to consider characters '9' < c < 'A' to be numeric])
 fi
 
 dnl the following three tests would better be nested, but it seems to overflow
@@ -1914,7 +1917,7 @@ lp_cv_prop_use_ioctl_fionbio=unknown
 AC_MSG_WARN(You have to supply the correct way to set sockets non-blocking by hand.)
 ))
 if test $lp_cv_prop_use_ioctl_fionbio = yes; then
-  AC_DEFINE(USE_IOCTL_FIONBIO)
+  AC_DEFINE(USE_IOCTL_FIONBIO, 1, [How to set a socket non-blocking])
 fi
 
 AC_CACHE_CHECK(nonblocking using fcntl with O_NDELAY,
@@ -1974,7 +1977,7 @@ main() {
 lp_cv_prop_use_fnctl_o_ndelay=no,
 lp_cv_prop_use_fnctl_o_ndelay=unknown))
 if test $lp_cv_prop_use_fnctl_o_ndelay = yes; then
-  AC_DEFINE(USE_FCNTL_O_NDELAY)
+  AC_DEFINE(USE_FCNTL_O_NDELAY, 1, [nonblocking using fcntl with O_NDELAY])
 fi
 
 AC_CACHE_CHECK(nonblocking using fcntl with FNDELAY,
@@ -2034,7 +2037,7 @@ main() {
 lp_cv_prop_use_fcntl_fndelay=no,
 lp_cv_prop_use_fcntl_fndelay=unknown))
 if test $lp_cv_prop_use_fcntl_fndelay = yes; then
-  AC_DEFINE(USE_FCNTL_FNDELAY)
+  AC_DEFINE(USE_FCNTL_FNDELAY, 1, [nonblocking using fcntl with FNDELAY])
 fi
 
 
@@ -2092,7 +2095,7 @@ main() {
 lp_cv_prop_use_fcntl_setown=no,
 lp_cv_prop_use_fcntl_setown=unknown))
 if test $lp_cv_prop_use_fcntl_setown = yes; then
-  AC_DEFINE(USE_FCNTL_SETOWN)
+  AC_DEFINE(USE_FCNTL_SETOWN, 1, [Can F_SETOWN be used on a socket?])
 fi
 
 AC_CACHE_CHECK(if OOBINLINE works,
@@ -2152,7 +2155,7 @@ main() {
 lp_cv_prop_use_oobinline=no,
 lp_cv_prop_use_oobinline=unknown))
 if test $lp_cv_prop_use_oobinline = yes; then
-  AC_DEFINE(USE_OOBINLINE)
+  AC_DEFINE(USE_OOBINLINE, 1, [Can SO_OOBINLINE be used on a socket?])
 fi
 
 
@@ -2173,7 +2176,7 @@ main(){
 lp_cv_prop_overlapping_bcopy=no,
 lp_cv_prop_overlapping_bcopy=yes))
 if test $lp_cv_prop_overlapping_bcopy = yes; then
-  AC_DEFINE(OVERLAPPING_BCOPY)
+  AC_DEFINE(OVERLAPPING_BCOPY, 1, [Define if you have bcopy, and it handles overlapping ranges correctly.])
 fi
 
 AC_CACHE_CHECK(if strtol needs const char*,
@@ -2185,7 +2188,7 @@ long strtol(str, ptr, base) char *str; char **ptr; int base; { return 0; }
 ],,lp_cv_prop_strtol_const_charp=no,
 lp_cv_prop_strtol_const_charp=yes))
 if test $lp_cv_prop_strtol_const_charp = yes; then
-  AC_DEFINE(STRTOL_CONST_CHARP)
+  AC_DEFINE(STRTOL_CONST_CHARP, 1, [needs the first argument of strtol be declared as const?])
 fi
 
 # --- Check for compiler options ---
@@ -2512,7 +2515,7 @@ int free(p)
 ],SBRK_OK=1)
 if test -n "${SBRK_OK}"; then
   if test -z "${TESTFLAG}"; then
-    AC_DEFINE(SBRK_OK)
+    AC_DEFINE(SBRK_OK, 1, [can we define our own malloc() safely?])
   else
     LDFLAGS="${LDFLAGS} ${TESTFLAG}"
     EXTRA_CFLAGS="${EXTRA_CFLAGS} -DSBRK_OK"
@@ -2552,14 +2555,19 @@ ${CC-cc} -o conftest conftest.c
 lp_cv_sys_malloc_overhead=`./conftest --terse`
 rm -f conftest*
 )
-AC_DEFINE_UNQUOTED(EXTERN_MALLOC_OVERHEAD,$lp_cv_sys_malloc_overhead)
+AC_DEFINE_UNQUOTED(EXTERN_MALLOC_OVERHEAD,$lp_cv_sys_malloc_overhead,                                                                                                                                              
+    [The following is needed for smalloc without SBRK_OK to use memory                                                                                                                                             
+     efficiently. smalloc will malloc blocks that are a large power of                                                                                                                                             
+     two, minus EXTERN_MALLOC_OVERHEAD. If you have no idea what number to                                                                                                                                         
+     choose, compile & run util/overhead.c                                                                                                                                                                         
+    ])                                                                                                                                                                                                             
 
 if test -z "${CONFIG_SHELL}"; then
   CONFIG_SHELL='/bin/sh'
 fi
 if test "${OSTYPE}" = 'win32'; then
   EXEEXT='.exe'
-  AC_DEFINE(HOST_INCLUDE,"hosts/GnuWin32/GnuWin32.h")
+  AC_DEFINE(HOST_INCLUDE,"hosts/GnuWin32/GnuWin32.h",[define the host-specific include file])
 fi
 
 
