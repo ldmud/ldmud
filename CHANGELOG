@@ -6,6 +6,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
     Added option to show the evaluation costs in the stacktrace.
   - (src/pkg-iksemel.c, many files)
     Added support for XML parsing with iksemel. (Bug #538, thanks, Bardioc!)
+            (Zesstra)
+  - (efuns.c)
+    Fixed potential crashes due to stack overflows in process_string(),
+    regexplode(), regexp() and present_clone(). (Bug #578)
 
 13-Dec 2008 (Zesstra)
   - (pkg-mysql.c)

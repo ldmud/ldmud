@@ -666,16 +666,18 @@ f_regexp (svalue_t *sp)
 
         /* Check every string in <v> if it matches and set res[]
          * accordingly.
+         * Allocate memory and push error handler on the stack.
          */
-        res = alloca(v_size * sizeof(*res));
+        res = xalloc_with_error_handler(v_size * sizeof(*res));
         if (!res)
         {
             free_regexp(reg);
-            inter_sp = sp;
-            errorf("Stack overflow in regexp()");
+            errorf("Out of memory (%zu bytes) in regexp()",
+                    v_size * sizeof(*res));
             /* NOTREACHED */
             return sp;
         }
+        sp = inter_sp;
 
         for (num_match = i = 0; i < v_size; i++) {
             string_t *line;
@@ -701,7 +703,6 @@ f_regexp (svalue_t *sp)
             {
                 const char * emsg = rx_error_message(rc, reg);
                 free_regexp(reg);
-                inter_sp = sp;
                 errorf("regexp: %s\n", emsg);
                 /* NOTREACHED */
                 return NULL;
@@ -718,9 +719,11 @@ f_regexp (svalue_t *sp)
                 continue;
             assign_svalue_no_free(&ret->item[j++], &v->item[i]);
         }
-
+        /* Free regexp and the intermediate buffer res by freeing the error
+         * handler. */
         free_regexp(reg);
-    }while(0);
+        free_svalue(sp--);
+    } while(0);
 
     free_svalue(sp--);
     free_svalue(sp--);
@@ -734,6 +737,43 @@ f_regexp (svalue_t *sp)
 } /* f_regexp() */
 
 /*-------------------------------------------------------------------------*/
+/* The found delimiter matches in f_regexplode() are kept in a list of these
+ * structures.
+ */
+struct regexplode_match {
+    size_t start, end;              /* Start and end of the match in text */
+    struct regexplode_match *next;  /* Next list element */
+};
+
+/* We need a special error handling for f_reg_explode(). It allocates a
+ * chained list of regexplode_match structures in a mempool and the compiled
+ * regexp which we have to free.
+ */
+struct regexplode_cleanup_s {
+    svalue_t sval;
+    regexp_t *reg;
+    Mempool matchmempool;
+};
+
+static void
+regexplode_error_handler( svalue_t * arg)
+/* The error handler: delete the mempool and free the compiled regexp.
+ * Note: it is static, but the compiler will have to emit a function and 
+ * symbol for this because the address of the function is taken and it is 
+ * therefore not suitable to be inlined.
+ */
+{
+    struct regexplode_cleanup_s *handler = (struct regexplode_cleanup_s *)arg;
+    
+    if (handler->reg)
+        free_regexp(handler->reg);
+    
+    if (handler->matchmempool) {
+        mempool_delete(handler->matchmempool);
+    }
+    xfree(handler);
+} /* regexplode_error_handler() */
+
 svalue_t *
 f_regexplode (svalue_t *sp)
 
@@ -750,13 +790,6 @@ f_regexplode (svalue_t *sp)
  */
 
 {
-    /* The found delimiter matches are kept in a list of these
-     * structures which are allocated on the stack.
-     */
-    struct regexplode_match {
-        size_t start, end;              /* Start and end of the match in text */
-        struct regexplode_match *next;  /* Next list element */
-    };
 
     string_t *text;                    /* Input string */
     string_t *pattern;                 /* Delimiter pattern from the vm stack */
@@ -767,25 +800,46 @@ f_regexplode (svalue_t *sp)
     vector_t *ret;                     /* Result vector */
     svalue_t *svp;                     /* Next element in ret to fill in */
     int num_match;                     /* Number of matches */
-    int arraysize;                     /* Size of result array */
+    p_int arraysize;                   /* Size of result array */
     int       opt;                     /* RE options */
     int       rc;                      /* Result from rx_exec() */
     size_t    start;                   /* Start position for match */
+    Mempool   pool;                    /* Mempool for the list of matches */
+    /* cleanup structure holding the head of chain of matches */
+    struct regexplode_cleanup_s *cleanup;
 
+    
     /* Get the efun arguments */
-
     text = sp[-2].u.str;
     pattern = sp[-1].u.str;
     opt = (int)sp->u.number;
+    
+    /* allocate space for cleanup structure. */
+    cleanup = xalloc(sizeof(*cleanup));
+    if (!cleanup)
+        errorf("Out of memory (%zu bytes) for cleanup structure in "
+               "regexplode().\n",sizeof(*cleanup));
 
+    /* create mempool */
+    pool = new_mempool(size_mempool(sizeof(*matches)));
+    if (!pool)
+    {
+        xfree(cleanup);
+        errorf("Out of memory (%zu) for mempool in regexplode().\n",
+               sizeof(*matches));
+    }
+    cleanup->matchmempool = pool;
+    /*  push error handler above the args on the stack */
+    sp = push_error_handler(regexplode_error_handler, &(cleanup->sval));
+        
     reg = rx_compile(pattern, opt, MY_FALSE);
     if (reg == 0) {
-        inter_sp = sp;
         errorf("Unrecognized search pattern");
         /* NOTREACHED */
         return sp;
     }
-
+    cleanup->reg = reg;
+    
     /* Loop over <text>, repeatedly matching it against the pattern,
      * until all matches have been found and recorded.
      */
@@ -804,20 +858,21 @@ f_regexplode (svalue_t *sp)
             break;
         }
 
-        match = alloca(sizeof *match);
+        match = mempool_alloc(pool, sizeof *match);
         if (!match)
         {
-            free_regexp(reg);
-            inter_sp = sp;
-            errorf("Stack overflow in regexplode()");
+            errorf("Out of memory (%zu bytes) in regexplode().\n",
+                   sizeof(*match));
             /* NOTREACHED */
             return sp;
         }
         rx_get_match(reg, text, &(match->start), &(match->end));
         start = match->end;
+        /* add match to the match list */
         *matchp = match;
         matchp = &match->next;
         num_match++;
+        
         if (start == mstrsize(text)
          || (match->start == start && ++start == mstrsize(text)) )
             break;
@@ -826,8 +881,6 @@ f_regexplode (svalue_t *sp)
     if (rc < 0) /* Premature abort on error */
     {
         const char * emsg = rx_error_message(rc, reg);
-        free_regexp(reg);
-        inter_sp = sp;
         errorf("regexp: %s\n", emsg);
         /* NOTREACHED */
         return NULL;
@@ -842,17 +895,14 @@ f_regexplode (svalue_t *sp)
         arraysize = 2 * num_match + 1;
 
     if (max_array_size && arraysize > (long)max_array_size-1 ) {
-        free_regexp(reg);
-        inter_sp = sp;
-        errorf("Illegal array size: %d",arraysize);
+        errorf("Illegal array size: %"PRIdPINT".\n", arraysize);
         /* NOTREACHED */
         return sp;
     }
     ret = allocate_array(arraysize);
 
-    /* Walk down the list of matches, extracting the
-     * text parts and matched delimiters, copying them
-     * into ret.
+    /* Walk down the list of matches, extracting the text parts and matched 
+     * delimiters, copying them into ret.
      */
     svp = ret->item;
     start = 0;
@@ -864,11 +914,13 @@ f_regexplode (svalue_t *sp)
         len = match->start - start;
         if (len)
         {
-            memsafe(txt = mstr_extract(text, start, match->start-1), (size_t)len, "text before delimiter");
+            memsafe(txt = mstr_extract(text, start, match->start-1), 
+                    (size_t)len, "text before delimiter");
             put_string(svp, txt);
         }
         else
             put_ref_string(svp, STR_EMPTY);
+        
         svp++;
 
         /* Copy the matched delimiter */
@@ -882,6 +934,7 @@ f_regexplode (svalue_t *sp)
             }
             else
                 put_ref_string(svp, STR_EMPTY);
+            
             svp++;
         }
 
@@ -903,15 +956,12 @@ f_regexplode (svalue_t *sp)
             put_ref_string(svp, STR_EMPTY);
     }
 
-    /* Cleanup */
-    free_regexp(reg);
-    free_svalue(sp);
-    sp--;
-    free_svalue(sp);
-    sp--;
-    free_svalue(sp);
+    /* Cleanup: free error handler and 3 arguments. Freeing the error handler
+     * will free the regexp and the chain of matches. */
+    sp = pop_n_elems(4, sp);
 
     /* Return the result */
+    sp++;
     put_array(sp, ret);
     return sp;
 } /* f_regexplode() */
@@ -2714,10 +2764,11 @@ process_value (const char *str, Bool original)
      */
     if (original)
     {
-        func = alloca(strlen(str)+1);
+        /* allocate memory and push error handler */
+        func = xalloc_with_error_handler(strlen(str)+1);
         if (!func)
-            errorf("Out of stack memory (%lu bytes)\n"
-                 , (unsigned long)(strlen(str)+1));
+            errorf("Out of memory (%zu bytes) in process_value().\n"
+                 , strlen(str)+1);
         strcpy(func, str);
     }
     else
@@ -2734,6 +2785,9 @@ process_value (const char *str, Bool original)
      */
     if ( NULL == (func2 = find_tabled_str(func)) )
     {
+        /* free the error handler if necessary. */
+        if (original)
+            free_svalue(inter_sp--);
         return NULL;
     }
 
@@ -2752,6 +2806,9 @@ process_value (const char *str, Bool original)
 
     if (!ob)
     {
+        /* free the error handler if necessary. */
+        if (original)
+            free_svalue(inter_sp--);
         return NULL;
     }
 
@@ -2770,11 +2827,17 @@ process_value (const char *str, Bool original)
             narg++;
         }
     }
-
-    /* Apply the function and see if adequate answer is returned.
-     */
+    
+    /* Apply the function */
     ret = apply(func2, ob, numargs);
 
+    /* Free func by freeing the error handler (if we allocated func).
+     * Has to be done now, after the arguments have been popped by apply().
+     */
+    if (original)
+        free_svalue(inter_sp--);
+    
+    /* see if adequate answer is returned by the apply(). */
     if (ret && ret->type == T_STRING)
         return ret->u.str;
         /* The svalue is stored statically in apply_return_value */
@@ -4436,9 +4499,11 @@ f_present_clone (svalue_t *sp)
         char * end;
         char * sane_name;
         char * name0;  /* Intermediate name */
-
+        char * tmpbuf; /* intermediate buffer for stripping any #xxxx */
+        
         name0 = get_txt(sp[-1].u.str);
-
+        tmpbuf = NULL;
+        
         /* Normalize the given string and check if it is
          * in the shared string table. If not, we know that
          * there is no blueprint with that name
@@ -4460,17 +4525,24 @@ f_present_clone (svalue_t *sp)
                 /* Not a digit: maybe a '#' */
                 if ('#' == c && len - i > 1)
                 {
-                    name0 = alloca((size_t)i + 1);
-                    if (!name0)
-                        errorf("Out of stack memory.\n");
-                    strncpy(name0, get_txt(sp[-1].u.str), (size_t)i);
+                    tmpbuf = xalloc((size_t)i + 1);
+                    if (!tmpbuf)
+                    {
+                        errorf("Out of memory (%ld bytes) for temporary "
+                               "buffer in present_clone().\n", i+1);
+                    }
+                    strncpy(tmpbuf, get_txt(sp[-1].u.str), (size_t)i);
                     name0[i] = '\0';
                 }
 
                 break; /* in any case */
             }
         }
-
+        /* if we got a clone name, tmpbuf is filled with the BP name. In any
+         * case, name0 contains now the name to be used. */
+        if (tmpbuf)
+            name0 = tmpbuf;
+        
         /* Now make the name sane */
         sane_name = (char *)make_name_sane(name0, !compat_mode);
 
@@ -4478,7 +4550,14 @@ f_present_clone (svalue_t *sp)
             name = find_tabled_str(sane_name);
         else
             name = find_tabled_str(name0);
-
+        
+        /* tmpbuf (and name0 which might point to the same memory) is unneeded
+         * from now on. Setting both to NULL, just in case somebody uses 
+         * them later below. */
+        if (tmpbuf) {
+            xfree(tmpbuf);
+            tmpbuf = name0 = NULL;
+        }
     }
     else if (sp[-1].type == T_OBJECT)
     {
