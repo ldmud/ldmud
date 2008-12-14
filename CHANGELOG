@@ -19,6 +19,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
     Replaced call to exit() by a call to fatal() in asster_master_ob_loaded()
     to allow core dumpes to be written in cases when the master object could
     not be loaded and there is no destructed master as well. (Bug #570).
+  - (simulate.c)
+    Fixed potential crash due to stack overflow in load_object(). (Bug #580).
 
 13-Dec 2008 (Zesstra)
   - (pkg-mysql.c)

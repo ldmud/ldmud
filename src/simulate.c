@@ -1757,9 +1757,9 @@ load_object (const char *lname, Bool create_super, int depth
     int         fd;
     object_t   *ob;
     object_t   *save_command_giver = command_giver;
-    int         i;
+    long        i;
     struct stat c_st;
-    int         name_length;
+    size_t      name_length;
     char       *name; /* Copy of <lname> */
     char       *fname; /* Filename for <name> */
     program_t  *prog;
@@ -1792,11 +1792,17 @@ load_object (const char *lname, Bool create_super, int depth
     /* We need two copies of <lname>: one to construct the filename in,
      * the second because lname might be a buffer which is deleted
      * during the compilation process.
+     * The memory is allocated in one chunk for both strings and an error 
+     * handler is pushed on the stack (additionally is needed: memory for '/' 
+     * and '\0’ (sizeof("/")) and '/', '\0', '.' and 'c' (sizeof("/.c"))).
      */
-    name = alloca(name_length+2);
-    fname = alloca(name_length+4);
-    if (!name || !fname)
-        fatal("Stack overflow in load_object()");
+    name = xalloc_with_error_handler(2 * name_length + sizeof("/") + 
+                                     sizeof("/.c"));
+    fname = name + name_length + sizeof("/") + 1;
+    if (!name)
+        errorf("Out of memory (%zu bytes) in load_object() for temporary name "
+               "buffers.\n", 2*name_length + sizeof("/") + sizeof("/.c"));
+    
     if (!compat_mode)
         *name++ = '/';  /* Add and hide a leading '/' */
     strcpy(name, lname);
@@ -1825,6 +1831,7 @@ load_object (const char *lname, Bool create_super, int depth
                  * memory... strange, but thinkable
                  */
                 errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+            pop_stack(); /* free error handler */
             return ob;
         }
     }
@@ -1892,6 +1899,7 @@ load_object (const char *lname, Bool create_super, int depth
                         ob->flags &= ~O_CLONE;
                         ob->flags |= O_REPLACED;
                     }
+                    pop_stack(); /* free error handler */
                     return ob;
                 }
             }
@@ -1914,6 +1922,7 @@ load_object (const char *lname, Bool create_super, int depth
                     ob->flags &= ~O_CLONE;
                     ob->flags |= O_REPLACED;
                 }
+                pop_stack(); /* free error handler */
                 return ob;
             }
             fname[name_length] = '.';
@@ -1945,6 +1954,7 @@ load_object (const char *lname, Bool create_super, int depth
         ob = lookup_object_hash_str((char *)name);
         if (ob)
         {
+            pop_stack(); /* free error handler */
             return ob;
         }
 
@@ -2152,6 +2162,9 @@ load_object (const char *lname, Bool create_super, int depth
     if ( !(ob->flags & O_DESTRUCTED))
         ob->flags |= O_WILL_CLEAN_UP;
 
+    /* free the error handler with the buffer for name and fname. */
+    pop_stack();
+    
     /* Restore the command giver */
     command_giver = check_object(save_command_giver);
 
