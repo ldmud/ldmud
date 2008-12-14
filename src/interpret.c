@@ -17546,11 +17546,13 @@ assert_master_ob_loaded (void)
 
             if (!destructed_master_ob)
             {
-                fprintf(stderr, "%s Failed to load master object '%s'.\n"
-                              , time_stamp(), master_name);
                 add_message("Failed to load master object '%s'!\n"
                            , master_name);
-                exit(1);
+                // fatal() may call us again. But fatal() and this function
+                // are secured against recursion so it should be safe to call
+                // it from here (otherwise we would not get a core dump...).
+                fatal("Failed to load master object '%s'!\n",
+                      master_name);
             }
 
             /* If we come here, we had a destructed master and failed

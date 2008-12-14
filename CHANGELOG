@@ -15,6 +15,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
     Added control_stack_depth() to determine the number of frames on the
     control stack and added flag DIT_CURRENT_DEPTH to
     debug_info(DINFO_TRACE,...).
+  - (interpret.c)
+    Replaced call to exit() by a call to fatal() in asster_master_ob_loaded()
+    to allow core dumpes to be written in cases when the master object could
+    not be loaded and there is no destructed master as well. (Bug #570).
 
 13-Dec 2008 (Zesstra)
   - (pkg-mysql.c)
