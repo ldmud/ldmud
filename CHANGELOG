@@ -10,6 +10,11 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (efuns.c)
     Fixed potential crashes due to stack overflows in process_string(),
     regexplode(), regexp() and present_clone(). (Bug #578)
+  - (interpret.h, interpret.c, efuns.c, mudlib/sys/debug_info.h,
+    doc/efun/debug_info, doc/efuns.de/debug_info.de)
+    Added control_stack_depth() to determine the number of frames on the
+    control stack and added flag DIT_CURRENT_DEPTH to
+    debug_info(DINFO_TRACE,...).
 
 13-Dec 2008 (Zesstra)
   - (pkg-mysql.c)

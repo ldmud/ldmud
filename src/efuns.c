@@ -8455,6 +8455,10 @@ v_debug_info (svalue_t *sp, int num_arg)
             put_string(&res, new_mstring(sbuf.buf));
             strbuf_free(&sbuf);
         }
+        else if (sp->u.number == DIT_CURRENT_DEPTH)
+        {
+            put_number(&res, control_stack_depth());
+        }
         else
             errorf("bad arg 2 to debug_info(): %"PRIdPINT", expected 0..2\n"
                  , sp->u.number);

@@ -19592,6 +19592,15 @@ f_last_instructions (svalue_t *sp)
 #endif /* TRACE_CODE */
 
 /*-------------------------------------------------------------------------*/
+int control_stack_depth (void)
+  /* Returns the number of frames on the control stack. Can be used to estimate
+   * the still available stack depth in recursive code.
+   */
+{
+    return (csp - CONTROL_STACK) + 1; 
+} /* control_stack_depth() */
+
+/*-------------------------------------------------------------------------*/
 static INLINE int
 caller_stack_depth(void)
 /* static helper function for f_caller_stack_depth() and f_caller_stack() for

@@ -435,6 +435,9 @@ BESCHREIBUNG
             <arg2> == DIT_STR_CURRENT (3): Liefert Informationen ueber den
                 momentanen Call Trace als druckbarer String.
 
+            <arg2> == DIT_CURRENT_DEPTH (4): Liefert die Zahl der Frames auf
+                dem Control Stack (Rekursionstiefe).
+
 AENDERUNGEN
         Seit 3.2.7 liefert DINFO_STATUS die Information zurueck, anstatt sie
             nur auszugeben.
@@ -459,6 +462,7 @@ AENDERUNGEN
             hinzu.
         LDMud 3.3.603 fuegte DID_MEM_EXT_STATISTICS zu DINFO_DATA:DID_MEMORY
             hinzu.
+        LDMud 3.3.718 fuegte DIT_CURRENT_DEPTH to DINFO_TRACE hinzu.
 
 SIEHE AUCH
         trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

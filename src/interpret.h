@@ -250,5 +250,6 @@ extern void clear_interpreter_refs(void);
 extern void count_interpreter_refs(void);
 #endif
 
+extern int  control_stack_depth(void);
 
 #endif /* INTERPRET_H__ */

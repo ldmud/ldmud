@@ -577,6 +577,9 @@ DESCRIPTION
             <arg2> == DIT_STR_CURRENT (3): Return the information about the
                current call trace as printable string.
 
+            <arg2> == DIT_CURRENT_DEPTH (4): Return the current number of
+               frames on the control stack (recursion depth).
+
 HISTORY
         Since 3.2.7, DINFO_STATUS returns the status information instead
           of printing it.
@@ -608,6 +611,7 @@ HISTORY
             DID_ST_PACKET_SIZE_IN.
         LDMud 3.3.679 removed DID_ST_IT_OVERHEAD and DID_ST_ITABLED*;
             added DID_ST_HYBRID_MAPPINGS and DID_ST_HASH_MAPPINGS.
+        LDMud 3.3.718 fuegte DIT_CURRENT_DEPTH to DINFO_TRACE hinzu.
 
 
 SEE ALSO
