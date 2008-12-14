@@ -60,6 +60,7 @@ enable_use_set_light=no
 enable_use_parse_command=no
 enable_use_mysql=no
 enable_use_sqlite=yes
+enable_use_iksemel=yes
 enable_use_deprecated=no
 enable_use_pcre=no
 enable_lpc_array_calls=yes

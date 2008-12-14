@@ -83,6 +83,7 @@ DESCRIPTION
       __MYSQL__ :     support for mySQL
       __PGSQL__ :     support for PostgreSQL
       __SQLITE__ :    support for SQLite 3.
+      __XML_DOM__ :   support for XML parsing.
       __MCCP__:       support for MCCP http://www.randomly.org/projects/MCCP
       __ALISTS__:     support for alists
       __PCRE__:       support for PCRE (always defined)

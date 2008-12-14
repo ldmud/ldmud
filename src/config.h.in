@@ -373,6 +373,10 @@
  */
 @cdef_use_builtin_pcre@ USE_BUILTIN_PCRE
 
+/* Define this if you want iksemel library support.
+ */
+@cdef_use_iksemel@ USE_IKSEMEL
+
 /* Define this if you want the obsolete and deprecated efuns.
  */
 @cdef_use_deprecated@ USE_DEPRECATED

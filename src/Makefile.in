@@ -91,7 +91,7 @@ SRC = access_check.c actions.c array.c backend.c bitstrings.c call_out.c \
       interpret.c \
       lex.c main.c mapping.c md5.c mempools.c mregex.c mstrings.c object.c \
       otable.c\
-      parser.c parse.c pkg-alists.c pkg-idna.c \
+      parser.c parse.c pkg-alists.c pgk-iksemel.c pkg-idna.c \
       pkg-mccp.c pkg-mysql.c pkg-pcre.c \
       pkg-pgsql.c pkg-sqlite.c pkg-tls.c \
       ptmalloc.c port.c ptrtable.c \
@@ -103,7 +103,7 @@ OBJ = access_check.o actions.o array.o backend.o bitstrings.o call_out.o \
       interpret.o \
       lex.o main.o mapping.o md5.o mempools.o mregex.o mstrings.o object.o \
       otable.o \
-      parser.o parse.o pkg-alists.o pkg-idna.o \
+      parser.o parse.o pkg-alists.o pkg-iksemel.o pkg-idna.o \
       pkg-mccp.o pkg-mysql.o pkg-pcre.o \
       pkg-pgsql.o pkg-sqlite.o pkg-tls.o \
       ptmalloc.o port.o ptrtable.o \

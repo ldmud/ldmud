@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Dec 2008 (Gnomi)
+  - (src/interpret.c, src/autoconf/*)
+    Added option to show the evaluation costs in the stacktrace.
+  - (src/pkg-iksemel.c, many files)
+    Added support for XML parsing with iksemel. (Bug #538, thanks, Bardioc!)
+
 13-Dec 2008 (Zesstra)
   - (pkg-mysql.c)
     Allocate temporary memory for the temporary string in f_db_conv_string()

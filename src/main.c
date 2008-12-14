@@ -76,6 +76,10 @@
 #include "pkg-mysql.h"
 #endif
 
+#ifdef USE_IKSEMEL
+#include "pkg-iksemel.h"
+#endif
+
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/regexp.h"
@@ -444,6 +448,10 @@ main (int argc, char **argv)
             rc = 1;
             break;
         }
+#endif
+
+#ifdef USE_IKSEMEL
+        pkg_iksemel_init();
 #endif
 
         /* If the master_name hasn't been set, select a sensible default */
@@ -1787,6 +1795,9 @@ options (void)
         char * optstrings[] = { "" /* have at least one string in here */
 #ifdef HAS_IDN
                               , "idna supported\n"
+#endif
+#ifdef USE_IKSEMEL
+                              , "iksemel supported\n"
 #endif
 #ifdef USE_IPV6
                               , "IPv6 supported\n"

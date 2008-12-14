@@ -701,6 +701,14 @@ int     end_mccp_compress();
 #endif /* USE_MCCP */
 
 
+#ifdef USE_IKSEMEL
+
+string  xml_generate(mixed *);
+mixed  *xml_parse(string);
+
+#endif /* USE_IKSEMEL */
+
+
 #ifdef USE_MYSQL
 
 int     db_affected_rows(int);

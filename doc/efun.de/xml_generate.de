@@ -1,0 +1,76 @@
+OPTIONAL
+SYNOPSIS
+        #include <xml.h>
+
+        string xml_generate(mixed *xml)
+
+BESCHREIBUNG
+        Wandelt das uebergebene <xml>-Array in einen XML-konformen String um,
+        sofern moeglich. Der <xml>-Parameter muss folgende Struktur haben:
+
+        Er muss Tag-Arrays mit folgenden drei Elementen enthalten:
+
+            string XML_TAG_NAME
+                Der Name des XML-Tags.
+
+            mapping XML_TAG_ATTRIBUTES
+                Alle Attribute dieses XML-Tags als ein Mapping mit dem
+                jeweiligen Attributnamen als Schluessel und den Attributwert
+                als der dazugehoerige String.
+                
+                Falls ein XML-Tag keine Attribute enthaelt, so ist dieses
+                Element 0.
+
+            mixed * XML_TAG_CONTENTS
+                Der Inhalt des XML-Tags als ein Array. Dieses Array kann
+                entweder Strings (reine Zeichendaten) oder Arrays
+                als weitere Tags enthalten, welche wiederum diese
+                drei Elemente besitzen.
+                
+                Falls das XML-Tag nichts enthaelt, so ist dieses Element 0.
+
+        Falls der uebergebe Parameter nicht diese Struktur besitzt, so wird
+        eine Fehlermeldung ausgegeben. Ansonsten ist ein gueltiger XML-String
+        das Resultat.
+
+        Diese Funktion ist nur verfuegbar, wenn der Driver mit Iksemel-
+        Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __XML_DOM__ definiert.
+
+BEISPIEL
+        xml_generate(({ "abc", 0, 0 })) -> "<abc/>"
+        xml_generate(({ "abc", ([ "xyz" : "cde" ]), 0 })) -> "<abc xyz="cde"/>"
+
+        mixed* xml = ({ "buch"
+                      , ([ "sprache" : "deutsch" ])
+                      , ({ ({ "titel"
+                            , 0
+                            , ({ "Dies ist der Titel" })
+                           })
+                         , ({ "kapitel"
+                            , 0
+                            , ({ "Dies ist ein Kapitel" })
+                           })
+                         , ({ "kapitel"
+                            , 0
+                            , ({ "Das soll "
+                               , ({ "b"
+                                  , 0 
+                                  , ({ "fettgedruckt" })
+                                 })
+                               , " sein."
+                              })
+                           })
+                        })
+                     })
+
+        xml_generate(xml)
+            -> "<buch sprache="deutsch"><titel>Dies ist der Titel</titel>"
+               "<kapitel>Dies ist ein Kapitel</kapitel><kapitel>Das soll "
+               "<b>fettgedruckt</b> sein.</kapitel></buch>"
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.3.718.
+
+SIEHE AUCH
+        xml_parse(E)

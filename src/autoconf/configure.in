@@ -123,6 +123,7 @@ AC_MY_ARG_ENABLE(use-pgsql,no,,[Enables PostgreSQL support])
 AC_MY_ARG_ENABLE(use-sqlite,no,,[Enables SQLite support])
 AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes])
 AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE: no/yes/builtin/no-builtin])
+AC_MY_ARG_ENABLE(use-iksemel,no,,[Enables use of iksemel for XML parsing])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
 AC_MY_ARG_ENABLE(use-structs,yes,,[Enables structs])
 AC_MY_ARG_ENABLE(use-tls,no,,[Enables Transport Layer Security over Telnet: no/gnu/ssl/yes])
@@ -321,6 +322,20 @@ else
   cdef_use_sqlite="#define"
   sqlite_path="$enable_use_sqlite"
   enable_use_sqlite="yes"
+fi
+
+AC_UPDATE_VAR(enable_use_iksemel)
+if test "x$enable_use_iksemel" = "x" || test "x$enable_use_iksemel" = "xyes"; then
+  cdef_use_iksemel="#define"
+  iksemel_path=
+  enable_use_iksemel="yes"
+elif test "x$enable_use_iksemel" = "xno"; then
+  cdef_use_iksemel="#undef"
+  iksemel_path=
+else
+  cdef_use_iksemel="#define"
+  iksemel_path="$enable_use_iksemel"
+  enable_use_iksemel="yes"
 fi
 
 AC_UPDATE_VAR(enable_use_tls)
@@ -595,6 +610,12 @@ AC_PROG_INSTALL
 AC_CONFIG_HEADERS(machine.h)
 AC_CHECK_PROGS(YACC, byacc "bison -y", yacc)
 AC_PROG_CPP
+
+AH_TOP([
+#ifndef MACHINE_H
+#define MACHINE_H])
+AH_BOTTOM([
+#endif])
 
 dnl Recognize some unusual systems.
 dnl Not all checks happen here - the check for solaris for example requires
@@ -1642,6 +1663,88 @@ else
   fi
 fi
 
+# --- Iksemel ---
+
+AC_CACHE_CHECK(for Iksemel,lp_cv_has_iksemel,
+for TESTPATH in "" "$iksemel_path" "$iksemel_path/include" "/usr/local/include" ; do
+    saveflags="$CFLAGS"
+    if test "x$TESTPATH" != "x"; then
+        CFLAGS="$saveflags -I$TESTPATH"
+    fi
+AC_TRY_COMPILE([
+#include <iksemel.h>
+
+iks * foo(void)
+{
+
+    return (iks*)0;
+}
+],,
+lp_cv_has_iksemel=yes
+if test "x$TESTPATH" != "x"; then
+    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+fi
+break;
+,
+lp_cv_has_iksemel=no
+CFLAGS="$saveflags"
+)
+done
+)
+
+# The system has the include files - now search for the libraries.
+if test $lp_cv_has_iksemel = yes; then
+  saveflags="$CFLAGS"
+  AC_DEFINE(HAS_IKSEMEL, 1, [Does the machine offer iksemel?])
+
+  if test $enable_use_iksemel = yes; then
+    tmp=""
+
+    AC_CHECK_LIB(iksemel,main, tmp="$PKGLIBS -liksemel")
+
+    if test "x$iksemel_path" == "x"; then
+        unset ac_cv_lib_iksemel_main
+        if test -d "${iksemel_path}/lib/iksemel"; then
+            CFLAGS="$saveflags -L${iksemel_path}/lib/iksemel"
+            AC_CHECK_LIB(iksemel,main, tmp="$PKGLIBS -L${iksemel_path}/lib/iksemel -liksemel")
+        elif test -d "${iksemel_path}/lib"; then
+            CFLAGS="$saveflags -L${iksemel_path}/lib"
+            AC_CHECK_LIB(iksemel,main, tmp="$PKGLIBS -L${iksemel_path}/lib -liksemel")
+        elif test -d "${iksemel_patch}"; then
+            CFLAGS="$saveflags -L$iksemel_path"
+            AC_CHECK_LIB(iksemel,main, tmp="$PKGLIBS -L$iksemel_path -liksemel")
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        unset ac_cv_lib_iksemel_main
+        if test -d "/usr/local/lib"; then
+            CFLAGS="$saveflags -L/usr/local/lib"
+            AC_CHECK_LIB(iksemel,main, tmp="$PKGLIBS -L/usr/local/lib -liksemel")
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        echo "libiksemel library not found - disabling Iksemel support"
+        AC_NOT_AVAILABLE(use-iksemel)
+        cdef_use_iksemel="#undef"
+        enable_use_iksemel="no"
+        iksemel=
+        lp_cv_has_iksemel="no"
+    else
+        PKGLIBS="$tmp"
+    fi
+  fi
+
+  CFLAGS="$saveflags"
+else
+  if test $enable_use_iksemel = yes; then
+      AC_NOT_AVAILABLE(use-iksemel)
+      cdef_use_iksemel="#undef"
+      enable_use_iksemel=no
+  fi
+fi
+
 # --- Check if we need zlib libraries for mccp ---
 
 if test "x$enable_use_mccp" = "x" || test "x$enable_use_mccp" = "xyes"; then
@@ -2621,6 +2724,7 @@ AC_SUBST(cdef_use_ipv6)
 AC_SUBST(cdef_use_mysql)
 AC_SUBST(cdef_use_pgsql)
 AC_SUBST(cdef_use_sqlite)
+AC_SUBST(cdef_use_iksemel)
 AC_SUBST(cdef_use_pthreads)
 AC_SUBST(cdef_use_alists)
 AC_SUBST(cdef_use_mccp)
