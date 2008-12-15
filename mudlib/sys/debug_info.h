@@ -25,6 +25,7 @@
 #define DIT_ERROR          1  /* Return the last error call chain as an array */
 #define DIT_UNCAUGHT_ERROR 2  /* Return the last uncaught error call chain */
 #define DIT_STR_CURRENT    3  /* Return the current call chain as a string */
+#define DIT_CURRENT_DEPTH  4  /* Return the current control stack depth */
 
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_STATUS)
  */
