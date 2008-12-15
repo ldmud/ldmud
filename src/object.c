@@ -3282,10 +3282,11 @@ f_rename_object (svalue_t *sp)
  */
 
 {
-    object_t *ob;
-    char     *name;
-    string_t *m_name;
-    mp_int length;
+    object_t *ob;      /* object to be renamed */
+    char     *name;    /* new name as c-string */
+    string_t *m_name;  /* new name */
+    size_t   length;   /* length of new name */
+    Bool     freenamebuffer = MY_FALSE;  /* free name when not needed */
 
     inter_sp = sp; /* this is needed for assert_master_ob_loaded(), and for
                     * the possible errors before.
@@ -3302,12 +3303,14 @@ f_rename_object (svalue_t *sp)
     if (name[length-2] == '.' && name[length-1] == 'c') {
         /* A new writeable copy of the name is needed. */
         char *p;
-        p = (char *)alloca(length+1);
+        p = xalloc(length+1);
         strcpy(p, name);
         name = p;
         name[length -= 2] = '\0';
+        freenamebuffer = MY_TRUE;
     }
 
+    /* check for any #xxx at the end. */
     {
         char c;
         char *p;
@@ -3328,18 +3331,38 @@ f_rename_object (svalue_t *sp)
         }
     }
 
-    assert_master_ob_loaded();
-    if (master_ob == ob)
-        errorf("Attempt to rename the master object\n");
-
     m_name = new_mstring(name);
     if (!m_name)
+    {
+        if (freenamebuffer)
+            xfree(name);
         errorf("Out of memory for object name (%zu bytes)\n", strlen(name));
+    }
+    /* in case of errors (e.g. in privilege_violation()), push string on the
+     * stack. */
+    push_string(sp, m_name);
+    inter_sp = sp;
 
+    /* name is not needed anymore. Free it, if it was allocated here. */
+    if (freenamebuffer)
+    {
+        xfree(name);
+        /* just to be sure it crashes if somebody uses the pointer by
+         * accident. */
+        name = NULL;
+    }
+    
+    assert_master_ob_loaded();
+    if (master_ob == ob)
+    {
+        errorf("Attempt to rename the master object\n");
+    }
+
+    
     if (lookup_object_hash(m_name))
     {
-        free_mstring(m_name);
-        errorf("Attempt to rename to existing object '%s'\n", name);
+        errorf("Attempt to rename to existing object '%s'\n", 
+               get_txt(m_name));
     }
 
     if (privilege_violation4(STR_RENAME_OBJECT, ob, m_name, 0, sp)
@@ -3351,11 +3374,10 @@ f_rename_object (svalue_t *sp)
         ob->name = m_name;
         enter_object_hash(ob);
     }
-    else
-        free_mstring(m_name);
 
-    free_svalue(sp--);
-    free_svalue(sp--);
+    /* free the string m_name (on the top of the stack) and the 2 arguments */
+    sp = pop_n_elems(3, sp);
+
     return sp;
 } /* f_rename_object() */
 
@@ -3404,6 +3426,7 @@ v_replace_program (svalue_t *sp, int num_arg)
         errorf("replace_program called with no current object\n");
     if (current_object == simul_efun_object)
         errorf("replace_program on simul_efun object\n");
+    
     if (current_object->flags & O_LAMBDA_REFERENCED)
     {
         inter_sp = sp;
@@ -3412,11 +3435,7 @@ v_replace_program (svalue_t *sp, int num_arg)
              , get_txt(current_object->name)
              , get_txt(current_prog->name)
              );
-        for ( ; num_arg != 0; num_arg--)
-        {
-            free_svalue(sp);
-            sp--;
-        }
+        sp = pop_n_elems(num_arg, sp);
         return sp;
     }
 
@@ -3463,21 +3482,39 @@ v_replace_program (svalue_t *sp, int num_arg)
     else
     {
         string_t *sname;
-        long name_len;
-        char *name;
+        { /* block for limiting the scope of name until the xfree. */
+            size_t name_len;
+            char *name;
 
-        /* Create the full program name with a trailing '.c' and without
-         * a leading '/' to match the internal name representation.
-         */
-        name_len = (long)mstrsize(sp->u.str);
-        name = alloca((size_t)name_len+3);
-        strcpy(name, get_txt(sp->u.str));
-        if (name[name_len-2] != '.' || name[name_len-1] != 'c')
-            strcat(name,".c");
-        if (*name == '/')
-            name++;
-        memsafe(sname = new_mstring(name), name_len+3, "normalized program name");
-
+            /* Create the full program name with a trailing '.c' and without
+             * a leading '/' to match the internal name representation.
+             */
+            name_len = mstrsize(sp->u.str);
+            name = xalloc(name_len+3);
+            if (!name)
+            {
+                errorf("Out of memory (%zu bytes) for temporary name buffer in "
+                       "replace_program.\n", name_len);
+            }
+            strcpy(name, get_txt(sp->u.str));
+            if (name[name_len-2] != '.' || name[name_len-1] != 'c')
+                strcat(name,".c");
+            if (*name == '/')
+                sname = new_mstring(name+1);
+            else
+                sname = new_mstring(name);
+            /* name is not needed anymore, free it first, before throwing any
+             * runtime errors. */
+            xfree(name);
+    
+            /* now check if we got a string from new_mstring(). */
+            if (!sname)
+            {
+                errorf("Out of memory (%zu bytes) for temporary name in "
+                       "replace_program().\n", name_len+3);
+            }
+        } /* scope of name ends here */
+        
         new_prog = search_inherited(sname, current_object->prog, offsets);
         if (!new_prog)
         {

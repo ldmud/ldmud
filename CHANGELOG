@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Dec 2008 (Zesstra)
+  - (object.c)
+    Fixed potential crashes in rename_object() and replace_program() due to
+    stack overflows. (Bug #581)
+
 14-Dec 2008 (Gnomi)
   - (src/interpret.c, src/autoconf/*)
     Added option to show the evaluation costs in the stacktrace.
