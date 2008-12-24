@@ -9,6 +9,7 @@ xx-xxx-xxxx () -- 3.3.718
                   to a unix timestamp (integer value).
        + strftime(): convert a timestamp to a formatted string using a format
                      string with a variety of format specifiers.
+       + xml_generate(), xml_parse(): Optional XML support.
 
 10-Aug-2008 (Lars Duening) -- 3.3.717
     - Changed Efuns:

@@ -542,6 +542,13 @@ f_xml_parse(svalue_t * sp)
         /* tree contains the tree now, this will put the resulting a */
         parse_node(sp, rec_data->node);
     }
+    else
+    {
+        /* There was no XML tag or the tag was not closed properly. */
+        errorf("Bad arg 1 to xml_parse(): XML document not well formed (premature end "
+               "at line %ld, byte %ld).\n", iks_nr_lines(rec_data->parser)
+               , iks_nr_bytes(rec_data->parser));
+    }
 
     /* At the end, be nice and remove the rest
        using our error handler. */
