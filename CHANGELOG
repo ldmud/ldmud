@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Dec 2008 (Gnomi)
+  - (ed.c)
+    The reference count of the filename and the exit function
+    wasn't cleared in a GC. (Bug #398)
+  
 15-Dec 2008 (Zesstra)
   - (object.c)
     Fixed potential crashes in rename_object() and replace_program() due to

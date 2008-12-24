@@ -3256,8 +3256,12 @@ clear_ed_buffer_refs (ed_buffer_t *b)
 {
     object_t *ob;
 
+    if (b->fname)
+        clear_string_ref(b->fname);
+
     if (b->exit_fn)
     {
+        clear_string_ref(b->exit_fn);
         if ( NULL != (ob = b->exit_ob) )
         {
             if (ob->flags & O_DESTRUCTED)
