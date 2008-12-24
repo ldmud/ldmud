@@ -87,6 +87,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <assert.h>
 
 #include "prolang.h"
 
@@ -6910,8 +6911,10 @@ name_list:
 /* Blocks and simple statements.
  */
 
-block:
-      '{'
+block: '{' statements_block '}'
+
+
+statements_block:
 
       { enter_block_scope(); }
 
@@ -6933,12 +6936,10 @@ block:
                     = (char)(scope->num_locals - scope->num_cleared);
               }
           }
+     
+          leave_block_scope(MY_FALSE);
       }
-
-      '}'
-
-      { leave_block_scope(MY_FALSE); }
-; /* block */
+; /* block_statements */
 
 
 statements:
@@ -7034,7 +7035,7 @@ statement:
       }
 
     | error ';' /* Synchronisation point */
-    | cond | while | do | for | foreach | switch | case | default
+    | cond | while | do | for | foreach | switch
     | return ';'
     | block
     | /* empty */ ';'
@@ -8035,23 +8036,20 @@ foreach_expr:
  *
  * Note that the actual switch rule is:
  *
- *   switch: L_SWITCH ( comma_expr ) block
+ *   switch: L_SWITCH ( comma_expr ) '{' switch_block '}'
  *
- * and that case and default are both just special kinds of statement
- * which mark addresses within the statement code to which the
- * switch statement may jump.
+ * and that case and default are explicitly parsed in the
+ * switch_block rule. Each group of statements after a
+ * label have their own scope, so that variable declarations
+ * within the switch block may not cross case labels.
  *
  * That also means that in contrast to C the code
  *
  *    switch(x);
  * or switch(x) write("Foo");
+ * or switch(x) {{ case "foo": break; }}
  *
  * is syntactically not ok.
- *
- * TODO: Since current_break_address is used to indicate an active switch(),
- * TODO:: the compiler can't compile Duff's device: the inner while() hides
- * TODO:: active switch(). If that is fixed, we can change the 'block'
- * TODO:: back to 'statement' in the grammar rule.
  */
 
 switch:
@@ -8097,8 +8095,12 @@ switch:
         if (current_continue_address)
             current_continue_address += SWITCH_DEPTH_UNIT;
       }
+      
+      '{'
 
-      block
+      switch_block
+      
+      '}'
 
       {
 %line
@@ -8141,6 +8143,19 @@ switch:
       }
 ; /* switch */
 
+
+switch_block:
+      switch_block switch_statements
+    | switch_statements
+; /* switch_block */
+
+
+switch_statements: switch_label statements_block ;
+
+
+switch_label: case | default ;
+
+
 case: L_CASE case_label ':'
     {
 %line
@@ -8149,11 +8164,8 @@ case: L_CASE case_label ':'
          */
         case_list_entry_t *temp;
 
-        if ( !( current_break_address & CASE_LABELS_ENABLED ) )
-        {
-            yyerror("Case outside switch");
-            break;
-        }
+        /* Should be within a switch statement. */
+        assert(current_break_address & CASE_LABELS_ENABLED);
 
         /* Get and fill in a new case entry structure */
         if ( !(temp = new_case_entry()) )
@@ -8182,11 +8194,8 @@ case: L_CASE case_label ':'
         if ( !$2.numeric || !$4.numeric )
             yyerror("String case labels not allowed as range bounds");
 
-        if ( !( current_break_address & CASE_LABELS_ENABLED ) )
-        {
-            yyerror("Case range outside switch");
-            break;
-        }
+        /* Should be within a switch statement. */
+        assert(current_break_address & CASE_LABELS_ENABLED);
 
         /* A range like "case 4..2" is illegal,
          * a range like "case 4..4" counts as simple "case 4".
@@ -8266,10 +8275,8 @@ default:
            * for the current switch.
            */
 
-          if ( !( current_break_address & CASE_LABELS_ENABLED ) ) {
-              yyerror("Default outside switch");
-              break;
-          }
+          /* Should be within a switch statement. */
+          assert(current_break_address & CASE_LABELS_ENABLED);
 
           if (case_state.default_addr)
               yyerror("Duplicate default");

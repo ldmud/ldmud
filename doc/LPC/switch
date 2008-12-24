@@ -59,10 +59,10 @@ EXAMPLE
               case 99 : write("It tastes good.\n";
             }
 
-BUGS
+NOTE
         In C, the grammar for switch() is
 
-            switch (expr) block
+            switch (expr) statement
 
         allowing constructs like
 
@@ -73,8 +73,10 @@ BUGS
               case 2: ...
               }
 
-        The LPC compiler currently can't handle neither statements as switch
-        body, nor case labels embedded in inner loops.
+        In LPC a switch has to be followed by a block that contains the
+        case labels directly. In contrast to C the group of statements
+        following a case label have their own lexical scope so that
+        variable declarations may not cross case labels.
 
 HISTORY
         LDMud 3.2.10 constrained the grammar to require a block for the
@@ -84,6 +86,8 @@ HISTORY
         LDMud 3.3 allowed to pass values of the wrong type to switch(), the
           driver would in that case use the default case. Before, values of
           the wrong type caused a runtime error.
+        LDMud 3.3.718 disallowed case labels in inner blocks and variable
+          declarations that cross case labels.
 
 SEE ALSO
         for(LPC), foreach(LPC), do-while(LPC), if(LPC), while(LPC)

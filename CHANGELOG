@@ -5,6 +5,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (ed.c)
     The reference count of the filename and the exit function
     wasn't cleared in a GC. (Bug #398)
+  - (prolang.y)
+    Switch now explicitly expects case/default statements in the switch
+    block and puts the non-case statements afterwards into their own
+    block scope. (Bug #584)
   
 15-Dec 2008 (Zesstra)
   - (object.c)
