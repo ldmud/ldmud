@@ -3324,6 +3324,8 @@ f_rename_object (svalue_t *sp)
             if ( (c = *--p) < '0' || c > '9' )
             {
                 if (c == '#' && length - i > 1) {
+                    if (freenamebuffer)
+                        xfree(name);
                     errorf("Illegal name to rename_object: '%s'.\n", name);
                 }
                 break;
@@ -3372,6 +3374,9 @@ f_rename_object (svalue_t *sp)
         remove_object_hash(ob);
         free_mstring(ob->name);
         ob->name = m_name;
+        // m_name needs another reference (one from the stack, one from
+        // object->name).
+        ref_mstring(m_name);
         enter_object_hash(ob);
     }
 

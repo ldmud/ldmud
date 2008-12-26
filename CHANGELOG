@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Dec 2008 (Zesstra)
+  - (object.c)
+    Fixes a forgotten increment of a ref count in f_rename_object().
+    
 24-Dec 2008 (Gnomi)
   - (ed.c)
     The reference count of the filename and the exit function
