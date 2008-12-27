@@ -19,15 +19,12 @@ BESCHREIBUNG
         Ist <n> nicht gegeben, aber <str> hat die Form "<id> <n>" , wird
         ebenfalls das n-te Objekt mit Namen <id> zurueckgeliefert.
 
-        Es ist: id(str) { return str == <name>; }
+        <str> kann auch ein Objekt (anstatt einer Id) sein, was den Test
+        schneller und einfacher macht.
 
-        <str> kann auch ein Objekt (anstatt einem object_name()) sein, was den
-        Test schneller und einfacher macht.
-
-        Das Argument <ob> ist optional. <ob> gibt an, wo nach <str> gesucht
-        wird. Nur das Inventory von <ob> wird durchsucht, nicht jedoch dessen
-        Umgebung. Oftmals wird fuer <ob> this_player() gesetzt.
-
+        Das Argument <env> ist optional. <env> gibt das Objekt an, in welchem
+        nach <str> gesucht wird. Nur das Inventory von <env> wird durchsucht,
+        nicht jedoch dessen Umgebung.
 
 ANMERKUNG
         Wenn die efun sowohl in this_object() als auch dessen Umgebung
