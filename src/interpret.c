@@ -4440,7 +4440,7 @@ aindex_lvalue (svalue_t *sp, bytecode_p pc)
 } /* aindex_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
+static svalue_t *
 protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_PROTECTED_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])

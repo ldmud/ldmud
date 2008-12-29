@@ -4236,7 +4236,7 @@ closure (char *in_yyp)
 } /* closure() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE char *
+static char *
 handle_preprocessor_statement (char * in_yyp)
 
 /* The lexer has found a preprocessor statement (<newline>#), an <in_yyp>

@@ -624,7 +624,7 @@ f_count_bits (svalue_t *sp)
 } /* f_count_bits() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE void
+static void
 copy_bits ( string_t * dest, p_int deststart
           , string_t * src,  p_int srcstart
           , p_int len
