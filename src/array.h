@@ -7,49 +7,6 @@
 #include "typedefs.h"
 #include "svalue.h"
 
-/* --- Macros --- */
-
-/* vector_t *ref_array(vector_t *a)
- *   Add another ref to array <a> and return the vector <a>.
- */
-
-#define ref_array(a) ((a)->ref++, (a))
-
-/* void free_array(vector_t *a)
- *   Subtract one ref from array <a>, and free the array fully if
- *   the refcount reaches zero.
- */
-
-#define free_array(a) MACRO( if (--((a)->ref) <= 0) _free_vector(a); )
-
-/* p_int deref_array(vector_t *a)
- *   Subtract one ref from array <a>, but don't check if it needs to
- *   be freed. Result is the number of refs left.
- */
-
-#define deref_array(a) (--(a)->ref)
-
-/* See array.c for a description of what the following macros do. */
-
-/* Helper for LOCAL_VECn() */
-#ifdef DEBUG
-#    define VEC_DEBUGREF(ref) ref,
-#else
-#    define VEC_DEBUGREF(ref)
-#endif
-#include "svalue.h"
-
-#define VEC_HEAD(size) size, 1, VEC_DEBUGREF(1) NULL
-
-#define VEC_SIZE(v) ((v)->size)
-
-#define LOCAL_VEC1(name, type1) \
-    struct { vector_t v; } name \
-      = { { VEC_HEAD(1), { { type1, { 0 } } } } }
-
-#define LOCAL_VEC2(name, type1, type2) \
-    struct { vector_t v; svalue_t item[1]; } name \
-      = { { VEC_HEAD(2), { { type1, { 0 } } } }, { { type2, { 0 } } } }
 
 /* --- Types --- */
 
@@ -70,12 +27,37 @@ struct vector_s {
 };
 
 
+/* --- Macros --- */
+/* See array.c for a description of what the following macros do. */
+
+/* Helper for LOCAL_VECn() */
+#ifdef DEBUG
+#    define VEC_DEBUGREF(ref) ref,
+#else
+#    define VEC_DEBUGREF(ref)
+#endif
+
+
+#define VEC_HEAD(size) size, 1, VEC_DEBUGREF(1) NULL
+
+#define VEC_SIZE(v) ((v)->size)
+
+#define LOCAL_VEC1(name, type1) \
+    struct { vector_t v; } name \
+      = { { VEC_HEAD(1), { { type1, { 0 } } } } }
+
+#define LOCAL_VEC2(name, type1, type2) \
+    struct { vector_t v; svalue_t item[1]; } name \
+      = { { VEC_HEAD(2), { { type1, { 0 } } } }, { { type2, { 0 } } } }
+
+
 /* --- Variables --- */
 
 extern vector_t null_vector;
 
 extern int num_arrays;
 extern void (*allocate_array_error_handler) (const char *, ...);
+
 
 /* --- Prototypes --- */
 
@@ -133,5 +115,34 @@ extern vector_t * shrink_array (vector_t *p, mp_int n);
 extern void clear_array_size (void);
 extern void count_array_size (vector_t *vec);
 #endif
+
+
+/* --- static helper functions --- */
+
+/* vector_t *ref_array(vector_t *a)
+ *   Add another ref to array <a> and return the vector <a>.
+ */
+static INLINE vector_t* ref_array(vector_t *a) {
+    ++a->ref;
+    return a;
+}
+
+/* void free_array(vector_t *a)
+ *   Subtract one ref from array <a>, and free the array fully if
+ *   the refcount reaches zero.
+ */
+static INLINE void free_array(vector_t *a) {
+    if (--(a->ref) <= 0) 
+        _free_vector(a); 
+}
+
+/* p_int deref_array(vector_t *a)
+ *   Subtract one ref from array <a>, but don't check if it needs to
+ *   be freed. Result is the number of refs left.
+ */
+static INLINE p_int deref_array(vector_t *a) {
+    return --a->ref;
+}
+
 
 #endif /* ARRAY_H__ */

@@ -394,22 +394,26 @@ static void (*telopts_wont[NTELOPTS])(int);
   /* Tables with the telnet statemachine handlers.
    */
 
-#define TS_DATA       0
-#define TS_IAC        1
-#define TS_WILL       2
-#define TS_WONT       3
-#define TS_DO         4
-#define TS_DONT       5
-#define TS_SB         6
-#define TS_SB_IAC     7
-#define TS_READY      8
-#define TS_SYNCH      9
-#define TS_INVALID   10
+enum telnet_states {
+  TS_DATA = 0,
+  TS_IAC,
+  TS_WILL,
+  TS_WONT,
+  TS_DO,
+  TS_DONT,
+  TS_SB,
+  TS_SB_IAC,
+  TS_READY,
+  TS_SYNCH,
+  TS_INVALID
+};
 
   /* Telnet states
    */
 
-#define TN_START_VALID(x) ((x & ~1) == TS_SB)
+static inline int TN_START_VALID(int x) {
+  return (x & ~TS_IAC) == TS_SB;
+}
 
 
 /* --- Misc --- */
@@ -517,16 +521,13 @@ static void *writer_thread(void *arg);
 #  define s6_addr32 __u6_addr.__u6_addr32
 #endif
 
-#ifndef CREATE_IPV6_MAPPED
-
-#define CREATE_IPV6_MAPPED(v6,v4) \
-    ((v6).s6_addr32[0] = 0, \
-     (v6).s6_addr32[1] = 0, \
-     (v6).s6_addr32[2] = 0x0000ffff, \
-     (v6).s6_addr32[2] = 0xffff0000, \
-     (v6).s6_addr32[3] = v4 )
-
-#endif
+static inline void CREATE_IPV6_MAPPED(struct in_addr *v6, uint32 v4) {
+  v6->s6_addr32[0] = 0;
+  v6->s6_addr32[1] = 0;
+  v6->s6_addr32[2] = 0x0000ffff;
+  v6->s6_addr32[2] = 0xffff0000;
+  v6->s6_addr32[3] = v4;
+}
 
 /* These are the typical IPv6 structures - we use them transparently.
  *
@@ -2752,14 +2753,14 @@ get_message (char *buff)
                               }
 #endif
                             } else {
-                                int32 naddr;
+                                uint32 naddr;
                                 struct in_addr net_addr;
 
-                                memcpy((char*)&naddr, rp+8, 4);
+                                memcpy((char*)&naddr, rp+8, sizeof(naddr));
 #ifndef USE_IPV6
                                 net_addr.s_addr = naddr;
 #else
-                                CREATE_IPV6_MAPPED(net_addr, naddr);
+                                CREATE_IPV6_MAPPED(&net_addr, naddr);
 #endif
                                 add_ip_entry(net_addr, rp+12);
                             }
@@ -6428,7 +6429,7 @@ open_ipv6_conn( const char *hostname, const unsigned short int port
         h = gethostbyname2(hostname, AF_INET);
         if(h)
         {
-            CREATE_IPV6_MAPPED(addr.sin6_addr, *((u_int32_t *)h->h_addr_list[0]));
+            CREATE_IPV6_MAPPED(&addr.sin6_addr, *((u_int32_t *)h->h_addr_list[0]));
             con = connect(sock, (struct sockaddr *) &addr, sizeof(addr));
         }
     }
@@ -7166,7 +7167,7 @@ f_send_udp (svalue_t *sp)
 
         if (hp->h_addrtype == AF_INET)
         {
-            CREATE_IPV6_MAPPED(name.sin_addr, (u_int32_t)hp->h_addr_list[0]);
+            CREATE_IPV6_MAPPED(&name.sin_addr, (u_int32_t)hp->h_addr_list[0]);
         }
         name.sin_family = AF_INET6;
 #endif /* USE_IPV6 */
@@ -8360,6 +8361,15 @@ f_query_mud_port (svalue_t *sp)
 } /* f_query_mud_port() */
 
 /*-------------------------------------------------------------------------*/
+
+
+static inline void translate_bit(char c, int i, int length, string_t *rc, unsigned int bitno)
+/* static helper function to translatin bits to characters in get_charset */
+{
+  if (c & (1 << bitno))
+    get_txt(rc)[length++] = (char)(i * 8 + bitno);
+} /* translate_bit */
+
 static void
 get_charset (svalue_t * sp, p_int mode, char charset[32])
 
@@ -8429,19 +8439,14 @@ get_charset (svalue_t * sp, p_int mode, char charset[32])
         {
             char c = charset[i];
 
-#define TRANSLATE(bitno) \
-            if (c & (1 << bitno)) \
-                get_txt(rc)[length++] = (char)(i * 8 + bitno);
-
-            TRANSLATE(0);
-            TRANSLATE(1);
-            TRANSLATE(2);
-            TRANSLATE(3);
-            TRANSLATE(4);
-            TRANSLATE(5);
-            TRANSLATE(6);
-            TRANSLATE(7);
-#undef TRANSLATE
+            translate_bit(c, i, length, rc, 0);
+            translate_bit(c, i, length, rc, 1);
+            translate_bit(c, i, length, rc, 2);
+            translate_bit(c, i, length, rc, 3);
+            translate_bit(c, i, length, rc, 4);
+            translate_bit(c, i, length, rc, 5);
+            translate_bit(c, i, length, rc, 6);
+            translate_bit(c, i, length, rc, 7);
         }
 
         put_string(sp, rc);

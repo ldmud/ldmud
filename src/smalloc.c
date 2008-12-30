@@ -695,7 +695,7 @@ mem_mark_permanent (POINTER p)
     if (q[-M_OVERHEAD] & M_GC_FREE)
     {
         q[-M_OVERHEAD] &= ~M_GC_FREE;
-        count_up(perm_alloc_stat, mem_block_total_size(q));
+        count_up(&perm_alloc_stat, mem_block_total_size(q));
     }
 } /* mem_mark_permanent() */
 
@@ -712,7 +712,7 @@ mem_mark_collectable (POINTER p)
     if (!(q[-M_OVERHEAD] & M_GC_FREE))
     {
         q[-M_OVERHEAD] |= (M_REF|M_GC_FREE);
-        count_back(perm_alloc_stat, mem_block_total_size(q));
+        count_back(&perm_alloc_stat, mem_block_total_size(q));
     }
 } /* mem_mark_collectable() */
 
@@ -832,6 +832,8 @@ mem_dump_data (strbuf_t *sbuf)
     strbuf_add(sbuf, "\n");
 #endif /* USE_AVL_FREELIST */
 
+#undef dump_stat
+    
     strbuf_addf(sbuf,
       "malloc_increment_size: calls %lu success %lu total %lu\n\n",
       malloc_increment_size_calls,
@@ -1111,7 +1113,7 @@ UNLINK_SMALL_FREE (word_t * block)
             next[M_PLINK(next[M_SIZE] & M_MASK)] = (word_t)prev | flag;
         prev[M_LINK] = (word_t) next;
     }
-    count_back(small_free_stat, bsize * SINT);
+    count_back(&small_free_stat, bsize * SINT);
 
 } /* UNLINK_SMALL_FREE() */
 
@@ -1159,7 +1161,7 @@ void MAKE_SMALL_FREE (word_t *block, word_t bsize)
         block[M_PLINK(bsize)-1] = bsize;
 
     sfltable[ix] = block;
-    count_up(small_free_stat, bsize * SINT);
+    count_up(&small_free_stat, bsize * SINT);
 
 #ifdef MALLOC_CHECK
     block[M_MAGIC] = sfmagic[SIZE_MOD_INDEX(bsize * SINT, sfmagic)];
@@ -1482,7 +1484,7 @@ mem_alloc (size_t size)
     size = (size+M_OVERHEAD*SINT+SINT-1) & ~(SINT-1);
 
     /* Update statistics */
-    count_up(small_alloc_stat,size);
+    count_up(&small_alloc_stat,size);
 #ifdef MALLOC_EXT_STATISTICS
     extstats[SIZE_INDEX(size)].num_xalloc++;
     extstats[SIZE_INDEX(size)].cur_alloc++;
@@ -1558,7 +1560,7 @@ mem_alloc (size_t size)
                     /* Just modify the size and move the .prev pointer
                      * and size field.
                      */
-                    count_back(small_free_stat, bsize * SINT);
+                    count_back(&small_free_stat, bsize * SINT);
 
                     this[M_SIZE] &= (PREV_BLOCK|M_DEFRAG);
                     this[M_SIZE] |= rsize | (THIS_BLOCK|M_REF);
@@ -1569,7 +1571,7 @@ mem_alloc (size_t size)
                     this[M_MAGIC] = sfmagic[SIZE_MOD_INDEX(rsize*SINT, sfmagic)];
 #endif
 
-                    count_up(small_free_stat, rsize * SINT);
+                    count_up(&small_free_stat, rsize * SINT);
                 }
 
                 /* Split off the allocated small block from the end
@@ -1717,8 +1719,8 @@ mem_alloc (size_t size)
         *new_chunk = (word_t)last_small_chunk;
         last_small_chunk = new_chunk++;
 
-        count_up(small_chunk_stat, new_chunk[-ML_OVERHEAD-1] * SINT);
-        count_up(small_chunk_wasted, SINT*(M_OVERHEAD+1));
+        count_up(&small_chunk_stat, new_chunk[-ML_OVERHEAD-1] * SINT);
+        count_up(&small_chunk_wasted, SINT*(M_OVERHEAD+1));
 
         small_chunk_size = SMALL_CHUNK_SIZE;
 
@@ -1782,7 +1784,7 @@ sfree (POINTER ptr)
 
     /* It's a small block: put it back into the free list */
 
-    count_back(small_alloc_stat, bsize * SINT);
+    count_back(&small_alloc_stat, bsize * SINT);
     i -=  SMALL_BLOCK_MIN + T_OVERHEAD;
 
 #ifdef MALLOC_EXT_STATISTICS
@@ -2104,7 +2106,7 @@ remove_from_free_list (word_t *ptr)
     }
 #endif
     p = (struct free_block *)(ptr+M_OVERHEAD);
-    count_back(large_free_stat, p->size);
+    count_back(&large_free_stat, p->size);
 #ifdef MALLOC_EXT_STATISTICS
     extstats[SMALL_BLOCK_NUM+1].cur_free--;
 #endif /* MALLOC_EXT_STATISTICS */
@@ -2493,7 +2495,7 @@ add_to_free_list (word_t *ptr)
                                     * register choice
                                     */
     r = (struct free_block *)(ptr+M_OVERHEAD);
-    count_up(large_free_stat, size);
+    count_up(&large_free_stat, size);
 #ifdef MALLOC_EXT_STATISTICS
     extstats[SMALL_BLOCK_NUM+1].cur_free++;
     extstat_update_max(extstats+SMALL_BLOCK_NUM+1);
@@ -3131,7 +3133,7 @@ found_fit:
         {
             mark_block(ptr+size);
             *(ptr+size) &= ~M_GC_FREE; /* Hands off, GC! */
-            count_up(large_wasted_stat, (*(ptr+size) & M_MASK) * SINT);
+            count_up(&large_wasted_stat, (*(ptr+size) & M_MASK) * SINT);
         }
         else
 #       endif
@@ -3147,7 +3149,7 @@ found_fit:
     /* The block at ptr is all ours */
 
     mark_block(ptr);
-    count_up(large_alloc_stat, size);
+    count_up(&large_alloc_stat, size);
 #ifdef MALLOC_EXT_STATISTICS
     extstats[SMALL_BLOCK_NUM+1].num_xalloc++;
     extstats[SMALL_BLOCK_NUM+1].cur_alloc++;
@@ -3175,7 +3177,7 @@ large_free (char *ptr)
     p = (word_t *) ptr;
     p -= M_OVERHEAD;
     size = p[M_LSIZE];
-    count_back(large_alloc_stat, size);
+    count_back(&large_alloc_stat, size);
 #ifdef MALLOC_EXT_STATISTICS
     extstats[SMALL_BLOCK_NUM+1].num_xfree++;
     extstats[SMALL_BLOCK_NUM+1].cur_alloc--;
@@ -3247,7 +3249,7 @@ esbrk (word_t size, size_t * pExtra)
         }
         *heap_start = 2;
         *(heap_start+1) = PREV_BLOCK | M_MASK;
-        count_up(large_wasted_stat, 2*SINT);
+        count_up(&large_wasted_stat, 2*SINT);
         assert_stack_gap();
     }
 
@@ -3255,7 +3257,7 @@ esbrk (word_t size, size_t * pExtra)
     if ((int)brk((char *)heap_end + size) == -1)
         return NULL;
 
-    count_up(sbrk_stat, size);
+    count_up(&sbrk_stat, size);
     heap_end = (word_t*)((char *)heap_end + size);
     heap_end[-1] = THIS_BLOCK | M_MASK;
     heap_end[-2] = M_MASK;
@@ -3321,7 +3323,7 @@ esbrk (word_t size, size_t * pExtra)
                 /* We can join with the existing heap */
                 p[overhead] &= ~PREV_BLOCK;
                 overlap = SINT;
-                count_back(large_wasted_stat, overlap);
+                count_back(&large_wasted_stat, overlap);
             }
             else
             {
@@ -3345,7 +3347,7 @@ esbrk (word_t size, size_t * pExtra)
                 heap_end = (word_t *)(block + size);
                 block -= overhead;
                 overlap = overhead * SINT;
-                count_back(large_wasted_stat, overlap);
+                count_back(&large_wasted_stat, overlap);
             }
             else
             {
@@ -3380,7 +3382,7 @@ esbrk (word_t size, size_t * pExtra)
                 /* Our block directly follows the one we found */
                 block -= overhead;
                 overlap += overhead * SINT;
-                count_back(large_wasted_stat, overhead * SINT);
+                count_back(&large_wasted_stat, overhead * SINT);
             }
             else
             {
@@ -3405,7 +3407,7 @@ esbrk (word_t size, size_t * pExtra)
                 /* Our block directly preceedes the next one */
                 *(next+1) &= ~PREV_BLOCK;
                 overlap += overhead * SINT;
-                count_back(large_wasted_stat, overhead * SINT);
+                count_back(&large_wasted_stat, overhead * SINT);
             }
             else
             {
@@ -3416,8 +3418,8 @@ esbrk (word_t size, size_t * pExtra)
         }
     }
 
-    count_up(sbrk_stat, size);
-    count_up(large_wasted_stat, overhead * SINT);
+    count_up(&sbrk_stat, size);
+    count_up(&large_wasted_stat, overhead * SINT);
 
     *pExtra = overlap;
     return block + SINT;
@@ -3477,7 +3479,7 @@ mem_increment_size (void *vp, size_t size)
             malloc_increment_size_success++;
             malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
 
-            count_add(small_alloc_stat, wsize * SINT);
+            count_add(&small_alloc_stat, wsize * SINT);
 
 #ifdef MALLOC_EXT_STATISTICS
             extstats[SIZE_INDEX(old_size * SINT)].cur_alloc--;
@@ -3504,7 +3506,7 @@ mem_increment_size (void *vp, size_t size)
             malloc_increment_size_success++;
             malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
 
-            count_add(small_alloc_stat, wsize * SINT);
+            count_add(&small_alloc_stat, wsize * SINT);
 
 #ifdef MALLOC_EXT_STATISTICS
             extstats[SIZE_INDEX(old_size * SINT)].cur_alloc--;
@@ -3536,7 +3538,7 @@ mem_increment_size (void *vp, size_t size)
         start[M_LSIZE] += wsize;
         malloc_increment_size_success++;
         malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
-        count_add(large_alloc_stat, wsize);
+        count_add(&large_alloc_stat, wsize);
 
         return start2+M_LSIZE;
     }
@@ -3554,7 +3556,7 @@ mem_increment_size (void *vp, size_t size)
         start[M_LSIZE] += wsize;
         malloc_increment_size_success++;
         malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
-        count_add(large_alloc_stat, wsize);
+        count_add(&large_alloc_stat, wsize);
         return start2+M_LSIZE;
     }
 
@@ -3745,7 +3747,7 @@ mem_free_unrefed_memory (void)
             word_t size2, flags2;
 
             success++;
-            count_back(xalloc_stat, mem_block_size(p+ML_OVERHEAD));
+            count_back(&xalloc_stat, mem_block_size(p+ML_OVERHEAD));
 #if defined(MALLOC_TRACE) || defined(MALLOC_LPC_TRACE)
             dprintf1(gcollect_outfd, "freeing large block 0x%x", (p_uint)p);
 #endif
@@ -3793,7 +3795,7 @@ mem_free_unrefed_memory (void)
             {
                 /* Unref'd small blocks are definitely lost */
                 success++;
-                count_back(xalloc_stat, mem_block_size(q+M_OVERHEAD));
+                count_back(&xalloc_stat, mem_block_size(q+M_OVERHEAD));
                 dprintf2(gcollect_outfd, "freeing small block 0x%x (user 0x%x)"
                         , (p_uint)q, (p_uint)(q+M_OVERHEAD));
 #ifdef MALLOC_TRACE
@@ -3993,8 +3995,8 @@ mem_consolidate (Bool force)
             UNLINK_SMALL_FREE(this+1);
             large_free((char *)this);
 
-            count_back(small_chunk_stat, chunk_size * SINT);
-            count_back(small_chunk_wasted, SINT*(M_OVERHEAD+2));
+            count_back(&small_chunk_stat, chunk_size * SINT);
+            count_back(&small_chunk_wasted, SINT*(M_OVERHEAD+2));
 
             this = next;
         }

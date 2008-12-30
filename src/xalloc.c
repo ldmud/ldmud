@@ -44,12 +44,37 @@
 typedef struct { unsigned long counter, size; } t_stat;
   /* A counter type for statistics and its functions: */
 
-#define count(a,b)           { a.size+=(b); if ((b)<0) --a.counter; else ++a.counter; }
-#define count_up(a,b)        { a.size+=(b); ++a.counter; }
-#define count_up_n(a,b,c)    { a.size+=(b)*(c); a.counter+=(b); }
-#define count_add(a,b)       { a.size+=(b); }
-#define count_back(a,b)      { a.size-=(b); --a.counter; }
-#define count_back_n(a,b,c)  { a.size-=(b)*(c); a.counter-=(b); }
+static inline void count_add(t_stat *a, unsigned long b) {
+  a->size += b;
+}
+
+static inline void count(t_stat *a, unsigned long b) {
+  count_add(a, b);
+  if (b < 0)
+    --a->counter;
+  else
+    ++a->counter;
+}
+
+static inline void count_up(t_stat *a, unsigned long b) {
+  count_add(a, b);
+  ++a->counter;
+}
+
+static inline void count_up_n(t_stat *a, unsigned long b, unsigned long c) {
+  count_add(a, b * c);
+  a->counter += b;
+}
+
+static inline void count_back(t_stat *a, unsigned long b) {
+  count_add(a, -b);
+  --a->counter;
+}
+
+static inline void count_back_n(t_stat *a, unsigned long b, unsigned long c) {
+  count_add(a, -(b * c));
+  a->counter -= b;
+}
 
 typedef p_uint word_t;
   /* Our 'word' type.
@@ -555,9 +580,9 @@ xalloc_traced (size_t size MTRACE_DECL)
         p[XM_PC]   = (word_t)inter_pc;
 #endif
 #ifdef NO_MEM_BLOCK_SIZE
-    count_up(xalloc_stat, XM_OVERHEAD_SIZE);
+    count_up(&xalloc_stat, XM_OVERHEAD_SIZE);
 #else
-    count_up(xalloc_stat, mem_block_size(p));
+    count_up(&xalloc_stat, mem_block_size(p));
     if (check_max_malloced())
         return NULL;
 #endif
@@ -576,9 +601,9 @@ xfree (POINTER p)
     {
         word_t *q = (word_t*)p - XM_OVERHEAD;
 #ifdef NO_MEM_BLOCK_SIZE
-        count_back(xalloc_stat, XM_OVERHEAD_SIZE);
+        count_back(&xalloc_stat, XM_OVERHEAD_SIZE);
 #else
-        count_back(xalloc_stat, mem_block_size(q));
+        count_back(&xalloc_stat, mem_block_size(q));
 #endif
         mem_free(q);
     }
@@ -673,8 +698,8 @@ malloc_increment_size (void *vp, size_t size)
 #ifndef NO_MEM_BLOCK_SIZE
     if (rc != NULL)
     {
-        count_back(xalloc_stat, old_size);
-        count_up(xalloc_stat, mem_block_size(block));
+        count_back(&xalloc_stat, old_size);
+        count_up(&xalloc_stat, mem_block_size(block));
         if (check_max_malloced())
             return NULL;
     }
@@ -749,8 +774,8 @@ rexalloc_traced (POINTER p, size_t size MTRACE_DECL
     if (t)
     {
 #ifndef NO_MEM_BLOCK_SIZE
-        count_back(xalloc_stat, old_size);
-        count_up(xalloc_stat, mem_block_size(t));
+        count_back(&xalloc_stat, old_size);
+        count_up(&xalloc_stat, mem_block_size(t));
         if (check_max_malloced())
             return NULL;
 #endif
@@ -1262,7 +1287,7 @@ malloc (size_t size)
     result = amalloc(size);
     if (result)
     {
-        count_up(clib_alloc_stat, get_block_size(result));
+        count_up(&clib_alloc_stat, get_block_size(result));
     }
 
     return result;
@@ -1278,7 +1303,7 @@ free (POINTER ptr)
 {
     if (ptr)
     {
-        count_back(clib_alloc_stat, get_block_size(ptr));
+        count_back(&clib_alloc_stat, get_block_size(ptr));
     }
 
     afree(ptr);

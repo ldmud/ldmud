@@ -729,7 +729,7 @@ mem_mark_permanent (POINTER p)
     if (q[-M_OVERHEAD] & M_GC_FREE)
     {
         q[-M_OVERHEAD] &= ~M_GC_FREE;
-        count_up(perm_alloc_stat, mem_block_total_size(q));
+        count_up(&perm_alloc_stat, mem_block_total_size(q));
     }
 } /* mem_mark_permanent() */
 
@@ -746,7 +746,7 @@ mem_mark_collectable (POINTER p)
     if (!(q[-M_OVERHEAD] & M_GC_FREE))
     {
         q[-M_OVERHEAD] |= (M_REF|M_GC_FREE);
-        count_back(perm_alloc_stat, mem_block_total_size(q));
+        count_back(&perm_alloc_stat, mem_block_total_size(q));
     }
 } /* mem_mark_collectable() */
 
@@ -937,6 +937,8 @@ mem_dump_data (strbuf_t *sbuf)
     strbuf_addf(sbuf, "AVL nodes:         %8lu                 -\n", num_avl_nodes);
     strbuf_add(sbuf, "\n");
 #endif /* USE_AVL_FREELIST */
+
+#undef dump_stat
 
     strbuf_addf(sbuf,
       "malloc_increment_size: calls %lu success %lu total %lu\n\n",
@@ -1513,8 +1515,8 @@ free_slab (mslab_t * slab, int ix)
 {
     ulog2f("slaballoc: deallocate slab %x [%d]\n", slab, ix);
     slabtable[ix].numSlabs--;
-    count_back(small_slab_stat, SLAB_SIZE(slab, ix));
-    count_back_n(small_free_stat, slabtable[ix].numBlocks, slab->size);
+    count_back(&small_slab_stat, SLAB_SIZE(slab, ix));
+    count_back_n(&small_free_stat, slabtable[ix].numBlocks, slab->size);
 #ifdef MALLOC_EXT_STATISTICS
     extstats[SIZE_INDEX(slab->size)].cur_free -= slabtable[ix].numBlocks;
     extstats[EXTSTAT_SLABS].cur_free--;
@@ -1591,7 +1593,7 @@ mem_alloc (size_t size)
     ulog2f(" %d bytes -> [%d]\n", size, ix);
 
     /* Update statistics */
-    count_up(small_alloc_stat,size);
+    count_up(&small_alloc_stat,size);
 
 #ifdef MALLOC_EXT_STATISTICS
     extstats[SIZE_INDEX(size)].num_xalloc++;
@@ -1612,7 +1614,7 @@ mem_alloc (size_t size)
 
         block = slab->freeList;
         slab->freeList = BLOCK_NEXT(slab->freeList);
-        count_back(small_free_stat, slab->size);
+        count_back(&small_free_stat, slab->size);
 
 #ifdef MALLOC_EXT_STATISTICS
         extstats[ix].cur_free--;
@@ -1701,7 +1703,7 @@ mem_alloc (size_t size)
             }
 
             slabtable[ix].numFreeSlabs--;
-            count_back(small_slab_free_stat, SLAB_SIZE(slab, ix));
+            count_back(&small_slab_free_stat, SLAB_SIZE(slab, ix));
 #ifdef MALLOC_EXT_STATISTICS
             extstats[EXTSTAT_SLABS].cur_free--;
 #endif /* MALLOC_EXT_STATISTICS */
@@ -1733,8 +1735,8 @@ mem_alloc (size_t size)
             slab->size = size;
 
             slabtable[ix].numSlabs++;
-            count_up(small_slab_stat, slabSize);
-            count_up_n(small_free_stat, numObjects, size);
+            count_up(&small_slab_stat, slabSize);
+            count_up_n(&small_free_stat, numObjects, size);
 #ifdef MALLOC_EXT_STATISTICS
             extstats[ix].cur_free += numObjects;
             extstats[EXTSTAT_SLABS].num_xalloc++;
@@ -1781,7 +1783,7 @@ mem_alloc (size_t size)
 
         MADVISE(block, orig_size);
 
-        count_back(small_free_stat, size);
+        count_back(&small_free_stat, size);
 #ifdef MALLOC_EXT_STATISTICS
         extstats[ix].cur_free--;
 #endif /* MALLOC_EXT_STATISTICS */
@@ -1870,7 +1872,7 @@ sfree (POINTER ptr)
     /* It's a small block: put it into the slab's free list */
 
     slab = (mslab_t*)(block - (block[M_SIZE] & M_MASK));
-    count_back(small_alloc_stat, slab->size);
+    count_back(&small_alloc_stat, slab->size);
     ix =  SIZE_INDEX(slab->size);
 
     ulog4f("slaballoc:   -> slab %x [%d], freelist %x, %d free\n"
@@ -1930,7 +1932,7 @@ sfree (POINTER ptr)
     slab->freeList = block;
     slab->numAllocated--;
 
-    count_up(small_free_stat, slab->size);
+    count_up(&small_free_stat, slab->size);
 
     /* If this slab is not the fresh slab, handle possible list movements.
      */
@@ -1990,7 +1992,7 @@ sfree (POINTER ptr)
                 slabtable[ix].firstFree = slab;
 
                 slabtable[ix].numFreeSlabs++;
-                count_up(small_slab_free_stat, SLAB_SIZE(slab, ix));
+                count_up(&small_slab_free_stat, SLAB_SIZE(slab, ix));
 #ifdef MALLOC_EXT_STATISTICS
                 extstats[EXTSTAT_SLABS].cur_alloc--;
                 extstats[EXTSTAT_SLABS].cur_free++;
@@ -2312,7 +2314,7 @@ remove_from_free_list (word_t *ptr)
     }
 #endif
     p = (struct free_block *)(ptr+M_OVERHEAD);
-    count_back(large_free_stat, p->size);
+    count_back(&large_free_stat, p->size);
 #ifdef MALLOC_EXT_STATISTICS
     extstats[EXTSTAT_LARGE].cur_free--;
 #endif /* MALLOC_EXT_STATISTICS */
@@ -2705,7 +2707,7 @@ add_to_free_list (word_t *ptr)
                                     * register choice
                                     */
     r = (struct free_block *)(ptr+M_OVERHEAD);
-    count_up(large_free_stat, size);
+    count_up(&large_free_stat, size);
 #ifdef MALLOC_EXT_STATISTICS
     extstats[EXTSTAT_LARGE].cur_free++;
     extstat_update_max(extstats+EXTSTAT_LARGE);
@@ -3346,7 +3348,7 @@ found_fit:
         {
             mark_block(ptr+size);
             *(ptr+size) &= ~M_GC_FREE; /* Hands off, GC! */
-            count_up(large_wasted_stat, (*(ptr+size) & M_MASK) * SINT);
+            count_up(&large_wasted_stat, (*(ptr+size) & M_MASK) * SINT);
         }
         else
 #       endif
@@ -3362,7 +3364,7 @@ found_fit:
     /* The block at ptr is all ours */
 
     mark_block(ptr);
-    count_up(large_alloc_stat, size);
+    count_up(&large_alloc_stat, size);
 #ifdef MALLOC_EXT_STATISTICS
     extstats[EXTSTAT_LARGE].num_xalloc++;
     extstats[EXTSTAT_LARGE].cur_alloc++;
@@ -3390,7 +3392,7 @@ large_free (char *ptr)
     p = (word_t *) ptr;
     p -= M_OVERHEAD;
     size = p[M_LSIZE];
-    count_back(large_alloc_stat, size);
+    count_back(&large_alloc_stat, size);
 #ifdef MALLOC_EXT_STATISTICS
     extstats[EXTSTAT_LARGE].num_xfree++;
     extstats[EXTSTAT_LARGE].cur_alloc--;
@@ -3460,7 +3462,7 @@ esbrk (word_t size, size_t * pExtra)
         }
         *heap_start = 2;
         *(heap_start+1) = PREV_BLOCK | M_MASK;
-        count_up(large_wasted_stat, 2*SINT);
+        count_up(&large_wasted_stat, 2*SINT);
         assert_stack_gap();
     }
 
@@ -3468,7 +3470,7 @@ esbrk (word_t size, size_t * pExtra)
     if ((int)brk((char *)heap_end + size) == -1)
         return NULL;
 
-    count_up(sbrk_stat, size);
+    count_up(&sbrk_stat, size);
     heap_end = (word_t*)((char *)heap_end + size);
     heap_end[-1] = THIS_BLOCK | M_MASK;
     heap_end[-2] = M_MASK;
@@ -3535,7 +3537,7 @@ esbrk (word_t size, size_t * pExtra)
                 /* We can join with the existing heap */
                 p[overhead] &= ~PREV_BLOCK;
                 overlap = SINT;
-                count_back(large_wasted_stat, overlap);
+                count_back(&large_wasted_stat, overlap);
             }
             else
             {
@@ -3559,7 +3561,7 @@ esbrk (word_t size, size_t * pExtra)
                 heap_end = (word_t *)(block + size);
                 block -= overhead;
                 overlap = overhead * SINT;
-                count_back(large_wasted_stat, overlap);
+                count_back(&large_wasted_stat, overlap);
             }
             else
             {
@@ -3594,7 +3596,7 @@ esbrk (word_t size, size_t * pExtra)
                 /* Our block directly follows the one we found */
                 block -= overhead;
                 overlap += overhead * SINT;
-                count_back(large_wasted_stat, overhead * SINT);
+                count_back(&large_wasted_stat, overhead * SINT);
             }
             else
             {
@@ -3619,7 +3621,7 @@ esbrk (word_t size, size_t * pExtra)
                 /* Our block directly preceedes the next one */
                 *(next+1) &= ~PREV_BLOCK;
                 overlap += overhead * SINT;
-                count_back(large_wasted_stat, overhead * SINT);
+                count_back(&large_wasted_stat, overhead * SINT);
             }
             else
             {
@@ -3630,8 +3632,8 @@ esbrk (word_t size, size_t * pExtra)
         }
     }
 
-    count_up(sbrk_stat, size);
-    count_up(large_wasted_stat, overhead * SINT);
+    count_up(&sbrk_stat, size);
+    count_up(&large_wasted_stat, overhead * SINT);
 
     *pExtra = overlap;
     return block + SINT;
@@ -3681,7 +3683,7 @@ mem_increment_size (void *vp, size_t size)
         start[M_LSIZE] += wsize;
         malloc_increment_size_success++;
         malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
-        count_add(large_alloc_stat, wsize);
+        count_add(&large_alloc_stat, wsize);
 
         return start2+M_LSIZE;
     }
@@ -3699,7 +3701,7 @@ mem_increment_size (void *vp, size_t size)
         start[M_LSIZE] += wsize;
         malloc_increment_size_success++;
         malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
-        count_add(large_alloc_stat, wsize);
+        count_add(&large_alloc_stat, wsize);
         return start2+M_LSIZE;
     }
 
@@ -3950,7 +3952,7 @@ mem_free_unrefed_slab_memory ( const char * tag
         {
             /* Unref'd small blocks are definitely lost */
             success++;
-            count_back(xalloc_stat, slab->size - (T_OVERHEAD * SINT));
+            count_back(&xalloc_stat, slab->size - (T_OVERHEAD * SINT));
             dprintf2(gcollect_outfd, "freeing small block 0x%x (user 0x%x)"
                     , (p_uint)p, (p_uint)(p+M_OVERHEAD));
 #ifdef MALLOC_TRACE
@@ -4007,7 +4009,7 @@ mem_free_unrefed_memory (void)
             word_t size2, flags2;
 
             success++;
-            count_back(xalloc_stat, mem_block_size(p+ML_OVERHEAD));
+            count_back(&xalloc_stat, mem_block_size(p+ML_OVERHEAD));
 #if defined(MALLOC_TRACE) || defined(MALLOC_LPC_TRACE)
             dprintf1(gcollect_outfd, "freeing large block 0x%x", (p_uint)p);
 #endif
@@ -4319,7 +4321,7 @@ mem_consolidate (Bool force)
             while (NULL != (slab = slabtable[ix].firstFree))
             {
                 slabtable[ix].firstFree = slab->next;
-                count_back(small_slab_free_stat, SLAB_SIZE(slab, ix));
+                count_back(&small_slab_free_stat, SLAB_SIZE(slab, ix));
                 free_slab(slab, ix);
             }
             slabtable[ix].numFreeSlabs = 0;
@@ -4343,7 +4345,7 @@ mem_consolidate (Bool force)
                 else
                     slabtable[ix].firstFree = NULL;
                 slabtable[ix].numFreeSlabs--;
-                count_back(small_slab_free_stat, SLAB_SIZE(slab, ix));
+                count_back(&small_slab_free_stat, SLAB_SIZE(slab, ix));
                 free_slab(slab, ix);
             }
 #ifdef DEBUG_MALLOC_ALLOCS

@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Dec 2008 (Zesstra)
+  - (array.h, comm.c, smalloc.c, slaballoc.c, xptmalloc.c, xalloc.c,
+      sprintf.c)
+    Changed some code defines and pre-compiler constants to static inline
+    functions and enums.
+
 26-Dec 2008 (Zesstra)
   - (object.c)
     Fixes a forgotten increment of a ref count in f_rename_object().

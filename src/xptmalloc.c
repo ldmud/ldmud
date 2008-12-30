@@ -251,7 +251,7 @@ void ptmalloc_ref_unused(void)
     in_malloc = 0;
     print_block(0, 0);
 #ifdef REPLACE_MALLOC
-    count_up(clib_alloc_stat, 0);
+    count_up(&clib_alloc_stat, 0);
 #endif
 }
 

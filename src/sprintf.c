@@ -133,30 +133,32 @@
 
 typedef unsigned int format_info;
 
-#define INFO_T        0xF
-#define INFO_T_ERROR  0x1
-#define INFO_T_NULL   0x2
-#define INFO_T_LPC    0x3
-#define INFO_T_QLPC   0x4
-#define INFO_T_STRING 0x5
-#define INFO_T_INT    0x6
-#define INFO_T_FLOAT  0x7
+enum format_info_t {
+  INFO_T         =    0xF,
+  INFO_T_ERROR   =    0x1,
+  INFO_T_NULL    =    0x2,
+  INFO_T_LPC     =    0x3,
+  INFO_T_QLPC    =    0x4,
+  INFO_T_STRING  =    0x5,
+  INFO_T_INT     =    0x6,
+  INFO_T_FLOAT   =    0x7,
 
-#define INFO_A          0x30  /* Right alignment */
-#define INFO_A_CENTRE   0x10
-#define INFO_A_LEFT     0x20
-#define INFO_A_JUSTIFY  0x30
+  INFO_A         =   0x30, /* Right alignment */
+  INFO_A_CENTRE  =   0x10,
+  INFO_A_LEFT    =   0x20,
+  INFO_A_JUSTIFY =   0x30,
 
-#define INFO_PP       0xC0
-#define INFO_PP_SPACE 0x40
-#define INFO_PP_PLUS  0x80
+  INFO_PP        =   0xC0,
+  INFO_PP_SPACE  =   0x40,
+  INFO_PP_PLUS   =   0x80,
 
-#define INFO_ARRAY    0x100
-#define INFO_COLS     0x200
-#define INFO_TABLE    0x400
+  INFO_ARRAY     =  0x100,
+  INFO_COLS      =  0x200,
+  INFO_TABLE     =  0x400,
 
-#define INFO_PS_ZERO  0x800
-#define INFO_PS_KEEP  0x1000
+  INFO_PS_ZERO   =  0x800,
+  INFO_PS_KEEP   = 0x1000,
+};
 
 /*-------------------------------------------------------------------------*/
 
@@ -166,26 +168,27 @@ typedef unsigned int format_info;
 
 /* The error handling */
 
+enum format_err {
+  ERR_ID_NUMBER          =     0xFFFF, /* Mask for the error number */
+  ERR_ARGUMENT           = 0xFFFF0000, /* Mask for the arg number */
+
+  ERR_BUFF_OVERFLOW      =        0x1, /* buffer overflowed */
+  ERR_TO_FEW_ARGS        =        0x2, /* more arguments spec'ed than passed */
+  ERR_INVALID_STAR       =        0x3, /* invalid arg to * */
+  ERR_PREC_EXPECTED      =        0x4, /* expected precision not found */
+  ERR_INVALID_FORMAT_STR =        0x5, /* error in format string */
+  ERR_INCORRECT_ARG      =        0x6, /* invalid arg to %[idcxXs] */
+  ERR_CST_REQUIRES_FS    =        0x7, /* field size not given for c/t */
+  ERR_UNDEFINED_TYPE     =        0x8, /* undefined type found */
+  ERR_QUOTE_EXPECTED     =        0x9, /* expected ' not found */
+  ERR_UNEXPECTED_EOS     =        0xA, /* fs terminated unexpectedly */
+  ERR_NULL_PS            =        0xB, /* pad string is null */
+  ERR_ARRAY_EXPECTED     =        0xC, /* array expected */
+  ERR_NOMEM              =        0xD, /* Out of memory */
+  ERR_SIZE_OVERFLOW      =        0xE, /* Fieldsize/precision numeric overflow */
+};
+
 #define ERROR(x) (longjmp(st->error_jmp, (x)))
-
-#define ERR_ID_NUMBER            0xFFFF /* Mask for the error number */
-#define ERR_ARGUMENT         0xFFFF0000 /* Mask for the arg number */
-
-#define ERR_BUFF_OVERFLOW       0x1     /* buffer overflowed */
-#define ERR_TO_FEW_ARGS         0x2     /* more arguments spec'ed than passed */
-#define ERR_INVALID_STAR        0x3     /* invalid arg to * */
-#define ERR_PREC_EXPECTED       0x4     /* expected precision not found */
-#define ERR_INVALID_FORMAT_STR  0x5     /* error in format string */
-#define ERR_INCORRECT_ARG       0x6     /* invalid arg to %[idcxXs] */
-#define ERR_CST_REQUIRES_FS     0x7     /* field size not given for c/t */
-#define ERR_UNDEFINED_TYPE      0x8     /* undefined type found */
-#define ERR_QUOTE_EXPECTED      0x9     /* expected ' not found */
-#define ERR_UNEXPECTED_EOS      0xA     /* fs terminated unexpectedly */
-#define ERR_NULL_PS             0xB     /* pad string is null */
-#define ERR_ARRAY_EXPECTED      0xC     /* array expected */
-#define ERR_NOMEM               0xD     /* Out of memory */
-#define ERR_SIZE_OVERFLOW       0xE     /* Fieldsize/precision numeric overflow */
-
 
 #define ERROR1(e,a)              ERROR((e) | (a)<<16)
 #define EXTRACT_ERR_ARGUMENT(i)  ((i)>>16)
@@ -326,60 +329,60 @@ static sprintf_buffer_t *svalue_to_string(fmt_state_t *
                                          , int, Bool, Bool, Bool, Bool);
 
 /*-------------------------------------------------------------------------*/
-/* Macros */
-#define ADD_CHAR(x) {\
-    if (st->bpos >= BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW); \
-    if (x == '\n' && st->sppos != -1) st->bpos = st->sppos; \
-    st->sppos = -1; \
-    st->buff[st->bpos++] = x;\
+/* static helper functions */
+static inline void ADD_CHAR(fmt_state_t *st, char x) {
+    if (st->bpos >= BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW);
+    if (x == '\n' && st->sppos != -1) st->bpos = st->sppos;
+    st->sppos = -1;
+    st->buff[st->bpos++] = x;
 }
 
   /* Add character <x> to the buffer.
    */
 
 /*-------------------------------------------------------------------------*/
-#define ADD_STRN(s, n) { \
-    if (st->bpos + n > BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW); \
-    if (n >= 1 && (s)[0] == '\n' && st->sppos != -1) st->bpos = st->sppos; \
-    st->sppos = -1; \
-    memcpy(st->buff+st->bpos, (s), n);\
-    st->bpos += n; \
+static inline void ADD_STRN(fmt_state_t *st, const char *s, size_t n) {
+    if (st->bpos + n > BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW);
+    if (n >= 1 && s[0] == '\n' && st->sppos != -1) st->bpos = st->sppos;
+    st->sppos = -1;
+    memcpy(st->buff+st->bpos, s, n);
+    st->bpos += n;
 }
 
   /* Add the <n> characters from <s> to the buffer.
    */
 
 /*-------------------------------------------------------------------------*/
-#define ADD_CHARN(c, n) { \
-    /* n must not be negative! */ \
-    if (st->bpos + n > BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW); \
-    if (n >= 1 && c == '\n' && st->sppos != -1) st->bpos = st->sppos; \
-    st->sppos = -1; \
-    memset(st->buff+st->bpos, c, n); \
-    st->bpos += n; \
+static inline void ADD_CHARN(fmt_state_t *st, char c, size_t n) {
+    /* n must not be negative! */
+    if (st->bpos + n > BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW);
+    if (n >= 1 && c == '\n' && st->sppos != -1) st->bpos = st->sppos;
+    st->sppos = -1;
+    memset(st->buff+st->bpos, c, n);
+    st->bpos += n;
 }
 
   /* Add character <c> <n>-times to the buffer.
    */
 
 /*-------------------------------------------------------------------------*/
-#define ADD_PADDING(pad, N) { \
-    int n = (N); \
-\
-    if (!pad[1]) { \
-        ADD_CHARN(*pad, n) \
-    } else { \
-        int l; \
-\
-        l = strlen(pad); \
-        for (i=0; --n >= 0; ) { \
-            if (pad[i] == '\\') \
-                i++; \
-            ADD_CHAR(pad[i]); \
-            if (++i == l) \
-                i = 0; \
-        } \
-    } \
+static inline void ADD_PADDING(fmt_state_t *st, const char *pad, size_t N) {
+    int n = N;
+
+    if (!pad[1]) {
+        ADD_CHARN(st, *pad, n);
+    } else {
+        int i, l;
+
+        l = strlen(pad);
+        for (i=0; --n >= 0; ) {
+            if (pad[i] == '\\')
+                i++;
+            ADD_CHAR(st, pad[i]);
+            if (++i == l)
+                i = 0;
+        }
+    }
 }
 
   /* Add the padding string <pad> to the buffer, repeatedly if necessary,
@@ -1082,7 +1085,6 @@ add_justified ( fmt_state_t *st
  */
 
 {
-    int i;
     size_t sppos;
     int num_words;    /* Number of words in the input */
     int num_chars;    /* Number of non-space characters in the input */
@@ -1149,7 +1151,7 @@ add_justified ( fmt_state_t *st
         for (mark = pos ; pos < len && str[pos] != ' '; pos++) NOOP;
 
         /* Add the word */
-        ADD_STRN(str+mark, pos - mark);
+        ADD_STRN(st, str+mark, pos - mark);
         num_words--;
 
         if (pos >= len || num_words < 1)
@@ -1169,7 +1171,7 @@ add_justified ( fmt_state_t *st
         else /* Randomly add one space */
             padlength = min_spaces + (int)random_number(2);
         sppos = st->bpos;
-        ADD_PADDING(" ", padlength);
+        ADD_PADDING(st, " ", padlength);
         st->sppos = sppos;
         num_spaces -= padlength;
 
@@ -1189,7 +1191,6 @@ add_aligned ( fmt_state_t *st
  */
 
 {
-    int i;
     size_t sppos;
     Bool is_space_pad;
 
@@ -1206,10 +1207,10 @@ add_aligned ( fmt_state_t *st
     case INFO_A_JUSTIFY:
     case INFO_A_LEFT:
         /* Also called for the last line of a justified block */
-        ADD_STRN(str, len)
+        ADD_STRN(st, str, len);
         if (is_space_pad)
             sppos = st->bpos;
-        ADD_PADDING(pad, fs - len)
+        ADD_PADDING(st, pad, fs - len);
         if (is_space_pad)
             st->sppos = sppos;
         break;
@@ -1217,16 +1218,16 @@ add_aligned ( fmt_state_t *st
     case INFO_A_CENTRE:
         if (finfo & INFO_PS_ZERO)
         {
-            ADD_PADDING("0", (fs - len + 1) >> 1)
+            ADD_PADDING(st, "0", (fs - len + 1) >> 1);
         }
         else
         {
-            ADD_PADDING(pad, (fs - len + 1) >> 1)
+            ADD_PADDING(st, pad, (fs - len + 1) >> 1);
         }
-        ADD_STRN(str, len)
+        ADD_STRN(st, str, len);
         if (is_space_pad)
             sppos = st->bpos;
-        ADD_PADDING(pad, (fs - len) >> 1)
+        ADD_PADDING(st, pad, (fs - len) >> 1);
         if (is_space_pad)
             st->sppos = sppos;
         break;
@@ -1236,13 +1237,13 @@ add_aligned ( fmt_state_t *st
          */
         if (finfo & INFO_PS_ZERO)
         {
-            ADD_PADDING("0", fs - len)
+            ADD_PADDING(st, "0", fs - len);
         }
         else
         {
-            ADD_PADDING(pad, fs - len)
+            ADD_PADDING(st, pad, fs - len);
         }
-        ADD_STRN(str, len)
+        ADD_STRN(st, str, len);
       }
     }
 } /* add_aligned() */
@@ -1403,7 +1404,7 @@ add_table (fmt_state_t *st, cst **table)
         for (; i < TAB->nocols; i++)
         {
             /* TAB->size is not negative. */
-            ADD_CHARN(' ', done)
+            ADD_CHARN(st, ' ', done);
         }
     }
 
@@ -1661,11 +1662,11 @@ static char buff[BUFF_SIZE];         /* For error messages */
                  */
 
                 if (column_stat == 2)
-                    ADD_CHAR('\n');
+                    ADD_CHAR(st, '\n');
                 column_stat = 0;
                 if (!format_str[fpos])
                     break;
-                ADD_CHAR('\n');
+                ADD_CHAR(st, '\n');
                 st->line_start = st->bpos;
                 continue;
             }
@@ -1673,7 +1674,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
             column_stat = 0; /* If there was a newline pending, it
                               * will be implicitely added now.
                               */
-            ADD_CHAR('\n');
+            ADD_CHAR(st, '\n');
             st->line_start = st->bpos;
 
             /* Handle pending columns and tables */
@@ -1692,7 +1693,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
                             while (*((*temp)->d.col) == ' ')
                                 (*temp)->d.col++;
                         i = (*temp)->start - (st->bpos - st->line_start);
-                        ADD_CHARN(' ', i);
+                        ADD_CHARN(st, ' ', i);
                         column_stat = add_column(st, temp);
                         if (!column_stat)
                             temp = &((*temp)->next);
@@ -1701,19 +1702,19 @@ static char buff[BUFF_SIZE];         /* For error messages */
                     {
                         i = (*temp)->start - (st->bpos - st->line_start);
                         if (i > 0)
-                            ADD_CHARN(' ', i);
+                            ADD_CHARN(st, ' ', i);
                         if (!add_table(st, temp))
                             temp = &((*temp)->next);
                     }
                 } /* while (*temp) */
 
                 if (st->csts || format_str[fpos] == '\n')
-                    ADD_CHAR('\n');
+                    ADD_CHAR(st, '\n');
                 st->line_start = st->bpos;
             } /* while (csts) */
 
             if (column_stat == 2 && format_str[fpos] != '\n')
-                ADD_CHAR('\n');
+                ADD_CHAR(st, '\n');
 
             if (!format_str[fpos])
                 break;
@@ -1726,16 +1727,16 @@ static char buff[BUFF_SIZE];         /* For error messages */
 
             if (format_str[fpos+1] == '%')
             {
-                ADD_CHAR('%');
+                ADD_CHAR(st, '%');
                 fpos++;
                 continue;
             }
 
             if (format_str[fpos+1] == '^')
             {
-                ADD_CHAR('%');
+                ADD_CHAR(st, '%');
                 fpos++;
-                ADD_CHAR('^');
+                ADD_CHAR(st, '^');
                 continue;
             }
 
@@ -1935,7 +1936,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
                     /* never reached... */
                     fprintf(stderr, "%s: (s)printf: INFO_T_NULL.... found.\n"
                                   , get_txt(current_object->name));
-                    ADD_CHAR('%');
+                    ADD_CHAR(st, '%');
                     break;
                   }
 
@@ -2192,7 +2193,7 @@ add_table_now:
                         }
                         else
                         {
-                            ADD_STRN(get_txt(carg->u.str), slen)
+                            ADD_STRN(st, get_txt(carg->u.str), slen);
                         }
                     }
                     break;
@@ -2238,7 +2239,7 @@ add_table_now:
                     if ((unsigned int)tmpl < fs)
                         add_aligned(st, temp, tmpl, pad, fs, finfo);
                     else
-                        ADD_STRN(temp, tmpl)
+                        ADD_STRN(st, temp, tmpl);
                     break;
                   }
                   else
@@ -2353,14 +2354,14 @@ add_table_now:
                              * with leading zeroes: preserve the sign
                              * character in the right place.
                              */
-                            ADD_STRN(temp, 1);
+                            ADD_STRN(st, temp, 1);
                             add_aligned(st, temp+1, tmpl-1, pad, fs-1, finfo);
                         }
                         else
                             add_aligned(st, temp, tmpl, pad, fs, finfo);
                     }
                     else
-                        ADD_STRN(temp, tmpl)
+                        ADD_STRN(st, temp, tmpl);
                     break;
                   }
                 default:        /* type not found */
@@ -2380,10 +2381,10 @@ add_table_now:
         } /* if format entry */
 
         /* Nothing to format: just copy the character */
-        ADD_CHAR(format_str[fpos]);
+        ADD_CHAR(st, format_str[fpos]);
     } /* for (fpos=0; 1; fpos++) */
 
-    ADD_CHAR('\0'); /* Terminate the formatted string */
+    ADD_CHAR(st, '\0'); /* Terminate the formatted string */
 
     /* Restore characters */
     while (st->saves)
