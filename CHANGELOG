@@ -5,7 +5,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (array.h, comm.c, smalloc.c, slaballoc.c, xptmalloc.c, xalloc.c,
       sprintf.c)
     Changed some code defines and pre-compiler constants to static inline
-    functions and enums.
+    functions and enums (partially from Largo, thanks!)
 
 26-Dec 2008 (Zesstra)
   - (object.c)
