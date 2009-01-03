@@ -5,6 +5,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (efuns.c, efuns.h, func_spec)
     Extended present_clone() to optionally search for the <n>th object in the
     environment.
+  - (port.h)
+    Cleaned up handling of gcc attributes (Assumption: gcc < 3 are out of use
+      now), added __attribute__ define which evaluates to nothing if gcc is
+      not used.
 
 30-Dec 2008 (Zesstra)
   - (array.h, comm.c, smalloc.c, slaballoc.c, xptmalloc.c, xalloc.c,

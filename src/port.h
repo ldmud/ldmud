@@ -150,30 +150,32 @@ extern int errno;
 #    endif
 #endif
 
-#if defined(__GNUC__) && __GNUC__ >= 2 && (__GNUC_MINOR__ > 6 || __GNUC__ > 2)
-#    define NORETURN __attribute__ ((noreturn))
-#    define UNUSED   __attribute__ ((unused))
+/* some handy gcc attributes, but define everything to nothing if any other
+ * compiler ist used. Additional attributes maybe used in the driver are:
+   always_inline, const, deprecated, format_arg, nonnull, pure, returns_twice,
+   unused, warn_unused_result.
+ */
+#if defined(__GNUC__)
+#    define MALLOC   __attribute__((malloc))
+#    define NORETURN __attribute__((noreturn))
+#    define UNUSED   __attribute__((unused))
+#    define FORMATDEBUG(f,a,b) __attribute__((format (f,a,b)))
 #elif defined(__MWERKS__)
+#    define  __attribute__(x)  /*NOTHING*/
 #    define NORETURN
 #    define UNUSED
-#else
-#    define NORETURN
-#    define UNUSED
-#endif
-
-#if defined(__GNUC__) && __GNUC__ >= 3
-#    define MALLOC   __attribute__ ((malloc))
-#else
 #    define MALLOC
-#endif
-
-#ifdef __GNUC__
-#    define FORMATDEBUG(f,a,b) __attribute__ ((format (f,a,b)))
+#    define FORMATDEBUG(f,a,b)
 #else
+#    define  __attribute__(x)  /*NOTHING*/
+#    define NORETURN
+#    define UNUSED
+#    define MALLOC
 #    define FORMATDEBUG(f,a,b)
 #endif
 
 #define VARPROT(proto,like,form,var) proto FORMATDEBUG(like,form,var)
+
 
 // TODO: autoconf defines inline to some suitable keyword if the compiler does
 // not understand inline itself. Just use inline in code?
