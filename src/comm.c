@@ -655,6 +655,8 @@ dump_bytes (void * data, size_t length, int indent)
 } /* dump_bytes() */
 
 /*-------------------------------------------------------------------------*/
+static void comm_fatal (interactive_t *ip, char *fmt, ...)
+                          FORMATDEBUG(printf,2,3) ;
 static void
 comm_fatal (interactive_t *ip, char *fmt, ...)
 

@@ -342,6 +342,9 @@ static work_area_t current
 /* Forward declarations */
 
 static void lambda_error VARPROT((const char *error_str, ...), printf, 1, 2) NORETURN;
+static void lambda_cerror(const char *s) FORMATDEBUG(printf,1,0) NORETURN;
+static void lambda_cerrorl(const char *s1, const char *s2 UNUSED, int line1 UNUSED, 
+                           int line2 UNUSED) NORETURN FORMATDEBUG(printf,1,0);
 static void free_symbols(void);
 static Bool is_lvalue (svalue_t *argp, int index_lvalue);
 static void compile_lvalue(svalue_t *, int);

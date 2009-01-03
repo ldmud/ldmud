@@ -278,7 +278,7 @@ extern void dinfo_data_status(svalue_t * svp, int value);
 extern void warnf VARPROT((char *, ...), printf, 1, 2);
 extern void errorf VARPROT((const char *, ...), printf, 1, 2) NORETURN;
 extern void fatal VARPROT((const char *, ...), printf, 1, 2) NORETURN;
-extern void throw_error(svalue_t *v);
+extern void throw_error(svalue_t *v) NORETURN;
 extern char *limit_error_format(char *fixed_fmt, size_t fixed_fmt_len, const char *fmt);
 extern Bool legal_path(const char *path);
 extern Bool check_no_parentdirs(const char *path);

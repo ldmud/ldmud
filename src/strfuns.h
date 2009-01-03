@@ -25,7 +25,8 @@ extern void strbuf_free(strbuf_t * buf);
 extern void strbuf_add(strbuf_t *buf, const char * text);
 extern void strbuf_addn(strbuf_t *buf, const char * text, size_t len);
 extern void strbuf_addc(strbuf_t *buf, const char ch);
-extern void strbuf_addf(strbuf_t *buf, const char *format, ...);
+extern void strbuf_addf(strbuf_t *buf, const char *format, ...)
+                           FORMATDEBUG(printf,2,3);
 extern void strbuf_send(strbuf_t *buf);
 extern void strbuf_store(strbuf_t *buf, svalue_t *svp);
 extern void strbuf_copy (strbuf_t *buf, char *cbuf);

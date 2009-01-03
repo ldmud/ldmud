@@ -61,7 +61,7 @@ extern int exit_code;
 extern int main(int argc, char **argv);
 extern void initialize_master_uid(void);
 extern void debug_message(const char *, ...) FORMATDEBUG(printf, 1, 2);
-extern void vdebug_message(const char *, va_list);
+extern void vdebug_message(const char *, va_list) FORMATDEBUG(printf, 1, 0);
 
 extern void write_X (int d, unsigned char i);
 extern void write_x(int d, p_uint i);

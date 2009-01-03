@@ -9,6 +9,18 @@ See the file HISTORY for a user-oriented summary of all the changes.
     Cleaned up handling of gcc attributes (Assumption: gcc < 3 are out of use
       now), added __attribute__ define which evaluates to nothing if gcc is
       not used.
+  - (make_func.y)
+    Added NORETURN attribute to yyerror() and fatal()
+    Changed fatal() from int to void.
+  - (closure.c, interpret.c, simulate.h )
+    Added NORETURN attribute to lambda_cerror(), lambda_cerrorl(),
+    stack_overflow(), throw_error(), 
+  - (port.h, main.h, comm.c, strfuns.h, closure.c)
+    Added the format attributes to: time_fstring(), strbuf_addf(),
+      vdebug_message(), comm_fatal(), lambda_cerror(), lambda_cerrorl()
+  - (xalloc.h)
+    Added the warn_unused_result attribute to xalloc_traced(),
+      rexalloc_traced(), pxalloc_traced(), prexalloc_traced().
 
 30-Dec 2008 (Zesstra)
   - (array.h, comm.c, smalloc.c, slaballoc.c, xptmalloc.c, xalloc.c,

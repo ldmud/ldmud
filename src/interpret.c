@@ -2862,6 +2862,8 @@ svalue_t * pop_n_elems (int n, svalue_t *sp)
 { return _pop_n_elems(n, sp); }
 
 /*-------------------------------------------------------------------------*/
+static void stack_overflow (svalue_t *sp, svalue_t *fp, bytecode_p pc)
+                              NORETURN;
 static void
 stack_overflow (svalue_t *sp, svalue_t *fp, bytecode_p pc)
 

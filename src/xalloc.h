@@ -124,11 +124,15 @@ extern int stack_direction;
 
 extern size_t  xalloced_size (POINTER p);
 extern size_t  xalloc_overhead (void);
-extern POINTER xalloc_traced(size_t size MTRACE_DECL) MALLOC;
+extern POINTER xalloc_traced(size_t size MTRACE_DECL) 
+                                  MALLOC __attribute__ ((warn_unused_result));
 extern void    xfree(POINTER);
-extern POINTER rexalloc_traced(POINTER, size_t MTRACE_DECL) MALLOC;
-extern POINTER pxalloc_traced(size_t MTRACE_DECL) MALLOC;
-extern POINTER prexalloc_traced(POINTER, size_t MTRACE_DECL) MALLOC;
+extern POINTER rexalloc_traced(POINTER, size_t MTRACE_DECL)
+                                  MALLOC __attribute__ ((warn_unused_result));
+extern POINTER pxalloc_traced(size_t MTRACE_DECL) 
+                                  MALLOC __attribute__ ((warn_unused_result));
+extern POINTER prexalloc_traced(POINTER, size_t MTRACE_DECL)
+                                  MALLOC __attribute__ ((warn_unused_result));
 extern void    pfree(POINTER);
 extern void  * malloc_increment_size (void *vp, size_t size);
 

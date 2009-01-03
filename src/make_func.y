@@ -485,7 +485,7 @@ static int curr_lpc_type_size = 0;
 
 /* Forward declarations */
 
-static void yyerror(const char *);
+static void yyerror(const char *) NORETURN;
 static int yylex(void);
 int yyparse(void);
 int ungetc(int c, FILE *f);
@@ -496,7 +496,7 @@ static const char *ctype(int);
 #ifndef toupper
 int toupper(int);
 #endif
-static int fatal(const char *str);
+static void fatal(const char *str) NORETURN;
 static int cond_get_exp(int);
 
 /*-------------------------------------------------------------------------*/
@@ -517,7 +517,7 @@ mystrdup (const char *str)
 }
 
 /*-------------------------------------------------------------------------*/
-static int
+static void
 fatal (const char *str)
 
 /* Print <str> on stderr, flush stdout and exit the program with
@@ -528,8 +528,6 @@ fatal (const char *str)
     fprintf(stderr, "%s", str);
     fflush(stdout);
     exit(1);
-    /* NOTREACHED */
-    return 0;
 }
 
 /*-------------------------------------------------------------------------*/
