@@ -3304,6 +3304,10 @@ f_rename_object (svalue_t *sp)
         /* A new writeable copy of the name is needed. */
         char *p;
         p = xalloc(length+1);
+        if (!p)
+            errorf("Out of memory for %zu bytes in rename_object().\n",
+                length+1);
+
         strcpy(p, name);
         name = p;
         name[length -= 2] = '\0';
