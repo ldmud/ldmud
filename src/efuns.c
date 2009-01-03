@@ -672,7 +672,7 @@ f_regexp (svalue_t *sp)
         if (!res)
         {
             free_regexp(reg);
-            errorf("Out of memory (%zu bytes) in regexp()",
+            errorf("Out of memory (%"PRIdMPINT" bytes) in regexp()",
                     v_size * sizeof(*res));
             /* NOTREACHED */
             return sp;
@@ -4473,15 +4473,15 @@ v_object_info (svalue_t *sp, int num_args)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_present_clone (svalue_t *sp)
+v_present_clone (svalue_t *sp, int num_arg)
 
 /* EFUN present_clone()
  *
- *    object present_clone(string str, object env)
- *    object present_clone(object obj, object env)
+ *    object present_clone(string str [, object env] [, [int n])
+ *    object present_clone(object obj [, object env] [, [int n])
  *
- * Search in the inventory of <env> for the first object with the
- * same blueprint as object <obj>, resp. for the first object with
+ * Search in the inventory of <env> for the <n>th object with the
+ * same blueprint as object <obj>, resp. for the <n>th object with
  * the loadname <str>, and return that object.
  *
  * If not found, 0 is returned.
@@ -4490,18 +4490,68 @@ f_present_clone (svalue_t *sp)
 {
     string_t * name; /* the shared loadname to look for */
     object_t *obj;   /* the object under scrutiny */
+    object_t *env;   /* the environment to search in */
+    p_int     count; /* the <count> object is searched */
 
-    /* Test and get the arguments from the stack */
-    if (sp[-1].type == T_STRING)
+    /* Get the arguments */
+    svalue_t *arg = sp - num_arg + 1;   // first argument
+    env = current_object;  // default
+    count = -1;
+    if (num_arg == 3)
     {
-        size_t len;
-        long i;
+        // if we got 3 args, the third must be a number.
+        count = arg[2].u.number;
+        // but 0 and negative ones make no sense.
+        if (count <= 0)
+        {
+            errorf("Bad argument 3 to present_clone(): got %"PRIdPINT
+                   ", expected a positive number.\n",count);
+            return sp; /* NOT REACHED */
+        }
+        free_svalue(sp--);
+        num_arg--;
+    }
+    if (num_arg == 2)
+    {
+        // the second arg may be an object or a number
+        if (arg[1].type == T_NUMBER)
+        {
+            // But it must not be 0 (which is probably a destructed object)
+            // and we don't accept two numbers (as second and third arg)
+            if (arg[1].u.number == 0 || count != -1)
+            {
+                vefun_arg_error(2, T_OBJECT, T_NUMBER, sp);
+                return sp; /* NOTREACHED */
+            }
+            count = arg[1].u.number;
+            if (count < 0)
+            {
+                errorf("Bad argument 2 to present_clone(): got %"PRIdPINT
+                       ", expected a positive number or an object.\n",count);
+                return sp; /* NOT REACHED */
+            }
+        }
+        else if (arg[1].type == T_OBJECT)
+        {
+            env = arg[1].u.ob;
+        }
+        free_svalue(sp--);
+        num_arg--;
+    }
+    /* if no number given and count is still ==-1, the for loop below searches
+     * implicitly for the first object */
+
+
+    /* Get the name/object to search for */
+    if (arg->type == T_STRING)
+    {
+        size_t len, i;
         char * end;
         char * sane_name;
         char * name0;  /* Intermediate name */
         char * tmpbuf; /* intermediate buffer for stripping any #xxxx */
         
-        name0 = get_txt(sp[-1].u.str);
+        name0 = get_txt(arg->u.str);
         tmpbuf = NULL;
         
         /* Normalize the given string and check if it is
@@ -4509,10 +4559,10 @@ f_present_clone (svalue_t *sp)
          * there is no blueprint with that name
          */
 
-        /* First, slash of a trailing '#<num>' */
+        /* First, slash off a trailing '#<num>' */
 
-        len = mstrsize((sp-1)->u.str);
-        i = (long)len;
+        len = mstrsize(arg->u.str);
+        i = len;
         end = name0 + len;
 
         while (--i > 0)
@@ -4525,13 +4575,13 @@ f_present_clone (svalue_t *sp)
                 /* Not a digit: maybe a '#' */
                 if ('#' == c && len - i > 1)
                 {
-                    tmpbuf = xalloc((size_t)i + 1);
+                    tmpbuf = xalloc(i + 1);
                     if (!tmpbuf)
                     {
-                        errorf("Out of memory (%ld bytes) for temporary "
+                        errorf("Out of memory (%zu bytes) for temporary "
                                "buffer in present_clone().\n", i+1);
                     }
-                    strncpy(tmpbuf, get_txt(sp[-1].u.str), (size_t)i);
+                    strncpy(tmpbuf, get_txt(arg->u.str), i);
                     name0[i] = '\0';
                 }
 
@@ -4559,26 +4609,30 @@ f_present_clone (svalue_t *sp)
             tmpbuf = name0 = NULL;
         }
     }
-    else if (sp[-1].type == T_OBJECT)
+    else if (arg->type == T_OBJECT)
     {
-        name = sp[-1].u.ob->load_name;
+        name = arg->u.ob->load_name;
     }
     else
-        efun_gen_arg_error(1, sp[-1].type, sp);
+        vefun_exp_arg_error(1, TF_STRING|TF_OBJECT, arg->type, sp);
 
     obj = NULL;
     if (name)
     {
         /* We have a name, now look for the object */
-        for (obj = sp->u.ob->contains; obj != NULL; obj = obj->next_inv)
+        for (obj = env->contains; obj != NULL; obj = obj->next_inv)
         {
-            if (!(obj->flags & O_DESTRUCTED) && name == obj->load_name)
+            /* check for <= is deliberate, count is -1 if no number is
+             * given and then the loop is terminated upon the first object
+             * matching the name. */
+            if (!(obj->flags & O_DESTRUCTED) && name == obj->load_name
+                && --count <= 0)
                 break;
         }
     }
 
-    /* Assign the result */
-    sp = pop_n_elems(2, sp) + 1;
+    /* Free first argument and assign the result */
+    free_svalue(sp);
     if (obj != NULL)
         put_ref_object(sp, obj, "present_clone");
     else

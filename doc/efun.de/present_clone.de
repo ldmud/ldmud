@@ -1,14 +1,24 @@
 VORLAEUFIG
 SYNOPSIS
-        object present_clone(string str [, object env] );
-        object present_clone(object obj [, object env] );
+        object present_clone(string str);
+        object present_clone(string str, int n)
+        object present_clone(string str, object env)
+        object present_clone(string str, object env, int n)
+
+        object present_clone(object obj);
+        object present_clone(object obj, int n)
+        object present_clone(object obj, object env)
+        object present_clone(object obj, object env, int n)
 
 BESCHREIBUNG
         Diese Efun durchsucht das Inventar von <env> nach einem Objekt mit
-        einem bestimmten Blueprint . Wird <env> nicht angegeben, wird in
+        einem bestimmten Blueprint. Wird <env> nicht angegeben, wird in
         this_object() gesucht. Der Blueprint kann entweder mit seinem Namen
-        <str> angegeben werden, oder als Blueprint des Objekts <obj>. Gesucht
+        <str> angegeben oder als Blueprint des Objekts <obj> werden. Gesucht
         wird in beiden Faellen aufgrund von load_name().
+        Wird <n> angegeben, wird das <n>. Objekt in <env> gesucht, ansonsten
+        das 1. in <env>.
+        Wird kein passendes Objekt gefunden, wird 0 zurueckgegeben.
 
         Fuer Driver im Plain Modus beginnt der Name in jedem Fall mit '/', im
         Compat Modus nicht.
@@ -25,16 +35,20 @@ BEISPIELE
         | present_clone("/std/weapon#12", env)             | /std/weapon#9 |
         | present_clone(find_object("/obj/money#14"), env) | /obj/money#8  |
         | present_clone("/obj/key#18", env)                | /obj/key      |
+        | present_clone("/std/weapon#12", env, 2)          | /std/weapon#12|
+        | present_clone("/std/weapon#12", env, 3)          | 0             |
         +--------------------------------------------------+---------------+
 
         Fuer Driver im Compat Modus liefert die Funktion keine '/' am Anfang.
 
-AENDERUNGEN
-        Eingefuehrt in 3.2.7.
-
 ANMERKUNG
         Im Unterschied zu present() sucht present_clone() niemals in der
         Umgebung von <env>.
+
+AENDERUNGEN
+        Eingefuehrt in 3.2.7.
+        Die Suche nach dem <n>. Objekt wurde in 3.3.718 ergaenzt.
+
 
 SIEHE AUCH
         load_name(E), present(E)

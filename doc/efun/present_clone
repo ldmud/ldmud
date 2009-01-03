@@ -1,37 +1,54 @@
+PRELIMINARY
 SYNOPSIS
-        object present_clone (string str [, object env] )
-        object present_clone (object obj [, object env] )
+        object present_clone(string str);
+        object present_clone(string str, int n)
+        object present_clone(string str, object env)
+        object present_clone(string str, object env, int n)
+
+        object present_clone(object obj);
+        object present_clone(object obj, int n)
+        object present_clone(object obj, object env)
+        object present_clone(object obj, object env, int n)
+
 
 DESCRIPTION
-        This efun searches the inventory of object <env> (default is the
-        current object) for an object with a specific blueprint. The first
-        object found is returned, otherwise the result is 0.
-
+        This efun searches the inventory of object <env> (default is 
+        this_object()) for an object with a specific blueprint.
         The blueprint can be specified either by name <str>, or as the same
         blueprint as of object <obj>. The matching criteria in both cases is
         the load_name().
+        If <n> is given, the <n>th object in <env> is returned (if present),
+        otherwise the first object matching <str> or <obj>.
+        If no object in <env> matches the criteria, 0 is returned.
 
         For plain driver this name starts with a '/', for compat-mode
         drivers it doesn't.
-
-        Note that in contrast to present(), this efun never searches
-        in the environment of <env>.
 
 EXAMPLES
         Assume that object 'env' contains the objects /obj/money#8,
         /std/weapon#9, /std/weapon#12 and /obj/key in the given order.
 
-          present_clone("/obj/money", env)     --> /obj/money#8
-          present_clone("/std/weapon#12", env) --> /std/weapon#9
-          present_clone(find_object("/obj/money#14"), env)
-                                               --> /obj/money#8
-          present_clone("/obj/key#18", env)    --> /obj/key
+        +--------------------------------------------------+---------------+
+        | Function call                                    | returns       |
+        +--------------------------------------------------+---------------+
+        | present_clone("/obj/money", env)                 | /obj/money#8  |
+        | present_clone("/std/weapon#12", env)             | /std/weapon#9 |
+        | present_clone(find_object("/obj/money#14"), env) | /obj/money#8  |
+        | present_clone("/obj/key#18", env)                | /obj/key      |
+        | present_clone("/std/weapon#12", env, 2)          | /std/weapon#12|
+        | present_clone("/std/weapon#12", env, 3)          | 0             |
+        +--------------------------------------------------+---------------+
 
         For compat-mode drivers, remove the leading '/' from the given
         names.
 
+REMARKS
+        Note that in contrast to present(), this efun never searches
+        in the environment of <env>.
+
 HISTORY
         Introduced in 3.2.7
+        Searching for the <n>th object was added in 3.3.718.
 
 SEE ALSO
         load_name(E), present(E)

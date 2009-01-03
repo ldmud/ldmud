@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Jan 2009 (Zesstra)
+  - (efuns.c, efuns.h, func_spec)
+    Extended present_clone() to optionally search for the <n>th object in the
+    environment.
+
 30-Dec 2008 (Zesstra)
   - (array.h, comm.c, smalloc.c, slaballoc.c, xptmalloc.c, xalloc.c,
       sprintf.c)

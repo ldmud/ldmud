@@ -6,10 +6,14 @@ For a detailed list of all changes see the file CHANGELOG.
 xx-xxx-xxxx () -- 3.3.718
     - New Efuns:
        + mkime(): convert a date/time information as returned by local_time()
-                  to a unix timestamp (integer value).
+           to a unix timestamp (integer value).
        + strftime(): convert a timestamp to a formatted string using a format
-                     string with a variety of format specifiers.
+           string with a variety of format specifiers.
        + xml_generate(), xml_parse(): Optional XML support.
+
+    - Changed Efuns:
+       + present_clone(): the efuns now optionally searches for the <n>th
+           object in <env> instead of the first one.
 
     - Language
        + Disallowed case labels in inner blocks of switch statements

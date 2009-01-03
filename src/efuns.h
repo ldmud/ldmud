@@ -76,7 +76,7 @@ extern svalue_t *f_localtime (svalue_t *sp);
 extern svalue_t *f_blueprint (svalue_t *sp);
 extern svalue_t *v_clones (svalue_t *sp, int num_args);
 extern svalue_t *v_object_info (svalue_t *sp, int num_args);
-extern svalue_t *f_present_clone (svalue_t *sp);
+extern svalue_t *v_present_clone (svalue_t *sp, int num_arg);
 extern svalue_t *f_to_object(svalue_t *sp);
 extern svalue_t *f_set_is_wizard(svalue_t *sp);  /* optional */
 extern svalue_t *tell_room(svalue_t *sp);
