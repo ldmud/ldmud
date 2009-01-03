@@ -21,6 +21,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (xalloc.h)
     Added the warn_unused_result attribute to xalloc_traced(),
       rexalloc_traced(), pxalloc_traced(), prexalloc_traced().
+  - (mregex.c, mstrings.c, simulate.c)
+    Fixed some wrong format specifiers which gcc found after using the format
+    attribute on strbuf_addf().
 
 30-Dec 2008 (Zesstra)
   - (array.h, comm.c, smalloc.c, slaballoc.c, xptmalloc.c, xalloc.c,

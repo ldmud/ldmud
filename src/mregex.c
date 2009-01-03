@@ -1195,12 +1195,13 @@ rxcache_status (strbuf_t *sbuf, Bool verbose)
     {
         strbuf_add(sbuf, "\nRegexp cache status:\n");
         strbuf_add(sbuf,   "--------------------\n");
-        strbuf_addf(sbuf, "Expressions in cache:  %lu (%.1f%%)\n"
+        strbuf_addf(sbuf, "Expressions in cache:  %"PRIu32" (%.1f%%)\n"
                    , iNumXEntries, 100.0 * (float)iNumXEntries / RXCACHE_TABLE);
-        strbuf_addf(sbuf, "Memory allocated:      %lu\n", iXSizeAlloc);
+        strbuf_addf(sbuf, "Memory allocated:      %"PRIu32"\n", iXSizeAlloc);
         iNumXReq = iNumXRequests ? iNumXRequests : 1;
         strbuf_addf(sbuf
-               , "Requests: %lu - Found: %lu (%.1f%%) - Coll: %lu (%.1f%% req/%.1f%% entries)\n"
+               , "Requests: %"PRIu32" - Found: %"PRIu32" (%.1f%%) - "
+               "Coll: %"PRIu32" (%.1f%% req/%.1f%% entries)\n"
                , iNumXRequests, iNumXFound, 100.0 * (float)iNumXFound/(float)iNumXReq
                , iNumXCollisions, 100.0 * (float)iNumXCollisions/(float)iNumXReq
                , 100.0 * (float)iNumXCollisions/(iNumXEntries ? iNumXEntries : 1)
@@ -1208,7 +1209,8 @@ rxcache_status (strbuf_t *sbuf, Bool verbose)
     }
     else
     {
-        strbuf_addf(sbuf, "Regexp cache:\t\t\t%8ld %9lu\n", iNumXEntries, iXSizeAlloc);
+        strbuf_addf(sbuf, "Regexp cache:\t\t\t%8"PRId32" %9"PRIu32"\n",
+            iNumXEntries, iXSizeAlloc);
     }
 
     return iXSizeAlloc;

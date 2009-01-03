@@ -1788,7 +1788,7 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         , (float)mstr_searchlen_byvalue / (float)mstr_searches_byvalue
                         );
         strbuf_addf(sbuf, "Hash chains used: %lu of %lu (%.1f%%)\n"
-                        , mstr_chains, HTABLE_SIZE
+                        , mstr_chains, (unsigned long)HTABLE_SIZE
                         , 100.0 * (float)mstr_chains / (float)HTABLE_SIZE
                         );
         strbuf_addf(sbuf, "Distinct strings added: %lu "

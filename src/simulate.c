@@ -3218,7 +3218,7 @@ status_parse (strbuf_t * sbuf, char * buff)
                       , "Last:    %10lu ticks, %3ld.%06ld s\n"
                         "Average: %10.0lf ticks, %10.6lf s\n"
                       , last_total_evalcost
-                      , last_eval_duration.tv_sec, last_eval_duration.tv_usec
+                      , last_eval_duration.tv_sec, (long)last_eval_duration.tv_usec
                       , stat_total_evalcost.weighted_avg
                       , stat_eval_duration.weighted_avg / 1000000.0
                       );
