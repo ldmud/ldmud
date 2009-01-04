@@ -26,11 +26,16 @@ DESCRIPTION
              set_is_wizard()
              set_light()
              transfer()
+             xml_generate()
+             xml_parse()
 
          - 'preliminary' or 'experimental'
 
            The behaviour of these efuns is not fixed yet, and may change
            with further releases:
+
+             xml_generate()
+             xml_parse()
 
          - 'deprecated' or 'obsolete'
 
