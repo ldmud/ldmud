@@ -266,12 +266,12 @@ mb_status (strbuf_t * sbuf, Bool verbose)
     {
         strbuf_add(sbuf, "\nMemory Buffers:\n");
         strbuf_add(sbuf,   "---------------\n");
-        strbuf_addf(sbuf, "File data:    %8lu\n", membuffers[mbFile].size);
-        strbuf_addf(sbuf, "Swap buffer:  %8lu\n", membuffers[mbSwap].size);
+        strbuf_addf(sbuf, "File data:    %8zu\n", membuffers[mbFile].size);
+        strbuf_addf(sbuf, "Swap buffer:  %8zu\n", membuffers[mbSwap].size);
     }
     else
     {
-        strbuf_addf(sbuf, "Memory buffers:\t\t\t\t %9lu\n", res);
+        strbuf_addf(sbuf, "Memory buffers:\t\t\t\t %9zu\n", res);
     }
 
     return res;
