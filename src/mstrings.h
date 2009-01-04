@@ -85,8 +85,6 @@ extern int        mstring_compare( string_t * const pStr1
 extern Bool       mstring_equal( string_t * const pStr1
                                , string_t * const pStr2);
 extern void mstring_free (string_t *s);
-extern string_t * mstring_ref ( string_t * str);
-extern unsigned long mstring_deref ( string_t * str);
 extern const char * mstring_mstr_n_str(const string_t * const pStr, size_t start, const char * const pTxt, size_t len);
 extern const char * mstring_mstr_rn_str(const string_t * const pStr, size_t start, const char * const pTxt, size_t len);
 extern string_t * mstring_add_slash (const string_t *str MTRACE_DECL);
@@ -117,110 +115,140 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 
 
 /* --- Inline functions and macros --- */
-
-#define mstr_mem_size(s) \
-    (sizeof(string_t) + (s)->size)
-
-  /* size_t mstr_mem_size(string_t * s)
-   *   The amount of memory used to hold all this strings' data.
+static INLINE size_t mstr_mem_size(const string_t * const s) 
+                                   __attribute__((nonnull(1)))
+                                   __attribute__((pure));
+static INLINE size_t mstr_mem_size(const string_t * const s)
+  /*   The amount of memory used to hold all this strings' data.
    *   Used only to keep the statistics up to date.
    */
+{
+    return sizeof(string_t) + s->size;
+}
 
-#define mstr_hash(s) \
-    ( (s)->hash )
-
-  /* whash_t mstr_hash(string_t * s)
-   *   Return the hash value of string <s>, which is 0 if the
+static INLINE whash_t mstr_hash(const string_t * const s)
+                                   __attribute__((nonnull(1)))
+                                   __attribute__((pure));
+static INLINE whash_t mstr_hash(const string_t * const s)
+  /*   Return the hash value of string <s>, which is 0 if the
    *   hash hasn't been computed yet.
    */
+{
+    return s->hash;
+}
 
-#define mstr_singular(s) \
-    (! ((s)->info.tabled || (s)->info.ref != 1) )
-  /* Bool mstr_singular(string_t *s)
-   *   Return FALSE if string<s> has multiple users, ie. is tabled
-   *   or has more than one reference.
+static INLINE Bool mstr_singular(const string_t * const s)
+                                   __attribute__((nonnull(1)))
+                                   __attribute__((pure));
+static INLINE Bool mstr_singular(const string_t * const s)
+  /* Return FALSE if string<s> has multiple users, ie. is tabled
+   * or has more than one reference.
    */
+{
+    return ! (s->info.tabled || s->info.ref != 1);
+}
 
-#define mstr_untabled(s) \
-    (!(s)->info.tabled)
-
-  /* Bool mstr_untabled (string_t *s)
-   *   Return TRUE if string <s> is not tabled.
-   *   The argument must not have sideeffects!
+static INLINE Bool mstr_untabled(const string_t * const s)
+                                   __attribute__((nonnull(1)))
+                                   __attribute__((pure));
+static INLINE Bool mstr_untabled(const string_t * const s)
+  /* Return TRUE if string <s> is not tabled.
    */
+{
+    return !(s->info.tabled);
+}
 
-#define mstr_tabled(s) \
-    ((s)->info.tabled)
-
-  /* Bool mstr_tabled (string_t *s)
-   *   Return TRUE if string <s> is tabled - directly or indirectly.
-   *   The argument must not have sideeffects!
+static INLINE Bool mstr_tabled(const string_t * const s)
+                                   __attribute__((nonnull(1)))
+                                   __attribute__((pure));
+static INLINE Bool mstr_tabled(const string_t * const s)
+  /* Return TRUE if string <s> is tabled - directly or indirectly.
    */
+{
+    return s->info.tabled;
+}
 
-#define mstrsize(s) \
-    ((s)->size)
-
-  /* size_t mstrsize(string_t *s)
-   *   Return the size (length) of the string <s>.
+static INLINE size_t mstrsize(const string_t * const s)
+                                   __attribute__((nonnull(1)))
+                                   __attribute__((pure));
+static INLINE size_t mstrsize(const string_t * const s)
+  /*   Return the size (length) of the string <s>.
    */
+{
+    return s->size;
+}
 
-#define ref_mstring(s) \
-    (mstr_used++, mstr_used_size += mstr_mem_size(s), (s)->info.ref ? ++((s)->info.ref) : 0, (s))
-
-#define ref_mstring_safe(s) mstring_ref(s)
-
-  /* string_t * ref_mstring (string_t *s)
-   * string_t * ref_mstring_safe (string_t *s)
-   *   Increment the refcount for string <s> and return the ref'ed string.
-   *   The argument <s> to ref_mstring() must not have sideeffects!
+static INLINE string_t *ref_mstring(string_t *const s) __attribute__((nonnull(1)));
+static INLINE string_t *ref_mstring(string_t *const s)
+  /* Increment the refcount for string <s> and return the ref'ed string.
    */
+{
+    mstr_used++;
+    mstr_used_size += mstr_mem_size(s);
+    if (s->info.ref)
+        ++(s->info.ref);
 
+    return s;
+}
 
-#define deref_mstring(s) \
-    (mstr_used--, mstr_used_size -= mstr_mem_size(s), (s)->info.ref ? --((s)->info.ref) : (s)->info.ref)
-
-#define deref_mstring_safe(s) mstring_deref(s)
-
-  /* int deref_mstring (string_t *s)
-   * int deref_mstring_safe (string_t *s)
-   *   Decrement the refcount for string <s> and return the new count.
-   *   The argument <s> to deref_mstring() must not have sideeffects!
+static INLINE unsigned int deref_mstring(string_t *const s) __attribute__((nonnull(1)));
+static INLINE unsigned int deref_mstring(string_t *const s)
+  /*   Decrement the refcount for string <s> and return the new count.
    */
+{
+    mstr_used--;
+    mstr_used_size -= mstr_mem_size(s);
+    if (s->info.ref)
+        --(s->info.ref);
 
+    return s->info.ref;
+}
 
-#define free_mstring(s) \
-    MACRO(string_t * fmsttmp = s; if (fmsttmp != NULL) { if (fmsttmp->info.ref == 1) { mstring_free(fmsttmp); } else deref_mstring(fmsttmp); } )
-
-  /* void free_mstring(s)
-   *
-   *   Decrement the refcount for string <s>, and if it reaches 0,
-   *   deallocate <s> altogether.
+static INLINE void free_mstring(string_t *const s) __attribute__((nonnull(1)));
+static INLINE void free_mstring(string_t *const s)
+  /* Decrement the refcount for string <s>, and if it reaches 0,
+   * deallocate <s> altogether.
+   * TODO: check if s can really be NULL or should be allowed to be.
    */
+{
+    if (s != NULL) 
+    { 
+        if (s->info.ref == 1) 
+        {
+            mstring_free(s); 
+        } 
+        else 
+            deref_mstring(s); 
+    }
+}
 
-#define get_txt(s) \
-    ((s)->txt)
-
-  /* char * get_txt (string_t *s)
-   *
-   *   Return a pointer to the actual string text of string <s>.
-   *   There is at least one '\0' terminating the string text.
+static INLINE char *get_txt(string_t *const s)
+                                   __attribute__((nonnull(1)))
+                                   __attribute__((pure));
+static INLINE char *get_txt(string_t *const s)
+  /* Return a pointer to the actual string text of string <s>.
+   * There is at least one '\0' terminating the string text.
+   * BTW: It is a pity that it can't be const char *get_txt().
    */
+{
+    return s->txt;
+}
 
-#define extract_cstr(d,s,l) \
-    MACRO(strncpy((d), get_txt(s), (l)-1); \
-          if ((l) > mstrsize(s)) \
-            d[mstrsize(s)] = '\0'; \
-          else \
-            d[(l)-1] = '\0'; \
-         )
-
-  /* void extract_cstr (char * d, string_t *s, size_t l)
-   *
-   *   Extract the C string from <s> (that is: all characters up to the
-   *   first '\0' resp the end of the string) and copy it into buffer <d>
-   *   of size <l>. The macro makes sure that the string is terminated
-   *   with a '\0'
+static INLINE void extract_cstr(char *d, const string_t *const s, size_t l)
+                                __attribute__((nonnull(1,2)));
+static INLINE void extract_cstr(char *d, const string_t *const s, size_t l)
+  /* Extract the C string from <s> (that is: all characters up to the
+   * first '\0' resp the end of the string) and copy it into buffer <d>
+   * of size <l>. The macro makes sure that the string is terminated
+   * with a '\0'
    */
+{
+    strncpy(d, get_txt((string_t*)s), l-1);
+    if (l > mstrsize(s))
+        d[mstrsize(s)] = '\0';
+    else
+        d[l-1] = '\0';
+}
 
 /* A handful of shorthands for commonly used functions */
 

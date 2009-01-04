@@ -111,7 +111,7 @@ static string_t ** stringtable = NULL;
    * This does include the memory by the string management structures.
    */
 
-static mp_uint mstr_tabled = 0;
+static mp_uint mstr_tabled_count = 0;
   /* Number of distinct strings in the string table.
    */
 
@@ -128,14 +128,14 @@ static mp_uint mstr_added = 0;
    */
 
 static mp_uint mstr_deleted = 0;
-  /* Number of distinct strings delete from the string table.
+  /* Number of distinct strings deleted from the string table.
    */
 
 static mp_uint mstr_collisions = 0;
   /* Number of collisions when adding a new distinct string.
    */
 
-static mp_uint mstr_untabled = 0;
+static mp_uint mstr_untabled_count = 0;
   /* Number of distinct untabled strings.
    */
 
@@ -369,7 +369,7 @@ make_new_tabled (const char * const pTxt, size_t size, whash_t hash MTRACE_DECL)
         msize = mstr_mem_size(string);
         mstr_used++;
         mstr_used_size += msize;
-        mstr_tabled++;
+        mstr_tabled_count++;
         mstr_tabled_size += msize;
     }
 
@@ -415,7 +415,7 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
         msize = mstr_mem_size(string);
         mstr_used++;
         mstr_used_size += msize;
-        mstr_untabled++;
+        mstr_untabled_count++;
         mstr_untabled_size += msize;
     }
 
@@ -587,10 +587,10 @@ table_string (string_t * pStr MTRACE_DECL)
         pStr->next = stringtable[idx];
         stringtable[idx] = pStr;
 
-        mstr_tabled++;
+        mstr_tabled_count++;
         mstr_tabled_size += msize;
 
-        mstr_untabled--;
+        mstr_untabled_count--;
         mstr_untabled_size -= msize;
 
         string = pStr;
@@ -837,7 +837,7 @@ mstring_free (string_t *s)
 
         int idx;
 
-        mstr_tabled--;
+        mstr_tabled_count--;
         mstr_tabled_size -= msize;
 
         idx = HashToIndex(get_hash(s));
@@ -859,43 +859,13 @@ mstring_free (string_t *s)
     {
         /* An untabled string */
 
-        mstr_untabled--;
+        mstr_untabled_count--;
         mstr_untabled_size -= msize;
     }
 
     /* The deallocation of the string itself is the same in either case. */
     xfree(s);
 } /* mstring_free() */
-
-/*-------------------------------------------------------------------------*/
-string_t *
-mstring_ref ( string_t * str)
-
-/* Aliased to: ref_mstring_safe(s)
- *
- * Increment the refcount for string <str> and return the ref'ed string.
- * In contrast to macro ref_mstring(), this function can handle arguments
- * with sideeffects.
- */
-
-{
-    return ref_mstring(str);
-} /* mstring_ref() */
-
-/*-------------------------------------------------------------------------*/
-unsigned long
-mstring_deref ( string_t * str)
-
-/* Aliased to: deref_mstring_safe(s)
- *
- * Decrement the refcount for string <str> and return the new refcount.
- * In contrast to macro deref_mstring(), this function can handle arguments
- * with sideeffects.
- */
-
-{
-    return deref_mstring(str);
-} /* mstring_deref() */
 
 /*-------------------------------------------------------------------------*/
 Bool
@@ -1059,7 +1029,8 @@ mstring_mstr_n_str ( const string_t * const pStr, size_t start
 
     /* Initialize 'characters remaining' and 'current position' */
     left = mstrsize(pStr) - start;
-    cp = get_txt(pStr)+start;
+    /* remove the const qualifier temporarily when calling get_txt(). */
+    cp = get_txt((string_t *const)pStr)+start;
 
     /* Special case: strstr("text", "") */
     if (len == 0)
@@ -1110,7 +1081,7 @@ mstring_mstr_rn_str ( const string_t * const pStr, size_t start
 
     /* Initialize 'characters remaining' and 'current position' */
     left = mstrsize(pStr) - start;
-    cp = get_txt(pStr)+start;
+    cp = get_txt((string_t *const)pStr)+start;
 
     /* Special case: strrstr("text", "") */
     if (len == 0)
@@ -1125,7 +1096,7 @@ mstring_mstr_rn_str ( const string_t * const pStr, size_t start
          && 0 == memcmp(cp, pTxt, len)
            )
             return cp;
-    } while (cp != get_txt(pStr));
+    } while (cp != get_txt((string_t *const)pStr));
 
     return NULL;
 } /* mstring_mstr_n_str() */
@@ -1152,7 +1123,7 @@ mstring_add_slash (const string_t *str MTRACE_DECL)
     {
         txt = get_txt(tmp);
         *txt = '/';
-        memcpy(txt+1, get_txt(str), mstrsize(str));
+        memcpy(txt+1, get_txt((string_t *const)str), mstrsize(str));
     }
     return tmp;
 } /* mstring_add_slash() */
@@ -1240,7 +1211,7 @@ mstring_cvt_progname (const string_t *str MTRACE_DECL)
     const char * txt, *p;
     char *txt2;
 
-    txt = get_txt(str);
+    txt = get_txt((string_t *const)str);
     len = mstrsize(str);
 
     p = strrchr(txt, '.');
@@ -1293,8 +1264,8 @@ mstring_add (const string_t *left, const string_t *right MTRACE_DECL)
         char * txt;
 
         txt = get_txt(tmp);
-        memcpy(txt, get_txt(left), lleft);
-        memcpy(txt+lleft, get_txt(right), lright);
+        memcpy(txt, get_txt((string_t *const)left), lleft);
+        memcpy(txt+lleft, get_txt((string_t *const)right), lright);
     }
     return tmp;
 } /* mstring_add() */
@@ -1323,7 +1294,7 @@ mstring_add_txt (const string_t *left, const char *right, size_t len MTRACE_DECL
     if (tmp)
     {
         txt = get_txt(tmp);
-        memcpy(txt, get_txt(left), lleft);
+        memcpy(txt, get_txt((string_t *const)left), lleft);
         memcpy(txt+lleft, right, len);
     }
     return tmp;
@@ -1354,7 +1325,7 @@ mstring_add_to_txt (const char *left, size_t len, const string_t *right MTRACE_D
     {
         txt = get_txt(tmp);
         memcpy(txt, left, len);
-        memcpy(txt+len, get_txt(right), lright);
+        memcpy(txt+len, get_txt((string_t *const)right), lright);
     }
     return tmp;
 } /* mstring_add_to_txt() */
@@ -1438,7 +1409,7 @@ mstring_repeat (const string_t *base, size_t num MTRACE_DECL)
         char   * txt = get_txt(result);
 
         /* Seed result[] with one copy of the string */
-        memcpy(txt, get_txt(base), len);
+        memcpy(txt, get_txt((string_t *const)base), len);
 
         /* Repeatedly double the string in result */
         curlen = len;
@@ -1512,7 +1483,7 @@ mstring_extract (const string_t *str, size_t start, long end MTRACE_DECL)
     result = mstring_alloc_string(reslen MTRACE_PASS);
     if (result && reslen)
     {
-        memcpy(get_txt(result), get_txt(str)+start, reslen);
+        memcpy(get_txt(result), get_txt((string_t *const)str)+start, reslen);
     }
     return result;
 } /* mstring_extract() */
@@ -1530,8 +1501,8 @@ mstring_prefixed (const string_t *p, const string_t *s)
     const char *pp, *ps;
     size_t lp, ls;
 
-    lp = mstrsize(p); pp = get_txt(p);
-    ls = mstrsize(s); ps = get_txt(s);
+    lp = mstrsize(p); pp = get_txt((string_t *const)p);
+    ls = mstrsize(s); ps = get_txt((string_t *const)s);
 
     for (; lp > 0 && ls > 0; lp--, ls--)
     {
@@ -1555,9 +1526,9 @@ mstring_chr (const string_t *p, char c)
 {
     char *pp;
 
-    pp = memchr(get_txt(p), c, mstrsize(p));
+    pp = memchr(get_txt((string_t *const)p), c, mstrsize(p));
     if (pp != NULL)
-        return pp - get_txt(p);
+        return pp - get_txt((string_t *const)p);
     return -1;
 } /* mstring_chr() */
 
@@ -1682,9 +1653,9 @@ mstring_gc_table (void)
                     next = this->next;
                 }
 
-                mstr_untabled++;
+                mstr_untabled_count++;
                 mstr_untabled_size += mstr_mem_size(this);
-                mstr_tabled--;
+                mstr_tabled_count--;
                 mstr_tabled_size += mstr_mem_size(this);
                 mstr_deleted++;
 
@@ -1721,10 +1692,10 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
     mp_uint distinct_overhead;
 
     stringtable_size = HTABLE_SIZE * sizeof(string_t *);
-    distinct_strings = mstr_tabled + mstr_untabled;
+    distinct_strings = mstr_tabled_count + mstr_untabled_count;
     distinct_size = mstr_tabled_size + mstr_untabled_size;
-    distinct_overhead = mstr_tabled * STR_OVERHEAD
-                      + mstr_untabled * STR_OVERHEAD;
+    distinct_overhead = mstr_tabled_count * STR_OVERHEAD
+                      + mstr_untabled_count * STR_OVERHEAD;
 
     if (!verbose)
     {
@@ -1754,20 +1725,20 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         , distinct_overhead + stringtable_size
                         );
         strbuf_addf(sbuf,  " - tabled\t%9lu %9lu (%9lu+%9lu)\n"
-                        , mstr_tabled
+                        , mstr_tabled_count
                         , mstr_tabled_size + stringtable_size
                         , mstr_tabled_size
-                          ? mstr_tabled_size - mstr_tabled * STR_OVERHEAD
+                          ? mstr_tabled_size - mstr_tabled_count * STR_OVERHEAD
                           : 0
-                        , mstr_tabled * STR_OVERHEAD + stringtable_size
+                        , mstr_tabled_count * STR_OVERHEAD + stringtable_size
                         );
         strbuf_addf(sbuf,  " - untabled\t%9lu %9lu (%9lu+%9lu)\n"
-                        , mstr_untabled
+                        , mstr_untabled_count
                         , mstr_untabled_size
                         , mstr_untabled_size
-                          ? mstr_untabled_size - mstr_untabled * STR_OVERHEAD
+                          ? mstr_untabled_size - mstr_untabled_count * STR_OVERHEAD
                           : 0
-                        , mstr_untabled * STR_OVERHEAD
+                        , mstr_untabled_count * STR_OVERHEAD
                         );
         strbuf_addf(sbuf, "\nSpace required vs. 'regular C' string implementation: "
                           "%lu%% with, %lu%% without overhead.\n"
@@ -1853,9 +1824,9 @@ string_dinfo_status (svalue_t *svp, int value)
     ST_NUMBER(DID_ST_STR_DELETED,    mstr_deleted);
     ST_NUMBER(DID_ST_STR_COLLISIONS, mstr_collisions);
 
-    ST_NUMBER(DID_ST_UNTABLED,      mstr_untabled);
+    ST_NUMBER(DID_ST_UNTABLED,      mstr_untabled_count);
     ST_NUMBER(DID_ST_UNTABLED_SIZE, mstr_untabled_size);
-    ST_NUMBER(DID_ST_TABLED,        mstr_tabled);
+    ST_NUMBER(DID_ST_TABLED,        mstr_tabled_count);
     ST_NUMBER(DID_ST_TABLED_SIZE,   mstr_tabled_size);
 
     ST_NUMBER(DID_ST_STR_SEARCHES,          mstr_searches);

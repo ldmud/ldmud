@@ -64,10 +64,10 @@ last_bit (string_t *str)
  */
 
 {
-    mp_int   pos;
-    long     len;
-    char   * cstr;
-    int      c;
+    mp_int       pos;
+    long         len;
+    const char * cstr;
+    int          c;
 
     pos = -1;
 

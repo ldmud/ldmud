@@ -330,7 +330,7 @@ trim_all_spaces (const string_t * txt)
     if (dest == NULL)
         errorf("Stack overflow (%zu bytes)\n", mstrsize(txt));
 
-    src = get_txt(txt);
+    src = get_txt((string_t *const)txt);
     srclen = mstrsize(txt);
     src_ix = 0;
     dest_ix = 0;
@@ -616,7 +616,7 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
     size_t   step;
     size_t   i, j;
 
-    in = get_txt(p_in);
+    in = get_txt((string_t *const)p_in);
     out = xalloc(len+1);
     tmp = xalloc(len+1);
     if (!out || !tmp)
@@ -833,7 +833,7 @@ intersect_strings (const string_t * p_left, const string_t * p_right, Bool bSubt
 
     /* Create the result: copy all flagged characters */
     memsafe(result = alloc_mstring(len_out), len_out, "intersection result");
-    left_txt = get_txt(p_left);
+    left_txt = get_txt((string_t *const)p_left);
     result_txt = get_txt(result);
     for (ix_left = 0, ix_right = 0; ix_left < len_left; ix_left++)
         if (matches[ix_left])

@@ -6,6 +6,16 @@ See the file HISTORY for a user-oriented summary of all the changes.
     Changed ASSIGN_EVAL_COST to a static inline function assign_eval_cost_inl()
       and use it consistently in interpret.c.
     Changed MAX_SHIFT to a static const.
+  - (mstrings.h, mstrings.c, strfuns.c)
+    Changed some code defines to static inline functions.
+    Renamed the variables mstr_tabled and mstr_untabled to mstr_tabled_count
+      and mstr_untabled_count. (They had the same name as the old defines which
+      are now functions).
+    Removed unused and now superfluous ref_mstring_safe, mstring_ref(),
+      deref_mstring_safe, mstring_deref(), because ref_mstring() and
+      deref_mstring() can now handle arguments with side-effects.
+    Added some casts to remove the const from const arguments when passing them
+    off to get_txt(). (Don't worry, it is only cosmetic and temporary.)
 
 03-Jan 2009 (Zesstra)
   - (efuns.c, efuns.h, func_spec)
