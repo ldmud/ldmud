@@ -746,39 +746,45 @@ static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
  *
  * This function must be called at least whenever the execution leaves
  * one object for another one.
+ *
+ * assign_eval_cost_inl() is the inlinable version used here, 
+ * assign_eval_cost() is used by other compilation units.
  */
 
-#define ASSIGN_EVAL_COST \
-    if (current_object->user)\
-    {\
-        unsigned long carry;\
-        current_object->user->cost += eval_cost - assigned_eval_cost;\
-        carry = current_object->user->cost / 1000000000;\
-        if (carry)\
-        {\
-            current_object->user->gigacost += carry;\
-            current_object->user->cost %= 1000000000;\
-        }\
-        current_object->user->total_cost += eval_cost - assigned_eval_cost;\
-        carry = current_object->user->total_cost / 1000000000;\
-        if (carry)\
-        {\
-            current_object->user->total_gigacost += carry;\
-            current_object->user->total_cost %= 1000000000;\
-        }\
-    }\
-    current_object->ticks += eval_cost - assigned_eval_cost;\
-    {\
-        unsigned long carry = current_object->ticks / 1000000000;\
-        if (carry)\
-        {\
-            current_object->gigaticks += carry;\
-            current_object->ticks %= 1000000000;\
-        }\
-    }\
+static INLINE void
+assign_eval_cost_inl(void)
+{
+    unsigned long carry;
+    if (current_object->user)
+    {
+        current_object->user->cost += eval_cost - assigned_eval_cost;
+        carry = current_object->user->cost / 1000000000;
+        if (carry)
+        {
+            current_object->user->gigacost += carry;
+            current_object->user->cost %= 1000000000;
+        }
+        current_object->user->total_cost += eval_cost - assigned_eval_cost;
+        carry = current_object->user->total_cost / 1000000000;
+        if (carry)
+        {
+            current_object->user->total_gigacost += carry;
+            current_object->user->total_cost %= 1000000000;
+        }
+    }
+    current_object->ticks += eval_cost - assigned_eval_cost;
+    {
+        carry = current_object->ticks / 1000000000;
+        if (carry)
+        {
+            current_object->gigaticks += carry;
+            current_object->ticks %= 1000000000;
+        }
+    }
     assigned_eval_cost = eval_cost;
+}
 
-void assign_eval_cost(void) { ASSIGN_EVAL_COST }
+void assign_eval_cost(void) { assign_eval_cost_inl(); }
 
 /*-------------------------------------------------------------------------*/
 void
@@ -7892,7 +7898,7 @@ again:
 
         printf("%s eval_cost too big %ld\n", time_stamp(), (long)eval_cost);
 
-        assign_eval_cost();
+        assign_eval_cost_inl();
 
         /* If the error isn't caught, reset the eval costs */
         for (context = rt_context
@@ -8038,7 +8044,7 @@ again:
 #endif
         inter_sp = sp;
         inter_pc = pc;
-        ASSIGN_EVAL_COST
+        assign_eval_cost_inl();
         sp = (*efun_table[code+EFUN0_OFFSET-TEFUN_OFFSET])(sp);
 #ifdef CHECK_OBJECT_REF
         check_all_object_shadows();
@@ -8087,7 +8093,7 @@ again:
 #endif
         inter_sp = sp;
         inter_pc = pc;
-        ASSIGN_EVAL_COST
+        assign_eval_cost_inl();
         test_efun_args(instruction, 1, sp);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
 #ifdef CHECK_OBJECT_REF
@@ -8137,7 +8143,7 @@ again:
 #endif
         inter_sp = sp;
         inter_pc = pc;
-        ASSIGN_EVAL_COST
+        assign_eval_cost_inl();
         test_efun_args(instruction, 2, sp-1);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
 #ifdef CHECK_OBJECT_REF
@@ -8188,7 +8194,7 @@ again:
 #endif
         inter_sp = sp;
         inter_pc = pc;
-        ASSIGN_EVAL_COST
+        assign_eval_cost_inl();
         test_efun_args(instruction, 3, sp-2);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
 #ifdef CHECK_OBJECT_REF
@@ -8238,7 +8244,7 @@ again:
 #endif
         inter_sp = sp;
         inter_pc = pc;
-        ASSIGN_EVAL_COST
+        assign_eval_cost_inl();
         test_efun_args(instruction, 4, sp-3);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
 #ifdef CHECK_OBJECT_REF
@@ -8274,7 +8280,7 @@ again:
 
         inter_sp = sp;
         inter_pc = pc;
-        ASSIGN_EVAL_COST
+        assign_eval_cost_inl();
 
         min_arg = instrs[instruction].min_arg;
         max_arg = instrs[instruction].max_arg;
@@ -8704,7 +8710,7 @@ again:
         {
             /* eval_instruction() must be left - setup the globals */
 
-            ASSIGN_EVAL_COST
+            assign_eval_cost_inl();
             current_object = csp->ob;
             previous_ob = csp->prev_ob;
             inter_pc = csp->pc;
@@ -9386,7 +9392,7 @@ again:
         svalue_t *arg;
         string_t *str;
 
-        assign_eval_cost();
+        assign_eval_cost_inl();
         num_arg = LOAD_UINT8(pc);
           /* GET_NUM_ARG doesn't work here either. */
         arg = sp - num_arg + 1;
@@ -14677,7 +14683,7 @@ again:
         int                 def_narg;  /* expected number of arguments */
         simul_efun_table_t *entry;
 
-        ASSIGN_EVAL_COST  /* we're changing objects */
+        assign_eval_cost_inl();  /* we're changing objects */
 
         /* Get the sefun code and the number of arguments on the stack */
         LOAD_SHORT(code, pc);
@@ -16085,7 +16091,7 @@ again:
          * catch(), that catch expression will return arg as error code.
          */
 
-        assign_eval_cost();
+        assign_eval_cost_inl();
         inter_sp = --sp;
         inter_pc = pc;
         throw_error(sp+1); /* do the longjump, with extra checks... */
@@ -16261,7 +16267,7 @@ again:
         {
             /* --- The normal call other to a single object --- */
 
-            ASSIGN_EVAL_COST
+            assign_eval_cost_inl();
 
             if (arg[0].type == T_OBJECT)
                 ob = arg[0].u.ob;
@@ -16349,7 +16355,7 @@ again:
             {
                 int i;
 
-                ASSIGN_EVAL_COST
+                assign_eval_cost_inl();
                 inter_sp = sp; /* Might be clobbered from previous loop */
 
                 if (svp->type == T_OBJECT)
@@ -20724,7 +20730,7 @@ f_trace (svalue_t *sp)
     {
         svalue_t *arg;
 
-        assign_eval_cost();
+        assign_eval_cost_inl();
         inter_sp = sp;
         push_ref_string(inter_sp, STR_TRACE);
         push_number(inter_sp, sp->u.number);
@@ -20781,7 +20787,7 @@ f_traceprefix (svalue_t *sp)
         inter_sp = sp;
         push_ref_string(inter_sp, STR_TRACEPREFIX);
         inter_sp++; assign_svalue_no_free(inter_sp, sp);
-        assign_eval_cost();
+        assign_eval_cost_inl();
         arg = apply_master(STR_VALID_TRACE,2);
         if (arg)
         {

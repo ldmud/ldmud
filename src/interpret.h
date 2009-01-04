@@ -94,9 +94,9 @@ typedef struct errorhandler_s {
 } errorhandler_t;
 
 
-/* --- Macros --- */
+/* --- Constants --- */
 
-#define MAX_SHIFT ((sizeof(p_int) << 3) - 1)
+static const short MAX_SHIFT = (sizeof(p_int) << 3) - 1;
   /* The maximally useful shift (left or right) of a number in LPC.
    */
 

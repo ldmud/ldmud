@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Jan 2009 (Zesstra)
+  - (interpret.c, interpret.h)
+    Changed ASSIGN_EVAL_COST to a static inline function assign_eval_cost_inl()
+      and use it consistently in interpret.c.
+    Changed MAX_SHIFT to a static const.
+
 03-Jan 2009 (Zesstra)
   - (efuns.c, efuns.h, func_spec)
     Extended present_clone() to optionally search for the <n>th object in the
