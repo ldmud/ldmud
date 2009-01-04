@@ -222,6 +222,7 @@ AC_MY_ARG_WITH(total-trace-length,0x1000,,)
 AC_MY_ARG_WITH(pcre-recursion-limit,3000,,[maximum number of recursions in PCRE package])
 AC_MY_ARG_WITH(wizlist-file,WIZLIST,,[name of the wizlist file])
 AC_MY_ARG_WITH(max_net_connects,10,,[maximum number of concurrent connection attempts])
+AC_MY_ARG_WITH(random-period-length,19937,[607 / 1279 / 2281 / 4253 / 11213 / 19937 / 44497 / 86243 / 132049 / 216091],[period length of the random number generator])
 
 AC_ARG_WITH(setting,[  --with-setting=SETTING  include a predefined setting],[
 if test -f "settings/$withval" ; then
@@ -465,6 +466,7 @@ AC_INT_VAL_FROM_WITH(max_malloced)
 AC_INT_VAL_FROM_WITH(total_trace_length)
 AC_INT_VAL_FROM_WITH(pcre_recursion_limit)
 AC_INT_VAL_FROM_WITH(max_net_connects)
+AC_INT_VAL_FROM_WITH(random_period_length)
 
 if test "x$cdef_access_control" = "x#undef"; then
   cdef_access_log="#undef"
@@ -2823,6 +2825,7 @@ AC_SUBST(val_total_trace_length)
 AC_SUBST(val_wizlist_file)
 AC_SUBST(val_pcre_recursion_limit)
 AC_SUBST(val_max_net_connects)
+AC_SUBST(val_random_period_length)
 
 dnl finally: some remaining stuff
 dnl

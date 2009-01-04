@@ -114,8 +114,6 @@ Bool share_variables = MY_FALSE;  /* Clones are initialized from their
 
 Bool allow_filename_spaces = MY_FALSE; /* Allow spaces in filenames */
 
-static uint32 random_seed = 0;  /* The seed for the pseudo-random generator. */
-
 static char * hostname = NULL;
 static char * hostaddr = NULL;
   /* Hostname and -addr given on the commandline. They are passed as
@@ -281,9 +279,15 @@ main (int argc, char **argv)
     put_number(&const1, 1);
 
     current_time = get_current_time();
-    random_seed = (uint32)current_time;
-    seed_random(random_seed);
-
+    
+         
+    // Set prng_device_name to the default //
+    prng_device_name = strdup(PRNG_DEFAULT_DEVICE);
+    // init PRG by the default device (/dev/urandom) 
+    // if --random-seed or --randomdevice is given on the command-line it
+    // will re-seeded later.
+    seed_random(prng_device_name);
+    
     do {
         dummy_current_object_for_loads = NULL_object;
 #ifdef DEBUG
@@ -436,11 +440,6 @@ main (int argc, char **argv)
         init_otable();
         for (i = 0; i < (int)(sizeof avg_consts / sizeof avg_consts[0]); i++)
             avg_consts[i] = exp(- i / 900.0);
-
-        printf("%s Random seed: 0x%lx\n"
-              , time_stamp(), (unsigned long)random_seed);
-        debug_message("%s Random seed: 0x%lx\n"
-                     , time_stamp(), (unsigned long)random_seed);
 
 #ifdef USE_MYSQL
         if (!pkg_mysql_init())
@@ -1055,6 +1054,7 @@ typedef enum OptNumber {
  , cNoHeart         /* --no-heart           */
  , cNoPreload       /* --no-preload         */
  , cPidFile         /* --pidfile            */
+ , cRandomdevice    /* --randomdevice       */
  , cRandomSeed      /* --random-seed        */
  , cRegexp          /* --regexp             */
  , cResetTime       /* --reset-time         */
@@ -1503,6 +1503,13 @@ static Option aOptions[]
       , "  --pidfile <filename>\n"
       , "  --pidfile <filename>\n"
         "    Write the pid of the driver process into <filename>.\n"
+      }
+
+    , { 0,   "randomdevice",       cRandomdevice,   MY_TRUE
+      , "  --randomdevice <filename>\n"
+      , "  --randomdevice <filename>\n"
+        "    Determines the source of the seed for the random number generator.\n"
+        "    (tries /dev/urandom by default and uses system clock as fallback)\n"
       }
 
     , { 0,   "random-seed",        cRandomSeed,     MY_TRUE
@@ -2539,14 +2546,23 @@ eval_arg (int eOption, const char * pValue)
             free(debug_file);
         debug_file = strdup(pValue);
         break;
+        
+    case cRandomdevice:
+        // sets prng_device_name to some file/device and re-seeds the PRNG
+        // from it.
+        if (prng_device_name != NULL)
+            free(prng_device_name);
+        prng_device_name = strdup(pValue);
+        seed_random(prng_device_name);
+        break;
 
     case cRandomSeed:
+    	// seeds PRG with given value
 #ifdef HAVE_STRTOUL
-        random_seed = strtoul(pValue, (char **)0, 0);
+        seed_random_from_int(strtoul(pValue, (char **)0, 0));
 #else
-        random_seed = (uint32)strtol(pValue, (char **)0, 0);
+        seed_random_from_int((uint32)strtol(pValue, (char **)0, 0));
 #endif
-        seed_random(random_seed);
         break;
 
     case cReserved:

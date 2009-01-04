@@ -16,6 +16,19 @@ See the file HISTORY for a user-oriented summary of all the changes.
       deref_mstring() can now handle arguments with side-effects.
     Added some casts to remove the const from const arguments when passing them
     off to get_txt(). (Don't worry, it is only cosmetic and temporary.)
+  - (random.h, random.c, main.c, autoconf/configure.in, config.h.in, efuns.c,
+      random/*)
+    Exchanged the Mersenne Twister (pseudo random number generator) by the
+      SIMD-oriented Fast Mersenne Twister (SFMT) to support random numbers up
+      to 2^63-1 on 64 bit platforms:
+      http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/SFMT/
+      Additionally, the period length can be configured now. The SFMT
+      faciliates a better equidistribution and a faster recovery from a
+      0-excess state as well. (Bug #527)
+    Added the possibility to seed the PRNG from arbitrary files or devices by
+      using the commandline option --randomdevice. The default device is
+      /dev/urandom. If that is not readable, the driver falls back to seed the
+      PRNG with the system time.
 
 03-Jan 2009 (Zesstra)
   - (efuns.c, efuns.h, func_spec)

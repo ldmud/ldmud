@@ -1,0 +1,21 @@
+This archive contails following directories and files.
+
+TOP DIRECTORY
+FILES.txt:      This file.
+LICENSE.txt:    License file.
+CHANGE-LOG.txt: Change log file.
+SFMT.h:         Header file.
+SFMT-params.h:  parameter file which controls various Mersenne expornent
+params607.h:    parameters for period of 2^{607}-1
+params1279.h:   parameters for period of 2^{1279}-1
+params2281.h:   parameters for period of 2^{2281}-1
+params4253.h:   parameters for period of 2^{4253}-1
+params11213.h:  parameters for period of 2^{11213}-1
+params19937.h:  parameters for period of 2^{19937}-1
+params44497.h:  parameters for period of 2^{44497}-1
+params86243.h:  parameters for period of 2^{86243}-1
+params132049.h: parameters for period of 2^{132049}-1
+params216091.h: parameters for period of 2^{216091}-1
+SFMT.c:         C code for standard C (c99) and unix like systems.
+SFMT-alti.h:    C code optimized for PowerPC AltiVec.
+SFMT-sse2.h:    C code optimized for intel SSE2.

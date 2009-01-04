@@ -254,7 +254,15 @@ DESCRIPTION
       --y|--yydebug
         Enable debugging of the LPC compiler.
         Only available if compiled with YYDEBUG.
-
+				
+      --randomdevice <filename>
+        Chooses the source of the seed for the random number generator.
+        Default is /dev/urandom, Fall-back if <filename> is not readable is
+        the system clock. If you want to seed the PRNG with a specific seed,
+        you can use a filename with the seed and give it here instead of using
+        --random-seed.
+        (Note: the last one of --randominit and --random-seed wins!)
+				
       --random-seed <num>
         Seed value for the random number generator. If not given, the
         driver chooses a seed value on its own.
@@ -343,3 +351,4 @@ HISTORY
     LDMud 3.3.672/3.2.11 added --tls-trustfile, --tls-trustdirectory.
     LDMud 3.3.677 added --max-mapping-keys.
     LDMud 3.3.714/3.2.15 added --tls-crlfile, --tls-crldirectory.
+    LDMud 3.3.x added --randominit.

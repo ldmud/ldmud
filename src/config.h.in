@@ -141,6 +141,11 @@
  */
 #define MAX_MALLOCED         @val_max_malloced@
 
+/* --- Random Number Generator (SFMT) --- */
+/* Set the period length of the SFMT.
+ * Default is a period length of 2^19937 - 1
+ */
+#define RANDOM_PERIOD_LENGTH @val_random_period_length@
 
 /* --- Interpreter --- */
 

@@ -1,0 +1,10 @@
+This is SFMT-1.3.3, stripped down to what is required by the LDMud gamedriver.
+
+Additionally the 'public' function were made static as well because they are
+probably not used without the wrapper. Therefore, their declarations have been
+commented out.
+The small inline functions from SFMT.h were moved to SFMT.c for the same
+reason.
+
+The files README.txt and LICENSE.txt tell you where to get the complete package.
+

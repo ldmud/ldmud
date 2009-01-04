@@ -8738,7 +8738,7 @@ f_random (svalue_t *sp)
     if (sp->u.number <= 0)
         sp->u.number = 0;
     else
-        sp->u.number = (p_int)random_number((uint32)sp->u.number);
+        sp->u.number = (p_int)random_number(sp->u.number);
 
     return sp;
 } /* f_random() */
