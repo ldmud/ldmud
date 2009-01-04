@@ -71,6 +71,14 @@ OPTIMIZE= $(@val_optimize@_OPTIMIZE)
 #   recompile.
 #DEBUG = -DDEBUG # -DDEBUG_TELNET
 DEBUG=
+
+# Flags for compiling the SFMT random number generator.
+SFMT_FLAGS = -fno-strict-aliasing
+# for machines with sse2 support you may use:
+#SFMT_FLAGS = -msse2 -fno-strict-aliasing -DHAVE_SSE2=1
+# for machines with altivec support you may use:
+#SFMT_FLAGS = -faltivec -fno-strict-aliasing -DHAVE_ALTIVEC=1
+
 #
 MPATH=-DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"' -DERQ_DIR='"$(ERQ_DIR)"'
 #
@@ -206,6 +214,9 @@ lang.c lang.h: lang.y
 
 pcre/chartables.c : dftables@EXEEXT@
 	./dftables@EXEEXT@ pcre/chartables.c
+
+random.o : random.c config.h driver.h
+       $(CC) $(CFLAGS) $(SFMT_FLAGS) -c random.c -o random.o
 
 #--------------------------------------------------------
 # The dependency generation uses the program 'mkdepend' and assumes GNUmake.
