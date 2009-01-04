@@ -829,6 +829,7 @@ f_regexplode (svalue_t *sp)
                sizeof(*matches));
     }
     cleanup->matchmempool = pool;
+    cleanup->reg = NULL;
     /*  push error handler above the args on the stack */
     sp = push_error_handler(regexplode_error_handler, &(cleanup->sval));
         
