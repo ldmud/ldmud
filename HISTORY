@@ -14,7 +14,20 @@ xx-xxx-xxxx () -- 3.3.718
     - Changed Efuns:
        + present_clone(): the efuns now optionally searches for the <n>th
            object in <env> instead of the first one.
+       + debug_info(): can be used to query the current stack control depth
+           with DIT_CURRENT_DEPTH (LPC recursion depth).
+
+    - Runtime:
        + random(): Uses now a new random number generator (SFMT) see below.
+       + sprintf(): Can now print values larger than 2^32-1 if the driver is
+           compiled on 64 bit platforms.
+
+    - Fixed Crashes:
+       + filter(), save_object(), restore_object(), send_erq(), send_udp(),
+         db_conv_string(), regexplode(), regexp(), process_string(),
+         present_clone(), load_object(), rename_object(), replace_program()
+         could crash the driver due to stack overflows, when large string were
+         used as arguments.
 
     - Language
        + Disallowed case labels in inner blocks of switch statements
@@ -33,6 +46,7 @@ xx-xxx-xxxx () -- 3.3.718
           devices by using the commandline option --randomdevice. The default
           device is /dev/urandom. If that is not readable, the driver falls
           back to seed the PRNG with the system time (Bug #515).
+       + The driver dumps a core now even if the master object is not loaded.
 
 10-Aug-2008 (Lars Duening) -- 3.3.717
     - Changed Efuns:
