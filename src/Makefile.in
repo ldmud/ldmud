@@ -216,7 +216,7 @@ pcre/chartables.c : dftables@EXEEXT@
 	./dftables@EXEEXT@ pcre/chartables.c
 
 random.o : random.c config.h driver.h
-       $(CC) $(CFLAGS) $(SFMT_FLAGS) -c random.c -o random.o
+	$(CC) $(CFLAGS) $(SFMT_FLAGS) -c random.c -o random.o
 
 #--------------------------------------------------------
 # The dependency generation uses the program 'mkdepend' and assumes GNUmake.
