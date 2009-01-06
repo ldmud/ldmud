@@ -16,7 +16,6 @@
 #endif
 
 #include "erq.h"
-#include "random.h"
 
 #include <stdio.h>
 #include <sys/socket.h>
@@ -60,8 +59,8 @@ typedef union wait wait_status_t;
 #    define SIGTERM 15
 #endif
 
-#define randomize(n) seed_random(n)
-#define get_ticket() random_number(0xffffffff)
+#define randomize(n) srandom(n)
+#define get_ticket() (random() & 0x7FFFFFFF)
 
 #ifdef TIOCNOTTY
 #    define DETACH

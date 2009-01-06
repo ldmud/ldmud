@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06 Jan 2009 (Fuchur)
+  - (util/xerq/erq.c, util/xerq/defs.h)
+    Remove dependency on the driver's random number generator - the
+    libc one should serve us just fine.
+
 04-Jan 2009 (Zesstra)
   - (interpret.c, interpret.h)
     Changed ASSIGN_EVAL_COST to a static inline function assign_eval_cost_inl()

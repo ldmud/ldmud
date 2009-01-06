@@ -13,8 +13,6 @@
 
 #include "defs.h"
 
-#include "random.c" /* Compile the driver's random module */
-
 /*-------------------------------------------------------------------------*/
 void (*erq_table[])(char *, int)
   = { erq_rlookup
