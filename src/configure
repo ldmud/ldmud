@@ -715,6 +715,7 @@ cdef_use_ipv6
 cdef_use_mysql
 cdef_use_pgsql
 cdef_use_sqlite
+cdef_use_iksemel
 cdef_use_pthreads
 cdef_use_alists
 cdef_use_mccp
@@ -738,6 +739,7 @@ cdef_malloc_trace
 cdef_malloc_lpc_trace
 cdef_malloc_sbrk_trace
 cdef_dynamic_costs
+cdef_eval_cost_trace
 cdef_rxcache_table
 cdef_wizlist_file
 cdef_synchronous_heart_beat
@@ -806,6 +808,7 @@ val_total_trace_length
 val_wizlist_file
 val_pcre_recursion_limit
 val_max_net_connects
+val_random_period_length
 erq_sub
 PKGLIBS
 ERQ_LIBS
@@ -831,6 +834,7 @@ enable_use_pgsql
 enable_use_sqlite
 enable_use_pthreads
 enable_use_pcre
+enable_use_iksemel
 enable_use_deprecated
 enable_use_structs
 enable_use_tls
@@ -849,6 +853,7 @@ enable_malloc_trace
 enable_malloc_lpc_trace
 enable_malloc_sbrk_trace
 enable_dynamic_costs
+enable_eval_cost_trace
 enable_trace_code
 enable_rxcache_table
 enable_synchronous_heart_beat
@@ -919,6 +924,7 @@ with_total_trace_length
 with_pcre_recursion_limit
 with_wizlist_file
 with_max_net_connects
+with_random_period_length
 with_setting
 with_target
 '
@@ -1579,6 +1585,8 @@ Optional Features:
         enable using of threads for socket writes
   --enable-use-pcre  default=enabled
         Enables PCRE: no/yes/builtin/no-builtin
+  --enable-use-iksemel  default=disabled
+        Enables use of iksemel for XML parsing
   --enable-use-deprecated  default=enabled
         Enables obsolete and deprecated efuns
   --enable-use-structs  default=enabled
@@ -1610,6 +1618,8 @@ Optional Features:
   --enable-malloc-sbrk-trace  default=disabled
         Log all esbrk() calls (smalloc,slaballoc)
   --enable-dynamic-costs  default=disabled
+  --enable-eval-cost-trace  default=disabled
+        Writes the evaluation costs in the stracktrace
   --enable-trace-code  default=enabled
         trace the most recently executed bytecode
   --enable-rxcache_table  default=enabled
@@ -1717,6 +1727,8 @@ Optional Packages:
         name of the wizlist file
   --with-max_net_connects=VALUE  default=10
         maximum number of concurrent connection attempts
+  --with-random-period-length=607 / 1279 / 2281 / 4253 / 11213 / 19937 / 44497 / 86243 / 132049 / 216091  default=19937
+        period length of the random number generator
   --with-setting=SETTING  include a predefined setting
   --with-target    ??
 
@@ -2303,6 +2315,13 @@ if test "${enable_use_pcre+set}" = set; then
 fi
 
 
+DEFAULTenable_use_iksemel=no
+# Check whether --enable-use-iksemel was given.
+if test "${enable_use_iksemel+set}" = set; then
+  enableval=$enable_use_iksemel;
+fi
+
+
 DEFAULTenable_use_deprecated=yes
 # Check whether --enable-use-deprecated was given.
 if test "${enable_use_deprecated+set}" = set; then
@@ -2427,6 +2446,13 @@ DEFAULTenable_dynamic_costs=no
 # Check whether --enable-dynamic-costs was given.
 if test "${enable_dynamic_costs+set}" = set; then
   enableval=$enable_dynamic_costs;
+fi
+
+
+DEFAULTenable_eval_cost_trace=no
+# Check whether --enable-eval-cost-trace was given.
+if test "${enable_eval_cost_trace+set}" = set; then
+  enableval=$enable_eval_cost_trace;
 fi
 
 
@@ -2983,6 +3009,14 @@ if test "${with_max_net_connects+set}" = set; then
 fi
 
 
+DEFAULTwith_random_period_length=19937
+
+# Check whether --with-random-period-length was given.
+if test "${with_random_period_length+set}" = set; then
+  withval=$with_random_period_length;
+fi
+
+
 
 
 # Check whether --with-setting was given.
@@ -3017,7 +3051,8 @@ fi
 if test "x$enable_erq" = "xerq" || test "x$enable_erq" = "xyes"; then
   cdef_erq_demon="#define"
   erq_sub=erq
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define ERQ_INCLUDE "util/erq/erq.h"
 _ACEOF
 
@@ -3107,6 +3142,23 @@ else
   cdef_use_sqlite="#define"
   sqlite_path="$enable_use_sqlite"
   enable_use_sqlite="yes"
+fi
+
+if test "x$enable_use_iksemel" = "x" && test "x$DEFAULTenable_use_iksemel" != "x"; then
+  enable_use_iksemel=$DEFAULTenable_use_iksemel
+fi
+
+if test "x$enable_use_iksemel" = "x" || test "x$enable_use_iksemel" = "xyes"; then
+  cdef_use_iksemel="#define"
+  iksemel_path=
+  enable_use_iksemel="yes"
+elif test "x$enable_use_iksemel" = "xno"; then
+  cdef_use_iksemel="#undef"
+  iksemel_path=
+else
+  cdef_use_iksemel="#define"
+  iksemel_path="$enable_use_iksemel"
+  enable_use_iksemel="yes"
 fi
 
 if test "x$enable_use_tls" = "x" && test "x$DEFAULTenable_use_tls" != "x"; then
@@ -3415,6 +3467,16 @@ if test "x$enable_dynamic_costs" = "xyes"; then
   cdef_dynamic_costs="#define"
 else
   cdef_dynamic_costs="#undef"
+fi
+
+if test "x$enable_eval_cost_trace" = "x" && test "x$DEFAULTenable_eval_cost_trace" != "x"; then
+  enable_eval_cost_trace=$DEFAULTenable_eval_cost_trace
+fi
+
+if test "x$enable_eval_cost_trace" = "xyes"; then
+  cdef_eval_cost_trace="#define"
+else
+  cdef_eval_cost_trace="#undef"
 fi
 
 if test "x$enable_trace_code" = "x" && test "x$DEFAULTenable_trace_code" != "x"; then
@@ -4113,6 +4175,16 @@ if test "x$with_max_net_connects" = "x" && test "x$DEFAULTwith_max_net_connects"
 fi
 
 val_max_net_connects=$with_max_net_connects
+
+if test "x$with_random_period_length" != "x"; then
+  with_random_period_length=`echo $with_random_period_length|
+             sed -e 's/^\(-\?\(0x[0-9a-fA-F]\+\)\?[0-9]*\)[^0-9]\?.*$/\1/'`
+fi
+if test "x$with_random_period_length" = "x" && test "x$DEFAULTwith_random_period_length" != "x"; then
+  with_random_period_length=$DEFAULTwith_random_period_length
+fi
+
+val_random_period_length=$with_random_period_length
 
 
 if test "x$cdef_access_control" = "x#undef"; then
@@ -5599,7 +5671,8 @@ _ACEOF
 esac
 
 if test "x$ac_cv_c_inline" != "xno"; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HAS_INLINE 1
 _ACEOF
 
@@ -11757,6 +11830,11 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
+
+
+
+
+
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -14063,6 +14141,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_sys_malloc_align" >&5
 $as_echo "$lp_cv_sys_malloc_align" >&6; }
+
 cat >>confdefs.h <<_ACEOF
 #define MALLOC_ALIGN $lp_cv_sys_malloc_align
 _ACEOF
@@ -14070,9 +14149,11 @@ _ACEOF
 
 
 if test "x$ac_cv_type_signal" = "xvoid"; then
-  cat >> confdefs.h <<EOF
+
+cat >>confdefs.h <<\_ACEOF
 #define RETSIGTYPE_VOID 1
-EOF
+_ACEOF
+
 fi
 
 # --- Check for common system libraries ---
@@ -14986,7 +15067,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_func_inet_ntoa_ok" >&5
 $as_echo "$lp_cv_func_inet_ntoa_ok" >&6; }
 if test $lp_cv_func_inet_ntoa_ok = yes ; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define INET_NTOA_OK 1
 _ACEOF
 
@@ -15059,7 +15141,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_has_ipv6" >&5
 $as_echo "$lp_cv_has_ipv6" >&6; }
 if test $lp_cv_has_ipv6 = yes; then
-    cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HAS_IPV6 1
 _ACEOF
 
@@ -15301,7 +15384,8 @@ $as_echo "$lp_cv_has_openssl" >&6; }
     if test $lp_cv_has_openssl = yes; then
         has_tls=yes
         tls_package=ssl
-        cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HAS_OPENSSL 1
 _ACEOF
 
@@ -15662,7 +15746,8 @@ $as_echo "$lp_cv_has_gnutls" >&6; }
     if test $lp_cv_has_gnutls = yes; then
         has_tls=yes
         tls_package=gnu
-        cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HAS_GNUTLS 1
 _ACEOF
 
@@ -15887,7 +15972,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_has_gnutls_version" >&5
 $as_echo "$lp_cv_has_gnutls_version" >&6; }
             LIBS="$savelibs"
-            cat >>confdefs.h <<_ACEOF
+
+cat >>confdefs.h <<_ACEOF
 #define HAS_GNUTLS_VERSION $lp_cv_has_gnutls_version
 _ACEOF
 
@@ -15988,7 +16074,8 @@ if test $lp_cv_has_pthreads = yes; then
     saveflags="$CFLAGS"
     savelibs="$LIBS"
 
-    cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HAS_PTHREADS 1
 _ACEOF
 
@@ -16271,7 +16358,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_has_pthread_atfork" >&5
 $as_echo "$lp_cv_has_pthread_atfork" >&6; }
     if test $lp_cv_has_pthread_atfork = yes; then
-        cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HAS_PTHREAD_ATFORK 1
 _ACEOF
 
@@ -16440,7 +16528,8 @@ $as_echo "$lp_cv_has_pcre" >&6; }
     CFLAGS="$saveflags"
 
     if test $lp_cv_has_pcre = yes; then
-        cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HAS_PCRE 1
 _ACEOF
 
@@ -16813,14 +16902,16 @@ fi
 fi
 
 if test "x$lp_cv_has_iconv" = "xyes"; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HAS_ICONV 1
 _ACEOF
 
 fi
 
 if test "x$lp_cv_has_iconv_nonconst_in" = "xyes"; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HAS_ICONV_NONCONST_IN 1
 _ACEOF
 
@@ -17260,7 +17351,8 @@ $as_echo "$lp_cv_has_mysql" >&6; }
 # The system has the include files - now search for the libraries.
 if test $lp_cv_has_mysql = yes; then
   saveflags="$CFLAGS"
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HAS_MYSQL 1
 _ACEOF
 
@@ -18195,7 +18287,8 @@ $as_echo "$lp_cv_has_pgsql" >&6; }
 # The system has the include files - now search for the libraries.
 if test $lp_cv_has_pgsql = yes; then
   saveflags="$CFLAGS"
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HAS_PGSQL 1
 _ACEOF
 
@@ -18929,7 +19022,8 @@ $as_echo "$lp_cv_has_sqlite3" >&6; }
 # The system has the include files - now search for the libraries.
 if test $lp_cv_has_sqlite3 = yes; then
   saveflags="$CFLAGS"
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HAS_SQLITE3 1
 _ACEOF
 
@@ -19367,7 +19461,8 @@ fi
 
 
       if test $lp_cv_sqlite3_uses_pthreads = yes ; then
-           cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define SQLITE3_USES_PTHREADS 1
 _ACEOF
 
@@ -19386,6 +19481,456 @@ else
 fi
       cdef_use_sqlite="#undef"
       enable_use_sqlite=no
+  fi
+fi
+
+# --- Iksemel ---
+
+{ $as_echo "$as_me:$LINENO: checking for Iksemel" >&5
+$as_echo_n "checking for Iksemel... " >&6; }
+if test "${lp_cv_has_iksemel+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  for TESTPATH in "" "$iksemel_path" "$iksemel_path/include" "/usr/local/include" ; do
+    saveflags="$CFLAGS"
+    if test "x$TESTPATH" != "x"; then
+        CFLAGS="$saveflags -I$TESTPATH"
+    fi
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+#include <iksemel.h>
+
+iks * foo(void)
+{
+
+    return (iks*)0;
+}
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
+$as_echo "$ac_try_echo") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  lp_cv_has_iksemel=yes
+if test "x$TESTPATH" != "x"; then
+    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+fi
+break;
+
+else
+  $as_echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	lp_cv_has_iksemel=no
+CFLAGS="$saveflags"
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+done
+
+fi
+{ $as_echo "$as_me:$LINENO: result: $lp_cv_has_iksemel" >&5
+$as_echo "$lp_cv_has_iksemel" >&6; }
+
+# The system has the include files - now search for the libraries.
+if test $lp_cv_has_iksemel = yes; then
+  saveflags="$CFLAGS"
+
+cat >>confdefs.h <<\_ACEOF
+#define HAS_IKSEMEL 1
+_ACEOF
+
+
+  if test $enable_use_iksemel = yes; then
+    tmp=""
+
+    { $as_echo "$as_me:$LINENO: checking for main in -liksemel" >&5
+$as_echo_n "checking for main in -liksemel... " >&6; }
+if test "${ac_cv_lib_iksemel_main+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-liksemel  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+return main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
+$as_echo "$ac_try_echo") >&5
+  (eval "$ac_link") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext && {
+	 test "$cross_compiling" = yes ||
+	 $as_test_x conftest$ac_exeext
+       }; then
+  ac_cv_lib_iksemel_main=yes
+else
+  $as_echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_cv_lib_iksemel_main=no
+fi
+
+rm -rf conftest.dSYM
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:$LINENO: result: $ac_cv_lib_iksemel_main" >&5
+$as_echo "$ac_cv_lib_iksemel_main" >&6; }
+if test $ac_cv_lib_iksemel_main = yes; then
+  tmp="$PKGLIBS -liksemel"
+fi
+
+
+    if test "x$iksemel_path" == "x"; then
+        unset ac_cv_lib_iksemel_main
+        if test -d "${iksemel_path}/lib/iksemel"; then
+            CFLAGS="$saveflags -L${iksemel_path}/lib/iksemel"
+            { $as_echo "$as_me:$LINENO: checking for main in -liksemel" >&5
+$as_echo_n "checking for main in -liksemel... " >&6; }
+if test "${ac_cv_lib_iksemel_main+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-liksemel  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+return main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
+$as_echo "$ac_try_echo") >&5
+  (eval "$ac_link") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext && {
+	 test "$cross_compiling" = yes ||
+	 $as_test_x conftest$ac_exeext
+       }; then
+  ac_cv_lib_iksemel_main=yes
+else
+  $as_echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_cv_lib_iksemel_main=no
+fi
+
+rm -rf conftest.dSYM
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:$LINENO: result: $ac_cv_lib_iksemel_main" >&5
+$as_echo "$ac_cv_lib_iksemel_main" >&6; }
+if test $ac_cv_lib_iksemel_main = yes; then
+  tmp="$PKGLIBS -L${iksemel_path}/lib/iksemel -liksemel"
+fi
+
+        elif test -d "${iksemel_path}/lib"; then
+            CFLAGS="$saveflags -L${iksemel_path}/lib"
+            { $as_echo "$as_me:$LINENO: checking for main in -liksemel" >&5
+$as_echo_n "checking for main in -liksemel... " >&6; }
+if test "${ac_cv_lib_iksemel_main+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-liksemel  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+return main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
+$as_echo "$ac_try_echo") >&5
+  (eval "$ac_link") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext && {
+	 test "$cross_compiling" = yes ||
+	 $as_test_x conftest$ac_exeext
+       }; then
+  ac_cv_lib_iksemel_main=yes
+else
+  $as_echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_cv_lib_iksemel_main=no
+fi
+
+rm -rf conftest.dSYM
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:$LINENO: result: $ac_cv_lib_iksemel_main" >&5
+$as_echo "$ac_cv_lib_iksemel_main" >&6; }
+if test $ac_cv_lib_iksemel_main = yes; then
+  tmp="$PKGLIBS -L${iksemel_path}/lib -liksemel"
+fi
+
+        elif test -d "${iksemel_patch}"; then
+            CFLAGS="$saveflags -L$iksemel_path"
+            { $as_echo "$as_me:$LINENO: checking for main in -liksemel" >&5
+$as_echo_n "checking for main in -liksemel... " >&6; }
+if test "${ac_cv_lib_iksemel_main+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-liksemel  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+return main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
+$as_echo "$ac_try_echo") >&5
+  (eval "$ac_link") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext && {
+	 test "$cross_compiling" = yes ||
+	 $as_test_x conftest$ac_exeext
+       }; then
+  ac_cv_lib_iksemel_main=yes
+else
+  $as_echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_cv_lib_iksemel_main=no
+fi
+
+rm -rf conftest.dSYM
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:$LINENO: result: $ac_cv_lib_iksemel_main" >&5
+$as_echo "$ac_cv_lib_iksemel_main" >&6; }
+if test $ac_cv_lib_iksemel_main = yes; then
+  tmp="$PKGLIBS -L$iksemel_path -liksemel"
+fi
+
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        unset ac_cv_lib_iksemel_main
+        if test -d "/usr/local/lib"; then
+            CFLAGS="$saveflags -L/usr/local/lib"
+            { $as_echo "$as_me:$LINENO: checking for main in -liksemel" >&5
+$as_echo_n "checking for main in -liksemel... " >&6; }
+if test "${ac_cv_lib_iksemel_main+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-liksemel  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+return main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
+$as_echo "$ac_try_echo") >&5
+  (eval "$ac_link") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext && {
+	 test "$cross_compiling" = yes ||
+	 $as_test_x conftest$ac_exeext
+       }; then
+  ac_cv_lib_iksemel_main=yes
+else
+  $as_echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_cv_lib_iksemel_main=no
+fi
+
+rm -rf conftest.dSYM
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:$LINENO: result: $ac_cv_lib_iksemel_main" >&5
+$as_echo "$ac_cv_lib_iksemel_main" >&6; }
+if test $ac_cv_lib_iksemel_main = yes; then
+  tmp="$PKGLIBS -L/usr/local/lib -liksemel"
+fi
+
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        echo "libiksemel library not found - disabling Iksemel support"
+        if test "x$not_available" = "x"; then
+    not_available="use-iksemel"
+else
+    not_available="$not_available, use-iksemel"
+fi
+        cdef_use_iksemel="#undef"
+        enable_use_iksemel="no"
+        iksemel=
+        lp_cv_has_iksemel="no"
+    else
+        PKGLIBS="$tmp"
+    fi
+  fi
+
+  CFLAGS="$saveflags"
+else
+  if test $enable_use_iksemel = yes; then
+      if test "x$not_available" = "x"; then
+    not_available="use-iksemel"
+else
+    not_available="$not_available, use-iksemel"
+fi
+      cdef_use_iksemel="#undef"
+      enable_use_iksemel=no
   fi
 fi
 
@@ -19538,7 +20083,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_sys_rename_handles_directories" >&5
 $as_echo "$lp_cv_sys_rename_handles_directories" >&6; }
 if test $lp_cv_sys_rename_handles_directories = yes; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define RENAME_HANDLES_DIRECTORIES 1
 _ACEOF
 
@@ -19625,7 +20171,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_struct_rusage_full" >&5
 $as_echo "$lp_cv_struct_rusage_full" >&6; }
 if test $lp_cv_struct_rusage_full = no; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define GETRUSAGE_RESTRICTED 1
 _ACEOF
 
@@ -19697,7 +20244,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_struct_rusage_usec" >&5
 $as_echo "$lp_cv_struct_rusage_usec" >&6; }
 if test $lp_cv_struct_rusage_usec = yes; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define RUSAGE_USEC 1
 _ACEOF
 
@@ -19764,11 +20312,14 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_func_getrusage_via_syscall" >&5
 $as_echo "$lp_cv_func_getrusage_via_syscall" >&6; }
 if test $lp_cv_func_getrusage_via_syscall=yes; then
-  cat >>confdefs.h <<\_ACEOF
-#define GETRUSAGE_VIA_SYSCALL 1
-_ACEOF
- cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HAVE_GETRUSAGE 1
+_ACEOF
+
+
+cat >>confdefs.h <<\_ACEOF
+#define GETRUSAGE_VIA_SYSCALL 1
 _ACEOF
 
 fi
@@ -19836,7 +20387,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_prop_free_returns_void" >&5
 $as_echo "$lp_cv_prop_free_returns_void" >&6; }
 if test $lp_cv_prop_free_returns_void = yes; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define FREE_RETURNS_VOID 1
 _ACEOF
 
@@ -19915,6 +20467,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_prop_malloc_return_type" >&5
 $as_echo "$lp_cv_prop_malloc_return_type" >&6; }
+
 cat >>confdefs.h <<_ACEOF
 #define POINTER $lp_cv_prop_malloc_return_type
 _ACEOF
@@ -19980,7 +20533,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_prop_charbits_eq_8" >&5
 $as_echo "$lp_cv_prop_charbits_eq_8" >&6; }
 if test $lp_cv_prop_charbits_eq_8 = yes; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define CHARBIT_MASK 0xff
 _ACEOF
 
@@ -20062,7 +20616,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_prop_strtol_broken" >&5
 $as_echo "$lp_cv_prop_strtol_broken" >&6; }
 if test $lp_cv_prop_strtol_broken = yes; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define STRTOL_BROKEN 1
 _ACEOF
 
@@ -20194,7 +20749,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_prop_use_ioctl_fionbio" >&5
 $as_echo "$lp_cv_prop_use_ioctl_fionbio" >&6; }
 if test $lp_cv_prop_use_ioctl_fionbio = yes; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define USE_IOCTL_FIONBIO 1
 _ACEOF
 
@@ -20307,7 +20863,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_prop_use_fnctl_o_ndelay" >&5
 $as_echo "$lp_cv_prop_use_fnctl_o_ndelay" >&6; }
 if test $lp_cv_prop_use_fnctl_o_ndelay = yes; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define USE_FCNTL_O_NDELAY 1
 _ACEOF
 
@@ -20420,7 +20977,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_prop_use_fcntl_fndelay" >&5
 $as_echo "$lp_cv_prop_use_fcntl_fndelay" >&6; }
 if test $lp_cv_prop_use_fcntl_fndelay = yes; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define USE_FCNTL_FNDELAY 1
 _ACEOF
 
@@ -20531,7 +21089,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_prop_use_fcntl_setown" >&5
 $as_echo "$lp_cv_prop_use_fcntl_setown" >&6; }
 if test $lp_cv_prop_use_fcntl_setown = yes; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define USE_FCNTL_SETOWN 1
 _ACEOF
 
@@ -20644,7 +21203,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_prop_use_oobinline" >&5
 $as_echo "$lp_cv_prop_use_oobinline" >&6; }
 if test $lp_cv_prop_use_oobinline = yes; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define USE_OOBINLINE 1
 _ACEOF
 
@@ -20718,7 +21278,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_prop_overlapping_bcopy" >&5
 $as_echo "$lp_cv_prop_overlapping_bcopy" >&6; }
 if test $lp_cv_prop_overlapping_bcopy = yes; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define OVERLAPPING_BCOPY 1
 _ACEOF
 
@@ -20779,7 +21340,8 @@ fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_prop_strtol_const_charp" >&5
 $as_echo "$lp_cv_prop_strtol_const_charp" >&6; }
 if test $lp_cv_prop_strtol_const_charp = yes; then
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define STRTOL_CONST_CHARP 1
 _ACEOF
 
@@ -21184,7 +21746,8 @@ fi
 
 if test -n "${SBRK_OK}"; then
   if test -z "${TESTFLAG}"; then
-    cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define SBRK_OK 1
 _ACEOF
 
@@ -21236,6 +21799,7 @@ rm -f conftest*
 fi
 { $as_echo "$as_me:$LINENO: result: $lp_cv_sys_malloc_overhead" >&5
 $as_echo "$lp_cv_sys_malloc_overhead" >&6; }
+
 cat >>confdefs.h <<_ACEOF
 #define EXTERN_MALLOC_OVERHEAD $lp_cv_sys_malloc_overhead
 _ACEOF
@@ -21246,7 +21810,8 @@ if test -z "${CONFIG_SHELL}"; then
 fi
 if test "${OSTYPE}" = 'win32'; then
   EXEEXT='.exe'
-  cat >>confdefs.h <<\_ACEOF
+
+cat >>confdefs.h <<\_ACEOF
 #define HOST_INCLUDE "hosts/GnuWin32/GnuWin32.h"
 _ACEOF
 
@@ -21271,6 +21836,9 @@ fi
 val_malloc="$with_malloc"
 
 fi
+
+
+
 
 
 
