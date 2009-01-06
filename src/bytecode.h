@@ -232,7 +232,7 @@ typedef bytecode_t    * bytecode_p;
                                  RSTORE_2BYTE(p,_us);)
 #else
 #  error "Unsupported size of short."
-#endif
+#endif /* SIZEOF_SHORT */
 
 #if SIZEOF_LONG == 4
 #  define GET_LONG(d,p)    GET_4BYTE(d,p)
@@ -256,7 +256,7 @@ typedef bytecode_t    * bytecode_p;
                                  RSTORE_4BYTE(p,_ui);)
 #else
 #  error "Unsupported size of long."
-#endif
+#endif /* SIZEOF_LONG */
 
 #define LOAD_INT16(d,p)  LOAD_2BYTE(d,p)
 
@@ -265,7 +265,7 @@ typedef bytecode_t    * bytecode_p;
 #define PUT_INT32(p,d)   PUT_4BYTE(p,d)
 #define STORE_INT32(p,d) STORE_4BYTE(p,d)
 
-#endif
+#endif /* CHAR_BIT */
 
 #ifndef GET_CODE
 #  error "No bytecode type defined."
