@@ -228,6 +228,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (i-eval_cost.h)
     add_eval_cost_n(): changed a comparison between signed and unsigned types
     
+12-Jan-2009 (Lars Duening)  (3.3.718)
+  - Created snapshot.
+
 17-Sep-2008 (Zesstra)
   - (simulate.c)
     Corrected format specifiers, removed not needed casts, corrected some

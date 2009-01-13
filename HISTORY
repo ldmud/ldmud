@@ -50,7 +50,7 @@ xx-xxx-xxxx () -- 3.3.718
        + New configuration option '--enable-eval-cost-trace' to show the
           evaluation costs in the stacktrace.
 
-10-Aug-2008 (Lars Duening) -- 3.3.717
+12-Jan-2009 (Lars Duening) -- 3.3.718
     - Changed Efuns:
        + md5(): The efuns costs 10 eval ticks per iteration (Bug #485).
        + sha1(): The efuns costs 10 eval ticks per iteration (Bug #485).
