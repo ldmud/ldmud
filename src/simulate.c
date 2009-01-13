@@ -1770,15 +1770,9 @@ load_object (const char *lname, Bool create_super, int depth
         fatal("Improper filename '%s' passed to load_object()\n", lname);
 #endif
 
-    /* Empty lnames may lead to a driver crash in enter_object_hash() if there 
-     * exists a file '.c' in the root of the mudlib.
+    /* Empty lnames (/.c in Mudlib) *should* be OK. But use at your own risk. ;-)
      */
     name_length = strlen(lname);
-
-    if (name_length < 1) {
-         load_object_error("Illegal file to load (empty filename)", lname, chain);
-         /* NOTREACHED */
-    }
 
     /* It could be that the passed filename is one of an already loaded
      * object. In that case, simply return that object.

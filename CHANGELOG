@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Jan-2009 (Zesstra)
+  - (simulate.c)
+    Reallowed empty object names (/.c) (#525)
+
+12-Jan-2009 (Lars Duening)  (3.3.718)
+  - Created snapshot.
+
 06 Jan 2009 (Fuchur)
   - (util/xerq/erq.c, util/xerq/defs.h)
     Remove dependency on the driver's random number generator - the
@@ -228,9 +235,6 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (i-eval_cost.h)
     add_eval_cost_n(): changed a comparison between signed and unsigned types
     
-12-Jan-2009 (Lars Duening)  (3.3.718)
-  - Created snapshot.
-
 17-Sep-2008 (Zesstra)
   - (simulate.c)
     Corrected format specifiers, removed not needed casts, corrected some
