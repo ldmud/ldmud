@@ -1,7 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-12-Jan-2009 (Zesstra)
+14-Jan-2009 (Zesstra
+  - (doc/driver/limitations)
+    Started to assemble a list of non-configurable limits - to be extended...
+
+13-Jan-2009 (Zesstra)
   - (simulate.c)
     Reallowed empty object names (/.c) (#525)
 

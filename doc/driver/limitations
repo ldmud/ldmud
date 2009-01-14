@@ -1,0 +1,54 @@
+These file contains a collection of non-configurable limits:
+
+Program properties
+==================
+* maximum program length: 1 MB (1048575 Bytes)
+  This is defined by FUNSTART_MASK in exec.h, which is the maximum offset
+  (address) of a functions code within the program block (relativ to the
+  beginning). Changing it involves changing funflag_t and probably other
+  stuff.
+
+* maximum number of programs: 2^32-1
+  The unique program ID number is a int32. It is incremented for each compiled
+  program. If it reaches zero (after wrapping to negative values) the
+  compiler or swapper calls renumber_programs(), which recycles numbers from
+  old programs.
+  (exec.h, prolang.y, swap.c, ...)
+
+* maximum number of functions in a program: 65534
+  The lookup table for function indexes holding the offsets of the function in
+  the functions tables is unsigned short.
+  The types of function arguments are stored in program_s.argument_types,
+  which is index by the unsigned short programs_s.type_start. 65535 has a
+  special meaning. Some code relies that this is unsigned short.
+  (exec.h, ...)
+  program_s.num_function_names and num_functions are unsigned short as well.
+  
+* maximum length of switch: 256k (262143 Bytes)
+  Limited by BREAK_ADDRESS_MASK and CONTINUE_ADDRESS_MASK?
+
+* maximum offset for branches: 32765 (0x7ffd)
+  (prolang.y)
+
+* number of virtual variables: 255
+* max number of struct members: 255
+  (exec.h, ...)
+
+
+Hash tables
+===========
+* maximum size of the hash table for identifiers (ITABLE): 32768
+  The hashes of identifiers are signed short which are in most cases 16 bit
+  wide integers (lex.h, lex.c, ...)
+
+* maximum size of the hash table for objects (OTABLE): 65536
+  The hashes of identifiers are signed short which are in most cases 16 bit
+  wide integers (object.h, object.c, otable.c, ...)
+
+
+Objects
+=======
+* maximum clone ID number: 2^32-1
+  Not a real limitation, after that the driver starts checking if 
+  blueprint name + #cloneid are unique.
+
