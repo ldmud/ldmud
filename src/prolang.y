@@ -12114,23 +12114,14 @@ possible_comma :
 
 opt_struct_init2:
       /* empty */
-      {
-          /* The end of a struct_init (or a list with just one
-           * element) - this is the first rule reduced.
-           */
-
-          $<struct_init_list>$.list = NULL;
-          $<struct_init_list>$.last = NULL;
-          $<struct_init_list>$.length = 0;
-      }
       struct_init
       {
           struct_init_t * p;
 
           p = xalloc(sizeof(*p));
           p->next = NULL;
-          p->name = $2.name;
-          p->type = $2.type;
+          p->name = $1.name;
+          p->type = $1.type;
           $$.length = 1;
           $$.list = p;
           $$.last = p;
