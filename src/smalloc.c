@@ -802,33 +802,33 @@ mem_dump_data (strbuf_t *sbuf)
 #   define dump_stat(str,stat) strbuf_addf(sbuf, str,stat.counter,stat.size)
 
     strbuf_add(sbuf, "Type                   Count      Space (bytes)\n");
-    dump_stat("xallocs:           %8u        %10lu\n\n", xalloc_st);
-    dump_stat("sbrk requests:     %8u        %10lu (a)\n",sbrk_st);
-    dump_stat("large blocks:      %8u        %10lu (b)\n",l_alloc);
+    dump_stat("xallocs:           %8lu        %10lu\n\n", xalloc_st);
+    dump_stat("sbrk requests:     %8lu        %10lu (a)\n",sbrk_st);
+    dump_stat("large blocks:      %8lu        %10lu (b)\n",l_alloc);
     strbuf_addf(sbuf
                , "large net avail:                   %10ld\n"
                , l_alloc.size - l_alloc.counter * ML_OVERHEAD * SINT
                );
-    dump_stat("large free blocks: %8u        %10lu (c)\n",l_free);
-    dump_stat("large wasted:      %8u        %10lu (d)\n\n",l_wasted);
-    dump_stat("small chunks:      %8u        %10lu (e)\n",s_chunk);
-    dump_stat("small blocks:      %8u        %10lu (f)\n",s_alloc);
+    dump_stat("large free blocks: %8lu        %10lu (c)\n",l_free);
+    dump_stat("large wasted:      %8lu        %10lu (d)\n\n",l_wasted);
+    dump_stat("small chunks:      %8lu        %10lu (e)\n",s_chunk);
+    dump_stat("small blocks:      %8lu        %10lu (f)\n",s_alloc);
     strbuf_addf(sbuf
-               , "small net avail:                   %10d\n"
+               , "small net avail:                   %10lu\n"
                , s_alloc.size - s_alloc.counter * M_OVERHEAD * SINT
                );
-    dump_stat("small free blocks: %8u        %10lu (g)\n",s_free);
-    dump_stat("small wasted:      %8u        %10lu (h)\n\n",s_wasted);
+    dump_stat("small free blocks: %8lu        %10lu (g)\n",s_free);
+    dump_stat("small wasted:      %8lu        %10lu (h)\n\n",s_wasted);
 
-    dump_stat("permanent blocks:  %8u        %10lu\n", perm_st);
+    dump_stat("permanent blocks:  %8lu        %10lu\n", perm_st);
 #ifdef SBRK_OK
-    dump_stat("clib allocations:  %8u        %10lu\n", clib_st);
+    dump_stat("clib allocations:  %8lu        %10lu\n", clib_st);
 #else
     strbuf_addf(sbuf, "clib allocations:       n/a               n/a\n");
 #endif
     strbuf_add(sbuf, "\n");
 #ifdef USE_AVL_FREELIST
-    strbuf_addf(sbuf, "AVL nodes:         %8u                 -\n", num_avl_nodes);
+    strbuf_addf(sbuf, "AVL nodes:         %8ld                 -\n", num_avl_nodes);
     strbuf_add(sbuf, "\n");
 #endif /* USE_AVL_FREELIST */
 

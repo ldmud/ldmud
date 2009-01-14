@@ -19,6 +19,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
       platforms in functionlist(). (#559)
     Renamed SEARCH_FUNCTION_INHERIT to search_function_inherit and return the
       pointer to the inherit structure.
+  - (smalloc.c)
+    Fixed some warnings about wrong format specifiers reported by Bardioc.
 
 13-Jan-2009 (Zesstra)
   - (simulate.c)
