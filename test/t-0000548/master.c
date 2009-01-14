@@ -1,6 +1,7 @@
 #define OWN_PRIVILEGE_VIOLATION
 #include "/inc/base.inc"
 #include "/inc/sefun.inc"
+#include "/inc/gc.inc"
 
 void run_test()
 {
@@ -19,5 +20,6 @@ int privilege_violation(string what, mixed who, mixed where, mixed how)
 string *epilog(int eflag)
 {
     run_test();
+    start_gc(#'shutdown);
     return 0;
 }

@@ -5540,22 +5540,30 @@ static mp_int current_sv_id_number;
    * writing a savefile.
    */
 
-static int restored_host = -1;
-  /* Type of the host which wrote the savefile being restored.
-   */
+struct restore_context_s {
 
-static long current_shared_restored;
-  /* ID of the shared value currently restored
-   */
+    int restored_host;
+      /* Type of the host which wrote the savefile being restored.
+       */
 
-static svalue_t *shared_restored_values = NULL;
-  /* Array of restored shared values, so that later references
-   * can do a simple lookup by ID-1 (IDs start at 1).
-   */
+    long current_shared_restored;
+      /* ID of the shared value currently restored
+       */
 
-static long max_shared_restored;
-  /* Current size of shared_restored_values.
-   */
+    svalue_t *shared_restored_values;
+      /* Array of restored shared values, so that later references
+       * can do a simple lookup by ID-1 (IDs start at 1).
+       */
+
+    long max_shared_restored;
+      /* Current size of shared_restored_values.
+       */
+       
+    struct restore_context_s *previous;
+      /* The previous context. */
+};
+
+static struct restore_context_s *restore_ctx = NULL;
 
 /*-------------------------------------------------------------------------*/
 /* Macros */
@@ -7331,10 +7339,12 @@ free_shared_restored_values (void)
  */
 
 {
-    while (current_shared_restored > 0)
-        free_svalue(&shared_restored_values[--current_shared_restored]);
-    xfree(shared_restored_values);
-    shared_restored_values = NULL;
+    struct restore_context_s *ctx = restore_ctx;
+    
+    while (ctx->current_shared_restored > 0)
+        free_svalue(&(ctx->shared_restored_values[--ctx->current_shared_restored]));
+    xfree(ctx->shared_restored_values);
+    ctx->shared_restored_values = NULL;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -8377,7 +8387,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
          * Otherwise, parse the float normally.
          */
         svp->type = T_FLOAT;
-        if ( NULL != (cp = strchr(cp, '=')) &&  restored_host == CURRENT_HOST)
+        if ( NULL != (cp = strchr(cp, '=')) &&  restore_ctx->restored_host == CURRENT_HOST)
         {
             cp++;
             if (sscanf(cp, "%"SCNxPHINT":%"SCNxPINT, &svp->x.exponent, &svp->u.mantissa) != 2)
@@ -8420,47 +8430,47 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
             /* Shared values can be used even before they have been read in
              * completely.
              */
-            if (id != ++current_shared_restored)
+            if (id != ++(restore_ctx->current_shared_restored))
             {
-                current_shared_restored--;
+                restore_ctx->current_shared_restored--;
                 *svp = const0;
                 return MY_FALSE;
             }
 
             /* Increase shared_restored_values[] if necessary */
 
-            if (id > max_shared_restored)
+            if (id > restore_ctx->max_shared_restored)
             {
                 svalue_t *new;
 
-                max_shared_restored *= 2;
-                new = rexalloc(shared_restored_values
-                              , sizeof(svalue_t)*max_shared_restored
+                restore_ctx->max_shared_restored *= 2;
+                new = rexalloc(restore_ctx->shared_restored_values
+                              , sizeof(svalue_t)*(restore_ctx->max_shared_restored)
                               );
                 if (!new)
                 {
-                    current_shared_restored--;
+                    restore_ctx->current_shared_restored--;
                     *svp = const0;
                     errorf("(restore) Out of memory (%lu bytes) for "
                           "%ld shared values.\n"
-                          , (unsigned long)max_shared_restored * sizeof(svalue_t)
-                          , max_shared_restored);
+                          , (unsigned long)restore_ctx->max_shared_restored * sizeof(svalue_t)
+                          , restore_ctx->max_shared_restored);
                     return MY_FALSE;
                 }
-                shared_restored_values = new;
+                restore_ctx->shared_restored_values = new;
             }
 
             /* in case of an error... */
             *svp = const0;
-            shared_restored_values[id-1] = const0;
+            restore_ctx->shared_restored_values[id-1] = const0;
 
             /* Restore the value */
-            res = restore_svalue(&shared_restored_values[id-1], pt, delimiter);
-            assign_svalue_no_free(svp, &shared_restored_values[id-1]);
+            res = restore_svalue(&(restore_ctx->shared_restored_values[id-1]), pt, delimiter);
+            assign_svalue_no_free(svp, &(restore_ctx->shared_restored_values[id-1]));
             return res;
         }
 
-        if (id <= 0 || id > current_shared_restored)
+        if (id <= 0 || id > restore_ctx->current_shared_restored)
         {
             *svp = const0;
             return MY_FALSE;
@@ -8468,7 +8478,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
 
         /* We know this value already: simply assign it */
 
-        assign_svalue_no_free(svp, &shared_restored_values[id-1]);
+        assign_svalue_no_free(svp, &(restore_ctx->shared_restored_values[id-1]));
 
         cp = strchr(cp, delimiter);
         *pt = cp+1;
@@ -8564,6 +8574,7 @@ restore_object_cleanup ( svalue_t * arg)
 
 {
     restore_cleanup_t * data = (restore_cleanup_t *)arg;
+    struct restore_context_s * ctx;
 
     while (data->dp)
     {
@@ -8589,6 +8600,10 @@ restore_object_cleanup ( svalue_t * arg)
         xfree(data->filename);
   
     xfree(arg);
+    
+    ctx = restore_ctx;
+    restore_ctx = ctx->previous;
+    xfree(ctx);    
 } /* restore_object_cleanup() */
 
 /*-------------------------------------------------------------------------*/
@@ -8644,6 +8659,8 @@ static int nesting = 0;  /* Used to detect recursive calls */
        */
     restore_cleanup_t * rcp;
       /* Cleanup structure */
+    struct restore_context_s * ctx;
+      /* Our helper structure. */
     
     arg = sp;
     
@@ -8652,18 +8669,35 @@ static int nesting = 0;  /* Used to detect recursive calls */
     rcp = xalloc(sizeof(*rcp));
     if (!rcp)
     {
-      errorf("(restore) Out of memory: (%zu bytes) for cleanup structure\n"
-             , sizeof(*rcp));
-      /* NOTREACHED */
-      return sp;
+        errorf("(restore) Out of memory: (%zu bytes) for cleanup structure\n"
+               , sizeof(*rcp));
+        /* NOTREACHED */
+        return sp;
     }
+    ctx = xalloc(sizeof(*ctx));
+    if (!ctx)
+    {
+        xfree(rcp);
+        errorf("(restore) Out of memory: (%zu bytes) for context structure\n"
+               , sizeof(*ctx));
+        /* NOTREACHED */
+        return sp;
+    }
+
     rcp->pNesting = &nesting;
     rcp->buff = NULL;
     rcp->f = NULL;
     rcp->dp = NULL;
     rcp->filename = NULL;
+
+    ctx->restored_host = -1;
+    ctx->current_shared_restored = 0;
+    ctx->shared_restored_values = NULL;
+    ctx->previous = restore_ctx;
+    
     /* Push it on top of the argument on the stack. */
     sp = push_error_handler(restore_object_cleanup, &(rcp->head));
+    restore_ctx = ctx;
   
     /* Keep track of recursive calls */
     nesting++;
@@ -8792,21 +8826,13 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
     /* Initialise the variables */
 
-    max_shared_restored = 64;
-    current_shared_restored = 0;
+    ctx->max_shared_restored = 64;
+    ctx->shared_restored_values = xalloc(sizeof(svalue_t)*(ctx->max_shared_restored));
 
-    if (shared_restored_values)
-    {
-        debug_message("(restore) Freeing lost shared_restored_values.\n");
-        free_shared_restored_values();
-    }
-
-    shared_restored_values = xalloc(sizeof(svalue_t)*max_shared_restored);
-
-    if (!shared_restored_values)
+    if (!ctx->shared_restored_values)
     {
         errorf("(restore) Out of memory (%lu bytes) for shared values.\n"
-             , sizeof(svalue_t)*(unsigned long)max_shared_restored);
+             , sizeof(svalue_t)*(unsigned long)ctx->max_shared_restored);
         /* NOTREACHED */
         return sp;
     }
@@ -8814,7 +8840,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
     num_var = ob->prog->num_variables;
     var_rest = 0;
     restored_version = -1;
-    restored_host = -1;
+    ctx->restored_host = -1;
 
     /* Loop until we run out of text to parse */
 
@@ -8858,7 +8884,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
             {
                 int i;
 
-                i = sscanf(cur+1, "%d:%d", &restored_version, &restored_host);
+                i = sscanf(cur+1, "%d:%d", &restored_version, &(ctx->restored_host));
                 if (i > 0 && (i == 2 || restored_version >= CURRENT_VERSION) )
                 {
                     if (pt)
@@ -9020,6 +9046,7 @@ restore_value_cleanup ( svalue_t * arg )
 
 {
     restore_cleanup_t * data = (restore_cleanup_t *) arg;
+    struct restore_context_s * ctx;
 
     if (data->buff)
         xfree(data->buff);
@@ -9027,6 +9054,10 @@ restore_value_cleanup ( svalue_t * arg )
     free_shared_restored_values();
 
     xfree(arg);
+
+    ctx = restore_ctx;
+    restore_ctx = ctx->previous;
+    xfree(ctx);    
 } /* restore_value_cleanup() */
 
 svalue_t *
@@ -9045,7 +9076,43 @@ f_restore_value (svalue_t *sp)
     int        restored_version; /* Formatversion of the saved data */
     char      *buff;  /* The string to parse */
     char      *p;
+    svalue_t  *arg;   /* pointer to the argument on the stack - for convenience */
     restore_cleanup_t *rcp; /* Cleanup structure */
+    struct restore_context_s * ctx; /* Our helper structure. */
+
+    /* Place the result variable onto the stack */
+    arg = sp;
+    inter_sp = ++sp;
+    *sp = const0;
+
+    /* Setup the error cleanup */
+    rcp = xalloc(sizeof(*rcp));
+    if (!rcp)
+    {
+        errorf("(restore) Out of memory (%zu bytes).\n"
+              , sizeof(*rcp));
+        /* NOTREACHED */
+        return sp;
+    }
+    ctx = xalloc(sizeof(*ctx));
+    if (!ctx)
+    {
+        xfree(rcp);
+        errorf("(restore) Out of memory: (%zu bytes) for context structure\n"
+             , sizeof(*ctx));
+        /* NOTREACHED */
+        return sp;
+    }
+
+    rcp->buff = NULL;
+
+    ctx->restored_host = -1;
+    ctx->current_shared_restored = 0;
+    ctx->shared_restored_values = NULL;
+    ctx->previous = restore_ctx;
+    
+    push_error_handler(restore_value_cleanup, &(rcp->head));
+    restore_ctx = ctx;
 
     /* The restore routines will put \0s into the string, so we
      * need to make a copy of all but malloced strings.
@@ -9053,7 +9120,7 @@ f_restore_value (svalue_t *sp)
     {
         size_t len;
 
-        len = mstrsize(sp->u.str);
+        len = mstrsize(arg->u.str);
         buff = xalloc(len+1);
         if (!buff)
         {
@@ -9062,58 +9129,31 @@ f_restore_value (svalue_t *sp)
             /* NOTREACHED */
             return sp;
         }
-        memcpy(buff, get_txt(sp->u.str), len);
+        memcpy(buff, get_txt(arg->u.str), len);
         buff[len] = '\0';
+
+        rcp->buff = buff;
     }
 
     restored_version = -1;
-    restored_host = -1;
 
     /* Initialise the shared value table */
 
-    max_shared_restored = 64;
-
-    if (shared_restored_values)
+    ctx->max_shared_restored = 64;
+    ctx->shared_restored_values = xalloc(sizeof(svalue_t)*(ctx->max_shared_restored));
+    if (!ctx->shared_restored_values)
     {
-        debug_message("(restore) Freeing lost shared_restored_values.\n");
-        free_shared_restored_values();
-    }
-
-    shared_restored_values = xalloc(sizeof(svalue_t)*max_shared_restored);
-    if (!shared_restored_values)
-    {
-        xfree(buff);
         errorf("(restore) Out of memory (%lu bytes) for shared values.\n"
-             , (unsigned long)max_shared_restored * sizeof(svalue_t));
+             , (unsigned long)ctx->max_shared_restored * sizeof(svalue_t));
         return sp; /* flow control hint */
     }
-
-    current_shared_restored = 0;
-
-    /* Place the result variable onto the stack */
-    inter_sp = ++sp;
-    *sp = const0;
-
-    /* Setup the error cleanup */
-    rcp = xalloc(sizeof(*rcp));
-    if (!rcp)
-    {
-        xfree(buff);
-        errorf("(restore) Out of memory (%zu bytes).\n"
-              , sizeof(*rcp));
-        /* NOTREACHED */
-        return sp;
-    }
-    rcp->buff = buff;
-
-    push_error_handler(restore_value_cleanup, &(rcp->head));
 
     /* Check if there is a version line */
     if (buff[0] == '#')
     {
         int i;
 
-        i = sscanf(buff+1, "%d:%d", &restored_version, &restored_host);
+        i = sscanf(buff+1, "%d:%d", &restored_version, &(ctx->restored_host));
 
         /* Advance to the next line */
         p = strchr(buff, '\n');

@@ -4,6 +4,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
 14-Jan-2009 (Gnomi)
   - (comm.c, pkg-mccp.c, configure)
     Use of write buffers without the need for threads.
+  - (object.c)
+    Made restore_value reentrant. (Bug #548)
   
 14-Jan-2009 (Zesstra)
   - (doc/driver/limitations)
