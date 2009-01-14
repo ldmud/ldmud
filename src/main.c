@@ -1047,7 +1047,7 @@ typedef enum OptNumber {
  , cMaxFile         /* --max-file           */
  , cMaxMapping      /* --max-mapping        */
  , cMaxMappingKeys  /* --max-mapping-keys   */
- , cMaxThreadPend   /* --max-thread-pending */
+ , cMaxWriteBuffer  /* --max-write-buffer   */
  , cMinMalloc       /* --min-malloc         */
  , cMinSmallMalloc  /* --min-small-malloc   */
  , cNoERQ           /* --no-erq             */
@@ -1326,15 +1326,12 @@ static Option aOptions[]
         "    Set to 0, reads and writes of any size are allowed.\n"
       }
 
-    , { 0,   "max-thread-pending", cMaxThreadPend,  MY_TRUE
-      , "  --max-thread-pending <size>\n"
-      , "  --max-thread-pending <size>\n"
-        "    The maximum number of bytes to be kept pending by the socket write\n"
-        "    thread.\n"
+    , { 0,   "max-write-buffer", cMaxWriteBuffer,  MY_TRUE
+      , "  --max-write-buffer<size>\n"
+      , "  --max-write-buffer <size>\n"
+        "    The maximum number of bytes to be kept pending for each socket\n"
+        "    to write.\n"
         "    Set to 0, an unlimited amount of data can be kept pending.\n"
-#ifndef USE_PTHREADS
-        "    (Ignored since pthreads are not supported)\n"
-#endif
       }
 
     , { 's', NULL,                 cSwap,           MY_TRUE
@@ -1857,9 +1854,7 @@ options (void)
   printf(" Runtime limits: max read file size:     %7d\n"
          "                 max byte read/write:    %7d\n"
          "                 max socket buf size:    %7d\n"
-#if defined(USE_PTHREADS)
-         "                 max pthread write size: %7d\n"
-#endif /* USE_PTHREADS */
+         "                 max write buf size:     %7d\n"
          "                 max eval cost:        %9d %s\n"
          "                 catch eval cost:        %7d\n"
          "                 master eval cost:       %7d\n"
@@ -1878,9 +1873,7 @@ options (void)
 #endif
         , READ_FILE_MAX_SIZE, MAX_BYTE_TRANSFER
         , SET_BUFFER_SIZE_MAX
-#if defined(USE_PTHREADS)
-        , PTHREAD_WRITE_MAX_SIZE
-#endif /* USE_PTHREADS */
+        , WRITE_BUFFER_MAX_SIZE
         , MAX_COST
 #if defined(DYNAMIC_COSTS)
         , "(dynamic)"
@@ -2418,12 +2411,12 @@ eval_arg (int eOption, const char * pValue)
         break;
       }
 
-    case cMaxThreadPend:
+    case cMaxWriteBuffer:
       {
         long val = atoi(pValue);
 
         if (val >= 0)
-            pthread_write_max_size = val;
+            write_buffer_max_size = val;
         else
             fprintf(stderr, "Illegal value for limit '%s' ignored.\n", pValue);
         break;

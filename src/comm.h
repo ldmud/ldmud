@@ -129,16 +129,19 @@
  * The instances are kept in a linked list from the interactive_t
  * structure.
  */
-#ifdef USE_PTHREADS
 struct write_buffer_s
 {
     struct write_buffer_s *next;
     size_t length;
+#ifndef USE_PTHREADS
+    size_t pos;
+#endif
+#if defined(USE_PTHREADS) && defined(USE_MCCP)
     Bool   compress; /* should the buffer get compressed by mccp? */
-    int    errorno; /* After writing, the errno */
+    int    errorno;  /* After writing, the errno */
+#endif
     char buffer[1 /* .length */ ];
 };
-#endif
 
 /* --- struct input_to_s: input_to() datastructure
  *
@@ -177,7 +180,8 @@ struct interactive_s {
     svalue_t prompt;            /* The prompt to print. */
     struct sockaddr_in addr;    /* Address of connected user */
 
-    CBool msg_discarded;        /* True if an earlier msg had been discarded */
+    char msg_discarded;         /* != 0 if an earlier msg had been discarded,
+                                   index into the message to be sent. */
     CBool set_input_to;         /* True if input_to was set in this cycle */
     CBool closing;              /* True when closing this socket. */
     CBool tn_enabled;           /* True: telnet machine enabled */
@@ -277,12 +281,12 @@ struct interactive_s {
     pthread_mutex_t        write_mutex;
     pthread_cond_t         write_cond;
     pthread_t              write_thread;
-    struct write_buffer_s *write_first;  /* List of buffers to write */
-    struct write_buffer_s *write_last;
-    unsigned long          write_size;
     struct write_buffer_s *write_current; /* Buffer currently written */
     struct write_buffer_s *written_first; /* List of written buffers */
 #endif
+    struct write_buffer_s *write_first;  /* List of buffers to write */
+    struct write_buffer_s *write_last;
+    unsigned long          write_size;
 
 #ifdef USE_TLS
     tls_session_t          tls_session;
@@ -384,7 +388,7 @@ extern int num_player;
 extern char *message_flush;
 extern char *domain_name;
 
-extern long pthread_write_max_size;
+extern long write_buffer_max_size;
 
 #ifdef COMM_STAT
 extern unsigned long add_message_calls;
@@ -409,6 +413,7 @@ extern void interactive_lock (interactive_t *ip UNUSED);
 extern void interactive_unlock (interactive_t *ip UNUSED);
 extern void interactive_cleanup (interactive_t *ip UNUSED);
 #endif /* USE_PTHREADS */
+extern Bool comm_socket_write (char *msg, size_t size, interactive_t *ip);
 extern void comm_cleanup_interactives (void);
 extern void  add_message VARPROT((const char *, ...), printf, 1, 2);
 extern void  flush_all_player_mess(void);

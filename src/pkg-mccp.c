@@ -166,57 +166,6 @@ start_compress (interactive_t * ip, unsigned char telopt)
 } /* start_compress() */
 
 /*-------------------------------------------------------------------------*/
-static Bool
-process_compressed (interactive_t * ip)
-
-/* Try to send any pending compressed-but-not-sent data in for <ip>.
- * Return TRUE on success.
- */
-
-{
-    int iStart, nBlock, nWrite, len;
-    
-    if (!ip->out_compress)
-        return MY_TRUE;
-    
-    len = ip->out_compress->next_out - ip->out_compress_buf;
-    if (len > 0)
-    {
-        for (iStart = 0; iStart < len; iStart += nWrite)
-        {
-            nBlock = UMIN (len - iStart, 4096);
-            if ((nWrite =
-                 socket_write(ip->socket, ip->out_compress_buf + iStart, nBlock)) < 0)
-            {
-                if (errno == EAGAIN)
-                  break;
-#ifdef ENOSR
-                if (errno == ENOSR)
-                  break;
-#endif /* ENOSR */
-                
-                /* write error */
-                return MY_FALSE;
-            }
-            if (nWrite <= 0)
-                break;
-        }
-        
-        if (iStart)
-        {
-            if (iStart < len)
-              memmove (ip->out_compress_buf, ip->out_compress_buf + iStart,
-                       len - iStart);
-            
-            ip->out_compress->next_out = ip->out_compress_buf + len - iStart;
-        }
-    }
-    
-    /* success */
-    return MY_TRUE;
-} /* process_compressed() */
-
-/*-------------------------------------------------------------------------*/
 Bool
 end_compress (interactive_t * ip, Bool force)
 
@@ -227,6 +176,8 @@ end_compress (interactive_t * ip, Bool force)
 
 {
     unsigned char dummy[1];
+    unsigned char buf[256];
+    size_t len;
     Bool retval = MY_TRUE;
     
     if (!ip->out_compress)
@@ -235,28 +186,25 @@ end_compress (interactive_t * ip, Bool force)
     ip->out_compress->avail_in = 0;
     ip->out_compress->next_in = dummy;
     
+    ip->out_compress->next_out = buf;
+    ip->out_compress->avail_out = sizeof(buf);
+
     /* No terminating signature is needed - receiver will get Z_STREAM_END */
     if (deflate (ip->out_compress, Z_FINISH) != Z_STREAM_END && !force)
         return MY_FALSE;
    
-    /* try to send any residual data */
-    if (!process_compressed (ip) && !force)
-    {
-        printf("%s MCCP-DEBUG: '%s' mccp had error while ending\n"
-              , time_stamp(), get_txt(ip->ob->name));
-        retval = MY_FALSE;
-        /* This is a write error - no sense in trying it again, so
-         * get rid of all the buffers anyway.
-         */
-    }
-     
-    /* reset compression values */
+    len = ip->out_compress->next_out - buf;
+    
+    /* first reset compression values */
     deflateEnd(ip->out_compress);
     xfree(ip->out_compress_buf);
     xfree(ip->out_compress);
     ip->compressing = 0;
     ip->out_compress = NULL;
     ip->out_compress_buf = NULL;
+
+    /* try to send any residual data */
+    comm_socket_write((char*) buf, len, ip);
    
     printf("%s MCCP-DEBUG: '%s' mccp ended\n"
           , time_stamp(), get_txt(ip->ob->name));

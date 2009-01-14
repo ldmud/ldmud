@@ -2026,12 +2026,6 @@ garbage_collection(void)
         if (all_players[i] == NULL)
             continue;
 
-#ifdef USE_PTHREADS
-        /* The threaded write buffers are allocated with malloc() and are
-         * thus out of our view.
-         */
-#endif /* USE_PTHREADS */
-
         for ( it = all_players[i]->input_to; it != NULL; it = it->next)
         {
             clear_memory_reference(it);
@@ -2217,6 +2211,17 @@ garbage_collection(void)
         /* The thread write buffers are allocated with malloc() and are
          * thus out of our view.
          */
+#else
+        if (all_players[i]->write_first)
+        {
+            struct write_buffer_s *tmp = all_players[i]->write_first;
+            
+            do
+            {
+                note_ref(tmp);
+                tmp = tmp->next;
+            } while (tmp != NULL);
+        }
 #endif /* USE_PTHREADS */
 #ifdef USE_MCCP
         if (all_players[i]->out_compress != NULL)

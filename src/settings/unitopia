@@ -15,6 +15,7 @@ with_max_mapping_keys=5000
 with_max_mapping_size=50000
 with_max_byte_transfer=50000
 with_read_file_max_size=50000
+with_write_buffer_max_size=524288
 
 # --- Timing ---
 with_time_to_clean_up=5400

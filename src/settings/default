@@ -81,12 +81,12 @@ with_max_byte_transfer=50000
 
 with_max_callouts=0
 
-# If PThreads are used, this is the max amount of data held pending
-# for writing. If the amount is exceeded, the oldest data blocks
+# This is the max amount of data held pending for writing.
+# If the amount is exceeded, the oldest data blocks
 # are discarded.
 # If 0, any amount of data is allowed.
 
-with_pthread_write_max_size=100000
+with_write_buffer_max_size=100000
 
 
 # --- Timing ---

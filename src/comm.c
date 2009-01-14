@@ -61,9 +61,12 @@
  * structure. Advantage is that the driver is no longer bothered by blocking
  * sockets.
  *
- * TODO: Generalize the background buffer and either use pthreads, or a call
- * TODO:: from the backend loop to write the data. Also  don't
- * TODO:: immediately discard EWOULDBLOCK-failed messages.
+#else
+ * The data that can not written directly to the sockets is put instead into
+ * an intermediate buffer, from which the backend loop will continue writing
+ * when possible. The buffers are stored in a linked list in the interactive_s
+ * structure.
+ *
 #endif
  *
  * TODO: Fiona says: The telnet code is frustrating. It would be better if
@@ -232,9 +235,8 @@ char *message_flush = NULL;
    * a 'null format string'.
    */
 
-long pthread_write_max_size = PTHREAD_WRITE_MAX_SIZE;
+long write_buffer_max_size = WRITE_BUFFER_MAX_SIZE;
   /* Amount of data held pending in the pthread fifo queue.
-   * Evaluated only with USE_PTHREADS.
    */
 
 
@@ -497,6 +499,8 @@ static int open_ipv6_conn(const char *hostname, const unsigned short int port, s
 
 #ifdef USE_PTHREADS
 static void *writer_thread(void *arg);
+#else
+static INLINE ssize_t comm_send_buf(char *msg, size_t size, interactive_t *ip);
 #endif
 
 #ifdef USE_IPV6
@@ -807,12 +811,16 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
     fprintf(stderr, "------\n");
 
     /* Disconnect the user */
+#ifndef USE_PTHREADS
+    comm_send_buf(msg, strlen(msg), ip);
+#else
 #ifdef USE_TLS
     if(ip->tls_status == TLS_ACTIVE)
         tls_write(ip, msg, strlen(msg));
     else
 #endif
         socket_write(ip->socket, msg, strlen(msg));
+#endif /* USE_PTHREADS */
     remove_interactive(ip->ob, MY_TRUE);
 
     /* Unset mutex */
@@ -1440,46 +1448,32 @@ comm_cleanup_interactives (void)
 /*-------------------------------------------------------------------------*/
 #ifdef USE_PTHREADS
 
-static int
-thread_socket_write( SOCKET_T s UNUSED, char *msg, size_t size
-                   , interactive_t *ip, Bool docompress
-#ifndef USE_MCCP
-                                                        UNUSED
-#endif /* USE_MCCP */
-                   )
+Bool
+comm_socket_write (char *msg, size_t size, interactive_t *ip)
 
 /* Stand in for socket_write(): take the data to be written and append
- * it to the buffer list of <ip>. <docompress> denotes the MCCP compression
- * setting.
+ * it to the buffer list of <ip>.
  */
 
 {
-#ifdef __MWERKS__
-#    pragma unused(s)
-#    ifndef USE_MCCP
-#        pragma unused(docompress)
-#    endif /* USE_MCCP */
-#endif
-
     struct write_buffer_s *b;
 
     if (size == 0)
-        return 0;
+        return MY_TRUE;
 
     /* Get a new buffer for the data to be written */
     b = malloc(sizeof(struct write_buffer_s) + size - 1);
     if (!b)
-        outofmem(sizeof(struct write_buffer_s) + size - 1, "thread_socket_write()");
+        outofmem(sizeof(struct write_buffer_s) + size - 1, "comm_socket_write()");
 
     b->length = size;
     b->next = NULL;
 #ifdef USE_MCCP
     if (ip->out_compress)   
-        b->compress = docompress;
+        b->compress = MY_TRUE;
     else
+        b->compress = MY_FALSE;
 #endif
-        b->compress = 0;
-
 
     memcpy(b->buffer, msg, size);
 
@@ -1496,8 +1490,8 @@ thread_socket_write( SOCKET_T s UNUSED, char *msg, size_t size
     /* Make sure that the amount of data pending never exceeds
      * the maximum.
      */
-    while (pthread_write_max_size != 0
-        && ip->write_size >= (unsigned long)pthread_write_max_size)
+    while (write_buffer_max_size != 0
+        && ip->write_size >= (unsigned long)write_buffer_max_size)
     {
         struct write_buffer_s *tmp = ip->write_first;
         ip->write_first = tmp->next;
@@ -1514,8 +1508,8 @@ thread_socket_write( SOCKET_T s UNUSED, char *msg, size_t size
     pthread_cond_signal(&ip->write_cond);
 
     errno = 0;
-    return size;
-} /* thread_socket_write() */
+    return MY_TRUE;
+} /* comm_socket_write() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1696,7 +1690,7 @@ writer_thread (void *arg)
         if (ip->write_first)
         {
             /* We have to move the buffer out of the to-write list,
-             * so that thread_socket_write() won't remove it if the
+             * so that comm_socket_write() won't remove it if the
              * data limit is reached. On the other hand a GC might
              * happen while we're still printing, erasing the
              * written list.
@@ -1704,7 +1698,7 @@ writer_thread (void *arg)
             buf = ip->write_first;
             ip->write_first = buf->next;
               /* If this was the last buffer, .write_first will become
-               * NULL and the next call to thread_socket_write() will
+               * NULL and the next call to comm_socket_write() will
                * set both .write_first and .write_last.
                */
             ip->write_size -= buf->length;
@@ -1744,6 +1738,247 @@ writer_thread (void *arg)
     return NULL;
 } /* writer_thread() */
 
+#else
+
+/*-------------------------------------------------------------------------*/
+static INLINE ssize_t
+comm_send_buf (char *msg, size_t size, interactive_t *ip)
+
+/* Low level send routine, just tries to send the data without buffering. 
+   A return value -1 indicates a total failure (i.e. the connection should
+   be dropped), otherwise the amount of data sent (even if it's 0).
+*/
+{
+    int     retries;   /* Number of retries left when sending data */
+    ssize_t n;         /* Bytes that have been sent */
+
+    for (retries = 6;;)
+    {
+#ifdef USE_TLS
+        if ((n = (ip->tls_status == TLS_INACTIVE ? 
+                  (int)socket_write(ip->socket, msg, size):
+                  (int)tls_write(ip, msg, size))) != -1)
+#else
+        if ((n = (int)socket_write(ip->socket, msg, size)) != -1)
+#endif
+        {
+            break;
+        }
+
+        switch (errno)
+        {
+
+        case EINTR:
+            if (--retries)
+                continue;
+            n = 0;
+            break;
+
+        case EWOULDBLOCK:
+            n = 0;
+            break;
+
+        case EMSGSIZE:
+            fprintf(stderr, "%s comm: write EMSGSIZE.\n", time_stamp());
+            break;
+
+        case EINVAL:
+            fprintf(stderr, "%s comm: write EINVAL.\n", time_stamp());
+            break;
+
+        case ENETUNREACH:
+            fprintf(stderr, "%s comm: write ENETUNREACH.\n", time_stamp());
+            break;
+
+        case EHOSTUNREACH:
+            fprintf(stderr, "%s comm: write EHOSTUNREACH.\n", time_stamp());
+            break;
+
+        case EPIPE:
+            fprintf(stderr, "%s comm: write EPIPE detected\n", time_stamp());
+            break;
+            
+        case ECONNRESET:
+            fprintf(stderr, "%s comm: write ECONNRESET detected\n", time_stamp());
+            break;
+
+        default:
+            {
+                int e = errno;
+                fprintf(stderr, "%s comm: write: unknown errno %d (%s)\n"
+                                  , time_stamp(), e, strerror(e));
+            }
+        }
+        
+        if (n == 0)
+            break;
+            
+        ip->do_close = FLAG_DO_CLOSE;
+        return -1;
+
+    } /* for (retries) */
+
+    /* EWOULDBLOCK and EINTR are not real failures. */
+    if (n == -1)
+        return 0;
+
+#ifdef COMM_STAT
+    inet_packets++;
+    inet_volume += n;
+#endif
+
+    return n;
+} /* comm_send_buf() */
+
+/*-------------------------------------------------------------------------*/
+Bool
+comm_socket_write (char *msg, size_t size, interactive_t *ip)
+
+/* Stand in for socket_write(): take the data to be written, compress and
+ * encrypt them if needed and send them to <ip>. If no data can be send
+ * right now append them to the buffer.
+ */
+
+{
+    struct write_buffer_s *b;
+    char *buf;
+    size_t length;
+
+    if (size == 0)
+        return MY_TRUE;
+
+#ifdef USE_MCCP
+    if (ip->out_compress)
+    {
+        int status;
+        
+        ip->out_compress->next_in = (unsigned char *) msg;
+        ip->out_compress->avail_in = size;
+            
+        ip->out_compress->next_out = ip->out_compress_buf;
+        ip->out_compress->avail_out = COMPRESS_BUF_SIZE;
+
+        status = deflate(ip->out_compress, Z_SYNC_FLUSH);
+          
+        if (status != Z_OK)
+        {
+            fprintf(stderr, "%s comm: MCCP compression error: %d\n"
+                          , time_stamp(), status);
+            return MY_FALSE;
+        }
+            
+        /* ok.. perhaps i should take care that all data in message_buf
+         * is compressed, but i guess there is no chance that 1024 byte
+         * compressed won't fit into the 8192 byte buffer
+         */
+        
+        length = ip->out_compress->next_out - ip->out_compress_buf;
+        buf = (char *) ip->out_compress_buf;
+    }
+    else
+#endif /* USE_MCCP */
+    {
+        buf = msg;
+        length = size;
+    }
+
+    /* now sending the buffer... */
+    if (ip->write_first == NULL)
+    {
+        /* Try writing to the socket first. */
+        ssize_t n = comm_send_buf(buf, length, ip);
+        
+        if (n == -1)
+            return MY_FALSE;
+        else if (n == length)
+        {
+            /* We're done. */
+            return MY_TRUE;
+        }
+        else
+        {
+            buf += n;
+            length -= n;
+        }
+    }
+    
+    /* We have to enqueue the message. */
+    b = xalloc(sizeof(struct write_buffer_s) + size - 1);
+    if (!b)
+        outofmem(sizeof(struct write_buffer_s) + size - 1, "comm_socket_write()");
+
+    b->length = length;
+    b->pos = 0;
+    b->next = NULL;
+    memcpy(b->buffer, buf, length);
+
+    /* Chain in the new buffer */
+    if(ip->write_first)
+        ip->write_last = ip->write_last->next = b;
+    else
+        ip->write_first = ip->write_last = b;
+    ip->write_size += size;
+    
+    /* Make sure that the amount of data pending never exceeds
+     * the maximum.
+     */
+    while (write_buffer_max_size != 0
+        && ip->write_size >= (unsigned long)write_buffer_max_size)
+    {
+        struct write_buffer_s *tmp = ip->write_first;
+        ip->write_first = tmp->next;
+        ip->write_size -= tmp->length;
+        xfree(tmp);
+
+        if (!ip->msg_discarded)
+            ip->msg_discarded = 1;
+    }
+    
+    return MY_TRUE;
+} /* comm_socket_write() */
+
+/*-------------------------------------------------------------------------*/
+static void
+comm_write_pending (interactive_t * ip)
+
+/* Send as much from the write buffer of <ip> as possible.
+ */
+
+{
+    /* First, if a previous call had to discard the message, inform the user.
+     */
+    if (ip->msg_discarded)
+    {
+        ssize_t n;
+        char msg[] = "\n*** Text lost in transmission ***\n";
+        
+        n = comm_send_buf(msg, sizeof(msg) - ip->msg_discarded, ip);
+        
+        ip->msg_discarded += n;
+        if (ip->msg_discarded >= sizeof(msg))
+            ip->msg_discarded = 0;
+    }
+    
+    while (ip->write_first != NULL)
+    {
+        struct write_buffer_s *buf;
+        ssize_t n;
+        
+        buf = ip->write_first;
+        n = comm_send_buf(buf->buffer + buf->pos, buf->length - buf->pos, ip);
+
+        if (n == -1)
+            return;
+        
+        buf->pos += n;
+        if (buf->pos < buf->length)
+            return;
+        
+        ip->write_first = buf->next;
+        ip->write_size -= buf->length;
+        xfree(buf);
+    }
+} /* comm_write_pending() */
 #endif /* USE_PTHREADS */
 
 /*-------------------------------------------------------------------------*/
@@ -1810,7 +2045,6 @@ add_message (const char *fmt, ...)
     va_list va;
     interactive_t *ip;       /* The interactive user */
     object_t      *snooper;  /* Snooper of <ip> */
-    int   n;
 
     source = NULL;
     srcstr = NULL;
@@ -1868,15 +2102,6 @@ add_message (const char *fmt, ...)
         fflush(stdout);
         va_end(va);
         return;
-    }
-
-    /* First, if a previous call had to discard the message, inform the user.
-     */
-    if (ip->msg_discarded)
-    {
-        ip->msg_discarded = MY_FALSE;
-        add_message("%s", "\n*** Text lost in transmission ***\n");
-        /* msg_discarded might be TRUE again now */
     }
 
     old_message_length = ip->message_length;
@@ -2081,7 +2306,6 @@ if (sending_telnet_command)
 
     do /* while (srclen != 0) */
     {
-        int    retries;   /* Number of retries left when sending data */
         ptrdiff_t chunk;  /* Current size of data in .message_buf[] */
         char   c;         /* Currently processed character */
 
@@ -2149,149 +2373,12 @@ if (sending_telnet_command)
 
         /* Write .message_buf[] to the network. */
 
-#if !defined(USE_PTHREADS) && defined(USE_MCCP)
-        if (ip->out_compress)
+        if (!comm_socket_write(ip->message_buf, (size_t)chunk, ip))
         {
-            ip->out_compress->next_in = (unsigned char *) ip->message_buf;
-            ip->out_compress->avail_in = chunk;
-            
-            ip->out_compress->avail_out = COMPRESS_BUF_SIZE -
-              (ip->out_compress->next_out -
-               ip->out_compress_buf);
-            
-            {
-              int status = deflate(ip->out_compress, Z_SYNC_FLUSH);
-              
-              if (status != Z_OK)
-                return;
-            }
-            
-            /* ok.. perhaps i should take care that all data in message_buf
-             * is compressed, but i guess there is no chance that 1024 byte
-             * compressed won't fit into the 8192 byte buffer
-             */
-            
-            length = ip->out_compress->next_out - ip->out_compress_buf;
-        }
-#endif /* USE_MCCP && !USE_PTHREADS */
-
-        /* now sending the buffer... */
-        
-        for (retries = 6;;)
-        {
-           
-#if defined(USE_PTHREADS)
-
-            if ((n = (int)thread_socket_write(ip->socket, ip->message_buf, (size_t)chunk, ip, MY_TRUE)) != -1)
-            {
-                break;
-            }
-
-#elif defined(USE_MCCP)
-            if (ip->out_compress) /* here we choose the correct buffer */             
-            {
-#ifdef USE_TLS
-                if ((n = (ip->tls_status == TLS_INACTIVE ?
-                          (int)socket_write(ip->socket, ip->out_compress_buf, (size_t)length):
-                          (int)tls_write(ip, ip->out_compress_buf, (size_t)length))) != -1)
-#else
-                if ((n = (int)socket_write(ip->socket, ip->out_compress_buf, (size_t)length)) != -1)
-#endif
-                {
-                    break;
-                }
-            }
-            else 
-#endif
-#if !defined(USE_PTHREADS)
-            {
-#ifdef USE_TLS
-                if ((n = (ip->tls_status == TLS_INACTIVE ? 
-                          (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk):
-                          (int)tls_write(ip, ip->message_buf, (size_t)chunk))) != -1)
-#else
-                if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
-#endif
-                {
-                    break;
-                }
-            }
-#endif
-            switch (errno) {
-              case EINTR:
-                if (--retries)
-                    continue;
-                ip->msg_discarded = MY_TRUE;
-                fprintf(stderr,
-                  "%s comm: write EINTR. Message discarded.\n", time_stamp());
-                if (old_message_length)
-                    remove_flush_entry(ip);
-                return;
-
-              case EWOULDBLOCK:
-                ip->msg_discarded = MY_TRUE;
-                if (d_flag)
-                    fprintf(stderr,
-                      "%s comm: write EWOULDBLOCK. Message discarded.\n", time_stamp());
-                if (old_message_length)
-                    remove_flush_entry(ip);
-                return;
-
-              case EMSGSIZE:
-                fprintf(stderr, "%s comm: write EMSGSIZE.\n", time_stamp());
-                return;
-
-              case EINVAL:
-                fprintf(stderr, "%s comm: write EINVAL.\n", time_stamp());
-                break;
-
-              case ENETUNREACH:
-                fprintf(stderr, "%s comm: write ENETUNREACH.\n", time_stamp());
-                break;
-
-              case EHOSTUNREACH:
-                fprintf(stderr, "%s comm: write EHOSTUNREACH.\n", time_stamp());
-                break;
-
-              case EPIPE:
-                fprintf(stderr, "%s comm: write EPIPE detected\n", time_stamp());
-                break;
-
-              default:
-                {
-                  int e = errno;
-                  perror("write");
-                  fprintf(stderr, "%s comm: write: unknown errno %d\n"
-                                , time_stamp(), e);
-                }
-            }
             if (old_message_length)
                 remove_flush_entry(ip);
-            ip->do_close = FLAG_DO_CLOSE;
             return;
-
-        } /* for (retries) */
-
-#ifdef COMM_STAT
-        inet_packets++;
-        inet_volume += n;
-#endif
-
-#if defined(USE_MCCP) && !defined(USE_PTHREADS)
-        if (ip->out_compress)
-        {
-            /* we update the compressed buffer here */
-            ip->out_compress->next_out = ip->out_compress_buf + length - n;
-            if (n != length)
-                fprintf(stderr, "%s write socket (compressed): wrote %ld, "
-                                "should be %td.\n"
-                        , time_stamp(), (long)n, chunk);
         }
-        else
-#endif
-        if (n != chunk)
-            fprintf(stderr, "%s write socket: wrote %ld, should be %td.\n"
-                    , time_stamp(), (long)n, chunk);
 
         /* Continue with the processing of source */
         dest = &ip->message_buf[0];
@@ -2551,6 +2638,15 @@ get_message (char *buff)
                     if (socket_number(ip->socket) >= nfds)
                         nfds = socket_number(ip->socket)+1;
                 }
+
+#ifndef USE_PTHREADS                
+                if (ip->write_first != NULL || ip->msg_discarded)
+                {
+                    /* There is something to write. */
+                    FD_SET(ip->socket, &writefds);
+                }
+#endif /* USE_PTHREADS */
+
             } /* for (all players) */
 #ifdef ERQ_DEMON
             if (erq_demon >= 0)
@@ -3018,6 +3114,12 @@ get_message (char *buff)
             }
 #endif
 
+#ifndef USE_PTHREADS                
+            if (FD_ISSET(ip->socket, &writefds))
+            {
+                comm_write_pending(ip);
+            }
+#endif
             /* Skip players which have reached the ip->maxNumCmds limit
              * for this second. We let the data accumulate on the socket.
              */
@@ -3373,19 +3475,9 @@ get_message (char *buff)
                     }
                     if (length > ip->chars_ready)
                     {
-#ifdef USE_PTHREADS
-                        thread_socket_write(ip->socket, ip->text + ip->chars_ready
-                                    , (size_t)(length - ip->chars_ready), ip, MY_FALSE);
-#else
-#ifdef USE_TLS
-                        if (ip->tls_status != TLS_INACTIVE)
-                            tls_write(ip, ip->text + ip->chars_ready
-                                        , (size_t)(length - ip->chars_ready));
-                        else
-#endif /* USE_TLS */
-                          socket_write(ip->socket, ip->text + ip->chars_ready
-                                      , (size_t)(length - ip->chars_ready));
-#endif
+                        comm_socket_write(ip->text + ip->chars_ready
+                                        , (size_t)(length - ip->chars_ready)
+                                        , ip);
                         ip->chars_ready = length;
                     }
                 }
@@ -3622,6 +3714,7 @@ remove_interactive (object_t *ob, Bool force)
           /* buffer list is returned by thread */
         interactive_cleanup(interactive);
 #endif
+
 #ifdef USE_MCCP
         if (interactive->out_compress)
             end_compress(interactive, MY_TRUE);
@@ -3629,6 +3722,12 @@ remove_interactive (object_t *ob, Bool force)
              * a second chance at it.
              */
 #endif
+
+#ifndef USE_PTHREADS
+        /* If there is anything left, try now. */
+        comm_write_pending(interactive);
+#endif
+
 #ifdef USE_TLS
         tls_deinit_connection(interactive);
 #endif
@@ -3672,6 +3771,15 @@ remove_interactive (object_t *ob, Bool force)
 
     if (interactive->trace_prefix)
         free_mstring(interactive->trace_prefix);
+
+#ifndef USE_PTHREADS
+    while (interactive->write_first)
+    {
+        struct write_buffer_s *tmp = interactive->write_first;
+        interactive->write_first = tmp->next;
+        xfree(tmp);
+    }
+#endif    
 
     /* Unlink the interactive structure from the shadow sentence
      * of the object.
@@ -3921,7 +4029,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
     new_interactive->input_to = NULL;
     put_number(&new_interactive->prompt, 0);
     new_interactive->modify_command = NULL;
-    new_interactive->msg_discarded = MY_FALSE;
+    new_interactive->msg_discarded = 0;
     new_interactive->set_input_to = MY_FALSE;
     new_interactive->closing = MY_FALSE;
     new_interactive->tn_enabled = MY_TRUE;
@@ -3957,6 +4065,8 @@ new_player ( object_t *ob, SOCKET_T new_socket
     new_interactive->next_player_for_flush = NULL;
     new_interactive->previous_player_for_flush = NULL;
 
+    new_interactive->write_first = new_interactive->write_last = NULL;
+    new_interactive->write_size = 0;
 #ifdef USE_PTHREADS
     new_interactive->flush_on_cleanup = MY_FALSE;
     pthread_mutex_init(&new_interactive->write_mutex, NULL);
@@ -3968,8 +4078,6 @@ new_player ( object_t *ob, SOCKET_T new_socket
         pthread_mutexattr_destroy(&mutexattr);
     }
     pthread_cond_init(&new_interactive->write_cond, NULL);
-    new_interactive->write_first = new_interactive->write_last = NULL;
-    new_interactive->write_size = 0;
     new_interactive->write_current = NULL;
     new_interactive->written_first = NULL;
     pthread_create(&new_interactive->write_thread, NULL, writer_thread, new_interactive);
@@ -5543,42 +5651,19 @@ telnet_neg (interactive_t *ip)
                     if (ip->text[0] == input_escape
                      && ! (find_no_bang(ip) & IGNORE_BANG) )
                     {
-#ifdef USE_PTHREADS
                         if (to > &ip->text[ip->chars_ready])
                         {
-                            thread_socket_write(ip->socket, &ip->text[ip->chars_ready],
-                              (size_t)(to - &ip->text[ip->chars_ready]), ip, MY_FALSE);
+                            comm_socket_write(&ip->text[ip->chars_ready]
+                                            , (size_t)(to - &ip->text[ip->chars_ready])
+                                            , ip);
                             ip->chars_ready = to - ip->text;
                         }
-                        if (to > first) {
-                            thread_socket_write(ip->socket, "\b \b", 3, ip, MY_FALSE);
+                        if (to > first)
+                        {
+                            comm_socket_write("\b \b", 3, ip);
                             to--;
                             ip->chars_ready--;
                         }
-#else
-                        if (to > &ip->text[ip->chars_ready])
-                        {
-#ifdef USE_TLS
-                            if (ip->tls_status != TLS_INACTIVE)
-                                tls_write(ip, &ip->text[ip->chars_ready]
-                                         , (size_t)(to - &ip->text[ip->chars_ready]));
-                            else
-#endif
-                                socket_write(ip->socket, &ip->text[ip->chars_ready],
-                                  (size_t)(to - &ip->text[ip->chars_ready]));
-                            ip->chars_ready = to - ip->text;
-                        }
-                        if (to > first) {
-#ifdef USE_TLS
-                            if (ip->tls_status != TLS_INACTIVE)
-                                tls_write(ip, "\b \b", 3);
-                            else
-#endif
-                                socket_write(ip->socket, "\b \b", 3);
-                            to--;
-                            ip->chars_ready--;
-                        }
-#endif
                         goto ts_data;
                     }
                 } /* if (ip->tn_enabled) */
@@ -7284,11 +7369,6 @@ f_binary_message (svalue_t *sp)
  * codes for colours and other things needs to bypass the allowed
  * charset filters, but isn't important enough to waste bandwith
  * on a synchronous transmission.
- *
-#ifdef USE_MCCP
- * If the client uses MCCP compression add_message ist always used
- * with flushing buffer _after_ the Message.
-#endif
  */
 
 {
@@ -7337,11 +7417,7 @@ f_binary_message (svalue_t *sp)
         save_command_giver = command_giver;
         command_giver = current_object;
 
-#ifdef USE_MCCP
-        if ((sp->u.number & 1)||ip->out_compress)
-#else
         if (sp->u.number & 1)
-#endif
         {
             /* Write before flush... */
 
@@ -7351,13 +7427,9 @@ f_binary_message (svalue_t *sp)
 
             sending_telnet_command = MY_FALSE;
 
-#ifdef USE_MCCP
-            if ((sp->u.number & 2)||ip->out_compress)
-                add_message(message_flush);
-#else
             if (sp->u.number & 2)
                 add_message(message_flush);
-#endif /* USE_MCCP */
+
             wrote = mstrsize(msg);
         }
         else
@@ -7369,46 +7441,9 @@ f_binary_message (svalue_t *sp)
              * to the socket now.
              */
 
-            for (i = 6; i > 0; i--) {
-#ifdef USE_PTHREADS
-                wrote = (mp_int)thread_socket_write(ip->socket, get_txt(msg)
-                                                   , mstrsize(msg), ip, MY_TRUE);
-#else
-#ifdef USE_TLS
-                if (ip->tls_status != TLS_INACTIVE)
-                    wrote = (mp_int)tls_write(ip, get_txt(msg), mstrsize(msg));
-                else
-#endif /* USE_TLS */
-                    wrote = (mp_int)socket_write(ip->socket, get_txt(msg), mstrsize(msg));
-#endif
-                if (wrote != -1 || errno != EINTR || i != 1)
-                    break;
-            }
-            if (wrote == -1)
-            {
-                /* TODO: Use strerror()? */
-                switch(errno)
-                {
-                case EINTR:
-                    fprintf(stderr
-                           , "%s comm: write EINTR. Message discarded.\n"
-                           , time_stamp());
-                    break;
-                case EWOULDBLOCK:
-                    fprintf(stderr,
-                      "%s comm: write EWOULDBLOCK. Message discarded.\n"
-                           , time_stamp());
-                    break;
-                case EMSGSIZE:
-                    fprintf(stderr, "%s comm: write EMSGSIZE.\n"
-                           , time_stamp());
-                    break;
-                default:
-                    perror("write");
-                    ip->do_close = FLAG_DO_CLOSE;
-                    break;
-                }
-            }
+            if (comm_socket_write(get_txt(msg), mstrsize(msg), ip))
+                wrote = mstrsize(msg);
+
         } /* if (type of write) */
 
         command_giver = save_command_giver;

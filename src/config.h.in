@@ -60,11 +60,11 @@
  */
 #define MAX_CALLOUTS              @val_max_callouts@
 
-/* When USE_PTHREADS is used, define this to the maximum amount of data
- * to be held pending for writing.
+/* Define this to the maximum amount of data
+ * to be held pending for writing per interactive.
  * A value of 0 means 'unlimited'.
  */
-#define PTHREAD_WRITE_MAX_SIZE @val_pthreads_write_max_size@
+#define WRITE_BUFFER_MAX_SIZE     @val_write_buffer_max_size@
 
 
 /* --- Timing --- */
