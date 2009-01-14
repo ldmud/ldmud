@@ -12,6 +12,13 @@ See the file HISTORY for a user-oriented summary of all the changes.
 14-Jan-2009 (Zesstra)
   - (doc/driver/limitations)
     Started to assemble a list of non-configurable limits - to be extended...
+  - (exec.h, object.c, closure.c, interpret.c)
+    Changed some code defines from exec.h to static functions and
+      constants to an enum.
+    Introducing a properly typed CROSSDEF_NAME_OFFSET() solves crash on LP64
+      platforms in functionlist(). (#559)
+    Renamed SEARCH_FUNCTION_INHERIT to search_function_inherit and return the
+      pointer to the inherit structure.
 
 13-Jan-2009 (Zesstra)
   - (simulate.c)
