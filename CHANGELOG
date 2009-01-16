@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Jan-2009 (Zesstra)
+  - (config.h.in, lex.c)
+    Enforce the possible value range for ITABLE_SIZE (256 - SHRT_MAX/32768).
+      Fixes issues of not finding identifiers in the table if the table is to
+      large. (#558)
+    Updated documentation in config.h.in to reflect this.
+
 14-Jan-2009 (Gnomi)
   - (comm.c, pkg-mccp.c, configure)
     Use of write buffers without the need for threads.

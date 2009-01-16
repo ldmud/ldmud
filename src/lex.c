@@ -347,6 +347,14 @@ static char yytext[MAXLINE];
 
 
 /*-------------------------------------------------------------------------*/
+/* Enforce an appropriate range for ITABLE_SIZE
+ * The hash used in ident_s is of type short. Therefore the hash table must
+ * not contain more hash chains than SHRT_MAX.
+ */
+#if ITABLE_SIZE < 256 || ITABLE_SIZE > SHRT_MAX
+#error "ITABLE_SIZE must be within the range of 256 and SHRT_MAX (usually 32768)."
+This is the end...
+#endif
 
 static ident_t *ident_table[ITABLE_SIZE];
   /* The lexer stores all encountered identifiers in a hashtable of struct

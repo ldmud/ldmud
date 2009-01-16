@@ -42,8 +42,9 @@ Hash tables
   wide integers (lex.h, lex.c, ...)
 
 * maximum size of the hash table for objects (OTABLE): 65536
-  The hashes of identifiers are signed short which are in most cases 16 bit
-  wide integers (object.h, object.c, otable.c, ...)
+* maximum size of the hash table for shared strings (HTABLE): 65536
+  The hashes are of type unsigned short which are in most cases 16 bit
+  wide integers.
 
 
 Objects

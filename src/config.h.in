@@ -498,9 +498,10 @@
  */
 #define OTABLE_SIZE               @val_otable_size@
 
-/* Define the size of the table of defines, reserved words, identifiers
- * and efun names. Should be either several times smaller than HTABLE_SIZE
- * or identical with it.
+/* Define the size of the ident_table. It contains all global identifiers
+ * (efuns and permanent defines) as well as the identifiers of a compiled
+ * program which are removed from the ident_table after compilation.
+ * Must be within 256 and the maximum of a short (SHRT_MAX, usually 32768).
  */
 #define ITABLE_SIZE               @val_itable_size@
 
