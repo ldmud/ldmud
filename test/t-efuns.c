@@ -90,6 +90,7 @@ mixed *tests = ({
     ({ "asin 2", TF_ERROR, (: funcall(#'asin,"1.0") :) }),
     ({ "asin 3", TF_ERROR, (: asin(1.1) :) }),
     ({ "asin 4", TF_ERROR, (: asin(-1.1) :) }),
+    ({ "save_object 1", 0, (: stringp(save_object()) :) }), /* Bug #594 */
     ({ "strstr 01", 0, (: strstr("","") == 0 :) }), /* Bug #536 */
     ({ "strstr 02", 0, (: strstr("","", 1) == -1 :) }),
     ({ "strstr 03", 0, (: strstr("abc","") == 0 :) }),

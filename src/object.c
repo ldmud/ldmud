@@ -6904,9 +6904,9 @@ v_save_object (svalue_t *sp, int numarg)
          * data pending in the save_buffer.
          */
 
-        /* free the error handler and the arguments (numarg + 1  from sp).
+        /* free the arguments (numarg from sp).
          */
-        sp = pop_n_elems(numarg + 1, sp);
+        sp = pop_n_elems(numarg, sp);
       
         sp++; /* for the result */
         if (failed)

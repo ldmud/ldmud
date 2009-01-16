@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Jan-2009 (Gnomi)
+  - (object.c)
+    Save_object without a filename removed one too many elements
+    from the stack. (Bug #595)
+  
 16-Jan-2009 (Zesstra)
   - (config.h.in, lex.c)
     Enforce the possible value range for ITABLE_SIZE (256 - SHRT_MAX/32768).
