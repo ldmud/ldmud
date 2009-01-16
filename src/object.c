@@ -5970,9 +5970,7 @@ save_closure (svalue_t *cl, Bool writable)
                 /* An inherited lfun closure. Go to the inherit. */
                 while (prog != inhProg)
                 {
-                    inherit_t *inheritp;
-
-                    SEARCH_FUNCTION_INHERIT(inheritp, prog, ix);
+                    inherit_t *inheritp = search_function_inherit(prog, ix);
                     ix -= inheritp->function_index_offset;
                     prog = inheritp->prog;
                 }
@@ -6028,7 +6026,7 @@ save_closure (svalue_t *cl, Bool writable)
                     inherit_t *inheritp;
                     string_t  *progName;
                     
-                    SEARCH_FUNCTION_INHERIT(inheritp, prog, ix);
+                    inheritp = search_function_inherit(prog, ix);
                     ix -= inheritp->function_index_offset;
                     prog = inheritp->prog;
                     progName = del_dotc(prog->name);

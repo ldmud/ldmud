@@ -295,7 +295,7 @@ struct cache
       /* The pointer to the program code of the function, or NULL if the
        * object does not implement the function.
        */
-    int id;
+    int32 id;
       /* The id_number of the program. */
 
     funflag_t flags;
@@ -7390,7 +7390,7 @@ setup_new_frame (int fx, program_t *inhProg)
                      , get_txt(progp->name)
                      );
 #endif
-            SEARCH_FUNCTION_INHERIT(inheritp, progp, fx);
+            inheritp = search_function_inherit(progp, fx);
             fx -= inheritp->function_index_offset;
 
             inh = adjust_variable_offsets(inheritp, progp, current_object);

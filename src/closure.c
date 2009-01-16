@@ -872,7 +872,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
                             break;
                         }
                         
-                        SEARCH_FUNCTION_INHERIT(inheritp, prog, i);
+                        inheritp = search_function_inherit(prog, i);
                         i-= inheritp->function_index_offset;
                         prog = inheritp->prog;
 
@@ -5483,8 +5483,8 @@ closure_lookup_lfun_prog ( lambda_t * l
                      , get_txt(prog->name)
                      );
 #endif
-
-            SEARCH_FUNCTION_INHERIT(inheritp, prog, ix);
+            
+            inheritp = search_function_inherit(prog, ix);
             ix -= inheritp->function_index_offset;
             prog = inheritp->prog;
 
