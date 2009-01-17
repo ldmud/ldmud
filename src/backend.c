@@ -451,6 +451,7 @@ backend (void)
     /*
      * We come here after errors, and have to clear some global variables.
      */
+    mark_end_evaluation();
     clear_state();
     flush_all_player_mess();
     prevent_object_cleanup = MY_FALSE;

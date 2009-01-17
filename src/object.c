@@ -921,6 +921,7 @@ logon_object (object_t *ob)
     object_t *save = current_object;
 
     current_object = ob;
+    mark_start_evaluation();
     ret = apply(STR_LOGON, ob, 0);
     if (ret == 0)
     {
@@ -928,6 +929,7 @@ logon_object (object_t *ob)
                get_txt(ob->name));
         /* NOTREACHED */
     }
+    mark_end_evaluation();
     current_object = save;
 } /* logon_object() */
 

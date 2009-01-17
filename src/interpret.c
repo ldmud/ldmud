@@ -17231,7 +17231,7 @@ apply (string_t *fun, object_t *ob, int num_arg)
 /*-------------------------------------------------------------------------*/
 void
 secure_apply_error ( svalue_t *save_sp, struct control_stack *save_csp
-                   , Bool clear_costs)
+                   , Bool external)
 
 /* Recover from an error during a secure apply. <save_sp> and <save_csp>
  * are the saved evaluator stack and control stack pointers, saving the
@@ -17242,7 +17242,7 @@ secure_apply_error ( svalue_t *save_sp, struct control_stack *save_csp
  * information, unless it is a triple fault - in that case only a
  * debug_message() is generated.
  *
- * If <clear_costs> is TRUE, the eval costs and limits will be reset
+ * If <external> is TRUE, the eval costs and limits will be reset
  * before runtime_error() is called. This is used for top-level master
  * applies which should behave like normal function calls in the error
  * handling.
@@ -17338,8 +17338,9 @@ secure_apply_error ( svalue_t *save_sp, struct control_stack *save_csp
             a++;
         }
 
-        if (clear_costs)
+        if (external)
         {
+            mark_end_evaluation();
             CLEAR_EVAL_COST;
             RESET_LIMITS;
         }
@@ -17405,7 +17406,11 @@ secure_apply_ob (string_t *fun, object_t *ob, int num_arg, Bool external)
     }
     else
     {
+        if (external)
+            mark_start_evaluation();
         result = sapply(fun, ob, num_arg);
+        if (external)
+            mark_end_evaluation();
     }
     rt_context = error_recovery_info.rt.last;
     return result;
@@ -17488,7 +17493,11 @@ apply_master_ob (string_t *fun, int num_arg, Bool external)
     }
     else
     {
+        if (external)
+            mark_start_evaluation();
         result = sapply_int(fun, master_ob, num_arg, MY_TRUE, MY_FALSE);
+        if (external)
+            mark_end_evaluation();
     }
 
     /* Free the reserve if we used it */
@@ -18260,9 +18269,13 @@ secure_call_lambda (svalue_t *closure, int num_arg, Bool external)
     }
     else
     {
+        if (external)
+            mark_start_evaluation();
         call_lambda(closure, num_arg);
         transfer_svalue((result = &apply_return_value), inter_sp);
         inter_sp--;
+        if (external)
+            mark_end_evaluation();
     }
     rt_context = error_recovery_info.rt.last;
     return result;

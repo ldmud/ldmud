@@ -5232,7 +5232,7 @@ h_telnet_neg (int n)
     if (driver_hook[H_TELNET_NEG].type == T_STRING)
     {
         svp =
-          secure_apply(driver_hook[H_TELNET_NEG].u.str, command_giver, n);
+          secure_callback(driver_hook[H_TELNET_NEG].u.str, command_giver, n);
     }
     else if (driver_hook[H_TELNET_NEG].type == T_CLOSURE)
     {
