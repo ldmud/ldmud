@@ -1616,7 +1616,7 @@ v_trim (svalue_t *sp, int num_arg)
     {
         if (argp[2].type == T_NUMBER)
         {
-            if (argp[2].u.number <= 0 || argp[2].u.number >= 1 << CHAR_BIT)
+            if (argp[2].u.number < 0 || argp[2].u.number >= 1 << CHAR_BIT)
                 errorf("Bad argument 3 to trim(): %"PRIdPINT
                        " is not a character\n", argp[2].u.number);
             def_ch[0] = (char)argp[2].u.number;
