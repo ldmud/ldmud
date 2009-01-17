@@ -6,6 +6,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
     check return value of verify_declared() - fixes a crash in t-language
   - (backend.c, comm.c, interpret.c, object.c)
     call mark_(start|end)_evaluation() in various places (#476)
+  - (efuns.c, func_spec, interpret.c, interpret.h, doc/efuns/get_eval_number)
+    add get_eval_number efun.
 
 17-Jan-2009 (Gnomi)
   - (object.c)

@@ -603,6 +603,7 @@ string  expand_define(string, null|string default: F_CONST0);
 void    garbage_collection(void|string, void|int);
 mixed  *get_error_file(string, int default: F_CONST1);
 int     get_eval_cost();
+int     get_eval_number();
 #ifdef TRACE_CODE
 string *last_instructions(int, int default: F_CONST1);
 #endif

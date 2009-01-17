@@ -713,7 +713,11 @@ static struct pointer_table *ptable;
 
 #endif
 
-       unsigned long total_evalcost;
+p_uint eval_number;
+  /* evaluation number. (may overflow)
+   */
+
+unsigned long total_evalcost;
 static struct timeval eval_begin;
   /* Current total evalcost counter, and start of the evaluation.
    */
@@ -795,6 +799,7 @@ mark_start_evaluation (void)
 
 {
     total_evalcost = 0;
+    eval_number++;
     if (gettimeofday(&eval_begin, NULL))
     {
         eval_begin.tv_sec = eval_begin.tv_usec = 0;

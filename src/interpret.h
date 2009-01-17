@@ -120,6 +120,7 @@ extern p_uint apply_cache_hit;
 extern p_uint apply_cache_miss;
 #endif
 
+extern p_uint eval_number;
 extern unsigned long total_evalcost;
 extern unsigned long last_total_evalcost;
 extern struct timeval last_eval_duration;
