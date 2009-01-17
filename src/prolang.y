@@ -3472,6 +3472,11 @@ define_global_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_s
     define_variable(name, actual_type);
     i = verify_declared(name); /* Is the var declared? */
 
+#ifdef DEBUG
+    if (i == -1)
+        fatal("Variable not declared after defining it.\n");
+#endif
+
     /* Initialize float values with 0.0. */
     if (with_init
        || (!(actual_type.typeflags & TYPE_MOD_POINTER)
@@ -9604,54 +9609,44 @@ expr0:
 %line
           $$.start = $1.start;
           i = verify_declared($2);
+          if (i == -1)
+              /* Variable not declared. */
+              YYACCEPT;
 
-          if (i != -1)
+          if (i & VIRTUAL_VAR_TAG)
           {
-
-              if (i & VIRTUAL_VAR_TAG)
-              {
-                  add_f_code(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
-                  add_byte(i);
-                  lvtype = V_VARIABLE(i)->type;
-                  lvtype.typeflags &= TYPE_MOD_MASK;
-              }
-              else
-              {
-                  if ((i + num_virtual_variables) & ~0xff)
-                  {
-                      add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
-                      add_short(i + num_virtual_variables);
-                      CURRENT_PROGRAM_SIZE += 1;
-                  }
-                  else
-                  {
-                      add_f_code(F_PUSH_IDENTIFIER_LVALUE);
-                      add_byte(i + num_virtual_variables);
-                  }
-                  lvtype = NV_VARIABLE(i)->type;
-                  lvtype.typeflags &= TYPE_MOD_MASK;
-              }
-
-              if (exact_types.typeflags
-               && !BASIC_TYPE(lvtype, Type_Number)
-               && !BASIC_TYPE(lvtype, Type_Float))
-              {
-                  argument_type_error($1.code, lvtype);
-              }
-
-              CURRENT_PROGRAM_SIZE += 2;
+              add_f_code(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
+              add_byte(i);
+              lvtype = V_VARIABLE(i)->type;
+              lvtype.typeflags &= TYPE_MOD_MASK;
           }
           else
           {
-              /* Variable not declared - try to recover */
-              YYACCEPT;
-
-              lvtype = Type_Any;
+              if ((i + num_virtual_variables) & ~0xff)
+              {
+                  add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
+                  add_short(i + num_virtual_variables);
+                  CURRENT_PROGRAM_SIZE += 1;
+              }
+              else
+              {
+                  add_f_code(F_PUSH_IDENTIFIER_LVALUE);
+                  add_byte(i + num_virtual_variables);
+              }
+              lvtype = NV_VARIABLE(i)->type;
+              lvtype.typeflags &= TYPE_MOD_MASK;
           }
 
-          last_expression = CURRENT_PROGRAM_SIZE;
+          if (exact_types.typeflags
+           && !BASIC_TYPE(lvtype, Type_Number)
+           && !BASIC_TYPE(lvtype, Type_Float))
+          {
+              argument_type_error($1.code, lvtype);
+          }
 
-          CURRENT_PROGRAM_SIZE += 1;
+          last_expression = CURRENT_PROGRAM_SIZE + 2;
+
+          CURRENT_PROGRAM_SIZE += 3;
 
           add_f_code($1.code);
           $$.end = CURRENT_PROGRAM_SIZE;
@@ -10591,6 +10586,9 @@ expr4:
           bytecode_p p;
 %line
           i = verify_declared($2);
+          if (i == -1)
+              /* variable not declared */
+              YYACCEPT;
 
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
@@ -10844,6 +10842,9 @@ expr4:
           bytecode_p p;
 %line
           i = verify_declared($1);
+          if (i == -1)
+              /* variable not declared */
+              YYACCEPT;
 
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.end = 0;
@@ -11474,6 +11475,10 @@ name_lvalue:
 %line
           $$.length = 0;
           i = verify_declared($1);
+          if (i == -1)
+              /* variable not declared */
+              YYACCEPT;
+
           if (i & VIRTUAL_VAR_TAG)
           {
               $$.u.simple[0] = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
@@ -13557,7 +13562,12 @@ lvalue_list:
           int i;
 %line
           $$ = 1 + $1;
+
           i = verify_declared($3);
+          if (i == -1)
+              /* variable not declared */
+              YYACCEPT;
+
           if (i & VIRTUAL_VAR_TAG)
           {
               ins_f_code(F_PUSH_VIRTUAL_VARIABLE_LVALUE);

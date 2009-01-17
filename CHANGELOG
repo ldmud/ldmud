@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Jan-2008 (Fuchur)
+  - (prolang.y)
+    check return value of verify_declared() - fixes a crash in t-language
+
 17-Jan-2009 (Gnomi)
   - (object.c)
     Save_object without a filename removed one too many elements
