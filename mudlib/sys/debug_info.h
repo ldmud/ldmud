@@ -12,6 +12,7 @@
 #define DINFO_DUMP    5  /* Dump some special information into files */
 #define DINFO_DATA    6  /* Return internal information */
 #define DINFO_TRACE   7  /* Return the current call trace */
+#define DINFO_EVAL_NUMBER 8 /* Return the current eval number */
 
 /* Sub-request values for debug_info(DINFO_DATA) */
 

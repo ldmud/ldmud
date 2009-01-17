@@ -438,6 +438,25 @@ BESCHREIBUNG
             <arg2> == DIT_CURRENT_DEPTH (4): Liefert die Zahl der Frames auf
                 dem Control Stack (Rekursionstiefe).
 
+        DINFO_EVAL_NUMBER (8): gibt die Nummer der aktuellen Berechnung
+            zurueck. Diese Nummer fuer fuer jeden vom driver initiierten
+            Aufruf von LPC-Code erhoeht, also bei Aufruf von:
+              - Kommandos (die per add_action hinzugefuegt wurden)
+              - heart_beat, reset, clean_up
+              - Aufrufe durch call_out oder input_to
+              - master applies, die auf externe Ereignisse zurueckgehen
+              - driver hooks genauso
+              - Rueckrufen von send_erq
+              - logon in interaktiven Objekten
+
+           Dieser Zaehler kann z.B. benutzt werden, um zu verhindern, dass
+           bestimmte Aktionen mehrfach innerhalb eines heart_beat()
+           ausgefuehrt werden. Eine andere Anwendungsmoeglichkeit sind
+           Zeitstempel zur Sortierung zur Sortierung von Ereignissen.
+
+           Es ist zu beachten, dass der Zaehler ueberlaufen kann, insbesondere
+           auf 32-bit-Systemen. Er kann demzufolge auch negativ werden.
+
 AENDERUNGEN
         Seit 3.2.7 liefert DINFO_STATUS die Information zurueck, anstatt sie
             nur auszugeben.
@@ -463,6 +482,7 @@ AENDERUNGEN
         LDMud 3.3.603 fuegte DID_MEM_EXT_STATISTICS zu DINFO_DATA:DID_MEMORY
             hinzu.
         LDMud 3.3.718 fuegte DIT_CURRENT_DEPTH to DINFO_TRACE hinzu.
+        LDMud 3.3.719 fuegte DINFO_EVAL_NUMBER hinzu
 
 SIEHE AUCH
         trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

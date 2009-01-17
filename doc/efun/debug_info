@@ -580,6 +580,25 @@ DESCRIPTION
             <arg2> == DIT_CURRENT_DEPTH (4): Return the current number of
                frames on the control stack (recursion depth).
 
+        DINFO_EVAL_NUMBER (8): Return the current evaluation number.
+            The number is incremented for each top-level call. Top-level
+            calls are initiated by the driver, usually in reaction to an
+            external event:
+              - commands (added by add_action)
+              - heart_beat, reset, clean_up
+              - calls from call_out or input_to
+              - master applies triggered by external events
+              - calls of driver hooks in reaction to external events
+              - send_erq callbacks
+              - logon in interactives
+
+            The number can be used to detect cases where the same code is
+            executed twice in the same top level evaluation (say, heart_beat),
+            and also for time stamps for ordering some events.
+
+            Please note that the counter may overflow, especially on 32 bit
+            systems. As a result, it can also be negative.
+
 HISTORY
         Since 3.2.7, DINFO_STATUS returns the status information instead
           of printing it.
@@ -611,8 +630,8 @@ HISTORY
             DID_ST_PACKET_SIZE_IN.
         LDMud 3.3.679 removed DID_ST_IT_OVERHEAD and DID_ST_ITABLED*;
             added DID_ST_HYBRID_MAPPINGS and DID_ST_HASH_MAPPINGS.
-        LDMud 3.3.718 fuegte DIT_CURRENT_DEPTH to DINFO_TRACE hinzu.
-
+        LDMud 3.3.718 added DIT_CURRENT_DEPTH to DINFO_TRACE.
+        LDMud 3.3.719 added DINFO_EVAL_NUMBER
 
 SEE ALSO
         trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

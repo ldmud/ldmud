@@ -1,19 +1,22 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-17-Jan-2008 (Zesstra)
+17-Jan-2009 (Zesstra)
   - (efuns.c)
     Relaxed syntax check in v_trim() to allow a 0 as <ch> for trimming 
       "\0" (#473)
 
-17-Jan-2008 (Fuchur)
-  - (prolang.y)
-    check return value of verify_declared() - fixes a crash in t-language
-  - (backend.c, comm.c, interpret.c, object.c)
-    call mark_(start|end)_evaluation() in various places (#476)
+17-Jan-2009 (Fuchur)
+  - (efuns.c, func_spec, mudlib/sys/debug_info.h, doc/efun/debug_info,
+    doc/efun.de/debug_info.de)
+    use debug_info instead of new get_eval_number() efun.
   - (efuns.c, func_spec, interpret.c, interpret.h, doc/efuns/get_eval_number,
     doc/efuns.de/get_eval_number.de)
     add get_eval_number efun.
+  - (backend.c, comm.c, interpret.c, object.c)
+    call mark_(start|end)_evaluation() in various places (#476)
+  - (prolang.y)
+    check return value of verify_declared() - fixes a crash in t-language
 
 17-Jan-2009 (Gnomi)
   - (object.c)
