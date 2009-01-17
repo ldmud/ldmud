@@ -1,0 +1,28 @@
+SYNOPSIS
+        int get_eval_number()
+
+BESCHREIBUNG
+        get_eval_number() gibt die Nummer der aktuellen Berechnung zurueck.
+        Diese Nummer fuer fuer jeden vom driver initiierten Aufruf von LPC-
+        Code erhoeht, also bei Aufruf von:
+          - Kommandos (die per add_action hinzugefuegt wurden)
+          - heart_beat, reset, clean_up
+          - Aufrufe durch call_out oder input_to
+          - master applies, die auf externe Ereignisse zurueckgehen
+          - driver hooks genauso
+          - Rueckrufen von send_erq
+          - logon in interaktiven Objekten
+
+        Die efun kann z.B. benutzt werden, um zu verhindern, dass bestimmte
+        Aktionen mehrfach innerhalb eines heart_beat() ausgefuehrt werden.
+        Eine andere Anwendungsmoeglichkeit sind Zeitstempel zur Sortierung
+        von Ereignissen.
+
+        Es ist zu beachten, dass der Zaehler ueberlaufen kann, insbesondere
+        auf 32-bit-Systemen. Er kann demzufolge auch negativ werden.
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.3.719
+
+SIEHE AUCH
+        get_eval_cost(E)
