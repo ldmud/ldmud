@@ -377,7 +377,8 @@ f_db_conv_string (svalue_t *sp)
     char *buff;
 
     s = sp->u.str;
-    buff = xalloc(mstrsize(s)*2 +1);
+    buff = xalloc_with_error_handler(mstrsize(s)*2 +1);
+    // top of stack / inter_sp is now one larger than sp!
     if ( !buff )
     {
         errorf("Out of memory (%zu bytes) in db_conv_string().\n",
@@ -387,9 +388,11 @@ f_db_conv_string (svalue_t *sp)
     }
     mysql_escape_string(buff, get_txt(s), strlen(get_txt(s)) );
     
-    xfree(buff);
     free_string_svalue(sp);
     put_c_string(sp, buff);
+    // the error handler is one above sp on the stack.
+    pop_stack();
+    // sp == inter_sp again.
     return sp;
 } /* f_db_conv_string() */
 

@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Jan-2008 (Zesstra)
+  - (pkg-mysql.c)
+    Fixed corrupted results of db_conv_string(). (#602).
+
 17-Jan-2009 (Zesstra)
   - (efuns.c)
     Relaxed syntax check in v_trim() to allow a 0 as <ch> for trimming 
