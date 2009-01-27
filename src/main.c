@@ -1462,23 +1462,27 @@ static Option aOptions[]
       }
     , { 0,      "tls-trustfile",       cTLStrustfile,     MY_TRUE
       , "  --tls-trustfile <pathname>\n"
-      , "    Use <pathname> as the filename holding your trusted PEM certificates.\n"
+      , "  --tls-trustfile <pathname>\n"
+        "    Use <pathname> as the filename holding your trusted PEM certificates.\n"
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
     , { 0,      "tls-trustdirectory",  cTLStrustdir,      MY_TRUE
       , "  --tls-trustdirectory <pathname>\n"
-      , "    Use <pathname> as the directory where your trusted PEM certificates reside,\n"
+      , "  --tls-trustdirectory <pathname>\n"
+        "    Use <pathname> as the directory where your trusted PEM certificates reside,\n"
         "    default is '" TLS_DEFAULT_TRUSTDIRECTORY "'.\n"
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
     , { 0,      "tls-crlfile",       cTLScrlfile,     MY_TRUE
       , "  --tls-crlfile <pathname>\n"
-      , "    Use <pathname> as the filename holding your certificate revocation lists.\n"
+      , "  --tls-crlfile <pathname>\n"
+        "    Use <pathname> as the filename holding your certificate revocation lists.\n"
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
     , { 0,      "tls-crldirectory",  cTLScrldir,      MY_TRUE
       , "  --tls-crldirectory <pathname>\n"
-      , "    Use <pathname> as the directory where your certificate revocation lists reside.\n"
+      , "  --tls-crldirectory <pathname>\n"
+        "    Use <pathname> as the directory where your certificate revocation lists reside.\n"
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
 #endif /* USE_TLS */
