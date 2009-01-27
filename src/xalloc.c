@@ -1345,7 +1345,7 @@ realloc (POINTER p, size_t size)
    if (!p)
         return malloc(size);
 
-   old_size = get_block_size(p) - mem_overhead();
+   old_size = get_block_size(p) - xalloc_overhead();
 
    if (old_size >= size)
       return p;

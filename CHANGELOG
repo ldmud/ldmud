@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Jan-2008 (Gnomi)
+  - (xalloc.c)
+    realloc() should also consider the xalloc overhead, when
+      assessing the available space.
+  
 18-Jan-2008 (Zesstra)
   - (pkg-mysql.c)
     Fixed corrupted results of db_conv_string(). (#602).
