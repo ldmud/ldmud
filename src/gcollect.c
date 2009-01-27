@@ -1908,18 +1908,6 @@ garbage_collection(void)
         uncaught_error_trace = NULL;
     }
 
-    /* Lock all interactive structures (in case we're using threads)
-     * and dispose of the written buffers.
-     */
-    for (i = 0 ; i < MAX_PLAYERS; i++)
-    {
-        if (all_players[i] == NULL)
-            continue;
-
-        interactive_lock(all_players[i]);
-        interactive_cleanup(all_players[i]);
-    }
-
     remove_destructed_objects(MY_TRUE); /* After reducing all object references! */
 
     if (dobj_count != tot_alloc_object)
@@ -2207,11 +2195,6 @@ garbage_collection(void)
 
         note_ref(all_players[i]);
 
-#ifdef USE_PTHREADS
-        /* The thread write buffers are allocated with malloc() and are
-         * thus out of our view.
-         */
-#else
         if (all_players[i]->write_first)
         {
             struct write_buffer_s *tmp = all_players[i]->write_first;
@@ -2222,7 +2205,6 @@ garbage_collection(void)
                 tmp = tmp->next;
             } while (tmp != NULL);
         }
-#endif /* USE_PTHREADS */
 #ifdef USE_MCCP
         if (all_players[i]->out_compress != NULL)
             note_ref(all_players[i]->out_compress);
@@ -2409,17 +2391,6 @@ garbage_collection(void)
         }
     }
 #endif
-
-    /* Lock all interactive structures (in case we're using threads)
-     * and dispose of the written buffers.
-     */
-    for (i = 0 ; i < MAX_PLAYERS; i++)
-    {
-        if (all_players[i] == NULL)
-            continue;
-
-        interactive_unlock(all_players[i]);
-    }
 
     /* If the GC log was redirected, close that file and set the
      * logging back to the default file.

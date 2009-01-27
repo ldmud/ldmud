@@ -4,9 +4,6 @@
 #include "driver.h"
 #include "typedefs.h"
 #include <sys/types.h>
-#ifdef USE_PTHREADS
-#    include <pthread.h>
-#endif
 #ifdef USE_MCCP
 #    include <zlib.h>
 #endif
@@ -133,13 +130,7 @@ struct write_buffer_s
 {
     struct write_buffer_s *next;
     size_t length;
-#ifndef USE_PTHREADS
     size_t pos;
-#endif
-#if defined(USE_PTHREADS) && defined(USE_MCCP)
-    Bool   compress; /* should the buffer get compressed by mccp? */
-    int    errorno;  /* After writing, the errno */
-#endif
     char buffer[1 /* .length */ ];
 };
 
@@ -261,29 +252,6 @@ struct interactive_s {
      unsigned char * out_compress_buf;
 #endif   
 
-#ifdef USE_PTHREADS
-    /* The data exchange with the writer thread happens through two
-     * lists: write_first/write_last hands of data to write to
-     * the thread, written_first receives the written buffers.
-     * Reason for this 2-way exchange is that the writer thread
-     * must not call xfree().
-     * TODO: These two lists + one extra can be combined into
-     * TODO:: one list, plus two roving pointers into it.
-     * TODO:: In fact, once ptmalloc is really complete, the buffers
-     * TODO:: can be discarded immediately and the written_first list
-     * TODO:: becomes unnecessary.
-     */
-    Bool                   flush_on_cleanup;
-      /* If set to TRUE at the time the thread is cancelled, all remaining
-       * pending data is sent to the socket (which is made non-blocking for
-       * this) as part of the cleanup.
-       */
-    pthread_mutex_t        write_mutex;
-    pthread_cond_t         write_cond;
-    pthread_t              write_thread;
-    struct write_buffer_s *write_current; /* Buffer currently written */
-    struct write_buffer_s *written_first; /* List of written buffers */
-#endif
     struct write_buffer_s *write_first;  /* List of buffers to write */
     struct write_buffer_s *write_last;
     unsigned long          write_size;
@@ -404,17 +372,7 @@ extern void initialize_host_name (const char *hname);
 extern void initialize_host_ip_number(const char *, const char *);
 extern void  prepare_ipc(void);
 extern void  ipc_remove(void);
-#ifdef USE_PTHREADS
-extern void interactive_lock (interactive_t *ip);
-extern void interactive_unlock (interactive_t *ip);
-extern void interactive_cleanup (interactive_t *ip);
-#else
-extern void interactive_lock (interactive_t *ip UNUSED);
-extern void interactive_unlock (interactive_t *ip UNUSED);
-extern void interactive_cleanup (interactive_t *ip UNUSED);
-#endif /* USE_PTHREADS */
 extern Bool comm_socket_write (char *msg, size_t size, interactive_t *ip);
-extern void comm_cleanup_interactives (void);
 extern void  add_message VARPROT((const char *, ...), printf, 1, 2);
 extern void  flush_all_player_mess(void);
 extern Bool get_message(char *buff);

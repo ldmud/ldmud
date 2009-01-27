@@ -201,11 +201,6 @@
  */
 @cdef_use_ipv6@ USE_IPV6
 
-/* If you want to use threads to write the data to the sockets 
- * define USE_PTHREADS.
- */ 
-@cdef_use_pthreads@ USE_PTHREADS
-
 /* maximum number of concurrent outgoing connection attempts by net_connect()
  * (that is connections that are in progress but not fully established yet).
  */

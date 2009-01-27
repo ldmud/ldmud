@@ -735,7 +735,6 @@ backend (void)
             command_giver = NULL;
             trace_level = 0;
             wiz_decay();
-            comm_cleanup_interactives();
 
             mem_consolidate(MY_FALSE);
         }

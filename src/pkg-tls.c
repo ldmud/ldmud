@@ -32,10 +32,6 @@
 
 #elif defined(HAS_GNUTLS)
 #  include <gnutls/gnutls.h>
-#  if defined(USE_PTHREADS) && defined(GCRY_THREAD_OPTION_PTHREAD_IMPL)
-#    include <pthread.h>
-     GCRY_THREAD_OPTION_PTHREAD_IMPL;
-#  endif
 #endif
 
 #include "pkg-tls.h"
@@ -567,10 +563,6 @@ ssl_init_err:
                                     NULL,
                                     tls_rexalloc,
                                     tls_xfree);
-
-#  if defined(USE_PTHREADS) && defined(GCRY_THREAD_OPTION_PTHREAD_IMPL)
-    gcry_control (GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
-#endif
 
     gnutls_global_init();
 

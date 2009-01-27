@@ -54,20 +54,10 @@
  * TODO: The noecho/charmode logic, especially in combination with
  * TODO:: the telnet machine is frustratingly underdocumented.
  *
-#ifdef USE_PTHREADS
- * The data is not written directly to the sockets, but instead to
- * an intermediate buffer, from which a secondary thread does the actual
- * writing. The buffers are stored in a linked list in the interactive-s
- * structure. Advantage is that the driver is no longer bothered by blocking
- * sockets.
- *
-#else
  * The data that can not written directly to the sockets is put instead into
  * an intermediate buffer, from which the backend loop will continue writing
  * when possible. The buffers are stored in a linked list in the interactive_s
  * structure.
- *
-#endif
  *
  * TODO: Fiona says: The telnet code is frustrating. It would be better if
  * TODO:: the common handling of e.g. TELNET_NAWS is offered by hooks,
@@ -236,7 +226,7 @@ char *message_flush = NULL;
    */
 
 long write_buffer_max_size = WRITE_BUFFER_MAX_SIZE;
-  /* Amount of data held pending in the pthread fifo queue.
+  /* Amount of data held pending in the write fifo queue.
    */
 
 
@@ -497,11 +487,7 @@ static int open_ipv6_conn(const char *hostname, const unsigned short int port, s
 
 #endif /* ERQ_DEMON */
 
-#ifdef USE_PTHREADS
-static void *writer_thread(void *arg);
-#else
 static INLINE ssize_t comm_send_buf(char *msg, size_t size, interactive_t *ip);
-#endif
 
 #ifdef USE_IPV6
 
@@ -811,16 +797,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
     fprintf(stderr, "------\n");
 
     /* Disconnect the user */
-#ifndef USE_PTHREADS
     comm_send_buf(msg, strlen(msg), ip);
-#else
-#ifdef USE_TLS
-    if(ip->tls_status == TLS_ACTIVE)
-        tls_write(ip, msg, strlen(msg));
-    else
-#endif
-        socket_write(ip->socket, msg, strlen(msg));
-#endif /* USE_PTHREADS */
     remove_interactive(ip->ob, MY_TRUE);
 
     /* Unset mutex */
@@ -1271,9 +1248,7 @@ prepare_ipc(void)
             perror("listen");
             exit(1);
         }
-#ifndef USE_PTHREADS
         set_socket_nonblocking(sos[i]);
-#endif
         set_close_on_exec(sos[i]);
 
         if (socket_number(sos[i]) >= min_nfds)
@@ -1318,427 +1293,6 @@ ipc_remove (void)
 #endif
 
 } /* ipc_remove() */
-
-/*-------------------------------------------------------------------------*/
-void
-interactive_lock (interactive_t *ip)
-
-/* Lock the interactive <ip> for the current thread.
- */
-
-{
-#ifdef USE_PTHREADS
-    pthread_mutex_lock(&ip->write_mutex);
-#else
-#  ifdef __MWERKS__
-#      pragma unused(ip)
-#  endif
-#endif
-} /* interactive_lock() */
-
-/*-------------------------------------------------------------------------*/
-void
-interactive_unlock (interactive_t *ip)
-
-/* Unlock the interactive <ip>.
- */
-
-{
-#ifdef USE_PTHREADS
-    pthread_mutex_unlock(&ip->write_mutex);
-#else
-#  ifdef __MWERKS__
-#      pragma unused(ip)
-#  endif
-#endif
-} /* interactive_unlock() */
-
-/*-------------------------------------------------------------------------*/
-void
-interactive_cleanup (interactive_t *ip)
-
-/* Free all pending 'written' buffers for the interactive <ip>.
- * Locking must be handled by the caller.
- */
-
-{
-#ifdef USE_PTHREADS
-    struct write_buffer_s *tmp;
-
-    for (tmp = ip->written_first; tmp != NULL; tmp = ip->written_first)
-    {
-        ip->written_first = tmp->next;
-        switch (tmp->errorno) {
-          case 0:
-            /* No error happened. */
-            break;
-
-          case EINTR:
-            dprintf1(2, "%s comm: write EINTR. Message discarded.\n"
-                      , (p_int)time_stamp());
-            break;
-
-          case EWOULDBLOCK:
-            dprintf1(2, "%s comm: write EWOULDBLOCK. Message discarded.\n"
-                      , (p_int)time_stamp());
-            break;
-
-          case EMSGSIZE:
-            dprintf1(2, "%s comm: write EMSGSIZE.\n", (p_int)time_stamp());
-            break;
-
-          case EINVAL:
-            dprintf1(2, "%s comm: write EINVAL.\n", (p_int)time_stamp());
-            break;
-
-          case ENETUNREACH:
-            dprintf1(2, "%s comm: write ENETUNREACH.\n", (p_int)time_stamp());
-            break;
-
-          case EHOSTUNREACH:
-            dprintf1(2, "%s comm: write EHOSTUNREACH.\n", (p_int)time_stamp());
-            break;
-
-          case EPIPE:
-            dprintf1(2, "%s comm: write EPIPE detected\n", (p_int)time_stamp());
-            break;
-
-          default:
-            {
-              dprintf2(2, "%s comm: write: unexpected errno %d\n"
-                        , (p_int)time_stamp(), (p_int)tmp->errorno);
-              break;
-            }
-        } /* switch (ip->errorno) */
-
-        free(tmp);
-    } /* for (tmp) */
-#else
-#  ifdef __MWERKS__
-#      pragma unused(ip)
-#  endif
-#endif
-} /* interactive_cleanup() */
-
-/*-------------------------------------------------------------------------*/
-void
-comm_cleanup_interactives (void)
-
-/* Remove all pending 'written' buffers from all interactive structures.
- * This function handles the locking.
- */
-
-{
-#ifdef USE_PTHREADS
-    size_t i;
-
-    for (i = 0; i < sizeof(all_players)/sizeof(all_players[0]); i++)
-    {
-        interactive_t * ip = all_players[i];
-        if (ip && ip->written_first != NULL)
-        {
-            interactive_lock(ip);
-            interactive_cleanup(ip);
-            interactive_unlock(ip);
-        }
-    }
-#endif
-} /* comm_cleanup_interactives() */
-
-/*-------------------------------------------------------------------------*/
-#ifdef USE_PTHREADS
-
-Bool
-comm_socket_write (char *msg, size_t size, interactive_t *ip)
-
-/* Stand in for socket_write(): take the data to be written and append
- * it to the buffer list of <ip>.
- */
-
-{
-    struct write_buffer_s *b;
-
-    if (size == 0)
-        return MY_TRUE;
-
-    /* Get a new buffer for the data to be written */
-    b = malloc(sizeof(struct write_buffer_s) + size - 1);
-    if (!b)
-        outofmem(sizeof(struct write_buffer_s) + size - 1, "comm_socket_write()");
-
-    b->length = size;
-    b->next = NULL;
-#ifdef USE_MCCP
-    if (ip->out_compress)   
-        b->compress = MY_TRUE;
-    else
-        b->compress = MY_FALSE;
-#endif
-
-    memcpy(b->buffer, msg, size);
-
-    /* Chain in the new buffer */
-
-    pthread_mutex_lock(&ip->write_mutex);
-
-    if(ip->write_first)
-        ip->write_last = ip->write_last->next = b;
-    else
-        ip->write_first = ip->write_last = b;
-    ip->write_size += size;
-
-    /* Make sure that the amount of data pending never exceeds
-     * the maximum.
-     */
-    while (write_buffer_max_size != 0
-        && ip->write_size >= (unsigned long)write_buffer_max_size)
-    {
-        struct write_buffer_s *tmp = ip->write_first;
-        ip->write_first = tmp->next;
-        ip->write_size -= tmp->length;
-        free(tmp);
-    }
-
-    /* While we have the structure locked, remove pending
-     * written buffers.
-     */
-    interactive_cleanup(ip);
-
-    pthread_mutex_unlock(&ip->write_mutex);
-    pthread_cond_signal(&ip->write_cond);
-
-    errno = 0;
-    return MY_TRUE;
-} /* comm_socket_write() */
-
-/*-------------------------------------------------------------------------*/
-static void
-thread_write_buf (interactive_t * ip, struct write_buffer_s *buf)
-
-/* Write the buffer <buf> to interactive <ip>, handling MCCP and other
- * things if necessary.
- * This function is called from the main write thread as well as the
- * thread cleanup.
- */
-
-{
-#ifdef USE_MCCP
-    int length;
-
-    buf->errorno = 0;
-    if (buf->compress)
-    {
-        int status;
-        ip->out_compress->next_in = (unsigned char *) buf->buffer;
-        ip->out_compress->avail_in = buf->length;
-        ip->out_compress->avail_out = COMPRESS_BUF_SIZE -
-          (ip->out_compress->next_out -
-           ip->out_compress_buf);
-        
-        status = deflate(ip->out_compress, Z_SYNC_FLUSH);
-        
-        if (status != Z_OK)
-            debug_message("%s MCCP compression error: %d\n"
-                         , time_stamp(), status);
-        length = ip->out_compress->next_out - ip->out_compress_buf;
-    }
-    if (buf->compress)
-    {
-#ifdef USE_TLS
-        if ((ip->tls_status == TLS_INACTIVE
-             ? socket_write(ip->socket, ip->out_compress_buf, length)
-             : tls_write(ip, ip->out_compress_buf, length)) == -1)
-#else
-        if (socket_write(ip->socket, ip->out_compress_buf, length) == -1)
-#endif
-        { 
-            buf->errorno = errno;
-        } /* if socket_write() == -1 */
-        
-        /* we update the compressed buffer here */
-        ip->out_compress->next_out = ip->out_compress_buf;
-    }
-    else
-    {
-#ifdef USE_TLS
-        if ((ip->tls_status == TLS_INACTIVE
-             ? socket_write(ip->socket, buf->buffer, buf->length)
-             : tls_write(ip, buf->buffer, buf->length)) == -1)
-#else
-        if (socket_write(ip->socket, buf->buffer, buf->length) == -1)
-#endif
-        {
-            buf->errorno = errno;
-        } /* if socket_write() == -1 */
-    }
-    if (buf->compress && !ip->compressing)
-    {
-        /* Compression has been turned off for this interactive,
-         * now get rid of all residual data.
-         */
-        end_compress(ip, MY_FALSE);
-    }
-#else /* USE_MCCP */
-    buf->errorno = 0;
-#ifdef USE_TLS
-    if ((ip->tls_status == TLS_INACTIVE
-         ? socket_write(ip->socket, buf->buffer, buf->length)
-         : tls_write(ip, buf->buffer, buf->length)) == -1)
-#else
-    if (socket_write(ip->socket, buf->buffer, buf->length) == -1)
-#endif
-    {
-        buf->errorno = errno;
-    } /* if socket_write() == -1 */
-#endif /* USE_MCCP */
-} /* thread_write_buf() */
-
-/*-------------------------------------------------------------------------*/
-static void
-writer_thread_cleanup(void *arg)
-
-/* The given thread is canceled - move all pending buffers into the
- * written list.
- */
-
-{
-    interactive_t * ip = (interactive_t *) arg;
-    struct write_buffer_s *buf;
-
-    if (ip->write_current)
-    {
-        if (ip->flush_on_cleanup)
-            thread_write_buf(ip, ip->write_current);
-        else
-            ip->write_current->errorno = 0;
-        ip->write_current->next = ip->written_first;
-        ip->written_first = ip->write_current;
-        ip->write_current = NULL;
-    }
-
-    buf = ip->write_first;
-    while (buf)
-    {
-        struct write_buffer_s *next = buf->next;
-        if (ip->flush_on_cleanup)
-            thread_write_buf(ip, buf);
-        else
-            buf->errorno = 0;
-        buf->next = ip->written_first;
-        ip->written_first = buf;
-        buf = next;
-    }
-    ip->write_first = ip->write_last = NULL;
-
-} /* writer_thread_cleanup() */
-
-/*-------------------------------------------------------------------------*/
-static void
-writer_thread_locked_cleanup (void *arg)
-
-/* The given thread is canceled - move all pending buffers into the
- * written list, protecting the operation with a lock.
- */
-
-{
-    interactive_t * ip = (interactive_t *) arg;
-    pthread_mutex_lock(&ip->write_mutex);
-    writer_thread_cleanup(arg);
-    pthread_mutex_unlock(&ip->write_mutex);
-} /* writer_thread_locked_cleanup() */
-
-/*-------------------------------------------------------------------------*/
-void *
-writer_thread (void *arg)
-
-/* The thread to write the pending data for the given interactive <arg>.
- * The buffer to be written is removed from the chain before the write
- * is attempted, so that a block here won't block add_message().
- */
-
-{
-    interactive_t *ip = (interactive_t *) arg;
-    int oldvalue;
-
-    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldvalue); /* make us cancelable */
-    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &oldvalue);
-    pthread_cleanup_push(writer_thread_locked_cleanup, ip);
-      /* MacOS X: pthread_cleanup_push() is a macro which opens a new scope
-       * and uses scope-local variable to store the cleanup handler.
-       * To close the scope, pthread_cleanup_pop() needs to be 'invoked'
-       * below.
-       */
-
-    while (MY_TRUE)
-    {
-        struct write_buffer_s * buf;
-
-        /* cancellation point */
-        pthread_testcancel();
-
-        /* mutex protected getting of first write_buffer */
-        pthread_mutex_lock(&ip->write_mutex);
-        if  (!ip->write_first)
-        {
-            /* if no first write_buffer -> wait on signal from mainthread */
-            pthread_cond_wait(&ip->write_cond, &ip->write_mutex);
-        }
-
-        /* another cancellation point */
-        pthread_testcancel();
-
-        if (ip->write_first)
-        {
-            /* We have to move the buffer out of the to-write list,
-             * so that comm_socket_write() won't remove it if the
-             * data limit is reached. On the other hand a GC might
-             * happen while we're still printing, erasing the
-             * written list.
-             */
-            buf = ip->write_first;
-            ip->write_first = buf->next;
-              /* If this was the last buffer, .write_first will become
-               * NULL and the next call to comm_socket_write() will
-               * set both .write_first and .write_last.
-               */
-            ip->write_size -= buf->length;
-            ip->write_current = buf;
-        }
-        else
-        {
-            buf = NULL;
-        }
-        pthread_mutex_unlock(&ip->write_mutex);
-
-        if (buf)
-        {
-            thread_write_buf(ip, buf);
-
-            pthread_mutex_lock(&ip->write_mutex);
-
-            ip->write_current = NULL;
-
-            /* Originally we didn't free(buf) here because smalloc
-             * wasn't threadsafe. We use malloc() now for the buffers,
-             * so it would be safe now, but since the code to clean up
-             * the buffers is already in the main thread, we keep it that
-             * way. It makes for nicer diagnostic messages for failed
-             * writes anyway.
-             */
-            buf->next = ip->written_first;
-            ip->written_first = buf;
-
-            pthread_mutex_unlock(&ip->write_mutex);
-        }
-    } /* while forever */
-
-    /* Remove the thread cleanup handler */
-    pthread_cleanup_pop(0);
-
-    return NULL;
-} /* writer_thread() */
-
-#else
 
 /*-------------------------------------------------------------------------*/
 static INLINE ssize_t
@@ -1979,7 +1533,6 @@ comm_write_pending (interactive_t * ip)
         xfree(buf);
     }
 } /* comm_write_pending() */
-#endif /* USE_PTHREADS */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -2639,13 +2192,11 @@ get_message (char *buff)
                         nfds = socket_number(ip->socket)+1;
                 }
 
-#ifndef USE_PTHREADS                
                 if (ip->write_first != NULL || ip->msg_discarded)
                 {
                     /* There is something to write. */
                     FD_SET(ip->socket, &writefds);
                 }
-#endif /* USE_PTHREADS */
 
             } /* for (all players) */
 #ifdef ERQ_DEMON
@@ -3114,12 +2665,10 @@ get_message (char *buff)
             }
 #endif
 
-#ifndef USE_PTHREADS                
             if (FD_ISSET(ip->socket, &writefds))
             {
                 comm_write_pending(ip);
             }
-#endif
             /* Skip players which have reached the ip->maxNumCmds limit
              * for this second. We let the data accumulate on the socket.
              */
@@ -3697,24 +3246,6 @@ remove_interactive (object_t *ob, Bool force)
 
         remove_flush_entry(interactive); /* To be sure */
 
-#ifdef USE_PTHREADS
-        /* Cancel the thread, then in case it is waiting on the
-         * condition, signal the condition as well. This way when
-         * the thread reaches the cancellation point after the
-         * condition, it will stop.
-         */
-        if (!force)
-        {
-            set_socket_nonblocking(interactive->socket);
-            interactive->flush_on_cleanup = MY_TRUE;
-        }
-        pthread_cancel(interactive->write_thread);
-        pthread_cond_signal(&interactive->write_cond);
-        pthread_join(interactive->write_thread, NULL);
-          /* buffer list is returned by thread */
-        interactive_cleanup(interactive);
-#endif
-
 #ifdef USE_MCCP
         if (interactive->out_compress)
             end_compress(interactive, MY_TRUE);
@@ -3723,10 +3254,8 @@ remove_interactive (object_t *ob, Bool force)
              */
 #endif
 
-#ifndef USE_PTHREADS
         /* If there is anything left, try now. */
         comm_write_pending(interactive);
-#endif
 
 #ifdef USE_TLS
         tls_deinit_connection(interactive);
@@ -3763,23 +3292,17 @@ remove_interactive (object_t *ob, Bool force)
     if (interactive->out_compress)
        xfree(interactive->out_compress);
 #endif
-#ifdef USE_PTHREADS
-    pthread_mutex_destroy(&interactive->write_mutex);
-    pthread_cond_destroy(&interactive->write_cond);
-#endif
     free_svalue(&interactive->prompt);
 
     if (interactive->trace_prefix)
         free_mstring(interactive->trace_prefix);
 
-#ifndef USE_PTHREADS
     while (interactive->write_first)
     {
         struct write_buffer_s *tmp = interactive->write_first;
         interactive->write_first = tmp->next;
         xfree(tmp);
     }
-#endif    
 
     /* Unlink the interactive structure from the shadow sentence
      * of the object.
@@ -3909,9 +3432,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
 #endif
 
     /* Set some useful socket options */
-#ifndef USE_PTHREADS
     set_socket_nonblocking(new_socket);
-#endif
     set_close_on_exec(new_socket);
     set_socket_own(new_socket);
 
@@ -4067,22 +3588,6 @@ new_player ( object_t *ob, SOCKET_T new_socket
 
     new_interactive->write_first = new_interactive->write_last = NULL;
     new_interactive->write_size = 0;
-#ifdef USE_PTHREADS
-    new_interactive->flush_on_cleanup = MY_FALSE;
-    pthread_mutex_init(&new_interactive->write_mutex, NULL);
-    {
-        pthread_mutexattr_t mutexattr;
-        pthread_mutexattr_init(&mutexattr);
-        pthread_mutexattr_settype(&mutexattr, PTHREAD_MUTEX_ERRORCHECK);
-        pthread_mutex_init(&new_interactive->write_mutex, &mutexattr);
-        pthread_mutexattr_destroy(&mutexattr);
-    }
-    pthread_cond_init(&new_interactive->write_cond, NULL);
-    new_interactive->write_current = NULL;
-    new_interactive->written_first = NULL;
-    pthread_create(&new_interactive->write_thread, NULL, writer_thread, new_interactive);
-      /* We pthread_join() on this thread when the connection is closed */
-#endif
 
     /* Add the new interactive structure to the list of users */
 
@@ -6707,26 +6212,6 @@ show_comm_status (strbuf_t * sbuf, Bool verbose UNUSED)
             sum += sizeof(*it);
 
         sum += ed_buffer_size(O_GET_EDBUFFER(pl->ob));
-#ifdef USE_PTHREADS
-        {
-            struct write_buffer_s *buf;
-
-            interactive_lock(pl);
-            for (buf = pl->write_first; buf != NULL; buf = buf->next)
-            {
-                sum += sizeof(*buf) - 1 + buf->length;
-            }
-            for (buf = pl->written_first; buf != NULL; buf = buf->next)
-            {
-                sum += sizeof(*buf) - 1 + buf->length;
-            }
-            if ((buf = pl->write_current) != NULL)
-            {
-                sum += sizeof(*buf) - 1 + buf->length;
-            }
-            interactive_unlock(pl);
-        }
-#endif
     }
 
     if (sbuf)

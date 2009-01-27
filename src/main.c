@@ -1822,9 +1822,6 @@ options (void)
 #ifdef USE_SQLITE
                               , "SQLite3 supported\n"
 #endif
-#ifdef USE_PTHREADS
-                              , "PThreads supported\n"
-#endif
 #ifdef USE_ALISTS
                               , "Alists supported\n"
 #endif

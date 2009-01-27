@@ -63,10 +63,6 @@
 #  if defined(SBRK_OK) && defined(USE_SQLITE) && defined(SQLITE3_USES_PTHREADS)
 #      undef SBRK_OK
 #  endif
-/* PTHREADS need a normal malloc() if the allocator is not ptmalloc */
-#  if defined(SBRK_OK) && defined(USE_PTHREADS)
-#      undef SBRK_OK
-#  endif
 #endif // MALLOC_ptmalloc
 
 

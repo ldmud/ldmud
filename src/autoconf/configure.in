@@ -121,7 +121,6 @@ AC_MY_ARG_ENABLE(use-mccp,no,,[Enables MCCP support])
 AC_MY_ARG_ENABLE(use-mysql,no,,[Enables mySQL support])
 AC_MY_ARG_ENABLE(use-pgsql,no,,[Enables PostgreSQL support])
 AC_MY_ARG_ENABLE(use-sqlite,no,,[Enables SQLite support])
-AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes])
 AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE: no/yes/builtin/no-builtin])
 AC_MY_ARG_ENABLE(use-iksemel,no,,[Enables use of iksemel for XML parsing])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
@@ -370,7 +369,6 @@ AC_CDEF_FROM_ENABLE(share_variables)
 AC_CDEF_FROM_ENABLE(use_system_crypt)
 AC_CDEF_FROM_ENABLE(use_alists)
 AC_CDEF_FROM_ENABLE(use_mccp)
-AC_CDEF_FROM_ENABLE(use_pthreads)
 AC_CDEF_FROM_ENABLE(use_ipv6)
 AC_CDEF_FROM_ENABLE(use_deprecated)
 AC_CDEF_FROM_ENABLE(use_structs)
@@ -1009,94 +1007,6 @@ fi
 
 CFLAGS="$saveflags"
 LIBS="$savelibs"
-
-# --- PThreads ---
-
-AC_CACHE_CHECK(for pthreads support,lp_cv_has_pthreads,
-    saveflags="$CFLAGS"
-    savelibs="$LIBS"
-
-    CFLAGS="$CFLAGS"
-    AC_TRY_COMPILE([
-#include <pthread.h>
-
-void foo(void)
-{
-    int i = PTHREAD_CREATE_JOINABLE;
-}
-    ],,lp_cv_has_pthreads=yes,
-    lp_cv_has_pthreads=no
-    CFLAGS="$saveflags"
-))
-
-if test $lp_cv_has_pthreads = yes; then
-    saveflags="$CFLAGS"
-    savelibs="$LIBS"
-
-    AC_DEFINE(HAS_PTHREADS, 1, [Does the machine offer pthreads?])
-
-    AC_CACHE_CHECK(if -lpthread or similar is needed, lp_cv_need_lib_pthread,
-        AC_TRY_RUN([
-#include <pthread.h>
-void t (void)
-{
-    pthread_t pid;
-    pthread_cancel(pid);
-}
-int main(void)
-{
-    return 0;
-}
-        ],
-        lp_cv_need_lib_pthread=no,
-        lp_cv_need_lib_pthread=yes
-    ))
-    if test "$lp_cv_need_lib_pthread" = "yes"; then
-        lp_cv_has_lib_pthread=no
-        AC_CHECK_LIB(pthread,main,
-                     LIBS="$savelibs -lpthread"
-                     lp_cv_has_lib_pthread=yes
-                    )
-        if test "$lp_cv_has_lib_pthread" = "no"; then
-            AC_CHECK_LIB(c_r,main,
-                         LIBS="$savelibs -lc_r"
-                         lp_cv_has_lib_pthread=yes
-                        )
-        fi
-    fi
-
-    AC_CACHE_CHECK(for pthread_atfork(),lp_cv_has_pthread_atfork,
-        AC_TRY_RUN([
-#include <pthread.h>
-void t (void)
-{
-    pthread_atfork(0, 0, 0);
-}
-int main (void) {
-    return 0;
-}
-        ],lp_cv_has_pthread_atfork=yes,
-        lp_cv_has_pthread_atfork=no
-        )
-    )
-    if test $lp_cv_has_pthread_atfork = yes; then
-        AC_DEFINE(HAS_PTHREAD_ATFORK, 1, [Does the machine offer pthread_atfork()?])
-    fi
-
-    CFLAGS="$saveflags"
-
-    if test $enable_use_pthreads = no; then
-        LIBS="$savelibs"
-    fi
-
-else
-    if test $enable_use_pthreads = yes; then
-        echo "pthreads not supported - disabling pthreads support."
-        AC_NOT_AVAILABLE(use-pthreads)
-    fi
-    cdef_use_pthreads="#undef"
-    enable_use_pthreads=no
-fi
 
 # --- PCRE ---
 
@@ -2727,7 +2637,6 @@ AC_SUBST(cdef_use_mysql)
 AC_SUBST(cdef_use_pgsql)
 AC_SUBST(cdef_use_sqlite)
 AC_SUBST(cdef_use_iksemel)
-AC_SUBST(cdef_use_pthreads)
 AC_SUBST(cdef_use_alists)
 AC_SUBST(cdef_use_mccp)
 AC_SUBST(cdef_use_pcre)
