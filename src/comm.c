@@ -711,8 +711,6 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       dump_bytes(&(ip->prompt), sizeof(ip->prompt), 21);
     fprintf(stderr, "  .addr:             ");
       dump_bytes(&(ip->addr), sizeof(ip->addr), 21);
-    fprintf(stderr, "  .msg_discarded:     %02hhx\n", (unsigned char)ip->msg_discarded);
-    fprintf(stderr, "  .set_input_to:      %02hhx\n", (unsigned char)ip->set_input_to);
     fprintf(stderr, "  .closing:           %02hhx\n", (unsigned char)ip->closing);
     fprintf(stderr, "  .tn_enabled:        %02hhx\n", (unsigned char)ip->tn_enabled);
     fprintf(stderr, "  .do_close:          %02hhx", (unsigned char)ip->do_close);
@@ -755,6 +753,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       default: putc('\n', stderr);
       }
     fprintf(stderr, "  .supress_go_ahead:  %02hhx\n", (unsigned char)ip->supress_go_ahead);
+    fprintf(stderr, "  .msg_discarded:     %hd\n", ip->msg_discarded);
     fprintf(stderr, "  .text_end:          %hd (%p)\n", ip->text_end, ip->text+ip->text_end);
     fprintf(stderr, "  .command_start:     %hd (%p)\n", ip->command_start, ip->text+ip->command_start);
     fprintf(stderr, "  .command_end:       %hd (%p)\n", ip->command_end, ip->text+ip->command_end);
@@ -3551,7 +3550,6 @@ new_player ( object_t *ob, SOCKET_T new_socket
     put_number(&new_interactive->prompt, 0);
     new_interactive->modify_command = NULL;
     new_interactive->msg_discarded = 0;
-    new_interactive->set_input_to = MY_FALSE;
     new_interactive->closing = MY_FALSE;
     new_interactive->tn_enabled = MY_TRUE;
     new_interactive->do_close = 0;
@@ -4074,13 +4072,19 @@ set_call ( object_t *ob, input_to_t *it, char noecho
     if (ob == NULL || it == NULL)
         return MY_FALSE;
     if (!(O_SET_INTERACTIVE(ip, ob))
-     || ip->closing || (!append && ip->set_input_to))
+     || ip->closing
+     || (   !append && ip->input_to != NULL
+         && ip->input_to->eval_nr == eval_number)
+       )
     {
         return MY_FALSE;
     }
 
     it->noecho = noecho;
     it->local = local_change;
+
+    /* Appended input_tos never count. */
+    it->eval_nr = eval_number - (append ? 1 : 0);
 
     if (!append || ip->input_to == NULL)
     {
@@ -4097,8 +4101,6 @@ set_call ( object_t *ob, input_to_t *it, char noecho
         ptr->next = it;
         it->next = NULL;
     }
-
-    ip->set_input_to = MY_TRUE;
 
     if (noecho || ip->noecho)
         set_noecho(ip, noecho, local_change, MY_FALSE);
@@ -7580,7 +7582,6 @@ v_remove_input_to (svalue_t *sp, int num_arg)
             it = ip->input_to;
             ip->input_to = it->next;
             free_input_to(it);
-            ip->set_input_to = (ip->input_to != NULL);
             removedFirst = MY_TRUE;
             rc = 1;
             break;
@@ -7646,7 +7647,6 @@ v_remove_input_to (svalue_t *sp, int num_arg)
                 prev->next = it->next;
 
             free_input_to(it);
-            ip->set_input_to = (ip->input_to != NULL);
             rc = 1;
             break;
         }

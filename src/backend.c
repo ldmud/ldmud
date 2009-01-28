@@ -641,7 +641,6 @@ backend (void)
             }
 #endif
 
-            ip->set_input_to = MY_FALSE;
             tracedepth = 0;
 
             mark_start_evaluation();

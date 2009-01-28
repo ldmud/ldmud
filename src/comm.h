@@ -147,6 +147,7 @@ struct input_to_s {
     char        noecho;     /* the requested "noecho" state */
     Bool        local;      /* TRUE if a CHARMODE change is local only */
     callback_t  fun;        /* The function to call, and its args */
+    p_uint      eval_nr;    /* The thread number where this started. */
 };
 
 /* --- struct interactive_s: an interactive connection
@@ -171,9 +172,6 @@ struct interactive_s {
     svalue_t prompt;            /* The prompt to print. */
     struct sockaddr_in addr;    /* Address of connected user */
 
-    char msg_discarded;         /* != 0 if an earlier msg had been discarded,
-                                   index into the message to be sent. */
-    CBool set_input_to;         /* True if input_to was set in this cycle */
     CBool closing;              /* True when closing this socket. */
     CBool tn_enabled;           /* True: telnet machine enabled */
     char do_close;              /* Bitflags: Close this down; Proto-ERQ. */
@@ -189,6 +187,8 @@ struct interactive_s {
                                  * net_connect().
                                  */
 
+    short msg_discarded;        /* != 0 if an earlier msg had been discarded,
+                                   index into the message to be sent. */
     short text_end;             /* first free char in buffer */
     short command_start;        /* used for charmode */
     short command_end;          /* where we are up to in player cmd buffer */

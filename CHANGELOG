@@ -5,7 +5,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (backend.c)
     !-escaped commands are treated specially even
     if the player object doesn't have an environment.
-  
+  - (comm.c)
+    Correctly detect if input_to() was called more than once
+    in the same execution thread (Bug #535).
+
 27-Jan-2009 (Gnomi)
   - (xalloc.c)
     realloc() should also consider the xalloc overhead, when
