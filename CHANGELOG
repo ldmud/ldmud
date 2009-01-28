@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Jan-2008 (Gnomi)
+  - (backend.c)
+    !-escaped commands are treated specially even
+    if the player object doesn't have an environment.
+  
 27-Jan-2008 (Gnomi)
   - (xalloc.c)
     realloc() should also consider the xalloc overhead, when
