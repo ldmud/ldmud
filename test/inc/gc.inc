@@ -16,10 +16,12 @@ static void check_gc(int nr, closure callback)
 	if(!nr)
 	{
 	    /* Wait one more cycle. */
-	    call_out("check_gc", 1, 1, callback);
+	    call_out("check_gc", __ALARM_TIME__, 1, callback);
 	    return;
 	}
-	msg("FAILURE: Could not read the garbage collection file.\n");
+	msg("Could not read the garbage collection file.\n"
+	    "The allocator has probably no suppport for garbage collection.\n");
+	error = 0;
     }
     else
     {
