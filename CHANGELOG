@@ -1,12 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-28-Jan-2008 (Gnomi)
+28-Jan-2009 (Gnomi)
   - (backend.c)
     !-escaped commands are treated specially even
     if the player object doesn't have an environment.
   
-27-Jan-2008 (Gnomi)
+27-Jan-2009 (Gnomi)
   - (xalloc.c)
     realloc() should also consider the xalloc overhead, when
       assessing the available space.
@@ -15,7 +15,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (comm.c, configure)
     Removed support for write threads.
 
-18-Jan-2008 (Zesstra)
+18-Jan-2009 (Zesstra)
   - (pkg-mysql.c)
     Fixed corrupted results of db_conv_string(). (#602).
 
