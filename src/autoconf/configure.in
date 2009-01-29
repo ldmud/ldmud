@@ -468,6 +468,7 @@ AC_INT_VAL_FROM_WITH(random_period_length)
 
 if test "x$cdef_access_control" = "x#undef"; then
   cdef_access_log="#undef"
+  val_access_file=
   val_access_log=
 fi
 

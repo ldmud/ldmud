@@ -21,6 +21,7 @@ do
 	      -s-1 -sv-1 --max-malloc 0 --min-malloc 0 \
 	      -ru0 -rm0 -rs0 --no-strict-euids --no-wizlist-file \
 	      --check-refcounts --check-state 2 \
+	      --access-file none --access-log none \
 	      -f test 65432 > /dev/null || { echo "Test $testdir FAILED."; FAILED="${FAILED}\n\t$testdir"; }
     elif [ -r "$testdir" ]
     then
@@ -30,6 +31,7 @@ do
 	      -s-1 -sv-1 --max-malloc 0 --min-malloc 0 \
 	      -ru0 -rm0 -rs0 --no-strict-euids --no-wizlist-file \
 	      --check-refcounts --check-state 2 \
+	      --access-file none --access-log none \
 	      -f test 65432 > /dev/null || { echo "Test $testdir FAILED."; FAILED="${FAILED}\n\t$testdir"; }
     fi
 done

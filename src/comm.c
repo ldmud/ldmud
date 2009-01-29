@@ -3263,10 +3263,8 @@ remove_interactive (object_t *ob, Bool force)
         socket_close(interactive->socket);
     } /* if (erq or user) */
 
-#if defined(ACCESS_CONTROL)
     release_host_access(interactive->access_class);
       /* One user less in this class */
-#endif
 
     num_player--;
 
@@ -3321,8 +3319,6 @@ remove_interactive (object_t *ob, Bool force)
     malloc_privilege = save_privilege;
 } /* remove_interactive() */
 
-#ifdef ACCESS_CONTROL
-
 /*-------------------------------------------------------------------------*/
 void
 refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
@@ -3354,8 +3350,6 @@ refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
     }
 }
 
-#endif /* ACCESS_CONTROL */
-
 /*-------------------------------------------------------------------------*/
 static INLINE void
 set_default_conn_charset (char charset[32])
@@ -3386,11 +3380,7 @@ set_default_combine_charset (char charset[32])
 static void
 new_player ( object_t *ob, SOCKET_T new_socket
            , struct sockaddr_in *addr, size_t addrlen
-#if !defined(ACCESS_CONTROL)
-           , int login_port UNUSED
-#else
            , int login_port
-#endif
            )
 
 /* Accept (or reject) a new connection on <new_socket> from <addr> (length
@@ -3417,30 +3407,24 @@ new_player ( object_t *ob, SOCKET_T new_socket
  */
 
 {
-#if defined(__MWERKS__) && !defined(ACCESS_CONTROL)
-#    pragma unused(login_port)
-#endif
-
     int   i;             /* Index of free slot in all_players[] */
     char *message;       /* Failure message */
     svalue_t *ret;       /* LPC call results */
     interactive_t *new_interactive;
                          /* The new interactive structure */
-#ifdef ACCESS_CONTROL
     long class;     /* Access class */
-#endif
 
     /* Set some useful socket options */
     set_socket_nonblocking(new_socket);
     set_close_on_exec(new_socket);
     set_socket_own(new_socket);
 
-#ifdef ACCESS_CONTROL
     /* Check for access restrictions for this connection */
     message = allow_host_access(addr, login_port, &class);
-#ifdef ACCESS_LOG
+
+    if (access_log != NULL)
     {
-        FILE *log_file = fopen (ACCESS_LOG, "a");
+        FILE *log_file = fopen (access_log, "a");
 
         if (log_file) {
             FCOUNT_WRITE(log_file);
@@ -3455,7 +3439,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
             fclose(log_file);
         }
     }
-#endif
+
     if (message)
     {
         socket_write(new_socket, message, strlen(message));
@@ -3463,7 +3447,6 @@ new_player ( object_t *ob, SOCKET_T new_socket
         socket_close(new_socket);
         return;
     }
-#endif /* ACCESS_CONTROL */
 
     if (d_flag)
         debug_message("%s New player at socket %d.\n"
@@ -3577,9 +3560,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
     set_default_combine_charset(new_interactive->combine_cset);
     new_interactive->text[0] = '\0';
     memcpy(&new_interactive->addr, addr, addrlen);
-#if defined(ACCESS_CONTROL)
     new_interactive->access_class = class;
-#endif
     new_interactive->socket = new_socket;
     new_interactive->next_player_for_flush = NULL;
     new_interactive->previous_player_for_flush = NULL;

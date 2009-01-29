@@ -288,18 +288,13 @@
 
 
 /* --- Access Control --- */
-/* #define ACCESS_CONTROL if you want the driver to do any access control.
- * TODO: Make this a runtime option.
+/* file for access permissions data.
+ * Don't define this if you don't want the driver to do any access control.
  */
-@cdef_access_control@ ACCESS_CONTROL
-
-/* file for access permissions data */
-/* TODO: Make this a runtime option */
-#define ACCESS_FILE               @val_access_file@
+@cdef_access_control@ ACCESS_FILE @val_access_file@
 
 /* logfile to show valid and rejected connections
  * simple not define this for NO logs
- * TODO: Make this a runtime option.
  */
 @cdef_access_log@ ACCESS_LOG      @val_access_log@
 

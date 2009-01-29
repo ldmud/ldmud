@@ -10,6 +10,12 @@ xx-xxx-xxxx -- 3.3.719
           '--with-write-buffer-max-size'.
        + Removed background threads that sent the data to the network
          and with it the '--enable-use-pthreads' configuration option.
+       + The commandline options '--access-file' and '--access-log'
+         specify the access permissions and log file, activating or
+         deactivating access control and log. The old configure options 
+         '--enable-access-control', '--with-access-file', '--with-access-log'
+         and their config.h symbols ACCESS_FILE and ACCESS_LOG just give
+         the default values.
 
 12-Jan-2009 -- 3.3.718
     - New Efuns:

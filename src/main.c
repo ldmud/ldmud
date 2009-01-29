@@ -50,6 +50,7 @@
 
 #include "backend.h"
 #include "array.h"
+#include "access_check.h"
 #include "comm.h"
 #include "filestat.h"
 #include "gcollect.h"
@@ -287,6 +288,13 @@ main (int argc, char **argv)
     // if --random-seed or --randomdevice is given on the command-line it
     // will re-seeded later.
     seed_random(prng_device_name);
+    
+#ifdef ACCESS_FILE
+    access_file = strdup(ACCESS_FILE);
+#endif
+#ifdef ACCESS_LOG
+    access_log = strdup(ACCESS_LOG);
+#endif
     
     do {
         dummy_current_object_for_loads = NULL_object;
@@ -553,6 +561,8 @@ main (int argc, char **argv)
         initialize_host_ip_number(hostname, hostaddr);
         free(hostname); hostname = NULL;
         free(hostaddr); hostaddr = NULL;
+
+        initialize_host_access();
 
         (void)signal(SIGFPE, SIG_IGN);
         current_object = &dummy_current_object_for_loads;
@@ -1040,6 +1050,8 @@ typedef enum OptNumber {
  , cHBInterval      /* --heart-interval     */
  , cHostname        /* --hostname           */
  , cHostaddr        /* --hostaddr           */
+ , cAccessFile      /* --access-file        */
+ , cAccessLogFile   /* --access-log         */
  , cMaxMalloc       /* --max-malloc         */
  , cMaxArray        /* --max-array          */
  , cMaxBytes        /* --max-bytes          */
@@ -1156,6 +1168,20 @@ static Option aOptions[]
       , "  --debug-file <filename>\n"
       , "  --debug-file <filename>\n"
         "    Log all debug output in <filename> instead of <host>.debug.log .\n"
+      }
+
+    , { 0,   "access-file",        cAccessFile,     MY_TRUE
+      , "  --access-file <filename>|none\n"
+      , "  --access-file <filename>|none\n"
+        "    Activate access control with these access permissions data.\n"
+        "    If 'none' is given access control is deactivated.\n"
+      }
+
+    , { 0,   "access-log",        cAccessLogFile, MY_TRUE
+      , "  --access-log <filename>|none\n"
+      , "  --access-log <filename>|none\n"
+        "    Log valid and rejected connections into this file.\n"
+        "    If 'none' is given no log is written.\n"
       }
 
     , { 0,   "hostname",           cHostname,       MY_TRUE
@@ -1716,7 +1742,7 @@ options (void)
   fputs("   Input Escape: '" INPUT_ESCAPE "'\n", stdout);
 #endif
 
-#ifdef ACCESS_CONTROL
+#ifdef ACCESS_FILE
   fputs(" Access control: using <mudlib>/" ACCESS_FILE
 #    ifdef ACCESS_LOG
         ", logs into <mudlib>/" ACCESS_LOG "\n"
@@ -2483,6 +2509,24 @@ eval_arg (int eOption, const char * pValue)
         if (hostaddr != NULL)
             free(hostaddr);
         hostaddr = strdup(pValue);
+        break;
+
+    case cAccessFile:
+        if (access_file != NULL)
+            free(access_file);
+        if (!strcmp(pValue, "none"))
+            access_file = NULL;
+        else
+            access_file = strdup(pValue);
+        break;
+
+    case cAccessLogFile:
+        if (access_log != NULL)
+            free(access_log);
+        if (!strcmp(pValue, "none"))
+            access_log = NULL;
+        else
+            access_log = strdup(pValue);
         break;
 
     case cMaster:

@@ -438,8 +438,6 @@ extern svalue_t *f_set_max_commands (svalue_t *sp);
 extern svalue_t *f_enable_telnet (svalue_t *sp);
 extern svalue_t *f_net_connect (svalue_t *sp);
 
-#if defined(ACCESS_CONTROL)
 extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) );
-#endif /* ACCESS_CONTROL */
 
 #endif /* COMM_H__ */

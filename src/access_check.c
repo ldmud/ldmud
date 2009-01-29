@@ -7,16 +7,16 @@
  * These are matched against a set of rules and if a match is detected, a
  * proper message is sent back and the connection is shutdown.
  *
- * This facility is active only if ACCESS_CONTROL has been defined in config.h
- * If ACCESS_LOG is defined in config.h, all checks and their results are
- * logged by comm.c in the specified file.
+ * This facility is active only if ACCESS_FILE has been defined in config.h
+ * or given on the command line. If ACCESS_LOG is defined in config.h or
+ * given on the command line, all checks and their results are logged by
+ * comm.c in the specified file.
  *
- * The rules are read from the file ACCESS_FILE (defined in config.h,
- * typically "ACCESS.ALLOW") which resides in the mudlib. Every line specifies
- * one rule and has to follow the syntax given below. Lines with a '#' as
- * first character count as comments and are ignored, as are lines which
- * do not conform to the rule syntax (but except for empty lines this should
- * be relied upon).
+ * The rules are read from the file <access_file> (typically "ACCESS.ALLOW")
+ * which resides in the mudlib. Every line specifies one rule and has to
+ * follow the syntax given below. Lines with a '#' as first character count
+ * as comments and are ignored, as are lines which do not conform to the
+ * rule syntax (but except for empty lines this should be relied upon).
  *
  * The syntax for a rule is (no leading whitespace allowed!):
  *
@@ -81,9 +81,7 @@
  * The rule file is (re)read whenever the gamedriver detects a change in its
  * timestamp.
  *
- * TODO: Make ACCESS_CONTROL a runtime option, also, when the file is
- * TODO:: missing on driver startup (and just then), allow every access.
- * TODO:: Alternatively, this could be made an
+ * TODO:  This could also be made an
  * TODO:: efun "string|int access_control(file, [interactive])" to be used
  * TODO:: from TODO:: master.c::connect().
  * TODO:: Or a driver hook with the settings "file", ({ "file", "logfile" })
@@ -92,8 +90,6 @@
  */
 
 #include "driver.h"
-
-#if defined(ACCESS_CONTROL)
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -113,6 +109,10 @@
 
 /*-------------------------------------------------------------------------*/
 #define MAX_MESSAGE_LENGTH 256
+
+/* Command line arguments. */
+char *access_file = NULL;
+char *access_log = NULL;
 
 /* IP address/time rules, kept in a linked list.
  * Every structure describes one rule, with a reference to the
@@ -209,7 +209,7 @@ add_access_entry (struct sockaddr_in *full_addr, int login_port, long *idp)
  * of users. The id of the class is put into *idp.
  * If there is no class, *idp is not changed.
  *
- * This function is called after the ACCESS_FILE has been (re-)read
+ * This function is called after the access_file has been (re-)read
  * to reinitialize the current class usage counts.
  */
 
@@ -227,7 +227,7 @@ add_access_entry (struct sockaddr_in *full_addr, int login_port, long *idp)
 static void
 read_access_file (void)
 
-/* Read and parse the ACCESS_FILE, (re)creating all the datastructures.
+/* Read and parse the access_file, (re)creating all the datastructures.
  * After the file has been read, the usage counts will be updated by
  * calling comm::refresh_access_data, passing add_access_entry() as
  * callback.
@@ -252,10 +252,10 @@ read_access_file (void)
     }
     all_access_classes = NULL;
 
-    infp = fopen(ACCESS_FILE, "r");
+    infp = fopen(access_file, "r");
     if (!infp)
-        perror("driver: Can't read access file '" ACCESS_FILE "'");
-    FCOUNT_READ(ACCESS_FILE);
+        perror("driver: Can't read access file");
+    FCOUNT_READ(access_file);
     last = &all_access_addresses;
       /* *last will be set to NULL at the end, so no dangling pointer
        * will exist.
@@ -436,17 +436,23 @@ allow_host_access (struct sockaddr_in *full_addr, int login_port, long *idp)
  *
  * If access is allowed, *idp is set to the corresponding class id; this
  * information is used later to re-initialize the class structures after
- * a re-read of the ACCESS_FILE.
+ * a re-read of the access_file.
  *
- * The ACCESS_FILE is read by this function if it has been changed.
+ * The access_file is read by this function if it has been changed.
  */
 
 {
     struct stat statbuf;
     struct access_class *acp;
 
-    if (ixstat(ACCESS_FILE, &statbuf))
-        perror("driver: Can't stat access file '" ACCESS_FILE "'");
+    if (!access_file)
+    {
+        *idp = 0;
+        return NULL;
+    }
+    
+    if (ixstat(access_file, &statbuf))
+        perror("driver: Can't stat access file");
     else if (statbuf.st_mtime > last_read_time) {
         last_read_time = statbuf.st_mtime;
         read_access_file();
@@ -485,7 +491,28 @@ release_host_access (long num)
     }
 }
 
-#endif /* ACCESS_CONTROL */
+/*-------------------------------------------------------------------------*/
+void
+initialize_host_access ()
+
+/* Check if the ACCESS_FILE is there, otherwise deactivate
+   access control.
+ */
+
+{
+    struct stat statbuf;
+
+    if (access_file == NULL)
+        return;
+
+    if (ixstat(access_file, &statbuf))
+    {
+        fprintf(stderr, "%s Access file '%s' missing, "
+                        "deactivating access control.\n", 
+                        time_stamp(), access_file);
+        access_file = NULL;
+    }
+}
 
 /***************************************************************************/
 
