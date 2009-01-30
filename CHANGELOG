@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Jan-2009 (Fuchur)
+  - (main.c)
+    Fix bug building erq_args, which could cause memory corruption. (#604)
+
 29-Jan-2009 (Gnomi)
   - (access_check.c, comm.c, main.c)
     Made access control a runtime option.

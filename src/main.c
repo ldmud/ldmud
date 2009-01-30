@@ -2291,17 +2291,20 @@ eval_arg (int eOption, const char * pValue)
 
             /* Skip leading spaces */
             *begin_arg++ = '\0';
-            while (*begin_arg == ' ') begin_arg++;
+            while (*begin_arg == ' ')
+                begin_arg++;
 
             /* Count the arguments */
             for (num_args = 0, cp = begin_arg; *cp != '\0'; )
             {
                 /* Found an argument: skip it */
                 num_args++;
-                while (*cp != ' ' && *cp != '\0') cp++;
+                while (*cp != ' ' && *cp != '\0')
+                    cp++;
 
                 /* Skip trailing spaces */
-                while (*cp == ' ') cp++;
+                while (*cp == ' ')
+                    *cp++;
             }
 
             if (num_args != 0)
@@ -2318,13 +2321,14 @@ eval_arg (int eOption, const char * pValue)
                 {
                     /* Found an argument: store and skip it */
                     erq_args[num_args++] = cp;
-                    while (*cp != ' ' && *cp != '\0') cp++;
+                    while (*cp != ' ' && *cp != '\0')
+                        cp++;
 
-                    /* Ensure termination */
-                    *cp++ = '\0';
-
-                    /* Skip trailing spaces */
-                    while (*cp == ' ') cp++;
+                    /* Skip trailing spaces, replacing them by \0 to
+                     * ensure proper string termination.
+                     */
+                    while (*cp == ' ')
+                        *cp++ = '\0';
                 }
             }
         }
