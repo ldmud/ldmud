@@ -5,25 +5,6 @@ SYNOPSIS
                                       , mixed skip)
 
 BESCHREIBUNG
-        Groups objects together for which the separator function returns the
-        same value. obarr should be an array of objects, other types are
-        ignored.
-        
-        If the separator function is defined by name, it is searched and
-        called in the objects from <obarr>. If <extra> arguments are given,
-        they are passed to the function as arguments.
-        
-        If the separator function is defined as a closure, it will be passed
-        the objects from <obarr> as first argument, with the <extra> arguments
-        (if any) passed following.
-        
-        If the <skip> argument is given (it is required when <extra> arguments
-        are to be used), and the return value from the separator function call
-        matches this value, the object in question will _not_ be included in
-        the returned array. Default value for <skip> is the number 0.
-
-        The returned array is an array of arrays of objects in the form:
-
         Gruppiert alle Objekte aus <*obj>, fuer die die Funktion <fun>
         den gleichen Wert liefert. Wenn <*obj> etwas anderes als Objekte
         enthaelt, werden diese ignoriert.

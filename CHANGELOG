@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Jan-2009 (Zesstra)
+  - Fixed german manpage for unique_array() which contained german and english.
+
 30-Jan-2009 (Fuchur)
   - (main.c)
     Fix bug building erq_args, which could cause memory corruption. (#604)
