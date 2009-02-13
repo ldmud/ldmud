@@ -4,6 +4,9 @@
 
 // Name, Flag, Function
 mixed *tests = ({
+    ({ "0000587", 0,
+		   (: strftime(__INT_MAX__); return 1; :)
+		}),
     ({ "0000537-1", 0,
 	(:
 	    int a;
