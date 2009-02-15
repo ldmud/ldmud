@@ -4,7 +4,8 @@
 #define T_CLOSURE       2       // The function to be evaluated
 
 // Flags
-#define TF_ERROR        1       // The function should generate an error.
+#define TF_ERROR          1       // The function should generate an error.
+#define TF_DONTCHECKERROR 2       // Doesn't matter if error or not, as long as it does not crash.
 
 void run_array(mixed* testarray, closure callback)
 {
@@ -20,22 +21,28 @@ void run_array(mixed* testarray, closure callback)
         if(test[T_FLAGS]&TF_ERROR)
         {
             if(!catch(funcall(test[T_CLOSURE]);nolog))
-	    {
-		errors++;
+            {
+                errors++;
                 msg(" FAILURE! (There was no error.)\n");
-	    }
+            }
             else
                 msg(" Success.\n");
+        }
+        else if (test[T_FLAGS]&TF_DONTCHECKERROR)
+        {
+            catch(funcall(test[T_CLOSURE]);nolog);
+            // if we surived the test: great
+            msg(" Success.\n");
         }
         else
         {
             if(funcall(test[T_CLOSURE]))
                 msg(" Success.\n");
             else
-	    {
-		errors++;
+            {
+                errors++;
                 msg(" FAILURE! (Wrong result.)\n");
-	    }
+            }
         }
     }
     

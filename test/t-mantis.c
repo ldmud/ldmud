@@ -4,9 +4,21 @@
 
 // Name, Flag, Function
 mixed *tests = ({
-    ({ "0000587", 0,
-		   (: strftime(__INT_MAX__); return 1; :)
-		}),
+    ({ "0000587-1", TF_DONTCHECKERROR,
+        (: strftime(__INT_MAX__); return 1; :)
+    }),
+    ({ "0000587-2", TF_DONTCHECKERROR,
+        (: gmtime(__INT_MAX__); return 1; :)
+    }),
+    ({ "0000587-3", TF_DONTCHECKERROR,
+        (: localtime(__INT_MAX__); return 1; :)
+    }),
+    ({ "0000587-4", TF_DONTCHECKERROR,
+        (: ctime(__INT_MAX__); return 1; :)
+    }),
+    ({ "0000587-5", TF_DONTCHECKERROR,
+        (: ctime(({__INT_MAX__,1})); return 1; :)
+    }),
     ({ "0000537-1", 0,
 	(:
 	    int a;

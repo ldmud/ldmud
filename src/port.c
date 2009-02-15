@@ -85,7 +85,6 @@ get_current_time (void)
 /*-------------------------------------------------------------------------*/
 char *
 time_fstring (mp_int t, const char* str, Bool localized)
-  
 /* Return a textual representation of the time <t> according to the format
  * string <str>. Doesn't cache because it would be necessary to 
  * save the format string and compare.
@@ -95,9 +94,13 @@ time_fstring (mp_int t, const char* str, Bool localized)
  * TODO::for using longer format strings. */
 {
     static char result[512];
-    struct tm *tm; // broken-down time struct    
+    struct tm *tm;
+
     time_t ti = (time_t)t;
     tm = localtime(&ti);
+    if (!tm)
+        return NULL;
+
     if (!localized) {
         setlocale(LC_TIME, "C");
         strftime(result, sizeof(result)-1, str, tm);
@@ -122,6 +125,9 @@ utime_string (mp_int t, mp_int ut)
 
     time_t ti = (time_t)t;
     tm = localtime(&ti);
+    if (!tm)
+        return NULL;
+
     len = strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S:", tm);
     sprintf(result+len, "%06"PRIdMPINT, ut);
     strftime(result+len+6, sizeof(result)-7-len, " %Y", tm);

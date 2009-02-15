@@ -8585,6 +8585,11 @@ x_gm_localtime (svalue_t *sp, Bool localTime)
     }
 
     pTm = (localTime ? localtime : gmtime)(&clk);
+    if (!pTm) {
+      errorf("Bad arg 1 to %s(): time value %"PRIdPINT
+          " can't be represented by the host system. Maybe too large?\n",
+          localTime ? "localtime" : "gmtime", clk);
+    }
 
     v = allocate_array(TM_MAX);
     if (!v)
@@ -8820,10 +8825,15 @@ f_ctime(svalue_t *sp)
         if (sp->u.vec->item[1].type != T_NUMBER)
             errorf("Bad arg 1 to ctime(): Element 1 is '%s', expected 'int'.\n"
                  , efun_arg_typename(sp->u.vec->item[1].type));
-        
+
         ts = utime_string( sp->u.vec->item[0].u.number
                          , sp->u.vec->item[1].u.number);
-        
+        if (!ts)
+            errorf("Bad time in ctime(): ({%"PRIdPINT", %"PRIdPINT
+                "}) can't be represented by host system. Maybe too large?\n",
+                sp->u.vec->item[0].u.number,
+                sp->u.vec->item[1].u.number);
+
         /* If the string contains nl characters, extract the substring
          * before the first one. Else just copy the (volatile) result
          * we got.
@@ -8847,7 +8857,11 @@ f_ctime(svalue_t *sp)
         {
           /* cache is outdated */
             ts = time_fstring(sp->u.number, "%a %b %d %H:%M:%S %Y", 0);
-            
+            if (!ts)
+                errorf("Bad time in ctime(): %"PRIdMPINT" can't be "
+                    "represented by the host system. Maybe too large?\n", 
+                    sp->u.number);
+
             /* If the string contains nl characters, extract the substring
              * before the first one. Else just copy the (volatile) result
              * we got.
@@ -9074,7 +9088,11 @@ v_strftime(svalue_t *sp, int num_arg)
             break;
     }
 
-    ts = time_fstring(clk,cfmt,localized); 
+    ts = time_fstring(clk,cfmt,localized);
+    if (!ts)
+        errorf("Bad time in strftime(): %"PRIdMPINT" can't be "
+            "represented by the host system. Maybe too large?\n", clk);
+
     memsafe(rc = new_tabled(ts), strlen(ts)+sizeof(string_t), "strftime() result");
     
     sp = pop_n_elems(num_arg, sp);
