@@ -28,6 +28,10 @@
 # of its option specification patterns, allowing us to make the files
 # self-executable.
 #-------------------------------------------------------------------------
+#
+# note: to find discrepancies between this file and configure, you can use
+# diff -u <(grep '^\w*=' settings/default | sort) \
+#         <(grep ^DEFAULT configure | sed 's/DEFAULT//' | sort)
 
 exec ./configure --with-setting=default $*
 
@@ -91,6 +95,8 @@ with_write_buffer_max_size=100000
 
 # --- Timing ---
 
+# NOTE: all times are given in seconds.
+
 # If an object is left alone for this time, it will be 'cleaned up'.
 # The time should be substantially longer than the swapping time.
 
@@ -111,7 +117,7 @@ with_time_to_swap_variables=1800
 # The actual length of the intervals is determined somewhat randomly
 # to make the game less predictable.
 
-with_time_to_reset=1800 # seconds
+with_time_to_reset=1800
 
 
 # --- Memory ---
@@ -127,7 +133,7 @@ with_reserved_system_size=200000
 # This value gives the upper limits for the total allocated memory.
 # A value of 0 means 'unlimited'.
 
-with_max_malloced=0x4000000 
+with_max_malloced=0x4000000
 
 # If these values are >0, the driver will reserve this amount of memory
 # on startup for large resp. small blocks, reducing the block fragmentation.
@@ -203,8 +209,8 @@ enable_erq=erq
 # Max size of a packet received from/send to the ERQ.
 # TODO: Do the current erqs compile this in?
 
-with_erq_max_reply=1024 
-with_erq_max_send=1024 
+with_erq_max_reply=1024
+with_erq_max_send=1024
 
 
 #----------- Compilation Options ----------
@@ -233,16 +239,19 @@ enable_apply_cache_stat=yes
 # enabled), relative to the mudlib directory. The driver will append
 # '.<hostname>' to the file.
 
-with_swap_file=LP_SWAP.3
+with_swap_file=LP_SWAP
 
 # Enable support for IPv6 (assuming your system supports it).
 
 enable_use_ipv6=no
 
-# Enable the use of pthreads for background socket IO.
+# The period of the random number generator. 2^19937-1 by default.
+# Possible values are
+# 607, 1279, 2281, 4253, 11213, 19937, 44497, 86243, 132049, 216091.
+with_random_period_length=19937
 
-enable_use_pthreads=no
-
+# If enabled, the driver includes evaluation costs in the stracktrace
+enable_eval_cost_trace=no
 
 # --- Memory ---
 
@@ -278,7 +287,7 @@ enable_malloc_trace=no
 # Enable this in addition to SMALLOC_TRACE to also annotate all allocations
 # with file:line of the lpc program responsible for it.
 
-enable_malloc_lpc_trace=no, MALLOC_slaballoc
+enable_malloc_lpc_trace=no
 
 # Define this to log all calls to esbrk() (the system memory allocator).
 # Works best if MALLOC_TRACE is defined.
@@ -350,12 +359,6 @@ enable_share_variables=no
 
 enable_use_system_crypt=yes
 
-# Define USE_LPC_NOSAVE if you want to use the keyword 'nosave' to
-# specify variables not be save by save_object(). The old keyword 'static'
-# works in either case.
-
-enable_lpc_nosave=yes
-
 # Enable support for mySQL (assuming your system supports it).
 #
 #  'no'  : mySQL support is not compiled in
@@ -422,6 +425,9 @@ enable_use_tls=no
 
 with_tls_path=
 
+# Enable XML parsing efuns using the iksemel package
+enable_use_iksemel=no
+
 # Enable support for alists.
 
 enable_use_alists=no
@@ -440,6 +446,9 @@ enable_lpc_array_calls=yes
 
 enable_use_pcre=yes
 
+# Limit the recursion done by PCRE to a certain number of steps
+with_pcre_recursion_limit=3000
+
 # Enable obsolete and deprecated efuns.
 
 enable_use_deprecated=yes
@@ -449,7 +458,7 @@ enable_use_deprecated=yes
 
 # Maximum size of a socket send buffer.
 
-with_set_buffer_size_max=65536 
+with_set_buffer_size_max=65536
 
 # CATCH_RESERVED_COST is the default value added to the eval cost for the time
 # executing code guarded by a catch() statement, so that an eval_cost-too-big
@@ -492,6 +501,9 @@ with_max_bits=6144
 # Maximum number of players in the game
 
 with_max_players=50
+
+# Maximum number of concurrent outgoing connections for net_connect efun.
+with_max_net_connects=10
 
 # Allowed number of ed commands per backend cycle (for faster file upload).
 
@@ -536,7 +548,7 @@ with_itable_size=256
 # Size of the apply cache, expressed in the bitsize of its indices.
 # The number of entries is 2**cache_bits.
 
-with_apply_cache_bits=12 
+with_apply_cache_bits=12
 
 # Select whether compiled regular expressions shall be cached, and
 # how big the cache shall be (max: 65536).
