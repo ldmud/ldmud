@@ -1,7 +1,7 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-15-Jan-2009 (Zesstra)
+15-Feb-2009 (Zesstra)
   - (port.c)
     Check results of gmtime() and localtime() and return NULL, if NULL is
     returned.
@@ -12,6 +12,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
     Added tests for the efuns affected by bug #587.
     Added an test flag TF_DONTCHECKERROR for tests which must not crash the
     driver but may cause a runtime error or not.
+
+31-Jan-2009 (Fuchur)
+  - (test/run.sh, test/t-0000604.sh)
+    Add Test for #604
 
 31-Jan-2009 (Zesstra)
   - Fixed german manpage for unique_array() which contained german and english.
