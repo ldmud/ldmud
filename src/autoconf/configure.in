@@ -61,23 +61,23 @@ val_[$1]="$with_[$1]"]
 AC_DEFUN([AC_FORM_HELP],[  --$1[]dnl
 ifelse([$2],,,dnl
 builtin(format,%[.]builtin(eval,(len([$1])<50)*(50-len([$1])))s,)  [default=$2])[]dnl
-ifelse([$3],,,[
-]patsubst([$3],[^],[        ]))[]dnl
+ifelse([$3],,,[[
+]patsubst([$3],[^],[        ])])[]dnl
 ])
 
 
 AC_DEFUN([AC_MY_ARG_ENABLE],
-[DEFAULTenable_[]translit([$1],[-],[_])=ifelse($2,,no,[$2])
-AC_ARG_ENABLE([$1],AC_FORM_HELP([enable-$1]ifelse($3,,,[=($3)]),
+[DEFAULTenable_[]translit([$1],[-],[_])=[$2]
+AC_ARG_ENABLE([$1],[AC_FORM_HELP([enable-$1]ifelse([$3],,,[=($3)]),
 ifelse([$2],,[disabled],[$2],no,[disabled],[$2],yes,[enabled],[enabled($2)]),
-[$4]),[$5],[$6])
+[$4])],[$5],[$6])
 ])
 
 AC_DEFUN([AC_MY_ARG_WITH],
-[DEFAULTwith_[]translit([$1],[-],[_])=ifelse($2,,no,[$2])
-AC_ARG_WITH([$1],AC_FORM_HELP([with-$1]ifelse($3,,[=VALUE],[=$3]),
+[DEFAULTwith_[]translit([$1],[-],[_])=[$2]
+AC_ARG_WITH([$1],[AC_FORM_HELP([with-$1]ifelse([$3],,[=VALUE],[=$3]),
 [$2],
-[$4]),[$5],[$6])
+[$4])],[$5],[$6])
 ])
 
 AC_DEFUN([AC_NOT_AVAILABLE],
@@ -106,15 +106,13 @@ dnl and declare the package arguments
 dnl
 
 AC_MY_ARG_ENABLE(erq,erq,[no/erq/xerq],[Enables and or selects ERQ demon])
-AC_MY_ARG_ENABLE(access-control,yes,,)
-AC_MY_ARG_ENABLE(access-log,no,,)
-AC_MY_ARG_ENABLE(align-functions,yes,,)
-AC_MY_ARG_ENABLE(compat-mode,no,,)
-AC_MY_ARG_ENABLE(strict-euids,no,,)
+AC_MY_ARG_ENABLE(access-control,yes,,[Enable access control])
+AC_MY_ARG_ENABLE(access-log,no,,[Log all connection attempts])
+AC_MY_ARG_ENABLE(compat-mode,no,,[Enable compat mode])
+AC_MY_ARG_ENABLE(strict-euids,no,,[Enforce euids for loading objects])
 AC_MY_ARG_ENABLE(filename-spaces,no,,[Allow space characters in filenames])
 AC_MY_ARG_ENABLE(share-variables,no,,[Enable clone initialization from blueprint variable values])
-AC_MY_ARG_ENABLE(use-system-crypt,yes,,)
-AC_MY_ARG_ENABLE(udp-send,yes,,)
+AC_MY_ARG_ENABLE(use-system-crypt,yes,,[Use crypt() from libc])
 AC_MY_ARG_ENABLE(use-ipv6,no,,[Enables support for IPv6])
 AC_MY_ARG_ENABLE(use-alists,no,,[Enables alist support])
 AC_MY_ARG_ENABLE(use-mccp,no,,[Enables MCCP support])
@@ -133,18 +131,18 @@ AC_MY_ARG_ENABLE(use-set-is-wizard,yes,,[Enables efun set_is_wizard()])
 AC_MY_ARG_ENABLE(use-parse-command,yes,,[Enables efun parse_command()])
 AC_MY_ARG_ENABLE(use-process-string,yes,,[Enables efun process_string()])
 AC_MY_ARG_ENABLE(lpc-array-calls,yes,,[Enables call_others on arrays of objects])
-AC_MY_ARG_ENABLE(comm-stat,yes,,)
-AC_MY_ARG_ENABLE(apply-cache_stat,yes,,)
+AC_MY_ARG_ENABLE(comm-stat,yes,,[Enable statistics for outgoing packets])
+AC_MY_ARG_ENABLE(apply-cache_stat,yes,,[Enable statistics for apply cache])
 AC_MY_ARG_ENABLE(malloc-sbrk,yes,,[Use sbrk() if possible (smalloc,slaballoc)])
 AC_MY_ARG_ENABLE(malloc-check,yes,,[Enable simple malloc checks (smalloc,slaballoc)])
 AC_MY_ARG_ENABLE(malloc-trace,no,,[Annotate allocations with source file:line])
 AC_MY_ARG_ENABLE(malloc-lpc-trace,no,,[Annotate allocations with LPC object info])
 AC_MY_ARG_ENABLE(malloc-sbrk-trace,no,,[Log all esbrk() calls (smalloc,slaballoc)])
-AC_MY_ARG_ENABLE(dynamic-costs,no,,)
+AC_MY_ARG_ENABLE(dynamic-costs,no,,[Assign eval costs dynamically])
 AC_MY_ARG_ENABLE(eval-cost-trace,no,,[Writes the evaluation costs in the stracktrace])
 AC_MY_ARG_ENABLE(trace-code,yes,,[trace the most recently executed bytecode])
 
-AC_MY_ARG_ENABLE(rxcache_table,yes,,)
+AC_MY_ARG_ENABLE(rxcache_table,yes,,[Cache compiled regular expressions])
 AC_MY_ARG_ENABLE(synchronous-heart-beat,yes,,[Do all heart beats at once.])
 
 AC_MY_ARG_ENABLE(opcprof,no,,[create VM instruction usage statistics])
@@ -167,8 +165,8 @@ AC_MY_ARG_WITH(access-file,ACCESS.ALLOW,,[access permissions file])
 AC_MY_ARG_WITH(access-log,access.allow.log,,[access log file])
 
 AC_MY_ARG_WITH(write-buffer-max-size,100000,,[max size of write buffer per interactive])
-AC_MY_ARG_WITH(erq-max-reply,1024,,)
-AC_MY_ARG_WITH(erq-max-send,1024,,)
+AC_MY_ARG_WITH(erq-max-reply,1024,,[max size of replies from ERQ])
+AC_MY_ARG_WITH(erq-max-send,1024,,[max size of commands sent to ERQ, xerq only])
 AC_MY_ARG_WITH(erq-debug,0,,[ERQ debug level])
 
 AC_MY_ARG_WITH(read-file-max-size,50000,[BYTES],
@@ -176,48 +174,47 @@ AC_MY_ARG_WITH(read-file-max-size,50000,[BYTES],
 
 AC_MY_ARG_WITH(master-name,secure/master,,[name of the master object])
 AC_MY_ARG_WITH(input-escape,"!",,[input escape character])
-AC_MY_ARG_WITH(time-to-clean_up,3600,[SECONDS],)
-AC_MY_ARG_WITH(time-to-swap,900,[SECONDS],)
-AC_MY_ARG_WITH(time-to-swap-variables,1800,[SECONDS],)
-AC_MY_ARG_WITH(time-to-reset,1800,[SECONDS],)
-AC_MY_ARG_WITH(alarm-time,2,[SECONDS],)
-AC_MY_ARG_WITH(heart-beat-interval,2,[SECONDS],)
-AC_MY_ARG_WITH(evaluator-stack-size,2000,,)
-AC_MY_ARG_WITH(max-user-trace,60,,)
-AC_MY_ARG_WITH(max-trace,65,,)
-AC_MY_ARG_WITH(compiler-stack-size,400,,)
-AC_MY_ARG_WITH(max-bits,6144,,)
-AC_MY_ARG_WITH(portno,4242,,)
-AC_MY_ARG_WITH(udp-port,4246,,)
-AC_MY_ARG_WITH(maxnumports,20,,)
-AC_MY_ARG_WITH(max-cost,1000000,,)
-AC_MY_ARG_WITH(catch-reserved-cost,2000,,)
-AC_MY_ARG_WITH(master-reserved-cost,0x200,,)
+AC_MY_ARG_WITH(time-to-clean_up,3600,[SECONDS],[time before cleaning up unused objects])
+AC_MY_ARG_WITH(time-to-swap,900,[SECONDS],[time before swapping out unused objects])
+AC_MY_ARG_WITH(time-to-swap-variables,1800,[SECONDS],[time before swapping out variables])
+AC_MY_ARG_WITH(time-to-reset,1800,[SECONDS],[time between resetting objects])
+AC_MY_ARG_WITH(alarm-time,2,[SECONDS],[timer granularity])
+AC_MY_ARG_WITH(heart-beat-interval,2,[SECONDS],[time between heartbeats])
+AC_MY_ARG_WITH(evaluator-stack-size,2000,,[virtual machine stack size])
+AC_MY_ARG_WITH(max-user-trace,60,,[maximum user function call depth])
+AC_MY_ARG_WITH(max-trace,65,,[maximum function call depth during error handling])
+AC_MY_ARG_WITH(compiler-stack-size,400,,[depth of parser stack])
+AC_MY_ARG_WITH(max-bits,6144,,[maximum number of bits in a bit string])
+AC_MY_ARG_WITH(portno,4242,,[tcp port to listen on])
+AC_MY_ARG_WITH(udp-port,4246,,[udp port to listen on])
+AC_MY_ARG_WITH(maxnumports,20,,[maximum number of tcp ports to listen on])
+AC_MY_ARG_WITH(max-cost,1000000,,[maximum eval cost for a single evaluation])
+AC_MY_ARG_WITH(catch-reserved-cost,2000,,[eval cost reserved for catch()])
+AC_MY_ARG_WITH(master-reserved-cost,512,,[eval cost reserved for master])
 AC_MY_ARG_WITH(swap-file,LP_SWAP,,[name of the swap file])
 AC_MY_ARG_WITH(max-array-size,5000,,[max number of array elements])
 AC_MY_ARG_WITH(max-mapping-keys,5000,,[max number of mapping entries])
 AC_MY_ARG_WITH(max-mapping-size,15000,,[max number of mapping elements])
-AC_MY_ARG_WITH(max-callouts,0,,)
-AC_MY_ARG_WITH(max-players,50,,)
-AC_MY_ARG_WITH(max-local,50,,)
+AC_MY_ARG_WITH(max-callouts,0,,[max number of callouts; 0=unlimited])
+AC_MY_ARG_WITH(max-players,50,,[maximum number of simultaneous players])
+AC_MY_ARG_WITH(max-local,50,,[maximum number of local variables per function])
 AC_MY_ARG_WITH(allowed-ed-cmds,20,,[number of ed commands per backend cycle])
-AC_MY_ARG_WITH(reserved-user-size,700000,,)
-AC_MY_ARG_WITH(reserved-master-size,100000,,)
-AC_MY_ARG_WITH(reserved-system-size,200000,,)
-AC_MY_ARG_WITH(htable-size,4096,,)
-AC_MY_ARG_WITH(itable-size,256,,)
-AC_MY_ARG_WITH(otable-size,1024,,)
-AC_MY_ARG_WITH(defmax,65000,,)
-AC_MY_ARG_WITH(apply-cache-bits,12,,)
-AC_MY_ARG_WITH(rxcache-table,8192,,)
-AC_MY_ARG_WITH(max-byte-transfer,50000,,)
-AC_MY_ARG_WITH(catch-udp-port,4246,,)
-AC_MY_ARG_WITH(set-buffer-size-max,65536,,)
+AC_MY_ARG_WITH(reserved-user-size,700000,,[memory reserved for user usage])
+AC_MY_ARG_WITH(reserved-master-size,100000,,[memory reserved for master usage])
+AC_MY_ARG_WITH(reserved-system-size,200000,,[memory reserved for internal usage])
+AC_MY_ARG_WITH(htable-size,4096,,[shared string hash table size])
+AC_MY_ARG_WITH(itable-size,256,,[identifier hash table size])
+AC_MY_ARG_WITH(otable-size,1024,,[object hash table size])
+AC_MY_ARG_WITH(defmax,65000,,[maximum expanded size of preprocessor macro])
+AC_MY_ARG_WITH(apply-cache-bits,12,,[2^N = size of apply cache])
+AC_MY_ARG_WITH(rxcache-table,8192,,[cache size for compiled regular expressions])
+AC_MY_ARG_WITH(max-byte-transfer,50000,,[maximum write/read size for read/write_bytes])
+AC_MY_ARG_WITH(set-buffer-size-max,65536,,[maximum size of socket send buffer])
 AC_MY_ARG_WITH(malloc,default,[default/smalloc/slaballoc/sysmalloc/ptmalloc],[memory manager to use])
-AC_MY_ARG_WITH(min-malloced,0,,)
-AC_MY_ARG_WITH(min-small-malloced,0,,)
-AC_MY_ARG_WITH(max-malloced,0x4000000,,)
-AC_MY_ARG_WITH(total-trace-length,0x1000,,)
+AC_MY_ARG_WITH(min-malloced,0,,[amount of memory to allocate on startup])
+AC_MY_ARG_WITH(min-small-malloced,0,,[amount of memory to allocate for small blocks on startup])
+AC_MY_ARG_WITH(max-malloced,0x4000000,,[maximum amount of memory to allocate; 0=unlimited])
+AC_MY_ARG_WITH(total-trace-length,4096,,[number of operations stored in bytecode trace])
 AC_MY_ARG_WITH(pcre-recursion-limit,3000,,[maximum number of recursions in PCRE package])
 AC_MY_ARG_WITH(wizlist-file,WIZLIST,,[name of the wizlist file])
 AC_MY_ARG_WITH(max_net_connects,10,,[maximum number of concurrent connection attempts])
@@ -2350,7 +2347,7 @@ yes
 [ EXTRA_CFLAGS="${EXTRA_CFLAGS} -Dsolaris" ])
 fi
 
-AC_ARG_WITH(target,[  --with-target    ??], EXTRA_CFLAGS="${EXTRA_CFLAGS} -D${withval}")
+AC_ARG_WITH(target,[  --with-target    ?? (OS2/WIN32/solaris)], EXTRA_CFLAGS="${EXTRA_CFLAGS} -D${withval}")
 
 # Some Unixes require the -n parameter for tail to work properly
 AC_MSG_CHECKING(if tail accepts the -n parameter)
