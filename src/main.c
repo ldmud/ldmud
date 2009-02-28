@@ -1052,7 +1052,8 @@ typedef enum OptNumber {
  , cHostaddr        /* --hostaddr           */
  , cAccessFile      /* --access-file        */
  , cAccessLogFile   /* --access-log         */
- , cMaxMalloc       /* --max-malloc         */
+ , cMaxMalloc       /* --hard-malloc-limit  */
+ , cSoftMallocLimit /* --soft-malloc-limit  */
  , cMaxArray        /* --max-array          */
  , cMaxBytes        /* --max-bytes          */
  , cMaxCallouts     /* --max-callouts       */
@@ -1390,11 +1391,20 @@ static Option aOptions[]
         "    Reuse free space in the swap file immediately.\n"
       }
 
-    , { 0,   "max-malloc",         cMaxMalloc,      MY_TRUE
-      , "  --max-malloc <size>\n"
-      , "  --max-malloc <size>\n"
-        "    Restrict total memory allocations to <size> bytes. A <size> of 0\n"
+    , { 0,   "hard-malloc-limit",  cMaxMalloc,      MY_TRUE
+      , "  --hard-malloc-lmit <size>\n"
+      , "  --hard-malloc-limit <size>\n"
+        "    Restrict total memory allocation to <size> bytes. A <size> of 0\n"
         "    or 'unlimited' removes any restriction.\n"
+      }
+
+    , { 0,   "soft-malloc-limit",  cSoftMallocLimit,  MY_TRUE
+      , "  --soft-malloc-limit <size>\n"
+      , "  --soft-malloc-limit <size>\n"
+        "    If total memory allocation exceeds <size> bytes, inform the mudlib\n"
+        "    master about a developing low memory situation. A <size> of 0\n"
+        "    or 'unlimited' removes the threshold. <size> must be smaller than\n"
+        "    --hard-malloc-limit.\n"
       }
 
     , { 0,   "min-malloc",         cMinMalloc,      MY_TRUE
@@ -1999,12 +2009,18 @@ options (void)
         , MIN_SMALL_MALLOCED
         );
 
-  printf("                 max allocation:       ");
-  if (MAX_MALLOCED > 0)
-      printf("%9d\n", MAX_MALLOCED);
+  printf("                 hard memory allocation limit: ");
+  if (HARD_MALLOC_LIMIT_DEFAULT > 0)
+      printf("%9d\n", HARD_MALLOC_LIMIT_DEFAULT);
   else
       printf("unlimited\n");
-
+  
+  printf("                 soft memory allocation limit: ");
+    if (SOFT_MALLOC_LIMIT_DEFAULT > 0)
+        printf("%9d\n", SOFT_MALLOC_LIMIT_DEFAULT);
+    else
+        printf("unlimited\n");
+    
   printf("Internal tables: shared string hash:      %6d entries\n"
          "                 object hash:             %6d entries\n"
          "                 reserved name hash:      %6d entries\n"
@@ -2562,19 +2578,33 @@ eval_arg (int eOption, const char * pValue)
     case cMaxMalloc:
         if (!strcasecmp(pValue, "unlimited"))
         {
-            max_malloced = 0;
+            set_memory_limit(MALLOC_HARD_LIMIT, 0);
         }
         else
         {
-            max_malloced = strtol(pValue, (char **)0, 0);
-            if (max_malloced < 0)
+            if (!set_memory_limit(MALLOC_HARD_LIMIT, strtol(pValue, (char **)0, 0)))
             {
-                fprintf(stderr, "Illegal value '%s' for --max-malloc\n", pValue);
+                fprintf(stderr, "Illegal value '%s' for --hard-malloc-limit\n", pValue);
                 return hrError;
             }
         }
         break;
 
+    case cSoftMallocLimit:
+            if (!strcasecmp(pValue, "unlimited"))
+            {
+                set_memory_limit(MALLOC_SOFT_LIMIT, 0);
+            }
+            else
+            {
+                if (!set_memory_limit(MALLOC_SOFT_LIMIT, strtol(pValue, (char **)0, 0)))
+                {
+                    fprintf(stderr, "Illegal value '%s' for --soft-malloc-limit\n", pValue);
+                    return hrError;
+                }
+            }
+            break;
+            
     case cMudlib:
         if (chdir(pValue) == -1) {
             fprintf(stderr, "Bad mudlib directory: %s\n", pValue);

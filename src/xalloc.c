@@ -126,9 +126,18 @@ mp_int reserved_user_size   = RESERVED_USER_SIZE;   /* The reserved sizes */
 mp_int reserved_master_size = RESERVED_MASTER_SIZE;
 mp_int reserved_system_size = RESERVED_SYSTEM_SIZE;
 
-mp_int min_malloced       = MIN_MALLOCED;           /* Allocation limits */
-mp_int min_small_malloced = MIN_SMALL_MALLOCED;     /* Allocation limits */
-mp_int max_malloced       = MAX_MALLOCED;
+/* at startup reserve these amounts of memory for large and small blocks */
+mp_int min_malloced       = MIN_MALLOCED;
+mp_int min_small_malloced = MIN_SMALL_MALLOCED;
+/* this is the hard limit for memory allocations. */
+static mp_int max_malloced       = HARD_MALLOC_LIMIT_DEFAULT;
+/* this is a soft limit for memory allocations. It serves as a kind of low
+ * watermark. If exceeded, the game driver will inform the mudlib by calling
+ * low_memory() in the master. */
+static mp_int soft_malloc_limit  = SOFT_MALLOC_LIMIT_DEFAULT;
+
+/* Was the low_memory() already called in the master`*/
+static Bool low_memory_applied = FALSE;
 
 int stack_direction = 0; /*  0: Unknown stack behaviour
                           * +1: Stack grows upward
@@ -180,7 +189,7 @@ static t_stat clib_alloc_stat = {0,0};
 /* Forward declarations */
 
 #ifdef MALLOC_LPC_TRACE
-static void write_lpc_trace (int d, word_t *p, int oneline);
+static void write_lpc_trace (int d, word_t *p, int oneline) __attribute__((nonnull(2)));
 #endif
 
 #ifdef GC_SUPPORT
@@ -509,7 +518,7 @@ check_max_malloced (void)
 #ifndef NO_MEM_BLOCK_SIZE
     if (max_malloced > 0 && (mp_int)xalloc_stat.size > max_malloced)
     {
-        static const char mess[] = "MAX_MALLOCED limit reached.\n";
+        static const char mess[] = "HARD_MALLOC_LIMIT reached.\n";
         writes(2, mess);
         if (malloc_privilege < MALLOC_SYSTEM)
             return MY_TRUE;
@@ -1654,4 +1663,134 @@ string_copy_traced (const char *str MTRACE_DECL)
     return p;
 } /* string_copy_traced() */
 
+/*-------------------------------------------------------------------------*/
+void
+notify_lowmemory_condition(enum memory_limit_types what)
+/* Calls low_memory(what, <limit>, <memory_consumption>, <reserves> ) 
+ * in the master.
+ */
+{
+    short reservestate = 0;
+    push_number(inter_sp, what);
+    if (what == SOFT_MALLOC_LIMIT_EXCEEDED)
+        push_number(inter_sp, soft_malloc_limit);
+    else if (what == HARD_MALLOC_LIMIT_EXCEEDED)
+        push_number(inter_sp, max_malloced);
+    else
+        push_number(inter_sp, 0);
+    push_number(inter_sp, xalloc_stat.size);
+    if (reserved_user_area)
+        reservestate |= USER_RESERVE_AVAILABLE;
+    if (reserved_master_area)
+        reservestate |= MASTER_RESERVE_AVAILABLE;
+    if (reserved_system_area)
+        reservestate |= SYSTEM_RESERVE_AVAILABLE;
+    push_number(inter_sp, reservestate);
+    callback_master(STR_LOW_MEMORY, 4);
+} /* notify_lowmemory_condition */
+
+/*-------------------------------------------------------------------------*/
+void
+check_for_soft_malloc_limit (void)
+/* If soft_malloc_limit is set, check if the allocated memory exceeds it.
+ * If yes and the master was not notified until now, low_memory() is called 
+ * in the mudlib master and low_memory_applied ist set to prevent any further
+ * notifications.
+ * If the limit is not exceeded, low_memory_applied is reset.
+ * Should be called from the backend.
+ */
+{
+#ifndef NO_MEM_BLOCK_SIZE
+    if (soft_malloc_limit > 0)
+    {
+        // check first, if the soft limit is > than the hard limit and issue
+        // a debug message. (Gnomi wanted to check this here to be able to set
+        // a soft limit before a hard limit without error.)
+        if (soft_malloc_limit >= max_malloced)
+        {
+            debug_message("%s The soft memory limit (%"PRIdMPINT") is bigger "
+                          "than the hard memory limit (%"PRIdMPINT") - "
+                          "disabling the soft limit!",
+                          time_stamp(), soft_malloc_limit, max_malloced);
+            soft_malloc_limit = 0;
+        }
+        else if ((mp_int)xalloc_stat.size > soft_malloc_limit)
+        {
+            if (!low_memory_applied)
+            {
+                /* call low_memory(malloced_memory) in the master but first
+                 * set the flag to prevent calling every backend cycle in case
+                 * of errors. */
+                low_memory_applied = TRUE;
+                notify_lowmemory_condition(SOFT_MALLOC_LIMIT_EXCEEDED);
+            }
+        }
+        else if (low_memory_applied)
+        {
+            /* OK, memory consumption shrunk below the soft limit. Reset the 
+             * warning, so that the next time the limit is exceeded,
+             * the master apply is done again. */
+            low_memory_applied = FALSE;
+        }
+    }
+#endif
+} /* check_for_soft_malloc_limit() */
+
+/*-------------------------------------------------------------------------*/
+Bool
+set_memory_limit(enum memory_limit_types what, mp_int limit)
+/* Sets the <what> memory limit to <limit>.
+ * <limit> for SOFT_MLIMIT has to be < HARD_MLIMIT.
+ * return TRUE on success and FALSE otherwise.
+ * If the current memory allocation is smaller than a new soft limit, the flag
+ * low_memory_applied is reset.
+ */
+{
+#ifndef NO_MEM_BLOCK_SIZE
+    // limits smaller than the sum of reserves (and some more) are harmful and
+    // lead anyway to immediate crashes... But we ignore this here, because
+    // reserve_memory() will deal with the needed sizes for the reserves and the
+    // minimum allocations. And later on in the game we will just prevent to
+    // set the limit smaller then the already allocated memory.
+    
+    if (what == MALLOC_SOFT_LIMIT)
+    {
+        if (limit < 0)
+            return FALSE;
+        
+        soft_malloc_limit = limit;
+        // reset flag if appropriate.
+        if ((mp_int)xalloc_stat.size < soft_malloc_limit
+            && low_memory_applied)
+            low_memory_applied = FALSE;
+    }
+    else 
+    {
+        // setting the limit below the currently allocated memory seems to be 
+        // a very bad idea.
+        if (limit && limit <= (mp_int)xalloc_stat.size)
+            return FALSE;
+        
+        max_malloced = limit;
+    }
+    return TRUE;
+#else
+    return FALSE;
+#endif // NO_MEM_BLOCK_SIZE
+} /* set_memory_limit */
+
+/*-------------------------------------------------------------------------*/
+mp_int
+get_memory_limit(enum memory_limit_types what)
+/* Return the value of limit <what>. */
+{
+#ifndef NO_MEM_BLOCK_SIZE
+    if (what == MALLOC_SOFT_LIMIT)
+        return soft_malloc_limit;
+    else
+        return max_malloced;
+#else
+    return 0;
+#endif
+}
 /***************************************************************************/

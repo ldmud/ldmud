@@ -32,7 +32,7 @@ with_max_mapping_size=27000
 with_max_players=100
 
 with_min_malloced=0x1000000
-with_max_malloced=0x8000000
+with_hard_malloc_limit=0x8000000
 
 with_htable_size=65536
 with_itable_size=4096

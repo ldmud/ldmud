@@ -38,3 +38,4 @@ DESCRIPTION
 
 SEE ALSO
         quota_demon(M), notify_shutdown(M), shutdown(E), malloc(D), memory(C)
+        low_memory(M)

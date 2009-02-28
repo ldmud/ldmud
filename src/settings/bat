@@ -65,7 +65,7 @@ with_evaluator_stack_size=3000
 with_compiler_stack_size=600
 with_max_user_trace=120
 with_max_trace=125
-with_max_malloced=0
+with_hard_malloc_limit=0
 
 with_max_cost=20000000
 with_catch_reserved_cost=150000

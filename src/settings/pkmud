@@ -46,5 +46,5 @@ enable_use_parse_command=no
 enable_share_variables=no
 
 with_min_malloced=0x80000
-with_max_malloced=0x5000000
+with_hard_malloc_limit=0x5000000
 enable_dynamic_costs=yes

@@ -53,4 +53,6 @@ DESCRIPTION
         other objects.
 
 SEE ALSO
-        clean_up(A), slow_shut_down(M), quota_demon(M), malloc(D)
+        clean_up(A), slow_shut_down(M), quota_demon(M), low_memory(M)
+        malloc(D),
+        garbage_collection(E)

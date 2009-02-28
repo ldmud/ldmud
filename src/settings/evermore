@@ -96,7 +96,7 @@ enable_malloc_lpc_trace=no
 with_reserved_user_size=800000
 with_catch_reserved_cost=0xF000
 with_master_reserved_cost=0xF000
-with_max_malloced=0
+with_hard_malloc_limit=0
 
 enable_use_system_crypt=no
 enable_with_pthreads=no

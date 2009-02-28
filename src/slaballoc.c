@@ -3254,7 +3254,7 @@ found_fit:
                 )
                )
             {
-                static const char mess[] = "MAX_MALLOCED limit reached.\n";
+                static const char mess[] = "HARD_MALLOC_LIMIT reached.\n";
                 writes(2, mess);
 
                 ptr = NULL;

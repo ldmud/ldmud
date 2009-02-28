@@ -67,10 +67,29 @@
 /* --- Constants --- */
 
 /* Allocation privilege levels */
+enum malloc_privileges {
+    MALLOC_USER    = 0,
+    MALLOC_MASTER  = 1,
+    MALLOC_SYSTEM  = 2,
+};
 
-#define MALLOC_USER    (0)
-#define MALLOC_MASTER  (1)
-#define MALLOC_SYSTEM  (2)
+/* memory limits */
+enum memory_limit_types {
+    MALLOC_SOFT_LIMIT  = 1,
+    MALLOC_HARD_LIMIT  = 2,
+};
+/* low memory conditions */
+enum low_memory_conditions {
+    NO_MALLOC_LIMIT_EXCEEDED    = 0,
+    SOFT_MALLOC_LIMIT_EXCEEDED  = MALLOC_SOFT_LIMIT,
+    HARD_MALLOC_LIMIT_EXCEEDED  = MALLOC_HARD_LIMIT,
+};
+/* Flags for available reserves */
+enum available_reserve_flags {
+    USER_RESERVE_AVAILABLE   = 0x1,
+    MASTER_RESERVE_AVAILABLE = 0x2,
+    SYSTEM_RESERVE_AVAILABLE = 0x4,
+};
 
 /* --- Variables --- */
 
@@ -84,7 +103,6 @@ extern mp_int reserved_master_size;
 extern mp_int reserved_system_size;
 extern mp_int min_malloced;
 extern mp_int min_small_malloced;
-extern mp_int max_malloced;
 extern int stack_direction;
 
 
@@ -122,43 +140,49 @@ extern int stack_direction;
 #define xalloc_pass(size)       xalloc_traced((size) MTRACE_PASS)
 #define rexalloc_pass(old,size) rexalloc_traced((old),(size) MTRACE_PASS)
 
-extern size_t  xalloced_size (POINTER p);
+extern size_t  xalloced_size (POINTER p)  __attribute__((nonnull(1)));
 extern size_t  xalloc_overhead (void);
-extern POINTER xalloc_traced(size_t size MTRACE_DECL) 
-                                  MALLOC __attribute__ ((warn_unused_result));
+
+extern POINTER xalloc_traced(size_t size MTRACE_DECL)
+       MALLOC __attribute__ ((warn_unused_result));
+
 extern void    xfree(POINTER);
-extern POINTER rexalloc_traced(POINTER, size_t MTRACE_DECL)
-                                  MALLOC __attribute__ ((warn_unused_result));
-extern POINTER pxalloc_traced(size_t MTRACE_DECL) 
-                                  MALLOC __attribute__ ((warn_unused_result));
-extern POINTER prexalloc_traced(POINTER, size_t MTRACE_DECL)
-                                  MALLOC __attribute__ ((warn_unused_result));
+
+extern POINTER rexalloc_traced(POINTER, size_t size MTRACE_DECL) 
+       MALLOC __attribute__((warn_unused_result));
+
+extern POINTER pxalloc_traced(size_t size MTRACE_DECL)
+       MALLOC __attribute__ ((warn_unused_result));
+extern POINTER prexalloc_traced(POINTER, size_t size MTRACE_DECL)
+       MALLOC __attribute__((warn_unused_result));
+
 extern void    pfree(POINTER);
-extern void  * malloc_increment_size (void *vp, size_t size);
+extern void  * malloc_increment_size (void *vp, size_t size)
+                                __attribute__((nonnull(1)));
 
 #ifdef GC_SUPPORT
-extern void x_clear_ref (POINTER p);
-extern int x_mark_ref (POINTER p);
-extern Bool x_test_ref (POINTER p);
+extern void x_clear_ref (POINTER p)  __attribute__((nonnull(1)));
+extern int x_mark_ref (POINTER p)  __attribute__((nonnull(1)));
+extern Bool x_test_ref (POINTER p)  __attribute__((nonnull(1)));
 #endif /* GC_SUPPORT */
 
 #ifdef MALLOC_TRACE
 extern void store_print_block_dispatch_info(void *block, void (*func)(int, void *, int) );
-extern Bool is_freed(void *p, p_uint minsize);
+extern Bool is_freed(void *p, p_uint minsize) __attribute__((nonnull(1)));
 #endif /* MALLOC_TRACE */
 
 #ifdef CHECK_OBJECT_GC_REF
-extern void note_object_allocation_info ( void *block );
-extern void note_program_allocation_info ( void *block );
-extern Bool is_object_allocation ( void *block );
-extern Bool is_program_allocation ( void *block );
+extern void note_object_allocation_info ( void *block ) __attribute__((nonnull(1)));
+extern void note_program_allocation_info ( void *block ) __attribute__((nonnull(1)));
+extern Bool is_object_allocation ( void *block ) __attribute__((nonnull(1)));
+extern Bool is_program_allocation ( void *block ) __attribute__((nonnull(1)));
 #endif /* CHECK_OBJECT_RC_REF */
 
 /* Functions directly exported from the allocator: */
 
-extern void mem_dump_data(strbuf_t *sbuf);
-extern void mem_dump_extdata(strbuf_t *sbuf);
-extern void mem_dinfo_data(svalue_t *svp, int value);
+extern void mem_dump_data(strbuf_t *sbuf) __attribute__((nonnull(1)));
+extern void mem_dump_extdata(strbuf_t *sbuf) __attribute__((nonnull(1)));
+extern void mem_dinfo_data(svalue_t *svp, int value) __attribute__((nonnull(1)));
 extern void mem_consolidate (Bool force);
 extern Bool mem_dump_memory(int fd);
 #ifdef MALLOC_EXT_STATISTICS
@@ -178,13 +202,19 @@ extern void mem_free_unrefed_memory(void);
 #define string_copy(s) string_copy_traced(s)
 #endif
 
-extern char * string_copy_traced(const char *str MTRACE_DECL) MALLOC;
-extern void dump_lpc_trace (int d, void *p);
-extern void dump_malloc_trace (int d, void *adr);
+extern char * string_copy_traced(const char *str MTRACE_DECL) MALLOC
+       __attribute__((nonnull(1))) __attribute__((warn_unused_result));
+extern void dump_lpc_trace (int d, void *p) __attribute__((nonnull(2)));
+extern void dump_malloc_trace (int d, void *adr) __attribute__((nonnull(2)));
 
 extern void get_stack_direction (void);
 extern void assert_stack_gap(void);
 extern void reserve_memory (void);
 extern void reallocate_reserved_areas(void);
+extern void check_for_soft_malloc_limit(void);
+extern void notify_lowmemory_condition(enum memory_limit_types what);
+
+extern Bool   set_memory_limit(enum memory_limit_types what, mp_int limit);
+extern mp_int get_memory_limit(enum memory_limit_types what);
 
 #endif /* XALLOC_H__ */

@@ -15,7 +15,7 @@ with_max_mapping_size=48000
 with_read_file_max_size=3000000
 with_max_byte_transfer=500000
 
-with_max_malloced=0x6000000
+with_hard_malloc_limit=0x6000000
 with_min_malloced=0x2000000
 
 with_time_to_clean_up=7200

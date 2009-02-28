@@ -804,7 +804,7 @@ init_lexer(void)
     sprintf(mtext, "%d", ERQ_MAX_REPLY);
     add_permanent_define("__ERQ_MAX_REPLY__", -1, string_copy(mtext), MY_FALSE);
 #endif
-    sprintf(mtext, "%"PRIdMPINT, max_malloced);
+    sprintf(mtext, "%"PRIdMPINT, get_memory_limit(MALLOC_HARD_LIMIT));
     add_permanent_define("__MAX_MALLOC__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%"PRId32, def_eval_cost);
     add_permanent_define("__MAX_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);

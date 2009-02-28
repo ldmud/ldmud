@@ -137,9 +137,16 @@
 /* This value gives the upper limit for the total allocated memory
  * (useful for systems with no functioning process limit).
  * A value of 0 means 'unlimited'.
- * TODO: This should be named 'MAX_MALLOC' - ditto in configure.
  */
-#define MAX_MALLOCED         @val_max_malloced@
+#define HARD_MALLOC_LIMIT_DEFAULT    @val_hard_malloc_limit@
+
+/* This value gives a soft limit of the allocated memory (kind of low
+ * watermark). If this value is exceeded, the driver will call low_memory() in
+ * the master to inform the mudlib about the (potenntially) developing low
+ * memory situation.
+ * A value of 0 means 'unlimited'.
+ */
+#define SOFT_MALLOC_LIMIT_DEFAULT    @val_soft_malloc_limit@
 
 /* --- Random Number Generator (SFMT) --- */
 /* Set the period length of the SFMT.

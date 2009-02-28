@@ -183,9 +183,16 @@ DESCRIPTION
         Giving this option results in smaller, but also more fragmented
         swapfiles, and the swap performance may degrade.
 
-      --max-malloc <size>
-        Restrict total memory allocations to <size> bytes.
+      --hard-malloc-limit <size>
+        Restrict total memory allocation to <size> bytes.
         A <size> of 0 or 'unlimited' removes any restriction.\n"
+        
+      --soft-malloc-limit <size>
+        This value gives a soft limit of the allocated memory (kind of low
+        watermark). If this value is exceeded, the driver will call low_memory()
+        in the master to inform the mudlib about the (potenntially) developing low
+        memory situation.
+        A <size> of 0 or 'unlimited' removes this threshold.
 
       --min-malloc <size>
       --min-small-malloc <size>

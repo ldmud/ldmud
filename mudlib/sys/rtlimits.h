@@ -21,4 +21,18 @@
 #define LIMIT_KEEP       (-1)  /* Keep the old limit setting */
 #define LIMIT_DEFAULT    (-2)  /* Use the default setting */
 
+/* memory limits */
+#define MALLOC_SOFT_LIMIT    1
+#define MALLOC_HARD_LIMIT    2
+
+/* low memory conditions */
+#define NO_MALLOC_LIMIT_EXCEEDED     0
+#define SOFT_MALLOC_LIMIT_EXCEEDED   MALLOC_SOFT_LIMIT
+#define HARD_MALLOC_LIMIT_EXCEEDED   MALLOC_HARD_LIMIT
+
+/* Flags for available reserves */
+#define USER_RESERVE_AVAILABLE     0x1
+#define MASTER_RESERVE_AVAILABLE   0x2
+#define SYSTEM_RESERVE_AVAILABLE   0x4
+
 #endif /* LPC_RTLIMITS_H_ */

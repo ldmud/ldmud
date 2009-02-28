@@ -31,7 +31,7 @@ with_time_to_reset=2700
 
 # --- Memory ---
 with_reserved_user_size=0x100000
-with_max_malloced=0x06000000
+with_hard_malloc_limit=0x06000000
 
 # --- Interpreter ---
 enable_strict_euids=no

@@ -11,6 +11,14 @@ xx-xxx-xxxx -- 3.3.719
          values as time stamp (>2^55) due to unchecked results from libc
          functions (Bug #587).
 
+    - Runtime
+       + The --max-malloced memory limit was renamed to --hard-memory-limit.
+       + Introduced new --soft-memory-limit in addition to the hard one.
+       + When exceeding the soft memory limit, the function low_memory() is
+         called in the mudlib master with details about the kind of low memory
+         situation. This check is done during the backend cycle and not at
+         'real-time'.
+
     - Other
        + Generalized the write buffer for non-threaded use and renamed the
           configuration option '--with-pthreads-write-max-size' to

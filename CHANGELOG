@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Feb-2009 (Zesstra)
+  - (xalloc.c|h, smalloc.c, main.c, lex.c, slaballoc.c, backend.c,
+      string_spec, mudlib/sys/rtlimits.h, src/settings*, doc/master/)
+    Renamed --max-malloced to --hard-memory-limit and  MAX_MALLOCED to
+    HARD_MALLOC_LIMIT_DEFAULT and changed the mud configurations.
+    Introduced a --soft-memory-limit/SOFT_MALLOC_LIMIT_DEFAULT
+    Added set_* and get_memory_limit() and related constants for managing the
+    memory limits
+    Added check_for_soft_malloc_limit() to check the soft memory limit
+    Added notify_lowmemory_condition() to call low_memory() in the mudlib master
+    Added calls to notify_lowmemory_condition() and
+      check_for_soft_malloc_limit() in the ba ckend cycle
+    Added documentation for new memory limit and low_memory().
+    
 27-Feb-2009 (Fuchur)
   - (settings/default)
     Sync options with configure.

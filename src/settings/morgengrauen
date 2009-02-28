@@ -59,7 +59,7 @@ with_max_trace=130
 with_max_byte_transfer=200000
 with_min_malloced=0xfa00000
 with_min_small_malloced=0x8200000
-with_max_malloced=0x7fffffff
+with_hard_malloc_limit=0x7fffffff
 with_pcre_recursion_limit=20000
 with_optimize=med
 

@@ -40,7 +40,7 @@ enable_use_mysql=/usr/lib/mysql
 with_htable_size=65536
 with_otable_size=8192
 
-with_max_malloced=0x20000000
+with_hard_malloc_limit=0x20000000
 
 with_max_array_size=10000
 with_max_mapping_keys=40000

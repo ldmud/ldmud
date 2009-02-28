@@ -490,6 +490,8 @@ backend (void)
 
         check_for_out_connections();
 
+        check_for_soft_malloc_limit();
+        
         if (prevent_object_cleanup)
         {
             if (num_listed_objs >= num_destructed/2)
@@ -541,6 +543,11 @@ backend (void)
                   write(1, buf, strlen(buf));
                   command_giver = NULL;
                   current_object = NULL;
+                  /* if the GC was not requested by an efun call, low_memory()
+                   * in the master is called to inform the game. */
+                  notify_lowmemory_condition(gc_request == gcEfun ?
+                                             NO_MALLOC_LIMIT_EXCEEDED : 
+                                             HARD_MALLOC_LIMIT_EXCEEDED);
                   garbage_collection();
                 }
                 else

@@ -106,7 +106,7 @@
 --with-malloc=default \
 --with-min-malloced=0 \
 --with-min-small-malloced=0 \
---with-max-malloced=0x6000000 \
+--with-hard-malloc-limit=0x6000000 \
 --with-total-trace-length=0x1000 \
 --with-wizlist-file=WIZLIST \
 $*

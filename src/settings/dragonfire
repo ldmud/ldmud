@@ -41,7 +41,7 @@
 --with-portno=1999 \
 --with-udp-port=2000 \
 --with-max-cost=2100000 \
---with-max-malloced=0 \
+--with-hard-malloc-limit=0 \
 --with-min-malloced=0x80000 \
 --with-min-small-malloced=0x80000 \
 --with-otable-size=8192 \
