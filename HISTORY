@@ -18,6 +18,12 @@ xx-xxx-xxxx -- 3.3.719
          called in the mudlib master with details about the kind of low memory
          situation. This check is done during the backend cycle and not at
          'real-time'.
+       + Made the maximum length of commands configurable at compile-time
+         (MAX_COMMAND_LENGTH, --max-command-length)
+
+    - Language
+       + Added a permanent define __MAX_COMMAND_LENGTH__ for the maximum
+         length of command.
 
     - Other
        + Generalized the write buffer for non-threaded use and renamed the

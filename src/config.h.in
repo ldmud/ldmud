@@ -456,9 +456,13 @@
  * recursions and choose about 3000 - 4000.) In doubt, increase the stack
  * size limit for the driver process with ulimit & Co.)
  * Defaults to 3000
- */                                                                                       
-#define LD_PCRE_RECURSION_LIMIT    @val_pcre_recursion_limit@                                
-			
+ */
+#define LD_PCRE_RECURSION_LIMIT    @val_pcre_recursion_limit@
+
+/* The maximum length of the buffer for commands. The maximum length of a
+ * command will be MAX_COMMAND_LENGTH - 1.
+ */
+#define MAX_COMMAND_LENGTH       @val_max_command_length@
 
 /* --- Compiler --- */
 

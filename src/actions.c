@@ -77,11 +77,14 @@
 #include "../mudlib/sys/commands.h"
 #include "../mudlib/sys/driver_hook.h"
 
+// check user-supplied value for MAX_COMMAND_LENGTH. Length == 0 will crash
+// the driver.
+#if MAX_COMMAND_LENGTH < 1
+#error MAX_COMMAND_LENGTH has to be > 0!
+#endif
+
 /*-------------------------------------------------------------------------*/
 
-#define COMMAND_FOR_OBJECT_BUFSIZE 1000
-  /* The maximum length of a command.
-   */
 
 /* --- struct command_context_s: last command context ---
  *
@@ -608,7 +611,7 @@ call_modify_command (char *buff)
     {
         if (svp->type == T_STRING)
         {
-            extract_cstr(buff, svp->u.str, (size_t)COMMAND_FOR_OBJECT_BUFSIZE);
+            extract_cstr(buff, svp->u.str, (size_t)MAX_COMMAND_LENGTH);
         } else if (svp->type == T_NUMBER && svp->u.number) {
             return MY_TRUE;
         }
@@ -1491,7 +1494,7 @@ v_command (svalue_t *sp, int num_arg)
     int rc;
     svalue_t *arg;
     object_t *ob;
-    char buff[COMMAND_FOR_OBJECT_BUFSIZE];
+    char buff[MAX_COMMAND_LENGTH];
     int save_eval_cost = eval_cost - 1000;
     interactive_t *ip;
 
@@ -1558,7 +1561,7 @@ f_execute_command (svalue_t *sp)
 {
     svalue_t *argp;
     object_t *origin, *player;
-    char buf[COMMAND_FOR_OBJECT_BUFSIZE];
+    char buf[MAX_COMMAND_LENGTH];
     size_t len;
     Bool res;
 

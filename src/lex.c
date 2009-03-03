@@ -822,6 +822,9 @@ init_lexer(void)
     add_permanent_define("__HEART_BEAT_INTERVAL__", -1, string_copy(mtext), MY_FALSE);
     if (synch_heart_beats)
         add_permanent_define("__SYNCHRONOUS_HEART_BEAT__", -1, string_copy("1"), MY_FALSE);
+    sprintf(mtext, "%zu", (size_t)MAX_COMMAND_LENGTH - 1);
+    add_permanent_define("__MAX_COMMAND_LENGTH__", -1, string_copy(mtext),
+                         MY_FALSE);
 #ifdef EVAL_COST_TRACE
     add_permanent_define("__EVAL_COST_TRACE__", -1, string_copy("1"), MY_FALSE);
 #endif
