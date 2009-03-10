@@ -130,6 +130,7 @@ f_idna_stringprep (svalue_t *sp)
     /* Get and check the flags. */
     {
         p_uint argflags = (p_uint)sp->u.number;
+        sp--;
 
         if (argflags > (STRINGPREP_FLAG_MAX << 1)-1
          || argflags & (STRINGPREP_NO_NFKC_FLAG | STRINGPREP_NO_BIDI_FLAG)
@@ -148,7 +149,7 @@ f_idna_stringprep (svalue_t *sp)
 
     /* Get and check the profile */
     prof = (int)sp->u.number;
-    free_svalue(sp--);
+    sp--;
 
     /* select the profile */
     switch(prof)
@@ -206,12 +207,13 @@ f_idna_stringprep (svalue_t *sp)
 
     if (ret != STRINGPREP_OK)
     {
-        put_number(sp, -ret);
         errorf("stringprep(): Error %s", stringprep_strerror(ret));
         /* NOTREACHED */
-    } 
+    }
     else 
     {
+        // free the string argument
+        free_svalue(sp);
         put_c_string(sp, buf);
     }
 

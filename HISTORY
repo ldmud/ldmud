@@ -11,6 +11,10 @@ xx-xxx-xxxx -- 3.3.719
          values as time stamp (>2^55) due to unchecked results from libc
          functions (Bug #587).
 
+    - Changed Efuns:
+       + idna_stringprep(): fixed the evaluation of the arguments and removed
+                            a memory leak (#498).
+
     - Runtime
        + The --max-malloced memory limit was renamed to --hard-memory-limit.
        + Introduced new --soft-memory-limit in addition to the hard one.
