@@ -137,7 +137,7 @@ static mp_int max_malloced       = HARD_MALLOC_LIMIT_DEFAULT;
 static mp_int soft_malloc_limit  = SOFT_MALLOC_LIMIT_DEFAULT;
 
 /* Was the low_memory() already called in the master`*/
-static Bool low_memory_applied = FALSE;
+static Bool low_memory_applied = MY_FALSE;
 
 int stack_direction = 0; /*  0: Unknown stack behaviour
                           * +1: Stack grows upward
@@ -1721,7 +1721,7 @@ check_for_soft_malloc_limit (void)
                 /* call low_memory(malloced_memory) in the master but first
                  * set the flag to prevent calling every backend cycle in case
                  * of errors. */
-                low_memory_applied = TRUE;
+                low_memory_applied = MY_TRUE;
                 notify_lowmemory_condition(SOFT_MALLOC_LIMIT_EXCEEDED);
             }
         }
@@ -1730,7 +1730,7 @@ check_for_soft_malloc_limit (void)
             /* OK, memory consumption shrunk below the soft limit. Reset the 
              * warning, so that the next time the limit is exceeded,
              * the master apply is done again. */
-            low_memory_applied = FALSE;
+            low_memory_applied = MY_FALSE;
         }
     }
 #endif
@@ -1756,26 +1756,26 @@ set_memory_limit(enum memory_limit_types what, mp_int limit)
     if (what == MALLOC_SOFT_LIMIT)
     {
         if (limit < 0)
-            return FALSE;
+            return MY_FALSE;
         
         soft_malloc_limit = limit;
         // reset flag if appropriate.
         if ((mp_int)xalloc_stat.size < soft_malloc_limit
             && low_memory_applied)
-            low_memory_applied = FALSE;
+            low_memory_applied = MY_FALSE;
     }
     else 
     {
         // setting the limit below the currently allocated memory seems to be 
         // a very bad idea.
         if (limit && limit <= (mp_int)xalloc_stat.size)
-            return FALSE;
+            return MY_FALSE;
         
         max_malloced = limit;
     }
-    return TRUE;
+    return MY_TRUE;
 #else
-    return FALSE;
+    return MY_FALSE;
 #endif // NO_MEM_BLOCK_SIZE
 } /* set_memory_limit */
 
