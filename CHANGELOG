@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Mar 2009 (Zesstra)
+  - (slaballoc.c, smalloc.c)
+    Fixed a bug in esbrk() during memory allocation, where SINT
+    (sizeof(word_t)) was not taken into account in the calculation of a block
+    size, leading to crashes afterwards. (#611)
+
 10-Mar 2009 (Zesstra)
   - (pkg-idna.c)
     Fixed the evaluation of the arguments of f_idna_stringprop() and removed a

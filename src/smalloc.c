@@ -3322,7 +3322,7 @@ esbrk (word_t size, size_t * pExtra)
             {
                 /* We can join with the existing heap */
                 p[overhead] &= ~PREV_BLOCK;
-                overlap = SINT;
+                overlap = overhead * SINT;
                 count_back(&large_wasted_stat, overlap);
             }
             else
@@ -3345,7 +3345,7 @@ esbrk (word_t size, size_t * pExtra)
             {
                 /* We can join with the existing heap */
                 heap_end = (word_t *)(block + size);
-                block -= overhead;
+                block -= overhead * SINT;
                 overlap = overhead * SINT;
                 count_back(&large_wasted_stat, overlap);
             }
@@ -3380,7 +3380,7 @@ esbrk (word_t size, size_t * pExtra)
             if ((word_t *)block == prev + overhead)
             {
                 /* Our block directly follows the one we found */
-                block -= overhead;
+                block -= overhead * SINT;
                 overlap += overhead * SINT;
                 count_back(&large_wasted_stat, overhead * SINT);
             }

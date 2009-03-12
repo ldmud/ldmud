@@ -10,6 +10,9 @@ xx-xxx-xxxx -- 3.3.719
          on platforms where time_t is 64 bits long and users supply huge
          values as time stamp (>2^55) due to unchecked results from libc
          functions (Bug #587).
+       + Fixed a bug in esbrk() during memory allocation, where SINT
+         (sizeof(word_t)) was not taken into account in the calculation of a
+         block size, leading to crashes afterwards. (#611)
 
     - Changed Efuns:
        + idna_stringprep(): fixed the evaluation of the arguments and removed
