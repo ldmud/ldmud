@@ -6,6 +6,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
     Fixed a bug in esbrk() during memory allocation, where SINT
     (sizeof(word_t)) was not taken into account in the calculation of a block
     size, leading to crashes afterwards. (#611)
+  - (efuns.c)
+    Fixed an off-by-one buffer overflow in v_sha1(). Actually removed the \0
+    written after the buffer, because it was not needed.
 
 10-Mar 2009 (Zesstra)
   - (pkg-idna.c)

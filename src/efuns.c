@@ -514,7 +514,7 @@ v_sha1 (svalue_t *sp, int num_arg)
 {
     SHA1Context context;
     string_t *s_digest;
-    unsigned char *digest, d[SHA1HashSize + 1];
+    unsigned char *digest, d[SHA1HashSize];
     int i;
     p_int iterations;
 
@@ -581,8 +581,6 @@ v_sha1 (svalue_t *sp, int num_arg)
     memsafe(s_digest = alloc_mstring(2 * SHA1HashSize)
            , 2 & SHA1HashSize, "sha1 encryption result");
     digest = (unsigned char *)get_txt(s_digest);
-
-    d[SHA1HashSize + 1]='\0';
 
     for (i = 0; i < SHA1HashSize; i++)
         sprintf((char *)digest+2*i, "%02x", d[i]);
