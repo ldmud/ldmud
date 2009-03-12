@@ -53,3 +53,9 @@ Objects
   Not a real limitation, after that the driver starts checking if 
   blueprint name + #cloneid are unique.
 
+
+Memory management
+=================
+* max. size of single large block in slaballo.c and smalloc.c:
+  0x07ffffff (134217727, defined by M_MASK)
+
