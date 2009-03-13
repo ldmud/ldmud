@@ -99,7 +99,7 @@ SRC = access_check.c actions.c array.c backend.c bitstrings.c call_out.c \
       interpret.c \
       lex.c main.c mapping.c md5.c mempools.c mregex.c mstrings.c object.c \
       otable.c\
-      parser.c parse.c pkg-alists.c pgk-iksemel.c pkg-idna.c \
+      parser.c parse.c pkg-alists.c pkg-iksemel.c pkg-idna.c \
       pkg-mccp.c pkg-mysql.c pkg-pcre.c \
       pkg-pgsql.c pkg-sqlite.c pkg-tls.c \
       ptmalloc.c port.c ptrtable.c \
