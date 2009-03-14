@@ -17,6 +17,9 @@ Unix or Unix-like system
   systems does all the work for you (for exceptions see below).
   To prepare the compilation, execute the 'configure' script from
   within the src/ directory.
+  [Note: If you got LDMud from our SVN repository please execute the
+  autogen.sh script in src/ to generate the configure script and other
+  auto-generated files.]
 
   configure checks for a number of site specific settings and uses this
   information to create the files machine.h (from machine.h.in), Makefile
