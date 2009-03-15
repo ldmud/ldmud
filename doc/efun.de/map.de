@@ -1,36 +1,47 @@
 SYNOPSIS
         mixed *map(mixed *arg, string func, string|object ob, mixed extra...);
         mixed *map(mixed *arg, closure cl, mixed extra...);
-        mixed *map(mixed *arg, mapping m);
+        mixed *map(mixed *arg, mapping m [, int idx]);
+
+        mixed *map(struct arg, string func, string|object ob, mixed extra...)
+        mixed *map(struct arg, closure cl, mixed extra...)
+        mixed *map(struct arg, mapping m [, int idx])
 
         mapping map(mapping arg, string func, string|object ob,
             mixed extra...);
         mapping map(mapping arg, closure cl, mixed extra...);
 
+        string map(string arg, string func, string|object ob, mixed extra...)
+        string map(string arg, closure cl, mixed extra...)
+        string map(string arg, mapping m [, int idx])
+
 BESCHREIBUNG
         Ruft die Funktion <ob>-><func>() bzw. die Closure <cl> fuer jedes
-        Element des Arrays oder Mappings <arg> auf und liefert ein Resultat,
-        das aus den verschiedenen Rueckgabewerten erstellt wurde.
+        Element des Strings, Arrays, Mappings oder der Struktur <arg> auf
+        und liefert ein Resultat, das aus den verschiedenen Rueckgabewerten
+        erstellt wurde.
 
         Wurde <ob> nicht angegeben, oder ist es weder ein String noch ein
         Objekt, wird stattdessen this_object() verwendet.
 
-        Ist <arg> ein Array, wird die Funktion mit jedem Element des Arrays
-        als erstem Parameter aufgerufen, gefolgt von den <extra> Argumenten.
-        Das Resultat der Efun ist ein Array, das die Rueckgabewerte der
-        Funktionsaufrufe enthaelt. Man koennte die Operation map() deshalb
-        umschreiben als:
+        Ist <arg> ein Array, ein String oder eine Struktur, wird die Funktion
+        mit jedem Element des Arrays als erstem Parameter aufgerufen, gefolgt
+        von den <extra> Argumenten. Das Resultat der Efun ist ein Array, das
+        die Rueckgabewerte der Funktionsaufrufe enthaelt. Man koennte die
+        Operation map() deshalb umschreiben als:
 
             foreach(index) result[index] = ob->func(arg[index], extra...)
 
-        Ist <arg> ein Array, und wurde statt einer Funktion ein Mapping
-        angegeben, so liefert map() ein Array mit den Werten, die im
-        Mapping an Stelle der urspruenglichen Werte stehen, bzw. mit den
-        Werten, fuer die kein Mappingeintrag existiert. Mit anderen Worten:
+        Ist <arg> ein Array, ein String oder eine Struktur, und wurde statt
+        einer Funktion ein Mapping angegeben, so liefert map() ein Array mit
+        den Werten, die im Mapping an Stelle der urspruenglichen Werte stehen,
+        bzw. mit den Originalwerten, wenn fuer sie kein Mappingeintrag
+        existiert. Ist <idx> angegeben, so wird die entsprechende Spalte des
+        Mappings verwendet. Mit anderen Worten:
 
             foreach(index)
                 if (arg[index] ist ein Key in <arg>)
-                    result[index] = map[arg[index]]
+                    result[index] = map[arg[index]] oder map[arg[index]]
                 else
                     result[index] = arg[index]
 
@@ -71,6 +82,8 @@ AENDERUNGEN
         Eingefuehrt in LDMud 3.2.6, loest map_array() ab.
         LDMud 3.2.8 fuehrt neu die Moeglichkeit ein, ein Array durch ein
         Mapping zu mappen.
+        LDMud 3.3.439 fuehrt map() fuer Strings ein.
+        LDMud 3.3.719 fuehrt den <idx>-Parameter fuer mappen mit Mappings ein.
 
 ANMERKUNG
         map() auf Arrays angewandt verhaelt sich wie map_array(), auf Mappings

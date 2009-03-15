@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Mar-2009 (Fuchur)
+  - (array.c, strfuns.c, structs.c, efuns.c, doc/efun[.de]/map[.de])
+    Implement map(*, mapping, idx) (#367)
+
 12-Mar 2009 (Zesstra)
   - (slaballoc.c, smalloc.c)
     Fixed a bug in esbrk() during memory allocation, where SINT

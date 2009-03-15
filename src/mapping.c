@@ -4145,9 +4145,6 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
 /* EFUN map() on mappings, map_indices()
  *
- *   mapping map_mapping(mapping m, string func, object ob, ...)
- *   mapping map_mapping(mapping m, closure cl, ...)
- *
  *   mapping map(mapping m, string func, string|object ob, ...)
  *   mapping map(mapping m, closure cl, ...)
  *

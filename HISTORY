@@ -17,6 +17,8 @@ xx-xxx-xxxx -- 3.3.719
     - Changed Efuns:
        + idna_stringprep(): fixed the evaluation of the arguments and removed
                             a memory leak (#498).
+       + map(): it's now possible to specify a mapping column when mapping
+         through mappings (#367)
 
     - Runtime
        + The --max-malloced memory limit was renamed to --hard-memory-limit.

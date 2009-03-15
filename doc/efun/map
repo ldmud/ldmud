@@ -1,22 +1,19 @@
 SYNOPSIS
-        mixed * map(mixed *arg, string func, string|object ob
-                                           , mixed extra...)
+        mixed * map(mixed *arg, string func, string|object ob, mixed extra...)
         mixed * map(mixed *arg, closure cl, mixed extra...)
-        mixed * map(mixed *arg, mapping m)
+        mixed * map(mixed *arg, mapping m [, int idx])
 
-        mixed * map(struct arg, string func, string|object ob
-                                           , mixed extra...)
+        mixed * map(struct arg, string func, string|object ob, mixed extra...)
         mixed * map(struct arg, closure cl, mixed extra...)
-        mixed * map(struct arg, mapping m)
+        mixed * map(struct arg, mapping m [, int idx])
 
         mapping map(mapping arg, string func, string|object ob
                                             , mixed extra...)
         mapping map(mapping arg, closure cl, mixed extra...)
 
-        string map(string arg, string func, string|object ob
-                                           , mixed extra...)
+        string map(string arg, string func, string|object ob, mixed extra...)
         string map(string arg, closure cl, mixed extra...)
-        string map(string arg, mapping m)
+        string map(string arg, mapping m [, int idx])
 
 
 DESCRIPTION
@@ -38,14 +35,14 @@ DESCRIPTION
         If <arg> is an string/array/struct, and a mapping is specified
         instead of a function, the result is an array/struct with the
         values found in the mapping for the original values, resp. with the
-        original values for which no mapping entry exists. In other words:
+        original values for which no mapping entry exists. If a column index
+        <idx> is given, that column of the mapping is used. In other words:
 
           foreach(index)
              if (arg[index] exists as key in map)
-                 result[index] = map[arg[index]]
+                 result[index] = map[arg[index]] or map[arg[index], idx]
              else
                  result[index] = arg[index]
-
 
         If <arg> is a string, the only allowed replacement values are
         numbers, of which only the lower 8 bit will be considered.
@@ -95,6 +92,7 @@ HISTORY
         Introduced in LDMud 3.2.6, obsoletes map_array().
         LDMud 3.2.8 added the feature of mapping an array through a mapping.
         LDMud 3.3.439 added mapping of strings.
+        LDMud 3.3.719 added the <idx> parameter for mapping through mappings.
 
 SEE ALSO
         filter(E), filter_indices(E), map_indices(E), map_objects(E)

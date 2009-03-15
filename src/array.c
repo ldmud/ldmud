@@ -2137,7 +2137,7 @@ x_map_array (svalue_t *sp, int num_arg)
  *
  *   mixed * map(mixed * arg, string func, string|object ob, mixed extra...)
  *   mixed * map(mixed * arg, closure cl, mixed extra...)
- *   mixed * map(mixed * arr, mapping map)
+ *   mixed * map(mixed * arr, mapping map [, int col])
  *
  * Map the elements of <arr> through a filter defined by the other
  * arguments, and return an array of the elements returned by the filter.
@@ -2148,10 +2148,11 @@ x_map_array (svalue_t *sp, int num_arg)
  *
  * or a mapping query:
  *
- *    <map>[elem]
+ *    <map>[elem[,idx]]
  *
- * In the mapping case, if <map>[elem] does not exist, the original
+ * In the mapping case, if <map>[elem[,idx]] does not exist, the original
  * value is returned in the result.
+ * [Note: argument type and range checking for idx is done in v_map()]
  *
  * <obj> can both be an object reference or a filename. If <ob> is
  * omitted, or neither an object nor a string, then this_object() is used.
@@ -2179,12 +2180,12 @@ x_map_array (svalue_t *sp, int num_arg)
         /* --- Map through mapping --- */
 
         mapping_t *m;
+        p_int column = 0; /* mapping column to use */
 
-        if (num_arg > 2) {
-            inter_sp = sp;
-            errorf("Too many arguments to map(array)\n");
-        }
         m = arg[1].u.map;
+
+        if (num_arg > 2)
+            column = arg[2].u.number;
 
         res = allocate_array(cnt);
         if (!res)
@@ -2201,9 +2202,11 @@ x_map_array (svalue_t *sp, int num_arg)
             if (v == &const0)
                 assign_svalue_no_free(x, w);
             else
-                assign_svalue_no_free(x, v);
+                assign_svalue_no_free(x, v + column);
         }
 
+        if (num_arg > 2)
+            free_svalue(arg+2);
         free_svalue(arg+1); /* the mapping */
         sp = arg;
     }

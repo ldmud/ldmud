@@ -6677,17 +6677,18 @@ v_map (svalue_t *sp, int num_arg)
  *
  *   mixed * map(mixed *arg, string func, string|object ob, mixed extra...)
  *   mixed * map(mixed *arg, closure cl, mixed extra...)
- *   mixed * map(mixed *arg, mapping m)
+ *   mixed * map(mixed *arg, mapping m [, int idx])
  *
  *   mixed * map(struct arg, string func, string|object ob, mixed extra...)
  *   mixed * map(struct arg, closure cl, mixed extra...)
+ *   mixed * map(struct arg, mapping m [, int idx])
  *
  *   mapping map(mapping arg, string func, string|object ob, mixed extra...)
  *   mapping map(mapping arg, closure cl, mixed extra...)
  *
  *   string map(string arg, string func, string|object ob, mixed extra...)
  *   string map(string arg, closure cl, mixed extra...)
- *   string map(mixed *arg, mapping m)
+ *   string map(string arg, mapping m [, int idx])
  *
  * Call the function <ob>-><func>() resp. the closure <cl> for
  * every element of the array/struct/mapping/string <arg>, and return a result
@@ -6705,12 +6706,33 @@ v_map (svalue_t *sp, int num_arg)
  */
 
 {
-    if (sp[-num_arg+1].type == T_MAPPING)
+    svalue_t *arg = sp - num_arg + 1;
+
+    if (num_arg > 2 && arg[0].type != T_MAPPING && arg[1].type == T_MAPPING) {
+        if (num_arg > 3) {
+            inter_sp = sp;
+            errorf("Too many arguments to map(%s, mapping).\n",
+                   typename(arg[0].type));
+        }
+        if (arg[2].type != T_NUMBER) {
+            inter_sp = sp;
+            errorf("Bad arg 3 to map(): got '%s', expected 'number'.\n",
+                   typename(arg[2].type));
+        }
+        p_int num_values = arg[1].u.map->num_values;
+        if (arg[2].u.number < 0 || arg[2].u.number >= num_values) {
+            inter_sp = sp;
+            errorf("map: Bad column index %"PRIdPINT" for mapping of "
+                   "width %"PRIdPINT".\n", arg[2].u.number, num_values);
+        }
+    }
+
+    if (arg[0].type == T_MAPPING)
         return x_map_mapping(sp, num_arg, MY_TRUE);
-    else if (sp[-num_arg+1].type == T_STRING)
+    else if (arg[0].type == T_STRING)
         return x_map_string(sp, num_arg);
 #ifdef USE_STRUCTS
-    else if (sp[-num_arg+1].type == T_STRUCT)
+    else if (arg[0].type == T_STRUCT)
         return x_map_struct(sp, num_arg);
 #endif /* USE_STRUCTS */
     else /* T_POINTER */

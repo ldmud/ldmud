@@ -1049,15 +1049,16 @@ x_map_string (svalue_t *sp, int num_arg)
  *
  *   string map(string arg, string func, string|object ob, mixed extra...)
  *   string map(string arg, closure cl, mixed extra...)
- *   string map(string arg, mapping m)
+ *   string map(string arg, mapping m [, int idx])
  *
  * Call the function <ob>-><func>() resp. the closure <cl> for
  * every element of the array/struct/mapping/string <arg>, and return a result
  * made up from the returned values.
  *
- * It is also possible to map every entry through a lookup <m>[element]. If
- * the mapping entry doesn't exist, the original value is kept, otherwise the
- * result of the mapping lookup.
+ * It is also possible to map every entry through a lookup <m>[element[,idx]].
+ * If the mapping entry doesn't exist, the original value is kept, otherwise
+ * the result of the mapping lookup.
+ * [Note: argument type and range checking for idx is done in v_map()]
  *
  * Since <arg> is a string, only integer return values are allowed, of which
  * only the lower 8 bits are considered.
@@ -1085,12 +1086,12 @@ x_map_string (svalue_t *sp, int num_arg)
         /* --- Map through mapping --- */
 
         mapping_t *m;
+        p_int column = 0; /* mapping column to use */
 
-        if (num_arg > 2) {
-            inter_sp = sp;
-            errorf("Too many arguments to map(string)\n");
-        }
         m = arg[1].u.map;
+
+        if (num_arg > 2)
+            column = arg[2].u.number;
 
         res = alloc_mstring(len);
         if (!res)
@@ -1109,16 +1110,18 @@ x_map_string (svalue_t *sp, int num_arg)
                 *dest = *src;
             else
             {
-                if (v->type != T_NUMBER)
+                if (v[column].type != T_NUMBER)
                 {
-                    errorf("(map_string) Illegal value: %s, expected string\n"
-                         , typename(v->type)
+                    errorf("(map_string) Illegal value type: %s, expected int\n"
+                         , typename(v[column].type)
                          );
                 }
-                *dest = (v->u.number & 0xFF);
+                *dest = (v[column].u.number & 0xFF);
             }
         }
 
+        if (num_arg > 2)
+            free_svalue(arg+2);
         free_svalue(arg+1); /* the mapping */
         sp = arg;
     }
