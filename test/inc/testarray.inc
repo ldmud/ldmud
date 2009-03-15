@@ -1,7 +1,7 @@
 // Indices into the array of a test.
-#define T_NAME          0       // The name of the test
-#define T_FLAGS         1       // Some Flags
-#define T_CLOSURE       2       // The function to be evaluated
+#define TI_NAME          0       // The name of the test
+#define TI_FLAGS         1       // Some Flags
+#define TI_CLOSURE       2       // The function to be evaluated
 
 // Flags
 #define TF_ERROR          1       // The function should generate an error.
@@ -16,11 +16,11 @@ void run_array(mixed* testarray, closure callback)
     
     foreach(mixed test: testarray)
     {
-        msg("Running Test %s...", test[T_NAME]);
+        msg("Running Test %s...", test[TI_NAME]);
 
-        if(test[T_FLAGS]&TF_ERROR)
+        if(test[TI_FLAGS]&TF_ERROR)
         {
-            if(!catch(funcall(test[T_CLOSURE]);nolog))
+            if(!catch(funcall(test[TI_CLOSURE]);nolog))
             {
                 errors++;
                 msg(" FAILURE! (There was no error.)\n");
@@ -28,15 +28,15 @@ void run_array(mixed* testarray, closure callback)
             else
                 msg(" Success.\n");
         }
-        else if (test[T_FLAGS]&TF_DONTCHECKERROR)
+        else if (test[TI_FLAGS]&TF_DONTCHECKERROR)
         {
-            catch(funcall(test[T_CLOSURE]);nolog);
+            catch(funcall(test[TI_CLOSURE]);nolog);
             // if we surived the test: great
             msg(" Success.\n");
         }
         else
         {
-            if(funcall(test[T_CLOSURE]))
+            if(funcall(test[TI_CLOSURE]))
                 msg(" Success.\n");
             else
             {

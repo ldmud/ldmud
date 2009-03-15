@@ -1,8 +1,11 @@
 #include "/inc/base.inc"
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
+#include "/inc/deep_eq.inc"
 
 #define TESTFILE "/log/testfile"
+
+int f(int arg);
 
 mixed *tests = ({
     // TODO: Add cases for indexing at string end ("abc"[3])
@@ -143,6 +146,22 @@ mixed *tests = ({
             return res;
         :)
     }),
+    ({ "map string 1", 0, (: map("abc", (['a':'x'])) == "xbc" :) }),
+    ({ "map string 2", 0, (: map("abc", (['a':'x';'y']), 1) == "ybc" :) }),
+    ({ "map string 3", TF_ERROR, (: map("abc", (['a']), 0) == "abc" :) }),
+    ({ "map string 4", 0, (: map("abc", #'+, 1) == "bcd" :) }),
+    ({ "map string 5", 0, (: map("abc", "f") == "bcd" :) }),
+    ({ "map string x", TF_ERROR, (: map("abc", (['a':'x']), 2) :) }),
+    ({ "map array 1", 0, (: deep_eq(map(({1,2,3}), ([1:5])), ({5,2,3})) :) }),
+    ({ "map array 2", 0, (: deep_eq(map(({1,2,3}), ([1:5;6]), 1),({6,2,3})) :) }),
+    ({ "map array 3", TF_ERROR, (: map(({1,2,3}), ([1]), 0) :) }),
+    ({ "map array 4", 0, (: deep_eq(map(({1,2,3}), #'+, 1), ({2,3,4})) :) }),
+    ({ "map array 5", 0, (: deep_eq(map(({1,2,3}), "f"), ({2,3,4})) :) }),
+    ({ "map mapping 1", TF_ERROR, (: deep_eq(map(([1,2,3]), ([1:5])), ({5,2,3})) :) }),
+    ({ "map mapping 2", TF_ERROR, (: deep_eq(map(([1,2,3]), ([1:5;6]), 1),({6,2,3})) :) }),
+    ({ "map mapping 3", TF_ERROR, (: map(([1,2,3]), ([1]), 0) :) }),
+    ({ "map mapping 4", 0, (: deep_eq(map(([1,2,3]), (: $1 + $3 :), 1), ([1:2,2:3,3:4])) :) }),
+    ({ "map mapping 5", 0, (: deep_eq(map(([1,2,3]), "f"), ([1:2,2:3,3:4])) :) }),
 });
 
 void run_test()
@@ -165,4 +184,9 @@ string *epilog(int eflag)
 {
     run_test();
     return 0;
+}
+
+int f(int arg)
+{
+    return arg + 1;
 }
