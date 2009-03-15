@@ -92,6 +92,8 @@ with_max_callouts=0
 
 with_write_buffer_max_size=100000
 
+# The maximum length of commands from users.
+with_max_command_length=1000
 
 # --- Timing ---
 
@@ -132,7 +134,12 @@ with_reserved_system_size=200000
 
 # This value gives the upper limits for the total allocated memory.
 # A value of 0 means 'unlimited'.
-with_hard_malloc_limit=0x4000000 
+with_hard_malloc_limit=0x4000000
+
+# Soft upper limit for total allocated memory. When this limit is reached, the
+# master object will be notified via low_memory().
+# A value of 0 means 'unlimited'.
+with_soft_malloc_limit=0
 
 # If these values are >0, the driver will reserve this amount of memory
 # on startup for large resp. small blocks, reducing the block fragmentation.
