@@ -31,6 +31,8 @@ Program properties
   (prolang.y)
 
 * number of virtual variables: 255
+* number of global variables: 65536 (F_IDENTIFIER16)
+
 * max number of struct members: 255
   (exec.h, ...)
 
