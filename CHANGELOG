@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Mar 2009 (Gnomi)
+  - (pkg-tls.c, pkg-openssl.c, pkg-gnutls.c) Separated code for GnuTLS
+    and OpenSSL.
+
 15-Mar-2009 (Fuchur)
   - (test/inc/deep_eq.inc)
     Implement deep equality for the testsuite.
