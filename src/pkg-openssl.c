@@ -1,0 +1,1072 @@
+/*------------------------------------------------------------------
+ * Wrapper for the OpenSSL module.
+ *------------------------------------------------------------------
+ */
+
+#include "driver.h"
+#include "machine.h"
+
+#if defined(USE_TLS) && defined(HAS_OPENSSL)
+
+#include <stdio.h>
+
+#include <openssl/ssl.h>
+#include <openssl/rand.h>
+#include <openssl/err.h>
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
+#include <sys/utsname.h>
+#include <openssl/opensslconf.h>
+
+#include <openssl/sha.h>
+#include <openssl/md5.h>
+#include <openssl/ripemd.h>
+
+#include <openssl/hmac.h>
+#include <openssl/evp.h>
+
+#include "pkg-tls.h"
+
+#include "actions.h"
+#include "array.h"
+#include "comm.h"
+#include "interpret.h"
+#include "main.h"
+#include "mstrings.h"
+#include "object.h"
+#include "sha1.h"
+#include "svalue.h"
+#include "xalloc.h"
+     
+#include "../mudlib/sys/tls.h"
+
+/*-------------------------------------------------------------------------*/
+/* Variables */
+
+static Bool tls_is_available = MY_FALSE;
+  /* Set to TRUE when the TLS layer has been initialised successfully.
+   */
+
+static SSL_CTX * context = NULL;
+  /* The SSL program context. */
+
+static DH *dhe1024 = NULL;
+  /* The Diffie-Hellmann parameters. */
+
+/*-------------------------------------------------------------------------*/
+static int
+no_passphrase_callback (char * buf, int num, int w, void *arg)
+
+/* OpenSSL: Empty method to hinder OpenSSL from asking for passphrases.
+ */
+{
+    return -1;
+} /* no_passphrase_callback() */
+
+/*-------------------------------------------------------------------------*/
+static Bool
+set_dhe1024 (void)
+
+/* Set the Diffie-Hellmann parameters.
+ * Return MY_TRUE on success, and MY_FALSE on error.
+ */
+
+{
+    int i;
+    DSA *dsaparams;
+    DH *dhparams;
+    const char *seed[] = { ";-)  :-(  :-)  :-(  ",
+                           ";-)  :-(  :-)  :-(  ",
+                           "Random String no. 12",
+                           ";-)  :-(  :-)  :-(  ",
+                           "hackers have even mo", /* from jargon file */
+                         };
+    unsigned char seedbuf[20];
+
+    if (dhe1024 != NULL)
+        return MY_TRUE;
+
+    RAND_bytes((unsigned char *) &i, sizeof i);
+
+    /* Make sure that i is non-negative - pick one of the provided seeds */
+    if (i < 0)
+        i = -1;
+    if (i < 0) /* happens if i == MININT */
+        i = 0;
+
+    i %= sizeof seed / sizeof seed[0];
+    memcpy(seedbuf, seed[i], 20);
+    dsaparams = DSA_generate_parameters(1024, seedbuf, 20, NULL, NULL, 0, NULL);
+
+    if (dsaparams == NULL)
+        return MY_FALSE;
+
+    dhparams = DSA_dup_DH(dsaparams);
+    DSA_free(dsaparams);
+    if (dhparams == NULL)
+        return MY_FALSE;
+
+    dhe1024 = dhparams;
+
+    return MY_TRUE;
+} /* set_dhe1024() */
+                                                  
+/*-------------------------------------------------------------------------*/
+static int
+tls_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) 
+
+/* This function will be called if the client did present a certificate
+ * always returns MY_TRUE so that the handshake will succeed
+ * and the verification status can later be checked on mudlib level
+ * see also: SSL_set_verify(3)
+ */
+
+{
+    if (d_flag)
+    {
+        char buf[512];
+        printf("%s tls_verify_callback(%d, ...)\n", time_stamp(), preverify_ok);
+
+        X509_NAME_oneline(X509_get_issuer_name(ctx->current_cert), buf, sizeof buf);
+        printf("depth %d: %s\n", X509_STORE_CTX_get_error_depth(ctx), buf);
+    }
+    return MY_TRUE;
+} /* tls_verify_callback() */
+
+/*-------------------------------------------------------------------------*/
+void
+tls_verify_init (void)
+
+/* initialize or reinitialize tls certificate storage and revocation lists
+ */
+{
+    char * trustfile = tls_trustfile ? tls_trustfile : NULL;
+    char * trustdirectory = tls_trustdirectory ? tls_trustdirectory : TLS_DEFAULT_TRUSTDIRECTORY;
+    char * crlfile = tls_crlfile ? tls_crlfile : NULL;
+    char * crldirectory = tls_crldirectory ? tls_crldirectory : NULL;
+
+    STACK_OF(X509_NAME) *stack = NULL;
+
+    if (trustfile != NULL && trustdirectory != NULL)
+    {
+        printf("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and directory '%s'.\n"
+              , time_stamp(), trustfile, trustdirectory);
+        debug_message("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and directory '%s'.\n"
+                     , time_stamp(), trustfile, trustdirectory);
+    }
+    else if (trustfile != NULL)
+    {
+        printf("%s TLS: (OpenSSL) trusted x509 certificates from '%s'.\n"
+              , time_stamp(), trustfile);
+        debug_message("%s TLS: (OpenSSL) trusted x509 certificates from '%s'.\n"
+                     , time_stamp(), trustfile);
+    }
+    else if (trustdirectory != NULL)
+    {
+        printf("%s TLS: (OpenSSL) trusted x509 certificates from directory '%s'.\n"
+              , time_stamp(), trustdirectory);
+        debug_message("%s TLS: (OpenSSL) trusted x509 certificates from directory '%s'.\n"
+                     , time_stamp(), trustdirectory);
+    }
+    else
+    {
+        printf("%s TLS: (OpenSSL) Trusted x509 certificates locations not specified.\n"
+              , time_stamp());
+        debug_message("%s TLS: (OpenSSL) trusted x509 certificates locations not specified.\n"
+                     , time_stamp());
+    }
+
+    if (crlfile != NULL || crldirectory != NULL)
+    {
+	X509_STORE *store = X509_STORE_new();
+	if (store != NULL)
+        {
+	    if (crlfile != NULL)
+            {
+		X509_LOOKUP *lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
+		if (lookup != NULL) 
+		    X509_LOOKUP_load_file(lookup, crlfile, X509_FILETYPE_PEM);
+	    }
+	    if (crldirectory != NULL)
+            {
+		X509_LOOKUP *lookup = X509_STORE_add_lookup(store, X509_LOOKUP_hash_dir());
+		if (lookup != NULL) 
+		    X509_LOOKUP_add_dir(lookup, crldirectory, X509_FILETYPE_PEM);
+	    }
+#if OPENSSL_VERSION_NUMBER >= 0x00907000L
+	    X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+	    SSL_CTX_set_cert_store(context, store);
+	    if (crlfile != NULL && crldirectory != NULL)
+            {
+		printf("%s TLS: (OpenSSL) CRLs from '%s' and '%s'.\n"
+		       , time_stamp(), crlfile, crldirectory);
+		debug_message("%s TLS: (OpenSSL) CRLs from '%s' and '%s'.\n"
+		       , time_stamp(), crlfile, crldirectory);
+	    }
+            else if (crlfile != NULL)
+            {
+		printf("%s TLS: (OpenSSL) CRLs from '%s'.\n"
+		       , time_stamp(), crlfile);
+		debug_message("%s TLS: (OpenSSL) CRLs from '%s'.\n"
+		       , time_stamp(), crlfile);
+	    }
+            else if (crldirectory != NULL)
+            {
+		printf("%s TLS: (OpenSSL) CRLs from '%s'.\n"
+		       , time_stamp(), crldirectory);
+		debug_message("%s TLS: (OpenSSL) CRLs from '%s'.\n"
+		       , time_stamp(), crldirectory);
+	    }
+            else
+            {
+		printf("%s TLS: (OpenSSL) CRL checking disabled.\n"
+		       , time_stamp());
+		debug_message("%s TLS: (OpenSSL) CRL checking disabled.\n"
+		       , time_stamp());
+	    }
+#else
+	    printf("%s TLS: Warning: Your OpenSSL version does not support "
+		   "Certificate revocation list checking\n"
+		  , time_stamp());
+	    debug_message("%s TLS: Warning: Your OpenSSL version does not "
+			  "support Certificate revocation list checking\n"
+		  , time_stamp());
+#endif
+	}
+        else
+        {
+	    printf("%s TLS: Warning: There was a problem getting the "
+		   "storage context from OpenSSL. Certificate revocation "
+		   "list checking is not enabled.\n"
+		  , time_stamp());
+	    debug_message("%s TLS: Warning: There was a problem getting the "
+			  "storage context from OpenSSL. Certificate revocation "
+			  "list checking is not enabled.\n"
+		  , time_stamp());
+	}
+    }
+
+    if (!SSL_CTX_load_verify_locations(context, trustfile, trustdirectory))
+    {
+        printf("%s TLS: Error preparing x509 verification certificates\n",
+               time_stamp());
+        debug_message("%s TLS: Error preparing x509 verification certificates\n",
+               time_stamp());
+    }
+    if (trustfile != NULL)
+    {
+	stack = SSL_load_client_CA_file(trustfile);
+    }
+    else
+    {
+	stack = SSL_CTX_get_client_CA_list(context);
+    }
+    if (trustdirectory != NULL)
+    {
+	SSL_add_dir_cert_subjects_to_stack(stack, trustdirectory);
+    }
+
+    if (stack != NULL)
+    {
+	SSL_CTX_set_client_CA_list(context, stack);
+    }
+}
+
+/*-------------------------------------------------------------------------*/
+void
+tls_global_init (void)
+
+/* Initialise the TLS package; to be called once at program startup.
+ */
+
+{
+    char * keyfile = tls_keyfile ? tls_keyfile : TLS_DEFAULT_KEYFILE;
+    char * certfile = tls_certfile ? tls_certfile : TLS_DEFAULT_CERTFILE;
+
+    printf("%s TLS: (OpenSSL) x509 keyfile '%s', certfile '%s'\n"
+          , time_stamp(), keyfile, certfile);
+    debug_message("%s TLS: (OpenSSL) Keyfile '%s', Certfile '%s'\n"
+                 , time_stamp(), keyfile, certfile);
+
+    SSL_load_error_strings();
+    ERR_load_BIO_strings();
+    if (!SSL_library_init())
+    {
+        printf("%s TLS: Initialising the SSL library failed.\n"
+              , time_stamp());
+        debug_message("%s TLS: Initialising the SSL library failed.\n"
+                     , time_stamp());
+        return;
+    }
+
+    /* SSL uses the rand(3) generator from libcrypto(), which needs
+     * to be seeded.
+     */
+    {
+        struct {
+            struct utsname uname;
+            int uname_1;
+            int uname_2;
+            uid_t uid;
+            uid_t euid;
+            gid_t gid;
+            gid_t egid;
+        } data1;
+
+        struct {
+            pid_t pid;
+            time_t time;
+            void *stack;
+        } data2;
+
+        data1.uname_1 = uname(&data1.uname);
+        data1.uname_2 = errno; /* Let's hope that uname fails randomly :-) */
+
+        data1.uid = getuid();
+        data1.euid = geteuid();
+        data1.gid = getgid();
+        data1.egid = getegid();
+
+        RAND_seed((const void *)&data1, sizeof data1);
+
+        data2.pid = getpid();
+        data2.time = time(NULL);
+        data2.stack = (void *)&data2;
+
+        RAND_seed((const void *)&data2, sizeof data2);
+    }
+
+    context = SSL_CTX_new (SSLv23_method());
+    if (!context)
+    {
+        printf("%s TLS: Can't get SSL context:\n"
+              , time_stamp());
+        debug_message("%s TLS: Can't get SSL context:\n"
+                     , time_stamp());
+        
+        goto ssl_init_err;
+    }
+
+    SSL_CTX_set_default_passwd_cb(context, no_passphrase_callback);
+    SSL_CTX_set_mode(context, SSL_MODE_ENABLE_PARTIAL_WRITE);
+    SSL_CTX_set_session_id_context(context, (unsigned char*) "ldmud", 5);
+
+    if (!SSL_CTX_use_PrivateKey_file(context, keyfile, SSL_FILETYPE_PEM))
+    {
+        printf("%s TLS: Error setting x509 keyfile:\n"
+              , time_stamp());
+        debug_message("%s TLS: Error setting x509 keyfile:\n"
+              , time_stamp());
+        goto ssl_init_err;
+    }
+
+    if (!SSL_CTX_use_certificate_file(context, certfile, SSL_FILETYPE_PEM))
+    {
+        printf("%s TLS: Error setting x509 certfile:\n"
+              , time_stamp());
+        debug_message("%s TLS: Error setting x509 certfile:\n"
+              , time_stamp());
+        goto ssl_init_err;
+    }
+    tls_verify_init();
+
+    if (!set_dhe1024()
+     || !SSL_CTX_set_tmp_dh(context, dhe1024)
+       )
+    {
+        printf("%s TLS: Error setting Diffie-Hellmann parameters:\n"
+              , time_stamp());
+        debug_message("%s TLS: Error setting Diffie-Hellmann parameters:\n"
+              , time_stamp());
+        goto ssl_init_err;
+    }
+
+    /* Avoid small subgroup attacks */
+    SSL_CTX_set_options(context, SSL_OP_SINGLE_DH_USE);
+
+    /* OpenSSL successfully initialised */
+    tls_is_available = MY_TRUE;
+    return;
+
+    /* General error handling for the initialisation */
+ssl_init_err:
+    {
+        unsigned long err;
+
+        while (0 != (err = ERR_get_error()))
+        {
+            char * errstring = ERR_error_string(err, NULL);
+            printf("%s TLS: SSL %s.\n"
+                  , time_stamp(), errstring);
+            debug_message("%s TLS: SSL %s.\n"
+                         , time_stamp(), errstring);
+        }
+
+        if (dhe1024 != NULL)
+        {
+            DH_free(dhe1024);
+            dhe1024 = NULL;
+        }
+
+        if (context != NULL)
+        {
+            SSL_CTX_free(context);
+            context = NULL;
+        }
+        return;
+    }
+
+} /* tls_global_init() */
+
+/*-------------------------------------------------------------------------*/
+void
+tls_global_deinit (void)
+
+/* Clean up the TLS package on program termination.
+ */
+
+{
+    if (dhe1024 != NULL)
+    {
+        DH_free(dhe1024);
+        dhe1024 = NULL;
+    }
+    if (context != NULL)
+    {
+        SSL_CTX_free(context);
+        context = NULL;
+    }
+
+    tls_is_available = MY_FALSE;
+
+} /* tls_global_deinit() */
+
+/*-------------------------------------------------------------------------*/
+int
+tls_read (interactive_t *ip, char *buffer, int length)
+
+/* Read up to <length> bytes data for the TLS connection of <ip>
+ * and store it in <buffer>.
+ * Return then number of bytes read, or a negative number if an error
+ * occured.
+ */
+
+{
+    int ret = -11;
+
+    int err;
+
+    do {
+        ret = SSL_read(ip->tls_session, buffer, length);
+    } while  (ret < 0 && (err = SSL_get_error(ip->tls_session, ret))
+              && (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE));
+
+    if (ret == 0)
+    {
+        tls_deinit_connection(ip);
+    }
+    else if (ret < 0)
+    {
+        ret = SSL_get_error(ip->tls_session, ret);
+        debug_message("%s TLS: Received corrupted data (%d). "
+                      "Closing the connection.\n"
+                     , time_stamp(), ret);
+        tls_deinit_connection(ip);
+    }
+
+    return (ret < 0 ? -1 : ret);
+} /* tls_read() */
+
+/*-------------------------------------------------------------------------*/
+int
+tls_write (interactive_t *ip, char *buffer, int length)
+
+/* Write <length> bytes from <buffer> to the TLS connection of <ip>
+ * Return the number of bytes written, or a negative number if an error
+ * occured.
+ */
+
+{
+    int ret = -1;
+
+    int err;
+
+    do {
+        ret = SSL_write(ip->tls_session, buffer, length);
+    } while  (ret < 0 && (err = SSL_get_error(ip->tls_session, ret))
+              && (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE));
+
+    if (ret == 0)
+    {
+        tls_deinit_connection(ip);
+    }
+    else if (ret < 0)
+    {
+        ret = SSL_get_error(ip->tls_session, ret);
+        debug_message("%s TLS: Sending data failed (%d). "
+                      "Closing the connection.\n"
+                     , time_stamp(), ret);
+        tls_deinit_connection(ip);
+    }
+
+    return (ret<0 ? -1 : ret);
+} /* tls_write() */
+
+/*-------------------------------------------------------------------------*/
+int
+tls_do_handshake (interactive_t *ip)
+
+/* Continue the TLS initialisation handshake for interactive <ip>.
+ * Return a negative error code if the connection can not be set up.
+ * Return 0 if the connection is still begin set up.
+ * Return 1 if the connection is now active (or if no secure connection
+ * had been requested).
+ *
+ * This function does only the package specific part of
+ * tls_continue_handshake.
+ */
+
+{
+    int ret, n;
+
+    if ((n = SSL_do_handshake(ip->tls_session)) < 0)
+        ret = SSL_get_error(ip->tls_session, n);
+    else
+        ret = 0;
+
+    if (ret != SSL_ERROR_WANT_READ && ret != SSL_ERROR_WANT_WRITE)
+    {
+        if (ret != 0)
+        {
+            /* Setup failed */
+            SSL_free(ip->tls_session);
+            ip->tls_session = NULL;
+            ret = - ret;
+        }
+        else
+        {
+            /* Setup finished */
+            /* TODO: Check SSL_in_init() at this place? */
+            ret = 1;
+        }
+    }
+    else
+        ret = 0;
+
+    return ret;
+} /* tls_do_handshake() */
+
+/*-------------------------------------------------------------------------*/
+int
+tls_init_connection (interactive_t *ip)
+
+/* Starts a TLS secured connection to the interactive <ip>.
+ * Returns a negative error code or 0 for success.
+ *
+ * After a successful start tls_do_handshake will be called.
+ */
+
+{
+    SSL * session = SSL_new(context);
+
+    if (session == NULL)
+    {
+        return -ERR_get_error();
+    }
+
+    if (!SSL_set_fd(session, ip->socket))
+    {
+        SSL_free(session);
+        return -ERR_get_error();
+    }
+
+    if (ip->outgoing_conn)
+        SSL_set_connect_state(session);
+    else
+    {
+        SSL_set_accept_state(session);
+        /* request a client certificate */
+        SSL_set_verify( session, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE
+                      , tls_verify_callback);
+    }
+    ip->tls_session = session;
+
+    return 0;
+} /* tls_init_connection() */
+
+/*-------------------------------------------------------------------------*/
+vector_t *
+tls_check_certificate (interactive_t *ip, Bool more)
+
+/* Checks the certificate of the secured connection and returns
+ * an array with the information about it for the efun
+ * tls_check_certificate().
+ */
+
+{
+    vector_t *v = NULL;
+    X509 *peer;
+    X509_NAME *subject;
+  
+    peer = SSL_get_peer_certificate(ip->tls_session);
+    if (peer != NULL)
+    {
+        int i, j, len;
+        char buf[256];
+        vector_t *extra = NULL;
+
+        v = allocate_array(more ? 3 : 2);
+
+        /* the result of SSL verification, the most important thing here
+         * see verify(1) for more details
+         */
+        put_number(&(v->item[0]), SSL_get_verify_result(ip->tls_session));
+
+        subject = X509_get_subject_name(peer);
+
+        j = X509_NAME_entry_count(subject);
+        extra = allocate_array(3 * j);
+
+        /* iterate all objects in the certificate */
+        for (i = 0; i < j; i++)
+        {
+            X509_NAME_ENTRY *entry;
+            ASN1_OBJECT *ob;
+
+            entry = X509_NAME_get_entry(subject, i);
+            ob = X509_NAME_ENTRY_get_object(entry);
+
+            len = OBJ_obj2txt(buf, sizeof buf, ob, 1);
+            put_c_n_string(&(extra->item[3 * i]), buf, len);
+
+            len = OBJ_obj2txt(buf, sizeof buf, ob, 0);
+            put_c_n_string(&(extra->item[3 * i + 1]), buf, len);
+            
+            put_c_string(&(extra->item[3 * i + 2])
+                        , (char *)ASN1_STRING_data(X509_NAME_ENTRY_get_data(entry)));
+        }
+        put_array(&(v->item[1]), extra);
+
+        /* also get all information from extensions like subjectAltName */
+        if (more)
+        {
+            vector_t *extensions = NULL;
+            vector_t *extension = NULL;
+
+            j = X509_get_ext_count(peer);
+            extensions = allocate_array(3 * j);
+            for (i = X509_get_ext_by_NID(peer, NID_subject_alt_name, -1)
+                ; i != -1
+                ; i = X509_get_ext_by_NID(peer, NID_subject_alt_name, i))
+            {
+                int iter, count;
+
+                X509_EXTENSION *ext = NULL;
+                STACK_OF(GENERAL_NAME) *ext_vals = NULL;
+
+                ext = X509_get_ext(peer, i);
+                if (ext == NULL) {
+                    break;
+                }
+                /* extension name */
+                len = OBJ_obj2txt(buf, sizeof buf, ext->object, 1),
+                put_c_n_string(&(extensions->item[3 * i]), (char *)buf, len);
+
+                len = OBJ_obj2txt(buf, sizeof buf, ext->object, 0),
+                put_c_n_string(&(extensions->item[3 * i + 1]), (char *)buf, len);
+
+                /* extension values */
+                ext_vals = X509V3_EXT_d2i(ext);
+                if (ext_vals == NULL) {
+                    break;
+                }
+
+                count = sk_GENERAL_NAME_num(ext_vals);
+                extension = allocate_array(3 * count);
+
+                put_array(&(extensions->item[3 * i + 2]), extension);
+                for (iter = 0; iter < count; iter++) {
+                    GENERAL_NAME *ext_val = NULL;
+                    ASN1_STRING *value = NULL;
+
+                    ext_val = sk_GENERAL_NAME_value(ext_vals, iter);
+
+                    switch(ext_val->type) {
+                    case GEN_OTHERNAME:
+                        value = ext_val->d.otherName->value->value.asn1_string;
+
+                        len = OBJ_obj2txt(buf, sizeof buf, ext_val->d.otherName->type_id, 1),
+                        put_c_n_string(&(extension->item[3 * iter]), buf, len);
+                        len = OBJ_obj2txt(buf, sizeof buf, ext_val->d.otherName->type_id, 0),
+                        put_c_n_string(&(extension->item[3 * iter + 1]), buf, len);
+                        put_c_string(&(extension->item[3 * iter + 2])
+                                    , (char*)ASN1_STRING_data(value));
+                        break;
+                    case GEN_DNS:
+                        value = ext_val->d.dNSName;
+                        put_c_n_string(&(extension->item[3 * iter]), "dNSName", 7);
+                        put_c_n_string(&(extension->item[3 * iter + 1]), "dNSName", 7);
+                        put_c_string(&(extension->item[3 * iter + 2])
+                                    , (char*)ASN1_STRING_data(value));
+
+                        break;
+                    case GEN_EMAIL:
+                        value = ext_val->d.rfc822Name;
+                        put_c_n_string(&(extension->item[3 * iter]), "rfc822Name", 10);
+                        put_c_n_string(&(extension->item[3 * iter + 1]), "rfc822Name", 10);
+                        put_c_string(&(extension->item[3 * iter + 2])
+                                    , (char*)ASN1_STRING_data(value));
+                        break;
+                    case GEN_URI:
+                        value = ext_val->d.uniformResourceIdentifier;
+                        put_c_n_string(&(extension->item[3 * iter]), "uniformResourceIdentifier", 25);
+                        put_c_n_string(&(extension->item[3 * iter + 1]), "uniformResourceIdentifier", 25);
+                        put_c_string(&(extension->item[3 * iter + 2])
+                                    , (char*)ASN1_STRING_data(value));
+                        break;
+
+                    /* TODO: the following are unimplemented 
+                     *                 and the structure is getting ugly 
+                     */
+                    case GEN_X400:
+                    case GEN_DIRNAME:
+                    case GEN_EDIPARTY:
+                    case GEN_IPADD:
+                    case GEN_RID:
+                    default:
+                        break;
+                    }
+                }
+            }
+            put_array(&(v->item[2]), extensions);
+        }
+        X509_free(peer);
+    }
+    
+    return v;
+} /* tls_check_certificate() */
+
+/*-------------------------------------------------------------------------*/
+void
+tls_deinit_connection (interactive_t *ip)
+
+/* Close the TLS connection for the interactive <ip> if there is one.
+ */
+
+{
+    if (ip->tls_status != TLS_INACTIVE)
+    {
+        SSL_shutdown(ip->tls_session);
+        SSL_free(ip->tls_session);
+        ip->tls_session = NULL;
+    }
+
+    if (ip->tls_cb != NULL)
+    {
+        free_callback(ip->tls_cb);
+        xfree(ip->tls_cb);
+        ip->tls_cb = NULL;
+    }
+    ip->tls_status = TLS_INACTIVE;
+} /* tls_deinit_connection() */
+
+/*-------------------------------------------------------------------------*/
+const char *
+tls_error (int err)
+
+/* Returns a string describing the error behind the
+ * error number <err>, which is always negative.
+ */
+
+{
+    return ERR_error_string(-err, NULL);
+} /* tls_error() */
+
+/*-------------------------------------------------------------------------*/
+vector_t *
+tls_query_connection_info (interactive_t *ip)
+
+/* Returns the connection info array for the efun
+ * tls_query_connection_info(). <ip> is guaranteed
+ * to have a TLS secured connection.
+ */
+
+{
+    vector_t * rc;
+    
+    rc = allocate_array(TLS_INFO_MAX);  
+    put_c_string(&(rc->item[TLS_CIPHER])
+                , SSL_get_cipher(ip->tls_session));
+    put_number(&(rc->item[TLS_COMP]), 0);
+    put_number(&(rc->item[TLS_KX]), 0);
+    put_number(&(rc->item[TLS_MAC]), 0);
+    put_c_string(&(rc->item[TLS_PROT])
+                , SSL_get_version(ip->tls_session));
+
+    return rc;
+} /* tls_query_connection_info() */
+
+/*-------------------------------------------------------------------------*/
+Bool
+tls_available ()
+
+/* If the global TLS Initialisation could not been set up, tls_available()
+ * returns MY_FALSE, otherwise MY_TRUE.
+ */
+
+{
+    return tls_is_available;
+} /* tls_available() */
+
+
+/*------------------------------------------------------------------
+ * Interface to the openssl cryptography api
+ *------------------------------------------------------------------
+ */
+static void
+get_digest (int num, const EVP_MD **md, int *len)
+
+/* Determine the proper digest descriptor <*md> and length <*len>
+ * from the designator <num>, which is one of the TLS_HASH_ constants.
+ *
+ * Return NULL for <*md> if the desired digest isn't available.
+ */
+
+{
+    switch(num)
+    {
+#ifndef OPENSSL_NO_SHA1
+# ifdef SHA_DIGEST_LENGTH
+    case TLS_HASH_SHA1:
+	(*len) = SHA_DIGEST_LENGTH;
+	(*md) = EVP_sha1();
+	break;
+# endif
+#endif
+#ifndef OPENSSL_NO_SHA256
+# ifdef SHA224_DIGEST_LENGTH
+    case TLS_HASH_SHA224:
+	(*len) = SHA224_DIGEST_LENGTH;
+	(*md) = EVP_sha224();
+	break;
+# endif
+# ifdef SHA256_DIGEST_LENGTH
+    case TLS_HASH_SHA256:
+	(*len) = SHA256_DIGEST_LENGTH;
+	(*md) = EVP_sha256();
+	break;
+# endif
+#endif
+#ifndef OPENSSL_NO_SHA512
+# ifdef SHA384_DIGEST_LENGTH
+    case TLS_HASH_SHA384:
+	(*len) = SHA384_DIGEST_LENGTH;
+	(*md) = EVP_sha384();
+	break;
+# endif
+# ifdef SHA512_DIGEST_LENGTH
+    case TLS_HASH_SHA512:
+	(*len) = SHA512_DIGEST_LENGTH;
+	(*md) = EVP_sha512();
+	break;
+# endif
+#endif
+#ifndef OPENSSL_NO_MD5
+# ifdef MD5_DIGEST_LENGTH
+    case TLS_HASH_MD5:
+	(*len) = MD5_DIGEST_LENGTH;
+	(*md) = EVP_md5();
+	break;
+# endif
+#endif
+#ifndef OPENSSL_NO_RIPEMD
+# ifdef RIPEMD160_DIGEST_LENGTH
+    case TLS_HASH_RIPEMD160:
+	(*len) = RIPEMD160_DIGEST_LENGTH;
+	(*md) = EVP_ripemd160();
+	break;
+# endif
+#endif
+    default:
+	(*md) = NULL;
+	break;
+    }
+} /* get_digest() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_hash(svalue_t *sp, int num_arg)
+
+/* EFUN hash()
+ *
+ *   string hash(int method, string arg [, int iterations ] )
+ *   string hash(int method, int *  arg [, int iterations ] )
+ *
+ * Calculate the hash from <arg> as determined by <method>. The
+ * hash is calculated with <iterations> iterations, default is 1 iteration.
+ *
+ * <method> is one of the TLS_HASH_ constants defined in tls.h; not
+ * all recognized methods may be supported for a given driven.
+ */
+
+{
+    EVP_MD_CTX ctx;
+    const EVP_MD *md = NULL;
+    char *tmp;
+    string_t *digest;
+    int i, hashlen;
+    unsigned int len;
+    p_int iterations;
+
+    if (num_arg == 3)
+    {
+        iterations = sp->u.number;
+        sp--;
+    }
+    else
+        iterations = 1;
+
+    if (iterations < 1)
+    {
+        errorf("Bad argument 3 to hash(): expected a number > 0, but got %ld\n"
+              , (long) iterations);
+        /* NOTREACHED */
+        return sp;
+    }
+
+    if (sp->type == T_POINTER)
+    {
+        string_t * arg;
+        char * argp;
+
+        memsafe(arg = alloc_mstring(VEC_SIZE(sp->u.vec)), VEC_SIZE(sp->u.vec)
+               , "hash argument string");
+        argp = get_txt(arg);
+
+        for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
+        {
+            if (sp->u.vec->item[i].type != T_NUMBER)
+            {
+                free_mstring(arg);
+                errorf("Bad argument 2 to hash(): got mixed*, expected string/int*.\n");
+                /* NOTREACHED */
+            }
+            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+        }
+
+        free_svalue(sp);
+        put_string(sp, arg);
+    }
+
+    get_digest(sp[-1].u.number, &md, &hashlen);
+
+    if (md == NULL)
+    {
+        errorf("Bad argument 1 to hash(): hash function %d unknown or unsupported by OpenSSL\n", (int) sp[-1].u.number);
+    }
+
+    memsafe(tmp = xalloc(hashlen), hashlen, "hash result");
+
+    EVP_DigestInit(&ctx, md);
+    EVP_DigestUpdate(&ctx, (unsigned char *)get_txt(sp->u.str), 
+		     mstrsize(sp->u.str));
+    EVP_DigestFinal(&ctx, (unsigned char*)tmp, &len);
+
+    while (--iterations > 0)
+    {
+        EVP_DigestInit(&ctx, md);
+        EVP_DigestUpdate(&ctx, tmp, len);
+	EVP_DigestFinal(&ctx, (unsigned char*)tmp, &len);
+    }
+
+    memsafe(digest = alloc_mstring(2 * len), 2 & len, "hex hash result");
+    for (i = 0; i < len; i++)
+        sprintf(get_txt(digest)+2*i, "%02x", tmp[i] & 0xff);
+    free_svalue(sp--);
+    free_svalue(sp);
+    put_string(sp, digest);
+
+    return sp;
+} /* v_hash() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_hmac(svalue_t *sp)
+
+/* EFUN hmac()
+ *
+ *   string hmac(int method, string key, string arg)
+ *   string hmac(int method, string key, int * arg)
+ *
+ * Calculate the Hashed Message Authenication Code for <arg> based
+ * on the digest <method> and the password <key>. Return the HMAC.
+ *
+ * <method> is one of the TLS_HASH_ constants defined in tls.h; not
+ * all recognized methods may be supported for a given driven.
+ */
+
+{
+#if defined(OPENSSL_NO_HMAC)
+    errorf("OpenSSL wasn't configured to provide the hmac() method.\n");
+    /* NOTREACHED */
+#else
+    HMAC_CTX ctx;
+    const EVP_MD *md = NULL;
+    char *tmp;
+    string_t *digest;
+    int i, hashlen;
+    unsigned int len;
+
+    if (sp->type == T_POINTER)
+    {
+        string_t * arg;
+        char * argp;
+
+        memsafe(arg = alloc_mstring(VEC_SIZE(sp->u.vec)), VEC_SIZE(sp->u.vec)
+               , "hash argument string");
+        argp = get_txt(arg);
+
+        for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
+        {
+            if (sp->u.vec->item[i].type != T_NUMBER)
+            {
+                free_mstring(arg);
+                errorf("Bad argument 2 to hash(): got mixed*, expected string/int*.\n");
+                /* NOTREACHED */
+            }
+            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+        }
+
+        free_svalue(sp);
+        put_string(sp, arg);
+    }
+
+    get_digest(sp[-2].u.number, &md, &hashlen);
+
+    if (md == NULL)
+    {
+        errorf("Bad argument 1 to hmac(): hash function %d unknown or unsupported by OpenSSL\n", (int) sp[-2].u.number);
+    }
+
+    memsafe(tmp = xalloc(hashlen), hashlen, "hash result");
+
+    HMAC_Init(&ctx, get_txt(sp[-1].u.str), mstrsize(sp[-1].u.str), md);
+    HMAC_Update(&ctx, (unsigned char*)get_txt(sp->u.str), mstrsize(sp->u.str));
+    HMAC_Final(&ctx, (unsigned char*)tmp, &len);
+
+    memsafe(digest = alloc_mstring(2 * hashlen)
+           , 2 & hashlen, "hmac result");
+    for (i = 0; i < len; i++)
+        sprintf(get_txt(digest)+2*i, "%02x", tmp[i] & 0xff);
+
+    free_svalue(sp--);
+    free_svalue(sp--);
+    free_svalue(sp);
+    put_string(sp, digest);
+#endif
+
+    return sp;
+} /* f_hmac */
+
+/***************************************************************************/
+#endif /* USE_TLS */
