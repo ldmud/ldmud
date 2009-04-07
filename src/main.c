@@ -2320,7 +2320,7 @@ eval_arg (int eOption, const char * pValue)
 
                 /* Skip trailing spaces */
                 while (*cp == ' ')
-                    *cp++;
+                    cp++;
             }
 
             if (num_args != 0)

@@ -6,6 +6,8 @@
 #if defined(USE_TLS) && defined(HAS_OPENSSL)
 #  include <openssl/ssl.h>
 
+#include "typedefs.h"
+
 /* --- Types --- */
 
 typedef SSL*           tls_session_t;

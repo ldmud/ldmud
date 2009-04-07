@@ -57,7 +57,7 @@ extern int tls_init_connection (interactive_t *ip);
 extern void tls_deinit_connection (interactive_t *ip);
 extern const char *tls_error(int err);
 extern vector_t *tls_query_connection_info(interactive_t *ip);
-extern vector_t *tls_check_certificate(interactive_t *ip);
+extern vector_t *tls_check_certificate(interactive_t *ip, Bool more);
 extern Bool tls_available ();
 
 #endif /* USE_TLS */
