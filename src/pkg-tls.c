@@ -110,7 +110,13 @@ tls_continue_handshake (interactive_t *ip)
         push_number(inter_sp, ret < 0 ? ret : 0);
         push_ref_object(inter_sp, ip->ob, "tls_handshake");
 
+        command_giver = ip->ob;
+        current_interactive = NULL; 
+        /* This is not a reaction to a user input. */
+
         (void)apply_callback(handler->cb, 2);
+
+        command_giver = NULL;
 
         free_svalue(inter_sp); inter_sp--; /* free the callback */
     }

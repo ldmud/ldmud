@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Apr-2009 (Gnomi)
+  - (pkg-tls.c) Set command_giver when executing the callback
+    after handshaking (Bug #499).
+
 07-Apr-2009 (Gnomi)
   - (pkg-tls.h) Corrected the definition of tls_check_certificate.
   - (pkg-gnutls.h, pkg-openssl.h) Forgot an include.
@@ -46,7 +50,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
       string_spec, mudlib/sys/rtlimits.h, src/settings*, doc/master/)
     Renamed --max-malloced to --hard-malloc-limit and  MAX_MALLOCED to
     HARD_MALLOC_LIMIT_DEFAULT and changed the mud configurations.
-    Introduced a --soft-memory-limit/SOFT_MALLOC_LIMIT_DEFAULT
+    Introduced a --soft-malloc-limit/SOFT_MALLOC_LIMIT_DEFAULT
     Added set_* and get_memory_limit() and related constants for managing the
     memory limits
     Added check_for_soft_malloc_limit() to check the soft memory limit
