@@ -464,13 +464,7 @@ enum function_flags {
     TYPE_MOD_PROTECTED = 0x01000000,  /* cannot be called externally    */
     TYPE_MOD_XVARARGS  = 0x00800000,  /* accepts optional arguments     */
     TYPE_MOD_NOSAVE    = 0x00400000,  /* vars: can't be saved           */
-
-    FUNSTART_MASK      = 0x000fffff,
-  /* Function not inherited: unsigned address of the function code relative
-   * to the begin of the program block (struct program_s->program).
-   */
-
-    NAME_CROSS_DEFINED = 0x00080000,
+    NAME_CROSS_DEFINED = 0x00200000,
   /* Two functions with the same name inherited from A and B into C.
    * The compiler usually prefers A, and the value 'flags & INHERIT_MASK'
    * (in bias-0x20000 representation) stored as B.offset.func is the
@@ -478,6 +472,11 @@ enum function_flags {
    * A special use is A uses a function from B. The function is marked
    * in A as undefined, but the compiler will use cross-defining in C
    * to resolve the function calls in A to call the function in B.
+   */
+
+    FUNSTART_MASK      = 0x000fffff,
+  /* Function not inherited: unsigned address of the function code relative
+   * to the begin of the program block (struct program_s->program).
    */
 
     INHERIT_MASK        = 0x0003ffff,

@@ -8967,7 +8967,7 @@ again:
 
         {
             int a, b;
-            union { unsigned char b[sizeof(p_int)-1]; short s; } abuf;
+            union { unsigned char b[sizeof(p_int)-1]; unsigned short s; } abuf;
               /* TODO: Assumes sizeof(p_int)-1 >= sizeof(short) */
               /* TODO: Assumes sizeof(p_int) == 4 */
               /* TODO: Assumes sizeof(short) == 2 */

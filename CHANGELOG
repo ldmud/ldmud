@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Apr-2009 (Gnomi)
+  - (interpret.c) Wrongly calculated the jump offset of the default
+    label in big switches due to a sign error (maybe #622).
+  - (exec.h) Another value for NAME_CROSS_DEFINED so that it doesn't
+    conflict with FUNSTART_MASK (large programs could hit that bit).
+
 08-Apr-2009 (Gnomi)
   - (pkg-tls.c) Set command_giver when executing the callback
     after handshaking (Bug #499).

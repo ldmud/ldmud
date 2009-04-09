@@ -71,6 +71,12 @@ mixed *tests = ({
   function int () {
       return to_int(sprintf("%d",__INT_MAX__)) == __INT_MAX__;
   } }),
+    ({ "0000613", 0,
+        (:
+            int x = 1;
+            return funcall(lambda(0,({ (: x :) })));
+        :)
+    }),
 });
 
 void run_test()
