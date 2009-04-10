@@ -16,9 +16,11 @@ xx-xxx-xxxx -- 3.3.719
 
     - Changed Efuns:
        + idna_stringprep(): fixed the evaluation of the arguments and removed
-                            a memory leak (#498).
+         a memory leak (#498).
        + map(): it's now possible to specify a mapping column when mapping
          through mappings (#367)
+       + tls_check_certificate(), tls_refresh_certs(): Now available if
+         GnuTLS is supported.
 
     - Runtime
        + The --max-malloced memory limit was renamed to --hard-malloc-limit.

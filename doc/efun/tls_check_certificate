@@ -34,9 +34,6 @@ DESCRIPTION
         Note: a x509 certificate can have more than one object with
         the same name
 
-BUGS
-        Not supported when using GnuTLS.
-
 HISTORY
         Introduced in LDMud 3.3.672/3.2.11.
         LDMud 3.3.711/3.2.12 modified the behaviour to return the

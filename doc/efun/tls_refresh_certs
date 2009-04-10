@@ -5,9 +5,6 @@ SYNOPSIS
 DESCRIPTION
         Reload the certificates and certificate revocation information.
 
-BUGS
-        Not supported when using GnuTLS.
-
 HISTORY
         Introduced in LDMud 3.3.714/3.2.15.
 

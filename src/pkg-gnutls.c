@@ -9,9 +9,37 @@
 
 #if defined(USE_TLS) && defined(HAS_GNUTLS)
 
+#include <errno.h>
 #include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#if defined(HAVE_DIRENT_H) || defined(_POSIX_VERSION)
+#    include <dirent.h>
+#    define generic_dirent dirent
+#    define DIRENT_NLENGTH(dirent) (strlen((dirent)->d_name))
+#else /* not (DIRENT or _POSIX_VERSION) */
+#    define generic_dirent direct
+#    define DIRENT_NLENGTH(dirent) ((dirent)->d_namlen)
+#    ifdef HAVE_SYS_NDIR_H
+#        include <sys/ndir.h>
+#    endif /* SYSNDIR */
+#    ifdef HAVE_SYS_DIR_H
+#        include <sys/dir.h>
+#    endif /* SYSDIR */
+#    ifdef HAVE_NDIR_H
+#        include <ndir.h>
+#    endif /* NDIR */
+#endif /* not (HAVE_DIRENT_H or _POSIX_VERSION) */
+
+#ifndef S_ISREG
+#    define S_ISREG(m) (((m)&S_IFMT) == S_IFREG)
+#endif
+
 
 #include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
 
 #include "pkg-tls.h"
 
@@ -25,9 +53,8 @@
 #include "sha1.h"
 #include "svalue.h"
 #include "xalloc.h"
-     
-#include "../mudlib/sys/tls.h"
 
+#include "../mudlib/sys/tls.h"
 /*-------------------------------------------------------------------------*/
 /* Variables */
 
@@ -85,7 +112,7 @@ initialize_tls_session (gnutls_session *session)
      * are adequate.
      */
     gnutls_set_default_priority( *session);   
-    
+
     gnutls_credentials_set( *session, GNUTLS_CRD_CERTIFICATE, x509_cred);
 
     gnutls_certificate_server_set_request( *session, GNUTLS_CERT_REQUEST);
@@ -137,7 +164,188 @@ tls_verify_init (void)
 /* initialize or reinitialize tls certificate storage and revocation lists.
  */
 {
-    /* TODO */
+    char * trustdirectory = tls_trustdirectory ? tls_trustdirectory : TLS_DEFAULT_TRUSTDIRECTORY;
+
+    gnutls_certificate_free_cas(x509_cred);
+
+    if (tls_trustfile != NULL)
+    {
+        int err;
+
+        printf("%s TLS: (GnuTLS) trusted x509 certificates from '%s'.\n"
+              , time_stamp(), tls_trustfile);
+        debug_message("%s TLS: (GnuTLS) trusted x509 certificates from '%s'.\n"
+                     , time_stamp(), tls_trustfile);
+        err = gnutls_certificate_set_x509_trust_file(x509_cred, tls_trustfile, GNUTLS_X509_FMT_PEM);
+
+        if (err < 0)
+        {
+            printf("%s TLS: Error setting x509 verification certificates: %s\n"
+                  , time_stamp(), gnutls_strerror(err));
+            debug_message("%s TLS: Error setting x509 verification certificates: %s\n"
+                         , time_stamp(), gnutls_strerror(err));
+        }
+    }
+
+    if (trustdirectory)
+    {
+        DIR * d;
+        char *fname;
+        size_t dirlen;
+        int err;
+
+        printf("%s TLS: (GnuTLS) trusted x509 certificates from directory '%s'.\n"
+              , time_stamp(), trustdirectory);
+        debug_message("%s TLS: (GnuTLS) trusted x509 certificates from directory '%s'.\n"
+                     , time_stamp(), trustdirectory);
+
+        dirlen = strlen(trustdirectory);
+        fname = (char*) xalloc(dirlen + NAME_MAX + 2);
+        if (!fname)
+        {
+            errno = ENOMEM;
+            d = NULL;
+        }
+        else
+        {
+            strcpy(fname, trustdirectory);
+            fname[dirlen++] = '/';
+            d = opendir(trustdirectory);
+        }
+
+        if (d == NULL)
+        {
+            printf("%s TLS: Can't read trust directory: %s.\n"
+                  , time_stamp(), strerror(errno));
+            debug_message("%s TLS: Can't read trust directory: %s\n"
+                         , time_stamp(), strerror(errno));
+        }
+        else
+        {
+            struct dirent *file;
+
+            while ((file = readdir(d)) != NULL)
+            {
+                struct stat st;
+
+                strcpy(fname+dirlen, file->d_name);
+                stat(fname, &st);
+
+                if (S_ISREG(st.st_mode))
+                {
+                    err = gnutls_certificate_set_x509_trust_file(x509_cred, fname, GNUTLS_X509_FMT_PEM);
+                    if (err < 0)
+                    {
+                        printf("%s TLS: Error setting x509 verification certificates from '%s': %s\n"
+                              , time_stamp(), fname, gnutls_strerror(err));
+                        debug_message("%s TLS: Error setting x509 verification certificates from '%s': %s\n"
+                                     , time_stamp(), fname, gnutls_strerror(err));
+                    }
+                }
+            }
+
+            closedir(d);
+        }
+
+        xfree(fname);
+    }
+    else if(tls_trustfile == NULL)
+    {
+        printf("%s TLS: (GnuTLS) Trusted x509 certificates locations not specified.\n"
+              , time_stamp());
+        debug_message("%s TLS: (GnuTLS) trusted x509 certificates locations not specified.\n"
+                     , time_stamp());
+    }
+
+    gnutls_certificate_free_crls(x509_cred);
+    if (tls_crlfile != NULL)
+    {
+        int err;
+
+        printf("%s TLS: (GnuTLS) CRLs from '%s'.\n"
+              , time_stamp(), tls_crlfile);
+        debug_message("%s TLS: (GnuTLS) CRLs from '%s'.\n"
+                     , time_stamp(), tls_crlfile);
+        err = gnutls_certificate_set_x509_crl_file(x509_cred, tls_crlfile, GNUTLS_X509_FMT_PEM);
+
+        if (err < 0)
+        {
+            printf("%s TLS: Error loading CRLs: %s\n"
+                  , time_stamp(), gnutls_strerror(err));
+            debug_message("%s TLS: Error loading CRLs: %s\n"
+                         , time_stamp(), gnutls_strerror(err));
+        }
+    }
+
+    if (tls_crldirectory)
+    {
+        DIR * d;
+        char *fname;
+        size_t dirlen;
+        int err;
+
+        printf("%s TLS: (GnuTLS) CRLs from directory '%s'.\n"
+              , time_stamp(), tls_crldirectory);
+        debug_message("%s TLS: (GnuTLS) CRLs from directory '%s'.\n"
+                     , time_stamp(), tls_crldirectory);
+
+        dirlen = strlen(tls_crldirectory);
+        fname = (char*) xalloc(dirlen + NAME_MAX + 2);
+        if (!fname)
+        {
+            errno = ENOMEM;
+            d = NULL;
+        }
+        else
+        {
+            strcpy(fname, tls_crldirectory);
+            fname[dirlen++] = '/';
+            d = opendir(tls_crldirectory);
+        }
+
+        if (d == NULL)
+        {
+            printf("%s TLS: Can't read CRL directory: %s.\n"
+                  , time_stamp(), strerror(errno));
+            debug_message("%s TLS: Can't read CRL directory: %s\n"
+                         , time_stamp(), strerror(errno));
+        }
+        else
+        {
+            struct dirent *file;
+
+            while ((file = readdir(d)) != NULL)
+            {
+                struct stat st;
+
+                strcpy(fname+dirlen, file->d_name);
+                stat(fname, &st);
+
+                if (S_ISREG(st.st_mode))
+                {
+                    err = gnutls_certificate_set_x509_crl_file(x509_cred, fname, GNUTLS_X509_FMT_PEM);
+                    if (err < 0)
+                    {
+                        printf("%s TLS: Error loading CRL from '%s': %s\n"
+                              , time_stamp(), fname, gnutls_strerror(err));
+                        debug_message("%s TLS: Error loading CRL from '%s': %s\n"
+                                     , time_stamp(), fname, gnutls_strerror(err));
+                    }
+                }
+            }
+
+            closedir(d);
+        }
+
+        xfree(fname);
+    }
+    else if(!tls_crlfile)
+    {
+        printf("%s TLS: (GnuTLS) CRL checking disabled.\n"
+              , time_stamp());
+        debug_message("%s TLS: (GnuTLS) CRL checking disabled.\n"
+                     , time_stamp());
+    }
 }
 
 /*-------------------------------------------------------------------------*/
@@ -153,7 +361,7 @@ tls_global_init (void)
 
     int f;
 
-  
+
     /* In order to be able to identify gnutls allocations as such, we redirect
      * all allocations through the driver's allocator. The wrapper functions
      * make sure that the allocations are annotated properly with this source
@@ -184,13 +392,17 @@ tls_global_init (void)
     }
     else
     {
-       printf("%s TLS: x509 keyfile and certificate set.\n", time_stamp());
+        printf("%s TLS: x509 keyfile and certificate set.\n", time_stamp());
+
+        tls_verify_init();
+
         generate_dh_params();
 
         gnutls_certificate_set_dh_params( x509_cred, dh_params);
 
         tls_is_available = MY_TRUE;
     }
+
 } /* tls_global_init() */
 
 /*-------------------------------------------------------------------------*/
@@ -293,7 +505,7 @@ tls_do_handshake (interactive_t *ip)
         {
             /* Setup failed */
             gnutls_deinit(ip->tls_session);
-	    ip->tls_session = NULL;
+            ip->tls_session = NULL;
         }
         else
         {
@@ -320,19 +532,160 @@ tls_init_connection (interactive_t *ip)
 {
     initialize_tls_session(&ip->tls_session);
     gnutls_transport_set_ptr(ip->tls_session, (gnutls_transport_ptr)(ip->socket));
-    
+
     return 0;
 } /* tls_init_connection() */
 
 /*-------------------------------------------------------------------------*/
 vector_t *
 tls_check_certificate (interactive_t *ip, Bool more)
-{
-    /* TODO */
-    errorf( "%s TLS: GnuTLS does not provide certificate checking yet.\n"
-          , time_stamp());
 
-    return NULL; /* NOTREACHED */
+/* Checks the certificate of the secured connection and returns
+ * an array with the information about it for the efun
+ * tls_check_certificate().
+ */
+
+{
+    vector_t *v = NULL;
+    const gnutls_datum_t *cert_list;
+    gnutls_x509_crt_t cert;
+    gnutls_x509_dn_t subject;
+    unsigned int cert_list_size;
+    unsigned int result;
+    time_t t, now;
+    int err;
+
+    cert_list = gnutls_certificate_get_peers(ip->tls_session, &cert_list_size);
+    if (cert_list == NULL || cert_list_size == 0)
+        return v;
+
+    err = gnutls_certificate_verify_peers2(ip->tls_session, &result);
+    if (err < 0)
+        return v;
+
+    if (gnutls_x509_crt_init(&cert) < 0)
+        return v;
+
+    if (gnutls_x509_crt_import(cert, &cert_list[0], GNUTLS_X509_FMT_DER) < 0)
+    {
+        gnutls_x509_crt_deinit(cert);
+        return v;
+    }
+
+    now = time(0);
+    t = gnutls_x509_crt_get_expiration_time(cert);
+    if (t == (time_t)-1 || t < now)
+        result |= GNUTLS_CERT_INVALID;
+
+    t = gnutls_x509_crt_get_activation_time(cert);
+    if (t == (time_t)-1 || t >= now)
+        result |= GNUTLS_CERT_INVALID;
+
+    v = allocate_array(more ? 3 : 2);
+    put_number(&(v->item[0]), result);
+
+    err = gnutls_x509_crt_get_subject(cert, &subject);
+    if (err < 0)
+        put_number(&(v->item[1]), 0);
+    else
+    {
+        int count;
+        int rdn, ava_nr;
+        gnutls_x509_ava_st ava;
+        vector_t *extra;
+
+        count = 0;
+        for(rdn=0; !gnutls_x509_dn_get_rdn_ava(subject, rdn, 0, &ava); rdn++)
+        {
+            count++;
+            for(ava_nr=1; !gnutls_x509_dn_get_rdn_ava(subject, rdn, ava_nr, &ava); ava_nr++)
+                count++;
+        }
+
+        extra = allocate_array(3 * count);
+        count = 0;
+
+        for(rdn=0; !gnutls_x509_dn_get_rdn_ava(subject, rdn, 0, &ava); rdn++)
+            for(ava_nr=0; ava_nr==0 || !gnutls_x509_dn_get_rdn_ava(subject, rdn, ava_nr, &ava); ava_nr++)
+            {
+                put_c_n_string(&(extra->item[count++]), (char*)ava.oid.data, ava.oid.size-1);
+                put_number(&(extra->item[count]), 0); count++;
+                put_c_n_string(&(extra->item[count++]), (char*)ava.value.data, ava.value.size);
+            }
+
+        put_array(&(v->item[1]), extra);
+    }
+
+    if (more)
+    {
+        int count, nr;
+        vector_t *extra;
+        char oid[128];
+        char data[256];
+        char *ptr;
+        size_t osize, dsize;
+
+        count = 0;
+        nr = 0;
+
+        while(1)
+        {
+            osize = sizeof(oid);
+
+            err = gnutls_x509_crt_get_extension_oid(cert, nr, oid, &osize);
+            if (err == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
+                break;
+            if (err >= 0)
+                count++;
+            nr++;
+        }
+
+        extra = allocate_array(3 * count);
+        count = 0;
+        ptr = 0;
+        nr = 0;
+
+        while (1)
+        {
+            osize = sizeof(oid);
+
+            err = gnutls_x509_crt_get_extension_oid(cert, nr, oid, &osize);
+            if (err == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
+                break;
+            if (err >= 0)
+            {
+                dsize = sizeof(data);
+                ptr = NULL;
+
+                err = gnutls_x509_crt_get_extension_data(cert, nr, data, &dsize);
+                if (err == GNUTLS_E_SHORT_MEMORY_BUFFER)
+                {
+                    ptr = (char*) xalloc(dsize);
+                    if (ptr)
+                        err = gnutls_x509_crt_get_extension_data(cert, nr, ptr, &dsize);
+                }
+
+                put_c_n_string(&(extra->item[count++]), oid, osize);
+                put_number(&(extra->item[count]), 0); count++;
+                if (err >= 0)
+                    put_c_n_string(&(extra->item[count++]), (ptr!=NULL) ? ptr : data, dsize);
+                else
+                {
+                    put_number(&(extra->item[count]), 0); count++;
+                }
+
+                if (ptr)
+                    xfree(ptr);
+            }
+
+            nr++;
+        }
+
+        put_array(&(v->item[2]), extra);
+    }
+
+    gnutls_x509_crt_deinit(cert);
+    return v;
 } /* tls_check_certificate() */
 
 /*-------------------------------------------------------------------------*/
@@ -412,4 +765,4 @@ tls_available ()
 
 
 /***************************************************************************/
-#endif /* USE_TLS && !HAS_OPENSSL */
+#endif /* USE_TLS && HAS_GNUTLS */

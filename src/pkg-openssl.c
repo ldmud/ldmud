@@ -110,7 +110,7 @@ set_dhe1024 (void)
 
     return MY_TRUE;
 } /* set_dhe1024() */
-                                                  
+
 /*-------------------------------------------------------------------------*/
 static int
 tls_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) 
@@ -178,72 +178,72 @@ tls_verify_init (void)
 
     if (crlfile != NULL || crldirectory != NULL)
     {
-	X509_STORE *store = X509_STORE_new();
-	if (store != NULL)
+        X509_STORE *store = X509_STORE_new();
+        if (store != NULL)
         {
-	    if (crlfile != NULL)
+            if (crlfile != NULL)
             {
-		X509_LOOKUP *lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
-		if (lookup != NULL) 
-		    X509_LOOKUP_load_file(lookup, crlfile, X509_FILETYPE_PEM);
-	    }
-	    if (crldirectory != NULL)
+                X509_LOOKUP *lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
+                if (lookup != NULL) 
+                    X509_LOOKUP_load_file(lookup, crlfile, X509_FILETYPE_PEM);
+            }
+            if (crldirectory != NULL)
             {
-		X509_LOOKUP *lookup = X509_STORE_add_lookup(store, X509_LOOKUP_hash_dir());
-		if (lookup != NULL) 
-		    X509_LOOKUP_add_dir(lookup, crldirectory, X509_FILETYPE_PEM);
-	    }
+                X509_LOOKUP *lookup = X509_STORE_add_lookup(store, X509_LOOKUP_hash_dir());
+                if (lookup != NULL) 
+                    X509_LOOKUP_add_dir(lookup, crldirectory, X509_FILETYPE_PEM);
+            }
 #if OPENSSL_VERSION_NUMBER >= 0x00907000L
-	    X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
-	    SSL_CTX_set_cert_store(context, store);
-	    if (crlfile != NULL && crldirectory != NULL)
+            X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+            SSL_CTX_set_cert_store(context, store);
+            if (crlfile != NULL && crldirectory != NULL)
             {
-		printf("%s TLS: (OpenSSL) CRLs from '%s' and '%s'.\n"
-		       , time_stamp(), crlfile, crldirectory);
-		debug_message("%s TLS: (OpenSSL) CRLs from '%s' and '%s'.\n"
-		       , time_stamp(), crlfile, crldirectory);
-	    }
+                printf("%s TLS: (OpenSSL) CRLs from '%s' and '%s'.\n"
+                       , time_stamp(), crlfile, crldirectory);
+                debug_message("%s TLS: (OpenSSL) CRLs from '%s' and '%s'.\n"
+                       , time_stamp(), crlfile, crldirectory);
+            }
             else if (crlfile != NULL)
             {
-		printf("%s TLS: (OpenSSL) CRLs from '%s'.\n"
-		       , time_stamp(), crlfile);
-		debug_message("%s TLS: (OpenSSL) CRLs from '%s'.\n"
-		       , time_stamp(), crlfile);
-	    }
+                printf("%s TLS: (OpenSSL) CRLs from '%s'.\n"
+                       , time_stamp(), crlfile);
+                debug_message("%s TLS: (OpenSSL) CRLs from '%s'.\n"
+                       , time_stamp(), crlfile);
+            }
             else if (crldirectory != NULL)
             {
-		printf("%s TLS: (OpenSSL) CRLs from '%s'.\n"
-		       , time_stamp(), crldirectory);
-		debug_message("%s TLS: (OpenSSL) CRLs from '%s'.\n"
-		       , time_stamp(), crldirectory);
-	    }
+                printf("%s TLS: (OpenSSL) CRLs from '%s'.\n"
+                       , time_stamp(), crldirectory);
+                debug_message("%s TLS: (OpenSSL) CRLs from '%s'.\n"
+                       , time_stamp(), crldirectory);
+            }
             else
             {
-		printf("%s TLS: (OpenSSL) CRL checking disabled.\n"
-		       , time_stamp());
-		debug_message("%s TLS: (OpenSSL) CRL checking disabled.\n"
-		       , time_stamp());
-	    }
+                printf("%s TLS: (OpenSSL) CRL checking disabled.\n"
+                       , time_stamp());
+                debug_message("%s TLS: (OpenSSL) CRL checking disabled.\n"
+                       , time_stamp());
+            }
 #else
-	    printf("%s TLS: Warning: Your OpenSSL version does not support "
-		   "Certificate revocation list checking\n"
-		  , time_stamp());
-	    debug_message("%s TLS: Warning: Your OpenSSL version does not "
-			  "support Certificate revocation list checking\n"
-		  , time_stamp());
+            printf("%s TLS: Warning: Your OpenSSL version does not support "
+                   "Certificate revocation list checking\n"
+                  , time_stamp());
+            debug_message("%s TLS: Warning: Your OpenSSL version does not "
+                          "support Certificate revocation list checking\n"
+                  , time_stamp());
 #endif
-	}
+        }
         else
         {
-	    printf("%s TLS: Warning: There was a problem getting the "
-		   "storage context from OpenSSL. Certificate revocation "
-		   "list checking is not enabled.\n"
-		  , time_stamp());
-	    debug_message("%s TLS: Warning: There was a problem getting the "
-			  "storage context from OpenSSL. Certificate revocation "
-			  "list checking is not enabled.\n"
-		  , time_stamp());
-	}
+            printf("%s TLS: Warning: There was a problem getting the "
+                   "storage context from OpenSSL. Certificate revocation "
+                   "list checking is not enabled.\n"
+                  , time_stamp());
+            debug_message("%s TLS: Warning: There was a problem getting the "
+                          "storage context from OpenSSL. Certificate revocation "
+                          "list checking is not enabled.\n"
+                  , time_stamp());
+        }
     }
 
     if (!SSL_CTX_load_verify_locations(context, trustfile, trustdirectory))
@@ -255,20 +255,20 @@ tls_verify_init (void)
     }
     if (trustfile != NULL)
     {
-	stack = SSL_load_client_CA_file(trustfile);
+        stack = SSL_load_client_CA_file(trustfile);
     }
     else
     {
-	stack = SSL_CTX_get_client_CA_list(context);
+        stack = SSL_CTX_get_client_CA_list(context);
     }
     if (trustdirectory != NULL)
     {
-	SSL_add_dir_cert_subjects_to_stack(stack, trustdirectory);
+        SSL_add_dir_cert_subjects_to_stack(stack, trustdirectory);
     }
 
     if (stack != NULL)
     {
-	SSL_CTX_set_client_CA_list(context, stack);
+        SSL_CTX_set_client_CA_list(context, stack);
     }
 }
 
@@ -343,7 +343,7 @@ tls_global_init (void)
               , time_stamp());
         debug_message("%s TLS: Can't get SSL context:\n"
                      , time_stamp());
-        
+
         goto ssl_init_err;
     }
 
@@ -607,7 +607,7 @@ tls_check_certificate (interactive_t *ip, Bool more)
     vector_t *v = NULL;
     X509 *peer;
     X509_NAME *subject;
-  
+
     peer = SSL_get_peer_certificate(ip->tls_session);
     if (peer != NULL)
     {
@@ -742,7 +742,7 @@ tls_check_certificate (interactive_t *ip, Bool more)
         }
         X509_free(peer);
     }
-    
+
     return v;
 } /* tls_check_certificate() */
 
@@ -793,7 +793,7 @@ tls_query_connection_info (interactive_t *ip)
 
 {
     vector_t * rc;
-    
+
     rc = allocate_array(TLS_INFO_MAX);  
     put_c_string(&(rc->item[TLS_CIPHER])
                 , SSL_get_cipher(ip->tls_session));
@@ -838,58 +838,58 @@ get_digest (int num, const EVP_MD **md, int *len)
 #ifndef OPENSSL_NO_SHA1
 # ifdef SHA_DIGEST_LENGTH
     case TLS_HASH_SHA1:
-	(*len) = SHA_DIGEST_LENGTH;
-	(*md) = EVP_sha1();
-	break;
+        (*len) = SHA_DIGEST_LENGTH;
+        (*md) = EVP_sha1();
+        break;
 # endif
 #endif
 #ifndef OPENSSL_NO_SHA256
 # ifdef SHA224_DIGEST_LENGTH
     case TLS_HASH_SHA224:
-	(*len) = SHA224_DIGEST_LENGTH;
-	(*md) = EVP_sha224();
-	break;
+        (*len) = SHA224_DIGEST_LENGTH;
+        (*md) = EVP_sha224();
+        break;
 # endif
 # ifdef SHA256_DIGEST_LENGTH
     case TLS_HASH_SHA256:
-	(*len) = SHA256_DIGEST_LENGTH;
-	(*md) = EVP_sha256();
-	break;
+        (*len) = SHA256_DIGEST_LENGTH;
+        (*md) = EVP_sha256();
+        break;
 # endif
 #endif
 #ifndef OPENSSL_NO_SHA512
 # ifdef SHA384_DIGEST_LENGTH
     case TLS_HASH_SHA384:
-	(*len) = SHA384_DIGEST_LENGTH;
-	(*md) = EVP_sha384();
-	break;
+        (*len) = SHA384_DIGEST_LENGTH;
+        (*md) = EVP_sha384();
+        break;
 # endif
 # ifdef SHA512_DIGEST_LENGTH
     case TLS_HASH_SHA512:
-	(*len) = SHA512_DIGEST_LENGTH;
-	(*md) = EVP_sha512();
-	break;
+        (*len) = SHA512_DIGEST_LENGTH;
+        (*md) = EVP_sha512();
+        break;
 # endif
 #endif
 #ifndef OPENSSL_NO_MD5
 # ifdef MD5_DIGEST_LENGTH
     case TLS_HASH_MD5:
-	(*len) = MD5_DIGEST_LENGTH;
-	(*md) = EVP_md5();
-	break;
+        (*len) = MD5_DIGEST_LENGTH;
+        (*md) = EVP_md5();
+        break;
 # endif
 #endif
 #ifndef OPENSSL_NO_RIPEMD
 # ifdef RIPEMD160_DIGEST_LENGTH
     case TLS_HASH_RIPEMD160:
-	(*len) = RIPEMD160_DIGEST_LENGTH;
-	(*md) = EVP_ripemd160();
-	break;
+        (*len) = RIPEMD160_DIGEST_LENGTH;
+        (*md) = EVP_ripemd160();
+        break;
 # endif
 #endif
     default:
-	(*md) = NULL;
-	break;
+        (*md) = NULL;
+        break;
     }
 } /* get_digest() */
 
@@ -969,14 +969,14 @@ v_hash(svalue_t *sp, int num_arg)
 
     EVP_DigestInit(&ctx, md);
     EVP_DigestUpdate(&ctx, (unsigned char *)get_txt(sp->u.str), 
-		     mstrsize(sp->u.str));
+                     mstrsize(sp->u.str));
     EVP_DigestFinal(&ctx, (unsigned char*)tmp, &len);
 
     while (--iterations > 0)
     {
         EVP_DigestInit(&ctx, md);
         EVP_DigestUpdate(&ctx, tmp, len);
-	EVP_DigestFinal(&ctx, (unsigned char*)tmp, &len);
+        EVP_DigestFinal(&ctx, (unsigned char*)tmp, &len);
     }
 
     memsafe(digest = alloc_mstring(2 * len), 2 & len, "hex hash result");
