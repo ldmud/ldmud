@@ -256,19 +256,21 @@ tls_verify_init (void)
     if (trustfile != NULL)
     {
         stack = SSL_load_client_CA_file(trustfile);
+        SSL_CTX_set_client_CA_list(context, stack);
     }
     else
     {
         stack = SSL_CTX_get_client_CA_list(context);
-    }
-    if (trustdirectory != NULL)
-    {
-        SSL_add_dir_cert_subjects_to_stack(stack, trustdirectory);
+        if (stack == NULL)
+        {
+            stack = sk_X509_NAME_new_null();
+            SSL_CTX_set_client_CA_list(context, stack);
+        }
     }
 
-    if (stack != NULL)
+    if (trustdirectory != NULL && stack != NULL)
     {
-        SSL_CTX_set_client_CA_list(context, stack);
+        SSL_add_dir_cert_subjects_to_stack(stack, trustdirectory);
     }
 }
 

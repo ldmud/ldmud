@@ -10,6 +10,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (efuns.c) sha1() calculated wrong hash values with multiple
     interations.
   - (doc/efun) Marked md5() and sha1() as obsoleted by hash().
+  - (pkg-openssl.c) Don't set a just queried client CA again. (Bug #583)
 
 10-Apr-2009 (Gnomi)
   - (pkg-gnutls.c) Implemented tls_refresh_certs and tls_check_certificate
