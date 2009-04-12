@@ -3,6 +3,8 @@
 
 #include "driver.h"
 #include "typedefs.h"
+#include "pkg-openssl.h"
+#include "pkg-gcrypt.h"
 
 /* --- Variables --- */
 
@@ -18,6 +20,8 @@ extern svalue_t *f_explode(svalue_t *);
 extern svalue_t *f_implode(svalue_t *);
 extern svalue_t *f_lower_case(svalue_t *);
 extern svalue_t *f_make_shared_string(svalue_t *);
+extern svalue_t *v_hash(svalue_t *sp, int num_arg);
+extern svalue_t *f_hmac(svalue_t *sp);
 extern svalue_t *v_md5(svalue_t *, int num_arg);
 extern svalue_t *f_md5_crypt(svalue_t *sp);
 extern svalue_t *v_sha(svalue_t *, int num_arg);
@@ -95,5 +99,13 @@ extern void clear_ref_from_efuns(void);
 extern void count_ref_from_efuns(void);
 #endif /* GC_SUPPORT */
 
-#endif /* EFUNS_H__ */
+/* --- Prototypes for TLS packages --- */
 
+#if (!defined(USE_TLS) || !defined(HAS_OPENSSL)) && !defined(USE_GCRYPT)
+typedef int digest_t;
+#endif
+
+extern Bool get_digest(int algo, digest_t *md, size_t *len);
+extern void calc_digest(digest_t md, void *dest, size_t destlen, void *msg, size_t msglen, void *key, size_t keylen);
+
+#endif /* EFUNS_H__ */

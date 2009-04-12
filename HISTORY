@@ -21,6 +21,11 @@ xx-xxx-xxxx -- 3.3.719
          through mappings (#367)
        + tls_check_certificate(), tls_refresh_certs(): Now available if
          GnuTLS is supported.
+       + hash() and hmac() is now always available und is able to use OpenSSL,
+         libgcrypt or internal MD5 and SHA1 routines (builtin routines for
+         hash() only). hash() costs 10 ticks per iteration.
+       + sha1() calculated wrong hash values with multiple interations.
+       + md5() and sha1() are obsoleted by hash().
 
     - Runtime
        + The --max-malloced memory limit was renamed to --hard-malloc-limit.
@@ -35,6 +40,8 @@ xx-xxx-xxxx -- 3.3.719
     - Language
        + Added a permanent define __MAX_COMMAND_LENGTH__ for the maximum
          length of command.
+       + Added a permanent define __GCRYPT__ when libgcrypt support is
+         available.
 
     - Other
        + Generalized the write buffer for non-threaded use and renamed the

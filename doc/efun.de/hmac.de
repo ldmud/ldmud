@@ -19,8 +19,8 @@ BESCHREIBUNG
           TLS_HASH_MD5       (6)
           TLS_HASH_RIPEMD160 (7)
 
-        Diese Funktion ist nur verfuegbar wenn der Driver mit OpenSSL
-        compiliert wurde.
+        Wenn der Driver ohne OpenSSL- oder GCrypt-Unterstuetzung compiliert
+        wurde, erzeugt diese Funktion einen Fehler.
 
 BEISPIELE
         string s;

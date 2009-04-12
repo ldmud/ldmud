@@ -125,6 +125,7 @@ AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
 AC_MY_ARG_ENABLE(use-structs,yes,,[Enables structs])
 AC_MY_ARG_ENABLE(use-tls,no,,[Enables Transport Layer Security over Telnet: no/gnu/ssl/yes])
 AC_MY_ARG_WITH(tls-path,,,[Optional location of the TLS include/ and lib/ directory])
+AC_MY_ARG_ENABLE(use-gcrypt,yes,,[Enables support for libgcrypt])
 AC_MY_ARG_ENABLE(use-new-inlines,yes,,[Enables new inline syntax])
 AC_MY_ARG_ENABLE(use-set-light,yes,,[Enables efun set_light()])
 AC_MY_ARG_ENABLE(use-set-is-wizard,yes,,[Enables efun set_is_wizard()])
@@ -357,6 +358,19 @@ if test "x$with_tls_path" = "x" -o "x$with_tls_path" = "xno" ; then
 else
   tls_include_path="${with_tls_path}/include"
   tls_lib_path="${with_tls_path}/lib"
+fi
+AC_UPDATE_VAR(enable_use_gcrypt)
+if test "x$enable_use_gcrypt" = "x" || test "x$enable_use_gcrypt" = "xyes"; then
+  cdef_use_gcrypt="#define"
+  gcrypt_path=
+  enable_use_gcrypt="yes"
+elif test "x$enable_use_gcrypt" = "xno"; then
+  cdef_use_gcrypt="#undef"
+  gcrypt_path=
+else
+  cdef_use_gcrypt="#define"
+  gcrypt_path="$enable_use_gcrypt"
+  enable_use_gcrypt="yes"
 fi
 
 AC_CDEF_FROM_ENABLE(access_control)
@@ -1010,6 +1024,83 @@ fi
 CFLAGS="$saveflags"
 LIBS="$savelibs"
 
+# --- Gcrypt ---
+
+if test "$tls_package" != "ssl"; then
+
+    AC_CACHE_CHECK(for libgcrypt,lp_cv_has_gcrypt,
+    for TESTPATH in "" "$gcrypt_path" "$gcrypt_path/include" "/usr/local/include" ; do
+        saveflags="$CFLAGS"
+        if test "x$TESTPATH" != "x"; then
+            CFLAGS="$saveflags -I$TESTPATH"
+        fi
+    AC_TRY_COMPILE([
+    #include <gcrypt.h>
+
+    void foo(void)
+    {
+        int algo = GCRY_MD_SHA1;
+    }
+    ],,
+    lp_cv_has_gcrypt=yes
+    if test "x$TESTPATH" != "x"; then
+        EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+    fi
+    break;
+    ,
+    lp_cv_has_gcrypt=no
+    CFLAGS="$saveflags"
+    )
+    done
+    )
+
+    if test $lp_cv_has_gcrypt = yes; then
+      saveflags="$CFLAGS"
+      AC_DEFINE(HAS_GCRYPT, 1, [Does the machine offer libgcrypt?])
+
+      if test $enable_use_gcrypt = yes; then
+        tmp=""
+
+        AC_CHECK_LIB(gcrypt,gcry_check_version, tmp="$PKGLIBS -lgcrypt")
+
+        if test "x$tmp" == "x" && test "x$gcrypt_path" != "x"; then
+            unset ac_cv_lib_gcrypt_main
+            if test -d "${gcrypt_path}/lib/gcrypt"; then
+                CFLAGS="$saveflags -L${gcrypt_path}/lib/gcrypt"
+                AC_CHECK_LIB(gcrypt,gcry_check_version, tmp="$PKGLIBS -L${gcrypt_path}/lib/gcrypt -lgcrypt")
+            elif test -d "${gcrypt_path}/lib"; then
+                CFLAGS="$saveflags -L${gcrypt_path}/lib"
+                AC_CHECK_LIB(gcrypt,gcry_check_version, tmp="$PKGLIBS -L${gcrypt_path}/lib -lgcrypt")
+            elif test -d "${gcrypt_patch}"; then
+                CFLAGS="$saveflags -L$gcrypt_path"
+                AC_CHECK_LIB(gcrypt,gcry_check_version, tmp="$PKGLIBS -L$gcrypt_path -lgcrypt")
+            fi
+        fi
+
+        if test "x$tmp" == "x"; then
+            echo "libgcrypt library not found - disabling gcrypt support"
+            AC_NOT_AVAILABLE(use-gcrypt)
+            cdef_use_gcrypt="#undef"
+            enable_use_gcrypt="no"
+            lp_cv_has_gcrypt="no"
+        else
+            PKGLIBS="$tmp"
+        fi
+      fi
+
+      CFLAGS="$saveflags"
+    else
+      if test $enable_use_gcrypt = yes; then
+          AC_NOT_AVAILABLE(use-gcrypt)
+          cdef_use_gcrypt="#undef"
+          enable_use_gcrypt=no
+      fi
+    fi
+else
+  cdef_use_gcrypt="#undef"
+  enable_use_gcrypt=no
+fi
+
 # --- PCRE ---
 
 lp_cv_has_pcre_lib="no"
@@ -1533,7 +1624,7 @@ if test $lp_cv_has_sqlite3 = yes; then
     if test "x$tmp" == "x"; then
         unset ac_cv_lib_sqlite3_main
         if test -d "/usr/local/lib"; then
-            CFLAGS="$saveflags -L/usr/local/pgsql/lib"
+            CFLAGS="$saveflags -L/usr/local/lib"
             AC_CHECK_LIB(sqlite3,main, tmp="$PKGLIBS -L/usr/local/lib -lsqlite3")
         fi
     fi
@@ -2646,6 +2737,7 @@ AC_SUBST(cdef_use_builtin_pcre)
 AC_SUBST(cdef_use_deprecated)
 AC_SUBST(cdef_use_structs)
 AC_SUBST(cdef_use_tls)
+AC_SUBST(cdef_use_gcrypt)
 AC_SUBST(cdef_use_new_inlines)
 AC_SUBST(cdef_use_set_light)
 AC_SUBST(cdef_use_set_is_wizard)

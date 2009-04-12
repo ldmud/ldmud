@@ -405,6 +405,8 @@ string  lower_case(string);
 string  make_shared_string(string) "no longer useful";
 string  md5(int*|string, void|int);
 string  md5_crypt(string, string|int default: F_CONST0);
+string  hash(int, string|int *, void|int);
+string  hmac(int, string, string|int *);
 string *regexp(string *, string, int default: F_CONST0);
 string *regexplode(string, string, int default: F_CONST0);
 string  regreplace(string,string,closure|string,int);
@@ -754,11 +756,6 @@ string  tls_error(int);
 int     tls_available();
 void    tls_refresh_certs();
 mixed  *tls_check_certificate(object, int default: F_CONST0);
-
-#ifdef HAS_OPENSSL
-string  hash(int, string|int *, void|int);
-string  hmac(int, string, string|int *);
-#endif
 
 #endif /* USE_TLS */
 

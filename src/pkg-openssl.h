@@ -11,9 +11,7 @@
 /* --- Types --- */
 
 typedef SSL*           tls_session_t;
-
-extern svalue_t *v_hash(svalue_t *sp, int num_arg);
-extern svalue_t *f_hmac(svalue_t *sp);
+typedef const EVP_MD * digest_t;
 
 #endif /* USE_TLS && HAS_OPENSSL */
 

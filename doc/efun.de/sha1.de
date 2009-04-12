@@ -23,6 +23,7 @@ HISTORY
         Eingefuehrt in LDMud 3.3.523.
         LDMud 3.3.712 fuehrte Zaehlenarrays als Argument ein.
         LDMud 3.3.717 fuehrte die Iterations-basierte Evaluationskosten ein.
+        Seit LDMud 3.3.719 abgeloest durch hash().
 
 SIEHE AUCH
         crypt(E), md5(E)

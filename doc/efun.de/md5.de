@@ -1,3 +1,4 @@
+VERALTET
 SYNOPSIS
         string md5 (string arg [ , int iterations ] )
         string md5 (int *  arg [ , int iterations ] )
@@ -27,6 +28,7 @@ AENDERUNGEN
         LDMud 3.2.12 fuehrte Zaehlenarrays als Argument ein, also auch
           die Anzahl der Wiederholungen.
         LDMud 3.3.717 fuehrte die Iterations-basierte Evaluationskosten ein.
+        Seit LDMud 3.3.719 abgeloest durch hash().
 
 SIEHE AUCH
         crypt(E), md5_crypt(E), sha1(E), hash(E), hmac(E)

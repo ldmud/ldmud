@@ -20,8 +20,10 @@ BESCHREIBUNG
           TLS_HASH_MD5       (6)
           TLS_HASH_RIPEMD160 (7)
 
-        Diese Funktion ist nur verfuegbar wenn der Driver mit OpenSSL
-        compiliert wurde.
+        Wenn der Driver ohne OpenSSL- oder GCrypt-Unterstuetzung compiliert
+        wurde, sind nur TLS_HASH_SHA1 und TLS_HASH_MD5 verfuegbar.
+
+        Jede Iteration kostet 10 Evalution-Ticks.
 
 BEISPIELE
         string s;
@@ -31,6 +33,7 @@ BEISPIELE
 
 GESCHICHTE
         Eingefuehrt in LDMud 3.3.714
+        LDMud 3.3.719 fuehrte die iterationsbasierten Evaluationskosten ein.
 
 SIEHE AUCH
         crypt(E), md5(E), md5_crypt(E), sha1(E), hmac(E)

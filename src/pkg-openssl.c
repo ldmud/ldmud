@@ -823,13 +823,13 @@ tls_available ()
  * Interface to the openssl cryptography api
  *------------------------------------------------------------------
  */
-static void
-get_digest (int num, const EVP_MD **md, int *len)
+Bool
+get_digest (int num, digest_t * md, size_t *len)
 
 /* Determine the proper digest descriptor <*md> and length <*len>
  * from the designator <num>, which is one of the TLS_HASH_ constants.
  *
- * Return NULL for <*md> if the desired digest isn't available.
+ * Return MY_FALSE if the desired digest isn't available.
  */
 
 {
@@ -889,184 +889,42 @@ get_digest (int num, const EVP_MD **md, int *len)
 #endif
     default:
         (*md) = NULL;
-        break;
+        return MY_FALSE;
     }
+
+    return MY_TRUE;
 } /* get_digest() */
 
 /*-------------------------------------------------------------------------*/
-svalue_t *
-v_hash(svalue_t *sp, int num_arg)
+void
+calc_digest (digest_t md, void *dest, size_t destlen, void *msg, size_t msglen, void *key, size_t keylen)
 
-/* EFUN hash()
- *
- *   string hash(int method, string arg [, int iterations ] )
- *   string hash(int method, int *  arg [, int iterations ] )
- *
- * Calculate the hash from <arg> as determined by <method>. The
- * hash is calculated with <iterations> iterations, default is 1 iteration.
- *
- * <method> is one of the TLS_HASH_ constants defined in tls.h; not
- * all recognized methods may be supported for a given driven.
+/* Calculates the hash or the HMAC if <key> != NULL from <msg> as determined
+ * by method <md> as it was returned by get_digest().
  */
-
 {
-    EVP_MD_CTX ctx;
-    const EVP_MD *md = NULL;
-    char *tmp;
-    string_t *digest;
-    int i, hashlen;
-    unsigned int len;
-    p_int iterations;
-
-    if (num_arg == 3)
+    if(key)
     {
-        iterations = sp->u.number;
-        sp--;
+#if defined(OPENSSL_NO_HMAC)
+        errorf("OpenSSL wasn't configured to provide the hmac() method.\n");
+        /* NOTREACHED */
+#else
+        HMAC_CTX ctx;
+
+        HMAC_Init(&ctx, key, keylen, md);
+        HMAC_Update(&ctx, msg, msglen);
+        HMAC_Final(&ctx, dest, NULL);
+#endif
     }
     else
-        iterations = 1;
-
-    if (iterations < 1)
     {
-        errorf("Bad argument 3 to hash(): expected a number > 0, but got %ld\n"
-              , (long) iterations);
-        /* NOTREACHED */
-        return sp;
-    }
+        EVP_MD_CTX ctx;
 
-    if (sp->type == T_POINTER)
-    {
-        string_t * arg;
-        char * argp;
-
-        memsafe(arg = alloc_mstring(VEC_SIZE(sp->u.vec)), VEC_SIZE(sp->u.vec)
-               , "hash argument string");
-        argp = get_txt(arg);
-
-        for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
-        {
-            if (sp->u.vec->item[i].type != T_NUMBER)
-            {
-                free_mstring(arg);
-                errorf("Bad argument 2 to hash(): got mixed*, expected string/int*.\n");
-                /* NOTREACHED */
-            }
-            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
-        }
-
-        free_svalue(sp);
-        put_string(sp, arg);
-    }
-
-    get_digest(sp[-1].u.number, &md, &hashlen);
-
-    if (md == NULL)
-    {
-        errorf("Bad argument 1 to hash(): hash function %d unknown or unsupported by OpenSSL\n", (int) sp[-1].u.number);
-    }
-
-    memsafe(tmp = xalloc(hashlen), hashlen, "hash result");
-
-    EVP_DigestInit(&ctx, md);
-    EVP_DigestUpdate(&ctx, (unsigned char *)get_txt(sp->u.str), 
-                     mstrsize(sp->u.str));
-    EVP_DigestFinal(&ctx, (unsigned char*)tmp, &len);
-
-    while (--iterations > 0)
-    {
         EVP_DigestInit(&ctx, md);
-        EVP_DigestUpdate(&ctx, tmp, len);
-        EVP_DigestFinal(&ctx, (unsigned char*)tmp, &len);
+        EVP_DigestUpdate(&ctx, msg, msglen);
+        EVP_DigestFinal(&ctx, dest, NULL);
     }
-
-    memsafe(digest = alloc_mstring(2 * len), 2 & len, "hex hash result");
-    for (i = 0; i < len; i++)
-        sprintf(get_txt(digest)+2*i, "%02x", tmp[i] & 0xff);
-    free_svalue(sp--);
-    free_svalue(sp);
-    put_string(sp, digest);
-
-    return sp;
-} /* v_hash() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_hmac(svalue_t *sp)
-
-/* EFUN hmac()
- *
- *   string hmac(int method, string key, string arg)
- *   string hmac(int method, string key, int * arg)
- *
- * Calculate the Hashed Message Authenication Code for <arg> based
- * on the digest <method> and the password <key>. Return the HMAC.
- *
- * <method> is one of the TLS_HASH_ constants defined in tls.h; not
- * all recognized methods may be supported for a given driven.
- */
-
-{
-#if defined(OPENSSL_NO_HMAC)
-    errorf("OpenSSL wasn't configured to provide the hmac() method.\n");
-    /* NOTREACHED */
-#else
-    HMAC_CTX ctx;
-    const EVP_MD *md = NULL;
-    char *tmp;
-    string_t *digest;
-    int i, hashlen;
-    unsigned int len;
-
-    if (sp->type == T_POINTER)
-    {
-        string_t * arg;
-        char * argp;
-
-        memsafe(arg = alloc_mstring(VEC_SIZE(sp->u.vec)), VEC_SIZE(sp->u.vec)
-               , "hash argument string");
-        argp = get_txt(arg);
-
-        for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
-        {
-            if (sp->u.vec->item[i].type != T_NUMBER)
-            {
-                free_mstring(arg);
-                errorf("Bad argument 2 to hash(): got mixed*, expected string/int*.\n");
-                /* NOTREACHED */
-            }
-            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
-        }
-
-        free_svalue(sp);
-        put_string(sp, arg);
-    }
-
-    get_digest(sp[-2].u.number, &md, &hashlen);
-
-    if (md == NULL)
-    {
-        errorf("Bad argument 1 to hmac(): hash function %d unknown or unsupported by OpenSSL\n", (int) sp[-2].u.number);
-    }
-
-    memsafe(tmp = xalloc(hashlen), hashlen, "hash result");
-
-    HMAC_Init(&ctx, get_txt(sp[-1].u.str), mstrsize(sp[-1].u.str), md);
-    HMAC_Update(&ctx, (unsigned char*)get_txt(sp->u.str), mstrsize(sp->u.str));
-    HMAC_Final(&ctx, (unsigned char*)tmp, &len);
-
-    memsafe(digest = alloc_mstring(2 * hashlen)
-           , 2 & hashlen, "hmac result");
-    for (i = 0; i < len; i++)
-        sprintf(get_txt(digest)+2*i, "%02x", tmp[i] & 0xff);
-
-    free_svalue(sp--);
-    free_svalue(sp--);
-    free_svalue(sp);
-    put_string(sp, digest);
-#endif
-
-    return sp;
-} /* f_hmac */
+} /* calc_digest() */
 
 /***************************************************************************/
 #endif /* USE_TLS */

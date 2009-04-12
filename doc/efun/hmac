@@ -7,7 +7,7 @@ SYNOPSIS
 DESCRIPTION
         Calculate the Hashed Message Authenication Code for <arg> based
         on the digest <method> and the password <key>. Return the HMAC.
-        
+
         <method> is one of the TLS_HASH_ constants defined in tls.h; not
         all recognized methods may be supported for a given driven:
 
@@ -19,8 +19,8 @@ DESCRIPTION
           TLS_HASH_MD5       (6)
           TLS_HASH_RIPEMD160 (7)
 
-        This efun is available only if the driver is compiled with
-        OpenSSL support.
+        If the driver is compiled without OpenSSL or GCrypt support
+        an error is thrown.
 
 EXAMPLES
         string s;

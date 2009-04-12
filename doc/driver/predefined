@@ -91,6 +91,7 @@ DESCRIPTION
       __TLS__:        support for TLS (internal)
       __GNUTLS__:     if __TLS__: TLS support provided by GnuTLS.
       __OPENSSL__:    if __TLS__: TLS support provided by OpenSSL.
+      __GCRYPT__:     cryptographic routines provided by libgcrypt.
       __DEPRECATED__: support for obsolete and deprecated efuns.
 
 
@@ -116,7 +117,7 @@ HISTORY
     3.3.713 added __IDNA__, __SQLITE__.
     3.3.714 added __OPENSSL__, __GNUTLS__.
     3.3.718 added __XML_DOM__.
-    3.3.719 removed __PTHREADS__.
+    3.3.719 removed __PTHREADS__ and added __GCRYPT__.
 
 SEE ALSO
     pragma(LPC), preprocessor(LPC)

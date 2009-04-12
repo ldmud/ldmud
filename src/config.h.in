@@ -343,6 +343,10 @@
  */
 @cdef_use_tls@ USE_TLS
 
+/* Define this if you want to use libgcrypt (and not OpenSSL).
+ */
+@cdef_use_gcrypt@ USE_GCRYPT
+
 /* Define this if you want mySQL support (assuming that your host
  * actually offers this.
  */

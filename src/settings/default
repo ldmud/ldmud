@@ -431,6 +431,17 @@ enable_use_tls=no
 
 with_tls_path=
 
+enable_use_gcrypt=yes
+
+# Enable support for libgcrypt to implement cryptographic hash functions.
+#
+#  'no':   No libgcrypt support, only MD5 and SHA1 are supported using
+#          builtin implementations
+#  'yes':  Libgcrypt support is compiled in, libgcrypt is expected in the
+#          normal library search path.
+#  <path>: Libgcrypt support is compiled in, <path> is added to the link
+#          paths and should be the path to libgcrypt.
+
 # Enable XML parsing efuns using the iksemel package
 enable_use_iksemel=no
 

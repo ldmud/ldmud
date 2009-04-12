@@ -14,6 +14,8 @@
  *    efun: make_shared_string()
  *    efun: md5()
  *    efun: md5_crypt()
+ *    efun: hash()
+ *    efun: hmac()
  *    efun: regexp()
  *    efun: regexplode()
  *    efun: regreplace()
@@ -141,6 +143,7 @@
 #include "../mudlib/sys/regexp.h"
 #include "../mudlib/sys/strings.h"
 #include "../mudlib/sys/time.h"
+#include "../mudlib/sys/tls.h"
 
 /* Variables */
 string_t *last_ctime_result = NULL;
@@ -574,7 +577,7 @@ v_sha1 (svalue_t *sp, int num_arg)
     while (--iterations > 0)
     {
         SHA1Reset(&context);
-        SHA1Input(&context, d, sizeof(d)-1);
+        SHA1Input(&context, d, sizeof(d));
         SHA1Result(&context, d);
     }
 
@@ -590,6 +593,251 @@ v_sha1 (svalue_t *sp, int num_arg)
 
     return sp;
 } /* v_sha1() */
+
+/*-------------------------------------------------------------------------*/
+#if (!defined(USE_TLS) || !defined(HAS_OPENSSL)) && !defined(USE_GCRYPT) 
+Bool
+get_digest (int num, digest_t * md, size_t *len)
+
+/* Determine the proper digest descriptor <*md> and length <*len>
+ * from the designator <num>, which is one of the TLS_HASH_ constants.
+ *
+ * Return MY_FALSE if the desired digest isn't available.
+ */
+
+{
+    switch(num)
+    {
+        case TLS_HASH_MD5:
+            *md = num;
+            *len = 16;
+            break;
+
+        case TLS_HASH_SHA1:
+            *md = num;
+            *len = SHA1HashSize;
+            break;
+
+        default:
+            return MY_FALSE;
+    }
+
+    return MY_TRUE;
+} /* get_digest() */
+
+/*-------------------------------------------------------------------------*/
+void
+calc_digest (digest_t md, void *dest, size_t destlen, void *msg, size_t msglen, void *key, size_t keylen)
+
+/* Calculates the hash or the HMAC if <key> != NULL from <msg> as determined
+ * by method <md> as it was returned by get_digest().
+ */
+{
+    if(key)
+    {
+        errorf("hmac() is not supported without OpenSSL or GCrypt.\n");
+        /* NOTREACHED */
+    }
+    else
+        switch(md)
+        {
+            case TLS_HASH_MD5:
+            {
+                M_MD5_CTX context;
+
+                MD5Init(&context);
+                MD5Update(&context, msg, msglen);
+                MD5Final(&context, dest);
+                break;
+            }
+            case TLS_HASH_SHA1:
+            {
+                SHA1Context context;
+
+                SHA1Reset(&context);
+                SHA1Input(&context, msg, msglen);
+                SHA1Result(&context, dest);
+                break;
+            }
+            break;
+        }
+}
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_hash (svalue_t *sp, int num_arg)
+
+/* EFUN hash()
+ *
+ *   string hash(int method, string arg [, int iterations ] )
+ *   string hash(int method, int *  arg [, int iterations ] )
+ *
+ * Calculate the hash from <arg> as determined by <method>. The
+ * hash is calculated with <iterations> iterations, default is 1 iteration.
+ *
+ * <method> is one of the TLS_HASH_ constants defined in tls.h; not
+ * all recognized methods may be supported for a given driven.
+ */
+
+{
+    string_t *digest;
+    digest_t md;
+    char *tmp;
+    size_t hashlen;
+    p_int iterations;
+    int i;
+
+    if (num_arg == 3)
+    {
+        iterations = sp->u.number;
+        sp--;
+
+        inter_sp = sp;
+    }
+    else
+        iterations = 1;
+
+    if (iterations < 1)
+    {
+        errorf("Bad argument 3 to hash(): expected a number > 0, but got %ld\n"
+              , (long) iterations);
+        /* NOTREACHED */
+        return sp;
+    }
+
+    if (add_eval_cost_n(10, iterations))
+    {
+        free_svalue(sp--);
+        free_svalue(sp);
+        put_number(sp, 0);
+
+        /* The interpreter loop will catch the exceeded evaluation cost. */
+        return sp;
+    }
+
+    if (sp->type == T_POINTER)
+    {
+        string_t * arg;
+        char * argp;
+
+        memsafe(arg = alloc_mstring(VEC_SIZE(sp->u.vec)), VEC_SIZE(sp->u.vec)
+               , "hash argument string");
+        argp = get_txt(arg);
+
+        for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
+        {
+            if (sp->u.vec->item[i].type != T_NUMBER)
+            {
+                free_mstring(arg);
+                errorf("Bad argument 2 to hash(): got mixed*, expected string/int*.\n");
+                /* NOTREACHED */
+            }
+            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+        }
+
+        free_svalue(sp);
+        put_string(sp, arg);
+    }
+
+    if (!get_digest(sp[-1].u.number, &md, &hashlen))
+    {
+        errorf("Bad argument 1 to hash(): hash function %d unknown or unsupported.\n", (int) sp[-1].u.number);
+    }
+
+    memsafe(tmp = xalloc_with_error_handler(hashlen), hashlen, "hash result");
+    sp = inter_sp;
+
+    calc_digest(md, tmp, hashlen, get_txt(sp[-1].u.str), mstrsize(sp[-1].u.str), NULL, 0);
+
+    while (--iterations > 0)
+        calc_digest(md, tmp, hashlen, tmp, hashlen, NULL, 0);
+
+    memsafe(digest = alloc_mstring(2 * hashlen), 2 & hashlen, "hex hash result");
+    for (i = 0; i < hashlen; i++)
+        sprintf(get_txt(digest)+2*i, "%02x", tmp[i] & 0xff);
+
+    free_svalue(sp--); /* The error handler. */
+    free_svalue(sp--); /* The message. */
+    free_svalue(sp);   /* The method. */
+    put_string(sp, digest);
+
+    return sp;
+} /* v_hash() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_hmac(svalue_t *sp)
+
+/* EFUN hmac()
+ *
+ *   string hmac(int method, string key, string arg)
+ *   string hmac(int method, string key, int * arg)
+ *
+ * Calculate the Hashed Message Authenication Code for <arg> based
+ * on the digest <method> and the password <key>. Return the HMAC.
+ *
+ * <method> is one of the TLS_HASH_ constants defined in tls.h; not
+ * all recognized methods may be supported for a given driven.
+ */
+
+{
+    string_t *digest;
+    digest_t md;
+    char *tmp;
+    size_t hashlen;
+    int i;
+
+    if (sp->type == T_POINTER)
+    {
+        string_t * arg;
+        char * argp;
+
+        memsafe(arg = alloc_mstring(VEC_SIZE(sp->u.vec)), VEC_SIZE(sp->u.vec)
+               , "hash argument string");
+        argp = get_txt(arg);
+
+        for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
+        {
+            if (sp->u.vec->item[i].type != T_NUMBER)
+            {
+                free_mstring(arg);
+                errorf("Bad argument 2 to hash(): got mixed*, expected string/int*.\n");
+                /* NOTREACHED */
+            }
+            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+        }
+
+        free_svalue(sp);
+        put_string(sp, arg);
+    }
+
+    if (!get_digest(sp[-2].u.number, &md, &hashlen))
+    {
+        errorf("Bad argument 1 to hmac(): hash function %d unknown or unsupported.\n", (int) sp[-2].u.number);
+    }
+
+    memsafe(tmp = xalloc_with_error_handler(hashlen), hashlen, "hash result");
+    sp = inter_sp;
+
+    calc_digest(md, tmp, hashlen
+               , get_txt(sp[-1].u.str), mstrsize(sp[-1].u.str)
+               , get_txt(sp[-2].u.str), mstrsize(sp[-2].u.str));
+
+    memsafe(digest = alloc_mstring(2 * hashlen)
+           , 2 & hashlen, "hmac result");
+    for (i = 0; i < hashlen; i++)
+        sprintf(get_txt(digest)+2*i, "%02x", tmp[i] & 0xff);
+
+    free_svalue(sp--); /* The error handler. */
+    free_svalue(sp--); /* The message. */
+    free_svalue(sp--); /* The key. */
+    free_svalue(sp);   /* The method. */
+    put_string(sp, digest);
+
+    return sp;
+} /* f_hmac */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

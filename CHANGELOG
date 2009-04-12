@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Apr-2009 (Gnomi)
+  - (efuns.c, pkg-openssl.c, pkg-gcrypt.c) Moved hash() and hmac()
+    from pkg-openssl.c to efuns.c and implemented them also using
+    libgcrypt or the internal MD5 and SHA1 routines (bug #52).
+  - (efuns.c) fixed a memory leak in hash() and hmac().
+  - (efuns.c) hash() now costs 10 ticks per iteration.
+  - (efuns.c) sha1() calculated wrong hash values with multiple
+    interations.
+  - (doc/efun) Marked md5() and sha1() as obsoleted by hash().
+
 10-Apr-2009 (Gnomi)
   - (pkg-gnutls.c) Implemented tls_refresh_certs and tls_check_certificate
     with GnuTLS.

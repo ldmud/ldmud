@@ -100,7 +100,7 @@ SRC = access_check.c actions.c array.c backend.c bitstrings.c call_out.c \
       lex.c main.c mapping.c md5.c mempools.c mregex.c mstrings.c object.c \
       otable.c\
       parser.c parse.c pkg-alists.c pkg-iksemel.c pkg-idna.c \
-      pkg-mccp.c pkg-mysql.c pkg-pcre.c \
+      pkg-mccp.c pkg-mysql.c pkg-pcre.c pkg-gcrypt.c \
       pkg-pgsql.c pkg-sqlite.c pkg-tls.c pkg-openssl.c pkg-gnutls.c \
       ptmalloc.c port.c ptrtable.c \
       random.c regexp.c sha1.c simulate.c simul_efun.c stdstrings.c \
@@ -112,7 +112,7 @@ OBJ = access_check.o actions.o array.o backend.o bitstrings.o call_out.o \
       lex.o main.o mapping.o md5.o mempools.o mregex.o mstrings.o object.o \
       otable.o \
       parser.o parse.o pkg-alists.o pkg-iksemel.o pkg-idna.o \
-      pkg-mccp.o pkg-mysql.o pkg-pcre.o \
+      pkg-mccp.o pkg-mysql.o pkg-pcre.o pkg-gcrypt.o \
       pkg-pgsql.o pkg-sqlite.o pkg-tls.o pkg-openssl.o pkg-gnutls.o \
       ptmalloc.o port.o ptrtable.o \
       random.o regexp.o sha1.o simulate.o simul_efun.o stdstrings.o \

@@ -8,6 +8,9 @@
 #if defined(HAS_OPENSSL) && defined(HAS_GNUTLS)
 #error Both, OpenSSL and GnuTLS enabled.
 #endif
+#if defined(HAS_OPENSSL) && defined(USE_GCRYPT) && defined(HAS_GCRYPT)
+#error Both, OpenSSL and GCypt enabled.
+#endif
 
 #include "pkg-openssl.h"
 #include "pkg-gnutls.h"

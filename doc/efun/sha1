@@ -1,3 +1,4 @@
+OBSOLETE
 SYNOPSIS
         string sha1 (string arg [ , int iterations ] )
         string sha1 (int  * arg [ , int iterations ] )
@@ -24,6 +25,7 @@ HISTORY
         LDMud 3.3.712 added number arrays as argument, and the number
           of iterations.
         LDMud 3.3.717 added the iteration-based evaluation cost.
+        Since LDMud 3.3.719 obsoleted by hash().
 
 SEE ALSO
         crypt(E), md5(E), md5_crypt(E), hash(E), hmac(E)

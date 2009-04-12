@@ -878,6 +878,9 @@ init_lexer(void)
     add_permanent_define("__OPENSSL__", -1, string_copy("1"), MY_FALSE);
 #endif
 #endif
+#ifdef USE_GCRYPT
+    add_permanent_define("__GCRYPT__", -1, string_copy("1"), MY_FALSE);
+#endif
     if (wizlist_name[0] != '\0')
     {
         if (compat_mode)

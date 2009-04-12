@@ -81,6 +81,10 @@
 #include "pkg-iksemel.h"
 #endif
 
+#ifdef USE_GCRYPT
+#include "pkg-gcrypt.h"
+#endif
+
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/regexp.h"
@@ -440,6 +444,14 @@ main (int argc, char **argv)
 
 #ifdef USE_TLS
         tls_global_init();
+#endif
+
+#ifdef USE_GCRYPT
+        if (!pkg_gcrypt_init())
+        {
+            rc = 1;
+            break;
+        }
 #endif
 
         if (numports < 1) /* then use the default port */
