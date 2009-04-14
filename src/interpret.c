@@ -8984,11 +8984,11 @@ again:
             if (len > 2)
             {
                 def_offs += p1[3] << 16;
-                break_addr = p1 + sizeof(p_int);
+                break_addr = p1 + 4;
             }
             else
             {
-                break_addr = p1 + sizeof(p_int)-1;
+                break_addr = p1 + 3;
             }
             tabstart = p0 + a;
         }

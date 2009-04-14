@@ -7025,7 +7025,7 @@ store_case_labels( p_int total_length
     tablen = (long)(key_num * sizeof(p_int));
       /*   = key_num << SWITCH_TABLEN_SHIFT */
     p = (bytecode_p)get_space((long)
-        (tablen + key_num * len + 2 + len + sizeof(p_int) - 4));
+        (tablen + key_num * len + 2 + len));
 
     PUT_UINT8(p-total_length, (unsigned char)tablen);
     PUT_UINT8(p-total_length+1, (unsigned char)type);
