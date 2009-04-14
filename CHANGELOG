@@ -4,8 +4,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
 14-Apr-2009 (Gnomi)
   - (doc/driver/predefined) Corrected description of __PATH__(n).
   - (mk-patchlevel.h) Call version.sh in the current directory.
-  - (interpret.c, closure.c) The size of big switch structures was
-    miscalculated on LP64 platforms. (t-0000622.c)
+  - (interpret.c) The size of big switch structures was miscalculated
+    on LP64 platforms. (t-0000622.c)
 
 12-Apr-2009 (Gnomi)
   - (efuns.c, pkg-openssl.c, pkg-gcrypt.c) Moved hash() and hmac()

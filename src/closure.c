@@ -7025,7 +7025,7 @@ store_case_labels( p_int total_length
     tablen = (long)(key_num * sizeof(p_int));
       /*   = key_num << SWITCH_TABLEN_SHIFT */
     p = (bytecode_p)get_space((long)
-        (tablen + key_num * len + 2 + len));
+        (tablen + key_num * len + 2 + len + sizeof(p_int) - 4));
 
     PUT_UINT8(p-total_length, (unsigned char)tablen);
     PUT_UINT8(p-total_length+1, (unsigned char)type);
@@ -7050,8 +7050,10 @@ store_case_labels( p_int total_length
     STORE_SHORT(p, (short)default_addr);
     STORE_CODE(p, i0);
 
-    /* Create the value table 'v' */
+    /* Dummy bytes for aligning. */
     p += sizeof(p_int) - 4;
+
+    /* Create the value table 'v' */
     for (list1 = list0; list1; list1 = list1->next)
     {
         memcpy(p, &list1->key, sizeof(list1->key));
