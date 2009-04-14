@@ -21,8 +21,9 @@ DESCRIPTION
       __LINE__          : the actual line number.
       __DIR__           : the directory path of the compiled file (in
                           compat mode without leading '/').
-      __PATH__(n)       : the <n> leading directory path elements of the
-                          compiled file (in compat mode without leading '/').
+      __PATH__(n)       : the directory path of the compiled file without
+                          the <n> trailing elements (in compat mode without
+                          leading '/').
       __VERSION__       : the version string of the driver.
       __VERSION_MAJOR__ : the major version number of the driver.
       __VERSION_MINOR__ : the minor version number of the driver.

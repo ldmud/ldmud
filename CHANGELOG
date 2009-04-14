@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Apr-2009 (Gnomi)
+  - (doc/driver/predefined) Corrected description of __PATH__(n).
+
 12-Apr-2009 (Gnomi)
   - (efuns.c, pkg-openssl.c, pkg-gcrypt.c) Moved hash() and hmac()
     from pkg-openssl.c to efuns.c and implemented them also using
