@@ -1,8 +1,9 @@
-# Create the patchlevel.h file from patchlevel.h.in
+#! /bin/sh
 
+# Create the patchlevel.h file from patchlevel.h.in
 # Create the patchlevel.h from the information in version.sh
 
-. version.sh
+. ./version.sh
 
 sed -e "s/\\\$VersionType\\\$/$version_type/g" \
     -e "s/\\\$VersionLongType\\\$/$version_longtype/g" \
