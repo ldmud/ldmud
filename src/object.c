@@ -6735,14 +6735,10 @@ v_save_object (svalue_t *sp, int numarg)
 
         /* Open the file */
 
-#ifdef MSDOS_FS
-        /* We have to use O_BINARY with cygwin to be sure we have no CRs
-         * the file. See cygwin-faq for more information.
-         */
+        /* Always write savefiles in 'binary mode'. (O_BINARY is 0 on all platforms
+         * except of Cygwin and therefore ignored. Cygwin may need it, if the
+         * volume with the mudlib is mounted in textmode. */
         f = ixopen3(tmp_name, O_CREAT|O_TRUNC|O_WRONLY|O_BINARY, 0640);
-#else
-        f = ixopen3(tmp_name, O_CREAT|O_TRUNC|O_WRONLY|O_TEXT, 0640);
-#endif
 
         if (f < 0) {
             char * emsg, * buf;
@@ -6875,12 +6871,8 @@ v_save_object (svalue_t *sp, int numarg)
         i = 0; /* Result from efun */
 
         unlink(name);
-#if !defined(MSDOS_FS) && !defined(AMIGA) && !(defined(OS2) || defined(__EMX__)) && !defined(__BEOS__)
+
         if (link(tmp_name, name) == -1)
-#else
-        close(f);
-        if (rename(tmp_name,name) < 0)
-#endif
         {
             perror(name);
             printf("%s Failed to link %s to %s\n"
@@ -6888,10 +6880,8 @@ v_save_object (svalue_t *sp, int numarg)
             add_message("Failed to save object !\n");
             i = 1;
         }
-#if !defined(MSDOS_FS) && !defined(AMIGA) && !(defined(__EMX__) || defined(OS2)) && !defined(__BEOS__)
         close(f);
         unlink(tmp_name);
-#endif
 
         /* free the error handler and the arguments (numarg + 1  from sp) and
          * push result on the stack.
@@ -8787,8 +8777,10 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
         free_mstring(sfile);
 
-        /* Open the file and gets its length */
-        f = fopen(name, "r");
+        /* Open the file and gets its length (binary mode is ignored on all
+         * POSIX conforming platforms but not on Cygwin).
+         */
+        f = fopen(name, "rb");
         if (!f || fstat(fileno(f), &st) == -1) {
             if (f)
                 fclose(f);

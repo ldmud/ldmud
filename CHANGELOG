@@ -3,6 +3,12 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 15-Apr-2009 (Gnomi)
   - (pkg-gnutls.c) Support for older versions of libgnutls.
+  - (port.h, object.c)
+    Savefiles are written in binary mode, if the host system supports any
+      such notion (O_BINARY exists). Additionally, they are read as binary
+      as well, if it is supported. (Note: POSIX conforming systems do not
+      distinguish between 'text' and 'binary' modes, this is only relevant
+      to Cygwin.)
 
 14-Apr-2009 (Gnomi)
   - (doc/driver/predefined) Corrected description of __PATH__(n).

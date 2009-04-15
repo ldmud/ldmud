@@ -55,6 +55,12 @@ xx-xxx-xxxx -- 3.3.719
          '--enable-access-control', '--with-access-file', '--with-access-log'
          and their config.h symbols ACCESS_FILE and ACCESS_LOG just give
          the default values.
+       + Savefiles are written in binary mode, if the host system supports any
+         such notion (O_BINARY exists). Additionally, they are read as binary
+         as well, if it is supported. (Note: POSIX conforming systems do not
+         distinguish between 'text' and 'binary' modes, this is only relevant
+         to Cygwin.)
+
 
 12-Jan-2009 -- 3.3.718
     - New Efuns:

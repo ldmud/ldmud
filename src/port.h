@@ -11,8 +11,7 @@
  * features, includes the most common system includes and, more
  * important, the host specific includes. port.h knows about the
  * architectures the driver has been ported to and includes
- * their files automatically. This process can be bypassed by
- * defining an include file in the macro HOST_INCLUDE.
+ * their files automatically.
  *
  * Not everything system dependent is defined here, some stuff
  * are kept in separate my-foo.h files.
@@ -200,7 +199,7 @@ extern int errno;
 #    undef USE_MYSQL
 #endif
 
-#if defined( MSDOS ) || defined(CYGWIN) || defined(__EMX__) || defined(OS2)
+#if defined(CYGWIN)
 #define MSDOS_FS
 #endif
 
@@ -519,8 +518,16 @@ typedef char  CBool;
 #    define strrchr rindex
 #endif
 
-#if !defined(__BEOS__) && !defined(CYGWIN) && !(defined(__EMX__) || defined(OS2))
+/* O_BINARY and O_TEXT don't exist on POSIX conforming platforms, but on Cygwin.
+ * On Cygwin it may be needed if the volume with the mudlib is mounted in 'textmode'
+ * to open files without any line break conversions (*sigh*).
+ * We define them here to 0 if they don't exist and use them in the driver
+ * code.
+ */
+#ifndef O_BINARY
 #    define O_BINARY 0
+#endif
+#ifndef O_TEXT
 #    define O_TEXT 0
 #endif
 
@@ -556,18 +563,6 @@ typedef char  CBool;
 #define ALARM_HANDLER_FIRST_CALL(name)  name(0)
 
 /*------------------------------------------------------------------
- * The host specific includes
- */
-
-#if defined(HOST_INCLUDE)
-#    include HOST_INCLUDE
-#elif defined(__BEOS__)
-#    include "hosts/be/be.h"
-#else
-#    include "hosts/unix.h"
-#endif
-
-/*------------------------------------------------------------------
  * At last, the functions provided in port.c
  */
 
@@ -598,7 +593,6 @@ extern void move_memory(char *, char *, size_t);
 #endif
 
 #if ((!defined(HAVE_CRYPT) && !defined(HAVE__CRYPT))) || \
-    !defined(USE_SYSTEM_CRYPT) || \
     (defined(sgi) && !defined(_MODERN_C)) || defined(ultrix) \
     || defined(sun)
 extern char *crypt(const char *, const char *);
@@ -608,7 +602,7 @@ extern char *crypt(const char *, const char *);
 #    define crypt(pass, salt) _crypt(pass, salt)
 #endif
 
-#if defined(CYGWIN) || defined(__EMX__) || defined(OS2)
+#if defined(CYGWIN)
 extern void init_rusage(void);
 #else
 #define init_rusage()
