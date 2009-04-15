@@ -26,6 +26,14 @@ DESCRIPTION
              set_is_wizard()
              set_light()
              transfer()
+             tls_available()
+             tls_check_certificate()
+             tls_deinit_connection()
+             tls_error()
+             tls_init_connection()
+             tls_query_connection_info()
+             tls_query_connection_state()
+             tls_refresh_certs()
              xml_generate()
              xml_parse()
 
@@ -34,12 +42,15 @@ DESCRIPTION
            The behaviour of these efuns is not fixed yet, and may change
            with further releases:
 
+             tls_*()
              xml_generate()
              xml_parse()
 
          - 'deprecated' or 'obsolete'
 
              make_shared_string()
+             md5()
+             sha1()
 
            These efuns should no longer be used, they are merely provided
            for backwards compatibility:

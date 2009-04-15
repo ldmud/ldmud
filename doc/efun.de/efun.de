@@ -25,16 +25,30 @@ BESCHREIBUNG
              set_is_wizard()
              set_light()
              transfer()
+             tls_available()
+             tls_check_certificate()
+             tls_deinit_connection()
+             tls_error()
+             tls_init_connection()
+             tls_query_connection_info()
+             tls_query_connection_state()
+             tls_refresh_certs()
+             xml_generate()
+             xml_parse()
 
          - 'Vorlaeufig'
 
            Das Verhalten dieser Efuns kann sich in spaeteren Driverversionene
            aendern.
 
+             tls_*()
+             xml_*()
 
          - 'Obsolet' or 'Veraltet'
 
              make_shared_string()
+             md5()
+             sha1()
 
            Diese Efuns sollten nicht weiter verwendet werden. Sie stehen
            lediglich aus Kompatibilitaetsgruenden zur Verfuegung, und

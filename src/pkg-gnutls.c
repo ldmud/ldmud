@@ -549,7 +549,10 @@ tls_check_certificate (interactive_t *ip, Bool more)
     vector_t *v = NULL;
     const gnutls_datum_t *cert_list;
     gnutls_x509_crt_t cert;
+#if LIBGNUTLS_VERSION_MAJOR > 1 || (LIBGNUTLS_VERSION_MAJOR==1 && (LIBGNUTLS_VERSION_MINOR > 7 || (LIBGNUTLS_VERSION_MINOR == 7 && LIBGNUTLS_VERSION_MINOR >= 8)))
+#define GNUTLS_NEW_DN_API
     gnutls_x509_dn_t subject;
+#endif
     unsigned int cert_list_size;
     unsigned int result;
     time_t t, now;
@@ -584,6 +587,7 @@ tls_check_certificate (interactive_t *ip, Bool more)
     v = allocate_array(more ? 3 : 2);
     put_number(&(v->item[0]), result);
 
+#ifdef GNUTLS_NEW_DN_API
     err = gnutls_x509_crt_get_subject(cert, &subject);
     if (err < 0)
         put_number(&(v->item[1]), 0);
@@ -615,6 +619,74 @@ tls_check_certificate (interactive_t *ip, Bool more)
 
         put_array(&(v->item[1]), extra);
     }
+#else
+    {
+        int count, nr;
+        vector_t *extra;
+        char oid[128];
+        char data[256];
+        char *ptr;
+        size_t osize, dsize;
+
+        count = 0;
+        nr = 0;
+
+        while(1)
+        {
+            osize = sizeof(oid);
+
+            err = gnutls_x509_crt_get_dn_oid(cert, nr, oid, &osize);
+            if (err == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
+                break;
+            if (err >= 0)
+                count++;
+            nr++;
+        }
+
+        extra = allocate_array(3 * count);
+        count = 0;
+        ptr = 0;
+        nr = 0;
+
+        while (1)
+        {
+            osize = sizeof(oid);
+
+            err = gnutls_x509_crt_get_dn_oid(cert, nr, oid, &osize);
+            if (err == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
+                break;
+            if (err >= 0)
+            {
+                dsize = sizeof(data);
+                ptr = NULL;
+
+                err = gnutls_x509_crt_get_dn_by_oid(cert, oid, 0, 0, data, &dsize);
+                if (err == GNUTLS_E_SHORT_MEMORY_BUFFER)
+                {
+                    ptr = (char*) xalloc(dsize);
+                    if (ptr)
+                        err = gnutls_x509_crt_get_dn_by_oid(cert, oid, 0, 0, ptr, &dsize);
+                }
+
+                put_c_n_string(&(extra->item[count++]), oid, osize);
+                put_number(&(extra->item[count]), 0); count++;
+                if (err >= 0)
+                    put_c_n_string(&(extra->item[count++]), (ptr!=NULL) ? ptr : data, dsize);
+                else
+                {
+                    put_number(&(extra->item[count]), 0); count++;
+                }
+
+                if (ptr)
+                    xfree(ptr);
+            }
+
+            nr++;
+        }
+
+        put_array(&(v->item[1]), extra);
+    }
+#endif
 
     if (more)
     {
@@ -654,9 +726,13 @@ tls_check_certificate (interactive_t *ip, Bool more)
                 break;
             if (err >= 0)
             {
+#ifndef GNUTLS_NEW_DN_API
+                unsigned int critical;
+#endif
                 dsize = sizeof(data);
                 ptr = NULL;
 
+#ifdef GNUTLS_NEW_DN_API
                 err = gnutls_x509_crt_get_extension_data(cert, nr, data, &dsize);
                 if (err == GNUTLS_E_SHORT_MEMORY_BUFFER)
                 {
@@ -664,6 +740,15 @@ tls_check_certificate (interactive_t *ip, Bool more)
                     if (ptr)
                         err = gnutls_x509_crt_get_extension_data(cert, nr, ptr, &dsize);
                 }
+#else
+                err = gnutls_x509_crt_get_extension_by_oid(cert, oid, 0, data, &dsize, &critical);
+                if (err == GNUTLS_E_SHORT_MEMORY_BUFFER)
+                {
+                    ptr = (char*) xalloc(dsize);
+                    if (ptr)
+                        err = gnutls_x509_crt_get_extension_by_oid(cert, oid, 0, ptr, &dsize, &critical);
+                }
+#endif
 
                 put_c_n_string(&(extra->item[count++]), oid, osize);
                 put_number(&(extra->item[count]), 0); count++;
