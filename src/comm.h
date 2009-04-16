@@ -126,13 +126,31 @@
  * The instances are kept in a linked list from the interactive_t
  * structure.
  */
+enum write_buffer_flags
+{
+    WB_NONDISCARDABLE = 0x0001, /* This message must be sent. */
+};
+
+typedef uint32 write_buffer_flag_t;
+
 struct write_buffer_s
 {
     struct write_buffer_s *next;
     size_t length;
     size_t pos;
+    write_buffer_flag_t flags;
     char buffer[1 /* .length */ ];
 };
+
+/* Indicates discarded messages. */
+enum discarded_msg_states
+{
+    DM_NONE = 0,
+    DM_SEND_INFO,
+    DM_INFO_WAS_SENT,
+};
+
+typedef char discarded_msg_state_t;
 
 /* --- struct input_to_s: input_to() datastructure
  *
@@ -186,9 +204,9 @@ struct interactive_s {
     CBool outgoing_conn;        /* TRUE if the connection was created by 
                                  * net_connect().
                                  */
-
-    short msg_discarded;        /* != 0 if an earlier msg had been discarded,
-                                   index into the message to be sent. */
+    discarded_msg_state_t msg_discarded;
+                                /* Indicates if an earlier message had
+                                 * been discarded. */
     short text_end;             /* first free char in buffer */
     short command_start;        /* used for charmode */
     short command_end;          /* where we are up to in player cmd buffer */
@@ -247,14 +265,20 @@ struct interactive_s {
       /* The send buffer. */
 
 #ifdef USE_MCCP
-     unsigned char   compressing;     
-     z_stream      * out_compress;    
-     unsigned char * out_compress_buf;
-#endif   
+    unsigned char   compressing;
+    z_stream      * out_compress;
+    unsigned char * out_compress_buf;
+#endif
 
     struct write_buffer_s *write_first;  /* List of buffers to write */
     struct write_buffer_s *write_last;
-    unsigned long          write_size;
+    p_uint                 write_size;
+    p_int                  write_max_size; 
+      /* Maximum write_size.
+       *   0: No write buffer.
+       *  -1: Infinite write buffer.
+       *  -2: Use global variable write_buffer_max_size.
+       */
 
 #ifdef USE_TLS
     tls_session_t          tls_session;
@@ -356,7 +380,7 @@ extern int num_player;
 extern char *message_flush;
 extern char *domain_name;
 
-extern long write_buffer_max_size;
+extern p_int write_buffer_max_size;
 
 #ifdef COMM_STAT
 extern unsigned long add_message_calls;
@@ -372,7 +396,7 @@ extern void initialize_host_name (const char *hname);
 extern void initialize_host_ip_number(const char *, const char *);
 extern void  prepare_ipc(void);
 extern void  ipc_remove(void);
-extern Bool comm_socket_write (char *msg, size_t size, interactive_t *ip);
+extern Bool comm_socket_write (char *msg, size_t size, interactive_t *ip, uint32 flags);
 extern void  add_message VARPROT((const char *, ...), printf, 1, 2);
 extern void  flush_all_player_mess(void);
 extern Bool get_message(char *buff);
@@ -437,6 +461,7 @@ extern svalue_t *f_get_max_commands (svalue_t *sp);
 extern svalue_t *f_set_max_commands (svalue_t *sp);
 extern svalue_t *f_enable_telnet (svalue_t *sp);
 extern svalue_t *f_net_connect (svalue_t *sp);
+extern svalue_t *f_configure_interactive(svalue_t *sp);
 
 extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) );
 

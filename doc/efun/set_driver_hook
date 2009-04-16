@@ -88,6 +88,11 @@ DESCRIPTION
           Optional hook to notify the mudlib about the termination of
           the erq demon.
 
+        H_MSG_DISCARDED
+          arg: lambda closure, lfun closure, string
+          Optional hook to specify a message or take other measures
+          when a message had to be discarded.
+
         See hooks(C) for a detailed discussion.
 
 HISTORY

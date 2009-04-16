@@ -1,5 +1,5 @@
 SYNOPSIS
-        int privilege_violation(string op, mixed who, mixed arg, mixed arg2)
+        int privilege_violation(string op, mixed who, mixed arg, mixed arg2, mixed arg3)
 
 DESCRIPTION
         Validate the execution of a privileged operation.
@@ -18,6 +18,8 @@ DESCRIPTION
         bind_lambda       Bind a lambda-closure to object <arg>.
         call_out_info     Return an array with all call_out
                           informations.
+        configure_interactive Set option <arg2> with value <arg3> as
+                          default (<arg>==0) or for object <arg>.
         enable_telnet     Enable/disable telnet (<arg2>) for object <arg>.
         execute_command   Execute command string <arg2> for the object
                           <arg>.

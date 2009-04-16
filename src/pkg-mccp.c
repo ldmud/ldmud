@@ -204,7 +204,7 @@ end_compress (interactive_t * ip, Bool force)
     ip->out_compress_buf = NULL;
 
     /* try to send any residual data */
-    comm_socket_write((char*) buf, len, ip);
+    comm_socket_write((char*) buf, len, ip, WB_NONDISCARDABLE);
    
     printf("%s MCCP-DEBUG: '%s' mccp ended\n"
           , time_stamp(), get_txt(ip->ob->name));

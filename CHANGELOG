@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Apr-2009 (Gnomi)
+  - (comm.c, interpret.c, doc/) Made the maximum write buffer size
+    configurable per interactive via a new efun configure_interactive.
+    New optional driver hook H_MSG_DISCARDED to inform the master about
+    discarded messages and send a custom error message to the interactive.
+    Already compressed packages wont be discarded (Bug #297).
+
 15-Apr-2009 (Gnomi)
   - (pkg-gnutls.c) Support for older versions of libgnutls.
   - (port.h, object.c)

@@ -1652,6 +1652,8 @@ name_to_hook(char *name)
         return H_PRINT_PROMPT;
     if ( !strcmp(name, "REGEXP_PACKAGE") )
         return H_REGEXP_PACKAGE;
+    if ( !strcmp(name, "MSG_DISCARDED") )
+        return H_MSG_DISCARDED;
     return -1;
 }
 

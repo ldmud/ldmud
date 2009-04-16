@@ -134,6 +134,7 @@
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/comm.h"
+#include "../mudlib/sys/configuration.h"
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/input_to.h"
 
@@ -225,8 +226,10 @@ char *message_flush = NULL;
    * a 'null format string'.
    */
 
-long write_buffer_max_size = WRITE_BUFFER_MAX_SIZE;
+p_int write_buffer_max_size = WRITE_BUFFER_MAX_SIZE;
   /* Amount of data held pending in the write fifo queue.
+   *   0: No queue.
+   *  -1: Infinite queue.
    */
 
 
@@ -469,7 +472,9 @@ static void send_will(int);
 static void send_wont(int);
 static void send_do(int);
 static void send_dont(int);
+static void add_flush_entry(interactive_t *ip);
 static void remove_flush_entry(interactive_t *ip);
+static void clear_message_buf(interactive_t *ip);
 static void new_player(object_t *receiver, SOCKET_T new_socket, struct sockaddr_in *addr, size_t len, int login_port);
 
 #ifdef ERQ_DEMON
@@ -753,7 +758,6 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       default: putc('\n', stderr);
       }
     fprintf(stderr, "  .supress_go_ahead:  %02hhx\n", (unsigned char)ip->supress_go_ahead);
-    fprintf(stderr, "  .msg_discarded:     %hd\n", ip->msg_discarded);
     fprintf(stderr, "  .text_end:          %hd (%p)\n", ip->text_end, ip->text+ip->text_end);
     fprintf(stderr, "  .command_start:     %hd (%p)\n", ip->command_start, ip->text+ip->command_start);
     fprintf(stderr, "  .command_end:       %hd (%p)\n", ip->command_end, ip->text+ip->command_end);
@@ -1350,7 +1354,7 @@ comm_send_buf (char *msg, size_t size, interactive_t *ip)
         case EPIPE:
             fprintf(stderr, "%s comm: write EPIPE detected\n", time_stamp());
             break;
-            
+
         case ECONNRESET:
             fprintf(stderr, "%s comm: write ECONNRESET detected\n", time_stamp());
             break;
@@ -1362,10 +1366,10 @@ comm_send_buf (char *msg, size_t size, interactive_t *ip)
                                   , time_stamp(), e, strerror(e));
             }
         }
-        
+
         if (n == 0)
             break;
-            
+
         ip->do_close = FLAG_DO_CLOSE;
         return -1;
 
@@ -1385,11 +1389,13 @@ comm_send_buf (char *msg, size_t size, interactive_t *ip)
 
 /*-------------------------------------------------------------------------*/
 Bool
-comm_socket_write (char *msg, size_t size, interactive_t *ip)
+comm_socket_write (char *msg, size_t size, interactive_t *ip, write_buffer_flag_t flags)
 
 /* Stand in for socket_write(): take the data to be written, compress and
  * encrypt them if needed and send them to <ip>. If no data can be send
- * right now append them to the buffer.
+ * right now append them to the buffer. Returns false if no more data
+ * is accepted at this time (messages are discarded or the connection
+ * was dropped).
  */
 
 {
@@ -1401,30 +1407,64 @@ comm_socket_write (char *msg, size_t size, interactive_t *ip)
         return MY_TRUE;
 
 #ifdef USE_MCCP
+    /* We cannot discard already compressed packets,
+     * because the zlib will generate a checksum
+     * over all bytes. So we have to check before
+     * compressing the message whether we can send 
+     * or put them in the write buffer.
+     *
+     * To provide a consistent behavior we do this
+     * also for uncompressed connections.
+     */
+#endif
+
+    if (!(flags & WB_NONDISCARDABLE) && ip->write_first)
+    {
+        p_int max_size;
+
+        max_size = ip->write_max_size;
+        if (max_size == -2)
+            max_size = write_buffer_max_size;
+
+        if (max_size >= 0 && ip->write_size >= (p_uint) max_size)
+        {
+            /* Buffer overflow. */
+            if (ip->msg_discarded != DM_NONE)
+                return MY_FALSE; /* Message will be or was sent. */
+
+            /* Notify the master about it. */
+            ip->msg_discarded = DM_SEND_INFO;
+            add_flush_entry(ip);
+
+            return MY_FALSE;
+        }
+    }
+
+#ifdef USE_MCCP
     if (ip->out_compress)
     {
         int status;
-        
+
         ip->out_compress->next_in = (unsigned char *) msg;
         ip->out_compress->avail_in = size;
-            
+
         ip->out_compress->next_out = ip->out_compress_buf;
         ip->out_compress->avail_out = COMPRESS_BUF_SIZE;
 
         status = deflate(ip->out_compress, Z_SYNC_FLUSH);
-          
+
         if (status != Z_OK)
         {
             fprintf(stderr, "%s comm: MCCP compression error: %d\n"
                           , time_stamp(), status);
             return MY_FALSE;
         }
-            
+
         /* ok.. perhaps i should take care that all data in message_buf
          * is compressed, but i guess there is no chance that 1024 byte
          * compressed won't fit into the 8192 byte buffer
          */
-        
+
         length = ip->out_compress->next_out - ip->out_compress_buf;
         buf = (char *) ip->out_compress_buf;
     }
@@ -1440,7 +1480,7 @@ comm_socket_write (char *msg, size_t size, interactive_t *ip)
     {
         /* Try writing to the socket first. */
         ssize_t n = comm_send_buf(buf, length, ip);
-        
+
         if (n == -1)
             return MY_FALSE;
         else if (n == length)
@@ -1448,45 +1488,34 @@ comm_socket_write (char *msg, size_t size, interactive_t *ip)
             /* We're done. */
             return MY_TRUE;
         }
-        else
+        else if (n > 0)
         {
             buf += n;
             length -= n;
         }
     }
-    
+
     /* We have to enqueue the message. */
-    b = xalloc(sizeof(struct write_buffer_s) + size - 1);
+
+    b = xalloc(sizeof(struct write_buffer_s) + length - 1);
     if (!b)
-        outofmem(sizeof(struct write_buffer_s) + size - 1, "comm_socket_write()");
+        outofmem(sizeof(struct write_buffer_s) + length - 1, "comm_socket_write()");
 
     b->length = length;
     b->pos = 0;
+    b->flags = flags;
     b->next = NULL;
     memcpy(b->buffer, buf, length);
 
-    /* Chain in the new buffer */
-    if(ip->write_first)
+     /* Chain in the new buffer */
+    if (ip->write_first)
         ip->write_last = ip->write_last->next = b;
     else
-        ip->write_first = ip->write_last = b;
-    ip->write_size += size;
-    
-    /* Make sure that the amount of data pending never exceeds
-     * the maximum.
-     */
-    while (write_buffer_max_size != 0
-        && ip->write_size >= (unsigned long)write_buffer_max_size)
-    {
-        struct write_buffer_s *tmp = ip->write_first;
-        ip->write_first = tmp->next;
-        ip->write_size -= tmp->length;
-        xfree(tmp);
+        ip->write_last = ip->write_first = b;
 
-        if (!ip->msg_discarded)
-            ip->msg_discarded = 1;
-    }
-    
+    ip->write_size += length;
+    ip->msg_discarded = DM_NONE;
+
     return MY_TRUE;
 } /* comm_socket_write() */
 
@@ -1498,40 +1527,83 @@ comm_write_pending (interactive_t * ip)
  */
 
 {
-    /* First, if a previous call had to discard the message, inform the user.
-     */
-    if (ip->msg_discarded)
-    {
-        ssize_t n;
-        char msg[] = "\n*** Text lost in transmission ***\n";
-        
-        n = comm_send_buf(msg, sizeof(msg) - ip->msg_discarded, ip);
-        
-        ip->msg_discarded += n;
-        if (ip->msg_discarded >= sizeof(msg))
-            ip->msg_discarded = 0;
-    }
-    
     while (ip->write_first != NULL)
     {
         struct write_buffer_s *buf;
         ssize_t n;
-        
+
         buf = ip->write_first;
         n = comm_send_buf(buf->buffer + buf->pos, buf->length - buf->pos, ip);
 
         if (n == -1)
             return;
-        
+
         buf->pos += n;
         if (buf->pos < buf->length)
             return;
-        
+
         ip->write_first = buf->next;
         ip->write_size -= buf->length;
         xfree(buf);
     }
 } /* comm_write_pending() */
+
+/*-------------------------------------------------------------------------*/
+static void
+add_discarded_message (interactive_t *ip)
+
+/* Calls the H_MSG_DISCARDED driver hook and adds the
+ * message to the write buffer of <ip>. <ip> is removed
+ * from the list of dirty interactives if it's clean afterwards.
+ */
+{
+    string_t *discarded_msg;
+
+    if (driver_hook[H_MSG_DISCARDED].type == T_CLOSURE)
+    {
+        if (driver_hook[H_MSG_DISCARDED].x.closure_type == CLOSURE_LAMBDA)
+        {
+            free_object(driver_hook[H_MSG_DISCARDED].u.lambda->ob, "add_discarded_message");
+            driver_hook[H_MSG_DISCARDED].u.lambda->ob = ref_object(ip->ob, "add_discarded_message");
+        }
+
+        push_ref_valid_object(inter_sp, ip->ob, "add_discarded_message");
+
+        call_lambda(&driver_hook[H_MSG_DISCARDED], 1);
+
+        if (inter_sp->type == T_STRING)
+        {
+            /* The new discarded_msg. Adopt the reference. */
+            discarded_msg = inter_sp->u.str;
+
+            inter_sp->type = T_INVALID;
+            inter_sp--;
+        }
+        else
+            discarded_msg = NULL;
+    }
+    else if (driver_hook[H_MSG_DISCARDED].type == T_STRING)
+    {
+        discarded_msg = ref_mstring(driver_hook[H_MSG_DISCARDED].u.str);
+    }
+    else
+    {
+        discarded_msg = ref_mstring(STR_DISCARDED_MSG);
+    }
+
+    if (discarded_msg)
+    {
+        /* Append it to the write buffer. */
+        comm_socket_write(get_txt(discarded_msg), mstrsize(discarded_msg)
+                        , ip, WB_NONDISCARDABLE);
+        free_mstring(discarded_msg);
+    }
+
+    ip->msg_discarded = DM_INFO_WAS_SENT;
+
+    if (!ip->message_length)
+        remove_flush_entry(ip);
+}
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1838,6 +1910,11 @@ add_message (const char *fmt, ...)
     dest = &ip->message_buf[old_message_length];
     end  = &ip->message_buf[sizeof ip->message_buf];
 
+    /* If there's any recursive call, let it begin
+     * at the start.
+     */
+    ip->message_length = 0;
+    
     /* This loop advances source until it reaches the end.
      * Every character encountered is copied, translated or fed
      * into the telnet machine.
@@ -1925,10 +2002,10 @@ if (sending_telnet_command)
 
         /* Write .message_buf[] to the network. */
 
-        if (!comm_socket_write(ip->message_buf, (size_t)chunk, ip))
+        if (!comm_socket_write(ip->message_buf, (size_t)chunk, ip, 0))
         {
             if (old_message_length)
-                remove_flush_entry(ip);
+                clear_message_buf(ip);
             return;
         }
 
@@ -1946,18 +2023,11 @@ if (sending_telnet_command)
     {
         /* Buffer became 'dirty': add this interactive to the list.
          */
-        if ( NULL != (ip->next_player_for_flush = first_player_for_flush) )
-        {
-            O_GET_INTERACTIVE(first_player_for_flush)->
-              previous_player_for_flush =
-                command_giver;
-        }
-        ip->previous_player_for_flush = NULL;
-        first_player_for_flush = command_giver;
+        add_flush_entry(ip);
     }
     if ( !length && old_message_length ) /* buffer has become empty */
     {
-        remove_flush_entry(ip);
+        clear_message_buf(ip);
     }
 } /* add_message() */
 
@@ -1999,19 +2069,35 @@ reset_input_buffer (interactive_t *ip)
 
 /*-------------------------------------------------------------------------*/
 static void
+add_flush_entry (interactive_t *ip)
+
+/* Add the given interactive <ip> to the list of 'dirty' interactives.
+ * The function is safe to call for interactives already in the list.
+ */
+
+{
+    if ( ip->previous_player_for_flush || first_player_for_flush == ip->ob)
+        return;
+
+    if ( NULL != (ip->next_player_for_flush = first_player_for_flush) )
+    {
+        O_GET_INTERACTIVE(first_player_for_flush)->
+          previous_player_for_flush = ip->ob;
+    }
+    ip->previous_player_for_flush = NULL;
+    first_player_for_flush = ip->ob;
+} /* add_flush_entry() */
+
+/*-------------------------------------------------------------------------*/
+static void
 remove_flush_entry (interactive_t *ip)
 
 /* Remove the given interactive <ip> from the list of 'dirty' interactives
  * and make sure it is really clean. The function is safe to call for
  * interactives not in the list.
- *
- * This function is called after an interactive sent all pending data (or
- * failing while doing so).
  */
 
 {
-    ip->message_length = 0;
-
     /* To make it safe for calling the function even for interactives
      * not in the flush list, we check that <ip> is either in the middle
      * or at the end of the flush list (one or both of the .previous
@@ -2050,17 +2136,41 @@ flush_all_player_mess (void)
 
 {
     object_t *p, *np;
+    interactive_t *ip;
     object_t *save = command_giver;
 
     for ( p = first_player_for_flush; p != NULL; p = np)
     {
-        np = O_GET_INTERACTIVE(p)->next_player_for_flush;
+        ip = O_GET_INTERACTIVE(p);
+        np = ip->next_player_for_flush;
           /* add_message() will clobber (p)->next_player_for_flush! */
         command_giver = p;
         add_message(message_flush);
+
+        if(ip->msg_discarded == DM_SEND_INFO)
+            add_discarded_message(ip);
     }
     command_giver = save;
 } /* flush_all_player_mess() */
+
+/*-------------------------------------------------------------------------*/
+static void
+clear_message_buf (interactive_t *ip)
+
+/* Clear the buffer of the given interactive <ip> and remove it from
+ * the list of 'dirty' interactives if there is nothing else to do.
+ * The function is safe to call for interactives not in the list.
+ *
+ * This function is called after an interactive sent all pending data (or
+ * failing while doing so).
+ */
+
+{
+    ip->message_length = 0;
+
+    if (ip->msg_discarded != DM_SEND_INFO)
+        remove_flush_entry(ip);
+} /* clear_message_buf() */
 
 /*-------------------------------------------------------------------------*/
 Bool
@@ -2191,7 +2301,7 @@ get_message (char *buff)
                         nfds = socket_number(ip->socket)+1;
                 }
 
-                if (ip->write_first != NULL || ip->msg_discarded)
+                if (ip->write_first != NULL)
                 {
                     /* There is something to write. */
                     FD_SET(ip->socket, &writefds);
@@ -3025,7 +3135,7 @@ get_message (char *buff)
                     {
                         comm_socket_write(ip->text + ip->chars_ready
                                         , (size_t)(length - ip->chars_ready)
-                                        , ip);
+                                        , ip, 0);
                         ip->chars_ready = length;
                     }
                 }
@@ -3532,7 +3642,6 @@ new_player ( object_t *ob, SOCKET_T new_socket
     new_interactive->input_to = NULL;
     put_number(&new_interactive->prompt, 0);
     new_interactive->modify_command = NULL;
-    new_interactive->msg_discarded = 0;
     new_interactive->closing = MY_FALSE;
     new_interactive->tn_enabled = MY_TRUE;
     new_interactive->do_close = 0;
@@ -3564,9 +3673,11 @@ new_player ( object_t *ob, SOCKET_T new_socket
     new_interactive->socket = new_socket;
     new_interactive->next_player_for_flush = NULL;
     new_interactive->previous_player_for_flush = NULL;
+    new_interactive->msg_discarded = DM_NONE;
 
     new_interactive->write_first = new_interactive->write_last = NULL;
     new_interactive->write_size = 0;
+    new_interactive->write_max_size = -2;
 
     /* Add the new interactive structure to the list of users */
 
@@ -5143,12 +5254,12 @@ telnet_neg (interactive_t *ip)
                         {
                             comm_socket_write(&ip->text[ip->chars_ready]
                                             , (size_t)(to - &ip->text[ip->chars_ready])
-                                            , ip);
+                                            , ip, 0);
                             ip->chars_ready = to - ip->text;
                         }
                         if (to > first)
                         {
-                            comm_socket_write("\b \b", 3, ip);
+                            comm_socket_write("\b \b", 3, ip, 0);
                             to--;
                             ip->chars_ready--;
                         }
@@ -6909,7 +7020,7 @@ f_binary_message (svalue_t *sp)
              * to the socket now.
              */
 
-            if (comm_socket_write(get_txt(msg), mstrsize(msg), ip))
+            if (comm_socket_write(get_txt(msg), mstrsize(msg), ip, 0))
                 wrote = mstrsize(msg);
 
         } /* if (type of write) */
@@ -8780,5 +8891,81 @@ f_net_connect (svalue_t *sp)
 
     return sp;
 } /* f_net_connect() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_configure_interactive (svalue_t *sp)
+
+/* EFUN configure_interactive()
+ *
+ *   void configure_interactive(object ob, int what, mixed data)
+ *
+ * Sets the option <what> to the value <data> on the interactive <ob>
+ * or the default for all interactives if <ob> is 0.
+ *
+ * <what> == IC_MAX_WRITE_BUFFER_SIZE
+ *
+ * If the first argument <ob> is not this_object(), the privilege violation
+ * ("configure_interactive", this_object(), ob, what, data) occurs.
+ */
+
+{
+    object_t *ob;
+    interactive_t *ip;
+
+    if (sp[-2].type == T_OBJECT)
+    {
+        ob = sp[-2].u.ob;
+
+        if (!O_SET_INTERACTIVE(ip, ob))
+        {
+            errorf("Bad arg 1 to configure_interactive(): "
+                   "Object '%s' is not interactive.\n"
+                 , get_txt(ob->name)
+                 );
+            return sp; /* NOTREACHED */
+        }
+    }
+    else
+    {
+        ob = NULL;
+        ip = NULL;
+    }
+
+    if (ob != current_object
+     && !privilege_violation_n(STR_CONFIGURE_INTERACTIVE, ob, sp, 2))
+    {
+        sp = pop_n_elems(3, sp);
+        return sp;
+    }
+
+    switch(sp[-1].u.number)
+    {
+    default:
+        errorf("Illegal value %"PRIdPINT" for configure_interactive().\n", sp[-1].u.number);
+        return sp; /* NOTREACHED */
+
+    case IC_MAX_WRITE_BUFFER_SIZE:
+        {
+            int max;
+
+            if (sp->type != T_NUMBER)
+                efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+
+            max = sp->u.number;
+            if (max < 0)
+                max = -1;
+
+            if (!ip)
+                write_buffer_max_size = max;
+            else
+                ip->write_max_size = max;
+            break;
+        }
+    }
+
+    sp = pop_n_elems(3, sp);
+    return sp;
+} /* f_configure_interactive() */
 
 /***************************************************************************/

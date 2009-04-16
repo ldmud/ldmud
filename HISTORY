@@ -14,6 +14,9 @@ xx-xxx-xxxx -- 3.3.719
          (sizeof(word_t)) was not taken into account in the calculation of a
          block size, leading to crashes afterwards. (#611)
 
+    - New Efuns:
+       + configure_interactive(): To set options for interactives.
+
     - Changed Efuns:
        + idna_stringprep(): fixed the evaluation of the arguments and removed
          a memory leak (#498).
@@ -36,6 +39,8 @@ xx-xxx-xxxx -- 3.3.719
          'real-time'.
        + Made the maximum length of commands configurable at compile-time
          (MAX_COMMAND_LENGTH, --max-command-length)
+       + The driver hook H_MSG_DISCARDED can be used to specify the messages
+         given to players when their messages were discarded.
 
     - Language
        + Added a permanent define __MAX_COMMAND_LENGTH__ for the maximum

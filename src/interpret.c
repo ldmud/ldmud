@@ -6652,6 +6652,79 @@ privilege_violation4 ( string_t *what,    object_t *whom
 } /* privilege_violation4() */
 
 /*-------------------------------------------------------------------------*/
+Bool
+privilege_violation_n ( string_t *what, object_t *whom, svalue_t *sp, int num_arg)
+
+/* Call the mudlib to check for a privilege violation:
+ *
+ *   master->privilege_violation(what, current_object, whom,
+ *                               sp[-num_arg+1], ...., sp)
+ *
+ * where <what> describes the type of the violation, and <whom> and the last
+ * <num_arg> values of the stack are data used in the violation. <sp> is 
+ * also the current stack setting. All strings are not counted.
+ *
+ * If the apply returns a positive number, the privilege is granted and
+ * the function returns TRUE.
+ * If the apply returns 0, the privilege is gently denied and the function
+ * returns FALSE.
+ * If the apply returns something else, or if the lfun doesn't exist,
+ * an error is raised.
+ *
+ * If the current_object is the master or simul_efun object, this function
+ * immediately returns TRUE.
+ *
+ * If the lfun doesn't exist, or returns anything else but a positive
+ * number, an error is raised.
+ *
+ * <inter_sp> is updated to <sp>, <inter_pc> is assumed to be correct.
+ */
+
+{
+    svalue_t *svp, *arg;
+    int num;
+
+    /* Trust these objects */
+    if (current_object == master_ob) return MY_TRUE;
+    if (current_object == simul_efun_object) return MY_TRUE;
+
+    /* Set up the lfun call */
+
+    arg = sp + 1 - num_arg;
+
+    push_ref_string(sp, what);
+    push_ref_valid_object(sp, current_object, "privilege_violation");
+    if (!whom)
+    {
+        push_number(sp, 0);
+    }
+    else
+    {
+        push_ref_object(sp, whom, "privilege_violation");
+    }
+
+    for (num = num_arg; num--; arg++)
+    {
+        sp++;
+        assign_svalue_no_free(sp,  arg);
+    }
+
+    inter_sp = sp;
+    svp = apply_master(STR_PRIVILEGE, 3 + num_arg);
+
+    /* Was it the proper lfun to call? */
+    if (!svp || svp->type != T_NUMBER || svp->u.number < 0)
+    {
+        inter_sp = sp - 3 - num_arg;
+        errorf("privilege violation : %s\n", get_txt(what));
+        /* TODO: Print full args and types */
+    }
+
+    /* Return the result */
+    return svp->u.number > 0;
+} /* privilege_violation_n() */
+
+/*-------------------------------------------------------------------------*/
 static Bool
 trace_test (int b)
 
