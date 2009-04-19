@@ -111,10 +111,13 @@ tls_continue_handshake (interactive_t *ip)
         push_ref_object(inter_sp, ip->ob, "tls_handshake");
 
         command_giver = ip->ob;
-        current_interactive = NULL; 
-        /* This is not a reaction to a user input. */
+        current_interactive = ip->ob;
+        /* Set current_interactive as it would be for a normal logon() call. */
 
         (void)apply_callback(handler->cb, 2);
+
+        if (!(ip->ob->flags & O_DESTRUCTED))
+            print_prompt();
 
         command_giver = NULL;
 
