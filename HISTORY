@@ -27,8 +27,9 @@ xx-xxx-xxxx -- 3.3.719
        + hash() and hmac() is now always available und is able to use OpenSSL,
          libgcrypt or internal MD5 and SHA1 routines (builtin routines for
          hash() only). hash() costs 10 ticks per iteration.
-       + sha1() calculated wrong hash values with multiple interations.
        + md5() and sha1() are obsoleted by hash().
+       + lambda() now supports bound and unbound lambdas as the first element
+         in an array of a lambda expression.
 
     - Runtime
        + The --max-malloced memory limit was renamed to --hard-malloc-limit.

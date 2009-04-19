@@ -13241,6 +13241,14 @@ again:
         pop_stack();
         break;
 
+    CASE(F_POP_SECOND);             /* --- pop_second          --- */
+        /* Pop the value under the topmost value and put the
+         * topmost value there.
+         */
+        free_svalue(--sp);
+        *sp = sp[1];
+        break;
+
     CASE(F_DUP);                    /* --- dup                 --- */
         /* Push a duplicate of sp[0] onto the stack.
          */
@@ -13763,6 +13771,58 @@ again:
         csp->extern_call = MY_FALSE;
         break;
     }
+
+    CASE(F_CALL_CLOSURE); /* --- call_closure --- */
+        /* Call the closure on the stack with the arguments on the stack.
+         * Just like funcall(), but as an internal call.
+         * We leave the closure an the stack for a following F_POP_SECOND
+         * to clear it up. This instruction is only used by lambda closures.
+         */
+    {
+        num_arg = sp - ap;
+
+        if (ap->type == T_CLOSURE)
+        {
+            inter_sp = sp;
+
+            /* No external calls may be done when this object is
+             * destructed.
+             */
+            if (current_object->flags & O_DESTRUCTED)
+            {
+                sp = _pop_n_elems(num_arg, sp);
+                push_number(sp, 0);
+                inter_sp = sp;
+                warnf("Call from destructed object '%s' ignored.\n"
+                     , get_txt(current_object->name));
+                return sp;
+            }
+
+            /* Call the closure and push the result.
+             * Note that the closure might destruct itself.
+             */
+            inter_pc = pc;
+
+            int_call_lambda(ap, num_arg, MY_FALSE, MY_FALSE);
+
+            pc = inter_pc;
+            sp = inter_sp;
+            fp = inter_fp;
+        }
+        else
+        {
+            /* Not a closure: pop the excess args and return <cl>
+             * as result.
+             */
+
+            sp = _pop_n_elems(num_arg, sp);
+            push_number(sp, 0);
+        }
+
+        break;
+    }
+
+
 
 #ifdef USE_NEW_INLINES
     CASE(F_CONTEXT_IDENTIFIER);  /* --- context_identifier <var_ix> --- */
@@ -17148,7 +17208,7 @@ int_apply (string_t *fun, object_t *ob, int num_arg
             }
             else /* hook->type == T_CLOSURE */
             {
-                int_call_lambda(hook, num_arg+num_extra, MY_TRUE);
+                int_call_lambda(hook, num_arg+num_extra, MY_TRUE, MY_TRUE);
                 rc = 1; /* This call obviously succeeds */
             }
 
@@ -17867,7 +17927,7 @@ assert_master_ob_loaded (void)
 
 /*-------------------------------------------------------------------------*/
 void
-int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
+int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
 
 /* Call the closure <lsvp> with <num_arg> arguments on the stack. On
  * success, the arguments are replaced with the result, else an errorf()
@@ -17875,6 +17935,10 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
  * If <allowRefs> is TRUE, references may be passed as extended varargs
  * ('(varargs mixed *)'). Currently this is used only for simul efuns.
  * is generated.
+ *
+ * If <external> is TRUE, the eval_instruction is called to execute the
+ * closure. Otherwise inter_pc is just set and int_call_lambda returns
+ * (this is only valid for non-alien lfun or lambda closures).
  */
 
 {
@@ -17981,6 +18045,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
             csp->prev_ob = previous_ob;
             csp->num_local_variables = num_arg;
             previous_ob = current_object;
+            external = MY_TRUE;
         }
         else
             extra_frame = MY_FALSE;
@@ -17988,7 +18053,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         /* Finish the setup of the control frame.
          * This is a real inter-object call.
          */
-        csp->extern_call = MY_TRUE;
+        csp->extern_call = external;
         current_object = l->function.lfun.ob;
         current_prog = current_object->prog;
         /* inter_sp == sp */
@@ -17997,7 +18062,10 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         if (l->function.lfun.context_size > 0)
             inter_context = l->context;
 #endif /* USE_NEW_INLINES */
-        eval_instruction(FUNCTION_CODE(csp->funstart), inter_sp);
+        if (external)
+            eval_instruction(FUNCTION_CODE(csp->funstart), inter_sp);
+        else
+            inter_pc = FUNCTION_CODE(csp->funstart);
 
         /* If l->ob selfdestructs during the call, l might have been
          * deallocated at this point!
@@ -18060,6 +18128,13 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         return;
       }
 
+    case CLOSURE_PRELIMINARY:
+        /* no valid current_object: fall out of the switch
+         * and let the error handling clean up the control
+         * stack.
+         */
+        break;
+
     case CLOSURE_BOUND_LAMBDA:  /* --- bound lambda closure --- */
       {
         lambda_t *l2;
@@ -18070,6 +18145,19 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         l2 = l->function.lambda;
         l2->ob = l->ob;
         l = l2;
+      }
+      /* FALLTHROUGH */
+
+    case CLOSURE_UNBOUND_LAMBDA:
+      if (lsvp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
+      {
+          if (external)
+              break;
+
+          /* Internal call of an unbound closure.
+           * Bind it on the fly.
+           */
+          l->ob = current_object;
       }
       /* FALLTHROUGH */
 
@@ -18111,21 +18199,20 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         function_index_offset = 0;
         funstart = l->function.code + 1;
         csp->funstart = funstart;
+        csp->extern_call = external;
         sp = setup_new_frame2(funstart, sp, allowRefs, MY_TRUE);
         current_variables = current_object->variables;
         current_strings = current_prog->strings;
-        eval_instruction(FUNCTION_CODE(funstart), sp);
+        if (external)
+            eval_instruction(FUNCTION_CODE(funstart), sp);
+        else
+        {
+            inter_pc = FUNCTION_CODE(funstart);
+            inter_sp = sp;
+        }
         /* The result is on the stack (inter_sp). */
         return;
       }
-
-    case CLOSURE_UNBOUND_LAMBDA:
-    case CLOSURE_PRELIMINARY:
-        /* no valid current_object: fall out of the switch
-         * and let the error handling clean up the control
-         * stack.
-         */
-        break;
 
     default: /* --- efun-, simul efun-, operator closure */
       {

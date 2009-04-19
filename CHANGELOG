@@ -5,6 +5,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (pkg-tls.c) Set this_interactive() when executing the callback
     after handshaking and print the prompt afterwards, so it looks the
     same as a normal logon() call.
+  - (closure.c, interpret.c) New opcodes F_CALL_CLOSURE and F_POP_SECOND
+    for calling more complicated closures like lambda, inherited lfun
+    and context closures from within a lambda closure. (Bug #613)
 
 16-Apr-2009 (Gnomi)
   - (comm.c, interpret.c, doc/) Made the maximum write buffer size

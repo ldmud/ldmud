@@ -143,6 +143,7 @@
  */
 
         pop_value
+        pop_second
         dup
         ldup
         swap_values
@@ -163,6 +164,7 @@
         call_function
         call_inherited
         call_inherited_noargs
+        call_closure
 #ifdef USE_NEW_INLINES
         context_closure
         context_identifier

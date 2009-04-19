@@ -4439,12 +4439,12 @@ compile_value (svalue_t *value, int opt_flags)
             break;
           } /* CLOSURE_SIMUL_EFUN */
 
-        case CLOSURE_UNBOUND_LAMBDA:
-        case CLOSURE_BOUND_LAMBDA:
-        case CLOSURE_LAMBDA:
         case CLOSURE_PRELIMINARY:
             lambda_error("Unimplemented closure type for lambda()\n");
 
+        case CLOSURE_UNBOUND_LAMBDA:
+        case CLOSURE_BOUND_LAMBDA:
+        case CLOSURE_LAMBDA:
         case CLOSURE_LFUN:
           {
             /* This is compiled as
@@ -4458,9 +4458,9 @@ compile_value (svalue_t *value, int opt_flags)
              *
              * alien-lfun: lambda->ob != lambda->function.lfun.ob
              *
-             * For now inherited lfun closures are compiled as alien
-             * lfuns.
-             * TODO: Implement them using internal calls.
+             * Inherited lfun closures, context lfun closures and lambda
+             * closures are compiled similar to alien lfuns using
+             * F_CALL_CLOSURE.
              */
 
             mp_int i;
@@ -4469,9 +4469,8 @@ compile_value (svalue_t *value, int opt_flags)
 
             block_size = (mp_int)VEC_SIZE(block);
             l = argp->u.lambda;
-            if (l->ob != current.lambda_origin
-             || l->ob != l->function.lfun.ob
-             || l->function.lfun.inhProg
+            if ((type != CLOSURE_UNBOUND_LAMBDA && l->ob != current.lambda_origin)
+             || (type == CLOSURE_LFUN && l->ob != l->function.lfun.ob)
                )
             {
                 /* Compile it like an alien lfun */
@@ -4493,10 +4492,36 @@ compile_value (svalue_t *value, int opt_flags)
                 STORE_CODE(current.codep, instrs[F_FUNCALL].opcode);
                 STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
             }
+            else if (type != CLOSURE_LFUN
+             || l->function.lfun.inhProg
+#ifdef USE_NEW_INLINES
+             || l->function.lfun.context_size
+#endif
+               )
+            {
+                /* Compile it using F_CALL_CLOSURE. */
+
+                if (current.code_left < 1)
+                    realloc_code();
+                current.code_left -= 1;
+                STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
+
+                insert_value_push(argp); /* Push the closure */
+                for (i = block_size; --i; )
+                {
+                    compile_value(++argp, 0);
+                }
+                if (current.code_left < 3)
+                    realloc_code();
+                current.code_left -= 3;
+                STORE_CODE(current.codep, instrs[F_CALL_CLOSURE].opcode);
+                STORE_CODE(current.codep, instrs[F_POP_SECOND].opcode);
+                STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
+            }
             else
             {
-            	/* Intra-object call: we can call by address */
-            	
+                /* Intra-object call: we can call by address */
+
                 if (current.code_left < 1)
                     realloc_code();
                 current.code_left -= 1;
