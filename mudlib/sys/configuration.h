@@ -1,5 +1,5 @@
 #ifndef LPC_CONFIGURATION_H_
-#define LPC_ CONFIGURATION_H_
+#define LPC_CONFIGURATION_H_
 
 /* Definition of argument values for configure_interactive().
  */
