@@ -1580,7 +1580,10 @@ add_discarded_message (interactive_t *ip)
             inter_sp--;
         }
         else
+        {
+            pop_stack();
             discarded_msg = NULL;
+        }
     }
     else if (driver_hook[H_MSG_DISCARDED].type == T_STRING)
     {
