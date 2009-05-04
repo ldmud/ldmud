@@ -16,6 +16,7 @@ xx-xxx-xxxx -- 3.3.719
 
     - New Efuns:
        + configure_interactive(): To set options for interactives.
+       + configure_driver(): To set settings/options for the driver itself.
 
     - Changed Efuns:
        + idna_stringprep(): fixed the evaluation of the arguments and removed
@@ -42,6 +43,8 @@ xx-xxx-xxxx -- 3.3.719
          (MAX_COMMAND_LENGTH, --max-command-length)
        + The driver hook H_MSG_DISCARDED can be used to specify the messages
          given to players when their messages were discarded.
+       + The soft and hard memory limits can now be configured at runtime
+         (configure_driver()).
 
     - Language
        + Added a permanent define __MAX_COMMAND_LENGTH__ for the maximum

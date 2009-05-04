@@ -139,6 +139,7 @@
 
 #include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_hook.h"
+#include "../mudlib/sys/configuration.h"
 #include "../mudlib/sys/objectinfo.h"
 #include "../mudlib/sys/regexp.h"
 #include "../mudlib/sys/strings.h"
@@ -7764,6 +7765,60 @@ f_sgn (svalue_t *sp)
 /*=========================================================================*/
 /*                               OTHER                                     */
 
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_configure_driver (svalue_t *sp)
+
+/* EFUN void configure_driver(int what, mixed data)
+ *
+ * This efun configures several aspects of the driver at run-time.
+ * 
+ * <what> is an identifier the setting:
+ *        - DC_MEMORY_LIMIT (0): configures the memory limits
+ * 
+ * <data> is dependent on <what>:
+ *   DC_MEMORY_LIMIT: ({soft-limit, hard-limit}) both <int>, given in Bytes.
+ *
+ */
+
+{
+
+    // Check for privilege_violation.
+    if (!privilege_violation2(STR_CONFIGURE_DRIVER, sp-1, sp, sp))
+    {
+        return pop_n_elems(2, sp);
+    }
+
+    switch(sp[-1].u.number) 
+    {
+        default:
+            errorf("Illegal value %"PRIdPINT" for configure_driver().\n", sp[-1].u.number);
+            return sp; /* NOTREACHED */
+        case DC_MEMORY_LIMIT:
+            if (sp->type != T_POINTER)
+                efun_arg_error(1, T_POINTER, sp->type, sp);
+            if (VEC_SIZE(sp->u.vec) != 2)
+                errorf("Bad arg 1 to configure_driver(): Invalid array size %"PRIdPINT
+                       ", expected 2.\n"
+                       , VEC_SIZE(sp->u.vec));
+            if (sp->u.vec->item[0].type != T_NUMBER)
+                errorf("Bad arg 1 to configure_driver(): Element 0 is '%s', expected 'int'.\n"
+                       , typename(sp->u.vec->item[0].type));
+            if (sp->u.vec->item[1].type != T_NUMBER)
+                errorf("Bad arg 1 to configure_driver(): Element 1 is '%s', expected 'int'.\n"
+                       , typename(sp->u.vec->item[1].type));
+            if (!set_memory_limit(MALLOC_SOFT_LIMIT, sp->u.vec->item[0].u.number))
+                errorf("Could not set the soft memory limit (%"PRIdPINT") in configure_driver()\n",
+                       sp->u.vec->item[0].u.number);
+            if (!set_memory_limit(MALLOC_HARD_LIMIT, sp->u.vec->item[1].u.number))
+                errorf("Could not set the hard memory limit (%"PRIdPINT") in configure_driver()\n",
+                       sp->u.vec->item[1].u.number);
+            break;
+    }
+
+    // free arguments
+    return pop_n_elems(2, sp);
+} /* f_configure_driver() */
 /*-------------------------------------------------------------------------*/
 svalue_t *
 v_debug_info (svalue_t *sp, int num_arg)

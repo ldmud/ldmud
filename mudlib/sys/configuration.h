@@ -8,4 +8,8 @@
  */
 #define IC_MAX_WRITE_BUFFER_SIZE 0
 
+/* Possible options for configure_driver().
+ */
+#define DC_MEMORY_LIMIT 0
+
 #endif /* LPC_CONFIGURATION_H_ */

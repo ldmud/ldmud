@@ -20,6 +20,7 @@ DESCRIPTION
                           informations.
         configure_interactive Set option <arg2> with value <arg3> as
                           default (<arg>==0) or for object <arg>.
+        configure_driver  Set option <arg1> to value(s) <arg2>.
         enable_telnet     Enable/disable telnet (<arg2>) for object <arg>.
         execute_command   Execute command string <arg2> for the object
                           <arg>.

@@ -1,0 +1,22 @@
+SYNOPSIS
+        #include <sys/configuration.h>
+
+        void configure_driver (int what, mixed data)
+
+DESCRIPTION
+        Sets the option <what> to the value <data>.
+
+        This function always causes the privilege_violation
+        ("configure_driver", this_object(), what, data).
+
+        <what> == DC_MEMORY_LIMIT
+           Set new soft and hard memory limits for the driver.
+           <data> is expected to be an array with two elements, which have to
+           be integers giving the amount of memory in bytes.
+           ({<soft memory limit>, <hard memory limit>})
+
+HISTORY
+        Introduced in LDMud 3.3.719.
+
+SEE ALSO
+        configure_interactive(E)
