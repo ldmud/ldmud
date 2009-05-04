@@ -2,8 +2,10 @@
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
 
+private float testfloat = 3.499965555966e-01;
+
 // Name, Flag, Function
-mixed *tests = ({
+nosave mixed *tests = ({
     ({ "0000587-1", TF_DONTCHECKERROR,
         (: strftime(__INT_MAX__); return 1; :)
     }),
@@ -76,6 +78,14 @@ mixed *tests = ({
             int x = 1;
             return funcall(lambda(0,({ (: x :) })));
         :)
+    }),
+    ({ "0000627", 0,
+        function int () {
+            save_object("/t-mantis");
+            restore_object("/t-mantis");
+            rm("/t-mantis.o");
+            return testfloat == 3.499965555966e-01;
+        }
     }),
 });
 
