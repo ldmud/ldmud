@@ -8525,31 +8525,19 @@ again:
          * TODO: This code makes heavy assumptions about data sizes and
          * TODO:: layout. E.g. there need not be a 16-Bit integral type
          * TODO:: available.
-         * TODO: It should be rewritten to use the LOAD_ macros (but
-         * TODO:: then the compiler needs to use them, too.
+         * TODO: short doesn't to be a 16 bit wide type (which the float format
+         * TODO:: expects). LOAD_INT16 would be nice (change in compiler as well).
          */
 
-#if SIZEOF_CHAR_P == 4
-        sp++;
-        sp->type = T_FLOAT;
-
-        memcpy((char *)&sp->u.mantissa, pc, sizeof(sp->u.mantissa));
-        memcpy((char *)&sp->x.exponent, pc + sizeof(sp->u.mantissa), sizeof(sp->x.exponent));
-        pc += sizeof(sp->u.mantissa)+sizeof(sp->x.exponent);
-#else
         int32 mantissa;
-        /* TODO: int16 */ short exponent;
+        short exponent;
 
         sp++;
         sp->type = T_FLOAT;
-
-        memcpy((char *)&mantissa, pc, sizeof(mantissa));
+        LOAD_INT32(mantissa, pc);
+        LOAD_SHORT(exponent, pc);
         sp->u.mantissa = mantissa;
-
-        memcpy((char *)&exponent, pc + sizeof(mantissa), sizeof(exponent));
         sp->x.exponent = exponent;
-        pc += sizeof(mantissa)+sizeof(exponent);
-#endif
         break;
     }
 

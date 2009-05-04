@@ -15,6 +15,17 @@ See the file HISTORY for a user-oriented summary of all the changes.
     Fixes #627, where restore_svalue() interpreted the 16bit integer for the
     exponent as 32bit integer, resulting in data corruption if the exponent
     was negative.
+  - (svalue.h)
+    The defines READ_DOUBLE, SPLIT_DOUBLe and STORE_DOUBLE were exchanged
+    by static inline functions.
+    STORE_DOUBLE_USED is not needed anymore and defined empty.
+    Additionally, SPLIT_DOUBLE returns now the mantissa as p_int instead of long.
+  - (interpret.c)
+    The compiler stores float literals with PUT_INT32 and PUT_SHORT. Reading
+    them from the bytecode was done by memcpy(). Some conditional compilation
+    was required to read the correct datatypes. This patch implements an old
+    TODO and makes F_FLOAT use the LOAD_INT32 and LOAD_SHORT macros from
+    bytecode.h.
 
 19-Apr-2009 (Gnomi)
   - (pkg-tls.c) Set this_interactive() when executing the callback

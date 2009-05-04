@@ -408,21 +408,24 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
 
 #define FLOAT_FORMAT_0
 
-#define READ_DOUBLE(svalue_pnt) ( ldexp( (double)((svalue_pnt)->u.mantissa) , \
-                (svalue_pnt)->x.exponent-31 ) )
-
+static INLINE double READ_DOUBLE(svalue_t *sv) {
+    return ldexp( (double)(sv->u.mantissa), sv->x.exponent - 31 );
+}
 /* if your machine doesn't use the exponent to designate powers of two,
-   the use of ldexp in SPLIT_DOUBLE won't work; you'll have to mulitply
+   the use of ldexp in SPLIT_DOUBLE won't work; you'll have to multiply
    with 32768. in this case */
 
-#define SPLIT_DOUBLE(double_value, int_pnt) \
-( (long)ldexp( frexp( (double_value), (int_pnt) ), 31) )
+static INLINE p_int SPLIT_DOUBLE(double doublevalue, int *int_p) {
+    return (p_int)ldexp( frexp( doublevalue, int_p ), 31);
+}
 
-#define STORE_DOUBLE_USED int __store_double_int_;
-#define STORE_DOUBLE(dest, double_value) (\
-((dest)->u.mantissa = SPLIT_DOUBLE((double_value), &__store_double_int_)),\
- (dest)->x.exponent = (short)__store_double_int_\
-)
+// STORE_DOUBLE_USED is not needed anymore and defined empty.
+#define STORE_DOUBLE_USED
+static INLINE void STORE_DOUBLE(svalue_t *dest, double doublevalue) {
+    int exponent;
+    dest->u.mantissa = SPLIT_DOUBLE(doublevalue, &exponent);
+    dest->x.exponent = (ph_int)exponent;
+}
 
 #endif /* ifndef STORE_DOUBLE */
 
