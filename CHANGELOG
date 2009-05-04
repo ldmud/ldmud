@@ -8,6 +8,13 @@ See the file HISTORY for a user-oriented summary of all the changes.
     The first settings available is now the soft and hard memory limits.
   - (smalloc.c, slaballoc.c, sysmalloc.c, xptmalloc.c)
     Added soft and hard memory limits in output of then 'malloc' command.
+  - (object.c)
+    Fix for float corruption in restore_svalue().
+    We use 32 bit mantissas and 16 bit exponents for our floats. Ensure to
+    write and read fixed-width types in save_svalue() and restore_svalue().
+    Fixes #627, where restore_svalue() interpreted the 16bit integer for the
+    exponent as 32bit integer, resulting in data corruption if the exponent
+    was negative.
 
 19-Apr-2009 (Gnomi)
   - (pkg-tls.c) Set this_interactive() when executing the callback

@@ -69,6 +69,8 @@ xx-xxx-xxxx -- 3.3.719
          as well, if it is supported. (Note: POSIX conforming systems do not
          distinguish between 'text' and 'binary' modes, this is only relevant
          to Cygwin.)
+       + Fixed a major bug on 64 bit platforms, where floats with negative
+         exponents were saved incorrectly leading to data corruption (#627).
 
 
 12-Jan-2009 -- 3.3.718

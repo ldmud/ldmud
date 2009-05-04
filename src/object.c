@@ -6310,9 +6310,9 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         char *source, c;
 
         source = number_buffer;
-        (void)sprintf(source, "%.12e=%"PRIxPHINT":%"PRIxPINT
-                     , READ_DOUBLE(v), v->x.exponent & 0xffff
-                     , v->u.mantissa);
+        (void)sprintf(source, "%.12e=%"PRIx16":%"PRIx32
+                     , READ_DOUBLE(v), (int16_t)v->x.exponent
+                     , (int32_t)v->u.mantissa);
         c = *source++;
         do L_PUTC(c) while ( '\0' != (c = *source++) );
         L_PUTC(delimiter);
@@ -8386,8 +8386,12 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         if ( NULL != (cp = strchr(cp, '=')) &&  restore_ctx->restored_host == CURRENT_HOST)
         {
             cp++;
-            if (sscanf(cp, "%"SCNxPHINT":%"SCNxPINT, &svp->x.exponent, &svp->u.mantissa) != 2)
+            int32_t mantissa;
+            int16_t exponent;
+            if (sscanf(cp, "%"SCNx16":%"SCNx32, &exponent, &mantissa) != 2)
                 return 0;
+            svp->x.exponent=exponent;
+            svp->u.mantissa=mantissa;
         }
         else
         {
