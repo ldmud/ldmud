@@ -5586,7 +5586,7 @@ f_to_int (svalue_t *sp)
         end = lex_parse_number(cp, &num, &overflow);
         if (end != cp)
         {
-            if (overflow)
+            if (overflow || ((p_int)num)<0)
             {
                 n = hasMinus ? PINT_MIN : PINT_MAX;
             }

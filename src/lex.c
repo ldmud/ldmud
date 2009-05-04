@@ -3822,7 +3822,9 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
     while (lexdigit(c = *cp++) && c < (char)('0'+base))
     {
         *p_overflow = *p_overflow || (l > max_shiftable);
-        l = l * base + (c - '0');
+        c -= '0';
+        l = l * base + c;
+        *p_overflow = *p_overflow || (l < (unsigned long)c);
     }
 
     *p_num = *p_overflow ? LONG_MAX : l;
@@ -5599,8 +5601,11 @@ yylex1 (void)
 
             /* Nope, normal number */
             yyp = parse_number(numstart, &l, &overflow);
-            if (overflow)
+            if (overflow || (l && ((long)l-1)<0))
             {
+                /* Don't warn on __INT_MAX__+1 because there
+                 * may be a minus preceeding this number.
+                 */
                 yywarnf("Number exceeds numeric limits");
             }
 

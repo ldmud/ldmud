@@ -69,10 +69,12 @@ nosave mixed *tests = ({
             }
 	:)
     }),
-  ({ "0000528", 0,
-  function int () {
-      return to_int(sprintf("%d",__INT_MAX__)) == __INT_MAX__;
-  } }),
+    ({ "0000528", 0,
+       function int ()
+       {
+            return to_int(sprintf("%d",__INT_MAX__)) == __INT_MAX__;
+       }
+    }),
     ({ "0000613", 0,
         (:
             int x = 1;
@@ -86,6 +88,92 @@ nosave mixed *tests = ({
             rm("/t-mantis.o");
             return testfloat == 3.499965555966e-01;
         }
+    }),
+    ({ "0000630-1", 0,
+       (:
+            /* calc __INT_MAX__ + 1 */
+            string num = to_string(__INT_MAX__);
+            int i = strlen(num);
+
+            while(i && num[i-1]=='9') num[--i] = '0';
+            if(!i)
+               num = "1"+num;
+            else
+               num[--i] += 1;
+
+            return to_int(num) == __INT_MAX__;
+       :)
+    }),
+    ({ "0000630-2", 0,
+       (:
+            /* calc 2*__INT_MAX__+1 */
+            string num = to_string(__INT_MAX__);
+            int i = strlen(num);
+            int carry = 1;
+
+            while(i)
+            {
+                --i;
+                if(num[i]<'5')
+                {
+                    num[i] += num[i] - '0' + carry;
+                    carry = 0;
+                }
+                else
+                {
+                    num[i] += num[i] - '0' - 10 + carry;
+                    carry = 1;
+                }
+            }
+
+            if(carry)
+               num = "1"+num;
+
+            return to_int(num) == __INT_MAX__;
+       :)
+    }),
+    ({ "0000630-3", 0,
+       (:
+            /* calc __INT_MIN__ - 1 */
+            string num = to_string(__INT_MIN__)[1..];
+            int i = strlen(num);
+
+            while(i && num[i-1]=='9') num[--i] = '0';
+            if(!i)
+               num = "1"+num;
+            else
+               num[--i] += 1;
+
+            return to_int("-"+num) == __INT_MIN__;
+       :)
+    }),
+    ({ "0000630-4", 0,
+       (:
+            /* calc 2*__INT_MIN__-1 */
+            string num = to_string(__INT_MIN__)[1..];
+            int i = strlen(num);
+            int carry = 1;
+
+            while(i)
+            {
+                --i;
+                if(num[i]<'5')
+                {
+                    num[i] += num[i] - '0' + carry;
+                    carry = 0;
+                }
+                else
+                {
+                    num[i] += num[i] - '0' - 10 + carry;
+                    carry = 1;
+                }
+            }
+
+            if(carry)
+               num = "1"+num;
+
+            return to_int("-"+num) == __INT_MIN__;
+       :)
     }),
 });
 

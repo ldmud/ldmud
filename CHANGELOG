@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-May-2009 (Gnomi)
+  - (lex.c, efuns.c) Improved numeric overflow detection. (Bug #630)
+
 04-May-2009 (Zesstra)
   - (efuns.c, efuns.h, func_spec, string_spec, doc/, mudlib/)
     Added new efun: configure_driver() and documentation.
