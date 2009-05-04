@@ -135,6 +135,11 @@ void mem_dump_data (strbuf_t *sbuf) {
     dump_stat("total alloced:             %8d bytes \n", uordblks);
     dump_stat("total free:                %8d bytes\n", fordblks);
     dump_stat("freeable bytes:            %8d bytes\n", keepcost);
+    strbuf_addf(sbuf,
+                "soft memory limit: %10lu, hard memory limit: %10lu\n\n",
+                get_memory_limit(MALLOC_SOFT_LIMIT),
+                get_memory_limit(MALLOC_HARD_LIMIT)
+               );
 
 #undef dump_stat
 } /* mem_dump_data() */

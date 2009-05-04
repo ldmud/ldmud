@@ -152,6 +152,12 @@ mem_dump_data (strbuf_t *sbuf)
 
 {
     strbuf_add(sbuf, "Using system standard malloc.\n");
+    strbuf_addf(sbuf,
+                "soft memory limit: %10lu, hard memory limit: %10lu\n\n",
+                get_memory_limit(MALLOC_SOFT_LIMIT),
+                get_memory_limit(MALLOC_HARD_LIMIT)
+               );
+
 } /* mem_dump_data() */
 
 /*-------------------------------------------------------------------------*/

@@ -863,6 +863,11 @@ mem_dump_data (strbuf_t *sbuf)
                , l_free.size + l_wasted.size
                  + s_free.size + s_wasted.size
                );
+    strbuf_addf(sbuf,
+                "soft memory limit: %10lu, hard memory limit: %10lu\n\n",
+                get_memory_limit(MALLOC_SOFT_LIMIT),
+                get_memory_limit(MALLOC_HARD_LIMIT)
+               );
 
     strbuf_addf(sbuf,
       "Defragmentation: %lu calls (%lu for size: %lu successful)\n"

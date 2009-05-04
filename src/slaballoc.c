@@ -968,6 +968,11 @@ mem_dump_data (strbuf_t *sbuf)
                , "Total storage unused: (c+d+g)     %10lu\n\n"
                , l_free.size + l_wasted.size + s_free.size
                );
+    strbuf_addf(sbuf,
+                "soft memory limit: %10lu, hard memory limit: %10lu\n\n",
+                get_memory_limit(MALLOC_SOFT_LIMIT),
+                get_memory_limit(MALLOC_HARD_LIMIT)
+               );
 
 } /* mem_dump_data() */
 
