@@ -21,6 +21,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 05-May-2009 (Gnomi)
   - (lex.c, efuns.c) Improved numeric overflow detection. (Bug #630)
+  - (pkg-gnutls.c) Don't abort on EINTR or EWOULDBLOCK.
 
 04-May-2009 (Zesstra)
   - (efuns.c, efuns.h, func_spec, string_spec, doc/, mudlib/)

@@ -471,6 +471,21 @@ tls_write (interactive_t *ip, char *buffer, int length)
     ret = gnutls_record_send( ip->tls_session, buffer, length );
     if (ret < 0)
     {
+        /* Let comm.c handle EINTR and EWOULDBLOCK.
+         * We are then called again later with the
+         * same content.
+         */
+        if (ret == GNUTLS_E_INTERRUPTED)
+        {
+            errno = EINTR;
+            return -1;
+        }
+        else if (ret == GNUTLS_E_AGAIN)
+        {
+            errno = EWOULDBLOCK;
+            return -1;
+        }
+
         debug_message("%s GnuTLS: Error in sending data (%s). "
                       "Closing the connection.\n"
                      , time_stamp(), gnutls_strerror(ret));
