@@ -14145,58 +14145,87 @@ insert_pop_value (void)
  */
 
 {
-    if (last_expression == CURRENT_PROGRAM_SIZE-1)
+    /* We don't have to fear sideeffects and try to prevent
+     * the value from being generated if the last expression is not too long
+     * ago.
+     */
+    if (last_expression == CURRENT_PROGRAM_SIZE - 1)
     {
-        /* We don't have to fear sideeffects and try to prevent
-         * the value from being generated.
-         */
+         /* The following ops have no data in the bytecode. */
         switch ( mem_block[A_PROGRAM].block[last_expression])
         {
-        case F_ASSIGN:
-            mem_block[A_PROGRAM].block[last_expression] =
+                /* The following ops have no data in the bytecode. */
+            case F_ASSIGN:
+                mem_block[A_PROGRAM].block[last_expression] =
                 F_VOID_ASSIGN;
-            break;
-        case F_ADD_EQ:
-            mem_block[A_PROGRAM].block[last_expression] =
+                break;
+            case F_ADD_EQ:
+                mem_block[A_PROGRAM].block[last_expression] =
                 F_VOID_ADD_EQ;
-            break;
-        case F_PRE_INC:
-        case F_POST_INC:
-            mem_block[A_PROGRAM].block[last_expression] =
+                break;
+            case F_PRE_INC:
+            case F_POST_INC:
+                mem_block[A_PROGRAM].block[last_expression] =
                 F_INC;
-            break;
-        case F_PRE_DEC:
-        case F_POST_DEC:
-            mem_block[A_PROGRAM].block[last_expression] =
+                break;
+            case F_PRE_DEC:
+            case F_POST_DEC:
+                mem_block[A_PROGRAM].block[last_expression] =
                 F_DEC;
-            break;
-        case F_CONST0:
-        case F_CONST1:
-        case F_NCONST1:
-            mem_block[A_PROGRAM].current_size = last_expression;
-            break;
-        case F_CLIT:
-        case F_NCLIT:
-        case F_CSTRING0:
-        case F_CSTRING1:
-        case F_CSTRING2:
-            mem_block[A_PROGRAM].current_size = last_expression-1;
-            break;
-        case F_STRING:
-            mem_block[A_PROGRAM].current_size = last_expression-2;
-            break;
-        case F_NUMBER:
-            mem_block[A_PROGRAM].current_size = last_expression-4;
-            break;
-        default: ins_f_code(F_POP_VALUE);
+                break;
+            case F_CONST0:
+            case F_CONST1:
+            case F_NCONST1:
+                mem_block[A_PROGRAM].current_size = last_expression;
+                break;
+            default:
+                ins_f_code(F_POP_VALUE);
+                break;
         }
-        last_expression = -1;
+    }
+    else if (last_expression == CURRENT_PROGRAM_SIZE - 2)
+    {
+        /* The following ops are followed by 1 chars of data in the bytecode. */
+        switch ( mem_block[A_PROGRAM].block[last_expression])
+        {
+            case F_CLIT:
+            case F_NCLIT:
+            case F_CSTRING0:
+            case F_CSTRING1:
+            case F_CSTRING2:
+            case F_CSTRING3:
+                mem_block[A_PROGRAM].current_size = last_expression;
+                break;
+            default:
+                ins_f_code(F_POP_VALUE);
+                break;
+        }
+    }
+    else if (last_expression == CURRENT_PROGRAM_SIZE - 3)
+    {
+        /* The following ops are followed by 2 chars of data in the bytecode. */
+        if ( mem_block[A_PROGRAM].block[last_expression] == F_STRING)
+            mem_block[A_PROGRAM].current_size = last_expression;
+        else
+            ins_f_code(F_POP_VALUE);            
+    }
+    else if (last_expression == CURRENT_PROGRAM_SIZE - sizeof(p_int))
+    {
+        /* The following ops are followed by sizeof(p_int) chars of data in 
+         * the bytecode. */
+        if ( mem_block[A_PROGRAM].block[last_expression] == F_NUMBER)
+            mem_block[A_PROGRAM].current_size = last_expression;
+        else
+            ins_f_code(F_POP_VALUE);            
     }
     else
-        /* The last expression is too long ago: just pop whatever there
-         * is on the stack.
-         */
+    {
+        /* last expression unknown or too long ago - just pop whatever there
+         * is on the stack */
         ins_f_code(F_POP_VALUE);
+    }
+    
+    last_expression = -1;
 } /* insert_pop_value() */
 
 /*-------------------------------------------------------------------------*/

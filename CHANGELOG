@@ -12,6 +12,12 @@ See the file HISTORY for a user-oriented summary of all the changes.
     Additionally upon storing a number (L_NUMBER) and in the unary '-'
     upd_p_int() is called instead of a direct memcpy(). (memcpy() is a bit
     faster, but I think it is much more risky to forget a place to change...)
+  - (prolang.y) Fixed insert_pop_value().
+    insert_pop_value() removes the last value from the stack. If possible, it
+    patches the code to prevent that value from being computed at all (by
+    removing the last expression). Unfortunately the function assumed that all
+    operations have no data following in the bytecode. This patches changes it
+    and enabled optimization/removal of operations with data.
 
 05-May-2009 (Gnomi)
   - (lex.c, efuns.c) Improved numeric overflow detection. (Bug #630)
