@@ -2053,8 +2053,60 @@ read_long (mp_uint offset)
 } /* read_long() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE void
+ins_p_int (p_int num)
+
+/* Add the number <num> to the A_PROGRAM area in a fixed byteorder.
+ */
+{
+    if (realloc_a_program(sizeof(num)))
+    {
+        /* F_NUMBER expects the number in the host format. Therefore memcpy()
+         * is OK. interpret.c will read the number with memcpy() as well.
+         * TODO: use a suitable PUT_ from bytecode.h (change in interpret.c as well!)
+         */
+        memcpy(mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE, &num, sizeof(num));
+        CURRENT_PROGRAM_SIZE += sizeof(num);
+    }
+    else
+    {
+        yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
+                 , mem_block[A_PROGRAM].current_size + sizeof(num));
+    }
+} /* ins_p_int() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+upd_p_int (mp_uint offset, p_int num)
+
+/* Store the number <num> at <offset> in the A_PROGRAM area in a fixed byteorder.
+ */
+{
+    /* F_NUMBER expects the number in the host format. Therefore memcpy()
+     * is OK. interpret.c will read the number with memcpy() as well.
+     * TODO: use a suitable PUT_ from bytecode.h (change in interpret.c as well!)
+     */
+    memcpy(mem_block[A_PROGRAM].block + offset, &num, sizeof(num));
+
+} /* upd_p_int() */
+
+/*-------------------------------------------------------------------------*/
+static p_int
+read_p_int (mp_uint offset)
+
+/* Return the <number> stored at <offset> in the A_PROGRAM area.
+ */
+{
+    p_int number;
+    /* TODO: use GET_ function from bytecode.h */
+    memcpy(&number, mem_block[A_PROGRAM].block + offset, sizeof(number));
+
+    return number;
+} /* read_p_int() */
+
+/*-------------------------------------------------------------------------*/
 static void
-ins_number (long num)
+ins_number (p_int num)
 
 /* Insert code to push number <num> onto the stack.
  * The function tries to find the shortest sequence to do so.
@@ -2082,7 +2134,7 @@ ins_number (long num)
     else
     {
         ins_f_code(F_NUMBER);
-        ins_long(num);
+        ins_p_int(num);
     }
 } /* ins_number() */
 
@@ -9930,12 +9982,9 @@ expr0:
                 F_NUMBER )
           {
               p_int number;
-
-              memcpy(&number, &(mem_block[A_PROGRAM].block[last_expression+1])
-                    , sizeof(number));
+              number = read_p_int(last_expression + 1);
               number = -number;
-              memcpy(&(mem_block[A_PROGRAM].block[last_expression+1]), &number
-                    , sizeof(number));
+              upd_p_int(last_expression + 1, number);
           }
           else
           {
@@ -10106,7 +10155,7 @@ expr4:
           else
           {
               add_f_code(F_NUMBER);
-              memcpy(__PREPARE_INSERT__p, &$1, sizeof $1);
+              upd_p_int((char*)__PREPARE_INSERT__p - mem_block[A_PROGRAM].block, $1);
               current += 1 + sizeof (p_int);
               $$.type = Type_Number;
           }

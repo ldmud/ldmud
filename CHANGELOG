@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-May-2009 (Zesstra)
+  - (prolang.y)
+    Fix inconsistent F_NUMBER generation (#628).
+    The compiler generates F_NUMBER at more than one places. ins_number()
+    only writes a int32 into the bytecode, all the other places write a p_int,
+    which interpret.c expects.
+    The patch adds ins_p_int(), upd_p_int() and read_p_int().
+    ins_number() now calls ins_p_int() upon generating the F_NUMBER instruction.
+    Additionally upon storing a number (L_NUMBER) and in the unary '-'
+    upd_p_int() is called instead of a direct memcpy(). (memcpy() is a bit
+    faster, but I think it is much more risky to forget a place to change...)
+
 05-May-2009 (Gnomi)
   - (lex.c, efuns.c) Improved numeric overflow detection. (Bug #630)
 
