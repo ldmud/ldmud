@@ -199,7 +199,7 @@ extern int errno;
 #    undef USE_MYSQL
 #endif
 
-#if defined( MSDOS ) || defined(CYGWIN)
+#if defined(CYGWIN)
 #define MSDOS_FS
 #endif
 

@@ -65,6 +65,7 @@ xx-xxx-xxxx -- 3.3.719
          time (#625).
          This removed --enable-use-system-crypt as well (#624).
        + Removed checks and special code for OS2 and __EMX__.
+       + Removed checks and special code for MSDOS.
 
     - Other
        + Generalized the write buffer for non-threaded use and renamed the
