@@ -69,9 +69,6 @@ DESCRIPTION
       __LPC_ARRAY_CALLS__: call_other()s on arrays of objects enabled.
       __BOOT_TIME__      : the time() the driver was started.
 
-    If the driver is compiled for using the MS-DOS filesystem
-    conventions, __MSDOS_FS__ is defined.
-
     If the ERQ is supported, the following macros are defined:
 
       __ERQ_MAX_SEND__  : the max size of the send buffer
@@ -118,7 +115,8 @@ HISTORY
     3.3.713 added __IDNA__, __SQLITE__.
     3.3.714 added __OPENSSL__, __GNUTLS__.
     3.3.718 added __XML_DOM__.
-    3.3.719 removed __PTHREADS__ and added __GCRYPT__.
+    3.3.719 removed __PTHREADS__, AMIGA, MSDOS_FS, __BEOS__  
+		    and added __GCRYPT__.
 
 SEE ALSO
     pragma(LPC), preprocessor(LPC)

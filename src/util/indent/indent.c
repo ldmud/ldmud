@@ -1335,21 +1335,8 @@ bakcopy()
     if (*p == '/')
 	p++;
     bakfile = xmalloc(40 + strlen(p));
-#ifndef MSDOS
     sprintf(bakfile, "%s.BAK", p);
-#else
-    {
-	char *here;
 
-	if ((here = strchr(p,'.')) == NULL || here <= p)
-	    sprintf(bakfile,"%s.BAK",p);
-	else {
-	    *here = 0;
-	    sprintf(bakfile,"%s.BAK",p);
-	    *here = '.';
-	}
-    }
-#endif
     errbuf = xmalloc(80 + strlen(p));
 
     sprintf(errbuf,"indent: %s",bakfile);

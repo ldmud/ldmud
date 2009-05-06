@@ -14,6 +14,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - Removed checks and special code for SunOS4 (The last release of SunOS4
     was in 1994.)
   - Removed checks and special code for Ultrix.
+  - Removed MSDOS filesystem semantics (Checks for MSDOS_FS and special
+    behaviour (e.g. \\ as path separator).
 
 05-May-2009 (Zesstra)
   - (prolang.y)

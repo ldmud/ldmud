@@ -1288,9 +1288,6 @@ v_read_file (svalue_t *sp, int num_arg)
         for (p2 = str; p != end; ) {
             c = *p++;
             if ( c == '\n' ) {
-#ifdef MSDOS_FS
-                if ( p2[-1] == '\r' ) p2--;
-#endif
                 if (!--len) {
                     *p2++=c;
                     break;
@@ -1329,9 +1326,6 @@ v_read_file (svalue_t *sp, int num_arg)
             for (p = p2; p != end; ) {
                 c = *p++;
                 if ( c == '\n' ) {
-#ifdef MSDOS_FS
-                    if ( p2[-1] == '\r' ) p2--;
-#endif
                     if (!--len) {
                         *p2++ = c;
                         break;

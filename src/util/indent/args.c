@@ -245,11 +245,8 @@ set_profile()
 {
     register FILE *f;
     char *fname;
-#ifndef MSDOS
     static char prof[] = ".indent.pro";
-#else
-    static char prof[] = "indent.pro";
-#endif
+
     char *homedir;
 
     homedir = getenv("HOME");

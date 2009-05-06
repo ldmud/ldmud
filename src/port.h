@@ -120,8 +120,6 @@ extern int errno;
  *                to HAS_IPV6 from autoconf.
  *   USE_MYSQL    check the definition from config.h in relation
  *                to HAS_MYSQL from autoconf.
- *   MSDOS_FS     if the filesystem uses MS-DOS semantics
- *                (i.e. backslashes as directory separators)
  */
 
 #ifndef CHAR_BIT
@@ -184,10 +182,6 @@ extern int errno;
 
 #if !defined(HAS_MYSQL) && defined(USE_MYSQL)
 #    undef USE_MYSQL
-#endif
-
-#if defined(CYGWIN)
-#define MSDOS_FS
 #endif
 
 /*------------------------------------------------------------------

@@ -1636,36 +1636,6 @@ legal_path (const char *path)
      || path[0] == '/')
         return MY_FALSE;
 
-#ifdef MSDOS_FS
-    {
-        const char *name;
-
-        if (strchr(path,'\\'))
-            return MY_FALSE; /* better safe than sorry ... */
-        if (strchr(path,':'))
-            return MY_FALSE; /* \B: is okay for DOS .. *sigh* */
-        name = strrchr(path,'/');
-        if (NULL != name)
-            name++;
-        else
-            name = path;
-        if (!strcasecmp(name,"NUL")
-         || !strcasecmp(name,"CON")
-         || !strcasecmp(name,"PRN")
-         || !strcasecmp(name,"AUX")
-         || !strcasecmp(name,"COM1")
-         || !strcasecmp(name,"COM2")
-         || !strcasecmp(name,"COM3")
-         || !strcasecmp(name,"COM4")
-         || !strcasecmp(name,"LPT1")
-         || !strcasecmp(name,"LPT2")
-         || !strcasecmp(name,"LPT3")
-         || !strcasecmp(name,"LPT4")
-           )
-            return MY_FALSE;
-    }
-#endif
-
     return check_no_parentdirs(path);
 } /* legal_path() */
 

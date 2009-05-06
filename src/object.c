@@ -6723,13 +6723,8 @@ v_save_object (svalue_t *sp, int numarg)
         tmp_name = name + len + sizeof save_file_suffix;
         strcpy(name, get_txt(sfile));
 
-#ifndef MSDOS_FS
         strcpy(name+len, save_file_suffix);
-#endif
         sprintf(tmp_name, "%s.tmp", name);
-#ifdef MSDOS_FS
-        strcpy(name+len, save_file_suffix);
-#endif
 
         free_mstring(sfile);
 
@@ -6871,12 +6866,7 @@ v_save_object (svalue_t *sp, int numarg)
         i = 0; /* Result from efun */
 
         unlink(name);
-#if !defined(MSDOS_FS)
         if (link(tmp_name, name) == -1)
-#else
-        close(f);
-        if (rename(tmp_name,name) < 0)
-#endif
         {
             perror(name);
             printf("%s Failed to link %s to %s\n"
@@ -6884,10 +6874,8 @@ v_save_object (svalue_t *sp, int numarg)
             add_message("Failed to save object !\n");
             i = 1;
         }
-#if !defined(MSDOS_FS)
         close(f);
         unlink(tmp_name);
-#endif
 
         /* free the error handler and the arguments (numarg + 1  from sp) and
          * push result on the stack.
@@ -8279,10 +8267,8 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                 return MY_FALSE;
             }
 
-#ifndef MSDOS_FS
             if (c == '\r')
                 c = '\n';
-#endif
 
             if (c == '\\')
             {
@@ -8519,13 +8505,8 @@ old_restore_string (svalue_t *v, char *str)
     if ( '\0' != (c = *cp++) )
     {
         do {
-#ifndef MSDOS_FS
             if (c == '\r')
                 cp[-1] = '\n';
-#else
-            if (c == CTRLZ)
-                cp[-1] = '\n';
-#endif
         } while ( '\0' != (c = *cp++) );
 
         if (cp[-2] == '\n' && cp[-3] == '\"')

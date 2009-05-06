@@ -72,6 +72,8 @@ xx-xxx-xxxx -- 3.3.719
          (2.x, <3.2).
        + Removed checks and special code for SunOS4
        + Removed checks and special code for Ultrix.
+       + Removed MSDOS filesystem semantics (Checks for MSDOS_FS and special
+         behaviour (e.g. \\ as path separator).
 
     - Other
        + Generalized the write buffer for non-threaded use and renamed the
