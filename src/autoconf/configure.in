@@ -636,13 +636,6 @@ dnl Not all checks happen here - the check for solaris for example requires
 dnl some library checks first.
 
 AC_EGREP_CPP(yes,[
-#if defined(__EMX__)
-yes
-#endif
-],
-[ EXTRA_CFLAGS="${EXTRA_CFLAGS} -DOS2" ])
-
-AC_EGREP_CPP(yes,[
 #if defined(__CYGWIN32__) || defined(__CYGWIN__)
 yes
 #endif
@@ -2434,8 +2427,6 @@ yes
 [ EXTRA_CFLAGS="${EXTRA_CFLAGS} -Dsolaris" ])
 fi
 
-AC_ARG_WITH(target,[  --with-target    ?? (OS2/WIN32/solaris)], EXTRA_CFLAGS="${EXTRA_CFLAGS} -D${withval}")
-
 # Some Unixes require the -n parameter for tail to work properly
 AC_MSG_CHECKING(if tail accepts the -n parameter)
 TAIL_N=""
@@ -2640,9 +2631,6 @@ case "$EXTRA_CFLAGS" in
         -ltcpip -lsocket -lnsl -lgcc -lc /usr/ucblib/libucb.a"
       LDFLAGS= "-u dgettext -lintl"
   fi ;;
- *-DOS2*)
-      LDFLAGS= "$LDFLAGS -Zbsd-signals -Zexe"
-      ;;
  *-MSWIN*)
       LDFLAGS= "$LDFLAGS -luser32 -lwinmm -lkernel32 -lwsock32"
       ;;

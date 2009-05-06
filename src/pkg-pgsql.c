@@ -77,7 +77,7 @@
 
 #else
 
-#    if defined(_AIX) || defined(__EMX__) || defined(OS2)
+#    if defined(_AIX)
 #        include <sys/select.h>
 #    endif
 

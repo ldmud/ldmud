@@ -197,17 +197,6 @@ xmemmem ( const char *haystack, size_t haystacklen
 } /* xmemmem() */
 
 /*-------------------------------------------------------------------------*/
-/* Some UNIX functions which are not supported on all platforms. */
-
-#if defined(__EMX__) || defined(OS2)
-int socketpair (int a, int b, int c, int *d)
-{
-    errno = EPERM;
-    return -1;
-}
-#endif
-
-/*-------------------------------------------------------------------------*/
 #ifdef STRTOL_BROKEN
 
 #define DIGIT(x)        (isdigit(x) ? (x) - '0' : \
@@ -378,7 +367,7 @@ getrusage (int who, struct rusage *rusage)
 }
 #endif /* getrusage implemented using times() */
 
-#if defined(CYGWIN) || defined(__EMX__) || defined(OS2)
+#if defined(CYGWIN)
 /*-----------------------------------------------------------------------
 ** void init_rusage (void)
 ** int getrusage (int who, struct rusage *rusage)

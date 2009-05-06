@@ -6,6 +6,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
     Removed the whole hosts/ directory because it wasn't maintained for a long
     time and most of the systems were anyway dead for a long time (#625).
     This removed --enable-use-system-crypt as well (#624).
+  - Removed checks and special code for OS2 and __EMX__.
 
 05-May-2009 (Zesstra)
   - (prolang.y)

@@ -51,10 +51,6 @@ extern int lstat (CONST char *, struct stat *);
 extern int fchmod(int, int);
 #endif
 
-#if defined(OS2) || defined(__EMX__)
-#    define lstat stat
-#endif
-
 /*-------------------------------------------------------------------------*/
 
 #include "files.h"

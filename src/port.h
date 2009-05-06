@@ -199,7 +199,7 @@ extern int errno;
 #    undef USE_MYSQL
 #endif
 
-#if defined( MSDOS ) || defined(CYGWIN) || defined(__EMX__) || defined(OS2)
+#if defined( MSDOS ) || defined(CYGWIN)
 #define MSDOS_FS
 #endif
 
@@ -602,7 +602,7 @@ extern char *crypt(const char *, const char *);
 #    define crypt(pass, salt) _crypt(pass, salt)
 #endif
 
-#if defined(CYGWIN) || defined(__EMX__) || defined(OS2)
+#if defined(CYGWIN)
 extern void init_rusage(void);
 #else
 #define init_rusage()
