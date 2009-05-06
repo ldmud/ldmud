@@ -38,7 +38,7 @@
 #    ifdef sun
          extern int getpagesize();
 #    endif
-#    if defined(sun) || defined(ultrix)
+#    if defined(sun)
          extern int getrusage (int, struct rusage *);
 #    endif
 

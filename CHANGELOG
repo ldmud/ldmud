@@ -13,6 +13,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - Removed checks and work-arounds for very old gcc compilers (2.x, <3.2).
   - Removed checks and special code for SunOS4 (The last release of SunOS4
     was in 1994.)
+  - Removed checks and special code for Ultrix.
 
 05-May-2009 (Zesstra)
   - (prolang.y)

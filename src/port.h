@@ -578,8 +578,7 @@ extern void move_memory(char *, char *, size_t);
 #endif
 
 #if ((!defined(HAVE_CRYPT) && !defined(HAVE__CRYPT))) || \
-    (defined(sgi) && !defined(_MODERN_C)) || defined(ultrix) \
-    || defined(sun)
+    (defined(sgi) && !defined(_MODERN_C)) || defined(sun)
 extern char *crypt(const char *, const char *);
 #endif
 
