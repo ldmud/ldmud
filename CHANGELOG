@@ -16,6 +16,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - Removed checks and special code for Ultrix.
   - Removed MSDOS filesystem semantics (Checks for MSDOS_FS and special
     behaviour (e.g. \\ as path separator).
+  - (prolang.y) Another fix in insert_pop_value().
+    In case of F_NUMBER was the operation itself not taken into account.
+    Replaced hard-coded numbers by the appropriate sizeof() in all other cases
+    as well.
 
 05-May-2009 (Zesstra)
   - (prolang.y)

@@ -14142,6 +14142,7 @@ insert_pop_value (void)
 /* Remove the last value computed from the stack. If possible, use
  * last_expression to prohibit that value from being generated
  * in the first place.
+ * TODO: check the sizeof() during bytecode cleanup...
  */
 
 {
@@ -14149,7 +14150,7 @@ insert_pop_value (void)
      * the value from being generated if the last expression is not too long
      * ago.
      */
-    if (last_expression == CURRENT_PROGRAM_SIZE - 1)
+    if (last_expression == CURRENT_PROGRAM_SIZE - sizeof(bytecode_t))
     {
          /* The following ops have no data in the bytecode. */
         switch ( mem_block[A_PROGRAM].block[last_expression])
@@ -14183,7 +14184,8 @@ insert_pop_value (void)
                 break;
         }
     }
-    else if (last_expression == CURRENT_PROGRAM_SIZE - 2)
+    else if (last_expression == CURRENT_PROGRAM_SIZE - sizeof(bytecode_t)
+                                                     -  sizeof(char))
     {
         /* The following ops are followed by 1 chars of data in the bytecode. */
         switch ( mem_block[A_PROGRAM].block[last_expression])
@@ -14201,7 +14203,8 @@ insert_pop_value (void)
                 break;
         }
     }
-    else if (last_expression == CURRENT_PROGRAM_SIZE - 3)
+    else if (last_expression == CURRENT_PROGRAM_SIZE - sizeof(bytecode_t) 
+                                                     - sizeof(short))
     {
         /* The following ops are followed by 2 chars of data in the bytecode. */
         if ( mem_block[A_PROGRAM].block[last_expression] == F_STRING)
@@ -14209,7 +14212,8 @@ insert_pop_value (void)
         else
             ins_f_code(F_POP_VALUE);            
     }
-    else if (last_expression == CURRENT_PROGRAM_SIZE - sizeof(p_int))
+    else if (last_expression == CURRENT_PROGRAM_SIZE - sizeof(bytecode_t) 
+                                                     - sizeof(p_int))
     {
         /* The following ops are followed by sizeof(p_int) chars of data in 
          * the bytecode. */
