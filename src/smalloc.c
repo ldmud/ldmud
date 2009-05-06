@@ -3236,10 +3236,6 @@ esbrk (word_t size, size_t * pExtra)
 
 {
 #ifdef SBRK_OK
-#ifdef SunOS4
-    extern char *sbrk();
-    extern int brk();
-#endif
 
     mdb_log_sbrk(size);
     *pExtra = 0;

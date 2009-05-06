@@ -165,18 +165,6 @@
 #    define socket_close  close
 #endif /* SOCKET_LIB */
 
-#if defined(SunOS4)
-struct timeval;
-extern SOCKET_T socket(int, int, int);
-extern int getpeername(SOCKET_T, struct sockaddr *, int *);
-extern void  shutdown(SOCKET_T, int);
-extern int setsockopt(SOCKET_T, int, int, char *, int);
-extern int bind(SOCKET_T, struct sockaddr *, int);
-extern int listen(SOCKET_T, int);
-extern SOCKET_T accept(SOCKET_T, struct sockaddr *, int *);
-extern int select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
-#endif /* SunOS4 */
-
 #if defined(_AIX)
 typedef unsigned long length_t;
 #elif defined(__INTEL_COMPILER) || defined (__GNUC__)

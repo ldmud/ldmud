@@ -44,10 +44,6 @@ Thats it.
  * Define some system macros.
  */
 
-#if defined(sun) && !defined(solaris)
-#    define SunOS4
-#endif
-
 #if defined(M_UNIX) || defined(__linux__) || defined(solaris) || \
     defined(_POSIX_VERSION)
 #    ifndef POSIX

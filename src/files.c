@@ -44,13 +44,6 @@ extern int lstat(const char *, struct stat *);
 #    define S_ISREG(m) (((m)&S_IFMT) == S_IFREG)
 #endif
 
-#ifdef SunOS4
-#    if !defined (__GNUC__)
-extern int lstat (CONST char *, struct stat *);
-#    endif
-extern int fchmod(int, int);
-#endif
-
 /*-------------------------------------------------------------------------*/
 
 #include "files.h"
