@@ -818,8 +818,6 @@ set_socket_nonblocking (SOCKET_T new_socket)
 {
     int tmp;
 
-#ifndef __BEOS__
-
     tmp = 1;
 
 # ifdef USE_IOCTL_FIONBIO
@@ -837,19 +835,6 @@ set_socket_nonblocking (SOCKET_T new_socket)
         abort();
     }
 # endif /* !USE_IOCTL_FIONBIO */
-
-#else /* if __BEOS__ */
-
-    /* BeOS up to R4 uses different filedescriptors for files and sockets;
-     * so a fcntl() modifies the regular file with the number <new_socket>,
-     * but not the socket itself. setsockopt() comes to our rescue.
-     * TODO: Add setsockopt() to configure to test?
-     */
-    tmp = 1;
-    if (setsockopt(new_socket, SOL_SOCKET, SO_NONBLOCK, &tmp, sizeof tmp))
-        perror("setsockopt SO_NONBLOCK");
-
-#endif /* if !__BEOS__ */
 
 } /* set_socket_nonblocking() */
 
@@ -2712,7 +2697,7 @@ get_message (char *buff)
          *   to prevent freezing.
          * TODO: Always use the readfds information.
          */
-#if !defined(__BEOS__) && !defined(CYGWIN)
+#if !defined(CYGWIN)
         if (udp_s >= 0)
 #else
         if (udp_s >= 0 && FD_ISSET(udp_s, &readfds))
@@ -6066,9 +6051,7 @@ open_ipv6_conn( const char *hostname, const unsigned short int port
     int sock;
     int con = 0;
     int fd_flags;
-#ifdef __BEOS__
-    const int bos = 1;
-#endif
+
     struct hostent *h;
     struct protoent *p;
     struct sockaddr_in6 addr;
@@ -6083,19 +6066,16 @@ open_ipv6_conn( const char *hostname, const unsigned short int port
         return -1;
     }
     endprotoent();
-#ifdef __BEOS__
-    if (setsockopt(sock, SOL_SOCKET, SO_NONBLOCK, &bos, sizeof(bos)))
-#else
-        fd_flags = fcntl(sock, F_GETFL, 0);
-#  if defined(O_NONBLOCK)
+
+    fd_flags = fcntl(sock, F_GETFL, 0);
+#if defined(O_NONBLOCK)
     fd_flags |= O_NONBLOCK;
-#  elif defined(O_NDELAY)
+#elif defined(O_NDELAY)
     fd_flags |= O_NDELAY;
-#  elif defined(FNDELAY)
+#elif defined(FNDELAY)
     fd_flags |= O_FNDELAY;
-#  endif
-    if (fcntl(sock, F_SETFL, fd_flags) == -1)
 #endif
+    if (fcntl(sock, F_SETFL, fd_flags) == -1)
     {
         perror("setsockopt/fcntl");
         close(sock);

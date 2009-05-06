@@ -102,15 +102,6 @@ extern int errno;
 #include <math.h>
 #include <float.h>
 
-#ifdef __BEOS__
-     /* BeOS defines some standard non-standard types itself (like int32).
-      * Since the defs will be used as part of the networking includes,
-      * we force them in here globally and simply adapt the other
-      * definitions to avoid clashes.
-      */
-#    include <SupportDefs.h>
-#endif
-
 #ifdef HAVE_SYS_PARAM_H
 #    include <sys/param.h>
 #endif
@@ -424,34 +415,32 @@ typedef p_uint       mp_uint;
 #define SCNxMPINT  PRIxPINT
 
 
-#ifndef __BEOS__
 /* int32 : an integer with 32 bits.
    TODO: just use (u)int32_t instead of (u)int32. */
 typedef int32_t   int32;
 typedef uint32_t  uint32;
-#  ifndef PRId32
+#ifndef PRId32
    /* unfortunately there seems to be no PRId32 from inttypes.h or alike.
       TODO: Once we require C99, we can get rid of the this stuff */
-#    if !defined(CHAR_BIT) || CHAR_BIT != 8
-#      error CHAR_BIT does not exist or is != 8 which is currently not supported!
-       Thats it.
-#    endif
+#  if !defined(CHAR_BIT) || CHAR_BIT != 8
+#    error CHAR_BIT does not exist or is != 8 which is currently not supported!
+     Thats it.
+#  endif
    /* now sizeof(int32) has to be sizeof(char) * 4 == 4. */
-#    if SIZEOF_INT == 4
-#      define __PRId32PREFIX
-#    elif SIZEOF_LONG == 4
-#      define __PRId32PREFIX "l"
-#    elif SIZEOF_SHORT == 4
-#      define __PRIx32PREFIX "h"
-#    else
-#      error Could not find length modifier for (u)int32
-       Thats it.
-#    endif
-#    define PRId32 __PRId32PREFIX "d"
-#    define PRIu32 __PRId32PREFIX "u"
-#    define PRIx32 __PRId32PREFIX "x"
-#  endif /* PRId32 */
-#endif /* __BEOS__ */
+#  if SIZEOF_INT == 4
+#    define __PRId32PREFIX
+#  elif SIZEOF_LONG == 4
+#    define __PRId32PREFIX "l"
+#  elif SIZEOF_SHORT == 4
+#    define __PRIx32PREFIX "h"
+#  else
+#    error Could not find length modifier for (u)int32
+     Thats it.
+#  endif
+#  define PRId32 __PRId32PREFIX "d"
+#  define PRIu32 __PRId32PREFIX "u"
+#  define PRIx32 __PRId32PREFIX "x"
+#endif /* PRId32 */
 
 
 /* type to use with constant pointer arithmetic. */

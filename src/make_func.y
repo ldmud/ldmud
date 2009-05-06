@@ -2708,9 +2708,6 @@ read_machine (void)
 #ifdef AMIGA
     add_define("AMIGA",-1,"");
 #endif
-#ifdef __BEOS__
-    add_define("__BEOS__", -1, "");
-#endif
 #ifdef DEBUG
     add_define("DEBUG", -1, "");
 #endif

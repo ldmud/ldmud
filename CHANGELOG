@@ -8,6 +8,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
     This removed --enable-use-system-crypt as well (#624).
   - Removed checks and special code for OS2 and __EMX__.
   - Removed check for MSDOS.
+  - Removed checks and special code for __BEOS__.
 
 05-May-2009 (Zesstra)
   - (prolang.y)

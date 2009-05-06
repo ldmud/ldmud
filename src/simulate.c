@@ -580,7 +580,6 @@ dump_core(void)
  */
 
 {
-#if !defined(__BEOS__)
     /* we want a core dump, and abort() seems to fail for linux and sun */
     (void)signal(SIGFPE, SIG_DFL);
     {
@@ -588,7 +587,6 @@ dump_core(void)
         *((char*)0) = 0/a;
         *((char*)fatal) = 0/a;
     }
-#endif
     abort();
 } /* dump_core() */
 

@@ -1890,7 +1890,7 @@ mem_realloc (POINTER p, size_t size)
 
 /* Extra types and definitions for the AVL routines */
 
-#if defined (sun) || defined(AMIGA) || defined(__linux__) || defined(__BEOS__)
+#if defined (sun) || defined(AMIGA) || defined(__linux__)
     /* there is a type signed char */
     typedef signed char balance_t;
 #   define BALANCE_T_BITS 8
