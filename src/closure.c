@@ -3770,24 +3770,14 @@ compile_value (svalue_t *value, int opt_flags)
 
                         for (; j--; labels++)
                         {
-#if defined(__linux__) && defined(__GNUC__)
-                              /* Workaround for probable optimizer bug. */
-                            ph_int label_type;
-#define UNION_BUG
-#endif
                             l = new_case_entry();
                             l->addr =
                               current.code_max - current.code_left - switch_pc;
                             l->line = 1;
 
                             /* Create the case_list_entry for this case label */
-#ifndef UNION_BUG
                             if (j && labels[1].type == T_CLOSURE
-#else
-                            if (j && (label_type = labels[1].type) == T_CLOSURE
-#endif
-                              && labels[1].x.closure_type ==
-                                  F_RANGE +CLOSURE_EFUN )
+                                  && labels[1].x.closure_type == F_RANGE +CLOSURE_EFUN )
                             {
                                 /* It's a ({#'.., <low>, <high>}) range */
                             	
@@ -3877,15 +3867,9 @@ compile_value (svalue_t *value, int opt_flags)
                                 {
                                     zero = l;
                                 }
-#ifndef UNION_BUG
                             }
                             else if (labels->type == T_CLOSURE
-#else
-                            }
-                            else if ((label_type = labels->type) == T_CLOSURE
-#endif
-                               && labels->x.closure_type ==
-                                  F_CSTRING0 +CLOSURE_OPERATOR)
+                                     && labels->x.closure_type == F_CSTRING0 +CLOSURE_OPERATOR)
                             {
                             	/* #'default label */
                             	
@@ -4707,9 +4691,6 @@ compile_value (svalue_t *value, int opt_flags)
     current.levels_left++;
     return opt_flags;
 
-#ifdef UNION_BUG
-#undef UNION_BUG
-#endif
 } /* compile_value() */
 
 /*-------------------------------------------------------------------------*/
