@@ -2705,9 +2705,6 @@ read_machine (void)
 {
     /* Some predefined macros */
 
-#ifdef AMIGA
-    add_define("AMIGA",-1,"");
-#endif
 #ifdef DEBUG
     add_define("DEBUG", -1, "");
 #endif

@@ -6871,7 +6871,7 @@ v_save_object (svalue_t *sp, int numarg)
         i = 0; /* Result from efun */
 
         unlink(name);
-#if !defined(MSDOS_FS) && !defined(AMIGA)
+#if !defined(MSDOS_FS)
         if (link(tmp_name, name) == -1)
 #else
         close(f);
@@ -6884,7 +6884,7 @@ v_save_object (svalue_t *sp, int numarg)
             add_message("Failed to save object !\n");
             i = 1;
         }
-#if !defined(MSDOS_FS) && !defined(AMIGA)
+#if !defined(MSDOS_FS)
         close(f);
         unlink(tmp_name);
 #endif

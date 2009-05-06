@@ -48,10 +48,6 @@ typedef void *pointer;  /* generic pointer type */
  * STACK_DIRECTION = 0 => direction of growth unknown
  */
 
-#if defined(AMIGA)
-#    define STACK_DIRECTION -1
-#endif
-
 #ifndef STACK_DIRECTION
 #    define STACK_DIRECTION  0  /* direction unknown */
 #endif

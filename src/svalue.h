@@ -334,10 +334,8 @@ struct svalue_s
  * be well below all existing host floating point formats so that we get
  * the same accuracy on all platforms.
  *
- * The functions to encode/decode float numbers exist in two version, one
- * fast one using internal knowledge about how the compiler stores its
- * numbers, and a second portable one. To keep the implementation
- * transparent, the following macros/functions are defined:
+ * To keep the implementation transparent, the following macros/functions are
+ * defined:
  *
  *   int FLOAT_FORMAT:
  *     0 for the portable format, 1 for the fast format.
@@ -360,47 +358,6 @@ struct svalue_s
  *     Declaration of a local variable which STORE_DOUBLE needs.
  */
 
-/* --- The fast format */
-
-#if (defined(AMIGA) && defined(_DCC))
-
-#define FLOAT_FORMAT_1
-
-/* Faster routines, using inline and knowlegde about double format.
- * The exponent isn't actually in 'exponent', but that doesn't really matter
- * as long as the accesses are consistent.
- *
- * The DICE compiler for the Amiga lacks the ldexp() and frexp() functions,
- * therefore these functions here are the only way to get things done.
- *
- * STORE_DOUBLE doesn't do any rounding, but truncates off the least
- * significant bits of the mantissa that won't fit together with the exponent
- * into 48 bits. To compensate for this, we initialise the unknown bits of
- * the mantissa with 0x7fff in READ_DOUBLE . This keeps the maximum precision
- * loss of a store/read pair to the same value as rounding, while being faster
- * and being more stable.
- */
-
-static INLINE
-double READ_DOUBLE(struct svalue *svalue_pnt)
-{        double tmp;
-        (*(long*)&tmp) = svalue_pnt->u.mantissa;
-        ((short*)&tmp)[2] = svalue_pnt->x.exponent;
-        ((short*)&tmp)[3] = 0x7fff;
-        return tmp;
-}
-
-#define SPLIT_DOUBLE(double_value, int_pnt) (\
-            (*(int_pnt) = ((short*)&double_value)[2]),\
-            *((long*)&double_value)\
-        )
-
-#define STORE_DOUBLE_USED
-#define STORE_DOUBLE(dest, double_value) (\
-            (dest)->u.mantissa = *((long*)&double_value),\
-            (dest)->x.exponent = ((short*)&double_value)[2]\
-        )
-#endif
 
 /* --- The portable format, used if no other format is defined */
 

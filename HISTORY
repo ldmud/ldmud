@@ -67,6 +67,7 @@ xx-xxx-xxxx -- 3.3.719
        + Removed checks and special code for OS2 and __EMX__.
        + Removed checks and special code for MSDOS.
        + Removed checks and special code for BeOS.
+       + Removed checks and special code for AMIGA.
 
     - Other
        + Generalized the write buffer for non-threaded use and renamed the

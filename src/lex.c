@@ -698,11 +698,6 @@ init_lexer(void)
     {
         ident_t *p;
 
-#if defined(AMIGA) && defined(_DCC) && defined(DICE30)
-        if (n >= NELEM(instrs)-1)
-            continue;
-#endif
-
         if (instrs[n].Default == -1)
             continue;
 
@@ -735,11 +730,6 @@ init_lexer(void)
     for (i = 0; i < NELEM(reswords); i++)
     {
         ident_t *p;
-
-#if defined(AMIGA) && defined(_DCC) && defined(DICE30)
-        if (i >= NELEM(reswords)-1)
-            continue;
-#endif
 
         p = make_shared_identifier(reswords[i].name, I_TYPE_RESWORD, 0);
         if (!p)

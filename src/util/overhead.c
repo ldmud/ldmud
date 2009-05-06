@@ -17,7 +17,7 @@
  */
 
 #include <stdio.h>
-#if defined(HAVE_STDLIB_H) || defined(AMIGA)
+#if defined(HAVE_STDLIB_H)
 #  include <stdlib.h>
 #endif
 #ifdef HAVE_LIBC_H

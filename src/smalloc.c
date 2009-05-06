@@ -1890,7 +1890,7 @@ mem_realloc (POINTER p, size_t size)
 
 /* Extra types and definitions for the AVL routines */
 
-#if defined (sun) || defined(AMIGA) || defined(__linux__)
+#if defined (sun) || defined(__linux__)
     /* there is a type signed char */
     typedef signed char balance_t;
 #   define BALANCE_T_BITS 8
@@ -1898,7 +1898,7 @@ mem_realloc (POINTER p, size_t size)
     typedef short balance_t;
 #   define BALANCE_T_BITS 16
 #endif
-#if defined(sparc) || defined(AMIGA)
+#if defined(sparc)
     /* try to avoid multiple shifts, because these are costly */
 #   define NO_BARREL_SHIFT
 #endif
