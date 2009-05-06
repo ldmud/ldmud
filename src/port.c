@@ -355,18 +355,6 @@ move_memory (char *dest, char *src, size_t n)
 #endif /* !HAVE_MEMMOVE */
 
 /*-------------------------------------------------------------------------*/
-#if (!defined(HAVE_CRYPT) && !defined(HAVE__CRYPT)) || !defined(USE_SYSTEM_CRYPT)
-#include "hosts/crypt.c"
-#endif
-
-#if 0 /* If you can't get crypt to compile,  you can use this dummy */
-char * crypt(char *pass, char *salt)
-{
-    return pass;
-}
-#endif
-
-/*-------------------------------------------------------------------------*/
 #if !defined(HAVE_GETRUSAGE)
 
 #include <sys/times.h>
@@ -424,4 +412,3 @@ getrusage (int who, struct rusage *rusage) {
 #endif /* CYGWIN */
 
 /***************************************************************************/
-

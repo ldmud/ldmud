@@ -112,7 +112,6 @@ AC_MY_ARG_ENABLE(compat-mode,no,,[Enable compat mode])
 AC_MY_ARG_ENABLE(strict-euids,no,,[Enforce euids for loading objects])
 AC_MY_ARG_ENABLE(filename-spaces,no,,[Allow space characters in filenames])
 AC_MY_ARG_ENABLE(share-variables,no,,[Enable clone initialization from blueprint variable values])
-AC_MY_ARG_ENABLE(use-system-crypt,yes,,[Use crypt() from libc])
 AC_MY_ARG_ENABLE(use-ipv6,no,,[Enables support for IPv6])
 AC_MY_ARG_ENABLE(use-alists,no,,[Enables alist support])
 AC_MY_ARG_ENABLE(use-mccp,no,,[Enables MCCP support])
@@ -379,7 +378,6 @@ AC_CDEF_FROM_ENABLE(compat_mode)
 AC_CDEF_FROM_ENABLE(strict_euids)
 AC_CDEF_FROM_ENABLE(filename_spaces)
 AC_CDEF_FROM_ENABLE(share_variables)
-AC_CDEF_FROM_ENABLE(use_system_crypt)
 AC_CDEF_FROM_ENABLE(use_alists)
 AC_CDEF_FROM_ENABLE(use_mccp)
 AC_CDEF_FROM_ENABLE(use_ipv6)
@@ -718,32 +716,26 @@ if test "$lp_cv_need_lib_resolv" = "yes"; then
 fi
 
 # --- Check if we need the crypto libraries ---
+AC_CHECK_FUNCS(crypt _crypt)
+for lp_lib in crypt crypto; do
+    if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
+        # Try linking with lib$lp_lib
+        unset ac_cv_func_crypt
+        unset ac_cv_func__crypt
+        lp_save_libs="$LIBS"
+        AC_CHECK_LIB($lp_lib,main, LIBS="$LIBS -l$lp_lib")
 
-if test "x$enable_use_system_crypt" = "x" || test "x$enable_use_system_crypt" = "xyes"; then
-    AC_CHECK_FUNCS(crypt _crypt)
-
-    for lp_lib in crypt crypto; do
-        if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
-            # Try linking with lib$lp_lib
-            unset ac_cv_func_crypt
-            unset ac_cv_func__crypt
-            lp_save_libs="$LIBS"
-            AC_CHECK_LIB($lp_lib,main, LIBS="$LIBS -l$lp_lib")
-
-            if test "$SAVE_LIBS" != "$LIBS" ; then
-                AC_CHECK_FUNCS(crypt _crypt)
-                if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
-                    # They are not in this library
-                    LIBS="$lp_save_libs"
-                else
-                    eval "lp_cv_need_lib_${lp_lib}=yes"
-                fi
+        if test "$SAVE_LIBS" != "$LIBS" ; then
+            AC_CHECK_FUNCS(crypt _crypt)
+            if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
+                # They are not in this library
+                LIBS="$lp_save_libs"
+            else
+                eval "lp_cv_need_lib_${lp_lib}=yes"
             fi
         fi
-    done
-
-fi
-
+    fi
+done
 
 AC_CACHE_CHECK(if inet_ntoa() ok,lp_cv_func_inet_ntoa_ok,
 AC_TRY_RUN([
@@ -2675,10 +2667,6 @@ AC_DEFINE_UNQUOTED(EXTERN_MALLOC_OVERHEAD,$lp_cv_sys_malloc_overhead,
 if test -z "${CONFIG_SHELL}"; then
   CONFIG_SHELL='/bin/sh'
 fi
-if test "${OSTYPE}" = 'win32'; then
-  EXEEXT='.exe'
-  AC_DEFINE(HOST_INCLUDE,"hosts/GnuWin32/GnuWin32.h",[define the host-specific include file])
-fi
 
 
 dnl
@@ -2724,7 +2712,6 @@ AC_SUBST(cdef_compat_mode)
 AC_SUBST(cdef_strict_euids)
 AC_SUBST(cdef_filename_spaces)
 AC_SUBST(cdef_share_variables)
-AC_SUBST(cdef_use_system_crypt)
 AC_SUBST(cdef_use_ipv6)
 AC_SUBST(cdef_use_mysql)
 AC_SUBST(cdef_use_pgsql)

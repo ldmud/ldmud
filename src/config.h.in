@@ -325,16 +325,6 @@
  */
 @cdef_use_process_string@ USE_PROCESS_STRING
 
-/* Define USE_SYSTEM_CRYPT if you want crypt() to be implemented by your
- * operating system (assuming it offers this function). This makes your
- * programm smaller and may even let you take advantage of improvements
- * of your OS, but may also prohibit transporting encrypted date like
- * passwords between different systems.
- * Undefine USE_SYSTEM_CRYPT if you want to use the driver's portable
- * crypt() implementation.
- */
-@cdef_use_system_crypt@ USE_SYSTEM_CRYPT
-
 /* Define this if you want MCCP (Mud Control Compression Protocol).
  */
 @cdef_use_mccp@ USE_MCCP

@@ -52,6 +52,19 @@ xx-xxx-xxxx -- 3.3.719
        + Added a permanent define __GCRYPT__ when libgcrypt support is
          available.
 
+    - Portability
+       + Savefiles are written in binary mode, if the host system supports any
+         such notion (O_BINARY exists). Additionally, they are read as binary
+         as well, if it is supported. (Note: POSIX conforming systems do not
+         distinguish between 'text' and 'binary' modes, this is only relevant
+         to Cygwin.)
+       + Fixed a major bug on 64 bit platforms, where floats with negative
+         exponents were saved incorrectly leading to data corruption (#627).
+       + Removed the whole hosts/ directory because it wasn't maintained for
+         a long time and most of the systems were anyway dead for a long 
+         time (#625).
+         This removed --enable-use-system-crypt as well (#624).
+
     - Other
        + Generalized the write buffer for non-threaded use and renamed the
           configuration option '--with-pthreads-write-max-size' to
@@ -64,13 +77,6 @@ xx-xxx-xxxx -- 3.3.719
          '--enable-access-control', '--with-access-file', '--with-access-log'
          and their config.h symbols ACCESS_FILE and ACCESS_LOG just give
          the default values.
-       + Savefiles are written in binary mode, if the host system supports any
-         such notion (O_BINARY exists). Additionally, they are read as binary
-         as well, if it is supported. (Note: POSIX conforming systems do not
-         distinguish between 'text' and 'binary' modes, this is only relevant
-         to Cygwin.)
-       + Fixed a major bug on 64 bit platforms, where floats with negative
-         exponents were saved incorrectly leading to data corruption (#627).
 
 
 12-Jan-2009 -- 3.3.718
