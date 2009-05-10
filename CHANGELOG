@@ -7,6 +7,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
     which describes the semantics of the define much better and it is now
     defined as being sizeof(word_t).
     Additionally, MEM_ALIGN is now defined as being the same as GRANULARITY.
+  - (xalloc.c) Replaced define by enum.
+    The defines for the header fields of memory blocks were replaced by an enum.
+    Additionally a comment about word_t is added.
 
 06-May-2009 (Zesstra)
   - (hosts/) The hosts/ directory was removed.

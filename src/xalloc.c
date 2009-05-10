@@ -77,7 +77,8 @@ static inline void count_back_n(t_stat *a, unsigned long b, unsigned long c) {
 }
 
 typedef p_uint word_t;
-  /* Our 'word' type.
+  /* Our 'word' type. This should not be changed unless you check the allocators
+   * first for assumptions that this is a p_uint.
    */
 
 /*-------------------------------------------------------------------------*/
@@ -88,26 +89,29 @@ typedef p_uint word_t;
  * TODO: Let the GC use the symbolic constants.
  */
 
+enum xalloc_header_fields {
 #ifdef MALLOC_LPC_TRACE
-#    define XM_OBJ  0  /* (object_t*) the allocating object */
-#    define XM_PROG 1  /* (int32) allocating program's id-number */
-#    define XM_PC   2  /* (bytecode_p) inter_pc at the allocation */
+    XM_OBJ  = 0,  /* (object_t*) the allocating object */
+    XM_PROG = 1,  /* (int32) allocating program's id-number */
+    XM_PC   = 2,  /* (bytecode_p) inter_pc at the allocation */
 #    ifdef MALLOC_TRACE
-#        define XM_OVERHEAD (5)
-#        define XM_FILE   3  /* (const char*) allocating source file */
-#        define XM_LINE   4  /* (word_t) allocating line in source file */
+         XM_FILE = 3,  /* (const char*) allocating source file */
+         XM_LINE = 4,  /* (word_t) allocating line in source file */
+         XM_OVERHEAD = 5,
 #    else
-#        define XM_OVERHEAD (3)
+         XM_OVERHEAD = 3,
 #    endif /* MALLOC_TRACE */
 #else /* !MALLOC_LPC_TRACE */
 #    ifdef MALLOC_TRACE
-#        define XM_OVERHEAD (2)
-#        define XM_FILE  0  /* (const char*) allocating source file */
-#        define XM_LINE  1  /* (word_t) allocating line in source file */
+         XM_FILE = 0,  /* (const char*) allocating source file */
+         XM_LINE = 1,  /* (word_t) allocating line in source file */
+         XM_OVERHEAD = 2,
 #    else
-#        define XM_OVERHEAD (0)
+         XM_OVERHEAD = 0,
 #    endif /* MALLOC_TRACE */
 #endif /* MALLOC_LPC_TRACE */
+    XM_OVERHEAD_SIZE = XM_OVERHEAD * sizeof(word_t),
+};
 
 #define XM_OVERHEAD_SIZE (XM_OVERHEAD * sizeof(word_t))
 
