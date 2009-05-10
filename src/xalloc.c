@@ -1191,15 +1191,17 @@ amalloc (size_t size)
 
 {
     char *temp;
-
-#if MALLOC_ALIGN > MEM_ALIGN
-
+    size_t orig_size UNUSED; // unused if no HAVE_MADVISE.
+    
+    if (MALLOC_ALIGN > MEM_ALIGN)
+    {
+        
 #if defined(HAVE_MADVISE)
-    size_t orig_size = size;
+        orig_size = size;
 #endif
-
-    size += (MALLOC_ALIGN-MEM_ALIGN);
-#endif
+        
+        size += (MALLOC_ALIGN-MEM_ALIGN);
+    }
 
     temp = (char *)pxalloc(size);
     if (!temp)
@@ -1210,18 +1212,19 @@ amalloc (size_t size)
         malloc_privilege = save_privilege;
     }
 
-#if MALLOC_ALIGN > MEM_ALIGN
-    if (temp)
+    if (MALLOC_ALIGN > MEM_ALIGN) 
     {
-        /* Set the first byte of the alignment area to 0xAF - afree(0
-         * is going to look for it - and the rest to 0.
-         */
-        *temp++ = 0xAF;
-        while ((p_int)temp & (MALLOC_ALIGN-1))
-            *temp++ = 0;
-        MADVISE(temp, orig_size);
+        if (temp)
+        {
+            /* Set the first byte of the alignment area to 0xAF - afree(0
+             * is going to look for it - and the rest to 0.
+             */
+            *temp++ = 0xAF;
+            while ((p_int)temp & (MALLOC_ALIGN-1))
+                *temp++ = 0;
+            MADVISE(temp, orig_size);
+        }
     }
-#endif
 
     return (POINTER)temp;
 } /* amalloc() */
@@ -1239,13 +1242,14 @@ afree (POINTER p)
     if (!q)
         return;
 
-#if MALLOC_ALIGN > MEM_ALIGN
-
-    /* amalloc() filled the alignment area with 0s except for the first byte.
-     * Search backwards to find that marker and with it the real block begin.
-     */
-    while (!*--q) NOOP;
-#endif
+    if (MALLOC_ALIGN > MEM_ALIGN)
+    {
+        
+        /* amalloc() filled the alignment area with 0s except for the first byte.
+         * Search backwards to find that marker and with it the real block begin.
+         */
+        while (!*--q) NOOP;
+    }
 
     pfree(q);
 } /* afree() */
@@ -1268,9 +1272,10 @@ get_block_size (POINTER ptr)
         char *q;
 
         q = (char *)ptr;
-#if MALLOC_ALIGN > MEM_ALIGN
-        while ( !(size = *--q) ) NOOP;
-#endif
+        
+        if (MALLOC_ALIGN > MEM_ALIGN)
+            while ( !(size = *--q) ) NOOP;
+
         size = xalloced_size(q) + mem_overhead();
     }
 
