@@ -5588,7 +5588,7 @@ yylex1 (void)
 
             /* Nope, normal number */
             yyp = parse_number(numstart, &l, &overflow);
-            if (overflow || (l && ((long)l-1)<0))
+            if (overflow || (l > (unsigned long)LONG_MAX+1))
             {
                 /* Don't warn on __INT_MAX__+1 because there
                  * may be a minus preceeding this number.
