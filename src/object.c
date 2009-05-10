@@ -5506,7 +5506,8 @@ static struct pointer_table *ptable = NULL;
    */
 
 static char number_buffer[36];
-  /* Buffer to create numbers in - big enough for 32 Bit uints.
+  /* Buffer to create numbers in - big enough for 64 Bit uints and our 48 Bit
+   * floats.
    */
 
 static char *save_object_bufstart;
@@ -5705,7 +5706,7 @@ recall_pointer (void *pointer)
 
         L_PUTC('<')
         source = number_buffer;
-        (void)sprintf(source, "%ld", id);
+        (void)snprintf(source, sizeof(number_buffer), "%ld", id);
         c = *source++;
         do L_PUTC(c) while ( '\0' != (c = *source++) );
         L_PUTC('>')
@@ -5823,7 +5824,7 @@ save_mapping (mapping_t *m)
 
         MY_PUTC(':')
         source = number_buffer;
-        (void)sprintf(source, "%"PRIdPINT, m->num_values);
+        (void)snprintf(source, sizeof(number_buffer), "%"PRIdPINT, m->num_values);
         c = *source++;
         do MY_PUTC(c) while ( '\0' != (c = *source++) );
     }
@@ -6268,7 +6269,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         char * source, c;
 
         source = number_buffer;
-        (void)sprintf(source, "#%"PRIdPHINT":", v->x.quotes);
+        (void)snprintf(source, sizeof(number_buffer), "#%"PRIdPHINT":", v->x.quotes);
         c = *source++;
         do L_PUTC(c) while ( '\0' != (c = *source++) );
         L_PUTC_EPILOG
@@ -6291,7 +6292,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         char *source, c;
 
         source = number_buffer;
-        (void)sprintf(source, "%"PRIdPINT, v->u.number);
+        (void)snprintf(source, sizeof(number_buffer), "%"PRIdPINT, v->u.number);
         c = *source++;
         do L_PUTC(c) while ( '\0' != (c = *source++) );
         L_PUTC(delimiter);
@@ -6310,8 +6311,16 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         char *source, c;
 
         source = number_buffer;
-        (void)sprintf(source, "%.12e=%"PRIx16":%"PRIx32
-                     , READ_DOUBLE(v), (int16_t)v->x.exponent
+        // Casting to uint16_t is done because PRIx16 on some systems is %x, not
+        // %hx, although int16_t is a short. That causes conversion of the 
+        // exponent to signed integer and in case of negative exponents wrong 
+        // data and too many chars will be written (ffffffff instead of ffff).
+        // And because on the same system SCNx16 is "%hx", different values 
+        // would be restored than written.
+        // Casting to unsigned keeps the bit pattern.
+        (void)snprintf(source, sizeof(number_buffer)
+                     ,  "%.12e=%"PRIx16":%"PRIx32
+                     , READ_DOUBLE(v), (uint16_t)v->x.exponent
                      , (int32_t)v->u.mantissa);
         c = *source++;
         do L_PUTC(c) while ( '\0' != (c = *source++) );
@@ -6330,7 +6339,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         char * source, c;
 
         source = number_buffer;
-        (void)sprintf(source, "#%hd:", v->x.quotes);
+        (void)snprintf(source, sizeof(number_buffer), "#%hd:", v->x.quotes);
         c = *source++;
         do L_PUTC(c) while ( '\0' != (c = *source++) );
         L_PUTC_EPILOG

@@ -14,6 +14,14 @@ See the file HISTORY for a user-oriented summary of all the changes.
     Because MEM_ALIGN is now a sizeof() expression, it can't be used in
     conditional compilation. Replaced them by real if() (which are eliminated
     by the compiler because their expression is constant).
+  - (object.c) Fixed buffer overflow in save_svalue() (#634)
+    save_svalue() used PRIx16 to print the exponent of a float. Unfortunately,
+    on some systems PRIx16 is %x, although int16_t is a short. This causes a
+    signed conversion (which keeps the value) and then 0xffffffff is written.
+    Even if the buffer is large enough, upon restore with SCNx16 (%hx) a wrong
+    value would be restored. *args*
+    Additionally all sprintf(), which write into number_buffer were replaced
+    by snprintf().
 
 06-May-2009 (Zesstra)
   - (hosts/) The hosts/ directory was removed.
