@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-May-2009 (Zesstra)
+  - (smalloc.c, slaballoc.) Replaced SINT by GRANULARITY
+    The define SINT was ill-named. All occurences were renamed to GRANULARITY
+    which describes the semantics of the define much better and it is now
+    defined as being sizeof(word_t).
+    Additionally, MEM_ALIGN is now defined as being the same as GRANULARITY.
+
 06-May-2009 (Zesstra)
   - (hosts/) The hosts/ directory was removed.
     Removed the whole hosts/ directory because it wasn't maintained for a long

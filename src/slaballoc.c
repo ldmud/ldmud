@@ -219,9 +219,17 @@
 
 #include "../mudlib/sys/debug_info.h"
 
-/* Defines required by the xalloc.c wrapper */
+/* This is the granularity of memory allocations.
+ * WARNING: This MUST be sizeof(word_t) at the moment. If you want to change
+ * the granularity, you have to check the whole allocator first... (Or change
+ * word_t.)
+ * word_t is defined in xalloc.c as being p_uint, that is, it has always the
+ * size of a pointer.
+ */
+#define GRANULARITY sizeof(word_t)
 
-#define MEM_ALIGN (SIZEOF_CHAR_P)
+/* Defines required by the xalloc.c wrapper */
+#define MEM_ALIGN GRANULARITY
 
 /* If possible, request memory using sbrk(). But if using pthreads, do
  * not replace malloc() with our routines, even if the system allows it,
@@ -243,8 +251,6 @@
 #define MEM_MAIN_THREADSAFE
 
 /* #undef NO_MEM_BLOCK_SIZE */
-
-#define SINT (SIZEOF_CHAR_P)
 
 /* Initialiser macros for the tables */
 
@@ -320,7 +326,7 @@
 
 /* Derived values */
 
-#define SMALL_BLOCK_MIN_BYTES  (SMALL_BLOCK_MIN * SINT)
+#define SMALL_BLOCK_MIN_BYTES  (SMALL_BLOCK_MIN * GRANULARITY)
    /* Minimum payload size of a small block.
     */
 
@@ -328,7 +334,7 @@
    /* The maximum size (incl. overhead) of a small block in words
     */
 
-#define SMALL_BLOCK_MAX_BYTES  ((SMALL_BLOCK_NUM-1 + SMALL_BLOCK_MIN) * SINT)
+#define SMALL_BLOCK_MAX_BYTES  ((SMALL_BLOCK_NUM-1 + SMALL_BLOCK_MIN) * GRANULARITY)
    /* Maximum payload size of a small block.
     */
 
@@ -342,14 +348,14 @@
 #    define CHUNK_SIZE          0x40000
 #else
     /* It seems to be advantagous to be just below a power of two
-     * make sure that the resulting chunk sizes are SINT aligned.
+     * make sure that the resulting chunk sizes are GRANULARITY aligned.
      */
-#    define CHUNK_SIZE    (0x40000 - SINT - EXTERN_MALLOC_OVERHEAD)
+#    define CHUNK_SIZE    (0x40000 - GRANULARITY - EXTERN_MALLOC_OVERHEAD)
 #endif
 
 
 /* Bitflags for the size field:
- * TODO: Assumes a 32-Bit word_t.
+ * TODO: Assumes a word_t of at least 32 bit.
  */
 #define PREV_BLOCK  0x80000000  /* Previous block is allocated */
 #define THIS_BLOCK  0x40000000  /* This block is allocated */
@@ -481,7 +487,7 @@ struct slab_s
 };
 
 #define SLAB_SIZE(slab, ix) \
-    ( sizeof(struct slab_s) - SINT + slabtable[ix].numBlocks * (slab)->size )
+    ( sizeof(struct slab_s) - GRANULARITY + slabtable[ix].numBlocks * (slab)->size )
   /* Actual size of a given slab.
    */
 
@@ -696,7 +702,7 @@ mem_block_total_size (POINTER p)
         mslab_t * slab = (mslab_t*)(q - (q[M_SIZE] & M_MASK));
         return slab->size;
     }
-    return q[M_LSIZE]*SINT;
+    return q[M_LSIZE]*GRANULARITY;
 } /* mem_block_total_size() */
 
 /*-------------------------------------------------------------------------*/
@@ -711,9 +717,9 @@ mem_block_size (POINTER p)
 
     if (q[M_SIZE] & M_SMALL)
     {
-        return mem_block_total_size(p) - M_OVERHEAD*SINT;
+        return mem_block_total_size(p) - M_OVERHEAD*GRANULARITY;
     }
-    return mem_block_total_size(p) - ML_OVERHEAD*SINT;
+    return mem_block_total_size(p) - ML_OVERHEAD*GRANULARITY;
 } /* mem_block_size() */
 
 /*-------------------------------------------------------------------------*/
@@ -758,7 +764,7 @@ mem_overhead (void)
  */
 
 {
-   return M_OVERHEAD*SINT;
+   return M_OVERHEAD*GRANULARITY;
 } /* mem_overhead() */
 
 /*-------------------------------------------------------------------------*/
@@ -776,15 +782,15 @@ getNumBlocks (int ix)
 
     if (0 == (numBlocks = slabtable[ix].numBlocks))
     {
-        size_t xsize = (ix+SMALL_BLOCK_MIN+M_OVERHEAD)*SINT;
+        size_t xsize = (ix+SMALL_BLOCK_MIN+M_OVERHEAD)*GRANULARITY;
 #ifdef SLABALLOC_DYNAMIC_SLABS
         size_t minSlabObjectSize = DESIRED_SLAB_SIZE / 128;
         size_t sizeMultiplier = 1+ (xsize-1) / minSlabObjectSize;
         size_t totalSlabSize = DESIRED_SLAB_SIZE * sizeMultiplier;
-        size_t effSlabSize = totalSlabSize - sizeof(mslab_t) - SINT;
+        size_t effSlabSize = totalSlabSize - sizeof(mslab_t) - GRANULARITY;
 #else
         size_t totalSlabSize = DESIRED_SLAB_SIZE;
-        size_t effSlabSize = totalSlabSize - sizeof(mslab_t) - SINT;
+        size_t effSlabSize = totalSlabSize - sizeof(mslab_t) - GRANULARITY;
 #endif
         numBlocks = (unsigned short)(effSlabSize / xsize);
 
@@ -891,15 +897,15 @@ mem_dump_data (strbuf_t *sbuf)
 #endif
     xalloc_st = xalloc_stat;
     perm_st = perm_alloc_stat;
-    l_alloc = large_alloc_stat; l_alloc.size *= SINT;
-    l_free = large_free_stat; l_free.size *= SINT;
+    l_alloc = large_alloc_stat; l_alloc.size *= GRANULARITY;
+    l_free = large_free_stat; l_free.size *= GRANULARITY;
     l_wasted = large_wasted_stat;
     s_alloc = small_alloc_stat;
     s_free = small_free_stat;
-    s_slab = small_slab_stat; s_slab.size += s_slab.counter * M_OVERHEAD * SINT;
+    s_slab = small_slab_stat; s_slab.size += s_slab.counter * M_OVERHEAD * GRANULARITY;
     s_free_slab = small_slab_free_stat;
 
-    s_overhead = s_slab.counter * (sizeof(mslab_t) - SINT + M_OVERHEAD * SINT);
+    s_overhead = s_slab.counter * (sizeof(mslab_t) - GRANULARITY + M_OVERHEAD * GRANULARITY);
 
 #   define dump_stat(str,stat) strbuf_addf(sbuf, str,stat.counter,stat.size)
 
@@ -909,7 +915,7 @@ mem_dump_data (strbuf_t *sbuf)
     dump_stat("large blocks:      %8lu        %10lu (b)\n",l_alloc);
     strbuf_addf(sbuf
                , "large net avail:                   %10lu\n"
-               , l_alloc.size - l_alloc.counter * ML_OVERHEAD * SINT
+               , l_alloc.size - l_alloc.counter * ML_OVERHEAD * GRANULARITY
                );
     dump_stat("large free blocks: %8lu        %10lu (c)\n",l_free);
     dump_stat("large wasted:      %8lu        %10lu (d)\n\n",l_wasted);
@@ -917,7 +923,7 @@ mem_dump_data (strbuf_t *sbuf)
     dump_stat("small blocks:      %8lu        %10lu (f)\n",s_alloc);
     strbuf_addf(sbuf
                , "small net avail:                   %10lu\n"
-               , s_alloc.size - s_alloc.counter * M_OVERHEAD * SINT
+               , s_alloc.size - s_alloc.counter * M_OVERHEAD * GRANULARITY
                );
     dump_stat("small free blocks: %8lu        %10lu (g)\n",s_free);
     dump_stat("small free slabs:  %8lu        %10lu    \n",s_free_slab);
@@ -960,8 +966,8 @@ mem_dump_data (strbuf_t *sbuf)
                , "Total storage in use: (b-g-h)     %10lu net available:   %10lu\n"
                , l_alloc.size - s_free.size - s_overhead
                , l_alloc.size - s_free.size - s_overhead
-                 - l_alloc.counter * ML_OVERHEAD * SINT
-                 - s_alloc.counter * M_OVERHEAD * SINT
+                 - l_alloc.counter * ML_OVERHEAD * GRANULARITY
+                 - s_alloc.counter * M_OVERHEAD * GRANULARITY
                  - xalloc_st.counter * XM_OVERHEAD_SIZE
                );
     strbuf_addf(sbuf
@@ -997,7 +1003,7 @@ mem_dump_extdata (strbuf_t *sbuf)
             strbuf_add(sbuf, "\n");
 
         if (i < SMALL_BLOCK_NUM)
-            strbuf_addf(sbuf, "  Size %3u: ", (i + SMALL_BLOCK_MIN) * SINT);
+            strbuf_addf(sbuf, "  Size %3u: ", (i + SMALL_BLOCK_MIN) * GRANULARITY);
         else if (i == EXTSTAT_SLABS)
             strbuf_addf(sbuf, "  Slabs:    ");
         else
@@ -1142,18 +1148,18 @@ mem_dinfo_data (svalue_t *svp, int value)
         put_ref_string(svp, STR_SLABALLOC);
 
     small_overhead = small_slab_stat.counter
-                     * (sizeof(mslab_t) - SINT + M_OVERHEAD * SINT);
+                     * (sizeof(mslab_t) - GRANULARITY + M_OVERHEAD * GRANULARITY);
 
     ST_NUMBER(DID_MEM_SBRK, sbrk_stat.counter);
     ST_NUMBER(DID_MEM_SBRK_SIZE, sbrk_stat.size);
     ST_NUMBER(DID_MEM_LARGE, large_alloc_stat.counter);
-    ST_NUMBER(DID_MEM_LARGE_SIZE, large_alloc_stat.size * SINT);
+    ST_NUMBER(DID_MEM_LARGE_SIZE, large_alloc_stat.size * GRANULARITY);
     ST_NUMBER(DID_MEM_LFREE, large_free_stat.counter);
-    ST_NUMBER(DID_MEM_LFREE_SIZE, large_free_stat.size * SINT);
+    ST_NUMBER(DID_MEM_LFREE_SIZE, large_free_stat.size * GRANULARITY);
     ST_NUMBER(DID_MEM_LWASTED, large_wasted_stat.counter);
     ST_NUMBER(DID_MEM_LWASTED_SIZE, large_wasted_stat.size);
     ST_NUMBER(DID_MEM_SLAB, small_slab_stat.counter);
-    ST_NUMBER(DID_MEM_SLAB_SIZE, small_slab_stat.size + small_slab_stat.counter * M_OVERHEAD * SINT);
+    ST_NUMBER(DID_MEM_SLAB_SIZE, small_slab_stat.size + small_slab_stat.counter * M_OVERHEAD * GRANULARITY);
     ST_NUMBER(DID_MEM_SLAB_FREE, small_slab_free_stat.counter);
     ST_NUMBER(DID_MEM_SLAB_FREE_SIZE, small_slab_free_stat.size);
     ST_NUMBER(DID_MEM_SMALL, small_alloc_stat.counter);
@@ -1173,18 +1179,18 @@ mem_dinfo_data (svalue_t *svp, int value)
 #endif
     ST_NUMBER(DID_MEM_PERM, perm_alloc_stat.counter);
     ST_NUMBER(DID_MEM_PERM_SIZE, perm_alloc_stat.size);
-    ST_NUMBER(DID_MEM_OVERHEAD, T_OVERHEAD * SINT);
-    ST_NUMBER(DID_MEM_ALLOCATED, large_alloc_stat.size * SINT
+    ST_NUMBER(DID_MEM_OVERHEAD, T_OVERHEAD * GRANULARITY);
+    ST_NUMBER(DID_MEM_ALLOCATED, large_alloc_stat.size * GRANULARITY
                               - small_free_stat.size
                               - small_overhead);
-    ST_NUMBER(DID_MEM_USED, large_alloc_stat.size * SINT
+    ST_NUMBER(DID_MEM_USED, large_alloc_stat.size * GRANULARITY
                               - small_free_stat.size
                               - small_overhead
-                              - large_alloc_stat.counter * ML_OVERHEAD * SINT
-                              - small_alloc_stat.counter * M_OVERHEAD * SINT
+                              - large_alloc_stat.counter * ML_OVERHEAD * GRANULARITY
+                              - small_alloc_stat.counter * M_OVERHEAD * GRANULARITY
                               - xalloc_stat.counter * XM_OVERHEAD_SIZE
              );
-    ST_NUMBER(DID_MEM_TOTAL_UNUSED, large_free_stat.size * SINT
+    ST_NUMBER(DID_MEM_TOTAL_UNUSED, large_free_stat.size * GRANULARITY
                                     + large_wasted_stat.size
                                     + small_free_stat.size
              );
@@ -1262,10 +1268,10 @@ available_memory(void)
 /* Return the amount of memory actually used by the driver. */
 
 {
-    return large_alloc_stat.size * SINT
+    return large_alloc_stat.size * GRANULARITY
            - small_free_stat.size
-           - large_alloc_stat.counter * ML_OVERHEAD * SINT
-           - small_alloc_stat.counter * M_OVERHEAD * SINT;
+           - large_alloc_stat.counter * ML_OVERHEAD * GRANULARITY
+           - small_alloc_stat.counter * M_OVERHEAD * GRANULARITY;
 } /* available_memory() */
 #endif /* CHECK_MAPPING_TOTAL */
 
@@ -1276,19 +1282,19 @@ available_memory(void)
 /*-------------------------------------------------------------------------*/
 
 #define SIZE_INDEX(size) \
-      ((size)/SINT - T_OVERHEAD - SMALL_BLOCK_MIN)
+      ((size)/GRANULARITY - T_OVERHEAD - SMALL_BLOCK_MIN)
     /* Index to the proper array entry for a small
      * block of <size> (including overhead).
      */
 
 #define SIZE_MOD_INDEX(size, table) \
-      (((size)/SINT - T_OVERHEAD - SMALL_BLOCK_MIN) % NELEM(table))
+      (((size)/GRANULARITY - T_OVERHEAD - SMALL_BLOCK_MIN) % NELEM(table))
     /* Index to the proper array entry for a small
      * block of <size> (including overhead), limited to the size of <table>.
      */
 
 #define INDEX_SIZE(ix) \
-      ((ix + T_OVERHEAD + SMALL_BLOCK_MIN) * SINT)
+      ((ix + T_OVERHEAD + SMALL_BLOCK_MIN) * GRANULARITY)
     /* Determine block <size> (including overhead) for a slab held
      * in table index <ix>.
      */
@@ -1556,8 +1562,8 @@ mem_alloc (size_t size)
     }
 
     /* TODO: For the following test, see SIZET_limits in port.h */
-    if (size >= ULONG_MAX - (T_OVERHEAD+SMALL_BLOCK_MIN)*SINT
-     || size >= (M_MASK + 1 - (T_OVERHEAD+SMALL_BLOCK_MIN))*SINT
+    if (size >= ULONG_MAX - (T_OVERHEAD+SMALL_BLOCK_MIN)*GRANULARITY
+     || size >= (M_MASK + 1 - (T_OVERHEAD+SMALL_BLOCK_MIN))*GRANULARITY
        )
     {
         in_malloc = 0;
@@ -1591,8 +1597,8 @@ mem_alloc (size_t size)
     if (size < SMALL_BLOCK_MIN_BYTES + XM_OVERHEAD_SIZE)
         size = SMALL_BLOCK_MIN_BYTES + XM_OVERHEAD_SIZE;
 
-    ulog2f("slaballoc: alloc (%d + %d)", size, M_OVERHEAD*SINT);
-    size = (size+M_OVERHEAD*SINT+SINT-1) & ~(SINT-1);
+    ulog2f("slaballoc: alloc (%d + %d)", size, M_OVERHEAD*GRANULARITY);
+    size = (size+M_OVERHEAD*GRANULARITY+GRANULARITY-1) & ~(GRANULARITY-1);
     ix = SIZE_INDEX(size);
 
     ulog2f(" %d bytes -> [%d]\n", size, ix);
@@ -1719,7 +1725,7 @@ mem_alloc (size_t size)
             /* Allocate a new slab from the large memory pool. */
 
             unsigned short numObjects = getNumBlocks(ix);
-            size_t slabSize = sizeof(struct slab_s) - SINT + numObjects * size;
+            size_t slabSize = sizeof(struct slab_s) - GRANULARITY + numObjects * size;
 
             slab = (mslab_t*)large_malloc_int(slabSize, MY_FALSE);
 
@@ -1757,7 +1763,7 @@ mem_alloc (size_t size)
         slab->numAllocated = 0;
 
         slabtable[ix].fresh = slab;
-        slabtable[ix].freshMem = slab->blocks + (slabtable[ix].numBlocks * slab->size / SINT);
+        slabtable[ix].freshMem = slab->blocks + (slabtable[ix].numBlocks * slab->size / GRANULARITY);
 
         ulog3f("slaballoc:   fresh %x mem %x..%x\n"
               , slab, slab->blocks, slabtable[ix].freshMem
@@ -1772,7 +1778,7 @@ mem_alloc (size_t size)
     /* Allocate a new block from the fresh slab's memory.
      */
     {
-        word_t wsize = size / SINT;
+        word_t wsize = size / GRANULARITY;
 
         slabtable[ix].freshMem -= wsize;
         block = slabtable[ix].freshMem;
@@ -1894,27 +1900,27 @@ sfree (POINTER ptr)
     {
         in_malloc = 0;
         fatal("mem_free: block %p size %"PRIuPINT" (user %p) freed in free slab %p\n"
-             , block, (ix * SINT), ptr, slab);
+             , block, (ix * GRANULARITY), ptr, slab);
     }
     if (slab->magic != samagic[ix % NELEM(samagic)])
     {
         in_malloc = 0;
         fatal("mem_free: block %p magic match failed for slab %p: "
               "size %"PRIuPINT", expected %"PRIuPINT", found %"PRIuPINT"\n"
-             , block, slab, (ix * SINT), (p_uint)samagic[ix], slab->magic);
+             , block, slab, (ix * GRANULARITY), (p_uint)samagic[ix], slab->magic);
     }
     if (block[M_MAGIC] == sfmagic[ix % NELEM(sfmagic)])
     {
         in_malloc = 0;
         fatal("mem_free: block %p size %"PRIuPINT" (user %p) freed twice\n"
-             , block, (ix * SINT), ptr);
+             , block, (ix * GRANULARITY), ptr);
     }
     if (block[M_MAGIC] != samagic[ix % NELEM(samagic)])
     {
         in_malloc = 0;
         fatal("mem_free: block %p magic match failed: "
               "size %"PRIuPINT", expected %"PRIuPINT", found %"PRIuPINT"\n"
-             , block, (ix * SINT), (p_uint)samagic[ix], block[M_MAGIC]);
+             , block, (ix * GRANULARITY), (p_uint)samagic[ix], block[M_MAGIC]);
     }
 #endif
 
@@ -2277,7 +2283,7 @@ check_free_block (void *m)
     word_t *p;
     int size;
 
-    p = (word_t *)(((char *)m)-M_OVERHEAD*SINT);
+    p = (word_t *)(((char *)m)-M_OVERHEAD*GRANULARITY);
     size = p[M_LSIZE];
     if (!(*(p+size) & THIS_BLOCK))
     {
@@ -3096,7 +3102,7 @@ large_malloc ( word_t size, Bool force_more)
     size_t orig_size = size;
 #endif
 
-    size = (size + SINT*ML_OVERHEAD + SINT-1) / SINT; /* incl. overhead */
+    size = (size + GRANULARITY*ML_OVERHEAD + GRANULARITY-1) / GRANULARITY; /* incl. overhead */
 
 retry:
     ptr = NULL;
@@ -3203,7 +3209,7 @@ found_fit:
         word_t chunk_size, block_size;
         size_t extra = 0; /* extra memory allocated by esbrk() */
 
-        block_size = size*SINT;
+        block_size = size*GRANULARITY;
 
         /* If force_more is true (read: we have to allocate a small chunk)
          * or if the if the requested block would leave only a 'small'
@@ -3213,7 +3219,7 @@ found_fit:
          */
 
         if (force_more
-         || block_size > CHUNK_SIZE - SMALL_BLOCK_MAX_BYTES - T_OVERHEAD*SINT )
+         || block_size > CHUNK_SIZE - SMALL_BLOCK_MAX_BYTES - T_OVERHEAD*GRANULARITY )
         {
             chunk_size = block_size;
 
@@ -3232,11 +3238,12 @@ found_fit:
 
         if ((chunk_size & ALLOC_MULTIPLE) != 0)
         {
-#           if SMALL_BLOCK_MAX_BYTES > ALLOC_MULTIPLE
+            // this expression is constant, so the compiler will remove the if
+            // (gcc actually removes it even without any optimization).
+            if (SMALL_BLOCK_MAX_BYTES > ALLOC_MULTIPLE)
                 chunk_size += SMALL_BLOCK_MAX_BYTES + 2 * ALLOC_MULTIPLE;
-#           else
+            else
                 chunk_size += ALLOC_MULTIPLE;
-#           endif
 
             chunk_size &= ~ALLOC_MULTIPLE;
         }
@@ -3252,9 +3259,9 @@ found_fit:
         {
             if (max_malloced > 0
              && (mp_int)(sbrk_stat.size + chunk_size) > max_malloced
-             && (    (mp_int)(sbrk_stat.size + (heap_start ? 0 : SINT)) >= max_malloced
+             && (    (mp_int)(sbrk_stat.size + (heap_start ? 0 : GRANULARITY)) >= max_malloced
                  || (chunk_size = max_malloced - sbrk_stat.size
-                                               - (heap_start?0:SINT) )
+                                               - (heap_start?0:GRANULARITY) )
                      < block_size
                 )
                )
@@ -3292,7 +3299,7 @@ found_fit:
         /* Enough of the scary words - we got our memory block */
 
         chunk_size += extra;
-        block_size = chunk_size / SINT;
+        block_size = chunk_size / GRANULARITY;
 
         /* Add block to free memory. */
         ptr = add_large_free(ptr, block_size);
@@ -3325,21 +3332,21 @@ found_fit:
         if (real_size - size <= SMALL_BLOCK_MAX)
         {
             dprintf2(2,"DEBUG: lmalloc(%d / %d): "
-                      , orig_size, size * SINT);
+                      , orig_size, size * GRANULARITY);
             dprintf2(2
                     , "Split off block of %d bytes, small limit is %d bytes.\n"
-                    , (p_int)(real_size - size) * SINT
-                    , (p_int)SMALL_BLOCK_MAX * SINT);
+                    , (p_int)(real_size - size) * GRANULARITY
+                    , (p_int)SMALL_BLOCK_MAX * GRANULARITY);
 #ifdef DEBUG_MALLOC_ALLOCS
             if (gcollect_outfd != 2)
             {
                 dprintf2(gcollect_outfd
                         ,"DEBUG: lmalloc(%d / %d): "
-                        , orig_size, size * SINT);
+                        , orig_size, size * GRANULARITY);
                 dprintf2(gcollect_outfd
                         , "Split off block of %d bytes, small limit is %d bytes.\n"
-                        , (p_int)(real_size - size) * SINT
-                        , (p_int)SMALL_BLOCK_MAX * SINT);
+                        , (p_int)(real_size - size) * GRANULARITY
+                        , (p_int)SMALL_BLOCK_MAX * GRANULARITY);
             }
 #endif
         }
@@ -3353,7 +3360,7 @@ found_fit:
         {
             mark_block(ptr+size);
             *(ptr+size) &= ~M_GC_FREE; /* Hands off, GC! */
-            count_up(&large_wasted_stat, (*(ptr+size) & M_MASK) * SINT);
+            count_up(&large_wasted_stat, (*(ptr+size) & M_MASK) * GRANULARITY);
         }
         else
 #       endif
@@ -3408,14 +3415,14 @@ large_free (char *ptr)
     {
         in_malloc = 0;
         fatal("large_free: block %p size %"PRIuPINT", (user %p) freed twice\n"
-             , p, (size * SINT), ptr);
+             , p, (size * GRANULARITY), ptr);
     }
     if (p[M_MAGIC] != LAMAGIC)
     {
         in_malloc = 0;
         fatal("large_free(%p): block %p magic match failed: size %"PRIuPINT", "
               "expected %"PRIuPINT", found %"PRIuPINT"\n"
-             , ptr, p, (size * SINT)
+             , ptr, p, (size * GRANULARITY)
              , (p_uint)LAMAGIC
              , p[M_MAGIC]
              );
@@ -3456,14 +3463,14 @@ esbrk (word_t size, size_t * pExtra)
     {
         /* First call: allocate the first fake block */
         heap_start = heap_end = (word_t *)sbrk(0);
-        if (!esbrk(2*SINT, pExtra))
+        if (!esbrk(2*GRANULARITY, pExtra))
         {
             in_malloc = 0;
             fatal("Couldn't malloc anything\n");
         }
         *heap_start = 2;
         *(heap_start+1) = PREV_BLOCK | M_MASK;
-        count_up(&large_wasted_stat, 2*SINT);
+        count_up(&large_wasted_stat, 2*GRANULARITY);
         assert_stack_gap();
     }
 
@@ -3489,7 +3496,7 @@ esbrk (word_t size, size_t * pExtra)
 
 
     mdb_log_sbrk(size);
-    size += overhead * SINT;  /* for the extra fake "allocated" block */
+    size += overhead * GRANULARITY;  /* for the extra fake "allocated" block */
 
     block = malloc(size);
     if (!block)
@@ -3537,7 +3544,7 @@ esbrk (word_t size, size_t * pExtra)
             {
                 /* We can join with the existing heap */
                 p[overhead] &= ~PREV_BLOCK;
-                overlap = overhead * SINT;
+                overlap = overhead * GRANULARITY;
                 count_back(&large_wasted_stat, overlap);
             }
             else
@@ -3560,8 +3567,8 @@ esbrk (word_t size, size_t * pExtra)
             {
                 /* We can join with the existing heap */
                 heap_end = (word_t *)(block + size);
-                block -= overhead * SINT;
-                overlap = overhead * SINT;
+                block -= overhead * GRANULARITY;
+                overlap = overhead * GRANULARITY;
                 count_back(&large_wasted_stat, overlap);
             }
             else
@@ -3595,9 +3602,9 @@ esbrk (word_t size, size_t * pExtra)
             if ((word_t *)block == prev + overhead)
             {
                 /* Our block directly follows the one we found */
-                block -= overhead * SINT;
-                overlap += overhead * SINT;
-                count_back(&large_wasted_stat, overhead * SINT);
+                block -= overhead * GRANULARITY;
+                overlap += overhead * GRANULARITY;
+                count_back(&large_wasted_stat, overhead * GRANULARITY);
             }
             else
             {
@@ -3621,8 +3628,8 @@ esbrk (word_t size, size_t * pExtra)
             {
                 /* Our block directly preceedes the next one */
                 *(next+1) &= ~PREV_BLOCK;
-                overlap += overhead * SINT;
-                count_back(&large_wasted_stat, overhead * SINT);
+                overlap += overhead * GRANULARITY;
+                count_back(&large_wasted_stat, overhead * GRANULARITY);
             }
             else
             {
@@ -3634,10 +3641,10 @@ esbrk (word_t size, size_t * pExtra)
     }
 
     count_up(&sbrk_stat, size);
-    count_up(&large_wasted_stat, overhead * SINT);
+    count_up(&large_wasted_stat, overhead * GRANULARITY);
 
     *pExtra = overlap;
-    return block + SINT;
+    return block + GRANULARITY;
 #endif /* !SBRK_OK */
 } /* esbrk() */
 
@@ -3654,7 +3661,7 @@ mem_increment_size (void *vp, size_t size)
 {
     char *p = vp;
     word_t *start, *start2, *start3, old_size, next;
-    const word_t wsize = (size + SINT - 1)/ SINT;
+    const word_t wsize = (size + GRANULARITY - 1)/ GRANULARITY;
 
     malloc_increment_size_calls++;
 
@@ -3771,14 +3778,14 @@ mem_is_freed (void *p, p_uint minsize)
 
     if (block[M_SIZE] & M_SMALL)
     {
-        i = ((mslab_t *)(block - (block[M_SIZE] & M_MASK)))->size / SINT;
+        i = ((mslab_t *)(block - (block[M_SIZE] & M_MASK)))->size / GRANULARITY;
     }
     else
     {
         i = block[M_LSIZE];
     }
 
-    if (i < M_OVERHEAD + ((minsize + SINT - 1) / SINT)
+    if (i < M_OVERHEAD + ((minsize + GRANULARITY - 1) / GRANULARITY)
      || block + i >= heap_end)
         return MY_TRUE;
 
@@ -3828,11 +3835,11 @@ mem_clear_slab_memory_flags ( const char * tag
 
     mem_mark_ref(slab);
 
-    while (p < slab->blocks + slabtable[ix].numBlocks * slab->size / SINT)
+    while (p < slab->blocks + slabtable[ix].numBlocks * slab->size / GRANULARITY)
     {
         /* ulog1f("slaballoc:   clear block %x\n", p); */
         *p &= ~M_REF;
-        p += slab->size / SINT;
+        p += slab->size / GRANULARITY;
     }
 
     for (p = slab->freeList; p != NULL; p = BLOCK_NEXT(p))
@@ -3947,13 +3954,13 @@ mem_free_unrefed_slab_memory ( const char * tag
           , slab->blocks, startp, ((char *)slab->blocks) + (slabtable[ix].numBlocks * slab->size)
           );
 
-    while (p < slab->blocks + slabtable[ix].numBlocks * slab->size / SINT)
+    while (p < slab->blocks + slabtable[ix].numBlocks * slab->size / GRANULARITY)
     {
         if ((*p & (M_REF|M_GC_FREE)) == M_GC_FREE)
         {
             /* Unref'd small blocks are definitely lost */
             success++;
-            count_back(&xalloc_stat, slab->size - (T_OVERHEAD * SINT));
+            count_back(&xalloc_stat, slab->size - (T_OVERHEAD * GRANULARITY));
             dprintf2(gcollect_outfd, "freeing small block 0x%x (user 0x%x)"
                     , (p_uint)p, (p_uint)(p+M_OVERHEAD));
 #ifdef MALLOC_TRACE
@@ -3975,7 +3982,7 @@ mem_free_unrefed_slab_memory ( const char * tag
             ulog1f("slaballoc:   block %x is ref'd\n", p);
 #endif /* DEBUG_MALLOC_ALLOCS */
 
-        p += slab->size / SINT;
+        p += slab->size / GRANULARITY;
     }
 
     return success;
@@ -4099,8 +4106,8 @@ mem_dump_slab_memory (int fd, const char * tag, int tableIx
                , (p_uint)SLAB_SIZE(slab, tableIx)
                );
     dprintf2(fd, " (%d/%d byte blocks)\n"
-               , (p_int)(tableIx + SMALL_BLOCK_MIN) * SINT
-               , (p_int)(tableIx + T_OVERHEAD+SMALL_BLOCK_MIN) * SINT
+               , (p_int)(tableIx + SMALL_BLOCK_MIN) * GRANULARITY
+               , (p_int)(tableIx + T_OVERHEAD+SMALL_BLOCK_MIN) * GRANULARITY
             );
 
     /* No trace information for slabs */
@@ -4110,7 +4117,7 @@ mem_dump_slab_memory (int fd, const char * tag, int tableIx
     else
         p = slab->blocks;
 
-    while (p <= slab->blocks + slabtable[tableIx].numBlocks * slab->size / SINT)
+    while (p <= slab->blocks + slabtable[tableIx].numBlocks * slab->size / GRANULARITY)
     {
         word_t size = *p;
         if (!(*p & THIS_BLOCK))
@@ -4118,7 +4125,7 @@ mem_dump_slab_memory (int fd, const char * tag, int tableIx
             dprintf4(fd, "%x .. %x %s offset %x "
                        , (p_uint)p, (p_uint)(p + (size&M_MASK)) - 1
                        , (p_uint)((size & M_GC_FREE) ? " " : "P")
-                       , (p_uint)(size & M_MASK) * SINT
+                       , (p_uint)(size & M_MASK) * GRANULARITY
                        );
 
 #ifdef MALLOC_TRACE
@@ -4140,7 +4147,7 @@ mem_dump_slab_memory (int fd, const char * tag, int tableIx
             writes(fd, "\n");
         }
 
-        p += slab->size / SINT;
+        p += slab->size / GRANULARITY;
     }
 } /* mem_dump_slab_memory() */
 #endif
@@ -4168,8 +4175,8 @@ mem_identify_slab (int fd, const char * tag, int tableIx
             dprintf4(fd, ": %s slab %x (%d/%d bytes)\n"
                        , (p_int)tag
                        , (p_int) slab
-                       , (p_int)(tableIx + SMALL_BLOCK_MIN) * SINT
-                       , (p_int)(tableIx + T_OVERHEAD+SMALL_BLOCK_MIN) * SINT
+                       , (p_int)(tableIx + SMALL_BLOCK_MIN) * GRANULARITY
+                       , (p_int)(tableIx + T_OVERHEAD+SMALL_BLOCK_MIN) * GRANULARITY
                        );
             isSlab = MY_TRUE;
             break;
@@ -4216,7 +4223,7 @@ mem_dump_memory (int fd)
             dprintf4(fd, "%x .. %x %s size %x "
                        , (p_uint)p, (p_uint)(p + size) - 1
                        , (p_uint)((flags & M_GC_FREE) ? " " : "P")
-                       , (p_uint)size * SINT
+                       , (p_uint)size * GRANULARITY
                        );
 
             q = p + ML_OVERHEAD;
@@ -4226,8 +4233,8 @@ mem_dump_memory (int fd)
                 if ((word_t *)slabtable[ix].fresh == q)
                 {
                     dprintf2(fd, ": fresh slab (%d/%d bytes)\n"
-                               , (p_int)(ix + SMALL_BLOCK_MIN) * SINT
-                               , (p_int)(ix + T_OVERHEAD+SMALL_BLOCK_MIN) * SINT
+                               , (p_int)(ix + SMALL_BLOCK_MIN) * GRANULARITY
+                               , (p_int)(ix + T_OVERHEAD+SMALL_BLOCK_MIN) * GRANULARITY
                                );
                     isSlab = MY_TRUE;
                 }
