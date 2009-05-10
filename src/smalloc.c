@@ -902,7 +902,7 @@ mem_dump_extdata (strbuf_t *sbuf)
     for (i = 0; i < SIZE_EXTSTATS; ++i)
     {
         if (i < SMALL_BLOCK_NUM)
-            strbuf_addf(sbuf, "  Size %3u: ", (i + SMALL_BLOCK_MIN) * GRANULARITY);
+            strbuf_addf(sbuf, "  Size %3zu: ", (i + SMALL_BLOCK_MIN) * GRANULARITY);
         else if (i == SMALL_BLOCK_NUM)
             strbuf_addf(sbuf, "  Oversize: ");
         else

@@ -1003,7 +1003,7 @@ mem_dump_extdata (strbuf_t *sbuf)
             strbuf_add(sbuf, "\n");
 
         if (i < SMALL_BLOCK_NUM)
-            strbuf_addf(sbuf, "  Size %3u: ", (i + SMALL_BLOCK_MIN) * GRANULARITY);
+            strbuf_addf(sbuf, "  Size %3zu: ", (i + SMALL_BLOCK_MIN) * GRANULARITY);
         else if (i == EXTSTAT_SLABS)
             strbuf_addf(sbuf, "  Slabs:    ");
         else
