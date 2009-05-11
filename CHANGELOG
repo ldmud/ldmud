@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-May-2009 (Gnomi)
+  - (sprintf.c) Don't rely on overflow, as gcc optimizes away overflow checks.
+
 10-May-2009 (Zesstra)
   - (smalloc.c, slaballoc.) Replaced SINT by GRANULARITY
     The define SINT was ill-named. All occurences were renamed to GRANULARITY

@@ -473,7 +473,7 @@ numadd (fmt_state_t *st, sprintf_buffer_t **buffer, p_int num)
         /* Negative number: remember that and make
          * the number positive.
          */
-        if ( (num *= -1) < 0)
+        if (num == PINT_MIN)
         {
             /* num == MININT: add <num>+1 to the buffer, the
              * increment the last digit by one.
@@ -485,6 +485,8 @@ numadd (fmt_state_t *st, sprintf_buffer_t **buffer, p_int num)
             BUF_TEXT(b)[b->offset - 1] += 1;
             return;
         }
+        else
+            num *= -1;
         nve = MY_TRUE;
     }
     else

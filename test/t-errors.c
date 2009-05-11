@@ -88,6 +88,7 @@ mixed *tests = ({
     ({ "b-990204-3", 0, (: funcall(lambda(0,({#',,({#'++, 'x}),'x})))==1 :) }),
     ({ "b-990204-3", 0, (: funcall(lambda(0,({#',,({#'--, 'x}),'x})))==-1 :) }),
     ({ "b-990210", 0, (: terminal_colour("foobar bla", ([ ]), 9, 2)=="foobar\n  bla" :) }),
+    ({ "sprintf-INT_MIN", 0, (: sprintf("%Q",__INT_MIN__) == to_string(__INT_MIN__) :) }),
 });
 
 void run_test()
