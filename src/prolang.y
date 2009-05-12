@@ -2716,6 +2716,7 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n",
             /* We're overlaying some other definition, but that's ok.
              */
             ident = make_shared_identifier(get_txt(ident->name), I_TYPE_LOCAL, depth);
+            assert (ident->type == I_TYPE_UNKNOWN);
         }
 
         /* Initialize the ident */
@@ -13926,10 +13927,14 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
 #endif /* DEBUG_INLINES */
 
         if (redeclare && current_inline->block_depth+1 <= name->u.local.depth)
+        {
             yyerrorf("Illegal to redeclare local name '%s'"
                 , get_txt(name->name));
+            q = name;
+        }
+        else
+            q = add_context_name(name, actual_type, -1);
 
-        q = add_context_name(name, actual_type, -1);
         lv->u.simple[0] = F_PUSH_CONTEXT_LVALUE;
         lv->u.simple[1] = q->u.local.context;
     }

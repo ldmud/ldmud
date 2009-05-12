@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-May-2009 (Fuchur)
+  - (prolang.y) Fix infinite loop when redefining a closure argument
+     in its closure's context.
+
 11-May-2009 (Gnomi)
   - (sprintf.c) Don't rely on overflow, as gcc optimizes away overflow checks.
 
