@@ -8166,6 +8166,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         {
             *svp = const0;
 
+#ifdef USE_NEW_INLINES
             if (context_size > 0)
             {
                 svalue_t context = const0;
@@ -8176,6 +8177,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
                 else
                     free_svalue(&context);
             }
+#endif /* USE_NEW_INLINES */
         }
         break;
       } /* case 'c', 'l' */

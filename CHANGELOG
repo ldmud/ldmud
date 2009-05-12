@@ -2,6 +2,7 @@ This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
 12-May-2009 (Fuchur)
+  - (object.c) compile fix for !USE_NEW_INLINES
   - (prolang.y) forbid accessing closure arguments from within the
     closure's context.
   - (prolang.y) Fix infinite loop when redefining a closure argument
