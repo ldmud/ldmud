@@ -584,6 +584,9 @@ struct block_scope_s
       /* Local variables beyond num_locals may be clobbered */
     mp_uint addr;
       /* Address of CLEAR_LOCALS instruction, needed for backpatching */
+%ifdef USE_NEW_INLINES
+    Bool    accessible;   /* True if variables of this block are accessible */
+%endif
 };
 
 static block_scope_t block_scope[COMPILER_STACK_SIZE];
@@ -2771,6 +2774,10 @@ check_for_context_local (ident_t *ident, fulltype_t * pType)
 {
     int depth = ident->u.local.depth;
 
+    if (!block_scope[depth-1].accessible)
+        yyerrorf("Variable '%s' is in scope but inaccessible.\n",
+                 get_txt(ident->name));
+
     if (current_inline
      && depth <= current_inline->block_depth
        )
@@ -2841,6 +2848,9 @@ init_scope (int depth)
     block_scope[depth-1].num_cleared = 0;
     block_scope[depth-1].clobbered = MY_FALSE;
     block_scope[depth-1].addr = 0;
+%ifdef USE_NEW_INLINES
+    block_scope[depth-1].accessible = MY_TRUE;
+%endif
 } /* init_scope() */
 
 /*-------------------------------------------------------------------------*/
@@ -6026,6 +6036,9 @@ printf("DEBUG: After inline_opt_type: program size %"PRIuMPINT"\n", CURRENT_PROG
 #ifdef DEBUG_INLINES
 printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
+
+          /* deactivate argument scope while parsing explicit context */
+          block_scope[current_inline->block_depth+1].accessible = MY_FALSE;
           current_inline->parse_context = MY_TRUE;
       }
 
@@ -6035,7 +6048,11 @@ printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROG
 #ifdef DEBUG_INLINES
 printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
+
+          /* reactivate argument scope */
+          block_scope[current_inline->block_depth+1].accessible = MY_TRUE;
           current_inline->parse_context = MY_FALSE;
+
           if (!inline_closure_prototype($4))
               YYACCEPT;
       }
