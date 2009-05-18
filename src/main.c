@@ -77,8 +77,16 @@
 #include "pkg-mysql.h"
 #endif
 
-#ifdef USE_IKSEMEL
-#include "pkg-iksemel.h"
+#ifdef USE_XML
+#    if defined(HAS_XML2) && defined(HAS_IKSEMEL)
+#        error Both, libxml2 and iksemel enabled.
+#    endif
+#    ifdef HAS_XML2
+#        include "pkg-xml2.h"
+#    endif
+#    ifdef HAS_IKSEMEL
+#        include "pkg-iksemel.h"
+#    endif
 #endif
 
 #ifdef USE_GCRYPT
@@ -469,8 +477,14 @@ main (int argc, char **argv)
         }
 #endif
 
-#ifdef USE_IKSEMEL
+#ifdef USE_XML
+#ifdef HAS_IKSEMEL
         pkg_iksemel_init();
+#endif
+
+#ifdef HAS_XML2
+        pkg_xml2_init();
+#endif
 #endif
 
         /* If the master_name hasn't been set, select a sensible default */
@@ -1844,8 +1858,16 @@ options (void)
 #ifdef HAS_IDN
                               , "idna supported\n"
 #endif
-#ifdef USE_IKSEMEL
-                              , "iksemel supported\n"
+#ifdef USE_XML
+                              , "XML supported ("
+#  if defined(HAS_XML2)
+                                "libxml2"
+#  elif defined(HAS_IKSEMEL)
+                                "iksemel"
+#  else
+                                "<unknown>"
+#  endif
+                                ")\n"
 #endif
 #ifdef USE_IPV6
                               , "IPv6 supported\n"

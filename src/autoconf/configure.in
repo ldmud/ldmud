@@ -87,6 +87,83 @@ else
     not_available="[$not_available], $1"
 fi])
 
+dnl Search for library $2.
+dnl First try using pkg-config, put its results into $1_LIBS and $1_CFLAGS.
+dnl Then try searching in /usr/include, /usr/include/$4 and ${$5}.
+dnl Try to compile $6.
+dnl Look for library $7.
+dnl If successful set $3 to yes, otherwise to no.
+AC_DEFUN([AC_MY_SEARCH_LIB],
+[
+    saveflags="$CFLAGS"
+    saveeflags="$EXTRA_CFLAGS"
+
+    ifdef([PKG_CHECK_MODULES],[
+        PKG_CHECK_MODULES([$1],[$2],[$3]=yes,[$3]=no)
+    ],[
+         [$3]=no
+    ])
+
+    # No pkg-config, search manually.
+    if test $[$3] = no; then
+        AC_MSG_CHECKING(for [$4] support)
+        for TESTPATH in "" "${[$5]}" "${[$5]}/include" "${[$5]}/include/[$4]" "/usr/include/[$4]" "/usr/local/include" "/usr/local/include/[$4]" ; do
+            if test "x$TESTPATH" != "x"; then
+                CFLAGS="$saveflags -I$TESTPATH"
+            else
+                CFLAGS="$saveflags"
+            fi
+            AC_TRY_COMPILE([$6],,
+                [$3]=yes
+                if test "x$TESTPATH" != "x"; then
+                    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+                fi
+                break;
+                ,
+                CFLAGS="$saveflags"
+            )
+        done
+        AC_MSG_RESULT($[$3])
+    elif test "x$[$1]_CFLAGS" != "x"; then
+        EXTRA_CFLAGS="$[$1]_CFLAGS $EXTRA_CFLAGS"
+    fi
+
+    if test $[$3] = yes; then
+        if test "x$[$1]_LIBS" != "x"; then
+            PKGLIBS="$PKGLIBS $[$1]_LIBS"
+        else
+            tmp=""
+
+            for TESTPATH in "" "${[$5]}" "${[$5]}/lib" "${[$5]}/lib/[$4]" "/usr/lib/[$4]" "/usr/local/lib" "/usr/local/lib/[$4]" ; do
+                if test "x$TESTPATH" != "x"; then
+                    CFLAGS="$saveflags -L$TESTPATH"
+                else
+                    CFLAGS="$saveflags"
+                fi
+
+                AC_CHECK_LIB([$7],xmlParseFile,
+                    if test "x$TESTPATH" != "x"; then
+                        tmp="$PKGLIBS -L$TESTPATH -l[$7]"
+                    else
+                        tmp="$PKGLIBS -l[$7]"
+                    fi
+                    break
+                )
+            done
+
+            if test "x$tmp" == "x"; then
+                [$3]=no
+
+                EXTRA_CFLAGS="$saveeflags"
+            else
+                PKGLIBS="$tmp"
+            fi
+        fi
+
+        CFLAGS="$saveflags"
+    fi
+])
+
 dnl
 dnl let's start
 AC_INIT(prolang.y)
@@ -119,7 +196,8 @@ AC_MY_ARG_ENABLE(use-mysql,no,,[Enables mySQL support])
 AC_MY_ARG_ENABLE(use-pgsql,no,,[Enables PostgreSQL support])
 AC_MY_ARG_ENABLE(use-sqlite,no,,[Enables SQLite support])
 AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE: no/yes/builtin/no-builtin])
-AC_MY_ARG_ENABLE(use-iksemel,no,,[Enables use of iksemel for XML parsing])
+AC_MY_ARG_ENABLE(use-xml,no,,[Enables XML support: no/xml2/iksemel/yes])
+AC_MY_ARG_WITH(xml-path,,,[Optional location of the XML include/ and lib/ directory])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
 AC_MY_ARG_ENABLE(use-structs,yes,,[Enables structs])
 AC_MY_ARG_ENABLE(use-tls,no,,[Enables Transport Layer Security over Telnet: no/gnu/ssl/yes])
@@ -323,18 +401,24 @@ else
   enable_use_sqlite="yes"
 fi
 
-AC_UPDATE_VAR(enable_use_iksemel)
-if test "x$enable_use_iksemel" = "x" || test "x$enable_use_iksemel" = "xyes"; then
-  cdef_use_iksemel="#define"
-  iksemel_path=
-  enable_use_iksemel="yes"
-elif test "x$enable_use_iksemel" = "xno"; then
-  cdef_use_iksemel="#undef"
-  iksemel_path=
+AC_UPDATE_VAR(enable_use_xml)
+if test "x$enable_use_xml" = "x" || test "x$enable_use_xml" = "xyes"; then
+  cdef_use_xml="#define"
+  xml_package="any"
+  enable_use_xml="yes"
+elif test "x$enable_use_xml" = "xno"; then
+  cdef_use_xml="#undef"
+  xml_package="any"
 else
-  cdef_use_iksemel="#define"
-  iksemel_path="$enable_use_iksemel"
-  enable_use_iksemel="yes"
+  cdef_use_xml="#define"
+  xml_package="$enable_use_xml"
+  enable_use_xml="yes"
+fi
+AC_UPDATE_VAR(with_xml_path)
+if test "x$with_xml_path" = "x" -o "x$with_xml_path" = "xno" ; then
+  xml_path=""
+else
+  xml_path="$with_xml_path"
 fi
 
 AC_UPDATE_VAR(enable_use_tls)
@@ -383,7 +467,6 @@ AC_CDEF_FROM_ENABLE(use_mccp)
 AC_CDEF_FROM_ENABLE(use_ipv6)
 AC_CDEF_FROM_ENABLE(use_deprecated)
 AC_CDEF_FROM_ENABLE(use_structs)
-AC_CDEF_FROM_ENABLE(use_tls)
 AC_CDEF_FROM_ENABLE(use_new_inlines)
 AC_CDEF_FROM_ENABLE(use_set_light)
 AC_CDEF_FROM_ENABLE(use_set_is_wizard)
@@ -1552,188 +1635,106 @@ fi
 
 # --- SQLite3 ---
 
-# Note: Some compilers don't have /usr/local/include in their standard
-# searchpath.
+ifdef([PKG_PROG_PKG_CONFIG],[PKG_PROG_PKG_CONFIG()],[])
 
-AC_CACHE_CHECK(for SQLite3,lp_cv_has_sqlite3,
-for TESTPATH in "" "$sqlite_path" "$sqlite_path/include" "/usr/local/include" ; do
-    saveflags="$CFLAGS"
-    if test "x$TESTPATH" != "x"; then
-        CFLAGS="$saveflags -I$TESTPATH"
-    fi
-AC_TRY_COMPILE([
-#include <sqlite3.h>
+AC_MY_SEARCH_LIB(SQLITE3,sqlite3,lp_cv_has_sqlite3,sqlite3,xml_path,
+[
+    #include <sqlite3.h>
 
-sqlite3 * foo(void)
-{
+    sqlite3 * foo(void)
+    {
+        return (sqlite3*)0;
+    }
+],sqlite3)
 
-    return (sqlite3*)0;
-}
-],,
-lp_cv_has_sqlite3=yes
-if test "x$TESTPATH" != "x"; then
-    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
-fi
-break;
-,
-lp_cv_has_sqlite3=no
-CFLAGS="$saveflags"
-)
-done
-)
 
-# The system has the include files - now search for the libraries.
 if test $lp_cv_has_sqlite3 = yes; then
-  saveflags="$CFLAGS"
-  AC_DEFINE(HAS_SQLITE3, 1, [Does the machine offer SQLite3?])
+    AC_DEFINE(HAS_SQLITE3, 1, [Does the machine offer SQLite3?])
 
-  if test $enable_use_sqlite = yes; then
-    tmp=""
+    if test "x$enable_use_sqlite" = "xyes"; then
+        savelibs="$LIBS"
+        LIBS="$LIBS $PKGLIBS"
 
-    AC_CHECK_LIB(sqlite3,main, tmp="$PKGLIBS -lsqlite3")
+        # Check if it uses pthreads
 
-    if test "x$sqlite_path" == "x"; then
-        unset ac_cv_lib_sqlite3_main
-        if test -d "${sqlite_path}/lib/sqlite"; then
-            CFLAGS="$saveflags -L${sqlite_path}/lib/sqlite"
-            AC_CHECK_LIB(sqlite3,main, tmp="$PKGLIBS -L${sqlite_path}/lib/sqlite -lsqlite3")
-        elif test -d "${sqlite_path}/lib"; then
-            CFLAGS="$saveflags -L${sqlite_path}/lib"
-            AC_CHECK_LIB(sqlite3,main, tmp="$PKGLIBS -L${sqlite_path}/lib -lsqlite3")
-        elif test -d "${sqlite_patch}"; then
-            CFLAGS="$saveflags -L$sqlite_path"
-            AC_CHECK_LIB(sqlite3,main, tmp="$PKGLIBS -L$sqlite_path -lsqlite3")
+        AC_SEARCH_LIBS(pthread_create,,
+            lp_cv_sqlite3_uses_pthreads=yes,
+            lp_cv_sqlite3_uses_pthreads=no
+        )
+
+        if test $lp_cv_sqlite3_uses_pthreads = yes ; then
+             AC_DEFINE(SQLITE3_USES_PTHREADS, 1, [Does SQLite3 use pthreads?])
         fi
-    fi
 
-    if test "x$tmp" == "x"; then
-        unset ac_cv_lib_sqlite3_main
-        if test -d "/usr/local/lib"; then
-            CFLAGS="$saveflags -L/usr/local/lib"
-            AC_CHECK_LIB(sqlite3,main, tmp="$PKGLIBS -L/usr/local/lib -lsqlite3")
-        fi
+        LIBS="$savelibs"
     fi
-
-    if test "x$tmp" == "x"; then
+else
+    if test $enable_use_sqlite = yes; then
         echo "libsqlite3 library not found - disabling SQLite support"
         AC_NOT_AVAILABLE(use-sqlite)
-        cdef_use_sqlite="#undef"
-        enable_use_sqlite="no"
-        sqlite=
-        lp_cv_has_sqlite="no"
-    else
-        PKGLIBS="$tmp"
     fi
-  fi
 
-  if test "x$enable_use_sqlite" = "xyes"; then
-      savelibs="$LIBS"
-      LIBS="$LIBS $PKGLIBS"
-      
-      # Check if it uses pthreads
-
-      AC_CHECK_LIB(sqlite3, pthread_create,
-      	   lp_cv_sqlite3_uses_pthreads=yes,
-      	   lp_cv_sqlite3_uses_pthreads=no
-      )
-
-      if test $lp_cv_sqlite3_uses_pthreads = yes ; then
-           AC_DEFINE(SQLITE3_USES_PTHREADS, 1, [Does SQLite3 use pthreads?])
-      fi
-
-      LIBS="$savelibs"
-  fi
-
-  CFLAGS="$saveflags"
-else
-  if test $enable_use_sqlite = yes; then
-      AC_NOT_AVAILABLE(use-sqlite)
-      cdef_use_sqlite="#undef"
-      enable_use_sqlite=no
-  fi
+    cdef_use_sqlite="#undef"
+    enable_use_sqlite="no"
+    sqlite=
 fi
 
-# --- Iksemel ---
+# --- XML ---
 
-AC_CACHE_CHECK(for Iksemel,lp_cv_has_iksemel,
-for TESTPATH in "" "$iksemel_path" "$iksemel_path/include" "/usr/local/include" ; do
-    saveflags="$CFLAGS"
-    if test "x$TESTPATH" != "x"; then
-        CFLAGS="$saveflags -I$TESTPATH"
-    fi
-AC_TRY_COMPILE([
-#include <iksemel.h>
+has_xml=no
 
-iks * foo(void)
-{
+if test "$xml_package" = "any" -o "$xml_package" = "xml2"; then
 
-    return (iks*)0;
-}
-],,
-lp_cv_has_iksemel=yes
-if test "x$TESTPATH" != "x"; then
-    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
-fi
-break;
-,
-lp_cv_has_iksemel=no
-CFLAGS="$saveflags"
-)
-done
-)
+    AC_MY_SEARCH_LIB(XML2,libxml-2.0,lp_cv_has_xml2,libxml2,xml_path,
+    [
+        #include <libxml/parser.h>
 
-# The system has the include files - now search for the libraries.
-if test $lp_cv_has_iksemel = yes; then
-  saveflags="$CFLAGS"
-  AC_DEFINE(HAS_IKSEMEL, 1, [Does the machine offer iksemel?])
+        void foo(void)
+        {
+            xmlElementType type = XML_ELEMENT_NODE;
+        }
+    ],xml2)
 
-  if test $enable_use_iksemel = yes; then
-    tmp=""
-
-    AC_CHECK_LIB(iksemel,main, tmp="$PKGLIBS -liksemel")
-
-    if test "x$iksemel_path" == "x"; then
-        unset ac_cv_lib_iksemel_main
-        if test -d "${iksemel_path}/lib/iksemel"; then
-            CFLAGS="$saveflags -L${iksemel_path}/lib/iksemel"
-            AC_CHECK_LIB(iksemel,main, tmp="$PKGLIBS -L${iksemel_path}/lib/iksemel -liksemel")
-        elif test -d "${iksemel_path}/lib"; then
-            CFLAGS="$saveflags -L${iksemel_path}/lib"
-            AC_CHECK_LIB(iksemel,main, tmp="$PKGLIBS -L${iksemel_path}/lib -liksemel")
-        elif test -d "${iksemel_patch}"; then
-            CFLAGS="$saveflags -L$iksemel_path"
-            AC_CHECK_LIB(iksemel,main, tmp="$PKGLIBS -L$iksemel_path -liksemel")
+    if test $lp_cv_has_xml2 = yes; then
+        if test "$enable_use_xml" = "yes"; then
+            has_xml=yes
+            xml_package=xml2
+            AC_DEFINE(HAS_XML2, 1, [Does the machine have libxml2?])
         fi
     fi
+fi
 
-    if test "x$tmp" == "x"; then
-        unset ac_cv_lib_iksemel_main
-        if test -d "/usr/local/lib"; then
-            CFLAGS="$saveflags -L/usr/local/lib"
-            AC_CHECK_LIB(iksemel,main, tmp="$PKGLIBS -L/usr/local/lib -liksemel")
+if test "$xml_package" = "any" -o "$xml_package" = "iksemel"; then
+
+    AC_MY_SEARCH_LIB(IKSEMEL,iksemel,lp_cv_has_iksemel,iksemel,xml_path,
+    [
+        #include <iksemel.h>
+
+        iks * foo(void)
+        {
+            return (iks*)0;
+        }
+    ],iksemel)
+
+    if test $lp_cv_has_iksemel = yes; then
+        if test "$enable_use_xml" = "yes"; then
+            has_xml=yes
+            xml_package=iksemel
+            AC_DEFINE(HAS_IKSEMEL, 1, [Does the machine have Iksemel?])
         fi
     fi
-
-    if test "x$tmp" == "x"; then
-        echo "libiksemel library not found - disabling Iksemel support"
-        AC_NOT_AVAILABLE(use-iksemel)
-        cdef_use_iksemel="#undef"
-        enable_use_iksemel="no"
-        iksemel=
-        lp_cv_has_iksemel="no"
-    else
-        PKGLIBS="$tmp"
-    fi
-  fi
-
-  CFLAGS="$saveflags"
-else
-  if test $enable_use_iksemel = yes; then
-      AC_NOT_AVAILABLE(use-iksemel)
-      cdef_use_iksemel="#undef"
-      enable_use_iksemel=no
-  fi
 fi
+
+if test "$has_xml" = no; then
+    if test $enable_use_xml = yes; then
+        echo "XML not supported - disabling XML support."
+        AC_NOT_AVAILABLE(use-xml)
+    fi
+
+    cdef_use_xml="#undef"
+    enable_use_xml=no
+fi
+
 
 # --- Check if we need zlib libraries for mccp ---
 
@@ -2308,7 +2309,7 @@ for TESTFLAG in -Wall -Wparentheses -Wshadow; do
     # above correct program, we still can't use it. So check for that.
     if echo `eval $tcomp2` | egrep '[a-z]' >/dev/null; then
       :
-      # Success means 'we got output' here :-(
+      # Success means 'we got output' here  :-(
     else
         CFLAGS="$CFLAGS $TESTFLAG"
     fi
@@ -2704,7 +2705,7 @@ AC_SUBST(cdef_use_ipv6)
 AC_SUBST(cdef_use_mysql)
 AC_SUBST(cdef_use_pgsql)
 AC_SUBST(cdef_use_sqlite)
-AC_SUBST(cdef_use_iksemel)
+AC_SUBST(cdef_use_xml)
 AC_SUBST(cdef_use_alists)
 AC_SUBST(cdef_use_mccp)
 AC_SUBST(cdef_use_pcre)

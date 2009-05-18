@@ -836,7 +836,7 @@ init_lexer(void)
 #ifdef USE_SQLITE
     add_permanent_define("__SQLITE__", -1, string_copy("1"), MY_FALSE);
 #endif
-#ifdef USE_IKSEMEL
+#ifdef USE_XML
     add_permanent_define("__XML_DOM__", -1, string_copy("1"), MY_FALSE);
 #endif
 #ifdef USE_ALISTS

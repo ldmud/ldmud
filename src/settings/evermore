@@ -67,6 +67,9 @@ enable_dynamic_costs=yes
 # we want mysql 
 enable_use_mysql=yes
 
+# we want xml2
+enable_use_xml=xml2
+
 # but we do not want old names for efuns
 enable_use_deprecated=no
 

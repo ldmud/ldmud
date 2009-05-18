@@ -10,8 +10,9 @@
  *------------------------------------------------------------------
  */
 #include "driver.h"
+#include "machine.h"
 
-#ifdef USE_IKSEMEL
+#if defined(USE_XML) && defined(HAS_IKSEMEL)
 
 #include <iksemel.h>
 #include "array.h"
@@ -557,4 +558,4 @@ f_xml_parse(svalue_t * sp)
     return sp;
 }
  
-#endif /* USE_IKSEMEL */
+#endif /* USE_XML && HAS_IKSEMEL */

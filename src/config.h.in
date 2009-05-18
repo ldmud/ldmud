@@ -371,7 +371,7 @@
 
 /* Define this if you want iksemel library support.
  */
-@cdef_use_iksemel@ USE_IKSEMEL
+@cdef_use_xml@ USE_XML
 
 /* Define this if you want the obsolete and deprecated efuns.
  */

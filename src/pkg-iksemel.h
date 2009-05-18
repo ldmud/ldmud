@@ -2,18 +2,15 @@
 #define PKG_IKSEMEL_H__ 1
 
 #include "driver.h"
+#include "machine.h"
 
-#ifdef USE_IKSEMEL
-
-#ifndef HAS_IKSEMEL
-#error "pkg-iksemel configured even though the machine doesn't support iksemel."
-#endif
+#if defined(USE_XML) && defined(HAS_IKSEMEL)
 
 /* --- Prototypes --- */
 
 void pkg_iksemel_init();
 
-#endif /* USE_IKSEMEL */
+#endif /* USE_XML && HAS_IKSEMEL */
 
 #endif /* PKG_IKSEMEL_H__ */
 

@@ -707,12 +707,12 @@ int     end_mccp_compress();
 #endif /* USE_MCCP */
 
 
-#ifdef USE_IKSEMEL
+#ifdef USE_XML
 
 string  xml_generate(mixed *);
 mixed  *xml_parse(string);
 
-#endif /* USE_IKSEMEL */
+#endif /* USE_XML */
 
 
 #ifdef USE_MYSQL
