@@ -1,6 +1,7 @@
 /*------------------------------------------------------------------
  * iksemel Efuns
  *
+ * Efuns written and donated 2008 by Heiko Kopp.
  *------------------------------------------------------------------
  * This file holds the efuns interfacing with iksemel and provides 
  * functions for handling xml files and converting them between 

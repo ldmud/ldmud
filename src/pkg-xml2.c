@@ -1,6 +1,7 @@
 /*------------------------------------------------------------------
  * xml_* Efuns
  *
+ * Based on code written and donated 2009 by Heiko Kopp.
  *------------------------------------------------------------------
  * This file holds the efuns interfacing with libxml2 and provides 
  * functions for handling xml files and converting them between 

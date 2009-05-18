@@ -90,3 +90,6 @@ Heinz.
 
 The MCCP implementation was originally written for Finalfrontier by
 Bastian Hoyer.
+
+The XML implementation using Iksemel and libxml2 is based on code written
+and donated 2008 resp. 2009 by Heiko Kopp.
