@@ -4,6 +4,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
 18-May-2009 (Gnomi)
   - (pkg-xml2.c, arraylist.c, configure) Added support for XML parsing
     using libxml2. (Bug #538, thanks, Bardioc!)
+  - (interpret.c) Ignore any arguments passed to a variable closure
+    instead of throwing an error. (Bug #612)
 
 12-May-2009 (Fuchur)
   - (object.c) compile fix for !USE_NEW_INLINES

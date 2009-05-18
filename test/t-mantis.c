@@ -75,6 +75,11 @@ nosave mixed *tests = ({
             return to_int(sprintf("%d",__INT_MAX__)) == __INT_MAX__;
        }
     }),
+    ({ "0000612", 0,
+        (:
+            return pointerp(funcall(#'tests, 42, (["Ignore me"])));
+        :)
+    }),
     ({ "0000613", 0,
         (:
             int x = 1;

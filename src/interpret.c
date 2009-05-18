@@ -18076,8 +18076,9 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         short i; /* the signed variant of lambda_t->function.index */
 
         CLEAN_CSP  /* no call will be done */
-        if (num_arg)
-            errorf("Arguments passed to variable closure.\n");
+
+        /* Ignore any arguments passed to a variable closure. */
+        pop_n_elems(num_arg);
 
         /* Don't use variables in a destructed object */
         if (l->ob->flags & O_DESTRUCTED)
