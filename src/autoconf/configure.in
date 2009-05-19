@@ -202,6 +202,12 @@ AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
 AC_MY_ARG_ENABLE(use-structs,yes,,[Enables structs])
 AC_MY_ARG_ENABLE(use-tls,no,,[Enables Transport Layer Security over Telnet: no/gnu/ssl/yes])
 AC_MY_ARG_WITH(tls-path,,,[Optional location of the TLS include/ and lib/ directory])
+AC_MY_ARG_WITH(tls-keyfile,key.pem,,[Default x509 keyfile])
+AC_MY_ARG_WITH(tls-certfile,cert.pem,,[Default x509 certificate file])
+AC_MY_ARG_WITH(tls-trustfile,no,,[Default filename holding trusted PEM certificates])
+AC_MY_ARG_WITH(tls-trustdirectory,"/etc/ssl/certs",,[Default directory holding trusted PEM certificates])
+AC_MY_ARG_WITH(tls-crlfile,no,,[Default filename holding certificate revocation lists])
+AC_MY_ARG_WITH(tls-crldirectory,no,,[Default directory holding certificate revocation lists])
 AC_MY_ARG_ENABLE(use-gcrypt,yes,,[Enables support for libgcrypt])
 AC_MY_ARG_ENABLE(use-new-inlines,yes,,[Enables new inline syntax])
 AC_MY_ARG_ENABLE(use-set-light,yes,,[Enables efun set_light()])
@@ -509,6 +515,12 @@ AC_STRING_VAL_FROM_WITH(swap_file)
 AC_STRING_VAL_FROM_WITH(wizlist_file)
 AC_STRING_VAL_FROM_WITH(master_name)
 AC_STRING_VAL_FROM_WITH(input_escape)
+AC_STRING_VAL_FROM_WITH(tls_keyfile)
+AC_STRING_VAL_FROM_WITH(tls_certfile)
+AC_STRING_VAL_FROM_WITH(tls_trustfile)
+AC_STRING_VAL_FROM_WITH(tls_trustdirectory)
+AC_STRING_VAL_FROM_WITH(tls_crlfile)
+AC_STRING_VAL_FROM_WITH(tls_crldirectory)
 
 AC_TEXT_VAL_FROM_WITH(malloc)
 
@@ -587,6 +599,66 @@ fi
 
 if test "x$cdef_wizlist_file" = "x#undef"; then
   val_wizlist_file=
+fi
+
+if test "x$with_tls_keyfile" != "xno"; then
+  cdef_tls_keyfile="#define"
+else
+  cdef_tls_keyfile="#undef"
+fi
+
+if test "x$cdef_tls_keyfile" = "x#undef"; then
+  val_tls_keyfile=
+fi
+
+if test "x$with_tls_certfile" != "xno"; then
+  cdef_tls_certfile="#define"
+else
+  cdef_tls_certfile="#undef"
+fi
+
+if test "x$cdef_tls_certfile" = "x#undef"; then
+  val_tls_certfile=
+fi
+
+if test "x$with_tls_trustfile" != "xno"; then
+  cdef_tls_trustfile="#define"
+else
+  cdef_tls_trustfile="#undef"
+fi
+
+if test "x$cdef_tls_trustfile" = "x#undef"; then
+  val_tls_trustfile=
+fi
+
+if test "x$with_tls_trustdirectory" != "xno"; then
+  cdef_tls_trustdirectory="#define"
+else
+  cdef_tls_trustdirectory="#undef"
+fi
+
+if test "x$cdef_tls_trustdirectory" = "x#undef"; then
+  val_tls_trustdirectory=
+fi
+
+if test "x$with_tls_crlfile" != "xno"; then
+  cdef_tls_crlfile="#define"
+else
+  cdef_tls_crlfile="#undef"
+fi
+
+if test "x$cdef_tls_crlfile" = "x#undef"; then
+  val_tls_crlfile=
+fi
+
+if test "x$with_tls_crldirectory" != "xno"; then
+  cdef_tls_crldirectory="#define"
+else
+  cdef_tls_crldirectory="#undef"
+fi
+
+if test "x$cdef_tls_crldirectory" = "x#undef"; then
+  val_tls_crldirectory=
 fi
 
 if test "x$cdef_opcprof" = "x#undef"; then
@@ -2734,6 +2806,12 @@ AC_SUBST(cdef_eval_cost_trace)
 AC_SUBST(cdef_rxcache_table)
 AC_SUBST(cdef_wizlist_file)
 AC_SUBST(cdef_synchronous_heart_beat)
+AC_SUBST(cdef_tls_keyfile)
+AC_SUBST(cdef_tls_certfile)
+AC_SUBST(cdef_tls_trustfile)
+AC_SUBST(cdef_tls_trustdirectory)
+AC_SUBST(cdef_tls_crlfile)
+AC_SUBST(cdef_tls_crldirectory)
 
 AC_SUBST(cdef_opcprof)
 AC_SUBST(cdef_verbose_opcprof)
@@ -2807,6 +2885,12 @@ AC_SUBST(val_wizlist_file)
 AC_SUBST(val_pcre_recursion_limit)
 AC_SUBST(val_max_net_connects)
 AC_SUBST(val_random_period_length)
+AC_SUBST(val_tls_keyfile)
+AC_SUBST(val_tls_certfile)
+AC_SUBST(val_tls_trustfile)
+AC_SUBST(val_tls_trustdirectory)
+AC_SUBST(val_tls_crlfile)
+AC_SUBST(val_tls_crldirectory)
 
 dnl finally: some remaining stuff
 dnl

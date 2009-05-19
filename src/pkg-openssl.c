@@ -140,33 +140,28 @@ tls_verify_init (void)
 /* initialize or reinitialize tls certificate storage and revocation lists
  */
 {
-    char * trustfile = tls_trustfile ? tls_trustfile : NULL;
-    char * trustdirectory = tls_trustdirectory ? tls_trustdirectory : TLS_DEFAULT_TRUSTDIRECTORY;
-    char * crlfile = tls_crlfile ? tls_crlfile : NULL;
-    char * crldirectory = tls_crldirectory ? tls_crldirectory : NULL;
-
     STACK_OF(X509_NAME) *stack = NULL;
 
-    if (trustfile != NULL && trustdirectory != NULL)
+    if (tls_trustfile != NULL && tls_trustdirectory != NULL)
     {
         printf("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and directory '%s'.\n"
-              , time_stamp(), trustfile, trustdirectory);
+              , time_stamp(), tls_trustfile, tls_trustdirectory);
         debug_message("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and directory '%s'.\n"
-                     , time_stamp(), trustfile, trustdirectory);
+                     , time_stamp(), tls_trustfile, tls_trustdirectory);
     }
-    else if (trustfile != NULL)
+    else if (tls_trustfile != NULL)
     {
         printf("%s TLS: (OpenSSL) trusted x509 certificates from '%s'.\n"
-              , time_stamp(), trustfile);
+              , time_stamp(), tls_trustfile);
         debug_message("%s TLS: (OpenSSL) trusted x509 certificates from '%s'.\n"
-                     , time_stamp(), trustfile);
+                     , time_stamp(), tls_trustfile);
     }
-    else if (trustdirectory != NULL)
+    else if (tls_trustdirectory != NULL)
     {
         printf("%s TLS: (OpenSSL) trusted x509 certificates from directory '%s'.\n"
-              , time_stamp(), trustdirectory);
+              , time_stamp(), tls_trustdirectory);
         debug_message("%s TLS: (OpenSSL) trusted x509 certificates from directory '%s'.\n"
-                     , time_stamp(), trustdirectory);
+                     , time_stamp(), tls_trustdirectory);
     }
     else
     {
@@ -176,46 +171,46 @@ tls_verify_init (void)
                      , time_stamp());
     }
 
-    if (crlfile != NULL || crldirectory != NULL)
+    if (tls_crlfile != NULL || tls_crldirectory != NULL)
     {
         X509_STORE *store = X509_STORE_new();
         if (store != NULL)
         {
-            if (crlfile != NULL)
+            if (tls_crlfile != NULL)
             {
                 X509_LOOKUP *lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
                 if (lookup != NULL) 
-                    X509_LOOKUP_load_file(lookup, crlfile, X509_FILETYPE_PEM);
+                    X509_LOOKUP_load_file(lookup, tls_crlfile, X509_FILETYPE_PEM);
             }
-            if (crldirectory != NULL)
+            if (tls_crldirectory != NULL)
             {
                 X509_LOOKUP *lookup = X509_STORE_add_lookup(store, X509_LOOKUP_hash_dir());
                 if (lookup != NULL) 
-                    X509_LOOKUP_add_dir(lookup, crldirectory, X509_FILETYPE_PEM);
+                    X509_LOOKUP_add_dir(lookup, tls_crldirectory, X509_FILETYPE_PEM);
             }
 #if OPENSSL_VERSION_NUMBER >= 0x00907000L
             X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
             SSL_CTX_set_cert_store(context, store);
-            if (crlfile != NULL && crldirectory != NULL)
+            if (tls_crlfile != NULL && tls_crldirectory != NULL)
             {
                 printf("%s TLS: (OpenSSL) CRLs from '%s' and '%s'.\n"
-                       , time_stamp(), crlfile, crldirectory);
+                       , time_stamp(), tls_crlfile, tls_crldirectory);
                 debug_message("%s TLS: (OpenSSL) CRLs from '%s' and '%s'.\n"
-                       , time_stamp(), crlfile, crldirectory);
+                       , time_stamp(), tls_crlfile, tls_crldirectory);
             }
-            else if (crlfile != NULL)
+            else if (tls_crlfile != NULL)
             {
                 printf("%s TLS: (OpenSSL) CRLs from '%s'.\n"
-                       , time_stamp(), crlfile);
+                       , time_stamp(), tls_crlfile);
                 debug_message("%s TLS: (OpenSSL) CRLs from '%s'.\n"
-                       , time_stamp(), crlfile);
+                       , time_stamp(), tls_crlfile);
             }
-            else if (crldirectory != NULL)
+            else if (tls_crldirectory != NULL)
             {
                 printf("%s TLS: (OpenSSL) CRLs from '%s'.\n"
-                       , time_stamp(), crldirectory);
+                       , time_stamp(), tls_crldirectory);
                 debug_message("%s TLS: (OpenSSL) CRLs from '%s'.\n"
-                       , time_stamp(), crldirectory);
+                       , time_stamp(), tls_crldirectory);
             }
             else
             {
@@ -246,16 +241,16 @@ tls_verify_init (void)
         }
     }
 
-    if (!SSL_CTX_load_verify_locations(context, trustfile, trustdirectory))
+    if (!SSL_CTX_load_verify_locations(context, tls_trustfile, tls_trustdirectory))
     {
         printf("%s TLS: Error preparing x509 verification certificates\n",
                time_stamp());
         debug_message("%s TLS: Error preparing x509 verification certificates\n",
                time_stamp());
     }
-    if (trustfile != NULL)
+    if (tls_trustfile != NULL)
     {
-        stack = SSL_load_client_CA_file(trustfile);
+        stack = SSL_load_client_CA_file(tls_trustfile);
         SSL_CTX_set_client_CA_list(context, stack);
     }
     else
@@ -268,9 +263,9 @@ tls_verify_init (void)
         }
     }
 
-    if (trustdirectory != NULL && stack != NULL)
+    if (tls_trustdirectory != NULL && stack != NULL)
     {
-        SSL_add_dir_cert_subjects_to_stack(stack, trustdirectory);
+        SSL_add_dir_cert_subjects_to_stack(stack, tls_trustdirectory);
     }
 }
 
@@ -282,13 +277,16 @@ tls_global_init (void)
  */
 
 {
-    char * keyfile = tls_keyfile ? tls_keyfile : TLS_DEFAULT_KEYFILE;
-    char * certfile = tls_certfile ? tls_certfile : TLS_DEFAULT_CERTFILE;
+    if (tls_keyfile == NULL)
+    {
+        printf("%s TLS deactivated.\n", time_stamp());
+        return;
+    }
 
     printf("%s TLS: (OpenSSL) x509 keyfile '%s', certfile '%s'\n"
-          , time_stamp(), keyfile, certfile);
+          , time_stamp(), tls_keyfile, tls_certfile);
     debug_message("%s TLS: (OpenSSL) Keyfile '%s', Certfile '%s'\n"
-                 , time_stamp(), keyfile, certfile);
+                 , time_stamp(), tls_keyfile, tls_certfile);
 
     SSL_load_error_strings();
     ERR_load_BIO_strings();
@@ -353,7 +351,7 @@ tls_global_init (void)
     SSL_CTX_set_mode(context, SSL_MODE_ENABLE_PARTIAL_WRITE);
     SSL_CTX_set_session_id_context(context, (unsigned char*) "ldmud", 5);
 
-    if (!SSL_CTX_use_PrivateKey_file(context, keyfile, SSL_FILETYPE_PEM))
+    if (!SSL_CTX_use_PrivateKey_file(context, tls_keyfile, SSL_FILETYPE_PEM))
     {
         printf("%s TLS: Error setting x509 keyfile:\n"
               , time_stamp());
@@ -362,7 +360,7 @@ tls_global_init (void)
         goto ssl_init_err;
     }
 
-    if (!SSL_CTX_use_certificate_file(context, certfile, SSL_FILETYPE_PEM))
+    if (!SSL_CTX_use_certificate_file(context, tls_certfile, SSL_FILETYPE_PEM))
     {
         printf("%s TLS: Error setting x509 certfile:\n"
               , time_stamp());

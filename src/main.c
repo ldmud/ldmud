@@ -307,7 +307,27 @@ main (int argc, char **argv)
 #ifdef ACCESS_LOG
     access_log = strdup(ACCESS_LOG);
 #endif
-    
+#ifdef USE_TLS
+#  ifdef TLS_DEFAULT_KEYFILE
+    tls_keyfile = strdup(TLS_DEFAULT_KEYFILE);
+#  endif
+#  ifdef TLS_DEFAULT_CERTFILE
+    tls_certfile = strdup(TLS_DEFAULT_CERTFILE);
+#  endif
+#  ifdef TLS_DEFAULT_TRUSTFILE
+    tls_trustfile = strdup(TLS_DEFAULT_TRUSTFILE);
+#  endif
+#  ifdef TLS_DEFAULT_TRUSTDIRECTORY
+    tls_trustdirectory = strdup(TLS_DEFAULT_TRUSTDIRECTORY);
+#  endif
+#  ifdef TLS_DEFAULT_CRLFILE
+    tls_crlfile = strdup(TLS_DEFAULT_CRLFILE);
+#  endif
+#  ifdef TLS_DEFAULT_CRLDIRECTORY
+    tls_crldirectory = strdup(TLS_DEFAULT_CRLDIRECTORY);
+#  endif
+#endif
+
     do {
         dummy_current_object_for_loads = NULL_object;
 #ifdef DEBUG
@@ -1520,41 +1540,69 @@ static Option aOptions[]
 
 #ifdef USE_TLS
     , { 0,   "tls-key",               cTLSkey,            MY_TRUE
-      , "  --tls-key <pathname>\n"
-      , "  --tls-key <pathname>\n"
+      , "  --tls-key <pathname>|none\n"
+      , "  --tls-key <pathname>|none\n"
+#  ifdef TLS_DEFAULT_KEYFILE
         "    Use <pathname> as the x509 keyfile, default is '" TLS_DEFAULT_KEYFILE "'.\n"
+#  else
+        "    Use <pathname> as the x509 keyfile, default is 'none'.\n"
+#  endif
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+        "    If 'none' is given TLS is deactivated.\n"
       }
 
     , { 0,   "tls-cert",              cTLScert,           MY_TRUE
       , "  --tls-cert <pathname>\n"
       , "  --tls-cert <pathname>\n"
+#  ifdef TLS_DEFAULT_CERTFILE
         "    Use <pathname> as the x509 certfile, default is '" TLS_DEFAULT_CERTFILE "'.\n"
+#  else
+        "    Use <pathname> as the x509 certfile, default is 'none'.\n"
+#  endif
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
     , { 0,      "tls-trustfile",       cTLStrustfile,     MY_TRUE
-      , "  --tls-trustfile <pathname>\n"
-      , "  --tls-trustfile <pathname>\n"
-        "    Use <pathname> as the filename holding your trusted PEM certificates.\n"
+      , "  --tls-trustfile <pathname>|none\n"
+      , "  --tls-trustfile <pathname>|none\n"
+        "    Use <pathname> as the filename holding your trusted PEM certificates,\n"
+#  ifdef TLS_DEFAULT_TRUSTFILE
+       "     default is '" TLS_DEFAULT_TRUSTFILE "'.\n"
+#  else
+       "     default is 'none'.\n"
+#  endif
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
     , { 0,      "tls-trustdirectory",  cTLStrustdir,      MY_TRUE
-      , "  --tls-trustdirectory <pathname>\n"
-      , "  --tls-trustdirectory <pathname>\n"
+      , "  --tls-trustdirectory <pathname>|none\n"
+      , "  --tls-trustdirectory <pathname>|none\n"
         "    Use <pathname> as the directory where your trusted PEM certificates reside,\n"
-        "    default is '" TLS_DEFAULT_TRUSTDIRECTORY "'.\n"
+#  ifdef TLS_DEFAULT_TRUSTDIRECTORY
+       "     default is '" TLS_DEFAULT_TRUSTDIRECTORY "'.\n"
+#  else
+       "     default is 'none'.\n"
+#  endif
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
     , { 0,      "tls-crlfile",       cTLScrlfile,     MY_TRUE
-      , "  --tls-crlfile <pathname>\n"
-      , "  --tls-crlfile <pathname>\n"
-        "    Use <pathname> as the filename holding your certificate revocation lists.\n"
+      , "  --tls-crlfile <pathname>|none\n"
+      , "  --tls-crlfile <pathname>|none\n"
+        "    Use <pathname> as the filename holding your certificate revocation lists,\n"
+#  ifdef TLS_DEFAULT_CRLFILE
+       "     default is '" TLS_DEFAULT_CRLFILE "'.\n"
+#  else
+       "     default is 'none'.\n"
+#  endif
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
     , { 0,      "tls-crldirectory",  cTLScrldir,      MY_TRUE
-      , "  --tls-crldirectory <pathname>\n"
-      , "  --tls-crldirectory <pathname>\n"
-        "    Use <pathname> as the directory where your certificate revocation lists reside.\n"
+      , "  --tls-crldirectory <pathname>|none\n"
+      , "  --tls-crldirectory <pathname>|none\n"
+        "    Use <pathname> as the directory where your certificate revocation lists reside,\n"
+#  ifdef TLS_DEFAULT_CRLDIRECTORY
+       "     default is '" TLS_DEFAULT_CRLDIRECTORY "'.\n"
+#  else
+       "     default is 'none'.\n"
+#  endif
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
 #endif /* USE_TLS */
@@ -1915,8 +1963,18 @@ options (void)
                                                "<unknown>"
 #  endif
                                                ", x509 key: '"
-                                  TLS_DEFAULT_KEYFILE "', cert: '"
-                                  TLS_DEFAULT_CERTFILE "')\n"
+#  ifdef TLS_DEFAULT_KEYFILE
+                                  TLS_DEFAULT_KEYFILE
+#  else
+                                               "none"
+#  endif
+                                               "', cert: '"
+#  ifdef TLS_DEFAULT_CERTFILE
+                                  TLS_DEFAULT_CERTFILE
+#  else
+                                               "none"
+#  endif
+                                               "')\n"
 #endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
@@ -2739,36 +2797,54 @@ eval_arg (int eOption, const char * pValue)
     case cTLSkey:
         if (tls_keyfile != NULL)
             free(tls_keyfile);
-        tls_keyfile = strdup(pValue);
+        if (!strcmp(pValue, "none"))
+            tls_keyfile = NULL;
+        else
+            tls_keyfile = strdup(pValue);
         break;
 
     case cTLScert:
         if (tls_certfile != NULL)
             free(tls_certfile);
-        tls_certfile = strdup(pValue);
+        if (!strcmp(pValue, "none"))
+            tls_certfile = NULL;
+        else
+            tls_certfile = strdup(pValue);
         break;
 
     case cTLStrustdir:
         if (tls_trustdirectory != NULL)
             free(tls_trustdirectory);
-        tls_trustdirectory = strdup(pValue);
+        if (!strcmp(pValue, "none"))
+            tls_trustdirectory = NULL;
+        else
+            tls_trustdirectory = strdup(pValue);
         break;
 
     case cTLStrustfile:
         if (tls_trustfile != NULL)
             free(tls_trustfile);
-        tls_trustfile = strdup(pValue);
+        if (!strcmp(pValue, "none"))
+            tls_trustfile = NULL;
+        else
+            tls_trustfile = strdup(pValue);
         break;
     case cTLScrlfile:
-	if (tls_crlfile != NULL)
-	    free(tls_crlfile);
-	tls_crlfile = strdup(pValue);
-	break;
+        if (tls_crlfile != NULL)
+           free(tls_crlfile);
+        if (!strcmp(pValue, "none"))
+            tls_crlfile = NULL;
+        else
+            tls_crlfile = strdup(pValue);
+        break;
     case cTLScrldir:
-	if (tls_crldirectory != NULL)
-	    free(tls_crldirectory);
-	tls_crldirectory = strdup(pValue);
-	break;
+        if (tls_crldirectory != NULL)
+            free(tls_crldirectory);
+        if (!strcmp(pValue, "none"))
+            tls_crldirectory = NULL;
+        else
+            tls_crldirectory = strdup(pValue);
+        break;
 #endif
 
 #ifdef GC_SUPPORT

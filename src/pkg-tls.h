@@ -18,10 +18,6 @@
 
 /* --- Macros --- */
 
-#define TLS_DEFAULT_KEYFILE  "key.pem"
-#define TLS_DEFAULT_CERTFILE "cert.pem"
-#define TLS_DEFAULT_TRUSTDIRECTORY "/etc/ssl/certs"
-
 /* Number of bits for the Diffie Hellmann parameters. */
 #define DH_BITS 1024
 

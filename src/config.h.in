@@ -333,6 +333,15 @@
  */
 @cdef_use_tls@ USE_TLS
 
+/* Default paths for TLS.
+ */
+@cdef_tls_keyfile@        TLS_DEFAULT_KEYFILE        @val_tls_keyfile@
+@cdef_tls_certfile@       TLS_DEFAULT_CERTFILE       @val_tls_certfile@
+@cdef_tls_trustfile@      TLS_DEFAULT_TRUSTFILE      @val_tls_trustfile@
+@cdef_tls_trustdirectory@ TLS_DEFAULT_TRUSTDIRECTORY @val_tls_trustdirectory@
+@cdef_tls_crlfile@        TLS_DEFAULT_CRLFILE        @val_tls_crlfile@
+@cdef_tls_crldirectory@   TLS_DEFAULT_CRLDIRECTORY   @val_tls_crldirectory@
+
 /* Define this if you want to use libgcrypt (and not OpenSSL).
  */
 @cdef_use_gcrypt@ USE_GCRYPT

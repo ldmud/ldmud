@@ -164,8 +164,6 @@ tls_verify_init (void)
 /* initialize or reinitialize tls certificate storage and revocation lists.
  */
 {
-    char * trustdirectory = tls_trustdirectory ? tls_trustdirectory : TLS_DEFAULT_TRUSTDIRECTORY;
-
     gnutls_certificate_free_cas(x509_cred);
 
     if (tls_trustfile != NULL)
@@ -187,7 +185,7 @@ tls_verify_init (void)
         }
     }
 
-    if (trustdirectory)
+    if (tls_trustdirectory)
     {
         DIR * d;
         char *fname;
@@ -195,11 +193,11 @@ tls_verify_init (void)
         int err;
 
         printf("%s TLS: (GnuTLS) trusted x509 certificates from directory '%s'.\n"
-              , time_stamp(), trustdirectory);
+              , time_stamp(), tls_trustdirectory);
         debug_message("%s TLS: (GnuTLS) trusted x509 certificates from directory '%s'.\n"
-                     , time_stamp(), trustdirectory);
+                     , time_stamp(), tls_trustdirectory);
 
-        dirlen = strlen(trustdirectory);
+        dirlen = strlen(tls_trustdirectory);
         fname = (char*) xalloc(dirlen + NAME_MAX + 2);
         if (!fname)
         {
@@ -208,9 +206,9 @@ tls_verify_init (void)
         }
         else
         {
-            strcpy(fname, trustdirectory);
+            strcpy(fname, tls_trustdirectory);
             fname[dirlen++] = '/';
-            d = opendir(trustdirectory);
+            d = opendir(tls_trustdirectory);
         }
 
         if (d == NULL)
@@ -356,11 +354,13 @@ tls_global_init (void)
  */
 
 {
-    char * keyfile = tls_keyfile ? tls_keyfile : TLS_DEFAULT_KEYFILE;
-    char * certfile = tls_certfile ? tls_certfile : TLS_DEFAULT_CERTFILE;
-
     int f;
 
+    if (tls_keyfile == NULL)
+    {
+        printf("%s TLS deactivated.\n", time_stamp());
+        return;
+    }
 
     /* In order to be able to identify gnutls allocations as such, we redirect
      * all allocations through the driver's allocator. The wrapper functions
@@ -378,11 +378,11 @@ tls_global_init (void)
     gnutls_certificate_allocate_credentials(&x509_cred);
 
     printf("%s TLS: (GnuTLS) x509 keyfile '%s', certfile '%s'\n"
-          , time_stamp(), keyfile, certfile);
+          , time_stamp(), tls_keyfile, tls_certfile);
     debug_message("%s TLS: (GnuTLS) Keyfile '%s', Certfile '%s'\n"
-                 , time_stamp(), keyfile, certfile);
+                 , time_stamp(), tls_keyfile, tls_certfile);
 
-    f = gnutls_certificate_set_x509_key_file(x509_cred, certfile, keyfile, GNUTLS_X509_FMT_PEM);
+    f = gnutls_certificate_set_x509_key_file(x509_cred, tls_certfile, tls_keyfile, GNUTLS_X509_FMT_PEM);
     if (f < 0)
     {
         printf("%s TLS: Error setting x509 keyfile: %s\n"

@@ -8,6 +8,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
     variables. (Bug #631)
   - (main.c, comm.c) Set the close-on-exec-flag on open file descriptors,
     so they are not passed to erq. (Bug #629)
+  - (pkg-tls.h, pkg-openssl.c, pkg-gnutls.c, main.c, configure)
+    Allow TLS to be deactivated per default or command line. (Bug #479)
 
 18-May-2009 (Gnomi)
   - (pkg-xml2.c, arraylist.c, configure) Added support for XML parsing
