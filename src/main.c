@@ -742,6 +742,8 @@ vdebug_message(const char *fmt, va_list va)
             perror(debug_file);
             abort();
         }
+        else
+            set_cloexec_flag(fileno(fp));
     }
     (void)vfprintf(fp, fmt, va);
     (void)fflush(fp);
@@ -929,6 +931,22 @@ dprintf4 (int fd, char *s, p_int a, p_int b, p_int c, p_int d)
     s = dprintf_first(fd, s, a);
     dprintf3(fd, s, b, c, d);
 } /* dprintf4() */
+
+/*-------------------------------------------------------------------------*/
+void
+set_cloexec_flag (int fd)
+
+/* Sets the FD_CLOEXEC flag, so that the file is closed on exec()
+ * and the erq doesn't inherit it.
+ */
+{
+#if defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
+    int flags = fcntl(fd, F_GETFD);
+
+    if (flags != -1)
+        fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+#endif
+}
 
 /*=========================================================================*/
 /*                        The argument parser                              */
@@ -2760,6 +2778,7 @@ eval_arg (int eOption, const char * pValue)
         } else {
             default_gcollect_outfd = ixopen3(pValue, O_CREAT|O_TRUNC|O_WRONLY, 0640);
         }
+        set_cloexec_flag(default_gcollect_outfd);
         gcollect_outfd = default_gcollect_outfd;
         break;
 #endif

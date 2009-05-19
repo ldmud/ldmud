@@ -5537,7 +5537,7 @@ start_erq_demon (const char *suffix, size_t suffixlen)
     erq_callback_t *erqp;
     char path[MAXPATHLEN+1];
     int sockets[2];
-    int pid;
+    int pid, i;
     char c;
 
     /* Create the freelist in pending_erq[] */
@@ -5567,6 +5567,11 @@ start_erq_demon (const char *suffix, size_t suffixlen)
           , time_stamp(), erq_file, suffix);
     debug_message("%s Attempting to start erq '%s%s'.\n"
                  , time_stamp(), erq_file, suffix);
+
+    /* Close inherited sockets first. */
+    for (i = 0; i < numports; i++)
+        if (port_numbers[i] < 0)
+            set_close_on_exec(-port_numbers[i]);
 
     if ((pid = fork()) == 0)
     {

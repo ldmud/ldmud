@@ -1377,6 +1377,7 @@ v_garbage_collection (svalue_t *sp, int num_arg)
             return sp;
         }
 
+        set_cloexec_flag(fd);
         if (change_default)
             new_default_gc_log(fd);
         else
