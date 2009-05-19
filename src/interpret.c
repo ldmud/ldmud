@@ -8543,7 +8543,7 @@ again:
 
     CASE(F_CLOSURE);            /* --- closure <ix> <inhIndex> --- */
 #ifdef USE_NEW_INLINES
-    CASE(F_CONTEXT_CLOSURE); /* --- context_closure <ix> <num> --- */
+    CASE(F_CONTEXT_CLOSURE); /* --- context_closure <ix> <vix> <num_ex> <num_im> --- */
 #endif /* USE_NEW_INLINES */
     {
         /* Push the closure value <ix> and <inhIndex> onto the stack.
@@ -8564,8 +8564,10 @@ again:
          * of the directly referenced inherited function.
 #ifdef USE_NEW_INLINES
          *
-         * If it is a context closure, the context is sized to and initialized
-         * with the uint16 <num> values on the stack.
+         * If it is a context closure, the context is sized to 
+         * uint16 <num_ex>+<num_in> values, uint16 <num_ex> values
+         * are taken from the local variables beginning at <vix>,
+         * uint16 <num_im> values are taken from the stack.
 #endif
          */
 
@@ -8573,18 +8575,21 @@ again:
         /* TODO: int32 */ int ix;
         /* TODO: uint16 */ unsigned short inhIndex;
 #ifdef USE_NEW_INLINES
-        unsigned short context_size;
+        unsigned short explicit_context_size, implicit_context_size;
+        svalue_t * explicit_context;
 #endif /* USE_NEW_INLINES */
 
         inhIndex = 0;
 #ifdef USE_NEW_INLINES
-        context_size = 0;
+        explicit_context_size = implicit_context_size = 0;
 #endif /* USE_NEW_INLINES */
         LOAD_SHORT(tmp_ushort, pc);
 #ifdef USE_NEW_INLINES
         if (instruction == F_CONTEXT_CLOSURE)
         {
-            LOAD_SHORT(context_size, pc);
+            explicit_context = fp + LOAD_UINT8(pc);
+            LOAD_SHORT(explicit_context_size, pc);
+            LOAD_SHORT(implicit_context_size, pc);
         }
         else
         {
@@ -8603,7 +8608,7 @@ again:
 #ifndef USE_NEW_INLINES
             closure_literal(sp, ix, inhIndex);
 #else /* USE_NEW_INLINES */
-            closure_literal(sp, ix, inhIndex, context_size);
+            closure_literal(sp, ix, inhIndex, explicit_context_size + implicit_context_size);
 #endif /* USE_NEW_INLINES */
             /* If out of memory, this will set sp to svalue-0 and
              * throw an error.
@@ -8618,13 +8623,29 @@ again:
                       "closure type %d.\n", sp->x.closure_type);
 #endif
             /* Now copy the context values */
-            if (context_size != 0)
+            if (explicit_context_size != 0)
             {
                 unsigned short i;
-                svalue_t * arg = sp - context_size;
                 svalue_t * context = sp->u.lambda->context;
 
-                for (i = 0; i < context_size; i++)
+                for (i = 0; i < explicit_context_size; i++)
+                {
+                    transfer_svalue_no_free(context+i, explicit_context+i);
+
+                    /* Set it to T_INVALID, as it is still a variable of
+                     * the function frame and will be freed on return.
+                     */
+                    explicit_context[i].type = T_INVALID;
+                }
+            }
+
+            if (implicit_context_size != 0)
+            {
+                unsigned short i;
+                svalue_t * arg = sp - implicit_context_size;
+                svalue_t * context = sp->u.lambda->context + explicit_context_size;
+
+                for (i = 0; i < implicit_context_size; i++)
                     transfer_svalue_no_free(context+i, arg+i);
 
                 /* Now move the created closure to the new top of the stack */

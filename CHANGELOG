@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-May-2009 (Gnomi)
+  - (prolang.y, interpret.c) Corrected the handling of implicit context
+    variables in nested inline closures and allowed the initializers
+    of explicit context variables to reference other explicit context
+    variables. (Bug #631)
+
 18-May-2009 (Gnomi)
   - (pkg-xml2.c, arraylist.c, configure) Added support for XML parsing
     using libxml2. (Bug #538, thanks, Bardioc!)

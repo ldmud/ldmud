@@ -568,6 +568,19 @@ static mem_block_t mem_block[NUMAREAS];
   /* Return the number of saved inline-closures.
    */
 
+#if MAX_LOCAL > 256
+  /* There are only 8 bit opcodes for accessing
+   * local variables.
+   */
+#  error "Maximum number of local variables too high."
+#endif
+
+#define CONTEXT_VARIABLE_BASE 256
+  /* Indicates context variables in ident->u.local.num
+   * when deriving new context variables from them.
+   * Should be greater or equal to MAX_LOCAL.
+   */
+
 %endif /* USE_NEW_INLINES */
 
 
@@ -620,6 +633,11 @@ struct inline_closure_s
 {
     mp_int prev;
       /* Index of the enclosing inline closure, or -1 if none.
+       */
+
+    mp_int next;
+      /* Index of an enclosed inline closure.
+       * This is only used temporarily.
        */
 
     /* --- Compilation information --- */
@@ -2572,8 +2590,7 @@ add_local_name (ident_t *ident, fulltype_t type, int depth
                 , get_txt(ident->name));
     }
 
-    if (current_number_of_locals >= MAX_LOCAL /* size of type recording array */
-     || current_number_of_locals >= 256)
+    if (current_number_of_locals >= MAX_LOCAL) /* size of type recording array */
         yyerror("Too many local variables");
 
     else
@@ -2684,7 +2701,7 @@ redeclare_local (ident_t *ident, fulltype_t type, int depth)
 #ifdef USE_NEW_INLINES
 /*-------------------------------------------------------------------------*/
 static ident_t *
-add_context_name (ident_t *ident, fulltype_t type, int num)
+add_context_name (inline_closure_t *closure, ident_t *ident, fulltype_t type, int num)
 
 /* Declare a new context variable <ident> with the type <type> for the
  * currently compiled inline closure. The references of <type> are NOT adopted.
@@ -2697,18 +2714,22 @@ add_context_name (ident_t *ident, fulltype_t type, int num)
     int depth;
     block_scope_t * block;
 
-    depth = current_inline->block_depth+1;
+    depth = closure->block_depth+1;
     block = & block_scope[depth-1];
 
 #ifdef DEBUG_INLINES
 printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n", 
        get_txt(ident->name), num, depth, block->num_locals);
 #endif /* DEBUG_INLINES */
-    if (block->num_locals >= 256
-     || block->num_locals >= MAX_LOCAL /* size of type recording array */
-       )
+    if (block->num_locals >= MAX_LOCAL) /* size of type recording array */
     {
         yyerror("Too many context variables");
+    }
+    else if (num < 0
+     && block->first_local + block->num_locals >= MAX_LOCAL
+        )
+    {
+        yyerror("Too many local variables");
     }
     else
     {
@@ -2724,9 +2745,21 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n",
 
         /* Initialize the ident */
         ident->type = I_TYPE_LOCAL;
-        ident->u.local.num = num;
         ident->u.local.depth = depth;
-        ident->u.local.context = block->num_locals;
+        if (num < 0)
+        {
+            /* First initialize it as a local variable
+             * of the outer function, so they can be
+             * referenced during initialization.
+             */
+            ident->u.local.num = block->first_local + block->num_locals;
+            ident->u.local.context = -1;
+        }
+        else
+        {
+            ident->u.local.num = num;
+            ident->u.local.context = block->num_locals;
+        }
 
         /* Put the ident into the list of all locals.
          */
@@ -2752,6 +2785,8 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n",
 
         /* Record the type */
         type_of_context[block->num_locals] = type;
+        if (num < 0)
+            type_of_locals[ident->u.local.num] = type;
 
         block->num_locals++;
     }
@@ -2782,48 +2817,82 @@ check_for_context_local (ident_t *ident, fulltype_t * pType)
      && depth <= current_inline->block_depth
        )
     {
-        /* This local has been inherited - create the
-         * proper context variable.
+        inline_closure_t *closure;
+        mp_int closure_nr;
+        fulltype_t type;
+
+        closure = current_inline;
+        closure_nr = closure - &(INLINE_CLOSURE(0));
+        closure->next = -1;
+
+        /* Go through all inline closures to our local variable
+         * and record this path using the ->next pointers.
+         *
+         * Stop at the last inline closure before the variable's
+         * scope, because the information about that scope was
+         * saved there.
          */
+        for (;;)
+        {
+            inline_closure_t *outer_closure;
+            mp_int outer_closure_nr;
+
+            outer_closure_nr = closure->prev;
+            if (outer_closure_nr == -1)
+                /* It is a local variable of the current function. */
+                break;
+
+            outer_closure = &(INLINE_CLOSURE(outer_closure_nr));
+            outer_closure->next = closure_nr;
+
+            if (outer_closure->block_depth < depth)
+                /* The variable belongs to outer_closure. */
+                break;
+
+            closure = outer_closure;
+            closure_nr = outer_closure_nr;
+        }
+
         if (ident->u.local.context >= 0)
         {
-            if (!current_inline->parse_context
-             && current_inline->prev != -1
-             && depth <= INLINE_CLOSURE(current_inline->prev).block_depth
-               )
-            {
-                /* Can't use outer context variables when compiling
-                 * an inline closure body.
-                 */
-                yyerrorf("Can't use context variable '%s' "
-                         "across closure boundaries", get_txt(ident->name));
-                ident = redeclare_local(ident, Type_Any, block_depth);
-                *pType = Type_Any;
-            }
-            else
-            {
-                /* We can use outer context variables when compiling
-                 * an inline closure context.
-                 */
-                *pType = LOCAL_TYPE(current_inline->full_context_type_start
-                                    + ident->u.local.context
-                                   );
-            }
+            /* It's a context variable. */
+            type = LOCAL_TYPE(closure->full_context_type_start
+                              + ident->u.local.context
+                             );
         }
-        else /* it's a local */
+        else
         {
-            fulltype_t type;
-
-            type = LOCAL_TYPE(current_inline->full_local_type_start
+            /* It's a local variable. */
+            type = LOCAL_TYPE(closure->full_local_type_start
                               + ident->u.local.num
                              );
-            if (!current_inline->parse_context)
+        }
+
+        /* Now pass this context variable through
+         * all surrounding inline closures.
+         */
+        while (MY_TRUE)
+        {
+            /* Skip closures whose context is being parsed,
+             * because current_inline is not created
+             * in their runtime.
+             */
+            if (!closure->parse_context)
             {
                 ref_fulltype_data(&type);
-                ident = add_context_name( ident, type, ident->u.local.num);
+                ident = add_context_name(closure, ident, type,
+                     ident->u.local.context >= 0
+                     ? CONTEXT_VARIABLE_BASE + ident->u.local.context
+                     : ident->u.local.num);
             }
-            *pType = type;
+
+            if (closure->next == -1)
+                break;
+
+            closure = &(INLINE_CLOSURE(closure->next));
         }
+
+        *pType = type;
     }
     else if (ident->u.local.context >= 0)
         *pType = type_of_context[ident->u.local.context];
@@ -2832,6 +2901,39 @@ check_for_context_local (ident_t *ident, fulltype_t * pType)
 
     return ident;
 } /* check_for_context_local() */
+
+/*-------------------------------------------------------------------------*/
+static void
+adapt_context_names (void)
+
+/* Convert all explicit context variables
+ * from local variables to context variables.
+ */
+
+{
+    int depth;
+    block_scope_t *scope;
+
+    depth = current_inline->block_depth+1;
+    scope = block_scope + depth - 1;
+
+    /* Are there locals of the given depth? */
+    if (all_locals && all_locals->u.local.depth >= depth)
+    {
+        ident_t *q = all_locals;
+
+        while (q != NULL && q->u.local.depth > depth)
+            q = q->next_all;
+
+        while (q != NULL && q->u.local.depth == depth)
+        {
+            q->u.local.context = q->u.local.num - scope->first_local;
+            q->u.local.num = -1;
+
+            q = q->next_all;
+        }
+    }
+} /* adapt_context_names() */
 
 #endif /* USE_NEW_INLINES */
 
@@ -5293,6 +5395,7 @@ printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[bloc
      * its rightful place.
      */
     {
+        int num_explicit_context = 0;
         int depth = current_inline->block_depth+1;
         block_scope_t * context = &(block_scope[depth-1]);
 
@@ -5337,8 +5440,16 @@ if (id->u.local.depth == depth) printf("DEBUG:     '%s': local %d, context %d\n"
             {
                 if (lcmap[i] != -1)
                 {
-                    ins_f_code(F_LOCAL);
-                    ins_byte(lcmap[i]);
+                    if (lcmap[i] >= CONTEXT_VARIABLE_BASE)
+                    {
+                        ins_f_code(F_CONTEXT_IDENTIFIER);
+                        ins_byte(lcmap[i] - CONTEXT_VARIABLE_BASE);
+                    }
+                    else
+                    {
+                        ins_f_code(F_LOCAL);
+                        ins_byte(lcmap[i]);
+                    }
                     got_mapped = MY_TRUE;
 #ifdef DEBUG_INLINES
 printf("DEBUG:     -> F_LOCAL %d\n", lcmap[i]);
@@ -5353,16 +5464,21 @@ printf("DEBUG:     -> F_LOCAL %d\n", lcmap[i]);
                     fatal("Explicite context var #%d has higher index than "
                           "implicite context variables.", i);
                 }
+                else
+                    num_explicit_context++;
             }
         } /* Push local vars */
 
         /* Add the context_closure instruction */
 #ifdef DEBUG_INLINES
-printf("DEBUG:     -> F_CONTEXT_CLOSURE %d %d\n", current_inline->function, context->num_locals);
+printf("DEBUG:     -> F_CONTEXT_CLOSURE %d %d %d\n", current_inline->function
+      , num_explicit_context, context->num_locals - num_explicit_context);
 #endif /* DEBUG_INLINES */
         ins_f_code(F_CONTEXT_CLOSURE);
         ins_short(current_inline->function);
-        ins_short(context->num_locals);
+        ins_byte(context->first_local);
+        ins_short(num_explicit_context);
+        ins_short(context->num_locals - num_explicit_context);
     } /* Complete F_CONTEXT_CLOSURE instruction */
 
 
@@ -6040,6 +6156,14 @@ printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROG
           /* deactivate argument scope while parsing explicit context */
           block_scope[current_inline->block_depth+1].accessible = MY_FALSE;
           current_inline->parse_context = MY_TRUE;
+          assert(block_scope[current_inline->block_depth].first_local == 0);
+          if (current_inline->prev != -1 && INLINE_CLOSURE(current_inline->prev).parse_context)
+          {
+              block_scope_t *scope = block_scope + INLINE_CLOSURE(current_inline->prev).block_depth;
+              block_scope[current_inline->block_depth].first_local = scope->first_local + scope->num_locals;
+          }
+          else
+              block_scope[current_inline->block_depth].first_local = current_inline->num_locals;
       }
 
       inline_opt_context
@@ -6049,9 +6173,53 @@ printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROG
 printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
 
+          /* Complete the F_CLEAR_LOCALS at the beginning of the context block. */
+          block_scope_t *scope = block_scope + current_inline->block_depth;
+          inline_closure_t *outer_closure;
+          int * outer_max_num_locals;
+
+          if (scope->num_locals > scope->num_cleared)
+          {
+              mem_block[A_PROGRAM].block[scope->addr+2]
+                = (char)(scope->num_locals - scope->num_cleared);
+          }
+
           /* reactivate argument scope */
           block_scope[current_inline->block_depth+1].accessible = MY_TRUE;
           current_inline->parse_context = MY_FALSE;
+          adapt_context_names();
+
+          /* Find the correct max_num_locals to update.
+           * That is the one of the last closure with parse_context set.
+           */
+          outer_max_num_locals = &(current_inline->max_num_locals);
+          outer_closure = current_inline;
+
+          while (outer_closure->prev != -1)
+          {
+              outer_closure = &(INLINE_CLOSURE(outer_closure->prev));
+              if (!outer_closure->parse_context)
+                  break;
+              outer_max_num_locals = &(outer_closure->max_num_locals);
+          }
+
+          if (scope->first_local + scope->num_locals > *outer_max_num_locals)
+              *outer_max_num_locals = scope->first_local + scope->num_locals;
+
+          /* Check whether we clobbered some other local or context variables. */
+          if (scope->num_locals || scope->clobbered)
+          {
+              if (current_inline->prev != -1)
+              {
+                  outer_closure = &(INLINE_CLOSURE(current_inline->prev));
+                  if (outer_closure->parse_context)
+                      block_scope[outer_closure->block_depth].clobbered = MY_TRUE;
+                  else
+                      block_scope[current_inline->block_depth-1].clobbered = MY_TRUE;
+              }
+              else
+                  block_scope[current_inline->block_depth-1].clobbered = MY_TRUE;
+          }
 
           if (!inline_closure_prototype($4))
               YYACCEPT;
@@ -6115,7 +6283,7 @@ printf("DEBUG: Before comma_expr: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_
 printf("DEBUG: After L_END_INLINE: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
 
-         /* Complete the F_CLEAR_LOCALS at the baginning of the block. */
+         /* Complete the F_CLEAR_LOCALS at the beginning of the block. */
          block_scope_t *scope = block_scope + block_depth - 1;
 
          if (use_local_scopes && scope->num_locals > scope->num_cleared)
@@ -13950,10 +14118,9 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
             q = name;
         }
         else
-            q = add_context_name(name, actual_type, -1);
+            q = add_context_name(current_inline, name, actual_type, -1);
 
-        lv->u.simple[0] = F_PUSH_CONTEXT_LVALUE;
-        lv->u.simple[1] = q->u.local.context;
+        scope = block_scope + current_inline->block_depth;
     }
     else
     {
@@ -13961,30 +14128,32 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
             q = redeclare_local(name, actual_type, block_depth);
         else
             q = add_local_name(name, actual_type, block_depth);
-
-        if (use_local_scopes && scope->clobbered)
-        {
-            /* finish the previous CLEAR_LOCALS, if any */
-            if (scope->num_locals - 1 > scope->num_cleared)
-                mem_block[A_PROGRAM].block[scope->addr+2]
-                  = (char)(scope->num_locals - 1 - scope->num_cleared);
-            scope->clobbered = MY_FALSE;
-            scope->num_cleared = scope->num_locals - 1;
-        }
-        if (use_local_scopes && scope->num_locals == scope->num_cleared + 1)
-        {
-            /* First definition of a local, so insert the
-             * clear_locals bytecode and remember its position
-             */
-            scope->addr = mem_block[A_PROGRAM].current_size;
-            ins_f_code(F_CLEAR_LOCALS);
-            ins_byte(scope->first_local + scope->num_cleared);
-            ins_byte(0);
-        }
-
-        lv->u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-        lv->u.simple[1] = q->u.local.num;
     }
+
+    if (use_local_scopes && scope->clobbered)
+    {
+        /* finish the previous CLEAR_LOCALS, if any */
+        if (scope->num_locals - 1 > scope->num_cleared)
+            mem_block[A_PROGRAM].block[scope->addr+2]
+              = (char)(scope->num_locals - 1 - scope->num_cleared);
+        scope->clobbered = MY_FALSE;
+        scope->num_cleared = scope->num_locals - 1;
+    }
+
+    if (use_local_scopes && scope->num_locals == scope->num_cleared + 1)
+    {
+        /* First definition of a local, so insert the
+         * clear_locals bytecode and remember its position
+         */
+        scope->addr = mem_block[A_PROGRAM].current_size;
+        ins_f_code(F_CLEAR_LOCALS);
+        ins_byte(scope->first_local + scope->num_cleared);
+        ins_byte(0);
+    }
+
+    lv->u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
+    lv->u.simple[1] = q->u.local.num;
+
 #else /* USE_NEW_INLINES */
     if (redeclare)
         q = redeclare_local(name, actual_type, block_depth);
@@ -14024,38 +14193,16 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
          * initializer, as the default svalue-0 is not a valid float value.
          */
 
-        Bool need_value = MY_FALSE;
 %line
-
-#ifdef USE_NEW_INLINES
-        /* When parsing context variables, the context_closure instruction
-         * expects a value on the stack. If we do a float initialization,
-         * we leave the 0.0 on the stack, otherwise we'll push a 0.
-         * For normal float locals, we'll create the bytecode to assign
-         * the float 0.
-         */
-        need_value = current_inline && current_inline->parse_context;
-#endif /* USE_NEW_INLINES */
-
         if (!(actual_type.typeflags & TYPE_MOD_POINTER)
          && (actual_type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
           )
         {
             ins_f_code(F_FCONST0);
+            if (!add_lvalue_code(lv, F_VOID_ASSIGN))
+                return;
 
-            if (!need_value)
-            {
-                if (!add_lvalue_code(lv, F_VOID_ASSIGN))
-                    return;
-            }
-              
-            need_value = MY_FALSE;
         } /* if (float variable) */
-
-        if (need_value) /* If we still need a value... */
-        {
-            ins_number(0);
-        }
     }
 } /* define_local_variable() */
 
@@ -14097,18 +14244,8 @@ if (current_inline && current_inline->parse_context)
     if (type2.typeflags & TYPE_MOD_REFERENCE)
         yyerror("Can't trace reference assignments");
 
-    /* If we're parsing a context variable, just leave the
-     * value on the stack for the context_closure instruction.
-     * For normal locals, add the bytecode to create the lvalue
-     * and do the assignment.
-     */
-#ifdef USE_NEW_INLINES
-    if (!current_inline || !current_inline->parse_context)
-#endif /* USE_NEW_INLINES */
-    {
-        if (!add_lvalue_code(lv, F_VOID_ASSIGN))
-            return;
-    } /* parsed context var */
+    if (!add_lvalue_code(lv, F_VOID_ASSIGN))
+        return;
 } /* init_local_variable() */
 
 /*-------------------------------------------------------------------------*/

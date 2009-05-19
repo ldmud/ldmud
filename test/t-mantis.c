@@ -180,6 +180,145 @@ nosave mixed *tests = ({
             return to_int("-"+num) == __INT_MIN__;
        :)
     }),
+    ({ "0000631-1", 0,
+        (:
+            int i=1;
+
+            return funcall(
+                (:
+                    if(i)
+                        return funcall((: return i; :));
+                :)) == 1;
+        :)
+    }),
+    ({ "0000631-2", 0,
+        (:
+            int i=1;
+
+            return funcall(
+                function int() : int j = 2
+                {
+                    if(i)
+                        return funcall((: return j; :));
+                }) == 2;
+        :)
+    }),
+    ({ "0000631-3", 0,
+        (:
+            int i=1;
+
+            return funcall(
+                function int()
+                {
+                    int j = 2;
+                    return funcall((: return i; :));
+                }) == 1;
+        :)
+    }),
+    ({ "0000631-4", 0,
+        (:
+            int i=1;
+
+            return funcall(
+                function int ()
+                {
+                    return funcall(
+                         function int () : int j=i
+                         {
+                             return j;
+                         });
+                });
+        :)
+    }),
+    ({ "0000631-5", 0,
+        (:
+            int a = 1;
+
+            return funcall(
+                function int() : closure cl = (: a :)
+                {
+                    return funcall(cl);
+                }) == 1;
+        :)
+    }),
+    ({ "0000631-6", 0,
+        (:
+            int a=1;
+
+            return funcall(
+                function int () : int b = a+1; int c = b+1
+                {
+                    return c;
+                }) == 3;
+        :)
+    }),
+    ({ "0000631-7", 0, /* #631 in conjunction with #537. */
+        (:
+            closure c;
+
+            {
+               int a = 1;
+            }
+
+            c = function int () : int b
+            {
+                return b;
+            };
+
+            return funcall(c) == 0;
+        :)
+    }),
+    ({ "0000631-8", 0, /* #631 in conjunction with #537. */
+        (:
+            closure c;
+
+            c = function int () : int b = 2
+            {
+                return b;
+            };
+
+            {
+                int d;
+
+                return d == 0;
+            }
+
+        :)
+    }),
+    ({ "0000631-9", 0, /* Check, that the array is only freed once. */
+        (:
+            closure c = function int() : string* a = ({ "" })
+            {
+                return 0;
+            };
+
+            return closurep(c); /* As long as it doesn't crash... */
+        :)
+    }),
+    ({ "0000631-10", 0,
+        function int(int a, int b, int c)
+        {
+
+            return funcall(funcall(funcall(
+                function :
+                    mixed i = 1;
+                    mixed j = function :
+                                 mixed j = function { return i; }
+                              { return j; };
+                { return j; }
+                ))) == 1;
+        }
+    }),
+    ({ "0000631-11", 0,
+        (:
+            return funcall(function int() :
+                    closure c = function int() : int a = 1 { return 2; };
+                    int b;
+                {
+                    return b;
+                }) == 0;
+        :)
+    }),
 });
 
 void run_test()
