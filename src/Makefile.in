@@ -500,8 +500,7 @@ port.o : main.h backend.h my-rusage.h driver.h typedefs.h port.h config.h \
 
 ptmalloc.o : ptmalloc/malloc.c machine.h config.h ptmalloc/hooks.c \
     ptmalloc/arena.c ptmalloc/thread-m.h ptmalloc/malloc.h \
-    /usr/include/malloc.h ptmalloc/config.h /usr/include/features.h \
-    /usr/include/gnu/stubs.h /usr/include/sys/cdefs.h
+    ptmalloc/config.h
 
 ptrtable.o : simulate.h mempools.h ptrtable.h driver.h svalue.h strfuns.h \
     sent.h bytecode.h typedefs.h port.h config.h machine.h
