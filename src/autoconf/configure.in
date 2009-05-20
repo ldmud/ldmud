@@ -93,74 +93,77 @@ dnl Then try searching in /usr/include, /usr/include/$4 and ${$5}.
 dnl Try to compile $6.
 dnl Look for library $7.
 dnl If successful set $3 to yes, otherwise to no.
+dnl Only do this if $8 is set to "yes"
 AC_DEFUN([AC_MY_SEARCH_LIB],
 [
-    saveflags="$CFLAGS"
-    saveeflags="$EXTRA_CFLAGS"
+    if test "x$[$8]" = "xyes"; then
+        saveflags="$CFLAGS"
+        saveeflags="$EXTRA_CFLAGS"
 
-    ifdef([PKG_CHECK_MODULES],[
-        PKG_CHECK_MODULES([$1],[$2],[$3]=yes,[$3]=no)
-    ],[
-         [$3]=no
-    ])
+        ifdef([PKG_CHECK_MODULES],[
+            PKG_CHECK_MODULES([$1],[$2],[$3]=yes,[$3]=no)
+        ],[
+             [$3]=no
+        ])
 
-    # No pkg-config, search manually.
-    if test $[$3] = no; then
-        AC_MSG_CHECKING(for [$4] support)
-        for TESTPATH in "" "${[$5]}" "${[$5]}/include" "${[$5]}/include/[$4]" "/usr/include/[$4]" "/usr/local/include" "/usr/local/include/[$4]" ; do
-            if test "x$TESTPATH" != "x"; then
-                CFLAGS="$saveflags -I$TESTPATH"
-            else
-                CFLAGS="$saveflags"
-            fi
-            AC_TRY_COMPILE([$6],,
-                [$3]=yes
+        # No pkg-config, search manually.
+        if test $[$3] = no; then
+            AC_MSG_CHECKING(for [$4] support)
+            for TESTPATH in "" "${[$5]}" "${[$5]}/include" "${[$5]}/include/[$4]" "/usr/include/[$4]" "/usr/local/include" "/usr/local/include/[$4]" ; do
                 if test "x$TESTPATH" != "x"; then
-                    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
-                fi
-                break;
-                ,
-                CFLAGS="$saveflags"
-            )
-        done
-        AC_MSG_RESULT($[$3])
-    elif test "x$[$1]_CFLAGS" != "x"; then
-        EXTRA_CFLAGS="$[$1]_CFLAGS $EXTRA_CFLAGS"
-    fi
-
-    if test $[$3] = yes; then
-        if test "x$[$1]_LIBS" != "x"; then
-            PKGLIBS="$PKGLIBS $[$1]_LIBS"
-        else
-            tmp=""
-
-            for TESTPATH in "" "${[$5]}" "${[$5]}/lib" "${[$5]}/lib/[$4]" "/usr/lib/[$4]" "/usr/local/lib" "/usr/local/lib/[$4]" ; do
-                if test "x$TESTPATH" != "x"; then
-                    CFLAGS="$saveflags -L$TESTPATH"
+                    CFLAGS="$saveflags -I$TESTPATH"
                 else
                     CFLAGS="$saveflags"
                 fi
-
-                AC_CHECK_LIB([$7],xmlParseFile,
+                AC_TRY_COMPILE([$6],,
+                    [$3]=yes
                     if test "x$TESTPATH" != "x"; then
-                        tmp="$PKGLIBS -L$TESTPATH -l[$7]"
-                    else
-                        tmp="$PKGLIBS -l[$7]"
+                        EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
                     fi
-                    break
+                    break;
+                    ,
+                    CFLAGS="$saveflags"
                 )
             done
-
-            if test "x$tmp" == "x"; then
-                [$3]=no
-
-                EXTRA_CFLAGS="$saveeflags"
-            else
-                PKGLIBS="$tmp"
-            fi
+            AC_MSG_RESULT($[$3])
+        elif test "x$[$1]_CFLAGS" != "x"; then
+            EXTRA_CFLAGS="$[$1]_CFLAGS $EXTRA_CFLAGS"
         fi
 
-        CFLAGS="$saveflags"
+        if test $[$3] = yes; then
+            if test "x$[$1]_LIBS" != "x"; then
+                PKGLIBS="$PKGLIBS $[$1]_LIBS"
+            else
+                tmp=""
+
+                for TESTPATH in "" "${[$5]}" "${[$5]}/lib" "${[$5]}/lib/[$4]" "/usr/lib/[$4]" "/usr/local/lib" "/usr/local/lib/[$4]" ; do
+                    if test "x$TESTPATH" != "x"; then
+                        CFLAGS="$saveflags -L$TESTPATH"
+                    else
+                        CFLAGS="$saveflags"
+                    fi
+
+                    AC_CHECK_LIB([$7],xmlParseFile,
+                        if test "x$TESTPATH" != "x"; then
+                            tmp="$PKGLIBS -L$TESTPATH -l[$7]"
+                        else
+                            tmp="$PKGLIBS -l[$7]"
+                        fi
+                        break
+                    )
+                done
+
+                if test "x$tmp" == "x"; then
+                    [$3]=no
+
+                    EXTRA_CFLAGS="$saveeflags"
+                else
+                    PKGLIBS="$tmp"
+                fi
+            fi
+
+            CFLAGS="$saveflags"
+        fi
     fi
 ])
 
@@ -1717,7 +1720,7 @@ AC_MY_SEARCH_LIB(SQLITE3,sqlite3,lp_cv_has_sqlite3,sqlite3,xml_path,
     {
         return (sqlite3*)0;
     }
-],sqlite3)
+],sqlite3,enable_use_sqlite)
 
 
 if test $lp_cv_has_sqlite3 = yes; then
@@ -1765,7 +1768,7 @@ if test "$xml_package" = "any" -o "$xml_package" = "xml2"; then
         {
             xmlElementType type = XML_ELEMENT_NODE;
         }
-    ],xml2)
+    ],xml2,enable_use_xml)
 
     if test $lp_cv_has_xml2 = yes; then
         if test "$enable_use_xml" = "yes"; then
@@ -1786,7 +1789,7 @@ if test "$xml_package" = "any" -o "$xml_package" = "iksemel"; then
         {
             return (iks*)0;
         }
-    ],iksemel)
+    ],iksemel,enable_use_xml)
 
     if test $lp_cv_has_iksemel = yes; then
         if test "$enable_use_xml" = "yes"; then
