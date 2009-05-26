@@ -32,6 +32,7 @@ xx-xxx-xxxx -- 3.3.719
        + lambda() now supports bound and unbound lambdas as the first element
          in an array of a lambda expression.
        + xml_generate(), xml_parse(): Also available using libxml2.
+       + cat(): marked as deprecated (#637)
 
     - Runtime
        + The --max-malloced memory limit was renamed to --hard-malloc-limit.

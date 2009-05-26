@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-May-2009 (Zesstra)
+  - (func_spec) Marked efun cat() as deprecated. (#637)
+
 19-May-2009 (Gnomi)
   - (prolang.y, interpret.c) Corrected the handling of implicit context
     variables in nested inline closures and allowed the initializers
