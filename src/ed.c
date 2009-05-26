@@ -3264,15 +3264,7 @@ clear_ed_buffer_refs (ed_buffer_t *b)
         clear_string_ref(b->exit_fn);
         if ( NULL != (ob = b->exit_ob) )
         {
-            if (ob->flags & O_DESTRUCTED)
-            {
-                reference_destructed_object(ob);
-                b->exit_ob = NULL;
-            }
-            else
-            {
-                ob->ref++;
-            }
+            clear_object_ref(ob);
         }
     }
 
