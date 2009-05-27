@@ -715,6 +715,11 @@ backend (void)
             time_to_call_heart_beat = MY_FALSE;
             alarm(alarm_time);
 
+            /* So call_outs from heart_beats are
+             * correctly timed.
+             */
+            next_call_out_cycle();
+
             /* Do the timed events */
 	    if (!synch_heart_beats
              || time_of_last_hb + heart_beat_interval <= current_time)

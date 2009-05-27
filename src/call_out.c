@@ -216,27 +216,18 @@ v_call_out (svalue_t *sp, int num_arg)
     return sp;
 } /* v_call_out() */
 
+
 /*-------------------------------------------------------------------------*/
 void
-call_out (void)
+next_call_out_cycle (void)
 
-/* Check if there is any callout due to be called. If yes, do so.
- * This function is called from the heart_beat handling in the backend.c.
- * It sets up its own error recovery context so that errors during an
- * execution won't disturb the rest of the game.
+/* Starts the next call_out cycle by decrementing the first delta.
+ * This function is called in the backend cycle before heart_beats are handled.
  */
 
 {
     static int last_time;
       /* Last time this function was called */
-
-    static struct call *current_call_out;
-      /* Current callout, static so that longjmp() won't clobber it. */
-
-    static object_t *called_object;
-      /* Object last called, static so that longjmp() won't clobber it */
-
-    struct error_recovery_info error_recovery_info;
 
     /* No calls pending: just update the last_time and return */
 
@@ -250,12 +241,38 @@ call_out (void)
     if (last_time == 0)
         last_time = current_time;
 
-    /* Update the first .delta in the list (so it won't happen
-     * twice in case of an error.
+    /* Update the first .delta in the list.
      */
     call_list->delta -= current_time - last_time;
 
     last_time = current_time;
+} /* next_call_out_cycle() */
+
+
+/*-------------------------------------------------------------------------*/
+void
+call_out (void)
+
+/* Check if there is any callout due to be called. If yes, do so.
+ * This function is called from the heart_beat handling in the backend.c.
+ * It sets up its own error recovery context so that errors during an
+ * execution won't disturb the rest of the game.
+ */
+
+{
+    static struct call *current_call_out;
+      /* Current callout, static so that longjmp() won't clobber it. */
+
+    static object_t *called_object;
+      /* Object last called, static so that longjmp() won't clobber it */
+
+    struct error_recovery_info error_recovery_info;
+
+    /* No calls pending: fine. */
+
+    if (call_list == NULL)
+        return;
+
     current_interactive = NULL;
 
     /* Activate the local error recovery context */

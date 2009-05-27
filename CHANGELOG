@@ -4,6 +4,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
 27-May-2009 (Gnomi)
   - (ed.c, comm.c) Put ed sessions into the input_to list of interactive
     objects, so now they have a common noecho and prompt handling. (Bug #522)
+  - (call_out.c, backend.c) Corrected the timing of call_outs from inside
+    a heartbeat. (Bug #375)
 
 26-May-2009 (Fuchur)
   - (ed.c) Fix bogus reference increment in clear_ed_buffer_refs()
