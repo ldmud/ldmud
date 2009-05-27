@@ -6,6 +6,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
     objects, so now they have a common noecho and prompt handling. (Bug #522)
   - (call_out.c, backend.c) Corrected the timing of call_outs from inside
     a heartbeat. (Bug #375)
+  - (comm.c) Allow sending \0 with binary_message(). (Bug #71)
+  - (comm.c) Enable IAC quoting by default, allow enabling '\0'
+    and disabling '\n' in connection charsets.
 
 26-May-2009 (Fuchur)
   - (ed.c) Fix bogus reference increment in clear_ed_buffer_refs()

@@ -89,6 +89,11 @@ xx-xxx-xxxx -- 3.3.719
          '--enable-access-control', '--with-access-file', '--with-access-log'
          and their config.h symbols ACCESS_FILE and ACCESS_LOG just give
          the default values.
+       + The default path of TLS certificates are now configurable during
+         compile time (--with-tls-keyfile, --with-tls-certfile,
+         --with-tls-trustfile, --with-tls-trustdirectory, --with-tls-crlfile,
+         --with-tls-crldirectory), these TLS features can also be deactivated
+         by giving "no" during compile time or "none" as a runtime parameter.
        + Ed sessions are removed when an object becomes non-interactive.
        + Multiple ed sessions per interactive are allowed.
 

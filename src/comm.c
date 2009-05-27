@@ -1946,12 +1946,12 @@ if (sending_telnet_command)
              *  - stop this loop if the source is exhausted or
              *    if the buffer is full.
              */
-            if (ip->charset[(c&0xff)>>3] & 1<<(c&7)
-             || (c && sending_telnet_command)
-               )
+            if (sending_telnet_command)
             {
                 *dest++ = c;
             }
+            else if (!(ip->charset[(c&0xff)>>3] & 1<<(c&7)))
+                NOOP;
             else if (c == '\n')
             {
                 if (dest + 1 == end)
@@ -1979,6 +1979,10 @@ if (sending_telnet_command)
                 }
 
                 *dest++ = c;
+                *dest++ = c;
+            }
+            else
+            {
                 *dest++ = c;
             }
 
@@ -3474,7 +3478,6 @@ set_default_conn_charset (char charset[32])
 
 {
     memset(charset, 255, 32);
-    charset['\n'/8] &= ~(1 << '\n' % 8);
     charset['\0'/8] &= ~(1 << '\0' % 8);
 } /* set_default_conn_charset() */
 
@@ -3651,6 +3654,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
     new_interactive->tn_enabled = MY_TRUE;
     new_interactive->do_close = 0;
     new_interactive->noecho = 0;
+    new_interactive->supress_go_ahead = MY_FALSE;
     new_interactive->gobble_char = 0;
     new_interactive->catch_tell_activ = MY_TRUE;
     new_interactive->text_end = 0;
@@ -3670,6 +3674,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
     new_interactive->trace_level = 0;
     new_interactive->trace_prefix = NULL;
     new_interactive->message_length = 0;
+    new_interactive->quote_iac = MY_TRUE;
     set_default_conn_charset(new_interactive->charset);
     set_default_combine_charset(new_interactive->combine_cset);
     new_interactive->text[0] = '\0';
@@ -8557,16 +8562,7 @@ f_set_connection_charset (svalue_t *sp)
             memset(p, 0, (size_t)(&ip->charset[sizeof ip->charset] - p));
         }
 
-        ip->charset['\n'/8] &= ~(1 << '\n' % 8);
-        ip->charset['\0'/8] &= ~(1 << '\0' % 8);
-
-        if ( 0 != (ip->quote_iac = (char)sp->u.number) )
-        {
-            if (ip->charset[IAC/8] & (1 << IAC % 8))
-                ip->charset[IAC/8] &= ~(1 << IAC % 8);
-            else
-                ip->quote_iac = MY_FALSE;
-        }
+        ip->quote_iac = (char)sp->u.number;
     }
     sp--;
     free_svalue(sp);
