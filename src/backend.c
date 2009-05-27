@@ -671,8 +671,6 @@ backend (void)
                     execute_command(buff+1, command_giver);
                 }
             }
-            else if (O_GET_EDBUFFER(command_giver))
-                ed_cmd(buff);
             else if (call_function_interactive(ip, buff))
                 NOOP;
             else

@@ -2470,17 +2470,16 @@ destruct_object (svalue_t *v)
         errorf("Master failed to clean inventory in prepare_destruct\n");
     }
 
-    if (ob->flags & O_SHADOW)
+    if (O_IS_INTERACTIVE(ob))
     {
-        shadow_t *sh;
+        interactive_t *ip = O_GET_INTERACTIVE(ob);
         object_t *save = command_giver;
 
         command_giver = ob;
-        sh = O_GET_SHADOW(ob);
-        if (sh->ip)
-            trace_level |= sh->ip->trace_level;
-        if (sh->ed_buffer)
-            save_ed_buffer();
+        trace_level |= ip->trace_level;
+
+        abort_input_handler(ip);
+
         command_giver = save;
     }
     destruct(ob);
@@ -2581,15 +2580,6 @@ destruct (object_t *ob)
         object_t *shadowing, *shadowed_by;
 
         shadow_sent = O_GET_SHADOW(ob);
-
-        if (shadow_sent->ed_buffer)
-        {
-            object_t *save = command_giver;
-
-            command_giver = ob;
-            free_ed_buffer();
-            command_giver = save;
-        }
 
         /* The chain of shadows is a double linked list. Take care to update
          * it correctly.
@@ -3033,7 +3023,6 @@ new_shadow_sent(void)
     p->sent.type = SENT_SHADOW;
     p->shadowing = NULL;
     p->shadowed_by = NULL;
-    p->ed_buffer = NULL;
     p->ip = NULL;
     return p;
 } /* new_shadow_sent() */
@@ -3072,7 +3061,6 @@ check_shadow_sent (object_t *ob)
         sh = O_GET_SHADOW(ob);
 
         if (!sh->ip
-         && !sh->ed_buffer
          && !sh->shadowing
          && !sh->shadowed_by
            )

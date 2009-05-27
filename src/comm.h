@@ -8,7 +8,7 @@
 #    include <zlib.h>
 #endif
 
-#include "simulate.h"   /* callback_t for input_to_t */
+#include "simulate.h"   /* callback_t for TLS */
 #include "svalue.h"
 #include "pkg-tls.h"
 
@@ -152,20 +152,27 @@ enum discarded_msg_states
 
 typedef char discarded_msg_state_t;
 
-/* --- struct input_to_s: input_to() datastructure
- *
- * input-to structures describe a pending input_to() for a given
- * interactive object. Every object can have one input-to pending, the
- * pointer to the structure is stored in the interactive sentence structure.
- */
+enum input_type_e {
+    INPUT_TO    /* A normal input_to. */
+ ,  INPUT_ED    /* An ed() session.   */
+};
 
-struct input_to_s {
-    input_to_t *next;
-    svalue_t    prompt;     /* the prompt, may be 0 */
-    char        noecho;     /* the requested "noecho" state */
-    Bool        local;      /* TRUE if a CHARMODE change is local only */
-    callback_t  fun;        /* The function to call, and its args */
-    p_uint      eval_nr;    /* The thread number where this started. */
+typedef enum input_type_e input_type_t;
+
+/* --- struct input_s: Stack of input handlers.
+ *
+ * input_s represents all pending input handlers, which
+ * are at this time either normal input_to()s or ed() sessions.
+ * Every interactive object can have these input handlers,
+ * the pointer to the structure is stored in the interactive
+ * sentence structure.
+ */
+struct input_s {
+    input_t      *next;
+    input_type_t  type;
+    svalue_t      prompt;     /* the prompt, may be 0 */
+    char          noecho;     /* the requested "noecho" state */
+    Bool          local;      /* TRUE if a CHARMODE change is local only */
 };
 
 /* --- struct interactive_s: an interactive connection
@@ -184,7 +191,7 @@ struct input_to_s {
 struct interactive_s {
     SOCKET_T socket;            /* The socket structure */
     object_t *ob;               /* Points back to the associated object */
-    input_to_t *input_to;       /* != NULL: defines function to be
+    input_t  *input_handler;    /* != NULL: defines function to be
                                    called with next input line */
     object_t *modify_command;   /* modify_command() handler() */
     svalue_t prompt;            /* The prompt to print. */
@@ -425,7 +432,14 @@ extern void check_for_out_connections (void);
 #ifdef GC_SUPPORT
 extern void  clear_comm_refs(void);
 extern void  count_comm_refs(void);
+extern void  clear_input_refs(input_t *it);
+extern void  count_input_refs(input_t *it);
 #endif /* GC_SUPPORT */
+
+extern void add_input_handler(interactive_t *ip, input_t *ih, Bool append);
+extern void remove_input_handler(interactive_t *ip, input_t *ih);
+extern void abort_input_handler(interactive_t *ip);
+extern input_t *get_input_handler(interactive_t *ip, input_type_t type);
 
 extern char *query_host_name(void);
 extern char *get_host_ip_number(void);

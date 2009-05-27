@@ -15,13 +15,12 @@ typedef struct action_s           action_t;           /* sent.h */
 typedef struct callback_s         callback_t;         /* simulate.h */
 typedef struct case_list_entry_s  case_list_entry_t;  /* switch.h */
 typedef struct case_state_s       case_state_t;       /* switch.h */
-typedef struct ed_buffer_s        ed_buffer_t;        /* ed.c */
 typedef struct function_s         function_t;         /* exec.h */
 typedef struct ident_s            ident_t;            /* lex.h */
 typedef struct include_s          include_t;          /* exec.h */
 typedef struct inherit_s          inherit_t;          /* exec.h */
 typedef struct interactive_s      interactive_t;      /* comm.h */
-typedef struct input_to_s         input_to_t;         /* comm.h */
+typedef struct input_s            input_t;            /* comm.h */
 typedef struct instr_s            instr_t;            /* exec.h */
 typedef struct lambda_s           lambda_t;           /* closure.h */
 typedef struct linenumbers_s      linenumbers_t;      /* exec.h */

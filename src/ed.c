@@ -175,9 +175,12 @@ typedef struct line LINE;
 
 /* The ed_buffer holds all the information for one editor session.
  */
+typedef struct ed_buffer_s ed_buffer_t;
 
 struct ed_buffer_s
 {
+    input_t input;             /* It's an input handler. */
+
     Bool    diag;              /* True: diagnostic-output?*/
     Bool    truncflg;          /* True: truncate long line flag
                                 * Note: not used anywhere */
@@ -207,7 +210,6 @@ struct ed_buffer_s
     string_t *exit_fn;         /* Function to be called when player exits */
                                /* TODO: Make this a callback */
     object_t *exit_ob;         /* Object holding <exit_fn> */
-    svalue_t prompt;           /* Editor prompt, a counted shared string */
 };
 
 /* ed_buffer.flag values
@@ -229,8 +231,8 @@ struct ed_buffer_s
 
 /* Macros handling the current ed_buffer for less typing */
 
-#define ED_BUFFER         (current_ed_buffer)
-#define EXTERN_ED_BUFFER  (O_GET_SHADOW(command_giver)->ed_buffer)
+#define ED_BUFFER             (current_ed_buffer)
+#define EXTERN_ED_BUFFER(ih)  ((ed_buffer_t*) (ih))
 
 #define P_DIAG          (ED_BUFFER->diag)
 #define P_TRUNCFLG      (ED_BUFFER->truncflg)
@@ -365,12 +367,13 @@ static regexp_t *optpat(void);
 
 /*-------------------------------------------------------------------------*/
 size_t
-ed_buffer_size (ed_buffer_t *buffer)
+ed_buffer_size (input_t *ih)
 
 /* Return the size of the memory allocated for the <buffer>
  */
 
 {
+    ed_buffer_t *buffer = (ed_buffer_t*) ih;
     size_t sum;
     long line;
     LINE *pLine;
@@ -396,8 +399,8 @@ set_ed_prompt (ed_buffer_t * ed_buffer, string_t * prompt)
  */
 
 {
-    free_mstring(ed_buffer->prompt.u.str);
-    ed_buffer->prompt.u.str = ref_mstring(prompt);
+    free_mstring(ed_buffer->input.prompt.u.str);
+    ed_buffer->input.prompt.u.str = ref_mstring(prompt);
 } /* set_ed_prompt() */
 
 /*-------------------------------------------------------------------------*/
@@ -472,24 +475,6 @@ more_append (char *str)
 
     return ED_OK;
 }
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-get_ed_prompt (interactive_t *ip)
-
-/* Return a pointer to the prompt svalue in <ip>->ed_buffer.
- * Return NULL if <ip> is not editing.
- */
-
-{
-    ed_buffer_t *ed_buffer;
-
-    if (NULL != (ed_buffer = O_GET_EDBUFFER(ip->ob)))
-    {
-        return &(ed_buffer->prompt);
-    }
-    return NULL;
-} /* get_ed_prompt() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3160,12 +3145,10 @@ ed_start (string_t *file_arg, string_t *exit_fn, object_t *exit_ob)
     string_t *new_path;
     svalue_t *setup;
     ed_buffer_t *old_ed_buffer;
+    interactive_t *ip;
 
-    if (!command_giver || !(O_IS_INTERACTIVE(command_giver)))
+    if (!command_giver || !(O_SET_INTERACTIVE(ip, command_giver)))
         errorf("Tried to start an ed session on a non-interative player.\n");
-
-    if (EXTERN_ED_BUFFER)
-        errorf("Tried to start an ed session, when already active.\n");
 
     /* Check for read on startup, since the buffer is read in. But don't
      * check for write, since we may want to change the file name.
@@ -3175,28 +3158,30 @@ ed_start (string_t *file_arg, string_t *exit_fn, object_t *exit_ob)
         return;
 
     /* Never trust the master... it might be as paranoid as ourselves...
-     * Starting another ed session in valid_read() looks stupid, but
-     * possible.
      */
     if (!command_giver
      || !(command_giver->flags & O_SHADOW)
      || command_giver->flags & O_DESTRUCTED
-     || EXTERN_ED_BUFFER)
+       )
     {
         return;
     }
 
     old_ed_buffer = ED_BUFFER;
-    EXTERN_ED_BUFFER =
-      ED_BUFFER = (ed_buffer_t *)xalloc(sizeof (ed_buffer_t));
+    ED_BUFFER = (ed_buffer_t *)xalloc(sizeof (ed_buffer_t));
 
     memset(ED_BUFFER, '\0', sizeof (ed_buffer_t));
+
+    ED_BUFFER->input.type = INPUT_ED;
 
     ED_BUFFER->truncflg = MY_TRUE;
     ED_BUFFER->flags |= EIGHTBIT_MASK | TABINDENT_MASK;
     ED_BUFFER->shiftwidth= 4;
-    put_ref_string(&(ED_BUFFER->prompt), STR_ED_PROMPT);
+    put_ref_string(&(ED_BUFFER->input.prompt), STR_ED_PROMPT);
     ED_BUFFER->CurPtr = &ED_BUFFER->Line0;
+
+    add_input_handler(ip, &(ED_BUFFER->input), MY_FALSE);
+
     if (exit_fn)
     {
         ED_BUFFER->exit_fn = ref_mstring(exit_fn);
@@ -3248,12 +3233,13 @@ ed_start (string_t *file_arg, string_t *exit_fn, object_t *exit_ob)
 
 /*-------------------------------------------------------------------------*/
 void
-clear_ed_buffer_refs (ed_buffer_t *b)
+clear_ed_buffer_refs (input_t *ih)
 
 /* GC Support: Clear all references from ed_buffer <b>.
  */
 
 {
+    ed_buffer_t *b = (ed_buffer_t*) ih;
     object_t *ob;
 
     if (b->fname)
@@ -3271,17 +3257,18 @@ clear_ed_buffer_refs (ed_buffer_t *b)
     /* For the RE cache */
     clear_regexp_ref(b->oldpat);
 
-    clear_ref_in_vector(&b->prompt, 1);
+    clear_ref_in_vector(&b->input.prompt, 1);
 }
 
 /*-------------------------------------------------------------------------*/
 void
-count_ed_buffer_refs (ed_buffer_t *b)
+count_ed_buffer_refs (input_t *ih)
 
 /* GC Support: Count all references from ed_buffer <b>.
  */
 
 {
+    ed_buffer_t *b = (ed_buffer_t*) ih;
     object_t *ob;
     LINE *line;
 
@@ -3317,7 +3304,7 @@ count_ed_buffer_refs (ed_buffer_t *b)
 
     if (b->oldpat)
         count_regexp_ref(b->oldpat);
-    count_ref_in_vector(&b->prompt, 1);
+    count_ref_in_vector(&b->input.prompt, 1);
 }
 
 #endif /* GC_SUPPORT */
@@ -3325,12 +3312,13 @@ count_ed_buffer_refs (ed_buffer_t *b)
 #ifdef DEBUG
 /*-------------------------------------------------------------------------*/
 void
-count_ed_buffer_extra_refs (ed_buffer_t *b)
+count_ed_buffer_extra_refs (input_t *ih)
 
 /* Count refs in ed_buffer <b> to debug refcounts.
  */
 
 {
+    ed_buffer_t *b = (ed_buffer_t*) ih;
     object_t *ob;
 
     if ( NULL != (ob = b->exit_ob) )
@@ -3341,7 +3329,7 @@ count_ed_buffer_extra_refs (ed_buffer_t *b)
 
 /*-------------------------------------------------------------------------*/
 void
-free_ed_buffer (void)
+free_ed_buffer (input_t *ih)
 
 /* Deallocate the ed_buffer of the command_giver and call the exit function
  * if set.
@@ -3353,13 +3341,14 @@ free_ed_buffer (void)
 {
     string_t *name;
     object_t *ob;
+    interactive_t *ip;
 
-    ED_BUFFER = EXTERN_ED_BUFFER;
+    ED_BUFFER = EXTERN_ED_BUFFER(ih);
 
     clrbuf();
     ob   = ED_BUFFER->exit_ob;
     name = ED_BUFFER->exit_fn;
-    free_svalue(&ED_BUFFER->prompt);
+    free_svalue(&ED_BUFFER->input.prompt);
 
     if(P_OLDPAT)
     {
@@ -3369,9 +3358,9 @@ free_ed_buffer (void)
 
     if (P_FNAME)
         free_mstring(P_FNAME);
-
+    if (O_SET_INTERACTIVE(ip, command_giver))
+        remove_input_handler(ip, ih);
     xfree(ED_BUFFER);
-    EXTERN_ED_BUFFER = NULL;
 
     if (name)
     {
@@ -3385,8 +3374,6 @@ free_ed_buffer (void)
 
             current_object = ob;
             secure_apply(name, ob, 0);
-              /* might call efun ed, thus setting (EXTERN_)ED_BUFFER again
-               */
             current_object = save;
         }
         if (ob)
@@ -3401,7 +3388,7 @@ free_ed_buffer (void)
 
 /*-------------------------------------------------------------------------*/
 void
-ed_cmd (char *str)
+ed_cmd (char *str, input_t *ih)
 
 /* Called from the backend with a new line of player input in <str>.
  */
@@ -3411,7 +3398,7 @@ ed_cmd (char *str)
     ed_buffer_t *old_ed_buffer;
 
     old_ed_buffer = ED_BUFFER;
-    ED_BUFFER = EXTERN_ED_BUFFER;
+    ED_BUFFER = EXTERN_ED_BUFFER(ih);
     if (P_MORE)
     {
         print_help2();
@@ -3459,7 +3446,7 @@ ed_cmd (char *str)
     switch (status)
     {
     case EOF:
-        free_ed_buffer();
+        free_ed_buffer(&(ED_BUFFER->input));
         ED_BUFFER = old_ed_buffer;
         return;
 
@@ -3504,7 +3491,7 @@ ed_cmd (char *str)
 
 /*-------------------------------------------------------------------------*/
 void
-save_ed_buffer (void)
+save_ed_buffer (input_t *ih)
 
 /* Called when the command_giver is destructed in an edit session.
  * The function calls master->get_ed_buffer_save_file() to get a filename
@@ -3515,10 +3502,10 @@ save_ed_buffer (void)
 {
     svalue_t *stmp;
     string_t *fname;
-    interactive_t *save = O_GET_INTERACTIVE(command_giver);
+    interactive_t *save;
 
     (void)O_SET_INTERACTIVE(save, command_giver);
-    ED_BUFFER = EXTERN_ED_BUFFER;
+    ED_BUFFER = EXTERN_ED_BUFFER(ih);
     push_ref_string(inter_sp, P_FNAME ? P_FNAME : STR_EMPTY);
     stmp = apply_master(STR_GET_ED_FNAME,1);
     if (save)
@@ -3545,7 +3532,7 @@ save_ed_buffer (void)
         dowrite(1, P_LASTLN, fname , MY_FALSE);
         free_mstring(fname);
     }
-    free_ed_buffer();
+    free_ed_buffer(ih);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -3617,21 +3604,20 @@ f_query_editing (svalue_t *sp)
  */
 
 {
-    object_t *ob;
-    shadow_t *sent;
+    object_t      *ob;
+    interactive_t *ip;
+    input_t       *ih;
 
     ob = sp->u.ob;
     deref_object(ob, "query_editing");
-    if (ob->flags & O_SHADOW
-     && NULL != (sent = O_GET_SHADOW(ob))
-     && sent->ed_buffer)
+
+    if (O_SET_INTERACTIVE(ip, ob)
+     && (ih = get_input_handler(ip, INPUT_ED)) != NULL)
     {
-        if ( NULL != (ob = sent->ed_buffer->exit_ob) )
-        {
+        if ( NULL != (ob = ((ed_buffer_t*) ih)->exit_ob) )
             sp->u.ob = ref_object(ob, "query_editing");
-            return sp;
-        }
-        put_number(sp, 1);
+        else
+            put_number(sp, 1);
     }
     else
     {

@@ -216,7 +216,6 @@
 #include "call_out.h"
 #include "closure.h"
 #include "comm.h"
-#include "ed.h"
 #include "efuns.h"
 #include "exec.h"
 #include "filestat.h"
@@ -20122,14 +20121,6 @@ count_extra_ref_in_object (object_t *ob)
 
     if (was_swapped)
         swap_program(ob);
-
-    if (ob->flags & O_SHADOW)
-    {
-        ed_buffer_t *buf;
-
-        if ( NULL != (buf = O_GET_SHADOW(ob)->ed_buffer) )
-            count_ed_buffer_extra_refs(buf);
-    }
 } /* count_extra_ref_in_object() */
 
 /*-------------------------------------------------------------------------*/

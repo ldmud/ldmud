@@ -195,6 +195,24 @@ extern int socketpair(int, int, int, int[2]);
 /* Amazing how complicated networking can be, hm? */
 
 /*-------------------------------------------------------------------------*/
+/* Types */
+
+/* --- struct input_to_s: input_to() datastructure
+ *
+ * input-to structures describe a pending input_to() for a given
+ * interactive object. It is a specialization of input_s,
+ * which therefore must be the first element.
+ */
+typedef struct input_to_s input_to_t;
+
+struct input_to_s {
+    input_t     input;
+    callback_t  fun;        /* The function to call, and its args */
+    p_uint      eval_nr;    /* The thread number where this started. */
+};
+
+/*-------------------------------------------------------------------------*/
+/* Variables */
 
 interactive_t *all_players[MAX_PLAYERS];
   /* Pointers to the structures of the interactive users.
@@ -455,6 +473,7 @@ struct OutConn {
 static void mccp_telnet_neg(int);
 
 static void free_input_to(input_to_t *);
+static void free_input_handler(input_t *);
 static void telnet_neg(interactive_t *);
 static void send_will(int);
 static void send_wont(int);
@@ -696,7 +715,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
     fprintf(stderr, "  .ob:                %p", ip->ob);
       if (ip->ob)  fprintf(stderr, " (%s)", get_txt(ip->ob->name));
       putc('\n', stderr);
-    fprintf(stderr, "  .input_to:          %p\n", ip->input_to);
+    fprintf(stderr, "  .input_handler:     %p\n", ip->input_handler);
     fprintf(stderr, "  .modify_command:    %p", ip->modify_command);
       if (ip->modify_command)  fprintf(stderr, " (%s)", get_txt(ip->modify_command->name));
       putc('\n', stderr);
@@ -3147,7 +3166,8 @@ get_message (char *buff)
                 /* If the user is not in ed, don't let him issue another command
                  * before the poll comes again.
                  */
-                if (O_GET_SHADOW(ip->ob)->ed_buffer
+                if (ip->input_handler
+                 && ip->input_handler->type == INPUT_ED
                  && CmdsGiven < ALLOWED_ED_CMDS)
                 {
                     CmdsGiven++;
@@ -3252,9 +3272,18 @@ remove_interactive (object_t *ob, Bool force)
 
     interactive->closing = MY_TRUE;
     current_object = ob;
+
+    /* If the object is not destructed, save any ed buffers. */
+
+    if ( !(ob->flags & O_DESTRUCTED) )
+    {
+        command_giver = ob;
+        abort_input_handler(interactive);
+    }
+
     save_privilege = malloc_privilege;
 
-    /* If the object is not destructed, inform the master */
+    /* If the object is still not destructed, inform the master */
 
     if ( !(ob->flags & O_DESTRUCTED) )
     {
@@ -3356,12 +3385,12 @@ remove_interactive (object_t *ob, Bool force)
 
     /* Release all associated resources */
 
-    while (interactive->input_to)
+    while (interactive->input_handler)
     {
-        input_to_t * it = interactive->input_to;
+        input_t * ih = interactive->input_handler;
 
-        interactive->input_to = it->next;
-        free_input_to(it);
+        interactive->input_handler = ih->next;
+        free_input_handler(ih);
     }
 
     if (interactive->modify_command)
@@ -3615,7 +3644,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
     new_interactive->tls_session = NULL;
     new_interactive->tls_cb = NULL;
 #endif
-    new_interactive->input_to = NULL;
+    new_interactive->input_handler = NULL;
     put_number(&new_interactive->prompt, 0);
     new_interactive->modify_command = NULL;
     new_interactive->closing = MY_FALSE;
@@ -3959,26 +3988,26 @@ find_no_bang (interactive_t *ip)
  */
 
 {
-    input_to_t *it;
+    input_t *ih;
 
     if (ip->noecho & IGNORE_BANG)
         return ip->noecho;
 
-    for (it = ip->input_to; it; it = it->next)
-        if (it->noecho & IGNORE_BANG)
-            return it->noecho;
+    for (ih = ip->input_handler; ih; ih = ih->next)
+        if (ih->noecho & IGNORE_BANG)
+            return ih->noecho;
     return 0;
 } /* find_no_bang() */
 
 /*-------------------------------------------------------------------------*/
-Bool
-call_function_interactive (interactive_t *i, char *str)
+static Bool
+call_input_to (interactive_t *i, char *str, input_to_t *it)
 
-/* Perform a pending input_to() for this user <i> and the input <str>
- * Return TRUE if an input_to() was pending and executed, and FALSE
+/* Call the input_to handler <it> for this user <i> and the input <str>.
+ * Return TRUE if this handler was executed successfully, and FALSE
  * if the input was not processed.
  *
- * This function is called by the backend as part of the input processing.
+ * This function is only called by call_function_interactive().
  */
 
 {
@@ -3986,64 +4015,14 @@ call_function_interactive (interactive_t *i, char *str)
       /* Current input_to, static so that longjmp() won't clobber it. */
 
     struct error_recovery_info error_recovery_info;
-
-    input_to_t *it;
     object_t   *ob;   /* object holding <function> */
 
-    it = i->input_to;
-
-    /* _Are_ there an input_to() pending? */
-    if (!it)
-        return MY_FALSE;
-
-    /* Yes, there are. Check if we have to handle input escape. */
-    if (*str == input_escape && str[1])
-    {
-        input_to_t * prev;
-
-        for (prev = NULL
-            ; it && !(it->noecho & IGNORE_BANG)
-            ; prev = it, it = it->next)
-            NOOP;
-
-        if (it)
-        {
-            /* Move this 'IGNORE_BANG' input_to to the top of list
-             * since it's the one we're going to execute.
-             */
-            if (prev)
-            {
-                prev->next = it->next;
-                it->next = i->input_to;
-                i->input_to = it;
-            }
-
-            if (!(i->noecho & NOECHO) != !(it->noecho & NOECHO_REQ)) {
-                /* !message for ECHO-context  while in NOECHO - simulate the
-                 * echo by sending the (remaining) raw data we got.
-                 */
-                add_message("%s\n", str + i->chars_ready);
-                i->chars_ready = 0;
-            }
-
-            /* Don't hide the leading input escape */
-        }
-        else
-        {
-            /* Bang-input but no matching input_to(): return */
-            return MY_FALSE;
-        }
-    }
 
     /* We got the right input_to_t. Check if it's still valid. */
     ob = callback_object(&(it->fun));
     if (!ob)
     {
         /* Sorry, the object has selfdestructed ! */
-        set_noecho(i, it->next ? it->next->noecho : 0
-                    , it->next ? it->next->local : MY_FALSE
-                    , MY_TRUE);
-        i->input_to = it->next;
         free_input_to(it);
         return MY_FALSE;
     }
@@ -4051,33 +4030,17 @@ call_function_interactive (interactive_t *i, char *str)
     if (O_PROG_SWAPPED(ob)
      && load_ob_from_swap(ob) < 0)
     {
-        set_noecho(i, it->next ? it->next->noecho : 0
-                    , it->next ? it->next->local : MY_FALSE
-                    , MY_TRUE);
-        i->input_to = it->next;
         free_input_to(it);
         errorf("Out of memory: unswap object '%s'.\n", get_txt(ob->name));
         return MY_FALSE;
-    }
-
-    /* if there is a series of noecho/charmode input, we should only
-     * negotiate when we know that the state actually should change.
-     * In other words: should the input_to function request NOECHO
-     * again, the NOECHO_STALE bit will be cleared and we will not
-     * turn NOECHO off after the call.
-     */
-    if (i->noecho)
-    {
-        i->noecho |= NOECHO_STALE;
     }
 
     /* Clear the input_to() reference in case the function called
      * sets up a new one.
      */
     current_it = *it;
-    i->input_to = it->next;
     xfree(it);
-    free_svalue(&current_it.prompt); /* Don't need this anymore */
+    free_svalue(&current_it.input.prompt); /* Don't need this anymore */
 
     /* Activate the local error recovery context */
 
@@ -4105,17 +4068,108 @@ call_function_interactive (interactive_t *i, char *str)
 
     rt_context = error_recovery_info.rt.last;
 
-    /* If NOECHO is no longer needed, turn it off. */
-
-    if (i->noecho & NOECHO_STALE)
-    {
-        set_noecho(i, i->input_to ? i->input_to->noecho : 0
-                    , i->input_to ? i->input_to->local : MY_FALSE
-                    , MY_TRUE);
-    }
-
     /* Done */
     return MY_TRUE;
+}
+
+/*-------------------------------------------------------------------------*/
+Bool
+call_function_interactive (interactive_t *i, char *str)
+
+/* Execute a pending input handler for this user <i> and the input <str>
+ * Return TRUE if an input_to() or ed() was pending and executed, and FALSE
+ * if the input was not processed.
+ *
+ * This function is called by the backend as part of the input processing.
+ */
+
+{
+    input_t    *ih;
+    ih = i->input_handler;
+
+    /* _Are_ there an input_to() pending? */
+    if (!ih)
+        return MY_FALSE;
+
+    /* Yes, there are. Check if we have to handle input escape. */
+    if (*str == input_escape && str[1])
+    {
+        input_t * prev;
+
+        for (prev = NULL
+            ; ih && !(ih->noecho & IGNORE_BANG)
+            ; prev = ih, ih = ih->next)
+            NOOP;
+
+        if (ih)
+        {
+            /* Move this 'IGNORE_BANG' input_to to the top of list
+             * since it's the one we're going to execute.
+             */
+            if (prev)
+            {
+                prev->next = ih->next;
+                ih->next = i->input_handler;
+                i->input_handler = ih;
+            }
+
+            if (!(i->noecho & NOECHO) != !(ih->noecho & NOECHO_REQ)) {
+                /* !message for ECHO-context  while in NOECHO - simulate the
+                 * echo by sending the (remaining) raw data we got.
+                 */
+                add_message("%s\n", str + i->chars_ready);
+                i->chars_ready = 0;
+            }
+
+            /* Don't hide the leading input escape */
+        }
+        else
+        {
+            /* Bang-input but no matching input_to(): return */
+            return MY_FALSE;
+        }
+    }
+
+    switch (ih->type)
+    {
+    case INPUT_TO:
+        {
+            Bool res;
+
+            i->input_handler = ih->next;
+
+            /* if there is a series of noecho/charmode input, we should only
+             * negotiate when we know that the state actually should change.
+             * In other words: should the input_to function request NOECHO
+             * again, the NOECHO_STALE bit will be cleared and we will not
+             * turn NOECHO off after the call.
+             */
+            if (i->noecho)
+            {
+                i->noecho |= NOECHO_STALE;
+            }
+
+            res = call_input_to(i, str, (input_to_t*) ih);
+
+            /* If NOECHO is no longer needed, turn it off. */
+
+            if (i->noecho & NOECHO_STALE)
+            {
+                set_noecho(i, i->input_handler ? i->input_handler->noecho : 0
+                            , i->input_handler ? i->input_handler->local : MY_FALSE
+                            , MY_TRUE);
+            }
+
+            return res;
+        }
+
+    case INPUT_ED:
+        ed_cmd(str, ih);
+        return MY_TRUE;
+    }
+
+    return MY_FALSE;
+
 } /* call_function_interactive() */
 
 /*-------------------------------------------------------------------------*/
@@ -4141,37 +4195,30 @@ set_call ( object_t *ob, input_to_t *it, char noecho
         return MY_FALSE;
     if (!(O_SET_INTERACTIVE(ip, ob))
      || ip->closing
-     || (   !append && ip->input_to != NULL
-         && ip->input_to->eval_nr == eval_number)
        )
     {
         return MY_FALSE;
     }
 
-    it->noecho = noecho;
-    it->local = local_change;
+    if (!append && ip->input_handler != NULL)
+    {
+        input_t * ih = ip->input_handler;
+
+        while (ih && ih->type != INPUT_TO)
+            ih = ih->next;
+
+         if (ih && ((input_to_t*)ih)->eval_nr == eval_number)
+             return MY_FALSE;
+    }
+
+    it->input.noecho = noecho;
+    it->input.local = local_change;
+    it->input.type = INPUT_TO;
 
     /* Appended input_tos never count. */
     it->eval_nr = eval_number - (append ? 1 : 0);
 
-    if (!append || ip->input_to == NULL)
-    {
-        it->next = ip->input_to;
-        ip->input_to = it;
-    }
-    else
-    {
-        input_to_t * ptr = ip->input_to;
-
-        while (ptr->next != NULL)
-            ptr = ptr->next;
-
-        ptr->next = it;
-        it->next = NULL;
-    }
-
-    if (noecho || ip->noecho)
-        set_noecho(ip, noecho, local_change, MY_FALSE);
+    add_input_handler(ip, &(it->input), append);
     return MY_TRUE;
 } /* set_call() */
 
@@ -4298,11 +4345,11 @@ print_prompt (void)
     if (!(O_SET_INTERACTIVE(ip, command_giver)))
         fatal("print_prompt() of non-interactive object\n");
 
-    if (ip->input_to != NULL)
+    if (ip->input_handler != NULL)
     {
-        prompt = &ip->input_to->prompt;
+        prompt = &ip->input_handler->prompt;
     }
-    else if (NULL == (prompt = get_ed_prompt(ip)))
+    else
     {
         prompt = &ip->prompt;
         if (prompt->type != T_CLOSURE && prompt->type != T_STRING)
@@ -6191,45 +6238,50 @@ remove_stale_player_data (void)
 
     for(i = 0 ; i < MAX_PLAYERS; i++)
     {
-        input_to_t * it, * prev;
+        input_t * ih, * prev;
         object_t *ob;
 
         if (all_players[i] == NULL)
             continue;
 
         /* Remove stale input_to data */
-        for ( prev = NULL, it = all_players[i]->input_to; it != NULL; )
-        {
-            input_to_t *tmp;
-            ob = callback_object(&(it->fun));
-            if (ob)
+        for ( prev = NULL, ih = all_players[i]->input_handler; ih != NULL; )
+            if (ih->type == INPUT_TO)
             {
-                prev = it;
-                it = it->next;
-            }
-            else
-            {
-                /* The object has selfdestructed */
-
-                if (prev == NULL)
+                input_to_t *tmp = (input_to_t*) ih;
+                ob = callback_object(&(tmp->fun));
+                if (ob)
                 {
-                    set_noecho(all_players[i]
-                              , it->next ? it->next->noecho : 0
-                              , it->next ? it->next->local : MY_FALSE
-                              , MY_TRUE);
-                    all_players[i]->input_to = it->next;
+                    prev = ih;
+                    ih = ih->next;
                 }
                 else
                 {
-                    prev->next = it->next;
+                    /* The object has selfdestructed */
+
+                    if (prev == NULL)
+                    {
+                        set_noecho(all_players[i]
+                                  , ih->next ? ih->next->noecho : 0
+                                  , ih->next ? ih->next->local : MY_FALSE
+                                  , MY_TRUE);
+                        all_players[i]->input_handler = ih->next;
+                    }
+                    else
+                    {
+                        prev->next = ih->next;
+                    }
+
+                    ih = ih->next;
+
+                    free_input_to(tmp);
                 }
-
-                tmp = it;
-                it = it->next;
-
-                free_input_to(tmp);
             }
-        }
+            else
+            {
+                prev = ih;
+                ih = ih->next;
+            }
 
         /* Remove stale snooping monsters */
         ob = all_players[i]->snoop_by;
@@ -6270,7 +6322,7 @@ show_comm_status (strbuf_t * sbuf, Bool verbose UNUSED)
     for (i = 0; i <= max_player; i++)
     {
         interactive_t *pl;
-        input_to_t *it;
+        input_t *ih;
 
         pl = all_players[i];
         if (!pl)
@@ -6278,10 +6330,16 @@ show_comm_status (strbuf_t * sbuf, Bool verbose UNUSED)
 
         sum += sizeof(*pl);
 
-        for (it = pl->input_to; it != NULL; it = it->next)
-            sum += sizeof(*it);
-
-        sum += ed_buffer_size(O_GET_EDBUFFER(pl->ob));
+        for (ih = pl->input_handler; ih != NULL; ih = ih->next)
+            switch(ih->type)
+            {
+            case INPUT_TO:
+                sum += sizeof(input_to_t);
+                break;
+            case INPUT_ED:
+                sum += ed_buffer_size(ih);
+                break;
+            }
     }
 
     if (sbuf)
@@ -6354,6 +6412,56 @@ count_comm_refs (void)
     }
 #endif /* ERQ_DEMON */
 } /* count_comm_refs() */
+
+/*-------------------------------------------------------------------------*/
+void
+clear_input_refs (input_t *i)
+
+/* GC Support: Clear all references from input_t <i>. 
+ */
+
+{
+    switch (i->type)
+    {
+    case INPUT_TO:
+        {
+            input_to_t *it = (input_to_t*) i;
+
+            clear_ref_in_callback(&(it->fun));
+            clear_ref_in_vector(&(it->input.prompt), 1);
+
+            break;
+        }
+    case INPUT_ED:
+       clear_ed_buffer_refs(i);
+       break;
+    }
+} /* clear_input_refs() */
+
+/*-------------------------------------------------------------------------*/
+void
+count_input_refs (input_t *i)
+
+/* GC Support: Count  all references from input_t <i>. 
+ */
+
+{
+    switch (i->type)
+    {
+    case INPUT_TO:
+        {
+            input_to_t *it = (input_to_t*) i;
+
+            count_ref_in_callback(&(it->fun));
+            count_ref_in_vector(&(it->input.prompt), 1);
+
+            break;
+        }
+    case INPUT_ED:
+        count_ed_buffer_refs(i);
+        break;
+    }
+} /* count_input_refs() */
 
 #endif /* GC_SUPPORT */
 
@@ -6661,7 +6769,7 @@ count_comm_extra_refs (void)
     for (i = 0; i < MAX_PLAYERS; i++)
     {
         object_t *ob;
-        input_to_t *it;
+        input_t *ih;
 
         if (all_players[i] == 0)
             continue;
@@ -6676,11 +6784,21 @@ count_comm_extra_refs (void)
             }
         } /* end of snoop-processing */
 
-        for ( it = all_players[i]->input_to; it; it = it->next)
-        {
-            count_callback_extra_refs(&(it->fun));
-            count_extra_ref_in_vector(&it->prompt, 1);
-        }
+        for ( ih = all_players[i]->input_handler; ih; ih = ih->next)
+            switch(ih->type)
+            {
+            case INPUT_TO:
+                {
+                    input_to_t *it = (input_to_t*) ih;
+                    count_callback_extra_refs(&(it->fun));
+                    count_extra_ref_in_vector(&it->input.prompt, 1);
+                    break;
+                }
+            case INPUT_ED:
+                count_ed_buffer_extra_refs(ih);
+                break;
+            }
+
         if ( NULL != (ob = all_players[i]->modify_command) )
             count_extra_ref_in_object(ob);
         count_extra_ref_in_vector(&all_players[i]->prompt, 1);
@@ -7322,13 +7440,13 @@ v_input_to (svalue_t *sp, int num_arg)
 
     xallocate(it, sizeof *it, "new input_to");
     init_empty_callback(&(it->fun));
-    put_number(&(it->prompt), 0);
+    put_number(&(it->input.prompt), 0);
 
     /* If SET_PROMPT was specified, collect it */
 
     if (iflags & INPUT_PROMPT)
     {
-        transfer_svalue(&(it->prompt), arg+2);
+        transfer_svalue(&(it->input.prompt), arg+2);
         extra--;
         extra_arg++;
     }
@@ -7398,9 +7516,134 @@ free_input_to (input_to_t *it)
 
 {
     free_callback(&(it->fun));
-    free_svalue(&(it->prompt));
+    free_svalue(&(it->input.prompt));
     xfree(it);
 } /* free_input_to() */
+
+/*-------------------------------------------------------------------------*/
+static void
+free_input_handler (input_t *ih)
+
+/* Deallocate the input_t structure <ih> and all referenced memory.
+ */
+
+{
+    switch (ih->type)
+    {
+    case INPUT_TO:
+        free_input_to((input_to_t*) ih);
+        break;
+
+    case INPUT_ED:
+        free_ed_buffer(ih);
+        break;
+    }
+
+} /* free_input_handler() */
+
+/*-------------------------------------------------------------------------*/
+void
+abort_input_handler (interactive_t *ip)
+
+/* Called from destruct_object to finish some input handlers,
+ * specifically save all ed sessions.
+ */
+{
+    input_t ** ptr = &(ip->input_handler);
+
+    while (*ptr)
+    {
+        switch ((*ptr)->type)
+        {
+        case INPUT_ED:
+            {
+                input_t * ed_buf = *ptr;
+
+                *ptr = (*ptr)->next;
+                save_ed_buffer(ed_buf);
+                break;
+            }
+
+        default:
+            ptr = &((*ptr)->next);
+            break;
+        }
+    }
+} /* abort_input_handler() */
+
+/*-------------------------------------------------------------------------*/
+void
+add_input_handler (interactive_t *ip, input_t *ih, Bool append)
+
+/* Put the input handler <ih> in front of the input handler list of
+ * the interactive <ip>.
+ * If <append> is TRUE, the handler is appended to the list.
+ */
+{
+    if (!append || ip->input_handler == NULL)
+    {
+        ih->next = ip->input_handler;
+        ip->input_handler = ih;
+    }
+    else
+    {
+        input_t * ptr = ip->input_handler;
+
+        while (ptr->next != NULL)
+            ptr = ptr->next;
+
+        ptr->next = ih;
+        ih->next = NULL;
+    }
+
+    if (ih->noecho || ip->noecho)
+        set_noecho(ip, ih->noecho, ih->local, MY_FALSE);
+
+} /* add_input_handler() */
+
+/*-------------------------------------------------------------------------*/
+void
+remove_input_handler (interactive_t *ip, input_t *ih)
+
+/* Remove the input handler <ih> from the input handler list of
+ * the interactive <ip>. <ih> is not freed.
+ */
+{
+    input_t * ptr = ip->input_handler;
+
+    if (ptr == ih)
+    {
+        ip->input_handler = ih->next;
+        return;
+    }
+
+    while (ptr)
+    {
+        if (ptr->next == ih)
+        {
+            ptr->next = ih->next;
+            break;
+        }
+        ptr = ptr->next;
+    }
+
+} /* remove_input_handler() */
+
+/*-------------------------------------------------------------------------*/
+input_t *
+get_input_handler (interactive_t *ip, input_type_t type)
+
+/* Returns the first input handler from <ip> of type <type>.
+ */
+{
+    input_t *ih;
+
+    for (ih = ip->input_handler; ih; ih = ih->next)
+        if (ih->type == type)
+            return ih;
+
+    return NULL;
+} /* get_input_handler */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -7420,11 +7663,21 @@ f_query_input_pending (svalue_t *sp)
     interactive_t *ip;
 
     ob = sp->u.ob;
-    if (O_SET_INTERACTIVE(ip, ob) && ip->input_to)
+    if (O_SET_INTERACTIVE(ip, ob) && ip->input_handler)
     {
-        cb = callback_object(&(ip->input_to->fun));
-        if (cb)
-            sp->u.ob = ref_object(cb, "query_input_pending");
+        input_t *ih = ip->input_handler;
+
+        while (ih && ih->type != INPUT_TO)
+            ih = ih->next;
+
+        if (ih)
+        {
+            cb = callback_object(&(((input_to_t*)ih)->fun));
+            if (cb)
+                sp->u.ob = ref_object(cb, "query_input_pending");
+            else
+                put_number(sp, 0);
+        }
         else
             put_number(sp, 0);
     }
@@ -7485,8 +7738,9 @@ v_find_input_to (svalue_t *sp, int num_arg)
     }
 
     /* Process the command, terminating out when possible */
-    do {
-        input_to_t    *it;
+    do
+    {
+        input_t       *ih;
         interactive_t *ip;
 
         /* Get the interactive object.
@@ -7494,7 +7748,7 @@ v_find_input_to (svalue_t *sp, int num_arg)
          * an input_to set, fail.
          */
         if (!(O_SET_INTERACTIVE(ip, arg[0].u.ob))
-         || ip->closing || ip->input_to == NULL
+         || ip->closing || ip->input_handler == NULL
            )
         {
             rc = -1;
@@ -7503,11 +7757,16 @@ v_find_input_to (svalue_t *sp, int num_arg)
 
         /* Search for the right input_to */
 
-        for ( it = ip->input_to
-            ; it != NULL
-            ; it = it->next)
+        for ( ih = ip->input_handler
+            ; ih != NULL
+            ; ih = ih->next)
         {
+            input_to_t *it;
             Bool found = MY_FALSE;
+
+            if (ih->type != INPUT_TO)
+                continue;
+            it = (input_to_t*) ih;
 
             switch (arg[1].type)
             {
@@ -7549,12 +7808,12 @@ v_find_input_to (svalue_t *sp, int num_arg)
                 break;
         }
 
-        if (it != NULL)
+        if (ih != NULL)
         {
             /* We found the input_to: now count at which position it is */
-            for ( rc = 0
-                ; it->next != NULL
-                ; it = it->next, rc++) NOOP ;
+            for ( rc = 0; ih->next != NULL; ih = ih->next)
+                if (ih->type == INPUT_TO)
+                    rc++;
             break;
         }
 
@@ -7624,9 +7883,10 @@ v_remove_input_to (svalue_t *sp, int num_arg)
 
 
     /* Process the command, bailing out whenever necessary */
-    do {
-        input_to_t * prev;
-        input_to_t    *it;
+    do
+    {
+        input_t * prev;
+        input_t    *ih;
 
         removedFirst = MY_FALSE;
 
@@ -7635,33 +7895,31 @@ v_remove_input_to (svalue_t *sp, int num_arg)
          * an input_to set, fail.
          */
         if (!(O_SET_INTERACTIVE(ip, arg[0].u.ob))
-         || ip->closing || ip->input_to == NULL
+         || ip->closing || ip->input_handler == NULL
            )
         {
             rc = 0;
             break;
         }
 
-        /* If no filter argument has been given, just remove
-         * the first input to.
-         */
-        if (num_arg < 2)
-        {
-            it = ip->input_to;
-            ip->input_to = it->next;
-            free_input_to(it);
-            removedFirst = MY_TRUE;
-            rc = 1;
-            break;
-        }
+        /* Search for the right input_to */
 
-        /* There is a filter argument: search for the right input_to */
-
-        for (prev = NULL, it = ip->input_to
-            ; it != NULL
-            ; prev = it, it = it->next)
+        for (prev = NULL, ih = ip->input_handler
+            ; ih != NULL
+            ; prev = ih, ih = ih->next)
         {
+            input_to_t *it;
             Bool found = MY_FALSE;
+
+            if (ih->type != INPUT_TO)
+                continue;
+            it = (input_to_t*) ih;
+
+            /* If no filter argument has been given, just remove
+             * the first input to.
+             */
+            if (num_arg < 2)
+                break;
 
             switch (arg[1].type)
             {
@@ -7703,18 +7961,18 @@ v_remove_input_to (svalue_t *sp, int num_arg)
                 break;
         }
 
-        if (it != NULL)
+        if (ih != NULL)
         {
             /* We found the input_to: remove it */
             if (prev == NULL)
             {
-                ip->input_to = it->next;
+                ip->input_handler = ih->next;
                 removedFirst = MY_TRUE;
             }
             else
-                prev->next = it->next;
+                prev->next = ih->next;
 
-            free_input_to(it);
+            free_input_to((input_to_t*)ih);
             rc = 1;
             break;
         }
@@ -7727,8 +7985,8 @@ v_remove_input_to (svalue_t *sp, int num_arg)
     {
         if (ip->noecho)
             ip->noecho |= NOECHO_STALE;
-        set_noecho(ip, ip->input_to ? ip->input_to->noecho : ip->noecho
-                     , ip->input_to ? ip->input_to->local : MY_FALSE
+        set_noecho(ip, ip->input_handler ? ip->input_handler->noecho : ip->noecho
+                     , ip->input_handler ? ip->input_handler->local : MY_FALSE
                      , MY_FALSE
                   );
     }
@@ -7759,7 +8017,7 @@ f_input_to_info (svalue_t *sp)
 {
     vector_t      *v;
     int            num_pending;
-    input_to_t    *it;
+    input_t       *ih;
     interactive_t *ip;
 
     /* Get the interactive object.
@@ -7767,7 +8025,7 @@ f_input_to_info (svalue_t *sp)
      * an input_to set, the efun will return the empty array.
      */
     if (!(O_SET_INTERACTIVE(ip, sp->u.ob))
-     || ip->closing || ip->input_to == NULL
+     || ip->closing || ip->input_handler == NULL
        )
     {
         num_pending = 0;
@@ -7776,9 +8034,11 @@ f_input_to_info (svalue_t *sp)
     {
         /* Count the number of pending input_tos.
          */
-        for ( num_pending = 0, it = ip->input_to
-            ; it != NULL
-            ; it = it->next, num_pending++) NOOP ;
+        for ( num_pending = 0, ih = ip->input_handler
+            ; ih != NULL
+            ; ih = ih->next)
+            if (ih->type == INPUT_TO)
+                num_pending++;
     }
 
     /* Allocate the result arrray and fill it in */
@@ -7788,13 +8048,22 @@ f_input_to_info (svalue_t *sp)
     {
         int i;
 
-        for (i = num_pending, it = ip->input_to
+        for (i = num_pending, ih = ip->input_handler
             ; --i >= 0
-            ; it = it->next
+            ; ih = ih->next
             )
         {
-            vector_t *vv;
-            object_t *ob;
+            vector_t   *vv;
+            object_t   *ob;
+            input_to_t *it;
+
+            if (ih->type != INPUT_TO)
+            {
+                i++;
+                continue;
+            }
+
+            it = (input_to_t*) ih;
 
             ob = callback_object(&(it->fun));
             if (!ob)

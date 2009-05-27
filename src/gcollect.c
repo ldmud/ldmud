@@ -93,7 +93,6 @@
 #include "call_out.h"
 #include "closure.h"
 #include "comm.h"
-#include "ed.h"
 #include "efuns.h"
 #include "filestat.h"
 #include "heartbeat.h"
@@ -1985,15 +1984,6 @@ garbage_collection(void)
         ob->ref = 0;
         clear_string_ref(ob->name);
         clear_ref_in_vector(ob->variables, ob->prog->num_variables);
-        if (ob->flags & O_SHADOW)
-        {
-            ed_buffer_t *buf;
-
-            if ( NULL != (buf = O_GET_EDBUFFER(ob)) )
-            {
-                clear_ed_buffer_refs(buf);
-            } /* end of ed-buffer processing */
-        }
         if (was_swapped)
         {
             swap(ob, was_swapped);
@@ -2009,16 +1999,15 @@ garbage_collection(void)
 
     for(i = 0 ; i < MAX_PLAYERS; i++)
     {
-        input_to_t * it;
+        input_t * it;
 
         if (all_players[i] == NULL)
             continue;
 
-        for ( it = all_players[i]->input_to; it != NULL; it = it->next)
+        for ( it = all_players[i]->input_handler; it != NULL; it = it->next)
         {
             clear_memory_reference(it);
-            clear_ref_in_callback(&(it->fun));
-            clear_ref_in_vector(&(it->prompt), 1);
+            clear_input_refs(it);
         }
 
 #ifdef USE_TLS
@@ -2151,22 +2140,15 @@ garbage_collection(void)
         if (ob->sent)
         {
             sentence_t *sent;
-            ed_buffer_t *buf;
 
             sent = ob->sent;
             if (ob->flags & O_SHADOW)
             {
                 note_ref(sent);
-                if ( NULL != (buf = ((shadow_t *)sent)->ed_buffer) )
-                {
-                    note_ref(buf);
-                    count_ed_buffer_refs(buf);
-                } /* end of ed-buffer processing */
 
                 /* If there is a ->ip, it will be processed as
                  * part of the player object handling below.
                  */
-
                 sent = sent->next;
             }
             if (sent)
@@ -2188,7 +2170,7 @@ garbage_collection(void)
 
     for(i = 0 ; i < MAX_PLAYERS; i++)
     {
-        input_to_t * it;
+        input_t * it;
 
         if (all_players[i] == NULL)
             continue;
@@ -2225,11 +2207,10 @@ garbage_collection(void)
             }
         } /* end of snoop-processing */
 
-        for ( it = all_players[i]->input_to; it != NULL; it = it->next)
+        for ( it = all_players[i]->input_handler; it != NULL; it = it->next)
         {
             note_ref(it);
-            count_ref_in_callback(&(it->fun));
-            count_ref_in_vector(&(it->prompt), 1);
+            count_input_refs(it);
         } /* end of input_to processing */
 
 #ifdef USE_TLS

@@ -34,8 +34,7 @@
  *
  *    SENT_SHADOW:
  *        The sentence is of type 'shadow_sentence' and describes
- *        an object shadow. It also holds the ed_buffer_t* for
- *        objects using the editor.
+ *        an object shadow.
  *
  *---------------------------------------------------------------------------
  */
@@ -111,8 +110,8 @@ struct action_s
  * list.
  *
  * Additionally the shadow sentence is used to hold additionally information
- * used by the object for short time. Such information is the ed_buffer_t
- * for editor uses, and the interactive_t for interactive objects.
+ * used by the object for short time. Such information is the interactive_t
+ * for interactive objects.
  */
 struct shadow_s
 {
@@ -120,7 +119,6 @@ struct shadow_s
     object_t *shadowing;     /* "prev": the shadowed object */
     object_t *shadowed_by;   /* "next": the shadowing object */
 
-    ed_buffer_t *ed_buffer;  /* the editor buffer, if needed */
     interactive_t *ip;       /* the information for interactive objects */
 };
 
@@ -128,7 +126,6 @@ struct shadow_s
 
 #define O_GET_SHADOW(ob)      ((shadow_t *)(ob)->sent)
 #define O_GET_INTERACTIVE(ob) (O_GET_SHADOW(ob)->ip)
-#define O_GET_EDBUFFER(ob)    (O_GET_SHADOW(ob)->ed_buffer)
 
   /* Expand to an expression suitable to query or set the
    * indicated attribute. No checks are performed.
