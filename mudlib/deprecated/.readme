@@ -1,0 +1,5 @@
+This directory contains sefuns meant as replacements for deprecated and
+removed efuns.
+Each sefun is in a single file and all are included in simul_efun.c
+Please use them if you need them.
+

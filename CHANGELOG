@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-May-2009 (Zesstra)
+  - Added sefun cat(), updated documentation of cat().
+    To reduce the workload of our users we supply implementations of
+    deprecated and removed efuns. This time: the deprecated efun cat().
+    (mudlib/deprecated/*)
+
 27-May-2009 (Gnomi)
   - (ed.c, comm.c) Put ed sessions into the input_to list of interactive
     objects, so now they have a common noecho and prompt handling. (Bug #522)

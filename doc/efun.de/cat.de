@@ -1,3 +1,4 @@
+VERALTET
 SYNOPSIS
         int cat(string path, int start, int num);
 
@@ -20,11 +21,18 @@ BESCHREIBUNG
         werden koennen (weil <start> z.B. groesser ist als die Laenge der
         Datei).
 
+        Diese efun ist veraltet. Bitte nutzt sie nicht mehr in neuem Code,
+        sondern verwendet etwas read_bytes() + tell_object() oder die im
+        Driverpaket mitgelieferte sefun cat().
+
 BEISPIEL
         cat("/doc/efun/cat", 5, 9);
 
         Das gibt die Datei "/doc/efun/cat" aus, beginnend mit Zeile 5 bis und
         mit Zeile 13.
+
+AeNDERUNGEN
+        Veraltet seid 3.3.719.
 
 SIEHE AUCH
         get_dir(E), file_size(E), read_file(E), read_bytes(E), valid_read(M)

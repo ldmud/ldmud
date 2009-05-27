@@ -1,3 +1,4 @@
+DEPRECATED
 SYNOPSIS
         int cat(string path, int start, int num)
 
@@ -18,11 +19,18 @@ DESCRIPTION
         0 if no such file or no lines to read (if start or len is < 0,
         or if the file has less than start lines).
 
+        This efun has been deprecated in 3.3.719. Please don't use it in new
+        code. Use either a combination of read_bytes() + tell_object() or the
+        sefun cat() from the driver package.
+
 EXAMPLE
         cat("/doc/efun/cat", 5, 9);
 
         This will print out the file "/doc/efun/cat" begining at line
         5 and ending with line 13.
+
+HISTORY
+        Deprecated in LDMud 3.3.719.
 
 SEE ALSO
         get_dir(E), file_size(E), read_file(E), read_bytes(E),
