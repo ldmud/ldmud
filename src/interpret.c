@@ -8592,6 +8592,7 @@ again:
         }
         else
         {
+            explicit_context = NULL; /* Makes the compiler happy. */
             LOAD_SHORT(inhIndex, pc);
         }
 #else /* USE_NEW_INLINES */
