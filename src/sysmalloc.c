@@ -17,7 +17,6 @@
 #include "../mudlib/sys/debug_info.h"
 
 /* Defines required by the xalloc.c wrapper */
-#define MEM_ALIGN (MALLOC_ALIGN)
 /* #undef REPLACE_MALLOC */
 #define NO_MEM_BLOCK_SIZE
 #define MEM_THREADSAFE

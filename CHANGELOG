@@ -20,6 +20,11 @@ See the file HISTORY for a user-oriented summary of all the changes.
     (slaballoc.c, xalloc.c, configure.in)
   - Support for using mmap() to get memory from the system (smalloc). (#640)
     (smalloc.c)
+  - Removed amalloc/afree(), MALLOC_ALIGN and MEM_ALIGN.
+    Our amalloc() had errors and never worked as intended. As the driver does
+    not need more alignment than guaranteed by the allocators, amalloc() was
+    removed (see commit log for details).
+    (xalloc.c, slabmalloc.c, smalloc.c, sysmalloc.c, xptmalloc.c)
 
 27-May-2009 (Gnomi)
   - (ed.c, comm.c) Put ed sessions into the input_to list of interactive

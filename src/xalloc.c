@@ -113,8 +113,6 @@ enum xalloc_header_fields {
     XM_OVERHEAD_SIZE = XM_OVERHEAD * sizeof(word_t),
 };
 
-#define XM_OVERHEAD_SIZE (XM_OVERHEAD * sizeof(word_t))
-
 /*-------------------------------------------------------------------------*/
 
 /* -- Global Variables/Arguments dealing with memory -- */
@@ -323,8 +321,6 @@ mdb_log_sbrk (p_int size)
 #endif
 #endif
  *
- *   #define MEM_ALIGN
- *     the alignment guaranteed by the allocator
  *   #define REPLACE_MALLOC
  *     if the allocator's mem_alloc()/mem_free() can be used to replace the
  *     libc allocation routines (ie. the allocator doesn't use malloc()
@@ -1181,108 +1177,6 @@ dump_malloc_trace (int d
 #if defined(REPLACE_MALLOC) && (defined(SBRK_OK) || defined(HAVE_MMAP))
 
 /*-------------------------------------------------------------------------*/
-static POINTER
-amalloc (size_t size)
-
-/* Allocate an aligned block of <size> bytes, if necessary, with
- * SYSTEM privilege. The block is not subject to GC.
- * Result is the pointer to the allocated block, or NULL.
- */
-
-{
-    char *temp;
-    size_t orig_size UNUSED; // unused if no HAVE_MADVISE.
-    
-    if (MALLOC_ALIGN > MEM_ALIGN)
-    {
-        
-#if defined(HAVE_MADVISE)
-        orig_size = size;
-#endif
-        
-        size += (MALLOC_ALIGN-MEM_ALIGN);
-    }
-
-    temp = (char *)pxalloc(size);
-    if (!temp)
-    {
-        int save_privilege = malloc_privilege;
-        malloc_privilege = MALLOC_SYSTEM;
-        temp = (char *)pxalloc(size);
-        malloc_privilege = save_privilege;
-    }
-
-    if (MALLOC_ALIGN > MEM_ALIGN) 
-    {
-        if (temp)
-        {
-            /* Set the first byte of the alignment area to 0xAF - afree(0
-             * is going to look for it - and the rest to 0.
-             */
-            *temp++ = 0xAF;
-            while ((p_int)temp & (MALLOC_ALIGN-1))
-                *temp++ = 0;
-            MADVISE(temp, orig_size);
-        }
-    }
-
-    return (POINTER)temp;
-} /* amalloc() */
-
-/*-------------------------------------------------------------------------*/
-static void
-afree (POINTER p)
-
-/* Free the aligned memory block <p>.
- */
-
-{
-    char *q = (char *)p;
-
-    if (!q)
-        return;
-
-    if (MALLOC_ALIGN > MEM_ALIGN)
-    {
-        
-        /* amalloc() filled the alignment area with 0s except for the first byte.
-         * Search backwards to find that marker and with it the real block begin.
-         */
-        while (!*--q) NOOP;
-    }
-
-    pfree(q);
-} /* afree() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE long
-get_block_size (POINTER ptr)
-
-/* Get the allocated block size for the block with user area starting
- * at <ptr>. This function is meant only for block allocated with (a)malloc().
- * Result is the size in bytes inclusive overhead.
- */
-{
-    long size = 0;
-
-    if (ptr)
-    {
-        /* Get the allocated size of the block for the statistics */
-
-        char *q;
-
-        q = (char *)ptr;
-        
-        if (MALLOC_ALIGN > MEM_ALIGN)
-            while ( !(size = *--q) ) NOOP;
-
-        size = xalloced_size(q) + mem_overhead();
-    }
-
-    return size;
-} /* get_block_size() */
-
-/*-------------------------------------------------------------------------*/
 POINTER
 malloc (size_t size)
 
@@ -1291,12 +1185,18 @@ malloc (size_t size)
  */
 
 {
-    POINTER result;
-
-    result = amalloc(size);
+    POINTER result = pxalloc(size);
+    if (!result)
+    {
+        int save_privilege = malloc_privilege;
+        malloc_privilege = MALLOC_SYSTEM;
+        result = pxalloc(size);
+        malloc_privilege = save_privilege;
+    }
+    
     if (result)
     {
-        count_up(&clib_alloc_stat, get_block_size(result));
+        count_up(&clib_alloc_stat, xalloced_size(result) + mem_overhead());
     }
 
     return result;
@@ -1312,10 +1212,10 @@ free (POINTER ptr)
 {
     if (ptr)
     {
-        count_back(&clib_alloc_stat, get_block_size(ptr));
+        count_back(&clib_alloc_stat, xalloced_size(ptr) + mem_overhead());
     }
 
-    afree(ptr);
+    pfree(ptr);
     FREE_RETURN
 } /* free() */
 
@@ -1354,7 +1254,7 @@ realloc (POINTER p, size_t size)
    if (!p)
         return malloc(size);
 
-   old_size = get_block_size(p) - xalloc_overhead();
+   old_size = xalloced_size(p) - xalloc_overhead();
 
    if (old_size >= size)
       return p;

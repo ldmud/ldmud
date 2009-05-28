@@ -110,12 +110,25 @@
  * A new AVL node is created for every free large block.
 #endif
  *
-#ifdef SBRK_OK && MALLOC_SBRK
+#ifdef MALLOC_SBRK && SBRK_OK
  * Memory is allocated from the system with sbrk() and brk(), which puts
  * the whole heap under our control.
  *
- * In this mode, several functions like amalloc() are compiled as malloc(),
- * implementing all libc memory functions.
+ * In this mode, we replace the system malloc() and free() by our own 
+ * functions, implementing all libc memory functions (malloc, free, calloc,
+ * realloc()).
+#else if MALLOC_SBRK && HAVE_MMAP
+ * If brk/sbrk() are non-functional (e.g. on Darwin; remember: they are legacy
+ * and not POSIX anymore), we check if mmap() is available. If it is, we use 
+ * it to map anonymous memory pages to get memory from the VM system.
+ *
+ * The allocated block (modulo joints) is tagged at both ends with fake
+ * "allocated" blocks of which cover the unallocated areas - large_malloc()
+ * will perceive this as a fragmented heap.
+ *
+ * In this mode, we replace the system malloc() and free() by our own 
+ * functions, implementing all libc memory functions (malloc, free, calloc,
+ * realloc()). 
 #else
  * malloc() is used to allocate a new block of memory. If this block borders
  * previous ones, the blocks are joined.
@@ -232,25 +245,19 @@
  */
 #define GRANULARITY sizeof(word_t)
 
-/* Defines required by the xalloc.c wrapper */
-#define MEM_ALIGN GRANULARITY
-
 /* If possible, request memory using sbrk(). But if using pthreads, do
  * not replace malloc() with our routines, even if the system allows it,
  * as slaballoc is not threadsafe.
+ * If sbrk/brk() are not working, but mmap() is, then use mmap() for getting
+ * memory. If that is also not available, use malloc().
  */
-
 #if defined(SBRK_OK)
 #  ifdef MALLOC_SBRK
-#      if MALLOC_ALIGN == 4
-#          define REPLACE_MALLOC
-#      else
-#          undef SBRK_OK
-#      endif
+#      define REPLACE_MALLOC
 #  else
 #      undef SBRK_OK
 #  endif
-#else if defined (HAVE_MMAP)
+#else if defined(HAVE_MMAP)
 #  ifdef MALLOC_SBRK
 #      define REPLACE_MALLOC
 #  endif
@@ -605,11 +612,14 @@ static unsigned long num_avl_nodes = 0;
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
-static char *esbrk(word_t, size_t * pExtra);
+static char *esbrk(word_t size, size_t * pExtra) __attribute__((malloc,warn_unused_result));
 
-static char *large_malloc(word_t, Bool);
+static char *large_malloc(word_t size, Bool force_m) __attribute__((malloc,warn_unused_result));
 #define large_malloc_int(size, force_m) large_malloc(size, force_m)
 static void large_free(char *);
+
+static INLINE size_t mem_overhead (void) __attribute__((const));
+
 
 #ifdef MALLOC_EXT_STATISTICS
 /*=========================================================================*/
@@ -726,7 +736,7 @@ mem_block_size (POINTER p)
 
     if (q[M_SIZE] & M_SMALL)
     {
-        return mem_block_total_size(p) - M_OVERHEAD*GRANULARITY;
+        return mem_block_total_size(p) - mem_overhead();
     }
     return mem_block_total_size(p) - ML_OVERHEAD*GRANULARITY;
 } /* mem_block_size() */

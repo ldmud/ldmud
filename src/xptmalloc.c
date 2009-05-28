@@ -232,10 +232,6 @@ static Bool mem_is_freed (POINTER p, size_t minsize) {
 
 #endif /* GC_SUPPORT */
 
-/*     the alignment guaranteed by the allocator */
-//#define MEM_ALIGN (2*(sizeof(size_t)))
-#define MEM_ALIGN (2*SIZEOF_INT)
-
 /* If the allocator can replace the libc allocation routines.
  * See above for the *BSD situation.
  */
