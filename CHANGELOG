@@ -8,6 +8,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
     (mudlib/deprecated/*)
   - Removed a configure check for ancient gcc on AIX.
   - Added checks to configure for the volatile keyword and VLAs.
+  - Check the compiler for support of -fwrapv and enable if supported (enables
+    a fully defined overflow/wrap behaviour of signed integers (#635).
 
 27-May-2009 (Gnomi)
   - (ed.c, comm.c) Put ed sessions into the input_to list of interactive

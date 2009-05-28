@@ -10,6 +10,29 @@ dnl
 dnl some helper macros
 dnl
 
+dnl Check if the compiler in use supports the given argument as command-line
+dnl switch and adds it to the list of variables given as second argument if
+dnl supported.
+AC_DEFUN([LD_CHECK_CC_SWITCH], [
+    ld_cc_switch_savecflags="$CFLAGS"
+    CFLAGS="${CFLAGS} $1"
+    AC_MSG_CHECKING([whether compiler supports $1])
+    AC_COMPILE_IFELSE(
+      [AC_LANG_PROGRAM(
+        [[]],
+        [[]])],
+      [AC_MSG_RESULT([yes])]
+      CFLAGS="$ld_cc_switch_savecflags"
+      for v in $2; do
+           todo="$v=\"\$$v $1\""
+           eval "$todo";
+      done,
+      [AC_MSG_RESULT([no])]
+      CFLAGS="$ld_cc_switch_savecflags"
+    )
+    ]
+)
+
 AC_DEFUN([AC_UPDATE_VAR],
 [if test "x$[$1]" = "x" && test "x$DEFAULT[$1]" != "x"; then
   [$1]=$DEFAULT[$1]
@@ -681,6 +704,11 @@ AC_PROG_CC_STDC
 if test "${ac_cv_prog_cc_stdc}" = no; then
   AC_MSG_ERROR(You need an ANSI-C89 or ISO-C (C99) compiler! sorry..)
 fi
+
+# --- check for support of various command line switches ---
+# -fwrapv is currently needed to enforce defined signed integr overflow (wrap)
+# in gcc.
+LD_CHECK_CC_SWITCH(-fwrapv, EXTRA_CFLAGS CFLAGS)
 
 # does the compile have an inline keyword?
 AC_C_INLINE

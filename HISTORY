@@ -96,7 +96,9 @@ xx-xxx-xxxx -- 3.3.719
          by giving "no" during compile time or "none" as a runtime parameter.
        + Ed sessions are removed when an object becomes non-interactive.
        + Multiple ed sessions per interactive are allowed.
-
+       + Check the compiler for support of -fwrapv and enable if supported.
+         Enables a fully defined overflow/wrap behaviour of signed integers
+         (#635)).
 
 12-Jan-2009 -- 3.3.718
     - New Efuns:
