@@ -216,6 +216,9 @@
 #if defined(HAVE_MADVISE) || defined(HAVE_MMAP)
 #    include <sys/types.h>
 #    include <sys/mman.h>
+#endif
+
+#ifdef HAVE_MADVIE
 #    define MADVISE(new,old)  madvise(new,old,MADV_RANDOM)
 #else
 #    define MADVISE(new,old)  NOOP
