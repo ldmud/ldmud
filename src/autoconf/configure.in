@@ -676,55 +676,11 @@ dnl select a C-Compiler
 dnl
 AC_PROG_CC
 
-# The newer versions of gcc/egcs running on SunOS fall into catatonia when
-# asked to compile this test with any optimisation. To be able to run
-# configure at all, we fudge the CFLAGS a bit.
-
-save_cflags=$CFLAGS
-CFLAGS="-g"
-echo "For this test, '$CFLAGS' instead of '$save_cflags' is used as compiler flags."
-
-AC_CACHE_CHECK([gcc/assembler float/branch incompatibility, e.g. on AIX],
-lp_cv_sys_float_branch_incompatible,
-AC_TRY_LINK([int foo(), bar(), foobar();
-#define x1 foobar();
-#define x4 x1 x1 x1 x1
-#define x10 x4 x4 x4 x4
-#define x40 x10 x10 x10 x10
-#define x100 x40 x40 x40 x40
-#define x400 x100 x100 x100 x100
-#define x1000 x400 x400 x400 x400
-int long_branch(i)
-    int i;
-{
-    if (i > 1) {
-        x1000
-    } else foo();
-    return bar();
-}
-int foo(){ return 0; }
-int bar(){ return 0; }
-int foobar(){ return 0; }
-double d = 4.5;],
-[double e = 1.3; e/= 0.2;],
-lp_cv_sys_float_branch_incompatible=no,
-lp_cv_sys_float_branch_incompatible=yes
-))
-if test $lp_cv_sys_float_branch_incompatible = yes ; then
-  CC="cc"
-  GCC=""
-  AC_MSG_WARN(falling back to cc)
-fi
-
-# Restore the CFLAGS
-CFLAGS=$save_cflags
-
 # check for ANSI-C  (for compiling LDMUD project)
 AC_PROG_CC_STDC
 if test "${ac_cv_prog_cc_stdc}" = no; then
   AC_MSG_ERROR(You need an ANSI-C89 or ISO-C (C99) compiler! sorry..)
 fi
-
 
 # does the compile have an inline keyword?
 AC_C_INLINE
