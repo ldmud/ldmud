@@ -699,6 +699,12 @@ AC_C_TYPEOF
 # does the preprocessor support the stringenizing operator?
 AC_C_STRINGIZE
 
+# does the compiler support variable length arrays?
+AC_C_VARARRAYS
+
+# does the compuler support the volatile keyword?
+AC_C_VOLATILE
+
 # check for some types
 AC_TYPE_INT8_T
 AC_TYPE_INT16_T

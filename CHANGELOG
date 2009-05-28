@@ -7,6 +7,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
     deprecated and removed efuns. This time: the deprecated efun cat().
     (mudlib/deprecated/*)
   - Removed a configure check for ancient gcc on AIX.
+  - Added checks to configure for the volatile keyword and VLAs.
 
 27-May-2009 (Gnomi)
   - (ed.c, comm.c) Put ed sessions into the input_to list of interactive
