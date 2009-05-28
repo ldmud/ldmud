@@ -709,6 +709,14 @@ fi
 # -fwrapv is currently needed to enforce defined signed integr overflow (wrap)
 # in gcc.
 LD_CHECK_CC_SWITCH(-fwrapv, EXTRA_CFLAGS CFLAGS)
+# gcc should warn about optimizations based on the assumption, signed integers
+# do not overflow/wrap.
+LD_CHECK_CC_SWITCH(-Wall, WCFLAGS)
+LD_CHECK_CC_SWITCH(-Wparentheses, WCFLAGS)
+LD_CHECK_CC_SWITCH(-Wshadow, WCFLAGS)
+LD_CHECK_CC_SWITCH(-Wstrict-overflow=2, WCFLAGS)
+AC_MSG_CHECKING(warning CFLAGS)
+AC_MSG_RESULT($WCFLAGS)
 
 # does the compile have an inline keyword?
 AC_C_INLINE
@@ -2364,25 +2372,6 @@ cat > conftest.c <<EOF
 double d = 4.5;
 int main(void) { printf("hello world\n"); return 0; }
 EOF
-
-AC_MSG_CHECKING(warning CFLAGS)
-changequote(,)dnl
-CFLAGS=
-for TESTFLAG in -Wall -Wparentheses -Wshadow; do
-  if eval $tcomp; then
-    # The option is recognized, but if it generates warnings on the
-    # above correct program, we still can't use it. So check for that.
-    if echo `eval $tcomp2` | egrep '[a-z]' >/dev/null; then
-      :
-      # Success means 'we got output' here  :-(
-    else
-        CFLAGS="$CFLAGS $TESTFLAG"
-    fi
-  fi
-done
-changequote([,])dnl
-WCFLAGS=$CFLAGS
-AC_MSG_RESULT($WCFLAGS)
 
 AC_MSG_CHECKING(low optimization CFLAGS)
 changequote(,)dnl
