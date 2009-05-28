@@ -10,6 +10,14 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - Added checks to configure for the volatile keyword and VLAs.
   - Check the compiler for support of -fwrapv and enable if supported (enables
     a fully defined overflow/wrap behaviour of signed integers (#635).
+  - Support for using mmap() to get memory from the system (slaballoc):
+    sbrk() and brk() are obsoleted and some systems (like Darwin) don't have a
+    working implementation anymore. If sbrk/brk() are not usable, but mmap()
+    is available, use mmap() for mapping anonymous memory which we then use.
+    If mmap() is not available, use the old fallback (system malloc()).
+    Changed some precompiler checks for SBRK_OK, which should be
+    REPLACE_MALLOC. (#640)
+    (slaballoc.c, xalloc.c, configure.in)
 
 27-May-2009 (Gnomi)
   - (ed.c, comm.c) Put ed sessions into the input_to list of interactive

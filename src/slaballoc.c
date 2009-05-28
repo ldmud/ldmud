@@ -25,10 +25,10 @@
  *
  *  -- Small Blocks --
  *
- * Small blocks are allocations of up to (SMALL_BLOCK_NUM+1)*4 Bytes, currently
- * 68 Bytes. Such block are allocated from larger memory blocks ('slabs')
- * sized rough multiples of 4KByte. The size is determined such that the slab
- * holds at least 100 blocks.
+ * Small blocks are allocations of up to (SMALL_BLOCK_NUM+1)*GRANULARITY Bytes,
+ * currently 68-136 Bytes. Such block are allocated from larger memory blocks 
+ * ('slabs') sized rough multiples of 4KByte. The size is determined such that
+ * the slab holds at least 100 blocks.
  *
  * A slab consists of a header, followed by the blocks themselves. Free blocks
  * within a slab are linked together in a free list. When a slab is freshly
@@ -200,12 +200,16 @@
 #include "driver.h"
 #include "typedefs.h"
 
-#ifdef HAVE_MADVISE
+#if defined(HAVE_MADVISE) || defined(HAVE_MMAP)
+#    include <sys/types.h>
 #    include <sys/mman.h>
 #    define MADVISE(new,old)  madvise(new,old,MADV_RANDOM)
 #else
 #    define MADVISE(new,old)  NOOP
 #endif
+
+// for sysconf()
+#include <unistd.h>
 
 #include "slaballoc.h"
 
@@ -246,7 +250,11 @@
 #  else
 #      undef SBRK_OK
 #  endif
-#endif
+#else if defined (HAVE_MMAP)
+#  ifdef MALLOC_SBRK
+#      define REPLACE_MALLOC
+#  endif
+#endif // SBRK_OK
 
 #define MEM_MAIN_THREADSAFE
 
@@ -344,7 +352,7 @@
     */
 
 
-#ifdef SBRK_OK
+#if defined(MALLOC_SBRK) && (defined(SBRK_OK) || defined (HAVE_MMAP))
 #    define CHUNK_SIZE          0x40000
 #else
     /* It seems to be advantagous to be just below a power of two
@@ -933,7 +941,7 @@ mem_dump_data (strbuf_t *sbuf)
                );
 
     dump_stat("\npermanent blocks:  %8lu        %10lu\n", perm_st);
-#ifdef SBRK_OK
+#ifdef REPLACE_MALLOC
     dump_stat("clib allocations:  %8lu        %10lu\n", clib_st);
 #else
     strbuf_addf(sbuf, "clib allocations:       n/a               n/a\n");
@@ -3442,7 +3450,7 @@ esbrk (word_t size, size_t * pExtra)
  *
 #ifdef SBRK_OK
  * It is system dependent how sbrk() aligns data, so we simpy use brk()
- * to insure that we have enough.
+ * to ensure that we have enough.
  * At the end of the newly expanded heap we create a fake allocated
  * block of 0 bytes so that large_malloc() knows where to stop.
 #else
@@ -3487,6 +3495,7 @@ esbrk (word_t size, size_t * pExtra)
 #else  /* not SBRK_OK */
 
     char *block;
+    size_t req_size = size; // the requested size of memory.
     word_t *p;    /* start of the fake block */
     const int overhead = TL_OVERHEAD;
     size_t overlap = 0;
@@ -3494,16 +3503,31 @@ esbrk (word_t size, size_t * pExtra)
        * the new allocation with the old one.
        */
 
-
     mdb_log_sbrk(size);
     size += overhead * GRANULARITY;  /* for the extra fake "allocated" block */
 
+    // get the new memory block
+#ifdef HAVE_MMAP
+    {
+        static size_t pagesize = 0; // pagesize - 1 for this system.
+        if (!pagesize)
+            pagesize = getpagesize() - 1;
+        // round to multiples of the real pagesize
+        if ((size & pagesize) != 0)
+        {
+            size += pagesize;
+            size &= ~pagesize;
+        }
+        // get new page(s)
+        block = mmap(0, size, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
+        if (block == MAP_FAILED)
+            return NULL;
+    }
+#else
     block = malloc(size);
     if (!block)
-    {
-        *pExtra = 0;
         return NULL;
-    }
+#endif    
 
     assert_stack_gap();
 
@@ -3643,7 +3667,12 @@ esbrk (word_t size, size_t * pExtra)
     count_up(&sbrk_stat, size);
     count_up(&large_wasted_stat, overhead * GRANULARITY);
 
+    // amount of additional memory that was allocated
+#ifdef HAVE_MMAP
+    *pExtra = overlap + (size - overhead * GRANULARITY - req_size);
+#else
     *pExtra = overlap;
+#endif
     return block + GRANULARITY;
 #endif /* !SBRK_OK */
 } /* esbrk() */
@@ -4371,4 +4400,19 @@ mem_consolidate (Bool force)
 #endif /* MALLOC_EXT_STATISTICS */
 } /* mem_consolidate() */
 
+/*-------------------------------------------------------------------------*/
+#if !defined(HAVE_GETPAGESIZE)
+static INLINE size_t
+getpagesize()
+/* get the pagesize for this system */
+{
+#ifdef(HAVE_SYSCONF)
+    return sysconf(_SC_PAGESIZE);
+#else
+#error Unable to find out the system pagesize. Please report this issue.
+#endif
+}
+#endif /* HAVE_GETPAGESIZE */
+
 /***************************************************************************/
+

@@ -814,7 +814,7 @@ AC_FUNC_ALLOCA
 AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn)
 AC_CHECK_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
 AC_CHECK_FUNCS(fcntl getdomainname poll strtoul trunc)
-
+AC_CHECK_FUNCS(mmap getpagesize)
 
 AC_CACHE_CHECK(for needed malloc() alignment,lp_cv_sys_malloc_align,
 AC_TRY_COMPILE([struct ts {double d; char *p; double e;};

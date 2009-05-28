@@ -76,6 +76,9 @@ xx-xxx-xxxx -- 3.3.719
        + Removed checks and special code for Ultrix.
        + Removed MSDOS filesystem semantics (Checks for MSDOS_FS and special
          behaviour (e.g. \\ as path separator).
+       + Support for using mmap() to get memory from the system (slaballoc),
+         because brk()/sbrk() are more or less deprecated and not supported by
+         some systems (e.g. Darwin/MacOS). (#640)
 
     - Other
        + Generalized the write buffer for non-threaded use and renamed the
