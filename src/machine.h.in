@@ -51,7 +51,7 @@
 /* Does the machine offer IDNA? */
 #undef HAS_IDN
 
-/* Does the machine offer iksemel? */
+/* Does the machine have Iksemel? */
 #undef HAS_IKSEMEL
 
 /* Does the compiler provide inline functions? */
@@ -75,6 +75,9 @@
 /* Does the machine offer SQLite3? */
 #undef HAS_SQLITE3
 
+/* Does the machine have libxml2? */
+#undef HAS_XML2
+
 /* Define to 1 if you have the `alarm' function. */
 #undef HAVE_ALARM
 
@@ -97,6 +100,9 @@
 /* Define to 1 if you have the <crypt.h> header file. */
 #undef HAVE_CRYPT_H
 
+/* Define to 1 if C supports variable-length arrays. */
+#undef HAVE_C_VARARRAYS
+
 /* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
    */
 #undef HAVE_DIRENT_H
@@ -112,6 +118,9 @@
 
 /* Define to 1 if you have the `getdomainname' function. */
 #undef HAVE_GETDOMAINNAME
+
+/* Define to 1 if you have the `getpagesize' function. */
+#undef HAVE_GETPAGESIZE
 
 /* Does the system have a getrusage call? */
 #undef HAVE_GETRUSAGE
@@ -167,6 +176,9 @@
 
 /* Define to 1 if you have the `memset' function. */
 #undef HAVE_MEMSET
+
+/* Define to 1 if you have the `mmap' function. */
+#undef HAVE_MMAP
 
 /* Define to 1 if you have the <ndir.h> header file, and it defines `DIR'. */
 #undef HAVE_NDIR_H
@@ -271,9 +283,6 @@
 
 /* Is the library function inet_ntoa() compatible with the compiler? */
 #undef INET_NTOA_OK
-
-/* word alignment */
-#undef MALLOC_ALIGN
 
 /* Define if you have bcopy, and it handles overlapping ranges correctly. */
 #undef OVERLAPPING_BCOPY
@@ -459,6 +468,10 @@
 /* Define to the type of an unsigned integer type wide enough to hold a
    pointer, if such a type exists, and if the system does not define it. */
 #undef uintptr_t
+
+/* Define to empty if the keyword `volatile' does not work. Warning: valid
+   code using `volatile' can become incorrect without. Disable with care. */
+#undef volatile
 
 
 #endif
