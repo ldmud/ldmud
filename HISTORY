@@ -79,6 +79,8 @@ xx-xxx-xxxx -- 3.3.719
        + Support for using mmap() to get memory from the system (slaballoc),
          because brk()/sbrk() are more or less deprecated and not supported by
          some systems (e.g. Darwin/MacOS). (#640)
+       + Support for using mmap() to get memory from the system (smalloc).
+         (#640)
 
     - Other
        + Generalized the write buffer for non-threaded use and renamed the

@@ -18,6 +18,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
     Changed some precompiler checks for SBRK_OK, which should be
     REPLACE_MALLOC. (#640)
     (slaballoc.c, xalloc.c, configure.in)
+  - Support for using mmap() to get memory from the system (smalloc). (#640)
+    (smalloc.c)
 
 27-May-2009 (Gnomi)
   - (ed.c, comm.c) Put ed sessions into the input_to list of interactive

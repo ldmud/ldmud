@@ -364,6 +364,7 @@
 
 /* Bitflags for the size field:
  * TODO: Assumes a word_t of at least 32 bit.
+ * TODO: define values for 64-bit word_t to support larger blocks.
  */
 #define PREV_BLOCK  0x80000000  /* Previous block is allocated */
 #define THIS_BLOCK  0x40000000  /* This block is allocated */
@@ -3463,9 +3464,10 @@ esbrk (word_t size, size_t * pExtra)
  */
 
 {
-#ifdef SBRK_OK
-
     mdb_log_sbrk(size);
+    
+#ifdef SBRK_OK
+    
     *pExtra = 0;
     if (!heap_end)
     {
@@ -3503,7 +3505,6 @@ esbrk (word_t size, size_t * pExtra)
        * the new allocation with the old one.
        */
 
-    mdb_log_sbrk(size);
     size += overhead * GRANULARITY;  /* for the extra fake "allocated" block */
 
     // get the new memory block
@@ -3622,7 +3623,7 @@ esbrk (word_t size, size_t * pExtra)
                 next = prev + *prev;
             } while (next < (word_t *)block);
             overlap = 0;
-
+                        
             if ((word_t *)block == prev + overhead)
             {
                 /* Our block directly follows the one we found */

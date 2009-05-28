@@ -213,12 +213,16 @@
 #include "driver.h"
 #include "typedefs.h"
 
-#ifdef HAVE_MADVISE
+#if defined(HAVE_MADVISE) || defined(HAVE_MMAP) || defined(HAVE_POSIX_MADVISE)
+#    include <sys/types.h>
 #    include <sys/mman.h>
 #    define MADVISE(new,old)  madvise(new,old,MADV_RANDOM)
 #else
 #    define MADVISE(new,old)  NOOP
 #endif
+
+// for sysconf()
+#include <unistd.h>
 
 #include "smalloc.h"
 
@@ -258,7 +262,11 @@
 #  else
 #      undef SBRK_OK
 #  endif
-#endif
+#else if defined (HAVE_MMAP)
+#  ifdef MALLOC_SBRK
+#      define REPLACE_MALLOC
+#  endif
+#endif // SBRK_OK
 
 #define MEM_MAIN_THREADSAFE
 
@@ -362,7 +370,7 @@
  *   CHUNK_SIZE: size of a chunk from which large blocks are allocated.
  */
 
-#ifdef SBRK_OK
+#if defined(MALLOC_SBRK) && (defined(SBRK_OK) || defined (HAVE_MMAP))
 #    define SMALL_CHUNK_SIZE    0x04000  /* 16 KByte */
 #    define CHUNK_SIZE          0x40000
 #else
@@ -379,6 +387,7 @@
 
 /* Bitflags for the size field:
  * TODO: Assumes a 32-Bit word_t.
+ * TODO: define values for 64-bit word_t to support larger blocks.
  */
 #define PREV_BLOCK  0x80000000  /* Previous block is allocated */
 #define THIS_BLOCK  0x40000000  /* This block is allocated */
@@ -777,7 +786,7 @@ mem_dump_data (strbuf_t *sbuf)
  */
 
 {
-#ifdef SBRK_OK
+#ifdef REPLACE_MALLOC
     t_stat clib_st;
 #endif
     t_stat sbrk_st, perm_st, xalloc_st;
@@ -793,7 +802,7 @@ mem_dump_data (strbuf_t *sbuf)
 #endif /* MALLOC_EXT_STATISTICS */
 
     sbrk_st = sbrk_stat;
-#ifdef SBRK_OK
+#ifdef REPLACE_MALLOC
     clib_st = clib_alloc_stat;
 #endif
     xalloc_st = xalloc_stat;
@@ -828,7 +837,7 @@ mem_dump_data (strbuf_t *sbuf)
     dump_stat("small wasted:      %8lu        %10lu (h)\n\n",s_wasted);
 
     dump_stat("permanent blocks:  %8lu        %10lu\n", perm_st);
-#ifdef SBRK_OK
+#ifdef REPLACE_MALLOC
     dump_stat("clib allocations:  %8lu        %10lu\n", clib_st);
 #else
     strbuf_addf(sbuf, "clib allocations:       n/a               n/a\n");
@@ -961,7 +970,7 @@ mem_dinfo_data (svalue_t *svp, int value)
     ST_NUMBER(DID_MEM_MINC_CALLS, malloc_increment_size_calls);
     ST_NUMBER(DID_MEM_MINC_SUCCESS, malloc_increment_size_success);
     ST_NUMBER(DID_MEM_MINC_SIZE, malloc_increment_size_total);
-#ifdef SBRK_OK
+#ifdef REPLACE_MALLOC
     ST_NUMBER(DID_MEM_CLIB, clib_alloc_stat.counter);
     ST_NUMBER(DID_MEM_CLIB_SIZE, clib_alloc_stat.size);
 #endif
@@ -3243,10 +3252,12 @@ esbrk (word_t size, size_t * pExtra)
  */
 
 {
+    mdb_log_sbrk(size);
+
+    *pExtra = 0;
+    
 #ifdef SBRK_OK
 
-    mdb_log_sbrk(size);
-    *pExtra = 0;
     if (!heap_end)
     {
         /* First call: allocate the first fake block */
@@ -3275,6 +3286,7 @@ esbrk (word_t size, size_t * pExtra)
 #else  /* not SBRK_OK */
 
     char *block;
+    size_t req_size = size; // the requested size of memory.
     word_t *p;    /* start of the fake block */
     const int overhead = TL_OVERHEAD;
     size_t overlap = 0;
@@ -3283,15 +3295,31 @@ esbrk (word_t size, size_t * pExtra)
        */
 
 
-    mdb_log_sbrk(size);
     size += overhead * GRANULARITY;  /* for the extra fake "allocated" block */
 
+    // get the new memory block
+#ifdef HAVE_MMAP
+    {
+        static size_t pagesize = 0; // pagesize - 1 for this system.
+        if (!pagesize)
+            pagesize = getpagesize() - 1;
+        // round to multiples of the real pagesize
+        if ((size & pagesize) != 0)
+        {
+            size += pagesize;
+            size &= ~pagesize;
+        }
+        // get new page(s)
+        block = mmap(0, size, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
+        if (block == MAP_FAILED)
+            return NULL;
+    }
+#else
     block = malloc(size);
     if (!block)
-    {
-        *pExtra = 0;
         return NULL;
-    }
+#endif
+    
     assert_stack_gap();
 
     /* p points to the start of the fake allocated block used
@@ -3430,7 +3458,12 @@ esbrk (word_t size, size_t * pExtra)
     count_up(&sbrk_stat, size);
     count_up(&large_wasted_stat, overhead * GRANULARITY);
 
+    // amount of additional memory that was allocated
+#ifdef HAVE_MMAP
+    *pExtra = overlap + (size - overhead * GRANULARITY - req_size);
+#else
     *pExtra = overlap;
+#endif
     return block + GRANULARITY;
 #endif /* !SBRK_OK */
 } /* esbrk() */
@@ -4017,4 +4050,18 @@ mem_consolidate (Bool force)
     } /* for (all chunks) */
 } /* mem_consolidate() */
 
+
+/*-------------------------------------------------------------------------*/
+#if !defined(HAVE_GETPAGESIZE)
+static INLINE size_t
+getpagesize()
+/* get the pagesize for this system */
+{
+#ifdef(HAVE_SYSCONF)
+    return sysconf(_SC_PAGESIZE);
+#else
+#error Unable to find out the system pagesize. Please report this issue.
+#endif
+}
+#endif /* HAVE_GETPAGESIZE */
 /***************************************************************************/
