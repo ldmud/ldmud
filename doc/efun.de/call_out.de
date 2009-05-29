@@ -23,6 +23,9 @@ BESCHREIBUNG
         call_out()s des betreffenden Benutzers, die zur gleichen Zeit
         faellig werden, entfernt.
 
+        Wenn zwei call_out()s zum gleichen Zeitpunkt ausgefuehrt werden
+        sollen, wird der zuerst gestartete zuerst ausgefuehrt.
+
 BEISPIELE
         call_out("RefreshMe", 10);
 

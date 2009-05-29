@@ -42,8 +42,12 @@ The following muds run natively on LDMud:
     <URL:telnet://rag.com:2222>
     <URL:http://www.rag.com/>
 
+  UNItopia (LDMud 3.3)
+    <URL:telnet://unitopia.de:23>
+    <URL:http://www.unitopia.de/>
+    <URL:ftp://ftp.unitopia.de/>
 
-TODO: Complete this list (Tubmud, PK-Mud, Unitopia, etc)
+TODO: Complete this list (Tubmud, PK-Mud, etc)
 
 
 Support exists for these muds:

@@ -29,6 +29,9 @@ DESCRIPTION
         call_outs() of this user scheduled for the same time are
         discarded.
 
+        If two call_out()s were started with the same target time
+        the one that was issued first will be executed first.
+
 EXAMPLE
         call_out("RefreshMe", 10);
 

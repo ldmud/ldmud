@@ -104,7 +104,8 @@ insert_call (struct call *cop, int delay)
     for (copp = &call_list; NULL != (cop2 = *copp); copp = &cop2->next)
     {
         int delta;
-        if ((delta = cop2->delta) >= delay)
+        /* Insert the call_out *after* calls with the same delay (FIFO). */
+        if ((delta = cop2->delta) > delay)
         {
             cop2->delta -= delay;
             cop->delta = delay;
