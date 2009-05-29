@@ -4,6 +4,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 29-May-2009 (Gnomi)
   - (call_out.c) Preserve the order of call_out()s.
   - (mudlib/deprecated/hash.c) Added sefuns md5() and sha1().
+  - (configure) Added a bunch of quotation marks.
 
 28-May-2009 (Zesstra)
   - Added sefun cat(), updated documentation of cat().

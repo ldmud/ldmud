@@ -130,7 +130,7 @@ AC_DEFUN([AC_MY_SEARCH_LIB],
         ])
 
         # No pkg-config, search manually.
-        if test $[$3] = no; then
+        if test "$[$3]" = "no"; then
             AC_MSG_CHECKING(for [$4] support)
             for TESTPATH in "" "${[$5]}" "${[$5]}/include" "${[$5]}/include/[$4]" "/usr/include/[$4]" "/usr/local/include" "/usr/local/include/[$4]" ; do
                 if test "x$TESTPATH" != "x"; then
@@ -153,7 +153,7 @@ AC_DEFUN([AC_MY_SEARCH_LIB],
             EXTRA_CFLAGS="$[$1]_CFLAGS $EXTRA_CFLAGS"
         fi
 
-        if test $[$3] = yes; then
+        if test "$[$3]" = "yes"; then
             if test "x$[$1]_LIBS" != "x"; then
                 PKGLIBS="$PKGLIBS $[$1]_LIBS"
             else
@@ -176,7 +176,7 @@ AC_DEFUN([AC_MY_SEARCH_LIB],
                     )
                 done
 
-                if test "x$tmp" == "x"; then
+                if test "x$tmp" = "x"; then
                     [$3]=no
 
                     EXTRA_CFLAGS="$saveeflags"
@@ -701,7 +701,7 @@ AC_PROG_CC
 
 # check for ANSI-C  (for compiling LDMUD project)
 AC_PROG_CC_STDC
-if test "${ac_cv_prog_cc_stdc}" = no; then
+if test "${ac_cv_prog_cc_stdc}" = "no"; then
   AC_MSG_ERROR(You need an ANSI-C89 or ISO-C (C99) compiler! sorry..)
 fi
 
@@ -832,7 +832,7 @@ AC_CHECK_LIB(nsl,main)
 ERQ_LIBS="$LIBS"
 
 AC_CHECK_LIB(ucb,main, LIBS="$LIBS -lc -lucb")
-if test $ac_cv_lib_socket_main = "yes" || test $ac_cv_lib_ucb_main = "yes"; then
+if test "$ac_cv_lib_socket_main" = "yes" || test "$ac_cv_lib_ucb_main" = "yes"; then
       AC_CHECK_LIB(nsl,main)
 fi
 
@@ -919,7 +919,7 @@ use inet_ntoa() from the library.
 ],,lp_cv_func_inet_ntoa_ok=no,
 lp_cv_func_inet_ntoa_ok=yes
 )))
-if test $lp_cv_func_inet_ntoa_ok = yes ; then
+if test "$lp_cv_func_inet_ntoa_ok" = "yes" ; then
 dnl TODO: Is there any platform where this is not the case?
   AC_DEFINE(INET_NTOA_OK, 1, [Is the library function inet_ntoa() compatible with the compiler?])
 fi
@@ -943,9 +943,9 @@ struct sockaddr_in6 foo(void)
     lp_cv_has_ipv6=no
     CFLAGS="$saveflags"
 ))
-if test $lp_cv_has_ipv6 = yes; then
+if test "$lp_cv_has_ipv6" = "yes"; then
     AC_DEFINE(HAS_IPV6, 1, [Does the machine offer IPv6?])
-    if test $enable_use_ipv6 = yes; then
+    if test "$enable_use_ipv6" = "yes"; then
         AC_CACHE_CHECK(if -linet6 is needed, lp_cv_need_lib_inet6,
             AC_TRY_RUN([
 #include <sys/types.h>
@@ -968,7 +968,7 @@ int main(void)
         fi
     fi
 else
-    if test $enable_use_ipv6 = yes; then
+    if test "$enable_use_ipv6" = "yes"; then
         echo "IPV6 not supported - disabling IPV6 support."
         AC_NOT_AVAILABLE(use-ipv6)
     fi
@@ -1012,7 +1012,7 @@ if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
         lp_cv_has_openssl=no
     ))
 
-    if test $lp_cv_has_openssl = yes; then
+    if test "$lp_cv_has_openssl" = "yes"; then
         has_tls=yes
         tls_package=ssl
         AC_DEFINE(HAS_OPENSSL, 1, [Does the machine offer OpenSSL/SSL?])
@@ -1084,7 +1084,7 @@ if test "$tls_package" = "any" -o "$tls_package" = "gnu"; then
         lp_cv_has_gnutls=no
     ))
 
-    if test $lp_cv_has_gnutls = yes; then
+    if test "$lp_cv_has_gnutls" = "yes"; then
         has_tls=yes
         tls_package=gnu
         AC_DEFINE(HAS_GNUTLS, 1, [Does the machine offer GnuTLS?])
@@ -1142,8 +1142,8 @@ fi
 
 # Evaluate the results of the checks
 
-if test "$has_tls" = no; then
-    if test $enable_use_tls = yes; then
+if test "$has_tls" = "no"; then
+    if test "$enable_use_tls" = "yes"; then
         echo "TLS not supported - disabling TLS support."
         AC_NOT_AVAILABLE(use-tls)
     fi
@@ -1186,11 +1186,11 @@ if test "$tls_package" != "ssl"; then
     done
     )
 
-    if test $lp_cv_has_gcrypt = yes; then
+    if test "$lp_cv_has_gcrypt" = "yes"; then
       saveflags="$CFLAGS"
       AC_DEFINE(HAS_GCRYPT, 1, [Does the machine offer libgcrypt?])
 
-      if test $enable_use_gcrypt = yes; then
+      if test "$enable_use_gcrypt" = "yes"; then
         tmp=""
 
         AC_CHECK_LIB(gcrypt,gcry_check_version, tmp="$PKGLIBS -lgcrypt")
@@ -1222,7 +1222,7 @@ if test "$tls_package" != "ssl"; then
 
       CFLAGS="$saveflags"
     else
-      if test $enable_use_gcrypt = yes; then
+      if test "$enable_use_gcrypt" = "yes"; then
           AC_NOT_AVAILABLE(use-gcrypt)
           cdef_use_gcrypt="#undef"
           enable_use_gcrypt=no
@@ -1238,7 +1238,7 @@ fi
 lp_cv_has_pcre_lib="no"
 AC_CHECK_LIB(pcre,main, lp_cv_has_pcre_lib="yes")
 
-if test $lp_cv_has_pcre_lib = yes; then
+if test "$lp_cv_has_pcre_lib" = "yes"; then
     saveflags="$CFLAGS"
     CFLAGS="$CFLAGS -lpcre"
     AC_CACHE_CHECK(for PCRE usability,lp_cv_has_pcre,
@@ -1259,11 +1259,11 @@ int main(void)
         ))
     CFLAGS="$saveflags"
 
-    if test $lp_cv_has_pcre = yes; then
+    if test "$lp_cv_has_pcre" = "yes"; then
         AC_DEFINE(HAS_PCRE, 1, [Does the machine offer PCRE?])
         PKGLIBS="$PKGLIBS -lpcre"
     else
-        if test $enable_use_builtin_pcre = no ; then
+        if test "$enable_use_builtin_pcre" = "no" ; then
             echo "PCRE not available in the system - using builtin version."
             enable_use_builtin_pcre="yes"
             cdef_use_builtin_pcre="#define"
@@ -1449,11 +1449,11 @@ done
 )
 
 # The system has the include files - now search for the libraries.
-if test $lp_cv_has_mysql = yes; then
+if test "$lp_cv_has_mysql" = "yes"; then
   saveflags="$CFLAGS"
   AC_DEFINE(HAS_MYSQL, 1, [Does the machine offer mySQL?])
 
-  if test $enable_use_mysql = yes; then
+  if test "$enable_use_mysql" = "yes"; then
     tmp=""
 
     if test "x$mysql_path" = "x"; then
@@ -1502,7 +1502,7 @@ if test $lp_cv_has_mysql = yes; then
     fi
   fi
 
-  if test $enable_use_mysql = yes; then
+  if test "$enable_use_mysql" = "yes"; then
       # Some systems need additional libraries
       savelibs="$LIBS"
       LIBS="$LIBS $PKGLIBS"
@@ -1554,7 +1554,7 @@ int main(void)
 
   CFLAGS="$saveflags"
 else
-  if test $enable_use_mysql = yes; then
+  if test "$enable_use_mysql" = "yes"; then
       AC_NOT_AVAILABLE(use-mysql)
       cdef_use_mysql="#undef"
       enable_use_mysql=no
@@ -1597,11 +1597,11 @@ done
 )
 
 # The system has the include files - now search for the libraries.
-if test $lp_cv_has_pgsql = yes; then
+if test "$lp_cv_has_pgsql" = "yes"; then
   saveflags="$CFLAGS"
   AC_DEFINE(HAS_PGSQL, 1, [Does the machine offer PostgreSQL?])
 
-  if test $enable_use_pgsql = yes; then
+  if test "$enable_use_pgsql" = "yes"; then
     tmp=""
 
     AC_CHECK_LIB(pq,main, tmp="$PKGLIBS -lpq")
@@ -1690,7 +1690,7 @@ int main(void)
 
   CFLAGS="$saveflags"
 else
-  if test $enable_use_pgsql = yes; then
+  if test "$enable_use_pgsql" = "yes"; then
       AC_NOT_AVAILABLE(use-pgsql)
       cdef_use_pgsql="#undef"
       enable_use_pgsql=no
@@ -1712,7 +1712,7 @@ AC_MY_SEARCH_LIB(SQLITE3,sqlite3,lp_cv_has_sqlite3,sqlite3,xml_path,
 ],sqlite3,sqlite3_exec,enable_use_sqlite)
 
 
-if test $lp_cv_has_sqlite3 = yes; then
+if test "$lp_cv_has_sqlite3" = "yes"; then
     AC_DEFINE(HAS_SQLITE3, 1, [Does the machine offer SQLite3?])
 
     if test "x$enable_use_sqlite" = "xyes"; then
@@ -1726,14 +1726,14 @@ if test $lp_cv_has_sqlite3 = yes; then
             lp_cv_sqlite3_uses_pthreads=no
         )
 
-        if test $lp_cv_sqlite3_uses_pthreads = yes ; then
+        if test "$lp_cv_sqlite3_uses_pthreads" = "yes" ; then
              AC_DEFINE(SQLITE3_USES_PTHREADS, 1, [Does SQLite3 use pthreads?])
         fi
 
         LIBS="$savelibs"
     fi
 else
-    if test $enable_use_sqlite = yes; then
+    if test "$enable_use_sqlite" = "yes"; then
         echo "libsqlite3 library not found - disabling SQLite support"
         AC_NOT_AVAILABLE(use-sqlite)
     fi
@@ -1759,7 +1759,7 @@ if test "$xml_package" = "any" -o "$xml_package" = "xml2"; then
         }
     ],xml2,xmlParseFile,enable_use_xml)
 
-    if test $lp_cv_has_xml2 = yes; then
+    if test "$lp_cv_has_xml2" = "yes"; then
         if test "$enable_use_xml" = "yes"; then
             has_xml=yes
             xml_package=xml2
@@ -1780,7 +1780,7 @@ if test "$xml_package" = "any" -o "$xml_package" = "iksemel"; then
         }
     ],iksemel,iks_parse,enable_use_xml)
 
-    if test $lp_cv_has_iksemel = yes; then
+    if test "$lp_cv_has_iksemel" = "yes"; then
         if test "$enable_use_xml" = "yes"; then
             has_xml=yes
             xml_package=iksemel
@@ -1789,8 +1789,8 @@ if test "$xml_package" = "any" -o "$xml_package" = "iksemel"; then
     fi
 fi
 
-if test "$has_xml" = no; then
-    if test $enable_use_xml = yes; then
+if test "$has_xml" = "no"; then
+    if test "$enable_use_xml" = "yes"; then
         echo "XML not supported - disabling XML support."
         AC_NOT_AVAILABLE(use-xml)
     fi
@@ -1829,12 +1829,12 @@ main() {
 ],
 lp_cv_sys_rename_handles_directories=yes,
 lp_cv_sys_rename_handles_directories=no))
-if test $lp_cv_sys_rename_handles_directories = yes; then
+if test "$lp_cv_sys_rename_handles_directories" = "yes"; then
   AC_DEFINE(RENAME_HANDLES_DIRECTORIES, 1, [Can rename handle directories?])
 fi
 rmdir conftestdirfrom conftestdirto 2> /dev/null
 
-if test $ac_cv_func_getrusage = "yes" ; then
+if test "$ac_cv_func_getrusage" = "yes" ; then
 AC_CACHE_CHECK(full availability of struct rusage members,
 lp_cv_struct_rusage_full,
 AC_TRY_COMPILE([
@@ -1866,7 +1866,7 @@ AC_TRY_COMPILE([
     *v++ = rus.ru_nvcsw;
     *v++ = rus.ru_nivcsw;
 ],lp_cv_struct_rusage_full=yes,lp_cv_struct_rusage_full=no))
-if test $lp_cv_struct_rusage_full = no; then
+if test "$lp_cv_struct_rusage_full" = "no"; then
   AC_DEFINE(GETRUSAGE_RESTRICTED, 1, [If so, is it restricted to user and system time?])
 fi
 AC_CACHE_CHECK(struct rusage timeval members with tv_usec,
@@ -1888,7 +1888,7 @@ AC_TRY_COMPILE([
     *v++ = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
     *v++ = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
 ], lp_cv_struct_rusage_usec=yes, lp_cv_struct_rusage_usec=no))
-if test $lp_cv_struct_rusage_usec = yes; then
+if test "$lp_cv_struct_rusage_usec" = "yes"; then
   AC_DEFINE(RUSAGE_USEC, 1, [Can ru_utime / ru_stime be accessed as a timeval with tv_sec and tv_usec?])
 fi
 else
@@ -1905,7 +1905,7 @@ AC_TRY_COMPILE([
 struct rusage rus;
 syscall(SYS_GETRUSAGE, RUSAGE_SELF, rus);
 ], lp_cv_func_getrusage_via_syscall=yes, lp_cv_func_getrusage_via_syscall=no))
-if test $lp_cv_func_getrusage_via_syscall=yes; then
+if test "$lp_cv_func_getrusage_via_syscall" = "yes"; then
   AC_DEFINE(HAVE_GETRUSAGE, 1, [Does the system have a getrusage call?])
   AC_DEFINE(GETRUSAGE_VIA_SYSCALL, 1, [Is it available as a subfunction of syscall()?])
 fi
@@ -1926,7 +1926,7 @@ AC_TRY_COMPILE([
 #endif
 void free();
 ],, lp_cv_prop_free_returns_void=yes, lp_cv_prop_free_returns_void=no))
-if test $lp_cv_prop_free_returns_void = yes; then
+if test "$lp_cv_prop_free_returns_void" = "yes"; then
   AC_DEFINE(FREE_RETURNS_VOID, 1, [does free() have void as its returntype?])
 fi
 
@@ -1971,7 +1971,7 @@ AC_TRY_COMPILE([
 #endif
 int i=[1/(CHAR_BIT-8)];
 ],,lp_cv_prop_charbits_eq_8=no, lp_cv_prop_charbits_eq_8=yes))
-if test $lp_cv_prop_charbits_eq_8 = yes; then
+if test "$lp_cv_prop_charbits_eq_8" = "yes"; then
   AC_DEFINE(CHARBIT_MASK, 0xff, [A mask that allows to extract an unsigned char from a signed])
 else
 dnl TODO: this is something I don't really understand... am I too stupid?
@@ -1995,7 +1995,7 @@ int main() {
 }
 ], lp_cv_prop_strtol_broken=no,
 lp_cv_prop_strtol_broken=yes))
-if test $lp_cv_prop_strtol_broken = yes; then
+if test "$lp_cv_prop_strtol_broken" = "yes"; then
   AC_DEFINE(STRTOL_BROKEN, 1, [the atari strtol() used to consider characters '9' < c < 'A' to be numeric])
 fi
 
@@ -2076,7 +2076,7 @@ lp_cv_prop_use_ioctl_fionbio=no,
 lp_cv_prop_use_ioctl_fionbio=unknown
 AC_MSG_WARN(You have to supply the correct way to set sockets non-blocking by hand.)
 ))
-if test $lp_cv_prop_use_ioctl_fionbio = yes; then
+if test "$lp_cv_prop_use_ioctl_fionbio" = "yes"; then
   AC_DEFINE(USE_IOCTL_FIONBIO, 1, [How to set a socket non-blocking])
 fi
 
@@ -2136,7 +2136,7 @@ main() {
 ], lp_cv_prop_use_fnctl_o_ndelay=yes,
 lp_cv_prop_use_fnctl_o_ndelay=no,
 lp_cv_prop_use_fnctl_o_ndelay=unknown))
-if test $lp_cv_prop_use_fnctl_o_ndelay = yes; then
+if test "$lp_cv_prop_use_fnctl_o_ndelay" = "yes"; then
   AC_DEFINE(USE_FCNTL_O_NDELAY, 1, [nonblocking using fcntl with O_NDELAY])
 fi
 
@@ -2196,7 +2196,7 @@ main() {
 ],lp_cv_prop_use_fcntl_fndelay=yes,
 lp_cv_prop_use_fcntl_fndelay=no,
 lp_cv_prop_use_fcntl_fndelay=unknown))
-if test $lp_cv_prop_use_fcntl_fndelay = yes; then
+if test "$lp_cv_prop_use_fcntl_fndelay" = "yes"; then
   AC_DEFINE(USE_FCNTL_FNDELAY, 1, [nonblocking using fcntl with FNDELAY])
 fi
 
@@ -2254,7 +2254,7 @@ main() {
 ],lp_cv_prop_use_fcntl_setown=yes,
 lp_cv_prop_use_fcntl_setown=no,
 lp_cv_prop_use_fcntl_setown=unknown))
-if test $lp_cv_prop_use_fcntl_setown = yes; then
+if test "$lp_cv_prop_use_fcntl_setown" = "yes"; then
   AC_DEFINE(USE_FCNTL_SETOWN, 1, [Can F_SETOWN be used on a socket?])
 fi
 
@@ -2314,7 +2314,7 @@ main() {
 ],lp_cv_prop_use_oobinline=yes,
 lp_cv_prop_use_oobinline=no,
 lp_cv_prop_use_oobinline=unknown))
-if test $lp_cv_prop_use_oobinline = yes; then
+if test "$lp_cv_prop_use_oobinline" = "yes"; then
   AC_DEFINE(USE_OOBINLINE, 1, [Can SO_OOBINLINE be used on a socket?])
 fi
 
@@ -2335,7 +2335,7 @@ main(){
 ], lp_cv_prop_overlapping_bcopy=yes,
 lp_cv_prop_overlapping_bcopy=no,
 lp_cv_prop_overlapping_bcopy=yes))
-if test $lp_cv_prop_overlapping_bcopy = yes; then
+if test "$lp_cv_prop_overlapping_bcopy" = "yes"; then
   AC_DEFINE(OVERLAPPING_BCOPY, 1, [Define if you have bcopy, and it handles overlapping ranges correctly.])
 fi
 
@@ -2347,7 +2347,7 @@ AC_TRY_COMPILE([#ifdef HAVE_STDLIB_H
 long strtol(str, ptr, base) char *str; char **ptr; int base; { return 0; }
 ],,lp_cv_prop_strtol_const_charp=no,
 lp_cv_prop_strtol_const_charp=yes))
-if test $lp_cv_prop_strtol_const_charp = yes; then
+if test "$lp_cv_prop_strtol_const_charp" = "yes"; then
   AC_DEFINE(STRTOL_CONST_CHARP, 1, [needs the first argument of strtol be declared as const?])
 fi
 
@@ -2464,7 +2464,7 @@ fi
 
 rm -f conftest.c
 
-if test $ac_cv_lib_socket_main = "yes"; then
+if test "$ac_cv_lib_socket_main" = "yes"; then
 AC_EGREP_CPP(yes,[
 #if defined(sun)
 yes
@@ -2671,7 +2671,7 @@ CFLAGS="${SAVE_CFLAGS}"
 
 case "$EXTRA_CFLAGS" in
  *-Dsolaris*)
-  if test $ac_cv_lib_ucb_main = "yes"; then
+  if test "$ac_cv_lib_ucb_main" = "yes"; then
       LIBS="${LDFLAGS} -lm -lgcc -lc -lnsl -lgcc -lc -ldl_stubs\
         -lnswnis -lnswnisplus -lnswfiles -lnswcompat -lstraddr -lswitch\
         -ltcpip -lsocket -lnsl -lgcc -lc /usr/ucblib/libucb.a"
