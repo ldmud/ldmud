@@ -117,7 +117,7 @@
  * In this mode, we replace the system malloc() and free() by our own 
  * functions, implementing all libc memory functions (malloc, free, calloc,
  * realloc()).
-#else if MALLOC_SBRK && HAVE_MMAP
+#elif MALLOC_SBRK && HAVE_MMAP
  * If brk/sbrk() are non-functional (e.g. on Darwin; remember: they are legacy
  * and not POSIX anymore), we check if mmap() is available. If it is, we use 
  * it to map anonymous memory pages to get memory from the VM system.
@@ -260,7 +260,7 @@
 #  else
 #      undef SBRK_OK
 #  endif
-#else if defined(HAVE_MMAP)
+#elif defined(HAVE_MMAP)
 #  ifdef MALLOC_SBRK
 #      define REPLACE_MALLOC
 #  endif
