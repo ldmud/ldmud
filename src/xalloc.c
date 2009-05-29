@@ -1254,7 +1254,7 @@ realloc (POINTER p, size_t size)
    if (!p)
         return malloc(size);
 
-   old_size = xalloced_size(p) - XM_OVERHEAD_SIZE(); // usable size
+   old_size = xalloced_size(p) - XM_OVERHEAD_SIZE; // usable size
 
    if (old_size >= size)
       return p;
