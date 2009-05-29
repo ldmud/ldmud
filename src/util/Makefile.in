@@ -9,6 +9,7 @@ CC=@CC@
 
 prefix=@prefix@
 exec_prefix=@exec_prefix@
+datarootdir=@datarootdir@
 
 SUBDIRS = indent @erq_sub@
 SED = sed

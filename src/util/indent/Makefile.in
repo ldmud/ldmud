@@ -27,6 +27,7 @@ CC=@CC@
 
 prefix=@prefix@
 exec_prefix=@exec_prefix@
+datarootdir=@datarootdir@
 
 SUBDIRS = 
 SED = sed

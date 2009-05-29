@@ -17,6 +17,7 @@ CP = cp
 # some standard stuff...
 prefix= @prefix@
 exec_prefix= @exec_prefix@
+datarootdir= @datarootdir@
 #
 #
 # Set MUD_LIB to the directory which contains the mud data.
