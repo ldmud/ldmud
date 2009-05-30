@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-May-2009 (LDMud Team)  (3.3.719)
+  - Created snapshot.
+
 29-May-2009 (Gnomi)
   - (call_out.c) Preserve the order of call_out()s.
   - (mudlib/deprecated/hash.c) Added sefuns md5() and sha1().
@@ -62,7 +65,6 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (interpret.c) Ignore any arguments passed to a variable closure
     instead of throwing an error. (Bug #612)
 
->>>>>>> .r2594
 12-May-2009 (Fuchur)
   - (object.c) compile fix for !USE_NEW_INLINES
   - (prolang.y) forbid accessing closure arguments from within the

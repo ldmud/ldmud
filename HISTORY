@@ -3,8 +3,8 @@ impact on its behaviour both towards the mudlib as well as towards
 the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
-xx-xxx-xxxx -- 3.3.719
 
+30-May-2009 (LDMud Team) -- 3.3.719
     - Fixed Crashes:
        + gmtime(), localtime(), ctime() and strftime() could crash the driver
          on platforms where time_t is 64 bits long and users supply huge
