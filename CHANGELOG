@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+01-Jun-2009 (Gnomi)
+  - Forked 3.5 off the 3.3 branch.
+
 30-May-2009 (LDMud Team)  (3.3.719)
   - Created snapshot.
 

@@ -20,6 +20,6 @@ version_longtype="stable"
 version_stamp="2009-05-30 12:00:00"
 
 # The version number information
-version_micro=719
-version_minor=3
+version_micro=0
+version_minor=5
 version_major=3
