@@ -313,6 +313,12 @@ typedef int32_t   int32;
 typedef uint32_t  uint32;
 
 
+// We need a big integral type for the heavily used statistic counters.
+typedef uint64_t statcounter_t;
+#define PRIuSTATCOUNTER PRIu64
+#define PRIxSTATCOUNTER PRIx64
+
+
 /* type to use with constant pointer arithmetic. */
 #define PTRTYPE char *
 
