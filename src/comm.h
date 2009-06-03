@@ -390,11 +390,11 @@ extern char *domain_name;
 extern p_int write_buffer_max_size;
 
 #ifdef COMM_STAT
-extern unsigned long add_message_calls;
-extern unsigned long inet_packets;
-extern unsigned long inet_volume;
-extern unsigned long inet_packets_in;
-extern unsigned long inet_volume_in;
+extern statcounter_t add_message_calls;
+extern statcounter_t inet_packets;
+extern statcounter_t inet_volume;
+extern statcounter_t inet_packets_in;
+extern statcounter_t inet_volume_in;
 #endif
 
 /* --- Prototypes --- */

@@ -123,15 +123,15 @@ static mp_uint mstr_chains = 0;
   /* Number of hash chains in the string table.
    */
 
-static mp_uint mstr_added = 0;
+static statcounter_t mstr_added = 0;
   /* Number of distinct strings added to the string table.
    */
 
-static mp_uint mstr_deleted = 0;
+static statcounter_t mstr_deleted = 0;
   /* Number of distinct strings deleted from the string table.
    */
 
-static mp_uint mstr_collisions = 0;
+static statcounter_t mstr_collisions = 0;
   /* Number of collisions when adding a new distinct string.
    */
 
@@ -147,11 +147,11 @@ static mp_uint mstr_searchlen_byvalue = 0;
   /* Number of search steps along hash chains with content comparisons.
    */
 
-static mp_uint mstr_searches_byvalue = 0;
+static statcounter_t mstr_searches_byvalue = 0;
   /* Number of searches in the string table with content comparison.
    */
 
-static mp_uint mstr_found_byvalue = 0;
+static statcounter_t mstr_found_byvalue = 0;
   /* Number of successful searches in the string table with content comparison.
    */
 
@@ -159,23 +159,23 @@ static mp_uint mstr_searchlen = 0;
   /* Number of search steps along hash chains without content comparisons.
    */
 
-static mp_uint mstr_searches = 0;
+static statcounter_t mstr_searches = 0;
   /* Number of searches in the string table without content comparisons.
    */
 
-static mp_uint mstr_found = 0;
+static statcounter_t mstr_found = 0;
   /* Number of successful searches in the string table with content comparison.
    */
 
 #ifdef EXT_STRING_STATS
-unsigned long stNumEqual = 0;
-unsigned long stNumHashEqual = 0;
-unsigned long stNumTabledEqual = 0;
-unsigned long stNumComp = 0;
-unsigned long stNumTabledComp = 0;
-unsigned long stNumTabledChecked = 0;
-unsigned long stNumTabledCheckedTable = 0;
-unsigned long stNumTabledCheckedSearch = 0;
+statcounter_t stNumEqual = 0;
+statcounter_t stNumHashEqual = 0;
+statcounter_t stNumTabledEqual = 0;
+statcounter_t stNumComp = 0;
+statcounter_t stNumTabledComp = 0;
+statcounter_t stNumTabledChecked = 0;
+statcounter_t stNumTabledCheckedTable = 0;
+statcounter_t stNumTabledCheckedSearch = 0;
 #endif /* EXT_STRING_STATS */
 
 /*-------------------------------------------------------------------------*/
@@ -1748,12 +1748,12 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                                           - distinct_overhead) * 100L)
                           / (mstr_used_size - mstr_used * STR_OVERHEAD)
                         );
-        strbuf_addf(sbuf, "Searches by address: %lu - found: %lu (%.1f%%) - avg length: %7.3f\n"
+        strbuf_addf(sbuf, "Searches by address: %"PRIuSTATCOUNTER" - found: %"PRIuSTATCOUNTER" (%.1f%%) - avg length: %7.3f\n"
                         , mstr_searches
                         , mstr_found, 100.0 * (float)mstr_found / (float)mstr_searches
                         , (float)mstr_searchlen / (float)mstr_searches
                         );
-        strbuf_addf(sbuf, "Searches by content: %lu - found: %lu (%.1f%%) - avg length: %7.3f\n"
+        strbuf_addf(sbuf, "Searches by content: %"PRIuSTATCOUNTER" - found: %"PRIuSTATCOUNTER" (%.1f%%) - avg length: %7.3f\n"
                         , mstr_searches_byvalue
                         , mstr_found_byvalue, 100.0 * (float)mstr_found_byvalue / (float)mstr_searches_byvalue
                         , (float)mstr_searchlen_byvalue / (float)mstr_searches_byvalue
@@ -1762,28 +1762,28 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         , mstr_chains, (unsigned long)HTABLE_SIZE
                         , 100.0 * (float)mstr_chains / (float)HTABLE_SIZE
                         );
-        strbuf_addf(sbuf, "Distinct strings added: %lu "
-                          "- deleted: %lu\n"
+        strbuf_addf(sbuf, "Distinct strings added: %"PRIuSTATCOUNTER" "
+                          "- deleted: %"PRIuSTATCOUNTER"\n"
                         , mstr_added, mstr_deleted
                         );
-        strbuf_addf(sbuf, "Collisions: %lu (%.1f%% added)\n"
+        strbuf_addf(sbuf, "Collisions: %"PRIuSTATCOUNTER" (%.1f%% added)\n"
                         , mstr_collisions
                         , 100.0 * (float)mstr_collisions / (float)mstr_added
                         );
 #ifdef EXT_STRING_STATS
-        strbuf_addf(sbuf, "Equality tests: %lu total, %lu by table (%.1f%%), %lu by hash (%.1lf%%)\n"
+        strbuf_addf(sbuf, "Equality tests: %"PRIuSTATCOUNTER" total, %"PRIuSTATCOUNTER" by table (%.1f%%), %"PRIuSTATCOUNTER" by hash (%.1lf%%)\n"
                         , stNumEqual, stNumTabledEqual
                         , stNumEqual ? 100.0 * ((float)stNumTabledEqual/stNumEqual) : 0.0
                         , stNumHashEqual
                         , stNumEqual ? 100.0 * ((float)stNumHashEqual/stNumEqual) : 0.0
                         );
-        strbuf_addf(sbuf, "Comparisons:    %lu total, %lu by table (%.1f%%)\n"
+        strbuf_addf(sbuf, "Comparisons:    %"PRIuSTATCOUNTER" total, %"PRIuSTATCOUNTER" by table (%.1f%%)\n"
                         , stNumComp, stNumTabledComp
                         , stNumComp ? 100.0 * ((float)stNumTabledComp/stNumComp) : 0.0
                         );
-        strbuf_addf(sbuf, "Table lookups for existence: %lu,"
-                          " %lu by table (%.1f%%),"
-                          " %lu by content (%.1f%%)\n"
+        strbuf_addf(sbuf, "Table lookups for existence: %"PRIuSTATCOUNTER","
+                          " %"PRIuSTATCOUNTER" by table (%.1f%%),"
+                          " %"PRIuSTATCOUNTER" by content (%.1f%%)\n"
                         , stNumTabledChecked
                         , stNumTabledCheckedTable
                         , stNumTabledChecked ? 100.0 * ((float)stNumTabledCheckedTable/stNumTabledChecked) : 0.0

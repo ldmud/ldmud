@@ -133,8 +133,8 @@ struct regexp_s {
 static RxHashEntry * xtable[RXCACHE_TABLE];  /* The Expression Hashtable */
 
 /* Expression cache statistics */
-static uint32 iNumXRequests   = 0;  /* Number of calls to rx_compile() */
-static uint32 iNumXFound      = 0;  /* Number of calls satisfied from table */
+static statcounter_t iNumXRequests   = 0;  /* Number of calls to rx_compile() */
+static statcounter_t iNumXFound      = 0;  /* Number of calls satisfied from table */
 static uint32 iNumXCollisions = 0;  /* Number of hashcollisions */
 static uint32 iNumXEntries    = 0;  /* Number of used cache entries */
 static uint32 iXSizeAlloc     = 0;  /* Dynamic memory held in regexp structs */
@@ -1184,7 +1184,7 @@ rxcache_status (strbuf_t *sbuf, Bool verbose)
 {
 #ifdef RXCACHE_TABLE
 
-    uint32 iNumXReq;  /* Number of rx_compile() requests, made non-zero */
+    statcounter_t iNumXReq;  /* Number of rx_compile() requests, made non-zero */
 
 #if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_largeargs off
@@ -1200,7 +1200,7 @@ rxcache_status (strbuf_t *sbuf, Bool verbose)
         strbuf_addf(sbuf, "Memory allocated:      %"PRIu32"\n", iXSizeAlloc);
         iNumXReq = iNumXRequests ? iNumXRequests : 1;
         strbuf_addf(sbuf
-               , "Requests: %"PRIu32" - Found: %"PRIu32" (%.1f%%) - "
+               , "Requests: %"PRIuSTATCOUNTER" - Found: %"PRIuSTATCOUNTER" (%.1f%%) - "
                "Coll: %"PRIu32" (%.1f%% req/%.1f%% entries)\n"
                , iNumXRequests, iNumXFound, 100.0 * (float)iNumXFound/(float)iNumXReq
                , iNumXCollisions, 100.0 * (float)iNumXCollisions/(float)iNumXReq

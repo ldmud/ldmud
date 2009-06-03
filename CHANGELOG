@@ -5,7 +5,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - We require C99 from now on. Remove checks and definitions for
     C99-incompatible systems.
     (port.h)
-
+  - Changed a bunch of counters to statcounter_t to stop them from overflowing
+    after a few weeks uptime. 
+    (comm, interpret, mregex, mstrings, otable, simulate, swap)
+    
 01-Jun-2009 (Gnomi)
   - Forked 3.5 off the 3.3 branch.
 

@@ -3182,16 +3182,16 @@ status_parse (strbuf_t * sbuf, char * buff)
             strbuf_add(sbuf, "\nNetwork IO:\n");
             strbuf_add(sbuf,   "-----------\n");
             strbuf_addf(sbuf
-                       , "In:  Packets: %10lu - Sum: %10lu - "
+                       , "In:  Packets: %10"PRIuSTATCOUNTER" - Sum: %10"PRIuSTATCOUNTER" - "
                          "Average packet size: %7.2f\n"
                        , inet_packets_in
                        , inet_volume_in
                        , inet_packets_in ? (float)inet_volume_in/(float)inet_packets_in : 0.0
             );
             strbuf_addf(sbuf
-                       , "Out: Packets: %10lu - Sum: %10lu - "
+                       , "Out: Packets: %10"PRIuSTATCOUNTER" - Sum: %10"PRIuSTATCOUNTER" - "
                          "Average packet size: %7.2f\n"
-                         "     Calls to add_message: %lu\n"
+                         "     Calls to add_message: %"PRIuSTATCOUNTER"\n"
                        , inet_packets
                        , inet_volume
                        , inet_packets ? (float)inet_volume/(float)inet_packets : 0.0
@@ -3202,8 +3202,8 @@ status_parse (strbuf_t * sbuf, char * buff)
             strbuf_add(sbuf, "\nApply Cache:\n");
             strbuf_add(sbuf,   "------------\n");
             strbuf_addf(sbuf
-                       , "Calls to apply_low: %10"PRIuPINT"\n"
-                         "Cache hits:         %10"PRIuPINT" (%.2f%%)\n"
+                       , "Calls to apply_low: %10"PRIuSTATCOUNTER"\n"
+                         "Cache hits:         %10"PRIuSTATCOUNTER" (%.2f%%)\n"
                        , (apply_cache_hit+apply_cache_miss)
                        , apply_cache_hit
                        , 100.*(float)apply_cache_hit/

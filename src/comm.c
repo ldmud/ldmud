@@ -247,19 +247,19 @@ p_int write_buffer_max_size = WRITE_BUFFER_MAX_SIZE;
  * use.
  */
 
-unsigned long add_message_calls = 0;
+statcounter_t add_message_calls = 0;
   /* Number of calls to add_message() */
 
-unsigned long inet_packets = 0;
+statcounter_t inet_packets = 0;
   /* Number packets sent to the users */
 
-unsigned long inet_volume = 0;
+statcounter_t inet_volume = 0;
   /* Amount of data sent to the users */
 
-unsigned long inet_packets_in = 0;
+statcounter_t inet_packets_in = 0;
   /* Number packets received from the users */
 
-unsigned long inet_volume_in = 0;
+statcounter_t inet_volume_in = 0;
   /* Amount of data received from the users */
 
 #endif

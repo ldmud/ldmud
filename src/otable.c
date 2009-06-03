@@ -67,15 +67,15 @@ static long objs_in_table = 0;
   /* Number of objects in the table.
    */
 
-static long obj_searches = 0;
-static long obj_probes = 0;
-static long objs_found = 0;
+static statcounter_t obj_searches = 0;
+static statcounter_t obj_probes = 0;
+static statcounter_t objs_found = 0;
   /* Total number of object lookups, of visited objects, and
    * the number of successfull lookups.
    */
 
-static long user_obj_lookups = 0;
-static long user_obj_found = 0;
+static statcounter_t user_obj_lookups = 0;
+static statcounter_t user_obj_found = 0;
   /* Number of externally requested lookups, and how many succeeded.
    */
 
@@ -276,10 +276,10 @@ show_otable_status (strbuf_t * sbuf, Bool verbose)
                    , "Average hash chain length                   %.2f\n"
                    , (float) objs_in_table / (float) OTABLE_SIZE);
         strbuf_addf(sbuf
-                   , "Searches/average search length       %ld (%.2f)\n"
+                   , "Searches/average search length       %"PRIuSTATCOUNTER" (%.2f)\n"
                    , obj_searches
                    , (float) obj_probes / (float) obj_searches);
-        strbuf_addf(sbuf, "External lookups (succeed)   %ld (%ld)\n"
+        strbuf_addf(sbuf, "External lookups (succeed)   %"PRIuSTATCOUNTER" (%"PRIuSTATCOUNTER")\n"
                    , (long)user_obj_lookups, (long)user_obj_found);
 #if defined(__MWERKS__)
 #    pragma warn_largeargs reset

@@ -271,7 +271,7 @@ static mp_int total_swap_reused = 0;
   /* Size of bytes reused from previously freed blocks.
    */
 
-static long swap_num_searches;
+static statcounter_t swap_num_searches;
   /* Number of searches for a free block to allocate (as opposed to
    * simply allocating it).
    */
@@ -280,7 +280,7 @@ static long swap_total_searchlength;
   /* Sum of search steps done when allocating a new block.
    */
 
-static long swap_free_searches;
+static statcounter_t swap_free_searches;
   /* Number of searches for a block to free.
    */
 
@@ -2494,8 +2494,8 @@ swap_status (strbuf_t *sbuf)
     strbuf_addf(sbuf, "Total reused space:%26"PRIdMPINT" bytes\n\n"
                     , total_swap_reused);
     strbuf_addf(sbuf
-               , "Swap: searches: %10ld average search length: %3.1f\n"
-                 "Free: searches: %10ld average search length: %3.1f\n"
+               , "Swap: searches: %10"PRIuSTATCOUNTER" average search length: %3.1f\n"
+                 "Free: searches: %10"PRIuSTATCOUNTER" average search length: %3.1f\n"
                , swap_num_searches
                , (double)swap_total_searchlength /
                  ( swap_num_searches ? swap_num_searches : 1 )

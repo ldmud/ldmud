@@ -8,7 +8,9 @@ xx-xxx-2009 (LDMud Team) -- 3.3.720
     - Other
        + The driver requires a C99 compatible build system. Some checks and
          work-arounds for non-C99 were removed.
-
+       + A bunch of statistic counters (string handler, object table, swapper,
+         network layer,...) were changed to a larger type to prevent them from
+         overflowing. (#521, #608)
 
 30-May-2009 (LDMud Team) -- 3.3.719
     - Fixed Crashes:
