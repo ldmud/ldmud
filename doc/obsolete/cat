@@ -31,6 +31,7 @@ EXAMPLE
 
 HISTORY
         Deprecated in LDMud 3.3.719.
+        Removed in LDMud 3.5.0
 
 SEE ALSO
         get_dir(E), file_size(E), read_file(E), read_bytes(E),

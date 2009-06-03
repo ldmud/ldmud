@@ -13,4 +13,5 @@ HISTORY
         LDMud 3.3.523 added the <flags> parameter.
 
 SEE ALSO
-        file_size(E), cat(E), write_bytes(E), read_file(E), rm(E)
+        file_size(E), write_bytes(E), write_file(E), read_file(E),
+        read_bytes(E), rm(E), get_dir(E)

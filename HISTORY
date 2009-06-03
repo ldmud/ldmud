@@ -4,7 +4,12 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-xx-xxx-2009 (LDMud Team) -- 3.3.720
+xx-xxx-2009 (LDMud Team) -- 3.5.0
+    - Removed Efun:
+       + The deprecated efun cat() was removed. It can be easily and more
+         flexibly replaced by an sefun, which is supplied with the driver.
+         (#637)
+
     - Other
        + The driver requires a C99 compatible build system. Some checks and
          work-arounds for non-C99 were removed.

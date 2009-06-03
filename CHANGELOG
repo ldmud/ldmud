@@ -8,7 +8,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - Changed a bunch of counters to statcounter_t to stop them from overflowing
     after a few weeks uptime. 
     (comm, interpret, mregex, mstrings, otable, simulate, swap)
-    
+  - Removed the deprecated efun cat() (#637)
+    The efun cat can be easily and more flexibly replaced by an sefun.
+    (files.c)
+
 01-Jun-2009 (Gnomi)
   - Forked 3.5 off the 3.3 branch.
 

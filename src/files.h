@@ -8,7 +8,6 @@
 
 /* --- Prototypes --- */
 
-extern svalue_t *v_cat (svalue_t *sp, int num_arg);
 extern svalue_t *f_copy_file (svalue_t *sp);
 extern svalue_t *f_file_size (svalue_t *sp);
 extern svalue_t *f_get_dir (svalue_t *sp);

@@ -115,4 +115,5 @@ AENDERUNGEN
         LDMud 3.2.11: GETDIR_ACCESS und GETDIR_MODES eingefuehrt.
 
 SIEHE AUCH
-        cat(E), mkdir(E), rmdir(E), file_size(E)
+        mkdir(E), rmdir(E), file_size(E), write_file(E), write_bytes(E),
+        read_file(E), read_bytes(E)

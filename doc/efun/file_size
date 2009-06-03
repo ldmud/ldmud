@@ -11,4 +11,4 @@ DESCRIPTION
         Size FSIZE_DIR (-2) indicates that it is a directory.
 
 SEE ALSO
-        write_file(E), cat(E), get_dir(E)
+        write_file(E), write_bytes(E), read_file(E), read_bytes(E), get_dir(E)

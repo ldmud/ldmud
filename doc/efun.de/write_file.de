@@ -11,4 +11,5 @@ BESCHREIBUNG
         'ueberschreiben'. Defaultwert fuer <flags> ist 0.
 
 SIEHE AUCH
-        file_size(E), cat(E), write_bytes(E), read_file(E), rm(E)
+        file_size(E), write_bytes(E), write_file(E), read_file(E),
+        read_bytes(E), rm(E)

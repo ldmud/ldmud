@@ -33,6 +33,7 @@ BEISPIEL
 
 AeNDERUNGEN
         Veraltet seid 3.3.719.
+        Entfernt in LDMud 3.5.0
 
 SIEHE AUCH
         get_dir(E), file_size(E), read_file(E), read_bytes(E), valid_read(M)

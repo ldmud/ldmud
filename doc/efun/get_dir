@@ -104,4 +104,5 @@ HISTORY
         LDMud 3.2.11/3.3.648 added GETDIR_ACCESS and GETDIR_MODES.
 
 SEE ALSO
-        cat(E), mkdir(E), rmdir(E), file_size(E)
+        mkdir(E), rmdir(E), file_size(E), write_file(E), write_bytes(E),
+        read_file(E), read_bytes(E)
