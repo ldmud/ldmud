@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Jun-2009 (Zesstra)
+  - Converted defines in struct.h into static functions.
+
 03-Jun-2009 (Zesstra
   - We require C99 from now on. Remove checks and definitions for
     C99-incompatible systems.

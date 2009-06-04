@@ -10,6 +10,7 @@
 #include "exec.h"
 #include "hash.h"
 #include "svalue.h"
+#include "mstrings.h"
 
 /* --- Types --- */
 
@@ -83,95 +84,7 @@ struct struct_type_s
        * If the struct doesn't have any members, this pointer is NULL.
        */
 };
-
-/* --- Macros --- */
-
-/* p_int struct_ref(struct *t)
- * p_int struct_t_ref(struct_type_t *t)
- *   Return the number of references to struct(type) <t>.
- */
-#define struct_ref(t)   ((t)->type->ref)
-#define struct_t_ref(t) ((t)->ref)
-
-
-/* unsigned short struct_size(struct *t)
- * unsigned short struct_t_size(struct_type_t *t)
- *   Return the number of elements in struct(type) <t>.
- */
-#define struct_size(t)   ((t)->type->num_members)
-#define struct_t_size(t) ((t)->num_members)
-
-
-/* string_t * struct_name(struct *t)
- * string_t * struct_t_name(struct_type_t *t)
- *   Return an uncounted reference to the struct name.
- */
-#define struct_name(t)   ((t)->type->name)
-#define struct_t_name(t) ((t)->name)
-
-
-/* string_t * struct_pname(struct *t)
- * string_t * struct_t_pname(struct_type_t *t)
- *   Return an uncounted reference to the struct's prog_name.
- */
-#define struct_pname(t)   ((t)->type->prog_name)
-#define struct_t_pname(t) ((t)->prog_name)
-
-/* int32 struct_pid(struct *t)
- * int32 struct_t_pid(struct_type_t *t)
- *   Return the ID of the struct's definint program.
- */
-#define struct_pid(t)   ((t)->type->prog_id)
-#define struct_t_pid(t) ((t)->prog_id)
-
-
-/* struct_t *ref_struct(struct_t *t)
- *   Add another ref to struct <t> and return <t>.
- *
- * struct_type_t *ref_struct_type(struct_type_t *t)
- *   Add another ref to struct typeobject <t> and return <t>.
- */
-
-#define ref_struct(t) ((t)->ref++, (t))
-#define ref_struct_type(t) ((t)->ref++, (t))
-
-
-/* void free_struct(struct_t *m)
- *   Subtract one ref from struct <t>, and free the struct
- *   fully if the refcount reaches zero.
- *
- * void free_struct_type(struct_type_t *m)
- *   Subtract one ref from struct typeobject <t>, and free the typeobject
- *   fully if the refcount reaches zero.
- */
-
-#define free_struct(t) MACRO( if (--((t)->ref) <= 0) struct_free(t); )
-#define free_struct_type(t) MACRO( if (--((t)->ref) <= 0) struct_free_type(t); )
-
-
-/* p_int deref_struct(struct_t *t)
- *   Subtract one ref from struct <t>, but don't check if it needs to
- *   be freed. Result is the number of refs left.
- *
- * p_int deref_struct_type(struct_type_t *t)
- *   Subtract one ref from struct typeobject <t>, but don't check if it needs
- *   to be freed. Result is the number of refs left.
- */
-
-#define deref_struct(t) (--(t)->ref)
-#define deref_struct_type(t) (--(t)->ref)
-
-
-/* void free_struct_member_data(struct_member_t *v)
- *   Free all data associated with struct member <v>.
- */
-
-#define free_struct_member_data(v) \
-    do { if ((v)->name) free_mstring((v)->name); free_vartype_data(&((v)->type)); } while(0)
-
-
-#endif /* USE_STRUCTS */
-
+#endif // USE_STRUCTS
 
 /* --- Prototypes --- */
 
@@ -221,5 +134,142 @@ extern void remove_unreferenced_structs (void);
 extern svalue_t * x_map_struct (svalue_t *sp, int num_arg);
 extern svalue_t * f_struct_info(svalue_t * sp);
 extern svalue_t * f_baseof(svalue_t *sp);
+
+
+#ifdef USE_STRUCTS
+/* --- Static (inline) helpers --- */
+
+/* p_int struct_ref(struct *t)
+ * p_int struct_t_ref(struct_type_t *t)
+ *   Return the number of references to struct(type) <t>.
+ */
+static INLINE p_int struct_ref(struct_t *t)
+{
+    return t->type->ref;
+}
+static INLINE p_int struct_t_ref(struct_type_t *t)
+{
+    return t->ref;
+}
+
+/* unsigned short struct_size(struct *t)
+ * unsigned short struct_t_size(struct_type_t *t)
+ *   Return the number of elements in struct(type) <t>.
+ */
+static INLINE short struct_size(struct_t *t)
+{
+    return t->type->num_members;
+}
+static INLINE short struct_t_size(struct_type_t *t)
+{
+    return t->num_members;
+}
+
+/* string_t * struct_name(struct *t)
+ * string_t * struct_t_name(struct_type_t *t)
+ *   Return an uncounted reference to the struct name.
+ */
+static INLINE string_t *struct_name(struct_t *t)
+{
+    return t->type->name;
+}
+static INLINE string_t *struct_t_name(struct_type_t *t)
+{
+    return t->name;
+}
+
+/* string_t * struct_pname(struct *t)
+ * string_t * struct_t_pname(struct_type_t *t)
+ *   Return an uncounted reference to the struct's prog_name.
+ */
+static INLINE string_t *struct_pname(struct_t *t)
+{
+    return t->type->prog_name;
+}
+static INLINE string_t *struct_t_pname(struct_type_t *t)
+{
+    return t->prog_name;
+}
+
+/* int32 struct_pid(struct *t)
+ * int32 struct_t_pid(struct_type_t *t)
+ *   Return the ID of the struct's definint program.
+ */
+static INLINE int32 struct_pid(struct_t *t)
+{
+    return t->type->prog_id;
+}
+static INLINE int32 struct_t_pid(struct_type_t *t)
+{
+    return t->prog_id;
+}
+
+/* struct_t *ref_struct(struct_t *t)
+ *   Add another ref to struct <t> and return <t>.
+ *
+ * struct_type_t *ref_struct_type(struct_type_t *t)
+ *   Add another ref to struct typeobject <t> and return <t>.
+ */
+static INLINE struct_t *ref_struct(struct_t *t)
+{
+    ++(t->ref);
+    return t;
+}
+static INLINE struct_type_t *ref_struct_type(struct_type_t *t)
+{
+    ++(t->ref);
+    return t;
+}
+
+
+/* void free_struct(struct_t *t)
+ *   Subtract one ref from struct <t>, and free the struct
+ *   fully if the refcount reaches zero.
+ *
+ * void free_struct_type(struct_type_t *t)
+ *   Subtract one ref from struct typeobject <t>, and free the typeobject
+ *   fully if the refcount reaches zero.
+ */
+static INLINE void free_struct(struct_t *t)
+{
+    if (--(t->ref) <= 0)
+        struct_free(t);
+}
+static INLINE void free_struct_type(struct_type_t *t)
+{
+    if (--(t->ref) <= 0)
+        struct_free_type(t);
+}
+
+
+/* p_int deref_struct(struct_t *t)
+ *   Subtract one ref from struct <t>, but don't check if it needs to
+ *   be freed. Result is the number of refs left.
+ *
+ * p_int deref_struct_type(struct_type_t *t)
+ *   Subtract one ref from struct typeobject <t>, but don't check if it needs
+ *   to be freed. Result is the number of refs left.
+ */
+static INLINE p_int deref_struct(struct_t *t)
+{
+    return --(t->ref);
+}
+static INLINE p_int deref_struct_type(struct_type_t *t)
+{
+    return --(t->ref);
+}
+
+
+/* void free_struct_member_data(struct_member_t *v)
+ *   Free all data associated with struct member <v>.
+ */
+static INLINE void free_struct_member_data(struct_member_t *v)
+{
+    if (v->name)
+        free_mstring(v->name);
+    free_vartype_data(&(v->type));
+}
+
+#endif /* USE_STRUCTS */
 
 #endif /* STRUCTS_H_ */

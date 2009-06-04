@@ -7684,7 +7684,7 @@ restore_struct (svalue_t *svp, char **str)
     /* Get the name of the struct, and from it the type pointer */
     {
         svalue_t name;
-        string_t * struct_name;
+        string_t * structname;
         string_t * prog_name;
         long pos;
 
@@ -7697,13 +7697,13 @@ restore_struct (svalue_t *svp, char **str)
         }
         siz--;
 
-        /* Accept both 'struct_name' and 'struct_name prog_name #id'
+        /* Accept both 'structname' and 'structname prog_name #id'
          * as formats.
          */
         pos = mstrchr(name.u.str, ' ');
         if (pos < 0)
         {
-            struct_name = ref_mstring(name.u.str);
+            structname = ref_mstring(name.u.str);
             prog_name = NULL;
         }
         else
@@ -7716,7 +7716,7 @@ restore_struct (svalue_t *svp, char **str)
                 free_mstring(name.u.str);
                 return MY_FALSE;
             }
-            struct_name = mstr_extract(name.u.str, 0, pos-1);
+            structname = mstr_extract(name.u.str, 0, pos-1);
             prog_name = mstr_extract(name.u.str, pos+1, pos2-2);
             if (!compat_mode)
             {
@@ -7735,7 +7735,7 @@ restore_struct (svalue_t *svp, char **str)
          * This allows to move inherited structs between modules without
          * breaking the savefiles.
          */
-        stt = struct_find(struct_name, current_object->prog);
+        stt = struct_find(structname, current_object->prog);
         if (!stt && prog_name != NULL)
         {
             do {
@@ -7751,13 +7751,13 @@ restore_struct (svalue_t *svp, char **str)
                    )
                     break;
 
-                stt = struct_find(struct_name, obj->prog);
+                stt = struct_find(structname, obj->prog);
             } while(0);
         }
 
         /* Now stt is either NULL or the struct type */
 
-        free_mstring(struct_name);
+        free_mstring(structname);
         if (prog_name)
             free_mstring(prog_name);
 
