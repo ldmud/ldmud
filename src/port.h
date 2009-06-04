@@ -238,14 +238,16 @@ typedef uintptr_t                p_uint;
 #define SCNuPINT  SCNuPTR
 #define SCNxPINT  SCNxPTR
 #ifdef __PRIPTR_PREFIX
-#   define PRI_PINT_PREFIX __PRIPTR_PREFIX
+    // some libc define __PRIPTR_PREFIX empty. The empty string "" is a bloody
+    // workaround for that.
+#   define PRI_PINT_PREFIX ""__PRIPTR_PREFIX
 #else
     /* ugly - it is a pity that the format specifiers are standardized but not
      * the length modifier. But we need one for sprintf.c. *sigh* */
 #   if SIZEOF_INTPTR_T == SIZEOF_LONG
 #       define PRI_PINT_PREFIX "l"
 #   elif SIZEOF_INTPTR_T == SIZEOF_INT
-#       define PRI_PINT_PREFIX
+#       define PRI_PINT_PREFIX ""
 #   elif HAVE_LONG_LONG && SIZEOF_INTPTR_T == SIZEOF_LONG_LONG
 #       define PRI_PINT_PREFIX "ll"
 #   else
