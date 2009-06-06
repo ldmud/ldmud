@@ -2991,13 +2991,13 @@ put_in (Mempool pool, struct unique **ulist
  */
 
 struct unique_cleanup_s {
-    svalue_t   head;  /* The link to the error handler function */
-    Mempool    pool;  /* Pool for the unique structures */
-    vector_t * arr;   /* Protective reference to the array */
+    error_handler_t head;  /* The link to the error handler function */
+    Mempool         pool;  /* Pool for the unique structures */
+    vector_t      * arr;   /* Protective reference to the array */
 };
 
 static void
-make_unique_cleanup (svalue_t * arg)
+make_unique_cleanup (error_handler_t * arg)
 {
     struct unique_cleanup_s * data = (struct unique_cleanup_s *)arg;
 

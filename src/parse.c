@@ -588,7 +588,7 @@ load_lpc_info (size_t ix, object_t *ob)
 
 /*-------------------------------------------------------------------------*/
 static void
-parse_error_handler (svalue_t *arg UNUSED)
+parse_error_handler (error_handler_t *arg UNUSED)
 
 /* The current parse_command() processing was interrupted by an error.
  * Clean up the current context and restore the previous context.
@@ -1622,7 +1622,7 @@ e_parse_command ( string_t *cmd          /* Command to parse */
  */
 
 {
-    static svalue_t error_handler_addr = { T_ERROR_HANDLER };
+    static error_handler_t error_handler_addr;
 
     vector_t        *obvec = NULL;  /* Objects to match against */
     vector_t        *patvec;        /* Elements in pattern <pattern> */

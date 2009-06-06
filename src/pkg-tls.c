@@ -45,13 +45,13 @@ char * tls_crldirectory = NULL;
 
 typedef struct tls_cb_handler_s
 {
-    svalue_t     val;
-    callback_t * cb;
+    error_handler_t head;
+    callback_t    * cb;
 } tls_cb_handler_t;
 
 /*-------------------------------------------------------------------------*/
 static void
-handle_tls_cb_error (svalue_t * arg)
+handle_tls_cb_error (error_handler_t * arg)
 
 {
     tls_cb_handler_t * data = (tls_cb_handler_t *)arg;
@@ -105,7 +105,7 @@ tls_continue_handshake (interactive_t *ip)
         ip->tls_cb = NULL;
             /* Protect the callback during its execution. */
 
-        push_error_handler (handle_tls_cb_error, (svalue_t *)handler);
+        push_error_handler (handle_tls_cb_error, &(handler->head));
 
         push_number(inter_sp, ret < 0 ? ret : 0);
         push_ref_object(inter_sp, ip->ob, "tls_handshake");

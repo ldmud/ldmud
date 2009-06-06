@@ -1174,6 +1174,10 @@ int_free_svalue (svalue_t *v)
         free_callback(v->u.cb);
         break;
 
+    case T_ERROR_HANDLER:
+        v->u.error_handler->fun(v->u.error_handler);
+        break;
+
     case T_LVALUE:
         switch (v->u.lvalue->type)
         {
@@ -1230,14 +1234,6 @@ int_free_svalue (svalue_t *v)
               break;
           }
 
-        case T_ERROR_HANDLER:
-          {
-              svalue_t *p;
-
-              p = v->u.lvalue;
-              (*p->u.error_handler)(p);
-              break;
-          }
         } /* switch (v->u.lvalue->type) */
         break; /* case T_LVALUE */
 
@@ -2907,7 +2903,7 @@ push_referenced_mapping (mapping_t *m)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-push_error_handler(void (*errorhandler)(svalue_t *), svalue_t *arg)
+push_error_handler(void (*errorhandler)(error_handler_t *), error_handler_t *arg)
 
 /* Push the <errorhandler>() with the argument <arg> as error handler
  * onto the stack.
@@ -2917,12 +2913,11 @@ push_error_handler(void (*errorhandler)(svalue_t *), svalue_t *arg)
  */
 
 {
-    arg->type = T_ERROR_HANDLER;
-    arg->u.error_handler = errorhandler;
+    arg->fun = errorhandler;
 
     inter_sp++;
-    inter_sp->type = T_LVALUE;
-    inter_sp->u.lvalue = arg;
+    inter_sp->type = T_ERROR_HANDLER;
+    inter_sp->u.error_handler = arg;
     return inter_sp;
 } /* push_error_handler() */
 
@@ -6435,14 +6430,14 @@ test_efun_args (int instr, int args, svalue_t *argp)
 /*-------------------------------------------------------------------------*/
 /* general errorhandler */
 static void
-generic_error_handler( svalue_t * arg)
+generic_error_handler( error_handler_t * arg)
 /* The error handler: free the allocated buffer and the errorhandler structure.
  * Note: it is static, but the compiler will have to emit a function and 
  * symbol for this because the address of the function is taken and it is 
  * therefore not suitable to be inlined.
  */
 {
-  errorhandler_t *handler = (errorhandler_t *)arg;
+  mem_error_handler_t *handler = (mem_error_handler_t *)arg;
   if (handler->buff)
     xfree(handler->buff);
   xfree(handler);
@@ -6460,7 +6455,7 @@ xalloc_with_error_handler(size_t size)
  */
 {
   void *buffer;
-  errorhandler_t *handler;
+  mem_error_handler_t *handler;
   /* get the memory for the handler first and fail if out-of-memory */
   handler = xalloc(sizeof(*handler));
   if (!handler)

@@ -337,14 +337,14 @@ pstrcmp (const void *p1, const void *p2)
 /*-------------------------------------------------------------------------*/
 struct get_dir_error_context
 {
-    svalue_t head;
+    error_handler_t head;
     XDIR *dirp;
     vector_t *v;
 };
 
 /*-------------------------------------------------------------------------*/
 static void
-get_dir_error_handler (svalue_t *arg)
+get_dir_error_handler (error_handler_t *arg)
 
 /* T_ERROR_HANDLER function: <arg> is a (struct get_dir_error_context*)
  * with the directory which needs to be closed.

@@ -997,13 +997,13 @@ struct regexplode_match {
  * regexp which we have to free.
  */
 struct regexplode_cleanup_s {
-    svalue_t sval;
+    error_handler_t head;
     regexp_t *reg;
     Mempool matchmempool;
 };
 
 static void
-regexplode_error_handler( svalue_t * arg)
+regexplode_error_handler( error_handler_t * arg)
 /* The error handler: delete the mempool and free the compiled regexp.
  * Note: it is static, but the compiler will have to emit a function and 
  * symbol for this because the address of the function is taken and it is 
@@ -1078,7 +1078,7 @@ f_regexplode (svalue_t *sp)
     cleanup->matchmempool = pool;
     cleanup->reg = NULL;
     /*  push error handler above the args on the stack */
-    sp = push_error_handler(regexplode_error_handler, &(cleanup->sval));
+    sp = push_error_handler(regexplode_error_handler, &(cleanup->head));
         
     reg = rx_compile(pattern, opt, MY_FALSE);
     if (reg == 0) {
@@ -1229,14 +1229,14 @@ struct regreplace_match {
  */
 
 struct regreplace_cleanup_s {
-    svalue_t   head;  /* The link to the error handler function */
+    error_handler_t head;  /* The link to the error handler function */
 
     struct regreplace_match *matches;  /* List of matches */
     regexp_t *reg;                     /* Compiled pattern */
 };
 
 static void
-regreplace_cleanup (svalue_t * arg)
+regreplace_cleanup (error_handler_t * arg)
 {
     struct regreplace_cleanup_s * data = (struct regreplace_cleanup_s *)arg;
     struct regreplace_match *match;

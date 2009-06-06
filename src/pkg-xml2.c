@@ -49,7 +49,7 @@ struct attribute_walk_extra_s
  */
 struct xml_cleanup_s
 {
-    svalue_t head; /* push_error_handler saves the link to our handler here. */
+    error_handler_t head; /* push_error_handler saves the link to our handler here. */
 
     xmlTextReaderPtr reader;
     xmlTextWriterPtr writer;
@@ -247,7 +247,7 @@ walk_attribute_mapping(svalue_t *key, svalue_t *val, void *pextra)
 }
 
 static void
-xml_cleanup (svalue_t * arg)
+xml_cleanup (error_handler_t * arg)
 
 /*
  * Takes care, that the xml document is correctly freed in case of an error 

@@ -33,7 +33,7 @@ typedef struct arraylist_element_s arraylist_element_t;
 
 struct arraylist_s
 {
-    svalue_t head; /* The error handler. */
+    error_handler_t head; /* The error handler. */
 
     arraylist_element_t *first;
     arraylist_element_t *last;
@@ -48,7 +48,7 @@ struct arraylist_element_s
 
 /*-------------------------------------------------------------------------*/
 static void
-cleanup_arraylist (svalue_t * list)
+cleanup_arraylist (error_handler_t * list)
 
 /* Our cleanup handler, called when the arraylist is freed.
  */
@@ -80,14 +80,13 @@ put_arraylist (svalue_t * list)
 
     memsafe(data = xalloc(sizeof(*data)), sizeof(*data), "arraylist");
 
-    data->head.type = T_ERROR_HANDLER;
-    data->head.u.error_handler = cleanup_arraylist;
+    data->head.fun = cleanup_arraylist;
     data->num = 0;
     data->first = NULL;
     data->last = NULL;
 
-    list->type = T_LVALUE;
-    list->u.lvalue = &(data->head);
+    list->type = T_ERROR_HANDLER;
+    list->u.error_handler = &(data->head);
 } /* put_arraylist() */
 
 /*-------------------------------------------------------------------------*/

@@ -49,8 +49,8 @@ struct sqlite_rows_s
  */
 struct sl_exec_cleanup_s
 {
-    svalue_t head; /* push_error_handler saves the link to our
-                      handler here. */
+    error_handler_t head; /* push_error_handler saves the link to our
+                             handler here. */
 
     sqlite3_stmt *stmt;
     sqlite_rows_t *rows;
@@ -318,7 +318,7 @@ f_sl_open (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static void
-sl_exec_cleanup (svalue_t * arg)
+sl_exec_cleanup (error_handler_t * arg)
 {
     sqlite_rows_t *row;
     struct sl_exec_cleanup_s * data;

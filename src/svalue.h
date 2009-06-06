@@ -95,14 +95,14 @@ union u {
       /* The following fields are used only in svalues referenced by
        * T_LVALUE svalues:
        */
-    void (*error_handler) (svalue_t *);
-      /* T_ERROR_HANDLER: this function is
-       * executed on a free_svalue(), receiving the T_ERROR_HANDLER svalue*
+    error_handler_t *error_handler;
+      /* T_ERROR_HANDLER: the function error_handler->fun is
+       * executed on a free_svalue(), receiving the error_handler_t*
        * as argument. This allows the transparent implemention of cleanup
        * functions which are called even after runtime errors. In order
        * to pass additional information to the error_handler(), embed
        * the T_ERROR_HANDLER svalue into a larger structure (possible since
-       * it has to be referenced by pointer) and let the error_handler()
+       * it has to be referenced by pointer) and let the error_handler->fun()
        * execute the appropriate casts.
        */
 };
@@ -138,6 +138,7 @@ struct svalue_s
     union {       /* Secondary type information */
         ph_int exponent;     /* Exponent of a T_FLOAT */
         ph_int closure_type; /* Type of a T_CLOSURE */
+        ph_int lvalue_type;  /* Type of a T_LVALUE */
         ph_int quotes;       /* Number of quotes of a quoted array or symbol */
         ph_int num_arg;      /* used by call_out.c to for vararg callouts */
         ph_int extern_args;  /* Callbacks: true if the argument memory was

@@ -8547,18 +8547,18 @@ struct discarded {
 };
 
 typedef struct restore_cleanup_s {
-    svalue_t head;        /* The T_ERROR_HANDLER structure */
-    int      * pNesting;  /* The nesting counter */
-    char     * buff;      /* The optional allocated line buffer. */
-    FILE     * f;         /* The optional input file */
+    error_handler_t    head;      /* The T_ERROR_HANDLER structure */
+    int              * pNesting;  /* The nesting counter */
+    char             * buff;      /* The optional allocated line buffer. */
+    FILE             * f;         /* The optional input file */
     struct discarded * dp;
-    char     * filename;  /* optional buffer for the filename */
+    char             * filename;  /* optional buffer for the filename */
       /* List of values for which the variables no longer exist. */
 } restore_cleanup_t;
 
 
 static void
-restore_object_cleanup ( svalue_t * arg)
+restore_object_cleanup ( error_handler_t * arg)
 
 /* The error handler during restore_object cleanup: free all resources
  * and update the nesting.
@@ -9033,7 +9033,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
 /*-------------------------------------------------------------------------*/
 static void
-restore_value_cleanup ( svalue_t * arg )
+restore_value_cleanup ( error_handler_t * arg )
 
 /* The error handler during restore value cleanup: free all resources.
  */

@@ -249,7 +249,7 @@
 
 /* The local typedefs */
 typedef struct map_chain_s    map_chain_t;
-
+typedef struct walk_mapping_s walk_mapping_t;
 
 /* --- struct map_chain_s: one entry in a hash chain ---
  *
@@ -268,6 +268,17 @@ struct map_chain_s {
   /* Allocation size of a map_chain_t for <nv> values per key.
    */
 
+
+/* --- struct walk_mapping_s: contains all walk_mapping pointers */
+
+struct walk_mapping_s {
+    error_handler_t head;      /* The error handler: f_walk_mapping_cleanup */
+    p_int           entries;   /* Number of mapping entries. */
+    mapping_t     * map;       /* The mapping. */
+    Bool            has_hash;  /* The mapping has a hash part (refcount +1) */
+    callback_t    * callback;  /* The callback structure */
+    svalue_t        pointers[1 /* + .entries-1*/];
+};
 
 /*-------------------------------------------------------------------------*/
 
@@ -3704,7 +3715,7 @@ f_walk_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 
 /*-------------------------------------------------------------------------*/
 static void
-f_walk_mapping_cleanup (svalue_t *arg)
+f_walk_mapping_cleanup (error_handler_t *arg)
 
 /* Auxiliary to efuns {walk,filter}_walk_mapping(): Cleanup.
  *
@@ -3712,25 +3723,24 @@ f_walk_mapping_cleanup (svalue_t *arg)
  * <arg> is the array of svalue allocated by walk_mapping_prologue().
  * See walk_mapping_prologue() for details.
  */
-
 {
+    walk_mapping_t *data;
     svalue_t *svp;
     mapping_t *m;
     mp_int i;
 
-    svp = arg + 1;
+    data = (walk_mapping_t*) arg;
 
-    if (svp->u.cb)
-        free_callback(svp->u.cb);
-    svp++;
+    if (data->callback)
+        free_callback(data->callback);
 
-    m = svp[1].u.map;
+    m = data->map;
 
     /* If the mapping had a hash part prior to the f_walk_mapping(),
      * it was protected by the prologue and we have to lift that
      * protection.
      */
-    if (svp[1].x.generic)
+    if (data->has_hash)
     {
         mapping_hash_t *hm;
 
@@ -3753,11 +3763,12 @@ f_walk_mapping_cleanup (svalue_t *arg)
     }
 
     /* Free the key svalues in the block */
-    i = svp->u.number;
+    i = data->entries;
+    svp = data->pointers;
     if (i) do
     {
-        svp += 2;
         free_svalue(svp);
+        svp += 2;
     } while (--i > 0);
 
     /* Deallocate the block */
@@ -3794,10 +3805,9 @@ walk_mapping_prologue (mapping_t *m, svalue_t *sp, callback_t *cb)
  * If <m> at call time has a hash part, it is protected by incrementing
  * hash->ref.
  */
-
 {
     mapping_hash_t *hm;
-    svalue_t *pointers;
+    walk_mapping_t *pointers;
     svalue_t *write_pointer, *read_pointer;
 
     if ( NULL != (hm = m->hash) ) {
@@ -3810,16 +3820,18 @@ walk_mapping_prologue (mapping_t *m, svalue_t *sp, callback_t *cb)
             hm->deleted = NULL;
         }
     }
-    xallocate(pointers, (m->num_entries * 2 + 4) * sizeof(svalue_t)
+    xallocate(pointers, sizeof(walk_mapping_t)
+                      + (m->num_entries * 2 - 1) * sizeof(svalue_t)
                       , "walk_mapping prologue" );
-    pointers[1].type = T_CALLBACK;
-    pointers[1].u.cb = cb;
-    pointers[2].u.number = m->num_entries;
-    pointers[3].u.map = m;
-    pointers[3].x.generic = hm != NULL;
+
+    pointers->callback = cb;
+    pointers->entries = m->num_entries;
+    pointers->map = m;
+    pointers->has_hash = hm != NULL;
+
     inter_sp = sp;
-    push_error_handler(f_walk_mapping_cleanup, pointers);
-    read_pointer = write_pointer = pointers + 4;
+    push_error_handler(f_walk_mapping_cleanup, &(pointers->head));
+    read_pointer = write_pointer = pointers->pointers;
     walk_mapping(m, f_walk_mapping_filter, &write_pointer);
     return read_pointer;
 } /* walk_mapping_prologue() */
@@ -3875,7 +3887,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
     assign_eval_cost();
 
     read_pointer = walk_mapping_prologue(m, sp, &cb);
-    i = read_pointer[-2].u.number;
+    i = m->num_entries;
     inter_sp = ++sp; /* walk_mapping_prologue() pushed one value */
 
     num_values = m->num_values;
@@ -3954,6 +3966,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
     int         error_index;
     callback_t  cb;
     p_int num_values;        /* Width of the mapping */
+    p_int num_entries;       /* Size of the mapping */
     vector_t *dvec;          /* Values of one key */
     svalue_t *dvec_sp;       /* Stackentry of dvec */
     svalue_t *read_pointer;  /* Prepared mapping values */
@@ -3982,6 +3995,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
     assign_eval_cost();
 
     num_values = m->num_values;
+    num_entries = m->num_entries;
 
     /* Prepare the vector for the values of each element */
     dvec = NULL;
@@ -4005,7 +4019,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
     read_pointer = walk_mapping_prologue(m, sp, &cb);
 
-    m = allocate_mapping(read_pointer[-2].u.number, num_values);
+    m = allocate_mapping(num_entries, num_values);
     if (!m)
     {
         inter_sp = sp + 1;
@@ -4023,7 +4037,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
      * a call to the filter function. If it returns true, assign the
      * pair to the new mapping.
      */
-    for (i = read_pointer[-2].u.number; --i >= 0; read_pointer += 2)
+    for (i = num_entries; --i >= 0; read_pointer += 2)
     {
         svalue_t *data;
 

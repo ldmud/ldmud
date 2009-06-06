@@ -84,14 +84,22 @@ struct control_stack {
 #endif
 };
 
+/* An error handler is simply a function that is given the
+ * pointer to a structure containing the function pointer, so that
+ * more data for cleaning up may be embedded into this structure.
+ */
+struct error_handler_s {
+    void (*fun) (error_handler_t *);
+};
+
 /* a general error handler structure. head is assigned as payload to an 
  * T_LVALUE svalue of type T_ERROR_HANDLER and pushed onto the value stack.
  * If the stack is unrolled during runtime errors the error_handler function
  * is called and frees buff. */
-typedef struct errorhandler_s {
-  svalue_t head;        /* The T_ERROR_HANDLER structure */
-  char     * buff;      /* The allocated buffer to free. */
-} errorhandler_t;
+typedef struct mem_error_handler_s {
+  error_handler_t head;      /* The T_ERROR_HANDLER structure */
+  char          * buff;      /* The allocated buffer to free. */
+} mem_error_handler_t;
 
 
 /* --- Constants --- */
@@ -165,7 +173,7 @@ extern void pop_stack(void);
 extern void push_apply_value(void);
 extern void pop_apply_value (void);
 extern void push_referenced_mapping(mapping_t *m);
-extern svalue_t *push_error_handler(void (*errorhandler)(svalue_t *), svalue_t *arg);
+extern svalue_t *push_error_handler(void (*errorhandler)(error_handler_t *), error_handler_t *arg);
 extern void *xalloc_with_error_handler(size_t size);
 
 extern void init_interpret(void);

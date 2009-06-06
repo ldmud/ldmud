@@ -110,7 +110,7 @@ struct limits_context_s
 
 struct give_uid_error_context
 {
-    svalue_t  head;        /* A T_ERROR_HANDLER with this struct as arg */
+    error_handler_t head;  /* A T_ERROR_HANDLER with this struct as arg */
     object_t *new_object;  /* The object under processing */
 };
 
@@ -1377,7 +1377,7 @@ set_svalue_user (svalue_t *svp, object_t *owner)
 
 /*-------------------------------------------------------------------------*/
 static void
-give_uid_error_handler (svalue_t *arg)
+give_uid_error_handler (error_handler_t *arg)
 
 /* Error handler for give_uid_to_object(), called automatically when
  * the stack is cleant up during the error handling.
