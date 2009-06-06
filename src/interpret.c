@@ -1387,7 +1387,7 @@ Bool destructed_object_ref (svalue_t *v) { return _destructed_object_ref(v); }
 
 /*-------------------------------------------------------------------------*/
 static INLINE Bool
-int_object_ref (svalue_t *svp, object_t *obj)
+inl_object_ref (svalue_t *svp, object_t *obj)
 
 /* Return TRUE if <svp> references object <obj> (destructed or alive),
  * return FALSE if it doesn't.
@@ -1415,9 +1415,10 @@ int_object_ref (svalue_t *svp, object_t *obj)
 
     return l->ob == obj;
 
-} /* int_object_ref() */
-
-#define object_ref(v,o) int_object_ref(v,o)
+} /* inl_object_ref() */
+// exporting the function als object_ref() is currently not necessary, because
+// it is only used in this file.
+#define object_ref(v,o) inl_object_ref(v,o)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
