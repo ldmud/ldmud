@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Jun-2009 (Gnomi)
+  - Made break_sp an svalue_t* and break addresses have their own
+    type (T_BREAK_ADDR).
+    (svalue.h, interpret.c)
+
 06-Jun-2009 (Zesstra)
   - Changed some defines in interpret.c to static inline functions.
 

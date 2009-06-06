@@ -105,6 +105,10 @@ union u {
        * it has to be referenced by pointer) and let the error_handler->fun()
        * execute the appropriate casts.
        */
+
+    bytecode_p break_addr;
+      /* Points to address to branch to at next F_BREAK from within a switch().
+       */
 };
 
 /* --- struct svalue_s: the LPC data structure ---
@@ -213,7 +217,13 @@ struct svalue_s
    * for details.
    */
 
-#define T_NULL                            0x16
+#define T_BREAK_ADDR                      0x16
+  /* Not an actual type, it's used internally for saving
+   * the address where break statements within switch statements
+   * should branch to.
+   */
+
+#define T_NULL                            0x17
   /* Not an actual type, this is used in the efun_lpc_types[] table
    * to encode the acceptance of '0' instead of the real datatype.
    */

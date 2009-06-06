@@ -69,7 +69,7 @@ struct control_stack {
       /* For EFUN_FUNSTART entries, this is the efun executed.
        */
 
-    bytecode_p *break_sp;
+    svalue_t *break_sp;
       /* Points to address to branch to at next F_BREAK, which is also
        * the actual bottom of the break stack.
        */

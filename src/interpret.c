@@ -475,6 +475,7 @@ static const char * svalue_typename[]
    , /* T_PROTECTOR_MAPPING  */              "protector-mapping"
    , /* T_CALLBACK */       "callback-mapping"
    , /* T_ERROR_HANDLER */  "error-handler"
+   , /* T_BREAK_ADDR */     "break-address"
    , /* T_NULL */  "null"
    };
 
@@ -507,15 +508,14 @@ static svalue_t *inter_context;
    */
 #endif /* USE_NEW_INLINES */
 
-static bytecode_p *break_sp;
+static svalue_t *break_sp;
   /* Points to address to branch to at next F_BREAK from within a switch().
    * This is actually a stack of addresses with break_sp pointing to the
    * bottom with the most recent entry. This break stack is stored on
-   * the evaluator stack, one address per svalue_t (which incidentally
-   * stored in the u.string field), between the functions temporary values
-   * and its local variables.
-   * TODO: Since this stores an opcode* in a svalue, it should get its
-   * TODO:: own union type, and break_sp should be an svalue_t *.
+   * the evaluator stack, one address per svalue_t (which have T_BREAK_ADDR
+   * set as the type), between the functions temporary values and its local
+   * variables (the compiler added the needed stack depth to the number
+   * of local variables).
    */
 
 program_t *current_prog;
@@ -1184,6 +1184,10 @@ int_free_svalue (svalue_t *v)
 
     case T_ERROR_HANDLER:
         v->u.error_handler->fun(v->u.error_handler);
+        break;
+
+    case T_BREAK_ADDR:
+        NOOP;
         break;
 
     case T_LVALUE:
@@ -7427,7 +7431,7 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
     /* Initialize the break stack, pointing to the entry above
      * the first available svalue.
      */
-    break_sp = (bytecode_p *)&sp[1].u.str;
+    break_sp = sp+1;
 
     return sp;
 } /* setup_new_frame2() */
@@ -8838,8 +8842,8 @@ again:
          * from the break stack.
          */
 
-        pc = *break_sp;
-        break_sp += sizeof(svalue_t)/sizeof(*break_sp);
+        pc = break_sp->u.break_addr;
+        break_sp++;
         break;
     }
 
@@ -9083,8 +9087,9 @@ again:
          * push the break address onto the break stack.
          */
         end_tab  = tabstart + tablen;
-        break_sp -= sizeof(svalue_t)/sizeof(*break_sp);
-        *break_sp = break_addr;
+        break_sp--;
+        break_sp->type = T_BREAK_ADDR;
+        break_sp->u.break_addr = break_addr;
 
         /* Get the search value from the argument passed on the
          * stack. This also does the type checking.
@@ -15893,8 +15898,7 @@ again:
          * first by of <offset>
          */
 
-        break_sp +=
-          LOAD_UINT8(pc) * (sizeof(svalue_t)/sizeof(*break_sp));
+        break_sp++;
         /* FALLTHROUGH */
 
     CASE(F_BREAK_CONTINUE);       /* --- break_continue <offset> ---*/
@@ -15915,7 +15919,7 @@ again:
 
         /* TODO: uint16 */ unsigned long offset;
 
-        break_sp += sizeof(svalue_t)/sizeof(*break_sp);
+        break_sp++;
         GET_LONG(offset, pc);
         offset += pc - current_prog->program;
         pc = current_prog->program + offset;

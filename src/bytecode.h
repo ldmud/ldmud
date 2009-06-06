@@ -121,8 +121,6 @@
  */
 
 #if CHAR_BIT == 8
-typedef unsigned char   bytecode_t;
-typedef bytecode_t    * bytecode_p;
 
 #define GET_CODE(p)      (*(p))
 #define LOAD_CODE(p)     (*(p)++)
