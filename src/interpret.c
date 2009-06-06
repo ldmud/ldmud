@@ -1011,7 +1011,7 @@ static void assign_protected_string_range(
     struct protected_range_lvalue *dest,svalue_t *source, Bool do_free);
 
 /*-------------------------------------------------------------------------*/
-void
+void INLINE
 free_string_svalue (svalue_t *v)
 
 /* Free the string svalue <v>; <v> must be of type T_STRING.
@@ -1031,8 +1031,6 @@ free_string_svalue (svalue_t *v)
 
     free_mstring(v->u.str);
 }
-
-#define free_string_svalue(v) free_mstring((v)->u.str)
 
 /*-------------------------------------------------------------------------*/
 void
