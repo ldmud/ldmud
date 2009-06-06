@@ -338,7 +338,7 @@ struct cache
 #if CACHE_SIZE > INT_MAX
 #error CACHE_SIZE is > INT_MAX.
 #endif
-  /* sanity check - some function rely that CACHE_SIZE fits into int */
+  /* sanity check - some functions rely that CACHE_SIZE fits into int */
 
 /*-------------------------------------------------------------------------*/
 /* Tracing */
@@ -346,7 +346,7 @@ struct cache
 #if TOTAL_TRACE_LENGTH > INT_MAX
 #error TOTAL_TRACE_LENGTH is > INT_MAX.
 #endif
-/* sanity check - some function rely that TOTAL_TRACE_LENGTH fits into int */
+/* sanity check - some functions rely that TOTAL_TRACE_LENGTH fits into int */
 
 int tracedepth;
   /* Current depth of traced functions.
@@ -394,50 +394,60 @@ static int              last = TOTAL_TRACE_LENGTH - 1;
 
 #endif
 
-/* --- Macros --- */
+// Forward declarations.
+static Bool trace_test (int b);
 
-#define TRACE_IS_INTERACTIVE() (command_giver && O_IS_INTERACTIVE(command_giver))
+/* --- Static helper functions --- */
+static INLINE Bool TRACE_IS_INTERACTIVE()
+/* Return TRUE if the current command_giver is interactive.
+ * TODO: Instead of disabling all traceoutput whenever the command_giver
+ * TODO:: turns non-interactive, output should be redirected (with a
+ * TODO:: special mark) to the current_interactive.
+ */
+{
+    return command_giver && O_IS_INTERACTIVE(command_giver);
+}
 
-  /* Return TRUE if the current command_giver is interactive.
-   * TODO: Instead of disabling all traceoutput whenever the command_giver
-   * TODO:: turns non-interactive, output should be redirected (with a
-   * TODO:: special mark) to the current_interactive.
-   */
+static INLINE Bool TRACETST(int b)
+/* Return TRUE if the any of the tracing options <b> are requested
+ * by the interactive user.
+ */
+{
+    return TRACE_IS_INTERACTIVE() && (O_GET_INTERACTIVE(command_giver)->trace_level & (b));
+}
 
-#define TRACETST(b) (TRACE_IS_INTERACTIVE() && (O_GET_INTERACTIVE(command_giver)->trace_level & (b)))
-
-  /* Return TRUE if the any of the tracing options <b> are requested
-   * by the interactive user.
-   */
-
-#define TRACEP(b) (trace_level & (b) && trace_test(b))
+static INLINE Bool TRACEP(int b)
   /* Return TRUE if tracing options <b> are both active in trace_level
    * and requested by the interactive user.
    */
+{
+    return trace_level & (b) && trace_test(b);
+}
 
-#define TRACEHB \
-  ( current_heart_beat == NULL || TRACETST(TRACE_HEART_BEAT))
-
+static INLINE Bool TRACEHB()
   /* Return TRUE if either the current execution is not caused
    * by a heart beat call, or if heartbeat tracing is allowed.
    */
+{
+    return current_heart_beat == NULL || TRACETST(TRACE_HEART_BEAT);
+}
 
-#define SET_TRACE_EXEC MACRO( \
-                              if (trace_level & TRACE_EXEC) \
-                                  trace_exec_active = MY_TRUE;\
-                            )
-
+static void INLINE SET_TRACE_EXEC()
   /* If TRACE_EXEC is requested, (re)activate it.
    * See trace_exec_active for the background.
    */
-
-#define TRACE_EXEC_P (   TRACEP(TRACE_EXEC) \
-                      || (trace_exec_active = MY_FALSE, MY_FALSE))
-
+{
+    if (trace_level & TRACE_EXEC)
+        trace_exec_active = MY_TRUE;
+}
+static INLINE Bool TRACE_EXEC_P()
   /* If TRACE_EXEC is still requested, return TRUE, otherwise deactivate
    * it and return FALSE.
    * See trace_exec_active for the background.
    */
+{
+    return TRACEP(TRACE_EXEC) ||  (trace_exec_active = MY_FALSE, MY_FALSE);
+}
 
 /*-------------------------------------------------------------------------*/
 /* The names for the svalue types */
@@ -6757,7 +6767,7 @@ do_trace (char *msg, char *fname, char *post)
     char buf[10000];
     char *objname;
 
-    if (!TRACEHB)
+    if (!TRACEHB())
         return;
     objname = TRACETST(TRACE_OBJNAME)
               ? (current_object && current_object->name
@@ -6797,7 +6807,7 @@ do_trace_call (fun_hdr_p funstart, Bool is_lambda)
         }
 
         /* If requested, also trace the arguments */
-        if (TRACEHB)
+        if (TRACEHB())
         {
             if (TRACETST(TRACE_ARGS))
             {
@@ -6835,7 +6845,7 @@ do_trace_return (svalue_t *sp)
         {
             inter_sp = sp;
             do_trace("Return", "", "");
-            if (TRACEHB) {
+            if (TRACEHB()) {
                 if (TRACETST(TRACE_ARGS)) {
                     add_message(" with value: ");
                     print_svalue(sp);
@@ -6847,7 +6857,7 @@ do_trace_return (svalue_t *sp)
     traceing_recursion--;
 
     /* If requested, (re)activate TRACE_EXEC */
-    SET_TRACE_EXEC;
+    SET_TRACE_EXEC();
 }
 
 /*-------------------------------------------------------------------------*/
@@ -7878,7 +7888,7 @@ eval_instruction (bytecode_p first_instruction
     use_ap = MY_FALSE;
     runtime_no_warn_deprecated = MY_FALSE;
     runtime_array_range_check = MY_FALSE;
-    SET_TRACE_EXEC;
+    SET_TRACE_EXEC();
 
     /* ------ The evaluation loop ------ */
 
@@ -7944,7 +7954,7 @@ again:
     /* If requested, trace the instruction.
      * Print the name of the instruction, but guard against recursions.
      */
-    if (trace_exec_active && TRACE_EXEC_P && TRACE_IS_INTERACTIVE())
+    if (trace_exec_active && TRACE_EXEC_P() && TRACE_IS_INTERACTIVE())
     {
         if (!++traceing_recursion)
         {
@@ -20923,7 +20933,7 @@ f_trace (svalue_t *sp)
 
     /* Return the old level */
     sp->u.number = ot;
-    SET_TRACE_EXEC;
+    SET_TRACE_EXEC();
     return sp;
 } /* f_trace() */
 
