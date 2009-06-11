@@ -15898,7 +15898,7 @@ again:
          * first by of <offset>
          */
 
-        break_sp++;
+        break_sp += LOAD_UINT8(pc);
         /* FALLTHROUGH */
 
     CASE(F_BREAK_CONTINUE);       /* --- break_continue <offset> ---*/
