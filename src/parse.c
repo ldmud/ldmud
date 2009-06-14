@@ -758,7 +758,10 @@ find_string (string_t *str, vector_t *wvec, size_t *cix_in)
 
         /* If all of split matched, we found it */
         if ((p_int)(*cix_in - fpos) == VEC_SIZE(split))
+        {
+            (*cix_in)--; /* point to the last matched word */
             return fpos;
+        }
 
         /* Not found: continue search */
         *cix_in = fpos;
