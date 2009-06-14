@@ -1686,10 +1686,10 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
 {
 #   define STR_OVERHEAD (sizeof(string_t)+1)
 
-    mp_uint stringtable_size;
-    mp_uint distinct_strings;
-    mp_uint distinct_size;
-    mp_uint distinct_overhead;
+    statcounter_t stringtable_size;
+    statcounter_t distinct_strings;
+    statcounter_t distinct_size;
+    statcounter_t distinct_overhead;
 
     stringtable_size = HTABLE_SIZE * sizeof(string_t *);
     distinct_strings = mstr_tabled_count + mstr_untabled_count;
@@ -1700,7 +1700,8 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
     if (!verbose)
     {
         strbuf_addf(sbuf
-                   , "Strings alloced\t\t\t%8lu %9lu (%lu + %lu overhead)\n"
+                   , "Strings alloced\t\t\t%8"PRIuSTATCOUNTER" %9"PRIuSTATCOUNTER
+                     " (%"PRIuSTATCOUNTER" + %"PRIuSTATCOUNTER" overhead)\n"
                    , distinct_strings, distinct_size + stringtable_size
                    , distinct_size - distinct_overhead
                    , distinct_overhead + stringtable_size
@@ -1710,7 +1711,8 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
     {
         strbuf_add(sbuf, "\nString handler:\n");
         strbuf_add(sbuf,   "---------------\t  Strings     Bytes (Data+Overhead)\n");
-        strbuf_addf(sbuf,  "Total asked for\t%9lu %9lu (%9lu+%9lu)\n"
+        strbuf_addf(sbuf,  "Total asked for\t%9"PRIuMPINT" %9"PRIuMPINT
+                           " (%9"PRIuMPINT"+%9"PRIuMPINT")\n"
                         , mstr_used
                         , mstr_used_size
                         , mstr_used_size
@@ -1718,13 +1720,14 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                           : 0
                         , mstr_used * STR_OVERHEAD
                         );
-        strbuf_addf(sbuf,  "Total allocated\t%9lu %9lu (%9lu+%9lu)\n"
+        strbuf_addf(sbuf,  "Total allocated\t%9"PRIuSTATCOUNTER" %9"PRIuSTATCOUNTER
+                           " (%9"PRIuSTATCOUNTER"+%9"PRIuSTATCOUNTER")\n"
                         , distinct_strings
                         , distinct_size + stringtable_size
                         , distinct_size - distinct_overhead
                         , distinct_overhead + stringtable_size
                         );
-        strbuf_addf(sbuf,  " - tabled\t%9lu %9lu (%9lu+%9lu)\n"
+        strbuf_addf(sbuf,  " - tabled\t%9"PRIuMPINT" %9"PRIuMPINT" (%9"PRIuMPINT"+%9"PRIuMPINT")\n"
                         , mstr_tabled_count
                         , mstr_tabled_size + stringtable_size
                         , mstr_tabled_size
@@ -1732,7 +1735,7 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                           : 0
                         , mstr_tabled_count * STR_OVERHEAD + stringtable_size
                         );
-        strbuf_addf(sbuf,  " - untabled\t%9lu %9lu (%9lu+%9lu)\n"
+        strbuf_addf(sbuf,  " - untabled\t%9"PRIuMPINT" %9"PRIuMPINT" (%9"PRIuMPINT"+%9"PRIuMPINT")\n"
                         , mstr_untabled_count
                         , mstr_untabled_size
                         , mstr_untabled_size
@@ -1741,7 +1744,7 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         , mstr_untabled_count * STR_OVERHEAD
                         );
         strbuf_addf(sbuf, "\nSpace required vs. 'regular C' string implementation: "
-                          "%lu%% with, %lu%% without overhead.\n"
+                          "%"PRIuSTATCOUNTER"%% with, %"PRIuSTATCOUNTER"%% without overhead.\n"
                         , ((distinct_size + stringtable_size) * 100L)
                           / (mstr_used_size - mstr_used * sizeof(string_t))
                         , ((distinct_size + stringtable_size
@@ -1758,7 +1761,7 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         , mstr_found_byvalue, 100.0 * (float)mstr_found_byvalue / (float)mstr_searches_byvalue
                         , (float)mstr_searchlen_byvalue / (float)mstr_searches_byvalue
                         );
-        strbuf_addf(sbuf, "Hash chains used: %lu of %lu (%.1f%%)\n"
+        strbuf_addf(sbuf, "Hash chains used: %"PRIuMPINT" of %lu (%.1f%%)\n"
                         , mstr_chains, (unsigned long)HTABLE_SIZE
                         , 100.0 * (float)mstr_chains / (float)HTABLE_SIZE
                         );
