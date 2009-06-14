@@ -1436,12 +1436,12 @@ defragment_small_block (word_t *block)
         if (block[M_MAGIC] != sfmagic[SIZE_MOD_INDEX(size, sfmagic)] ) \
         { \
             in_malloc = 0; \
-            fatal("allocation from free list for %lu bytes: " \
+            fatal("allocation from free list for %zu bytes: " \
                   "block %p (user %p) magic match failed, " \
-                  "expected %08lx, found %08lx\n" \
-                 , (unsigned long) size, block, block+T_OVERHEAD \
-                 , sfmagic[SIZE_MOD_INDEX(size, sfmagic)] \
-                 , block[M_MAGIC]); \
+                  "expected %08"PRIxPTR", found %08"PRIxPTR"\n" \
+                 , size, block, block+T_OVERHEAD \
+                 , (intptr_t)sfmagic[SIZE_MOD_INDEX(size, sfmagic)] \
+                 , (intptr_t)block[M_MAGIC]); \
         } \
         block[M_MAGIC] = samagic[SIZE_MOD_INDEX(size, samagic)]; \
       } while(0)

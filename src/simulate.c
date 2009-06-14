@@ -1511,7 +1511,7 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
     ob->eff_user = ob->user;
     put_object(&arg, ob);
     destruct_object(&arg);
-    errorf(err);
+    errorf("%s", err);
     /* NOTREACHED */
     return MY_FALSE;
 } /* give_uid_to_object() */
@@ -2460,7 +2460,7 @@ destruct_object (svalue_t *v)
         errorf("No prepare_destruct\n");
 
     if (result->type == T_STRING)
-        errorf(get_txt(result->u.str));
+        errorf("%s", get_txt(result->u.str));
 
     if (result->type != T_NUMBER || result->u.number != 0)
         return;
@@ -4311,7 +4311,7 @@ print_svalue (svalue_t *arg)
         char buff[120];
 
         snprintf(buff, sizeof(buff), "%g", READ_DOUBLE( arg ) );
-        add_message(buff);
+        add_message("%s", buff);
     }
     else if (arg->type == T_POINTER)
         add_message("<ARRAY>");

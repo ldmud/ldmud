@@ -6780,9 +6780,9 @@ do_trace (char *msg, char *fname, char *post)
               : "";
     sprintf(buf, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, ""
                , msg, objname, fname, post);
-    add_message(buf);
+    add_message("%s", buf);
 #ifdef DEBUG
-    add_message(message_flush);
+    add_message("%s", message_flush);
 #endif
 } /* do_trace() */
 
