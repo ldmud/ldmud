@@ -400,11 +400,6 @@ extern char *xmemmem(const char *, size_t, const char *, size_t);
 extern size_t strcspn(const char *s, const char *set);
 #endif
 
-#ifndef HAVE_STRDUP
-extern char *strdup(const char *);
-#endif
-
-
 #ifdef HAVE_CRYPT_H
      /* solaris defines crypt() here */
 #    include <crypt.h>

@@ -798,7 +798,7 @@ AC_HEADER_DIRENT
 dnl check for some functions
 AC_FUNC_MKTIME
 AC_FUNC_ALLOCA
-AC_CHECK_FUNCS(fchmod getrusage memmem strdup strcspn)
+AC_CHECK_FUNCS(fchmod getrusage memmem strcspn)
 AC_CHECK_FUNCS(getcwd sysconf gettimeofday wait3 waitpid)
 AC_CHECK_FUNCS(fcntl getdomainname poll strtoul trunc)
 AC_CHECK_FUNCS(mmap getpagesize)

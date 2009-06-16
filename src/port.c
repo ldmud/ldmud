@@ -285,25 +285,6 @@ strcspn(const char *s, const char *set)
 #endif /* !HAVE_STRCSPN */
 
 /*-------------------------------------------------------------------------*/
-#ifndef HAVE_STRDUP
-
-char *
-strdup (const char *str)
-
-/* Copy <str> into a freshly allocated memory block and return that one.
- */
-
-{
-    char *copy = malloc(strlen(str)+1);
-    if (!copy)
-        fatal("strdup failed\n");
-    strcpy(copy, str);
-    return copy;
-}
-
-#endif /* !HAVE_STRDUP */
-
-/*-------------------------------------------------------------------------*/
 #if !defined(HAVE_GETRUSAGE)
 
 #include <sys/times.h>
