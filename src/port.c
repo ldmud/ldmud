@@ -304,24 +304,6 @@ strdup (const char *str)
 #endif /* !HAVE_STRDUP */
 
 /*-------------------------------------------------------------------------*/
-#ifndef HAVE_MEMSET
-
-char *
-memset (char *s, int c, size_t n)
-{
-#ifdef HAVE_BZERO
-    if(c == 0)
-        bzero(s, n);
-#endif
-    else {
-        while(--n >= 0)
-            *s++ = c;
-    }
-}
-
-#endif /* !HAVE_MEMSET */
-
-/*-------------------------------------------------------------------------*/
 #if !defined(HAVE_GETRUSAGE)
 
 #include <sys/times.h>
