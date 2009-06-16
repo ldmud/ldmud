@@ -1727,7 +1727,7 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         , distinct_size - distinct_overhead
                         , distinct_overhead + stringtable_size
                         );
-        strbuf_addf(sbuf,  " - tabled\t%9"PRIuMPINT" %9"PRIuMPINT" (%9"PRIuMPINT"+%9"PRIuMPINT")\n"
+        strbuf_addf(sbuf,  " - tabled\t%9"PRIuMPINT" %9"PRIuSTATCOUNTER" (%9"PRIuMPINT"+%9"PRIuSTATCOUNTER")\n"
                         , mstr_tabled_count
                         , mstr_tabled_size + stringtable_size
                         , mstr_tabled_size

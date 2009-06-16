@@ -280,7 +280,7 @@ show_otable_status (strbuf_t * sbuf, Bool verbose)
                    , obj_searches
                    , (float) obj_probes / (float) obj_searches);
         strbuf_addf(sbuf, "External lookups (succeed)   %"PRIuSTATCOUNTER" (%"PRIuSTATCOUNTER")\n"
-                   , (long)user_obj_lookups, (long)user_obj_found);
+                   , user_obj_lookups, user_obj_found);
 #if defined(__MWERKS__)
 #    pragma warn_largeargs reset
 #endif
