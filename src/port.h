@@ -396,10 +396,6 @@ extern char * utime_string(mp_int, mp_int);
 extern char * time_stamp(void);
 extern char *xmemmem(const char *, size_t, const char *, size_t);
 
-#ifndef HAVE_STRCSPN
-extern size_t strcspn(const char *s, const char *set);
-#endif
-
 #ifdef HAVE_CRYPT_H
      /* solaris defines crypt() here */
 #    include <crypt.h>

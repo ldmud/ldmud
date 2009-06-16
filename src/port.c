@@ -264,27 +264,6 @@ strtol(register char *str, char **ptr, register int base)
 #endif /* STRTOL_BROKEN */
 
 /*-------------------------------------------------------------------------*/
-#ifndef HAVE_STRCSPN
-
-size_t
-strcspn(const char *s, const char *set)
-{
-    register char *t, *s, c, d;
-
-    s = start;
-    while (c = *s)
-    {
-        t = set;
-        while (d = *t++) {
-            if (c == d)
-                return s - start;
-        }
-        s++;
-    }
-}
-#endif /* !HAVE_STRCSPN */
-
-/*-------------------------------------------------------------------------*/
 #if !defined(HAVE_GETRUSAGE)
 
 #include <sys/times.h>
