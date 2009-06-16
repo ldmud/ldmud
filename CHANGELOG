@@ -10,6 +10,12 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - Just require on existence of PCRE_EXTRA_MATCH_LIMIT_RECURSION in libpcre.
     Whoever has an ancient libpcre in use without this, should update it.
     (mregexp.c, pkg-pcre)
+  - Removed a bunch of checks and own fall-back implementations for
+    functions required by C89/90/99 or POSIX.1: memmove, memcpy, memcpy,
+    strchr, strrchr, strdup, strcspn, strtoul. We just require them.
+    Also removed checks for broken versions on ancient sytems and a rarely
+    used abstraction for memmove (move_memory).
+    (port.c, port.h, configure.in)
 
 15-Jun-2009 (Fuchur)
   - (parse.c) Fix off-by-one error in find_string(). It returned a wrong index.

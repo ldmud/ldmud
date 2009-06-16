@@ -15,6 +15,8 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          Since libpcre is installed on nearly every halfway POSIX compatible
          system, we just link against the system libpcre. If there is none
          available, no PCREs are available in the driver (#658).
+       + Removed a bunch of checks and own fall-back implementations for
+         functions required by C89/90/99 or POSIX.1. We just require them.
 
     - Other
        + The driver requires a C99 compatible build system. Some checks and
