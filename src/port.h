@@ -350,16 +350,6 @@ typedef char  CBool;
  * Provide functions, types and defines missing from the system headers.
  */
 
-#ifndef HAVE_MEMCPY
-/* The following 'implementation' is suitable for throwing away a value,
-   but not to using it; the cast to return int is likely to show a warning
-   if the value is used by accident.
-   If you need the return value, use a proper function:#
-     char *memcpy(char *memcpy(char *b, char *a, int s) { bcopy(a,b,s); return b; }
- */
-#    define memcpy(b, a, s) (*((int (*)())(&bcopy)))(a, b, s)
-#endif
-
 #ifndef HAVE_BZERO
 #    define bzero(str, i) memset(str, '\0', i)
 #endif
