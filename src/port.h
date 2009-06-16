@@ -385,15 +385,8 @@ typedef char  CBool;
 #    define O_TEXT 0
 #endif
 
-#ifdef HAVE_MEMMOVE
-    /* apple unix does prototype memmove, but there is no such function in the
-     * library. Moreover, bcopy() won't handle overlapping right there.
-     */
-#    define move_memory(dest, source, size) memmove(dest, source, size)
-#endif
-#if !defined(HAVE_MEMMOVE) && defined(OVERLAPPING_BCOPY)
-#    define move_memory(dest, source, size) bcopy(source, dest, size)
-#endif
+/* we just alias memmove() to move_memory() nowadays. */
+#define move_memory(dest, source, size) memmove(dest, source, size)
 
 #define ixstat   stat
 #define ixopen   open
@@ -436,10 +429,6 @@ extern size_t strcspn(const char *s, const char *set);
 extern char *strdup(const char *);
 #endif
 
-
-#if !defined(HAVE_MEMMOVE) && !defined(OVERLAPPING_BCOPY)
-extern void move_memory(char *, char *, size_t);
-#endif
 
 #ifdef HAVE_CRYPT_H
      /* solaris defines crypt() here */

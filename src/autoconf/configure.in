@@ -799,7 +799,7 @@ dnl check for some functions
 AC_FUNC_MKTIME
 AC_FUNC_ALLOCA
 AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn)
-AC_CHECK_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
+AC_CHECK_FUNCS(strchr strrchr getcwd sysconf gettimeofday wait3 waitpid)
 AC_CHECK_FUNCS(fcntl getdomainname poll strtoul trunc)
 AC_CHECK_FUNCS(mmap getpagesize)
 
@@ -2299,27 +2299,6 @@ if test "$lp_cv_prop_use_oobinline" = "yes"; then
   AC_DEFINE(USE_OOBINLINE, 1, [Can SO_OOBINLINE be used on a socket?])
 fi
 
-
-AC_CACHE_CHECK(for overlapping bcopy,
-lp_cv_prop_overlapping_bcopy,
-AC_TRY_RUN([
-main(){
-    char str[[99]] = "hello world";
-    bcopy(str, str+2, 12);
-    if(strcmp("hehello world", str))
-	exit(1);
-    bcopy(str+2, str, 11);
-    if(strcmp("hello worldld", str))
-	exit(1);
-    exit(0);
-}
-], lp_cv_prop_overlapping_bcopy=yes,
-lp_cv_prop_overlapping_bcopy=no,
-lp_cv_prop_overlapping_bcopy=yes))
-if test "$lp_cv_prop_overlapping_bcopy" = "yes"; then
-  AC_DEFINE(OVERLAPPING_BCOPY, 1, [Define if you have bcopy, and it handles overlapping ranges correctly.])
-fi
-
 AC_CACHE_CHECK(if strtol needs const char*,
 lp_cv_prop_strtol_const_charp,
 AC_TRY_COMPILE([#ifdef HAVE_STDLIB_H
@@ -2615,11 +2594,9 @@ POINTER realloc(p, size)
     if (*(size_t *)p >= size)
         return p;
     q = malloc(size);
-#ifdef HAVE_MEMCPY
+
     memcpy(q, p, size);
-#else
-    bcopy(p, q, size);
-#endif
+
     *(size_t *)q = size;
     return q + sizeof size;
 }

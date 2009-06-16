@@ -322,28 +322,6 @@ memset (char *s, int c, size_t n)
 #endif /* !HAVE_MEMSET */
 
 /*-------------------------------------------------------------------------*/
-#if !defined(HAVE_MEMMOVE) && !defined(OVERLAPPING_BCOPY)
-
-void
-move_memory (char *dest, char *src, size_t n)
-{
-    if (!n)
-        return;
-    if (dest > src) {
-        dest += n;
-        src  += n;
-        do
-            *--dest = *--src;
-        while (--n);
-    } else {
-        do
-            *dest++ = *src++;
-        while (--n);
-    }
-}
-#endif /* !HAVE_MEMMOVE */
-
-/*-------------------------------------------------------------------------*/
 #if !defined(HAVE_GETRUSAGE)
 
 #include <sys/times.h>
