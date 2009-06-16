@@ -7,6 +7,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
     just link against the system libpcre. If there is none available, no PCREs
     are available in the driver (#658).
     (mregexp.c, pkg-pcre)
+  - Just require on existence of PCRE_EXTRA_MATCH_LIMIT_RECURSION in libpcre.
+    Whoever has an ancient libpcre in use without this, should update it.
+    (mregexp.c, pkg-pcre)
 
 15-Jun-2009 (Fuchur)
   - (parse.c) Fix off-by-one error in find_string(). It returned a wrong index.
