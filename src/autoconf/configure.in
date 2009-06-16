@@ -1960,26 +1960,6 @@ dnl TODO:: bitmask set to number of bits ?????? *shudder* [Mubo]
   AC_DEFINE(CHARBIT_MASK, CHAR_BIT)
 fi
 
-AC_CACHE_CHECK(if strtol broken, lp_cv_prop_strtol_broken,
-dnl the quoting hell wants two start quotes here, but only one end quote...
-dnl M4 can be wonderful... :-(  [Mubo]
-AC_TRY_RUN([[
-#ifdef HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-int main() {
-    if (strtol("1]", (char **)0, 10) != 1) exit(1);
-    exit(0);
-}
-], lp_cv_prop_strtol_broken=no,
-lp_cv_prop_strtol_broken=yes))
-if test "$lp_cv_prop_strtol_broken" = "yes"; then
-  AC_DEFINE(STRTOL_BROKEN, 1, [the atari strtol() used to consider characters '9' < c < 'A' to be numeric])
-fi
-
 dnl the following three tests would better be nested, but it seems to overflow
 dnl internal buffers of m4
 AC_CACHE_CHECK(nonblocking using ioctl with FIONBIO,
@@ -2297,18 +2277,6 @@ lp_cv_prop_use_oobinline=no,
 lp_cv_prop_use_oobinline=unknown))
 if test "$lp_cv_prop_use_oobinline" = "yes"; then
   AC_DEFINE(USE_OOBINLINE, 1, [Can SO_OOBINLINE be used on a socket?])
-fi
-
-AC_CACHE_CHECK(if strtol needs const char*,
-lp_cv_prop_strtol_const_charp,
-AC_TRY_COMPILE([#ifdef HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-long strtol(str, ptr, base) char *str; char **ptr; int base; { return 0; }
-],,lp_cv_prop_strtol_const_charp=no,
-lp_cv_prop_strtol_const_charp=yes))
-if test "$lp_cv_prop_strtol_const_charp" = "yes"; then
-  AC_DEFINE(STRTOL_CONST_CHARP, 1, [needs the first argument of strtol be declared as const?])
 fi
 
 # --- Check for compiler options ---
