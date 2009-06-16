@@ -83,11 +83,13 @@ typedef struct regdata_s {
     p_uint        ref;       /* Number of refs */
     int           opt;       /* Additional options, but no package flags */
     /* -- PCRE -- */
+#ifdef HAS_PCRE
     pcre        * pProg;     /* The generated regular expression */
     pcre_extra  * pHints;    /* Study data */
     int           num_subs;  /* Number of elements in pSubs */
     int         * pSubs;     /* Substring offsets + workarea */
     int           res;       /* Result of last rx_exec() */
+#endif // HAS_PCRE
     /* -- Traditional -- */
     regexp      * rx;        /* The actual regular expression */
 } regdata_t;
@@ -141,6 +143,7 @@ static uint32 iXSizeAlloc     = 0;  /* Dynamic memory held in regexp structs */
 
 #endif /* RXCACHE_TABLE */
 
+#ifdef HAS_PCRE
 static size_t pcre_malloc_size;
   /* Accumulated size from pcre_malloc() calls. Used when creating
    * a new PCRE to capture its allocated size for statistics.
@@ -151,25 +154,35 @@ static const char* pcre_malloc_err;
    * condition in the pcre_xalloc() wrapper can get the proper
    * error message.
    */
+#endif // HAS_PCRE
 
 /*--------------------------------------------------------------------*/
-/* --- Macros --- */
+/* Declarations */
+static void rx_free_data (regdata_t * expr); /* forward */
+static void rx_free_subdata (regdata_t * expr); /* forward */
 
+/* --- Helpers --- */
+static INLINE regdata_t *
+ref_regdata(regdata_t *r)
 /* regdata_t *ref_regdata(regdata_t *r)
  *   Add another ref to regdata <r> and return the regdata <r>.
  */
+{
+    r->ref++;
+    return r;
+}
 
-#define ref_regdata(r) ((r)->ref++, (r))
-
+static INLINE void
+free_regdata(regdata_t *r)
 /* void free_regdata(regdata_t *r)
  *   Subtract one ref from regdata <r>, and free the regdata fully if
  *   the refcount reaches zero.
  */
+{
+    if (--(r->ref) <= 0)
+        rx_free_data(r);
+}
 
-static void rx_free_data (regdata_t * expr); /* forward */
-static void rx_free_subdata (regdata_t * expr); /* forward */
-
-#define free_regdata(r) MACRO( if (--((r)->ref) <= 0) rx_free_data(r); )
 
 #ifdef RXCACHE_TABLE
 
@@ -184,6 +197,7 @@ static void rx_free_subdata (regdata_t * expr); /* forward */
 #endif /* RXCHACHE_TABLE */
 
 /*--------------------------------------------------------------------*/
+#ifdef HAS_PCRE
 static void *
 pcre_xalloc (size_t size)
 
@@ -198,6 +212,7 @@ pcre_xalloc (size_t size)
     pcre_malloc_size += size;
     return p;
 } /* pcre_xalloc() */
+#endif // HAS_PCRE
 
 /*--------------------------------------------------------------------*/
 const char *
@@ -208,10 +223,11 @@ rx_pcre_version (void)
 
 {
     static char buf[40];
-    sprintf(buf, "%d.%d", PCRE_MAJOR, PCRE_MINOR);
-#    ifdef USE_BUILTIN_PCRE
-    strcat(buf, " (builtin)");
-#    endif
+#ifdef HAS_PCRE
+    snprintf(buf, sizeof(buf), "%d.%d", PCRE_MAJOR, PCRE_MINOR);
+#else
+    sprintf(buf, "not available");
+#endif
     return buf;
 } /* rx_pcre_version() */
 
@@ -224,9 +240,10 @@ void rx_init(void)
 #ifdef RXCACHE_TABLE
     memset(xtable, 0, sizeof(xtable));
 #endif
-
+#ifdef HAS_PCRE
     pcre_malloc = pcre_xalloc;
     pcre_free = xfree;
+#endif
 } /* rx_init() */
 
 /*--------------------------------------------------------------------*/
@@ -239,6 +256,7 @@ get_error_message (int code, int package)
  */
 
 {
+#ifdef HAS_PCRE
     if (package & RE_PCRE)
     {
         const char* text;
@@ -266,6 +284,7 @@ get_error_message (int code, int package)
         }
         return text;
     }
+#endif // HAS_PCRE
 
     if (package & RE_TRADITIONAL)
     {
@@ -347,6 +366,7 @@ rx_compile_re (string_t * expr, int opt, Bool from_ed, regdata_t * rdata)
 } /* rx_compile_re() */
 
 /*--------------------------------------------------------------------*/
+#ifdef HAS_PCRE
 static size_t
 rx_compile_pcre (string_t * expr, int opt, Bool from_ed, regdata_t * rdata)
 
@@ -463,6 +483,7 @@ rx_compile_pcre (string_t * expr, int opt, Bool from_ed, regdata_t * rdata)
 
     return pcre_malloc_size;
 } /* rx_compile_pcre() */
+#endif // HAS_PCRE
 
 /*--------------------------------------------------------------------*/
 static regdata_t *
@@ -509,12 +530,14 @@ rx_compile_data (string_t * expr, int opt, Bool from_ed)
 
         /* Regexp found, but it may not have been compiled for us yet.
          */
+#ifdef HAS_PCRE
         if ((opt & RE_PCRE) && !pHash->base.pProg)
         {
             pHash->size = rx_compile_pcre(expr, opt, from_ed, &(pHash->base));
             if (!pHash->size)
                 return NULL;
         }
+#endif // HAS_PCRE
         if ((opt & RE_TRADITIONAL) && !pHash->base.rx)
         {
             if (!rx_compile_re(expr, opt, from_ed, &(pHash->base)))
@@ -530,6 +553,7 @@ rx_compile_data (string_t * expr, int opt, Bool from_ed)
     pcre_size = 0;
     memset(&rdata, 0, sizeof(rdata));
 
+#ifdef HAS_PCRE
     if (opt & RE_PCRE)
     {
         pcre_size = rx_compile_pcre(expr, opt, from_ed, &rdata);
@@ -538,6 +562,8 @@ rx_compile_data (string_t * expr, int opt, Bool from_ed)
             return NULL;
         }
     }
+#endif // HAS_PCRE
+
     if (opt & RE_TRADITIONAL)
     {
         if (!rx_compile_re(expr, opt, from_ed, &rdata))
@@ -640,6 +666,16 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
             errorf("Missing specification of which regexp package to use.\n");
         return NULL;
     }
+#ifndef HAS_PCRE
+    if (opt & RE_PCRE)
+    {
+        if (from_ed)
+            add_message("Wrong specification of which regexp package to use: PCREs not available.\n");
+        else
+            errorf("Wrong specification of which regexp package to use: PCREs not available.\n");
+        return NULL;
+    }
+#endif
 
     pData = rx_compile_data(expr, opt, from_ed);
     if (pData)
@@ -673,6 +709,7 @@ rx_exec (regexp_t *pRegexp, string_t * string, size_t start)
 {
     regdata_t * prog = pRegexp->data;
 
+#ifdef HAS_PCRE
     if (pRegexp->opt & RE_PCRE)
     {
         int rc;
@@ -725,6 +762,7 @@ rx_exec (regexp_t *pRegexp, string_t * string, size_t start)
 
         return rc;
     } /* if (use pcre) */
+#endif // HAS_PCRE
 
     /* Fallback: Traditional regexp */
     return hs_regexec(prog->rx, get_txt(string)+start, get_txt(string));
@@ -745,7 +783,7 @@ rx_exec_str (regexp_t *pRegexp, char * string, char * start)
 
 {
     regdata_t * prog = pRegexp->data;
-
+#ifdef HAS_PCRE
     if (pRegexp->opt & RE_PCRE)
     {
         int rc;
@@ -798,6 +836,7 @@ rx_exec_str (regexp_t *pRegexp, char * string, char * start)
 
         return rc;
     } /* if (use pcre) */
+#endif // HAS_PCRE
 
     /* Fallback: Traditional regexp */
     return hs_regexec(prog->rx, string, start);
@@ -817,10 +856,12 @@ rx_num_matches (regexp_t *pRegexp)
  */
 
 {
+#ifdef HAS_PCRE
     if (pRegexp->opt & RE_PCRE)
     {
         return pRegexp->data->res >= 1 ? pRegexp->data->res : 0;
     } /* if (use pcre) */
+#endif
 
     /* Fallback: Traditional regexp */
     {
@@ -861,6 +902,7 @@ rx_get_match_n (regexp_t *pRegexp, string_t * str, int n, size_t * start, size_t
     Bool rc;
     regdata_t * prog = pRegexp->data;
 
+#ifdef HAS_PCRE
     if (pRegexp->opt & RE_PCRE)
     {
         if (n < 0
@@ -881,6 +923,7 @@ rx_get_match_n (regexp_t *pRegexp, string_t * str, int n, size_t * start, size_t
         }
         return rc;
     } /* if (use pcre) */
+#endif // HAS_PCRE
 
     /* Fallback: Traditional regexp */
     if (n < 0
@@ -915,12 +958,14 @@ rx_get_match (regexp_t *pRegexp, string_t * str, size_t * start, size_t * end)
 {
     regdata_t * prog = pRegexp->data;
 
+#ifdef HAS_PCRE
     if (pRegexp->opt & RE_PCRE)
     {
         *start = (size_t)prog->pSubs[0];
         *end = (size_t)prog->pSubs[1];
         return;
     } /* if (use pcre) */
+#endif // HAS_PCRE
 
     /* Fallback: Traditional regexp */
     *start = prog->rx->startp[0] - get_txt(str);
@@ -939,12 +984,14 @@ rx_get_match_str (regexp_t *pRegexp, char * str, size_t * start, size_t * end)
 {
     regdata_t * prog = pRegexp->data;
 
+#ifdef HAS_PCRE
     if (pRegexp->opt & RE_PCRE)
     {
         *start = (size_t)prog->pSubs[0];
         *end = (size_t)prog->pSubs[1];
         return;
     } /* if (use pcre) */
+#endif // HAS_PCRE
 
     /* Fallback: Traditional regexp */
     *start = prog->rx->startp[0] - str;
@@ -1016,6 +1063,7 @@ rx_sub (regexp_t *pRegexp, string_t *source, string_t *subst)
             }
             else
             {
+#ifdef HAS_PCRE
                 if (pRegexp->opt & RE_PCRE)
                 {
                     if (no < prog->res
@@ -1037,6 +1085,7 @@ rx_sub (regexp_t *pRegexp, string_t *source, string_t *subst)
                         }
                     }
                 } /* if (use pcre) */
+#endif // HAS_PCRE
 
                 if (pRegexp->opt & RE_TRADITIONAL)
                 {
@@ -1134,9 +1183,11 @@ rx_free_subdata (regdata_t * expr)
  */
 
 {
+#ifdef HAS_PCRE
     if (expr->pSubs)  xfree(expr->pSubs);  expr->pSubs = NULL;
     if (expr->pHints) xfree(expr->pHints); expr->pHints = NULL;
     if (expr->pProg)  xfree(expr->pProg);  expr->pProg = NULL;
+#endif // HAS_PCRE
     if (expr->rx)     xfree(expr->rx);     expr->rx = NULL;
 } /* rx_free_subdata() */
 
@@ -1301,6 +1352,7 @@ count_regdata_ref (regdata_t * pRegexp)
 
 {
     note_malloced_block_ref(pRegexp);
+#ifdef HAS_PCRE
     if (pRegexp->pProg)
     {
         note_malloced_block_ref(pRegexp->pProg);
@@ -1309,6 +1361,7 @@ count_regdata_ref (regdata_t * pRegexp)
         if (pRegexp->pSubs)
             note_malloced_block_ref(pRegexp->pSubs);
     }
+#endif // HAS_PCRE
     if (pRegexp->rx)
         note_malloced_block_ref(pRegexp->rx);
 #ifdef RXCACHE_TABLE

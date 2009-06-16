@@ -10,6 +10,12 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          flexibly replaced by an sefun, which is supplied with the driver.
          (#637)
 
+    - Portability
+       + Removed built-in PCRE package, because it was awfully out of date.
+         Since libpcre is installed on nearly every halfway POSIX compatible
+         system, we just link against the system libpcre. If there is none
+         available, no PCREs are available in the driver (#658).
+
     - Other
        + The driver requires a C99 compatible build system. Some checks and
          work-arounds for non-C99 were removed.

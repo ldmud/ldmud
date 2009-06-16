@@ -139,6 +139,13 @@
 #    define __IPV6__
 #endif
 
+/* If USE_PCRE is defined, check if the libpcre is available on this system.
+ * Disable USE_PCRE if not. */
+#if defined(USE_PCRE) && !defined(HAS_PCRE)
+#undef USE_PCRE
+#endif
+
+
 /* TODO: this ctype-stuff might go into lex.h (impl in efun_defs.c) */
 #define _MCTe 0x01 /* escaped character in save/restore object. */
 #define _MCTd 0x02 /* numeric digit                */

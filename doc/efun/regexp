@@ -15,7 +15,7 @@ DESCRIPTION
 EXAMPLE
         string strs;
         string pattern;
-        
+
         if (regexp_package() == RE_PCRE)
             pattern = "\\<help\\>.*\\<me\\>";
         else
@@ -35,6 +35,8 @@ EXAMPLE
 
 HISTORY
         LDMud 3.3 added the optional <opt> argument.
+        Since 3.5.0 a error is raised if RE_PCRE is specified in <opt>, but
+        the driver lacks PCRE support.
 
 SEE ALSO
         regexplode(E), regmatch(E), regreplace(E), regexp_package(E), sscanf(E),

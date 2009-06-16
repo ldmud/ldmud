@@ -221,7 +221,7 @@ AC_MY_ARG_ENABLE(use-mccp,no,,[Enables MCCP support])
 AC_MY_ARG_ENABLE(use-mysql,no,,[Enables mySQL support])
 AC_MY_ARG_ENABLE(use-pgsql,no,,[Enables PostgreSQL support])
 AC_MY_ARG_ENABLE(use-sqlite,no,,[Enables SQLite support])
-AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE: no/yes/builtin/no-builtin])
+AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE: no/yes])
 AC_MY_ARG_ENABLE(use-xml,no,,[Enables XML support: no/xml2/iksemel/yes])
 AC_MY_ARG_WITH(xml-path,,,[Optional location of the XML include/ and lib/ directory])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
@@ -372,23 +372,10 @@ fi
 AC_UPDATE_VAR(enable_use_pcre)
 if test "x$enable_use_pcre" = "x" || test "x$enable_use_pcre" = "xyes"; then
   cdef_use_pcre="#define"
-  cdef_use_builtin_pcre="#undef"
-  enable_use_builtin_pcre="no"
-elif test "x$enable_use_pcre" = "xbuiltin"; then
-  cdef_use_pcre="#define"
-  cdef_use_builtin_pcre="#define"
-  enable_use_pcre="yes"
-  enable_use_builtin_pcre="yes"
-elif test "x$enable_use_pcre" = "xno-builtin"; then
-  cdef_use_pcre="#undef"
-  cdef_use_builtin_pcre="#define"
-  enable_use_pcre="no"
   enable_use_builtin_pcre="yes"
 else
   cdef_use_pcre="#undef"
-  cdef_use_builtin_pcre="#undef"
   enable_use_pcre="no"
-  enable_use_builtin_pcre="no"
 fi
 
 AC_UPDATE_VAR(enable_use_mysql)
@@ -1262,12 +1249,6 @@ int main(void)
     if test "$lp_cv_has_pcre" = "yes"; then
         AC_DEFINE(HAS_PCRE, 1, [Does the machine offer PCRE?])
         PKGLIBS="$PKGLIBS -lpcre"
-    else
-        if test "$enable_use_builtin_pcre" = "no" ; then
-            echo "PCRE not available in the system - using builtin version."
-            enable_use_builtin_pcre="yes"
-            cdef_use_builtin_pcre="#define"
-        fi
     fi
 fi
 
@@ -2754,7 +2735,6 @@ AC_SUBST(cdef_use_xml)
 AC_SUBST(cdef_use_alists)
 AC_SUBST(cdef_use_mccp)
 AC_SUBST(cdef_use_pcre)
-AC_SUBST(cdef_use_builtin_pcre)
 AC_SUBST(cdef_use_deprecated)
 AC_SUBST(cdef_use_structs)
 AC_SUBST(cdef_use_tls)

@@ -4776,9 +4776,9 @@ f_set_driver_hook (svalue_t *sp)
         }
         else if (n == H_REGEXP_PACKAGE)
         {
+#ifdef HAS_PCRE
             if (sp->u.number != RE_PCRE
-             && sp->u.number != RE_TRADITIONAL
-               )
+             && sp->u.number != RE_TRADITIONAL )
             {
                 errorf("Bad value for hook %"PRIdPINT": got 0x%"PRIxPINT
                        ", expected RE_PCRE (0x%lx) or RE_TRADITIONAL (0x%lx).\n"
@@ -4787,6 +4787,16 @@ f_set_driver_hook (svalue_t *sp)
                      );
                 break;
             }
+#else
+            if (sp->u.number != RE_TRADITIONAL )
+            {
+                errorf("Bad value for hook %"PRIdPINT": got 0x%"PRIxPINT
+                       ", RE_TRADITIONAL (0x%lx).\n"
+                       , n, sp->u.number, (long)RE_TRADITIONAL
+                       );
+                break;
+            }
+#endif // HAS_PCRE
             goto default_test;
         }
         else

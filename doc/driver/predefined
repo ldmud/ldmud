@@ -85,7 +85,7 @@ DESCRIPTION
       __XML_DOM__ :   support for XML parsing.
       __MCCP__:       support for MCCP http://www.randomly.org/projects/MCCP
       __ALISTS__:     support for alists
-      __PCRE__:       support for PCRE (always defined)
+      __PCRE__:       support for PCRE
       __TLS__:        support for TLS (internal)
       __GNUTLS__:     if __TLS__: TLS support provided by GnuTLS.
       __OPENSSL__:    if __TLS__: TLS support provided by OpenSSL.

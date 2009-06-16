@@ -2,7 +2,7 @@ SYNOPSIS
         #include <sys/driver_hooks.h>
         #include <sys/regexp.h>
 
-        set_driver_hook(H_PRINT_PROMPT, value)
+        set_driver_hook(H_REGEXP_PACKAGE, value)
 
         <value> being an integer:
           0

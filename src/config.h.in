@@ -373,11 +373,6 @@
  */
 @cdef_use_pcre@ USE_PCRE
 
-/* Define this if you want to use builtin PCRE (ignored when PCRE
- * is disabled as a whole).
- */
-@cdef_use_builtin_pcre@ USE_BUILTIN_PCRE
-
 /* Define this if you want iksemel library support.
  */
 @cdef_use_xml@ USE_XML

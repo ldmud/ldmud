@@ -41,6 +41,8 @@ HISTORY
         Introduced in LDMud 3.3.198.
         Modified in 3.3.214 to return 0 for non-matches, and to take and
         return a start position.
+        Since 3.5.0 a error is raised if RE_PCRE is specified in <opt>, but
+        the driver lacks PCRE support.
 
 SEE ALSO
         regexplode(E), regreplace(E), regexp(E), regexp_package(E), regexp(C)
