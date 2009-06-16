@@ -350,14 +350,6 @@ typedef char  CBool;
  * Provide functions, types and defines missing from the system headers.
  */
 
-#ifndef HAVE_STRCHR
-#    define strchr index
-#endif
-
-#ifndef HAVE_STRRCHR
-#    define strrchr rindex
-#endif
-
 /* O_BINARY and O_TEXT don't exist on POSIX conforming platforms, but on Cygwin.
  * On Cygwin it may be needed if the volume with the mudlib is mounted in 'textmode'
  * to open files without any line break conversions (*sigh*).
