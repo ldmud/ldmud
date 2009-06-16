@@ -800,7 +800,7 @@ AC_FUNC_MKTIME
 AC_FUNC_ALLOCA
 AC_CHECK_FUNCS(fchmod getrusage memmem)
 AC_CHECK_FUNCS(getcwd sysconf gettimeofday wait3 waitpid)
-AC_CHECK_FUNCS(fcntl getdomainname poll strtoul trunc)
+AC_CHECK_FUNCS(fcntl getdomainname poll trunc)
 AC_CHECK_FUNCS(mmap getpagesize)
 
 if test "x$ac_cv_type_signal" = "xvoid"; then

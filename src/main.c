@@ -2729,11 +2729,7 @@ eval_arg (int eOption, const char * pValue)
 
     case cRandomSeed:
     	// seeds PRG with given value
-#ifdef HAVE_STRTOUL
         seed_random_from_int(strtoul(pValue, (char **)0, 0));
-#else
-        seed_random_from_int((uint32)strtol(pValue, (char **)0, 0));
-#endif
         break;
 
     case cReserved:
