@@ -1490,7 +1490,7 @@ lambda_move_switch_instructions (int len, p_int blocklen)
         realloc_code();
     current.code_left -= len;
     current.codep += len;
-    move_memory( current.codep - blocklen
+    memmove( current.codep - blocklen
                , current.codep - blocklen - len
                , (size_t)blocklen
                );
@@ -2322,7 +2322,7 @@ compile_value (svalue_t *value, int opt_flags)
                             	/* Make space for the CONST0 */
                                 current.code_left--;
                                 start = branchp[-2];
-                                move_memory(
+                                memmove(
                                   &current.code[start+1],
                                   &current.code[start],
                                   (size_t)(non_void_dest - start)
@@ -7149,8 +7149,8 @@ align_switch (bytecode_p pc)
     size = (long)(tablen + tablen / sizeof(char*) * len);
     if (starta != startu)
     {
-        move_memory(starta, startu, (size_t)size);
-        move_memory(starta+size, abuf + sizeof abuf - (startu-starta)
+        memmove(starta, startu, (size_t)size);
+        memmove(starta+size, abuf + sizeof abuf - (startu-starta)
                    , (size_t)(startu-starta));
     }
 } /* align_switch() */

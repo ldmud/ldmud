@@ -371,9 +371,6 @@ typedef char  CBool;
 #    define O_TEXT 0
 #endif
 
-/* we just alias memmove() to move_memory() nowadays. */
-#define move_memory(dest, source, size) memmove(dest, source, size)
-
 #define ixstat   stat
 #define ixopen   open
 #define ixopen3  open

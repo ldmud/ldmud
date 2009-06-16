@@ -2056,7 +2056,7 @@ reset_input_buffer (interactive_t *ip)
             ip->text_end = 0;
         else
         {
-            move_memory( ip->text, ip->text + ip->command_start
+            memmove( ip->text, ip->text + ip->command_start
                        , ip->text_end
                        );
         }
@@ -2644,7 +2644,7 @@ get_message (char *buff)
                     /* Delete the processed data from the buffer */
                     if (rp != buf_from_erq)
                     {
-                        move_memory(buf_from_erq, rp, (size_t)l);
+                        memmove(buf_from_erq, rp, (size_t)l);
                         input_from_erq = &buf_from_erq[l];
                     }
                 } /* if (read data from erq) */
@@ -3079,7 +3079,7 @@ get_message (char *buff)
 
                         if (ip->command_start && ip->command_end > 0)
                         {
-                            move_memory( ip->text, ip->text+ip->command_start
+                            memmove( ip->text, ip->text+ip->command_start
                                        , ip->command_end
                                        );
                         }

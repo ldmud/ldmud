@@ -2791,7 +2791,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 }
 
                 /* Remove the previous line from tmpmem */
-                move_memory(tmpmem, tmpmem + n, (size_t)len);
+                memmove(tmpmem, tmpmem + n, (size_t)len);
                 pt = tmpmem + len;
 
                 /* If we are indenting, check if we have to add the

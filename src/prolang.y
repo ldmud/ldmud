@@ -2381,7 +2381,7 @@ yymove_switch_instructions (int len, p_int blocklen)
             current_continue_address += len;
         }
 
-        move_memory(
+        memmove(
           mem_block[A_PROGRAM].block + switch_pc + len,
           mem_block[A_PROGRAM].block + switch_pc,
           blocklen
