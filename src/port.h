@@ -350,10 +350,6 @@ typedef char  CBool;
  * Provide functions, types and defines missing from the system headers.
  */
 
-#ifndef HAVE_BZERO
-#    define bzero(str, i) memset(str, '\0', i)
-#endif
-
 #ifndef HAVE_STRCHR
 #    define strchr index
 #endif
