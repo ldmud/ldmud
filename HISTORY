@@ -5,7 +5,12 @@ the host system.
 For a detailed list of all changes see the file CHANGELOG.
 
 xx-xxx-2009 (LDMud Team) -- 3.5.0
-    - Removed Efun:
+    - Changed Efuns:
+       + add_action(): The function can be given as a closure. (#243)
+       + command(): Won't throw an error anymore when a static function
+         in another object is called. Such an action will simply be skipped.
+
+    - Removed Efuns:
        + The deprecated efun cat() was removed. It can be easily and more
          flexibly replaced by an sefun, which is supplied with the driver.
          (#637)

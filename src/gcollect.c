@@ -1582,6 +1582,20 @@ mark_unreferenced_string (string_t *string)
 
 /*-------------------------------------------------------------------------*/
 static void
+clear_action_ref (action_t *p)
+
+/* Clear the refs of all sentences in list <p>.
+ */
+
+{
+    do
+    {
+        clear_ref_in_callback(&(p->cb));
+    } while ( NULL != (p = (action_t *)p->sent.next) );
+}
+
+/*-------------------------------------------------------------------------*/
+static void
 gc_note_action_ref (action_t *p)
 
 /* Mark the strings of function and verb of all sentences in list <p>.
@@ -1589,8 +1603,7 @@ gc_note_action_ref (action_t *p)
 
 {
     do {
-        if (p->function)
-            MARK_MSTRING_REF(p->function);
+        count_ref_in_callback(&(p->cb));
         if (p->verb)
             MARK_MSTRING_REF(p->verb);
         note_ref(p);
@@ -1984,6 +1997,19 @@ garbage_collection(void)
         ob->ref = 0;
         clear_string_ref(ob->name);
         clear_ref_in_vector(ob->variables, ob->prog->num_variables);
+
+        if (ob->sent)
+        {
+            sentence_t *sent;
+
+            sent = ob->sent;
+            if (ob->flags & O_SHADOW)
+                sent = sent->next;
+            if (sent)
+                clear_action_ref((action_t *)sent);
+        }
+
+
         if (was_swapped)
         {
             swap(ob, was_swapped);

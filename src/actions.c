@@ -202,9 +202,9 @@ new_action_sent(void)
     alloc_action_sent++;
 
     p->verb = NULL;
-    p->function = NULL;
     p->ob = NULL;
     p->shadow_ob = NULL;
+    init_empty_callback(&(p->cb));
     return p;
 } /* new_action_sent() */
 
@@ -221,8 +221,7 @@ _free_action_sent (action_t *p)
         fatal("free_action_sent() received internal sent %d\n", p->sent.type);
 #endif
 
-    if (p->function)
-        free_mstring(p->function);
+    free_callback(&(p->cb));
     if (p->verb)
         free_mstring(p->verb);
     xfree(p);
@@ -333,18 +332,11 @@ remove_action_sent (object_t *ob, object_t *player)
 #ifdef DEBUG
             if (d_flag > 1)
             {
-                if (tmp->function && tmp->verb)
-                    debug_message("%s --Unlinking sentence fun='%s', verb='%s'\n"
-                                 , time_stamp(), get_txt(tmp->function)
-                                 , get_txt(tmp->verb));
-                else if (tmp->function)
-                    debug_message("%s --Unlinking sentence fun='%s', verb=0\n"
-                                 , time_stamp(), get_txt(tmp->function));
-                else if (tmp->verb)
-                    debug_message("%s --Unlinking sentence fun=0, verb='%s'\n"
+                if (tmp->verb)
+                    debug_message("%s --Unlinking sentence verb='%s'\n"
                                  , time_stamp(), get_txt(tmp->verb));
                 else
-                    debug_message("%s --Unlinking sentence fun=0, verb=0\n"
+                    debug_message("%s --Unlinking sentence verb=0\n"
                                  , time_stamp());
             }
 #endif
@@ -385,18 +377,11 @@ remove_shadow_action_sent (object_t *ob, object_t *player)
 #ifdef DEBUG
             if (d_flag > 1)
             {
-                if (tmp->function && tmp->verb)
-                    debug_message("%s --Unlinking sentence fun='%s', verb='%s'\n"
-                                 , time_stamp(), get_txt(tmp->function)
-                                 , get_txt(tmp->verb));
-                else if (tmp->function)
-                    debug_message("%s --Unlinking sentence fun='%s', verb=0\n"
-                                 , time_stamp(), get_txt(tmp->function));
-                else if (tmp->verb)
-                    debug_message("%s --Unlinking sentence fun=0, verb='%s'\n"
+                if (tmp->verb)
+                    debug_message("%s --Unlinking sentence verb='%s'\n"
                                  , time_stamp(), get_txt(tmp->verb));
                 else
-                    debug_message("%s --Unlinking sentence fun=0, verb=0\n"
+                    debug_message("%s --Unlinking sentence verb=0\n"
                                  , time_stamp());
             }
 #endif
@@ -443,8 +428,14 @@ remove_environment_sent (object_t *player)
 
 #ifdef DEBUG
                 if (d_flag > 1)
-                    debug_message("%s --Unlinking sentence %s\n"
-                                 , time_stamp(), get_txt(s->function));
+                {
+                    if (tmp->verb)
+                        debug_message("%s --Unlinking sentence verb='%s'\n"
+                                     , time_stamp(), get_txt(tmp->verb));
+                    else
+                        debug_message("%s --Unlinking sentence verb=0\n"
+                                     , time_stamp());
+                }
 #endif
                 tmp = s;
                 s = (action_t *)s->sent.next;
@@ -993,8 +984,7 @@ parse_command (char *buff, Bool from_efun)
 
 #ifdef DEBUG
         if (d_flag > 1)
-            debug_message("%s Local command %s on %s\n", time_stamp()
-                         , get_txt(sa->function)
+            debug_message("%s Local command on %s\n", time_stamp()
                          , get_txt(sa->ob->name));
 #endif
 
@@ -1055,8 +1045,8 @@ parse_command (char *buff, Bool from_efun)
          */
         marker_sent->sent.type = SENT_MARKER;
         marker_sent->verb = NULL;
-        marker_sent->function = NULL;
         marker_sent->shadow_ob = NULL;
+        init_empty_callback(&(marker_sent->cb));
 
         /* Push the argument and call the command function.
          */
@@ -1065,11 +1055,11 @@ parse_command (char *buff, Bool from_efun)
             if (strlen(buff) > mstrsize(sa->verb))
             {
                 push_c_string(inter_sp, &buff[mstrsize(sa->verb)]);
-                ret = sapply(sa->function, sa->ob, 1);
+                ret = execute_callback(&(sa->cb), 1, MY_TRUE, save_current_object == NULL);
             }
             else
             {
-                ret = sapply(sa->function, sa->ob, 0);
+                ret = execute_callback(&(sa->cb), 0, MY_TRUE, save_current_object == NULL);
             }
         }
         else if (s->type == SENT_NO_SPACE)
@@ -1090,28 +1080,23 @@ parse_command (char *buff, Bool from_efun)
                 last_verb = new_tabled(buff);
                 buff[len] = ch;
                 push_c_string(inter_sp, &buff[len]);
-                ret = sapply(sa->function, sa->ob, 1);
+                ret = execute_callback(&(sa->cb), 1, MY_TRUE, save_current_object == NULL);
                 free_mstring(last_verb);
                 last_verb = inter_sp->u.str; inter_sp--;
             }
             else
             {
-                ret = sapply(sa->function, sa->ob, 0);
+                ret = execute_callback(&(sa->cb), 0, MY_TRUE, save_current_object == NULL);
             }
         }
         else if (buff[length] == ' ')
         {
             push_c_string(inter_sp, &buff[length+1]);
-            ret = sapply(sa->function, sa->ob, 1);
+            ret = execute_callback(&(sa->cb), 1, MY_TRUE, save_current_object == NULL);
         }
         else
         {
-            ret = sapply(sa->function, sa->ob, 0);
-        }
-
-        if (ret == 0)
-        {
-            errorf("function %s not found.\n", get_txt(sa->function));
+            ret = execute_callback(&(sa->cb), 0, MY_TRUE, save_current_object == NULL);
         }
 
         /* Restore the old current_object and command_giver */
@@ -1160,7 +1145,8 @@ parse_command (char *buff, Bool from_efun)
         }
 
         /* If we get fail from the call, it was wrong second argument. */
-        if (ret->type == T_NUMBER && ret->u.number == 0) {
+        if (!ret || (ret->type == T_NUMBER && ret->u.number == 0))
+        {
             continue;
         }
 
@@ -1181,8 +1167,8 @@ parse_command (char *buff, Bool from_efun)
      */
     marker_sent->sent.type = SENT_MARKER;
     marker_sent->verb = NULL;
-    marker_sent->function = NULL;
     marker_sent->shadow_ob = NULL;
+    init_empty_callback(&(marker_sent->cb));
     command_marker = marker_sent;
 
     /* If the command was not found, notify the failure */
@@ -1289,6 +1275,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
     action_t *p;
     object_t *ob, *shadow_ob;
     string_t *str;
+    int error_index;
 
     /* Can't take actions from destructed objects */
     if (current_object->flags & O_DESTRUCTED)
@@ -1298,7 +1285,8 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
     ob = current_object;
 
     /* Check if the call comes from a shadow of the current object */
-    if (ob->flags & O_SHADOW && O_GET_SHADOW(ob)->shadowing)
+    if (func->type == T_STRING
+     && ob->flags & O_SHADOW && O_GET_SHADOW(ob)->shadowing)
     {
         shadow_ob = ob;
         str = find_tabled(func->u.str);
@@ -1332,31 +1320,58 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
 
 #ifdef DEBUG
     if (d_flag > 1)
-        debug_message("%s --Add action %s\n", time_stamp(), get_txt(func->u.str));
+        debug_message("%s --Add action for %s\n", time_stamp(), get_txt(cmd->u.str));
 #endif
-
-    /* Sanity checks */
-    if (get_txt(func->u.str)[0] == ':')
-        errorf("Illegal function name: %s\n", get_txt(func->u.str));
-
-    if (compat_mode)
-    {
-        char *s;
-        s = get_txt(func->u.str);
-        if (*s++=='e' && *s++=='x' && *s++=='i' && *s++=='t'
-         && (!*s || mstrsize(func->u.str) == 4))
-        {
-            errorf("Illegal to define a command to the exit() function.\n");
-            /* NOTREACHED */
-            return MY_TRUE;
-        }
-    }
 
     /* Allocate and initialise a new sentence */
     p = new_action_sent();
 
-    /* Set ->function to the function name, made tabled */
-    p->function = make_tabled(func->u.str); func->type = T_NUMBER;
+    if (func->type == T_STRING)
+    {
+        /* Sanity checks */
+        if (get_txt(func->u.str)[0] == ':')
+        {
+            free_action_sent(p);
+            errorf("Illegal function name: %s\n", get_txt(func->u.str));
+        }
+
+        if (compat_mode)
+        {
+            char *s;
+            s = get_txt(func->u.str);
+            if (*s++=='e' && *s++=='x' && *s++=='i' && *s++=='t'
+             && (!*s || mstrsize(func->u.str) == 4))
+            {
+                free_action_sent(p);
+                errorf("Illegal to define a command to the exit() function.\n");
+                /* NOTREACHED */
+                return MY_TRUE;
+            }
+        }
+
+        error_index = setup_function_callback(&(p->cb), ob, func->u.str
+                                             , 0, NULL, MY_TRUE
+                                             );
+    }
+    else if (func->type == T_CLOSURE)
+    {
+        error_index = setup_closure_callback(&(p->cb), func
+                                             , 0, NULL, MY_TRUE
+                                             );
+    }
+    else
+    {
+        error_index = 0;
+    }
+
+    if (error_index >= 0)
+    {
+        free_action_sent(p);
+        vefun_bad_arg(error_index + 1, inter_sp);
+        /* NOTREACHED */
+        return MY_TRUE;
+    }
+
     p->ob = ob;
     p->shadow_ob = shadow_ob;
 
@@ -1615,7 +1630,7 @@ f_match_command(svalue_t * sp)
 
 /* EFUN match_command()
  *
- *   mixed * execute_command (string command, object origin)
+ *   mixed * match_command (string command, object origin)
  *
  * Take the command <command>, parse it, and return an array of all
  * matching actions added to <origin> (read: <origin> is the object
@@ -1626,8 +1641,8 @@ f_match_command(svalue_t * sp)
  *   string [CMDM_VERB]:   The matched verb.
  *   string [CMDM_ARG]:    The argument string remaining, or 0 if none.
  *   object [CMDM_OBJECT]: The object defining the action.
- *   string [CMDM_FUN]:    The name of the function to call in CMDM_OBJECT,
- *                         which may be static.
+ *   mixed  [CMDM_FUN]:    The name of the function to call in CMDM_OBJECT,
+ *                         which may be static, or a closure.
  *
  * The efun is useful for both debugging, and for implementing your
  * own H_COMMAND handling.
@@ -1656,7 +1671,7 @@ f_match_command(svalue_t * sp)
         struct cmd_s *next;
         string_t     *verb;  /* The verb */
         string_t     *arg;   /* The arg string, or NULL */
-        string_t     *fun;   /* The function to call */
+        svalue_t      fun;   /* The function to call */
         object_t     *ob;    /* The object to call */
         sentence_t   *s;     /* The sentence */
     };
@@ -1767,7 +1782,7 @@ f_match_command(svalue_t * sp)
         new_cmd->next = NULL;
         new_cmd->s = s;
         new_cmd->ob = ref_object(sa->ob, "match_command");
-        new_cmd->fun = ref_mstring(sa->function);
+        transfer_svalue_no_free(&(new_cmd->fun), callback_function(&(sa->cb)));
 
         /* Fill in the verb and arg information of the cmd_s structure.
          */
@@ -1858,7 +1873,7 @@ f_match_command(svalue_t * sp)
         if (pcmd->arg)
             put_string(&(sub->item[CMDM_ARG]), pcmd->arg);
         /* else: entry is svalue-0 already */
-        put_string(&(sub->item[CMDM_FUN]), pcmd->fun);
+        transfer_svalue_no_free(&(sub->item[CMDM_FUN]), &(pcmd->fun));
         put_object(&(sub->item[CMDM_OBJECT]), pcmd->ob);
 
         put_array(&(rc->item[i]), sub);
@@ -2030,7 +2045,7 @@ e_get_action (object_t *ob, string_t *verb)
         p++;
         put_ref_object(p, sa->ob, "get_action");
         p++;
-        put_ref_string(p, sa->function);
+        transfer_svalue_no_free(p, callback_function(&(sa->cb)));
 
         return v;
     }
@@ -2110,7 +2125,7 @@ e_get_all_actions (object_t *ob, int mask)
         }
         if (mask & QA_FUNCTION)
         {
-            put_ref_string(p, sa->function);
+            transfer_svalue_no_free(p, callback_function(&(sa->cb)));
             p++;
         }
     }
@@ -2161,7 +2176,7 @@ e_get_object_actions (object_t *ob1, object_t *ob2)
             put_ref_string(p, sa->verb);
             p++;
 
-            put_ref_string(p, sa->function);
+            transfer_svalue_no_free(p, callback_function(&(sa->cb)));
             p++;
         }
     }

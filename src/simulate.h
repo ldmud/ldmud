@@ -252,6 +252,7 @@ extern svalue_t *execute_callback (callback_t *cb, int nargs, Bool keep, Bool to
 #define apply_callback(cb,nargs)   execute_callback(cb,nargs,MY_TRUE,MY_FALSE)
 #define backend_callback(cb,nargs) execute_callback(cb,nargs,MY_FALSE,MY_TRUE)
 extern object_t *callback_object(callback_t *cb);
+extern svalue_t *callback_function (callback_t *cb);
 extern void callback_change_object (callback_t *cb, object_t *obj);
 #ifdef DEBUG
 extern void count_callback_extra_refs (callback_t *cb);

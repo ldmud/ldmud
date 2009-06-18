@@ -1,8 +1,8 @@
 SYNOPSIS
         #include <sys/commands.h>
 
-        void add_action(string fun, string cmd)
-        void add_action(string fun, string cmd, int flag)
+        void add_action(string|closure fun, string cmd)
+        void add_action(string|closure fun, string cmd, int flag)
 
 DESCRIPTION
         Set up a local function fun to be called when user input
@@ -116,6 +116,7 @@ HISTORY
         really implemented before LDMud 3.2.8.
         LDMud 3.2.9 introduced the AA_IMM_ARGS flag.
         LDMud 3.3 removed the historical add_action(fun) notation.
+        Since LDMud 3.5 the function can be given as a closure.
 
 SEE ALSO
         query_verb(E), query_command(E), remove_action(), init(A)

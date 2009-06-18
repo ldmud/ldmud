@@ -65,43 +65,6 @@ struct sentence_s
 };
 
 
-/* --- struct action_s: the action sentence structure ---
- *
- * Sentences of this type are used to hold the actions (verbs+functions)
- * available to one object.
- *
- * A special case are SENT_MARKER sentences which are used to
- * mark the progress of a command search.
- */
-
-struct action_s
-{
-    sentence_t sent;  /* The basic sentence */
-    string_t *verb;
-      /* Shared string: the defined verb.
-       * For SENT_PLAIN and SENT_SHORT_VERB, this is the whole verb.
-       * For SENT_NO_SPACE, only the first letters of the command have
-       *   to match this verb.
-       */
-    object_t *ob;
-      /* Object defining this sentence. This value is used for comparisons
-       * only, and in case of SENT_MARKER it is in fact a *rt_context_t.
-       * The reference is not counted.
-       */
-    object_t *shadow_ob;
-      /* If the action originates from an object shadow, .ob will be the
-       * shadowed object (as the action has to seem to come from there),
-       * and this will be the actual shadow object defining the object.
-       * The reference is not counted.
-       * Otherwise, this entry is NULL.
-       */
-    string_t *function;             /* the name of the action function */
-    unsigned short short_verb;
-      /* SENT_SHORT_VERB: the number of characters which have to
-       *   match at minimum.
-       */
-};
-
 /* --- struct shadow_s: the action sentence structure ---
  *
  * Main purpose of the shadow sentence is to link together the shadowing

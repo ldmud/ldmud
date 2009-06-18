@@ -647,7 +647,7 @@ void    tell_room(object|string, string|mixed *|object|mapping, void|object *);
 
         /* Verbs and Commands (TODO: should be optional) */
 
-void    add_action(string, string, void|int);
+void    add_action(string|closure, string, void|int);
 int     command(string, void|object);
 mixed  *command_stack();
 int     command_stack_depth();

@@ -1,9 +1,9 @@
 SYNOPSIS
         #include <sys/commands.h>
 
-        void add_action(string fun, string cmd);
-        void add_action(string fun, string cmd, int flag);
-        void add_action(string fun);        /* veraltet */
+        void add_action(string|closure fun, string cmd);
+        void add_action(string|closure fun, string cmd, int flag);
+        void add_action(string|closure fun);        /* veraltet */
 
 BESCHREIBUNG
         Setzt eine lokale Funktion fun, die aufgerufen wird, wenn der Spieler
@@ -111,7 +111,7 @@ BEISPIELE
 AENDERUNGEN
         Das Argument <flag> < 0 wird seit 3.2@127 unterstuetzt, aber erst ab
         LDMud 3.2.8 richtig implementiert. LDMud 3.2.9 fuehrte das AA_IMM_ARGS
-        Flag ein.
+        Flag ein. Ab LDMud 3.5 kann man Closures als Funktionen uebergeben.
 
 SIEHE AUCH
         query_verb(E), query_command(E), add_verb(E), add_xverb(E), init(A)

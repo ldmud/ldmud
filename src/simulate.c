@@ -3948,6 +3948,27 @@ callback_object (callback_t *cb)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+callback_function (callback_t *cb)
+
+/* Returns the function to call from the callback structure <cb>.
+ * It returns a pointer to a statically allocated svalue_t,
+ * which contains either a T_STRING or T_CLOSURE.
+ * It's the caller's responsibility to free its contents.
+ */
+
+{
+    static svalue_t fun;
+
+    if (cb->is_lambda)
+        assign_svalue_no_free(&fun, &(cb->function.lambda));
+    else
+        put_ref_string(&fun, cb->function.named.name);
+
+    return &fun;
+} /* callback_object() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
 
 /* Call the callback <cb> with the <nargs> arguments already pushed
