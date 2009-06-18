@@ -348,11 +348,11 @@ static char yytext[MAXLINE];
 
 /*-------------------------------------------------------------------------*/
 /* Enforce an appropriate range for ITABLE_SIZE
- * The hash used in ident_s is of type short. Therefore the hash table must
+ * The hash used in ident_s is of type hash16_t. Therefore the hash table must
  * not contain more hash chains than SHRT_MAX.
  */
-#if ITABLE_SIZE < 256 || ITABLE_SIZE > SHRT_MAX
-#error "ITABLE_SIZE must be within the range of 256 and SHRT_MAX (usually 32768)."
+#if ITABLE_SIZE < 256 || ITABLE_SIZE > MAX_HASH16
+#error "ITABLE_SIZE must in the range of 256 and MAX_HASH16 (usually 2^16)."
 This is the end...
 #endif
 
@@ -373,14 +373,17 @@ static ident_t *ident_table[ITABLE_SIZE];
    * .inferior pointers into a list ordered by falling type value. The entry
    * with the highest type value is the one put into the hashtable's chain.
    */
-
-#if ITABLE_SIZE == 256
-#        define identhash(s) chashstr((s), 12)
-#else
-#        define identhash(s) (dwhashstr((s), 12) % ITABLE_SIZE)
-#endif
+static INLINE hash16_t identhash(const char* s)
   /* Hash an identifier name (c-string) into a table index.
    */
+{
+#if !( (ITABLE_SIZE) & (ITABLE_SIZE)-1 )
+    // use faster masking if ITABLE_SIZE is a power of 2.
+    return hash_string(s, strlen(s)) & (ITABLE_SIZE-1);
+#else
+    return hash_string(s, strlen(s)) % ITABLE_SIZE;
+#endif
+}
 
   /* In addition to this, the lexer keeps two lists for all efuns and
    * preprocessor defines: all_efuns and all_defines. These are linked
@@ -1786,7 +1789,7 @@ lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
 
 {
     ident_t  *curr, *prev;
-    int       h;
+    hash16_t h;
     string_t *str;
 
 #if defined(LEXDEBUG)
@@ -1871,7 +1874,7 @@ lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
         curr->next = ident_table[h];
         curr->type = I_TYPE_UNKNOWN;
         curr->inferior = NULL;
-        curr->hash = (short)h;
+        curr->hash = h;
         ident_table[h] = curr;
     }
     /* else curr is NULL */
@@ -1959,7 +1962,7 @@ unlink_shared_identifier (ident_t *p)
 
 {
     ident_t *curr, **q;
-    int  h;
+    hash16_t  h;
     string_t *s;
 
     h = p->hash;

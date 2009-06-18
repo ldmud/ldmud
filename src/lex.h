@@ -7,6 +7,8 @@
 #include "strfuns.h"
 #endif
 
+#include "hash.h"
+
 /* --- Types --- */
 
 typedef struct source_file_s source_file_t; /* forward */
@@ -150,7 +152,7 @@ struct ident_s
                               * structure all share the same reference to
                               * the string. */
     short type;              /* Type of this entry */
-    short hash;              /* Hashvalue of this identifier */
+    hash16_t hash;           /* Hashvalue of this identifier */
     ident_t *next;           /* Next in hash chain */
     ident_t *inferior;       /* Ident of same name, but lower type */
     union {                  /* Type-depend data: */
