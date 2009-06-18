@@ -1115,9 +1115,15 @@ static struct type types[]
  *
  * The macros are kept in the usual hashtable.
  */
-
-#define MAKE_FUNC_DEFHASH 101
-#define defhash(str) (dwhashstr((str), 12) % MAKE_FUNC_DEFHASH)
+#define MAKE_FUNC_DEFHASHBITS 7
+#define MAKE_FUNC_DEFHASH (1 << MAKE_FUNC_DEFHASHBITS)
+static INLINE hash16_t defhash(const char *str)
+{
+    size_t len = strlen(str);
+    if (len > 12)
+        len = 12;
+    return hashmem32(str, len) & hashmask(MAKE_FUNC_DEFHASHBITS);
+}
 
 struct defn {
     char *name;         /* Macro name */
@@ -1266,7 +1272,7 @@ add_define (const char * name, int num_arg, const char *exps)
  */
 
 {
-    int i;
+    hash16_t i;
     struct defn *ndef;
 
     i = defhash(name);
@@ -1292,7 +1298,7 @@ lookup_define (const char *s)
 
 {
     struct defn *curr, *prev;
-    int h;
+    hash16_t h;
 
     h = defhash(s);
 
