@@ -50,7 +50,7 @@
  *   struct_type_t
  *   {
  *       struct_type_t * next;
- *       dwhash_t        hash;
+ *       hash32_t        hash;
  * 
  *       string_t      * name;
  *       p_int           ref;
@@ -194,18 +194,18 @@ static mp_int size_struct_type = 0;
    */
 
 /*-------------------------------------------------------------------------*/
-static INLINE dwhash_t
+static INLINE hash32_t
 hash2 (string_t * pName, string_t * pProgName)
 
 /* Compute the hash from <pName> combined with <pProgName>.
  */
 
 {
-    dwhash_t         hash;
+    hash32_t         hash;
 
     hash = mstr_get_hash(pName);
-    hash = dwhashmem2("\n", 1, 1, hash);
-    hash = dwhashmem2(get_txt(pProgName), mstrsize(pProgName), MSTRING_HASH_LENGTH, hash);
+    hash = hash_string_chained("\n", 1, hash);
+    hash = hash_string_chained(get_txt(pProgName), mstrsize(pProgName), hash);
 
     return hash;
 } /* hash2() */
@@ -252,7 +252,7 @@ find_by_type (struct_type_t * pSType)
 
 /*-------------------------------------------------------------------------*/
 static struct_type_t *
-find_by_name (string_t * pName, string_t * pProgName, dwhash_t  hash)
+find_by_name (string_t * pName, string_t * pProgName, hash32_t  hash)
 
 /* Lookup the struct type named <pName> and defined in program <pProgName>
  * in the hash table. <hash> is the hash of the two names combined.
@@ -336,7 +336,7 @@ add_type (struct_type_t * pSType)
      /* If chain lengths grow too much (more than 2 entries per bucket
       * on average), increase the table size
       */
-     if (num_types > 2 * table_size && table_size * 2 < MAX_DWHASH)
+     if (num_types > 2 * table_size && table_size * 2 < MAX_HASH32)
      {
          size_t new_size = 2 * table_size;
          struct_type_t ** table2;
