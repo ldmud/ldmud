@@ -514,6 +514,7 @@
  */
 @cdef_rxcache_table@ RXCACHE_TABLE            @val_rxcache_table@
 
+
 /* --- Current Developments ---
  * These options can be used to disable developments-in-progress if their
  * code turns out to be interrrupting.
@@ -527,7 +528,6 @@
  * (f-020528).
  */
 @cdef_use_new_inlines@ USE_NEW_INLINES
-
 
 /* --- Profiling ---
  * For profiling of the VM instruction implementations, refer to the Makefile

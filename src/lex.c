@@ -375,9 +375,9 @@ static ident_t *ident_table[ITABLE_SIZE];
    */
 
 #if ITABLE_SIZE == 256
-#    define identhash(s) chashstr((s), 12)
+#        define identhash(s) chashstr((s), 12)
 #else
-#    define identhash(s) (whashstr((s), 12) % ITABLE_SIZE)
+#        define identhash(s) (dwhashstr((s), 12) % ITABLE_SIZE)
 #endif
   /* Hash an identifier name (c-string) into a table index.
    */

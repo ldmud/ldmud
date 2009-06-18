@@ -58,7 +58,7 @@ struct struct_member_s
 struct struct_type_s
 {
     struct_type_t * next;      /* Next type in hash chain (uncounted) */
-    whash_t         hash;      /* Hash value of this type */
+    dwhash_t        hash;      /* Hash value of this type */
 
     string_t      * name;      /* Tabled name of the struct */
     p_int           ref;       /* Number of references to this structure */

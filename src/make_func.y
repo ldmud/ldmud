@@ -1117,7 +1117,7 @@ static struct type types[]
  */
 
 #define MAKE_FUNC_DEFHASH 101
-#define defhash(str) (whashstr((str), 12) % MAKE_FUNC_DEFHASH)
+#define defhash(str) (dwhashstr((str), 12) % MAKE_FUNC_DEFHASH)
 
 struct defn {
     char *name;         /* Macro name */

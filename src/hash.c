@@ -5,6 +5,8 @@
  * A simple and fast generic string hasher based on Peter K. Pearson's
  * article in Communications of the ACM 33-6, pp. 677.
  * TODO: Use Bob Jenkins hash instead of Pearson's?
+ * For 32 bit wide hashes, the hash function from D.J. Bernstein's CDB library
+ * is used, which is public domain according the the CDB distribution package.
  *---------------------------------------------------------------------------
  */
 
@@ -161,5 +163,51 @@ chashstr (const char *s, int maxn)
     return h;
 } /* chashstr() */
 
-/***************************************************************************/
+/*-------------------------------------------------------------------------*/
 
+/* The following functions basically implement Dan J. Bernsteins Hash 
+ * function, also used in his CDB */
+dwhash_t
+dwhashmem2 (const char *s, size_t len, int maxn, dwhash_t initial)
+
+/* Hash the first min(<len>,<maxn>) characters of string <s> into an 
+ * unsigned long integer (p_uint, double word) and return this hashed value.
+ * The hash value is initialized with <initial>, so that this function
+ * can be used to hash a series of strings into one result.
+ * Aliased to dwhashmem()
+ */
+{
+    register dwhash_t hash = initial;
+    register size_t i = maxn;
+    
+    if (i > len)
+        i = len;
+    
+    while(i--) {
+        hash += (hash << 5);
+        hash = hash ^ *(s++);
+    }
+    return (hash);
+}
+
+/*-------------------------------------------------------------------------*/
+
+dwhash_t
+dwhashstr (const char *s, int maxn)
+/* Hash the first min(<len>,<maxn>) characters of string <s> (or until \0,
+ * whatever comes first) into an unsigned long integer (p_uint, double word) 
+ * and return this hashed value.
+ */
+{
+    register dwhash_t hash = INITIAL_DWHASH;
+    register size_t i = maxn;
+    register unsigned char c;
+    
+    while(i-- && (c = *s++) != '\0') {
+        hash += (hash << 5);
+        hash = hash ^ c;
+    }
+    return (hash);
+}
+
+/***************************************************************************/

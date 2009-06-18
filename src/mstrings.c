@@ -33,7 +33,7 @@
  *        } info;
  *        string_t * next;            String table pointer.
  *        size_t     size;            Length of the string 
- *        whash_t    hash;            0, or the hash of the string
+ *        dwhash_t    hash;            0, or the hash of the string
  *        char       txt[1.. .size];
  *        char       null             Gratuituous terminator
  *    }
@@ -179,7 +179,7 @@ statcounter_t stNumTabledCheckedSearch = 0;
 #endif /* EXT_STRING_STATS */
 
 /*-------------------------------------------------------------------------*/
-static INLINE whash_t
+static INLINE dwhash_t
 hash_string_inl (const char * const s, size_t size)
 
 /* Compute the hash for string <s> of length <size> and return it.
@@ -187,24 +187,21 @@ hash_string_inl (const char * const s, size_t size)
  */
 
 {
-    whash_t hash;
-
-    hash = whashmem(s, size, MSTRING_HASH_LENGTH);
+    dwhash_t hash = dwhashmem(s, size, MSTRING_HASH_LENGTH);
     if (!hash)
         hash = 1 << (sizeof (hash) * CHAR_BIT - 1);
     return hash;
 } /* hash_string_inl() */
 
-whash_t
+dwhash_t
 hash_string (const char * const s, size_t size)
 {
     return hash_string_inl(s, size);
 }
 
 /*-------------------------------------------------------------------------*/
-static INLINE whash_t
+static INLINE dwhash_t
 get_hash (string_t * pStr)
-
 /* Return the hash of string <pStr>, computing it if necessary.
  */
 
@@ -216,7 +213,7 @@ get_hash (string_t * pStr)
 } /* get_hash() */
 
 /*-------------------------------------------------------------------------*/
-whash_t
+dwhash_t
 mstring_get_hash (string_t * pStr)
 
 /* Aliased to: mstr_get_hash()
@@ -230,8 +227,7 @@ mstring_get_hash (string_t * pStr)
 
 /*-------------------------------------------------------------------------*/
 static INLINE string_t *
-find_and_move (const char * const s, size_t size, whash_t hash)
-
+find_and_move (const char * const s, size_t size, dwhash_t hash)
 /* If <s> is a tabled string of length <size> and <hash> in the related
  * stringtable chain: find it, move it to the head of the chain and return its
  * string_t*.
@@ -320,8 +316,7 @@ move_to_head (string_t *s, int idx)
 
 /*-------------------------------------------------------------------------*/
 static INLINE string_t *
-make_new_tabled (const char * const pTxt, size_t size, whash_t hash MTRACE_DECL)
-
+make_new_tabled (const char * const pTxt, size_t size, dwhash_t hash MTRACE_DECL)
 /* Helper function for mstring_new_tabled() and mstring_new_n_tabled().
  *
  * Create a new tabled string by copying the data string <pTxt> of length
@@ -487,7 +482,7 @@ mstring_new_tabled (const char * const pTxt MTRACE_DECL)
  */
 
 {
-    whash_t    hash;
+    dwhash_t   hash;
     size_t     size;
     string_t * string;
 
@@ -519,7 +514,7 @@ mstring_new_n_tabled (const char * const pTxt, size_t size MTRACE_DECL)
  */
 
 {
-    whash_t    hash;
+    dwhash_t   hash;
     string_t * string;
 
     hash = hash_string_inl(pTxt, size);
@@ -552,7 +547,7 @@ table_string (string_t * pStr MTRACE_DECL)
 
 {
     string_t *string;
-    whash_t    hash;
+    dwhash_t   hash;
     int        idx;
     size_t     size;
     size_t     msize;
@@ -755,7 +750,7 @@ mstring_find_tabled (string_t * pStr)
  */
 
 {
-    whash_t hash;
+    dwhash_t   hash;
     size_t  size;
 
 #ifdef EXT_STRING_STATS
@@ -796,7 +791,7 @@ mstring_find_tabled_str (const char * const pTxt, size_t size)
  */
 
 {
-    whash_t hash;
+    dwhash_t   hash;
 
     hash = hash_string_inl(pTxt, size);
 
@@ -995,8 +990,8 @@ mstring_order (string_t * const pStr1, string_t * const pStr2)
 
     /* Strings with a smaller hash also count as 'less'. */
     {
-        whash_t hash1 = get_hash(pStr1);
-        whash_t hash2 = get_hash(pStr2);
+        dwhash_t hash1 = get_hash(pStr1);
+        dwhash_t hash2 = get_hash(pStr2);
         if (hash1 != hash2)
             return  hash1 < hash2 ? -1 : 1;
     }
