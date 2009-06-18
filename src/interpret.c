@@ -13444,10 +13444,7 @@ again:
          * The <offset> is counted from its first byte (TODO: Ugh).
          */
 
-        short offset;
-
-        GET_SHORT(offset, pc);
-        pc += offset;
+        pc += get_bc_shortoffset(pc);
         break;
     }
 
@@ -13458,16 +13455,13 @@ again:
          * sp[0] is popped from the stack.
          */
 
-        short offset;
-
         if (sp->type == T_NUMBER && sp->u.number == 0)
         {
-            GET_SHORT(offset, pc);
-            pc += offset;
+            pc += get_bc_shortoffset(pc);
             sp--;
             break;
         }
-        pc += 2;
+        pc += sizeof(bc_shortoffset_t);
         pop_stack();
         break;
     }
@@ -13479,16 +13473,13 @@ again:
          * sp[0] is popped from the stack.
          */
 
-        short offset;
-
         if (sp->type != T_NUMBER || sp->u.number != 0)
         {
-            GET_SHORT(offset, pc);
-            pc += offset;
+            pc += get_bc_shortoffset(pc);
             pop_stack();
             break;
         }
-        pc += sizeof(short);
+        pc += sizeof(bc_shortoffset_t);
         sp--;
         break;
     }
@@ -13499,7 +13490,7 @@ again:
          * The <offset> is counted from the next instruction.
          */
 
-        pc += GET_UINT8(pc)+1;
+        pc += get_uint8(pc) + sizeof(bytecode_t);
         break;
     }
 
