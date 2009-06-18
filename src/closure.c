@@ -2219,8 +2219,8 @@ compile_value (svalue_t *value, int opt_flags)
                         }
                         else
                         {
-                            PUT_INT8(current.code+start+1
-                                     , GET_INT8(current.code+start+1) + offset);
+                            put_uint8(current.code+start+1
+                                     , (int8_t)get_uint8(current.code+start+1) + offset);
                         }
 
                         /* Prepare for the backpatching run */
@@ -5214,7 +5214,7 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
 
     /* Store the lambda code header */
     STORE_UINT8(current.codep, 0);          /* dummy for num values */
-    STORE_INT8(current.codep, (char)current.num_locals); /* num arguments */
+    STORE_UINT8(current.codep, current.num_locals); /* num arguments */
     STORE_UINT8(current.codep, 0);          /* dummy for num variables */
 
     current.value_max = current.values_left = VALUE_START_MAX;

@@ -141,20 +141,12 @@ static INLINE uint8_t get_uint8(bytecode_p p) {
     return *((uint8_t *)p);
 }
 
-static INLINE int8_t get_int8(bytecode_p p) {
-    return *((int8_t *)p);
-}
-
 static INLINE uint16_t get_uint16(bytecode_p p) {
     return *((uint16_t *)p);
 }
 
 static INLINE uint32_t get_uint32(bytecode_p p) {
     return *((uint32_t *)p);
-}
-
-static INLINE int32_t get_int32(bytecode_p p) {
-    return *((int32_t *)p);
 }
 
 static INLINE uint64_t get_uint64(bytecode_p p) {
@@ -178,20 +170,12 @@ static INLINE uint8_t put_uint8(bytecode_p p, uint8_t c) {
     return *((uint8_t *)p) = c;
 }
 
-static INLINE int8_t put_int8(bytecode_p p, int8_t c) {
-    return *((int8_t *)p) = c;
-}
-
 static INLINE uint16_t put_uint16(bytecode_p p, uint16_t c) {
     return *((uint16_t *)p) = c;
 }
 
 static INLINE uint32_t put_uint32(bytecode_p p, uint32_t c) {
     return *((uint32_t *)p) = c;
-}
-
-static INLINE int32_t put_int32(bytecode_p p, int32_t c) {
-    return *((int32_t *)p) = c;
 }
 
 static INLINE uint64_t put_uint64(bytecode_p p, uint64_t c) {
@@ -213,10 +197,6 @@ static INLINE bytecode_t load_code(bytecode_p *p) {
 
 static INLINE uint8_t load_uint8(bytecode_p *p) {
     return *( (*(uint8_t**)(p))++ );
-}
-
-static INLINE int8_t load_int8(bytecode_p *p) {
-    return *( (*(int8_t**)(p))++ );
 }
 
 static INLINE uint16_t load_uint16(bytecode_p *p) {
@@ -249,10 +229,6 @@ static INLINE bytecode_t rstore_code(bytecode_p *p, bytecode_t c) {
 
 static INLINE uint8_t store_uint8(bytecode_p *p, uint8_t c) {
     return *( (*(uint8_t**)(p))++ ) = c;
-}
-
-static INLINE int8_t store_int8(bytecode_p *p, int8_t c) {
-    return *( (*(int8_t**)(p))++ ) = c;
 }
 
 static INLINE uint16_t store_uint16(bytecode_p *p, uint16_t c) {
@@ -296,19 +272,6 @@ static INLINE void rstore_short(bytecode_p *p, unsigned short d) {
 #  error "Unsupported size of short."
 #endif /* SIZEOF_SHORT */
 
-static INLINE long get_long(bytecode_p p) {
-    return get_uint32(p);
-}
-static INLINE long load_long(bytecode_p *p) {
-    return load_uint32(p);
-}
-static INLINE void put_long(bytecode_p p, unsigned long d) {
-    put_uint32(p, (uint32_t)d);
-}
-static INLINE void store_long(bytecode_p *p, unsigned long d) {
-    store_uint32(p, (uint32_t)d);
-}
-
 /* some macros for compatibility */
 // GET_CODE und PUT_CODE are functions.
 #define LOAD_CODE(p)       load_code(&(p))
@@ -320,21 +283,11 @@ static INLINE void store_long(bytecode_p *p, unsigned long d) {
 #define LOAD_UINT8(p)      load_uint8(&(p))
 #define STORE_UINT8(p,c)   store_uint8(&(p),(c))
 
-#define GET_INT8(p)        get_int8(p)
-#define PUT_INT8(p,c)      put_int8((p),(c))
-#define LOAD_INT8(p)       load_int8(&(p))
-#define STORE_INT8(p,c)    store_int8(&(p),(c))
-
 #define GET_SHORT(d,p)     (d = get_short((p)))
 #define LOAD_SHORT(d,p)    (d = load_short(&(p)))
 #define PUT_SHORT(p,d)     put_short((p),(d))
 #define STORE_SHORT(p,d)   store_short(&(p),(d))
 #define RSTORE_SHORT(p,d)  rstore_short(&(p),(d))
-
-#define GET_LONG(d,p)      (d = get_long((p)))
-#define LOAD_LONG(d,p)     (d = load_long(&(p)))
-#define PUT_LONG(p,d)      put_long((p),(d))
-#define STORE_LONG(p,d)    store_long(&(p),(d))
 
 #endif /* CHAR_BIT */
 

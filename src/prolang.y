@@ -842,7 +842,7 @@ static p_int switch_pc;
    * after the SWITCH instruction.
    */
 
-static p_int current_break_address;
+static bc_offset_t current_break_address;
   /* If != 0, the compiler is in a break-able environment and this
    * variable points to the first offset-part of a series of LBRANCHes
    * which implement the break statement. Stored in every offset-part
@@ -870,7 +870,7 @@ static p_int current_break_address;
   /* Special value: no break encountered (yet).
    */
 
-static p_int current_continue_address;
+static bc_offset_t current_continue_address;
   /* If != 0, the compiler is in a continue-able environment and this
    * variable points to the first offset-part of a series of  FBRANCHes
    * which implement the continue statement. Stored in every offset-part
@@ -1988,20 +1988,44 @@ read_short (bc_offset_t offset)
 
 /*-------------------------------------------------------------------------*/
 static void
-upd_jump_offset (bc_offset_t offset, bc_offset_t l)
-
-/* Store the new offset <l> at <offset> in the A_PROGRAM area in
- * a fixed byteorder.
+ins_jump_offset (bc_offset_t l)
+/* Add the jump offset <l> to the A_PROGRAM area in a fixed byteorder.
  */
-
 {
-    put_bc_offset(PROGRAM_BLOCK + offset, l);
-
-} /* upd_jump_offset() */
+    if (realloc_a_program(sizeof(l)))
+    {
+        put_bc_offset(PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE, l);
+        CURRENT_PROGRAM_SIZE += sizeof(l);
+    }
+    else
+    {
+        yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
+                 , CURRENT_PROGRAM_SIZE + sizeof(l));
+    }
+} /* ins_jump_offset() */
 
 /*-------------------------------------------------------------------------*/
 static void
-ins_int32 (int32 l)
+upd_jump_offset (bc_offset_t offset, bc_offset_t l)
+/* Store the new offset <l> at <offset> in the A_PROGRAM area in
+ * a fixed byteorder.
+ */
+{
+    put_bc_offset(PROGRAM_BLOCK + offset, l);
+} /* upd_jump_offset() */
+
+/*-------------------------------------------------------------------------*/
+static bc_offset_t
+read_jump_offset (bc_offset_t offset)
+/* Return the jump offset stored at <offset> in the A_PROGRAM area.
+ */
+{
+    return get_bc_offset(PROGRAM_BLOCK + offset);
+} /* read_jump_offset() */
+
+/*-------------------------------------------------------------------------*/
+static void
+ins_uint32 (uint32_t l)
 
 /* Add the 4-byte number <l> to the A_PROGRAM area in a fixed byteorder.
  */
@@ -2010,21 +2034,21 @@ ins_int32 (int32 l)
    TODO::size type (int32, int32_t).
  */
 {
-    if (realloc_a_program(sizeof(int32)))
+    if (realloc_a_program(sizeof(uint32_t)))
     {
-        put_int32(PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE, l);
-        CURRENT_PROGRAM_SIZE += sizeof(int32);
+        put_uint32(PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE, l);
+        CURRENT_PROGRAM_SIZE += sizeof(uint32_t);
     }
     else
     {
         yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
-                , CURRENT_PROGRAM_SIZE + sizeof(int32));
+                , CURRENT_PROGRAM_SIZE + sizeof(uint32_t));
     }
-} /* ins_int32() */
+} /* ins_uint32() */
 
 /*-------------------------------------------------------------------------*/
 static void
-upd_int32 (bc_offset_t offset, int32 l)
+upd_uint32 (bc_offset_t offset, uint32_t l)
  
 /* Store the 4-byte number <l> at <offset> in the A_PROGRAM are in
  * a fixed byteorder.
@@ -2035,12 +2059,12 @@ upd_int32 (bc_offset_t offset, int32 l)
 */
 
 {
-    put_int32(PROGRAM_BLOCK + offset, l);
-} /* upd_int32() */
+    put_uint32(PROGRAM_BLOCK + offset, l);
+} /* upd_uint32() */
 
 /*-------------------------------------------------------------------------*/
-static int32
-read_int32 (bc_offset_t offset)
+static uint32
+read_uint32 (bc_offset_t offset)
 
 /* Return the 4-byte number stored at <offset> in the A_PROGRAM area.
    TODO: check callers for assumptions that a long is always 4 bytes. 
@@ -2049,8 +2073,8 @@ read_int32 (bc_offset_t offset)
 */
 
 {
-    return get_int32(PROGRAM_BLOCK + offset);
-} /* read_int32() */
+    return get_uint32(PROGRAM_BLOCK + offset);
+} /* read_uint32() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -2160,7 +2184,7 @@ ins_number (p_int num)
     bytecode_p __PREPARE_INSERT__p = (\
       realloc_a_program(n) ? (PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE) : NULL);
 
-#define add_byte(b)   (void) STORE_INT8(__PREPARE_INSERT__p, (b))
+#define add_byte(b)   (void) STORE_UINT8(__PREPARE_INSERT__p, (b))
 
 #define add_short(s) STORE_SHORT(__PREPARE_INSERT__p, (s))
 
@@ -2253,7 +2277,7 @@ fix_branch (int ltoken, p_int dest, p_int loc)
         /* We need a long branch. That also means that we have to
          * move the following code and adapt remembered addresses.
          */
-        p_int i, j;
+        bc_offset_t i, j;
         bytecode_p p;
 
         mem_block[A_PROGRAM].block[loc] = 0; /* Init it */
@@ -2263,9 +2287,9 @@ fix_branch (int ltoken, p_int dest, p_int loc)
          && !(current_break_address & (BREAK_ON_STACK|BREAK_DELIMITER) ) )
         {
             for (i = current_break_address & BREAK_ADDRESS_MASK
-                ; (j = read_int32(i)) > loc; )
+                ; (j = read_jump_offset(i)) > loc; )
             {
-                upd_int32(i, j+1);
+                upd_jump_offset(i, j+1);
                 i = j;
             }
             current_break_address++;
@@ -2276,9 +2300,9 @@ fix_branch (int ltoken, p_int dest, p_int loc)
          && !(current_continue_address & CONTINUE_DELIMITER ) )
         {
             for(i = current_continue_address & CONTINUE_ADDRESS_MASK;
-              (j=read_int32(i)) > loc; )
+              (j=read_jump_offset(i)) > loc; )
             {
-                upd_int32(i, j+1);
+                upd_jump_offset(i, j+1);
                 i = j;
             }
             current_continue_address++;
@@ -2341,7 +2365,7 @@ yymove_switch_instructions (int len, p_int blocklen)
  */
 
 {
-    mp_int i, j;
+    bc_offset_t i, j;
 
     if (realloc_a_program(len))
     {
@@ -2352,9 +2376,9 @@ yymove_switch_instructions (int len, p_int blocklen)
          && !(current_continue_address & CONTINUE_DELIMITER ) )
         {
             for(i = current_continue_address & CONTINUE_ADDRESS_MASK;
-              (j=read_int32(i)) > switch_pc; )
+              (j=read_jump_offset(i)) > switch_pc; )
             {
-                    upd_int32(i, j+len);
+                    upd_jump_offset(i, j+len);
                     i = j;
             }
             current_continue_address += len;
@@ -7281,7 +7305,7 @@ statement:
               /* A normal loop break: add the FBRANCH to the list */
 
               ins_f_code(F_FBRANCH);
-              ins_int32(current_break_address & BREAK_ADDRESS_MASK);
+              ins_jump_offset(current_break_address & BREAK_ADDRESS_MASK);
               current_break_address = CURRENT_PROGRAM_SIZE - sizeof(int32);
               if (current_break_address > BREAK_ADDRESS_MASK)
                   yyerrorf("Compiler limit: (L_BREAK) value too large: %"PRIdPINT
@@ -7307,7 +7331,7 @@ statement:
               {
                   ins_f_code(F_BREAKN_CONTINUE);
                   ins_byte(255);
-                  ins_int32(4);
+                  ins_jump_offset(4);
                   depth -= SWITCH_DEPTH_UNIT*256;
               }
 
@@ -7330,7 +7354,7 @@ statement:
           }
 
           /* In either case, handle the list of continues alike */
-          ins_int32(current_continue_address & CONTINUE_ADDRESS_MASK);
+          ins_jump_offset(current_continue_address & CONTINUE_ADDRESS_MASK);
           current_continue_address =
                         ( current_continue_address & SWITCH_DEPTH_MASK ) |
                         ( CURRENT_PROGRAM_SIZE - sizeof(int32) );
@@ -7474,7 +7498,7 @@ while:
            */
 
           p_int offset;
-          p_int next_addr;
+          bc_offset_t next_addr;
           p_int addr = pop_address();
 
           /* Update the offsets of all continue BRANCHes
@@ -7483,8 +7507,8 @@ while:
           for ( ; current_continue_address > 0
                 ; current_continue_address = next_addr)
           {
-              next_addr = read_int32(current_continue_address);
-              upd_int32(current_continue_address,
+              next_addr = read_jump_offset(current_continue_address);
+              upd_jump_offset(current_continue_address,
                   CURRENT_PROGRAM_SIZE - current_continue_address);
           }
 
@@ -7529,8 +7553,8 @@ while:
           for( ; current_break_address > 0
                ; current_break_address = next_addr)
           {
-              next_addr = read_int32(current_break_address);
-              upd_int32(current_break_address,
+              next_addr = read_jump_offset(current_break_address);
+              upd_jump_offset(current_break_address,
                   CURRENT_PROGRAM_SIZE - current_break_address);
           }
 
@@ -7569,15 +7593,15 @@ do:
            * the continue statements.
            */
 
-          p_int next_addr;
+          bc_offset_t next_addr;
           p_int current;
 %line
           current = CURRENT_PROGRAM_SIZE;
           for(; current_continue_address > 0
               ; current_continue_address = next_addr)
           {
-              next_addr = read_int32(current_continue_address);
-              upd_int32(current_continue_address,
+              next_addr = read_jump_offset(current_continue_address);
+              upd_jump_offset(current_continue_address,
                   current - current_continue_address);
           }
       }
@@ -7591,7 +7615,7 @@ do:
            */
 
           p_int offset;
-          p_int next_addr;
+          bc_offset_t next_addr;
           p_int addr = pop_address();
           mp_uint current;
           bytecode_p dest;
@@ -7649,8 +7673,8 @@ do:
           for (; current_break_address > 0
                ; current_break_address = next_addr)
           {
-              next_addr = read_int32(current_break_address);
-              upd_int32(current_break_address,
+              next_addr = read_jump_offset(current_break_address);
+              upd_jump_offset(current_break_address,
                   current - current_break_address);
           }
 
@@ -7800,14 +7824,14 @@ for:
            */
 
           p_int offset;
-          p_int next_addr;
+          bc_offset_t next_addr;
 
           /* Patch up the continues */
           for (; current_continue_address > 0
                ; current_continue_address = next_addr)
           {
-              next_addr = read_int32(current_continue_address);
-              upd_int32(current_continue_address,
+              next_addr = read_jump_offset(current_continue_address);
+              upd_jump_offset(current_continue_address,
                   CURRENT_PROGRAM_SIZE - current_continue_address);
           }
 
@@ -7864,8 +7888,8 @@ for:
           for (; current_break_address > 0
                ; current_break_address = next_addr)
           {
-              next_addr = read_int32(current_break_address);
-              upd_int32(current_break_address,
+              next_addr = read_jump_offset(current_break_address);
+              upd_jump_offset(current_break_address,
                   CURRENT_PROGRAM_SIZE - current_break_address);
           }
 
@@ -8052,7 +8076,7 @@ foreach:
            * break statements and generate the remaining statements.
            */
 
-          p_int next_addr;
+          bc_offset_t next_addr;
           p_int addr;
           mp_uint current;
 
@@ -8097,8 +8121,8 @@ foreach:
               for(; current_continue_address > 0
                   ; current_continue_address = next_addr)
               {
-                  next_addr = read_int32(current_continue_address);
-                  upd_int32(current_continue_address,
+                  next_addr = read_jump_offset(current_continue_address);
+                  upd_jump_offset(current_continue_address,
                       current - current_continue_address);
               }
 
@@ -8118,8 +8142,8 @@ foreach:
               for (; current_break_address > 0
                    ; current_break_address = next_addr)
               {
-                  next_addr = read_int32(current_break_address);
-                  upd_int32(current_break_address,
+                  next_addr = read_jump_offset(current_break_address);
+                  upd_jump_offset(current_break_address,
                       current - current_break_address);
               }
 

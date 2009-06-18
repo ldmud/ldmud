@@ -15895,22 +15895,12 @@ again:
          * surrounding structure.
          *
          * Pop one break-level from the break stack and jump
-         * by (32-Bit) unsigned long <offset> bytes, counted from the
-         * first by of <offset>
+         * by (32-Bit) bc_offset_t <offset> bytes, counted from the
+         * first byte of <offset>.
          *
-         * Pitfall: the offset is added to the current pc in 16-Bit
-         * unsigned arithmetic, allowing to jump backwards using big
-         * enough values.
-         *
-         * TODO: Make that a proper signed short.
          */
-
-        /* TODO: uint16 */ unsigned long offset;
-
         break_sp++;
-        GET_LONG(offset, pc);
-        offset += pc - current_prog->program;
-        pc = current_prog->program + offset;
+        pc += get_bc_offset(pc);
         break;
     }
 
@@ -19513,7 +19503,7 @@ get_arg (int a)
 
     if (to - from == 5)
     {
-        int32 arg = get_int32(from+1);
+        int32 arg = get_uint32(from+1);
 
         snprintf(buff, sizeof(buff), "%"PRId32, arg);
         return buff;
