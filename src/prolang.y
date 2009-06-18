@@ -1941,26 +1941,19 @@ ins_short (long l)
  */
 
 {
-    short s = (short)l;
-
     if (l > (long)USHRT_MAX || l < SHRT_MIN)
         yyerrorf("Compiler error: too large number %lx passed to ins_short()"
                 , l);
 
-    if (realloc_a_program(2))
+    if (realloc_a_program(sizeof(short)))
     {
-        mp_uint current_size;
-        bytecode_p dest;
-
-        current_size = CURRENT_PROGRAM_SIZE;
+        put_short(PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE, l);
         CURRENT_PROGRAM_SIZE += sizeof(short);
-        dest = mem_block[A_PROGRAM].block + current_size;
-        put_short(dest, s);
     }
     else
     {
         yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
-                , mem_block[A_PROGRAM].current_size + 2);
+                , CURRENT_PROGRAM_SIZE + sizeof(short));
     }
 } /* ins_short() */
 
@@ -1973,15 +1966,11 @@ upd_short (bc_offset_t offset, long l)
  */
 
 {
-    bytecode_p dest;
-    short s = (short)l;
-
     if (l > (long)USHRT_MAX || l < SHRT_MIN)
         yyerrorf("Compiler error: too large number %ld passed to upd_short()"
                 , l);
 
-    dest = mem_block[A_PROGRAM].block + offset;
-    put_short(dest, s);
+    put_short(PROGRAM_BLOCK + offset, l);
 
 } /* upd_short() */
 
@@ -1993,12 +1982,8 @@ read_short (bc_offset_t offset)
  */
 
 {
-    bytecode_p dest;
-    short s;
-    dest = mem_block[A_PROGRAM].block + offset;
+    return get_short(PROGRAM_BLOCK + offset);
 
-    get_short(s, dest);
-    return s;
 } /* read_short() */
 
 /*-------------------------------------------------------------------------*/
@@ -2010,10 +1995,7 @@ upd_jump_offset (bc_offset_t offset, bc_offset_t l)
  */
 
 {
-    bytecode_p dest;
-
-    dest = mem_block[A_PROGRAM].block + offset;
-    put_bc_offset(dest, l);
+    put_bc_offset(PROGRAM_BLOCK + offset, l);
 
 } /* upd_jump_offset() */
 
@@ -2030,11 +2012,8 @@ ins_int32 (int32 l)
 {
     if (realloc_a_program(sizeof(int32)))
     {
-        bytecode_p dest = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE;
- 
+        put_int32(PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE, l);
         CURRENT_PROGRAM_SIZE += sizeof(int32);
-
-        put_int32(dest, l);
     }
     else
     {
@@ -2056,8 +2035,7 @@ upd_int32 (bc_offset_t offset, int32 l)
 */
 
 {
-    bytecode_p dest = mem_block[A_PROGRAM].block + offset;
-    put_int32(dest, l);
+    put_int32(PROGRAM_BLOCK + offset, l);
 } /* upd_int32() */
 
 /*-------------------------------------------------------------------------*/
@@ -2071,9 +2049,7 @@ read_int32 (bc_offset_t offset)
 */
 
 {
-    bytecode_p dest = mem_block[A_PROGRAM].block + offset;
-
-    return get_int32(dest);
+    return get_int32(PROGRAM_BLOCK + offset);
 } /* read_int32() */
 
 /*-------------------------------------------------------------------------*/
@@ -14704,9 +14680,8 @@ add_new_init_jump (void)
     
     if (realloc_a_program(sizeof(bc_offset_t)))
     {
-        bytecode_p dest = mem_block[A_PROGRAM].block + last_initializer_end;
         // just 'reserve' space for the offset, will be updated later.
-        put_bc_offset(dest, 0);
+        put_bc_offset(PROGRAM_BLOCK + last_initializer_end, 0);
         CURRENT_PROGRAM_SIZE += sizeof(bc_offset_t);
     }
     else

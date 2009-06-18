@@ -2212,7 +2212,7 @@ compile_value (svalue_t *value, int opt_flags)
                         if (code == F_LBRANCH_WHEN_ZERO
                          || code == F_LBRANCH_WHEN_NON_ZERO)
                         {
-                            short old_offset;
+                            unsigned short old_offset;
 
                             GET_SHORT(old_offset, current.code+start+1);
                             PUT_SHORT(current.code+start+1, old_offset+offset);
