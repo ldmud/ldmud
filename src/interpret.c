@@ -13506,18 +13506,18 @@ again:
             if (sp->u.number == 0)
             {
                 sp--;
-                pc += GET_UINT8(pc) + 1;
+                pc += GET_UINT8(pc) + sizeof(bytecode_t);
                 break;
             }
             sp--;
-            pc++;
+            pc += sizeof(uint8_t);
             break;
         }
         else
         {
             free_svalue(sp);
             sp--;
-            pc++;
+            pc += sizeof(uint8_t);
             break;
         }
     }
@@ -13534,7 +13534,7 @@ again:
             if (sp->u.number == 0)
             {
                 sp--;
-                pc++;
+                pc += sizeof(uint8_t);
                 break;
             }
         }
@@ -13543,7 +13543,7 @@ again:
             free_svalue(sp);
         }
         sp--;
-        pc += GET_UINT8(pc) + 1;
+        pc += GET_UINT8(pc) + sizeof(bytecode_t);
         break;
     }
 
@@ -13560,7 +13560,7 @@ again:
             pc -= GET_UINT8(pc);
             break;
         }
-        pc += 1;
+        pc += sizeof(bytecode_t);
         pop_stack();
         break;
     }
@@ -13575,7 +13575,7 @@ again:
         {
             if (sp->u.number == 0)
             {
-                pc += 1;
+                pc += sizeof(bytecode_t);
                 sp--;
                 break;
             }
@@ -15101,8 +15101,8 @@ again:
         Bool has_template;
         svalue_t * svp;
 
-        LOAD_SHORT(idx, pc);
-        num_values = LOAD_UINT8(pc);
+        idx = load_short(&pc);
+        num_values = load_uint8(&pc);
         has_template = MY_FALSE;
 
         if (idx < 0 && instruction == F_S_AGGREGATE)
@@ -15160,7 +15160,7 @@ again:
 
             for ( ; num_values > 0 ; num_values--, sp--)
             {
-                ix = LOAD_UINT8(pc);
+                ix = load_uint8(&pc);
                 st->member[ix] = *sp;
             }
         }
@@ -15206,11 +15206,11 @@ again:
          * function code and uint8 <num> is used to index that array
          * from the end.
          */
-        int ix;
+        uint8_t ix;
         svalue_t * cstart;
 
         /* Get the value index */
-        ix = LOAD_UINT8(pc);
+        ix = load_uint8(&pc);
 
         /* Get the pointer to the last constant value */
         cstart = (svalue_t *)((char *)(csp->funstart)
@@ -15233,7 +15233,7 @@ again:
         svalue_t * cstart;
 
         /* Get the value index */
-        LOAD_SHORT(ix, pc);
+        ix = load_short(&pc);
 
         /* Get the pointer to the last constant value */
         cstart = (svalue_t *)((char *)(csp->funstart)
@@ -15387,7 +15387,7 @@ again:
          */
 
         int vars_required;
-        int nargs;
+        int8_t nargs;
         p_int count, start;
         unsigned short offset;
         Bool gen_refs, use_range, do_extra_loop;
@@ -15398,7 +15398,7 @@ again:
         do_extra_loop = MY_FALSE;
         start = 0;
 
-        nargs = LOAD_UINT8(pc);
+        nargs = load_uint8(&pc);
         LOAD_SHORT(offset, pc);
 
         /* Unravel the lvalue chain (if any) to get to the actual value
