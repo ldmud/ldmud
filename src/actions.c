@@ -429,9 +429,9 @@ remove_environment_sent (object_t *player)
 #ifdef DEBUG
                 if (d_flag > 1)
                 {
-                    if (tmp->verb)
+                    if (s->verb)
                         debug_message("%s --Unlinking sentence verb='%s'\n"
-                                     , time_stamp(), get_txt(tmp->verb));
+                                     , time_stamp(), get_txt(s->verb));
                     else
                         debug_message("%s --Unlinking sentence verb=0\n"
                                      , time_stamp());
