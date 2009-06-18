@@ -33,6 +33,9 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
        + Take more care of issues with different width of integers in the
          bytecode (e.g. long was regarded as 32 bit until now).
 
+    - Runtime
+       + re-worked and consolidated hash functions and hash types. (#564)
+
     - Other
        + The driver requires a C99 compatible build system. Some checks and
          work-arounds for non-C99 were removed.

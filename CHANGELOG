@@ -30,6 +30,12 @@ See the file HISTORY for a user-oriented summary of all the changes.
     existing Macros (e.g. GET_SHORT) ensure compatibiliy with existing code
   - Removed the _LONG macros and _long() functions from bytecode.h. They were
     rarely used and replaced by fixed-sized types with specific semantic.
+  - Hashes are now available in 3 fixed sizes, all calculated by Bob Jenkins
+    hash function (for the moment).
+    (hash.c, hash.h)
+  - Changed code using hashes to use dedicated types instead of a mixture of
+    int/short/unsigned short.
+    (lex.c|h)
 
 18-Jun-2009 (Gnomi)
   - Allow closures as actions. (Bug #243)
