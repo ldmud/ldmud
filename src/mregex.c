@@ -105,7 +105,7 @@ typedef struct RxHashEntry {
 
     string_t * pString;  /* Generator string, a counted tabled string
                           * NULL if unused */
-    dwhash_t    hString;  /* Hash of pString */
+    hash32_t    hString;  /* Hash of pString */
     size_t     size;     /* Size of regexp expressions for statistics */
 } RxHashEntry;
 
@@ -506,7 +506,7 @@ rx_compile_data (string_t * expr, int opt, Bool from_ed)
     regdata_t rdata; /* Local rdata structure to hold compiled expression */
 
 #ifdef RXCACHE_TABLE
-    dwhash_t hExpr;
+    hash32_t hExpr;
     int h;
     RxHashEntry *pHash;
 #endif
