@@ -33,7 +33,7 @@
  *        } info;
  *        string_t * next;            String table pointer.
  *        size_t     size;            Length of the string 
- *        dwhash_t    hash;            0, or the hash of the string
+ *        hash32_t    hash;            0, or the hash of the string
  *        char       txt[1.. .size];
  *        char       null             Gratuituous terminator
  *    }
@@ -81,15 +81,24 @@
 #include "../mudlib/sys/debug_info.h"
 
 /*-------------------------------------------------------------------------*/
+#if HTABLE_SIZE > MAX_HASH32
+#error The hash table size must not be larger then MAX_HASH32.
+The end.
+#endif
 
+static INLINE hash32_t
+HashToIndex(hash32_t hash)
 /* Adapt a hash value to our table size.
  */
-
+{
 #if !( (HTABLE_SIZE) & (HTABLE_SIZE)-1 )
-#    define HashToIndex(h) ((h) & ((HTABLE_SIZE)-1))
+    // use faster masking in case of HTABLE_SIZE being a power of 2.
+    return hash & ((HTABLE_SIZE)-1);
 #else
-#    define HashToIndex(h) ((h) % HTABLE_SIZE)
+    // fallback to slow modulo.
+    return hash % HTABLE_SIZE;
 #endif
+}
 
 /*-------------------------------------------------------------------------*/
 
@@ -179,7 +188,7 @@ statcounter_t stNumTabledCheckedSearch = 0;
 #endif /* EXT_STRING_STATS */
 
 /*-------------------------------------------------------------------------*/
-static INLINE dwhash_t
+static INLINE hash32_t
 hash_string_inl (const char * const s, size_t size)
 
 /* Compute the hash for string <s> of length <size> and return it.
@@ -187,20 +196,39 @@ hash_string_inl (const char * const s, size_t size)
  */
 
 {
-    dwhash_t hash = dwhashmem(s, size, MSTRING_HASH_LENGTH);
+    if (size > MSTRING_HASH_LENGTH)
+        size = MSTRING_HASH_LENGTH;
+
+    hash32_t hash = hashmem32(s, size);
     if (!hash)
         hash = 1 << (sizeof (hash) * CHAR_BIT - 1);
     return hash;
 } /* hash_string_inl() */
 
-dwhash_t
+hash32_t
 hash_string (const char * const s, size_t size)
 {
     return hash_string_inl(s, size);
 }
 
+hash32_t
+hash_string_chained (const char * const s, size_t size, hash32_t chainhash)
+/* Compute the hash for string <s> of length <size> and use <chainhash> as
+ * initial value. Used to hash several strings into one hash value.
+ * The result will always be non-zero.
+ */
+{
+    if (size > MSTRING_HASH_LENGTH)
+        size = MSTRING_HASH_LENGTH;
+    
+    hash32_t hash = hashmem32_chained(s, size, chainhash);
+    if (!hash)
+        hash = 1 << (sizeof (hash) * CHAR_BIT - 1);
+    return hash;    
+} // hash_string_chained
+
 /*-------------------------------------------------------------------------*/
-static INLINE dwhash_t
+static INLINE hash32_t
 get_hash (string_t * pStr)
 /* Return the hash of string <pStr>, computing it if necessary.
  */
@@ -213,7 +241,7 @@ get_hash (string_t * pStr)
 } /* get_hash() */
 
 /*-------------------------------------------------------------------------*/
-dwhash_t
+hash32_t
 mstring_get_hash (string_t * pStr)
 
 /* Aliased to: mstr_get_hash()
@@ -227,7 +255,7 @@ mstring_get_hash (string_t * pStr)
 
 /*-------------------------------------------------------------------------*/
 static INLINE string_t *
-find_and_move (const char * const s, size_t size, dwhash_t hash)
+find_and_move (const char * const s, size_t size, hash32_t hash)
 /* If <s> is a tabled string of length <size> and <hash> in the related
  * stringtable chain: find it, move it to the head of the chain and return its
  * string_t*.
@@ -238,7 +266,7 @@ find_and_move (const char * const s, size_t size, dwhash_t hash)
 {
     string_t *prev, *rover;
 
-    int idx = HashToIndex(hash);
+    hash32_t idx = HashToIndex(hash);
 
     mstr_searches_byvalue++;
 
@@ -316,7 +344,7 @@ move_to_head (string_t *s, int idx)
 
 /*-------------------------------------------------------------------------*/
 static INLINE string_t *
-make_new_tabled (const char * const pTxt, size_t size, dwhash_t hash MTRACE_DECL)
+make_new_tabled (const char * const pTxt, size_t size, hash32_t hash MTRACE_DECL)
 /* Helper function for mstring_new_tabled() and mstring_new_n_tabled().
  *
  * Create a new tabled string by copying the data string <pTxt> of length
@@ -328,7 +356,7 @@ make_new_tabled (const char * const pTxt, size_t size, dwhash_t hash MTRACE_DECL
 
 {
     string_t * string;
-    int        idx = HashToIndex(hash);
+    hash32_t   idx = HashToIndex(hash);
 
     /* Get the memory for a new one */
 
@@ -482,7 +510,7 @@ mstring_new_tabled (const char * const pTxt MTRACE_DECL)
  */
 
 {
-    dwhash_t   hash;
+    hash32_t   hash;
     size_t     size;
     string_t * string;
 
@@ -514,7 +542,7 @@ mstring_new_n_tabled (const char * const pTxt, size_t size MTRACE_DECL)
  */
 
 {
-    dwhash_t   hash;
+    hash32_t   hash;
     string_t * string;
 
     hash = hash_string_inl(pTxt, size);
@@ -547,8 +575,8 @@ table_string (string_t * pStr MTRACE_DECL)
 
 {
     string_t *string;
-    dwhash_t   hash;
-    int        idx;
+    hash32_t   hash;
+    hash32_t   idx;
     size_t     size;
     size_t     msize;
 
@@ -750,7 +778,7 @@ mstring_find_tabled (string_t * pStr)
  */
 
 {
-    dwhash_t   hash;
+    hash32_t hash;
     size_t  size;
 
 #ifdef EXT_STRING_STATS
@@ -791,7 +819,7 @@ mstring_find_tabled_str (const char * const pTxt, size_t size)
  */
 
 {
-    dwhash_t   hash;
+    hash32_t   hash;
 
     hash = hash_string_inl(pTxt, size);
 
@@ -830,7 +858,7 @@ mstring_free (string_t *s)
     {
         /* A tabled string */
 
-        int idx;
+        hash32_t idx;
 
         mstr_tabled_count--;
         mstr_tabled_size -= msize;
@@ -990,8 +1018,8 @@ mstring_order (string_t * const pStr1, string_t * const pStr2)
 
     /* Strings with a smaller hash also count as 'less'. */
     {
-        dwhash_t hash1 = get_hash(pStr1);
-        dwhash_t hash2 = get_hash(pStr2);
+        hash32_t hash1 = get_hash(pStr1);
+        hash32_t hash2 = get_hash(pStr2);
         if (hash1 != hash2)
             return  hash1 < hash2 ? -1 : 1;
     }

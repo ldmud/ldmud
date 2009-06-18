@@ -47,7 +47,7 @@ struct string_s
     } info;
     string_t * next;    /* Linkpointer in string table. */
     size_t     size;    /* Length of the string */
-    dwhash_t   hash;    /* 0, or the hash of the string */
+    hash32_t   hash;    /* 0, or the hash of the string */
     char       txt[1];  /* In fact .size characters plus one '\0' */
       /* The string text follows here */
 };
@@ -55,7 +55,7 @@ struct string_s
 /* --- Constants --- */
 
 #define MSTRING_HASH_LENGTH (256)
-  /* The typical hashed length of a string. */
+  /* The maximum hashed length of a string. */
 
 /* --- Variables --- */
 
@@ -65,8 +65,9 @@ extern mp_uint mstr_used_size;
 /* --- Prototypes --- */
 
 extern void mstring_init (void);
-extern dwhash_t   mstring_get_hash (string_t * pStr);
-extern dwhash_t   hash_string (const char * const s, size_t size);
+extern hash32_t   mstring_get_hash (string_t * pStr);
+extern hash32_t   hash_string (const char * const s, size_t size);
+extern hash32_t   hash_string_chained (const char * const s, size_t size, hash32_t chainhash);
 extern string_t * mstring_alloc_string (size_t iSize MTRACE_DECL);
 extern string_t * mstring_new_string (const char * const pTxt MTRACE_DECL);
 extern string_t * mstring_new_n_string (const char * const pTxt, size_t len MTRACE_DECL);
@@ -126,10 +127,10 @@ static INLINE size_t mstr_mem_size(const string_t * const s)
     return sizeof(string_t) + s->size;
 }
 
-static INLINE dwhash_t mstr_hash(const string_t * const s)
+static INLINE hash32_t mstr_hash(const string_t * const s)
                                    __attribute__((nonnull(1)))
                                    __attribute__((pure));
-static INLINE dwhash_t mstr_hash(const string_t * const s)
+static INLINE hash32_t mstr_hash(const string_t * const s)
   /*   Return the hash value of string <s>, which is 0 if the
    *   hash hasn't been computed yet.
    */
