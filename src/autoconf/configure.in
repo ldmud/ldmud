@@ -728,6 +728,9 @@ AC_C_VARARRAYS
 # does the compuler support the volatile keyword?
 AC_C_VOLATILE
 
+# check for endianness (defines WORDS_BIGENDIAN if big endian).
+AC_C_BIGENDIAN
+
 # check for some types
 AC_TYPE_INT8_T
 AC_TYPE_INT16_T
