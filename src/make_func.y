@@ -1809,12 +1809,12 @@ exgetc(void)
         {
             /* handle the defined "function" in #if */
             do c = mygetc(); while(lexwhite(c));
-            if (c != '(')
+            if (c == '(')
             {
-                yyerror("Missing ( in defined");
-                continue;
+                // skip whitespaces between '(' and keyword.
+                do c = mygetc(); while(lexwhite(c));
             }
-            do c = mygetc(); while(lexwhite(c));
+
             p = word;
             space_left = sizeof(word);
             while ( isalunum(c) && --space_left) {
@@ -1822,12 +1822,18 @@ exgetc(void)
                 c = mygetc();
             }
             *p = '\0';
+            // skip all whitespaces following the keyword
             while(lexwhite(c)) c = mygetc();
+            // if this is already the end of the line, we have to go back, so
+            // that it is read again on next mygetc().
+            if (c == '\n')
+                myungetc((char)c);
+            // if the keywords was enclose in '()', we are now at ')'. If not,
+            // we may be at the next expression and have to go back one as
+            // well.
             if (c != ')')
-            {
-                yyerror("Missing ) in defined");
-                continue;
-            }
+                myungetc((char)c);
+
             if (lookup_define(word))
                 add_input(" 1 ");
             else
