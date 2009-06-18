@@ -36,6 +36,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - Changed code using hashes to use dedicated types instead of a mixture of
     int/short/unsigned short.
     (lex.c|h)
+  - T_FLOATSs consist now of int32_t as mantissa and int16_t as exponent.
 
 18-Jun-2009 (Gnomi)
   - Allow closures as actions. (Bug #243)

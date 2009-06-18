@@ -59,7 +59,7 @@ union u {
     lambda_t *lambda;
       /* T_CLOSURE: allocated closures: the closure structure.
        */
-    p_int mantissa;
+    int32_t mantissa;
       /* T_FLOAT: The mantissa (or at least one half of the float bitpattern).
        */
     callback_t *cb;
@@ -140,7 +140,7 @@ struct svalue_s
 {
     ph_int type;  /* Primary type information */
     union {       /* Secondary type information */
-        ph_int exponent;     /* Exponent of a T_FLOAT */
+        int16_t exponent;    /* Exponent of a T_FLOAT */
         ph_int closure_type; /* Type of a T_CLOSURE */
         ph_int lvalue_type;  /* Type of a T_LVALUE */
         ph_int quotes;       /* Number of quotes of a quoted array or symbol */
@@ -383,8 +383,8 @@ static INLINE double READ_DOUBLE(svalue_t *sv) {
    the use of ldexp in SPLIT_DOUBLE won't work; you'll have to multiply
    with 32768. in this case */
 
-static INLINE p_int SPLIT_DOUBLE(double doublevalue, int *int_p) {
-    return (p_int)ldexp( frexp( doublevalue, int_p ), 31);
+static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
+    return (int32_t)ldexp( frexp( doublevalue, int_p ), 31);
 }
 
 // STORE_DOUBLE_USED is not needed anymore and defined empty.
@@ -392,7 +392,7 @@ static INLINE p_int SPLIT_DOUBLE(double doublevalue, int *int_p) {
 static INLINE void STORE_DOUBLE(svalue_t *dest, double doublevalue) {
     int exponent;
     dest->u.mantissa = SPLIT_DOUBLE(doublevalue, &exponent);
-    dest->x.exponent = (ph_int)exponent;
+    dest->x.exponent = exponent;
 }
 
 #endif /* ifndef STORE_DOUBLE */

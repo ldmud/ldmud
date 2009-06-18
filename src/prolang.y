@@ -2026,12 +2026,7 @@ read_jump_offset (bc_offset_t offset)
 /*-------------------------------------------------------------------------*/
 static void
 ins_uint32 (uint32_t l)
-
-/* Add the 4-byte number <l> to the A_PROGRAM area in a fixed byteorder.
- */
-/* TODO: check callers for assumptions that a long is always 4 bytes. 
-   TODO::and use either specific types with a specific semantic or a fixed
-   TODO::size type (int32, int32_t).
+/* Add the uint32_t <l> to the A_PROGRAM area.
  */
 {
     if (realloc_a_program(sizeof(uint32_t)))
@@ -2049,15 +2044,8 @@ ins_uint32 (uint32_t l)
 /*-------------------------------------------------------------------------*/
 static void
 upd_uint32 (bc_offset_t offset, uint32_t l)
- 
-/* Store the 4-byte number <l> at <offset> in the A_PROGRAM are in
- * a fixed byteorder.
+/* Store the uint32_t <l> at <offset> in the A_PROGRAM are.
  */
-/* TODO: check callers for assumptions that a long is always 4 bytes. 
-   TODO::and use either specific types with a specific semantic or a fixed 
-   TODO::size type (int32, int32_t).
-*/
-
 {
     put_uint32(PROGRAM_BLOCK + offset, l);
 } /* upd_uint32() */
@@ -2065,16 +2053,28 @@ upd_uint32 (bc_offset_t offset, uint32_t l)
 /*-------------------------------------------------------------------------*/
 static uint32
 read_uint32 (bc_offset_t offset)
-
-/* Return the 4-byte number stored at <offset> in the A_PROGRAM area.
-   TODO: check callers for assumptions that a long is always 4 bytes. 
-   TODO::and use either specific types with a specific semantic or a fixed 
-   TODO::size type (int32, int32_t).
-*/
-
+// Return the uint32_t stored at <offset> in the A_PROGRAM area.
 {
     return get_uint32(PROGRAM_BLOCK + offset);
 } /* read_uint32() */
+
+/*-------------------------------------------------------------------------*/
+static void
+ins_uint16 (uint16_t l)
+/* Add the uint16_t <l> to the A_PROGRAM area.
+ */
+{
+    if (realloc_a_program(sizeof(l)))
+    {
+        put_uint16(PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE, l);
+        CURRENT_PROGRAM_SIZE += sizeof(l);
+    }
+    else
+    {
+        yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
+                 , CURRENT_PROGRAM_SIZE + sizeof(l));
+    }
+} /* ins_uint16() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -10406,8 +10406,8 @@ expr4:
           $$.start = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
           ins_f_code(F_FLOAT);
-          ins_int32 ( SPLIT_DOUBLE( $1, &exponent) );
-          ins_short( exponent );
+          ins_uint32 ( SPLIT_DOUBLE( $1, &exponent) );
+          ins_uint16 ( exponent );
           $$.type = Type_Float;
       }
 

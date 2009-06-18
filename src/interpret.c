@@ -8536,13 +8536,13 @@ again:
          * TODO:: expects). LOAD_INT16 would be nice (change in compiler as well).
          */
 
-        int32 mantissa;
-        short exponent;
+        int32_t mantissa;
+        int16_t exponent;
 
         sp++;
         sp->type = T_FLOAT;
-        LOAD_INT32(mantissa, pc);
-        LOAD_SHORT(exponent, pc);
+        mantissa = load_uint32(&pc);
+        exponent = load_uint16(&pc);
         sp->u.mantissa = mantissa;
         sp->x.exponent = exponent;
         break;
