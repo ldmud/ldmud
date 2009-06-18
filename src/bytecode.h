@@ -131,7 +131,7 @@
 /* The basic code type encoding one instruction (bytecode_t) is in typedefs.h. 
 // Type for storing offsets in the bytecode */
 typedef int32_t         bc_offset_t;
-
+typedef int16_t         bc_shortoffset_t;
 
 /* Functions (static, for inlining): generic types */
 /* GET */
@@ -165,6 +165,10 @@ static INLINE bc_offset_t get_bc_offset(bytecode_p p) {
     return *((bc_offset_t *)p);
 }
 
+static INLINE bc_shortoffset_t get_bc_shortoffset(bytecode_p p) {
+    return *((bc_shortoffset_t *)p);
+}
+
 /* PUT */
 static INLINE bytecode_t PUT_CODE(bytecode_p p, bytecode_t c) {
     return *p = c;
@@ -196,6 +200,10 @@ static INLINE uint64_t put_uint64(bytecode_p p, uint64_t c) {
 
 static INLINE bc_offset_t put_bc_offset(bytecode_p p, bc_offset_t c) {
     return *((bc_offset_t *)p) = c;
+}
+
+static INLINE bc_shortoffset_t put_bc_shortoffset(bytecode_p p, bc_shortoffset_t c) {
+    return *((bc_shortoffset_t *)p) = c;
 }
 
 /* LOAD */
