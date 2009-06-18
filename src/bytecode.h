@@ -269,11 +269,11 @@ static INLINE bc_offset_t store_bc_offset(bytecode_p *p, bc_offset_t c) {
 
 
 #if SIZEOF_SHORT == 2
-static INLINE void get_short(unsigned short *d, bytecode_p p) {
-    *d = get_uint16(p);
+static INLINE unsigned short get_short(bytecode_p p) {
+    return get_uint16(p);
 }
-static INLINE void load_short(unsigned short *d, bytecode_p *p) {
-    *d = load_uint16(p);
+static INLINE unsigned short load_short(bytecode_p *p) {
+    return load_uint16(p);
 }
 static INLINE void put_short(bytecode_p p, unsigned short d) {
     put_uint16(p, d);
@@ -288,11 +288,11 @@ static INLINE void rstore_short(bytecode_p *p, unsigned short d) {
 #  error "Unsupported size of short."
 #endif /* SIZEOF_SHORT */
 
-static INLINE void get_long(unsigned long *d, bytecode_p p) {
-    *d = (long)get_uint32(p);
+static INLINE long get_long(bytecode_p p) {
+    return get_uint32(p);
 }
-static INLINE void load_long(unsigned long *d, bytecode_p *p) {
-    *d = (long)load_uint32(p);
+static INLINE long load_long(bytecode_p *p) {
+    return load_uint32(p);
 }
 static INLINE void put_long(bytecode_p p, unsigned long d) {
     put_uint32(p, (uint32_t)d);
@@ -317,17 +317,16 @@ static INLINE void store_long(bytecode_p *p, unsigned long d) {
 #define LOAD_INT8(p)       load_int8(&(p))
 #define STORE_INT8(p,c)    store_int8(&(p),(c))
 
-#define GET_SHORT(d,p)     get_short(&(d),(p))
-#define LOAD_SHORT(d,p)    load_short(&(d),&(p))
+#define GET_SHORT(d,p)     (d = get_short((p)))
+#define LOAD_SHORT(d,p)    (d = load_short(&(p)))
 #define PUT_SHORT(p,d)     put_short((p),(d))
 #define STORE_SHORT(p,d)   store_short(&(p),(d))
 #define RSTORE_SHORT(p,d)  rstore_short(&(p),(d))
 
-#define GET_LONG(d,p)      get_long(&(d),(p))
-#define LOAD_LONG(d,p)     load_long(&(d),&(p))
+#define GET_LONG(d,p)      (d = get_long((p)))
+#define LOAD_LONG(d,p)     (d = load_long(&(p)))
 #define PUT_LONG(p,d)      put_long((p),(d))
 #define STORE_LONG(p,d)    store_long(&(p),(d))
-//#define RSTORE_LONG(p,d)   rstore_long(&(p),(d))
 
 #endif /* CHAR_BIT */
 
