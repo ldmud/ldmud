@@ -13488,7 +13488,7 @@ again:
             pop_stack();
             break;
         }
-        pc += 2;
+        pc += sizeof(short);
         sp--;
         break;
     }

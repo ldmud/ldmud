@@ -1899,7 +1899,7 @@ realloc_a_program (size_t size)
 #ifndef ins_byte
 
 static INLINE void
-ins_byte (unsigned char b)
+ins_byte (bytecode_t b)
 
 /* Add the byte <b> to the A_PROGRAM area.
  */
@@ -2287,9 +2287,9 @@ fix_branch (int ltoken, p_int dest, p_int loc)
          && !(current_break_address & (BREAK_ON_STACK|BREAK_DELIMITER) ) )
         {
             for (i = current_break_address & BREAK_ADDRESS_MASK
-                ; (j = read_long(i)) > loc; )
+                ; (j = read_int32(i)) > loc; )
             {
-                upd_long(i, j+1);
+                upd_int32(i, j+1);
                 i = j;
             }
             current_break_address++;
@@ -2300,9 +2300,9 @@ fix_branch (int ltoken, p_int dest, p_int loc)
          && !(current_continue_address & CONTINUE_DELIMITER ) )
         {
             for(i = current_continue_address & CONTINUE_ADDRESS_MASK;
-              (j=read_long(i)) > loc; )
+              (j=read_int32(i)) > loc; )
             {
-                upd_long(i, j+1);
+                upd_int32(i, j+1);
                 i = j;
             }
             current_continue_address++;
@@ -2376,9 +2376,9 @@ yymove_switch_instructions (int len, p_int blocklen)
          && !(current_continue_address & CONTINUE_DELIMITER ) )
         {
             for(i = current_continue_address & CONTINUE_ADDRESS_MASK;
-              (j=read_long(i)) > switch_pc; )
+              (j=read_int32(i)) > switch_pc; )
             {
-                    upd_long(i, j+len);
+                    upd_int32(i, j+len);
                     i = j;
             }
             current_continue_address += len;
@@ -7305,8 +7305,8 @@ statement:
               /* A normal loop break: add the FBRANCH to the list */
 
               ins_f_code(F_FBRANCH);
-              ins_long(current_break_address & BREAK_ADDRESS_MASK);
-              current_break_address = CURRENT_PROGRAM_SIZE - 4;
+              ins_int32(current_break_address & BREAK_ADDRESS_MASK);
+              current_break_address = CURRENT_PROGRAM_SIZE - sizeof(int32);
               if (current_break_address > BREAK_ADDRESS_MASK)
                   yyerrorf("Compiler limit: (L_BREAK) value too large: %"PRIdPINT
                           , current_break_address);
@@ -7331,7 +7331,7 @@ statement:
               {
                   ins_f_code(F_BREAKN_CONTINUE);
                   ins_byte(255);
-                  ins_long(4);
+                  ins_int32(4);
                   depth -= SWITCH_DEPTH_UNIT*256;
               }
 
@@ -7354,10 +7354,10 @@ statement:
           }
 
           /* In either case, handle the list of continues alike */
-          ins_long(current_continue_address & CONTINUE_ADDRESS_MASK);
+          ins_int32(current_continue_address & CONTINUE_ADDRESS_MASK);
           current_continue_address =
                         ( current_continue_address & SWITCH_DEPTH_MASK ) |
-                        ( CURRENT_PROGRAM_SIZE - 4 );
+                        ( CURRENT_PROGRAM_SIZE - sizeof(int32) );
       }
 ; /* statement */
 
@@ -7507,8 +7507,8 @@ while:
           for ( ; current_continue_address > 0
                 ; current_continue_address = next_addr)
           {
-              next_addr = read_long(current_continue_address);
-              upd_long(current_continue_address,
+              next_addr = read_int32(current_continue_address);
+              upd_int32(current_continue_address,
                   CURRENT_PROGRAM_SIZE - current_continue_address);
           }
 
@@ -7553,8 +7553,8 @@ while:
           for( ; current_break_address > 0
                ; current_break_address = next_addr)
           {
-              next_addr = read_long(current_break_address);
-              upd_long(current_break_address,
+              next_addr = read_int32(current_break_address);
+              upd_int32(current_break_address,
                   CURRENT_PROGRAM_SIZE - current_break_address);
           }
 
@@ -7600,8 +7600,8 @@ do:
           for(; current_continue_address > 0
               ; current_continue_address = next_addr)
           {
-              next_addr = read_long(current_continue_address);
-              upd_long(current_continue_address,
+              next_addr = read_int32(current_continue_address);
+              upd_int32(current_continue_address,
                   current - current_continue_address);
           }
       }
@@ -7673,8 +7673,8 @@ do:
           for (; current_break_address > 0
                ; current_break_address = next_addr)
           {
-              next_addr = read_long(current_break_address);
-              upd_long(current_break_address,
+              next_addr = read_int32(current_break_address);
+              upd_int32(current_break_address,
                   current - current_break_address);
           }
 
@@ -7830,8 +7830,8 @@ for:
           for (; current_continue_address > 0
                ; current_continue_address = next_addr)
           {
-              next_addr = read_long(current_continue_address);
-              upd_long(current_continue_address,
+              next_addr = read_int32(current_continue_address);
+              upd_int32(current_continue_address,
                   CURRENT_PROGRAM_SIZE - current_continue_address);
           }
 
@@ -7888,8 +7888,8 @@ for:
           for (; current_break_address > 0
                ; current_break_address = next_addr)
           {
-              next_addr = read_long(current_break_address);
-              upd_long(current_break_address,
+              next_addr = read_int32(current_break_address);
+              upd_int32(current_break_address,
                   CURRENT_PROGRAM_SIZE - current_break_address);
           }
 
@@ -8121,8 +8121,8 @@ foreach:
               for(; current_continue_address > 0
                   ; current_continue_address = next_addr)
               {
-                  next_addr = read_long(current_continue_address);
-                  upd_long(current_continue_address,
+                  next_addr = read_int32(current_continue_address);
+                  upd_int32(current_continue_address,
                       current - current_continue_address);
               }
 
@@ -8142,8 +8142,8 @@ foreach:
               for (; current_break_address > 0
                    ; current_break_address = next_addr)
               {
-                  next_addr = read_long(current_break_address);
-                  upd_long(current_break_address,
+                  next_addr = read_int32(current_break_address);
+                  upd_int32(current_break_address,
                       current - current_break_address);
               }
 
@@ -10406,7 +10406,7 @@ expr4:
           $$.start = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
           ins_f_code(F_FLOAT);
-          ins_long ( SPLIT_DOUBLE( $1, &exponent) );
+          ins_int32 ( SPLIT_DOUBLE( $1, &exponent) );
           ins_short( exponent );
           $$.type = Type_Float;
       }
