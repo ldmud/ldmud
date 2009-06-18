@@ -1,6 +1,36 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Jun-2009 (Zesstra)
+  - The data from the bytecode is not written/read byte per byte and
+    combined by shifting and masking anymore, but by reading the
+    specific type directly. This should not have endianness issues, as
+    long as compiled bytecode is not transferred to a different machine.
+    But Alignment issues may arise on some system.
+  - The bytecode starts using fixed-size integer types from C99.
+  - Entities in the bytecode are getting their semantic types (like
+    bc_offset_t).
+  - Macros in bytecode.h are replaced by static inline functions. In some
+    cases, the old macros are still there, but implemented by the new
+    functions.
+  - The *_LONG, *_INT32 and *_3BYTE and LOAD_INT16 macros are rarely used and
+    removed.
+  - added new types for offsets within the bytecode: bc_offset_t (uint32),
+    bc_shortoffset_t (uint16).
+  - replaced GET_3BYTE and PUT_3BYTE macros by calls to get_bc_offset(), because
+    these are actually offsets. Increases sizes of offsets by 1, but probably
+    increases speed as well.
+  - replaced anonymous int32 in compiler in interpreter by bc_offset_t.
+  - changed some hard-coded assumptions about sizes of datatypes by sizeof(type)
+  - replaced unsigned char by bytecode_t
+  - renamed ins_long() and upd_long() by ins_int32() and upd_in32() because
+    they store a (u)int32, not a long in the bytecode.
+  - get_short(), load_short(), get_long() and load_long() do return the
+    values, just like the other function for reading the bytecode. The
+    existing Macros (e.g. GET_SHORT) ensure compatibiliy with existing code
+  - Removed the _LONG macros and _long() functions from bytecode.h. They were
+    rarely used and replaced by fixed-sized types with specific semantic.
+
 18-Jun-2009 (Gnomi)
   - Allow closures as actions. (Bug #243)
     (actions.c)

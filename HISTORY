@@ -22,6 +22,16 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          available, no PCREs are available in the driver (#658).
        + Removed a bunch of checks and own fall-back implementations for
          functions required by C89/90/99 or POSIX.1. We just require them.
+       + The data from the bytecode is not written/read byte per byte and
+         combined by shifting and masking anymore, but by reading the
+         specific type directly. This should not have endianness issues, as
+         long as compiled bytecode is not transferred to a different machine.
+         But Alignment issues may arise on some system.
+       + The bytecode uses fixed-size integer types from C99.
+       + Entities in the bytecode are getting their semantic types (like
+         bc_offset_t).
+       + Take more care of issues with different width of integers in the
+         bytecode (e.g. long was regarded as 32 bit until now).
 
     - Other
        + The driver requires a C99 compatible build system. Some checks and
