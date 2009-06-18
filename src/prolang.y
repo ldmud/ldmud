@@ -1950,12 +1950,12 @@ ins_short (long l)
     if (realloc_a_program(2))
     {
         mp_uint current_size;
-        char *dest;
+        bytecode_p dest;
 
         current_size = CURRENT_PROGRAM_SIZE;
-        CURRENT_PROGRAM_SIZE = current_size + 2;
+        CURRENT_PROGRAM_SIZE += sizeof(short);
         dest = mem_block[A_PROGRAM].block + current_size;
-        PUT_SHORT(dest, s);
+        put_short(dest, s);
     }
     else
     {
@@ -1966,14 +1966,14 @@ ins_short (long l)
 
 /*-------------------------------------------------------------------------*/
 static void
-upd_short (mp_uint offset, long l)
+upd_short (bc_offset_t offset, long l)
 
-/* Store the 2-byte number <l> at <offset> in the A_PROGRAM are in
+/* Store the 2-byte number <l> at <offset> in the A_PROGRAM area in
  * a fixed byteorder.
  */
 
 {
-    char *dest;
+    bytecode_p dest;
     short s = (short)l;
 
     if (l > (long)USHRT_MAX || l < SHRT_MIN)
@@ -1981,97 +1981,100 @@ upd_short (mp_uint offset, long l)
                 , l);
 
     dest = mem_block[A_PROGRAM].block + offset;
-    PUT_SHORT(dest, s);
+    put_short(dest, s);
+
 } /* upd_short() */
 
 /*-------------------------------------------------------------------------*/
 static short
-read_short (mp_uint offset)
+read_short (bc_offset_t offset)
 
 /* Return the 2-byte number stored at <offset> in the A_PROGRAM area.
  */
 
 {
-    short l;
-    char *dest;
-
+    bytecode_p dest;
+    short s;
     dest = mem_block[A_PROGRAM].block + offset;
-    GET_SHORT(l, dest);
-    return l;
+
+    get_short(s, dest);
+    return s;
 } /* read_short() */
 
 /*-------------------------------------------------------------------------*/
 static void
-upd_jump_offset (mp_uint offset, long l)
+upd_jump_offset (bc_offset_t offset, bc_offset_t l)
 
-/* Store the 3-byte number <l> at <offset> in the A_PROGRAM are in
+/* Store the new offset <l> at <offset> in the A_PROGRAM area in
  * a fixed byteorder.
  */
 
 {
-    char *dest;
+    bytecode_p dest;
 
     dest = mem_block[A_PROGRAM].block + offset;
-    PUT_3BYTE(dest, l);
+    put_bc_offset(dest, l);
+
 } /* upd_jump_offset() */
 
 /*-------------------------------------------------------------------------*/
 static void
-ins_long (int32 l)
+ins_int32 (int32 l)
 
 /* Add the 4-byte number <l> to the A_PROGRAM area in a fixed byteorder.
  */
-/* TODO: check callers for assumptions that a long is always 4 bytes. */
+/* TODO: check callers for assumptions that a long is always 4 bytes. 
+   TODO::and use either specific types with a specific semantic or a fixed
+   TODO::size type (int32, int32_t).
+ */
 {
-    if (realloc_a_program(4))
+    if (realloc_a_program(sizeof(int32)))
     {
-        mp_uint current_size;
-        char *dest;
+        bytecode_p dest = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE;
+ 
+        CURRENT_PROGRAM_SIZE += sizeof(int32);
 
-        current_size = CURRENT_PROGRAM_SIZE;
-        CURRENT_PROGRAM_SIZE = current_size + 4;
-        dest = mem_block[A_PROGRAM].block + current_size;
-        PUT_INT32(dest, l);
+        put_int32(dest, l);
     }
     else
     {
         yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
-                , mem_block[A_PROGRAM].current_size + 4);
+                , CURRENT_PROGRAM_SIZE + sizeof(int32));
     }
-} /* ins_long() */
+} /* ins_int32() */
 
 /*-------------------------------------------------------------------------*/
 static void
-upd_long (mp_uint offset, int32 l)
-
+upd_int32 (bc_offset_t offset, int32 l)
+ 
 /* Store the 4-byte number <l> at <offset> in the A_PROGRAM are in
  * a fixed byteorder.
  */
-/* TODO: check callers for assumptions that a long is always 4 bytes. */
+/* TODO: check callers for assumptions that a long is always 4 bytes. 
+   TODO::and use either specific types with a specific semantic or a fixed 
+   TODO::size type (int32, int32_t).
+*/
 
 {
-    char *dest;
-
-    dest = mem_block[A_PROGRAM].block + offset;
-    PUT_LONG(dest, l);
-} /* upd_long() */
+    bytecode_p dest = mem_block[A_PROGRAM].block + offset;
+    put_int32(dest, l);
+} /* upd_int32() */
 
 /*-------------------------------------------------------------------------*/
 static int32
-read_long (mp_uint offset)
+read_int32 (bc_offset_t offset)
 
 /* Return the 4-byte number stored at <offset> in the A_PROGRAM area.
- */
-/* TODO: this should probably read in a int32. */
+   TODO: check callers for assumptions that a long is always 4 bytes. 
+   TODO::and use either specific types with a specific semantic or a fixed 
+   TODO::size type (int32, int32_t).
+*/
 
 {
-    long l;
-    char *dest;
+    bytecode_p dest = mem_block[A_PROGRAM].block + offset;
 
-    dest = mem_block[A_PROGRAM].block + offset;
-    GET_LONG(l, dest);
-    return l;
-} /* read_long() */
+    return get_int32(dest);
+} /* read_int32() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -14671,12 +14674,12 @@ transfer_init_control (void)
                                   + FUNCTION_PRE_HDR_SIZE;
         CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE;
     }
-    else if ((p_int)(CURRENT_PROGRAM_SIZE - 3) == last_initializer_end)
+    else if ((p_int)(CURRENT_PROGRAM_SIZE - sizeof(bc_offset_t)) == last_initializer_end)
     {
         /* The new INIT fragment directly follows the old one, so
          * just overwrite the JUMP instruction of the last.
          */
-        mem_block[A_PROGRAM].current_size -= 4;
+        mem_block[A_PROGRAM].current_size -= sizeof(bc_offset_t)+sizeof(bytecode_t);
     }
     else
     {
@@ -14697,9 +14700,20 @@ add_new_init_jump (void)
 
 {
     ins_f_code(F_JUMP);
-    last_initializer_end = (p_int)mem_block[A_PROGRAM].current_size;
-    ins_byte(0);
-    ins_short(0);
+    last_initializer_end = (bc_offset_t)CURRENT_PROGRAM_SIZE;
+    
+    if (realloc_a_program(sizeof(bc_offset_t)))
+    {
+        bytecode_p dest = mem_block[A_PROGRAM].block + last_initializer_end;
+        // just 'reserve' space for the offset, will be updated later.
+        put_bc_offset(dest, 0);
+        CURRENT_PROGRAM_SIZE += sizeof(bc_offset_t);
+    }
+    else
+    {
+        yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
+                , CURRENT_PROGRAM_SIZE + sizeof(bc_offset_t));
+    }
 } /* add_new_init_jump() */
 
 /*-------------------------------------------------------------------------*/

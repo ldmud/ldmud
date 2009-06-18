@@ -118,157 +118,226 @@
  *   void PUT_INT32([unsigned] int32 d, bytecode_p p)
  *     Store the (unsigned) int32 'd' at <p>, the STORE_ variant
  *     then increments <p>.
+ *
+ * TODO: Instead of using *_LONG and *_SHORT we should introduce specific
+ * TODO::types for specific tasks (like a type for offsets in the bytecode
+   TODO::which can be different on different hosts and needs). In that way
+   TODO::we should get rid of the *_SHORT and *_LONG variants.
  */
 
 #if CHAR_BIT == 8
 
-#define GET_CODE(p)      (*(p))
-#define LOAD_CODE(p)     (*(p)++)
+/* Types with specific semantics */
+/* The basic code type encoding one instruction (bytecode_t) is in typedefs.h. 
+// Type for storing offsets in the bytecode */
+typedef int32_t         bc_offset_t;
 
-#define PUT_CODE(p,c)    (*(p) = (c))
-#define STORE_CODE(p,c)  (*(p)++ = (c))
-#define RSTORE_CODE(p,c)  (*--(p) = (c))
 
-/* TODO: all these casts yield rvalues, so they shouldn't compile
- * TODO:: (and on xlc on AIX some of them indeed don't).
- */
-#define GET_UINT8(p)     (*((unsigned char *)(p)))
-#define GET_INT8(p)      (*((signed char *)(p)))
-#define LOAD_UINT8(p)    (*((unsigned char *)(p)++))
-#define LOAD_INT8(p)     (*((signed char *)(p)++))
+/* Functions (static, for inlining): generic types */
+/* GET */
+static INLINE bytecode_t GET_CODE(bytecode_p p) { return *p; }
 
-#define PUT_UINT8(p,c)   (*((unsigned char *)(p)) = (c))
-#define PUT_INT8(p,c)    (*((signed char *)(p)) = (c))
-#define STORE_UINT8(p,c) (*((unsigned char *)(p)++) = (c))
-#define STORE_INT8(p,c)  (*((signed char *)(p)++) = (c))
+static INLINE uint8_t get_uint8(bytecode_p p) {
+    return *((uint8_t *)p);
+}
 
-/* TODO: These generic mem-macros should go into a macros.h. See also
- * TODO:: how mudos does it.
- * Note: the lowlevel BYTE macros can't use MACRO(), since this is
- * needed on the next abstraction level, and a macro can't be nested
- * into itself.
- */
-#define LOAD_2BYTE(d,p) ( ((char *)&(d))[0] = *(char *)(p)++, \
-                          ((char *)&(d))[1] = *(char *)(p)++)
+static INLINE int8_t get_int8(bytecode_p p) {
+    return *((int8_t *)p);
+}
 
-#define GET_2BYTE(d,p)  ( ((char *)&(d))[0] = ((char *)(p))[0], \
-                          ((char *)&(d))[1] = ((char *)(p))[1] )
+static INLINE uint16_t get_uint16(bytecode_p p) {
+    return *((uint16_t *)p);
+}
 
-#define STORE_2BYTE(p,d) do {\
-                             unsigned char * _q, ** _qq; \
-                             _q = (unsigned char *)(p); \
-                             _qq = (unsigned char **)&(p); \
-                             _q[0] = ((unsigned char *)&(d))[0]; \
-                             _q[1] = ((unsigned char *)&(d))[1]; \
-                             *_qq += 2; \
-                         } while(0)
+static INLINE uint32_t get_uint32(bytecode_p p) {
+    return *((uint32_t *)p);
+}
 
-#define RSTORE_2BYTE(p,d) do {\
-                             unsigned char * _q, ** _qq; \
-                             _q = (unsigned char *)(p); \
-                             _qq = (unsigned char **)&(p); \
-                             _q[-2] = ((unsigned char *)&(d))[0]; \
-                             _q[-1] = ((unsigned char *)&(d))[1]; \
-                             *_qq -= 2; \
-                         } while(0)
+static INLINE int32_t get_int32(bytecode_p p) {
+    return *((int32_t *)p);
+}
 
-#define PUT_2BYTE(p,d)  ( ((char *)(p))[0] = ((char *)&(d))[0], \
-                          ((char *)(p))[1] = ((char *)&(d))[1] )
+static INLINE uint64_t get_uint64(bytecode_p p) {
+    return *((uint64_t *)p);
+}
 
-#define LOAD_3BYTE(d,p) ( (d) =   ((*(unsigned char *)(p)++) << 16) \
-                                | ((*(unsigned char *)(p)++) <<  8) \
-                                | (*(unsigned char *)(p)++) )
+static INLINE bc_offset_t get_bc_offset(bytecode_p p) {
+    return *((bc_offset_t *)p);
+}
 
-#define GET_3BYTE(d,p) ( (d) =   ((((unsigned char *)(p))[0]) << 16) \
-                               | ((((unsigned char *)(p))[1]) <<  8) \
-                               | (((unsigned char *)(p))[2]) )
+/* PUT */
+static INLINE bytecode_t PUT_CODE(bytecode_p p, bytecode_t c) {
+    return *p = c;
+}
 
-#define STORE_3BYTE(p,d) do {\
-                             unsigned char * _q, ** _qq; \
-                             unsigned long _d = (unsigned long)(d); \
-                             _q = (unsigned char *)(p); \
-                             _qq = (unsigned char **)&(p); \
-                             _q[0] = (unsigned char) (_d >> 16) \
-                             _q[1] = (unsigned char) (_d >> 8) \
-                             _q[2] = (unsigned char) (_d) \
-                             *_qq += 3; \
-                         } while(0)
+static INLINE uint8_t put_uint8(bytecode_p p, uint8_t c) {
+    return *((uint8_t *)p) = c;
+}
 
-#define PUT_3BYTE(p,d)  ( ((unsigned char *)(p))[0] = (unsigned char)((d) >> 16), \
-                          ((unsigned char *)(p))[1] = (unsigned char)((d) >> 8), \
-                          ((unsigned char *)(p))[2] = (unsigned char)(d) )
+static INLINE int8_t put_int8(bytecode_p p, int8_t c) {
+    return *((int8_t *)p) = c;
+}
 
-#define LOAD_4BYTE(d,p) ( ((char *)&(d))[0] = *(char *)(p)++, \
-                          ((char *)&(d))[1] = *(char *)(p)++, \
-                          ((char *)&(d))[2] = *(char *)(p)++, \
-                          ((char *)&(d))[3] = *(char *)(p)++ )
+static INLINE uint16_t put_uint16(bytecode_p p, uint16_t c) {
+    return *((uint16_t *)p) = c;
+}
 
-#define GET_4BYTE(d,p)  ( ((char *)&(d))[0] = ((char *)(p))[0], \
-                          ((char *)&(d))[1] = ((char *)(p))[1], \
-                          ((char *)&(d))[2] = ((char *)(p))[2], \
-                          ((char *)&(d))[3] = ((char *)(p))[3] )
+static INLINE uint32_t put_uint32(bytecode_p p, uint32_t c) {
+    return *((uint32_t *)p) = c;
+}
 
-#define STORE_4BYTE(p,d) ( *(unsigned char *)(p)++ = ((char *)&(d))[0], \
-                           *(unsigned char *)(p)++ = ((char *)&(d))[1], \
-                           *(unsigned char *)(p)++ = ((char *)&(d))[2], \
-                           *(unsigned char *)(p)++ = ((char *)&(d))[3] )
+static INLINE int32_t put_int32(bytecode_p p, int32_t c) {
+    return *((int32_t *)p) = c;
+}
 
-#define PUT_4BYTE(p,d)  ( ((char *)(p))[0] = ((char *)&(d))[0], \
-                          ((char *)(p))[1] = ((char *)&(d))[1], \
-                          ((char *)(p))[2] = ((char *)&(d))[2], \
-                          ((char *)(p))[3] = ((char *)&(d))[3] )
+static INLINE uint64_t put_uint64(bytecode_p p, uint64_t c) {
+    return *((uint64_t *)p) = c;
+}
+
+static INLINE bc_offset_t put_bc_offset(bytecode_p p, bc_offset_t c) {
+    return *((bc_offset_t *)p) = c;
+}
+
+/* LOAD */
+static INLINE bytecode_t load_code(bytecode_p *p) {
+    return *((*p)++); 
+}
+
+static INLINE uint8_t load_uint8(bytecode_p *p) {
+    return *( (*(uint8_t**)(p))++ );
+}
+
+static INLINE int8_t load_int8(bytecode_p *p) {
+    return *( (*(int8_t**)(p))++ );
+}
+
+static INLINE uint16_t load_uint16(bytecode_p *p) {
+    return *( (*(uint16_t**)(p))++ );
+}
+
+
+static INLINE uint32_t load_uint32(bytecode_p *p) {
+    return *( (*(uint32_t**)(p))++ );
+}
+
+static INLINE uint64_t load_uint64(bytecode_p *p) {
+    return *( (*(uint64_t**)(p))++ );
+}
+
+static INLINE bc_offset_t load_bc_offset(bytecode_p *p) {
+    return *( (*(bc_offset_t**)(p))++ );
+}
+
+/* STORE */
+static INLINE bytecode_t store_code(bytecode_p *p, bytecode_t c) {
+    *((*p)++) = c;
+    return c;
+}
+
+static INLINE bytecode_t rstore_code(bytecode_p *p, bytecode_t c) {
+    *(--(*p)) = c;
+    return c;
+}
+
+static INLINE uint8_t store_uint8(bytecode_p *p, uint8_t c) {
+    return *( (*(uint8_t**)(p))++ ) = c;
+}
+
+static INLINE int8_t store_int8(bytecode_p *p, int8_t c) {
+    return *( (*(int8_t**)(p))++ ) = c;
+}
+
+static INLINE uint16_t store_uint16(bytecode_p *p, uint16_t c) {
+    return *( (*(uint16_t**)(p))++ ) = c;
+}
+
+static INLINE uint16_t rstore_uint16(bytecode_p *p, uint16_t c) {
+    return *( --(*(uint16_t**)(p)) ) = c;
+}
+
+static INLINE uint32_t store_uint32(bytecode_p *p, uint32_t c) {
+    return *( (*(uint32_t**)(p))++ ) = c;
+}
+
+static INLINE uint64_t store_uint64(bytecode_p *p, uint64_t c) {
+    return *( (*(uint64_t**)(p))++ ) = c;
+}
+
+static INLINE bc_offset_t store_bc_offset(bytecode_p *p, bc_offset_t c) {
+    return *( (*(bc_offset_t**)(p))++ ) = c;
+}
 
 
 #if SIZEOF_SHORT == 2
-#  define GET_SHORT(d,p)    GET_2BYTE(d,p)
-#  define LOAD_SHORT(d,p)   LOAD_2BYTE(d,p)
-#  define PUT_SHORT(p,d)    MACRO(unsigned short _us = (unsigned short)d; \
-                                  PUT_2BYTE(p,_us);)
-#  define STORE_SHORT(p,d)  MACRO(unsigned short _us = (unsigned short)d; \
-                                 STORE_2BYTE(p,_us);)
-#  define RSTORE_SHORT(p,d) MACRO(unsigned short _us = (unsigned short)d; \
-                                 RSTORE_2BYTE(p,_us);)
+static INLINE void get_short(unsigned short *d, bytecode_p p) {
+    *d = get_uint16(p);
+}
+static INLINE void load_short(unsigned short *d, bytecode_p *p) {
+    *d = load_uint16(p);
+}
+static INLINE void put_short(bytecode_p p, unsigned short d) {
+    put_uint16(p, d);
+}
+static INLINE void store_short(bytecode_p *p, unsigned short d) {
+    store_uint16(p, d);
+}
+static INLINE void rstore_short(bytecode_p *p, unsigned short d) {
+    rstore_uint16(p, d);
+}
 #else
 #  error "Unsupported size of short."
 #endif /* SIZEOF_SHORT */
 
-#if SIZEOF_LONG == 4
-#  define GET_LONG(d,p)    GET_4BYTE(d,p)
-#  define LOAD_LONG(d,p)   LOAD_4BYTE(d,p)
-#  define PUT_LONG(p,d)    MACRO(unsigned long _us = (unsigned long)d; \
-                                 PUT_4BYTE(p,_us);)
-#  define STORE_LONG(p,d)  MACRO(unsigned long _us = (unsigned long)d; \
-                                 STORE_4BYTE(p,_us);)
-#  define RSTORE_LONG(p,d) MACRO(unsigned long _us = (unsigned long)d; \
-                                 RSTORE_4BYTE(p,_us);)
-#elif SIZEOF_LONG == 8 && SIZEOF_INT == 4
-#  define GET_LONG(d,p)    MACRO(int _ui; GET_4BYTE(_ui,p); \
-                                 d = _ui;)
-#  define LOAD_LONG(d,p)   MACRO(int _ui; LOAD_4BYTE(_ui,p); \
-                                 d = _ui;)
-#  define PUT_LONG(p,d)    MACRO(unsigned int _ui = (unsigned int)d; \
-                                 PUT_4BYTE(p,_ui);)
-#  define STORE_LONG(p,d)  MACRO(unsigned int _ui = (unsigned int)d; \
-                                 STORE_4BYTE(p,_ui);)
-#  define RSTORE_LONG(p,d) MACRO(unsigned int _ui = (unsigned int)d; \
-                                 RSTORE_4BYTE(p,_ui);)
-#else
-#  error "Unsupported size of long."
-#endif /* SIZEOF_LONG */
+static INLINE void get_long(unsigned long *d, bytecode_p p) {
+    *d = (long)get_uint32(p);
+}
+static INLINE void load_long(unsigned long *d, bytecode_p *p) {
+    *d = (long)load_uint32(p);
+}
+static INLINE void put_long(bytecode_p p, unsigned long d) {
+    put_uint32(p, (uint32_t)d);
+}
+static INLINE void store_long(bytecode_p *p, unsigned long d) {
+    store_uint32(p, (uint32_t)d);
+}
 
-#define LOAD_INT16(d,p)  LOAD_2BYTE(d,p)
+/* some macros for compatibility */
+// GET_CODE und PUT_CODE are functions.
+#define LOAD_CODE(p)       load_code(&(p))
+#define STORE_CODE(p,c)    store_code(&(p),(c))
+#define RSTORE_CODE(p,c)   rstore_code(&(p),(c))
 
-#define LOAD_INT32(d,p)  LOAD_4BYTE(d,p)
-#define GET_INT32(d,p)   GET_4BYTE(d,p)
-#define PUT_INT32(p,d)   PUT_4BYTE(p,d)
-#define STORE_INT32(p,d) STORE_4BYTE(p,d)
+#define GET_UINT8(p)       get_uint8(p)
+#define PUT_UINT8(p,c)     put_uint8((p),(c))
+#define LOAD_UINT8(p)      load_uint8(&(p))
+#define STORE_UINT8(p,c)   store_uint8(&(p),(c))
+
+#define GET_INT8(p)        get_int8(p)
+#define PUT_INT8(p,c)      put_int8((p),(c))
+#define LOAD_INT8(p)       load_int8(&(p))
+#define STORE_INT8(p,c)    store_int8(&(p),(c))
+
+#define GET_SHORT(d,p)     get_short(&(d),(p))
+#define LOAD_SHORT(d,p)    load_short(&(d),&(p))
+#define PUT_SHORT(p,d)     put_short((p),(d))
+#define STORE_SHORT(p,d)   store_short(&(p),(d))
+#define RSTORE_SHORT(p,d)  rstore_short(&(p),(d))
+
+#define GET_LONG(d,p)      get_long(&(d),(p))
+#define LOAD_LONG(d,p)     load_long(&(d),&(p))
+#define PUT_LONG(p,d)      put_long((p),(d))
+#define STORE_LONG(p,d)    store_long(&(p),(d))
+//#define RSTORE_LONG(p,d)   rstore_long(&(p),(d))
 
 #endif /* CHAR_BIT */
 
+/*
 #ifndef GET_CODE
 #  error "No bytecode type defined."
 #endif
-
-/***************************************************************************/
+*/
 
 #endif /* BYTECODE_H__ */
+
+/* Tester: Coogan@tubmud, Arkas@Unitopia, largo@wunderland */
+

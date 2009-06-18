@@ -7752,7 +7752,7 @@ eval_instruction (bytecode_p first_instruction
  */
 
 {
-    register bytecode_p     pc;  /* Current program pointer */
+    bytecode_p     pc;  /* Current program pointer */
     register svalue_t *fp;  /* Current frame pointer */
     register svalue_t *sp;  /* Current stack pointer */
       /* For speed reasons, these variables shadow their global counterparts,
@@ -13434,10 +13434,7 @@ again:
          * The <offset> is counted from its first byte (TODO: Ugh).
          */
 
-        long offset;
-
-        GET_LONG(offset, pc);
-        pc += offset;
+        pc += get_bc_offset(pc);
         break;
     }
 
@@ -15929,13 +15926,10 @@ again:
 #ifdef F_JUMP
     CASE(F_JUMP);                   /* --- jump <dest>         --- */
     {
-        /* Jump to the (24-Bit) unsigned address <dest> (absolute jump).
+        /* Jump to the address <dest> (absolute jump, bc_offset_t).
          */
 
-        unsigned long dest;
-
-        GET_3BYTE(dest, pc);
-        pc = current_prog->program + dest;
+        pc = current_prog->program + get_bc_offset(pc);
         break;
     }
 #endif /* F_JUMP */
@@ -19528,9 +19522,8 @@ get_arg (int a)
 
     if (to - from == 5)
     {
-        int32 arg;
+        int32 arg = get_int32(from+1);
 
-        GET_INT32(arg, from+1);
         snprintf(buff, sizeof(buff), "%"PRId32, arg);
         return buff;
     }
