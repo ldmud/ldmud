@@ -5,13 +5,13 @@
 #include <limits.h>
 #include "driver.h"
 
-typedef unsigned short whash_t;
-typedef unsigned char  chash_t;
-typedef uint32_t       dwhash_t;
+typedef uint8_t   chash_t;
+typedef uint16_t  whash_t;
+typedef uint32_t  dwhash_t;
 
-#define MAX_WHASH (USHRT_MAX)
-#define MAX_CHASH (UCHAR_MAX)
-#define MAX_DWHASH (PUINT_MAX)
+#define MAX_CHASH  (UINT8_MAX)
+#define MAX_WHASH  (UINT16_MAX)
+#define MAX_DWHASH (UINT32_MAX)
 
 #define INITIAL_DWHASH 5381
 
