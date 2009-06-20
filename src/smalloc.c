@@ -891,7 +891,7 @@ mem_dump_data (strbuf_t *sbuf)
                  + s_free.size + s_wasted.size
                );
     strbuf_addf(sbuf,
-                "soft memory limit: %10lu, hard memory limit: %10lu\n\n",
+                "soft memory limit: %10"PRIdMPINT", hard memory limit: %10"PRIdMPINT"\n\n",
                 get_memory_limit(MALLOC_SOFT_LIMIT),
                 get_memory_limit(MALLOC_HARD_LIMIT)
                );
@@ -1836,8 +1836,9 @@ sfree (POINTER ptr)
     {
         in_malloc = 0;
         fatal("mem_free: block %p magic match failed: "
-              "size %lu, expected %lx, found %lx\n"
-             , block, (unsigned long)(i * GRANULARITY), samagic[i], block[M_MAGIC]);
+              "size %lu, expected %jx, found %jx\n"
+             , block, (unsigned long)(i * GRANULARITY),
+             (intmax_t)samagic[i], (intmax_t)block[M_MAGIC]);
     }
 #endif
 
@@ -3719,8 +3720,8 @@ mem_clear_ref_flags (void)
         if (p + *p > heap_end)
         {
             in_malloc = 0;
-            fatal("pointer larger than brk: %p + %lx = %p > %p\n"
-                  , p, *p, p + *p , last);
+            fatal("pointer larger than brk: %p + %"PRIxPTR" = %p > %p\n"
+                  , p, *p, (intptr_t)(p + *p) , last);
         }
         p += *p;
     }

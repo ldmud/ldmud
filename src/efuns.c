@@ -8909,9 +8909,9 @@ x_gm_localtime (svalue_t *sp, Bool localTime)
 
     pTm = (localTime ? localtime : gmtime)(&clk);
     if (!pTm) {
-      errorf("Bad arg 1 to %s(): time value %"PRIdPINT
+      errorf("Bad arg 1 to %s(): time value %jd"
           " can't be represented by the host system. Maybe too large?\n",
-          localTime ? "localtime" : "gmtime", clk);
+          localTime ? "localtime" : "gmtime", (intmax_t)clk);
     }
 
     v = allocate_array(TM_MAX);

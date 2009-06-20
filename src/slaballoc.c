@@ -1928,8 +1928,9 @@ sfree (POINTER ptr)
     {
         in_malloc = 0;
         fatal("mem_free: block %p magic match failed for slab %p: "
-              "size %"PRIuPINT", expected %"PRIuPINT", found %"PRIuPINT"\n"
-             , block, slab, (ix * GRANULARITY), (p_uint)samagic[ix], slab->magic);
+              "size %"PRIuPINT", expected %jx, found %jx\n"
+             , block, slab, (ix * GRANULARITY), 
+             (intmax_t)samagic[ix], (intmax_t)slab->magic);
     }
     if (block[M_MAGIC] == sfmagic[ix % NELEM(sfmagic)])
     {
@@ -1941,8 +1942,8 @@ sfree (POINTER ptr)
     {
         in_malloc = 0;
         fatal("mem_free: block %p magic match failed: "
-              "size %"PRIuPINT", expected %"PRIuPINT", found %"PRIuPINT"\n"
-             , block, (ix * GRANULARITY), (p_uint)samagic[ix], block[M_MAGIC]);
+              "size %"PRIuPINT", expected %jx, found %jx\n"
+             , block, (ix * GRANULARITY), (intmax_t)samagic[ix], (intmax_t)block[M_MAGIC]);
     }
 #endif
 
@@ -3912,8 +3913,8 @@ mem_clear_ref_flags (void)
         if (p + *p > heap_end)
         {
             in_malloc = 0;
-            fatal("pointer larger than brk: %p + %"PRIuPINT" = %p > %p\n"
-                  , p, (p_uint)(*p), p + *p , last);
+            fatal("pointer larger than brk: %p + %"PRIxPTR" = %p > %p\n"
+                  , p, (intptr_t)(*p), p + *p , last);
         }
         p += *p;
     }
