@@ -3720,8 +3720,8 @@ mem_clear_ref_flags (void)
         if (p + *p > heap_end)
         {
             in_malloc = 0;
-            fatal("pointer larger than brk: %p + %"PRIxPTR" = %p > %p\n"
-                  , p, *p, (intptr_t)(p + *p) , last);
+            fatal("pointer larger than brk: %p + %"PRIdPTR" = %p > %p\n"
+                  , p, (intptr_t)*p, p + *p , last);
         }
         p += *p;
     }
