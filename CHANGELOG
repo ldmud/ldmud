@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Jun-2009 (Gnomi)
+  - Corrected a memory leak in send_udp.
+    (comm.c)
+
 18-Jun-2009 (Zesstra)
   - The data from the bytecode is not written/read byte per byte and
     combined by shifting and masking anymore, but by reading the
