@@ -6880,7 +6880,7 @@ f_send_udp (svalue_t *sp)
 
         /* Is this call valid? */
 
-        if (!privilege_violation(STR_SEND_UDP, firstarg, firstarg + 2))
+        if (!privilege_violation(STR_SEND_UDP, firstarg, sp))
             break;
 
         if (udp_s < 0)
