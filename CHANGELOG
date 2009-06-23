@@ -5,6 +5,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (interpret.c) Backported generic error handler from 3.3.
   - (comm.c) Allocate temporary buffers in send_erq() and send_udp()
     in the heap instead of the stack. (Backport of #577 from 3.3)
+  - (array.c, efuns.c) Allocate temporary buffers in regexp(),
+    regexplode() and present_clone() in the heap instead on the
+    stack. (Backport of #578 from 3.3)
 
 17-Nov-2008 (Gnomi)
   - (comm.c) add_message(): fixed a potential crash due to a buffer overflow

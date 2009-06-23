@@ -2640,12 +2640,13 @@ match_regexp (vector_t *v, char *pattern)
 
     /* Check every string in <v> if it matches and set res[]
      * accordingly.
+     * Allocate memory and push error handler on the stack.
      */
-    res = alloca(v_size * sizeof(*res));
+    res = xalloc_with_error_handler(v_size * sizeof(*res));
     if (!res)
     {
         REGFREE(reg);
-        errorf("Stack overflow in regexp()");
+        errorf("Out of memory (%lu bytes) in regexp()", v_size * sizeof(*res));
         /* NOTREACHED */
         return NULL;
     }
@@ -2677,6 +2678,8 @@ match_regexp (vector_t *v, char *pattern)
     }
 
     REGFREE(reg);
+    /* Free the intermediate buffer. */
+    pop_stack();
 
     return ret;
 }
@@ -2808,6 +2811,43 @@ f_transpose_array (svalue_t *sp)
 } /* f_transpose_array() */
 
 /*-------------------------------------------------------------------------*/
+/* The found delimiter matches are kept in a list of these
+ * structures which are allocated on the stack.
+ */
+struct regexplode_match {
+    char *start, *end;              /* Start and end of the match in text */
+    struct regexplode_match *next;  /* Next list element */
+};
+
+/* We need a special error handling for f_reg_explode(). It allocates a
+ * chained list of regexplode_match structures in a mempool and the compiled
+ * regexp which we have to free.
+ */
+struct regexplode_cleanup_s {
+    svalue_t sval;
+    struct regexp *reg;
+    Mempool matchmempool;
+};
+
+static void
+regexplode_error_handler( svalue_t * arg)
+/* The error handler: delete the mempool and free the compiled regexp.
+ * Note: it is static, but the compiler will have to emit a function and
+ * symbol for this because the address of the function is taken and it is
+ * therefore not suitable to be inlined.
+ */
+{
+    struct regexplode_cleanup_s *handler = (struct regexplode_cleanup_s *)arg;
+
+    if (handler->reg)
+        REGFREE(handler->reg);
+
+    if (handler->matchmempool) {
+        mempool_delete(handler->matchmempool);
+    }
+    xfree(handler);
+} /* regexplode_error_handler() */
+
 svalue_t *
 f_regexplode (svalue_t *sp)
 
@@ -2822,14 +2862,6 @@ f_regexplode (svalue_t *sp)
  */
 
 {
-    /* The found delimiter matches are kept in a list of these
-     * structures which are allocated on the stack.
-     */
-    struct regexplode_match {
-        char *start, *end;              /* Start and end of the match in text */
-        struct regexplode_match *next;  /* Next list element */
-    };
-
     char *text;                        /* Input text from the vm stack */
     char *pattern;                     /* Delimiter pattern from the vm stack */
     struct regexp *reg;                /* Compiled pattern */
@@ -2840,6 +2872,9 @@ f_regexplode (svalue_t *sp)
     svalue_t *svp;                     /* Next element in ret to fill in */
     int num_match;                     /* Number of matches */
     char *str;
+    Mempool   pool;                    /* Mempool for the list of matches */
+    /* cleanup structure holding the head of chain of matches */
+    struct regexplode_cleanup_s *cleanup;
 
     /* Get the efun arguments */
     if (sp[-1].type != T_STRING)
@@ -2850,13 +2885,39 @@ f_regexplode (svalue_t *sp)
     text = sp[-1].u.string;
     pattern = sp->u.string;
 
+    /* allocate space for cleanup structure. */
+    cleanup = xalloc(sizeof(*cleanup));
+    if (!cleanup)
+    {
+        errorf("Out of memory (%lu bytes) for cleanup structure in "
+               "regexplode().\n",(unsigned long) sizeof(*cleanup));
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    /* create mempool */
+    pool = new_mempool(size_mempool(sizeof(*matches)));
+    if (!pool)
+    {
+        xfree(cleanup);
+        errorf("Out of memory (%zu) for mempool in regexplode().\n",
+               sizeof(*matches));
+        /* NOTREACHED */
+        return NULL;
+    }
+    cleanup->matchmempool = pool;
+    cleanup->reg = NULL;
+    /*  push error handler above the args on the stack */
+    push_error_handler(regexplode_error_handler, &(cleanup->sval));
+
     reg = REGCOMP((unsigned char *)pattern, 0, MY_FALSE);
     if (reg == 0) {
-        inter_sp = sp;
         errorf("Unrecognized search pattern");
         /* NOTREACHED */
         return NULL;
     }
+
+    cleanup->reg = reg;
 
     /* Loop over <text>, repeatedly matching it against the pattern,
      * until all matches have been found and recorded.
@@ -2866,11 +2927,11 @@ f_regexplode (svalue_t *sp)
     matchp = &matches;
     while (hs_regexec(reg, str, text)) {
         eval_cost++;
-        match = (struct regexplode_match *)alloca(sizeof *match);
+        match = (struct regexplode_match *)mempool_alloc(pool, sizeof *match);
         if (!match)
         {
-            REGFREE(reg);
-            errorf("Stack overflow in regexplode()");
+            errorf("Out of memory (%lu bytes) in regexplode().\n",
+                   (unsigned long) sizeof(*match));
             /* NOTREACHED */
             return NULL;
         }
@@ -2888,8 +2949,6 @@ f_regexplode (svalue_t *sp)
 
     /* Prepare the result vector */
     if (max_array_size && num_match > ((max_array_size-1) >> 1) ) {
-        REGFREE(reg);
-        inter_sp = sp;
         errorf("Illegal array size");
         /* NOTREACHED */
         return NULL;
@@ -2927,12 +2986,11 @@ f_regexplode (svalue_t *sp)
     put_malloced_string(svp, string_copy(text));
 
     /* Cleanup */
-    REGFREE(reg);
-    free_string_svalue(sp);
-    sp--;
-    free_string_svalue(sp);
+    /* 2 arguments and the error handler. */
+    sp = pop_n_elems(3, inter_sp);
 
     /* Return the result */
+    sp++;
     put_array(sp, ret);
     return sp;
 } /* f_regexplode() */

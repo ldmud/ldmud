@@ -3945,8 +3945,10 @@ f_present_clone (svalue_t *sp)
         long i;
         char * end;
         char * name0;  /* Intermediate name */
+        char * tmpbuf; /* intermediate buffer for stripping any #xxxx */
 
         name0 = sp[-1].u.string;
+        tmpbuf = NULL;
 
         /* Normalize the given string and check if it is
          * in the shared string table. If not, we know that
@@ -3969,11 +3971,15 @@ f_present_clone (svalue_t *sp)
                 /* Not a digit: maybe a '#' */
                 if ('#' == c && len - i > 1)
                 {
-                    name0 = alloca((size_t)i + 1);
-                    if (!name0)
-                        errorf("Out of stack memory.\n");
-                    strncpy(name0, sp[-1].u.string, (size_t)i);
-                    name0[i] = '\0';
+                    tmpbuf = xalloc((size_t)i + 1);
+                    if (!tmpbuf)
+                    {
+                        errorf("Out of memory (%ld bytes) for temporary "
+                               "buffer in present_clone().\n", i+1);
+                    }
+                    strncpy(tmpbuf, sp[-1].u.string, (size_t)i);
+                    tmpbuf[i] = '\0';
+                    name0 = tmpbuf;
                 }
 
                 break; /* in any case */
@@ -3988,6 +3994,14 @@ f_present_clone (svalue_t *sp)
         else
             name = findstring(name0);
 
+        /* tmpbuf (and name0 which might point to the same memory) is unneeded
+         * from now on. Setting both to NULL, just in case somebody uses
+         * them later below. */
+        if (tmpbuf)
+        {
+            xfree(tmpbuf);
+            tmpbuf = name0 = NULL;
+        }
     }
     else if (sp[-1].type == T_OBJECT)
     {
