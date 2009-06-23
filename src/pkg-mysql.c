@@ -412,7 +412,8 @@ f_db_conv_string (svalue_t *sp)
 
     TYPE_TEST1(sp, T_STRING)
     s = sp->u.string;
-    buff = alloca(strlen(s)*2 +1);
+    buff = xalloc_with_error_handler(strlen(s)*2 +1);
+    /* inter_sp is now sp+1. */
     if ( !buff )
     {
         errorf("Out of memory.\n");
@@ -424,6 +425,7 @@ f_db_conv_string (svalue_t *sp)
     /* Re-allocate the escaped string to its proper length */
     s = string_copy(buff);
 
+    pop_stack(); /* inter_sp is now sp. */
     free_string_svalue(sp);
     put_malloced_string(sp, s);
     return sp;
