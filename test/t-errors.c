@@ -3,6 +3,7 @@
 #include "/inc/gc.inc"
 
 mixed globalvar;
+object unpriv;
 
 // Name, Flag, Function
 mixed *tests = ({
@@ -89,6 +90,7 @@ mixed *tests = ({
     ({ "b-990204-3", 0, (: funcall(lambda(0,({#',,({#'--, 'x}),'x})))==-1 :) }),
     ({ "b-990210", 0, (: terminal_colour("foobar bla", ([ ]), 9, 2)=="foobar\n  bla" :) }),
     ({ "sprintf-INT_MIN", 0, (: sprintf("%Q",__INT_MIN__) == to_string(__INT_MIN__) :) }),
+    ({ "send_udp leak", 0, (: funcall(bind_lambda(#'send_udp, unpriv), "127.0.0.1",9999, ({ 1 })); return 1; :) }),
 });
 
 void run_test()
@@ -97,6 +99,8 @@ void run_test()
     
     msg("\nRunning old error test suite:\n"
           "-----------------------------\n");
+
+    unpriv = clone_object(this_object());
 
     run_array(tests,
         (:
