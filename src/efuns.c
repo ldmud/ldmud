@@ -4830,7 +4830,7 @@ v_present_clone (svalue_t *sp, int num_arg)
                                "buffer in present_clone().\n", i+1);
                     }
                     strncpy(tmpbuf, get_txt(arg->u.str), i);
-                    name0[i] = '\0';
+                    tmpbuf[i] = '\0';
                 }
 
                 break; /* in any case */
