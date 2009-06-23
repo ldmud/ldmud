@@ -68,6 +68,16 @@ struct control_stack {
        */
 };
 
+/* a general error handler structure. head is assigned as payload to an 
+ * T_LVALUE svalue of type T_ERROR_HANDLER and pushed onto the value stack.
+ * If the stack is unrolled during runtime errors the error_handler function
+ * is called and frees buff. */
+typedef struct errorhandler_s {
+  svalue_t head;        /* The T_ERROR_HANDLER structure */
+  char     * buff;      /* The allocated buffer to free. */
+} errorhandler_t;
+
+
 /* --- Macros --- */
 
 #define MAX_SHIFT ((sizeof(p_int) << 3) - 1)
@@ -145,6 +155,7 @@ extern void push_string_shared(char *p);
 extern void push_malloced_string(char *p);
 extern void push_volatile_string(char *p);
 extern void push_error_handler(void (*errorhandler)(svalue_t *), svalue_t *arg);
+extern void *xalloc_with_error_handler(size_t size);
 
 extern void init_interpret(void);
 extern void bad_efun_arg(int arg, int instr, svalue_t *sp) NORETURN;

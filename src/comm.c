@@ -5940,13 +5940,17 @@ f_send_erq (svalue_t *sp)
         vector_t *v;
         svalue_t *svp;
         char *cp;
-        mp_int j;
+        p_int j;
 
         v = sp[-1].u.vec;
         arglen = VEC_SIZE(v);
-        cp = arg = alloca(arglen);
+        cp = arg = xalloc(arglen);
+        if (!arg) {
+            errorf("Out of memory (%zu bytes) in send_erq() for allocating "
+                   "temporary buffer.\n", arglen);
+        }
         svp = &v->item[0];
-        for (j = (mp_int)arglen; --j >= 0; )
+        for (j = (p_int)arglen; --j >= 0; )
             *cp++ = (char)(*svp++).u.number;
     }
     else
@@ -5976,6 +5980,8 @@ f_send_erq (svalue_t *sp)
     }
     else
     {
+        if (sp[-1].type != T_STRING)
+            xfree(arg);
         bad_xefun_arg(3, sp);
         /* NOTREACHED */
     }
@@ -5994,7 +6000,11 @@ failure:
         i = 0;
         free_svalue(sp);
     }
-
+    /* cleanup */
+    if (sp[-1].type != T_STRING) {
+        /* free arg only if sp-1 is not a string */
+        xfree(arg);
+    }
     free_svalue(--sp);
     (*--sp).u.number = i;
 
@@ -6920,7 +6930,7 @@ f_send_udp (svalue_t *sp)
  */
 
 {
-    char *to_host;
+    char *to_host = NULL;
     int to_port;
     char *msg;
     size_t msglen;
@@ -6930,9 +6940,12 @@ f_send_udp (svalue_t *sp)
     struct sockaddr_in name;
     struct hostent *hp;
     int ret = 0;
+    svalue_t *firstarg;
 
     if ((sp-2)->type != T_STRING) bad_xefun_arg(1, sp);
     if ((sp-1)->type != T_NUMBER) bad_xefun_arg(2, sp);
+
+    firstarg = sp-2;
 
     switch(0) { default: /* try {...} */
 
@@ -6948,15 +6961,15 @@ f_send_udp (svalue_t *sp)
             vector_t *v;
             svalue_t *svp;
             char *cp;
-            mp_int j;
+            p_int j;
 
             v = sp->u.vec;
             msglen = VEC_SIZE(v);
-            cp = msg = alloca(msglen);
-            if (!msg)
-                break;
+            memsafe(cp = msg = xalloc_with_error_handler(msglen), msglen
+                   , "temporary buffer in send_udp()");
+            sp = inter_sp;
             svp = &v->item[0];
-            for (j = (mp_int)msglen; --j >= 0; )
+            for (j = (p_int)msglen; --j >= 0; )
                 *cp++ = (char)(*svp++).u.number;
         }
         else
@@ -6969,9 +6982,9 @@ f_send_udp (svalue_t *sp)
 
         if (
 #ifdef USE_DEPRECATED
-            !privilege_violation3("send_imp", sp-2, sp) &&
+            !privilege_violation3("send_imp", firstarg, sp) &&
 #endif
-            !privilege_violation3("send_udp", sp-2, sp)
+            !privilege_violation3("send_udp", firstarg, sp)
            )
             break;
 
@@ -6980,8 +6993,8 @@ f_send_udp (svalue_t *sp)
 
         /* Determine the destination address */
 
-        to_host = (sp-2)->u.string;
-        to_port = (sp-1)->u.number;
+        to_host = firstarg->u.string;
+        to_port = (firstarg+1)->u.number;
 
 #ifndef USE_IPV6
         if (sscanf(to_host, "%d.%d.%d.%d", &ip1, &ip2, &ip3, &ip4) == 4)
@@ -7024,14 +7037,17 @@ f_send_udp (svalue_t *sp)
             break;
         ret = 1;
     }
+    /* Cleanup - an allocated buffer for the message will be on the stack 
+     * above the arguments, therefore clean everything from the first argument
+     * (including) to sp.
+     */
+    sp = pop_n_elems((sp-firstarg)+1, sp);
 
-    /* Return the result */
-
-    free_svalue(sp);
-    free_svalue(--sp);
-    free_svalue(--sp);
+    /*Return the result */
+    sp++;
     put_number(sp, ret);
     return sp;
+    
 } /* f_send_udp() */
 
 /*-------------------------------------------------------------------------*/
