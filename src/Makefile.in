@@ -206,6 +206,9 @@ lang.c lang.h: lang.y
 	@CLEAN_YACC_TAB@
 	$(MV) $(YACCTAB)h lang.h
 
+bytecode_gen.h: mk_bytecode_gen.sh
+	./mk_bytecode_gen.sh > $@
+
 random.o : random.c config.h driver.h
 	$(CC) $(CFLAGS) $(SFMT_FLAGS) -c random.c -o random.o
 

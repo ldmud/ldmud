@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Jul-2009 (Fuchur)
+  - correct strict aliasing problem in byte code accessor functions.
+    also generate the accessor functions using a script.
+    (bytecode.h, mk_bytecode_gen.sh)
+
 23-Jun-2009 (Gnomi)
   - Corrected a memory leak in send_udp.
     (comm.c)

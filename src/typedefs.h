@@ -12,6 +12,7 @@
 #include "driver.h"
 
 typedef struct action_s           action_t;           /* sent.h */
+// NOTE: mk_bytecode_gen.sh assumes that sizeof(bytecode_t) == 1
 typedef unsigned char             bytecode_t;         /* bytecode.h */
 typedef bytecode_t              * bytecode_p;         /* bytecode.h */
 typedef struct callback_s         callback_t;         /* simulate.h */

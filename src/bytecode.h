@@ -133,147 +133,16 @@
 typedef int32_t         bc_offset_t;
 typedef int16_t         bc_shortoffset_t;
 
-/* Functions (static, for inlining): generic types */
-/* GET */
-static INLINE bytecode_t GET_CODE(bytecode_p p) { return *p; }
+// get_foo(), put_foo(), load_foo(), store_foo() and rstore_foo() functions
+#include "bytecode_gen.h"
 
-static INLINE uint8_t get_uint8(bytecode_p p) {
-    return *((uint8_t *)p);
-}
-
-static INLINE uint16_t get_uint16(bytecode_p p) {
-    return *((uint16_t *)p);
-}
-
-static INLINE uint32_t get_uint32(bytecode_p p) {
-    return *((uint32_t *)p);
-}
-
-static INLINE uint64_t get_uint64(bytecode_p p) {
-    return *((uint64_t *)p);
-}
-
-static INLINE bc_offset_t get_bc_offset(bytecode_p p) {
-    return *((bc_offset_t *)p);
-}
-
-static INLINE bc_shortoffset_t get_bc_shortoffset(bytecode_p p) {
-    return *((bc_shortoffset_t *)p);
-}
-
-/* PUT */
-static INLINE bytecode_t PUT_CODE(bytecode_p p, bytecode_t c) {
-    return *p = c;
-}
-
-static INLINE uint8_t put_uint8(bytecode_p p, uint8_t c) {
-    return *((uint8_t *)p) = c;
-}
-
-static INLINE uint16_t put_uint16(bytecode_p p, uint16_t c) {
-    return *((uint16_t *)p) = c;
-}
-
-static INLINE uint32_t put_uint32(bytecode_p p, uint32_t c) {
-    return *((uint32_t *)p) = c;
-}
-
-static INLINE uint64_t put_uint64(bytecode_p p, uint64_t c) {
-    return *((uint64_t *)p) = c;
-}
-
-static INLINE bc_offset_t put_bc_offset(bytecode_p p, bc_offset_t c) {
-    return *((bc_offset_t *)p) = c;
-}
-
-static INLINE bc_shortoffset_t put_bc_shortoffset(bytecode_p p, bc_shortoffset_t c) {
-    return *((bc_shortoffset_t *)p) = c;
-}
-
-/* LOAD */
-static INLINE bytecode_t load_code(bytecode_p *p) {
-    return *((*p)++); 
-}
-
-static INLINE uint8_t load_uint8(bytecode_p *p) {
-    return *( (*(uint8_t**)(p))++ );
-}
-
-static INLINE uint16_t load_uint16(bytecode_p *p) {
-    return *( (*(uint16_t**)(p))++ );
-}
-
-
-static INLINE uint32_t load_uint32(bytecode_p *p) {
-    return *( (*(uint32_t**)(p))++ );
-}
-
-static INLINE uint64_t load_uint64(bytecode_p *p) {
-    return *( (*(uint64_t**)(p))++ );
-}
-
-static INLINE bc_offset_t load_bc_offset(bytecode_p *p) {
-    return *( (*(bc_offset_t**)(p))++ );
-}
-
-/* STORE */
-static INLINE bytecode_t store_code(bytecode_p *p, bytecode_t c) {
-    *((*p)++) = c;
-    return c;
-}
-
-static INLINE bytecode_t rstore_code(bytecode_p *p, bytecode_t c) {
-    *(--(*p)) = c;
-    return c;
-}
-
-static INLINE uint8_t store_uint8(bytecode_p *p, uint8_t c) {
-    return *( (*(uint8_t**)(p))++ ) = c;
-}
-
-static INLINE uint16_t store_uint16(bytecode_p *p, uint16_t c) {
-    return *( (*(uint16_t**)(p))++ ) = c;
-}
-
-static INLINE uint16_t rstore_uint16(bytecode_p *p, uint16_t c) {
-    return *( --(*(uint16_t**)(p)) ) = c;
-}
-
-static INLINE uint32_t store_uint32(bytecode_p *p, uint32_t c) {
-    return *( (*(uint32_t**)(p))++ ) = c;
-}
-
-static INLINE uint64_t store_uint64(bytecode_p *p, uint64_t c) {
-    return *( (*(uint64_t**)(p))++ ) = c;
-}
-
-static INLINE bc_offset_t store_bc_offset(bytecode_p *p, bc_offset_t c) {
-    return *( (*(bc_offset_t**)(p))++ ) = c;
-}
-
-
-#if SIZEOF_SHORT == 2
-static INLINE unsigned short get_short(bytecode_p p) {
-    return get_uint16(p);
-}
-static INLINE unsigned short load_short(bytecode_p *p) {
-    return load_uint16(p);
-}
-static INLINE void put_short(bytecode_p p, unsigned short d) {
-    put_uint16(p, d);
-}
-static INLINE void store_short(bytecode_p *p, unsigned short d) {
-    store_uint16(p, d);
-}
-static INLINE void rstore_short(bytecode_p *p, unsigned short d) {
-    rstore_uint16(p, d);
-}
-#else
+#if SIZEOF_SHORT != 2
 #  error "Unsupported size of short."
 #endif /* SIZEOF_SHORT */
 
 /* some macros for compatibility */
-// GET_CODE und PUT_CODE are functions.
+#define GET_CODE(p)        get_code(p)
+#define PUT_CODE(p,c)      put_code((p),(c))
 #define LOAD_CODE(p)       load_code(&(p))
 #define STORE_CODE(p,c)    store_code(&(p),(c))
 #define RSTORE_CODE(p,c)   rstore_code(&(p),(c))
