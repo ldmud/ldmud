@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Jul-2009 (Gnomi)
+  - Set a maximum number of retries for reading data (in case the
+    underlying functions go crazy and cause an endless loop).
+    (pkg-gnutls.c, pkg-openssl.c)
+
 13-Jul-2009 (Fuchur)
   - correct strict aliasing problem in byte code accessor functions.
     also generate the accessor functions using a script.
