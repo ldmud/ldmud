@@ -455,11 +455,13 @@ tls_read (interactive_t *ip, char *buffer, int length)
     int ret = -11;
 
     int err;
+    int retries = 6;
 
     do {
         ret = SSL_read(ip->tls_session, buffer, length);
     } while  (ret < 0 && (err = SSL_get_error(ip->tls_session, ret))
-              && (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE));
+              && (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
+              && (--retries));
 
     if (ret == 0)
     {
@@ -472,6 +474,10 @@ tls_read (interactive_t *ip, char *buffer, int length)
                       "Closing the connection.\n"
                      , time_stamp(), ret);
         tls_deinit_connection(ip);
+        /* get_message() expects an errno value.
+         * ESHUTDOWN will close the connection.
+         */
+        errno = ESHUTDOWN;
     }
 
     return (ret < 0 ? -1 : ret);

@@ -436,10 +436,13 @@ tls_read (interactive_t *ip, char *buffer, int length)
 
 {
     int ret = -11;
+    int retries = 6;
 
     do {
            ret = gnutls_record_recv(ip->tls_session, buffer, length);
-    } while ( ret < 0 && (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN) );
+    } while ( ret < 0
+           && (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN)
+           && (--retries) );
 
     if (ret == 0)
     {
@@ -451,6 +454,10 @@ tls_read (interactive_t *ip, char *buffer, int length)
                       "Closing the connection.\n"
                      , time_stamp(), gnutls_strerror(ret));
         tls_deinit_connection(ip);
+        /* get_message() expects an errno value.
+         * ESHUTDOWN will close the connection.
+         */
+        errno = ESHUTDOWN;
     }
 
     return (ret < 0 ? -1 : ret);
