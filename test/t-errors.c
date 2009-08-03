@@ -94,6 +94,15 @@ mixed *tests = ({
     ({ "present_clone string corruption", 0,
        (: string a="item#123"; present_clone(a); return a[4..]=="#123"; :)
     }),
+    ({ "string range memory corruption 1", 0,
+       (: string a="abcdefg"; funcall((: $1 = "y"; :), &(a[0..1])); return a == "ycdefg"; :)
+    }),
+    ({ "string range memory corruption 2", 0,
+       (: string a="abcdefg"; funcall((: $1 = "y"; :), &(a[1..2])); return a == "aydefg"; :)
+    }),
+    ({ "string range memory corruption 3", 0,
+       (: string a="abcdefg"; funcall((: $1 = "y"; :), &(a[1..2]), (a="abc")); return a == "abc"; :)
+    }),
 });
 
 void run_test()

@@ -1205,13 +1205,8 @@ int_free_svalue (svalue_t *v)
           {
               struct protected_range_lvalue *p;
 
-              /* TODO: Are these checks necessary? See RANGE_LVALUE below */
               p = v->u.protected_range_lvalue;
-              if (p->lvalue->type != T_STRING
-               || get_txt(p->lvalue->u.str) == get_txt(p->v.u.str))
-              {
-                  free_mstring(p->v.u.str);
-              }
+              free_mstring(p->v.u.str);
               if (p->lvalue->type == T_STRING)
                   free_mstring(p->lvalue->u.str);
               free_protector_svalue(&p->protector);
@@ -2470,11 +2465,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         if (dsvp->u.str != ds)
         {
             if (do_free)
-            {
                 free_svalue(source);
-                free_mstring(dest->v.u.str);
-                xfree(dest);
-            }
             return;
         }
 
@@ -2488,32 +2479,26 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         }
 
         if (index1)
-            memcpy(rs, ds, (size_t)index1);
+            memcpy(get_txt(rs), get_txt(ds), (size_t)index1);
         if (ssize)
-            memcpy(rs + index1, ss, (size_t)ssize);
+            memcpy(get_txt(rs) + index1, get_txt(ss), (size_t)ssize);
         dest->index2 = (int)(index1 + ssize);
         if (dsize > index2)
             memcpy( get_txt(rs) + dest->index2, get_txt(ds) + index2
                   , (size_t)(dsize - index2));
-        xfree(ds);
 
+        free_mstring(ds);
+        free_mstring(ds);
         dest->v.u.str = dsvp->u.str = rs;
+
         if (do_free)
-        {
             free_string_svalue(source);
-            free_protector_svalue(&dest->protector);
-            xfree(dest);
-        }
     }
     else
     {
         /* Not a string: just free it */
         if (do_free)
-        {
             free_svalue(source);
-            free_protector_svalue(&dest->protector);
-            xfree(dest);
-        }
     }
 } /* transfer_protected_string_range() */
 
