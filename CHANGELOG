@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Aug-2009 (Gnomi)
+  - Memory corruption when using protected string ranges.
+    (interpret.c)
+
 20-Jul-2009 (Gnomi)
   - Set a maximum number of retries for reading data (in case the
     underlying functions go crazy and cause an endless loop).
