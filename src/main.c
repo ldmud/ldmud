@@ -2036,11 +2036,11 @@ eval_arg (int eOption, const char * pValue)
                     erq_args[num_args++] = cp;
                     while (*cp != ' ' && *cp != '\0') cp++;
 
-                    /* Ensure termination */
-                    *cp++ = '\0';
-
-                    /* Skip trailing spaces */
-                    while (*cp == ' ') cp++;
+                    /* Skip trailing spaces, replacing them by \0 to
+                     * ensure proper string termination.
+                     */
+                    while (*cp == ' ')
+                        *cp++ = '\0';
                 }
             }
         }

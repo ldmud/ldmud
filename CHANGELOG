@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Aug-2009 (Gnomi)
+  - (main.c) Backported erq argument fix from 3.3. (Bug #604)
+
 23-Jun-2009 (Gnomi)
   - (interpret.c) Backported generic error handler from 3.3.
   - (comm.c) Allocate temporary buffers in send_erq() and send_udp()
