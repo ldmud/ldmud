@@ -15393,7 +15393,7 @@ copy_functions (program_t *from, funflag_t type)
                              * It's not fatal, but annoying.
                              */
                             yywarnf(
-                                "Misplaced prototype for %s in %s\n"
+                                "Misplaced prototype for %s in %s ignored.\n"
                                 , get_txt(fun.name), current_loc.file->name
                             );
                             cross_define( &fun, OldFunction
