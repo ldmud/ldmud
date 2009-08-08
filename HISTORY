@@ -12,6 +12,10 @@ For a detailed list of all changes see the file CHANGELOG.
        + An argument mismatch error during a lfun-closure call could
          crash the driver. (Bug #495).
        + Removed a possible stack overflow in restore_value (Bug #532).
+       + save_object(), restore_object(), send_erq(), send_udp(),
+         db_conv_string(), regexplode(), regexp(), present_clone()
+         could crash the driver due to stack overflows, when large
+         string were used as arguments.
 
     - Other Changes:
        + The mySQL configuration failed to handle less-standard standard
