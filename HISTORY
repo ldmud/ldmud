@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
- 8-Aug-2009 (LDMud Team) -- 3.2.16
+08-Aug-2009 (LDMud Team) -- 3.2.16
 
     - Fixed Crashers:
        + Removed a crasher when running with --check-refcounts: References
