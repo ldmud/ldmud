@@ -1,5 +1,6 @@
 SYNOPSIS
         mapping mkmapping(mixed *arr1, mixed *arr2, mixed *arr3, ...);
+        mapping mkmapping(struct st);
 
 BESCHREIBUNG
         Liefert ein Mapping mit Keys aus <arr1> und Datenelementen aus
@@ -7,6 +8,10 @@ BESCHREIBUNG
         <arr2[0]>, <arr3[0]>... zugeordnet. Wenn die Datenarrays
         ungleich gross sind, enthaelt das Mapping nur so viele Eintraege,
         wie im kleinsten Datenarray enthalten sind.
+
+        Die zweite Form konvertiert die angegebene struct <st> in ein Mapping.
+        Hierbei werden die Namen des jeweiligen Elementes in der struct als
+        als Schluessel.
 
         Gewoehnlich werden Mappings erweitert, indem einfach neue Elemente
         eingefuegt werden. Diese Funktion ist nuetzlich, wenn der
@@ -19,6 +24,14 @@ BESIPIEL
         mkmapping( ({ 1, 2 }), ({ 10, 11 }), ({ 20, 21, 22}));
           liefert ([ 1:10;20, 2:11;21 ])
 
+        struct s { int a, b, c; };
+        mkmapping( (<s> 1, ({ 2, 3 }), 3 )
+          liefert ([ "a":1, "b":({2,3}), "c":3 ])
+
+AeNDERUNGEN
+        LDMud 3.3.433 ermoeglichte die Konversion von structs.
+
 VERGLEICHE
         mappings(LPC), mappingp(E), m_indices(E), m_values(E),
-        m_add(E), m_delete(E), sizeof(E), widthof(E), unmkmapping(E).
+        m_add(E), m_delete(E), sizeof(E), widthof(E), unmkmapping(E),
+        to_struct(E)
