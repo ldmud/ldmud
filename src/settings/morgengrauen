@@ -10,8 +10,7 @@
 
 MUDHOME=/home/mud
 
-exec ./configure --prefix=${MUDHOME}/ --libdir=${MUDHOME}/mudlib --bindir=${MUDHOME}/bin.install --libexecdir=${MUDHOME}/bin/erq.d --with-swap-file=${MUDHOME}/swapfiles/swapfile
- --with-setting=morgengrauen $*
+exec ./configure --prefix=${MUDHOME}/ --libdir=${MUDHOME}/mudlib --bindir=${MUDHOME}/bin.install --libexecdir=${MUDHOME}/bin/erq.d --with-swap-file=${MUDHOME}/swapfiles/swapfile --with-setting=morgengrauen $*
 exit $?
 
 # --- The actual settings ---
@@ -62,4 +61,7 @@ with_min_small_malloced=0x8200000
 with_hard_malloc_limit=0x7fffffff
 with_pcre_recursion_limit=20000
 with_optimize=med
+enable_use_tls=yes
+enable_use_xml=xml2
+enable_use_sqlite=yes
 
