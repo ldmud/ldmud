@@ -91,17 +91,17 @@ enum xalloc_header_fields {
 #    ifdef MALLOC_TRACE
          XM_FILE = 3,  /* (const char*) allocating source file */
          XM_LINE = 4,  /* (word_t) allocating line in source file */
-         XM_OVERHEAD = 5,
+         XM_OVERHEAD = 5 + VALGRIND_REDZONE,
 #    else
-         XM_OVERHEAD = 3,
+         XM_OVERHEAD = 3 + VALGRIND_REDZONE,
 #    endif /* MALLOC_TRACE */
 #else /* !MALLOC_LPC_TRACE */
 #    ifdef MALLOC_TRACE
          XM_FILE = 0,  /* (const char*) allocating source file */
          XM_LINE = 1,  /* (word_t) allocating line in source file */
-         XM_OVERHEAD = 2,
+         XM_OVERHEAD = 2 + VALGRIND_REDZONE,
 #    else
-         XM_OVERHEAD = 0,
+         XM_OVERHEAD = 0 + VALGRIND_REDZONE,
 #    endif /* MALLOC_TRACE */
 #endif /* MALLOC_LPC_TRACE */
     XM_OVERHEAD_SIZE = XM_OVERHEAD * sizeof(word_t),
@@ -323,16 +323,29 @@ mdb_log_sbrk (p_int size)
  *     The allocator is safe to use from the main thread.
  *   #define MEM_THREADSAFE
  *     The allocator is altogether threadsafe.
+ *
+ * For allocators which are not (yet) instrumented with the correct valgrind
+ * macros, NVALGRIND is defined to de-activate all the macros used here - 
+ * otherwise we are in trouble...
  */
 
 #if defined(MALLOC_smalloc)
+#  define NVALGRIND
+#  include "valgrind/memcheck.h"
 #  include "smalloc.c"
 #elif defined(MALLOC_slaballoc)
+#  include "valgrind/memcheck.h"
 #  include "slaballoc.c"
 #elif defined(MALLOC_sysmalloc)
+#  define NVALGRIND
+#  include "valgrind/memcheck.h"
 #  include "sysmalloc.c"
 #else
 #  error "No allocator specified."
+#endif
+
+#ifndef SUPPORT_VALGRIND
+#  define NVALGRIND
 #endif
 
 #ifndef GRANULARITY
@@ -342,6 +355,9 @@ mdb_log_sbrk (p_int size)
 #ifdef NO_MEM_BLOCK_SIZE
 #  if defined(GC_SUPPORT) || defined(REPLACE_MALLOC)
 #    error "For GC_SUPPORT or REPLACE_MALLOC, mem_block_size() must exist!"
+#  endif
+#  if !defined(NVALGRIND)
+#    error "For Valgrind support, mem_block_size() must exist!"
 #  endif
 #endif
 
@@ -390,7 +406,7 @@ xalloced_usable_size (void * p
 
 {
 #ifndef NO_MEM_BLOCK_SIZE
-    return mem_block_size((word_t*)p - XM_OVERHEAD) - XM_OVERHEAD_SIZE;
+    return mem_block_size((word_t*)p - XM_OVERHEAD) - XM_OVERHEAD_SIZE - sizeof(word_t)*VALGRIND_REDZONE;
 #else
 #   ifdef __MWERKS__
 #       pragma unused(p)
@@ -584,6 +600,9 @@ xalloc_traced (size_t size MTRACE_DECL)
 {
     word_t *p;
 
+    /* Additional bytes if we round up to full words. */
+    size_t remainder = ((size + sizeof(word_t) - 1) & ~(sizeof(word_t) - 1)) - size;
+
     if (going_to_exit) /* A recursive call while we're exiting */
         exit(3);
 
@@ -596,7 +615,7 @@ xalloc_traced (size_t size MTRACE_DECL)
 #endif
 #endif /* MALLOC_SBRK_TRACE */
 
-    size += XM_OVERHEAD_SIZE;
+    size += XM_OVERHEAD_SIZE + sizeof(word_t)*VALGRIND_REDZONE;
 
     do {
         p = mem_alloc(size);
@@ -607,6 +626,7 @@ xalloc_traced (size_t size MTRACE_DECL)
         return NULL;
     }
 
+    VALGRIND_MAKE_MEM_UNDEFINED((char*)p, XM_OVERHEAD_SIZE);
 #ifdef MALLOC_TRACE
         p[XM_FILE] = (word_t)malloc_trace_file;
         p[XM_LINE] = (word_t)malloc_trace_line;
@@ -616,6 +636,13 @@ xalloc_traced (size_t size MTRACE_DECL)
         p[XM_PROG] = current_prog ? current_prog->id_number : 0;
         p[XM_PC]   = (word_t)inter_pc;
 #endif
+
+    // mark the header block as not accessable and the usable memory as
+    // malloced block.
+    VALGRIND_MAKE_MEM_NOACCESS((char*)p, XM_OVERHEAD_SIZE);
+    VALGRIND_MALLOCLIKE_BLOCK((char*)(p+XM_OVERHEAD), size-XM_OVERHEAD_SIZE-sizeof(word_t)*VALGRIND_REDZONE+remainder, sizeof(word_t)*VALGRIND_REDZONE, 0);
+    VALGRIND_MAKE_MEM_NOACCESS(((char*)p) + size - sizeof(word_t)*VALGRIND_REDZONE, remainder);
+
 #ifdef NO_MEM_BLOCK_SIZE
     count_up(&xalloc_stat, XM_OVERHEAD_SIZE);
 #else
@@ -637,12 +664,16 @@ xfree (void * p)
     if (NULL != p)
     {
         word_t *q = (word_t*)p - XM_OVERHEAD;
+
 #ifdef NO_MEM_BLOCK_SIZE
         count_back(&xalloc_stat, XM_OVERHEAD_SIZE);
 #else
         count_back(&xalloc_stat, mem_block_size(q));
 #endif
         mem_free(q);
+         //memset((char*)q, 0xff, mem_block_size(q));
+        // mark block as free'd.
+        VALGRIND_FREELIKE_BLOCK((char*)p, 0);
     }
 } /* xfree() */
 
@@ -732,15 +763,28 @@ malloc_increment_size (void *vp, size_t size)
 
     rc = mem_increment_size(block, size);
 
-#ifndef NO_MEM_BLOCK_SIZE
     if (rc != NULL)
     {
+        rc -= sizeof(word_t)*VALGRIND_REDZONE;
+
+#ifndef NO_MEM_BLOCK_SIZE
         count_back(&xalloc_stat, old_size);
         count_up(&xalloc_stat, mem_block_size(block));
         if (check_max_malloced())
             return NULL;
-    }
+
+        if (size)
+        {
+            /* Additional bytes if we round up to full words. */
+            size_t remainder = ((size + sizeof(word_t) - 1) & ~(sizeof(word_t) - 1)) - size;
+
+            VALGRIND_RESIZEINPLACE_BLOCK((char*)vp, old_size - XM_OVERHEAD_SIZE - sizeof(word_t)*VALGRIND_REDZONE, old_size + size + remainder - XM_OVERHEAD_SIZE - sizeof(word_t)*VALGRIND_REDZONE, sizeof(word_t)*VALGRIND_REDZONE);
+            VALGRIND_MAKE_MEM_DEFINED((char*)rc - GRANULARITY + 1, GRANULARITY - 1);
+            VALGRIND_MAKE_MEM_UNDEFINED((char*)rc, size);
+            VALGRIND_MAKE_MEM_NOACCESS(((char*)vp) + old_size + size - XM_OVERHEAD_SIZE - sizeof(word_t)*VALGRIND_REDZONE, remainder);
+        }
 #endif
+    }
 
     return rc;
 } /* malloc_increment_size() */
@@ -794,7 +838,7 @@ rexalloc_traced (void * p, size_t size MTRACE_DECL
 #endif
 #endif /* MALLOC_SBRK_TRACE */
 
-    size += XM_OVERHEAD_SIZE;
+    size += XM_OVERHEAD_SIZE + sizeof(word_t)*VALGRIND_REDZONE;
     block = (word_t *)p - XM_OVERHEAD;
 
 #ifndef NO_MEM_BLOCK_SIZE
@@ -804,12 +848,17 @@ rexalloc_traced (void * p, size_t size MTRACE_DECL
         return p;
 #endif
 
+    VALGRIND_MAKE_MEM_DEFINED(block, XM_OVERHEAD_SIZE);
+
     do {
         t = mem_realloc(block, size);
     } while (t == NULL && retry_alloc(size MTRACE_ARG));
 
     if (t)
     {
+        /* Additional bytes if we round up to full words. */
+        size_t remainder = ((size + sizeof(word_t) - 1) & ~(sizeof(word_t) - 1)) - size;
+
 #ifndef NO_MEM_BLOCK_SIZE
         count_back(&xalloc_stat, old_size);
         count_up(&xalloc_stat, mem_block_size(t));
@@ -817,8 +866,25 @@ rexalloc_traced (void * p, size_t size MTRACE_DECL
             return NULL;
 #endif
         t += XM_OVERHEAD;
+        if (p == t)
+        {
+            VALGRIND_RESIZEINPLACE_BLOCK((char*)p, old_size-XM_OVERHEAD_SIZE-sizeof(word_t)*VALGRIND_REDZONE, size+remainder-XM_OVERHEAD_SIZE-sizeof(word_t)*VALGRIND_REDZONE, sizeof(word_t)*VALGRIND_REDZONE);
+        }
+        else
+        {
+            VALGRIND_MALLOCLIKE_BLOCK((char*)t, size+remainder-XM_OVERHEAD_SIZE-sizeof(word_t)*VALGRIND_REDZONE, sizeof(word_t)*VALGRIND_REDZONE, 1);
+            VALGRIND_FREELIKE_BLOCK((char*)p, 0);
+        }
+        VALGRIND_MAKE_MEM_DEFINED((char*)t + old_size - GRANULARITY + 1, GRANULARITY - 1);
+        VALGRIND_MAKE_MEM_UNDEFINED((char*)t + old_size, size - old_size);
+        VALGRIND_MAKE_MEM_NOACCESS(((char*)t) + size - XM_OVERHEAD_SIZE - sizeof(word_t)*VALGRIND_REDZONE, remainder);
     }
-    
+    else
+    {
+        VALGRIND_MAKE_MEM_NOACCESS(block, XM_OVERHEAD_SIZE);
+        VALGRIND_MAKE_MEM_NOACCESS((char*)p + old_size - sizeof(word_t)*VALGRIND_REDZONE, sizeof(word_t)*VALGRIND_REDZONE);
+    }
+
     return (void *)t;
 } /* rexalloc() */
 
@@ -897,27 +963,37 @@ static word_t program_line;
 void
 note_object_allocation_info ( void *block )
 {
+    VALGRIND_MAKE_MEM_DEFINED((char*)block - XM_OVERHEAD_SIZE, XM_OVERHEAD_SIZE);
     object_file = (char *)((word_t*)block)[XM_FILE-XM_OVERHEAD];
     object_line = ((word_t*)block)[XM_LINE-XM_OVERHEAD];
+    VALGRIND_MAKE_MEM_NOACCESS((char*)block - XM_OVERHEAD_SIZE, XM_OVERHEAD_SIZE);
 }
 void
 note_program_allocation_info ( void *block )
 {
+    VALGRIND_MAKE_MEM_DEFINED((char*)block - XM_OVERHEAD_SIZE, XM_OVERHEAD_SIZE);
     program_file = (char *)((word_t*)block)[XM_FILE-XM_OVERHEAD];
     program_line = ((word_t*)block)[XM_LINE-XM_OVERHEAD];
+    VALGRIND_MAKE_MEM_NOACCESS((char*)block - XM_OVERHEAD_SIZE, XM_OVERHEAD_SIZE);
 }
 
 Bool
 is_object_allocation ( void *block )
 {
-    return (object_file == (char *)((word_t*)block)[XM_FILE-XM_OVERHEAD])
-        && (object_line == ((word_t*)block)[XM_LINE-XM_OVERHEAD]);
+    VALGRIND_MAKE_MEM_DEFINED((char*)block - XM_OVERHEAD_SIZE, XM_OVERHEAD_SIZE);
+    Bool result = (object_file == (char *)((word_t*)block)[XM_FILE-XM_OVERHEAD])
+               && (object_line == ((word_t*)block)[XM_LINE-XM_OVERHEAD]);
+    VALGRIND_MAKE_MEM_NOACCESS((char*)block - XM_OVERHEAD_SIZE, XM_OVERHEAD_SIZE);
+    return result;
 }
 Bool
 is_program_allocation ( void *block )
 {
-    return (program_file == (char *)((word_t*)block)[XM_FILE-XM_OVERHEAD])
-        && (program_line == ((word_t*)block)[XM_LINE-XM_OVERHEAD]);
+    VALGRIND_MAKE_MEM_DEFINED((char*)block - XM_OVERHEAD_SIZE, XM_OVERHEAD_SIZE);
+    Bool result = (program_file == (char *)((word_t*)block)[XM_FILE-XM_OVERHEAD])
+               && (program_line == ((word_t*)block)[XM_LINE-XM_OVERHEAD]);
+    VALGRIND_MAKE_MEM_NOACCESS((char*)block - XM_OVERHEAD_SIZE, XM_OVERHEAD_SIZE);
+    return result;
 }
 #endif
 
@@ -941,9 +1017,11 @@ store_print_block_dispatch_info (void *block
         return;
     }
 
+    VALGRIND_MAKE_MEM_DEFINED((char*)block - XM_OVERHEAD_SIZE, XM_OVERHEAD_SIZE);
     dispatch_table[i].file = (char *)((word_t*)block)[XM_FILE-XM_OVERHEAD];
     dispatch_table[i].line = ((word_t*)block)[XM_LINE-XM_OVERHEAD];
     dispatch_table[i].func = func;
+    VALGRIND_MAKE_MEM_NOACCESS((char*)block - XM_OVERHEAD_SIZE, XM_OVERHEAD_SIZE);
 } /* store_print_block_dispatch_info() */
 
 /*-------------------------------------------------------------------------*/

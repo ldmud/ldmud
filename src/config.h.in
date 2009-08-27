@@ -667,4 +667,16 @@
  */
 @cdef_dump_gc_refs@ DUMP_GC_REFS
 
+/* Instrument our allocators with client requests for valgrind. This helps
+ * valgrind to understand our memory usage and produces more useful data. The
+ * runtime slowdown is minimal, but if you don't plan to run the driver in
+ * valgrind, just undefine this (default).
+ */
+@cdef_valgrind@ SUPPORT_VALGRIND
+
+/* Add a buffer of unused memory after each allocated memory block
+ * to detect memory overruns.
+ */
+#define VALGRIND_REDZONE @val_valgrind_redzone@
+
 #endif /* CONFIG_H__ */

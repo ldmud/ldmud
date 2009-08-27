@@ -22,21 +22,51 @@ if ${DRIVER} --options | grep -q 'Python supported'; then
     DRIVER_DEFAULTS="$DRIVER_DEFAULTS --python-script startup.py"
 fi
 
+while [ $# -gt 0 ]
+do
+    case "$1" in
+        -h | --help)
+            echo "Usage: $0 [-h] [-v] [TEST ...]"
+            echo ""
+            echo "Run test cases for the LDMud driver."
+            echo ""
+            echo "Optional arguments:"
+            echo "  -h, --help      Show this help message and exit."
+            echo "  -v, --valgrind  Run the tests with Valgrind memcheck."
+            echo ""
+            echo "Positional arguments:"
+            echo "  TEST            Test case to run, either a directory or a single .c file."
+            echo "                  (If none is given all tests are executed.)"
+            exit
+            ;;
+
+        -v | --valgrind)
+            DRIVER="valgrind --tool=memcheck --error-exitcode=1 $VALGRIND_OPTS --suppressions=../src/valgrind/ldmud.supp -- $DRIVER -DVALGRIND"
+            shift
+            continue
+            ;;
+    esac
+
+    break
+done
+
 export DRIVER DRIVER_DEFAULTS
 
 for testdir in ${@:-t-*}
 do
+    export TEST_LOGFILE=./log/result.${testdir}.log
+    export TEST_OUTPUTFILE=./log/result.${testdir}.out
+
     if [ -d "${testdir}" ]
     then
 	${DRIVER} ${DRIVER_DEFAULTS} -Mmaster -m"${testdir}" \
-              --debug-file "../log/result.${testdir}.log"  > /dev/null \
+              --debug-file ".${TEST_LOGFILE}"  > "${TEST_OUTPUTFILE}" \
         || { echo "Test ${testdir} FAILED."; FAILED="${FAILED}\n\t${testdir}"; }
     else
-        export TEST_LOGFILE=./log/result.${testdir}.log
         case ${testdir} in
         *.c)
             ${DRIVER} ${DRIVER_DEFAULTS} -M"${testdir}" -m. \
-                  --debug-file ${TEST_LOGFILE} > /dev/null \
+                  --debug-file ${TEST_LOGFILE} > "${TEST_OUTPUTFILE}" \
             || { echo "Test ${testdir} FAILED."; FAILED="${FAILED}\n\t${testdir}"; }
         ;;
         *.sh)

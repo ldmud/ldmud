@@ -267,6 +267,7 @@ AC_MY_ARG_ENABLE(check-mapping-total,no,,[check the mapping statistic])
 AC_MY_ARG_ENABLE(check-object-ref,no,,[check object references])
 AC_MY_ARG_ENABLE(check-object-gc-ref,yes,,[check object references in GC])
 AC_MY_ARG_ENABLE(dump-gc-refs,no,,[trace GC references])
+AC_MY_ARG_ENABLE(valgrind,no,,[instrument allocators with valgrind client requests?])
 
 AC_MY_ARG_WITH(optimize,med,,[Optimization level: no/low/med/high])
 
@@ -330,6 +331,7 @@ AC_MY_ARG_WITH(pcre-recursion-limit,3000,,[maximum number of recursions in PCRE 
 AC_MY_ARG_WITH(wizlist-file,WIZLIST,,[name of the wizlist file])
 AC_MY_ARG_WITH(max_net_connects,10,,[maximum number of concurrent connection attempts])
 AC_MY_ARG_WITH(random-period-length,19937,[607 / 1279 / 2281 / 4253 / 11213 / 19937 / 44497 / 86243 / 132049 / 216091],[period length of the random number generator])
+AC_MY_ARG_WITH(valgrind-redzone,0,,[add an unused buffer at the begin and end of each memory block in words])
 
 AC_ARG_WITH(setting,[  --with-setting=SETTING  include a predefined setting],[
 if test -f "settings/$withval" ; then
@@ -541,6 +543,7 @@ AC_CDEF_FROM_ENABLE(check_mapping_total)
 AC_CDEF_FROM_ENABLE(check_object_ref)
 AC_CDEF_FROM_ENABLE(check_object_gc_ref)
 AC_CDEF_FROM_ENABLE(dump_gc_refs)
+AC_CDEF_FROM_ENABLE(valgrind)
 
 AC_TEXT_VAL_FROM_WITH(optimize)
 
@@ -611,6 +614,7 @@ AC_INT_VAL_FROM_WITH(total_trace_length)
 AC_INT_VAL_FROM_WITH(pcre_recursion_limit)
 AC_INT_VAL_FROM_WITH(max_net_connects)
 AC_INT_VAL_FROM_WITH(random_period_length)
+AC_INT_VAL_FROM_WITH(valgrind_redzone)
 
 if test "x$cdef_access_control" = "x#undef"; then
   cdef_access_log="#undef"
@@ -2622,6 +2626,7 @@ AC_SUBST(cdef_check_mapping_total)
 AC_SUBST(cdef_check_object_ref)
 AC_SUBST(cdef_check_object_gc_ref)
 AC_SUBST(cdef_dump_gc_refs)
+AC_SUBST(cdef_valgrind)
 
 dnl second: valued defines
 dnl
@@ -2689,6 +2694,7 @@ AC_SUBST(val_tls_trustdirectory)
 AC_SUBST(val_tls_crlfile)
 AC_SUBST(val_tls_crldirectory)
 AC_SUBST(val_python_script)
+AC_SUBST(val_valgrind_redzone)
 
 dnl finally: some remaining stuff
 dnl

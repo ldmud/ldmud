@@ -31,6 +31,9 @@ void run_test()
 string *epilog(int eflag)
 {
     call_out(#'run_test,0);
+#ifdef VALGRIND
+    call_out(#'shutdown,2,0);
+#endif
     return 0;
 }
 
