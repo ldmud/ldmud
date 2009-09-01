@@ -376,8 +376,10 @@ static ident_t *ident_table[ITABLE_SIZE];
 
 #if ITABLE_SIZE == 256
 #    define identhash(s) chashstr((s), 12)
+#    define identhash_n(s,l) chashstr((s), (l)>12 ? 12 : (l))
 #else
 #    define identhash(s) (whashstr((s), 12) % ITABLE_SIZE)
+#    define identhash_n(s,l) (whashstr((s), (l)>12 ? 12 : (l)) % ITABLE_SIZE)
 #endif
   /* Hash an identifier name (c-string) into a table index.
    */
@@ -1483,11 +1485,10 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, Bool is_efun)
      */
     if (isalunum(*str))
     {
-    	/* It is a function or keyword.
-    	 */
+        /* It is a function or keyword.
+         */
 
         ident_t *p;
-        char *cstr;
 
         /* Take care of an leading efun override */
 
@@ -1498,19 +1499,10 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, Bool is_efun)
             efun_override = MY_TRUE;
         }
 
-        /* Convert the string_t into a C string for local purposes */
-        cstr = alloca(len+1);
-        if (!cstr)
-        {
-            outofmem(len, "identifier");
-        }
-        memcpy(cstr, str, len);
-        cstr[len] = '\0';
-
         /* Lookup the identifier in the string in the global table
          * of identifers.
          */
-        if ( !(p = make_shared_identifier(cstr, I_TYPE_GLOBAL, 0)) )
+        if ( !(p = make_shared_identifier_n(str, len, I_TYPE_GLOBAL, 0)) )
         {
             outofmem(len, "identifier");
         }
@@ -1755,15 +1747,15 @@ init_global_identifier (ident_t * ident, Bool bVariable)
 
 /*-------------------------------------------------------------------------*/
 ident_t *
-lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
+lookfor_shared_identifier (const char *s, size_t len, int n, int depth, Bool bCreate)
 
 /* Aliases: make_shared_identifier(): bCreate passed as MY_TRUE
  *          find_shared_identifier(): bCreate passed as MY_FALSE
  *
- * Find and/or add identifier <s> of type <n> to the ident_table, and
- * return a pointer to the found/generated struct ident. Local identifiers
- * (<n> == I_TYPE_LOCAL) are additionally distinguished by their definition
- * <depth>.
+ * Find and/or add identifier <s> with size <len> of type <n> to the
+ * ident_table, and return a pointer to the found/generated struct ident.
+ * Local identifiers (<n> == I_TYPE_LOCAL) are additionally distinguished
+ * by their definition <depth>.
  *
  * If bCreate is FALSE, the function just checks if the given identfier
  * exists in the table. The identifier is considered found, if there
@@ -1790,10 +1782,10 @@ lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
     string_t *str;
 
 #if defined(LEXDEBUG)
-    printf("%s lookfor_shared_identifier called: %s\n", time_stamp(), s);
+    printf("%s lookfor_shared_identifier called: %.*s\n", time_stamp(), len, s);
 #endif
 
-    h = identhash(s);  /* the identifiers hash code */
+    h = identhash_n(s, len);  /* the identifiers hash code */
 
     /* look for the identifier in the table */
 
@@ -1804,7 +1796,8 @@ lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
 #if defined(LEXDEBUG)
         printf("%s checking %s.\n", time_stamp(), get_txt(curr->name));
 #endif
-        if (!strcmp(get_txt(curr->name), s)) /* found it */
+        if (mstrsize(curr->name) == len
+         && !strncmp(get_txt(curr->name), s, len)) /* found it */
         {
 #if defined(LEXDEBUG)
             printf("%s  -> found.\n", time_stamp());
@@ -1857,7 +1850,7 @@ lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
     {
         /* Identifier is not in table, so create a new entry */
 
-        str = new_tabled(s);
+        str = new_n_tabled(s, len);
         if (!str)
             return NULL;
         curr = xalloc(sizeof *curr);
@@ -4059,9 +4052,7 @@ closure (char *in_yyp)
         return L_CLOSURE;
     }
 
-    *yyp = '\0'; /* c holds the char at this place */
-    p = make_shared_identifier(wordstart, I_TYPE_GLOBAL, 0);
-    *yyp = c;
+    p = make_shared_identifier_n(wordstart, yyp-wordstart, I_TYPE_GLOBAL, 0);
     if (!p) {
         lexerror("Out of memory");
         return 0;
@@ -5631,18 +5622,15 @@ yylex1 (void)
             ident_t *p;
             char *wordstart = yyp-1;
 
-            /* Find the end of the identifier and mark it with a '\0' */
+            /* Find the end of the identifier */
             do
                 c = *yyp++;
             while (isalunum(c));
-            c = *--yyp; /* the assignment is good for the data flow analysis :-} */
-            *yyp = '\0';
+            --yyp; /* Remember to take back one character to honor the the wizard whose identifier this is. */
 
-            /* Lookup/enter the identifier in the ident_table, then restore
-             * the original text
-             */
-            p = make_shared_identifier(wordstart, I_TYPE_UNKNOWN, 0);
-            *yyp = c;
+            /* Lookup/enter the identifier in the ident_table. */
+            p = make_shared_identifier_n(wordstart, yyp-wordstart, I_TYPE_UNKNOWN, 0);
+
             if (!p)
             {
                 lexerror("Out of memory");
