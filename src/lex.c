@@ -385,6 +385,18 @@ static INLINE hash16_t identhash(const char* s)
 #endif
 }
 
+static INLINE hash16_t identhash_n(const char* s, size_t len)
+  /* Hash an identifier name (<s> with length <len>) into a table index.
+   */
+{
+#if !( (ITABLE_SIZE) & (ITABLE_SIZE)-1 )
+    // use faster masking if ITABLE_SIZE is a power of 2.
+    return hash_string(s, len) & (ITABLE_SIZE-1);
+#else
+    return hash_string(s, len) % ITABLE_SIZE;
+#endif
+}
+
   /* In addition to this, the lexer keeps two lists for all efuns and
    * preprocessor defines: all_efuns and all_defines. These are linked
    * together with the .next_all field in the ident structure.
@@ -1442,7 +1454,7 @@ symbol_resword (ident_t *p)
 
 /*-------------------------------------------------------------------------*/
 void
-symbol_efun_str (const char * str, size_t len, svalue_t *sp, Bool is_efun)
+symbol_efun_str (const char * str, size_t len, svalue_t *sp, efun_override_t is_efun)
 
 /* This function implements the efun/operator/sefun part of efun
  * symbol_function().
@@ -1453,8 +1465,8 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, Bool is_efun)
  * The function takes the string <str> of length <len> and looks up the named
  * efun, sefun or operator. If the efun/operator is found, the value <sp> is
  * turned into the proper closure value, otherwise it is set to the numeric
- * value 0.  If <is_efun> is TRUE, <str> is resolved as an efun even if it
- * doesn't contain the 'efun::' prefix.
+ * value 0.  If <is_efun> is OVERRIDE_SEFUN, <str> is resolved as an efun even
+ * if it doesn't contain the 'efun::' prefix, similar with OVERRIDE_SEFUN.
  *
  * inter_sp must be set properly before the call.
  *
@@ -1479,18 +1491,17 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, Bool is_efun)
  */
 
 {
-    Bool efun_override = is_efun;
+    efun_override_t efun_override = is_efun;
 
     /* If the first character is alphanumeric, the string names a function,
      * otherwise an operator.
      */
     if (isalunum(*str))
     {
-    	/* It is a function or keyword.
-    	 */
+        /* It is a function or keyword.
+         */
 
         ident_t *p;
-        char *cstr;
 
         /* Take care of an leading efun override */
 
@@ -1498,22 +1509,19 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, Bool is_efun)
         {
             str += 6;
             len -= 6;
-            efun_override = MY_TRUE;
+            efun_override = OVERRIDE_EFUN;
         }
-
-        /* Convert the string_t into a C string for local purposes */
-        cstr = alloca(len+1);
-        if (!cstr)
+        else if ( len >= 7 && !strncmp(str, "sefun::", 7) )
         {
-            outofmem(len, "identifier");
+            str += 7;
+            len -= 7;
+            efun_override = OVERRIDE_SEFUN;
         }
-        memcpy(cstr, str, len);
-        cstr[len] = '\0';
 
         /* Lookup the identifier in the string in the global table
          * of identifers.
          */
-        if ( !(p = make_shared_identifier(cstr, I_TYPE_GLOBAL, 0)) )
+        if ( !(p = make_shared_identifier_n(str, len, I_TYPE_GLOBAL, 0)) )
         {
             outofmem(len, "identifier");
         }
@@ -1523,7 +1531,8 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, Bool is_efun)
         while (p->type > I_TYPE_GLOBAL)
         {
             /* Is it a reserved word? */
-            if (p->type == I_TYPE_RESWORD)
+            if (p->type == I_TYPE_RESWORD
+             && efun_override != OVERRIDE_SEFUN)
             {
                 int code = symbol_resword(p);
 
@@ -1549,8 +1558,8 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, Bool is_efun)
         /* It is a real identifier */
 
         if (!p || p->type < I_TYPE_GLOBAL
-         || (( efun_override || p->u.global.sim_efun < 0 )
-             && p->u.global.efun < 0)
+         || (( efun_override != OVERRIDE_SEFUN || p->u.global.sim_efun < 0 )
+          && ( efun_override != OVERRIDE_EFUN  || p->u.global.efun < 0 ))
            )
         {
             /* But it's a (new) local identifier or a non-existing function */
@@ -1565,7 +1574,7 @@ undefined_function:
         /* Attempting to override a 'nomask' simul efun?
          * Check it with a privilege violation.
          */
-        if (efun_override && p->u.global.sim_efun >= 0
+        if (efun_override == OVERRIDE_EFUN && p->u.global.sim_efun >= 0
          && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK)
         {
             svalue_t *res;
@@ -1577,7 +1586,7 @@ undefined_function:
 
             if (!res || res->type != T_NUMBER || res->u.number < 0)
             {
-            	/* Override attempt is fatal */
+                /* Override attempt is fatal */
                 errorf(
                   "Privilege violation: nomask simul_efun %s\n",
                   get_txt(p->name)
@@ -1585,15 +1594,15 @@ undefined_function:
             }
             else if (!res->u.number)
             {
-            	/* Override attempt not fatal, but rejected nevertheless */
-                efun_override = MY_FALSE;
+                /* Override attempt not fatal, but rejected nevertheless */
+                efun_override = OVERRIDE_NONE;
             }
         }
 
         /* Symbol is ok - create the closure value */
 
         sp->type = T_CLOSURE;
-        if (!efun_override && p->u.global.sim_efun >= 0)
+        if (efun_override != OVERRIDE_EFUN && p->u.global.sim_efun >= 0)
         {
             /* Handle non-overridden simul efuns */
 
@@ -1758,15 +1767,15 @@ init_global_identifier (ident_t * ident, Bool bVariable)
 
 /*-------------------------------------------------------------------------*/
 ident_t *
-lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
+lookfor_shared_identifier (const char *s, size_t len, int n, int depth, Bool bCreate)
 
 /* Aliases: make_shared_identifier(): bCreate passed as MY_TRUE
  *          find_shared_identifier(): bCreate passed as MY_FALSE
  *
- * Find and/or add identifier <s> of type <n> to the ident_table, and
- * return a pointer to the found/generated struct ident. Local identifiers
- * (<n> == I_TYPE_LOCAL) are additionally distinguished by their definition
- * <depth>.
+ * Find and/or add identifier <s> with size <len> of type <n> to the
+ * ident_table, and return a pointer to the found/generated struct ident.
+ * Local identifiers (<n> == I_TYPE_LOCAL) are additionally distinguished
+ * by their definition <depth>.
  *
  * If bCreate is FALSE, the function just checks if the given identfier
  * exists in the table. The identifier is considered found, if there
@@ -1793,10 +1802,10 @@ lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
     string_t *str;
 
 #if defined(LEXDEBUG)
-    printf("%s lookfor_shared_identifier called: %s\n", time_stamp(), s);
+    printf("%s lookfor_shared_identifier called: %.*s\n", time_stamp(), len, s);
 #endif
 
-    h = identhash(s);  /* the identifiers hash code */
+    h = identhash_n(s, len);  /* the identifiers hash code */
 
     /* look for the identifier in the table */
 
@@ -1807,7 +1816,8 @@ lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
 #if defined(LEXDEBUG)
         printf("%s checking %s.\n", time_stamp(), get_txt(curr->name));
 #endif
-        if (!strcmp(get_txt(curr->name), s)) /* found it */
+        if (mstrsize(curr->name) == len
+         && !strncmp(get_txt(curr->name), s, len)) /* found it */
         {
 #if defined(LEXDEBUG)
             printf("%s  -> found.\n", time_stamp());
@@ -1860,7 +1870,7 @@ lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
     {
         /* Identifier is not in table, so create a new entry */
 
-        str = new_tabled(s);
+        str = new_n_tabled(s, len);
         if (!str)
             return NULL;
         curr = xalloc(sizeof *curr);
@@ -3989,7 +3999,8 @@ closure (char *in_yyp)
     ident_t *p;
     char *wordstart = ++yyp;
     char *super_name = NULL;
-    Bool efun_override;  /* True if 'efun::' is specified. */
+    efun_override_t efun_override;
+    /* Set if 'efun::' or 'sefun::' is specified. */
 
     /* Set yyp to the last character of the functionname
      * after the #'.
@@ -4028,10 +4039,15 @@ closure (char *in_yyp)
 
     /* Test for the 'efun::' override.
      */
-    efun_override = MY_FALSE;
+    efun_override = OVERRIDE_NONE;
     if (super_name != NULL && !strncmp(super_name, "efun::", 6))
     {
-        efun_override = MY_TRUE;
+        efun_override = OVERRIDE_EFUN;
+        super_name = NULL;
+    }
+    else if (super_name != NULL && !strncmp(super_name, "sefun::", 7))
+    {
+        efun_override = OVERRIDE_SEFUN;
         super_name = NULL;
     }
 
@@ -4062,9 +4078,7 @@ closure (char *in_yyp)
         return L_CLOSURE;
     }
 
-    *yyp = '\0'; /* c holds the char at this place */
-    p = make_shared_identifier(wordstart, I_TYPE_GLOBAL, 0);
-    *yyp = c;
+    p = make_shared_identifier_n(wordstart, yyp-wordstart, I_TYPE_GLOBAL, 0);
     if (!p) {
         lexerror("Out of memory");
         return 0;
@@ -4077,7 +4091,7 @@ closure (char *in_yyp)
      */
     while (p->type > I_TYPE_GLOBAL)
     {
-        if (p->type == I_TYPE_RESWORD)
+        if (p->type == I_TYPE_RESWORD && efun_override != OVERRIDE_SEFUN)
         {
             int code = symbol_resword(p);
 
@@ -4121,7 +4135,7 @@ closure (char *in_yyp)
      * this attempt, the efun-override will still be deactivated
      * (iow: a nomask simul-efun overrules an efun override).
      */
-    if (efun_override
+    if (efun_override == OVERRIDE_EFUN
      && p->u.global.sim_efun >= 0
      && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
      && p->u.global.efun >= 0
@@ -4165,34 +4179,32 @@ closure (char *in_yyp)
      */
     yylval.closure.inhIndex = 0;
     switch(0) { default:
-        if (!efun_override)
+
+        /* lfun? */
+        if (efun_override == OVERRIDE_NONE && p->u.global.function >= 0)
         {
+            int i;
 
-            /* lfun? */
-            if (p->u.global.function >= 0)
-            {
-                int i;
+            i = p->u.global.function;
+            yylval.closure.number = i;
+            if (i >= CLOSURE_IDENTIFIER_OFFS)
+                yyerrorf(
+                  "Too high function index of %s for #'",
+                  get_txt(p->name)
+                );
+            break;
+        }
 
-                i = p->u.global.function;
-                yylval.closure.number = i;
-                if (i >= CLOSURE_IDENTIFIER_OFFS)
-                    yyerrorf(
-                      "Too high function index of %s for #'",
-                      get_txt(p->name)
-                    );
-                break;
-            }
-
-            /* simul-efun? */
-            if (p->u.global.sim_efun >= 0) {
-                yylval.closure.number =
-                  p->u.global.sim_efun + CLOSURE_SIMUL_EFUN_OFFS;
-                break;
-            }
+        /* simul-efun? */
+        if (efun_override != OVERRIDE_EFUN && p->u.global.sim_efun >= 0)
+        {
+            yylval.closure.number =
+              p->u.global.sim_efun + CLOSURE_SIMUL_EFUN_OFFS;
+            break;
         }
 
         /* efun? */
-        if (p->u.global.efun >= 0)
+        if (efun_override != OVERRIDE_SEFUN && p->u.global.efun >= 0)
         {
             yylval.closure.number =
               p->u.global.efun + CLOSURE_EFUN_OFFS;
@@ -5634,18 +5646,15 @@ yylex1 (void)
             ident_t *p;
             char *wordstart = yyp-1;
 
-            /* Find the end of the identifier and mark it with a '\0' */
+            /* Find the end of the identifier */
             do
                 c = *yyp++;
             while (isalunum(c));
-            c = *--yyp; /* the assignment is good for the data flow analysis :-} */
-            *yyp = '\0';
+            --yyp; /* Remember to take back one character to honor the the wizard whose identifier this is. */
 
-            /* Lookup/enter the identifier in the ident_table, then restore
-             * the original text
-             */
-            p = make_shared_identifier(wordstart, I_TYPE_UNKNOWN, 0);
-            *yyp = c;
+            /* Lookup/enter the identifier in the ident_table. */
+            p = make_shared_identifier_n(wordstart, yyp-wordstart, I_TYPE_UNKNOWN, 0);
+
             if (!p)
             {
                 lexerror("Out of memory");

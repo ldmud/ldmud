@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Sep-2009 (Gnomi)
+  - Fixed a crash in symbol_function with very long function names
+    by removing the necessity of an alloca and giving make_shared_identifier
+    the length of the identifier as an additional parameter.
+    (lex.c, prolang.y)
+  - Added a sefun:: specifier to explicitly call simul efuns. (#669)
+    (lex.c, prolang.y)
+
 03-Aug-2009 (Gnomi)
   - Memory corruption when using protected string ranges.
     (interpret.c)

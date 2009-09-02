@@ -2627,7 +2627,7 @@ if (current_inline && current_inline->block_depth+2 == block_depth
                        , get_txt(ident->name));
             }
 #endif /* USE_NEW_INLINES */
-            ident = make_shared_identifier(get_txt(ident->name), I_TYPE_LOCAL, depth);
+            ident = make_shared_identifier_mstr(ident->name, I_TYPE_LOCAL, depth);
         }
 
         /* Initialize the ident */
@@ -2742,7 +2742,7 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n",
         {
             /* We're overlaying some other definition, but that's ok.
              */
-            ident = make_shared_identifier(get_txt(ident->name), I_TYPE_LOCAL, depth);
+            ident = make_shared_identifier_mstr(ident->name, I_TYPE_LOCAL, depth);
             assert (ident->type == I_TYPE_UNKNOWN);
         }
 
@@ -3338,7 +3338,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
             /* The ident has been used before otherwise, so
              * get a fresh structure.
              */
-            p = make_shared_identifier(get_txt(p->name), I_TYPE_GLOBAL, 0);
+            p = make_shared_identifier_mstr(p->name, I_TYPE_GLOBAL, 0);
         }
         /* should be I_TYPE_UNKNOWN now. */
 
@@ -3405,7 +3405,7 @@ define_variable (ident_t *name, fulltype_t type)
             /* The ident has been used before otherwise, so
              * get a fresh structure.
              */
-            name = make_shared_identifier(get_txt(name->name), I_TYPE_GLOBAL, 0);
+            name = make_shared_identifier_mstr(name->name, I_TYPE_GLOBAL, 0);
         }
 
         init_global_identifier(name, /* bVariable: */ MY_TRUE);
@@ -4289,7 +4289,7 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
             /* The ident has been used before otherwise, so
              * get a fresh structure.
              */
-            p = make_shared_identifier(get_txt(p->name), I_TYPE_GLOBAL, 0);
+            p = make_shared_identifier_mstr(p->name, I_TYPE_GLOBAL, 0);
         }
         /* should be I_TYPE_UNKNOWN now. */
 
@@ -4317,7 +4317,7 @@ find_struct ( string_t * name )
 {
     ident_t * p;
 
-    p = find_shared_identifier(get_txt(name), I_TYPE_GLOBAL, 0);
+    p = find_shared_identifier_mstr(name, I_TYPE_GLOBAL, 0);
 
     /* Find the global struct identifier */
     while (p != NULL && p->type != I_TYPE_GLOBAL)
@@ -5880,6 +5880,7 @@ delete_prog_string (void)
     struct {
         int    simul_efun;    /* -1, or index of the simul_efun */
         p_int  start;         /* Address of the function call */
+        efun_override_t efun_override; /* set on (s)efun:: prefix. */
     } function_call_head;
       /* Used to save address and possible sefun-index over
        * the argument parsing in a function call.
@@ -12426,6 +12427,18 @@ function_call:
           $<function_call_head>$.start = CURRENT_PROGRAM_SIZE;
           $<function_call_head>$.simul_efun = -1;
 
+          if($1.super)
+          {
+              if (strcmp($1.super, get_txt(STR_EFUN)) == 0)
+                  $<function_call_head>$.efun_override = OVERRIDE_EFUN;
+              else if (strcmp($1.super, get_txt(STR_SEFUN)) == 0)
+                  $<function_call_head>$.efun_override = OVERRIDE_SEFUN;
+              else
+                  $<function_call_head>$.efun_override = OVERRIDE_NONE;
+          }
+          else
+              $<function_call_head>$.efun_override = OVERRIDE_NONE;
+
           /* Insert the save_arg_frame instruction.
            * If it's not really needed, we'll remove it later.
            */
@@ -12457,8 +12470,8 @@ function_call:
               real_name->next_all = all_globals;
               all_globals = real_name;
           }
-          else if (!$1.super
-                && real_name->u.global.function < 0
+          else if ( ($1.super ? ( $<function_call_head>$.efun_override == OVERRIDE_SEFUN )
+                              : ( real_name->u.global.function < 0 ))
                 && real_name->u.global.sim_efun >= 0
                 && !disable_sefuns)
           {
@@ -12495,7 +12508,6 @@ function_call:
            */
 %line
           int        f = 0;             /* Function index */
-          Bool       efun_override;     /* TRUE on explicite efun calls */
           int        simul_efun;
           vartype_t *arg_types = NULL;  /* Argtypes from the program */
           int        first_arg;         /* Startindex in arg_types[] */
@@ -12504,8 +12516,6 @@ function_call:
 
           has_ellipsis = got_ellipsis[argument_level];
           ap_needed = MY_FALSE;
-
-          efun_override = ($1.super && strcmp($1.super, get_txt(STR_EFUN)) == 0);
 
           $$.start = $<function_call_head>2.start;
           $$.code = -1;
@@ -12587,7 +12597,7 @@ function_call:
                   $$.type.typeflags &= TYPE_MOD_MASK;
               } /* if (simul-efun) */
 
-              else if ($1.super ? !efun_override
+              else if ($1.super ? ($<function_call_head>2.efun_override == OVERRIDE_NONE)
                                 : (f = defined_function($1.real)) >= 0
                       )
               {
@@ -12936,9 +12946,10 @@ function_call:
                   }
               } /* efun */
 
-              else if (efun_override)
+              else if ($<function_call_head>2.efun_override)
               {
-                  yyerrorf("Unknown efun: %s", get_txt($1.real->name));
+                  yyerrorf(($<function_call_head>2.efun_override == OVERRIDE_EFUN)
+                      ? "Unknown efun: %s" : "Unknown simul-efun: %s", get_txt($1.real->name));
                   $$.type = Type_Any;
               }
               else
@@ -13316,7 +13327,7 @@ function_name:
     | L_LOCAL
       {
           ident_t *lvar = $1;
-          ident_t *fun = find_shared_identifier(get_txt(lvar->name), I_TYPE_UNKNOWN, 0);
+          ident_t *fun = find_shared_identifier_mstr(lvar->name, I_TYPE_UNKNOWN, 0);
 
           /* Search the inferior list for this identifier for a global
            * (function) definition.
@@ -13529,7 +13540,8 @@ inline_fun:
                save_tol[i] = type_of_locals[i];
                save_ftol[i] = type_of_locals[i];
                name[1] = (char)('1' + i);
-               add_local_name(make_shared_identifier( name, I_TYPE_UNKNOWN
+               add_local_name(make_shared_identifier_n( name, 2
+                                                    , I_TYPE_UNKNOWN
                                                     , block_depth)
                              , Type_Any, block_depth, MY_TRUE);
            }
@@ -16315,7 +16327,7 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
 
     if (!disable_sefuns)
     {
-        id = make_shared_identifier(get_txt(STR_CALL_OTHER), I_TYPE_UNKNOWN, 0);
+        id = make_shared_identifier_mstr(STR_CALL_OTHER, I_TYPE_UNKNOWN, 0);
 
         if (!id)
             fatal("Out of memory: identifier '%s'.\n", get_txt(STR_CALL_OTHER));

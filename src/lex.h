@@ -271,17 +271,29 @@ extern unsigned int next_inline_fun;
 #define PRAGMA_STRONG_TYPES  1
 #define PRAGMA_STRICT_TYPES  2
 
+/* Function name overrides. */
+enum efun_override_e
+{
+    OVERRIDE_NONE  = 0,
+    OVERRIDE_EFUN  = 1,
+    OVERRIDE_SEFUN = 2,
+};
+typedef enum efun_override_e efun_override_t;
 
 /* --- Prototypes --- */
 
 extern void init_lexer(void);
 extern int  symbol_operator(const char *symbol, const char **endp);
-extern void symbol_efun_str(const char *str, size_t len, svalue_t *sp, Bool is_efun);
+extern void symbol_efun_str(const char *str, size_t len, svalue_t *sp, efun_override_t is_efun);
 extern void symbol_efun(string_t *name, svalue_t *sp);
 extern void init_global_identifier (ident_t * ident, Bool bVariable);
-extern ident_t *lookfor_shared_identifier(char *, int, int, Bool);
-#define make_shared_identifier(s,n,d) lookfor_shared_identifier(s,n,d, MY_TRUE)
-#define find_shared_identifier(s,n,d) lookfor_shared_identifier(s,n,d, MY_FALSE)
+extern ident_t *lookfor_shared_identifier(const char *, size_t, int, int, Bool);
+#define make_shared_identifier(s,n,d) lookfor_shared_identifier(s,strlen(s),n,d, MY_TRUE)
+#define find_shared_identifier(s,n,d) lookfor_shared_identifier(s,strlen(s),n,d, MY_FALSE)
+#define make_shared_identifier_n(s,l,n,d) lookfor_shared_identifier(s,l,n,d, MY_TRUE)
+#define find_shared_identifier_n(s,l,n,d) lookfor_shared_identifier(s,l,n,d, MY_FALSE)
+#define make_shared_identifier_mstr(s,n,d) lookfor_shared_identifier(get_txt(s),mstrsize(s),n,d, MY_TRUE)
+#define find_shared_identifier_mstr(s,n,d) lookfor_shared_identifier(get_txt(s),mstrsize(s),n,d, MY_FALSE)
 extern ident_t *make_global_identifier(char *, int);
 extern void free_shared_identifier(ident_t*);
 extern int yylex(void);

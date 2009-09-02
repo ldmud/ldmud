@@ -1,0 +1,4 @@
+string geteuid()
+{
+    return "sefun";
+}

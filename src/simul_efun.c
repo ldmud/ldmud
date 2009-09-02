@@ -354,7 +354,7 @@ assert_simul_efun_object (void)
             num_locals = FUNCTION_NUM_VARS(funstart);
 
             /* Find or make the identifier for the function */
-            p = make_shared_identifier(get_txt(function_name), I_TYPE_GLOBAL, 0);
+            p = make_shared_identifier_mstr(function_name, I_TYPE_GLOBAL, 0);
             if (p->type == I_TYPE_UNKNOWN)
             {
                 init_global_identifier(p, /* bVariable: */ MY_FALSE);
