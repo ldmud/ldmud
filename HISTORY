@@ -36,6 +36,9 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
     - Runtime
        + re-worked and consolidated hash functions and hash types. (#564)
 
+    - Language
+       + Added a sefun:: specifier to explicitly call simul-efuns. (#669)
+
     - Other
        + The driver requires a C99 compatible build system. Some checks and
          work-arounds for non-C99 were removed.

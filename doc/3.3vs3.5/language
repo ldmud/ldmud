@@ -1,0 +1,10 @@
+Listed herein are language incompatibilites between 3.3 and 3.5,
+that you should pay attention to when updating.
+
+- sefun prefix:
+  The 3.5 driver allows to explicitly call simul-efuns using a 'sefun::'
+  prefix, e.g. sefun::fun(). If a program has inherited another
+  program with the name "sefun" and explicitly called inherited
+  lfuns with that syntax, this won't work anymore, because the
+  driver now tries to find a simul-efun with that name.
+  This also applies to symbol_function and closure literals (#'sefun::fun).
