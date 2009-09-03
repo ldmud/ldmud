@@ -36,11 +36,14 @@ string geteuid()
             errors++;                                                               \
             msg("FAILURE.\n");                                                      \
         }                                                                           \
+        res = "sefun";                                                              \
     }                                                                               \
-    else if(result != "inh")                                                        \
+    else                                                                            \
+        res = result;                                                               \
+    if(result != "inh")                                                             \
     {                                                                               \
-        msg("Checking funcall(symbol_function(\"fun\")) == \""+result+"\":\t");     \
-        if(funcall(symbol_function("fun")) == result)                               \
+        msg("Checking funcall(symbol_function(\"fun\")) == \""+res+"\":\t");        \
+        if(funcall(symbol_function("fun")) == res)                                  \
             msg("Success.\n");                                                      \
         else                                                                        \
         {                                                                           \
@@ -52,6 +55,7 @@ string geteuid()
 int run_test()
 {
     int errors;
+    string res;
     seteuid("efun");
 
     CHECK_PREFIX(geteuid, "lfun");

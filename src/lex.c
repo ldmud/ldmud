@@ -1558,8 +1558,8 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, efun_override_t is_
         /* It is a real identifier */
 
         if (!p || p->type < I_TYPE_GLOBAL
-         || (( efun_override != OVERRIDE_SEFUN || p->u.global.sim_efun < 0 )
-          && ( efun_override != OVERRIDE_EFUN  || p->u.global.efun < 0 ))
+         || (( efun_override == OVERRIDE_EFUN || p->u.global.sim_efun < 0 )
+          && ( efun_override == OVERRIDE_SEFUN  || p->u.global.efun < 0 ))
            )
         {
             /* But it's a (new) local identifier or a non-existing function */
@@ -1657,7 +1657,7 @@ symbol_efun (string_t *name, svalue_t *sp)
  */
 
 {
-    symbol_efun_str(get_txt(name), mstrsize(name), sp, MY_FALSE);
+    symbol_efun_str(get_txt(name), mstrsize(name), sp, OVERRIDE_NONE);
 } /* symbol_efun() */
 
 /*-------------------------------------------------------------------------*/
