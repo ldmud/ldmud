@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Sep-2009 (Zesstra)
+  - Fixed initialization of libxml2 (#671).
+    LIBXML_TEST_VERSION already allocates memory, so xmlMemSetup() has to be
+    called before that macro. Otherwise crashes may occur.
+    (pkg-xml2.c)
+  - Use the 'permanent' variants of our allocation function, because the
+    memory used by libxml2 should not be subject to the garbage collector.
+    (pkg-xml2.c, pkg-iksemel.c)
+
 02-Sep-2009 (Gnomi)
   - Fixed a crash in symbol_function with very long function names
     by removing the necessity of an alloca and giving make_shared_identifier

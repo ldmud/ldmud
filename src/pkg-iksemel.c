@@ -54,13 +54,13 @@ struct xml_cleanup_s
 void *
 iksemel_alloc(size_t size)
 {
-    return xalloc(size);
+    return pxalloc(size);
 }
 
 void
 iksemel_free(void *ptr)
 {
-    xfree(ptr);
+    pfree(ptr);
 }
 
 void
