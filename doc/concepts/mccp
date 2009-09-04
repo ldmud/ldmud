@@ -96,5 +96,5 @@ HISTORY
 
 SEE ALSO
         start_mccp_compress(E), end_mccp_compress(E), query_mccp(E),
-        query_mccp_stats(object player)
+        query_mccp_stats(E)
 
