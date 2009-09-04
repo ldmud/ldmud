@@ -319,6 +319,13 @@ nosave mixed *tests = ({
                 }) == 0;
         :)
     }),
+#ifdef __XML_DOM__
+    ({ "0000671", 0,
+        (:
+            return stringp(xml_generate(({ "abc", ([ "xyz" : "cde" ]), 0 })));
+        :)
+    }),
+#endif // __XML_DOM__
 });
 
 void run_test()
