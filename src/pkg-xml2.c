@@ -63,7 +63,7 @@ xml_pkg_malloc (size_t size)
  * Realize malloc with the driver-internal xalloc rather than a direct malloc()
  */
 {
-    return xalloc(size);
+    return pxalloc(size);
 }
 
 static void
@@ -73,7 +73,7 @@ xml_pkg_free (void * ptr)
  * Realize free with the driver-internal xfree rather than a direct free()
  */
 {
-    xfree(ptr);
+    pfree(ptr);
 }
 
 static void *
@@ -84,7 +84,7 @@ xml_pkg_realloc (void * ptr, size_t size)
  * and line rather the direct realloc()
  */
 {
-    return rexalloc(ptr, size);
+    return prexalloc(ptr, size);
 }
 
 static char *
@@ -390,10 +390,11 @@ write_xml_node(vector_t * vnode, xmlTextWriterPtr writer)
 void
 pkg_xml2_init ()
 {
-    /* Check for correct libxml version. */
-    LIBXML_TEST_VERSION
-
+    // First override the default memory access functions
     xmlMemSetup(xml_pkg_free, xml_pkg_malloc, xml_pkg_realloc, xml_pkg_strdup);
+
+    // Check for correct libxml version.
+    LIBXML_TEST_VERSION
 }
 
 /*=========================================================================*/
