@@ -119,4 +119,4 @@ HISTORY
         Since LDMud 3.5 the function can be given as a closure.
 
 SEE ALSO
-        query_verb(E), query_command(E), remove_action(), init(A)
+        query_verb(E), query_command(E), remove_action(E), init(A)
