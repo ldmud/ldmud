@@ -7,7 +7,9 @@ For a detailed list of all changes see the file CHANGELOG.
 xx-xxx-200x (LDMud Team) -- 3.3.720
     - Fixed Crashes
        + xml_generate(), xml_parse() could crash the driver due to a wrong
-         order during initialization of libxml2 (#671).
+         order during initialization of libxml2 (#671) and could lead to
+         memory corruption, because the memory used by libxml2 was subject to
+         the garbage collector and would be free'd by it while still in use.
 
 30-May-2009 (LDMud Team) -- 3.3.719
     - Fixed Crashes:

@@ -89,13 +89,21 @@ xml_pkg_realloc (void * ptr, size_t size)
 
 static char *
 xml_pkg_strdup (const char * str)
-
 /*
- * Realize strdup with the driver interal string_copy instead of the direct
- * strdup()
+ * Our own strdup() which uses our own memory allocator. Gets memory with 
+ * pxalloc(), because it must not be subject to the garbage collector.
  */
 {
-    return string_copy(str);
+    char *p;
+    size_t len;
+    
+    len = strlen(str)+1;
+    memsafe(p = pxalloc(len), len, "xml_pkg_strdup");
+    if (p)
+    {
+        memcpy(p, str, len);
+    }
+    return p;
 }
 
 static void
