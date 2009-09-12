@@ -1207,8 +1207,6 @@ int_free_svalue (svalue_t *v)
 
               p = v->u.protected_range_lvalue;
               free_mstring(p->v.u.str);
-              if (p->lvalue->type == T_STRING)
-                  free_mstring(p->lvalue->u.str);
               free_protector_svalue(&p->protector);
               xfree(p);
               break;
@@ -2445,6 +2443,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         string_t *rs;            /* result string */
         mp_int dsize;            /* size of destination string */
         mp_int ssize;            /* size of source string */
+        mp_int rsize;            /* size of result string */
         mp_int index1, index2;   /* range indices */
 
         /* Set variables */
@@ -2472,7 +2471,8 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         /* Create a new string */
         ss = source->u.str;
         ssize = (mp_int)mstrsize(ss);
-        rs = alloc_mstring((size_t)(dsize + ssize + index1 - index2));
+        rsize = dsize + ssize + index1 - index2;
+        rs = alloc_mstring((size_t)rsize);
         if (!rs)
         {
             outofmem((dsize + ssize + index1 - index2), "new string");
@@ -2486,9 +2486,11 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         if (dsize > index2)
             memcpy( get_txt(rs) + dest->index2, get_txt(ds) + index2
                   , (size_t)(dsize - index2));
-
+        dest->size = rsize;
         free_mstring(ds);
         free_mstring(ds);
+        /* we will have two references to rs */
+        ref_mstring(rs);
         dest->v.u.str = dsvp->u.str = rs;
 
         if (do_free)

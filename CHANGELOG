@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Sep-2009 (Fuchur)
+  - fix some refcounting issues (interpret.c)
+
 08-Sep 2009 (Zesstra)
   - Get permanently allocated memory in xml_pkg_strdup(), which is not
     subject to the GC to prevent some nasty problems.
