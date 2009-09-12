@@ -1208,9 +1208,9 @@ int_free_svalue (svalue_t *v)
               struct protected_char_lvalue *p;
 
               p = v->u.protected_char_lvalue;
-              if (p->lvalue->type == T_STRING)
+              if (p->v.type == T_STRING)
               {
-                  free_mstring(p->lvalue->u.str);
+                  free_mstring(p->v.u.str);
               }
               free_protector_svalue(&p->protector);
               xfree(p);
