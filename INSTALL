@@ -1,13 +1,32 @@
 Topics covered:
 
-  - Unix or Unix-like systems, with additional details for FreeBSD, AIX 3.4,
-      and DEC Ultrix.
+  - Prerequisites: what do you need to compile and run LDMud-3.5.x
+  - Unix or Unix-like systems (like Linux, FreeBSD, MacOS X, ...).
   - 64 bit systems (LP64 model)
+  - Compiling sources directly from our SVN repository
   - IPv 6
   - mySQL
-  - BeOS
-  - Windows 95/98/NT
-  - OS/2
+  - Windows 95/98/NT/XP
+
+
+Prerequisites
+-------------
+  - a POSIX compatible platform
+  - a C99 compatible build environment, including make, bison/yacc
+  - supported architectures: i386, x86_64 (work in progress, see section about
+      64 bit systems). Other platforms are not actively supported and tested
+      by us, but many will most likely work as well. Please try and tell us
+      about your experiences.
+  - autoconf for compiling sources directly from our SVN repository.
+
+  Optional libraries:
+  - libpcre for the support of PCRE compatible regular expressions
+  - mysql for the mysql package
+  - postgresql for the postgresql package
+  - libsqlite3 for the sqlite package
+  - libgcrypt for various optional algorithms for hashing and crypting
+  - OpenSSL or GnuTLS for TLS support
+  - libxml2 or libiksemel for XML support
 
 
 Unix or Unix-like system
@@ -87,58 +106,13 @@ Unix or Unix-like system
   and make sure that the files from mudlib/sys/ all go into your lib's
   include directory (usually 'sys/').
 
-  To test the driver, start it with 'ldmud &'. If you see the message
+  To test the driver, start it with 'ldmud 4242'. If you see the message
   'LDMud ready for users', the driver is up and accepting connections. Test
   it with 'telnet localhost 4242'.
 
-  pthreads:
-    If your systems supports pthreads, --enable-use-pthreads will allow to
-    compile the driver with pthread support. Currently this means that
-    background threads will be used to write data to the network.
-
-    WARNING: pthreads support is still experimental and might crash
-      your driver!
-
-  FreeBSD:
-    When using gcc, it could happen that the compiler aborts with signal 10
-    or 11. The reasons are unknown, but you can restart the compilation
-    process by typing "make" again (and again...).
-
-  AIX 3.4:
-    The native compiler comes in several forms, of which only the
-    basic form 'xlc' works with the configuration script.
-    Start the script as:
-
-      CC=xlc ./configure ...
-
-  DEC Ultrix:
-    Depending on the system configuration you might be unable to
-    compile 'interpret.c' with any kind of optimization at all.
-    The typical symptom is a failure during the compilation with
-    "Error code 1". When that happens, do the following steps:
-
-      - Make as usual until the "interpret" compilation
-         fails.  The symptom is "Error code 1".
-
-      - Edit the makefile.  Uncomment the compilation
-         line for debugging, and comment the compilation
-         line containing the optimization switches and
-         options.
-
-      - Start the make again.  After the "interpret"
-         compilation completes, control-C out of the
-         compilation.
-
-      - Edit the makefile again.  Re-comment the line
-         for debugging, and uncomment the line with
-         the optimization switches and options.
-
-      - Start the make again.  This time it will
-         complete as expected.
-
 
 64 bit systems (using the LP64 model)
-------------------------
+-------------------------------------
 The driver can be compiled on systems which use the LP64 data model (longs and
 pointers are 64 bit wide). This is the case on many unixoids (but not Windows).
 
@@ -167,34 +141,31 @@ driver may assume wrong sizes of data types, resulting in undefined behaviour
 and crashes.)
 
 
+Compiling sources directly from our SVN repository
+--------------------------------------------------
+If you want to be on the bleeding edge of development, you may check out the
+LDMud sources from our SVN repository which is at
+  svn://svn.bearnip.com/ldmud
+The trunk of 3.5 is to be found at svn://svn.bearnip.com/ldmud/trunk/,
+the trunk 3.3 at svn://svn.bearnip.com/ldmud/3.3/trunk,
+and tags for different versions in svn://svn.bearnip.com/ldmud/version/.
+
+You will need the autoconf package to generate and update some files 
+Prior to configuring the driver, please run:
+# ./autogen.sh
+in the src/ directory. Then configure the driver as usual.
+
+
 IPv6
 ----
   If your machine supports IPv6, the driver can be configured to use it: give
   '--enable-use-ipv6=yes' as argument to the configure script.
-  
+
   Beware: the driver support is rudimentary, experimental, and may cease to
   function on the next full moon. Additional work is necessary to really
   change _all_ address-related functions in driver and mudlibs.
 
   IPv6 support was implemented by Uwe <mai94cch@studserv.uni-leipzig.de>.
-
-  In order to test IPv6 under Linux you need a 2.2.x kernel (preferably 2.2.10
-  or better) and the inet6 apps. If you use glibc 2.0, you need version 0.35
-  of the inet6 apps, or for glibc 2.1 you need version 0.36. The apps should
-  installed into /usr/inet6.
-
-  The apps are available on ftp.inner.net or on its mirrors, e.g.
-
-   <URL:ftp://6bone.informatik.uni-leipzig.de/pub/ftp.inner.net/pub/ipv6/inet6-apps-0.35.tar.gz>
-
-  resp.
-
-   <URL:ftp://6bone.informatik.uni-leipzig.de/pub/ftp.inner.net/pub/ipv6/inet6-apps0.36.tar.gz>
-
-  Furthermore you need a connection to the 6bone
-  (<URL:http://www.join.uni-muenster.de/>).
-
-  Newer versions of AIX also come with IPv6 support.
 
 
 mySQL
@@ -217,58 +188,7 @@ mySQL
   the databases.
 
 
-BeOS
-----
-  Under BeOS, the driver can be configured and compiled in two ways:
-
-  1. Using the provided configuration files.
-
-    Copy the files machine.h, config.h and Makefile from src/hosts/be/
-    to src/. You may have to edit config.h and Makefile if you have
-    to use a specific mudlib with exotic settings.
-
-    Advantage of this method is that the Makefile allows cross-compilation
-    and covers Be specifics like file icon, type and version.
-
-  2. Use the Unix configure mechanism.
-
-    In general just follow the instructions given for Unix systems, but
-    be aware of the follwing:
-
-     - If the configure script doesn't properly work, try starting it
-       with
-
-       CC="$BE_C_COMPILER" EXTRA_CFLAGS="$BE_DEFAULT_C_FLAGS" ./configure
-
-       or (especially on BeOS R4.5 on PPC) even
-
-       CC=cc EXTRA_CFLAGS="$BE_DEFAULT_C_FLAGS" ./configure
-
-     - the created executable will have neither icon nor type.
-     - cross compilation is not supported.
-     - the Makefile defaults to best optimization which needs a lot
-       of memory during compilation.
-
-  If on driver start you get an error about an unknown hostname or
-  seems to hang, you're missing an /etc/hosts file:
-     - In the network preferences, select a name for you machine,
-       e.g. 'bebox'. The domain name field can be blank.
-     - Copy the /boot/beos/etc/hosts-sample file to /boot/beos/etc/hosts,
-       and edit it to contain at least the following lines:
-
-         127.0.0.1  bebox.my-isp.com  bebox
-         127.1      bebox.my-isp.com  bebox
-
-      (Note: in the file, every line has to start with the IP address -
-       no leading spaces are allowed).
-
-  With the current networking implementation, the driver is unable
-  to start ERQs. In order to use ERQs, you have to start them manually.
-
-  Other than this, the installation steps are the same as for Unix.
-
-
-Windows 95/98/NT
+Windows 95/98/NT/XP
 ----------------
 
   To compile the gamedriver for Windows, you need the 'Cygwin' package,
@@ -310,30 +230,4 @@ Windows 95/98/NT
 
   Brandon Mathis points out, "that to compile under Windows you have to
   use 'tar -xvfz' and not WinZIP to extract the source".
-
-
-OS/2
-----
-
-  The OS/2 port uses the EMX (a gcc version) to compile the gamedriver.
-  To compile the driver, copy the machine.h and Makefile from the hosts/os2
-  directory into the top directory and make as under Unix. The Makefile
-  is configured to install the driver in /mud - edit the variable 'prefix'
-  if you want a different directory.
-
-  Important: the Makefile must be save using the Unix lineend convention,
-  otherwise the make program will stop with an error. In the EPM editor
-  this can be achieved using the 'save -u' command.
-
-  If you have the full GNU suite installed, you can also configure the
-  driver as under Unix. Following caveats regarding the configure script:
-   - the ac_exeext variable may not be set to '.exe' as it should be;
-   - the calls to the program conftest may lack the ${ac_exeext} extension.
-
-  Additionally, configure does not properly recognize the settings for
-  HAVE_GETRUSAGE, GETRUSAGE_RESTRICTED, GETRUSAGE_VIA_SYSCALL and RUSAGE_USEC.
-  Copy these values from the provided machine.h
-
-  To recreate the configure script from configure.in, you need autoconf
-  version 2.50 or newer.
 
