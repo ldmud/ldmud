@@ -118,6 +118,10 @@
  *   .user is the wizlist entry.
  *   .member are the member values.
  *
+ * Concerning the struct hash table and the index calculation: the hash table
+ * size is always a power of two (starts with 1 and is always doubled, if the
+ * the table grows). So we use hash & (tablesize-1) for the calculation which
+ * is significantly faster then % (modulo).
  *------------------------------------------------------------------
  */
 
@@ -195,7 +199,7 @@ static mp_int size_struct_type = 0;
 
 /*-------------------------------------------------------------------------*/
 static INLINE hash32_t
-hash2 (string_t * pName, string_t * pProgName)
+hash2 (string_t * const pName, string_t * const pProgName)
 
 /* Compute the hash from <pName> combined with <pProgName>.
  */
@@ -226,7 +230,7 @@ find_by_type (struct_type_t * pSType)
     if (!table || !table_size)
         return NULL;
 
-    ix = pSType->hash % table_size;
+    ix = pSType->hash & (table_size-1);
 
     prev = NULL;
     this = table[ix];
@@ -269,7 +273,7 @@ find_by_name (string_t * pName, string_t * pProgName, hash32_t  hash)
     if (!table || !table_size)
         return NULL;
 
-    ix = hash % table_size;
+    ix = hash & (table_size-1);
 
     prev = NULL;
     this = table[ix];
@@ -327,7 +331,7 @@ add_type (struct_type_t * pSType)
          return;
      }
 
-     ix = pSType->hash % table_size;
+     ix = pSType->hash & (table_size-1);
      pSType->next = table[ix];
      table[ix] = pSType;
 
@@ -356,7 +360,7 @@ add_type (struct_type_t * pSType)
                      size_t ix2;
 
                      table[ix] = this->next;
-                     ix2 = this->hash % new_size;
+                     ix2 = this->hash & (new_size-1);
 
                      this->next = table2[ix2];
                      table2[ix2] = this;
@@ -386,7 +390,7 @@ remove_type (struct_type_t * pSType)
 
      /* pSType is now at the head of it's chain */
 
-     ix = pSType->hash % table_size;
+     ix = pSType->hash & (table_size-1);
      table[ix] = pSType->next;
 
      num_types--;
