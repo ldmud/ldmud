@@ -41,6 +41,10 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
 
     - Runtime
        + re-worked and consolidated hash functions and hash types. (#564)
+       + re-worked string hashing to use dedicated hash types and MurmurHash2.
+         This is about 5 times faster than our old hashing algorithm and
+         supports hashes with more than 16 bit width. This supports larger
+         hash tables than 65535.
 
     - Language
        + Added a sefun:: specifier to explicitly call simul-efuns. (#669)

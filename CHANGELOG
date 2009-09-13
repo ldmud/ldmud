@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Sep 2009 (Zesstra)
+  - Replaced Bob Jenkins Hash3 by Murmurhash2. During tests with strings from
+    MorgenGrauen and Avalon the Murmurhash2 performed just as well as Jenkins
+    Hash, but the hashing speed was nearly doubled.
+    (hash.h, hash.c)
+  - Changed index calculation for the struct table from Modula to the faster
+    & (tablesize - 1), because the table size is always a power of two.
+    (structs.c)
+  - Changed Macros ObjHash and ObjHaskStr to static INLINE functions.
+    (otable.c)
+
 12-Sep 2009 (Fuchur)
   - fix some refcounting issues (interpret.c)
 

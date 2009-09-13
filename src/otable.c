@@ -49,15 +49,24 @@
 /*                           OBJECT TABLE                                  */
 /*-------------------------------------------------------------------------*/
 
-#if !( (OTABLE_SIZE) & (OTABLE_SIZE)-1 )
-#    define ObjHash(s)        (mstr_get_hash(s) & ((OTABLE_SIZE)-1) )
-#    define ObjHashStr(s,len) (hash_string(s, len) & ((OTABLE_SIZE)-1) )
-#else
-#    define ObjHash(s)        (mstr_get_hash(s) % OTABLE_SIZE)
-#    define ObjHashStr(s,len) (hash_string(s, len) % OTABLE_SIZE)
-#endif
 /* Hash the string <s> and compute the appropriate table index
  */
+static INLINE hash32_t ObjHash(string_t * const s)
+{
+#if !( (OTABLE_SIZE) & (OTABLE_SIZE)-1 )
+    return mstr_get_hash(s) & ((OTABLE_SIZE)-1);
+#else
+    return mstr_get_hash(s) % (OTABLE_SIZE);
+#endif
+}
+static INLINE hash32_t ObjHashStr(char const * const s, size_t len)
+{
+#if !( (OTABLE_SIZE) & (OTABLE_SIZE)-1 )
+    return hash_string(s, len) & ((OTABLE_SIZE)-1);
+#else
+    return hash_string(s, len) % (OTABLE_SIZE);
+#endif
+}
 
 static object_t ** obj_table = NULL;
   /* Pointer to the (allocated) hashtable.
@@ -125,7 +134,7 @@ find_obj_n (string_t *s)
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-find_obj_n_str (const char *s)
+find_obj_n_str (char const * const s)
 
 /* Lookup the object with name <s> (length <slen>) in the table and return
  * the pointer to its structure. If it is not in the table, return NULL.
