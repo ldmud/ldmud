@@ -828,6 +828,7 @@ mem_dump_data (strbuf_t *sbuf)
 
 #   define dump_stat(str,stat) strbuf_addf(sbuf, str,stat.counter,stat.size)
 
+    strbuf_add(sbuf, "Using LDMUD smalloc.\n");
     strbuf_add(sbuf, "Type                   Count      Space (bytes)\n");
     dump_stat("xallocs:           %8lu        %10lu\n\n", xalloc_st);
     dump_stat("sbrk requests:     %8lu        %10lu (a)\n",sbrk_st);

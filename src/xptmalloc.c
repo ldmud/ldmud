@@ -124,6 +124,7 @@ void mem_dump_data (strbuf_t *sbuf) {
 
 #   define dump_stat(str,member) strbuf_addf(sbuf, str, stats.member)
 
+    strbuf_add(sbuf, "Using LDMUD xptmalloc.\n");
     strbuf_add(sbuf, "Type                         Amount\n");
     dump_stat("total non-mmaped:          %8d bytes\n", arena);
     dump_stat("number of free chunks:     %8d\n", ordblks);

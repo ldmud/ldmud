@@ -1,7 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-12-Sep-2009 (Fuchur)
+16-Sep-2009 (Zesstra)
+  - 'status/malloc' commands include now the allocator in use (Patch from
+      Xtian, #672)
+    (slaballoc.c, xptmalloc.c, smalloc.c)
+
+12-Sep 2009 (Fuchur)
   - fix some refcounting issues (interpret.c)
 
 08-Sep 2009 (Zesstra)
