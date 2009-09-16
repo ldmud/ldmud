@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Sep-2009 (Zesstra)
+  - 'status/malloc' commands include now the allocator in use (Patch from
+      Xtian, #672)
+    (slaballoc.c, xptmalloc.c, smalloc.c)
+
 13-Sep 2009 (Zesstra)
   - Replaced Bob Jenkins Hash3 by Murmurhash2. During tests with strings from
     MorgenGrauen and Avalon the Murmurhash2 performed just as well as Jenkins
