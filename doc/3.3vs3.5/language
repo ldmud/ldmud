@@ -8,3 +8,9 @@ that you should pay attention to when updating.
   lfuns with that syntax, this won't work anymore, because the
   driver now tries to find a simul-efun with that name.
   This also applies to symbol_function and closure literals (#'sefun::fun).
+
+- ptmalloc keywords for debug_info():
+  DID_MEM_MMAP, DID_MEM_MMAP_SIZE, DID_MEM_FREE_CHUNKS, DID_MEM_FFREE,
+  DID_MEM_FFREE_SIZE, DID_MEM_MAX_ALLOCATED and DID_MEM_KEEP_COST were
+  removed.
+

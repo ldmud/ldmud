@@ -8139,16 +8139,12 @@ v_debug_info (svalue_t *sp, int num_arg)
  *  
  *        string DID_MEM_NAME
  *            The name of the allocator: "sysmalloc", "smalloc",
- *            "ptmalloc", "slaballoc"
+ *            "slaballoc"
  *  
  *        int DID_MEM_SBRK          (slaballoc, smalloc)
- *        int DID_MEM_SBRK_SIZE     (slaballoc, smalloc, ptmalloc)
+ *        int DID_MEM_SBRK_SIZE     (slaballoc, smalloc)
  *            Number and size of memory blocks requested from the
  *            operating system (non-mmapped memory).
- *  
- *        int DID_MEM_MMAP          (ptmalloc)
- *        int DID_MEM_MMAP_SIZE     (ptmalloc)
- *            Number and size of mmapped regions.
  *  
  *        int DID_MEM_LARGE         (slaballoc, smalloc)
  *        int DID_MEM_LARGE_SIZE    (slaballoc, smalloc)
@@ -8161,13 +8157,6 @@ v_debug_info (svalue_t *sp, int num_arg)
  *        int DID_MEM_LWASTED       (slaballoc, smalloc)
  *        int DID_MEM_LWASTED_SIZE  (slaballoc, smalloc)
  *            Number and size of unusable large memory fragments.
- *  
- *        int DID_MEM_FREE_CHUNKS   (ptmalloc)
- *            Number of free chunks.
- *  
- *        int DID_MEM_FFREE         (ptmalloc)
- *        int DID_MEM_FFREE_SIZE    (ptmalloc)
- *            Number of fastbin blocks, size of freed fastbin blocks.
  *  
  *        int DID_MEM_CHUNK         (smalloc)
  *        int DID_MEM_CHUNK_SIZE    (smalloc)
@@ -8211,26 +8200,20 @@ v_debug_info (svalue_t *sp, int num_arg)
  *            Number and size of allocations done through the
  *            clib functions (if supported by the allocator).
  *  
- *        int DID_MEM_OVERHEAD     (slaballoc, smalloc, ptmalloc)
+ *        int DID_MEM_OVERHEAD     (slaballoc, smalloc)
  *            Overhead for every allocation.
  *  
- *        int DID_MEM_ALLOCATED    (slaballoc, smalloc, ptmalloc)
+ *        int DID_MEM_ALLOCATED    (slaballoc, smalloc)
  *            The amount of memory currently allocated from the
  *            allocator, including the overhead for the allocator.
  *  
- *        int DID_MEM_MAX_ALLOCATED (ptmalloc)
- *            Maximum total allocated space.
- *  
- *        int DID_MEM_USED         (slaballoc, smalloc, ptmalloc)
+ *        int DID_MEM_USED         (slaballoc, smalloc)
  *            The amount of memory currently used for driver data,
  *            excluding the overhead from the allocator.
  *  
- *        int DID_MEM_TOTAL_UNUSED (slaballoc, smalloc, ptmalloc)
+ *        int DID_MEM_TOTAL_UNUSED (slaballoc, smalloc)
  *            The amount of memory allocated from the system, but
  *            not used by the driver.
- *  
- *        int DID_MEM_KEEP_COST    (ptmalloc)
- *            Top-most releasable space.
  *  
  *        int DID_MEM_DEFRAG_CALLS       (smalloc)
  *            Total number of calls to defragment_small_lists().

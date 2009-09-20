@@ -2083,8 +2083,6 @@ options (void)
         , "slaballoc"
 #elif defined(MALLOC_smalloc)
         , "smalloc"
-#elif defined(MALLOC_ptmalloc)
-        , "ptmalloc"
 #else
         , "unknown malloc"
 #endif

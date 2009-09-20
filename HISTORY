@@ -45,6 +45,7 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          This is about 5 times faster than our old hashing algorithm and
          supports hashes with more than 16 bit width. This supports larger
          hash tables than 65535.
+       + The ptmalloc memory allocator was removed. (#552)
 
     - Language
        + Added a sefun:: specifier to explicitly call simul-efuns. (#669)

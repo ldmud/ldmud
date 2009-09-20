@@ -3,7 +3,6 @@
 # Settings for a compat-mode driver for Dragonfire mud.
 # by Nostradamus
 # configure will strip this part from the script.
-# --with-malloc=ptmalloc \
 # --enable-share-variables=yes \
 # --enable-use-pthreads=yes \
 # export EXTRA_CFLAGS="-mcpu=k6 -march=k6"

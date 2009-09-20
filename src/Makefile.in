@@ -103,7 +103,7 @@ SRC = access_check.c actions.c array.c arraylist.c backend.c bitstrings.c \
       parser.c parse.c pkg-alists.c pkg-iksemel.c pkg-xml2.c pkg-idna.c \
       pkg-mccp.c pkg-mysql.c pkg-gcrypt.c \
       pkg-pgsql.c pkg-sqlite.c pkg-tls.c pkg-openssl.c pkg-gnutls.c \
-      ptmalloc.c port.c ptrtable.c \
+      port.c ptrtable.c \
       random.c regexp.c sha1.c simulate.c simul_efun.c stdstrings.c \
       strfuns.c structs.c sprintf.c swap.c wiz_list.c xalloc.c 
 OBJ = access_check.o actions.o array.o arraylist.o backend.o bitstrings.o \
@@ -115,7 +115,7 @@ OBJ = access_check.o actions.o array.o arraylist.o backend.o bitstrings.o \
       parser.o parse.o pkg-alists.o pkg-iksemel.o pkg-xml2.o pkg-idna.o \
       pkg-mccp.o pkg-mysql.o pkg-gcrypt.o \
       pkg-pgsql.o pkg-sqlite.o pkg-tls.o pkg-openssl.o pkg-gnutls.o \
-      ptmalloc.o port.o ptrtable.o \
+      port.o ptrtable.o \
       random.o regexp.o sha1.o simulate.o simul_efun.o stdstrings.o \
       strfuns.o structs.o sprintf.o swap.o wiz_list.o xalloc.o @ALLOCA@ 
 
@@ -227,11 +227,11 @@ random.o : random.c config.h driver.h
 depend: $(SRC) $(GENSRC)
 	@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
           echo Updating dependencies.; \
-          mkdepend $(SKELETON) -I. -Iptmalloc $(EXCEPT) -m -p .c:%n.o -fMakefile; \
-          mkdepend $(SKELETON) -I. -Iptmalloc $(EXCEPT) $(SELECT) -m -p .c:%n.o -fMakefile; \
+          mkdepend $(SKELETON) -I. $(EXCEPT) -m -p .c:%n.o -fMakefile; \
+          mkdepend $(SKELETON) -I. $(EXCEPT) $(SELECT) -m -p .c:%n.o -fMakefile; \
           echo Updating dependencies in Makefile.in.; \
-          mkdepend $(SKELETON) -I. -Iptmalloc $(EXCEPT) -m -p .c:%n.o -fMakefile.in; \
-          mkdepend $(SKELETON) -I. -Iptmalloc $(EXCEPT) $(SELECT) -m -p .c:%n.o -fMakefile.in; \
+          mkdepend $(SKELETON) -I. $(EXCEPT) -m -p .c:%n.o -fMakefile.in; \
+          mkdepend $(SKELETON) -I. $(EXCEPT) $(SELECT) -m -p .c:%n.o -fMakefile.in; \
         else\
           echo mkdepend utility not available.; \
         fi"
@@ -491,10 +491,6 @@ pkg-xml2.o : ../mudlib/sys/xml.h typedefs.h pkg-xml2.h interpret.h \
 port.o : main.h backend.h my-rusage.h driver.h typedefs.h port.h config.h \
     machine.h
 
-ptmalloc.o : ptmalloc/malloc.c machine.h config.h ptmalloc/hooks.c \
-    ptmalloc/arena.c ptmalloc/thread-m.h ptmalloc/malloc.h \
-    ptmalloc/config.h
-
 ptrtable.o : simulate.h mempools.h ptrtable.h driver.h svalue.h strfuns.h \
     sent.h bytecode.h typedefs.h port.h config.h bytecode_gen.h machine.h
 
@@ -563,9 +559,9 @@ wiz_list.o : xalloc.h svalue.h stdstrings.h simulate.h object.h mstrings.h \
     strfuns.h sent.h bytecode.h hash.h port.h config.h bytecode_gen.h \
     machine.h
 
-xalloc.o : xptmalloc.c sysmalloc.c slaballoc.c smalloc.c mstrings.h \
+xalloc.o : sysmalloc.c slaballoc.c smalloc.c mstrings.h \
     object.h exec.h simulate.h interpret.h gcollect.h backend.h xalloc.h \
-    driver.h ../mudlib/sys/debug_info.h ptmalloc/malloc.h svalue.h \
+    driver.h ../mudlib/sys/debug_info.h svalue.h \
     stdstrings.h sysmalloc.h array.h slaballoc.h typedefs.h smalloc.h \
     hash.h sent.h bytecode.h strfuns.h main.h port.h config.h \
     bytecode_gen.h machine.h

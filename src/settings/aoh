@@ -41,7 +41,6 @@ exec ./configure \
 --enable-use-tls=gnu \
 --enable-synchronous-heart-beat=no \
 --enable-use-pthreads=yes \
---with-malloc=ptmalloc \
 --with-optimize=high \
 --with-time-to-swap=0 \
 --with-time-to-swap-variables=0 \

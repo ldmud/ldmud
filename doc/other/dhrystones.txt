@@ -116,14 +116,6 @@ Tarkin: G4/800MHz/1GByte, Mac OS X 10.2.4, LDMud 3.3.444, gcc 3.1:
   m: D, TC, MC, MT                     312.5     526.3     526.3     588.2
   m: D, TC, MC, MT, ML                 333.3     526.3     555.6     555.6
 
-  p: -                                 555.6     909.1     909.1     909.1
-  p: D                                 400.0     769.2     769.2     729.2
-  p: D, TC                             277.8     500.0     526.3     588.2
-  p: D, TC, MC                         263.2     500.0     555.6     526.3
-  p: D, TC, MC, MT                     256.4     454.5     526.3     500.0
-  p: D, TC, MC, MT, ML                 250.0     400.0     416.7     434.8
-
-
 Legend:
   D: DEBUG
   TC: TRACE_CODE
@@ -132,7 +124,6 @@ Legend:
   ML: MALLOC_LPC_TRACE
   m: malloc
   s: smalloc
-  p: ptmalloc
 
 
 Dhrystone, 3.2.9.585, Hurrikap (K6 350, 256 MB), Mai 2003:

@@ -337,8 +337,6 @@ mdb_log_sbrk (p_int size)
 #  include "slaballoc.c"
 #elif defined(MALLOC_sysmalloc)
 #  include "sysmalloc.c"
-#elif defined(MALLOC_ptmalloc)
-#  include "xptmalloc.c"
 #else
 #  error "No allocator specified."
 #endif
@@ -358,14 +356,6 @@ mdb_log_sbrk (p_int size)
 #    warning ""
 #endif
 
-#if defined(MALLOC_ptmalloc) && defined(GC_SUPPORT) && defined(__FreeBSD__)
-#    warning ""
-#    warning "-----------------------------------"
-#    warning "PTMalloc selected, but the allocator"
-#    warning "doesn't support GC under FreeBSD!"
-#    warning "-----------------------------------"
-#    warning ""
-#endif
 
 /*-------------------------------------------------------------------------*/
 size_t

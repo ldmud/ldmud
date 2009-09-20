@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Sep-2009 (Zesstra)
+  - removed the ptmalloc memory allocator. (#552)
+    (ptmalloc/, ptmalloc.c, xptmalloc.c, xalloc.c Makefile.in, configure.in)
+
 16-Sep-2009 (Zesstra)
   - 'status/malloc' commands include now the allocator in use (Patch from
       Xtian, #672)

@@ -249,7 +249,6 @@
  *   MALLOC_slaballoc: Slab allocator. Fastest, reduces fragmentation,
  *                     supports garbage collection, not threadsafe.
  *   MALLOC_sysmalloc: the normal system malloc()
- *   MALLOC_ptmalloc:  ptmalloc from www.malloc.de - threadsafe.
  */
 
 #define MALLOC_@val_malloc@

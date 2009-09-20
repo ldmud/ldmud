@@ -8,3 +8,7 @@ complete list of them:
   want to use PCREs in your mud, you must have a libpcre installed on your
   system.
 
+- ptmalloc
+  The ptmalloc memory allocator was removed. Please use one of the others. For
+  more information, please see Issue #552 in our bug tracker.
+

@@ -38,32 +38,24 @@
 #  define YYDEBUG 1
 #endif
 
-#if !defined(MALLOC_smalloc) && !defined(MALLOC_sysmalloc) && !defined(MALLOC_ptmalloc) && ~defined(MALLOC_slaballoc)
+#if !defined(MALLOC_smalloc) && !defined(MALLOC_sysmalloc) && ~defined(MALLOC_slaballoc)
 #  define MALLOC_slaballoc
 #endif
 
 
 /* Do we have full GC support? */
 
-#if defined(MALLOC_smalloc) || defined(MALLOC_ptmalloc) || defined(MALLOC_slaballoc)
+#if defined(MALLOC_smalloc) || defined(MALLOC_slaballoc)
 #  define GC_SUPPORT 1
 #endif
 
 
 /* Do some of the selected packages require special treatment? */
 
-/* ptmalloc only works correctly with SBRK_OK right now. */
-#ifdef MALLOC_ptmalloc
-#  ifndef SBRK_OK
-#    define SBRK_OK
-#  endif
-#else // no ptmalloc
-/* SQLite in the threadsafe mode needs a normal malloc() if the allocator is
- * not ptmalloc*/
-#  if defined(SBRK_OK) && defined(USE_SQLITE) && defined(SQLITE3_USES_PTHREADS)
+/* SQLite in the threadsafe mode needs a normal malloc() */
+#if defined(SBRK_OK) && defined(USE_SQLITE) && defined(SQLITE3_USES_PTHREADS)
 #      undef SBRK_OK
-#  endif
-#endif // MALLOC_ptmalloc
+#endif
 
 
 /* When we have allocation tracing, the allocator annotates every
