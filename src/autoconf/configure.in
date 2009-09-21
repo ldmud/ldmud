@@ -2483,6 +2483,28 @@ else
 fi
 rm -f conftest*
 
+# check for a working sbrk().
+AC_MSG_CHECKING(for a working sbrk())
+AC_RUN_IFELSE([
+    AC_LANG_PROGRAM([ AC_INCLUDES_DEFAULT ],
+      [[
+    alarm(2); // a crash can be an infinite loop...
+    void *ptr = sbrk(0);
+    if ((intptr_t)ptr <= 0)
+        exit(1); // SBRK not OK!
+    for (int i = 0 ; i < 50 ; ++i) {
+        ptr = brk(ptr + 1048576);
+        if ((intptr_t)ptr == -1)
+            exit(1); // SBRK not OK!
+    }
+    return 0; // SBRK_OK
+      ]])],
+    [AC_DEFINE([SBRK_OK], [1], [Defined if sbrk() is working])]
+    [AC_MSG_RESULT([yes])],
+    [AC_MSG_RESULT([no])],
+    [AC_MSG_RESULT([no])]
+    )
+
 
 SAVE_LIBS="${LIBS}"
 SAVE_CFLAGS="${CFLAGS}"
