@@ -1,6 +1,23 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Sep-2009 (Zesstra)
+  - Added new check for a woring sbrk() (#680)
+    The old check for SBRK_OK checked for a) a working brk() and the
+    possibility to replace malloc. This new check only checks if sbrk() can be
+    used to get a significant amount of memory (currently 50MB).
+    (configure.in)
+  - Updated and simplified check for replacing malloc, respect SBRK_OK and
+    HAVE_MMAP. (#680) The check now sets REPLACEABLE_MALLOC instead of
+    SBRK_OK. Additionally, the check was updated to current autoconf macros.
+    (configure.in)
+  - Make use of SBRK_OK and MALLOC_REPLACEABLE in the allocators.
+    Use this two defines to determine if a user-requested MALLOC_SBRK is
+    possible and define REPLACE_MALLOC accordingly. If not, undefine
+    MALLOC_SBRK. Use HAVE_MMAP as fallback. In case of HAVE_MMAP and
+    MALLOC_REPLACEABLE, REPLACE_MALLOC is set as well. (#680)
+    (slabmalloc.c, smalloc.c, xalloc.c)
+
 19-Sep-2009 (Zesstra)
   - removed the ptmalloc memory allocator. (#552)
     (ptmalloc/, ptmalloc.c, xptmalloc.c, xalloc.c Makefile.in, configure.in)

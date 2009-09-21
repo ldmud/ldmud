@@ -180,7 +180,7 @@ static t_stat xalloc_stat = {0,0};
   /* Total number and size of allocations done by the driver (incl overhead).
    */
 
-#if defined(MALLOC_SBRK) && (defined(SBRK_OK) || defined(HAVE_MMAP))
+#if (defined(MALLOC_SBRK) && defined(SBRK_OK) && defined(MALLOC_REPLACEABLE)) || (defined(HAVE_MMAP) && defined(MALLOC_REPLACEABLE))
 static t_stat clib_alloc_stat = {0,0};
   /* Number and size of allocations done through the clib emulation
    * functions (incl overhead).
@@ -1164,7 +1164,7 @@ dump_malloc_trace (int d
 
 /*                     CLIB ALLOCATION FUNCTIONS                           */
 
-#if defined(REPLACE_MALLOC) && (defined(SBRK_OK) || defined(HAVE_MMAP))
+#if defined(REPLACE_MALLOC)
 
 /*-------------------------------------------------------------------------*/
 POINTER

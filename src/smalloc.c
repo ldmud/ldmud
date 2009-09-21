@@ -112,14 +112,14 @@
  * A new AVL node is created for every free large block.
 #endif
  *
- #ifdef MALLOC_SBRK && SBRK_OK
+#ifdef MALLOC_SBRK && SBRK_OK && MALLOC_REPLACEABLE
  * Memory is allocated from the system with sbrk() and brk(), which puts
  * the whole heap under our control.
  *
  * In this mode, we replace the system malloc() and free() by our own 
  * functions, implementing all libc memory functions (malloc, free, calloc,
  * realloc()).
- #elif MALLOC_SBRK && HAVE_MMAP
+ #elif HAVE_MMAP
  * If brk/sbrk() are non-functional (e.g. on Darwin; remember: they are legacy
  * and not POSIX anymore), we check if mmap() is available. If it is, we use 
  * it to map anonymous memory pages to get memory from the VM system.
@@ -128,17 +128,19 @@
  * "allocated" blocks of which cover the unallocated areas - large_malloc()
  * will perceive this as a fragmented heap.
  *
+ #ifdef MALLOC_REPLACEABLE
  * In this mode, we replace the system malloc() and free() by our own 
  * functions, implementing all libc memory functions (malloc, free, calloc,
  * realloc()). 
- #else
+ #endif
+#else
  * malloc() is used to allocate a new block of memory. If this block borders
  * previous ones, the blocks are joined.
  *
  * The allocated block (modulo joints) is tagged at both ends with fake
  * "allocated" blocks of which cover the unallocated areas - large_malloc()
  * will perceive this as a fragmented heap.
- #endif
+#endif
  *
  *  -- Privilege Level --
  *
@@ -261,21 +263,23 @@
  */
 #define GRANULARITY sizeof(word_t)
 
-/* If possible, request memory using sbrk().
+/* If configure and possible, request memory using sbrk() and replace malloc().
+ * If replacing malloc is not possible, don't use sbrk().
  * If sbrk/brk() are not working, but mmap() is, then use mmap() for getting
- * memory. If that is also not available, use malloc().
+ * memory. In this case, malloc may be replaced as well.
+ * If that is also not available, use malloc().
  */
-#if defined(SBRK_OK)
-#  ifdef MALLOC_SBRK
-#      define REPLACE_MALLOC
+#if defined(MALLOC_SBRK)
+#  if defined(SBRK_OK) && defined(MALLOC_REPLACEABLE)
+#    define REPLACE_MALLOC
 #  else
-#      undef SBRK_OK
+#    undef MALLOC_SBRK
+#    undef MALLOC_REPLACEABLE
 #  endif
-#elif defined (HAVE_MMAP)
-#  ifdef MALLOC_SBRK
-#      define REPLACE_MALLOC
-#  endif
-#endif // SBRK_OK
+#endif
+#if defined(HAVE_MMAP) && defined(MALLOC_REPLACEABLE)
+#  define REPLACE_MALLOC
+#endif
 
 #define MEM_MAIN_THREADSAFE
 
@@ -379,7 +383,7 @@
  *   CHUNK_SIZE: size of a chunk from which large blocks are allocated.
  */
 
-#if defined(MALLOC_SBRK) && (defined(SBRK_OK) || defined (HAVE_MMAP))
+#if defined(MALLOC_SBRK) || defined (HAVE_MMAP)
 #    define SMALL_CHUNK_SIZE    0x04000  /* 16 KByte */
 #    define CHUNK_SIZE          0x40000
 #else
@@ -3160,7 +3164,7 @@ found_fit:
         }
 #endif
 
-#       ifndef SBRK_OK
+#       ifndef MALLOC_SBRK
         /* When we allocate a new chunk, it might differ slightly in size from
          * the desired size.
          */
@@ -3250,18 +3254,24 @@ esbrk (word_t size, size_t * pExtra)
  * If esbrk() allocated a larger block, the difference to <size> is
  * returned in *<pExtra>.
  *
-#ifdef SBRK_OK
+ #ifdef MALLOC_SBRK (&& SBRK_OK && MALLOC_REPLACEABLE is implied)
  * It is system dependent how sbrk() aligns data, so we simpy use brk()
- * to insure that we have enough.
+ * to ensure that we have enough.
  * At the end of the newly expanded heap we create a fake allocated
  * block of 0 bytes so that large_malloc() knows where to stop.
-#else
+ #elif HAVE_MMAP
+ * Use mmap() to allocate a new block of memory. If this block borders
+ * to the previous one, both blocks are joined.
+ * The allocated block (modulo joints) is tagged at both ends with fake
+ * "allocated" blocks of which cover the unallocated areas - large_malloc()
+ * will perceive this as a fragmented heap.
+ #else
  * Use malloc() to allocate a new block of memory. If this block borders
  * to the previous one, both blocks are joined.
  * The allocated block (modulo joints) is tagged at both ends with fake
  * "allocated" blocks of which cover the unallocated areas - large_malloc()
  * will perceive this as a fragmented heap.
-#endif
+ #endif
  */
 
 {
@@ -3269,7 +3279,7 @@ esbrk (word_t size, size_t * pExtra)
 
     *pExtra = 0;
     
-#ifdef SBRK_OK
+#ifdef MALLOC_SBRK
 
     if (!heap_end)
     {
@@ -3296,7 +3306,7 @@ esbrk (word_t size, size_t * pExtra)
     heap_end[-2] = M_MASK;
     return (char *)(heap_end - 1) - size; /* overlap old memory block */
 
-#else  /* not SBRK_OK */
+#else  /* not MALLOC_SBRK */
 
     char *block;
     size_t req_size = size; // the requested size of memory.
@@ -3478,7 +3488,7 @@ esbrk (word_t size, size_t * pExtra)
     *pExtra = overlap;
 #endif
     return block + GRANULARITY;
-#endif /* !SBRK_OK */
+#endif /* !MALLOC_SBRK */
 } /* esbrk() */
 
 

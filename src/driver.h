@@ -53,8 +53,14 @@
 /* Do some of the selected packages require special treatment? */
 
 /* SQLite in the threadsafe mode needs a normal malloc() */
-#if defined(SBRK_OK) && defined(USE_SQLITE) && defined(SQLITE3_USES_PTHREADS)
-#      undef SBRK_OK
+/* TODO: does it work with mmap, as long as we don't replace malloc? */
+#if defined(USE_SQLITE) && defined(SQLITE3_USES_PTHREADS)
+#  if defined(MALLOC_SBRK)
+#      undef MALLOC_SBRK
+#  endif
+#  if defined(MALLOC_REPLACEABLE)
+#      undef MALLOC_REPLACEABLE
+#  endif
 #endif
 
 

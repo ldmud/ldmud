@@ -89,9 +89,10 @@ LIBS=@LIBS@ @PKGLIBS@
 #
 LDFLAGS=$(PROFIL) @LDFLAGS@
 #
-#Note that, if you use smalloc with SBRK_OK(which is the default), and
-#don't link statically, it could happen that the system malloc is linked
-#along with the one from smalloc; this combination is bound to cause crashes.
+#Note that, if you use smalloc/slaballoc with MALLOC_SBRK (which is the 
+#default) and sbkr() (SBRK_OK) is available, and you don't link statically,
+#it could happen that the system malloc is linked along with the one from 
+#smalloc/slaballoc; this combination is bound to cause crashes.
 MFLAGS = "BINDIR=$(BINDIR)" "MUD_LIB=$(MUD_LIB)"
 #
 SRC = access_check.c actions.c array.c arraylist.c backend.c bitstrings.c \

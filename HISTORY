@@ -38,6 +38,9 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          bc_offset_t).
        + Take more care of issues with different width of integers in the
          bytecode (e.g. long was regarded as 32 bit until now).
+       + Improved detection of working sbrk/brk() and malloc replaceability.
+         Enabled the possibility to replace malloc while using mmap()
+         independently of the old SBRK_OK. (#680)
 
     - Runtime
        + re-worked and consolidated hash functions and hash types. (#564)
