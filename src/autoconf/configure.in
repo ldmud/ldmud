@@ -2506,119 +2506,102 @@ AC_RUN_IFELSE([
     )
 
 
+# check if we can replace malloc safely
 SAVE_LIBS="${LIBS}"
 SAVE_CFLAGS="${CFLAGS}"
 CFLAGS=''
-for TESTFLAG in '' -static -Bstatic -n; do
-
-
-AC_MSG_CHECKING(malloc redefinition with linking flag ${TESTFLAG})
-LIBS="${SAVE_LIBS} ${TESTFLAG}"
+AC_MSG_CHECKING(if we can replace malloc)
+#this is read by the test program
 cat > conftest.data <<EOF
 42
 EOF
-AC_TRY_RUN([
-#include <sys/types.h>
-#include <stdio.h>
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-#ifdef HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-#ifdef HAVE_STRING_H
-#include <string.h>
-#else
-#include <strings.h>
-#endif
-#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
-#include <memory.h>
-#endif
-#undef malloc
-#undef calloc
-int my_malloc_used;
-int main() {
-    int i, j;
-    FILE *f;
 
-    alarm(10); /* a crash can be an infinite loop... */
-    for (i = 0; i < 100; i++) {
-	my_malloc_used = 0;
-	/* strdup seems to be partially unavailable */
-	f = fopen("conftest.data", "r");
-	fscanf(f, "%d", &j);
-	fclose(f);
-	if (!my_malloc_used || j != 6*7) exit(1);
-    }
-    /* linking in printf called with variable format makes shared libs
-     * worthwhile. Moreover, calling it is a good test
-     */
-    printf(f?"%f%% successful\n":(char*)f, 100.);
-    exit(0);
-}
-POINTER malloc(size)
-    size_t size;
+for TESTFLAG in '' -static -Bstatic -n; do
+LIBS="${SAVE_LIBS} ${TESTFLAG}"
+AC_RUN_IFELSE([
+    AC_LANG_PROGRAM([
+      AC_INCLUDES_DEFAULT
+      #include <sys/mman.h>
+      [int my_malloc_used;
+      void* malloc(size_t size)
 {
-    size_t size2;
-    static char *current_break = 0;
-    char *q;
-
     my_malloc_used = 1;
-    if (!current_break)
-      current_break = sbrk(0);
-    size2 = sizeof size + size+7 & ~7;
-    q = current_break;
-    if (brk(current_break+=size2)) exit(1);
+#ifdef HAVE_MMAP
+    size_t ps = sysconf(_SC_PAGESIZE);
+    while (ps < size + sizeof(size_t))
+        ps += sysconf(_SC_PAGESIZE);
+    void *q = mmap(0, ps, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
+#elif defined(SBRK_OK)    
+    size = sizeof size + size+7 & ~7;
+    void *q = sbrk(size);
+    if ((intptr_t)q == -1) exit(1);
+#endif
     *(size_t *)q = size;
     return q + sizeof size;
 }
-POINTER calloc(size, num)
-    size_t size, num;
+void* calloc(size_t size, size_t num)
 {
-    char *q;
+    void *q;
     q = malloc(size*num);
     memset(q, 0, size);
+    return q;
 }
-POINTER realloc(p, size)
-    POINTER p;
-    size_t size;
+void* realloc(void *p, size_t size)
 {
     char *q;
     if (*(size_t *)p >= size)
         return p;
     q = malloc(size);
-
+    
     memcpy(q, p, size);
-
+    
     *(size_t *)q = size;
     return q + sizeof size;
 }
-#ifdef FREE_RETURNS_VOID
-void free(p)
-    POINTER p;
+void free(void *p)
 {}
-#else
-int free(p)
-    POINTER p;
-{ return 1; }
+      ]],
+      [[
+    int i, j; 
+    FILE *f;
+#if !defined(HAVE_MMAP) && !defined(SBRK_OK)
+    exit(1); // malloc not replaceable.
 #endif
-],SBRK_OK=1)
-if test -n "${SBRK_OK}"; then
-  if test -z "${TESTFLAG}"; then
-    AC_DEFINE(SBRK_OK, 1, [can we define our own malloc() safely?])
-  else
-    LDFLAGS="${LDFLAGS} ${TESTFLAG}"
-    EXTRA_CFLAGS="${EXTRA_CFLAGS} -DSBRK_OK"
-  fi
-  break
-  AC_MSG_RESULT(ok)
-else
-  AC_MSG_RESULT(failed)
-fi
+    char *buf = malloc(256);
+    alarm(10); // a crash can be an infinite loop...
+    for (i = 0; i < 100; i++) {
+        my_malloc_used = 0;
+        // strdup seems to be partially unavailable
+        f = fopen("conftest.data", "r");
+        fscanf(f, "%d", &j);
+        /* linking in snprintf called with variable format makes shared libs
+         * worthwhile. Moreover, calling it is a good test
+         */
+        snprintf(buf, 256, f ? "%f%% successful\n" : (char*)f, 100.);        
+        fclose(f);
+        if (!my_malloc_used || j != 6*7)
+            exit(1); // fopen did not use our malloc, not replaceable.
+    }
+    exit(0);
+      ]])],
+    [ac_malloc_replaceable_result=yes
+     if test -z "${TESTFLAG}"; then
+        AC_DEFINE([MALLOC_REPLACEABLE], [1], [Defined if we can replace malloc.])
+    else
+        LDFLAGS="${LDFLAGS} ${TESTFLAG}"
+        EXTRA_CFLAGS="${EXTRA_CFLAGS} -DMALLOC_REPLACEABLE"
+    fi
+    break],
+    ac_malloc_replaceable_result=no,
+    ac_malloc_replaceable_result=no
+    [break]
+    )
 done
-
+AC_MSG_RESULT($ac_malloc_replaceable_result)
 LIBS="${SAVE_LIBS}"
 CFLAGS="${SAVE_CFLAGS}"
+rm conftest.data
+
 
 case "$EXTRA_CFLAGS" in
  *-Dsolaris*)
@@ -2643,7 +2626,7 @@ lp_cv_sys_malloc_overhead=`./conftest --terse`
 rm -f conftest*
 )
 AC_DEFINE_UNQUOTED(EXTERN_MALLOC_OVERHEAD,$lp_cv_sys_malloc_overhead,                                                                                                                                              
-    [The following is needed for smalloc without SBRK_OK to use memory                                                                                                                                             
+    [The following is needed for smalloc without MALLOC_REPLACABLE to use memory                                                                                                                                             
      efficiently. smalloc will malloc blocks that are a large power of                                                                                                                                             
      two, minus EXTERN_MALLOC_OVERHEAD. If you have no idea what number to                                                                                                                                         
      choose, compile & run util/overhead.c                                                                                                                                                                         
