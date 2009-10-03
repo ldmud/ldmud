@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Oct-2009 (Zesstra)
+  - prepend '/' in get_dir() in plain mode for entries in the root directory,
+    if paths are requested by GETDIR_PATH. They were omitted until now. (#501)
+    (files.c)
+
 21-Sep-2009 (Zesstra)
   - Added new check for a woring sbrk() (#680)
     The old check for SBRK_OK checked for a) a working brk() and the

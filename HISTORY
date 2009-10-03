@@ -15,6 +15,8 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
        + add_action(): The function can be given as a closure. (#243)
        + command(): Won't throw an error anymore when a static function
          in another object is called. Such an action will simply be skipped.
+       + get_dir(): prepend '/' in plain mode for entries in the root directory,
+         if paths are requested by GETDIR_PATH.
 
     - Removed Efuns:
        + The deprecated efun cat() was removed. It can be easily and more
