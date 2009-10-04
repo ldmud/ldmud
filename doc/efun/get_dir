@@ -50,6 +50,13 @@ DESCRIPTION
 
         The values of mask can be added together.
 
+NOTES
+        The path argument to this efun is processed by valid_read() in the
+        mudlib master before being used. The mudlib may normalize this path
+        (e.g. strip leading or trailing "/") and this may lead to expected
+        results (e.g. get_dir("/dir/", ...) not returning the contents
+        of /dir/).
+
 EXAMPLES
         function                         returns
         -------------------------------------------------------------------

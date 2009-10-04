@@ -57,6 +57,13 @@ BESCHREIBUNG
         Die Eintraege in der Bitmaske koennen miteinander kombiniert
         werden.
 
+BEMERKUNGEN
+        Der als Argument angegebene Pfad wird vor Benutzung von valid_read()
+        im Master der Mudlib verarbeitet. Hierbei kann die Mudlib eine
+        Normalisierung vornehmen (z.B. fuehrende und endstaendige "/"
+        entfernen). Dann fuehrt dann u.U. zu erwarteten Resultaten (z.B. dass
+        get_dir("/dir/", ...) nicht den Inhalt von /dir/ zurueckgibt).
+
 BEISPIELE
         Funktion                         Rueckgabewert
         -------------------------------------------------------------------
