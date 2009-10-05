@@ -63,6 +63,33 @@ no_passphrase_callback (char * buf, int num, int w, void *arg)
     return -1;
 } /* no_passphrase_callback() */
 
+static void *
+openssl_malloc (size_t size)
+/*
+ * Wrapper function for using our own allocator in openssl.
+ */
+{
+    return pxalloc(size);
+}
+
+static void
+openssl_free (void * ptr)
+/*
+ * Wrapper function for using our own allocator in openssl.
+ */
+{
+    pfree(ptr);
+}
+
+static void *
+openssl_realloc (void * ptr, size_t size)
+/*
+ * Wrapper function for using our own allocator in openssl.
+ */
+{
+    return prexalloc(ptr, size);
+}
+
 /*-------------------------------------------------------------------------*/
 static Bool
 set_dhe1024 (void)
@@ -288,6 +315,10 @@ tls_global_init (void)
     debug_message("%s TLS: (OpenSSL) Keyfile '%s', Certfile '%s'\n"
                  , time_stamp(), tls_keyfile, tls_certfile);
 
+    // Register pointers to our own allocator functions before calling any
+    // other function from OpenSSL.
+    CRYPTO_set_mem_functions(openssl_malloc, openssl_realloc, openssl_free);
+    
     SSL_load_error_strings();
     ERR_load_BIO_strings();
     if (!SSL_library_init())

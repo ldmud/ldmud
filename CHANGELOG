@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Oct-2009 (Zesstra)
+  - Use CRYPTO_set_mem_functions() to register function pointers to our own
+    allocator functions in openssl.
+    (pkg-openssl.c)
+
 16-Sep-2009 (Zesstra)
   - 'status/malloc' commands include now the allocator in use (Patch from
       Xtian, #672)
