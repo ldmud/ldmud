@@ -827,9 +827,7 @@ f_get_dir (svalue_t *sp)
             }
             break;
         }
-
-        pathlen = strlen(path);
-
+        
         if ( XOPENDIR(dirp, path) == 0)
             break;
 
@@ -880,6 +878,13 @@ f_get_dir (svalue_t *sp)
         w = v;
         j = 0;
 
+        // do not prepend the path for the mudlib root directory. (effect is
+        // in the loop below if GETDIR_PATH == true).
+        if (in_top_dir)
+            pathlen = 0;
+        else
+            pathlen = strlen(path);
+        
         /* Taken into account that files might be added/deleted from outside. */
         for(i = 0, de = xreaddir(dirp,mask); de; de = xreaddir(dirp,mask))
         {
@@ -915,10 +920,10 @@ f_get_dir (svalue_t *sp)
             {
                 string_t *result;
 
-                if ((mask & GETDIR_PATH) && !in_top_dir)
+                if (mask & GETDIR_PATH)
                 {
                     char * name;
-
+                    
                     if (compat_mode)
                     {
                         memsafe(result = alloc_mstring(namelen+pathlen+1)
@@ -934,9 +939,12 @@ f_get_dir (svalue_t *sp)
                         name = get_txt(result);
                         *name++ = '/';
                     }
-                    memcpy(name, path, pathlen);
-                    name += pathlen;
-                    *name++ = '/';
+                    if (pathlen)
+                    {
+                        memcpy(name, path, pathlen);
+                        name += pathlen;
+                        *name++ = '/';
+                    }
                     if (namelen)
                         memcpy(name, de->d_name, namelen);
                     name[namelen] = '\0';

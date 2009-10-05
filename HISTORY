@@ -11,6 +11,11 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
          memory corruption, because the memory used by libxml2 was subject to
          the garbage collector and would be free'd by it while still in use.
 
+    - Changed Efuns:
+         + get_dir(): prepend '/' in plain mode for entries in the root directory,
+         if paths are requested by GETDIR_PATH.
+
+
 30-May-2009 (LDMud Team) -- 3.3.719
     - Fixed Crashes:
        + gmtime(), localtime(), ctime() and strftime() could crash the driver
