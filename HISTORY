@@ -6,6 +6,10 @@ For a detailed list of all changes see the file CHANGELOG.
 
 xx-xxx-xxxx (LDMud Team  -- 3.2.17
 
+    - Fixed Crashers:
+       + Removed a crash pkg-tls: we implicitly free'd the client CA list,
+         which was then overwritten. (#677)
+
 08-Aug-2009 (LDMud Team) -- 3.2.16
 
     - Fixed Crashers:
