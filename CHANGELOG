@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Oct-2009 (Zesstra)
+  - (pkg-tls.c) Use CRYPTO_set_mem_functions() to register pointers to our own
+      allocator in openssl. Otherwise, openssl may use the system allocator
+      and memory gets used twice. (#677)
+
 08-Aug-2009 (LDMud Team)  (3.2.16)
   - Created snapshot.
 

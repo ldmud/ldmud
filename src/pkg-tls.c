@@ -257,6 +257,34 @@ tls_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
 
 /*-------------------------------------------------------------------------*/
 #ifdef HAS_OPENSSL
+
+static void *
+tls_pkg_malloc (size_t size)
+/*
+ * Wrapper function for using our own allocator in openssl.
+ */
+{
+    return pxalloc(size);
+}
+
+static void
+tls_pkg_free (void * ptr)
+/*
+ * Wrapper function for using our own allocator in openssl.
+ */
+{
+    pfree(ptr);
+}
+
+static void *
+tls_pkg_realloc (void * ptr, size_t size)
+/*
+ * Wrapper function for using our own allocator in openssl.
+ */
+{
+    return prexalloc(ptr, size);
+}
+
 void
 tls_verify_init (void)
   
@@ -414,6 +442,9 @@ tls_global_init (void)
           , time_stamp(), keyfile, certfile);
     debug_message("%s TLS: (OpenSSL) Keyfile '%s', Certfile '%s'\n"
                  , time_stamp(), keyfile, certfile);
+
+    // first register our own allocator function before calling any Openssl function.
+    CRYPTO_set_mem_functions(tls_pkg_malloc, tls_pkg_realloc, tls_pkg_free);
 
     SSL_load_error_strings();
     ERR_load_BIO_strings();
