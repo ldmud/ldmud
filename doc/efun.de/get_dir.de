@@ -63,6 +63,7 @@ BEMERKUNGEN
         Normalisierung vornehmen (z.B. fuehrende und endstaendige "/"
         entfernen). Dann fuehrt dann u.U. zu erwarteten Resultaten (z.B. dass
         get_dir("/dir/", ...) nicht den Inhalt von /dir/ zurueckgibt).
+        Compat mode: GETDIR_PATH liefert die Pfade ohne fuehrenden /.
 
 BEISPIELE
         Funktion                         Rueckgabewert

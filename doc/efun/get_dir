@@ -56,6 +56,7 @@ NOTES
         (e.g. strip leading or trailing "/") and this may lead to expected
         results (e.g. get_dir("/dir/", ...) not returning the contents
         of /dir/).
+        Compat mode: GETDIR_PATH will return the paths without leading /.
 
 EXAMPLES
         function                         returns
