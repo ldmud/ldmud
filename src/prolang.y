@@ -66,7 +66,6 @@
  * TODO: This whole thing is quite complex and not very well documented.
  * TODO:: It's propably easier to rewrite interpreter and compiler...
  *
-#ifdef USE_NEW_INLINES
  * Another challenge is the compilation of inline closures, as they
  * are implemented as separate lfuns (with synthetic names), but encountered
  * in the middle of a regular lfun or even another inline closure. The
@@ -74,7 +73,6 @@
  * inline closures, and then resets its state as if a normal lfun is
  * compiled. When the inline closure is complete, its data is moved into
  * a backup storage area, and the compiler restores its previous state.
-#endif
  *---------------------------------------------------------------------------
  */
 
@@ -117,12 +115,10 @@
 
 #include "../mudlib/sys/driver_hook.h"
 
-#ifdef USE_NEW_INLINES
-#  undef DEBUG_INLINES
+#undef DEBUG_INLINES
   /* Define this to activate lots of debugging output during the compilation
    * of inline closures.
    */
-#endif /* USE_NEW_INLINES */
 
 #define lint  /* redef again to prevent spurious warnings */
 
@@ -367,13 +363,10 @@ enum e_internal_areas {
 
  , A_LOCAL_TYPES
    /* (fulltype_t) The full types of local and context variables.
-#ifdef USE_NEW_INLINES
     * For normal functions, only the beginning of the area is used.
     * The rest is used stack-wise for nested inline closures.
-#endif
     */
 
-%ifdef USE_NEW_INLINES
  , A_INLINE_PROGRAM
     /* (bytecode_t, char): Program and linenumbers saved from the compiled
      * but not yet inserted inline closures.
@@ -383,7 +376,6 @@ enum e_internal_areas {
      * nesting is achieved with the .prev/.next pointers in the
      * inline_closure_t structures.
      */
-%endif /* USE_NEW_INLINES */
 
  , A_STRUCT_MEMBERS
     /* (struct_member_t) While a struct definition is parsed, the member
@@ -529,7 +521,6 @@ static mem_block_t mem_block[NUMAREAS];
   /* Return the local/context var type at index <n>.
    */
 
-%ifdef USE_NEW_INLINES
 #define INLINE_PROGRAM_BLOCK(n) ((bytecode_p)(mem_block[A_INLINE_PROGRAM].block + (n)))
   /* Return the inline-closure program block at address <n>, properly typed.
    */
@@ -559,7 +550,6 @@ static mem_block_t mem_block[NUMAREAS];
    * Should be greater or equal to MAX_LOCAL.
    */
 
-%endif /* USE_NEW_INLINES */
 
 
 /*-------------------------------------------------------------------------*/
@@ -575,9 +565,7 @@ struct block_scope_s
       /* Local variables beyond num_locals may be clobbered */
     mp_uint addr;
       /* Address of CLEAR_LOCALS instruction, needed for backpatching */
-%ifdef USE_NEW_INLINES
     Bool    accessible;   /* True if variables of this block are accessible */
-%endif
 };
 
 static block_scope_t block_scope[COMPILER_STACK_SIZE];
@@ -601,7 +589,6 @@ static Bool use_local_scopes;
    */
 
 /*-------------------------------------------------------------------------*/
-#ifdef USE_NEW_INLINES
 /* Information describing inline closures.
 */
 
@@ -700,7 +687,6 @@ static inline_closure_t * current_inline;
 static unsigned int inline_closure_id;
   /* ID Number for the inline closure name.
    */
-#endif /* USE_NEW_INLINES */
 
 /*-------------------------------------------------------------------------*/
 /* Other Variables */
@@ -764,14 +750,12 @@ static fulltype_t * type_of_locals = NULL;
    * Points to a location in mem_block A_LOCAL_TYPES, it is NULL between
    * compilations.
    */
-  
-#ifdef USE_NEW_INLINES
+
 static fulltype_t * type_of_context = NULL;
   /* The full types of the context variables.
    * Points to a location in mem_block A_LOCAL_TYPES, it is NULL between
    * compilations.
    */
-#endif /* USE_NEW_INLINES */
 
 static int current_number_of_locals = 0;
   /* Current (active) number of local variables at this point in the
@@ -991,9 +975,7 @@ static void transfer_init_control(void);
 static void copy_variables(program_t *, funflag_t);
 static int copy_functions(program_t *, funflag_t type);
 static void copy_structs(program_t *, funflag_t);
-#ifdef USE_NEW_INLINES
 static void new_inline_closure (void);
-#endif /* USE_NEW_INLINES */
 static void fix_function_inherit_indices(program_t *);
 static void fix_variable_index_offsets(program_t *);
 static short store_prog_string (string_t *str);
@@ -2510,19 +2492,10 @@ free_local_names (int depth)
 
 /*-------------------------------------------------------------------------*/
 static ident_t *
-add_local_name (ident_t *ident, fulltype_t type, int depth
-#ifndef USE_NEW_INLINES
-               , Bool may_shadow
-#endif /* USE_NEW_INLINES */
-               )
+add_local_name (ident_t *ident, fulltype_t type, int depth)
 
 /* Declare a new local variable <ident> with the type <type> on
  * the scope depth <depth>. The references of <type> are NOT adopted.
-#ifndef USE_NEW_INLINES
- * If <may_shadow> is TRUE, the declaration is
- * allowed to shadow a previous one without generating a warning (this is
- * used to declare inline functions on the fly).
-#endif
  * Return the (adjusted) ident for the new variable.
  */
 
@@ -2546,7 +2519,6 @@ add_local_name (ident_t *ident, fulltype_t type, int depth
              * If it's a global, or if we are in an inline-closure arg list,
              * it's ok.
              */
-#ifdef USE_NEW_INLINES
 #ifdef DEBUG_INLINES
 if (current_inline && current_inline->block_depth+2 == block_depth 
     && ident->type != I_TYPE_GLOBAL)
@@ -2560,13 +2532,6 @@ if (current_inline && current_inline->block_depth+2 == block_depth
                 yywarnf( "Variable '%s' shadows previous declaration"
                        , get_txt(ident->name));
             }
-#else /* USE_NEW_INLINES */
-            if (!may_shadow && ident->type != I_TYPE_GLOBAL)
-            {
-                yywarnf( "Variable '%s' shadows previous declaration"
-                       , get_txt(ident->name));
-            }
-#endif /* USE_NEW_INLINES */
             ident = make_shared_identifier_mstr(ident->name, I_TYPE_LOCAL, depth);
         }
 
@@ -2574,9 +2539,7 @@ if (current_inline && current_inline->block_depth+2 == block_depth
         ident->type = I_TYPE_LOCAL;
         ident->u.local.num = current_number_of_locals;
         ident->u.local.depth = depth;
-#ifdef USE_NEW_INLINES
         ident->u.local.context = -1;
-#endif /* USE_NEW_INLINES */
 
         /* Put the ident into the list of all locals */
         if (all_locals && all_locals->u.local.depth > depth)
@@ -2620,28 +2583,20 @@ redeclare_local (ident_t *ident, fulltype_t type, int depth)
 
     if (ident->u.local.depth >= depth
      || (ident->u.local.depth == 1 && depth == 2)
-#ifdef USE_NEW_INLINES
      || (current_inline && ident->u.local.depth == current_inline->block_depth+2
-                        && depth == current_inline->block_depth+3
-        )
-#endif /* USE_NEW_INLINES */
+                        && depth == current_inline->block_depth+3)
        )
     {
         yyerrorf("Illegal to redeclare local name '%s'", get_txt(ident->name));
     }
     else
     {
-#ifdef USE_NEW_INLINES
         ident = add_local_name(ident, type, depth);
-#else /* USE_NEW_INLINES */
-        ident = add_local_name(ident, type, depth, MY_FALSE);
-#endif /* USE_NEW_INLINES */
     }
 
     return ident;
 } /* redeclare_local() */
 
-#ifdef USE_NEW_INLINES
 /*-------------------------------------------------------------------------*/
 static ident_t *
 add_context_name (inline_closure_t *closure, ident_t *ident, fulltype_t type, int num)
@@ -2878,8 +2833,6 @@ adapt_context_names (void)
     }
 } /* adapt_context_names() */
 
-#endif /* USE_NEW_INLINES */
-
 /*-------------------------------------------------------------------------*/
 static void
 init_scope (int depth)
@@ -2893,9 +2846,7 @@ init_scope (int depth)
     block_scope[depth-1].num_cleared = 0;
     block_scope[depth-1].clobbered = MY_FALSE;
     block_scope[depth-1].addr = 0;
-%ifdef USE_NEW_INLINES
     block_scope[depth-1].accessible = MY_TRUE;
-%endif
 } /* init_scope() */
 
 /*-------------------------------------------------------------------------*/
@@ -3805,11 +3756,7 @@ get_function_information (function_t * fun_p, program_t * prog, int ix)
 
 /*-------------------------------------------------------------------------*/
 static void
-def_function_typecheck (fulltype_t returntype, ident_t * ident
-#ifdef USE_NEW_INLINES
-                       , Bool is_inline
-#endif /* USE_NEW_INLINES */
-                       )
+def_function_typecheck (fulltype_t returntype, ident_t * ident, Bool is_inline)
 
 /* Called after parsing the '<type> <functionname>' part of a function
  * definition, this function performs the typecheck, makes sure that
@@ -3823,7 +3770,6 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident
  */
 
 {
-#ifdef USE_NEW_INLINES
     if (is_inline)
     {
         new_inline_closure();
@@ -3832,13 +3778,10 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident
     }
     else
     {
-#endif /* USE_NEW_INLINES */
         use_local_scopes = pragma_use_local_scopes;
         block_depth = 1;
         init_scope(block_depth);
-#ifdef USE_NEW_INLINES
     }
-#endif /* USE_NEW_INLINES */
 
     if (!(returntype.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
                                   | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)))
@@ -3875,7 +3818,6 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident
     }
 
     /* Store the data */
-#ifdef USE_NEW_INLINES
     if (is_inline)
     {
         current_inline->ident = ident;
@@ -3883,21 +3825,14 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident
     }
     else
     {
-#endif /* USE_NEW_INLINES */
         def_function_returntype = returntype;
         def_function_ident = ident;
-#ifdef USE_NEW_INLINES
     }
-#endif /* USE_NEW_INLINES */
 } /* def_function_typecheck() */
 
 /*-------------------------------------------------------------------------*/
 static void
-def_function_prototype (int num_args
-#ifdef USE_NEW_INLINES
-                       , Bool is_inline
-#endif /* USE_NEW_INLINES */
-                       )
+def_function_prototype (int num_args, Bool is_inline)
 
 /* Called after parsing '<type> <name> ( <args> ) of a function definition,
  * this function creates the function prototype entry.
@@ -3912,14 +3847,12 @@ def_function_prototype (int num_args
     fulltype_t returntype;
     int fun;
 
-#ifdef USE_NEW_INLINES
     if (is_inline)
     {
         ident = current_inline->ident;
         returntype = current_inline->returntype;
     }
     else
-#endif /* USE_NEW_INLINES */
     {
         ident = def_function_ident;
         returntype = def_function_returntype;
@@ -3961,7 +3894,6 @@ def_function_prototype (int num_args
                              , returntype);
 
     /* Store the data */
-#ifdef USE_NEW_INLINES
     if (is_inline)
     {
         current_inline->returntype = returntype;
@@ -3969,7 +3901,6 @@ def_function_prototype (int num_args
         current_inline->function = fun;
     }
     else
-#endif /* USE_NEW_INLINES */
     {
         def_function_returntype = returntype;
         def_function_num_args = num_args;
@@ -3978,11 +3909,7 @@ def_function_prototype (int num_args
 
 /*-------------------------------------------------------------------------*/
 static void
-def_function_complete ( p_int body_start
-#ifdef USE_NEW_INLINES
-                      , Bool is_inline
-#endif /* USE_NEW_INLINES */
-                      )
+def_function_complete ( p_int body_start, Bool is_inline)
 
 /* Called after completely parsing a function definition,
  * this function updates the function header and closes all scopes..
@@ -3999,7 +3926,6 @@ def_function_complete ( p_int body_start
     fulltype_t   returntype;
     int          num_args;
 
-#ifdef USE_NEW_INLINES
     if (is_inline)
     {
         ident = current_inline->ident;
@@ -4007,7 +3933,6 @@ def_function_complete ( p_int body_start
         num_args = current_inline->num_args;
     }
     else
-#endif /* USE_NEW_INLINES */
     {
         ident = def_function_ident;
         returntype = def_function_returntype;
@@ -4109,13 +4034,11 @@ def_function_complete ( p_int body_start
      * and freed after the compile.
      * Inline closures need some of the information for some more processing.
      */
-#ifdef USE_NEW_INLINES
     if (is_inline)
     {
         /* Keep block_depth, and local names */
     }
     else
-#endif /* USE_NEW_INLINES */
     {
         free_all_local_names();
         block_depth = 0;
@@ -4848,7 +4771,6 @@ struct_epilog (void)
 } /* struct_epilog() */
 
 
-#ifdef USE_NEW_INLINES
 /* =========================   Inline Closures   =-======================= */
 
 /*-------------------------------------------------------------------------*/
@@ -4997,7 +4919,7 @@ printf("DEBUG:   move code forward: from %"PRIuMPINT", length %"PRIuMPINT
     }
     CURRENT_PROGRAM_SIZE -= length + (start - end);
     stored_bytes -= length + (start - end);
-    
+
 #ifdef DEBUG_INLINES
 printf("DEBUG:   program size: %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
@@ -5016,13 +4938,13 @@ printf("DEBUG:   move li data to %"PRIuMPINT", from %"PRIuMPINT" length %"
         add_to_mem_block( A_INLINE_PROGRAM, LINENUMBER_BLOCK+start, length);
         current_inline->li_start = backup_start;
     }
-    
+
     /* Skip the lines with the closure. */
     offset = current_inline->end_line - current_inline->start_line;
     while (offset > 0)
     {
         int lines;
-        
+
         lines = offset;
         if (lines > LI_MAXEMPTY)
             lines = LI_MAXEMPTY;
@@ -5030,7 +4952,7 @@ printf("DEBUG:   move li data to %"PRIuMPINT", from %"PRIuMPINT" length %"
         LINENUMBER_BLOCK[start++] = (char)(256 - lines);
         length--;
     }
-    
+
     if (start + length < LINENUMBER_SIZE)
     {
 #ifdef DEBUG_INLINES
@@ -5115,7 +5037,7 @@ printf("DEBUG:   #%"PRIdMPINT": start %"PRIuMPINT", length %"PRIuMPINT
             store_line_number_info();
             if (stored_lines > ict->start_line)
                 store_line_number_backward(stored_lines - ict->start_line);
-	    else 
+            else 
                 while (stored_lines < ict->start_line)
                 {
                     int lines;
@@ -5426,7 +5348,6 @@ printf("DEBUG:     -> F_CONTEXT_CLOSURE %d %d %d\n", current_inline->function
     leave_block_scope(MY_TRUE);  /* Context scope */
     finish_inline_closure(MY_FALSE);
 } /* complete_inline_closure() */
-#endif /* USE_NEW_INLINES */
 
 /* =========================   PROGRAM STRINGS   ========================= */
 
@@ -5590,11 +5511,9 @@ delete_prog_string (void)
 %token L_ELLIPSIS
 %token L_ELSE
 %token L_EQ
-%ifdef USE_NEW_INLINES
 %token L_FUNC
 %token L_BEGIN_INLINE
 %token L_END_INLINE
-%endif /* USE_NEW_INLINES */
 %token L_FLOAT
 %token L_FLOAT_DECL
 %token L_FOR
@@ -5855,17 +5774,11 @@ delete_prog_string (void)
 %type <fulltype>     name_list local_name_list
 %type <inh_flags>    inheritance_qualifier inheritance_qualifiers
 %type <typeflags>    inheritance_modifier_list inheritance_modifier
-%ifdef USE_NEW_INLINES
 %type <fulltype>     inline_opt_type
-%endif /* USE_NEW_INLINES */
 %type <type>         decl_cast cast
 %type <lrvalue>      note_start comma_expr expr0 expr4
 %type <lrvalue>      function_call
-%ifdef USE_NEW_INLINES
 %type <lrvalue>      inline_func
-%else /* USE_NEW_INLINES */
-%type <lrvalue>      inline_fun
-%endif /* USE_NEW_INLINES */
 %type <lrvalue>      catch sscanf
 %type <lrvalue>      for_init_expr for_expr
 %type <lrvalue>      comma_expr_decl expr_decl
@@ -5891,9 +5804,7 @@ delete_prog_string (void)
   /* program address or -1 */
 
 %type <number> argument argument_list lvalue_list
-%ifdef USE_NEW_INLINES
 %type <number> inline_opt_args
-%endif /* USE_NEW_INLINES */
   /* number of arguments */
 
 %type <number> expr_list expr_list3 e_expr_list2 expr_list2
@@ -5984,48 +5895,25 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
 
       {
           $1.typeflags |= $2;
-#ifdef USE_NEW_INLINES
           def_function_typecheck($1, $3, MY_FALSE);
-#else /* USE_NEW_INLINES */
-          def_function_typecheck($1, $3);
-#endif /* USE_NEW_INLINES */
       }
 
       '(' argument ')'
 
       {
-#ifdef USE_NEW_INLINES
           def_function_prototype($6, MY_FALSE);
-#else /* USE_NEW_INLINES */
-          def_function_prototype($6);
-#endif /* USE_NEW_INLINES */
       }
 
       function_body
 
       {
-#ifdef USE_NEW_INLINES
           def_function_complete($9, MY_FALSE);
-#else /* USE_NEW_INLINES */
-          def_function_complete($9);
-#endif /* USE_NEW_INLINES */
-
-#ifndef USE_NEW_INLINES
-          if (first_inline_fun)
-              insert_inline_fun_now = MY_TRUE;
-#else
           insert_pending_inline_closures();
-#endif /* USE_NEW_INLINES */
       }
 
     | name_list ';' /* Variable definition */
       {
-#ifndef USE_NEW_INLINES
-          if (first_inline_fun)
-              insert_inline_fun_now = MY_TRUE;
-#else
           insert_pending_inline_closures();
-#endif /* USE_NEW_INLINES */
       }
 
     | struct_decl
@@ -6062,7 +5950,7 @@ function_body:
     | ';' { $$ = -1; }
 ; /* function_body */
 
-%ifdef USE_NEW_INLINES
+
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* Inline functions
  */
@@ -6225,7 +6113,7 @@ printf("DEBUG: After L_END_INLINE: program size %"PRIuMPINT"\n", CURRENT_PROGRAM
          }
 
          leave_block_scope(MY_FALSE);
-        
+
          $$.start = current_inline->end;
          $$.code = -1;
          $$.type = Type_Closure;
@@ -6305,7 +6193,6 @@ inline_comma_expr:
       }
 ; /* inline_comma_expr */
 
-%endif /* USE_NEW_INLINES */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* Definition of a struct
@@ -6977,11 +6864,7 @@ new_arg_name:
           if (exact_types.typeflags && $1.typeflags == 0)
           {
               yyerror("Missing type for argument");
-#ifdef USE_NEW_INLINES
               add_local_name($3, Type_Any, block_depth);
-#else /* USE_NEW_INLINES */
-              add_local_name($3, Type_Any, block_depth, MY_FALSE);
-#endif /* USE_NEW_INLINES */
                 /* Supress more errors */
           }
           else
@@ -6989,22 +6872,12 @@ new_arg_name:
               fulltype_t argtype;
 
               set_fulltype(argtype, $1.typeflags | $2, $1.t_struct);
-#ifdef USE_NEW_INLINES
               add_local_name($3, argtype, block_depth);
-#else /* USE_NEW_INLINES */
-              add_local_name($3, argtype, block_depth, MY_FALSE);
-#endif /* USE_NEW_INLINES */
           }
       }
 
     | non_void_type optional_star L_LOCAL
       {
-%ifndef USE_NEW_INLINES
-          /* A local name is redeclared. Since this is the argument list of a
-           * function, it can't be legal.
-           */
-          yyerror("Illegal to redeclare local name");
-%else
           /* A local name is redeclared. */
           if (current_inline == NULL)
           {
@@ -7023,7 +6896,6 @@ new_arg_name:
               set_fulltype(argtype, $1.typeflags | $2, $1.t_struct);
               redeclare_local($3, argtype, block_depth);
           }
-%endif
       }
 ; /* new_arg_name */
 
@@ -9821,7 +9693,6 @@ expr0:
           PREPARE_INSERT(3)
 %line
           $$.start = $1.start;
-#ifdef USE_NEW_INLINES
 
           $2 = check_for_context_local($2, &lvtype);
 
@@ -9837,13 +9708,6 @@ expr0:
           }
           CURRENT_PROGRAM_SIZE =
             (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
-#else /* USE_NEW_INLINES */
-          add_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
-          add_byte($2->u.local.num);
-          CURRENT_PROGRAM_SIZE =
-            (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
-          lvtype = type_of_locals[$2->u.local.num];
-#endif /* USE_NEW_INLINES */
           add_f_code($1.code);
           if (exact_types.typeflags
            && !BASIC_TYPE(lvtype, Type_Number)
@@ -10165,11 +10029,7 @@ pre_inc_dec:
 
 expr4:
       function_call  %prec '~'
-%ifdef USE_NEW_INLINES
     | inline_func    %prec '~' {}
-%else /* USE_NEW_INLINES */
-    | inline_fun
-%endif /* USE_NEW_INLINES */
     | catch          %prec '~'
     | sscanf         %prec '~'
 %ifdef USE_PARSE_COMMAND
@@ -10797,9 +10657,7 @@ expr4:
           mp_uint current;
           bytecode_p p;
 %line
-#ifdef USE_NEW_INLINES
           $2 = check_for_context_local($2, &$$.type);
-#endif /* USE_NEW_INLINES */
 
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
@@ -10810,7 +10668,7 @@ expr4:
               YYACCEPT;
           }
           p = PROGRAM_BLOCK + current;
-#ifdef USE_NEW_INLINES
+
           if ($2->u.local.context >= 0)
           {
               *p++ = F_PUSH_CONTEXT_LVALUE;
@@ -10823,13 +10681,6 @@ expr4:
           }
           $$.type.typeflags |= TYPE_MOD_REFERENCE;
           CURRENT_PROGRAM_SIZE = current + 2;
-#else /* USE_NEW_INLINES */
-          *p++ = F_PUSH_LOCAL_VARIABLE_LVALUE;
-          *p = $2->u.local.num;
-          CURRENT_PROGRAM_SIZE = current + 2;
-          $$.type = type_of_locals[$2->u.local.num];
-          $$.type.typeflags |= TYPE_MOD_REFERENCE;
-#endif /* USE_NEW_INLINES */
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11056,9 +10907,7 @@ expr4:
           mp_uint current;
           bytecode_p p;
 %line
-#ifdef USE_NEW_INLINES
           $1 = check_for_context_local($1, &$$.type);
-#endif /* USE_NEW_INLINES */
 
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.end = 0;
@@ -11068,7 +10917,7 @@ expr4:
               YYACCEPT;
           }
           p = PROGRAM_BLOCK + current;
-#ifdef USE_NEW_INLINES
+
           if ($1->u.local.context >= 0)
           {
               $$.code = F_PUSH_CONTEXT_LVALUE;
@@ -11082,12 +10931,6 @@ expr4:
               *p = $1->u.local.num;
           }
           CURRENT_PROGRAM_SIZE = current + 2;
-#else /* USE_NEW_INLINES */
-          *p++ = F_LOCAL;
-          *p = $1->u.local.num;
-          CURRENT_PROGRAM_SIZE = current + 2;
-          $$.type = type_of_locals[$1->u.local.num];
-#endif /* USE_NEW_INLINES */
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11672,7 +11515,6 @@ name_lvalue:
 %line
           /* Generate the lvalue for a local */
 
-#ifdef USE_NEW_INLINES
           $1 = check_for_context_local($1, &$$.type);
 
           if ($1->u.local.context >= 0)
@@ -11686,12 +11528,6 @@ name_lvalue:
               $$.u.simple[1] = $1->u.local.num;
           }
           $$.length = 0;
-#else /* USE_NEW_INLINES */
-          $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-          $$.u.simple[1] = $1->u.local.num;
-          $$.length = 0;
-          $$.type = type_of_locals[$1->u.local.num];
-#endif /* USE_NEW_INLINES */
       }
 ; /* name_lvalue */
 
@@ -13403,91 +13239,6 @@ anchestor:
 ; /* anchestor */
 
 
-%ifndef USE_NEW_INLINES
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-/* The inline function expression.
- *
- * This expression synthesizes a prototype for the inline function
- * and yields a closure-lrvalue suitable for expr4.
- * The function definition will be provided by the lexer at the next
- * opportunity.
- */
-
-inline_fun:
-      L_INLINE_FUN
-      {
-          /* Synthesize the prototype of the inline function
-           * Since we have to declare the function arguments for that,
-           * first save the existing locals.
-           */
-
-           ident_t * save_all_locals;
-           int save_current_number_of_locals;
-           int save_max_number_of_locals;
-           fulltype_t save_tol[10];
-           fulltype_t save_ftol[10];
-           char name[3];
-           int num, i;
-           fulltype_t ftype;
-
-           /* Save the old locals information */
-           save_all_locals = all_locals;
-           save_current_number_of_locals = current_number_of_locals;
-           save_max_number_of_locals = max_number_of_locals;
-
-           /* Simulate 'no locals' */
-           all_locals = NULL;
-           current_number_of_locals = 0;
-           max_number_of_locals = 0;
-           use_local_scopes = MY_TRUE;
-           enter_block_scope();
-
-           /* Declare the 9 parameters (saving the types of the old ones) */
-           name[0] = '$'; name[2] = '\0';
-
-           for (i = 0; i < 9; i++)
-           {
-               save_tol[i] = type_of_locals[i];
-               save_ftol[i] = type_of_locals[i];
-               name[1] = (char)('1' + i);
-               add_local_name(make_shared_identifier_n( name, 2
-                                                    , I_TYPE_UNKNOWN
-                                                    , block_depth)
-                             , Type_Any, block_depth, MY_TRUE);
-           }
-
-           /* Declare the function */
-           ftype = Type_Unknown;
-           ftype.typeflags |= TYPE_MOD_VARARGS | TYPE_MOD_PRIVATE;
-           num = define_new_function(MY_FALSE, /* id */ $1, 9, 0, 0
-                                    , NAME_UNDEFINED|NAME_PROTOTYPE
-                                    , ftype
-                                    );
-
-           /* Restore the old locals information */
-           leave_block_scope(MY_TRUE);
-           use_local_scopes = pragma_use_local_scopes;
-           all_locals = save_all_locals;
-           current_number_of_locals = save_current_number_of_locals;
-           max_number_of_locals = save_max_number_of_locals;
-
-           for (i = 0; i < 9; i++)
-           {
-               type_of_locals[i] = save_ftol[i];
-           }
-
-           /* Insert the call to the lfun closure */
-
-           $$.start = CURRENT_PROGRAM_SIZE;
-           $$.code = -1;
-           ins_f_code(F_CLOSURE);
-           ins_short(num);
-           ins_short(0);
-           $$.type = Type_Closure;
-      }
-; /* inline_fun */
-
-%endif /* USE_NEW_INLINES */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* The catch()-statement
@@ -13755,7 +13506,6 @@ lvalue_list:
 %line
           /* Push the lvalue for a local variable */
 
-#ifdef USE_NEW_INLINES
           fulltype_t dummy;
           $3 = check_for_context_local($3, &dummy);
 
@@ -13770,11 +13520,6 @@ lvalue_list:
               ins_byte($3->u.local.num);
           }
           $$ = 1 + $1;
-#else /* USE_NEW_INLINES */
-          $$ = 1 + $1;
-          ins_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
-          ins_byte($3->u.local.num);
-#endif /* USE_NEW_INLINES */
       }
 
     | lvalue_list ',' expr4 index_expr
@@ -14027,7 +13772,6 @@ define_local_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_st
 
     actual_type.typeflags |= opt_star;
 
-#ifdef USE_NEW_INLINES
     if (current_inline && current_inline->parse_context)
     {
 #ifdef DEBUG_INLINES
@@ -14077,36 +13821,6 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
     lv->u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
     lv->u.simple[1] = q->u.local.num;
 
-#else /* USE_NEW_INLINES */
-    if (redeclare)
-        q = redeclare_local(name, actual_type, block_depth);
-    else
-        q = add_local_name(name, actual_type, block_depth, MY_FALSE);
-
-    if (use_local_scopes && scope->clobbered)
-    {
-        /* finish the previous CLEAR_LOCALS, if any */
-        if (scope->num_locals - 1 > scope->num_cleared)
-            mem_block[A_PROGRAM].block[scope->addr+2]
-              = (char)(scope->num_locals - 1 - scope->num_cleared);
-        scope->clobbered = MY_FALSE;
-        scope->num_cleared = scope->num_locals - 1;
-    }
-
-    if (use_local_scopes && scope->num_locals == scope->num_cleared + 1)
-    {
-        /* First definition of a local, so insert the
-         * clear_locals bytecode and remember its position
-         */
-        scope->addr = mem_block[A_PROGRAM].current_size;
-        ins_f_code(F_CLEAR_LOCALS);
-        ins_byte(scope->first_local + scope->num_cleared);
-        ins_byte(0);
-    }
-
-    lv->u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-    lv->u.simple[1] = q->u.local.num;
-#endif /* USE_NEW_INLINES */
     lv->length = 0;
     lv->type = actual_type;
 
@@ -14143,14 +13857,13 @@ init_local_variable ( ident_t* name, struct lvalue_s *lv, int assign_op
     /* We got a "<name> = <expr>" type declaration. */
 
 %line
-#ifdef USE_NEW_INLINES
+
 #ifdef DEBUG_INLINES
 if (current_inline && current_inline->parse_context) 
   printf("DEBUG: inline context decl: name = expr, program_size %"PRIuMPINT"\n", 
          CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
-#endif /* USE_NEW_INLINES */
-    
+
     type2.typeflags &= TYPEID_MASK;
 
     /* Check the assignment for validity */
@@ -16177,10 +15890,8 @@ prolog (const char * fname, Bool isMasterObj)
     use_local_scopes = MY_TRUE;
     default_varmod = 0;
     default_funmod = 0;
-#ifdef USE_NEW_INLINES
     current_inline = NULL;
     inline_closure_id = 0;
-#endif /* USE_NEW_INLINES */
 
     free_all_local_names();   /* In case of earlier error */
 
@@ -16198,9 +15909,7 @@ prolog (const char * fname, Bool isMasterObj)
     memset(&LOCAL_TYPE(0), 0, LOCAL_TYPE_COUNT * sizeof(fulltype_t));
 
     type_of_locals = &(LOCAL_TYPE(0));
-#ifdef USE_NEW_INLINES
     type_of_context = type_of_locals;
-#endif /* USE_NEW_INLINES */
 #ifdef DEBUG_INLINES
 printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
 #endif /* DEBUG_INLINES */
@@ -16893,9 +16602,7 @@ epilog (void)
         }
 
         type_of_locals = NULL;
-#ifdef USE_NEW_INLINES
         type_of_context = NULL;
-#endif /* USE_NEW_INLINES */
 
         /* Reference the program and all inherits, but avoid multiple
          * referencing when an object inherits more than one object
@@ -16960,9 +16667,7 @@ epilog (void)
         }
 
         type_of_locals = NULL;
-#ifdef USE_NEW_INLINES
         type_of_context = NULL;
-#endif /* USE_NEW_INLINES */
         return;
     }
 

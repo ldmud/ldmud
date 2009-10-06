@@ -519,10 +519,6 @@
  * code turns out to be interrrupting.
  */
 
-/* Define this if you want the new inline closure syntax supported.
- * (f-020528).
- */
-@cdef_use_new_inlines@ USE_NEW_INLINES
 
 /* --- Profiling ---
  * For profiling of the VM instruction implementations, refer to the Makefile

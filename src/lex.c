@@ -279,16 +279,6 @@ static source_t yyin;
  * after the macro use), then outp is set back to point at the beginning
  * of the added text, lexing the just expanded text next.
  *
-#ifndef USE_NEW_INLINES
- * Functionals (inline functions) are somewhat similar to macros. When a
- * definition '(: ... :)' is encountered, a copy of text between the
- * delimiters is stored verbatim in the list of inline functions, starting at
- * first_inline_fun. To the compiler the lexer returns L_INLINE_FUN with the
- * synthetic identifier of the function. Whenever such functions are pending
- * and the compiler is at a safe place to accept a function definition
- * (signalled in insert_inline_fun_now), the text of the pending functions is
- * inserted into the input stream like a macro.
-#endif
  */
 
 static char *defbuf = NULL;
@@ -420,25 +410,6 @@ static ident_t *undefined_permanent_defines = NULL;
    * the ident_table.
    */
 
-#ifndef USE_NEW_INLINES
-/*-------------------------------------------------------------------------*/
-
-struct inline_fun * first_inline_fun = NULL;
-  /* Linked list of the saved function text for inline functions.
-   */
-
-Bool insert_inline_fun_now = MY_FALSE;
-  /* This is TRUE when we are at a suitable point to insert the
-   * saved inline functions. Usually this is at the end of a function,
-   * or after a global variable definition.
-   */
-
-unsigned int next_inline_fun = 0;
-  /* The running count of inline functions, used to 'name' the next
-   * function to generate.
-   */
-#endif /* USE_NEW_INLINES */
-
 /*-------------------------------------------------------------------------*/
 
 /* The stack to handle nested #if...#else...#endif constructs.
@@ -498,9 +469,7 @@ static struct s_reswords reswords[]
    , { "float",          L_FLOAT_DECL    }
    , { "for",            L_FOR           }
    , { "foreach",        L_FOREACH       }
-#ifdef USE_NEW_INLINES
    , { "function",       L_FUNC          }
-#endif
    , { "if",             L_IF            }
 #ifdef L_IN
    , { "in",             L_IN            }
@@ -862,10 +831,8 @@ init_lexer(void)
 #endif
 
     add_permanent_define("__LPC_STRUCTS__", -1, string_copy("1"), MY_FALSE);
-
-#ifdef USE_NEW_INLINES
     add_permanent_define("__LPC_INLINE_CLOSURES__", -1, string_copy("1"), MY_FALSE);
-#endif
+
 #ifdef USE_ARRAY_CALLS
     add_permanent_define("__LPC_ARRAY_CALLS__", -1, string_copy("1"), MY_FALSE);
 #endif
@@ -2949,7 +2916,6 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
 } /* open_include_file() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef USE_NEW_INLINES
 void *
 get_include_handle (void)
 
@@ -2960,7 +2926,6 @@ get_include_handle (void)
 {
     return (void*)inctop;
 } /* get_include_handle() */
-#endif /* USE_NEW_INLINES */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -4591,35 +4556,6 @@ yylex1 (void)
 
 #define TRY(c, t) if (*yyp == (c)) {yyp++; outp = yyp; return t;}
 
-#ifndef USE_NEW_INLINES
-    /* If we are at a point suitable for inline function insertion,
-     * do it.
-     * Note: It is not strictly necessary to insert all of them
-     * at once, since the compiler will set insert_inline_fun_now
-     * again as soon as it is finished with this one.
-     */
-    if (insert_inline_fun_now)
-    {
-        struct inline_fun * fun;
-        char buf[80];
-
-        sprintf(buf, "#line %d\n", current_loc.line);
-        insert_inline_fun_now = MY_FALSE;
-        while (first_inline_fun)
-        {
-            fun = first_inline_fun->next;
-            if (first_inline_fun->buf.length)
-            {
-                strbuf_add(&(first_inline_fun->buf), buf);
-                add_input(first_inline_fun->buf.buf);
-                strbuf_free(&(first_inline_fun->buf));
-            }
-            xfree(first_inline_fun);
-            first_inline_fun = fun;
-        }
-    }
-#endif /* USE_NEW_INLINES */
-
     yyp = outp;
 
     for(;;) {
@@ -4935,384 +4871,13 @@ yylex1 (void)
 
         case ':':
             TRY(':', L_COLON_COLON);
-#ifdef USE_NEW_INLINES
             TRY(')', L_END_INLINE);
-#endif /* USE_NEW_INLINES */
             outp = yyp;
             return ':';
 
         /* --- Inline Function --- */
 
         case '(':
-#ifndef USE_NEW_INLINES
-            /* Check for '(:' but ignore '(::' which can occur e.g.
-             * in 'if (::remove())'. However, accept '(:::' e.g. from
-             * '(:::remove()', and '(::)'.
-             */
-
-            if (*yyp == ':'
-             && (yyp[1] != ':' || yyp[2] == ':' || yyp[2] == ')'))
-            {
-                struct inline_fun * fun;
-                strbuf_t * textbuf;
-                size_t pos_return;  /* position of the 'return' */
-                char name[256+MAXPATHLEN+1];
-                int level;       /* Nesting level of embedded (: :) */
-                int blevel;      /* Nesting level of embedded { } */
-                int first_line;  /* For error messages */
-                char *start;
-
-                first_line = current_loc.line;
-
-                /* Allocate new function list element */
-                if (!first_inline_fun)
-                {
-                    /* Create the list */
-                    first_inline_fun = xalloc(sizeof *first_inline_fun);
-                    if (!first_inline_fun)
-                        yyerror("Out of memory.");
-                    fun = first_inline_fun;
-                }
-                else
-                {
-                    /* Append the element at the end of the list */
-                    fun = first_inline_fun;
-                    while (fun->next)
-                        fun = fun->next;
-                    fun->next = xalloc(sizeof *fun);
-                    if (!fun->next)
-                        yyerror("Out of memory.");
-                    fun = fun->next;
-                }
-
-                textbuf = &(fun->buf);
-                strbuf_zero(textbuf);
-                fun->next = NULL; /* Terminate the list properly */
-
-                /* Create the name of the new inline function.
-                 * We have to make sure the name is really unique.
-                 */
-                do
-                {
-                    sprintf(name, "__inline_%s_%d_%04x", current_loc.file->name
-                                 , current_loc.line, next_inline_fun++);
-
-                    /* Convert all non-alnums to '_' */
-                    for (start = name; *start != '\0'; start++)
-                    {
-                        if (!isalnum((unsigned char)(*start)))
-                            *start = '_';
-                    }
-                } while (    find_shared_identifier(name, 0, 0)
-                          && next_inline_fun != 0);
-
-                if (next_inline_fun == 0)
-                {
-                    yyerror("Can't generate unique name for inline closure.");
-                    return -1;
-                }
-
-                /* Create the function header in the string buffer.
-                 * For now we insert a 'return' which we might 'space out'
-                 * later.
-                 */
-                strbuf_addf(textbuf, "\n#line %d\n", current_loc.line-1);
-                strbuf_addf(textbuf,
-                             "private nomask varargs mixed %s "
-                             "(mixed $1, mixed $2, mixed $3,"
-                             " mixed $4, mixed $5, mixed $6, mixed $7,"
-                             " mixed $8, mixed $9) {\n"
-                             "return "
-                           , name
-                           );
-                pos_return = (size_t)textbuf->length-7;
-
-                /* Set yyp to the end of (: ... :), and also check
-                 * for the highest parameter used.
-                 */
-                yyp++;
-                level = 1;
-                blevel = 0;
-                start = yyp;
-                while (level)
-                {
-                    switch (*yyp++)
-                    {
-                    case CHAR_EOF:
-                        current_loc.line = first_line;
-                        yyerror("Unexpected end of file in (: .. :)");
-                        return -1;
-
-                    case '\0':
-                        lexerror("Lexer failed to refill the line buffer");
-                        return -1;
-
-                    case '(':
-                        if (yyp[0] == ':'
-                         && (yyp[1] != ':' || yyp[2] == ':' || yyp[2] == ')')
-                           )
-                            level++, yyp++;
-                        else if (yyp[0] == '{')
-                            yyp++;
-                        break;
-
-                    case ':':
-                        if (yyp[0] == ')')
-                            level--, yyp++;
-                        break;
-
-                    case '#':
-                        if (*yyp == '\'')
-                            yyp++;
-                        break;
-
-                    case '{':
-                        blevel++;
-                        break;
-
-                    case '}':
-                        if (yyp[0] != ')')
-                        {
-                            if (!blevel)
-                            {
-                                yyerror("Illegal block nesting");
-                                return -1;
-                            }
-                            blevel--;
-                        }
-                        break;
-
-                    case '/':
-                        c = *yyp;
-                        if (c == '*')
-                        {
-                            int this_line;
-
-                            this_line = current_loc.line;
-                            strbuf_addn(textbuf, start, (size_t)(yyp-start-1));
-                            outp = yyp;
-                            skip_comment();
-                            yyp = outp;
-                            if (lex_fatal)
-                                return -1;
-
-                            start = yyp;
-                            while (this_line++ < current_loc.line)
-                                strbuf_addc(textbuf, '\n');
-
-                            continue;
-                        }
-
-                        if (c == '/')
-                        {
-                            int this_line;
-
-                            this_line = current_loc.line;
-                            strbuf_addn(textbuf, start, (size_t)(yyp-start-1));
-                            yyp = skip_pp_comment(yyp);
-
-                            start = yyp;
-                            while (this_line++ < current_loc.line)
-                                strbuf_addc(textbuf, '\n');
-
-                            continue;
-                        }
-                        break;
-
-                    case '\n':
-                        store_line_number_info();
-                        nexpands = 0;
-                        current_loc.line++;
-                        total_lines++;
-                        if (!*yyp)
-                        {
-                            strbuf_addn(textbuf, start, (size_t)(yyp-start));
-                            outp = yyp;
-                            yyp = _myfilbuf();
-                            start = yyp;
-                        }
-                        break;
-
-                    case '\"':
-                    case '\'':
-                      {
-                        char delimiter = yyp[-1];
-
-                        /* If the delimiter is a ', we have to check
-                         * for (possibly escaped) character constants
-                         * and symbols.
-                         */
-                        if (delimiter == '\'' && *yyp == '\\')
-                        {
-                            /* Parse an escape sequence */
-
-                            if ('\n' != yyp[1] && CHAR_EOF != yyp[1])
-                            {
-                                char *cp;
-                                char lc; /* Since c is 'register' */
-
-                                cp = parse_escaped_char(yyp+1, &lc);
-                                if (!cp)
-                                    yyerror("Illegal character constant");
-                                yyp = cp;
-                            }
-
-                            /* Test if it's terminated by a quote (this also
-                             * catches the \<nl> and \<eof> case).
-                             */
-                            if (*yyp++ != '\'')
-                            {
-                                yyp--;
-                                yyerror("Illegal character constant");
-                            }
-                        }
-                        else if (delimiter == '\''
-                         && ( (    yyp[1] != '\''
-                               || (   *yyp == '\''
-                                   && (   yyp[1] == '('
-                                       || isalunum(yyp[1])
-                                       || yyp[1] == '\'')
-                                      )
-                                  )
-                            )
-                           )
-                        {
-                            /* Skip the symbol or quoted aggregate
-                             *
-                             * The test rejects all sequences of the form
-                             *   'x'
-                             * and
-                             *   '''x, with x indicating that the ' character
-                             *         itself is meant as the desired constant.
-                             *
-                             * It accepts all forms of quoted symbols, with
-                             * one or more leading ' characters.
-                             */
-
-                            /* Skip all leading quotes.
-                             */
-                            while (*yyp == '\'')
-                            {
-                                yyp++;
-                            }
-
-                            /* If the first non-quote is not an alnum, it must
-                             * be a quoted aggregrate or an error.
-                             */
-                            if (!isalpha((unsigned char)*yyp)
-                                 && *yyp != '_'
-                               )
-                            {
-                                if (*yyp == '(' && yyp[1] == '{')
-                                {
-                                    yyp += 2;
-                                }
-                                else
-                                {
-                                    lexerror("Illegal character constant");
-                                    return -1;
-                                }
-                            }
-                            else
-                            {
-                                /* Find the end of the symbol. */
-                                while (isalunum(*++yyp)) NOOP;
-                            }
-                        }
-                        else /* Normal string or character */
-                        while ((c = *yyp++) != delimiter)
-                        {
-                            if (c == CHAR_EOF)
-                            {
-                                /* Just in case... */
-                                current_loc.line = first_line;
-                                lexerror("Unexpected end of file "
-                                         "(or 0x01 character) in string.\n");
-                                return -1;
-                            }
-                            else if (c == '\\')
-                            {
-                                if (*yyp++ == '\n')
-                                {
-                                    store_line_number_info();
-                                    nexpands = 0;
-                                    current_loc.line++;
-                                    total_lines++;
-                                    if (!*yyp)
-                                    {
-                                        strbuf_addn(textbuf
-                                            , start
-                                            , (size_t)(yyp-start));
-                                        outp = yyp;
-                                        yyp = _myfilbuf();
-                                        start = yyp;
-                                    }
-                                }
-                            }
-                            else if (c == '\n')
-                            {
-                                /* No unescaped newlines in strings */
-                                lexerror("Newline in string");
-                                return -1;
-                            }
-                        } /* while(!delimiter) */
-                        break;
-                      } /* string-case */
-
-                    } /* switch(yyp[0]) */
-
-                } /* while(level) */
-
-                /* yyp now points to the character after the ':)'.
-                 * This is where the next call to lex has to continue.
-                 * Also copy the remaining (or the only) part of the
-                 * closure into the text buffer.
-                 */
-
-                strbuf_addn(textbuf, start, (size_t)(yyp-start-2));
-                outp = yyp;
-
-                /* The closure must not be too long (there is a hard limit in
-                 * the strbuf_t datastructure.
-                 */
-                if (textbuf->length > MAX_STRBUF_LEN-100)
-                    yyerror("Inline closure too long");
-
-                /* Check if the last character before the ':)' is
-                 * a ';' or '}'. For convenience we re-use yyp to
-                 * point into our buffer (we will exit from here
-                 * anyway).
-                 */
-
-                yyp = textbuf->buf + textbuf->length-1;
-                while (lexwhite(*yyp) || '\n' == *yyp || '\r' == *yyp)
-                    yyp--;
-
-                if (*yyp == ';' || *yyp == '}')
-                {
-                    /* Functional contains statements: remove the 'return'
-                     * added in the beginnin.
-                     */
-                    int i;
-
-                    for (i = 0; i < 6; i++)
-                        textbuf->buf[pos_return+i] = ' ';
-
-                    /* Finish up the function text */
-                    strbuf_add(textbuf, "\n}\n");
-                }
-                else
-                {
-                    /* Finish up the function text */
-                    strbuf_add(textbuf, ";\n}\n");
-                }
-
-                /* Return the ID of the name of the new inline function */
-
-                yylval.ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
-                return L_INLINE_FUN;
-            }
-#else /* USE_NEW_INLINES */
             /* Check for '(:' but ignore '(::' which can occur e.g.
              * in 'if (::remove())'. However, accept '(:::' e.g. from
              * '(:::remove()', and '(::)'.
@@ -5325,7 +4890,6 @@ yylex1 (void)
                 outp = yyp;
                 return L_BEGIN_INLINE;
             }
-#endif /* USE_NEW_INLINES */
 
             /* FALL THROUGH */
         /* --- Single-char Operators and Punctuation --- */
@@ -5794,11 +5358,6 @@ start_new_file (int fd, const char * fname)
 
     nexpands = 0;
 
-#ifndef USE_NEW_INLINES
-    next_inline_fun = 0;
-    insert_inline_fun_now = MY_FALSE;
-#endif /* USE_NEW_INLINES */
-
     add_auto_include(object_file, NULL, MY_FALSE);
 } /* start_new_file() */
 
@@ -5838,17 +5397,6 @@ end_new_file (void)
         free_mstring(last_lex_string);
         last_lex_string = NULL;
     }
-
-#ifndef USE_NEW_INLINES
-    while (first_inline_fun)
-    {
-        struct inline_fun * fun = first_inline_fun;
-
-        first_inline_fun = first_inline_fun->next;
-        strbuf_free(&(fun->buf));
-        xfree(fun);
-    }
-#endif /* USE_NEW_INLINES */
 
 } /* end_new_file() */
 

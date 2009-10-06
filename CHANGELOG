@@ -4,6 +4,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
 06-Oct-2099 (Zesstra)
   - Always enable structs (#557).
     (prolang.y, lex.c, driver.h, config.h.in, func_spec)
+  - Always enable new inline closures (#557).
+    (prolang.y, config.h.in, driver.h, lex.c)
 
 04-Oct-2009 (Zesstra)
   - prepend '/' in get_dir() in plain mode for entries in the root directory,

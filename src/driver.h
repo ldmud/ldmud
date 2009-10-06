@@ -189,4 +189,11 @@ extern unsigned char _my_ctype[];
  */
 #define USE_STRUCTS 1
 
+/* Always enable new inline closures.
+ * TODO: remove this, once all #ifdef USE_NEW_INLINES have been removed.
+ * Warning: do not #undef this to disable them. It will produce an
+ * inconsistent and buggy driver.
+ */
+#define USE_NEW_INLINES 1
+
 #endif /* DRIVER_H__ */

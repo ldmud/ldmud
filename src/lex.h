@@ -3,9 +3,6 @@
 
 #include "driver.h"
 #include "typedefs.h"
-#ifndef USE_NEW_INLINES
-#include "strfuns.h"
-#endif
 
 #include "hash.h"
 
@@ -216,23 +213,6 @@ struct ident_s
 
 #define lookup_predef(p) (p->type == I_TYPE_GLOBAL ? p->u.global.efun : -1)
 
-
-#ifndef USE_NEW_INLINES
-/* --- struct inline_fun: linked list element of saved function texts ---
- *
- * The functions inlined by (: ... :) have their code (plus the function
- * header and trailer) saved for later parsing in a list of these
- * structures.
- */
-
-struct inline_fun
-{
-    strbuf_t buf;              /* the complete function text */
-    struct inline_fun * next;  /* next list element */
-};
-#endif /* USE_NEW_INLINES */
-
-
 /* --- Variables --- */
 
 extern struct lpc_predef_s * lpc_predefs;
@@ -255,11 +235,6 @@ extern Bool pragma_check_overloads;
 extern Bool pragma_share_variables;
 extern string_t *last_lex_string;
 extern ident_t *all_efuns;
-#ifndef USE_NEW_INLINES
-extern struct inline_fun * first_inline_fun;
-extern Bool insert_inline_fun_now;
-extern unsigned int next_inline_fun;
-#endif /* USE_NEW_INLINES */
 
 /* Values of pragma_strict_types */
 
@@ -304,9 +279,7 @@ extern void remove_unknown_identifier(void);
 extern char *lex_error_context(void);
 extern svalue_t *f_expand_define(svalue_t *sp);
 extern char * lex_parse_number (char * cp, unsigned long * p_num, Bool * p_overflow);
-#ifdef USE_NEW_INLINES
 extern void * get_include_handle (void);
-#endif /* USE_NEW_INLINES */
 
 #ifdef GC_SUPPORT
 extern void count_lex_refs(void);
