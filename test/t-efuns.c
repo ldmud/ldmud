@@ -162,6 +162,14 @@ mixed *tests = ({
     ({ "map mapping 3", TF_ERROR, (: map(([1,2,3]), ([1]), 0) :) }),
     ({ "map mapping 4", 0, (: deep_eq(map(([1,2,3]), (: $1 + $3 :), 1), ([1:2,2:3,3:4])) :) }),
     ({ "map mapping 5", 0, (: deep_eq(map(([1,2,3]), "f"), ([1:2,2:3,3:4])) :) }),
+    ({ "explode 1", 0, (: deep_eq(explode("",""), ({""})) :) }),
+    ({ "explode 2", 0, (: deep_eq(explode("","anything"), ({""})) :) }),
+    ({ "explode 3", 0, (: deep_eq(explode("abc",""), ({"a","b","c"})) :) }),
+    ({ "explode 4", 0, (: deep_eq(explode("abc","xyz"), ({"abc"})) :) }),
+    ({ "explode 5", 0, (: deep_eq(explode("abc","abc"), ({"",""})) :) }),
+    ({ "explode 6", 0, (: deep_eq(explode(" ab cd ef ", " "), 
+                                  ({ "", "ab", "cd", "ef", "" })) :) }),
+
 });
 
 void run_test()

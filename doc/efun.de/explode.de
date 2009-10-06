@@ -13,7 +13,8 @@ BEISPIELE
         -------------------------------------------------------------------
         explode(" ab cd ef ", " ")  ({ "", "ab", "cd", "ef", "" })
         explode("abc", "abc")       ({ "", "" })
-        explode("", "")             ({})
+        explode("", "")             ({ "" })
+        explode("", <whatever>)     ({ "" })
         explode("abc", "xyz")       ({ "abc" })
         explode("abc", "")          ({ "a", "b", "c" })
 
@@ -23,6 +24,8 @@ AENDERUNGEN
         anstatt ({ "", "ab", "cd", "ef", "" }), d. h., leere Zeichenketten
         wurden ignoriert. Das neue Verhalten ist schoener, da nun
         implode(explode(str, del), del) == str immer wahr ist.
+        Seit 3.5.0 liefert explode("","") ({""}) zurueck, sodass garantiert
+        ist, dass ein nicht-leeres Array geliefert wird.
 
 SIEHE AUCH
         sscanf(E), extract(E), implode(E), regexplode(E)

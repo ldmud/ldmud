@@ -6,6 +6,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
     (prolang.y, lex.c, driver.h, config.h.in, func_spec)
   - Always enable new inline closures (#557).
     (prolang.y, config.h.in, driver.h, lex.c)
+  - explode("","") returned an empty array, while explode("","anything")
+    returned ({""}). Changed behaviour that explode will always return ({""})
+    if the explode string is empty. (#180)
+    (array.c)
 
 04-Oct-2009 (Zesstra)
   - prepend '/' in get_dir() in plain mode for entries in the root directory,

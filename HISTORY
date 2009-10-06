@@ -17,6 +17,8 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          in another object is called. Such an action will simply be skipped.
        + get_dir(): prepend '/' in plain mode for entries in the root directory,
          if paths are requested by GETDIR_PATH.
+       + explode() always returns a non-empty array, even upon explode("","")
+         (#180).
 
     - Removed Efuns:
        + The deprecated efun cat() was removed. It can be easily and more

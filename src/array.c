@@ -485,6 +485,7 @@ explode_string (string_t *str, string_t *del)
  *   explode("xyz", "")         -> { "x", "y", "z" }
  *   explode("###", "##")       -> { "", "#" }
  *   explode(" the  fox ", " ") -> { "", "the", "", "", "fox", ""}
+ *   explode("", whatever)      -> { "" }
  */
 
 {
@@ -494,6 +495,15 @@ explode_string (string_t *str, string_t *del)
     vector_t *ret;
     string_t *buff;
 
+    /* Special case: str is an empty string. */
+    if (mstrsize(str) == 0)
+    {
+        ret = allocate_array(1);
+        buff = new_n_mstring("", 0);
+        put_string(ret->item, buff);
+        return ret;
+    }
+    
     len = (long)mstrsize(del);
 
     /* --- Special case: Delimiter is an empty or one-char string --- */
