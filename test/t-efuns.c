@@ -169,6 +169,10 @@ mixed *tests = ({
     ({ "explode 5", 0, (: deep_eq(explode("abc","abc"), ({"",""})) :) }),
     ({ "explode 6", 0, (: deep_eq(explode(" ab cd ef ", " "), 
                                   ({ "", "ab", "cd", "ef", "" })) :) }),
+    ({ "implode 1", 0, (: implode(({ "foo", "bar", "" }), "*") == "foo*bar*":) }),
+    ({ "implode 2", 0, (: implode(({ "a", 2, this_object(), "c" }), "b") == "abc" :) }),
+    ({ "implode 3", 0, (: implode(({ "", "" }), "") == "":) }),
+    ({ "implode 4", TF_ERROR, (: implode(({ }), "") == "" :) }),
 
 });
 

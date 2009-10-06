@@ -653,11 +653,11 @@ string_t *
 arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
 
 /* Implode the string vector <arr> by <del>, i.e. all strings from <arr>
- * with <del> interspersed are contatenated into one string. The
+ * with <del> interspersed are concatenated into one string. The
  * resulting string is returned. The function will return at least
  * the empty string "".
  *
- * Non-string elements are ignore; elements referencing destructed
+ * Non-string elements are ignored; elements referencing destructed
  * objects are replaced by the svalue number 0.
  *
  *   implode({"The", "fox", ""}, " ") -> "The fox "
