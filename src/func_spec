@@ -103,9 +103,7 @@
         rindex    binary
         aindex    binary
         map_index ternary
-#ifdef USE_STRUCTS
         s_index   binary
-#endif /* USE_STRUCTS */
 ".."    range     ternary
 "..<"   nr_range  ternary
 "<.."   rn_range  ternary
@@ -181,15 +179,11 @@
         push_indexed_lvalue
         push_rindexed_lvalue
         push_aindexed_lvalue
-#ifdef USE_STRUCTS
         push_indexed_s_lvalue
-#endif /* USE_STRUCTS */
         index_lvalue
         rindex_lvalue
         aindex_lvalue
-#ifdef USE_STRUCTS
         index_s_lvalue
-#endif /* USE_STRUCTS */
         range_lvalue
         nr_range_lvalue
         rn_range_lvalue
@@ -206,15 +200,11 @@
         push_protected_rindexed_lvalue
         push_protected_aindexed_lvalue
         push_protected_indexed_map_lvalue
-#ifdef USE_STRUCTS
         push_protected_indexed_s_lvalue
-#endif /* USE_STRUCTS */
         protected_index_lvalue
         protected_rindex_lvalue
         protected_aindex_lvalue
-#ifdef USE_STRUCTS
         protected_index_s_lvalue
-#endif /* USE_STRUCTS */
         protected_range_lvalue
         protected_nr_range_lvalue
         protected_rn_range_lvalue
@@ -231,10 +221,8 @@
         aggregate
         m_aggregate
         m_caggregate
-#ifdef USE_STRUCTS
         s_aggregate
         s_m_aggregate
-#endif /* USE_STRUCTS */
         previous_object0
         lambda_cconstant
         lambda_constant
@@ -271,9 +259,7 @@ int     objectp(mixed);
 int     pointerp(mixed);
 int     referencep(mixed &);
 int     stringp(mixed);
-#ifdef USE_STRUCTS
 int     structp(mixed);
-#endif
 int     symbolp(mixed);
 int     typeof(mixed|mixed &);
 
@@ -286,13 +272,9 @@ void    throw(mixed);
 
 int     strlen(null|string);
 
-        /* Arrays and Mapings */
+        /* Arrays, Mapings, Structs and Strings*/
 
-#ifdef USE_STRUCTS
 int     sizeof(null|string|mixed|mixed *|mapping|struct);
-#else
-int     sizeof(null|string|mixed|mixed *|mapping);
-#endif /* USE_STRUCTS */
 
         /* Functions and Closures */
 
@@ -354,15 +336,12 @@ int     sgn(int|float);
 int     to_int(int|string|float|closure);
 float   to_float(float|string|int);
 string  to_string(mixed);
-#ifdef USE_STRUCTS
-int     baseof(struct, struct);
 mixed  *to_array(string|mixed*|symbol|quoted_array|struct);
 mixed   to_struct(mapping|mixed*|struct, void|struct);
-mixed  *struct_info(struct, int);
-#else
-mixed  *to_array(string|mixed*|symbol|quoted_array);
-#endif /* USE_STRUCTS */
 object  to_object(null|object|string|closure);
+
+mixed  *struct_info(struct, int);
+int     baseof(struct, struct);
 
 mixed   copy(mixed);
 mixed   deep_copy(mixed);
@@ -448,11 +427,7 @@ mixed  *unique_array(mixed *, string|closure, ...);
 mixed   filter(mapping|mixed *|string, string|closure|mapping, ...);
 mapping filter_indices(mapping, string|closure,  ...);
 
-#ifdef USE_STRUCTS
 mixed   map(mixed *|mapping|struct|string, mapping|string|closure, ...);
-#else
-mixed   map(mixed *|mapping, mapping|string|closure, ...);
-#endif /* USE_STRUCTS */
 mapping map_indices(mapping, string|closure, ...);
 
 mapping m_allocate(int, int default: F_CONST1);
@@ -463,11 +438,7 @@ mixed * m_entry(mapping, mixed);
 mixed  *m_indices(mapping);
 mapping m_reallocate(mapping, int);
 mixed  *m_values(mapping, int default: F_CONST0);
-#ifdef USE_STRUCTS
 mapping mkmapping(mixed *|struct, ...);
-#else
-mapping mkmapping(mixed *, ...);
-#endif
 int     member(mixed *|string|mapping, mixed, void|int);
 int     rmember(mixed *|string, mixed, void|int);
 mixed  *unmkmapping(mapping);
@@ -541,11 +512,8 @@ int     set_next_reset(int);
 void    set_this_object(object);
 object  shadow(object, int);
 int     snoop(object, void|object);
-#ifdef USE_STRUCTS
 void    tell_object(object|string, string|mixed*|mapping|struct|object);
-#else
-void    tell_object(object|string, string|mixed*|mapping|object);
-#endif /* USE_STRUCTS */
+
 void    unshadow();
 string  variable_exists(string, void|int|object, void|int);
 mixed  *variable_list(object|string, int default: F_CONST1);
@@ -632,17 +600,9 @@ object  first_inventory(object|string default: F_THIS_OBJECT);
 object  next_inventory(object default: F_THIS_OBJECT);
 void    move_object(object|string, object|string);
 object  present(object|string, void|int|object, void|object);
-#ifdef USE_STRUCTS
 void    say(string|mixed *|object|mapping|struct, void|object|object *);
-#else
-void    say(string|mixed *|object|mapping, void|object|object *);
-#endif /* USE_STRUCTS */
 void    set_environment(object, null|object);
-#ifdef USE_STRUCTS
 void    tell_room(object|string, string|mixed *|object|mapping|struct, void|object *);
-#else
-void    tell_room(object|string, string|mixed *|object|mapping, void|object *);
-#endif /* USE_STRUCTS */
 
 
         /* Verbs and Commands (TODO: should be optional) */

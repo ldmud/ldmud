@@ -182,4 +182,11 @@ extern unsigned char _my_ctype[];
 #define __EVAL_COST_TRACE__
 #endif
 
+/* Always enable structs.
+ * TODO: remove this, once all #ifdef USE_STRUCTS have been removed.
+ * Warning: do not #undef this to disable structs. It will produce an
+ * inconsistent and buggy driver.
+ */
+#define USE_STRUCTS 1
+
 #endif /* DRIVER_H__ */

@@ -522,9 +522,7 @@ static struct s_reswords reswords[]
    , { "sscanf",         L_SSCANF        }
    , { "static",         L_STATIC        }
    , { "status",         L_STATUS        }
-#ifdef USE_STRUCTS
    , { "struct",         L_STRUCT        }
-#endif
    , { "string",         L_STRING_DECL   }
    , { "switch",         L_SWITCH        }
    , { "symbol",         L_SYMBOL_DECL   }
@@ -862,9 +860,9 @@ init_lexer(void)
 #ifdef USE_DEPRECATED
     add_permanent_define("__DEPRECATED__", -1, string_copy("1"), MY_FALSE);
 #endif
-#ifdef USE_STRUCTS
+
     add_permanent_define("__LPC_STRUCTS__", -1, string_copy("1"), MY_FALSE);
-#endif
+
 #ifdef USE_NEW_INLINES
     add_permanent_define("__LPC_INLINE_CLOSURES__", -1, string_copy("1"), MY_FALSE);
 #endif
@@ -1007,10 +1005,8 @@ symbol_operator (const char *symbol, const char **endp)
  *   #'[>     -> F_AINDEX
  *   #'({     -> F_AGGREGATE
  *   #'([     -> F_M_CAGGREGATE
-#ifdef USE_STRUCTS
  *   #'->     -> F_S_INDEX
  *   #'(<     -> F_S_AGGREGATE
-#endif
  *
  * Note that all operators must have a instrs[].Default value of '0'.
  * If necessary, update the lex::init_lexer()::binary_operators[] to
@@ -1054,14 +1050,13 @@ symbol_operator (const char *symbol, const char **endp)
             ret = F_POST_DEC;
             break;
         }
-#ifdef USE_STRUCTS
         else if (c == '>')
         {
             symbol++;
             ret = F_S_INDEX;
             break;
         }
-#endif /* USE_STRUCTS */
+
         ret = F_SUBTRACT;
         break;
 
@@ -1344,13 +1339,12 @@ symbol_operator (const char *symbol, const char **endp)
             ret = F_M_CAGGREGATE;
             break;
         }
-#ifdef USE_STRUCTS
         else if (c == '<')
         {
             ret = F_S_AGGREGATE;
             break;
         }
-#endif /* USE_STRUCTS */
+
         symbol--;
         /* FALL THROUGH */
     default:
@@ -1760,9 +1754,8 @@ init_global_identifier (ident_t * ident, Bool bVariable)
         ident->u.global.variable = I_GLOBAL_VARIABLE_FUN;
     ident->u.global.efun     = I_GLOBAL_EFUN_OTHER;
     ident->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
-#ifdef USE_STRUCTS
     ident->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
-#endif
+
 } /* init_global_identifier() */
 
 /*-------------------------------------------------------------------------*/

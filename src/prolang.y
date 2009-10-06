@@ -106,9 +106,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#ifdef USE_STRUCTS
 #include "structs.h"
-#endif
 #include "svalue.h"
 #include "swap.h"
 #include "switch.h"
@@ -135,9 +133,7 @@
 typedef struct block_scope_s       block_scope_t;
 typedef struct const_list_s        const_list_t;
 typedef struct const_list_svalue_s const_list_svalue_t;
-#ifdef USE_STRUCTS
 typedef struct struct_init_s       struct_init_t;
-#endif /* USE_STRUCTS */
 typedef struct efun_shadow_s       efun_shadow_t;
 typedef struct mem_block_s         mem_block_t;
 
@@ -225,9 +221,7 @@ struct const_list_s
 {
     const_list_t *next;
     svalue_t val;
-#ifdef USE_STRUCTS
     string_t * member; /* NULL, or the member name to initialize */
-#endif
 };
 
 /* --- struct const_list_svalue_s: Head of a constant list ---
@@ -244,12 +238,9 @@ struct const_list_svalue_s
 {
     svalue_t     head;  /* the error handler */
     const_list_t list;  /* First element of the list */
-#ifdef USE_STRUCTS
     const_list_t *last_member; /* For nested struct initialisations */
-#endif /* USE_STRUCTS */
 };
 
-#ifdef USE_STRUCTS
 /* --- struct struct_init_s: Descriptor for one struct literal member
  *
  * When createing struct literals at runtime, a list of these structures
@@ -262,7 +253,6 @@ struct struct_init_s
     vartype_t       type;  /* Type of expression */
     string_t      * name;  /* Member name, or NULL if unnamed */
 };
-#endif /* USE_STRUCTS */
 
 /* --- struct efun_shadow_s: Store info about masked efuns ---
  *
@@ -294,17 +284,10 @@ struct efun_shadow_s
    * and -1 otherwise.
    */
 
-#ifdef USE_STRUCTS
 #define set_vartype(t, id, ptr) \
     ( t.type = (id), t.t_struct = (ptr) )
 #define set_fulltype(t, id, ptr) \
     ( t.typeflags = (id), t.t_struct = (ptr) )
-#else
-#define set_vartype(t, id, ptr) \
-    ( t.type = (id) )
-#define set_fulltype(t, id, ptr) \
-    ( t.typeflags = (id) )
-#endif
   /* Set the full/vartype <t> to type(flags) <id> and the struct
    * typeobject pointer to <ptr>.
    */
@@ -363,11 +346,10 @@ enum e_saved_areas {
      * of appearance.
      */
 
-#ifdef USE_STRUCTS
  , A_STRUCT_DEFS
     /* (struct_def_t) Tabled descriptors of all struct definitions.
      */
-#endif /* USE_STRUCTS */
+
  , NUMPAREAS  /* Number of saved areas */
 };
 
@@ -403,12 +385,11 @@ enum e_internal_areas {
      */
 %endif /* USE_NEW_INLINES */
 
-#ifdef USE_STRUCTS
  , A_STRUCT_MEMBERS
     /* (struct_member_t) While a struct definition is parsed, the member
      * descriptors are collected here.
      */
-#endif /* USE_STRUCTS */
+
  , NUMAREAS  /* Total number of areas */
 };
 
@@ -508,7 +489,6 @@ static mem_block_t mem_block[NUMAREAS];
   /* Return the number of inherits encountered so far.
    */
 
-#ifdef USE_STRUCTS
 #define STRUCT_DEF(n)     ((struct_def_t *)mem_block[A_STRUCT_DEFS].block)[n]
   /* Index the struct_def_t <n>.
    */
@@ -524,8 +504,6 @@ static mem_block_t mem_block[NUMAREAS];
 #define STRUCT_MEMBER_COUNT (mem_block[A_STRUCT_MEMBERS].current_size / sizeof(struct_member_t))
   /* Return the number of struct members stored.
    */
-
-#endif /* USE_STRUCTS */
 
 #define PROG_STRING(n) ((string_t **)mem_block[A_STRINGS].block)[n]
   /* Index the pointer for program string <n>.
@@ -897,11 +875,9 @@ static bc_offset_t current_continue_address;
   /* Special value: no continue encountered (yet).
    */
 
-#ifdef USE_STRUCTS
 static int current_struct;
   /* Index of the current structure to be defined.
    */
-#endif /* USE_STRUCTS */
 
 static p_uint last_expression;
   /* If >= 0, the address of the last instruction which by itself left
@@ -969,7 +945,6 @@ static Bool got_ellipsis[COMPILER_STACK_SIZE];
    * TODO: This should be dynamic.
    */
 
-#ifdef USE_STRUCTS
 static const char * compiled_file;
   /* The name of the program to be compiled. While current_loc.file reflects
    * the name of the source file currently being read, this name is always
@@ -991,23 +966,6 @@ static const fulltype_t Type_Quoted_Array = { TYPE_QUOTED_ARRAY, NULL };
 static const fulltype_t Type_Ptr_Any = { TYPE_ANY|TYPE_MOD_POINTER, NULL };
 static const fulltype_t Type_Ref_Any = { TYPE_ANY|TYPE_MOD_REFERENCE, NULL };
 static const fulltype_t Type_Ref_Number = { TYPE_NUMBER|TYPE_MOD_REFERENCE, NULL };
-#else
-static const fulltype_t Type_Any     = { TYPE_ANY };
-static const fulltype_t Type_Unknown = { TYPE_UNKNOWN };
-static const vartype_t  VType_Unknown = { TYPE_UNKNOWN };
-static const fulltype_t Type_Number  = { TYPE_NUMBER };
-static const fulltype_t Type_Float   = { TYPE_FLOAT };
-static const fulltype_t Type_String  = { TYPE_STRING };
-static const fulltype_t Type_Object  = { TYPE_OBJECT };
-static const fulltype_t Type_Closure = { TYPE_CLOSURE };
-static const fulltype_t Type_Mapping = { TYPE_MAPPING };
-static const fulltype_t Type_Symbol  = { TYPE_SYMBOL };
-static const fulltype_t Type_Void    = { TYPE_VOID };
-static const fulltype_t Type_Quoted_Array = { TYPE_QUOTED_ARRAY };
-static const fulltype_t Type_Ptr_Any = { TYPE_ANY|TYPE_MOD_POINTER };
-static const fulltype_t Type_Ref_Any = { TYPE_ANY|TYPE_MOD_REFERENCE };
-static const fulltype_t Type_Ref_Number = { TYPE_NUMBER|TYPE_MOD_REFERENCE };
-#endif /* USE_STRUCTS */
   /* Constants for the known simple types.
    */
 
@@ -1032,9 +990,7 @@ static void add_new_init_jump(void);
 static void transfer_init_control(void);
 static void copy_variables(program_t *, funflag_t);
 static int copy_functions(program_t *, funflag_t type);
-#ifdef USE_STRUCTS
 static void copy_structs(program_t *, funflag_t);
-#endif /* USE_STRUCTS */
 #ifdef USE_NEW_INLINES
 static void new_inline_closure (void);
 #endif /* USE_NEW_INLINES */
@@ -1327,9 +1283,8 @@ assign_full_to_vartype(vartype_t * dest, fulltype_t src)
 
 {
     dest->type = src.typeflags;
-#ifdef USE_STRUCTS
     dest->t_struct = src.t_struct;
-#endif
+
 } /* assign_full_to_vartype() */
 
 /*-------------------------------------------------------------------------*/
@@ -1341,9 +1296,8 @@ assign_var_to_fulltype(fulltype_t * dest, vartype_t src)
 
 {
     dest->typeflags = src.type;
-#ifdef USE_STRUCTS
     dest->t_struct = src.t_struct;
-#endif
+
 } /* assign_var_to_fulltype() */
 
 /*-------------------------------------------------------------------------*/
@@ -1355,10 +1309,8 @@ equal_types (fulltype_t e, fulltype_t t)
 
 {
     return (e.typeflags & TYPEID_MASK) == (t.typeflags & TYPEID_MASK)
-#ifdef USE_STRUCTS
-        && e.t_struct == t.t_struct
-#endif
-    ;
+      && e.t_struct == t.t_struct;
+
 } /* equal_types() */
 
 
@@ -1553,7 +1505,6 @@ get_type_name (fulltype_t type)
 
     strcat(buff, type_name[type.typeflags]);
 
-#ifdef USE_STRUCTS
     if  (type.typeflags == TYPE_STRUCT)
     {
         strcat(buff, " ");
@@ -1565,7 +1516,6 @@ get_type_name (fulltype_t type)
             strcat(buff, buff2);
         }
     }
-#endif /* USE_STRUCTS */
 
     if (pointer)
         strcat(buff, " *");
@@ -1592,7 +1542,6 @@ get_two_types (fulltype_t type1, fulltype_t type2)
     return buff;
 } /* get_two_types() */
 
-#ifdef USE_STRUCTS
 /*-------------------------------------------------------------------------*/
 static char *
 get_two_vtypes (vartype_t type1, vartype_t type2)
@@ -1606,7 +1555,6 @@ get_two_vtypes (vartype_t type1, vartype_t type2)
     assign_var_to_fulltype(&ftype2, type2);
     return get_two_types(ftype1, ftype2);
 } /* get_two_vtypes() */
-#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1679,7 +1627,6 @@ compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
     if (t1.typeflags == TYPE_ANY || t2.typeflags == TYPE_ANY)
         return MY_TRUE;
 
-#ifdef USE_STRUCTS
     if (is_assign
      && (t1.typeflags & PRIMARY_TYPE_MASK) == T_STRUCT
      && (t2.typeflags & PRIMARY_TYPE_MASK) == T_STRUCT
@@ -1703,16 +1650,11 @@ compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
         if (id2 != NULL)
             t2.t_struct = id1;
     }
-#endif
 
     if (t1.typeflags == t2.typeflags)
     {
-#ifdef USE_STRUCTS
         if (t1.t_struct == t2.t_struct)
             return MY_TRUE;
-#else
-        return MY_TRUE;
-#endif
     }
 
     if ((t1.typeflags & TYPE_MOD_POINTER) && (t2.typeflags & TYPE_MOD_POINTER))
@@ -1722,7 +1664,6 @@ compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
             return MY_TRUE;
     }
 
-#ifdef USE_STRUCTS
     if (is_assign && (t1.typeflags & PRIMARY_TYPE_MASK) == T_STRUCT)
     {
         /* Check if t2 is a struct.  If it is, the above
@@ -1731,7 +1672,6 @@ compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
         if ((t2.typeflags & PRIMARY_TYPE_MASK) != T_STRUCT)
             return MY_FALSE;
     }
-#endif
 
     return MY_FALSE;
 } /* compatible_types() */
@@ -4185,7 +4125,6 @@ def_function_complete ( p_int body_start
 
 /* =============================   STRUCTS   ============================= */
 
-#ifdef USE_STRUCTS
 /*-------------------------------------------------------------------------*/
 static int
 define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
@@ -4802,7 +4741,7 @@ struct_epilog (void)
 
         if (STRUCT_DEF(i).inh >= 0)
             continue;
-        
+
         pOld = struct_lookup_type(pSType);
         if (!pOld || !struct_type_equivalent(pSType, pOld))
             continue;
@@ -4908,7 +4847,6 @@ struct_epilog (void)
 
 } /* struct_epilog() */
 
-#endif /* USE_STRUCTS */
 
 #ifdef USE_NEW_INLINES
 /* =========================   Inline Closures   =-======================= */
@@ -4944,9 +4882,7 @@ printf("DEBUG: new inline #%"PRIuMPINT": prev %"PRIdMPINT"\n", INLINE_CLOSURE_CO
     ict.function = -1;
     ict.ident = NULL;
     ict.returntype.typeflags = 0;
-#ifdef USE_STRUCTS
     ict.returntype.t_struct = NULL;
-#endif
     ict.num_args = 0;
     ict.parse_context = MY_FALSE;
     ict.start_line = stored_lines;
@@ -5699,9 +5635,7 @@ delete_prog_string (void)
 %token L_STATUS
 %token L_STRING
 %token L_STRING_DECL
-%ifdef USE_STRUCTS
 %token L_STRUCT
-%endif
 %token L_SWITCH
 %token L_SYMBOL
 %token L_SYMBOL_DECL
@@ -5886,7 +5820,6 @@ delete_prog_string (void)
        * the argument parsing in a function call.
        */
 
-%ifdef USE_STRUCTS
     struct {
         int length;            /* Number of initializers parsed */
         /* Description of initializers parsed: */
@@ -5904,7 +5837,6 @@ delete_prog_string (void)
       /* For runtime struct literals: information about a single
        * member initializer.
        */
-%endif /* USE_STRUCTS */
 
 } /* YYSTYPE */
 
@@ -5946,12 +5878,10 @@ delete_prog_string (void)
 %type <address>      optional_else
 %type <string>       anchestor
 %type <sh_string>    call_other_name identifier
-%ifdef USE_STRUCTS
 %type <fulltype>     member_name_list
 %type <struct_init_member> struct_init
 %type <struct_init_list>   opt_struct_init opt_struct_init2
 %type <sh_string>    struct_member_name
-%endif /* USE_STRUCTS */
 %type <function_name> function_name
 
 
@@ -6098,9 +6028,7 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
 #endif /* USE_NEW_INLINES */
       }
 
-%ifdef USE_STRUCTS
     | struct_decl
-%endif /* USE_STRUCTS */
     | inheritance
     | default_visibility
 ; /* def */
@@ -6379,7 +6307,6 @@ inline_comma_expr:
 
 %endif /* USE_NEW_INLINES */
 
-%ifdef USE_STRUCTS
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* Definition of a struct
  */
@@ -6489,29 +6416,28 @@ member_name_list:
       {
           fulltype_t actual_type = $1;
           vartype_t type;
-          
+
           actual_type.typeflags |= $2;
-          
+
           assign_full_to_vartype(&type, actual_type);
           add_struct_member($3->name, type, NULL);
-            
+
           $$ = $1;
       }
     | member_name_list ',' optional_star L_IDENTIFIER
       {
           fulltype_t actual_type = $1;
           vartype_t type;
-          
+
           actual_type.typeflags |= $3;
-          
+
           assign_full_to_vartype(&type, actual_type);
           add_struct_member($4->name, type, NULL);
-            
+
           $$ = $1;
       }
 ; /* member_name_list */
 
-%endif /* USE_STRUCTS */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -6727,9 +6653,8 @@ inheritance:
                */
               int initializer;
 
-#ifdef USE_STRUCTS
               copy_structs(ob->prog, $1[0]);
-#endif
+
               initializer = copy_functions(ob->prog, $1[0]);
               copy_variables(ob->prog, $1[1]);
 
@@ -6966,7 +6891,6 @@ basic_non_void_type:
     | L_FLOAT_DECL   { $$ = Type_Float;   }
     | L_MAPPING      { $$ = Type_Mapping; }
     | L_MIXED        { $$ = Type_Any;     }
-%ifdef USE_STRUCTS
     | L_STRUCT identifier
       {
           int num;
@@ -6985,7 +6909,7 @@ basic_non_void_type:
 
           free_mstring($2);
       }
-%endif /* USE_STRUCTS */
+
 ; /* basic_non_void_type */
 
 
@@ -8925,7 +8849,6 @@ expr0:
           if (type2.typeflags & TYPE_MOD_REFERENCE)
               yyerror("Can't trace reference assignments.");
 
-#ifdef USE_STRUCTS
           /* Special checks for struct assignments */
           if (IS_TYPE_STRUCT(type1) || IS_TYPE_STRUCT(type2)
              )
@@ -8934,7 +8857,6 @@ expr0:
               if ($2 != F_ASSIGN)
                   yyerror("Only plain assigment allowed for structs");
           }
-#endif /* USE_STRUCTS */
 
           if ($2 == F_LAND_EQ || $2 == F_LOR_EQ)
           {
@@ -9529,12 +9451,10 @@ expr0:
               else if (($1.type.typeflags == TYPE_NUMBER || $1.type.typeflags == TYPE_ANY)
                     && $4.type.typeflags == TYPE_FLOAT)
                   $$.type = Type_Float;
-#ifdef USE_STRUCTS
               else if (IS_TYPE_STRUCT($1.type) || IS_TYPE_STRUCT($4.type))
                   yyerrorf("Bad arguments to '+': %s"
                           , get_two_types($1.type, $4.type)
                           );
-#endif /* USE_STRUCTS */
           }
           $$.end = CURRENT_PROGRAM_SIZE;
       } /* '+' */
@@ -9795,10 +9715,8 @@ expr0:
               switch($1.typeflags)
               {
               default:
-#ifdef USE_STRUCTS
                   if (IS_TYPE_STRUCT($1))
                       break; /* Do nothing, just adapt the type information */
-#endif /* USE_STRUCTS */
                   type_error("Illegal cast", $1);
                   break;
               case TYPE_ANY:
@@ -10521,7 +10439,6 @@ expr4:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-%ifdef USE_STRUCTS
     | '(' '<' note_start '>' ')'
       {
           yyerror("Missing identifier for empty struct literal");
@@ -10619,12 +10536,12 @@ expr4:
               /* At this point: s_index >= 0: $1 is of type struct
                *                         < 0: $1 is of type mixed
                */
-          
+
               if ($3 != NULL)
               {
                   int num;
                   struct_type_t * ptype = NULL;
-                  
+
                   if (s_index >= 0)
                   {
                       ptype = $1.type.t_struct;
@@ -10715,12 +10632,12 @@ expr4:
               /* At this point: s_index >= 0: $1 is of type struct
                *                         < 0: $1 is of type mixed
                */
-          
+
               if ($5 != NULL)
               {
                   int num;
                   struct_type_t * ptype = NULL;
-                  
+
                   if (s_index >= 0)
                   {
                       ptype = $3.type.t_struct;
@@ -10774,7 +10691,6 @@ expr4:
           if ($5 != NULL)
               free_mstring($5);
       }
-%endif /* USE_STRUCTS */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr4 index_range %prec '['
@@ -11549,7 +11465,6 @@ lvalue:
           }
       }
 
-%ifdef USE_STRUCTS
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr4 L_ARROW struct_member_name
       {
@@ -11583,11 +11498,11 @@ lvalue:
               /* At this point: s_index >= 0: $1 is of type struct
                *                         < 0: $1 is of type mixed
                */
-          
+
               if ($3 != NULL)
               {
                   struct_type_t * ptype = NULL;
-                  
+
                   if (s_index >= 0)
                   {
                       ptype = $1.type.t_struct;
@@ -11700,7 +11615,6 @@ lvalue:
           if ($3 != NULL)
               free_mstring($3);
       }
-%endif /* USE_STRUCTS */
 
 ; /* lvalue */
 
@@ -12308,7 +12222,6 @@ m_expr_values:
 ; /* m_expr_values */
 
 
-%ifdef USE_STRUCTS
 
 /* Rule used to parse a static or dynamic member name in lookups */
 
@@ -12336,7 +12249,7 @@ struct_member_name:
               )
               type_error("Illegal type for struct member name", $2.type);
       }
-      
+
 ; /* struct_member_name */
 
 
@@ -12400,7 +12313,6 @@ struct_init:
       }
 ; /* struct_init */
 
-%endif /* USE_STRUCTS */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* Function calls and inline functions.
  */
@@ -12865,9 +12777,7 @@ function_call:
                                * handle references correctly
                                */
                               if (equal_types(tmp1, tmp2)
-#ifdef USE_STRUCTS
                                || (IS_TYPE_STRUCT(tmp1) && IS_TYPE_STRUCT(tmp2))
-#endif
                                  )
                                   break;
 
@@ -14006,7 +13916,6 @@ lvalue_list:
           }
       }
 
-%ifdef USE_STRUCTS
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | lvalue_list ',' expr4 L_ARROW struct_member_name
       {
@@ -14034,11 +13943,11 @@ lvalue_list:
               /* At this point: s_index >= 0: $1 is of type struct
                *                         < 0: $1 is of type mixed
                */
-          
+
               if ($5 != NULL)
               {
                   int num;
-                  
+
                   if (s_index >= 0)
                   {
                       struct_type_t * ptype = $3.type.t_struct;
@@ -14080,7 +13989,6 @@ lvalue_list:
           if ($5 != NULL)
               free_mstring($5);
       }
-%endif /* USE_STRUCTS */
 
 ; /* lvalue_list */
 
@@ -14431,10 +14339,8 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
  *     Cases are:
  *         global
  *             IDENTIFIER16 -> PUSH_IDENTIFIER16_LVALUE
-#ifdef USE_STRUCTS
  *         expr4->x
  *             S_INDEX      -> PUSH_PROTECTED_INDEXED_S_LVALUE
-#endif
  *         expr4[x]
  *             INDEX        -> PUSH_PROTECTED_INDEXED_LVALUE
  *         expr4[<x]
@@ -14481,10 +14387,8 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
  *                       -> F_PUSH_PROTECTED_INDEXED_LVALUE;
  *         &(expr4[<x]): F_PROTECTED_RINDEX_LVALUE
  *                       -> F_PUSH_PROTECTED_RINDEXED_LVALUE;
-#ifdef USE_STRUCTS
  *         &(expr4->x):  F_PROTECTED_INDEX_S_LVALUE
  *                       -> F_PUSH_PROTECTED_INDEXED_S_LVALUE;
-#endif
  *
  * TODO: I am surprised this works at all.
  */
@@ -14531,11 +14435,9 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
             /* Adjust the code... */
             switch(code)
             {
-#ifdef USE_STRUCTS
             case F_PUSH_INDEXED_S_LVALUE:
                 code = F_PUSH_PROTECTED_INDEXED_S_LVALUE;
                 break;
-#endif /* USE_STRUCTS */
             case F_PUSH_INDEXED_LVALUE:
                 code = F_PUSH_PROTECTED_INDEXED_LVALUE;
                 break;
@@ -14598,11 +14500,9 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
 
         switch(newcode)
         {
-#ifdef USE_STRUCTS
         case F_PROTECTED_INDEX_S_LVALUE:
             newcode = F_PUSH_PROTECTED_INDEXED_S_LVALUE;
             break;
-#endif /* USE_STRUCTS */
         case F_PROTECTED_INDEX_LVALUE:
             newcode = F_PUSH_PROTECTED_INDEXED_LVALUE;
             break;
@@ -15171,7 +15071,7 @@ get_virtual_function_id (program_t *progp, int fx)
 } /* get_virtual_function_id() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef USE_STRUCTS
+
 static void
 copy_structs (program_t *from, funflag_t flags)
 
@@ -15188,7 +15088,7 @@ copy_structs (program_t *from, funflag_t flags)
         ident_t *p;
         struct_def_t *pdef = from->struct_defs + struct_id;
         funflag_t f;
-        
+
         f = flags | pdef->flags;
 
         /* Is this struct visible to us? */
@@ -15242,7 +15142,6 @@ copy_structs (program_t *from, funflag_t flags)
         STRUCT_DEF(current_struct).inh = INHERIT_COUNT;
     }
 } /* copy_structs() */
-#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -16306,9 +16205,7 @@ prolog (const char * fname, Bool isMasterObj)
 printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
 #endif /* DEBUG_INLINES */
 
-#ifdef USE_STRUCTS
     compiled_file = fname;
-#endif /* USE_STRUCTS */
     stored_lines = 0;
     stored_bytes = 0;
     last_include_start = -1;
@@ -16387,7 +16284,6 @@ epilog (void)
 
     free_case_blocks();
 
-%ifdef USE_STRUCTS
     for (i = 0; (size_t)i < STRUCT_MEMBER_COUNT; i++)
     {
         free_struct_member_data(&STRUCT_MEMBER(i));
@@ -16403,7 +16299,6 @@ epilog (void)
     {
         struct_epilog();
     }
-%endif /* USE_STRUCTS */
 
     /* Append the non-virtual variable block to the virtual ones,
      * and take care of the initializers.
@@ -16730,7 +16625,7 @@ epilog (void)
     /* Now create the program structure */
     switch (0) { default:
 
-#if 0 && defined(USE_STRUCTS)
+#if 0
 {
     int i, j;
 
@@ -16767,7 +16662,7 @@ epilog (void)
     printf("DEBUG: ------\n");
 
 }
-#endif /* 0 && USE_STRUCTS */
+#endif /* 0 */
 
         /* On error, don't create anything */
         if (num_parse_error > 0 || inherit_file)
@@ -16908,7 +16803,6 @@ epilog (void)
         }
         p += align(mem_block[A_INHERITS].current_size);
 
-#ifdef USE_STRUCTS
         /* Add the struct information.
          */
         prog->num_structs = STRUCT_COUNT;
@@ -16921,7 +16815,6 @@ epilog (void)
             prog->struct_defs = NULL;
         }
         p += align(mem_block[A_STRUCT_DEFS].current_size);
-#endif /* USE_STRUCTS */
 
         /* Add the include file information */
         prog->num_includes = INCLUDE_COUNT;
@@ -17044,10 +16937,8 @@ epilog (void)
                            , (variable_t *)mem_block[A_VIRTUAL_VAR].block
                            , INCLUDE_COUNT
                            , (include_t *)mem_block[A_INCLUDES].block
-#ifdef USE_STRUCTS
                            , STRUCT_COUNT
                            , (struct_def_t *)mem_block[A_STRUCT_DEFS].block
-#endif /* USE_STRUCTS */
                            );
 
         /* Free the type information */

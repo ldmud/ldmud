@@ -54,6 +54,7 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
 
     - Language
        + Added a sefun:: specifier to explicitly call simul-efuns. (#669)
+       + structs are always enabled.
 
     - Other
        + The driver requires a C99 compatible build system. Some checks and
