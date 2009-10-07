@@ -1,7 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-06-Oct-2099 (Zesstra)
+07-Oct-2009 (Gnomi)
+  - Check for references to destructed objects before entering them as
+    keys into a mapping. (#689)
+    (mapping.c)
+
+06-Oct-2009 (Zesstra)
   - Always enable structs (#557).
     (prolang.y, lex.c, driver.h, config.h.in, func_spec)
   - Always enable new inline closures (#557).

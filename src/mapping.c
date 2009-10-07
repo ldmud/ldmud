@@ -821,6 +821,11 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
         map_index->u.str = make_tabled(map_index->u.str);
     }
 
+    /* Check if it's a destructed object.
+     */
+    if (destructed_object_ref(map_index))
+        assign_svalue(map_index, &const0);
+
     /* Generate secondary information for types which usually
      * have none (required for hashing).
      */

@@ -326,6 +326,30 @@ nosave mixed *tests = ({
         :)
     }),
 #endif // __XML_DOM__
+    ({ "0000689", 0,
+        (:
+            // Each pass will crash with approx. 40% propability.
+            // So let's make that a sure thing:
+            foreach(int i: 1000)
+            {
+                mapping xm = ([
+                    clone_object(this_object()),
+                    clone_object(this_object())
+                ]);
+                object * x = m_indices(xm);
+
+                destruct(x[0]);
+                destruct(x[1]);
+
+                // This will crash when there is a destructed object with the
+                // same hash value as '0' and would have another hash value
+                // with being '0' instead of a destructed object.
+                m_delete(mkmapping(x),0);
+            }
+
+            return 1;
+        :)
+    }),
 });
 
 void run_test()
