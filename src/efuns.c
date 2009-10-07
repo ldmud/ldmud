@@ -268,19 +268,12 @@ f_implode (svalue_t * sp)
  *
  * Concatenate all strings found in array arr, with the string
  * del between each element. Only strings are used from the array.
- * An empty array will cause an error (here, not in implode_string(), because
- * that function is also used somewhere else).
  */
 
 {
     string_t *str;
-    
-    vector_t *arr = (sp-1)->u.vec;
 
-    if (VEC_SIZE(arr) == 0)
-        errorf("Bad argument 1 to implode: got an empty array.\n");
-    
-    str = implode_string(arr, sp->u.str);
+    str = implode_string((sp-1)->u.vec, sp->u.str);
     if (!str)
         errorf("Out of memory for implode() result.\n");
 

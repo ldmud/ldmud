@@ -19,8 +19,5 @@ EXAMPLES
         regreplace("a short text", " ", "_", 1)
         instead.
 
-HISTORY
-        Since 3.5.0 an empty array will cause an error.
-
 SEE ALSO
         explode(E), regreplace(E)

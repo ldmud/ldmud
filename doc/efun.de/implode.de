@@ -21,8 +21,6 @@ BEISPIELE
         regreplace("a short text", " ", "_", 1)
         verwenden.
 
-AenDERUNGEN
-        Seit 3.5.0 ist die Uebergabe eines leeren Arrays ein Fehler.
 
 SIEHE AUCH
         explode(E), regreplace(E)
