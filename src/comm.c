@@ -4942,72 +4942,18 @@ init_telopts (void)
 {
     int i;
 
+    /* Pass all telnet options that we're not
+     * able to handle to the mudlib.
+     */
     for (i = NTELOPTS; --i >= 0; ) {
-        telopts_do[i] = send_wont;
-    }
-    for (i = NTELOPTS; --i >= 0; ) {
-        telopts_dont[i] = reply_nil;
-    }
-    for (i = NTELOPTS; --i >= 0; ) {
-        telopts_will[i] = send_dont;
-    }
-    for (i = NTELOPTS; --i >= 0; ) {
-        telopts_wont[i] = reply_nil;
+        telopts_do[i] = reply_h_telnet_neg;
+        telopts_dont[i] = reply_h_telnet_neg;
+        telopts_will[i] = reply_h_telnet_neg;
+        telopts_wont[i] = reply_h_telnet_neg;
     }
 
     telopts_do[TELOPT_ECHO] = reply_to_do_echo;
     telopts_dont[TELOPT_ECHO] = reply_to_dont_echo;
-
-    telopts_do[TELOPT_TM] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_TM] = reply_h_telnet_neg;
-    telopts_will[TELOPT_TM] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_TM] = reply_h_telnet_neg;
-
-    telopts_do[TELOPT_NEWENV] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_NEWENV] = reply_h_telnet_neg;
-    telopts_will[TELOPT_NEWENV] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_NEWENV] = reply_h_telnet_neg;
-
-    telopts_do[TELOPT_ENVIRON] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_ENVIRON] = reply_h_telnet_neg;
-    telopts_will[TELOPT_ENVIRON] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_ENVIRON] = reply_h_telnet_neg;
-
-    telopts_do[TELOPT_XDISPLOC] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_XDISPLOC] = reply_h_telnet_neg;
-    telopts_will[TELOPT_XDISPLOC] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_XDISPLOC] = reply_h_telnet_neg;
-
-    telopts_do[TELOPT_LINEMODE] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_LINEMODE] = reply_h_telnet_neg;
-    telopts_will[TELOPT_LINEMODE] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_LINEMODE] = reply_h_telnet_neg;
-
-    telopts_do[TELOPT_NAWS] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_NAWS] = reply_h_telnet_neg;
-    telopts_will[TELOPT_NAWS] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_NAWS] = reply_h_telnet_neg;
-
-    telopts_do[TELOPT_TTYPE] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_TTYPE] = reply_h_telnet_neg;
-    telopts_will[TELOPT_TTYPE] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_TTYPE] = reply_h_telnet_neg;
-
-    telopts_do[TELOPT_TSPEED] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_TSPEED] = reply_h_telnet_neg;
-    telopts_will[TELOPT_TSPEED] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_TSPEED] = reply_h_telnet_neg;
-
-    telopts_do[TELOPT_BINARY] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_BINARY] = reply_h_telnet_neg;
-    telopts_will[TELOPT_BINARY] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_BINARY] = reply_h_telnet_neg;
-
-    /* Tinyfugue can do bad things to your health */
-    telopts_do[TELOPT_EOR] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_EOR] = reply_h_telnet_neg;
-    telopts_will[TELOPT_EOR] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_EOR] = reply_h_telnet_neg;
 
     /* Go Ahead does not make any sense when coupling multiple
      * interactive users. It is debatable if we are sending
@@ -5028,7 +4974,6 @@ init_telopts (void)
     telopts_wont[TELOPT_SGA] = reply_to_wont_sga;
 
     /* Mud specific protocols */
-
     telopts_do[TELOPT_COMPRESS] = mccp_telnet_neg;
     telopts_dont[TELOPT_COMPRESS] = mccp_telnet_neg;
     telopts_will[TELOPT_COMPRESS] = mccp_telnet_neg;
@@ -5038,21 +4983,6 @@ init_telopts (void)
     telopts_dont[TELOPT_COMPRESS2] = mccp_telnet_neg;
     telopts_will[TELOPT_COMPRESS2] = mccp_telnet_neg;
     telopts_wont[TELOPT_COMPRESS2] = mccp_telnet_neg;
-
-    telopts_do[TELOPT_MSP] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_MSP] = reply_h_telnet_neg;
-    telopts_will[TELOPT_MSP] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_MSP] = reply_h_telnet_neg;
-
-    telopts_do[TELOPT_MXP] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_MXP] = reply_h_telnet_neg;
-    telopts_will[TELOPT_MXP] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_MXP] = reply_h_telnet_neg;
-
-    telopts_do[TELOPT_STARTTLS] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_STARTTLS] = reply_h_telnet_neg;
-    telopts_will[TELOPT_STARTTLS] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_STARTTLS] = reply_h_telnet_neg;
 } /* init_telopts() */
 
 /*-------------------------------------------------------------------------*/

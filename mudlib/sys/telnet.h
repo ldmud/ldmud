@@ -106,10 +106,14 @@ char *telcmds[] = {
 #define  TELOPT_STARTTLS      46        /* Transport Layer Security */
 
 /* Inofficial, mud specific telnet options */
+#define  TELOPT_MSSP          70        /* Mud Server Status Protocol */
 #define  TELOPT_COMPRESS      85        /* Mud Compression Protocol, v.1 */
 #define  TELOPT_COMPRESS2     86        /* Mud Compression Protocol, v.2 */
 #define  TELOPT_MSP           90        /* Mud Sound Protocol */
 #define  TELOPT_MXP           91        /* Mud Extension Protocol */
+#define  TELOPT_ZMP           93        /* Zenith Mud Protocol */
+#define  TELOPT_MUSHCLIENT   102        /* Mushclient/Aardwolf Protocol */
+#define  TELOPT_ATCP         200        /* Achaea Telnet Client Protocol */
 #define  TELOPT_EXOPL        255        /* extended-options-list */
 
 #define  NTELOPTS            256        /* was: (1+TELOPT_NEWENV) */
@@ -135,17 +139,54 @@ char *telopts[NTELOPTS]
    , "TELOPT 56", "TELOPT 57", "TELOPT 58", "TELOPT 59"
    , "TELOPT 60", "TELOPT 61", "TELOPT 62", "TELOPT 63"
    , "TELOPT 64", "TELOPT 65", "TELOPT 66", "TELOPT 67"
-   , "TELOPT 68", "TELOPT 69", "TELOPT 70", "TELOPT 71"
+   , "TELOPT 68", "TELOPT 69", "MSSP", "TELOPT 71"
    , "TELOPT 72", "TELOPT 73", "TELOPT 74", "TELOPT 75"
    , "TELOPT 76", "TELOPT 77", "TELOPT 78", "TELOPT 79"
    , "TELOPT 80", "TELOPT 81", "TELOPT 82", "TELOPT 83"
    , "TELOPT 84", "MUD COMPRESS", "MUD COMPRESS2", "TELOPT 87"
    , "TELOPT 88", "TELOPT 89", "MUD SOUND", "MUD EXTENSION"
+   , "TELOPT 92", "ZMP", "TELOPT 94", "TELOPT 95"
+   , "TELOPT 96", "TELOPT 97", "TELOPT 98", "TELOPT 99"
+   , "TELOPT 100", "TELOPT 101", "MUSHCLIENT", "TELOPT 103"
+   , "TELOPT 104", "TELOPT 105", "TELOPT 106", "TELOPT 107"
+   , "TELOPT 108", "TELOPT 109", "TELOPT 110", "TELOPT 111"
+   , "TELOPT 112", "TELOPT 113", "TELOPT 114", "TELOPT 115"
+   , "TELOPT 116", "TELOPT 117", "TELOPT 118", "TELOPT 119"
+   , "TELOPT 120", "TELOPT 121", "TELOPT 122", "TELOPT 123"
+   , "TELOPT 124", "TELOPT 125", "TELOPT 126", "TELOPT 127"
+   , "TELOPT 128", "TELOPT 129", "TELOPT 130", "TELOPT 131"
+   , "TELOPT 132", "TELOPT 133", "TELOPT 134", "TELOPT 135"
+   , "TELOPT 136", "TELOPT 137", "TELOPT 138", "TELOPT 139"
+   , "TELOPT 140", "TELOPT 141", "TELOPT 142", "TELOPT 143"
+   , "TELOPT 144", "TELOPT 145", "TELOPT 146", "TELOPT 147"
+   , "TELOPT 148", "TELOPT 149", "TELOPT 150", "TELOPT 151"
+   , "TELOPT 152", "TELOPT 153", "TELOPT 154", "TELOPT 155"
+   , "TELOPT 156", "TELOPT 157", "TELOPT 158", "TELOPT 159"
+   , "TELOPT 160", "TELOPT 161", "TELOPT 162", "TELOPT 163"
+   , "TELOPT 164", "TELOPT 165", "TELOPT 166", "TELOPT 167"
+   , "TELOPT 168", "TELOPT 169", "TELOPT 170", "TELOPT 171"
+   , "TELOPT 172", "TELOPT 173", "TELOPT 174", "TELOPT 175"
+   , "TELOPT 176", "TELOPT 177", "TELOPT 178", "TELOPT 179"
+   , "TELOPT 180", "TELOPT 181", "TELOPT 182", "TELOPT 183"
+   , "TELOPT 184", "TELOPT 185", "TELOPT 186", "TELOPT 187"
+   , "TELOPT 188", "TELOPT 189", "TELOPT 190", "TELOPT 191"
+   , "TELOPT 192", "TELOPT 193", "TELOPT 194", "TELOPT 195"
+   , "TELOPT 196", "TELOPT 197", "TELOPT 198", "TELOPT 199"
+   , "ATCP", "TELOPT 201", "TELOPT 202", "TELOPT 203"
+   , "TELOPT 204", "TELOPT 205", "TELOPT 206", "TELOPT 207"
+   , "TELOPT 208", "TELOPT 209", "TELOPT 210", "TELOPT 211"
+   , "TELOPT 212", "TELOPT 213", "TELOPT 214", "TELOPT 215"
+   , "TELOPT 216", "TELOPT 217", "TELOPT 218", "TELOPT 219"
+   , "TELOPT 220", "TELOPT 221", "TELOPT 222", "TELOPT 223"
+   , "TELOPT 224", "TELOPT 225", "TELOPT 226", "TELOPT 227"
+   , "TELOPT 228", "TELOPT 229", "TELOPT 230", "TELOPT 231"
+   , "TELOPT 232", "TELOPT 233", "TELOPT 234", "TELOPT 235"
+   , "TELOPT 236", "TELOPT 237", "TELOPT 238", "TELOPT 239"
+   , "TELOPT 240", "TELOPT 241", "TELOPT 242", "TELOPT 243"
+   , "TELOPT 244", "TELOPT 245", "TELOPT 246", "TELOPT 247"
+   , "TELOPT 248", "TELOPT 249", "TELOPT 250", "TELOPT 251"
+   , "TELOPT 252", "TELOPT 253", "TELOPT 254", "EXOPL"
 };
-#define  TELOPT_FIRST   TELOPT_BINARY
-#define  TELOPT_LAST    TELOPT_MXP
-#define  TELOPT_OK(x)   ((x) <= TELOPT_LAST && (x) >= TELOPT_FIRST)
-#define  TELOPT(x)      telopts[(x)-TELOPT_FIRST]
 #endif
 
 #endif /* __DRIVER_SOURCE__ */
