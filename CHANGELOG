@@ -8,7 +8,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
     that (too large handshake data). Whoever wants to use client
     certificates shall set it up explicitely.
     (configure)
- 
+  - Updated Avalon settings file.
+    (settings/avalon)
+
 12-Oct-2009 (Gnomi)
   - Pass all unknown telnet options to the mudlib. (#670)
     (comm.c)

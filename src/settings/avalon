@@ -5,7 +5,7 @@
 #
 # configure will strip this part from the script.
 
-export EXTRA_CFLAGS="-mcpu=i686 -march=i686"
+export EXTRA_CFLAGS="-march=native"
 exec ./configure --prefix=/home/mud --libdir=/home/mud/mudlib --libexecdir=/home/mud/erq --enable-erq=xerq --with-setting=avalon $*
 exit 1
 
@@ -40,7 +40,8 @@ enable_use_mysql=/usr/lib/mysql
 with_htable_size=65536
 with_otable_size=8192
 
-with_hard_malloc_limit=0x23000000
+#with_hard_malloc_limit=0x23000000
+with_hard_malloc_limit=0x7fffffff
 
 with_max_array_size=10000
 with_max_mapping_keys=40000
@@ -53,3 +54,5 @@ with_optmize=medium
 enable_use_mccp=yes
 enable_use_pcre=yes
 enable_use_tls=gnu
+
+with_tls_trustdirectory=no
