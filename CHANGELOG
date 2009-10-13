@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Oct-2009 (Gnomi)
+  - Deactivate tls_trustdirectory per default as /etc/ssl/certs may contain
+    a large number of certificates on usual installations (which are not
+    related to client certificates) and GnuTLS clients have a problem with
+    that (too large handshake data). Whoever wants to use client
+    certificates shall set it up explicitely.
+    (configure)
+ 
 12-Oct-2009 (Gnomi)
   - Pass all unknown telnet options to the mudlib. (#670)
     (comm.c)
