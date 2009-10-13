@@ -231,7 +231,7 @@ AC_MY_ARG_WITH(tls-path,,,[Optional location of the TLS include/ and lib/ direct
 AC_MY_ARG_WITH(tls-keyfile,key.pem,,[Default x509 keyfile])
 AC_MY_ARG_WITH(tls-certfile,cert.pem,,[Default x509 certificate file])
 AC_MY_ARG_WITH(tls-trustfile,no,,[Default filename holding trusted PEM certificates])
-AC_MY_ARG_WITH(tls-trustdirectory,"/etc/ssl/certs",,[Default directory holding trusted PEM certificates])
+AC_MY_ARG_WITH(tls-trustdirectory,no,,[Default directory holding trusted PEM certificates])
 AC_MY_ARG_WITH(tls-crlfile,no,,[Default filename holding certificate revocation lists])
 AC_MY_ARG_WITH(tls-crldirectory,no,,[Default directory holding certificate revocation lists])
 AC_MY_ARG_ENABLE(use-gcrypt,yes,,[Enables support for libgcrypt])
