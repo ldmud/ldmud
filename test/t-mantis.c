@@ -325,6 +325,13 @@ nosave mixed *tests = ({
             return stringp(xml_generate(({ "abc", ([ "xyz" : "cde" ]), 0 })));
         :)
     }),
+    ({ "0000683", 0,
+        (:
+            foreach(int i: 1000)
+                catch(xml_generate(({ "a", "b", "c" })));
+            return 1; // It didn't crash...
+        :)
+    }),
 #endif // __XML_DOM__
 });
 

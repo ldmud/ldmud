@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Oct-2009 (Gnomi)
+  - Free the xml buffer after xml reader and writer, because they might
+    use it when cleaning up. (maybe #683)
+    (pkg-xml2.c)
+  - Don't call xmlCleanupParser, as it should be called when there's no more
+    xml processing. Don't call xmlInitParser, as it is already done on startup.
+    (pkg-xml2.c)
+
 13-Oct-2009 (Gnomi)
   - Deactivate tls_trustdirectory per default as /etc/ssl/certs may contain
     a large number of certificates on usual installations (which are not

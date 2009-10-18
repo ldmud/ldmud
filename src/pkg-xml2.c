@@ -267,11 +267,6 @@ xml_cleanup (svalue_t * arg)
 
     data = (struct xml_cleanup_s *) arg;
 
-    if (data->buf)
-    {
-        xmlBufferFree(data->buf);
-    }
-
     if (data->writer)
     {
        xmlFreeTextWriter(data->writer);
@@ -282,7 +277,10 @@ xml_cleanup (svalue_t * arg)
        xmlFreeTextReader(data->reader);
     }
 
-    xmlCleanupParser();
+    if (data->buf)
+    {
+        xmlBufferFree(data->buf);
+    }
 
     xfree(data);
 } /* xml_cleanup() */
@@ -521,8 +519,6 @@ f_xml_parse(svalue_t * sp)
     rec_data->writer = NULL;
     rec_data->reader = NULL;
     push_error_handler(xml_cleanup, &(rec_data->head));
-
-    xmlInitParser();
 
     /* Disable standard error functions, as they will print out errors
      * to stderr automatically. We do not want that.
