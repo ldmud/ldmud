@@ -1,6 +1,6 @@
 VERALTET
 SYNOPSIS
-        void write(mixed msg);
+        void write(mixed msg)
 
 BESCHREIBUNG
         Gibt etwas an den aktuellen Benutzer aus. Was genau ausgegeben wird,

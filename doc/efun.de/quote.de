@@ -1,15 +1,15 @@
 SYNOPSIS
-        mixed quote(mixed arg);
+        mixed quote(mixed arg)
 
 BESCHREIBUNG
         Konvertiert ein Array zu einem quoted Array und Strings zu Symbolen.
         Symbole und quoted Arrays werden erneut gequoted.
 
-BEISPIEL
+BEISPIELE
         quote("foo") -> 'foo
         quote(({1,2,3})) -> '({1,2,3})
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2@70.
 
 SIEHE AUCH

@@ -1,7 +1,7 @@
 SYNOPSIS
-        int sizeof(mixed * val);
-        int sizeof(string  val);
-        int sizeof(mapping val);
+        int sizeof(mixed * val)
+        int sizeof(string  val)
+        int sizeof(mapping val)
 
 BESCHREIBUNG
         Liefert die Anzahl Elemente in einem Array <val>, die Anzahl
@@ -11,7 +11,7 @@ BESCHREIBUNG
         Als Spezialfall kann <val> auch 0 sein. In diesem Fall liefert die
         Funktion 0 zurueck.
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.9 fuehrte Strings als moegliche Attribute ein.
 
 SIEHE AUCH

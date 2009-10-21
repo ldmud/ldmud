@@ -1,9 +1,9 @@
 SYNOPSIS
-        #include <sys/input_to.h>
+        #include <input_to.h>
 
-        void input_to(string|closure fun);
-        void input_to(string|closure fun, int flag, ...);
-        void input_to(string|closure fun, int flag, string|closure prompt, ...);
+        void input_to(string|closure fun)
+        void input_to(string|closure fun, int flag, ...)
+        void input_to(string|closure fun, int flag, string|closure prompt, ...)
 
 BESCHREIBUNG
         Die naechste Zeile, die der Spieler eintippt, wird als Argument an die
@@ -82,16 +82,16 @@ BESCHREIBUNG
             input_tos angehaengt.
 
         INPUT_IGNORE_BANG (128):
-            Eingaben, die mit ! beginnen, werden NICHT als Kommandi geparset,
+            Eingaben, die mit ! beginnen, werden NICHT als Kommandos geparst,
             sondern auch als Argument an die Funkion <fun> uebergeben. Die
             Verwendung dieses Flags ist eingeschraenkt.
 
         Alle nachfolgenden Argumente werden als zweites bzw. drittes usw.
         Argument an <fun> uebergeben.
 
-BEISPIEL
-        void func()
-        {
+
+BEISPIELE
+        void func() {
             ...
             input_to("enter_name", INPUT_PROMPT, "Wie lautet dein Name?:");
             /* Frueher erledigte man dies mit:
@@ -101,8 +101,7 @@ BEISPIEL
              ...
          }
 
-         enter_name(string str)
-         {
+        void enter_name(string str) {
             write("Heisst du wirklich '"+str+"'?? *kicher*\n");
             ...
         }
@@ -126,9 +125,9 @@ BEISPIEL
         (einschliesslich etwaiger eigener non-INPUT_APPEND input_tos), geht
         die naechste Eingabe an enter_lastname().
 
-AENDERUNGEN
+GESCHICHTE
         Die Bedeutung von <flag> wurde in 3.2.1@93 erweitert.
-        Die Limitierung fuer das "stapeln" von input_to()s aus !-Kommandi
+        Die Limitierung fuer das "stapeln" von input_to()s aus !-Kommandos
             wurde in LDMud 3.2.8 implementiert.
         Seit LDMud 3.2.8 kann <fun> in Form einer Closure angegeben werden.
         LDMud 3.2.9 fuehrte das Flag INPUT_PROMPT samt zugehoerigem Argument
@@ -136,7 +135,7 @@ AENDERUNGEN
         LDMud 3.2.11/3.3.593 fuehrte das INPUT_NO_TELNET Flag ein.
         LDMud 3.2.11/3.3.637 fuehrte das INPUT_APPEND Flag ein.
 
-BUGS
+FEHLER
         Im Zeichenmodus sollten Zeilenumbrueche eigentlich als "\n" zurueck
         gegeben werden. Dies allerdings kann existierenden Code zerstoeren.
 

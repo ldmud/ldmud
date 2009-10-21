@@ -1,7 +1,7 @@
 OPTIONAL
 SYNOPSIS
-        int *query_mccp_stats()
-        int *query_mccp_stats(object player)
+        int * query_mccp_stats()
+        int * query_mccp_stats(object player)
 
 DESCRIPTION
         This efun gives you statistics about current compression

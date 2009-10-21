@@ -28,7 +28,7 @@ DESCRIPTION
         although the object is not visible anywhere anymore from
         outside.
 
-EXAMPLE
+EXAMPLES
         ob->remove();
         if(ob)        /* still there, probably ob does not provide remove() */
            destruct(ob);

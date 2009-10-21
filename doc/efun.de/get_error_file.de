@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed *get_error_file(string name, int set_forget_flag);
+        mixed * get_error_file(string name, int set_forget_flag)
 
 BESCHREIBUNG
         Liefert Informationen ueber den letzten Fehler, der fuer <name>
@@ -12,7 +12,7 @@ BESCHREIBUNG
         einem *) und ein numerisches Flag (das 'forget flag'), wenn der
         Fehler bereits angeschaut wurde.
 
-        Wenn es keinen Fehler fuer <name> gibt, wird 0 zurueck gegeben.
+        Wenn es keinen Fehler fuer <name> gibt, wird 0 zurueckgegeben.
 
         Wenn <set_forget_flag> ungleich 0 ist, wird das 'forget flag' gesetzt,
         nachdem die Fehlermeldung ausgegeben wurde.

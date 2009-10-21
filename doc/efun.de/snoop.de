@@ -1,7 +1,7 @@
 GESCHUETZT
 SYNOPSIS
-        int snoop(object snooper);
-        int snoop(object snooper, object snoopee);
+        int snoop(object snooper)
+        int snoop(object snooper, object snoopee)
 
 BESCHREIBUNG
         Beginnt die Beobachtung des Objekts <snoopee> durch <snooper>. Wenn
@@ -15,7 +15,7 @@ BESCHREIBUNG
         Es wird auch ein Fehler verursacht, wenn eine Beobachtung zu einer
         Rekursion fuehren wuerde.
 
-ANMERKUNG
+ANMERKUNGEN
         Diese Funktion ist geschuetzt.
 
 SIEHE AUCH

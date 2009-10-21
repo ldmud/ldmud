@@ -1,7 +1,7 @@
 SYNOPSIS
-        *object deep_inventory();
-        *object deep_inventory(object ob);
-        object *deep_inventory(object ob, int depth)
+        object * deep_inventory()
+        object * deep_inventory(object ob)
+        object * deep_inventory(object ob, int depth)
 
 BESCHREIBUNG
         Gibt ein Array der Objekte zurueck, die in <obj> enthalten sind.
@@ -17,7 +17,7 @@ BESCHREIBUNG
           <depth> < 0: Nur die Objekte in der -<depth>ten Ebene werden
                        zurueckgegeben.
 
-BEISPIEL
+BEISPIELE 
         ob
         +- ob1
         +- ob2

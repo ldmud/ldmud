@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed *m_indices(mapping map)
+        mixed * m_indices(mapping map)
 
 DESCRIPTION
         Returns an array containing the indices of mapping 'map'.

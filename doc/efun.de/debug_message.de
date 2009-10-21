@@ -1,12 +1,12 @@
 SYNOPSIS
-        #include <sys/debug_message.h>
+        #include <debug_message.h>
 
-        void debug_message(string text);
-        void debug_message(string text, int flags);
+        void debug_message(string text)
+        void debug_message(string text, int flags)
 
 BESCHREIBUNG
         Gibt <text> an die Ausgaenge stdout und stderr sowie an die Datei
-        <host>.debug.log, oder an eine beliebige Kombination dieser drei.
+        <host>.debug.log oder an eine beliebige Kombination dieser drei aus.
 
         Das Argument <flag> bezeichnet durch eine Kombination von Bitflags das
         Ziel und die Art, in der das Resultat geschrieben wird.
@@ -18,7 +18,8 @@ BESCHREIBUNG
         Wenn <flags> 0 ist, weggelassen wird oder kein Ziel-Flag enthaelt,
         wird <text> standardmaessig an stdout und ins Logfile ausgegeben.
 
-BEISPIEL
+
+BEISPIELE
         debug_message("Dieser Text geht an stdout und ins Logfile.\n");
         debug_message("Dies geht an stderr.\n", DMSG_STDERR);
         debug_message("Dies geht an stdout und stderr.\n", DMSG_STDOUT
@@ -28,7 +29,7 @@ BEISPIEL
         debug_message("Die geht an stdout, mit vorangestelltem Timestamp.\n",
             DMSG_STDOUT | DMSG_STAMP);
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2.1@34.
         LDMud 3.2.9 fuehrte das Argument <flags> ein.
 

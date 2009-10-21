@@ -1,7 +1,7 @@
 SYNOPSIS
-        object* clones ()
-        object* clones (int what)
-        object* clones (string|object obj [, int what])
+        object * clones()
+        object * clones(int what)
+        object * clones(string|object obj [, int what])
 
 DESCRIPTION
         The efuns returns an array with all clones of a certain blueprint.
@@ -23,9 +23,9 @@ DESCRIPTION
         If the driver is compiled with DYNAMIC_COSTS, the cost of this
         efun is proportional to the number of objects in the game.
 
-EXAMPLE
+EXAMPLES
         object o, p;
-        o = clone_object("/std/thing"); /* or "std/thing" in COMPAT_MODE */
+        o = clone_object("/std/thing"); /* or "std/thing" in COMPAT mode */
         destruct(find_object("/std/thing"));
         p = clone_object("/std/thing");
 

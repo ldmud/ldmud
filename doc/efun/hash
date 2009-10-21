@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/tls.h>
+        #include <tls.h>
 
         string hash(int method, string arg [, int iterations ] )
         string hash(int method, int *  arg [, int iterations ] )
@@ -24,6 +24,7 @@ DESCRIPTION
 
         The efun costs 10 ticks per iteration.
 
+
 EXAMPLES
         string s;
 
@@ -31,7 +32,7 @@ EXAMPLES
         s = hash(TLS_HASH_SHA1, ({ 'H', 'e', 'l', 'l', 'o' }) )
 
 HISTORY
-        Introduced in LDMud 3.3.714
+        Introduced in LDMud 3.3.714.
         LDMud 3.3.719 added the iteration-based evaluation cost.
 
 SEE ALSO

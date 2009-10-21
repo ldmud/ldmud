@@ -40,7 +40,8 @@ DESCRIPTION
         In the absence of share_variables, variables without explicit
         initializers are initialized to 0.
 
-EXAMPLE
+
+EXAMPLES
         // Clone a torch (filename in non-compat format)
         object torch;
         torch = clone_object("/obj/torch");

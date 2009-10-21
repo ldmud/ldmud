@@ -1,7 +1,7 @@
 OBSOLETE
 SYNOPSIS
-        string sha1 (string arg [ , int iterations ] )
-        string sha1 (int  * arg [ , int iterations ] )
+        string sha1(string arg [, int iterations ])
+        string sha1(int  * arg [, int iterations ])
 
 DESCRIPTION
         Create and return a SHA1 message digest from <arg>.

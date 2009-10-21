@@ -1,6 +1,6 @@
 OPTIONAL
 SYNOPSIS
-        int db_insert_id (int handle)
+        int db_insert_id(int handle)
 
 BESCHREIBUNG
         Nach dem Einfuegen einer Zeile in eine Tabelle mit einem

@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed restore_value (string str)
+        mixed restore_value(string str)
 
 DESCRIPTION
         Decode the string representation <str> of a value back into the value

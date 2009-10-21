@@ -1,5 +1,5 @@
 SYNOPSIS
-        int sscanf(string str, string fmt, mixed var1, mixed var2, ...);
+        int sscanf(string str, string fmt, mixed var1, mixed var2, ...)
 
 BESCHREIBUNG
         Wertet einen String <str> unter Beruecksichtigung des Formats
@@ -53,7 +53,7 @@ BESCHREIBUNG
         Die Funktion sscanf() ist insofern ein Spezialfall, als dass
         Argumente automatisch nach Referenz uebergeben werden.
 
-BEISPIEL
+BEISPIELE
         string who, what;
             if (sscanf("wirf frisbee zu rex",
                 "wirf %s zu %s", what, who) != 2)

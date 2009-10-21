@@ -1,6 +1,6 @@
 SYNOPSIS
         string copy_bits(string src, string dest [, int srcstart
-            [, int deststart [, int copylen]]]);
+            [, int deststart [, int copylen]]])
 
 BESCHREIBUNG
         Kopiert den Bitbereich [<srcstart> .. <srcstart> + <copylen>] aus dem
@@ -33,8 +33,8 @@ BEISPIELE
 
         (Die Notation src[] / dest[] dient nur der Illustration!)
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.9
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.9.
 
 SIEHE AUCH
         clear_bit(E), set_bit(E), test_bit(E), next_bit(E), last_bit(E),

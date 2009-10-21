@@ -36,11 +36,12 @@ DESCRIPTION
         The function is available only if the driver is compiled with Iksemel
         support. In that case, __XML_DOM__ is defined.
 
-EXAMPLE
+
+EXAMPLES
         xml_generate(({ "abc", 0, 0 })) -> "<abc/>"
         xml_generate(({ "abc", ([ "xyz" : "cde" ]), 0 })) -> "<abc xyz="cde"/>"
 
-        mixed* xml = ({ "book"
+        mixed *xml = ({ "book"
                       , ([ "language" : "common" ])
                       , ({ ({ "title"
                             , 0

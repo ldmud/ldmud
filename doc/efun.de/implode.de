@@ -2,25 +2,24 @@ SYNOPSIS
         string implode(mixed *arr, string del)
 
 BESCHREIBUNG
-        Setzt alle Zeichenketten (Strings) aus dem Feld (Array) arr zu
+	Setzt alle Zeichenketten (Strings) aus dem Feld (Array) arr zu
         einer Zeichenkette zusammen und fuegt dabei die Zeichenkette del
         zwischen je zwei Elementen ein. Elemente aus dem Feld arr, welche
         keine Zeichenketten sind, werden ignoriert.
 
 BEISPIELE
-        Funktion                                        Rueckgabewert
+	Funktion                                        Rueckgabewert
         -------------------------------------------------------------------
-        implode(({ "foo", "bar", "" }), "*")            "foo*bar*"
-        implode(({ "a", 2, this_object(), "c" }), "b")  "abc"
+	implode(({ "foo", "bar", "" }), "*")            "foo*bar*"
+	implode(({ "a", 2, this_object(), "c" }), "b")  "abc"
 
-        Kann zusammen mit explode() als Funktion zum Ersetzen von
+	Kann zusammen mit explode() als Funktion zum Ersetzen von
         Zeichenketten verwendet werden:
         implode(explode("a short text", " "), "_")      "a_short_text"
 
-        Heutzutage kann man stattdessen auch
-        regreplace("a short text", " ", "_", 1)
-        verwenden.
-
+	Heutzutage kann man stattdessen auch
+	    regreplace("a short text", " ", "_", 1)
+	verwenden.
 
 SIEHE AUCH
         explode(E), regreplace(E)

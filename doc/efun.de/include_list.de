@@ -1,9 +1,9 @@
 SYNOPSIS
-        #include <sys/include_list.h>
+        #include <include_list.h>
 
-        string *include_list();
-        string *include_list(object ob);
-        string *include_list(object ob, int flags);
+        string * include_list()
+        string * include_list(object ob)
+        string * include_list(object ob, int flags)
 
 BESCHREIBUNG
         Diese Funktion liefert Informationen ueber alle Dateien, die bei der
@@ -38,7 +38,7 @@ BESCHREIBUNG
             in [i+0], [i+1] und [i+2] sind 0). Diese Untervektoren haben
             die gleiche Struktur wie das Resultatarray.
 
-        Wenn ein Objekt, inklusive <ob>, einem replace_programm() unterworfen
+        Wenn ein Objekt inklusive <ob> einem replace_program() unterworfen
         war, spiegeln die gelieferten Dateinamen das effektiv aktive Programm
         wider.
 
@@ -47,7 +47,8 @@ BESCHREIBUNG
         Trotzdem beginnt der tatsaechliche Dateiname nicht mit einem '/',
         wenn der Treiber im COMPAT Modus laeuft.
 
-BEISPIEL
+
+BEISPIELE
         Dieser Code erzeugt (mit /sys als Includeverzeichnis des Systems):
 
             a.c:  #include "b.h"
@@ -73,8 +74,8 @@ BEISPIEL
                  , "<c.h>",   "/sys/c.h", 1
                  })
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.9, 3.3.128
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.9, 3.3.128.
 
 SIEHE AUCH
         debug_info(E), inherit_list(E)

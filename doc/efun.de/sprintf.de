@@ -143,5 +143,5 @@ ERWEITERTE MODI
           Wenn string* worte die in die Tabelle einzubettenden Worte
           enthaelt, so muss str=implode(worte,"\n") sein.
 
-SIEHE AUCH:
+SIEHE AUCH
         printf(E)

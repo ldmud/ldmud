@@ -1,11 +1,11 @@
 SYNOPSIS
         #include <regexp.h>
 
-        string  regmatch (string text, string pattern)
-        string  regmatch (string text, string pattern, int opt)
-        string  regmatch (string text, string pattern, int opt, int start)
-        string *regmatch (string text, string pattern, int opt)
-        string *regmatch (string text, string pattern, int opt, int start)
+        string   regmatch(string text, string pattern)
+        string   regmatch(string text, string pattern, int opt)
+        string   regmatch(string text, string pattern, int opt, int start)
+        string * regmatch(string text, string pattern, int opt)
+        string * regmatch(string text, string pattern, int opt, int start)
 
 DESCRIPTION
         Match the string <txt> against <pattern> (interpreted according
@@ -30,7 +30,8 @@ DESCRIPTION
         new index is usually equal the length of the match, but at least one
         higher than the original start index.
 
-EXAMPLE
+
+EXAMPLES
         regmatch("abcdefcdf", "cd")    -> "cd"
         regmatch("abcdefcdf", "cd(e)") -> "cde"
 

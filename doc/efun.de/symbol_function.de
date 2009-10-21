@@ -1,7 +1,7 @@
 SYNOPSIS
-        closure symbol_function(symbol arg);
-        closrue symbol_function(string arg);
-        closure symbol_function(string arg, object|string obj);
+        closure symbol_function(symbol arg)
+        closure symbol_function(string arg)
+        closure symbol_function(string arg, object|string obj)
 
 BESCHREIBUNG
         Erzeugt eine Lfun-, Efun- oder Operator-Closure aus <arg>, wobei
@@ -28,7 +28,7 @@ BEISPIELE
         symbol_function("QueryProp", other_obj);
             --> ergibt: other_obj->QueryProp()
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2@70.
 
 SIEHE AUCH

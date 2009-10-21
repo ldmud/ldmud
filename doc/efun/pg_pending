@@ -1,7 +1,7 @@
 OPTIONAL
 SYNOPSIS
-        int pg_pending ()
-        int pg_pending (object obj)
+        int pg_pending()
+        int pg_pending(object obj)
 
 DESCRIPTION
         Return the number of pending queries for the connection on the given

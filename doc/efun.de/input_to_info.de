@@ -1,5 +1,5 @@
 SYNOPSIS
-        *mixed input_to_info(object player);
+        mixed * input_to_info(object player)
 
 BESCHREIBUNG
         Liefert ein Array aller fuer <player> haengigen input_to()s. Der
@@ -13,7 +13,7 @@ BESCHREIBUNG
             1:   Die Funktion (String oder Closure)
             2ff: Die Argumente
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.9.
 
 SIEHE AUCH

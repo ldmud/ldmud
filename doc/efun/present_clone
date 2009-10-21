@@ -1,11 +1,11 @@
 PRELIMINARY
 SYNOPSIS
-        object present_clone(string str);
+        object present_clone(string str)
         object present_clone(string str, int n)
         object present_clone(string str, object env)
         object present_clone(string str, object env, int n)
 
-        object present_clone(object obj);
+        object present_clone(object obj)
         object present_clone(object obj, int n)
         object present_clone(object obj, object env)
         object present_clone(object obj, object env, int n)
@@ -21,7 +21,7 @@ DESCRIPTION
         otherwise the first object matching <str> or <obj>.
         If no object in <env> matches the criteria, 0 is returned.
 
-        For plain driver this name starts with a '/', for compat-mode
+        For plain driver this name starts with a '/', for COMPAT mode
         drivers it doesn't.
 
 EXAMPLES
@@ -39,15 +39,12 @@ EXAMPLES
         | present_clone("/std/weapon#12", env, 3)          | 0             |
         +--------------------------------------------------+---------------+
 
-        For compat-mode drivers, remove the leading '/' from the given
-        names.
-
 REMARKS
         Note that in contrast to present(), this efun never searches
         in the environment of <env>.
 
 HISTORY
-        Introduced in 3.2.7
+        Introduced in 3.2.7.
         Searching for the <n>th object was added in 3.3.718.
 
 SEE ALSO

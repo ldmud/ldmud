@@ -1,11 +1,11 @@
 VERALTET
 SYNOPSIS
-        int m_sizeof(mapping map);
+        int m_sizeof(mapping map)
 
 BESCHREIBUNG
         Liefert die Anzahl Indizes im Mapping <map>. Diese Funktion ist
         ein Alias fuer sizeof().
 
-AENDERUNGEN
+GESCHICHTE
         Seit LDMud 3.2.9 ist m_sizeof() nur noch verfuegbar, wenn der Treiber
             mit USE_DEPRECATED kompiliert wurde.

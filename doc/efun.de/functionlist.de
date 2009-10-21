@@ -1,9 +1,9 @@
 GESCHUETZT
 SYNOPSIS
-        #include <sys/functionlist.h>
-        #include <sys/lpctypes.h>
+        #include <functionlist.h>
+        #include <lpctypes.h>
 
-        mixed *functionlist(object ob, int flags = RETURN_FUNCTION_NAME)
+        mixed * functionlist(object ob, int flags)
 
 BESCHREIBUNG
         Liefert ein Array mit Informationen zu den Lfuns von <ob>. Fuer jede
@@ -11,7 +11,7 @@ BESCHREIBUNG
         eingetragen, und zwar in folgender Reihenfolge:
           - der Name der Funktion
           - die Flags der Funktion (vergleiche weiter unten)
-          - den Rueckgabetyp (aufgelistet in mudlib/sys/lpctypes.h)
+          - den Rueckgabetyp (aufgelistet in <lpctypes.h>)
           - die Anzahl Argumente, die die Funktion akzeptiert.
 
         <ob> kann als echtes Objekt oder als Objektname uebergeben werden. Im
@@ -20,11 +20,11 @@ BESCHREIBUNG
         <flags> bestimmt sowohl, welche Informationen im Ergebnis gesammelt
         werden, als auch, fuer welche Funktionen die Pruefung durchgefuehrt
         wird. Der Wert von <flags> wird durch binaere Veroderung folgender
-        Konstanten aus mudlib/sys/functionlist.h festgelegt:
+        Konstanten aus <functionlist.h> festgelegt:
 
         Festlegen der gesammelten Information:
             RETURN_FUNCTION_NAME        liefert den Funktionsnamen
-            RETURN_FUNCTION_FLAGS       liefert die Flas der Funktion
+            RETURN_FUNCTION_FLAGS       liefert die Flags der Funktion
             RETURN_FUNCTION_TYPE        liefert den Rueckgabetyp der Funktion
             RETURN_FUNCTION_NUMARG      liefert die Anzahl moeglicher
                                         Argumente.

@@ -1,8 +1,10 @@
 SYNOPSIS
         #include <functionlist.h>
 
-        mixed function_exists(string str [, int flags]);
-        mixed function_exists(string str, object ob [, int flags]);
+        mixed function_exists(string str)
+        mixed function_exists(string str, int flags)
+        mixed function_exists(string str, object ob)
+        mixed function_exists(string str, object ob, int flags)
 
 BESCHREIBUNG
         Sucht eine Funktion <str> im aktuellen Objekt bzw. im Objekt <ob>. Je
@@ -35,19 +37,20 @@ BESCHREIBUNG
             int    [FEXISTS_FLAGS]:    die Funktionsflags
 
         <flags> kann mit einem binaren Oder mit NAME_HIDDEN ergaenzt
-        werden, um Informationen ueber static und protected deklarierte
+        werden, um Informationen ueber als static und protected deklarierte
         Funktionen in anderen Objekten zu erhalten. Es ist nicht moeglich,
-        Informationen ueber private deklarierte Funktionen zu erhalten.
+        Informationen ueber als private deklarierte Funktionen zu erhalten.
 
-        Wenn die Funktion nicht gefunden werden kann (weil sie nicht
-        existiert oder fuer den Aufrufer nicht sichtbar ist), liefert
-        die Funktion 0.
+        Wenn die gesuchte Funktion nicht gefunden werden kann (weil sie
+        nicht existiert oder fuer den Aufrufer nicht sichtbar ist), dann
+        wird als Rueckgabewert 0 geliefert.
+
 
 BEISPIELE
         function_exists("create");
         function_exists("create", that_object, NAME_HIDDEN|FEXISTS_ALL);
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.10 erweiterte die Menge der zurueck gelieferten Werte und
             fuehrte das <flags> Argument ein.
         LDMud 3.2.12/3.3.713 fuegte die zusaetzliche Funktionsinformation zum

@@ -1,5 +1,5 @@
 SYNOPSIS
-        int sgn (int|float arg)
+        int sgn(int|float arg)
 
 DESCRIPTION
         Return the sign of the argument.

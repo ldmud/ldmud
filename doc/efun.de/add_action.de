@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/commands.h>
+        #include <commands.h>
 
         void add_action(string|closure fun, string cmd);
         void add_action(string|closure fun, string cmd, int flag);
@@ -32,10 +32,10 @@ BESCHREIBUNG
         der Umgebung des Spielers befinden; also entweder der Spieler selbst,
         im Inventar des Spielers, der Raum, in dem sich der Spieler befindet
         oder ein Objekt im gleichen Raum wie der Spieler. Wenn der Spieler
-        die Umgebung des Objekts verlaesst, werden alle von add_action
-        definierten Kommandi automatisch entfernt.
+        die Umgebung des Objekts verlaesst, werden alle von add_action()
+        definierten Kommandos automatisch entfernt.
 
-        Die Kommandi lassen sich auch manuell entfernen. Die Efun dazu lautet
+        Die Kommandos lassen sich auch manuell entfernen. Die Efun dazu lautet
         remove_actions().
 
         Wenn das Argument <flag> AA_SHORT (d.h. 1) ist, koennen Argumente von
@@ -79,7 +79,7 @@ BEISPIELE
         add_action("fun", "ncmd", AA_NOSPACE);
         add_action("fun", "icmd", AA_IMM_ARGS);
 
-        Die folgende Tabelle zeigt, was die oben aufgefuehrten Kommandi bzw.
+        Die folgende Tabelle zeigt, was die oben aufgefuehrten Kommandos bzw.
         <flag> fuer Werte an query_verb() und als Argumente an die Funktion
         fun uebergeben:
 
@@ -108,7 +108,7 @@ BEISPIELE
         | "icmdbla fasel"   | "icmd"       | "bla fasel"                |
         |-------------------|--------------|----------------------------|
 
-AENDERUNGEN
+GESCHICHTE
         Das Argument <flag> < 0 wird seit 3.2@127 unterstuetzt, aber erst ab
         LDMud 3.2.8 richtig implementiert. LDMud 3.2.9 fuehrte das AA_IMM_ARGS
         Flag ein. Ab LDMud 3.5 kann man Closures als Funktionen uebergeben.

@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/tls.h>
+        #include <tls.h>
 
         string hmac(int method, string key, string arg )
         string hmac(int method, string key, int *  arg )
@@ -21,6 +21,7 @@ BESCHREIBUNG
 
         Wenn der Driver ohne OpenSSL- oder GCrypt-Unterstuetzung compiliert
         wurde, erzeugt diese Funktion einen Fehler.
+
 
 BEISPIELE
         string s;

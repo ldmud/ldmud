@@ -1,5 +1,5 @@
 SYNOPSIS
-        string *explode(string str, string del)
+        string * explode(string str, string del)
 
 DESCRIPTION
         Return an array of strings, created when the string str is split

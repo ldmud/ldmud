@@ -1,5 +1,5 @@
 SYNOPSIS
-        *mixed unmkmapping(mapping map);
+        mixed * unmkmapping(mapping map)
 
 BESCHREIBUNG
         Wandelt das Mapping <map> in ein Array von Arrays aus, das alle Keys
@@ -15,11 +15,11 @@ BESCHREIBUNG
 
             apply(#'mkmapping, unmkmapping(m)) == m
 
-BEISPIEL
+BEISPIELE
         mapping m = ([ 1:10;20, 2:11;21 ]);
         unmkmapping(m) ergibt: ({ ({1, 2}) , ({10, 11}) , ({20, 21}) })
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.6.
 
 SIEHE AUCH

@@ -1,6 +1,6 @@
 VERALTET
 SYNOPSIS
-        string make_shared_string (string str);
+        string make_shared_string(string str)
 
 BESCHREIBUNG
         Fuegt <str> in die Tabelle der gemeinsam verwendeten String des Spiels
@@ -15,10 +15,10 @@ BESCHREIBUNG
         Driver wandelt untablierte Strings nach einiger Zeit automatisch in
         tablierte Strings um um
 
-BUGS
+FEHLER
         Ein besseres Stringhandling im Driver sollte diese Efun ueberfluessig
         machen.
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.6, auf Vorschlag von TubMud.
-        Veraltet seit LDMud 3.3 .
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.6, auf Vorschlag von Tubmud.
+        Veraltet seit LDMud 3.3.

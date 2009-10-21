@@ -1,7 +1,7 @@
 SYNOPSIS
-        int member(mixed *array, mixed elem [, int start]);
-        int member(string s, int elem [, int start]);
-        int member(mapping map, mixed key);
+        int member(mixed *array, mixed elem [, int start])
+        int member(string s, int elem [, int start])
+        int member(mapping map, mixed key)
 
 BESCHREIBUNG
         Fuer Arrays und String liefert member() den Index des ersten
@@ -15,8 +15,8 @@ BESCHREIBUNG
         Fuer Mapping prueft member(), ob <key> in <map> enthalten ist und
         liefert 1 zurueck falls ja, 0 sonst.
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.3.556 fuegte den <start>-Parameter hinzu.
 
-VERGLEICHE
+SIEHE AUCH
         rmember(E), mappings(LPC)

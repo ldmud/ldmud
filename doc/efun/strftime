@@ -38,23 +38,23 @@ CONVERSION SPECIFIERS:
            name.
      %B    is replaced by national representation of the full month name.
      %b    is replaced by national representation of the abbreviated month name.
-     %C    is replaced by (year / 100) as decimal number; single digits are pre-
-           ceded by a zero.
+     %C    is replaced by (year / 100) as decimal number; single digits are
+           preceded by a zero.
      %c    is replaced by national representation of time and date.
      %D    is equivalent to ``%m/%d/%y''.
      %d    is replaced by the day of the month as a decimal number (01-31).
      %E* %O*
            POSIX locale extensions.  The sequences %Ec %EC %Ex %EX %Ey %EY %Od
-           %Oe %OH %OI %Om %OM %OS %Ou %OU %OV %Ow %OW %Oy are supposed to pro-
-           vide alternate representations.
-           Additionly %OB implemented to represent alternative months names (used
-           standalone, without day mentioned).
+           %Oe %OH %OI %Om %OM %OS %Ou %OU %OV %Ow %OW %Oy are supposed to
+           provide alternate representations.
+           Additionally %OB implemented to represent alternative 
+           months names (used standalone, without day mentioned).
      %e    is replaced by the day of month as a decimal number (1-31); single
            digits are preceded by a blank.
      %F    is equivalent to ``%Y-%m-%d''.
-     %G    is replaced by a year as a decimal number with century.  This year is
-           the one that contains the greater part of the week (Monday as the
-           first day of the week).
+     %G    is replaced by a year as a decimal number with century.  This year
+           is the one that contains the greater part of the week (Monday as
+           the first day of the week).
      %g    is replaced by the same year as in ``%G'', but as a decimal number
            without century (00-99).
      %H    is replaced by the hour (24-hour clock) as a decimal number (00-23).
@@ -78,41 +78,42 @@ CONVERSION SPECIFIERS:
            mktime(3)).
      %T    is equivalent to ``%H:%M:%S''.
      %t    is replaced by a tab.
-     %U    is replaced by the week number of the year (Sunday as the first day of
-           the week) as a decimal number (00-53).
-     %u    is replaced by the weekday (Monday as the first day of the week) as a
-           decimal number (1-7).
-     %V    is replaced by the week number of the year (Monday as the first day of
-           the week) as a decimal number (01-53).  If the week containing January
-           1 has four or more days in the new year, then it is week 1; otherwise
-           it is the last week of the previous year, and the next week is week 1.
+     %U    is replaced by the week number of the year (Sunday as the
+           first day of the week) as a decimal number (00-53).
+     %u    is replaced by the weekday (Monday as the first day of
+           the week) as a decimal number (1-7).
+     %V    is replaced by the week number of the year (Monday as the
+           first day of the week) as a decimal number (01-53).  If the week
+           containing January 1st has four or more days in the new year,
+           then it is week 1; otherwise it is the last week of the previous
+           year, and the next week is week 1.
      %v    is equivalent to ``%e-%b-%Y''.
-     %W    is replaced by the week number of the year (Monday as the first day of
-           the week) as a decimal number (00-53).
-     %w    is replaced by the weekday (Sunday as the first day of the week) as a
-           decimal number (0-6).
+     %W    is replaced by the week number of the year (Monday as the 
+           first day of the week) as a decimal number (00-53).
+     %w    is replaced by the weekday (Sunday as the first day of the week)
+           as a decimal number (0-6).
      %X    is replaced by national representation of the time.
      %x    is replaced by national representation of the date.
      %Y    is replaced by the year with century as a decimal number.
      %y    is replaced by the year without century as a decimal number (00-99).
      %Z    is replaced by the time zone name.
      %z    is replaced by the time zone offset from UTC; a leading plus sign
-           stands for east of UTC, a minus sign for west of UTC, hours and min-
-           utes follow with two digits each and no delimiter between them (common
-           form for RFC 822 date headers).
-     %+    is replaced by national representation of the date and time (the for-
-           mat is similar to that produced by date(1)).
+           stands for east of UTC, a minus sign for west of UTC, hours and
+           minutes follow with two digits each and no delimiter between
+           them (common form for RFC 822 date headers).
+     %+    is replaced by national representation of the date and time
+           (the format is similar to that produced by date(1)).
      %%    is replaced by `%'.
      
+
 BUGS
-    There is no conversion specification for the phase of the moon.
+        There is no conversion specification for the phase of the moon.
 
-EXAMPLE
-     write(strftime("Heute ist %A, der %d. %B %Y.\n"))
-     ergibt z.B.
-     "Heute ist Montag, der 24. September 2007.\n"
+EXAMPLES
+        write(strftime("Today is %A, %d. %B %Y.\n"))
+          results in "Today is Monday, 24. September 2007.\n"
 
-CHANGES
+HISTORY
      Introduced in LDMud 3.3.718.
 
 SEE ALSO

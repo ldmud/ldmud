@@ -1,7 +1,8 @@
 PRELIMINARY
 SYNOPSIS
-        #include <sys/ tls.h>
-        int *tls_query_connection_info (object ob)
+        #include <tls.h>
+
+        int * tls_query_connection_info(object ob)
 
 DESCRIPTION
         If <ob> does not have a TLS connection or if the connection

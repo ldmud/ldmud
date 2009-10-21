@@ -1,7 +1,7 @@
 OPTIONAL
 SYNOPSIS
-        int parse_command (string cmd, object  env, string fmt, mixed &var, ...)
-        int parse_command (string cmd, object* arr, string fmt, mixed &var, ...)
+        int parse_command(string cmd, object  env, string fmt, mixed &var, ...)
+        int parse_command(string cmd, object *arr, string fmt, mixed &var, ...)
 
 DESCRIPTION
         parse_command() is basically a spiffed up sscanf operating
@@ -120,10 +120,10 @@ DESCRIPTION
         int parse_command(string, object|object*, string, destargs...)
 
 
-EXAMPLE
+EXAMPLES
         object *items;
-        parse_command( "take apple",environment(this_player())
-                     , " 'get' / 'take' %i ",items);
+        parse_command("take apple",environment(this_player()),
+                      " 'get' / 'take' %i ", items);
 
 HISTORY
         LDMud 3.3.258 removed the compat-mode parse_command().

@@ -11,7 +11,7 @@ DESCRIPTION
         The result of time() does not change during the course of a command
         execution.
 
-EXAMPLE
+EXAMPLES
         write(ctime(time())+"\n");
 
         Print out the current date and time.

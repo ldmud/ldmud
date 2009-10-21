@@ -1,10 +1,10 @@
 SYNOPSIS
-        void tell_room(string|object obj, string str);
-        void tell_room(string|object obj, string str, object *exclude);
+        void tell_room(string|object obj, string str)
+        void tell_room(string|object obj, string str, object *exclude)
 
         void tell_room(string|object obj, mixed *|mapping|struct|object msg)
-        void tell_room(string|object obj, mixed *|mapping|struct|object  msg
-                                        , object *exlcude);
+        void tell_room(string|object obj, mixed *|mapping|struct|object msg,
+                                                     object *exclude)
 
 BESCHREIBUNG
         Gibt einen Text <str> an den Raum <obj> aus. <obj> kann auch der
@@ -31,14 +31,12 @@ BEISPIELE
         funktioniert.
 
         Objekt1 (ein Lebewesen):
-            void catch_tell(string str)
-            {
+            void catch_tell(string str) {
                 write("Empfangen: "+str+"\n");
             }
 
         Objekt2:
-            void fun()
-            {
+            void fun() {
                 tell_room(environment(this_player()), "Hallo Welt!\n");
             }
 

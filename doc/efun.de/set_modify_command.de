@@ -1,7 +1,7 @@
 SYNOPSIS
-        object set_modify_command(object obj);
-        object set_modify_command(string obj);
-        object set_modify_command(int int);
+        object set_modify_command(object obj)
+        object set_modify_command(string obj)
+        object set_modify_command(int int)
 
 SYNOPSIS
         Alle Befehle fuer das aktuelle Objekt (das natuerlich interaktiv sein
@@ -24,8 +24,8 @@ SYNOPSIS
         auszuwerten. Genauere Informationen finden sich unter hooks(C)
         H_MODIFY_COMMAND_FNAME.
 
-AENDERUNGEN
-        Bis 3.2.1@108 war die Lfun direkt als modify_command geschrieben.
+GESCHICHTE
+        Bis 3.2.1@108 wurde die Lfun direkt als modify_command() geschrieben.
         Der Hook H_MODIFY_COMMAND_FNAME wurde in 3.2.1@109 eingefuehrt und
         erlaubt, den Namen zu aendern.
 

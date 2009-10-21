@@ -1,5 +1,5 @@
 SYNOPSIS
-        string set_bit(string str, int n);
+        string set_bit(string str, int n)
 
 BESCHREIBUNG
         Liefert einen neuen String, bei dem das Bit <n> in <str> gesetzt
@@ -12,7 +12,7 @@ BESCHREIBUNG
 
         Der neue String wird automatisch verlaengert, falls noetig.
 
-BEISPIEL
+BEISPIELE
         string s;
         s=set_bit("?",5);
 

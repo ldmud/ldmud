@@ -1,5 +1,5 @@
 SYNOPSIS
-        void tail(string file);
+        void tail(string file)
 
 BESCHREIBUNG
         Listet das Ende eines Files. Es gibt kein Zeilenlimit, es werden aber

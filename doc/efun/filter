@@ -1,17 +1,17 @@
 SYNOPSIS
-        mixed * filter (mixed *arg, string fun, string|object ob
-                                              , mixed extra...)
-        mixed * filter (mixed *arg, closure cl, mixed extra...)
-        mixed * filter (mixed *arg, mapping map, mixed extra...)
+        mixed * filter(mixed *arg, string fun, string|object ob
+                                             , mixed extra...)
+        mixed * filter(mixed *arg, closure cl, mixed extra...)
+        mixed * filter(mixed *arg, mapping map, mixed extra...)
 
-        string  filter (string arg, string fun, string|object ob
-                                           , mixed extra...)
-        string  filter (string arg, closure cl, mixed extra...)
-        string  filter (string arg, mapping map, mixed extra...)
+        string  filter(string arg, string fun, string|object ob
+                                          , mixed extra...)
+        string  filter(string arg, closure cl, mixed extra...)
+        string  filter(string arg, mapping map, mixed extra...)
 
-        mapping filter (mapping arg, string func, string|object ob
-                                                , mixed extra...)
-        mapping filter (mapping arg, closure cl, mixed extra...)
+        mapping filter(mapping arg, string func, string|object ob
+                                               , mixed extra...)
+        mapping filter(mapping arg, closure cl, mixed extra...)
 
 DESCRIPTION
         Call the function <ob>-><func>() resp. the closure <cl> for

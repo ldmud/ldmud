@@ -1,6 +1,6 @@
 SYNOPSIS
-        object master();
-        object master(int dont_load);
+        object master()
+        object master(int dont_load)
 
 BESCHREIBUNG
         Die Funktion liefert das Masterobjekt.
@@ -10,8 +10,8 @@ BESCHREIBUNG
         master() nur das Masterobjekt oder 0, falls das aktuelle Masterobjekt
         zerstoert wurde.
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.10
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.10.
 
 SIEHE AUCH
         master(M)

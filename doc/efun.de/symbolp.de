@@ -4,10 +4,10 @@ SYNOPSIS
 BESCHREIBUNG
         Liefert 1, wenn das Argument ein Symbol ist, ansonsten 0.
 
-BEISPIEL
+BEISPIELE
         symbolp('foo) liefert 1.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2@70.
 
 SIEHE AUCH

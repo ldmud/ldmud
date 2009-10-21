@@ -1,7 +1,8 @@
 SYNOPSIS
-        #include <sys/commands.h>
+        #include <commands.h>
+        #include <sent.h>
 
-        mixed *query_actions(object|string ob, mixed mask_or_verb);
+        mixed * query_actions(object|string ob, mixed mask_or_verb)
 
 BESCHREIBUNG
         Das erste Argument von query_actions() ist entweder ein Objekt
@@ -22,8 +23,8 @@ BESCHREIBUNG
             QA_OBJECT       ( 8):   das Objekt,
             QA_FUNCTION     (16):   die Funktion.
 
-        Der Typ ist ein Wert wie in <sent.h> (bzw. /sys/sent.h) definiert,
-        der vom Parser Quellcode geliefert wird.
+        Der Typ ist ein Wert wie in <sent.h> definiert, der mit dem
+        Driver-Quellcode geliefert wird.
 
             SENT_PLAIN       durch add_action(fun, cmd) hinzugefuegt
             SENT_SHORT_VERB  durch add_action(fun, cmd, 1) hinzugefuegt

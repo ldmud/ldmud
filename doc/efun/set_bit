@@ -17,7 +17,7 @@ EXAMPLES
         s=set_bit("?",5);
 
         Because "?" has a value of 31 the variable s will now contain
-        the character "_" wich is equal to 63 (31+2^5=63).
+        the character "_" which is equal to 63 (31+2^5=63).
 
         string s;
         s=set_bit("78",3);

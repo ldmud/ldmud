@@ -1,6 +1,6 @@
 OPTIONAL
 SYNOPSIS
-        int *db_handles()
+        int * db_handles()
 
 BESCHREIBUNG
         Result ist ein Array mit allen aktiven Verbindungshandles zum

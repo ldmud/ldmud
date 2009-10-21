@@ -1,6 +1,6 @@
 SYNOPSIS
-        object previous_object();
-        object previous_object(int i);
+        object previous_object()
+        object previous_object(int i)
 
 BESCHREIBUNG
         Liefert einen Pointer auf das letzte Objekt, das einen Aufruf (mittels
@@ -16,23 +16,22 @@ BESCHREIBUNG
 
         Es gibt einen wichtigen Spezialfall: in Funktionen, die vom Gamedriver
         auf Grund eines externen Ereignises aufgerufen wurden (zum Beispiel
-        Kommandi, die mit add_action() definiert wurden), liefert
-        previous_object() this_object(), previous_object(0) hingegen 0.
+        Kommandos, die mit add_action() definiert wurden), liefert
+        previous_object() den Wert von this_object(), previous_object(0)
+        hingegen 0.
 
-BEISPIEL
-        int sicherheitscheck()
-        {
+BEISPIELE
+        int sicherheitscheck() {
             object prev;
-            if(!(prev=previous_object()));
-            else if(getuid(prev)!=getuid(this_object()));
-            else if(geteuid(prev)!=geteuid(this_object()));
+            if (!(prev=previous_object()));
+            else if (getuid(prev)  != getuid(this_object()));
+            else if (geteuid(prev) != geteuid(this_object()));
             else return 1;
             return 0;
         }
-        void sensible_funktion()
-        {
-            if(!sicherheitscheck())
-            return;
+        void sensible_funktion() {
+            if (!sicherheitscheck())
+                return;
             ...
         }
 

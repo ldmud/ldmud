@@ -7,7 +7,7 @@ BESCHREIBUNG
         und nicht bloss eine Referenz auf das Original, wie bei der Addition
         / Subtraktion bei Mappings.
 
-AENDERUNGEN
+GESCHICHTE
         Diese Funktion wurde durch copy() abgeloest.
 
 SIEHE AUCH

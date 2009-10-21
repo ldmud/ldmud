@@ -1,5 +1,5 @@
 SYNOPSIS
-        int mkdir(string path);
+        int mkdir(string path)
 
 BESCHREIBUNG
         Erstellt ein Verzeichnis <path> und liefert 1, wenn das Verzeichnis

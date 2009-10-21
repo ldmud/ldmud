@@ -1,8 +1,8 @@
 SYNOPSIS
-        #include <sys/objectinfo.h>
+        #include <objectinfo.h>
 
-        mixed * object_info (object ob, int what)
-        mixed * object_info (object ob, int what, int index)
+        mixed * object_info(object ob, int what)
+        mixed * object_info(object ob, int what, int index)
 
 DESCRIPTION
         Returns some internal information about object <ob>, collected

@@ -1,6 +1,6 @@
 SYNOPSIS
-        mixed query_notify_fail();
-        mixed query_notify_fail(int flag);
+        mixed query_notify_fail()
+        mixed query_notify_fail(int flag)
 
 BESCHREIBUNG
         Wenn <flag> nicht angegeben oder 0 ist, liefert die Funktion den String
@@ -9,7 +9,7 @@ BESCHREIBUNG
 
         Wurde keine Meldung gesetzt, wird 0 geliefert.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.7.
         LDMud 3.2.8 fuegte den Paramter <flag> hinzu.
 

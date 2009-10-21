@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/trace.h>
+        #include <trace.h>
 
         int trace(int traceflags)
 
@@ -31,16 +31,16 @@ DESCRIPTION
         massive output! TRACE_OBJNAME should be avoided when you know
         what you trace.
 
-
         The master-lfun valid_trace() is called with ("trace", traceflags)
         as argument to verify the use of this efun.
 
-EXAMPLE
+
+EXAMPLES
         object obj;
         string prefix;
-        obj=find_player("wessex");
-        prefix=object_name(obj);
-        prefix=prefix[1..strlen(prefix)-1]; /* cut off the leading "/" */
+        obj = find_player("wessex");
+        prefix = object_name(obj);
+        prefix = prefix[1..];  /* cut off the leading "/" */
         traceprefix(prefix);
           /* From here on, only code in the object "std/player#69"
            * will be traced.
@@ -51,7 +51,7 @@ EXAMPLE
 
 HISTORY
         LDMud 3.2.9 passes the <traceflags> argument to the valid_trace()
-            apply as well.
+        apply as well.
 
 SEE ALSO
         traceprefix(E)

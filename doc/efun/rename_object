@@ -1,5 +1,5 @@
 SYNOPSIS
-        void rename_object (object ob, string new_name);
+        void rename_object(object ob, string new_name)
 
 DESCRIPTION
         Give the object <ob> a new object name <new_name>. Causes a privilege

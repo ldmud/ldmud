@@ -1,5 +1,5 @@
 SYNOPSIS
-        int call_resolved(mixed result, object ob, string func, mixed arg,...);
+        int call_resolved(mixed result, object ob, string func, mixed arg,...)
 
 BESCHREIBUNG
         Die Funktion ist aehnlich zu call_other(). Wenn obj->func() definiert

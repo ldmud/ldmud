@@ -17,19 +17,19 @@ DESCRIPTION
         added by add_action), previous_object() will return this_object(),
         but previous_object(0) will return 0.
 
-EXAMPLE
+EXAMPLES
         int security() {
            object prev;
-           if(!(prev=previous_object()));
-           else if(getuid(prev)!=getuid(this_object()));
-           else if(geteuid(prev)!=geteuid(this_object()));
+           if (!(prev=previous_object()));
+           else if (getuid(prev)  != getuid(this_object()));
+           else if (geteuid(prev) != geteuid(this_object()));
            else return 1;
            return 0;
         }
         void highly_sensible_func() {
-           if(!security())
-              return;
-           ...
+            if (!security())
+                return;
+            ...
         }
 
         This example shows how we can check if the last call to a

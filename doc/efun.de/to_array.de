@@ -1,8 +1,9 @@
 SYNOPSIS
-        mixed *to_array(string arg);
-        mixed *to_array(symbol arg);
-        mixed *to_array(quotedarray arr);
-        mixed *to_array(mixed *arg);
+        mixed * to_array(string arg)
+        mixed * to_array(symbol arg)
+        mixed * to_array(quotedarray arr)
+        mixed * to_array(mixed *arg)
+        mixed * to_array(struct arg)
 
         (int*)<value>
 
@@ -13,10 +14,13 @@ BESCHREIBUNG
 
         Gequotete Arrays werden "entquotet", und Arrays bleiben, wie sie sind.
 
-BUGS
+FEHLER
         Die Cast-Schreibweise funktioniert nur, wenn der genaue Wert von
         <value> zum Zeitpunkt der Kompilierung bekannt ist. Dies wird
         nicht geaendert werden, da die Funktionsform verwendet werden kann.
+
+GESCHICHTE
+        LDMud 3.3.250 fuegte den Support von structs hinzu.
 
 SIEHE AUCH
         to_int(E), to_string(E)

@@ -23,7 +23,7 @@ DESCRIPTION
 
           @@function1@@function2@@
 
-EXAMPLE
+EXAMPLES
         string foo(string str) {
            return "ab"+str+"ef";
         }

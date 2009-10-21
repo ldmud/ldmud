@@ -1,11 +1,11 @@
 SYNOPSIS
-        int widthof (mapping map)
+        int widthof(mapping map)
 
 DESCRIPTION
         Returns the number of values per key of mapping <map>.
         If <map> is 0, the result is 0.
 
-EXAMPLE
+EXAMPLES
         mapping m = ([ "foo": 1,2 ]);
         widthof(m)  --> returns 2
 

@@ -10,7 +10,7 @@ DESCRIPTION
         -1 is returned if there were no call-outs pending to this
         function.
 
-EXAMPLE
+EXAMPLES
         To remove every pending call-out to MyTimer() :
 
         while (remove_call_out("MyTimer") != -1) /* continue */ ;

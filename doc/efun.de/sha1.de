@@ -1,6 +1,6 @@
 SYNOPSIS
-        string sha1 (string arg [ , int iterations ] )
-        string sha1 (int *  arg [ , int iterations ] )
+        string sha1(string arg [, int iterations])
+        string sha1(int *  arg [, int iterations])
 
 BESCHREIBUNG
         Berechnet den SHA1-Hashwert von <arg>.
@@ -13,13 +13,13 @@ BESCHREIBUNG
         
         Jede Iteration kostet 5 Evalution-Ticks.
 
-BEISPIEL
+BEISPIELE
         string s;
 
         s = sha1("Hello");
         s = sha1( ({ 'H', 'e', 'l', 'l', 'o' })
 
-HISTORY
+GESCHICHTE
         Eingefuehrt in LDMud 3.3.523.
         LDMud 3.3.712 fuehrte Zaehlenarrays als Argument ein.
         LDMud 3.3.717 fuehrte die Iterations-basierte Evaluationskosten ein.

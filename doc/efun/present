@@ -24,7 +24,7 @@ DESCRIPTION
         the efun searches just inside <env>.
 
         When searching both inventory and environment of this_object(),
-        the numbering is applied linear over both spaces (see example).
+        the numbering is applied linear over both spaces (see examples).
 
         The driver identifies objects by calling the lfun id() in each
         object.
@@ -48,7 +48,7 @@ EXAMPLES
         A typical 2.4.5-implementation of the "do <id> <n>" command style
         is:
 
-            void init () { add_action ("open_chest", "open"); }
+            void init() { add_action("open_chest", "open"); }
 
             int open_chest (string str) {
               if (present (str) != this_object ())

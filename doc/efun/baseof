@@ -1,5 +1,5 @@
 SYNOPSIS
-        int baseof (struct b, struct s)
+        int baseof(struct b, struct s)
 
 DESCRIPTION
         Test if the type of struct <b> is a base of struct <s> (the

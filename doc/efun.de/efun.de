@@ -3,7 +3,7 @@ NAME
 
 BESCHREIBUNG
         Dieses Directory enthaelt die Beschreibungen fuer die Efuns in
-        LDMud 3.3 .
+        LDMud 3.3.
 
         Diese Funktionen werden vom Driver zur Verfuegung gestellt und koennen
         von jedem LPC-Objekt verwendet werden.
@@ -44,7 +44,7 @@ BESCHREIBUNG
              tls_*()
              xml_*()
 
-         - 'Obsolet' or 'Veraltet'
+         - 'Obsolet' bzw. 'Veraltet'
 
              make_shared_string()
              md5()
@@ -53,7 +53,6 @@ BESCHREIBUNG
            Diese Efuns sollten nicht weiter verwendet werden. Sie stehen
            lediglich aus Kompatibilitaetsgruenden zur Verfuegung, und
            werden in einer spaeteren Drivervariante entfernt werden.
-
 
 SIEHE AUCH
         efuns(LPC), applied(A), master(M), lpc(LPC), concepts(C), driver(D)

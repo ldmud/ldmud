@@ -1,11 +1,11 @@
 SYNOPSIS
-        void say(string str);
-        void say(string str, object exclude);
-        void say(string str, object *excludes);
+        void say(string str)
+        void say(string str, object exclude)
+        void say(string str, object *excludes)
 
-        void say(mixed *|mapping|struct|object msg);
-        void say(mixed *|mapping|struct|object msg, object exclude);
-        void say(mixed *|mapping|struct|object msg, object *excludes);
+        void say(mixed *|mapping|struct|object msg)
+        void say(mixed *|mapping|struct|object msg, object exclude)
+        void say(mixed *|mapping|struct|object msg, object *excludes)
 
 BESCHREIBUNG
         Es bestehen zwei Hauptanwendungen fuer say():
@@ -72,23 +72,21 @@ BEISPIELE
         catch_msg() auf den aktuellen Benutzer zeigt.
 
         Object 1 (living):
-            void catch_msg(mixed *arr, object who)
-            {
+            void catch_msg(mixed *arr, object who) {
                 int i;
-                if(!arr) return;
-                for(i=0;i<sizeof(arr);i++)
+                if (!arr) return;
+                for (i=0;i<sizeof(arr);i++)
                     tell_object(who, (stringp(arr[i]) ? arr[i] : "-/-")+"\n");
             }
 
         Object 2 (nicht living):
-            void func()
-            {
+            void func() {
                 ...
-                say( ({ "Hello", "there!" }) );
+                say(({ "Hello", "there!" }));
                 ...
             }
 
-ANMERKUNG
+ANMERKUNGEN
         Wenn die Lfun catch_msg() den Wert <msg> veraendert, erhalten alle
         nachfolgenden Objekte das veraenderte <msg>.
 

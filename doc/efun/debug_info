@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/debug_info.h>
+        #include <debug_info.h>
 
         mixed debug_info(int flag)
         mixed debug_info(int flag, mixed arg)
@@ -100,7 +100,6 @@ DESCRIPTION
 
               NOTE: Make sure that this option can't be abused!
  
-
 
         DINFO_DATA (6): Return raw information about an aspect of
             the driver specified by <arg2>. The result of the function

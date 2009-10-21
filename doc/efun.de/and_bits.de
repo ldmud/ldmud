@@ -1,5 +1,5 @@
 SYNOPSIS
-        string and_bits(string str1, string str2);
+        string and_bits(string str1, string str2)
 
 BESCHREIBUNG
         <str1> und <str2> seien beides Bitstrings. Das Resultat von and_bits()
@@ -7,7 +7,7 @@ BESCHREIBUNG
         heisst ein String, in dem ein Bit nur gesetzt ist, wenn das
         entsprechende Bit in beiden Strings <str1> und <str2> gesetzt ist.
 
-BEISPIEL
+BEISPIELE
         string s1, s2, s3;
 
         s1 = set_bit("", 3); s1 = set_bit(s1, 15);  -> s1 is "( ("

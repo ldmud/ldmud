@@ -1,6 +1,6 @@
 SYNOPSIS
-        string query_verb();
-        string query_verb(int flag);
+        string query_verb()
+        string query_verb(int flag)
 
 BESCHREIBUNG
         Liefert das Verb des aktuellen Kommandos oder 0, wenn kein Kommando
@@ -10,17 +10,15 @@ BESCHREIBUNG
         Zeilenumbruch). Wenn <flag> nicht 0 ist, wird das Verb entsprechend
         der add_action() zurueck gegeben.
 
-BEISPIEL
-        void init()
-        {
+BEISPIELE
+        void init() {
             ...
             add_action("sing","singe");
             add_action("sing","jodel", 1);
             ...
         }
 
-        int sing(string str)
-        {
+        int sing(string str) {
             write("Das Kommando war:"+query_verb()+(str ? str : "")+"\n");
             write("Das Verb war:"+query_verb(1)+(str ? str : "")+"\n");
         }
@@ -37,7 +35,7 @@ BEISPIEL
             Das Kommando war: jodele
             Das Verb war: jodel
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.9. fuehrte das optionale Argument <flag> ein.
 
 SIEHE AUCH

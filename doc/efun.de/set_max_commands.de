@@ -1,7 +1,7 @@
 GESCHUETZT
 SYNOPSIS
-        void set_max_commands(int num);
-        void set_max_commands(int num, object obj);
+        void set_max_commands(int num)
+        void set_max_commands(int num, object obj)
 
 BESCHREIBUNG
         Setzt die maximale Anzahl Befehle, die vom Benutzer <obj> pro Sekunde
@@ -20,15 +20,11 @@ BESCHREIBUNG
         das einen LPC-Aufruf ausloest; sowohl Aktionen wie auch Aufrufe
         von input_to().
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.10
-
-BEISPIEL
+BEISPIELE
         Um einen mudweiten Standard fuer die maximale Anzahl Befehle pro
         Sekunde zu setzen, muss master::connect() folgendermassen aussehen:
 
-        object connect ()
-        {
+        object connect() {
             object obj;
             ...
             set_max_commands(100);
@@ -39,5 +35,8 @@ BEISPIEL
         veraenderten max_commands vom Masterobjekt zurueck zum zurueck
         gelieferten Objekt <obj>.
 
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.10.
+
 SIEHE AUCH
-        privilege_violation(M)x
+        privilege_violation(M)

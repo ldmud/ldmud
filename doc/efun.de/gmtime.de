@@ -1,8 +1,8 @@
 SYNOPSIS
-        #include <sys/time.h>
+        #include <time.h>
 
-        int *gmtime(int clock);
-        int *gmtime(int *uclock);
+        int * gmtime(int clock)
+        int * gmtime(int *uclock)
 
 BESCHREIBUNG
         Interpretiert <clock> als Anzahl Sekunden seit dem 01. Januar 1970,
@@ -11,7 +11,7 @@ BESCHREIBUNG
 
         Alternativ kann auch ein Array mit zwei Elementen angegeben werden,
         wie es von uclock() geliefert wird: das erste Element wird
-        interpretiert wie <clock>, das zweite Element bezeichnet die
+        wie <clock> interpretiert, das zweite Element bezeichnet die
         Mikrosekunden in der aktuellen Sekunde. Dieses zweite Element wird
         ignoriert.
 
@@ -26,13 +26,13 @@ BESCHREIBUNG
             int TM_YDAY  (7) : Tag im Jahr (0..365)
             int TM_ISDST (8) : TRUE: Daylight saving time
 
-BEISPIEL
+BEISPIELE
         printf("Heute ist %s\n", ({ "Sonntag", "Montag", "Dienstag",
             "Mittwoch",        "Donnerstag", "Freitag", "Samstag"})
             [gmtime()[TM_WDAY]]);
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.9.
 
 SIEHE AUCH
-    ctime(E), localtime(E), time(E), utime(E)
+        ctime(E), localtime(E), time(E), utime(E)

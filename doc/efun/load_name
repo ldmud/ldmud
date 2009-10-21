@@ -27,7 +27,7 @@ DESCRIPTION
         The returned name starts with a '/', unless the driver is running
         in COMPAT mode.
 
-EXAMPLE
+EXAMPLES
         object o;
         o = clone_object("/std/thing");
         write(load_name(o));  --> writes "/std/thing" in !compat mode

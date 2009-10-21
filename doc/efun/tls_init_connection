@@ -1,7 +1,8 @@
 PRELIMINARY
 SYNOPSIS
         int tls_init_connection(object ob)
-        int tls_init_connection(object ob, string fun, string|object fob, mixed extra...)
+        int tls_init_connection(object ob, string fun, string|object fob,
+                                mixed extra...)
         int tls_init_connection(object ob, closure fun, mixed extra...)
 
 DESCRIPTION

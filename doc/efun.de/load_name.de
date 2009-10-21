@@ -1,6 +1,6 @@
 SYNOPSIS
-        string load_name();
-        string load_name(object|string obj);
+        string load_name()
+        string load_name(object|string obj)
 
 BESCHREIBUNG
         Die Funktion liefert den Namen, mit dem <obj> geladen wurde. <obj>
@@ -28,7 +28,7 @@ BESCHREIBUNG
         replace_program() unterworfen, spiegelt der load_name() nicht mehr
         das effektive Verhalten des Objekts wider.
 
-BEISPIEL
+BEISPIELE
         object o;
         o = clone_object("/std/thing");
         write(load_name(o));  --> liefert "/std/thing" in !Compat Modus
@@ -36,7 +36,7 @@ BEISPIEL
         write(load_name("/std/thing"));  --> gleich wie oben
         write(load_name("/std/thing#4n5")); --> liefert 0
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.6.
         Strings als Argumente sind moeglich seit 3.2.8.
         0 ist zulaessig seit 3.2.9.

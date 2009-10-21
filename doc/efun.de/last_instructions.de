@@ -1,6 +1,6 @@
 GESCHUETZT
 SYNOPSIS
-        string *last_instructions(int lenght, int verbose);
+        string * last_instructions(int lenght, int verbose)
 
 BESCHREIBUNG
         Liefert ein Array mit der "Laenge" der zuletzt ausgefuehrten

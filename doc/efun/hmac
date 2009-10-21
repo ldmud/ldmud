@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/tls.h>
+        #include <tls.h>
 
         string hmac(int method, string key, string arg )
         string hmac(int method, string key, int *  arg )
@@ -22,6 +22,7 @@ DESCRIPTION
         If the driver is compiled without OpenSSL or GCrypt support
         an error is thrown.
 
+
 EXAMPLES
         string s;
 
@@ -29,7 +30,7 @@ EXAMPLES
         s = hmac(TLS_HASH_SHA1, "secret", ({ 'H', 'e', 'l', 'l', 'o' }) )
 
 HISTORY
-        Introduced in LDMud 3.3.714
+        Introduced in LDMud 3.3.714.
 
 SEE ALSO
         crypt(E), md5(E), md5_crypt(E), sha1(E), hmac(E)

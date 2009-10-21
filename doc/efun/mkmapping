@@ -18,7 +18,7 @@ DESCRIPTION
         unused allocated space will be freed after the current function
         returns.
 
-EXAMPLE
+EXAMPLES
         mkmapping( ({ 1, 2 }), ({ 10, 11 }), ({ 20, 21, 22}))
           returns ([ 1:10;20, 2:11;21 ])
 

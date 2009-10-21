@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed query_editing(object ob);
+        mixed query_editing(object ob)
 
 BESCHREIBUNG
         Liefert 1, wenn <ob> interaktiv ist (das heisst, es gibt einen realen

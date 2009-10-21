@@ -1,6 +1,6 @@
 VERALTET
 SYNOPSIS
-        int cat(string path, int start, int num);
+        int cat(string path, int start, int num)
 
 BESCHREIBUNG
         Listet die Datei, die unter <path> gefunden wird.
@@ -16,22 +16,22 @@ BESCHREIBUNG
         Die totale Anzahl Zeilen ist durch ein Systemlimit beschraenkt, das
         normalerweise bei 50 Zeilen liegt.
 
-        cat() liefert die Anzahl ausgegebener Zeilen bei Erfolg, 0 wenn
-        <pfad> nicht gefunden werden kann oder keine Zeilen ausgegeben
-        werden koennen (weil <start> z.B. groesser ist als die Laenge der
+        cat() liefert die Anzahl ausgegebener Zeilen bei Erfolg oder 0,
+        wenn <pfad> nicht gefunden werden kann oder keine Zeilen ausgegeben
+        werden koennen (weil z.B. <start> groesser ist als die Laenge der
         Datei).
 
         Diese efun ist veraltet. Bitte nutzt sie nicht mehr in neuem Code,
-        sondern verwendet etwas read_bytes() + tell_object() oder die im
-        Driverpaket mitgelieferte sefun cat().
+        sondern verwendet stattdessen read_bytes() + tell_object() oder 
+        die im Driverpaket mitgelieferte sefun cat().
 
-BEISPIEL
+BEISPIELE
         cat("/doc/efun/cat", 5, 9);
 
         Das gibt die Datei "/doc/efun/cat" aus, beginnend mit Zeile 5 bis und
         mit Zeile 13.
 
-AeNDERUNGEN
+GESCHICHTE
         Veraltet seid 3.3.719.
         Entfernt in LDMud 3.5.0
 

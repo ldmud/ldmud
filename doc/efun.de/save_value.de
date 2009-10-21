@@ -1,5 +1,6 @@
 SYNOPSIS
-        string save_value(mixed wert [, int format]);
+        string save_value(mixed wert)
+        string save_value(mixed wert, int format)
 
 BESCHREIBUNG
         Schreibt <wert> in einen String, der sich mit restore_value()
@@ -20,7 +21,7 @@ BESCHREIBUNG
         Das Format zum Schreiben des Wertes in den String entspricht dem von
         save_object() und restore_object() verwendeten Format.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.8.
         LDMud 3.2.9. ergaenzte die Funktion um die Moeglichkeit, Non-Lambda
             Closures, Symbole und gequotete Arrays zu speichern. Dazu wurde

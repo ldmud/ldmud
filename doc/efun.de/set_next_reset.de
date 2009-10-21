@@ -1,5 +1,5 @@
 SYNOPSIS
-        int set_next_reset(int delay);
+        int set_next_reset(int delay)
 
 BESCHREIBUNG
         Weist den Gamedriver an, im Objekt nicht vor Ablauf von <delay>
@@ -18,9 +18,9 @@ BESCHREIBUNG
 
 BEISPIELE
         set_next_reset(15*60);      Der naechste Reset erfolgt nach
-                                    fruehstens 15 Minuten.
+                                    fruehestens 15 Minuten.
         set_next_reset(0);          Gibt die verbleibende Zeit zum naechsten
                                     Reset zurueck.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.6, angepasst von Morgengrauen.

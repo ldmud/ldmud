@@ -1,7 +1,6 @@
 SYNOPSIS
         string copy_bits(string src, string dest
-                         [, int srcstart [, int deststart [, int copylen ]]]
-                        )
+                         [, int srcstart [, int deststart [, int copylen ]]])
 
 DESCRIPTION
         Copy the bitrange [<srcstart>..<srcstart>+<copylen>[ from
@@ -36,7 +35,7 @@ EXAMPLES
           (The src[]/dest[] is just for explanatory purposes!)
 
 HISTORY
-        Introduced in LDMud 3.3.166
+        Introduced in LDMud 3.3.166.
 
 SEE ALSO
         clear_bit(E), set_bit(E), test_bit(E), next_bit(E), last_bit(E),

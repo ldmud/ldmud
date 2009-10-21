@@ -1,6 +1,6 @@
 SYNOPSIS
-        object *caller_stack()
-        object *caller_stack(int add_interactive)
+        object * caller_stack()
+        object * caller_stack(int add_interactive)
 
 DESCRIPTION
         Returns an array of the previous_object()s who caused the
@@ -16,7 +16,7 @@ DESCRIPTION
         from the closure object: the first is for the bound object,
         the second for the closure object.
 
-EXAMPLE
+EXAMPLES
         interactive object A enters a command which causes
         a call to a function in object B, that one calls a
         function in object C and that, in turn, in object D
@@ -25,7 +25,7 @@ EXAMPLE
         If it calls caller_stack(1) the result is: ({C,B,A}).
 
 HISTORY
-        Introduced in LDMud 3.2.6, suggested by TubMud.
+        Introduced in LDMud 3.2.6, suggested by Tubmud.
 
 SEE ALSO
         caller_stack_depth(E), previous_object(E), this_interactive(E),

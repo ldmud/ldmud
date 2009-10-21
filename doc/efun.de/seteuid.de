@@ -1,5 +1,5 @@
 SYNOPSIS
-        int seteuid(string str);
+        int seteuid(string str)
 
 BESCHREIBUNG
         Setzt die effektive UID auf <str>. Das aufrufende Objekt muss dazu
@@ -10,10 +10,10 @@ BESCHREIBUNG
         Nur wenn dieser Wert 0 ist, kann die UID des Objekts durch
         export_uid() veraendert werden.
 
-        Unter strikten eUID Regeln koennen Objekte mit UID 0 keine anderen
+        Unter strikten eUID-Regeln koennen Objekte mit UID 0 keine anderen
         Objekte laden oder clonen.
 
-AENDERUNGEN
+GESCHICHTE
         Seit 3.2.1@47 ist die Efun nur verfuegbar, wenn eUIDs verwendet
             werden.
         Seti 3.2.7 ist diese Efun immer verfuegbar.

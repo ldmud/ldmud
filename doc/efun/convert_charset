@@ -84,10 +84,10 @@ DESCRIPTION
                 RISCOS-LATIN1
 
 
-EXAMPLE
+EXAMPLES
         convert_charset("Hi!", "ascii", "utf-8")
 
 HISTORY
-        Introduced in LDMud 3.3.531 .
+        Introduced in LDMud 3.3.531.
 
 SEE ALSO

@@ -1,6 +1,6 @@
 SYNOPSIS
-        int    save_object (string name [, int format])
-        string save_object ([int format])
+        int    save_object(string name [, int format])
+        string save_object([int format])
 
 DESCRIPTION
         Encode the saveable variables of the current object into a string.
@@ -20,7 +20,7 @@ DESCRIPTION
 
            -1: use the driver's native format (default).
             0: original format, used by Amylaar LPMud and LDMud <= 3.2.8 .
-            1: LDMud >= 3.2.9: no-lambda closures, symbols, quoted arrays
+            1: LDMud >= 3.2.9: non-lambda closures, symbols, quoted arrays
                  can be saved.
 
         A variable is considered 'saveable' if it is not declared

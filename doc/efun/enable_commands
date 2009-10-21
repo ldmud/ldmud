@@ -9,7 +9,7 @@ DESCRIPTION
         create() (or reset(0) in compat mode), because the command
         giver will be set to this object.
 
-EXAMPLE
+EXAMPLES
         void create() {
            enable_commands();
            set_living_name("dummymonster");

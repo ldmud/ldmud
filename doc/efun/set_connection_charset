@@ -1,11 +1,11 @@
 SYNOPSIS
-        void set_connection_charset (int* bitvector, int quote_iac)
-        void set_connection_charset (string charset, int quote_iac)
-        void set_connection_charset (0, int quote_iac)
+        void set_connection_charset(int *bitvector, int quote_iac)
+        void set_connection_charset(string charset, int quote_iac)
+        void set_connection_charset(0, int quote_iac)
 
 DESCRIPTION
         Set the set of characters that can be output to the
-        interactive user (this does not apply to binary_message() ).
+        interactive user (this does not apply to binary_message()).
         The function must be called by the interactive user object
         itself.
 

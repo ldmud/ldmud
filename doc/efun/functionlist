@@ -1,16 +1,16 @@
 SYNOPSIS
-        #include <sys/functionlist.h>
-        #include <sys/lpctypes.h>
+        #include <functionlist.h>
+        #include <lpctypes.h>
 
-        mixed *functionlist (object ob, int flags = RETURN_FUNCTION_NAME)
+        mixed * functionlist(object ob, int flags)
 
 DESCRIPTION
-        Return an array with information about <ob>s lfunctions. For every
+        Returns an array with information about <ob>s lfunctions. For every
         function, 1 to 4 values (depending on <flags>) are stored in
         the result array conveying in this order:
           - the name of the function
           - the function flags (see below)
-          - the return type (listed in mudlib/sys/lpctypes.h)
+          - the return type (listed in <lpctypes.h>)
           - the number of accepted argumens
 
         <ob> may be given as true object or as a filename. In the latter
@@ -19,7 +19,7 @@ DESCRIPTION
         <flags> determines both which information is returned for every
         function, and which functions should be considered at all.
         Its value is created by bin-or'ing together following flags from
-        mudlib/sys/functionlist.h:
+        <functionlist.h>:
 
           Control of returned information:
             RETURN_FUNCTION_NAME    include the function name
@@ -44,6 +44,7 @@ DESCRIPTION
             NAME_CROSS_DEFINED  function is defined to be in a different program
             TYPE_MOD_NO_MASK    function is nomask
             TYPE_MOD_PUBLIC     function is public
+
 
 SEE ALSO
         inherit_list(E), function_exists(E), variable_list(E),

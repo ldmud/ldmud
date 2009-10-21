@@ -1,6 +1,6 @@
 SYNOPSIS
-        object clone_object(string name);
-        object clone_object(object template);
+        object clone_object(string name)
+        object clone_object(object template)
 
 BESCHREIBUNG
         Clont ein neues Objekt aus der Definiton <name> oder alternativ aus
@@ -61,7 +61,7 @@ BEISPIELE
         }
 
 
-AENDERUNGEN
+GESCHICHTE
         Modifiziert in LDMud 3.2.6: es werden auch Objekte als Argument
             akzeptiert.
         LDMud 3.3.378 fuehrte das pragma share_variables ein.

@@ -2,8 +2,8 @@ SYNOPSIS
         mixed  arr[index];
         int    str[index];
 
-        *mixed arr[from .. to];
-        string str[from .. to];
+        mixed * arr[from..to];
+        string  str[from..to];
 
 BESCHREIBUNG
         Liefert ein Element aus einem Array oder String (erste Form), oder
@@ -52,7 +52,7 @@ BEISPIELE
         str[1..2] = "bar"               -> str == "tbart"
         str[1..2] = ""                  -> str == "tt"
 
-AENDERUNGEN
+GESCHICHTE
         slice_array() ist die alte Form der []-Operatoren fuer Arrays,
         extract() ist die alte Form der []-Operatoren fuer Strings.
         BEIDE VARIANTEN SIND VERALTET, WERDEN NICHT MEHR UNTERSTUETZT UND

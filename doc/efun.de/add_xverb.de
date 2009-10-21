@@ -1,6 +1,6 @@
 VERALTET
 SYNOPSIS
-    void add_xverb(string str);
+    void add_xverb(string str)
 
 BESCHREIBUNG
         Diese Funktion gehoert zu den add_action() Funktionen. Sie setzt ein

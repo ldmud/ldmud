@@ -1,11 +1,11 @@
 SYNOPSIS
-        object find_object(string str);
+        object find_object(string str)
 
 BESCHREIBUNG
-        Liefert das Objekt mit dem Namen <str>. Wenn das Objekt nicht geladen
-        wurde, wird es nicht gefunden.
+        Liefert das Objekt mit dem Namen <str>. Wenn das Objekt nicht
+        geladen ist, wird es nicht gefunden.
 
-BEISPIEL
+BEISPIELE
         object obj;
         obj = find_object("std/thing");
         obj = find_object("std/thing.c");

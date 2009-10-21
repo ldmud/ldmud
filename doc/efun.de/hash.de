@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/tls.h>
+        #include <tls.h>
 
         string hash(int method, string arg [, int iterations ] )
         string hash(int method, int *  arg [, int iterations ] )
@@ -25,6 +25,7 @@ BESCHREIBUNG
 
         Jede Iteration kostet 10 Evalution-Ticks.
 
+
 BEISPIELE
         string s;
 
@@ -32,7 +33,7 @@ BEISPIELE
         s = hash(TLS_HASH_SHA1, ({ 'H', 'e', 'l', 'l', 'o' }) )
 
 GESCHICHTE
-        Eingefuehrt in LDMud 3.3.714
+        Eingefuehrt in LDMud 3.3.714.
         LDMud 3.3.719 fuehrte die iterationsbasierten Evaluationskosten ein.
 
 SIEHE AUCH

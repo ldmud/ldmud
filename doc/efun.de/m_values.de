@@ -1,6 +1,6 @@
 SYNOPSIS
-        *mixed m_values(mapping map);
-        *mixed m_values(mapping map, int index);
+        mixed * m_values(mapping map)
+        mixed * m_values(mapping map, int index)
 
 BESCHREIBUNG
         Liefert ein Array mit den Werten des Mappings <map>. Wenn <index>
@@ -9,7 +9,7 @@ BESCHREIBUNG
 
 BEISPIELE
         mapping m = ([ "bla":1;2;3 , "fasel":4;5;6 , "schnack":7;8;9 ]);
-        m_values(m)    -> liefert ({ 1 , 4 , 7 }) (uU. permutiert)
+        m_values(m)    -> liefert ({ 1 , 4 , 7 }) (u.U. permutiert)
         m_values(m, 0) -> liefert ({ 1 , 4 , 7 }) (ditto)
         m_values(m, 1) -> liefert ({ 2 , 5 , 8 }) (ditto)
 

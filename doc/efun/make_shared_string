@@ -1,6 +1,6 @@
 DEPRECATED
 SYNOPSIS
-        string make_shared_string (string str)
+        string make_shared_string(string str)
 
 DESCRIPTION
         Puts <str> in the table of shared strings of the game.
@@ -14,5 +14,5 @@ DESCRIPTION
         converts untabled strings into tabled strings after some time.
 
 HISTORY
-        Introduced in LDMud 3.2.6; following a suggestion from TubMud.
-        Deprecated in LDMud 3.3.531 .
+        Introduced in LDMud 3.2.6; following a suggestion from Tubmud.
+        Deprecated in LDMud 3.3.531.

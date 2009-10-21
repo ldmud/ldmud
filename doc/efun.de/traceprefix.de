@@ -1,7 +1,7 @@
 GESCHUETZT
 SYNOPSIS
-        string traceprefix(string prefix);
-        string traceprefix(int dummy);
+        string traceprefix(string prefix)
+        string traceprefix(int dummy)
 
 BESCHREIBUNG
         Wenn die Funktion mit einem String als Argument aufgerufen wird,
@@ -19,19 +19,19 @@ BESCHREIBUNG
         aufgerufen, um die Erlaubnis fuer die Benutzung dieser Funktion zu
         erhalten.
 
-BEISPIEL
+BEISPIELE
         object obj;
         string prefix;
         obj=find_player("thomas");
-        prefix=objec_name(obj);
-        prefix=prefix[1..strlen(prefix)-1];  /* entfernt den Praefix "/" */
+        prefix = object_name(obj);  /* z.B. /std/player#69         */
+        prefix = prefix[1..];       /* entfernt den fuehrenden "/" */
         traceprefix(prefix);
         /* Von hier an wird nur Code im Objekt std/player#69 getracet */
         trace(TRACE_CALL|TRACE_CALL_OTHER|TRACE_RETURN|TRACE_ARGS);
         ...
         trace(TRACE_NOTHING);
 
-AENDERUNGEN
+GESCHICHTE
         Ab LDMud 3.2.9 wird das Argument <prefix> an valid_trace() uebergeben.
 
 SIEHE AUCH

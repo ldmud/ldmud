@@ -1,7 +1,7 @@
 SYNOPSIS
-        closure symbol_variable(string arg);
-        closure symbol_variable(symbol arg);
-        closure symbol_variable(int arg);
+        closure symbol_variable(string arg)
+        closure symbol_variable(symbol arg)
+        closure symbol_variable(int arg)
 
 BESCHREIBUNG
         Erzeugt eine Identifier (Lfun) Closure aus der globalen Variablen
@@ -16,14 +16,14 @@ BESCHREIBUNG
         bezieht, die im geerbten Objekt "private" deklariert ist (d.h.
         versteckt), fuehrt dies zu einer Schutzverletzung.
 
-AENDERUNGEN
-        Eingefuehrt in 3.2.1@8
-
 BEISPIELE
         int base;
         int var;
         symbol_variable("var");         ergibt: #'<this_object>->var
         symbol_variable(0);             ergibt: #'<this_object>->base
+
+GESCHICHTE
+        Eingefuehrt in 3.2.1@8.
 
 SIEHE AUCH
         lambda(E), quote(E), symbol_function(E)

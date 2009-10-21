@@ -1,7 +1,7 @@
 SYNOPSIS
-        #include <sys/commands.h>
+        #include <commands.h>
 
-        mixed * match_command (string command, object origin)
+        mixed * match_command(string command, object origin)
 
 DESCRIPTION
         Take the command <command>, parse it, and return an array of all

@@ -1,10 +1,10 @@
 GESCHUETZT
 SYNOPSIS
-        #include <sys/debug_info.h>
+        #include <debug_info.h>
 
-        mixed debug_info(int flag);
-        mixed debug_info(int flag, mixed arg);
-        mixed debug_info(int flag, mixed arg2, mixed arg3);
+        mixed debug_info(int flag)
+        mixed debug_info(int flag, mixed arg)
+        mixed debug_info(int flag, mixed arg2, mixed arg3)
 
 BESCHREIBUNG
         Sammelt entsprechend den Angaben in <flag> gewisse intere Debuginfos
@@ -410,7 +410,7 @@ BESCHREIBUNG
             bezeichnen den Call Stack, beginnen mit der hoechsten
             aufgerufenen Funktion.
 
-            Alle Eintraege im Array sind wiederdum Arrays mit folgenden
+            Alle Eintraege im Array sind wiederum Arrays mit folgenden
             Elementen:
               - int[TRACE_TYPE]: Der Typ der aufrufenden Funktion
                     TRACE_TYPE_SYMBOL (0): ein Funktionssymbol (sollte nicht
@@ -439,7 +439,7 @@ BESCHREIBUNG
                 dem Control Stack (Rekursionstiefe).
 
         DINFO_EVAL_NUMBER (8): gibt die Nummer der aktuellen Berechnung
-            zurueck. Diese Nummer fuer fuer jeden vom driver initiierten
+            zurueck. Diese Nummer wird fuer jeden vom driver initiierten
             Aufruf von LPC-Code erhoeht, also bei Aufruf von:
               - Kommandos (die per add_action hinzugefuegt wurden)
               - heart_beat, reset, clean_up
@@ -457,7 +457,8 @@ BESCHREIBUNG
            Es ist zu beachten, dass der Zaehler ueberlaufen kann, insbesondere
            auf 32-bit-Systemen. Er kann demzufolge auch negativ werden.
 
-AENDERUNGEN
+
+GESCHICHTE
         Seit 3.2.7 liefert DINFO_STATUS die Information zurueck, anstatt sie
             nur auszugeben.
         DINFO_DUMP wurde in 3.2.7 eingefuehrt.
@@ -482,7 +483,7 @@ AENDERUNGEN
         LDMud 3.3.603 fuegte DID_MEM_EXT_STATISTICS zu DINFO_DATA:DID_MEMORY
             hinzu.
         LDMud 3.3.718 fuegte DIT_CURRENT_DEPTH to DINFO_TRACE hinzu.
-        LDMud 3.3.719 fuegte DINFO_EVAL_NUMBER hinzu
+        LDMud 3.3.719 fuegte DINFO_EVAL_NUMBER hinzu.
 
 SIEHE AUCH
         trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

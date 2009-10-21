@@ -1,5 +1,5 @@
 SYNOPSIS
-        int extern_call();
+        int extern_call()
 
 BESCHREIBUNG
         Liefert 0, wenn die momentane ausgefuehrte Funktion durch eine lokale
@@ -8,8 +8,8 @@ BESCHREIBUNG
         Funktion in all diesen Faellen 1 zurueck, in Zukunft koennte
         allerdings eine Unterscheidung der Aufrufe moeglich werden.
 
-AENDERUNGEN
-        Eingefuehrt in 3.2@263 bzw. 3.2.1@12
+GESCHICHTE
+        Eingefuehrt in 3.2@263 bzw. 3.2.1@12.
 
 SIEHE AUCH
         call_other(E), previous_object(E)

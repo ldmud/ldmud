@@ -1,5 +1,5 @@
 SYNOPSIS
-        int random(int n);
+        int random(int n)
 
 BESCHREIBUNG
         Liefert eine Zufallszahl im Bereich [0 .. n-1].

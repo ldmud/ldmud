@@ -1,9 +1,10 @@
 SYNOPSIS
-        int interactive(object obj);
+        int interactive()
+        int interactive(object obj)
 
 BESCHREIBUNG
         Liefert 1 zurueck, wenn <obj> ein interaktiver User (ein Spieler)
-        ist. Wird <obj> weggelassen, wird this_object()verwendet.
+        ist, sonst 0. Wird <obj> weggelassen, so wird this_object() verwendet.
 
 SIEHE AUCH
         query_once_interactive(E), query_ip_number(E), query_ip_name(E),

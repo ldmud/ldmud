@@ -1,7 +1,7 @@
 SYNOPSIS
-        object first_inventory();
-        object first_inventory(string ob);
-        object first_inventory(object ob);
+        object first_inventory()
+        object first_inventory(string ob)
+        object first_inventory(object ob)
 
 BESCHREIBUNG
         Liefert das erste Objekt im Inventory von <obj>, wobei <obj> entweder
@@ -17,7 +17,7 @@ BEISPIELE
             }
 
         Wer solche Aufrufe haeufig verwendet, findet es moeglicherweise
-        sinnvoll, ein Praeprozessor Makro zu verwenden:
+        sinnvoll, ein Praeprozessor-Makro zu verwenden:
 
             #define FORALL(x, y) for(x=first_inventory(y);x;
                 x=next_inventory(x))

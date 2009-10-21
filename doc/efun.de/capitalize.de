@@ -1,11 +1,11 @@
 SYNOPSIS
-        string capitalize(string str);
+        string capitalize(string str)
 
 BESCHREIBUNG
         Konvertiert das erste Zeichen des Strings <str> in einen
         Grossbuchtaben und gibt den neuen String zurueck.
 
-BEISPIEL
+BEISPIELE
         capitalize("hallo welt!") -> "Hallo welt!"
 
 SIEHE AUCH

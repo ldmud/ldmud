@@ -1,5 +1,5 @@
 SYNOPSIS
-        string invert_bits (string str)
+        string invert_bits(string str)
 
 DESCRIPTION
         Invert the status of all bits in bitstring <str> and return the

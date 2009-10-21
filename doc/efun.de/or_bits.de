@@ -1,5 +1,5 @@
 SYNOPSIS
-        string or_bits(string str1, string str2);
+        string or_bits(string str1, string str2)
 
 BESCHREIBUNG
         <str1> und <str2> sind beides Bitstrings. Das Resultat von or_bits()
@@ -12,7 +12,7 @@ BESCHREIBUNG
         ist der Leerschlag " " mit dem Wert 0. Das erste Zeichen im String
         ist jenes mit den niedrigsten Bits (0-5).
 
-BEISPIEL
+BEISPIELE
         string s1, s2, s3;
 
         s1 = set_bit("", 3); s1 = set_bit(s1, 15);  -> s1 is "( ("

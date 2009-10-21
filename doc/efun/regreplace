@@ -1,8 +1,8 @@
 SYNOPSIS
         #include <regexp.h>
 
-        string regreplace( string txt, string pattern
-                         , closure|string replacepattern, int flags)
+        string regreplace(string txt, string pattern,
+                          closure|string replacepattern, int flags)
 
 DESCRIPTION
         This function looks through txt looking for the regular
@@ -25,7 +25,8 @@ DESCRIPTION
         replacing variable strings (as opposed to regexplode, where
         you can explode by regular expression, but not implode...)
 
-EXAMPLE
+
+EXAMPLES
         string msgin;
 
         /* Checks msgin for the string 'tells you: ' and all following
@@ -43,8 +44,9 @@ EXAMPLE
         /* Put the word HOUSE into lower case. */
         txt = regreplace(txt, "HOUSE", #'lower_case, 1);
 
+
 HISTORY
-        Introduced in 3.2.1@125
+        Introduced in 3.2.1@125.
         The use of a closure as replacepattern was introduced in
         LDMud 3.2.9.
 

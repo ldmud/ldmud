@@ -2,8 +2,7 @@ SYNOPSIS
         int intp(mixed arg)
 
 BESCHREIBUNG
-        Liefert 1, wenn das Argument eine Ganzzahl (Integer) ist, ansonsten
-        0.
+        Liefert 1, wenn das Argument eine Ganzzahl (Integer) ist, sonst 0.
 
 SIEHE AUCH
         closurep(E), floatp(E), mappingp(E), objectp(E), pointerp(E),

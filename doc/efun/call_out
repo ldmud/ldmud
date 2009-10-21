@@ -32,7 +32,7 @@ DESCRIPTION
         If two call_out()s were started with the same target time
         the one that was issued first will be executed first.
 
-EXAMPLE
+EXAMPLES
         call_out("RefreshMe", 10);
 
         This will call the function RefreshMe() in 10 seconds without

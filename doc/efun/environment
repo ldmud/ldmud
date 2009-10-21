@@ -10,7 +10,7 @@ DESCRIPTION
 
         Destructed objects do not have an environment.
 
-EXAMPLE
+EXAMPLES
         object room;
         room = environment(this_player());
 

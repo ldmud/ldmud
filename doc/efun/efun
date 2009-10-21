@@ -48,12 +48,13 @@ DESCRIPTION
 
          - 'deprecated' or 'obsolete'
 
+           These efuns should no longer be used, they are merely provided
+           for backwards compatibility:
+
              make_shared_string()
              md5()
              sha1()
 
-           These efuns should no longer be used, they are merely provided
-           for backwards compatibility:
 
 SEE ALSO
         efuns(LPC), applied(A), master(M), lpc(LPC), concepts(C), driver(D)

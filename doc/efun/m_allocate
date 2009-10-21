@@ -1,10 +1,11 @@
 SYNOPSIS
+        mapping m_allocate(int size)
         mapping m_allocate(int size, int width)
 
 DESCRIPTION
         Reserve memory for a mapping.
 
-        size is the number of entries (i.e. keys) to reserve, width is
+        <size> is the number of entries (i.e. keys) to reserve, <width> is
         the number of data items per entry. If the optional width is
         omitted, 1 is used as default.
 
@@ -27,13 +28,13 @@ DESCRIPTION
 
 EXAMPLES
         m_allocate(3, 7) -> mapping with 7 values per key, and with space
-           for 3 entries.
+        for 3 entries.
 
         ([:2*3 ]) -> same as m_allocate(0, 6)
 
 HISTORY
         Renamed from 'allocate_mapping' in LDMud 3.2.6.
-        The ([:width ]) notation introduced in LDMud 3.2.9 / 3.3.208.
+        The ([:width ]) notation was introduced in LDMud 3.2.9 / 3.3.208.
 
 SEE ALSO
         mappings(LPC), walk_mapping(E), get_type_info(E), m_reallocate(E)

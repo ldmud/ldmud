@@ -1,13 +1,13 @@
 GESCHUETZT
 SYNOPSIS
-        #include <sys/commands.h>
+        #include <commands.h>
 
-        *mixed command_stack();
+        mixed * command_stack()
 
 BESCHREIBUNG
-        Liefert ein Array, das den Kommando Stack beschreibt. Das Array
-        umfasst command_stack_depth() Eintraege, der erste davon beschreibt
-        das Top-Level Kommando, der letze Eintrag das aktuelle Kommando.
+        Liefert ein Array, das den Kommandostack beschreibt. Das Array
+        umfasst command_stack_depth() Eintraege; der erste davon beschreibt
+        das Top-Level-Kommando, der letzte Eintrag das aktuelle Kommando.
 
         Jeder Eintrag ist wiederum ein Array mit folgenden Eintraegen:
 
@@ -19,16 +19,16 @@ BESCHREIBUNG
             mixed  [CMD_FAILOBJ]:   das Objekt, welches notify_fail() gesetzt
                                     hat
 
-        CMD_ORIGIN und CMD_PLAYER sind fuer gewohenlich das gleiche Objekt.
-        Es gibt nur einen Unterschied, wenn der modify_command Hook den
+        CMD_ORIGIN und CMD_PLAYER sind fuer gewoehnlich das gleiche Objekt.
+        Es gibt nur einen Unterschied, wenn der modify_command-Hook den
         Kommandogeber mit set_this_player() aendert.
 
-AENDERUNGEN
+ANMERKUNGEN
+        Jeder der Eintraege im Array kann 0 sein.
+
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.7.
         LDMud 3.2.8 fuegte den CMD_FAILOBJ Eintrag hinzu.
-
-ANMERKUNG
-        Jeder der Eintraege im Array kann 0 sein.
 
 SIEHE AUCH
         command(E), command_stack_depth(E), notify_fail(E)

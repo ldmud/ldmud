@@ -1,7 +1,7 @@
 SYNOPSIS
-        float to_float(int arg);
-        float to_float(string arg);
-        float to_flaot(float arg);
+        float to_float(int    arg)
+        float to_float(string arg)
+        float to_float(float  arg)
 
         (float)<value>
 
@@ -10,7 +10,7 @@ BESCHREIBUNG
         konvertiert bis zum ersten Zeichen, das nicht mehr zum Float
         gehoert. Floats werden direkt zurueck gegeben.
 
-BUGS
+FEHLER
         Die Cast-Schreibweise funktioniert nur, wenn der genaue Wert von
         <value> zum Zeitpunkt der Kompilierung bekannt ist. Dies wird nicht
         geaendert werden, da die Funktionsform verwendet werden kann.

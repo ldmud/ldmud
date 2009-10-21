@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed restore_value(string str);
+        mixed restore_value(string str)
 
 BESCHREIBUNG
         Wandelt die String-Entsprechung <str> eines Wertes zurueck in den Wert
@@ -7,7 +7,7 @@ BESCHREIBUNG
         save_value() erzeugt wird. Die Spezifikation des Speicherformates
         '#x:y' ist optional.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.8.
         Mit LDMud 3.2.9 kam das Laden von Non-Lambda Closures, Symbolen und
         gequoteten Arrays hinzu, wozu ein neues Format fuer die Speicherdatei

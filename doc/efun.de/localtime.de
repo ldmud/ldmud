@@ -1,8 +1,8 @@
 SYNOPSIS
-        #include <sys/time.h>
+        #include <time.h>
 
-        int *localtime(int clock);
-        int *localtime(int *uclock);
+        int * localtime(int clock)
+        int * localtime(int *uclock)
 
 BESCHREIBUNG
         Interpretiert das Argument <clock> als Anzahl Sekunden seit dem
@@ -27,13 +27,13 @@ BESCHREIBUNG
             int TM_YDAY   (7):  Tag im Jahr (0..365)
             inz TM_ISDST  (8):  TRUE: Daylight Saving Time
 
-BEISPIEL
-        printf("Today is %s\n", ({ "Sonntag", "Montag", "Dienstag",
+BEISPIELE
+        printf("Heute ist %s\n", ({ "Sonntag", "Montag", "Dienstag",
             "Mittwoch", "Donnerstag", "Freitag", "Samstag"})
             [localtime()[TM_WDAY]]);
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.9
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.9.
 
 SIEHE AUCH
-    ctime(E), gmtime(E), time(E), utime(E)
+        ctime(E), gmtime(E), time(E), utime(E)

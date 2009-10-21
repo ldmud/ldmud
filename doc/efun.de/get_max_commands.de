@@ -1,5 +1,5 @@
 SYNOPSIS
-        int get_max_commands([object obj]);
+        int get_max_commands([object obj])
 
 BESCHREIBUNG
         Liefert die maximale Anzahl Kommandos, die der interaktive Benutzer
@@ -13,7 +13,7 @@ BESCHREIBUNG
         einen LPC-Aufruf verursacht, also sowohl Aktionen, wie auch Aufrufe an
         input_to().
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.10.
 
 SIEHE AUCH

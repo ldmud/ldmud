@@ -1,9 +1,9 @@
 GESCHUETZT
 SYNOPSIS
-        #include <sys/functionlist.h>
-        #include <sys/lpctypes.h>
+        #include <functionlist.h>
+        #include <lpctypes.h>
 
-        *mixed variable_list(object obj, int flags = RETURN_FUNCTION_NAME);
+        mixed *variable_list(object obj, int flags = RETURN_FUNCTION_NAME)
 
 BESCHREIBUNG
         Liefert ein Array mit Informationen ueber die Variablen von <obj>.
@@ -12,7 +12,7 @@ BESCHREIBUNG
         im Array abgespeichert:
           - der Name der Variablen
           - die Flags der Variablen (siehe weiter unten)
-          - der Rueckgabetyp (gemaess mudlib/sys/lpctypes.h)
+          - der Rueckgabetyp (gemaess <lpctypes.h>)
           - der Wert der Variablen
 
         <obj> kann als Objekt oder als Dateinamen uebergeben werden. Im
@@ -24,7 +24,7 @@ BESCHREIBUNG
         <obj>).
 
         Mit <flags> wird festgelegt, welche Informationen ueber welche
-        Variablen abgefragt werden. Folgende Flags aus <sys/functionlist.h>
+        Variablen abgefragt werden. Folgende Flags aus <functionlist.h>
         koennen mit binaerem Oder kombiniert werden:
 
         Auswahl der gesammelten Information:
@@ -48,13 +48,11 @@ BESCHREIBUNG
             TYPE_MOD_NO_MASGK     die Variable ist "nomask" deklariert
             TYPE_MOD_PUBLIC       die Variable ist "public" deklariert
 
-        All diese Flags sind in mudlib/sys/functionlist.h definiert und
-        sollten an einen allgemein zugaenglichen Platz kopiert werden.
-        Die Rueckgabewerte sind in mudlib/sys/lpctypes.h definiert, die
-        auch in die Mudlib kopiert werden sollten.
+        All diese Flags sind in <functionlist.h>, die Rueckgabewerte in
+        <lpctypes.h> definiert.
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.10
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.10.
 
 SIEHE AUCH
         inherit_list(E), functionlist(E), variable_exists(E)

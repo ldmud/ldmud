@@ -1,8 +1,8 @@
 SYNOPSIS
-        int clonep ()
-        int clonep (object obj)
-        int clonep (string obj)
-        int clonep (mixed  arg)
+        int clonep()
+        int clonep(object obj)
+        int clonep(string obj)
+        int clonep(mixed  arg)
 
 DESCRIPTION
         The efun returns 1 if <obj> is a clone, and 0 if it is not.
@@ -11,7 +11,7 @@ DESCRIPTION
         Arguments of other types return 0.
         Objects with replaced programs no longer count as clones.
 
-EXAMPLE
+EXAMPLES
         object o;
         o = clone_object("/std/thing");
         write(clonep(o));                           --> writes "1"

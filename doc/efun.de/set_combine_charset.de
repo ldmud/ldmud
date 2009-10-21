@@ -1,7 +1,7 @@
 SYNOPSIS
-        void set_combine_charset(int *bitvector);
-        void set_combine_charset(string charset);
-        void set_combine_charset(0);
+        void set_combine_charset(int *bitvector)
+        void set_combine_charset(string charset)
+        void set_combine_charset(0)
 
 BESCHREIBUNG
         Setzt den Satz der zu einem einzelnen String kombinierbaren Zeichen,
@@ -12,7 +12,7 @@ BESCHREIBUNG
         zurueck gegeben, wie gewohnt. Die Funktion muss mit dem interaktiven
         Benutzer als Kommandogeber aufgerufen werden.
 
-        Der Zeilenumbruch "\n" und das Nullzeichen "\0" ist immer
+        Der Zeilenumbruch "\n" und das Nullzeichen "\0" sind immer
         inkompatibel.
 
         Der Zeichensatz kann entweder direkt als String oder indirekt als
@@ -25,7 +25,7 @@ BESCHREIBUNG
 
             sizeof(bitvektor) > n/8 && bitvektor[n/8] & (1 << n%8)
 
-BEISPIEL
+BEISPIELE
         In einem bildschirmorientierten Editor koennen die meisten
         druckbaren Zeichen (abgesehen von Antworten auf Prompts wie 'j',
         'n' oder 'q') in kombinierte Strings zusammengefasst werden.
@@ -36,7 +36,7 @@ BEISPIEL
         Der Standard wird so wiederhergestellt:
             set_combine_charset("");
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.8.
         LDMued 3.2.10 ergaenzte die Funktion um die Moeglichkeit, den
             Standard wiederherzustellen.

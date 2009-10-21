@@ -1,7 +1,7 @@
 GESCHUETZT
 SYNOPSIS
-        string query_ip_number(object ob);
-        string query_ip_number(mixed & ob);
+        string query_ip_number(object ob)
+        string query_ip_number(mixed & ob)
 
 BESCHREIBUNG
         Liefert die IP-Nummer des Benutzers <ob> oder des aktuellen Benutzers,
@@ -17,7 +17,7 @@ BESCHREIBUNG
             ob[4 .. 7] : sin_addr
             ob[8 ..15] : nicht definiert.
 
-AENDERUNGEN
+GESCHICHTE
         Die Rueckgabe von struct sockaddr_in wurde in 3.2.1@81 eingefuehrt.
 
 SIEHE AUCH
