@@ -31,14 +31,15 @@ BESCHREIBUNG
                 
                 Falls das XML-Tag nichts enthaelt, so ist dieses Element 0.
 
-        Falls der XML-String nicht wohlgeformt ist oder falls nicht genug Speicher
-        zur Verfuegung steht, wird eine Fehlermeldung ausgegeben.
+        Falls der XML-String nicht wohlgeformt ist oder falls nicht genug
+        Speicher zur Verfuegung steht, wird eine Fehlermeldung ausgegeben.
 
         Diese Funktion ist nur verfuegbar, wenn der Driver mit Iksemel-
         Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
         __XML_DOM__ definiert.
 
-BEISPIEL
+
+BEISPIELE
         xml_parse("<abc/>")           -> ({ "abc", 0, 0 })
         xml_parse("<abc xyz="cde"/>") -> ({ "abc", ([ "xyz" : "cde" ]), 0 })
 

@@ -1,6 +1,6 @@
 SYNOPSIS
-        int   abs (int arg)
-        float abs (float arg)
+        int   abs(int arg)
+        float abs(float arg)
 
 DESCRIPTION
         Returns the absolute value of the argument <arg>.

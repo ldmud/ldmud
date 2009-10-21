@@ -1,6 +1,6 @@
 SYNOPSIS
-        int   abs (int arg)
-        float abs (float arg)
+        int   abs(int arg)
+        float abs(float arg)
 
 BESCHREIBUNG
         Liefert den Betrag des Argumentes <arg>.
@@ -12,7 +12,7 @@ BEISPIELE
         abs( 11    )  11
         abs( -1.974)   1.974
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.6.
 
 SIEHE AUCH

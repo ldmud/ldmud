@@ -1,9 +1,8 @@
 SYNOPSIS
-        string creator (object ob)
+        string creator(object ob)
 
-DESCRIPTION
-        Diese Funktion is nicht verfuegbar im native Modus, da dieser
-        user-ids verwendet.
+BESCHREIBUNG
+        Diese Funktion ist nur im COMPAT-Modus verfuegbar.
 
         Resultat is der Name des Erzeugers des Objektes. Dies kann ein
         Wizard sein, oder eine Domain.

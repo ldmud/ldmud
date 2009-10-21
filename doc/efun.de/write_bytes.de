@@ -1,5 +1,5 @@
 SYNOPSIS
-        int write_bytes(string file, int start, string str);
+        int write_bytes(string file, int start, string str)
 
 BESCHREIBUNG
         Schreibt den String <str> ins File <file> und ueberschreibt dabei die
@@ -7,8 +7,8 @@ BESCHREIBUNG
         werden die Zeichen vom Ende von <file> an gezaehlt. write_bytes()
         liefert 1 bei Erfolg, 0 bei Misserfolg.
 
-ANMERKUNG
-        Seit Version 3.2@232 ist write_bytes() in der Lage, ueberlange Zeichen
+ANMERKUNGEN
+        Seit Version 3.2@232 ist write_bytes() in der Lage, Zeichen
         aus <str> ans File <file> anzuhaengen.
 
 SIEHE AUCH

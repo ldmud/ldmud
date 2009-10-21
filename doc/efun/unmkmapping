@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed* unmkmapping(mapping map)
+        mixed * unmkmapping(mapping map)
 
 DESCRIPTION
         Take mapping <map> and return an array of arrays with the keys
@@ -17,7 +17,7 @@ DESCRIPTION
 
         holds.
 
-EXAMPLE
+EXAMPLES
         mapping m = ([ 1:10;20, 2:11;21 ]);
         unmkmapping(m)
           --> returns ({ ({1, 2}), ({ 10, 11 }), ({ 20, 21 }) })

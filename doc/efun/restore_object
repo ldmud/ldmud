@@ -1,6 +1,6 @@
 SYNOPSIS
-        int restore_object (string name)
-        int restore_object (string str)
+        int restore_object(string name)
+        int restore_object(string str)
 
 DESCRIPTION
         Restore values of variables for current object from the file <name>,

@@ -1,5 +1,5 @@
 SYNOPSIS
-        *mixed transpose_array(mixed *arr);
+        mixed * transpose_array(mixed *arr)
 
 BESCHREIBUNG
         Transponiert das Array <arr>.
@@ -11,7 +11,7 @@ BESCHREIBUNG
         Array von ({ key, data }) in Paaren. Das ist praktisch, wenn
         sort_array() oder filter() auf die Alist angewendet werden soll.
 
-BEISPIEL
+BEISPIELE
         sort_array(transpose_array( ({m_indices(map), m_values(map) }) ),
                    lambda( ({'a, 'b}),
                            ({#'<, ({ #'[, 'a, 0}),

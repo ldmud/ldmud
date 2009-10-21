@@ -1,7 +1,7 @@
 SYNOPSIS
-        #include <sys/wizlist.h>
+        #include <wizlist.h>
 
-        mixed *wizlist_info()
+        mixed * wizlist_info()
 
 DESCRIPTION
         Returns an array with the interesting entries of the wizlist.
@@ -23,7 +23,6 @@ DESCRIPTION
           int    w[WL_MAPPING_TOTAL] = Total size of mappings in elements.
           int    w[WL_STRUCT_TOTAL]  = Total size of structs in elements.
           mixed  w[WL_EXTRA]         = Extra wizlist-info if set.
-
 
         The 'weighted' entries decay every hour by 10%.
 

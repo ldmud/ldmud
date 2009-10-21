@@ -1,11 +1,11 @@
 SYNOPSIS
-        #include <sys/time.h>
+        #include <time.h>
 
-        int mktime(int *ts);
+        int mktime(int *ts)
 
 BESCHREIBUNG
-        Ist das Argument <ts> ein Array mit 9 Elementen (int), entsprechend
-        des Rueckgabewertes von local_time()/gm_time(), liefert die Funktion
+        Ist das Argument <ts> ein Array mit 9 Elementen (int) entsprechend
+        des Rueckgabewertes von local_time()/gm_time(), so liefert die Funktion
         die Anzahl Sekunden seit dem 01. Januar 1970, 00:00:00 zurueck.
         Dies ist von Nutzen, wenn man ein Datum/Uhrzeit hat, diese aber als
         Ganzzahl-Wert speichern will oder eine Zeitdifferenz zwischen zwei
@@ -22,17 +22,17 @@ BESCHREIBUNG
             int TM_YDAY   (7):  Tag im Jahr (0..365)
             inz TM_ISDST  (8):  TRUE: Daylight Saving Time
 
-      TM_YDAY und TM_WDAY werden ignoriert und koennen beliebige Zahlen
-      enthalten.
+        TM_YDAY und TM_WDAY werden ignoriert und koennen beliebige Zahlen
+        enthalten.
 
-BEISPIEL
-      Man hat ein Datum/Uhrzeit (z.B. Benutzereingabe), welches als
-      Unix-Zeitstmepel gespeichert werden soll:
-      // "Mit, 24. Okt 2007, 10:48:00" entspricht folgendem Zeitstempel:
-      int unixzeit = mktime( ({0, 48, 09, 24, 09, 2007, 0, 01, 0}) );
+BEISPIELE
+        Man hat ein Datum/Uhrzeit (z.B. Benutzereingabe), welches als
+        Unix-Zeitstempel gespeichert werden soll:
+        // "Mit, 24. Okt 2007, 10:48:00" entspricht folgendem Zeitstempel:
+        int unixzeit = mktime(({0, 48, 09, 24, 09, 2007, 0, 01, 0}));
       
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.3.718
+GESCHICHTE
+        Eingefuehrt in LDMud 3.3.718.
 
 SIEHE AUCH
-    ctime(E), gmtime(E), local_time(E), time(E), utime(E)
+        ctime(E), gmtime(E), local_time(E), time(E), utime(E)

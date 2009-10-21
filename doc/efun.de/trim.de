@@ -1,9 +1,9 @@
 SYNOPSIS
-        #include <sys/strings.h>
+        #include <strings.h>
 
-        string trim(string str);
-        string trim(string str, int where);
-        string trim(string str, int where, string char);
+        string trim(string str)
+        string trim(string str, int where)
+        string trim(string str, int where, string char)
 
 BESCHREIBUNG
         Entfernt alle vorausgehenden und abschliessenden Zeichen <char> in
@@ -21,13 +21,13 @@ BESCHREIBUNG
             TRIM_BOTH   (3 oder 0): entfernt sowohl vorausgehende als auch
                                     abschliessende Zeichen <char>
 
-BEISPIEL
+BEISPIELE
         trim("    1234    ");                       ergibt: "1234"
         trim("    1234    ", TRIM_RIGHT);           ergibt: "    1234"
         trim("    1234    ", TRIM_BOTH, " 1");      ergibt: "234"
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.7
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.7.
 
 SIEHE AUCH
         regreplace(E)

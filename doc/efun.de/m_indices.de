@@ -1,5 +1,5 @@
 SYNOPSIS
-        *mixed m_indices(mapping map);
+        mixed * m_indices(mapping map)
 
 BESCHREIBUNG
         Liefert ein Array mit den Indizes von <map>.

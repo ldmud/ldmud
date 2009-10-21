@@ -18,7 +18,7 @@ DESCRIPTION
         or apply(), the second arg forms the code of the closure.
 
 HISTORY
-        Introduced in 3.2@82
+        Introduced in 3.2@82.
 
 SEE ALSO
         closures(LPC), lambda(E), apply(E), funcall(E), bind_lambda(E)

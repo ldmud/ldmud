@@ -1,7 +1,7 @@
 SYNOPSIS
-        #include <sys/configuration.h>
+        #include <configuration.h>
 
-        void configure_driver (int what, mixed data)
+        void configure_driver(int what, mixed data)
 
 DESCRIPTION
         Sets the option <what> to the value <data>.
@@ -14,6 +14,7 @@ DESCRIPTION
            <data> is expected to be an array with two elements, which have to
            be integers giving the amount of memory in bytes.
            ({<soft memory limit>, <hard memory limit>})
+
 
 HISTORY
         Introduced in LDMud 3.3.719.

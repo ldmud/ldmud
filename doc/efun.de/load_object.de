@@ -1,5 +1,5 @@
 SYNOPSIS
-        object load_object(string file);
+        object load_object(string file)
 
 BESCHREIBUNG
         Laedt und liefert das Objekt aus der Datei <file>. Wenn das Objekt
@@ -11,12 +11,12 @@ BESCHREIBUNG
         Werden strikte EUIDs verlangt, muss das ladende Objekt eine EUID != 0
         haben.
 
-BEISPIEL
+BEISPIELE
         // Erneuere das Standard Player-Objekt
         destruct(find_object("/std/player"));
         load_object("/std/player");
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.6.
 
 SIEHE AUCH

@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/rtlimits.h>
+        #include <rtlimits.h>
 
         int * query_limits()
         int * query_limits(int default)

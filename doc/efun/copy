@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed copy (mixed arg)
+        mixed copy(mixed arg)
 
 DESCRIPTION
         Create a shallow copy of <arg> and return it. For arrays and mappings
@@ -8,7 +8,7 @@ DESCRIPTION
 
         For other values this function is a no-op.
 
-EXAMPLE
+EXAMPLES
         mixed *a, *b;
 
         a = ({ 1, ({ 21, 22 }) });

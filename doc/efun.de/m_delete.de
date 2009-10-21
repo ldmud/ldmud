@@ -1,5 +1,5 @@
 SYNOPSIS
-        mapping m_delete(mapping map, mixed key);
+        mapping m_delete(mapping map, mixed key)
 
 BESCHREIBUNG
         Loescht den Eintrag mit dem Index <key> aus dem Mapping <map> und

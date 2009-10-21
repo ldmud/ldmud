@@ -1,6 +1,6 @@
 GESCHUETZT
 SYNOPSIS
-        object query_snoop(object opfer);
+        object query_snoop(object opfer)
 
 BESCHREIBUNG
         Liefert den Benutzer, der momentan <opfer> beobachtet. Das aufrufende

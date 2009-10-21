@@ -8,7 +8,7 @@ DESCRIPTION
         If called from inside the heart_beat() of a not living object
         0 will be returned.
 
-EXAMPLE
+EXAMPLES
         if (this_player() != this_interactive())
            write("Hey, somebody must have forced us to do a
            command!\n");

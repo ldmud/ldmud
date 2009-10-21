@@ -1,6 +1,6 @@
 SYNOPSIS
-        *object caller_stack();
-        *object caller_stack(int add_interactive);
+        object * caller_stack()
+        object * caller_stack(int add_interactive)
 
 BESCHREIBUNG
         Liefert ein Array der previous_object(), die einen call_other() auf
@@ -11,7 +11,7 @@ BESCHREIBUNG
         wird this_interactive() dem Array hinzugefuegt, oder 0, wenn kein
         this_interactive() existiert.
 
-BEISPIEL
+BEISPIELE
         Das interaktive Objekt A gibt ein Kommando ein, das im Objekt B eine
         Funktion aufruft, die auf das Objekt C verweist, welches wiederum
         eine Funktion im Objekt D aufruft.
@@ -19,14 +19,14 @@ BEISPIEL
         Wenn D nun caller_stack() aufruft, ergibt dies: ({C,B}).
         Fuer caller_stack(1) ergibt die Funktion: ({C,B,A}).
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.6, vorgeschlagen von TubMud.
-
-ANMERKUNG
+ANMERKUNGEN
         Aufrufe von "alien lfun closures" (vergleiche symbol_function())
         erzeugen zwei Eintraege im Stack, wenn das gebundene Objekt sich vom
         Objekt der Closure unterscheidet: der erste Eintrag steht fuer das
         gebundene Objekt, der zweite fuer das Closure-Objekt.
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.6, vorgeschlagen von Tubmud.
 
 SIEHE AUCH
         caller_stack_depth(E), previous_object(E), this_interactive(E),

@@ -1,5 +1,5 @@
 SYNOPSIS
-        int* utime()
+        int * utime()
 
 DESCRIPTION
          Return the time since 1. Jan 1970, 00:00:00 GMT in microsecond
@@ -9,7 +9,7 @@ DESCRIPTION
            int[0]: number of seconds elapsed
            int[1]: number of microseconds within the current second.
 
-EXAMPLE
+EXAMPLES
         write(ctime(utime())+"\n");
 
         Print out the current date and time.

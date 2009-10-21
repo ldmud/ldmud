@@ -5,7 +5,7 @@ DESCRIPTION
         Find an object with the object_name str. If the object isn't loaded,
         it will not be found.
 
-EXAMPLE
+EXAMPLES
         object obj;
         obj = find_object("std/thing");
         obj = find_object("std/thing.c");

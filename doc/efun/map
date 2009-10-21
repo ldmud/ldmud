@@ -15,7 +15,6 @@ SYNOPSIS
         string map(string arg, closure cl, mixed extra...)
         string map(string arg, mapping m [, int idx])
 
-
 DESCRIPTION
         Call the function <ob>-><func>() resp. the closure <cl> for every
         element of the string, array, struct or mapping <arg>, and return a

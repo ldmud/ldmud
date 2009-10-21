@@ -11,7 +11,7 @@ DESCRIPTION
         If strict euids are enforced, the cloning object must have
         a non-zero euid.
 
-EXAMPLE
+EXAMPLES
         // Update and reload the standard player object
         destruct(find_object("/std/player"));
         load_object("/std/player");

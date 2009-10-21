@@ -1,7 +1,6 @@
 SYNOPSIS
-        varargs string terminal_colour( string str
-                                      , null|mapping|closure map
-                                      , int wrap, int indent )
+        varargs string terminal_colour(string str, null|mapping|closure map,
+                                       int wrap, int indent)
 
 DESCRIPTION
         If <map> is given as a non-0 value, this efun expands all
@@ -61,14 +60,11 @@ DESCRIPTION
         then tries to treat every substring as color key. One can achieve
         the MudOS behaviour with this LPC function:
 
-          string mudos_terminal_colour(string str, mapping ext, int w, int i)
-          {
+          string mudos_terminal_colour(string str, mapping ext, int w, int i) {
             return terminal_colour("%^"+implode(explode(str, "%^")-({""})
                                                ,"%^%^")
                                   , ext, w, i);
           }
-
-
 
 EXAMPLES
         mapping trans;

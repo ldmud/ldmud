@@ -53,7 +53,6 @@ DESCRIPTION
         the appropriate type before you can use it for anything.
 
 EXAMPLES
-
         // All the following statements call the lfun QueryProp()
         // in the current player with the argument P_SHORT.
         string str, fun;
@@ -72,10 +71,9 @@ EXAMPLES
 
         // This statement calls the lfun short() in all interactive users
         // and stores the collected results in a variable.
-        string * s;
+        string *s;
 
         s = (string *)users()->short();
-
 
         !Compat: call_other("/users/luser/thing", "???", 0);
          Compat: call_other("users/luser/thing", "???", 0);
@@ -93,7 +91,6 @@ HISTORY
          - a simul_efun call_other() also catches ->() calls.
          - call_other can be applied on arrays of objects.
         LDMud 3.2.10 made the call on arrays of objects configurable.
-
         LDMud 3.3.113 introduced the H_DEFAULT_METHOD hook.
 
 SEE ALSO

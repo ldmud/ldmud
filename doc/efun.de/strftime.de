@@ -24,94 +24,93 @@ BESCHREIBUNG
      0: Ausgabe im klassischen "C" locale (english)
      1: Ausgabe in Landessprache des Mudrechners.
 
-BEMERKUNGEN:
+ANMERKUNGEN
      Der zurueckgebene Ergebnisstring ist max. 511 Zeichen lang.
 
-PLATZHALTER:
+PLATZHALTER
      Diese Funktion versteht alle Platzhalter, die die Funktion strftime() aus
      der C-Standardbibliothek versteht. Momentan sind dies:
        %a     Der abgekuerzte Wochentag abhaengig von der momentanen Locale.
        %A     Der gesamte Wochentag abhaengig von der momentanen Locale.
        %b     Der abgekuerzte Monatsname abhaengig von der momentanen Locale.
        %B     Der volle Monatsname abhaengig von der momentanen Locale.
-       %c     Das bevorzugte Datums- und Uhrzeit-Repraesentation laut Einstel-            
-              lungen der momentanen Locale.
+       %c     Das bevorzugte Datums- und Uhrzeit-Repraesentation laut
+              Einstellungen der momentanen Locale.
        %C     Das Jahrhundert als zweistellige Zahl.
        %d     Der Tag im Monat als Dezimalzahl (01 - 31).
        %D     Aequivalent  zu %m/%d/%y.  (US-amerikanisches Format.  In anderen
-              Laendern ist %d/%m/%y durchaus ueblich . In internationalem Kon-            
-              text ist dieses Format daher mehrdeutig und sollte nicht verwen-            
-              det werden.)
-       %e     Wie %d, der Tag im Monat als Dezimalzahl, aber eine fuehrende            
-              Null ist durch ein Leerzeichen ersetzt.
+              Laendern ist %d/%m/%y durchaus ueblich . In internationalem
+              Kontext ist dieses Format daher mehrdeutig und sollte nicht
+              verwendet werden.)
+       %e     Wie %d, der Tag im Monat als Dezimalzahl, aber eine fuehrende
+              Null wird durch ein Leerzeichen ersetzt.
        %E     Modifikator: Alternatives Format benutzen, s.u.
-       %g     Wie  %G,  aber ohne das Jahrhundert, also mit zweistelligem Jahr            
+       %g     Wie  %G,  aber ohne das Jahrhundert, also mit zweistelligem Jahr
               (00-99).
-       %G     Das Jahr laut ISO 8601 mit dem Jahrhundert als Dezimalzahl.  Das            
-              vierstellige Jahr, das zu ISO-Wochennummer (siehe %V) passt.  Es            
-              hat dasselbe Format und denselben Wert wie %y,  nur  dass,  wenn            
-              die  ISO-Wochennummer  zum  vorhergehenden  oder  naechsten  Jahr
-              gehoert, dieses Jahr stattdessen benutzt wird.
+       %G     Das Jahr laut ISO 8601 mit dem Jahrhundert als Dezimalzahl.
+              Das vierstellige Jahr, das zu ISO-Wochennummer (siehe %V) passt.
+              Es hat dasselbe Format und denselben Wert wie %y, nur dass,
+              wenn die  ISO-Wochennummer zum vorhergehenden oder naechsten
+              Jahr gehoert, stattdessen dieses Jahr benutzt wird.
        %h     Aequivalent zu %b.
        %H     Die Stunde im 24h-Format als Ganzzahl (00 - 23).
        %I     Die Stunde im 12h-Format als Ganzzahl (01 - 12).
        %j     Der Tag im Jahr als Ganzzahl (001 - 366).
-       %k     Die Stunde im 24h-Format als Ganzzahl (0 - 23); einzelne Ziffern            
+       %k     Die Stunde im 24h-Format als Ganzzahl (0 - 23); einzelne Ziffern
               haben ein vorangestelltes Leerzeichen. (Siehe %H.)
-       %l     Die Stunde im 12h-Format als Ganzzahl (0 - 12); einzelne Ziffern            
+       %l     Die Stunde im 12h-Format als Ganzzahl (0 - 12); einzelne Ziffern
               haben ein vorangestelltes Leerzeichen. (Siehe %I.)
        %m     Der Monat als Ganzzahl (01 - 12).
        %M     Die Minute als Ganzzahl (00 - 59).
        %n     Ein Zeilenvorschub.
-       %p     Entweder 'AM' oder 'PM', je nach der uebergebenen  Uhrzeit,  oder
-              die  zugehoerigen Zeichenketten in der momentanen Locale.  Mittag
+       %p     Entweder 'AM' oder 'PM', je nach der uebergebenen  Uhrzeit, oder
+              die zugehoerigen Zeichenketten in der momentanen Locale.  Mittag
               erhaelt 'PM', Mitternacht 'AM'.
        %P     Wie %p, aber in Kleinbuchstaben.
-       %r     Zeit in AM/PM-Notation; in der POSIX-Locale ist das Aequivalent            
+       %r     Zeit in AM/PM-Notation; in der POSIX-Locale ist das Aequivalent
               zu '%I:%M:%S %p'.
        %R     Zeit in 24h-Notation (%H:%M). (SU) Fuer eine Version mit Sekunden
               siehe %T.
-       %s     Die Zahl der Sekunden seit  der  Epoche,  also  seit  1970-01-01            
+       %s     Die Zahl der Sekunden seit der Epoche, also seit 1970-01-01
               00:00:00 UTC.
        %S     Die Sekunde als Ganzzahl (00 - 61).
        %t     Ein Tabulatorzeichen.
        %T     Zeit in 24h-Notation (%H:%M:%S).
-       %u     Der Tag der Woche als Zahl von 1 bis 7, mit Montag als 1.  Siehe            
+       %u     Der Tag der Woche als Zahl von 1 bis 7, mit Montag als 1. Siehe
               auch %w.
-       %U     Die Wochennummer des aktuellen Jahres als Ganzzahl  von  00  bis            
-              53,  beginnend  mit dem ersten Sonntag als erster Tag der ersten            
-              Woche.  Siehe auch %V und %W.
-       %V     Die Wochennummer nach ISO 8601:1988 als Dezimalzahl von  01  bis            
-              53,  wobei Woche 1 die erste Woche ist, die wenigstens 4 Tage im            
-              laufenden Jahr hat, mit Montag als dem  ersten  Tag  der  Woche.            
+       %U     Die Wochennummer des aktuellen Jahres als Ganzzahl von 00 bis 53,
+              beginnend mit dem ersten Sonntag als erster Tag der ersten Woche.
+              Siehe auch %V und %W.
+       %V     Die Wochennummer nach ISO 8601:1988 als Dezimalzahl von 01 bis
+              53, wobei Woche 1 die erste Woche ist, die wenigstens 4 Tage im
+              laufenden Jahr hat, mit Montag als dem ersten Tag der Woche.
               Siehe auch %U und %W.
-       %w     Der  Tag  der  Woche  als  Zahl  von 0 bis 6, mit Sonntag als 0.            
+       %w     Der Tag der Woche als Zahl von 0 bis 6, mit Sonntag als 0.
               Siehe auch %u.
-       %W     Die Wochennummer des aktuellen Jahres als Ganzzahl  von  00  bis            
-              53,  beginnend  mit  dem ersten Montag als erster Tag der ersten            
-              Woche.
-       %x     Die bevorzugte Datums-Repraesentation ohne die Zeit in der momen-
-              tanen Locale.
-       %X     Die  bevorzugte  Uhrzeit-Repraesentation  ohne  das  Datum in der
+       %W     Die Wochennummer des aktuellen Jahres als Ganzzahl von 00 bis 53,
+              beginnend mit dem ersten Montag als erster Tag der ersten Woche.
+       %x     Die bevorzugte Datums-Repraesentation ohne die Zeit in der
+              momentanen Locale.
+       %X     Die  bevorzugte  Uhrzeit-Repraesentation ohne das  Datum in der
               momentanen Locale.
        %y     Das Jahr als Ganzzahl ohne das Jahrhundert (00 - 99).
        %Y     Das Jahr als Ganzzahl mit dem Jahrhundert.
        %z     Die  Zeitzone  als  Stundendifferenz  zu  GMT. Benoetigt, um
-              RFC822-konforme  Datumsangaben  zu  erhalten  (mit '%a, %d %b %Y            
+              RFC822-konforme  Datumsangaben  zu  erhalten  (mit '%a, %d %b %Y 
               %H:%M:%S %z').
        %Z     Die Zeitzone oder der Name oder die Abkuerzung.
        %+     Datum und Zeit im Format von date(1).
        %%     Das Zeichen '%'.                                                            
     
-BUGS
+FEHLER
      Es gibt keinen Platzhalter fuer die Mondphase.
 
-BEISPIEL
+BEISPIELE
      write(strftime("Heute ist %A, der %d. %B %Y.\n"))
      ergibt z.B.
      "Heute ist Montag, der 24. September 2007.\n"
 
-AeNDERUNGEN
+GESCHICHTE
     Eingefuehrt in LDMud 3.3.718.
 
 SIEHE AUCH

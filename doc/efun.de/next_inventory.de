@@ -1,6 +1,6 @@
 SYNOPSIS
-        object next_inventory();
-        object next_inventory(object ob);
+        object next_inventory()
+        object next_inventory(object ob)
 
 BESCHREIBUNG
         Liefert das naechste Objekt aus dem Inventar von <ob>. Wird <ob>

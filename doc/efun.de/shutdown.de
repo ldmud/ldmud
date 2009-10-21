@@ -1,6 +1,6 @@
 SYNOPSIS
-        void shutdown();
-        void shutdown(int exit_code);
+        void shutdown()
+        void shutdown(int exit_code)
 
 BESCHREIBUNG
         Faehrt das Mud herunter. Diese Funktion darf nie verwendet werden!
@@ -14,7 +14,7 @@ BESCHREIBUNG
         wenn man sie nicht verwenden darf. Sorry, das darf hier nicht
         bekannt gegeben werden. Streng geheim.
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.11 fuehrte das 'exit_code' Argument ein.
 
 SIEHE AUCH

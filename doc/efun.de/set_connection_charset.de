@@ -1,8 +1,8 @@
 GESCHUETZT
 SYNOPSIS
-        void set_connection_charset(int* bitvector, int quote_iac);
-        void set_connection_charset(string charset, int quote_iac);
-        void set_connection_charset(0, int quote_iac);
+        void set_connection_charset(int *bitvector, int quote_iac)
+        void set_connection_charset(string charset, int quote_iac)
+        void set_connection_charset(0, int quote_iac)
 
 BESCHREIBUNG
         Setzt den Zeichensatz, der an den aktuellen interaktiven Benutzer
@@ -24,7 +24,7 @@ BESCHREIBUNG
         erlaubt ist, wird dieses Zeichen gequotet, damit es vom Telnet
         Protokoll nicht als IAC interpretiert wird.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.1@40.
         LDMud 3.2.8 fuehrte die Moeglichkeit ein, den Zeichensatz als String
             zu uebergeben.

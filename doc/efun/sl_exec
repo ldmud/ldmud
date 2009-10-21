@@ -1,6 +1,6 @@
 OPTIONAL
 SYNOPSIS
-        mixed* sl_exec(string statement, ...)
+        mixed * sl_exec(string statement, ...)
 
 DESCRIPTION
         Executes the SQL statement <statement> for the current

@@ -1,9 +1,10 @@
 SYNOPSIS
+        int interactive()
         int interactive(object ob)
 
 DESCRIPTION
-        Return non-zero if ob, or when the argument is omitted, this
-        object(), is an interactive user. Will return 1 if the
+        Return non-zero if ob is an interactive user. If ob is omitted,
+        this_object() will be used. The return value is 1 if the
         object is interactive, else 0.
 
 SEE ALSO

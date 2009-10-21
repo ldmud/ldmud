@@ -1,5 +1,5 @@
 SYNOPSIS
-        string *regexp(string *list, string pattern)
+        string * regexp(string *list, string pattern)
 
 BESCHREIBUNG
         Liefert ein neues Array mit all jenen Strings aus list zurueck,
@@ -43,18 +43,19 @@ BESCHREIBUNG
         Wenn es einen Fehler im regulaeren Ausdruck gibt, wird ein
 	Laufzeitfehler ausgeloest.
 
-BEISPIEL
+BEISPIELE
         string strs;
-        if (strs = regexp( ({"Bitte helfen sie mir, Sir John."}),
-                                 "\\<helfen\\>.*\\<mir\\>"))
+        if (strs = regexp(({ "Bitte helfen sie mir, Sir John." }),
+                          "\\<helfen\\>.*\\<mir\\>")) {
            if (sizeof(strs)
               write("Es passt.\n");
+        }
 
         Der regulaere Ausdruck wird den uebergebenen String (welcher in
 	einem Array verpackt wurde) daraufhin ueberpruefen, ob
 	sowas wie "helfen ... mir" darin vorkommt.
 
-AENDERUNG
+GESCHICHTE
         LDMud 3.2.9 fuegte das Sonderzeichen '+' hinzu.
 
 SIEHE AUCH

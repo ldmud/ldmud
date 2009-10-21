@@ -1,6 +1,6 @@
 OPTIONAL
 SYNOPSIS
-        mixed * intersect_alist (mixed * list1, mixed * list2)
+        mixed * intersect_alist(mixed * list1, mixed * list2)
 
 DESCRIPTION
         Does a fast set intersection on alist key vectors (NOT on full alists!).
@@ -9,7 +9,7 @@ DESCRIPTION
         The function is available only if the driver is compiled with
         alist support. In that case, __ALISTS__ is defined.
 
-EXAMPLE
+EXAMPLES
         new_list = intersect_alist(list1, list2);
 
 HISTORY

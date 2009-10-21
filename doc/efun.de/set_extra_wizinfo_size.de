@@ -1,5 +1,5 @@
 SYNOPSIS
-        void set_extra_wizinfo_size(int size);
+        void set_extra_wizinfo_size(int size)
 
 BESCHREIBUNG
         Bewirkt, dass die Wizlist ein Array der Groesse <size> mit

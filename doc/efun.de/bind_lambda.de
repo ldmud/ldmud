@@ -1,5 +1,5 @@
 SYNOPSIS
-        closure bind_lambda(closure cl, object ob);
+        closure bind_lambda(closure cl, object ob)
 
 BESCHREIBUNG
         Bindet eine ungebundene Lambda-Closure (die von unbound_lambda()
@@ -11,8 +11,8 @@ BESCHREIBUNG
         uebereinstimmt, wird eine Schutzverletzung ("bind_lambda",
         this_object(), ob) verursacht.
 
-AENDERUNGEN
-        Eingefuehrt in 3.2.@82.
+GESCHICHTE
+        Eingefuehrt in 3.2.1@82.
 
 SIEHE AUCH
         lambda(E), unbound_lambda(E), apply(E), funcall(E), closures(LPC)

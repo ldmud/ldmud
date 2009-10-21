@@ -1,18 +1,18 @@
 SYNOPSIS
-        void enable_commands();
+        void enable_commands()
 
 BESCHREIBUNG
-        Erlaubt dem Objekt, Kommandi zu verwenden, die normalerweise Usern
+        Erlaubt dem Objekt, Kommandos zu verwenden, die normalerweise Usern
         zugaenglich sind. Der Aufruf markiert das Objekt als "living".
 
         Diese Funktion darf nicht ausserhalb von create() (oder reset(0) im
         Compat-Modus) aufgerufen werden, weil der der Kommandogeber auf dieses
         Objekt gesetzt wird.
 
-BEISPIEL
-        void create()
-        {
+BEISPIELE
+        void create() {
             enable_commands();
+            set_living_name("dummymonster");
             ...
         }
 

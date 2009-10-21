@@ -1,6 +1,6 @@
 SYNOPSIS
-        int remove_action(int|string verb);
-        int remove_action(int|string verb, object obj);
+        int remove_action(int|string verb)
+        int remove_action(int|string verb, object obj)
 
 BESCHREIBUNG
         Wenn <verb> ein String ist: entferne das erste im Objekt <obj> durch
@@ -10,13 +10,13 @@ BESCHREIBUNG
         sonst 0.
 
         Wenn <verb> ein Integer ist: wenn verb nicht 0 ist, entferne alle
-        durch das Objekt <obj> definierten Kommandi. Wenn <obj> nicht
+        durch das Objekt <obj> definierten Kommandos. Wenn <obj> nicht
         angegeben wird, wird standardmaessig this_player() verwendet. Gibt
-        die Anzahl der entfernten Kommandi zurueck.
+        die Anzahl der entfernten Kommandos zurueck.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt seit 3.2.1.
-        LDMud 3.2.10 fuehrte zusaetzlich die Moeglichkeit ein, alle Kommandi
+        LDMud 3.2.10 fuehrte zusaetzlich die Moeglichkeit ein, alle Kommandos
         auf einmal zu entfernen.
 
 SIEHE AUCH

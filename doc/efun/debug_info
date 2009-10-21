@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/debug_info.h>
+        #include <debug_info.h>
 
         mixed debug_info(int flag)
         mixed debug_info(int flag, mixed arg)
@@ -100,7 +100,6 @@ DESCRIPTION
 
               NOTE: Make sure that this option can't be abused!
  
-
 
         DINFO_DATA (6): Return raw information about an aspect of
             the driver specified by <arg2>. The result of the function
@@ -631,7 +630,7 @@ HISTORY
         LDMud 3.3.679 removed DID_ST_IT_OVERHEAD and DID_ST_ITABLED*;
             added DID_ST_HYBRID_MAPPINGS and DID_ST_HASH_MAPPINGS.
         LDMud 3.3.718 added DIT_CURRENT_DEPTH to DINFO_TRACE.
-        LDMud 3.3.719 added DINFO_EVAL_NUMBER
+        LDMud 3.3.719 added DINFO_EVAL_NUMBER.
 
 SEE ALSO
         trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

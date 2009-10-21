@@ -1,9 +1,9 @@
 VERALTET
 SYNOPSIS
-        mixed *filter_array(mixed *arr, string fun, string|object ob,
-            mixed extra, ...);
-        mixed *filter_array(mixed *arr, closure cl, mixed extra, ... );
-        mixed *filter_array(mixed *arr, mapping map, mixed extra, ... );
+        mixed * filter_array(mixed *arr, string fun, string|object ob,
+                                                mixed extra, ...)
+        mixed * filter_array(mixed *arr, closure cl, mixed extra, ... )
+        mixed * filter_array(mixed *arr, mapping map, mixed extra, ... )
 
 BESCHREIBUNG
         Liefert ein Array, das alle Elemente von <arr> enthaelt, fuer die
@@ -28,7 +28,7 @@ BESCHREIBUNG
         werden nur jene Elemente von <arr> ins Ergebnis aufgenommen, die ein
         Key von <map> sind (d.h. map[arr[index]] != 0).
 
-BEISPIEL
+BEISPIELE
         int check_if_idle(object user) { return query_idle(user); }
         ...
         object *idle_users;
@@ -39,7 +39,7 @@ BEISPIEL
         Das Array *idle_users enthaelt jetzt alle User, die fuer mehr als
         1 Sekunde idle waren.
 
-AENDERUNGEN
+GESCHICHTE
         Seit LDMud 3.2.6 abgeloest von filter().
         Seit LDMud 3.2.9 ist die Funktion nur noch verfuegbar, wenn der
             Treiber mit USE_DEPRECATED kompiliert wurde.

@@ -1,5 +1,5 @@
 SYNOPSIS
-        int copy_file(string from, string to);
+        int copy_file(string from, string to)
 
 BESCHREIBUNG
         Die Efun copy_file() kopiert die Datei <from> nach <to>. Wenn <to> ein
@@ -9,12 +9,13 @@ BESCHREIBUNG
         Die Funktion erfordert Lesezugriff auf <from> und Schreibrechte fuer
         <to>.
 
-        Bei Erfolg liefert die Funktion 0 zurueck, etwas anderes sonst.
+        Bei Erfolg liefert die Funktion 0 zurueck, im Fehlerfalle einen
+        Wert ungleich Null.
 
-BEISPIEL
+BEISPIELE
         copy_file("/players/wizard/obj.c", "/players/wizard/newobj.c");
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.9 beschraenkte die Fehlermeldungen auf Werte != 0.
 
 SIEHE AUCH

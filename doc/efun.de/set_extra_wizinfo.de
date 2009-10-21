@@ -1,8 +1,8 @@
 GESCHUETZT
 SYNOPSIS
-        void set_extra_wizinfo(object wiz, mixed extra);
-        void set_extra_wizinfo(string wiz, mixed extra);
-        void set_extra_wizinfo(int    wiz, mixed extra);
+        void set_extra_wizinfo(object wiz, mixed extra)
+        void set_extra_wizinfo(string wiz, mixed extra)
+        void set_extra_wizinfo(int    wiz, mixed extra)
 
 BESCHREIBUNG
         Setzt den Wert <extra> als Eintrag im 'Extra' Feld in der Wizlist fuer

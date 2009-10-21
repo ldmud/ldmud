@@ -1,5 +1,5 @@
 SYNOPSIS
-        int sgn (int|float arg)
+        int sgn(int|float arg)
 
 BESCHREIBUNG
         Liefert das Vorzeichen des Argumentes.
@@ -10,7 +10,7 @@ BESCHREIBUNG
           0   0
         < 0  -1
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.9.
 
 SIEHE AUCH

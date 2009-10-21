@@ -1,7 +1,7 @@
 SYNOPSIS
-        *object clones();
-        *object clones(int what);
-        *object clones(string|object obj [, int what]);
+        object * clones()
+        object * clones(int what)
+        object * clones(string|object obj [, int what])
 
 BESCHREIBUNG
         Diese Efun liefert ein Array mit allen Clones eines bestimmten
@@ -22,9 +22,9 @@ BESCHREIBUNG
         Wenn der Treiber mit DYNAMIC_COSTS kompiliert wurde, sind die Kosten
         fuer diese Funktion proportional zur Anzahl Objekte im Spiel.
 
-BEISPIEL
+BEISPIELE
         object o, p;
-        o = clone_object("/std/thing"); /* oder "std/thing" im COMPAT_MODE */
+        o = clone_object("/std/thing"); /* oder "std/thing" im COMPAT-Modus */
         destruct(find_object("/std/thing"));
         p = clone_object("/std/thing");
 
@@ -33,6 +33,6 @@ BEISPIEL
         clones("/std/thing", 1) --> ergibt ({ o })
         clones("/std/thing", 2) --> ergibt ({ o, p })
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.8.
         LDMud 3.2.9 fuehrte die dynamischen Kosten ein.

@@ -1,6 +1,6 @@
 SYNOPSIS
-        object *all_environment();
-        object *all_environment(object ob);
+        object * all_environment()
+        object * all_environment(object ob)
 
 BESCHREIBUNG
         Gibt ein Array mit allen Umgebungen des Objekts <ob> zurueck.
@@ -10,13 +10,13 @@ BESCHREIBUNG
         Wenn <o> keine Umgebung hat oder zerstoert wurde, wird 0 zurueck
         gegeben.
 
-BEISPIEL
+BEISPIELE
         Wenn <ob> ein Zuendholz in einer Schachtel in einer Truhe in einem
         Raum ist, so liefert all_environment(ob) das Array
         ({ Schachtel, Truhe, Raum }) zurueck.
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.6. Ein Vorschlag von TubMud.
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.6. Ein Vorschlag von Tubmud.
 
 SIEHE AUCH
         environment(E), all_inventory(E)

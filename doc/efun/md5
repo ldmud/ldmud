@@ -1,7 +1,7 @@
 OBSOLETE
 SYNOPSIS
-        string md5 (string arg [ , int iterations ] )
-        string md5 (int *  arg [ , int iterations ] )
+        string md5(string arg [, int iterations])
+        string md5(int *  arg [, int iterations])
 
 DESCRIPTION
         Create and return a MD5 message digest from <arg>.
@@ -22,7 +22,7 @@ EXAMPLES
         s = md5( ({ 'H', 'e', 'l', 'l', 'o' }), 2 )
 
 HISTORY
-        Introduced in LDMud 3.2.9
+        Introduced in LDMud 3.2.9.
         LDMud 3.2.12 added number arrays as argument, and the number of
         interations.
         LDMud 3.3.717 added the iteration-based evaluation cost.

@@ -23,7 +23,7 @@ DESCRIPTION
         code. Use either a combination of read_bytes() + tell_object() or the
         sefun cat() from the driver package.
 
-EXAMPLE
+EXAMPLES
         cat("/doc/efun/cat", 5, 9);
 
         This will print out the file "/doc/efun/cat" begining at line

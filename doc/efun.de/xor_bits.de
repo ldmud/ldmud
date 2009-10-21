@@ -1,5 +1,5 @@
 SYNOPSIS
-        string xor_bits(string str1, string str2);
+        string xor_bits(string str1, string str2)
 
 BESCHREIBUNG
         <str1> und <str2> sind beiden Bitstrings. Das Resultat von xor_bits()

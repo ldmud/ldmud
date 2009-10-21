@@ -1,6 +1,6 @@
 SYNOPSIS
 	string regreplace(string txt, string pattern, 
-		string|closure replacepattern, int flags)
+                            string|closure replacepattern, int flags)
 
 BESCHREIBUNG
 	Die Funktion durchsucht den String txt nach einem Vorkommen
@@ -25,7 +25,7 @@ BESCHREIBUNG
 	variable Strings zu ersetzen, im Gegensatz zu regexplode, wo
 	man den String nur nach einem regulaeren Ausdruck zerlegen kann.
 
-BEISPIEL
+BEISPIELE
 	string msgin;
 
 	/* Sucht nach 'teilt Dir mit: ' und schliesst den nachfolgenden
@@ -43,7 +43,7 @@ BEISPIEL
 	txt = regreplace(txt, "HOUSE", #'lower_case, 1);
 
 AUTOR
-	Marcus@TAPPMud schrieb die Original-efun (und die englische Manpage)
+	Marcus@TAPPMud schrieb die Original-efun (und die englische Manpage).
 	
 SIEHE AUCH
 	regexp(E), regexplode(E), sscanf(E)

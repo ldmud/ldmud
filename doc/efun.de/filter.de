@@ -1,11 +1,11 @@
 SYNOPSIS
-        mixed *filter(mixed *arg, string func, string|object ob,
-            mixed extra...);
-        mixed *filter(mixed *arg, closure cl, mixed extra...);
-        mixed *filter(mixed *arg, mapping map, mixed extra...);
+        mixed * filter(mixed *arg, string func, string|object ob,
+                                                      mixed extra...)
+        mixed * filter(mixed *arg, closure cl, mixed extra...)
+        mixed * filter(mixed *arg, mapping map, mixed extra...)
         mapping filter(mapping arg, string func, string|object ob,
-            mixed extra...);
-        mapping filter(mapping arg, closure cl, mixed extra...);
+                                                      mixed extra...)
+        mapping filter(mapping arg, closure cl, mixed extra...)
 
 BESCHREIBUNG
         Ruft fuer jedes Element des Arrays oder Mappings <arg> die Funktion
@@ -45,12 +45,12 @@ BESCHREIBUNG
         multidimensionalen Mappings (Mappings mit mehreren Werte pro Key und
         Mappings aus Arrays) gleich verarbeitet werden koennen.
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.6. Die Funktion loest filter_array() ab.
-
-ANMERKUNG
+ANMERKUNGEN
         Fuer Arrays wirkt filter() wie filter_array(), fuer Mappings stellt
         filter() eine Verallgemeinerung von filter_indices() dar.
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.6. Die Funktion loest filter_array() ab.
 
 SIEHE AUCH
         filter(E), filter_indices(E), map(E), walk_mapping(E), member(E),

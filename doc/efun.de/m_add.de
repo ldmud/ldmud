@@ -1,5 +1,5 @@
 SYNOPSIS
-        mapping m_add(mapping map, mixed key, [mixed data, ...]);
+        mapping m_add(mapping map, mixed key, [mixed data, ...])
 
 BESCHREIBUNG
         Fuegt einen neuen Eintrag mit Index <key> zum Mapping <map> hinzu
@@ -21,7 +21,7 @@ BEISPIELE
         apply(#'m_add, m, "baz", ({ 4, 5 }))
         --> ([ "foo":1;2, "bar":1;0, "baz":4;5 ])
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.9.
 
 SIEHE AUCH

@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed deep_copy (mixed arg)
+        mixed deep_copy(mixed arg)
 
 DESCRIPTION
         Create a deep copy of <arg> and return it. For arrays and mappings
@@ -11,7 +11,7 @@ DESCRIPTION
         If DYNAMIC_COST is defined, every nested mapping or array counts
         towards the evaluation cost in both size and nesting depth.
 
-EXAMPLE
+EXAMPLES
         mixed *a, *b;
 
         a = ({ 1, ({ 21, 22 }) });

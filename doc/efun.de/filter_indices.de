@@ -1,8 +1,8 @@
 VERALTET
 SYNOPSIS
         mapping filter_indices(mapping map, string func, string|object ob,
-            mixed extra ... );
-        mapping filter_indices(mapping map, closure cl, mixed extra ... );
+                                                          mixed extra ... )
+        mapping filter_indices(mapping map, closure cl, mixed extra ... )
 
 BESCHREIBUNG
         Die Funktion ob->func() bzw. die Closure cl wird fuer jedes Element
@@ -18,7 +18,7 @@ BESCHREIBUNG
         Wird <ob> nicht angegeben oder weder ein String noch ein Objekt, so
         wird standardmaessig this_object() verwendet.
 
-AENDERUNGEN
+GESCHICHTE
         In LDMud 3.2.6 umbenannt aus filter_mapping() und verallgemeinert in
             der Efun filter().
 

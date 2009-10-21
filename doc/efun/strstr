@@ -1,6 +1,6 @@
 SYNOPSIS
-        int strstr (string str, string str2)
-        int strstr (string str, string str2, int pos)
+        int strstr(string str, string str2)
+        int strstr(string str, string str2, int pos)
 
 DESCRIPTION
         Returns the index of <str2> in <str> searching from position <pos>

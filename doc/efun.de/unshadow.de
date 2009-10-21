@@ -1,11 +1,10 @@
 SYNOPSIS
-        void unshadow();
+        void unshadow()
 
 BESCHREIBUNG
         Das aufrufende Objekt wird als Shadow von allen anderen Objekten
         entfernt, denen es uebergeworfen war. Wenn dem aufrufenden Objekt
         selbst ein Shadow uebergeworfen war, wird dieser entfernt.
-
 
 SIEHE AUCH
         shadow(E), query_shadowing(E)

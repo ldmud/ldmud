@@ -1,8 +1,9 @@
 OPTIONAL
 SYNOPSIS
-        int pg_connect (string conn, string fun)
-        int pg_connect (string conn, string fun, string|object obj, mixed extra, ...)
-        int pg_connect (string conn, closure cl, mixed extra, ...)
+        int pg_connect(string conn, string fun)
+        int pg_connect(string conn, string fun, string|object obj,
+                       mixed extra, ...)
+        int pg_connect(string conn, closure cl, mixed extra, ...)
 
 DESCRIPTION
         Open a database connection as directed by <conn>, and assign the

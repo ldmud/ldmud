@@ -1,5 +1,5 @@
 SYNOPSIS
-        mapping m_reallocate(mapping m, int width);
+        mapping m_reallocate(mapping m, int width)
 
 BESCHREIBUNG
         Erzeugt ein neues Mapping mit <width> Werten pro Key und fuellt das
@@ -10,14 +10,14 @@ BESCHREIBUNG
 
         Das urspruengliche Mapping <m> wird nicht veraendert.
 
-BEISPIEL
+BEISPIELE
         mapping m = ([ "foo":1;2;3, "bar":4;5;6 ])
 
         m_reallocate(m, 1) --> liefert ([ "foo":1,       "bar:4 ])
         m_reallocate(m, 4) --> liefert ([ "foo":1;2;3;0, "bar:4;5;6;0 ])
 
-AENDERUNGEN
-    Eingefuehrt in LDMud 3.2.6, auf Vorschlag von TubMud.
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.6, auf Vorschlag von Tubmud.
 
 SIEHE AUCH
         m_allocate(E), m_values(E), widthof(E)

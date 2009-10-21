@@ -1,5 +1,5 @@
 SYNOPSIS
-        string read_bytes(string file, int start, int anzahl);
+        string read_bytes(string file, int start, int anzahl)
 
 BESCHREIBUNG
         Liest eine bestimmte Anzahl Bytes aus dem File <file>. Wenn <start>
@@ -10,7 +10,7 @@ BESCHREIBUNG
         Werte sind zwar moeglich, aber wenig sinnvoll.
 
         Wenn <start> ausserhalb der Groesse des Files liegt, liefert
-        read_byte() 0 zurueck anstelle eines Strings.
+        read_byte() anstelle eines Strings 0 zurueck.
 
 SIEHE AUCH
         read_file(E), write_bytes(E), write_file(E)

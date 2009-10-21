@@ -18,7 +18,7 @@ BEISPIELE
         implode(explode("a short text", " "), "_")      "a_short_text"
 
 	Heutzutage kann man stattdessen auch
-	regreplace("a short text", " ", "_", 1)
+	    regreplace("a short text", " ", "_", 1)
 	verwenden.
 
 SIEHE AUCH

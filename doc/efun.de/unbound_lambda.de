@@ -1,5 +1,5 @@
 SYNOPSIS
-        closure unbound_lambda(mixed *arg, mixed code);
+        closure unbound_lambda(mixed *arg, mixed code)
 
 BESCHREIBUNG
         Erzeugt eine Lambda-Closure, die nicht an ein Objekt gebunden ist,
@@ -23,8 +23,8 @@ BESCHREIBUNG
         funcall() oder apply() ausgewertet wird. Das zweite Argument <code>
         enthaelt den Code der Closure.
 
-AENDERUNGEN
-        Eingefuehrt in 3.2@82
+GESCHICHTE
+        Eingefuehrt in 3.2@82.
 
 SIEHE AUCH
         closures(LPC), lambda(E), apply(E), funcall(E), bind_lambda(E)

@@ -1,7 +1,7 @@
 SYNOPSIS
-        void ed();
-        void ed(string file);
-        void ed(string file, string func);
+        void ed()
+        void ed(string file)
+        void ed(string file, string func)
 
 BESCHREIBUNG
         Der Aufruf von ed() ohne Argumente startet den Editor mit dem Namen

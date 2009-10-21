@@ -1,7 +1,7 @@
 GESCHUETZT
 SYNOPSIS
-        void garbage_collection();
-        void garbage_collection(string filename);
+        void garbage_collection()
+        void garbage_collection(string filename)
 
 BESCHREIBUNG
         Befiehlt dem Treiber, nach Ende der aktuellen Ausfuehrung eine
@@ -18,8 +18,8 @@ BESCHREIBUNG
         Fuer andere Memory Allocators erzeugt garbage_collection() keinen
         Output. Ein allfaelliges Argument <filename> wird ignoriert.
 
-AENDERUNGEN
-        LDMud 3.2.9 fuehte neu das Argument <filename> ein.
+GESCHICHTE
+        LDMud 3.2.9 fuehrte das Argument <filename> ein.
 
 SIEHE AUCH
         rusage(E), valid_write(M)

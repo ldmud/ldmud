@@ -1,6 +1,6 @@
 SYNOPSIS
-        object *all_inventory()
-        object *all_inventory(object ob)
+        object * all_inventory()
+        object * all_inventory(object ob)
 
 BESCHREIBUNG
         Liefert ein Feld (Array) mit allen Objekten, die sich im Objekt ob

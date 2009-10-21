@@ -61,7 +61,7 @@ EXAMPLES
            void catch_msg(mixed *arr, object who) {
               int i;
               if(!arr) return;
-              for(i=0;i<sizeof(arr);i++)
+              for(i=0; i<sizeof(arr); i++)
                  tell_object(who, (stringp(arr[i]) ? arr[i] : "-/-")+"\n");
            }
         Object 2 (not living):

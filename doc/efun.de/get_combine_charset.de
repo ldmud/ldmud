@@ -1,7 +1,7 @@
 SYNOPSIS
-        #include <sys/comm.h>
+        #include <comm.h>
 
-        mixed get_combine_charset(int mode);
+        mixed get_combine_charset(int mode)
 
 BESCHREIBUNG
         Liefert den kombinierten Zeichensatz des momentanen interaktiven
@@ -10,7 +10,7 @@ BESCHREIBUNG
             <mode> == CHARSET_VECTOR: liefert den Zeichensatz als Bitvektor,
             <mode> == CHARSET_STRING: liefert den Zeichensatz als String.
 
-        Der Bitvektor wird interpretiert als Array von 8-Bit-Werten und
+        Der Bitvektor wird als Array von 8-Bit-Werten interpretiert und
         kann bis zu 32 Elemente enthalten. Das Zeichen n ist "kombinierbar",
         wenn gilt:
 
@@ -18,7 +18,7 @@ BESCHREIBUNG
 
         Wenn kein interaktiver Benutzer gesetzt ist, liefert die Funktion 0.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.10.
 
 SIEHE AUCH

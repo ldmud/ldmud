@@ -1,11 +1,11 @@
 SYNOPSIS
-        int count_bits(string str);
+        int count_bits(string str)
 
 BESCHREIBUNG
         Diese Funktion zaehlt die Anzahl gesetzer Bits im Bitstring <str> und
         liefert die Anzahl als Resultat zurueck.
 
-BEISPIEL
+BEISPIELE
         string s;
         s = set_bit("", 3); s = set_bit(s, 15);
         count_bits(s) --> liefert 2

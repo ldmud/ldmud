@@ -1,6 +1,6 @@
 SYNOPSIS
-        int strrstr (string str, string str2)
-        int strrstr (string str, string str2, int pos)
+        int strrstr(string str, string str2)
+        int strrstr(string str, string str2, int pos)
 
 DESCRIPTION
         Returns the index of the first occurance of <str2> in <str> searching

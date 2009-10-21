@@ -1,7 +1,7 @@
 VERALTET
 SYNOPSIS
-        int member_array(mixed item, mixed *arr);
-        int member_array(mixed item, string arr);
+        int member_array(mixed item, mixed *arr)
+        int member_array(mixed item, string arr)
 
 BESCHREIBUNG
         Liefert den Index des ersten Auftretens von <item> in <arr> oder
@@ -16,5 +16,5 @@ GESCHICHTE
         Seit LDMued 3.2.9 ist member_array() nur noch verfuegbar, wenn der
             Treiber mit USE_DEPRECATED kompiliert wurde.
 
-VERGLEICHE
+SIEHE AUCH
         member(E), alists(LPC), mappings(LPC), assoc(E), slice_array(E)

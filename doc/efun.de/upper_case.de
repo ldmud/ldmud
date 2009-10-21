@@ -1,11 +1,11 @@
 SYNOPSIS
-        string upper_case(string str);
+        string upper_case(string str)
 
 BESCHREIBUNG
         Wandelt alle Zeichen in <str> in Grossbuchstaben um und gibt das
         Resultat zurueck.
 
-BEISPIEL
+BEISPIELE
         upper_case("Heya!")     ergibt: "HEYA!"
 
 SIEHE AUCH

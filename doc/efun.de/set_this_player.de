@@ -1,6 +1,6 @@
 GESCHUETZT
 SYNOPSIS
-        void set_this_player(object ob);
+        void set_this_player(object ob)
 
 BESCHREIBUNG
         Aendert den momentanen Kommandogeber zu <ob>. Dabei kann <ob> auch
@@ -12,18 +12,7 @@ BESCHREIBUNG
         Es ist sonst einfach, die Sicherheit eines Muds mit Hilfe dieser
         Efun zu untergraben.
 
-        Die Efun ist nur in 3.2.1 verfuegbar. Eine moegliche Simulation fuer
-        3.2 koennte etwa so aussehen:
-
-            void set_this_player(object ob)
-            {
-                /* Insert your privilege checks here */
-                if (living(ob))
-                    funcall(bind_lambda(#'enable_commands, ob));
-            }
-            (suggested by Mark Lewis (Nostradamus@Zebedee))
-
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.1.
         LDMud 3.2.6 fuehrte die 0 als moeglichen Parameter ein.
 

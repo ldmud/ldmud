@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed apply(closure cl, mixed arg, ...);
+        mixed apply(closure cl, mixed arg, ...)
 
 BESCHREIBUNG
         Wertet die Closure <cl> aus. Wenn <cl> keine Closure ist, wird <cl>
@@ -26,7 +26,7 @@ BESCHREIBUNG
         Eine wichtige Anwendung von apply() ist das Auswerten des
         Array-Arguments in "varargs" Funktionen.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2@70.
         LDMud 3.2.8 fuehrte ein, dass das erste Argument zurueck gegeben wird,
             wenn es sich nicht um eine Closure handelt.

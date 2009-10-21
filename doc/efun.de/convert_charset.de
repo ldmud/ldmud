@@ -84,11 +84,11 @@ BESCHREIBUNG
                 RISCOS-LATIN1
 
 
-BEISPIEL
+BEISPIELE
         convert_charset("Hi!", "ascii", "utf-8")
 
 GESCHICHTE
-        Introduced in LDMud 3.3.531 .
+        Eingefuehrt in LDMud 3.3.531.
 
-SEE ALSO
+SIEHE AUCH
 

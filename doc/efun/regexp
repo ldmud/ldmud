@@ -1,8 +1,8 @@
 SYNOPSIS
         #include <regexp.h>
 
-        string *regexp(string *list, string pattern)
-        string *regexp(string *list, string pattern, int opt)
+        string * regexp(string *list, string pattern)
+        string * regexp(string *list, string pattern, int opt)
 
 DESCRIPTION
         Match the pattern <pattern> (interpreted according to <opt> if
@@ -12,7 +12,7 @@ DESCRIPTION
         If there is an error in the regular expression, a runtime
         error will be raised.
 
-EXAMPLE
+EXAMPLES
         string strs;
         string pattern;
         
@@ -21,12 +21,9 @@ EXAMPLE
         else
             pattern = "\\bhelp\\b.*\\bme\\b";
 
-        if (strs = regexp( ({"please, help me Sir John."}),
-                         , pattern
-                         ))
-        {
-           if (sizeof(strs)
-              write("It matches.\n");
+        if (strs = regexp(({"please, help me Sir John."}), pattern)) {
+            if (sizeof(strs)
+                write("It matches.\n");
         }
 
         The regular expression will test the given string (which is

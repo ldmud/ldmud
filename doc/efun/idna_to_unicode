@@ -1,8 +1,8 @@
 OPTIONAL
 SYNOPSIS
-        #include <sys/idn.h>
+        #include <idn.h>
 
-        string idna_to_unicode (string name)
+        string idna_to_unicode(string name)
 
 DESCRIPTION
         Convert string <name> from idna representation (8z punycode)

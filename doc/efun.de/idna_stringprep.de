@@ -1,19 +1,19 @@
 OPTIONAL
 SYNOPSIS
-        #include <sys/idn.h>
+        #include <idn.h>
 
-        string idna_stringprep (string str, int profile, int flags = 0)
+        string idna_stringprep(string str, int profile, int flags)
 
 BESCHREIBUNG
-        Prepariere den UTF-8 String <str> passend zum Profil <profile>
+        Prepariere den UTF-8-String <str> passend zum Profil <profile>
         (siehe auch libidn stringprep(3)).
 
-        <profile> und <flags> sind definiert in idn.h .
+        <profile> und <flags> sind definiert in <idn.h>.
 
         Sollte ein Fehler auftreten, wird eine Exception geworfen.
 
-        Diese Efun is nur verfuegbar auf Systemen mit libidn
-        installiert - in diesem Fall ist das Makro __IDNA__ definiert.
+        Diese Efun is nur auf Systemen mit einer installierten libidn 
+        verfuegbar -- in diesem Fall ist das Makro __IDNA__ definiert.
 
 GESCHICHTE
         Introduced in LDMud 3.3.713.

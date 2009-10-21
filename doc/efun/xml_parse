@@ -3,7 +3,7 @@ EXPERIMENTAL
 SYNOPSIS
         #include <xml.h>
 
-        mixed* xml_parse(string xml)
+        mixed * xml_parse(string xml)
 
 DESCRIPTION
         Parses the given string <xml> as a XML conform string. The string must
@@ -36,7 +36,8 @@ DESCRIPTION
         The function is available only if the driver is compiled with Iksemel
         support. In that case, __XML_DOM__ is defined. 
 
-EXAMPLE
+
+EXAMPLES
         xml_parse("<abc/>")           -> ({ "abc", 0, 0 })
         xml_parse("<abc xyz="cde"/>") -> ({ "abc", ([ "xyz" : "cde" ]), 0 })
 

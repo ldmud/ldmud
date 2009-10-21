@@ -1,14 +1,14 @@
 OPTIONAL
 SYNOPSIS
-        #include <sys/idn.h>
+        #include <idn.h>
 
-        string idna_stringprep (string str, int profile, int flags = 0)
+        string idna_stringprep(string str, int profile, int flags)
 
 DESCRIPTION
         Prepare the UTF-8 string <str> according to the stringprep
         <profile> (see also libidn stringprep(3)).
 
-        <profile> and <flags> are one of the values defined in idn.h .
+        <profile> and <flags> are one of the values defined in <idn.h>.
 
         If an error occurs, an exception is thrown.
 

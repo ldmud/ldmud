@@ -1,13 +1,13 @@
 OPTIONAL, VERALTET
 SYNOPSIS
-        mixed *intersect_alist(mixed *list1, mixed *list2);
+        mixed * intersect_alist(mixed *list1, mixed *list2)
 
 BESCHREIBUNG
         Liefert eine schnelle Schnittmenge von zwei Alist Key-Vektoren (NICHT
-        von zwei vollstaendigen Alists). Der Opeartor '&' erzeugt Schnittmengen
+        von zwei vollstaendigen Alists). Der Operator '&' erzeugt Schnittmengen
         von Arrays im Allgemeinen.
 
-BEISPIEL
+BEISPIELE
         new_list = intersect_alist(list1, list2);
 
 SIEHE AUCH

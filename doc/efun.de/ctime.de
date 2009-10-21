@@ -1,6 +1,6 @@
 SYNOPSIS
-        string ctime(int clock);
-        string ctime(int* uclock);
+        string ctime(int clock)
+        string ctime(int *uclock)
 
 BESCHREIBUNG
         Interpretiert das Argument <clock> als Anzahl Sekunden seit dem
@@ -10,15 +10,15 @@ BESCHREIBUNG
 
         Die zweite Form entspricht der ersten, ausser dass das Argument ein
         Array mit zwei Integer Elementen ist. Das erste Element int[0] gibt
-        die Anzahl Sekunden seit dem 01.JAN.1970 an, das zweite Element
+        die Anzahl Sekunden seit dem 01. Januar 1970 an, das zweite Element
         int[1] die Anzahl Millisekunden innerhalb dieser Sekunde.
 
-BEISPIEL
+BEISPIELE
         write(ctime()+"\n");
 
         Dies gibt etwas aus wie "Sun Oct 26 19:28:30 2003".
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.9 fuehrte die zweite Variante ein.
 
 SIEHE AUCH

@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/input_to.h>
+        #include <input_to.h>
 
         void input_to(string|closure fun)
         void input_to(string|closure fun, int flag, ...)
@@ -88,7 +88,7 @@ DESCRIPTION
         The optional trailing args will be passed as second and
         subsequent args to the function fun.
 
-EXAMPLE
+EXAMPLES
         void func() {
            ...
            input_to("enter_name", INPUT_PROMPT, "Please enter your name:");
@@ -123,7 +123,7 @@ EXAMPLE
         input will go to enter_lastname().
 
 
-        Note that the list of input_tos is treated as a flat list:
+        Note that the list of input_to-s is treated as a flat list:
 
         void func() {
           ..

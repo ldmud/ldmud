@@ -1,6 +1,6 @@
 SYNOPSIS
-        int strrstr(string str, string muster);
-        int strrstr(string str, string muster, int pos);
+        int strrstr(string str, string muster)
+        int strrstr(string str, string muster, int pos)
 
 BESCHREIBUNG:
         Liefert den Index des ersten Auftretens von <muster> im String <str>,
@@ -18,8 +18,8 @@ BESCHREIBUNG:
         Strings aus gezaehlt. Dabei wird die Suche aber dennoch rueckwaerts
         im String <str> durchgefuehrt.
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.10
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.10.
 
 SIEHE AUCH
         strstr(E), strlen(E), sscanf(E), sprintf(E), explode(E)

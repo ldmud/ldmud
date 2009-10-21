@@ -1,5 +1,5 @@
 SYNOPSIS
-        string clear_bit(string str, int n);
+        string clear_bit(string str, int n)
 
 BESCHREIBUNG
         Gibt einen neuen String zurueck, in dem das n-te Bit im String <str>

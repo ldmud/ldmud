@@ -4,7 +4,7 @@ SYNOPSIS
 BESCHREIBUNG
         Liefert 1, wenn das Argument eine Closure ist, ansonsten 0.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2@70.
 
 SIEHE AUCH

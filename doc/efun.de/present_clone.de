@@ -1,11 +1,11 @@
 VORLAEUFIG
 SYNOPSIS
-        object present_clone(string str);
+        object present_clone(string str)
         object present_clone(string str, int n)
         object present_clone(string str, object env)
         object present_clone(string str, object env, int n)
 
-        object present_clone(object obj);
+        object present_clone(object obj)
         object present_clone(object obj, int n)
         object present_clone(object obj, object env)
         object present_clone(object obj, object env, int n)
@@ -41,14 +41,13 @@ BEISPIELE
 
         Fuer Driver im Compat Modus liefert die Funktion keine '/' am Anfang.
 
-ANMERKUNG
+ANMERKUNGEN
         Im Unterschied zu present() sucht present_clone() niemals in der
         Umgebung von <env>.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2.7.
-        Die Suche nach dem <n>. Objekt wurde in 3.3.718 ergaenzt.
-
+        Die Suche nach dem <n>-ten Objekt wurde in 3.3.718 ergaenzt.
 
 SIEHE AUCH
         load_name(E), present(E)

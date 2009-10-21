@@ -8,7 +8,7 @@ BESCHREIBUNG
         verwendet.
 
         Der Name ist fuer Clones der Name des Files, aus dem der Blueprint
-        kompliert wurde. Der Name wechselt, wenn ein Objekt sein Programm
+        kompiliert wurde. Der Name wechselt, wenn ein Objekt sein Programm
         durch replace_program() aendert.
 
         Fuer den Spezialfall, dass <obj> als 0 uebergeben wird, liefert
@@ -17,7 +17,7 @@ BESCHREIBUNG
         Der Name endet immer mit '.c'. Er beginnt mit einem '/', wenn der
         Driver sich nicht im Compat Modus befindet.
 
-BEISPIEL
+BEISPIELE
         object o;
         o = clone_object("/std/dings");
         write(program_name(o));
@@ -26,12 +26,12 @@ BEISPIEL
         --> "/std/dings.c", wenn der Driver nicht im Compat Modus laeuft.
         --> "std/dings.c", wenn der Driver im Compat Modus laeuft.
 
-AENDERUNGEN
+ANMERKUNGEN
+        Die Efun swapt das Programm ein, wenn dieses ausgelagert ist.
+
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.6.
         Seit 3.2.9 ist das Argument 0 erlaubt.
-
-ANMERKUNG
-        Die Efun swapt zum Programm, wenn dieses geswapt ist.
 
 SIEHE AUCH
         clone_object(E), clonep(E), load_name(E), load_object(E),

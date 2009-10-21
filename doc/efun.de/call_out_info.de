@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed *call_out_info();
+        mixed * call_out_info()
 
 BESCHREIBUNG
         Liefert Informationen ueber alle haengigen call_out()s. Das Resultat

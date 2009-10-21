@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed *map_objects(object *arr, string fun, mixed extra, ...);
+        mixed * map_objects(object *arr, string fun, mixed extra, ...)
 
 BESCHREIBUNG
         map_objects() verhaelt sich aehnlich wie map(), ruft jedoch

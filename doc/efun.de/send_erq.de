@@ -1,6 +1,8 @@
 GESCHUETZT
 SYNOPSIS
-        int send_erq(int request, string|int *data, closure callback);
+        #include <erq.h>
+
+        int send_erq(int request, string|int *data, closure callback)
 
 BESCHREIBUNG
         Eine Anfrage vom Typ <request> (standardmaessig 0) wird mit Inhalt
@@ -13,16 +15,17 @@ BESCHREIBUNG
 
         <data> kann entweder ein String oder ein Array von Integers sein,
         wobei im zweiten Fall die Zahlen als Zeichen interpretiert werden.
-        Die unterschiedlichen Anfragen sind in /sys/erq.h definiert.
+        Die unterschiedlichen Anfragen sind in <erq.h> definiert.
 
         Die Funktion liefert 0 zurueck, wenn das Senden fehlgeschlagen ist,
         etwas anderes sost.
 
         Die Funktion verursacht eine Schutzverletzung "erq".
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2.1@61.
-        Geschuetzt in 3.2.1@84
+        Geschuetzt in 3.2.1@84.
+        LDMud 3.3.318 fuehrte das ERQ_CB_STRING-Flag ein.
 
 SIEHE AUCH
         attach_erq_demon(E), erq(C)

@@ -1,6 +1,6 @@
 GESCHUETZT
 SYNOPSIS
-        int exec(object new, object old);
+        int exec(object new, object old)
 
 BESCHREIBUNG
         exec() schaltet die Verbindung um vom interaktiven Objekt <old> zum
@@ -28,12 +28,12 @@ BESCHREIBUNG
         bind_lambda() #'exec an das richtige Objekt gebunden und anschliessend
         mit funcall() aufgerufen werden.
 
-BEISPIEL
+BEISPIELE
         ob = clone_object("std/player");
         exec(ob, this_object());
         destruct(this_object());
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.9 fuehrte den Austauschprozess fuer this_interactive() ein.
 
 SIEHE AUCH

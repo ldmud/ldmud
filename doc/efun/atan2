@@ -1,5 +1,5 @@
 SYNOPSIS
-        float atan2 (int|float y, int|float x)
+        float atan2(int|float y, int|float x)
 
 DESCRIPTION
         Returns the angle part of the polar coordinates of the point (x, y)

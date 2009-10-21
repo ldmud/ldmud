@@ -1,5 +1,5 @@
 SYNOPSIS
-        int rename(string from, string to);
+        int rename(string from, string to)
 
 BESCHREIBUNG
         Die Efun rename() verschiebt <from> nach <to>. Wenn <from> ein File
@@ -18,7 +18,7 @@ BESCHREIBUNG
 
         Bei Erfolg liefert rename() 0, bei Fehlschlag einen Wert ungleich 0.
 
-BEISPIEL
+BEISPIELE
         rename("/players/wizard/obj.c", "/players/wizard/newobj.c");
 
 SIEHE AUCH

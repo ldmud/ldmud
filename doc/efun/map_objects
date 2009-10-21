@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed *map_objects(object *arr, string fun, mixed extra, ...)
+        mixed * map_objects(object *arr, string fun, mixed extra, ...)
 
 DESCRIPTION
         Similar to map_array(), but calls arr[n]->fun(extra,...). The

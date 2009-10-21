@@ -1,8 +1,8 @@
 SYNOPSIS
         #include <files.h>
 
-        mixed *get_dir(string str)
-        mixed *get_dir(string str, int mask)
+        mixed * get_dir(string str)
+        mixed * get_dir(string str, int mask)
 
 BESCHREIBUNG
         Benoetigt einen Pfad als erstes Argument und liefert ein Feld
@@ -57,7 +57,7 @@ BESCHREIBUNG
         Die Eintraege in der Bitmaske koennen miteinander kombiniert
         werden.
 
-BEMERKUNGEN
+ANMERKUNGEN
         Der als Argument angegebene Pfad wird vor Benutzung von valid_read()
         im Master der Mudlib verarbeitet. Hierbei kann die Mudlib eine
         Normalisierung vornehmen (z.B. fuehrende und endstaendige "/"
@@ -98,10 +98,10 @@ BEISPIELE
                                          jede Datei in /obj den Namen, die
                                          Groesse und den Zeitpunkt der
                                          letzten Aenderung enthaelt, z.B.
-                                         ({
-                                             "axt.c"    ,  927, 994539583,
-                                             "schwert.c", 1283, 998153903,
-                                             }).
+                                           ({
+                                              "axt.c"    ,  927, 994539583,
+                                              "schwert.c", 1283, 998153903,
+                                           }).
 
         get_dir("/obj/schwert.c", GETDIR_NAMES|GETDIR_PATH)
                                          ({ "/obj/sword.c" }), sofern
@@ -113,12 +113,12 @@ BEISPIELE
                          , get_dir(str, GETDIR_DATES) }));
         Liefert ein unsortiertes Feld mit Feldern, von denen ein jedes
         Name, Groesse und Zeit einer Datei enthaelt, z. B.
-        ({
-            ({ "schwert.c", 1283, 998153903 }),
-            ({ "axt.c"    ,  927, 994539583 }),
-            }).
+          ({
+             ({ "schwert.c", 1283, 998153903 }),
+             ({ "axt.c"    ,  927, 994539583 }),
+          }).
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.9: GETDIR_PATH eingefuehrt.
         LDMud 3.2.11: GETDIR_ACCESS und GETDIR_MODES eingefuehrt.
 

@@ -1,12 +1,12 @@
 GESCHUETZT
 SYNOPSIS
-        int command_stack_depth();
+        int command_stack_depth()
 
 BESCHREIBUNG
-        Liefert die Anzahl der verschachtelten Kommandi, also die Tiefe des
+        Liefert die Anzahl der verschachtelten Kommandos, also die Tiefe des
         Command Stacks.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.7.
 
 SIEHE AUCH

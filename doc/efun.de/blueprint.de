@@ -1,7 +1,7 @@
 VORLAEUFIG
 SYNOPSIS
         object blueprint()
-        object blueprint(string|object ob);
+        object blueprint(string|object ob)
 
 BESCHREIBUNG
         Die Efun liefert den Blueprint fuer das angegeben Objekt <ob> oder
@@ -11,12 +11,12 @@ BESCHREIBUNG
         Objekte mit replace_program() liefert die Funktion den Blueprint des
         ersetzenden Programs.
 
-BEISPIEL
+BEISPIELE
         blueprint("/obj/ding");                 -> liefert /obj/ding
         blueprint(find_object("/obj/ding"));    -> liefert /obj/ding
         blueprint(clone_object("/obj/ding"));   -> liefert /obj/ding
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.9.
 
 SIEHE AUCH

@@ -1,9 +1,9 @@
 SYNOPSIS
-        object master ()
-        object master (int dont_load)
+        object master()
+        object master(int dont_load)
 
 DESCRIPTION
-        Return the master object.
+        Returns the master object.
         
         If <dont_load> is false, the function first makes sure that
         the master object exists.

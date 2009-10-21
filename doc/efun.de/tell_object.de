@@ -1,6 +1,6 @@
 SYNOPSIS
-        void tell_object(object|string obj, string str);
-        void tell_object(object|string obj, mixed *|mapping|struct|object msg);
+        void tell_object(object|string obj, string str)
+        void tell_object(object|string obj, mixed *|mapping|struct|object msg)
 
 BESCHREIBUNG
         Sendet einen Nachricht an das Objekt <obj> (das auch durch seinen
@@ -13,7 +13,7 @@ BESCHREIBUNG
         Ist die Nachricht ein anderer Typ, wird die lfun catch_msg() im
         Empfaenger aufgerufen.
 
-BEISPIEL
+BEISPIELE
         Dies gibt ein einfaches "Hi!" an den Spieler Thomas aus:
 
             object wer;

@@ -1,9 +1,9 @@
 SYNOPSIS
-        #include <sys/inherit_list.h>
+        #include <inherit_list.h>
 
-        string *inherit_list();
-        string *inherit_list(object ob);
-        string *inherit_list(object ob, int flags);
+        string * inherit_list()
+        string * inherit_list(object ob)
+        string * inherit_list(object ob, int flags)
 
 BESCHREIBUNG
         Liefert die Namen von allen Dateien, die von <ob> geerbt werden,
@@ -30,14 +30,15 @@ BESCHREIBUNG
         Alle Flags koennen mit einem binaeren Oder | verbunden werden, wobei
         INHLIST_FLAT und INHLIST_TREE sich gegenseitig ausschliessen.
 
-        Wenn ein Objekt, inklusive <ob>, einem replace_programm() unterworfen
+        Wenn ein Objekt inklusive <ob> einem replace_program() unterworfen
         war, spiegeln die gelieferten Dateinamen das effektiv aktive Programm
         wider.
 
         Die Inheritpfade, die geliefert werden, beginnen immer mit '/'
         (absolute Pfade), auch wenn der Treiber im COMPAT Modus laeuft.
 
-BEISPIEL
+
+BEISPIELE
         Gegeben folgende Vererbungsstruktur:
 
             / c - d
@@ -51,7 +52,7 @@ BEISPIEL
             inherit_list(a, 1) -> ({ "a", ({ "c", "d" }), "b" })
             inherit_list(a, 3) -> ({ "  a", ({ " c", "v d" }), "  b" })
 
-AENDERUNGEN
+GESCHICHTE
         Vor 3.2.8, begannen die gelieferten Namen niemals mit einem '/'.
         LDMud 3.2.9 fuehrte die Baumstruktur (_TREE) und Tags fuer virtuelle
             Inherits ("v ") ein.

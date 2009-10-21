@@ -1,7 +1,7 @@
 VERALTET
 SYNOPSIS
-        mixed *order_alist(mixed *keys, mixed *data, ...);
-        mixed *order_alist(mixed *list);
+        mixed * order_alist(mixed *keys, mixed *data, ...)
+        mixed * order_alist(mixed *list)
 
 BESCHREIBUNG
         Diese Funktion erzeugt eine Alist.

@@ -10,7 +10,7 @@ DESCRIPTION
         erq (a status code) arrives, if the response carries enough data to
         work on.
 
-        <request> can be one of the request codes defined in <erq.h>
+        <request> can be one of the request codes defined in <erq.h>.
         The binary flag ERQ_CB_STRING defines whether the <callback>
         closure expects the returned data packed into an array of
         integers or as a string.
@@ -20,7 +20,7 @@ DESCRIPTION
 
         <callback>, if set, is a closure of either these forms:
 
-          !ERQ_CB_STRING: void <closure>(int * response_data, int len)
+          !ERQ_CB_STRING: void <closure>(int *response_data, int len)
            ERQ_CB_STRING: void <closure>(string response_data)
 
         The result returned from the efun is 0 on failure to send the

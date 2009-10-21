@@ -1,7 +1,7 @@
 SYNOPSIS
-        #include <sys/comm.h>
+        #include <comm.h>
 
-        mixed get_combine_charset (int mode)
+        mixed get_combine_charset(int mode)
 
 DESCRIPTION
         Return the combine charset of the current interactive in the form
@@ -14,7 +14,6 @@ DESCRIPTION
         if sizeof(bitvector) > n/8 && bitvector[n/8] & (1 << n%8) .
 
         If there is no current interactive, the function returns 0. 
-
 
 HISTORY
         Introduced in LDMud 3.2.10.

@@ -1,6 +1,6 @@
 VERALTET, OPTIONAL
 SYNOPSIS
-        int set_light(int n);
+        int set_light(int n)
 
 BESCHREIBUNG
         Ein Objekt ist standardmaessig dunkel. Man kann es jedoch zum
@@ -12,7 +12,7 @@ BESCHREIBUNG
         Es ist zu beachten, dass der Wert des Arguments <n> zur Helligkeit
         des momentanen Objekts hinzuaddiert wird.
 
-BUGS
+FEHLER
         Diese Verarbeitung von Licht durch den Parser fuehrt in den meisten
         Faellen zu unerwuenschten Ergebnissen. So fuehrt eine Kerze, die man
-        in einen Safe stellt dazu, dass der Safe zu leuchten beginnt.
+        in einen Safe stellt, dazu, dass der Safe zu leuchten beginnt.

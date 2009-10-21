@@ -1,6 +1,6 @@
 SYNOPSIS
-        int next_bit(string str, int start);
-        int next_bit(string str, int start, int find_cleared);
+        int next_bit(string str, int start)
+        int next_bit(string str, int start, int find_cleared)
 
 BESCHREIBUNG
         Liefert den Zahlenwert des naechsten Bits im Bitstring <bit> nach
@@ -16,7 +16,7 @@ BESCHREIBUNG
         ist der Leerschlag " " mit dem Wert 0. Das erste Zeichen im String
         ist jenes mit den niedrigsten Bits (0-5).
 
-BEISPIEL
+BEISPIELE
         string s;
         int p;
 

@@ -1,6 +1,6 @@
 SYNOPSIS
-        void replace_program();
-        void replace_program(string program);
+        void replace_program()
+        void replace_program(string program)
 
 BESCHREIBUNG
         Ersetzt ein Programm mit dem geerbten Programm (inherit) <program>.
@@ -36,12 +36,12 @@ BESCHREIBUNG
         verschwundene Lfuns des Objekts referenzieren. Das stellt allerdings
         kein Problem dar, solange diese Referenzen nicht ausgefuehrt werden.
 
-BUGS
+FEHLER
         Wenn ein ersetzendes Programm virtuell geerbte Variablen enthaelt,
         muss dieses Programm als erstes geerbt werden. Ohne diese
         Einschraenkung ueberleben die falschen Variablen den
         Ersetzungsprozess.
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.9 liess zu, dass das Argument <program> weggelassen wird,
         wenn nur ein Inherit existiert.

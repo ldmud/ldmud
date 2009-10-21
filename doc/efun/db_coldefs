@@ -1,6 +1,6 @@
 OPTIONAL
 SYNOPSIS
-        string * db_coldefs (int handle)
+        string * db_coldefs(int handle)
 
 DESCRIPTION
         Return an array with the column names of the current table.
@@ -13,7 +13,7 @@ DESCRIPTION
         The efun triggers a privilege violation ("mysql", "db_coldefs").
 
 HISTORY
-        Added in 3.2.9 .
+        Added in 3.2.9.
         LDMud 3.2.11 added the privilege violation.
 
 SEE ALSO

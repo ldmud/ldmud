@@ -1,18 +1,18 @@
 SYNOPSIS
-        int time();
+        int time()
 
 BESCHREIBUNG
         Liefert die Anzahl Sekunden, die seit dem 01. Januar 1970,
         00:00:00 GMT verstrichen sind.
 
-        Die Zeitangabe basiert auf der Systemzeit des Hosts, der Driver
+        Die Zeitangabe basiert auf der Systemzeit des Hosts; der Driver
         stellt jedoch sicher, dass das Resultat von time() monoton ansteigt
         (also immer nur zu hoeheren Werten wechselt).
 
         Das Resultat von time() veraendert sich nicht waehrend dem Abarbeiten
         eines Kommandos.
 
-BEISPIEL
+BEISPIELE
         Um das aktuelle Datum und die aktuelle Zeit anzuzeigen:
 
             write(ctime(time())+"\n");

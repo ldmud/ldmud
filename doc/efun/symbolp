@@ -4,7 +4,7 @@ SYNOPSIS
 DESCRIPTION
         Returns true, if arg is a symbol.
 
-EXAMPLE
+EXAMPLES
         symbolp('foo) returns 1.
 
 HISTORY

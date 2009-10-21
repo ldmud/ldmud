@@ -1,10 +1,10 @@
 SYNOPSIS
-        unknown call_other(object ob, string fun, mixed arg, ...);
-        unknown call_other(object *ob, string fun, mixed arg, ...);
+        unknown call_other(object ob, string fun, mixed arg, ...)
+        unknown call_other(object *ob, string fun, mixed arg, ...)
 
-        ob->fun(mixed arg, ...);
-        ob->"fun"(mixed arg, ...);
-        ob->(fun)(mixed arg, ...);
+        ob->fun(mixed arg, ...)
+        ob->"fun"(mixed arg, ...)
+        ob->(fun)(mixed arg, ...)
 
 BESCHREIBUNG
         Ruft die in einem anderen Objekt <ob> die Funktion <fun> mit den
@@ -70,7 +70,7 @@ BEISPIELE
         Benutzern auf und speichert das gesammelte Resultat in einer
         Variablen:
 
-            string * s;
+            string *s;
             s = (string *)users()->short();
             !Compat: call_other("/users/luser/thing", "???", 0);
             Compat: call_other("users/luser/thing", "???", 0);
@@ -80,7 +80,7 @@ BEISPIELE
         "???" im Objekt aufgerufen. Gluecklicherweise gibt es heute zu
         diesem Zweck die Efun load_object().
 
-AENDERUNGEN
+GESCHICHTE
         In LDMud 3.2.8 wurden die folgenden Verbesserungen eingefuehrt:
           - die Formen x->"y"() und x->(y)() werden erkannt;
           - die Form x->y() kollidiert nicht mehr mit einer lokalen Variablen,
@@ -88,6 +88,7 @@ AENDERUNGEN
           - eine simul_efun call_other() erwischt auch Aufrufe der Form ->().
           - call_other kann auch auf Arrays von Objekten angewandt werden.
         LDMud 3.2.10 machte den Aufruf von Objektarrays konfigurierbar.
+        LDMud 3.3.113 fuehrte den Hook H_DEFAULT_METHOD ein.
 
 SIEHE AUCH
         function_exists(E), call_resolved(E), create(A), pragma(LPC),

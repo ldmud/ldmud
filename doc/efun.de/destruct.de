@@ -27,7 +27,7 @@ BESCHREIBUNG
         es moeglich, dass ein Objekt noch lange nach seiner Zerstoerung
         Speicher belegt, obwohl es von ausserhalb nicht mehr gefunden wird.
 
-BEISPIEL
+BEISPIELE
         ob->remove();
         if(ob)        // es existiert noch, vielleicht ist die Lfun
                       // remove() nicht definiert?
@@ -36,7 +36,7 @@ BEISPIEL
         Dies ist die Standard-Methode, ein Objekt zu zerstoeren, ihm aber
         vorher noch die Chance zu geben, es selber zu tun.
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.7: 0 (zerstoerte Objekt) als Argument annehmen.
 
 SIEHE AUCH

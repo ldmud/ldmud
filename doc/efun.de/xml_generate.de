@@ -38,7 +38,8 @@ BESCHREIBUNG
         Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
         __XML_DOM__ definiert.
 
-BEISPIEL
+
+BEISPIELE
         xml_generate(({ "abc", 0, 0 })) -> "<abc/>"
         xml_generate(({ "abc", ([ "xyz" : "cde" ]), 0 })) -> "<abc xyz="cde"/>"
 

@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/commands.h>
+        #include <commands.h>
 
         void add_action(string fun, string cmd)
         void add_action(string fun, string cmd, int flag)

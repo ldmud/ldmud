@@ -6,7 +6,7 @@ DESCRIPTION
         enable_commands() has been called from inside the ob).
         ob may be 0.
 
-EXAMPLE
+EXAMPLES
         living(this_player())
 
 SEE ALSO

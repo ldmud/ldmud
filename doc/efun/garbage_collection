@@ -1,7 +1,7 @@
 SYNOPSIS
-        void garbage_collection ()
-        void garbage_collection (string filename)
-        void garbage_collection (string filename, int flag)
+        void garbage_collection()
+        void garbage_collection(string filename)
+        void garbage_collection(string filename, int flag)
 
 DESCRIPTION
         Tell the parser to initiate a garbage collection after the

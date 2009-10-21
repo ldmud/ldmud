@@ -1,6 +1,6 @@
 SYNOPSIS
-        mixed catch(expr, expr, ...);
-        mixed catch(expr, expr, ...; modifiers);
+        mixed catch(expr, expr, ...)
+        mixed catch(expr, expr, ...; modifiers)
 
 BESCHREIBUNG
         Wertet die Ausdruecke <expr> aus. Wenn kein Fehler auftritt, wird 0
@@ -34,24 +34,25 @@ BESCHREIBUNG
                         ist 2 * __MASTER_EVAL_COST__ .
 
         catch() an sich ist nicht besonders laufzeit-intensiv: es braucht
-        nur etwas mehr Zeit als ein Intra-Objekt Funktionsaufruf.
+        nur etwas mehr Zeit als ein Intra-Objekt-Funktionsaufruf.
         
         throw() ist ebenfalls nicht sehr teuer, da lediglich einige
         interne Strukturen aufgeraeumt werden muessen.
 
-        Echte Laufzeitfehlers (ob nun mit oder ohne catch()) auf
-        der anderen Seite ist sehr zeitintensiv.
+        Echte Laufzeitfehler (ob nun mit oder ohne catch()) sind hingegen
+        sehr zeitintensiv.
 
         catch ist nicht im eigentlichen Sinne eine Efun, sondern eine Compiler
         Anweisung.
 
-BEISPIEL
+
+BEISPIELE
         object obj;
         string err;
         if(err = catch(obj = clone_object("/foo/bar/baz")))
             write("Kann das Objekt nicht clonen. Grund: "+err+"\n");
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.9 fuehrte den 'nolog' catch() als experimentelles Feature
             ein.
         LDMud 3.2.10 implementierte 'nolog' als offizielle Form und fuehrte

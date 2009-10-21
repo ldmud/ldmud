@@ -1,5 +1,5 @@
 SYNOPSIS
-        string geteuid(object ob);
+        string geteuid(object ob)
 
 BESCHREIBUNG
         Liefert die effektive User-ID des Objekts <obj> (normalerweise ein
@@ -8,7 +8,7 @@ BESCHREIBUNG
         Zugriffschecks verwendet. Wenn <obj> nicht angegeben wird, wird
         standardmaessig this_object() verwendet.
 
-AENDERUNGEN
+GESCHICHTE
         Seit 3.2.1@47 war diese Efun nur verfuegbar, wenn EUIDs verwendet
             wurden.
         Seit 3.2.7 ist diese Efun immer verfuegbar.

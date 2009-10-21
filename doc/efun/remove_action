@@ -12,7 +12,7 @@ DESCRIPTION
         Return the number of actions removed.
 
 HISTORY
-        Introduced in 3.2.1
+        Introduced in 3.2.1.
         LDMud 3.2.10 added the ability to remove all actions.
 
 SEE ALSO

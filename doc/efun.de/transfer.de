@@ -20,7 +20,7 @@ BESCHREIBUNG
         Die Funktion ruft die lfuns add_weight(), drop(), get(),
         prevent_insert(), add_weight(), und can_put_and_get() nach Bedarf..
 
-REPLACEMENT
+ERSATZ
         Diese Funktion kann einfach mit einer simul-efun simuliert werden: 
 
         /*--------------------------------------------------------*/

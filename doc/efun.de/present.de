@@ -26,7 +26,7 @@ BESCHREIBUNG
         nach <str> gesucht wird. Nur das Inventory von <env> wird durchsucht,
         nicht jedoch dessen Umgebung.
 
-ANMERKUNG
+ANMERKUNGEN
         Wenn die efun sowohl in this_object() als auch dessen Umgebung
         sucht, werden, soweit es die Numerierung betrifft, die beiden
         Umgebungen zusammenhaengend betrachtet.
@@ -63,7 +63,7 @@ BEISPIELE
                 }
             }
 
-HISTORY
+GESCHICHTE
         LDMud 3.2.11/3.3.610 fuehrte die (str, n)-Form ein.
         LDMud 3.3.713 aenderte die Numerierung wenn sowohl Inventory
           als auch Umgebung durchsucht werden. In der vorherigen

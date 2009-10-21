@@ -1,16 +1,16 @@
 VERALTET, GESCHUETZT
 SYNOPSIS
-        void efun308(object item, object env);
+        void efun308(object item, object env)
 
 BESCHREIBUNG
         Das Objekt <item> wird in eine neue Umgebung <env> bewegt, die auch 0
         sein kann. Diese Efun ist fuer die Verwendung im move_object() Treiber
-        Hook gedacht. Sie macht nichts als <item> zu bewegen - keine Aufrufe
-        von init() und aehnliches.
+        Hook gedacht. Sie macht nichts anderes als <item> zu bewegen -- 
+        keine Aufrufe von init() und aehnliches.
 
         Diese Funktion soll deshalb nicht in eigenen Objekten verwendet werden.
 
-GESCHCIHTE
+GESCHICHTE
         Eingefuehrt in 3.2.1@1.
         Umbenannt nach set_environment() in LDMud 3.2.6.
         Seit LDMud 3.2.9 ist diese Efun nur noch verfuegbar, wenn der Treiber

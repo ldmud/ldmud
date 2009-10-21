@@ -1,5 +1,5 @@
 SYNOPSIS
-        void raise_error(string arg);
+        void raise_error(string arg)
 
 BESCHREIBUNG
         Bricht die Ausfuehrung des laufenden Programms ab. Wenn das Programm

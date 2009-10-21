@@ -1,9 +1,10 @@
 SYNOPSIS
-        #include <sys/rtlimits.h>
+        #include <rtlimits.h>
 
         mixed limited(closure fun)
         mixed limited(closure fun, int tag, int value, ...)
-        mixed limited(closure fun, int * limits [, mixed args...] )
+        mixed limited(closure fun, int *limits)
+        mixed limited(closure fun, int *limits, mixed *args)
 
 DESCRIPTION
         Call the function <fun> with any given <args> as parameters,
@@ -29,6 +30,7 @@ DESCRIPTION
 
         The efun causes a privilege violation ("limited", current_object,
         fun, limits-array).
+
 
 EXAMPLES
         limited(#'function)

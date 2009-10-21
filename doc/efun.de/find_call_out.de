@@ -1,6 +1,6 @@
 SYNOPSIS
-        int find_call_out(string fun);
-        int find_call_out(closur cl);
+        int find_call_out(string fun)
+        int find_call_out(closur cl)
 
 BESCHREIBUNG
         Findet den ersten call_out() auf die Funktion fun im aktuellen Objekt
@@ -8,7 +8,7 @@ BESCHREIBUNG
         wird die verbleibende Zeit bis zum Aufruf. Wenn kein call_out()
         haengig ist, wird -1 zurueck gegeben.
 
-BUGS
+FEHLER
         Die Suche nach call_out()s auf Closures funktioniert nur, wenn der
         genaue Wert der Closure gesucht wird.
 
@@ -21,7 +21,7 @@ BUGS
             call_out(symbol_function("main", obj), 2);
             find_call_out(symbol_function("main", obj));
 
-AENDERUNGEN
+GESCHICHTE
         Die Suche nach call_out()s auf Closures wurde in 3.2.1@45 eingefuehrt.
 
 SIEHE AUCH

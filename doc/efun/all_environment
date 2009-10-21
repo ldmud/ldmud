@@ -1,6 +1,6 @@
 SYNOPSIS
-        object *all_environment()
-        object *all_environment(object o)
+        object * all_environment()
+        object * all_environment(object o)
 
 DESCRIPTION
         Returns an array with all environments object <o> is in. If <o> is
@@ -8,13 +8,13 @@ DESCRIPTION
 
         If <o> has no environment, or if <o> is destructed, 0 is returned.
 
-EXAMPLE
+EXAMPLES
         If o is a match in a matchbox which is in a box in a chest,
         in a room, all_environment(o) will return
         ({ matchbox, box, chest, room }).
 
 HISTORY
-        Introduced in LDMud 3.2.6, suggested by TubMud.
+        Introduced in LDMud 3.2.6, suggested by Tubmud.
 
 SEE ALSO
         environment(E), all_inventory(E)

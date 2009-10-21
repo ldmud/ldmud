@@ -31,7 +31,7 @@ EXAMPLES
 HISTORY
         Introduced in 3.2@70.
         Returning a non-closure as it is even when args are given was
-        introduced with 3.2.1
+        introduced with 3.2.1.
 
 SEE ALSO
         apply(E), quote(E)

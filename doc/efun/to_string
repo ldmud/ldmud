@@ -12,7 +12,7 @@ DESCRIPTION
 
         CAVEAT: Arrays are considered exploded strings, ie. arrays of char
         codes, and are 'imploded' up to the first non-number entry, whatever
-        comes first. That means that to_string( ({ 49, 50 }) ) will return
+        comes first. That means that to_string(({ 49, 50 })) will return
         "12" and not "({ 49, 50 })".
 
 BUGS

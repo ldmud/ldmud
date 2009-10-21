@@ -1,10 +1,10 @@
 SYNOPSIS
-        unknown call_direct (object ob, string fun, mixed arg, ...)
-        unknown call_direct (object *ob, string fun, mixed arg, ...)
+        unknown call_direct(object ob, string fun, mixed arg, ...)
+        unknown call_direct(object *ob, string fun, mixed arg, ...)
 
 DESCRIPTION
-        Call a member function <fun> in another object <ob> with an
-        the argument(s) <arg...>. Result is the value returned from
+        Call a member function <fun> in another object <ob> with 
+        argument(s) <arg...>. Result is the value returned from
         the called function (or 0 for non-existing or void functions).
 
         This efun is a twin to call_other(), with the difference
@@ -47,6 +47,7 @@ DESCRIPTION
         'unknown', and the result of call_other() must be casted to
         the appropriate type before you can use it for anything.
 
+
 EXAMPLES
         // All the following statements call the lfun QueryProp()
         // in the current player with the argument P_SHORT.
@@ -61,7 +62,7 @@ EXAMPLES
 
         // This statement calls the lfun short() in all interactive users
         // and stores the collected results in a variable.
-        string * s;
+        string *s;
 
         s = (string *)call_direct(users(), "short");
 

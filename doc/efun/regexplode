@@ -1,8 +1,8 @@
 SYNOPSIS
         #include <regexp.h>
 
-        string *regexplode (string text, string pattern)
-        string *regexplode (string text, string pattern, int opt)
+        string * regexplode(string text, string pattern)
+        string * regexplode(string text, string pattern, int opt)
 
 DESCRIPTION
         This function is similar to explode but accepts a regular
@@ -19,7 +19,7 @@ EXAMPLES
         regexplode("abcdef", "cde", RE_OMIT_DELIM) -> ({ "ab", "f" })
 
 HISTORY
-        Introduced in 3.2@61
+        Introduced in 3.2@61.
         LDMud 3.3 added the optional <opt> argument and the RE_OMIT_DELIM
           flag.
 

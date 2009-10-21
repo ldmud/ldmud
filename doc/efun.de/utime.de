@@ -1,21 +1,21 @@
 SYNOPSIS
-        *int utime()
+        int * utime()
 
 BESCHREIBUNG
         Liefert ein Array der Zeit, die seit dem 01. Januar 1970,
-        00:00:00 GMT vergangen ist, mit Genauigkeit in Mikrosekunden
+        00:00:00 GMT vergangen ist, mit einer Genauigkeit in Mikrosekunden
         (0.000001 Sekunden).
 
         Zurueck gegeben wird ein Array der Form:
             int[0]: Anzahl Sekunden seit Beginn der Zeitrechnung
             int[1]: Anzahl Mikrosekunden innerhalb der aktuellen Sekunde
 
-BEISPIEL
+BEISPIELE
         write(ctime(utime())+"\n");
 
         Gibt das aktuelle Datum und Zeit zurueck.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.9.
 
 SIEHE AUCH

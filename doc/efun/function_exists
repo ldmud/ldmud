@@ -1,8 +1,10 @@
 SYNOPSIS
         #include <functionlist.h>
 
-        mixed function_exists (string str [, int flags])
-        mixed function_exists (string str , object ob, [, int flags])
+        mixed function_exists(string str)
+        mixed function_exists(string str, int flags)
+        mixed function_exists(string str, object ob)
+        mixed function_exists(string str, object ob, int flags)
 
 DESCRIPTION
         Look up a function <str> in the current object, respectively
@@ -41,6 +43,7 @@ DESCRIPTION
 
         If the function cannot be found (because it doesn't exist or
         it is not visible to the caller), the result is 0.
+
 
 EXAMPLES
         function_exists("create")

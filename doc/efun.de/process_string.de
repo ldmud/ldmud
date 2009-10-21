@@ -1,6 +1,6 @@
 OPTIONAL
 SYNOPSIS
-        string process_string(string str);
+        string process_string(string str)
 
 BESCHREIBUNG
         Durchsucht den String <str> nach "value by function call", das
@@ -19,26 +19,24 @@ BESCHREIBUNG
 
         Sowohl <filename> wie auch die Argumente <arg> sind optional.
 
-BEISPIEL
-        string foo(string str)
-        {
+BEISPIELE
+        string foo(string str) {
             return "ab"+str+"ef";
         }
 
-        void func()
-        {
+        void func() {
             write(process_string("@@foo|cd@@"+"\n");
         }
 
         func() gibt jetzt an den Benutzer den String "abcdef" aus.
 
-BUGS
+FEHLER
         Die Verwendung von process_string() kann massive Sicherheitsprobleme
         verursachen.
 
-AENDERUNGEN
-        Wegen der Sicherheitsprobleme ist process_string seit 3.2.1@34
-            optional.
+GESCHICHTE
+        Wegen der Sicherheitsprobleme ist process_string() seit 3.2.1@34
+        optional.
 
 SIEHE AUCH
         notify_fail(E), closures(LPC), get_bb_uid(M)

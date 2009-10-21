@@ -1,8 +1,8 @@
 OPTIONAL
 SYNOPSIS
-        #include <sys/idn.h>
+        #include <idn.h>
 
-        string idna_to_unicode (string name)
+        string idna_to_unicode(string name)
 
 BESCHREIBUNG
         Wandle den String <name> von IDNA Darstellung (8z punycode)
@@ -10,8 +10,8 @@ BESCHREIBUNG
 
         Sollte ein Fehler auftreten, wird eine Exception geworfen.
 
-        Diese Efun is nur verfuegbar auf Systemen mit libidn
-        installiert - in diesem Fall ist das Makro __IDNA__ definiert.
+        Diese Efun is nur auf Systemen mit installierter libidn
+        verfuegbar - in diesem Fall ist das Makro __IDNA__ definiert.
 
 GESCHICHTE
         Introduced in LDMud 3.3.713.

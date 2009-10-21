@@ -2,7 +2,7 @@ SYNOPSIS
         #include <struct_info.h>
         #include <lpctypes.h>
 
-        mixed * struct_info (struct st, int what)
+        mixed * struct_info(struct st, int what)
 
 DESCRIPTION
         Return information about the structure of struct <st> in an array.
@@ -26,8 +26,8 @@ DESCRIPTION
           string [SI_PROG_NAME]:   the name of program defining the struct
           string [SI_PROG_ID]:     the id of the program defining the struct
           mixed  [SI_BASE]:        0, or the base struct information
-          mixed* [SI_MEMBER+0]:    the first member information
-          mixed* [SI_MEMBER+n]:    the last member information
+          mixed *[SI_MEMBER+0]:    the first member information
+          mixed *[SI_MEMBER+n]:    the last member information
 
         The member information entries are arrays themselves with
         these elements:

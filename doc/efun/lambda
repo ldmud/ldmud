@@ -11,7 +11,7 @@ DESCRIPTION
         or apply().
 
 HISTORY
-        Introduced in 3.2@70
+        Introduced in 3.2@70.
 
 SEE ALSO
         closures(LPC), unbound_lambda(E), apply(E), funcall(E),

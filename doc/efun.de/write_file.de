@@ -1,6 +1,6 @@
 SYNOPSIS
-        int write_file(string file, string str);
-        int write_file(string file, string str, int flags);
+        int write_file(string file, string str)
+        int write_file(string file, string str, int flags)
 
 BESCHREIBUNG
         Haengt den String <str> an die Datei <file> an. Liefert 1 bei Erfolg,

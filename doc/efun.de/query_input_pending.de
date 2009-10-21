@@ -1,5 +1,5 @@
 SYNOPSIS
-        object query_input_pending(object ob);
+        object query_input_pending(object ob)
 
 BESCHREIBUNG
         Wenn <ob> interaktiv und ein input_to() haengig ist, so liefert die

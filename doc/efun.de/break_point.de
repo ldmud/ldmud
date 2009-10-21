@@ -1,6 +1,6 @@
 OPTIONAL, GESCHUETZT
 SYNOPSIS
-        void break_point();
+        void break_point()
 
 BESCHREIBUNG
         Diese Funktion ist fuer interne Benutzung und sollte niemals von einem
