@@ -595,7 +595,7 @@ string  read_file(string, void|int, void|int);
 int     rename(string, string);
 int     rm(string);
 int     rmdir(string);
-int     tail(string);
+int     tail(string) "replace by a simul-efun (see deprecated/tail.c)";
 int     write_bytes(string, int, string);
 int     write_file(string, string, int default: F_CONST0);
 

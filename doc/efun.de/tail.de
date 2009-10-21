@@ -1,9 +1,13 @@
+VERALTET
 SYNOPSIS
         void tail(string file)
 
 BESCHREIBUNG
         Listet das Ende eines Files. Es gibt kein Zeilenlimit, es werden aber
-        maximal 1000 Bytes ausgegeben.
+        maximal ca. 1000 Bytes ausgegeben.
+
+GESCHICHTE
+        Veraltet seid 3.3.720.
 
 SIEHE AUCH
         cat(E), ed(E)

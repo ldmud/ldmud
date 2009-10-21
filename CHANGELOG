@@ -3,6 +3,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 21-Oct-2009 (Zesstra)
   - Applied a bunch of small fixes for manpages by Coogan. (#692)
+  - Marked tail as deprecated, added sefun tail(), updated documentation
+    of tail(). (#228)
 
 18-Oct-2009 (Gnomi)
   - Free the xml buffer after xml reader and writer, because they might

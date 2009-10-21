@@ -12,8 +12,9 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
          the garbage collector and would be free'd by it while still in use.
 
     - Changed Efuns:
-         + get_dir(): prepend '/' in plain mode for entries in the root directory,
+       + get_dir(): prepend '/' in plain mode for entries in the root directory,
          if paths are requested by GETDIR_PATH.
+       + tail(): marked as deprecated (#228)
 
 
 30-May-2009 (LDMud Team) -- 3.3.719

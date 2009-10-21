@@ -1,10 +1,14 @@
+DEPRECATED
 SYNOPSIS
         void tail(string file)
 
 DESCRIPTION
         Print out the tail of a file. There is no specific amount of
-        lines given to the output. Only a maximum of 1000 bytes will
+        lines given to the output. Only a maximum of about 1000 bytes will
         be printed.
+
+HISTORY
+        Deprecated in LDMud 3.3.720.
 
 SEE ALSO
         cat(E), ed(E)
