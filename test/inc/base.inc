@@ -38,6 +38,13 @@ mixed valid_write(string path, string uid, string func, object ob)
 }
 #endif
 
+#ifndef OWN_VALID_EXEC
+mixed valid_exec(string prog, object ob, object obfrom)
+{
+    return 1;
+}
+#endif
+
 #ifndef OWN_PREPARE_DESTRUCT
 mixed prepare_destruct (object obj)
 {
