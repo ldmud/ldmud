@@ -14,3 +14,8 @@ that you should pay attention to when updating.
   DID_MEM_FFREE_SIZE, DID_MEM_MAX_ALLOCATED and DID_MEM_KEEP_COST were
   removed.
 
+- removed efuns:
+  + The deprecated efuns cat() and tail() were removed. They can be
+    easily and more flexibly replaced by sefuns, which are supplied with
+    the driver in /mudlib/deprecated/. (#637, #228)
+

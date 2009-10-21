@@ -1,4 +1,4 @@
-VERALTET
+ENTFERNTE EFUN
 SYNOPSIS
         int cat(string path, int start, int num)
 

@@ -21,9 +21,9 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          (#180).
 
     - Removed Efuns:
-       + The deprecated efun cat() was removed. It can be easily and more
-         flexibly replaced by an sefun, which is supplied with the driver.
-         (#637)
+       + The deprecated efuns cat() and tail() were removed. They can be
+         easily and more flexibly replaced by sefuns, which are supplied with
+         the driver. (#637, #228)
 
     - Portability
        + Removed built-in PCRE package, because it was awfully out of date.
