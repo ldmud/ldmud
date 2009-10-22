@@ -162,6 +162,16 @@ mixed *tests = ({
     ({ "map mapping 3", TF_ERROR, (: map(([1,2,3]), ([1]), 0) :) }),
     ({ "map mapping 4", 0, (: deep_eq(map(([1,2,3]), (: $1 + $3 :), 1), ([1:2,2:3,3:4])) :) }),
     ({ "map mapping 5", 0, (: deep_eq(map(([1,2,3]), "f"), ([1:2,2:3,3:4])) :) }),
+    ({ "sort_array 1", 0, (: deep_eq(sort_array(({4,5,2,6,1,3,0}),#'>),
+                                     ({0,1,2,3,4,5,6})) :) }),
+    ({ "sort_array 2", 0, // sort in-place
+        (:
+           int *a = ({4,5,2,6,1,3,0});
+           int *b = a;
+           sort_array(&a, #'>);
+           return deep_eq(a, b) && deep_eq(a, ({0,1,2,3,4,5,6}) );
+        :)
+    }),
 });
 
 void run_test()

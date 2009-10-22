@@ -441,7 +441,7 @@ string  copy_bits(string,string,void|int,void|int,void|int);
 mixed  *allocate(int|int*, void|mixed);
 mixed  *filter_objects(mixed *, string, ...);
 mixed  *map_objects(mixed *, string, ...);
-mixed  *sort_array(mixed *,string|closure, ...);
+mixed  *sort_array(mixed *|mixed *&, string|closure, ...);
 mixed  *transpose_array(mixed *);
 mixed  *unique_array(mixed *, string|closure, ...);
 

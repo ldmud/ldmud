@@ -2308,7 +2308,8 @@ v_sort_array (svalue_t * sp, int num_arg)
     mp_int      step, halfstep, size;
     int         i, j, index1, index2, end1, end2;
     svalue_t   *source, *dest, *temp;
-
+    Bool        inplace = MY_FALSE;
+    
     arg = sp - num_arg + 1;
 
     error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
@@ -2322,14 +2323,46 @@ v_sort_array (svalue_t * sp, int num_arg)
     put_callback(sp, &cb);
     num_arg = 2;
 
+    /* If the argument is passed in by reference, make sure that it is
+     * an array, place the argument vector directly into the stack and set
+     * inplace.
+     */
+    if (arg->type == T_LVALUE)
+    {
+        svalue_t * svp = arg;
+        vector_t * vec = NULL;
+        
+        do {
+            svp = svp->u.lvalue;
+        } while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE);
+        
+        if (svp->type != T_POINTER)
+        {
+            inter_sp = sp;
+            errorf("Bad arg 1 to sort_array(): got '%s &', "
+                   "expected 'mixed * / mixed *&'.\n"
+                   , typename(svp->type));
+            // NOTREACHED
+            return sp;
+        }
+
+        inplace = MY_TRUE;
+        
+        vec = ref_array(svp->u.vec);
+        free_svalue(arg);
+        put_array(arg, vec);
+    }
+        
+    
     /* Get the array. Since the sort sorts in-place, we have
      * to make a shallow copy of arrays with more than one
-     * ref.
+     * ref. Exception is, if the array is given as reference/lvalue, then we
+     * always sort in-place.
      */
     data = arg->u.vec;
     check_for_destr(data);
 
-    if (data->ref != 1)
+    if (!inplace && data->ref != 1)
     {
         vector_t *vcopy;
 

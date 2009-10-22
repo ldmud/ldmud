@@ -7,19 +7,21 @@ SYNOPSIS
         mixed * sort_array(mixed *arr, closure cl, mixed extra...)
 
 DESCRIPTION
-        Create a shallow copy of the array <arr> and sort the copy
-        either by the ordering function ob->wrong_order(a, b), or by
-        the closure expression 'cl'.
-        The sorted copy is returned as result.
+        Sort the copy either by the ordering function ob->wrong_order(a, b),
+        or by the closure expression <cl>.
 
-        If the 'arr' argument equals 0, the result is also 0.
+        Usually a shallow copy of <arr> is made first and the sorted copy is
+        returned as result. However, if <arr> is given as a reference, no copy
+        will be made and <arr> will be sorted in-place.
 
-        'ob' is the object in which the ordering function is called
+        If the <arr> argument equals 0, the result is also 0.
+
+        <ob> is the object in which the ordering function is called
         and may be given as object or by its filename. If <ob> is omitted
         or neither a string nor an object, it defaults to this_object().
 
         The elements from the array to be sorted are passed in pairs to
-        the function 'wrong_order' as arguments, followed by the <extra>
+        the function <wrong_order> as arguments, followed by the <extra>
         arguments if any.
 
         The function should return a positive number if the elements
@@ -39,11 +41,16 @@ EXAMPLES
 
         the following uses of sort_array() are equivalent:
 
-          sort_array(arr, "is_greater", this_object())
-          sort_array(arr, "is_greater")
-          sort_array(arr, #'is_greater)
-          sort_array(arr, #'>)  (this is the preferred variant :-)
-          sort_array(arr, lambda(({'a, 'b}), ({#'>, 'a, 'b})))
+          arr = sort_array(arr, "is_greater", this_object())
+          arr = sort_array(arr, "is_greater")
+          arr = sort_array(arr, #'is_greater)
+          arr = sort_array(arr, #'>)  (this is the preferred variant :-)
+          arr = sort_array(arr, lambda(({'a, 'b}), ({#'>, 'a, 'b})))
+
+        If no implicit shallow copy of <arr> should be made, pass <arr> as
+        reference:
+
+          sort_array(&arr, #'>)
 
         A more complicated example is to sort the array
 
@@ -58,6 +65,7 @@ EXAMPLES
 
 HISTORY
         LDMud 3.2.8 added the support of extra arguments.
+        LDMud 3.3.720 added the support of references to sort in-place.
 
 SEE ALSO
         transpose_array(E), filter(E), map(E), alists(LPC)
