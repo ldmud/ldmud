@@ -19,6 +19,8 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          if paths are requested by GETDIR_PATH.
        + explode() always returns a non-empty array, even upon explode("","")
          (#180).
+       + sort_array() will sort in-place instead of a copying the array first,
+         if the array is passed as reference. (#224)
 
     - Removed Efuns:
        + The deprecated efuns cat() and tail() were removed. They can be

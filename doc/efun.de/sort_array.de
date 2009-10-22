@@ -7,10 +7,13 @@ SYNOPSIS
         mixed * sort_array(mixed *arr, closure cl, mixed extra...)
 
 BESCHREIBUNG
-        Erzeugt eine flache Kopie des Arrays <arr> und sortiert die Kopie
-        entweder nach der Ordnungsfunktion <ob->wrong_order(a, b)> oder nach
-        der Closure cl. Das sortierte Array wird als Ergebnis zurueck
-        geliefert.
+        Sortiert das Array <arr> entweder nach der Ordnungsfunktion
+        <ob->wrong_order(a, b)> oder nach der Closure cl.
+
+        Normalerweise wird zuerst eine flache Kopie des Arrays <arr> erstellt
+        und die sortierte Kopie als Ergebnis zurueckgeliefert. Wird <arr>
+        jedoch als Referenz uebergeben, wird keine implizite Kopie erstellt
+        und das Originalarray sortiert.
 
         Wenn das Argument <arr> 0 ist, ist das Resultat der Funktion auch 0.
 
@@ -39,11 +42,16 @@ BEISPIELE
 
         Folgende Aufrufe von sort_array() sind alle aequivalent:
 
-            sort_array(arr, "ist_groesser", this_object())
-            sort_array(arr, "ist_groesser")
-            sort_array(arr, #'ist_groesser)
-            sort_array(arr, #'>)  // dies ist die bevorzugte Variante :-)
-            sort_array(arr, lambda(({'a, 'b}), ({#'>, 'a, 'b})))
+            arr = sort_array(arr, "ist_groesser", this_object())
+            arr = sort_array(arr, "ist_groesser")
+            arr = sort_array(arr, #'ist_groesser)
+            arr = sort_array(arr, #'>)  //dies ist die bevorzugte Variante :-)
+            arr = sort_array(arr, lambda(({'a, 'b}), ({#'>, 'a, 'b})))
+
+        Soll direkt das Original <arr> statt einer impliziten Kopie sortiert
+        werden:
+
+            sort_array(&arr, #'>)
 
         Etwas komplizierter ist es, folgendes Array aufsteigend nach dem
         zweiten Argument jedes Teilarrays zu ordnen:
@@ -59,6 +67,8 @@ BEISPIELE
 GESCHICHTE
         LDMud 3.2.8 fuehrte die Moeglichkeit ein, zusaetzliche Argumente
             <extra> zu uebergeben.
+        LDMud 3.3.720 unterstuetzt die Uebergabe von <arr> als Referenz und
+            sortiert das Original statt einer impliziten flachen Kopie.
 
 SIEHE AUCH
         transpose_array(E), filter(E), map(E), alists(LPC)

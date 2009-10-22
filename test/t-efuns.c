@@ -173,6 +173,16 @@ mixed *tests = ({
     ({ "implode 2", 0, (: implode(({ "a", 2, this_object(), "c" }), "b") == "abc" :) }),
     ({ "implode 3", 0, (: implode(({ "", "" }), "") == "":) }),
 
+    ({ "sort_array 1", 0, (: deep_eq(sort_array(({4,5,2,6,1,3,0}),#'>),
+                                     ({0,1,2,3,4,5,6})) :) }),
+    ({ "sort_array 2", 0, // sort in-place
+        (:
+           int *a = ({4,5,2,6,1,3,0});
+           int *b = a;
+           sort_array(&a, #'>);
+           return deep_eq(a, b) && deep_eq(a, ({0,1,2,3,4,5,6}) );
+        :)
+    }),
 });
 
 void run_test()
