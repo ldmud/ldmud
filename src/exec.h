@@ -191,10 +191,8 @@ typedef struct fulltype_s fulltype_t;
 
 struct vartype_s {
     typeid_t        type;
-#ifdef USE_STRUCTS
     struct_type_t * t_struct;
       /* For now, only structs have type objects */
-#endif
 };
 
 /* --- struct fulltype_s: Full type information
@@ -215,10 +213,8 @@ struct vartype_s {
  */
 struct fulltype_s {
     typeflags_t     typeflags;
-#ifdef USE_STRUCTS
     struct_type_t * t_struct;
       /* For now, only structs have type objects */
-#endif
 };
 
 /* --- Primary type values --- */
@@ -234,15 +230,9 @@ enum primary_types {
     TYPE_CLOSURE      =  8,
     TYPE_SYMBOL       =  9,
     TYPE_QUOTED_ARRAY = 10,
-#ifdef USE_STRUCTS
     TYPE_STRUCT       = 11,   /* Secondary info is the struct id */
 
     TYPEMAP_SIZE      = 12,   /* Number of types */
-#else
-
-    TYPEMAP_SIZE      = 11,   /* Number of types */
-#endif /* USE_STRUCTS */
-
 };
 
 /* Flags, or'ed on top of the basic type */
@@ -268,8 +258,6 @@ enum type_flags {
 };
 
 
-
-#ifdef USE_STRUCTS
 /* Macros to check a type value for a certain primary type.
  */
 static INLINE Bool IS_TYPE_STRUCT(fulltype_t t) __attribute__((pure));
@@ -370,26 +358,6 @@ enum {
 
 #endif /* GC_SUPPORT */
 
-#else /* !USE_STRUCTS */
-
-#define ref_vartype_data(v) NOOP
-#define ref_fulltype_data(v) NOOP
-
-#define free_vartype_data(v) NOOP
-#define free_fulltype_data(v) NOOP
-
-#ifdef GC_SUPPORT
-
-#define clear_vartype_ref(v) NOOP
-#define clear_fulltype_ref(v) NOOP
-
-#define count_vartype_ref(v) NOOP
-#define count_fulltype_ref(v) NOOP
-
-#endif /* GC_SUPPORT */
-
-#endif /* USE_STRUCTS */
-
 
 /* --- struct instr_s: description of stackmachine instructions ---
  *
@@ -488,17 +456,10 @@ enum function_flags {
    * (real = this + offset).
    */
 
-#ifdef USE_STRUCTS
     NAME_HIDDEN        = 0x00020000, /* Not visible for inheritance    */
     NAME_PROTOTYPE     = 0x00010000, /* Defined by a prototype only    */
     NAME_UNDEFINED     = 0x00008000, /* Not defined yet                */
     NAME_TYPES_LOST    = 0x00004000, /* inherited, no save_types       */
-#else /* !USE_STRUCTS */
-    NAME_HIDDEN        = 0x00000800, /* Not visible for inheritance    */
-    NAME_PROTOTYPE     = 0x00000400, /* Defined by a prototype only    */
-    NAME_UNDEFINED     = 0x00000200, /* Not defined yet                */
-    NAME_TYPES_LOST    = 0x00000100, /* inherited, no save_types       */
-#endif /* USE_STRUCTS */
 };
 
 
@@ -509,12 +470,8 @@ enum function_flags {
  *
  * struct fun_hdr {
  *     shared string_t * name_of_function;   (4 Bytes)
-#ifdef USE_STRUCTS
  *     vartype_t         return_type;        (6 Byte)
  *         References from the return_type are not counted!
-#else
- *     vartype_t         return_type;        (2 Byte)
-#endif
  * --> byte              number_formal_args; (1 Byte)
  *         Bit 7: set if the function has a 'varargs' argument
  * TODO: some code makes use of the fact that this makes the number negative
@@ -656,7 +613,6 @@ enum inherit_types {
     INHERIT_TYPE_DUPLICATE = 0x0004,  /* Flag: Duplicate virt inherit */
 };
 
-#ifdef USE_STRUCTS
 /* --- struct struct_def: description of one struct
  *
  * The information about structs visible in the program are stored
@@ -671,7 +627,6 @@ struct struct_def_s
                              * struct came from.
                              */
 };
-#endif /* USE_STRUCTS */
 
 
 /* --- struct include_s: description of one include file
@@ -778,10 +733,8 @@ struct program_s
     include_t *includes;
       /* Array [.num_includes] of descriptors for included files.
        */
-#ifdef USE_STRUCTS
     struct_def_t *struct_defs;
       /* Array [.num_structs] of struct descriptors */
-#endif /* USE_STRUCTS */
 
     unsigned short flags;
       /* Flags for the program: */
@@ -827,10 +780,8 @@ struct program_s
       /* Number of variables (inherited and own) of this program */
     unsigned short num_inherited;
       /* Number of (directly) inherited programs */
-#ifdef USE_STRUCTS
     unsigned short num_structs;
       /* Number of listed struct definitions */
-#endif /* USE_STRUCTS */
 };
 
 /* Constants for flags in program_s. */

@@ -232,9 +232,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#ifdef USE_STRUCTS
 #include "structs.h"
-#endif /* USE_STRUCTS */
 #include "svalue.h"
 #include "swap.h"
 #include "switch.h"
@@ -1091,11 +1089,9 @@ free_protector_svalue (svalue_t *v)
 {
     switch (v->type)
     {
-#ifdef USE_STRUCTS
       case T_STRUCT:
         free_struct(v->u.strct);
         break;
-#endif /* USE_STRUCTS */
       case T_POINTER:
         free_array(v->u.vec);
         break;
@@ -1160,11 +1156,9 @@ int_free_svalue (svalue_t *v)
         free_array(v->u.vec);
         break;
 
-#ifdef USE_STRUCTS
     case T_STRUCT:
         free_struct(v->u.strct);
         break;
-#endif /* USE_STRUCTS */
 
     case T_MAPPING:
         free_mapping(v->u.map);
@@ -1282,11 +1276,9 @@ free_svalue (svalue_t *v)
         needs_deserializing = (v->u.vec->ref == 1);
         break;
 
-#ifdef USE_STRUCTS
     case T_STRUCT:
         needs_deserializing = (struct_ref(v->u.strct) == 1);
         break;
-#endif /* USE_STRUCTS */
 
     case T_MAPPING:
         needs_deserializing = (v->u.map->ref == 1);
@@ -1518,11 +1510,9 @@ inl_assign_svalue_no_free (svalue_t *to, svalue_t *from)
         (void)ref_array(to->u.vec);
         break;
 
-#ifdef USE_STRUCTS
     case T_STRUCT:
         (void)ref_struct(to->u.strct);
         break;
-#endif /* USE_STRUCTS */
 
     case T_SYMBOL:
         (void)ref_mstring(to->u.str);
@@ -1647,11 +1637,9 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from)
         (void)ref_array(from->u.vec);
         break;
 
-#ifdef USE_STRUCTS
     case T_STRUCT:
         (void)ref_struct(from->u.strct);
         break;
-#endif /* USE_STRUCTS */
 
     case T_SYMBOL:
         (void)ref_mstring(from->u.str);
@@ -1705,11 +1693,9 @@ assign_from_lvalue:
       case T_POINTER:
         (void)ref_array(from->u.vec);
         break;
-#ifdef USE_STRUCTS
       case T_STRUCT:
         (void)ref_struct(from->u.strct);
         break;
-#endif /* USE_STRUCTS */
       case T_SYMBOL:
         (void)ref_mstring(from->u.str);
         break;
@@ -1787,11 +1773,9 @@ void assign_lrvalue_no_free (svalue_t *to, svalue_t *from)
         (void)ref_array(to->u.vec);
         break;
 
-#ifdef USE_STRUCTS
     case T_STRUCT:
         (void)ref_struct(to->u.strct);
         break;
-#endif /* USE_STRUCTS */
 
     case T_SYMBOL:
         (void)ref_mstring(to->u.str);
@@ -1878,7 +1862,6 @@ assign_svalue (svalue_t *dest, svalue_t *v)
             return;
           }
 
-#ifdef USE_STRUCTS
         case T_STRUCT:
           {
             struct_t *strct = dest->u.strct;
@@ -1887,7 +1870,6 @@ assign_svalue (svalue_t *dest, svalue_t *v)
             free_struct(strct);
             return;
           }
-#endif /* USE_STRUCTS */
 
         case T_MAPPING:
           {
@@ -2039,11 +2021,9 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
             free_array(dest->u.vec);
             break;
 
-#ifdef USE_STRUCTS
         case T_STRUCT:
             free_struct(dest->u.strct);
             break;
-#endif /* USE_STRUCTS */
 
         case T_SYMBOL:
             free_mstring(dest->u.str);
@@ -3419,7 +3399,6 @@ get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
     return &(get_txt(svp->u.str)[ind]);
 } /* get_string_a_item() */
 
-#ifdef USE_STRUCTS
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
 check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
@@ -3615,7 +3594,6 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc)
 
     return item;
 } /* get_struct_item() */
-#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
@@ -3664,7 +3642,6 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         return sp;
     }
 
-#ifdef USE_STRUCTS
     /* Index a struct.
      */
     if (vec->type == T_STRUCT)
@@ -3690,7 +3667,6 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         sp->u.lvalue = item;
         return sp;
     }
-#endif /* USE_STRUCTS */
 
     /* Index a mapping
      */
@@ -3913,7 +3889,6 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         return sp;
     }
 
-#ifdef USE_STRUCTS
     /* Index a struct.
      */
     if (vec->type == T_STRUCT)
@@ -3939,7 +3914,6 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         sp->u.lvalue = &lvalue->v;
         return sp;
     }
-#endif /* USE_STRUCTS */
 
     /* Index a mapping
      */
@@ -4237,7 +4211,6 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
         return sp;
     }
 
-#ifdef USE_STRUCTS
     /* Index a struct.
      */
     if (type == T_STRUCT)
@@ -4256,7 +4229,6 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
         sp->u.lvalue = item;
         return sp;
     }
-#endif /* USE_STRUCTS */
 
     /* Index a mapping.
      */
@@ -4507,7 +4479,6 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
             return sp;
         }
 
-#ifdef USE_STRUCTS
         /* Index a struct.
          */
         if (type == T_STRUCT)
@@ -4534,7 +4505,6 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
             return sp;
         }
-#endif /* USE_STRUCTS */
 
         /* Index a string.
          */
@@ -5572,7 +5542,6 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         return sp;
       }
 
-#ifdef USE_STRUCTS
     case T_STRUCT:
       {
         struct_t * st = vec->u.strct;
@@ -5591,7 +5560,6 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         free_struct(st);
         return sp;
       }
-#endif /* USE_STRUCTS */
 
     default:
         inter_sp = sp;
@@ -11166,7 +11134,6 @@ again:
             case T_POINTER:
                 i = (sp-1)->u.vec == sp->u.vec;
                 break;
-#ifdef USE_STRUCTS
             case T_STRUCT:
                 i = (sp-1)->u.strct == sp->u.strct;
                 if (!i && struct_size((sp-1)->u.strct) == 0
@@ -11176,7 +11143,6 @@ again:
                     i = 1;
                 }
                 break;
-#endif
             case T_STRING:
                 i = mstreq((sp-1)->u.str, sp->u.str);
                 break;
@@ -11252,11 +11218,9 @@ again:
             case T_POINTER:
                 i = (sp-1)->u.vec != sp->u.vec;
                 break;
-#ifdef USE_STRUCTS
             case T_STRUCT:
                 i = (sp-1)->u.strct != sp->u.strct;
                 break;
-#endif
             case T_OBJECT:
                 i = (sp-1)->u.ob != sp->u.ob;
                 break;
@@ -13989,7 +13953,6 @@ again:
         sp->u.lvalue = fp + LOAD_UINT8(pc);
         break;
 
-#ifdef USE_STRUCTS
     CASE(F_PUSH_INDEXED_S_LVALUE); /* --- push_indexed_s_lvalue --- */
         /* Op. (struct v=sp[-2], mixed i=sp[-1], short idx=sp[0])
          *
@@ -14005,7 +13968,6 @@ again:
         sp = check_struct_op(sp, 0, -2, pc);
         sp = push_indexed_lvalue(sp, pc);
         break;
-#endif /* USE_STRUCTS */
 
     CASE(F_PUSH_INDEXED_LVALUE);    /* --- push_indexed_lvalue --- */
         /* Operator F_PUSH_INDEXED_LVALUE(vector  v=sp[-1], int   i=sp[0])
@@ -14016,7 +13978,6 @@ again:
          * and the lvalue refers to that variable.
          */
 
-#ifdef USE_STRUCTS
         {
             svalue_t * svp = sp-1;
 
@@ -14031,7 +13992,6 @@ again:
                 /* NOTREACHED */
             }
         }
-#endif /* USE_STRUCTS */
         sp = push_indexed_lvalue(sp, pc);
         break;
 
@@ -14057,7 +14017,6 @@ again:
         sp = push_aindexed_lvalue(sp, pc);
         break;
 
-#ifdef USE_STRUCTS
     CASE(F_INDEX_S_LVALUE);         /* --- index_s_lvalue     --- */
         /* Op. (struct &v=sp[0], int i=sp[-2], short * idx=sp[-1])
          *
@@ -14072,7 +14031,6 @@ again:
         sp = check_struct_op(sp, -1, 1, pc);
         sp = index_lvalue(sp, pc);
         break;
-#endif /* USE_STRUCTS */
 
     CASE(F_INDEX_LVALUE);           /* --- index_lvalue       --- */
         /* Operator F_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
@@ -14085,7 +14043,6 @@ again:
          * <special_lvalue>.
          */
 
-#ifdef USE_STRUCTS
         {
             svalue_t * svp = sp;
 
@@ -14100,7 +14057,6 @@ again:
                 /* NOTREACHED */
             }
         }
-#endif /* USE_STRUCTS */
         sp = index_lvalue(sp, pc);
         break;
 
@@ -14130,7 +14086,6 @@ again:
         sp = aindex_lvalue(sp, pc);
         break;
 
-#ifdef USE_STRUCTS
     CASE(F_S_INDEX);                /* --- s_index            --- */
         /* Operator F_S_INDEX (struct v=sp[-2], mixed i=sp[-1], short idx=sp[0])
          *
@@ -14146,7 +14101,6 @@ again:
         sp = check_struct_op(sp, 0, -2, pc);
         sp = push_indexed_value(sp, pc);
         break;
-#endif /* USE_STRUCTS */
 
     CASE(F_INDEX);                  /* --- index              --- */
         /* Operator F_INDEX (string|vector v=sp[-1], int   i=sp[0])
@@ -14159,7 +14113,6 @@ again:
          * Mapping indices may use <indexing_quickfix> for temporary storage.
          */
 
-#ifdef USE_STRUCTS
         if ((sp-1)->type == T_STRUCT)
         {
             ERRORF(("Illegal type to []: %s, expected string/vector/mapping.\n"
@@ -14167,7 +14120,6 @@ again:
                   ));
             /* NOTREACHED */
         }
-#endif /* USE_STRUCTS */
         sp = push_indexed_value(sp, pc);
         break;
 
@@ -14382,7 +14334,6 @@ again:
         sp = range_lvalue(AR_RANGE, sp);
         break;
 
-#ifdef USE_STRUCTS
                         /* --- push_protected_indexed_s_lvalue --- */
     CASE(F_PUSH_PROTECTED_INDEXED_S_LVALUE);
         /* Op. (struct  v=sp[-2], mixed i=sp[-1], short idx=sp[0])
@@ -14399,7 +14350,6 @@ again:
         sp = check_struct_op(sp, 0, 3, pc);
         sp = push_protected_indexed_lvalue(sp, pc);
         break;
-#endif /* USE_STRUCTS */
 
                           /* --- push_protected_indexed_lvalue --- */
     CASE(F_PUSH_PROTECTED_INDEXED_LVALUE);
@@ -14411,7 +14361,6 @@ again:
          * into the stack.
          */
 
-#ifdef USE_STRUCTS
         if ((sp-1)->type == T_STRUCT)
         {
             ERRORF(("Illegal type to []: %s, expected vector/mapping.\n"
@@ -14419,7 +14368,6 @@ again:
                   ));
             /* NOTREACHED */
         }
-#endif /* USE_STRUCTS */
         sp = push_protected_indexed_lvalue(sp, pc);
         break;
 
@@ -14459,7 +14407,6 @@ again:
         push_protected_indexed_map_lvalue(sp, pc);
         break;
 
-#ifdef USE_STRUCTS
                                /* --- protected_index_s_lvalue --- */
     CASE(F_PROTECTED_INDEX_S_LVALUE);
         /* Operator (struct &v=sp[0], mixed i=sp[-2], short idx=sp[-1])
@@ -14476,7 +14423,6 @@ again:
         sp = check_struct_op(sp, -1, 1, pc);
         sp = protected_index_lvalue(sp, pc);
         break;
-#endif /* USE_STRUCTS */
 
                                  /* --- protected_index_lvalue --- */
     CASE(F_PROTECTED_INDEX_LVALUE);
@@ -14496,7 +14442,6 @@ again:
          * necessary.
          */
 
-#ifdef USE_STRUCTS
         if ((sp-1)->type == T_STRUCT)
         {
             ERRORF(("Illegal type to []: %s, expected string/vector/mapping.\n"
@@ -14504,7 +14449,6 @@ again:
                   ));
             /* NOTREACHED */
         }
-#endif /* USE_STRUCTS */
         sp = protected_index_lvalue(sp, pc);
         break;
 
@@ -15064,7 +15008,6 @@ again:
         break;
     }
 
-#ifdef USE_STRUCTS
     CASE(F_S_AGGREGATE);
                         /* --- s_aggregate <idx> <num> --- */
     CASE(F_S_M_AGGREGATE);
@@ -15164,7 +15107,6 @@ again:
 
         break;
    }
-#endif /* USE_STRUCTS */
 
     CASE(F_PREVIOUS_OBJECT0);       /* --- previous_object0    --- */
         /* EFUN previous_object(void)
@@ -15411,9 +15353,7 @@ again:
         if (arg->type != T_STRING
          && arg->type != T_POINTER
          && arg->type != T_NUMBER
-#ifdef USE_STRUCTS
          && arg->type != T_STRUCT
-#endif /* USE_STRUCTS */
          && arg->type != T_MAPPING)
             ERRORF(("foreach() got a %s, expected a (&)string/array/mapping/struct or number.\n"
                    , typename(sp->type)
@@ -15479,7 +15419,6 @@ again:
                 put_array(sp, vec);
             }
         }
-#ifdef USE_STRUCTS
         else if (arg->type == T_STRUCT)
         {
             struct_check_for_destr(arg->u.strct);
@@ -15498,7 +15437,6 @@ again:
                 put_struct(sp, st);
             }
         }
-#endif /* USE_STRUCTS */
         else
         {
             mapping_t *m;
@@ -15768,7 +15706,6 @@ again:
                     lvalue->u.lvalue = &prot->v;
                 }
             }
-#ifdef USE_STRUCTS
             else if (sp[-2].type == T_STRUCT)
             {
                 if (ix >= struct_size(sp[-2].u.strct))
@@ -15806,11 +15743,6 @@ again:
             else
               fatal("foreach() requires a string, array, struct or mapping.\n");
               /* If this happens, the check in F_FOREACH failed. */
-#else /* USE_STRUCTS */
-            else
-              fatal("foreach() requires a string, array or mapping.\n");
-              /* If this happens, the check in F_FOREACH failed. */
-#endif /* USE_STRUCTS */
         }
 
         /* All that is left is to branch back. */
@@ -16097,7 +16029,6 @@ again:
         break;
     }
 
-#ifdef USE_STRUCTS
     CASE(F_STRUCTP);                /* --- structp             --- */
     {
         /* EFUN structp()
@@ -16114,7 +16045,6 @@ again:
         put_number(sp, i);
         break;
     }
-#endif
 
     CASE(F_SYMBOLP);                /* --- symbolp             --- */
     {
@@ -16273,7 +16203,6 @@ again:
             break;
         }
 
-#ifdef USE_STRUCTS
         if (sp->type == T_STRUCT)
         {
             i = struct_size(sp->u.strct);
@@ -16281,7 +16210,6 @@ again:
             put_number(sp, i);
             break;
         }
-#endif /* USE_STRUCTS */
 
         if (sp->type == T_MAPPING)
         {
@@ -20192,13 +20120,11 @@ count_extra_ref_in_vector (svalue_t *svp, size_t num)
             count_extra_ref_in_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec));
             continue;
 
-#ifdef USE_STRUCTS
         case T_STRUCT:
             if (NULL == register_pointer(ptable, p->u.strct) )
                 continue;
             count_extra_ref_in_vector(&p->u.strct->member[0], struct_size(p->u.strct));
             continue;
-#endif /* USE_STRUCTS */
 
         case T_MAPPING:
             if (NULL == register_pointer(ptable, p->u.map) ) continue;
@@ -20237,14 +20163,12 @@ check_extra_ref_in_vector (svalue_t *svp, size_t num)
             p->u.vec->extra_ref = 0;
             continue;
 
-#ifdef USE_STRUCTS
         case T_STRUCT:
             if (NULL == register_pointer(ptable, p->u.strct) )
                 continue;
             check_extra_ref_in_vector(&p->u.strct->member[0], struct_size(p->u.strct));
             p->u.vec->extra_ref = 0;
             continue;
-#endif /* USE_STRUCTS */
 
         case T_MAPPING:
             if (NULL == register_pointer(ptable, p->u.map) ) continue;
