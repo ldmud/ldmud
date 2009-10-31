@@ -3679,13 +3679,14 @@ init_global_variable (int i, ident_t* name, fulltype_t actual_type
 /*-------------------------------------------------------------------------*/
 static void
 store_function_header ( p_int start
-                      , string_t * name, fulltype_t returntype
-                      , int num_args, int num_vars
+                      , string_t * name, unsigned short fx
+                      , fulltype_t returntype, int num_args, int num_vars
                       )
 
 /* Store a function header into the program block at address <start>.
  * The caller has to make sure that there is enough space.
  * The references of <returntype> are adopted.
+ * <fx> is the index of the function in the defining program.
  */
 
 {
@@ -3699,6 +3700,10 @@ store_function_header ( p_int start
     p += sizeof name;
     (void)ref_mstring(name);
 
+    // FUNCTION_INDEX
+    memcpy(p, &fx, sizeof fx);
+    p+= sizeof fx;
+    
     /* FUNCTION_TYPE */
     assign_full_to_vartype(&rtype, returntype);
     memcpy(p, &rtype, sizeof(rtype));
@@ -3965,22 +3970,24 @@ def_function_complete ( p_int body_start, Bool is_inline)
         /* function_body was a block: generate the
          * function header and update the ident-table entry.
          */
-
+        int fx; // index of new function in the program
         int num_vars = max_number_of_locals - num_args
                                             + max_break_stack_need;
 
+        fx = define_new_function(MY_TRUE, ident
+                            , num_args
+                            , num_vars
+                            , body_start + FUNCTION_PRE_HDR_SIZE
+                            , 0, returntype);
+
         store_function_header( body_start
                              , ident->name
+                             , fx
                              , returntype
                              , num_args
                              , num_vars
                              );
 
-        define_new_function(MY_TRUE, ident
-                           , num_args
-                           , num_vars
-                           , body_start + FUNCTION_PRE_HDR_SIZE
-                           , 0, returntype);
 
         /* Catch a missing return if the function has a return type */
         if ((returntype.typeflags & PRIMARY_TYPE_MASK) != TYPE_VOID
@@ -14291,6 +14298,7 @@ transfer_init_control (void)
 
         store_function_header( CURRENT_PROGRAM_SIZE
                              , STR_VARINIT
+                             , 0 // actually, this is wrong and will be corrected in epilog()
                              , Type_Any
                              , 0 /* num_args */
                              , 0 /* num_vars */
@@ -16033,9 +16041,12 @@ epilog (void)
 
         ip = make_global_identifier(get_txt(STR_VARINIT), I_TYPE_UNKNOWN);
         if (ip)
-            define_new_function(MY_FALSE, ip, 0, 0, first_initializer_start
-                               , TYPE_MOD_PROTECTED, Type_Unknown);
-
+        {
+            int fx = define_new_function(MY_FALSE, ip, 0, 0, first_initializer_start
+                                         , TYPE_MOD_PROTECTED, Type_Unknown);
+            // correct the index of __INIT in the function header
+            *FUNCTION_INDEXP(mem_block[A_PROGRAM].block + first_initializer_start) = fx;
+        }
         /* ref count for ip->name was incremented by transfer_init_control() */
 
         /* Change the last jump after the last initializer into a
@@ -16115,7 +16126,9 @@ epilog (void)
                 {
                     f->offset.pc = CURRENT_PROGRAM_SIZE + FUNCTION_PRE_HDR_SIZE;
                     store_function_header( CURRENT_PROGRAM_SIZE
-                                         , f->name, f->type, f->num_arg
+                                         , f->name
+                                         , (f - (function_t *)mem_block[A_FUNCTIONS].block)/sizeof(function_t *) // index of this function
+                                         , f->type, f->num_arg
                                          , f->num_local);
                     p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE
                         + FUNCTION_HDR_SIZE;

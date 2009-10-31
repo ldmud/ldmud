@@ -469,8 +469,9 @@ enum function_flags {
  * and information about arguments and types:
  *
  * struct fun_hdr {
- *     shared string_t * name_of_function;   (4 Bytes)
- *     vartype_t         return_type;        (6 Byte)
+ *     shared string_t * name_of_function;   (usually 4 Bytes)
+ *     unsigned short    function_index in defining program (usually 2 Bytes)
+ *     vartype_t         return_type;        (usually 6 Byte)
  *         References from the return_type are not counted!
  * --> byte              number_formal_args; (1 Byte)
  *         Bit 7: set if the function has a 'varargs' argument
@@ -519,7 +520,19 @@ static INLINE void * FUNCTION_NAMEP(const fun_hdr_p const p)
                           __attribute__((nonnull(1))) __attribute__((const));
 static INLINE void * FUNCTION_NAMEP(const fun_hdr_p const p)
 {
-    return (char *)p - sizeof(vartype_t) - sizeof(string_t *);
+    return (char *)p - sizeof(vartype_t) - sizeof(unsigned short) - sizeof(string_t *);
+}
+static INLINE unsigned short *FUNCTION_INDEXP(const fun_hdr_p const p) 
+                          __attribute__((nonnull(1))) __attribute__((const));
+static INLINE unsigned short *FUNCTION_INDEXP(const fun_hdr_p const p)
+{
+    return ((unsigned short*)((char *)p - sizeof(vartype_t) - sizeof(unsigned short)));
+}
+static INLINE unsigned short FUNCTION_INDEX(const fun_hdr_p const p) 
+                          __attribute__((nonnull(1))) __attribute__((const));
+static INLINE unsigned short FUNCTION_INDEX(const fun_hdr_p const p)
+{
+    return *FUNCTION_INDEXP(p);
 }
 static INLINE void * FUNCTION_TYPEP(const fun_hdr_p const p) 
                           __attribute__((nonnull(1))) __attribute__((const));
@@ -554,7 +567,7 @@ static INLINE bytecode_p FUNCTION_FROM_CODE(const fun_hdr_p const p)
 
 enum function_header_sizes {
     /* Number of function header bytes before the function pointer. */
-    FUNCTION_PRE_HDR_SIZE = sizeof(string_t*) + sizeof(vartype_t),
+    FUNCTION_PRE_HDR_SIZE = sizeof(string_t*) + sizeof(unsigned short) + sizeof(vartype_t),
     /* Number of function header bytes after the function pointer. */
     FUNCTION_POST_HDR_SIZE = 2 * sizeof(char),
     /* Total size of the function header. */
