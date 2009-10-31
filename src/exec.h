@@ -845,6 +845,7 @@ enum program_flags {
     P_NO_SHADOW       = 0x0008, /* No shadows allowed */
     P_SHARE_VARIABLES = 0x0010, /* Clone vars are assigned from 
                                  * the current blueprint vars. */
+    P_RTT_CHECKS      = 0x0020, /* enable runtime type checks */
 };
 /* Special value for type_start in program_s designating that the function has
  * no type info. */

@@ -206,6 +206,10 @@ Bool pragma_warn_empty_casts;
   /* True: warn if a type is casted to itself.
    */
 
+Bool pragma_rtt_checks;
+  /* True: enable runtime type checks for this program
+   */
+
 string_t *last_lex_string;
   /* When lexing string literals, this is the (shared) string lexed
    * so far. It is used to pass string values to lang.c and may be
@@ -3440,6 +3444,11 @@ handle_pragma (char *str)
             pragma_warn_empty_casts = MY_FALSE;
             validPragma = MY_TRUE;
         }
+        else if (strncmp(base, "rtt_checks", namelen) == 0)
+        {
+            pragma_rtt_checks = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
         else if (strncmp(base, "share_variables", namelen) == 0)
         {
             if (variables_defined)
@@ -5355,6 +5364,7 @@ start_new_file (int fd, const char * fname)
     pragma_warn_empty_casts = MY_TRUE;
     pragma_combine_strings = MY_TRUE;
     pragma_share_variables = share_variables;
+    pragma_rtt_checks = MY_FALSE;
 
     nexpands = 0;
 
