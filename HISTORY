@@ -55,11 +55,17 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          supports hashes with more than 16 bit width. This supports larger
          hash tables than 65535.
        + The ptmalloc memory allocator was removed. (#552)
+       + The interpreter checks for the correct types of function arguments
+         upon function calls, if runtime type checks are enabled for the
+         program defining the function (and save_types is used as well).
+         (experimental feature)
 
     - Language
        + Added a sefun:: specifier to explicitly call simul-efuns. (#669)
        + structs are always enabled. (#557)
        + 'new' inline closure are always enabled. (#557)
+       + Added a new pragma 'rtt_checks', which will enable type checks at
+         runtime (experimental).
 
     - Other
        + The driver requires a C99 compatible build system. Some checks and

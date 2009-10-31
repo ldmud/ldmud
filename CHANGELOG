@@ -1,6 +1,29 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Oct-2009 (Zesstra)
+  - Introduced new pragma rtt_checks. The pragma rtt_checks can be used to
+    enable type checks at runtime for a specific program.
+    (prolang.y, lex.c, exec.h)
+  - Added the function index to the function header.
+    To check argument types at runtime, we need the function index in the
+    defining program. Sometimes we only have the pointer to the function
+    header and it is non-trivial to get the function index from this. With
+    the index stored in the header we can access the function information in
+    the defining progp.
+    (exec.h, prolang.y)
+  - Added function check_function_args().
+    check_function_args() checks for the correct argument types of a function
+    if runtime type checking has been enabled for the program (pragma) and
+    there is information about the types for this function. If the arguments
+    don't match, errorf() is called.
+    For printing a meaningful name of the function argument in the error
+    message the function get_type_name() from prolang.y is used instead of
+    something own. Therefore this function is no longer static.
+    Added calls to F_CALL_FUNCTION, F_CALL_INHERITED/F_CALL_INHERITED_NOARGS,
+    apply_low(), int_call_lambda().
+    (interpret.c, prolang.y|h)
+
 22-Oct-2009 (Zesstra)
   - sort_array(): sort in-place if array is given as reference. (#224)
     (array.c, func_spec)
