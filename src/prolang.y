@@ -1440,7 +1440,7 @@ get_visibility (fulltype_t type)
 } /* get_visibility() */
 
 /*-------------------------------------------------------------------------*/
-static char *
+char *
 get_type_name (fulltype_t type)
 
 /* Return (in a static buffer) a textual representation of <type>.
@@ -16045,7 +16045,7 @@ epilog (void)
             int fx = define_new_function(MY_FALSE, ip, 0, 0, first_initializer_start
                                          , TYPE_MOD_PROTECTED, Type_Unknown);
             // correct the index of __INIT in the function header
-            *FUNCTION_INDEXP(mem_block[A_PROGRAM].block + first_initializer_start) = fx;
+            *FUNCTION_INDEXP((fun_hdr_p)(mem_block[A_PROGRAM].block + first_initializer_start)) = fx;
         }
         /* ref count for ip->name was incremented by transfer_init_control() */
 

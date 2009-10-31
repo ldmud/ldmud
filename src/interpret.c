@@ -6396,6 +6396,149 @@ test_efun_args (int instr, int args, svalue_t *argp)
 
 
 /*-------------------------------------------------------------------------*/
+static INLINE
+Bool check_rtt_compatibility(vartype_t formaltype, svalue_t *svp)
+// This function checks if <formal_type> and the svalue pointed to by <svp>
+// are compatible (that means, it is allowed to assign *svp to an LPC variable
+// having the type described by <formal_type>. The function handles lvalues,
+// but the lvalue property is ignored for assessing the compatibility.
+// returns MY_TRUE if *<svp> is compatible to <formal_type>, MY_FALSE otherwise.
+{
+    // mixed accepts anything... Also zero (0) is considered to be an element
+    // of any type.
+    if ((formaltype.type & PRIMARY_TYPE_MASK) == TYPE_ANY
+        || (svp->type == T_NUMBER && svp->u.number == 0))
+        return MY_TRUE;
+    
+    switch(svp->type)
+    {
+        // These should anyway not happen...
+        case T_INVALID:
+        case T_CALLBACK:
+        case T_ERROR_HANDLER:
+        case T_BREAK_ADDR:
+            return MY_FALSE;
+
+        case T_STRING:
+            if ((formaltype.type & PRIMARY_TYPE_MASK) == TYPE_STRING)
+                return MY_TRUE;
+            return MY_FALSE;
+                        
+        case T_POINTER:
+        case T_QUOTED_ARRAY:
+            // unfortunately, there is no real information about the types of 
+            // the vector in the svalue.
+            if (formaltype.type & TYPE_MOD_POINTER)
+                return MY_TRUE;
+            return MY_FALSE;
+
+        case T_MAPPING:
+            if ((formaltype.type & PRIMARY_TYPE_MASK) == TYPE_MAPPING)
+                return MY_TRUE;
+            return MY_FALSE;
+        
+        case T_CLOSURE:
+            if ((formaltype.type & PRIMARY_TYPE_MASK) == TYPE_CLOSURE)
+                return MY_TRUE;
+            return MY_FALSE;
+            
+        case T_SYMBOL:
+            if ((formaltype.type & PRIMARY_TYPE_MASK) == TYPE_SYMBOL)
+                return MY_TRUE;
+            return MY_FALSE;
+            
+        case T_NUMBER:
+            if ((formaltype.type & PRIMARY_TYPE_MASK) == TYPE_NUMBER)
+                return MY_TRUE;
+            return MY_FALSE;
+            
+        case T_FLOAT:
+            if ((formaltype.type & PRIMARY_TYPE_MASK) == TYPE_FLOAT)
+                return MY_TRUE;
+            return MY_FALSE;
+            
+        case T_OBJECT:
+            if ((formaltype.type & PRIMARY_TYPE_MASK) == TYPE_OBJECT)
+                return MY_TRUE;
+            return MY_FALSE;
+            
+        case T_STRUCT:
+            if ((formaltype.type & PRIMARY_TYPE_MASK) == TYPE_STRUCT
+                && svp->u.strct->type == formaltype.t_struct)
+                return MY_TRUE;
+            return MY_FALSE;
+
+        // handle lvalues/references.
+        case T_LVALUE:
+        case T_PROTECTED_LVALUE:
+            // trace LVALUE chain to the real svalue.
+            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
+                svp = svp->u.lvalue;
+            return check_rtt_compatibility(formaltype, svp);
+            
+        // these point directly to the referenced svalue.
+        case T_PROTECTED_STRING_RANGE_LVALUE:
+        case T_STRING_RANGE_LVALUE:
+        case T_PROTECTED_CHAR_LVALUE:
+        case T_POINTER_RANGE_LVALUE:
+        case T_PROTECTED_POINTER_RANGE_LVALUE:
+        case T_PROTECTOR_MAPPING:
+            // check for correct types.
+            return check_rtt_compatibility(formaltype,svp->u.lvalue);
+    } // switch(svp->type)
+
+    // Fall-through
+    return MY_FALSE;
+} // check_rtt_compatibility()
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+check_function_args(int fx, program_t *progp, fun_hdr_p funstart)
+/* Check the argument types of the function <fx> in <progp>.
+ * The proper number of arguments must be on the stack, so this must be called
+ * after setup_new_frame2().
+ * <inter_sp> is assumed to be the current top of the stack, <funstart> the 
+ * pointer to number_formal_args in the function header.
+ * If runtime checks are requested for the program <progp> (pragma rtt_checks)
+ * and there are type information for the arguments, this function will check
+ * the arguments on the stack for compatibility and call errorf() if not.
+ */
+{
+    // Runtime type checks: check if rtt_checks are requested and we have any
+    // argument type information.
+    if (progp->flags & P_RTT_CHECKS 
+        && progp->type_start && progp->type_start[fx] != INDEX_START_NONE)
+    {
+        // check for the correct argument types
+        vartype_t *arg_type = progp->argument_types + progp->type_start[fx];
+        svalue_t *firstarg = inter_sp - csp->num_local_variables + 1;
+        char formal_args = FUNCTION_NUM_ARGS(funstart);
+        if (formal_args < 0)
+            formal_args &= 0x7f;
+        int i = 0;
+        while (i < formal_args)
+        {
+            // do the types match (in case of structs also the structure)
+            // or is the formal argument of type TYPE_ANY (mixed)?
+            if (!check_rtt_compatibility(arg_type[i], firstarg+i))
+            {
+                // raise error
+                // At this point, a control frame was already created for this call.
+                // To attribute error to caller, pop that one from the control stack.
+                pop_control_stack();
+                string_t *function_name;
+                memcpy(&function_name, FUNCTION_NAMEP(funstart), sizeof function_name);
+                fulltype_t ft = { .typeflags = arg_type[i].type, .t_struct = arg_type[i].t_struct };
+                errorf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
+                       , i+1, get_txt(function_name), typename(firstarg[i].type),
+                       get_type_name(ft));
+            }
+            ++i;
+        }
+    }
+} // check_function_args()
+
+/*-------------------------------------------------------------------------*/
 /* general errorhandler */
 static void
 generic_error_handler( error_handler_t * arg)
@@ -6954,9 +7097,7 @@ void
 push_control_stack ( svalue_t   *sp
                    , bytecode_p  pc
                    , svalue_t   *fp
-#ifdef USE_NEW_INLINES
                    , svalue_t   *context
-#endif /* USE_NEW_INLINES */
                    )
 
 /* Push the current execution context onto the control stack.
@@ -6983,9 +7124,7 @@ push_control_stack ( svalue_t   *sp
 
     /* csp->funstart  has to be set later, it is used only for tracebacks. */
     csp->fp = fp;
-#ifdef USE_NEW_INLINES
     csp->context = context;
-#endif /* USE_NEW_INLINES */
     csp->prog = current_prog;
     csp->lambda = current_lambda; put_number(&current_lambda, 0);
     /* csp->extern_call = MY_FALSE; It is set by eval_instruction() */
@@ -7382,12 +7521,11 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
       do_trace_call(funstart, is_lambda);
     }
 
-
     /* Initialize the break stack, pointing to the entry above
      * the first available svalue.
      */
     break_sp = sp+1;
-
+    
     return sp;
 } /* setup_new_frame2() */
 
@@ -7481,6 +7619,7 @@ setup_new_frame (int fx, program_t *inhProg)
     if (current_variables)
         current_variables += variable_index_offset;
     current_strings = current_prog->strings;
+
 } /* setup_new_frame() */
 
 /*-------------------------------------------------------------------------*/
@@ -13557,7 +13696,7 @@ again:
            */
         funflag_t  flags;     /* the function flags */
         fun_hdr_p  funstart;  /* the actual function (code) */
-
+        
         /* Make sure that we are not calling from a set_this_object()
          * context.
          */
@@ -13598,11 +13737,7 @@ again:
         }
 
         /* Save all important global stack machine registers */
-#ifdef USE_NEW_INLINES
         push_control_stack(sp, pc, fp, inter_context);
-#else
-        push_control_stack(sp, pc, fp);
-#endif /* USE_NEW_INLINES */
 
         /* Set the current program back to the objects program _after_
          * the control stack push, since here is where we search for
@@ -13619,7 +13754,11 @@ again:
 
         /* Setup the stack, arguments and local vars */
         sp = setup_new_frame2(funstart, sp, MY_FALSE, MY_FALSE);
-
+        inter_sp = sp;
+        
+        // check the argument types
+        check_function_args(FUNCTION_INDEX(funstart), current_prog, funstart);
+        
         /* Finish the setup */
 
 #ifdef DEBUG
@@ -13636,6 +13775,7 @@ again:
         fp = inter_fp;
         pc = FUNCTION_CODE(funstart);
         csp->extern_call = MY_FALSE;
+                
         break;
     }
 
@@ -13695,11 +13835,7 @@ again:
 #endif
 
         /* Save all important global stack machine registers */
-#ifdef USE_NEW_INLINES
         push_control_stack(sp, pc, fp, inter_context);
-#else
-        push_control_stack(sp, pc, fp);
-#endif /* USE_NEW_INLINES */
 
         inheritp = setup_inherited_call(prog_index);
 
@@ -13719,7 +13855,11 @@ again:
 
         /* Setup the stack, arguments and local vars */
         sp = setup_new_frame2(funstart, sp, MY_FALSE, MY_FALSE);
-
+        inter_sp = sp;
+        
+        // check the arguments
+        check_function_args(FUNCTION_INDEX(funstart), current_prog, funstart);
+        
         /* Finish the setup */
         fp = inter_fp;
         pc = FUNCTION_CODE(funstart);
@@ -16875,6 +17015,9 @@ retry_for_shadow:
             if (current_variables)
                 current_variables += cache[ix].variable_index_offset;
             inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs, MY_FALSE);
+            // check argument types
+            check_function_args(FUNCTION_INDEX(funstart), cache[ix].progp, funstart);
+            
             previous_ob = current_object;
             current_object = ob;
             save_csp = csp;
@@ -16988,6 +17131,9 @@ retry_for_shadow:
                 }
                 csp->funstart = funstart;
                 inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs, MY_FALSE);
+                // check argument types
+                check_function_args(fx, progp, funstart);
+
                 previous_ob = current_object;
                 current_object = ob;
                 save_csp = csp;
@@ -17943,11 +18089,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
             extra_frame = MY_TRUE;
             csp->extern_call = MY_TRUE;
             csp->funstart = NULL;
-#ifdef USE_NEW_INLINES
             push_control_stack(sp, 0, inter_fp, inter_context);
-#else
-            push_control_stack(sp, 0, inter_fp);
-#endif /* USE_NEW_INLINES */
             csp->ob = current_object;
             csp->prev_ob = previous_ob;
             csp->num_local_variables = num_arg;
@@ -17965,10 +18107,10 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         current_prog = current_object->prog;
         /* inter_sp == sp */
         setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg);
-#ifdef USE_NEW_INLINES
+        // check arguments
+        check_function_args(FUNCTION_INDEX(csp->funstart), current_prog, csp->funstart);
         if (l->function.lfun.context_size > 0)
             inter_context = l->context;
-#endif /* USE_NEW_INLINES */
         if (external)
             eval_instruction(FUNCTION_CODE(csp->funstart), inter_sp);
         else
@@ -18109,6 +18251,9 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         csp->funstart = funstart;
         csp->extern_call = external;
         sp = setup_new_frame2(funstart, sp, allowRefs, MY_TRUE);
+        inter_sp = sp;
+        check_function_args(FUNCTION_INDEX(funstart), current_prog, funstart);
+
         current_variables = current_object->variables;
         current_strings = current_prog->strings;
         if (external)
