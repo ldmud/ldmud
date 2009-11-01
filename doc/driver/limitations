@@ -39,6 +39,8 @@ Program properties
 * max number of struct members: 255
   (exec.h, ...)
 
+* max number of structs per program: usually 32767 (short)
+
 
 Hash tables
 ===========
