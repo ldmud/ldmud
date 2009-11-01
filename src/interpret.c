@@ -8877,8 +8877,31 @@ again:
         }
         *sp = *pResult;
 
+        // check return type. Runtime type checks have to be enabled by the 
+        // program, we must not return from a Lambda (only CLOSURE_LFUN has
+        // type data) or efun- or operator closure.
+        // (IMHO funstart == SIMUL_EFUN_FUNSTART can't happen here.)
+        if (current_prog && current_prog->flags & P_RTT_CHECKS
+            && !(current_lambda.type == T_CLOSURE && current_lambda.x.closure_type != CLOSURE_LFUN)
+            && csp->funstart != EFUN_FUNSTART)
+        {
+            vartype_t rtype = *((vartype_t *)FUNCTION_TYPEP(csp->funstart));
+            // functions declared without type may return anything... *sigh*
+            if (rtype.type != TYPE_UNKNOWN && !check_rtt_compatibility(rtype, sp))
+            {
+                string_t *function_name;
+                memcpy(&function_name, FUNCTION_NAMEP(csp->funstart), sizeof function_name);
+                fulltype_t ft = { .typeflags = rtype.type, .t_struct = rtype.t_struct };
+                inter_sp = sp;
+                errorf("Bad return type in %s(): got '%s', expected '%s'.\n",
+                       get_txt(function_name), typename(sp->type),
+                       get_type_name(ft));
+            }
+        }
+        
         /* Restore the previous execution context */
-        if ( NULL != (current_prog = csp->prog) ) /* is 0 when we reach the bottom */
+        current_prog = csp->prog;
+        if ( NULL != current_prog ) /* is 0 when we reach the bottom */
         {
             current_strings = current_prog->strings;
         }
