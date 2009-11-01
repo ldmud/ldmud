@@ -764,7 +764,8 @@ struct_new_anonymous (int num_members)
 
     if (pStruct == NULL)
     {
-        free_struct_type(pType);
+        // the type was not referenced by struct_new() in this case, so it must
+        // not be freed.
         return NULL;
     }
 
