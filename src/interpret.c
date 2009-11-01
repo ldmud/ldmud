@@ -15004,6 +15004,9 @@ again:
             if (current_variables)
                 current_variables += entry->variable_index_offset;
             new_sp = setup_new_frame2(funstart, sp, MY_TRUE, MY_FALSE);
+            inter_sp = new_sp;
+            check_function_args(FUNCTION_INDEX(funstart), current_prog, funstart);
+            
             /* The simul_efun object should not use simul_efuns itself... */
             previous_ob = current_object;
             current_object = ob;
