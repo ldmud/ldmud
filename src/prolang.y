@@ -4245,16 +4245,6 @@ add_struct_member ( string_t *name, vartype_t type
     }
 
     /* Member is ok: add it */
-
-    if (STRUCT_MEMBER_COUNT == 0)
-    {
-        /* First member */
-        if (from_struct)
-        {
-            pdef->type->base = ref_struct_type(from_struct);
-        }
-    }
-
     if (STRUCT_MEMBER_COUNT == STRUCT_MAX_MEMBERS)
     {
         yyerrorf("Too many members for struct '%s'"
@@ -6269,9 +6259,11 @@ opt_base_struct:
               }
               else
               {
-                  struct_type_t *ptype;
-
-                  ptype = STRUCT_DEF(num).type;
+                  struct_type_t *ptype = STRUCT_DEF(num).type;
+                  struct_type_t *ctype = STRUCT_DEF(current_struct).type;
+                  // record pointer to base struct even if the base struct has no members
+                  ctype->base = ref_struct_type(ptype);
+                  
                   if (struct_t_size(ptype) > 0)
                   {
                       int count;
