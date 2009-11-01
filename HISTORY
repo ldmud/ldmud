@@ -59,6 +59,10 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          upon function calls, if runtime type checks are enabled for the
          program defining the function (and save_types is used as well).
          (experimental feature)
+       + The intrepreter checks for the correct type of return values when
+         returning from a lfun or sefun, if runtime type checks are enabled
+         for the program defining the function (and save_types is used as
+         well). (experimental feature)
 
     - Language
        + Added a sefun:: specifier to explicitly call simul-efuns. (#669)
