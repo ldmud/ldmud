@@ -70,6 +70,8 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
        + 'new' inline closure are always enabled. (#557)
        + Added a new pragma 'rtt_checks', which will enable type checks at
          runtime (experimental).
+       + A base struct is recorded as base struct in a child struct even if
+         the base struct has no members. (#695)
 
     - Other
        + The driver requires a C99 compatible build system. Some checks and

@@ -7,6 +7,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - Check type of return values in F_RETURN when returning from lfuns, sefuns,
     lfun-Closures and RTT checks are requested.
     (interpret.c)
+  - Removed a potential double free in struct_new_anonymous(). (structs.c)
+  - Record a base struct as base struct in a child struct even if the base
+    struct has no members. (#695)
+    (prolang.y)
 
 30-Oct-2009 (Zesstra)
   - Introduced new pragma rtt_checks. The pragma rtt_checks can be used to
