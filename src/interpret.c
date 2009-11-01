@@ -18251,8 +18251,6 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         csp->funstart = funstart;
         csp->extern_call = external;
         sp = setup_new_frame2(funstart, sp, allowRefs, MY_TRUE);
-        inter_sp = sp;
-        check_function_args(FUNCTION_INDEX(funstart), current_prog, funstart);
 
         current_variables = current_object->variables;
         current_strings = current_prog->strings;
