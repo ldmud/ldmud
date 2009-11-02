@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Nov-2009 (Zesstra)
+  - Split f_baseof() into f_baseof() and baseof(), because some parts of the
+    interpreter need to know the relationship of two structs in the future.
+    (structs.c)
+
 01-Nov-2009 (Zesstra)
   - Don't try to check arguments when calling lambdas.
   - Check function arguments in F_SIMUL_EFUN (if RTT checks are requested)
