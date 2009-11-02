@@ -331,11 +331,13 @@ free_empty_vector (vector_t *p)
 }
 
 /*-------------------------------------------------------------------------*/
+#ifdef USE_ALISTS
 static INLINE vector_t *
 i_shrink_array (vector_t *p, mp_int n)
 
 /* Create and return a new array containing just the first <n> elements
  * of <p>. <p> itself is freed (and thus possibly deallocated).
+ * This function is only needed if alists are used.
  */
 
 {
@@ -362,6 +364,7 @@ i_shrink_array (vector_t *p, mp_int n)
 vector_t * shrink_array (vector_t *p, mp_int n) { return i_shrink_array(p, n); }
 
 #define shrink_array(p,n) i_shrink_array(p,n)
+#endif
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1463,8 +1466,8 @@ intersect_array (vector_t *vec1, vector_t *vec2)
     if (vec1_size == 0 || vec2_size == 0)
     {
         free_array(vec2);
-        return shrink_array(vec1, 0);
-          /* Fancy way of creating an empty array */
+        free_array(vec1);
+        return ref_array(&null_vector);
     }
 
     /* Non-trivial arrays: match them up */

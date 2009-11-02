@@ -3631,8 +3631,8 @@ map_intersect_array (vector_t *vec, mapping_t *map)
     if (vec_size == 0)
     {
         free_mapping(map);
-        return shrink_array(vec, 0);
-          /* Fancy way of creating an empty array copy */
+        free_array(vec);
+        return ref_array(&null_vector);
     }
 
     /* Non-trivial arrays: match them up */

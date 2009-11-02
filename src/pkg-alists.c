@@ -70,7 +70,7 @@ intersect_ordered_arr (vector_t *a1, vector_t *a2)
  *
  * The result is a new sorted(!) vector with all elements, which are present
  * in both input vectors.
- * This function is called by intersect_array() and f_intersect_alists().
+ * This function is called by f_intersect_alists().
  */
 
 {
