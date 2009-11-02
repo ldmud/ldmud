@@ -10,6 +10,12 @@ See the file HISTORY for a user-oriented summary of all the changes.
     of creating a new empty array with shrink_array(vec,0). shrink_array is
     only used in intersect_ordered_arr().
     (array.c, mapping.c)
+  - Allow structs being children of the declared one in RTT checks.
+    check_rtt_compatibility() checked for identical types of structs. Instead
+    it should check if the declared struct (the formal argument type) is a
+    base of the given struct.
+    Also use baseof() in check_struct_op().
+    (interpret.c)
 
 01-Nov-2009 (Zesstra)
   - Don't try to check arguments when calling lambdas.

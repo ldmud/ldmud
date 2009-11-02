@@ -3485,16 +3485,9 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
     if (s_index >= 0)
     {
         struct_type_t * pExpected = current_prog->struct_defs[s_index].type;
-        struct_type_t * pType;
+        struct_type_t * pType = svp->u.strct->type;
 
-        /* Check the struct type */
-        for ( pType = svp->u.strct->type
-            ; pType != NULL && pType != pExpected
-            ; pType = pType->base
-            )
-          NOOP;
-
-        if (pType == NULL)
+        if (!baseof(pExpected, pType))
         {
             string_t * got_name, * exp_name;
 
@@ -6463,9 +6456,12 @@ Bool check_rtt_compatibility(vartype_t formaltype, svalue_t *svp)
             return MY_FALSE;
             
         case T_STRUCT:
-            if ((formaltype.type & PRIMARY_TYPE_MASK) == TYPE_STRUCT
-                && svp->u.strct->type == formaltype.t_struct)
-                return MY_TRUE;
+            if ((formaltype.type & PRIMARY_TYPE_MASK) == TYPE_STRUCT)
+            {
+                // allow structs having the declared struct as a base.
+                if (baseof(formaltype.t_struct, svp->u.strct->type) > 0)
+                    return MY_TRUE;
+            }
             return MY_FALSE;
 
         // handle lvalues/references.

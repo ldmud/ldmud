@@ -3,8 +3,6 @@
 
 #include "driver.h"
 
-#ifdef USE_STRUCTS
-
 #include "typedefs.h"
 
 #include "exec.h"
@@ -84,7 +82,6 @@ struct struct_type_s
        * If the struct doesn't have any members, this pointer is NULL.
        */
 };
-#endif // USE_STRUCTS
 
 /* --- Prototypes --- */
 
@@ -137,7 +134,6 @@ extern svalue_t * f_struct_info(svalue_t * sp);
 extern svalue_t * f_baseof(svalue_t *sp);
 
 
-#ifdef USE_STRUCTS
 /* --- Static (inline) helpers --- */
 
 /* p_int struct_ref(struct *t)
@@ -270,7 +266,5 @@ static INLINE void free_struct_member_data(struct_member_t *v)
         free_mstring(v->name);
     free_vartype_data(&(v->type));
 }
-
-#endif /* USE_STRUCTS */
 
 #endif /* STRUCTS_H_ */
