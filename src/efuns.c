@@ -6174,7 +6174,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                 // a template struct was given for conversion
                 // check if template is a base of the old struct or the old struct is
                 // a base of the template.
-                rc = baseof(newstruct->type, oldstruct->type);
+                rc = struct_baseof(newstruct->type, oldstruct->type);
                 
                 // special case, same structs.
                 if (rc == 2)
@@ -6184,7 +6184,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                 }
                 if (rc == 1)
                     size = struct_size(newstruct); // newstruct is base and has <= members than oldstruct.
-                else if (baseof(oldstruct->type, newstruct->type) == 1)
+                else if (struct_baseof(oldstruct->type, newstruct->type) == 1)
                     size = struct_size(oldstruct); // oldstruct is base and has <= members than newstruct.
                 else
                 {

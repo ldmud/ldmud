@@ -1418,7 +1418,7 @@ x_map_struct (svalue_t *sp, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 int
-baseof(struct_type_t *base, struct_type_t *st)
+struct_baseof(struct_type_t *base, struct_type_t *st)
 /* Test if the struct type <base> is a base of the struct type *st
  * Results are:
  *   0: <base> is not a base of <st>, nor is <base> of equal type as <st> 
@@ -1460,7 +1460,7 @@ f_baseof (svalue_t *sp)
     int rc;
 
     /* Get the arguments from the stack */
-    rc = baseof(sp[-1].u.strct->type, sp[0].u.strct->type);
+    rc = struct_baseof(sp[-1].u.strct->type, sp[0].u.strct->type);
     
     /* Remove the arguments and push the result */
     free_svalue(sp); sp--;
