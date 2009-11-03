@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Nov 2009 (Zesstra)
+  - to_struct() converts a given struct into a struct with the same type as
+    the template struct given as optional second argument.
+    This conversion is only done if the template struct is a base of the given
+    struct or vice versa. Otherwise an error is raised.
+    (efuns.c)
+  - Renamed baseof() to struct_baseof().
+    That is much more consistent to the other funtions in structs.c.
+    (structs.c, interpret.c, efuns.c)
+
 02-Nov-2009 (Zesstra)
   - Split f_baseof() into f_baseof() and baseof(), because some parts of the
     interpreter need to know the relationship of two structs in the future.
