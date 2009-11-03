@@ -1,12 +1,12 @@
 SYNOPSIS
-        int living(object ob);
+        int living(object ob)
 
 BESCHREIBUNG
-        Liefert 1 zurueck, wenn <ob> ein lebendiges Objekt (living) ist.
-        <ob> ist living, wenn enable_commands() aus <obj> aufgerufen wurde.
-        <ob> kann auch 0 sein.
+        Liefert 1 zurueck, wenn <ob> ein lebendiges Objekt ("living") ist.
+        <ob> ist living, wenn enable_commands() aus <obj> heraus aufgerufen
+        wurde.  <ob> kann auch 0 sein.
 
-BEISPIEL
+BEISPIELE
         living(this_player());  -> Dies liefert (hoffentlich) 1 zuerueck.
 
 SIEHE AUCH

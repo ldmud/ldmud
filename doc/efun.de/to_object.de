@@ -1,7 +1,7 @@
 SYNOPSIS
-        object to_object(string arg);
-        object to_object(closure arg);
-        object to_object(object arg);
+        object to_object(string arg)
+        object to_object(closure arg)
+        object to_object(object arg)
 
         (object)<value>
 
@@ -20,7 +20,7 @@ BESCHREIBUNG
 
         Objekte und die Zahl 0 werden unveraendert zurueck gegeben.
 
-BUGS
+FEHLER
         Die Cast-Schreibweise funktioniert nur, wenn der genaue Wert von
         <value> zum Zeitpunkt der Kompilierung bekannt ist. Dies wird nicht
         geaendert werden, da die Funktionsform verwendet werden kann.

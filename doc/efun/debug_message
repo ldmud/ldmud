@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/debug_message.h>
+        #include <debug_message.h>
 
         void debug_message(string text)
         void debug_message(string text, int flags)
@@ -18,7 +18,8 @@ DESCRIPTION
         If <flags> is given as 0, left out, or contains no target
         definition, debug_message() will print to stdout and to the logfile.
 
-EXAMPLE
+
+EXAMPLES
         debug_message("This goes to stdout and the logfile.\n");
         debug_message("This goes to stderr.\n", DMSG_STDERR);
         debug_message("This goes to stdout and stderr.\n"
@@ -30,7 +31,7 @@ EXAMPLE
                      , DMSG_STDOUT | DMSG_STAMP);
 
 HISTORY
-        Introduced in 3.2.1@34
+        Introduced in 3.2.1@34.
         LDMud 3.2.9 introduced the <flags> parameter.
 
 SEE ALSO

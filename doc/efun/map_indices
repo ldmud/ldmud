@@ -19,7 +19,7 @@ DESCRIPTION
         Also note that the behaviour of this function is different from
         map_array().
 
-EXAMPLE
+EXAMPLES
         m = mkmapping(users());
         m = map_indices(m, #'environment);
 

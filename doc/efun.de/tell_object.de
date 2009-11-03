@@ -1,6 +1,6 @@
 SYNOPSIS
-        void tell_object(object|string obj, string str);
-        void tell_object(object|string obj, mixed * msg);
+        void tell_object(object|string obj, string str)
+        void tell_object(object|string obj, mixed * msg)
 
 BESCHREIBUNG
         Sendet einen Nachricht an das Objekt <obj> (das auch durch seinen
@@ -13,7 +13,7 @@ BESCHREIBUNG
         Ist die Nachricht ein Array, wird die lfun catch_msg() im Empfaenger
         aufgerufen.
 
-BEISPIEL
+BEISPIELE
         Dies gibt ein einfaches "Hi!" an den Spieler Thomas aus:
 
             object wer;
@@ -25,14 +25,12 @@ BEISPIEL
         mit Namen "Dummymonster", Objekt2 verteilt die Meldung:
 
         Objekt1:
-            void catch_tell(string str)
-            {
+            void catch_tell(string str) {
                 wirte("Erhaltener Text: "+str+"\n");
             }
 
         Objekt2:
-            void fun()
-            {
+            void fun() {
                 object wer;
                 wer = find_living("dummymonster");
                 tell_object(wer, "Folge mir, Sterblicher!\n");

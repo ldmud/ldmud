@@ -1,9 +1,9 @@
 VORLAEUFIG
 SYNOPSIS
-        #include <sys/rtlimits.h>
+        #include <rtlimits.h>
 
-        int *query_limits();
-        int *query_limits(int default);
+        int * query_limits()
+        int * query_limits(int default)
 
 BESCHREIBUNG
         Liefert ein Array mit den momentan gueltigen Laufzeit Limiten bzw.
@@ -14,20 +14,20 @@ BESCHREIBUNG
         int[LIMIT_ARRAY]:       die maximale Anzahl Array Eintraege
         int[LIMIT_MAPPING]:     die maximale Anzahl Mapping Eintraege
         int[LIMIT_BYTE]:        die maximale Anzahl Bytes, die mit read_bytes()
-                                /write_bytes() bearbeitet werden koennen
+                                bzw. write_bytes() bearbeitet werden koennen
         int[LIMIT_FILE]:        die maximale Anzahl Bytes, die mit read_file()
-                                /write_file() bearbeitet werden koennen
+                                bzw. write_file() bearbeitet werden koennen
         int[LIMIT_CALLOUTS]:    die maximale Anzahl gleichzeitiger call_out()s
 
-        Eine Limite von '0' (auch LIMIT_UNLIMITED) bedeutet 'keine Limite'
+        Eine Limit von '0' (auch LIMIT_UNLIMITED) bedeutet 'kein Limit'.
 
 BEISPIELE
         query_limits()
-        --> liefert die momentan gueltigen Laufzeit Limiten.
+        --> liefert die momentan gueltigen Laufzeitbegrenzungen.
         query_limits(1)
-        --> liefert die standardmaessigen Laufzeit Limiten.
+        --> liefert die standardmaessigen Laufzeitbegrenzungen.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.7.
         LIMIT_CALLOUTS wurde in LDMud 3.2.9 eingefuehrt.
 

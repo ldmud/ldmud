@@ -1,5 +1,5 @@
 SYNOPSIS
-        object *users(void)
+        object * users(void)
 
 DESCRIPTION
         Return an array containing all interactive users.

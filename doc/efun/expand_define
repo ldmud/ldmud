@@ -1,6 +1,6 @@
 SYNOPSIS
-        string expand_define (string name)
-        string expand_define (string name, string arg, ...)
+        string expand_define(string name)
+        string expand_define(string name, string arg, ...)
 
 DESCRIPTION
         Expands the macro <name> with the argument(s) <arg>... (default is
@@ -13,7 +13,7 @@ DESCRIPTION
         H_INCLUDE_DIRS driver hook, or the masters runtime_error()
         function.
 
-EXAMPLE
+EXAMPLES
         While compiling 'foo.c':
           expand_define("__FILE__") --> "foo.c"
 

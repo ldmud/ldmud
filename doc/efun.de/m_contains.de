@@ -1,5 +1,5 @@
 SYNOPSIS
-        int m_contains(mixed &data1, ... , &dataN, mapping map, mixed key);
+        int m_contains(mixed &data1, ... , &dataN, mapping map, mixed key)
 
 BESCHREIBUNG
         Wenn <map> den Key <key> enthaelt, werden die entsprechenden Werte
@@ -11,7 +11,7 @@ BESCHREIBUNG
         Man kann diese Funktion auch fuer 0-Wert Mappings verwenden, wobei
         sie den gleichen Effekt wie member(E) hat.
 
-AENDERUNGEN
+GESCHICHTE
         Umbenannt von 'mapping_contains' in LDMud 3.2.6.
 
 SIEHE AUCH

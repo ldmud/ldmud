@@ -1,11 +1,11 @@
 SYNOPSIS
-        string lower_case(string str);
+        string lower_case(string str)
 
 BESCHREIBUNG
         Konvertiert alle Zeichen in <str> in Kleinbuchstaben und liefert den
         neuen String.
 
-BEISPIEL
+BEISPIELE
         lower_case("Hallo WeLT!") -> "hallo welt!"
 
 SIEHE AUCH

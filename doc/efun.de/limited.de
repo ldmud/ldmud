@@ -1,28 +1,30 @@
 VORLAEUFIG, GESCHUETZT
 SYNOPSIS
-        #include <sys/rtlimits.h>
-
-        mixed limited(closure fun);
-        mixed limited(closure fun, int tag, int value, ...);
-        mixed limited(closure fun, int *limits [, mixed *args]);
+        #include <rtlimits.h>
+  
+        mixed limited(closure fun)
+        mixed limited(closure fun, int tag, int value, ...)
+        mixed limited(closure fun, int *limits)
+        mixed limited(closure fun, int *limits, mixed *args)
 
 BESCHREIBUNG
         limited() ruft die Funktion <fun> mit den bezeichneten Argumenten
-        <args> auf und fuehrt sie mit den gegebenen Laufzeitlimiten aus.
-
+        <args> auf und fuehrt sie mit den gegebenen Laufzeitlimitierungen aus.
+  
         Beim Ende der Funktion <fun> werden die momentan aktiven
-        Laufzeitlimiten wiederhergestellt. limited() liefert den
+        Laufzeitlimitierungen wiederhergestellt. limited() liefert den
         Rueckgabewert der Closure <fun> zurueck.
 
-        Die Laufzeitlimiten koennen in zwei Formen angegeben werden: als
-        Array (wie es von query_limits() geliefert wird) oder als Liste von
-        Werten mit Tags. Wird limited() ohne Angabe von Limits aufgerufen,
-        gelten die Laufzeitlimiten als 'unlimitiert'.
-
-        Die Limiteneinstellung kennt drei spezielle Werte aus <rtlimits.h>:
+        Die Laufzeitlimitierungen koennen in zwei Formen angegeben werden: 
+        *  als Array (wie es von query_limits() geliefert wird) oder 
+        *  als Liste von Werten mit Tags.
+        Wird limited() ohne Angabe von Limits aufgerufen, gelten die
+        Laufzeitlimiten als 'unlimitiert'.
+  
+        Die Limitierung kennt drei spezielle Werte aus <rtlimits.h>:
             LIMIT_UNLIMITED:    es gibt kein Limit
             LIMIT_KEEP:         das zuletzt gesetzte Limit wird beibehalten
-            LIMIT_DEFAULT:      die 'globalen' Limiten werden verwendet
+            LIMIT_DEFAULT:      die 'globalen' Limitierungen werden verwendet
 
         limited() erzeugt eine Schutzverletzung ("limited", current_object,
         closure).
@@ -31,19 +33,20 @@ BESCHREIBUNG
         Fall kostet eine Closure 10 Ticks, unabhaengig davon, wie viele Ticks
         tatsaechlich verbraucht werden.
 
+
 BEISPIELE
         limited(#'function)
-        --> fuehrt die Funktion ohne Limiten aus.
+        --> fuehrt die Funktion ohne Limits aus.
 
         limited(#'function, ({ 200000 }), "foo")
-        --> fuehrt die Funktion mit einem Eval-Kosten Limit von 200000 Ticks
+        --> fuehrt die Funktion mit einem Eval-Kosten-Limit von 200000 Ticks
             aus. Die Funktion wird als 'function("foo")' aufgerufen.
 
         limited(lambda(0, ({#'function, "foo"})), LIMIT_EVAL, 200000)
-        --> fuehrt die Funktion mit einem Eval-Kosten Limit von 200000 Ticks
+        --> fuehrt die Funktion mit einem Eval-Kosten-Limit von 200000 Ticks
             aus. Die Funktion wird als 'function("foo")' aufgerufen.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.7.
 
 SIEHE AUCH

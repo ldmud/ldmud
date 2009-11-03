@@ -1,7 +1,7 @@
 OPTIONAL
 SYNOPSIS
-        mixed* insert_alist (mixed key, mixed data..., mixed * alist)
-        int    insert_alist (mixed key, mixed * keys)
+        mixed * insert_alist(mixed key, mixed data..., mixed * alist)
+        int     insert_alist(mixed key, mixed * keys)
 
 DESCRIPTION
         1. Form: Alist Insertion

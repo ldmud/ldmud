@@ -1,5 +1,5 @@
 SYNOPSIS
-        object shadow(object obj, int flag);
+        object shadow(object obj, int flag)
 
 BESCHREIBUNG
         Wenn <flag> nicht 0 ist, wird das aktuelle Objekt dem Objekt obj
@@ -30,28 +30,23 @@ BESCHREIBUNG
         Hingegen werden alle normalen (internen) Funktionsaufrufe innerhalb
         von B werden wie gewohnt innerhalb von B bearbeitet.
 
-BEISPIEL
-        Mir drei Objekten a.c, b.c und c.c:
+BEISPIELE
+        Mit drei Objekten a.c, b.c und c.c:
 
         --- a.c ---
-            void fun()
-            {
+            void fun() {
                 debug_message(sprintf("%O [a] fun()\n", this_object()));
             }
-
-            void fun3()
-            {
+            void fun3() {
                 debug_message(sprintf("%O [a] fun3()\n", this_object()));
             }
 
         --- b.c ---
-            int fun()
-            {
+            int fun() {
                 debug_message(sprintf("%O [b] fun()\n", this_object()));
                 find_object("a")->fun();
             }
-            void fun2()
-            {
+            void fun2() {
                 debug_message(sprintf("%O [b] fun2()\n", this_object()));
                 find_object("a")->fun3();
                 this_object()->fun3();
@@ -60,13 +55,11 @@ BEISPIEL
             void do_shadow(object target) { shadow(target, 1); }
 
         --- c.c ---
-            int fun()
-            {
+            int fun() {
                 debug_message(sprintf("%O [c] fun()\n", this_object()));
                 find_object("a")->fun();
             }
-            void fun3()
-            {
+            void fun3() {
                 debug_message(sprintf("%O [c] fun3()\n", this_object()));
             }
             void do_shadow(object target) { shadow(target, 1); }
@@ -114,7 +107,7 @@ BEISPIEL
             zweite Aufruf hingegen ergeht an b selbst, das der Treiber als
             vom Shadow c ueberlagert erkennt.
 
-AENDERUNGEN
+GESCHICHTE
         Bis 3.2.1@46 fuehrte die Zerstoerung eines Objekts, dem ein Shadow
             uebergeworfen war, auch zur Zerstoerung aller seiner Shadows.
         Seit 3.2.1@47 ueberleben Shadows die Zerstoerung des Objektes, dem

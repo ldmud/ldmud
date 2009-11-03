@@ -1,5 +1,5 @@
 SYNOPSIS
-        int set_next_reset (int delay)
+        int set_next_reset(int delay)
 
 DESCRIPTION
         Instruct the gamedriver to reset this object not earlier than
@@ -13,7 +13,7 @@ DESCRIPTION
         Note that the actual time the reset occurs depends on when
         the object will be used after the given time delay.
 
-EXAMPLE
+EXAMPLES
         set_next_reset(15*60); // Next reset in 15 Minutes or later
         set_next_reset(0)      --> just returns the time until the
                                    next reset.

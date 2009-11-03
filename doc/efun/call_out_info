@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed *call_out_info(void)
+        mixed * call_out_info(void)
 
 DESCRIPTION
         Get information about all pending call outs. The result is an

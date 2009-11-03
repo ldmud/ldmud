@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Nov-2009 (Zesstra)
+  - Applied a bunch of small fixes for manpages by Coogan. (#700)
+
 05-Oct-2009 (Zesstra)
   - Because we set the old CA list again with SSL_CTX_set_client_CA_list(),
     and this function implicitly free's the old list, the memory of the list

@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed deep_copy(mixed arg);
+        mixed deep_copy(mixed arg)
 
 BESCHREIBUNG
         Erzeugt eine echte Kopie von <arg> und liefert diese zurueck. Fuer
@@ -14,7 +14,7 @@ BESCHREIBUNG
         Mapping oder Array zu den Evaluationskosten sowohl in der Groesse als
         auch in der Einbettungstiefe.
 
-BEISPIEL
+BEISPIELE
         mixed *a, *b;
         a = ({ 1, ({ 21, 22 }) });
         b = deep_copy(a);
@@ -22,6 +22,6 @@ BEISPIEL
          --> a ist jetzt   ({ -1, ({ -21, 22 }) })
              b bleibt      ({  1, ({  21, 22 }) })
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.6.
         LDMud 3.2.9 fuegte die dynamischen Kosten zur Efun hinzu.

@@ -1,8 +1,8 @@
 OPTIONAL
 SYNOPSIS
-        int   assoc (mixed key, mixed *keys)
-        mixed assoc (mixed key, mixed *alist [, mixed fail] )
-        mixed assoc (mixed key, mixed *keys, mixed *data [, mixed fail] )
+        int   assoc(mixed key, mixed *keys)
+        mixed assoc(mixed key, mixed *alist [, mixed fail])
+        mixed assoc(mixed key, mixed *keys, mixed *data [, mixed fail])
 
 DESCRIPTION
         All invocation forms search for a <key> in an <alist> (an array
@@ -10,7 +10,7 @@ DESCRIPTION
         An attempt to search in any other structure will yield an
         unpredictable result.
 
-        Complexity: O( lg(n) ) , where n is the number of keys.
+        Complexity: O(lg(n)) , where n is the number of keys.
 
 
         1. Form: Key Search

@@ -1,5 +1,6 @@
 SYNOPSIS
-        int enable_telnet (int num, object obj = this_interactive() )
+        int enable_telnet(int num)
+        int enable_telnet(int num, object obj)
 
 DESCRIPTION
         Enable or disable the telnet machine for the interactive object <obj>.

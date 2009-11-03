@@ -1,6 +1,6 @@
 VERALTET
 SYNOPSIS
-        void add_verb(string str);
+        void add_verb(string str)
 
 BESCHREIBUNG
         Diese Funktion haengt mit add_action() zusammen. add_verb setzt ein

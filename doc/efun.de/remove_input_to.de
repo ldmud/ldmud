@@ -1,9 +1,9 @@
 SYNOPSIS
-        int remove_input_to (object player);
-        int remove_input_to (object player, string fun);
-        int remove_input_to (object player, closure fun);
-        int remove_input_to (object player, object fun);
-        int remove_input_to (object player, object obj, string fun);
+        int remove_input_to(object player)
+        int remove_input_to(object player, string fun)
+        int remove_input_to(object player, closure fun)
+        int remove_input_to(object player, object fun)
+        int remove_input_to(object player, object obj, string fun)
 
 BESCHREIBUNG
         Entfernt ein haengiges input_to() aus dem interaktiven Playerobjekt.
@@ -28,10 +28,10 @@ BESCHREIBUNG
 BEISPIELE
         Entfernt alle haengigen input_to()s des aktuellen Spielers, falls
         vorhanden:
-            while(remove_input_to(this_interactive()));
+            while (remove_input_to(this_interactive()));
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.9.
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.9 / 3.3.119.
 
 SIEHE AUCH
         input_to(E), find_input_to(E), input_to_info(E),

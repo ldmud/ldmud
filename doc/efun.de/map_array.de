@@ -1,7 +1,7 @@
 VERALTET
 SYNOPSIS
-        mixed *map_array(mixed *arr, string fun, string|object ob, mixed extra);
-        mixed *map_array(mixed *arr, closure cl, mixed extra);
+        mixed * map_array(mixed *arr, string fun, string|object ob, mixed extra)
+        mixed * map_array(mixed *arr, closure cl, mixed extra)
 
 BESCHREIBUNG
         Liefert ein Array, das die Eintraege von <arr> enthaelt, die mit
@@ -21,14 +21,12 @@ BESCHREIBUNG
         Das <extra> Argument ist optional und darf keine geschuetzten
         Referenzen wie &(i[0]) enthalten.
 
-BEISPIEL
-        string ask_for_uid(object obj)
-        {
+BEISPIELE
+        string ask_for_uid(object obj) {
            return getuid(obj);
         }
 
-        void func()
-        {
+        void func() {
            string *names;
            names = map_array(users(), "ask_for_uid", this_object());
            /* gleichwertig, aber etwas kleiner und schneller dies: */
@@ -39,7 +37,7 @@ BEISPIEL
         Dies erzeugt ein Array, das alle UIDs der momentan vorhandenen
         Benutzer enthaelt.
 
-AENDERUNGEN
+GESCHICHTE
         Seit LDMud 3.2.6 abgeloest durch map().
         Seit LDMud 3.2.9 nur noch verfuegbar, wenn der Treiber mit
             USE_DEPRECATED kompiliert wurde.

@@ -1,7 +1,7 @@
 GESCHUETZT
 SYNOPSIS
-        int attach_erq_demon(object ob, int do_close);
-        int attach_erq_demon(string obname, int do_close);
+        int attach_erq_demon(object ob, int do_close)
+        int attach_erq_demon(string obname, int do_close)
 
 BESCHREIBUNG
         Diese geschuetzte Funktion setzt oder aendert die die Verbindung des
@@ -25,12 +25,12 @@ BESCHREIBUNG
 
         Die Efun liefert 1 bei Erfolg, 0 sonst.
 
-BEISPIEL
-        Um den (Standard-) Erq neu zu starten, muss in
+BEISPIELE
+        Um den (Standard-)Erq neu zu starten, muss in
         master.c::stale_erq(closure c) geschrieben werden:
         attach_erq_demon("", 0);
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2.1@61.
 
 SIEHE AUCH

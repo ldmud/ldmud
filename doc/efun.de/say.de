@@ -1,12 +1,12 @@
 VERALTET
 SYNOPSIS
-        void say(string str);
-        void say(string str, object exclude);
-        void say(string str, object *excludes);
+        void say(string str)
+        void say(string str, object exclude)
+        void say(string str, object *excludes)
 
-        void say(mixed *arr);
-        void say(mixed *arr, object exclude);
-        void say(mixed *arr, object *excludes);
+        void say(mixed *arr)
+        void say(mixed *arr, object exclude)
+        void say(mixed *arr, object *excludes)
 
 BESCHREIBUNG
         Es bestehen zwei Hauptanwendungen fuer say():
@@ -53,14 +53,12 @@ BEISPIELE
         write() an den aktuellen Benutzer geht.
 
         Objekt 1 (living):
-            void catch_tell(string str)
-            {
+            void catch_tell(string str) {
                 write("Empfangen: "+str+"\n");
             }
 
         Objekt 2 (nicht living):
-            void func()
-            {
+            void func() {
                 ...
                 say("HiHo!\n");
                 ...
@@ -72,23 +70,21 @@ BEISPIELE
         catch_msg() auf den aktuellen Benutzer zeigt.
 
         Object 1 (living):
-            void catch_msg(mixed *arr, object who)
-            {
+            void catch_msg(mixed *arr, object who) {
                 int i;
-                if(!arr) return;
-                for(i=0;i<sizeof(arr);i++)
+                if (!arr) return;
+                for (i=0;i<sizeof(arr);i++)
                     tell_object(who, (stringp(arr[i]) ? arr[i] : "-/-")+"\n");
             }
 
         Object 2 (nicht living):
-            void func()
-            {
+            void func() {
                 ...
                 say( ({ "Hello", "there!" }) );
                 ...
             }
 
-ANMERKUNG
+ANMERKUNGEN
         Wenn die Lfun catch_msg() den Array <arr> veraendert, erhalten alle
         nachfolgenden Objekte das veraenderte <arr>.
 

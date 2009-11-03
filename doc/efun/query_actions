@@ -1,7 +1,8 @@
 SYNOPSIS
-        #include <sys/commands.h>
+        #include <commands.h>
+        #include <sent.h>
 
-        mixed *query_actions(object ob, mixed mask_or_verb)
+        mixed * query_actions(object ob, mixed mask_or_verb)
 
 DESCRIPTION
         query_actions takes either an object or a filename as first
@@ -18,7 +19,7 @@ DESCRIPTION
             QA_OBJECT     ( 8):  object
             QA_FUNCTION   (16): function
 
-        "type" is one of the values defined in <sent.h> (/sys/sent.h)
+        "type" is one of the values defined in <sent.h> 
         (which is provided with the parser source).
 
         SENT_PLAIN        added with add_action (fun, cmd);

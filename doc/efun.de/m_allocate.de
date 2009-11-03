@@ -1,5 +1,6 @@
 SYNOPSIS
-        mapping m_allocate(int size, int width);
+        mapping m_allocate(int size)
+        mapping m_allocate(int size, int width)
 
 BESCHREIBUNG
         Die Funktion reserviert Speicher fuer ein Mapping. <size> ist die
@@ -29,7 +30,7 @@ BEISPIELE
            fuer 3 Eintraege.
        ([:2*3]) -> entspricht m_allocate(0,6).
 
-AENDERUNGEN
+GESCHICHTE
         Umbenannt von allocate_mapping() in LDMud 3.2.6.
         Die ([:<width>]) Notation wurde in 3.2.9 eingefuehrt.
 

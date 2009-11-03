@@ -30,7 +30,7 @@ DESCRIPTION
         conjunction with self-defined verbs (like "open chest 3") you
         can do it like that:
 
-        init () { add_action ("open_chest", "open"); }
+        init () { add_action("open_chest", "open"); }
 
         open_chest (str) {
           if (present (str) != this_object ())

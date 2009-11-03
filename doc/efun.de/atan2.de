@@ -1,5 +1,5 @@
 SYNOPSIS
-        float atan2 (int|float y, int|float x)
+        float atan2(int|float y, int|float x)
 
 BESCHREIBUNG
         Liefert den Winkel der Polarkoordinaten des Punktes (x, y) im
@@ -9,7 +9,7 @@ BESCHREIBUNG
         Parameter-Liste, die die Abfolge in der Steigungs-Winkel-Umrechnung
         atan(y / x) widerspiegelt.
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.9: Ganzzahlen (Integers) als Argumente hinzugefuegt.
 
 SIEHE AUCH

@@ -15,8 +15,8 @@ EXAMPLES
         function of strings:
         implode(explode("a short text", " "), "_")      "a_short_text"
 
-        But nowadays You can also use
-        regreplace("a short text", " ", "_", 1)
+        But nowadays you can also use
+            regreplace("a short text", " ", "_", 1)
         instead.
 
 SEE ALSO

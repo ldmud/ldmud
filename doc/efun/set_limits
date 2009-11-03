@@ -1,9 +1,9 @@
 PRELIMINARY
 SYNOPSIS
-        #include <sys/rtlimits.h>
+        #include <rtlimits.h>
 
         void set_limits(int tag, int value, ...)
-        void set_limits(int * limits)
+        void set_limits(int *limits)
 
 DESCRIPTION
         Set the default runtime limits from the given arguments. The new
@@ -20,14 +20,15 @@ DESCRIPTION
         The efun causes a privilege violation ("set_limits", current_object,
         first
 
+
 EXAMPLES
-        set_limits( ({ 200000 }) )
-        set_limits( LIMIT_EVAL, 200000 )
+        set_limits(({ 200000 }))
+        set_limits(LIMIT_EVAL, 200000)
           --> set new default eval_cost limit to 200000
 
-        set_limits( ({ LIMIT_UNLIMITED, LIMIT_KEEP, 5000 }) )
-        set_limits( LIMIT_EVAL, LIMIT_UNLIMITED, LIMIT_ARRAY, LIMIT_KEEP,
-                    LIMIT_MAPPING, 5000 )
+        set_limits(({ LIMIT_UNLIMITED, LIMIT_KEEP, 5000 }))
+        set_limits(LIMIT_EVAL, LIMIT_UNLIMITED, LIMIT_ARRAY, LIMIT_KEEP,
+                    LIMIT_MAPPING, 5000)
           --> set new eval_cost limit to unlimited, keep the current
               array size limit, and limit mapping sizes to 5000.
 

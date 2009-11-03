@@ -1,7 +1,10 @@
 PRELIMINARY
 SYNOPSIS
-        object present_clone (string str [, object env] )
-        object present_clone (object obj [, object env] )
+        object present_clone(string str)
+        object present_clone(string str, object env)
+  
+        object present_clone(object obj)
+        object present_clone(object obj, object env)
 
 DESCRIPTION
         This efun searches the inventory of object <env> (default is the
@@ -12,7 +15,7 @@ DESCRIPTION
         blueprint as of object <obj>. The matching criteria in both cases is
         the load_name().
 
-        For plain driver this name starts with a '/', for compat-mode
+        For plain driver this name starts with a '/', for COMPAT mode
         drivers it doesn't.
 
         Note that in contrast to present(), this efun never searches
@@ -32,7 +35,7 @@ EXAMPLES
         names.
 
 HISTORY
-        Introduced in 3.2.7
+        Introduced in 3.2.7.
 
 SEE ALSO
         load_name(E), present(E)

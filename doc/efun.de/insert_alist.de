@@ -1,7 +1,7 @@
 OPTIONAL, VERALTET
 SYNOPSIS
-        mixed *insert_alist(mixed key, mixed data, ... , mixed *alist);
-        int    insert_alist(mixed key, mixed *keys);
+        mixed * insert_alist(mixed key, mixed data, ... , mixed *alist)
+        int     insert_alist(mixed key, mixed *keys)
 
 BESCHREIBUNG
      1. Form: Einfuegen in eine Alist.
@@ -17,7 +17,7 @@ BESCHREIBUNG
         ist der Index, unter dem <key> eingefuegt oder bereits gefunden
         wurde.
 
-ANMERKUNG
+ANMERKUNGEN
         Wird mit String-Keys gearbeitet, kann der Index nach dem naechsten
         Aufruf von insert_alist() nicht mehr gueltig sein.
 

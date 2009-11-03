@@ -1,8 +1,7 @@
 SYNOPSIS
 
         string copy_bits(string src, string dest
-                         [, int srcstart [, int deststart [, int copylen ]]]
-                        )
+                         [, int srcstart [, int deststart [, int copylen ]]])
 
 DESCRIPTION
         Copy the bitrange [<srcstart>..<srcstart>+<copylen>[ from

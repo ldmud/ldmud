@@ -1,5 +1,5 @@
 SYNOPSIS
-        string make_shared_string (string str)
+        string make_shared_string(string str)
 
 DESCRIPTION
         Puts <str> in _the_ list of shared strings of the game.
@@ -13,4 +13,4 @@ BUGS
         efun unnecessary.
 
 HISTORY
-        Introduced in LDMud 3.2.6; following a suggestion from TubMud.
+        Introduced in LDMud 3.2.6; following a suggestion from Tubmud.

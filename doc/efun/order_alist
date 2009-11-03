@@ -1,5 +1,6 @@
+OPTIONAL
 SYNOPSIS
-        mixed *order_alist(mixed *keys, mixed *|void data, ...)
+        mixed * order_alist(mixed *keys, mixed *|void data, ...)
 
 DESCRIPTION
         Creates an alist.

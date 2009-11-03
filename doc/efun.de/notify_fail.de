@@ -19,7 +19,7 @@ BESCHREIBUNG
         command()), und ein notify_fail() in einem Unterkommando
         hat keinen Einfluss auf das uebergeordnete Kommando.
 
-BEISPIEL
+BEISPIELE
         Verwendet man
 
                 return notify_fail(message);

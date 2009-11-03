@@ -1,8 +1,8 @@
 SYNOPSIS
-        int to_int(string arg);
-        int to_int(float arg);
-        int to_int(int arg);
-        int to_int(closure arg);
+        int to_int(string  arg)
+        int to_int(float   arg)
+        int to_int(int     arg)
+        int to_int(closure arg)
 
         (int)<value>
 
@@ -19,13 +19,13 @@ BESCHREIBUNG
 
         Diese Funktion unterstuetzt die Basisprefixe '0x', '0o' und '0b'.
 
-BUGS
+FEHLER
         Die Cast-Schreibweise funktioniert nur, wenn der genaue Wert von
         <value> zum Zeitpunkt der Kompilierung bekannt ist. Dies wird
         nicht geaendert werden, da die Funktionsform verwendet werden kann.
 
-AENDERUNGEN
-        Eingefuehrt in 3.2.1@2
+GESCHICHTE
+        Eingefuehrt in 3.2.1@2.
         LDMud 3.2.11 fuehrte die Basisprefixe ein.
 
 SIEHE AUCH

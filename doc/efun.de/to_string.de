@@ -1,5 +1,5 @@
 SYNOPSIS
-        string to_string(mixed arg);
+        string to_string(mixed arg)
 
 BESCHREIBUNG
         <arg> wird in einen String umgewandelt. Das klappt mit Werten vom Typ
@@ -8,7 +8,7 @@ BESCHREIBUNG
         Closures werden in einen passenden Namen umgewandelt (vorwiegend fuer
         Debugging-Zwecke geeignet).
 
-ANMERKUNG
+ANMERKUNGEN
         Arrays werden als "explodete" Strings betrachtet, also Arrays von
         Zeichencodes. Sie werden bis zur ersten 0 oder bis zum ersten
         nicht-numerischen Eintrag "implodet", je nachdem, was zuerst eintritt.
@@ -16,12 +16,12 @@ ANMERKUNG
         Das bedeutet, dass to_string( ({ 49, 50 }) ); "12" liefert, und nicht
         "({ 49, 50 })"
 
-BUGS
+FEHLER
         Die Cast-Schreibweise funktioniert nur, wenn der genaue Wert von
         <value> zum Zeitpunkt der Kompilierung bekannt ist. Dies wird nicht
         geaendert werden, da die Funktionsform verwendet werden kann.
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.8 laesst Lambdaclosures als gueltige Datentypen zu.
 
 SIEHE AUCH

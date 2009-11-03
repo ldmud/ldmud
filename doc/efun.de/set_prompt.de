@@ -1,5 +1,5 @@
 SYNOPSIS
-        string set_prompt(mixed prompt, object obj);
+        string set_prompt(mixed prompt, object obj)
 
 BESCHREIBUNG
         Setzt den Prompt entsprechend dem Argument <prompt> fuer das

@@ -1,6 +1,6 @@
 OPTIONAL
 SYNOPSIS
-        int set_is_wizard(object obj, int n);
+        int set_is_wizard(object obj, int n)
 
 BESCHREIBUNG
         Setzt das Wizard-Flag des Objekts. Wenn n = 0, wird das Flag
@@ -12,5 +12,5 @@ BESCHREIBUNG
         dumpallobj etc. beeinflusst, die standardmaessig fuer alle Benutzer
         freigegeben sind.
 
-AENDERUNGEN
+GESCHICHTE
         Seit 3.2.7 ist diese Efun optional.

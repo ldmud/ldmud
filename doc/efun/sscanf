@@ -2,7 +2,6 @@ SYNOPSIS
         int sscanf(string str, string fmt, mixed var1, mixed var2, ...)
 
 DESCRIPTION
-
         Parse a string str using the format fmt. fmt can contain
         strings seperated by %d and %s. Every %d and %s corresponds to
         one of var1, var2, ... .
@@ -52,7 +51,7 @@ DESCRIPTION
         The function sscanf is special, in that arguments are passed
         by reference automatically.
 
-EXAMPLE
+EXAMPLES
         string who, what;
         if (sscanf("throw frisbee to rover",
            "throw %s to %s", what, who) != 2)

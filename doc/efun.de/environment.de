@@ -1,7 +1,7 @@
 SYNOPSIS
-        object environment();
-        object environment(object obj);
-        object environment(string obj);
+        object environment()
+        object environment(object obj)
+        object environment(string obj)
 
 BESCHREIBUNG
         Gibt das umgebende Objekt von <obj> wider. Das Objekt <obj> kann
@@ -11,7 +11,7 @@ BESCHREIBUNG
 
         Zerstoerte Objekte haben kein Environment.
 
-BEISPIEL
+BEISPIELE
         object room;
         room = environment(this_player());
 

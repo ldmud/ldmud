@@ -1,6 +1,6 @@
 SYNOPSIS
-        void set_max_commands (int num)
-        void set_max_commands (int num, object obj)
+        void set_max_commands(int num)
+        void set_max_commands(int num, object obj)
 
 DESCRIPTION
         Set the max number of commands the interactive <obj> is
@@ -17,15 +17,12 @@ DESCRIPTION
         which causes a LPC call - actions and calls to input_to()
         alike.
 
-HISTORY
-        Introduced in LDMud 3.2.10.
 
-EXAMPLE
+EXAMPLES
         To establish a mud-wide default for the maximum command rate,
         write master::connect() like this:
 
-        object connect ()
-        {
+        object connect() {
             object obj;
 
             ...
@@ -37,6 +34,8 @@ EXAMPLE
         modified max_commands will be rebound from the master object
         to the returned object.
 
+HISTORY
+        Introduced in LDMud 3.2.10.
 
 SEE ALSO
         set_max_commands(E), privilege_violation(M)

@@ -1,7 +1,7 @@
 VERALTET
 SYNOPSIS
-        string file_name();
-        string file_name(object ob);
+        string file_name()
+        string file_name(object ob)
 
 BESCHREIBUNG
         Liefert den Namen des Objekts <ob> oder, wenn <ob> nicht angegeben
@@ -22,13 +22,13 @@ BESCHREIBUNG
         Der Name, den die Funktion liefert, beginnt immer mit '/', ausser der
         Treiber laeuft im COMPAT-Modus.
 
-BEISPIEL
+BEISPIELE
         find_object(file_name(ob)) == ob;
 
         Diese Beziehung gilt fuer alle Objekte ob, die nicht zerstoert wurden.
 
-AENDERUNGEN
-        Die Funktion wurde in LDMud 3.2.6 umbenannt zu object_name(). Der
+GESCHICHTE
+        Die Funktion wurde in LDMud 3.2.6 zu object_name() umbenannt. Der
             alte Name file_name() kann als Alias verwendet werden.
         Seit LDMud 3.2.9 ist die Funktion nur noch verfuegbar, wenn der Driver
             mit USE_DEPRECATED kompiliert wurde.

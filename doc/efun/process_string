@@ -19,7 +19,7 @@ DESCRIPTION
 
         Note that both filename and args are optional.
 
-EXAMPLE
+EXAMPLES
         string foo(string str) {
            return "ab"+str+"ef";
         }

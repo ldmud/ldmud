@@ -1,10 +1,11 @@
 SYNOPSIS
+        mapping m_allocate(int size)
         mapping m_allocate(int size, int width)
 
 DESCRIPTION
         Reserve memory for a mapping.
 
-        size is the number of entries (i.e. keys) to reserve, width is
+        <size> is the number of entries (i.e. keys) to reserve, <width> is
         the number of data items per entry. If the optional width is
         omitted, 1 is used as default.
 
@@ -27,7 +28,7 @@ DESCRIPTION
 
 EXAMPLES
         m_allocate(3, 7) -> mapping with 7 values per key, and with space
-           for 3 entries.
+        for 3 entries.
 
         ([:2*3 ]) -> same as m_allocate(0, 6)
 

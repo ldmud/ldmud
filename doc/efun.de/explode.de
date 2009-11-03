@@ -1,5 +1,5 @@
 SYNOPSIS
-        string *explode(string str, string del)
+        string * explode(string str, string del)
 
 BESCHREIBUNG
         Liefert ein Feld (Array) mit Zeichenketten (Strings), indem alle
@@ -17,7 +17,7 @@ BEISPIELE
         explode("abc", "xyz")       ({ "abc" })
         explode("abc", "")          ({ "a", "b", "c" })
 
-AENDERUNGEN
+GESCHICHTE
         Zeitpunkt der Aenderung unbekannt.
         explode(" ab cd ef ", " ") lieferte frueher ({ "ab", "cd", "ef" })
         anstatt ({ "", "ab", "cd", "ef", "" }), d. h., leere Zeichenketten

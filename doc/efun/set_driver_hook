@@ -1,11 +1,13 @@
 SYNOPSIS
+        #include <driver_hook.h>
+
         void set_driver_hook(int what, closure arg)
         void set_driver_hook(int what, string arg)
-        void set_driver_hook(int what, string * arg)
+        void set_driver_hook(int what, string *arg)
 
 DESCRIPTION
         This privileged efun sets the driver hook 'what' (values are
-        defined in /sys/driver_hook.h) to 'arg'.
+        defined in <driver_hook.h>) to 'arg'.
         The exact meanings and types of 'arg' depend of the hook set.
         To remove a hook, set 'arg' to 0.
 
@@ -80,7 +82,7 @@ DESCRIPTION
 
 HISTORY
         Introduced in 3.2.1@1 as efun309(), renamed to
-        set_driver_hook() in 3.2.1@13
+        set_driver_hook() in 3.2.1@13.
 
 SEE ALSO
         hooks(C)

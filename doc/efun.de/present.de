@@ -1,5 +1,5 @@
 SYNOPSIS
-        object present(mixed str);
+        object present(mixed str)
         object present(mixed str, int n)
         object present(mixed str, object ob)
         object present(mixed str, int n, object ob)
@@ -41,7 +41,7 @@ BESCHREIBUNG
             }
         }
 
-ANMERKUNG
+ANMERKUNGEN
         Wenn das n-te Objekt <str> in this_object() UND in der Umgebung von
         this_object() gefunden wird, so liefert present() das n-te Objekt aus
         der Umgebung, nicht beide.
@@ -56,7 +56,7 @@ BEISPIELE
         present("chest 2", 1);
           --> findet das erste 'chest 2' Objekt
 
-HISTORY
+GESCHICHTE
         LDMud 3.2.11 fuehrte die (str, n)-Form ein.
 
 SIEHE AUCH

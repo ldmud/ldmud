@@ -9,7 +9,7 @@ DESCRIPTION
         up to but not including the first space or lineend). If <flag> is
         non-0, the verb as specified in the add_action() statement is returned.
 
-EXAMPLE
+EXAMPLES
         void init() {
            ...
            add_action("sing","sing");

@@ -1,8 +1,8 @@
 SYNOPSIS
-        void walk_mapping(mapping map, string fun, mixed extra, ...);
+        void walk_mapping(mapping map, string fun, mixed extra, ...)
         void walk_mapping(mapping map, string fun, string|object obj,
-            mixed extra, ...);
-        void walk_mapping(mapping map, closures cl, mixed extra, ...);
+                                                      mixed extra, ...)
+        void walk_mapping(mapping map, closures cl, mixed extra, ...)
 
 BESCHREIBUNG
         Ruft obj->fun(key, value1, ... valuen, extra, ...) fuer jeden Key
@@ -18,7 +18,7 @@ BESCHREIBUNG
         Wird <obj> weggelassen oder enthaelt es weder einen String noch ein
         Objekt, wird standardmaessig this_object() verwendet.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2@61.
 
 SIEHE AUCH

@@ -1,12 +1,14 @@
 SYNOPSIS
-        int typeof(mixed arg);
+        #include <lpctypes.h>
+
+        int typeof(mixed arg)
 
 BESCHREIBUNG
         Gibt einen Code fuer den Typ des Arguments <arg>. Die Typen sind
-        definiert in <sys/lpctypes.h>
+        definiert in <lpctypes.h>.
 
-AENDERUNGEN
-        Eingefuehrt in 3.2@63
+GESCHICHTE
+        Eingefuehrt in 3.2@63.
 
 SIEHE AUCH
         get_type_info(E), intp(E), objectp(E), floatp(E), pointerp(E),

@@ -1,5 +1,5 @@
 SYNOPSIS
-        int test_bit(string str, int n);
+        int test_bit(string str, int n)
 
 BESCHREIBUNG
         Gibt 0 oder 1 des <n>-ten Bits im String <str> zurueck.

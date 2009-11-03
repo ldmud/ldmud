@@ -1,7 +1,7 @@
 SYNOPSIS
-        #include <sys/wizlist.h>
+        #include <wizlist.h>
 
-        mixed *wizlist_info()
+        mixed * wizlist_info()
 
 DESCRIPTION
         Returns an array with the interesting entries of the wizlist.

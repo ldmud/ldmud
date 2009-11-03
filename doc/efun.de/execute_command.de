@@ -1,6 +1,6 @@
 VORLAEUFIG, GESCHUETZT
 SYNOPSIS
-        int execute_command(string command, object origin, object player);
+        int execute_command(string command, object origin, object player)
 
 BESCHREIBUNG
         Diese Funktion bietet Low-Level Zugriff auf den Kommandoparser:
@@ -14,8 +14,8 @@ BESCHREIBUNG
         H_NOTIFY_FAIL Hook. Zwar kann notify_fail() verwendet werden, die
         Verarbeitung muss jedoch durch das aufrufende Objekt erfolgen.
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.7
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.7.
 
 SIEHE AUCH
         hooks(C), command(E), notify_fail(E), command_stack(E)

@@ -1,6 +1,6 @@
 VERALTET
 SYNOPSIS
-        int mapping_contains(mixed &data1, ... &dataN, map, key);
+        int mapping_contains(mixed &data1, ... &dataN, map, key)
 
 BESCHREIBUNG
         Wenn das Mapping <map> den Key <key> enthaelt, werden die
@@ -13,7 +13,7 @@ BESCHREIBUNG
         moeglich, diese Funktion auf ein 0-Wert Mapping anzuwenden. In
         diesem Fall hat sie die gleiche Auswirkung wie member().
 
-AENDERUNGEN
+GESCHICHTE
         Umbenannt zu m_contains() in LDMud 3.2.6.
         Seit LDMud 3.2.9 ist mapping_contains() nur noch verfuegbar, wenn
             der Treiber mit USE_DEPRECATED kompiliert wurde.

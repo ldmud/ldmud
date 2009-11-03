@@ -8,7 +8,7 @@ DESCRIPTION
         Calling throw() without previous catch() does not make sense
         and will result in an ``throw without catch'' error.
 
-EXAMPLE
+EXAMPLES
         catch(throw("aborting execution"));
         This will just print the string "aborting execution".
 

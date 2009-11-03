@@ -1,6 +1,6 @@
 OPTIONAL
 SYNOPSIS
-        int *db_handles()
+        int * db_handles()
 
 DESCRIPTION
         Returns an array with all open handles to the SQL-server.

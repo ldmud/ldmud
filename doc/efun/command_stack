@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/commands.h>
+        #include <commands.h>
 
         mixed * command_stack(void)
 

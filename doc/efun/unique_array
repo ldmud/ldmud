@@ -18,7 +18,7 @@ DESCRIPTION
               ....
            ({ SameM:1, SameM:2, ... SameM:N }) })
 
-EXAMPLE
+EXAMPLES
         mixed *arr;
         arr=unique_array(users(), "_query_level", -1);
 

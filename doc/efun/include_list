@@ -1,9 +1,9 @@
 SYNOPSIS
-        #include <sys/include_list.h>
+        #include <include_list.h>
 
-        string *include_list ()
-        string *include_list (object ob)
-        string *include_list (object ob, int flags)
+        string * include_list()
+        string * include_list(object ob)
+        string * include_list(object ob, int flags)
 
 
 DESCRIPTION

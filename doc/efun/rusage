@@ -1,6 +1,6 @@
 OPTIONAL
 SYNOPSIS
-        int *rusage(void)
+        int * rusage(void)
 
 DESCRIPTION
         Return an array with current system resource usage statistics,
@@ -14,4 +14,4 @@ DESCRIPTION
         This function is optional.
 
 SEE ALSO
-        sys/resource.h(Unix)
+        <sys/resource.h>(Unix)

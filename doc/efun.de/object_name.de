@@ -1,6 +1,6 @@
 SYNOPSIS
-        string object_name();
-        string object_name(object ob);
+        string object_name()
+        string object_name(object ob)
 
 BESCHREIBUNG
         Liefert den Namen des Objekts <ob> oder des aktuellen Objekts, wenn
@@ -20,14 +20,14 @@ BESCHREIBUNG
         object_name() beruecksichtigt alle diese Aenderungen.
 
         Der zurueck gegebene Name beginnt immer mit '/' (absoluter Pfad),
-        ausser wenn der Driver im Compat Modus laeuft.
+        ausser wenn der Driver im COMPAT-Modus laeuft.
 
-BEISPIEL
+BEISPIELE
         find_object(object_name(ob)) == ob
 
         Dies ist immer wahr fuer alle Objekte <ob>, die nicht zerstoert sind.
 
-AENDERUNGEN
+GESCHICHTE
         0 als Argument wird seit 3.2.9 akzeptiert.
 
 SIEHE AUCH

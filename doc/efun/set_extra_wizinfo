@@ -1,7 +1,7 @@
 SYNOPSIS
-        void set_extra_wizinfo (object wiz, mixed extra)
-        void set_extra_wizinfo (string wiz, mixed extra)
-        void set_extra_wizinfo (int    wiz, mixed extra)
+        void set_extra_wizinfo(object wiz, mixed extra)
+        void set_extra_wizinfo(string wiz, mixed extra)
+        void set_extra_wizinfo(int    wiz, mixed extra)
 
 DESCRIPTION
         Set the value <extra> as the 'extra' information for the wizlist

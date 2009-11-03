@@ -18,12 +18,12 @@ BESCHREIBUNG
                ({same2:1, same2:2, ... same2:n}),
                ({samem:1, samem:2, ... samem:n}) })
 
-BEISPIEL
+BEISPIELE
         Um ein Array von Arrays zu erhalten, das alle Benutzer, nach Level
         gruppiert, enthaelt:
 
             mixed *arr;
-            arr=unique_array(users(), "_query_level", -1);
+            arr = unique_array(users(), "_query_level", -1);
 
         Goetter haben einen Level von -1. Sie werden nicht in arr aufgenommen,
         weil <skip> == -1.

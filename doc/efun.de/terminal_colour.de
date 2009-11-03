@@ -1,7 +1,7 @@
 SYNOPSIS
         varargs string terminal_colour(string str,
                                        null | mapping | closure map,
-                                       int wrap, int indent);
+                                       int wrap, int indent)
 BESCHREIBUNG
         Ist <map> ein Wert ungleich 0, ersetzt diese Efun alle Farb-
         Definitionen der Form "%^KEY%^" (siehe unten fuer Details) im
@@ -63,8 +63,7 @@ BESCHREIBUNG
         und versucht dann jeden Teilstring als Farbschluessel zu behandeln.
         Dieses Verhalten laesst sich auch unter LPC erreichen:
 
-          string mudos_terminal_colour(string str, mapping ext, int w, int i)
-          {
+          string mudos_terminal_colour(string str, mapping ext, int w, int i) {
             return terminal_colour("%^"+implode(explode(str, "%^")-({""})
                                                ,"%^%^")
                                   , ext, w, i);
@@ -113,7 +112,7 @@ BEISPIELE
 
             "dies ist die erste Zeile\n   und dies ist die zweite Zeile"
 
-AENDERUNGEN
+GESCHICHTE
         Die Idee fuer diese Efun und die erste Implementierung stammen
         aus MudOS; die Strategie fuer das Erkennen von Schluesseln
         (eingeschlossen die pure Zeilenumbruch Funktion) wurde in

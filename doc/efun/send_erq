@@ -1,4 +1,6 @@
 SYNOPSIS
+        #include <erq.h>
+
         int send_erq(int request, string|int * data, closure callback)
 
 DESCRIPTION
@@ -11,7 +13,7 @@ DESCRIPTION
 
         The data given to send_erq() may be either a string, or an
         array of integers, which are then interpreted as characters.
-        The various requests are defined in /sys/erq.h.
+        The various requests are defined in <erq.h>.
 
         The result returned is 0 on failure to send the data, or
         non-zero on a successful send.
@@ -20,7 +22,7 @@ DESCRIPTION
 
 HISTORY
         Introduced in 3.2.1@61.
-        Made a privileged function in 3.2.1@84
+        Made a privileged function in 3.2.1@84.
 
 SEE ALSO
         attach_erq_demon(E), erq(C)

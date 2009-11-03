@@ -1,9 +1,9 @@
 SYNOPSIS
-        string query_load_average();
+        string query_load_average()
 
 BESCHREIBUNG
         Liefert die Auslastung des Muds. Es werden zwei Zahlen angegeben:
-        ausgefuehrte Kommandi pro Sekunde und kompilierte Zeilen pro Sekunde.
+        ausgefuehrte Kommandos pro Sekunde und kompilierte Zeilen pro Sekunde.
 
 SIEHE AUCH
         rusage(E)

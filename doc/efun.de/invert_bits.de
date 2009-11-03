@@ -1,12 +1,12 @@
 SYNOPSIS
-        string invert_bits(string str);
+        string invert_bits(string str)
 
 BESCHREIBUNG
         Invertiert den Status aller Bits im Bitstring <str> und liefert den
         neuen String zurueck. Dabei bleibt die Laenge von <str>, also die
         gesamte Anzahl Bits, die gleiche.
 
-BEISPIEL
+BEISPIELE
         string s;
         s = set_bit("", 3); s = set_bit(s, 4); s = set_bit(s, 15);
         --> s ist nun  "8 ("

@@ -1,5 +1,7 @@
 SYNOPSIS
-        string *regexp(string *list, string pattern)
+        #include <regexp.h>
+
+        string * regexp(string *list, string pattern)
 
 DESCRIPTION
         Match the pattern pattern against all strings in list, and
@@ -40,12 +42,13 @@ DESCRIPTION
         If there is an error in the regular expression, a runtime
         error will be raised.
 
-EXAMPLE
+EXAMPLES
         string strs;
-        if (strs = regexp( ({"please, help me Sir John."}),
-                                 "\\<help\\>.*\\<me\\>"))
-           if (sizeof(strs)
-              write("It matches.\n");
+        if (strs = regexp(({"please, help me Sir John."}),
+                                 "\\<help\\>.*\\<me\\>")) {
+            if (sizeof(strs)
+                write("It matches.\n");
+        }
 
         The regular expression will test the given string (which is
         packed into an array) if there is something like "help ... me"

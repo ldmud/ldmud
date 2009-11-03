@@ -1,11 +1,11 @@
 SYNOPSIS
-        mapping mkmapping(mixed *arr1, mixed *arr2, mixed *arr3, ...);
+        mapping mkmapping(mixed *arr1, mixed *arr2, mixed *arr3, ...)
 
 BESCHREIBUNG
         Liefert ein Mapping mit Keys aus <arr1> und Datenelementen aus
         <arr2>, <arr3>.... Dem Key <arr1[0]> werden die Datenelemente
         <arr2[0]>, <arr3[0]>... zugeordnet. Wenn die Datenarrays
-        ungleich gross sind, enthaelt das Mapping nur so viele Eintraege,
+        ungleich gross sind, enthaelt das Mapping nur so viele Eintraege
         wie im kleinsten Datenarray enthalten sind.
 
         Gewoehnlich werden Mappings erweitert, indem einfach neue Elemente
@@ -13,12 +13,12 @@ BESCHREIBUNG
         ungefaehr benoetigte Speicherplatz bereits vorher bekannt ist,
         um so den Overhead bei der Speicherallokation zu minimieren.
         Allenfalls zu viel allozierter Speicher wird freigegeben, sobald
-        die Funktion, die die mkmapping() Anweisung enthaelt, beendet ist.
+        die Funktion, die die mkmapping()-Anweisung enthaelt, beendet ist.
 
-BESIPIEL
+BESIPIELE
         mkmapping( ({ 1, 2 }), ({ 10, 11 }), ({ 20, 21, 22}));
           liefert ([ 1:10;20, 2:11;21 ])
 
-VERGLEICHE
+SIEHE AUCH
         mappings(LPC), mappingp(E), m_indices(E), m_values(E),
         m_add(E), m_delete(E), sizeof(E), widthof(E), unmkmapping(E).

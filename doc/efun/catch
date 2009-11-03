@@ -1,6 +1,6 @@
 SYNOPSIS
-        mixed catch (expr, expr, ...)
-        mixed catch (expr, expr, ... ; modifiers)
+        mixed catch(expr, expr, ...)
+        mixed catch(expr, expr, ... ; modifiers)
 
 DESCRIPTION
         Evaluate the expressions. If there is no error, 0 is returned.
@@ -25,9 +25,9 @@ DESCRIPTION
                      for a caught error. This modifier instructs
                      catch() to call it nevertheless.
 
-        Catch is not really an efun, but a compiler directive.
+        Catch is not really an efun but a compiler directive.
 
-EXAMPLE
+EXAMPLES
         object obj;
         string err;
         if (err = catch(obj = clone_object("/foo/bar/baz")))

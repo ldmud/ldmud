@@ -1,7 +1,7 @@
 VORLAEUFIG
 SYNOPSIS
-        object present_clone(string str [, object env] );
-        object present_clone(object obj [, object env] );
+        object present_clone(string str [, object env])
+        object present_clone(object obj [, object env])
 
 BESCHREIBUNG
         Diese Efun durchsucht das Inventar von <env> nach einem Objekt mit
@@ -29,12 +29,12 @@ BEISPIELE
 
         Fuer Driver im Compat Modus liefert die Funktion keine '/' am Anfang.
 
-AENDERUNGEN
-        Eingefuehrt in 3.2.7.
-
-ANMERKUNG
+ANMERKUNGEN
         Im Unterschied zu present() sucht present_clone() niemals in der
         Umgebung von <env>.
+
+GESCHICHTE
+        Eingefuehrt in 3.2.7.
 
 SIEHE AUCH
         load_name(E), present(E)

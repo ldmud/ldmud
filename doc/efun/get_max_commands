@@ -1,6 +1,6 @@
 SYNOPSIS
-        int get_max_commands ()
-        int get_max_commands (object obj)
+        int get_max_commands()
+        int get_max_commands(object obj)
 
 DESCRIPTION
         Return the max number of commands the interactive <obj> is

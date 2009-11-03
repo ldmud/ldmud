@@ -1,6 +1,6 @@
 SYNOPSIS
-        int save_object(string name [, int format]);
-        string save_object([int format]);
+        int    save_object(string name [, int format])
+        string save_object([int format])
 
 BESCHREIBUNG
         Codiert die speicherbaren Variablen des aktuellen Objekts in einen
@@ -28,7 +28,7 @@ BESCHREIBUNG
         Eine Variable wird als 'speicherbar' betrachtet, wenn sie nicht als
         'nosave' oder 'static' deklariert ist.
 
-AENDERUNGEN
+GESCHICHTE
         Seit LDMud 3.2.8 liefert save_object() einen fixen Wert bei Erfolg.
         Das direkte Abspeichern in einen String wurde in LDMud 3.2.8
             eingefuehrt, wird aber in Zukunft eventuell in eine separate Efun

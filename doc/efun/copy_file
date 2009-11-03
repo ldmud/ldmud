@@ -12,7 +12,7 @@ DESCRIPTION
         On successfull completion copy_file() will return 0. If any error
         occurs, a non-zero value is returned.
 
-EXAMPLE
+EXAMPLES
         copy_file("/players/wizard/obj.c", "/players/wizard/newobj.c");
 
 HISTORY

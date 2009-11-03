@@ -1,6 +1,6 @@
 SYNOPSIS
-        int restore_object(string name);
-        int restore_object(string str);     (VORLAEUFIG)
+        int restore_object(string name)
+        int restore_object(string str)
 
 BESCHREIBUNG
         Laedt Werte von Variablen fuer das aktuelle Objekt aus der Datei
@@ -34,7 +34,7 @@ BESCHREIBUNG
         einzigartigen Namen bei nicht-statischen Variablen. So wird auch das
         manuelle Lesen oder Editieren des Savefiles einfacher.
 
-AENDERUNGEN
+GESCHICHTE
         Das direkte Laden aus einem String wurde in LDMud 3.2.8 eingefuehrt,
             wird aber moeglicherweise in Zukunft in eine separate Efun
             ausgelagert.

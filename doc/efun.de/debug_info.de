@@ -1,10 +1,10 @@
 GESCHUETZT
 SYNOPSIS
-        #include <sys/debug_info.h>
+        #include <debug_info.h>
 
-        mixed debug_info(int flag);
-        mixed debug_info(int flag, mixed arg);
-        mixed debug_info(int flag, mixed arg2, mixed arg3);
+        mixed debug_info(int flag)
+        mixed debug_info(int flag, mixed arg)
+        mixed debug_info(int flag, mixed arg2, mixed arg3)
 
 BESCHREIBUNG
         Sammelt entsprechend den Angaben in <flag> gewisse intere Debuginfos
@@ -351,7 +351,7 @@ BESCHREIBUNG
             bezeichnen den Call Stack, beginnen mit der hoechsten
             aufgerufenen Funktion.
 
-            Alle Eintraege im Array sind wiederdum Arrays mit folgenden
+            Alle Eintraege im Array sind wiederum Arrays mit folgenden
             Elementen:
               - int[TRACE_TYPE]: Der Typ der aufrufenden Funktion
                     TRACE_TYPE_SYMBOL (0): ein Funktionssymbol (sollte nicht
@@ -376,7 +376,8 @@ BESCHREIBUNG
             <arg2> == DIT_STR_CURRENT (3): Liefert Informationen ueber den
                 momentanen Call Trace als druckbarer String.
 
-AENDERUNGEN
+
+GESCHICHTE
         Seit 3.2.7 liefert DINFO_STATUS die Information zurueck, anstatt sie
             nur auszugeben.
         DINFO_DUMP wurde in 3.2.7 eingefuehrt.

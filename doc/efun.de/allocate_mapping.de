@@ -1,6 +1,6 @@
 VERALTET
 SYNOPSIS
-        mapping allocate_mapping(int size, int width);
+        mapping allocate_mapping(int size, int width)
 
 BESCHREIBUNG
         Reserviert Speicherplatz fuer ein Mapping.
@@ -19,7 +19,7 @@ BESCHREIBUNG
         bestimmten Groesse zu erzeugen, dem aber im Moment der Erzeugung
         noch keine Daten zu den Keys zugewiesen werden.
 
-AENDERUNGEN
+GESCHICHTE
         Umbenannt zu m_allocate() in LDMud 3.2.6.
         Seit 3.2.9 ist die Funktion nicht mehr verfuegbar, wenn der Treiber
             nicht mit USE_DEPRECATED kompiliert wurde.

@@ -1,9 +1,9 @@
 GESCHUETZT
 SYNOPSIS
-        #include <sys/objectinfo.h>
+        #include <objectinfo.h>
 
-        *mixed object_info(object ob, int what);
-        *mixed object_info(object ob, int what, int index);
+        mixed * object_info(object ob, int what)
+        mixed * object_info(object ob, int what, int index)
 
 BESCHREIBUNG
         Liefert einige interne Informationen ueber das Objekt <ob> in Form
@@ -15,9 +15,9 @@ BESCHREIBUNG
         Position <index> stehen wuerde.
 
         Die moeglichen Werte fuer <what> und die Indizes des gelieferten
-        Arrays sind in <objectinfo.h> definiert und muessen eingebunden werden.
-        Diese Definitionen koennen in zukuenftigen Versionen des Drivers
-        aendern!
+        Arrays sind in <objectinfo.h> definiert und muessen eingebunden
+        werden. Diese Definitionen koennen sich in zukuenftigen Versionen
+        des Drivers aendern!
 
         <what> == OINFO_BASIC:
 
@@ -28,7 +28,7 @@ BESCHREIBUNG
                                     Wizard Flag gesetzt hat), sonst 0. Der
                                     Eintrag ist immer 0, wenn set_is_wizard()
                                     nicht verfuegbar ist.
-        int [OIB_ENABLE_COMMANDS]:  1, wenn <ob> Kommandi geben darf, sonst 0.
+        int [OIB_ENABLE_COMMANDS]:  1, wenn <ob> Kommandos geben darf, sonst 0.
         int [OIB_CLONE]:            1, wenn <ob> ein Clon ist, sonst 0.
         int [OIB_DESTRUCTED]:       1, wenn <ob> zerstoert wurde, sonst 0.
         int [OIB_SWAPPED]:          1, wenn <ob> geswapt wurde, sonst 0.
@@ -106,12 +106,13 @@ BESCHREIBUNG
         int [OIM_NO_SHADOW]:          1, wenn dem Objekt kein Shadow
                                       uebergeworfen werden darf.
 
-        Dieser Aufruf swapt das Programm, falls notwendig. Die OIM_SIZE_xxx
-        Eintraege zeigen nur den Speicherbedarf der Strukturen / Pointers,
-        nicht den Speicherbedarf von Variablenwerten, Funktionscode oder
-        Strings selbst.
+        Dieser Aufruf holt das Programm aus dem Swap, falls notwendig.
+        Die OIM_SIZE_xxx-Eintraege zeigen nur den Speicherbedarf der
+        Strukturen / Pointer an, nicht aber den Speicherbedarf von
+        Variablenwerten, Funktionscode oder der Strings selbst.
 
-AENDERUNGEN
+
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.6.
         Aenderungen in LDMud 3.2.7:
           - neues Kriterium OIB_REPLACED.

@@ -1,8 +1,8 @@
 SYNOPSIS
-        mixed *to_array(string)
-        mixed *to_array(symbol)
-        mixed *to_array(quotedarray)
-        mixed *to_array(mixed *)
+        mixed * to_array(string)
+        mixed * to_array(symbol)
+        mixed * to_array(quotedarray)
+        mixed * to_array(mixed *)
 
         (int*)<value>
 

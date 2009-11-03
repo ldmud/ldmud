@@ -1,6 +1,6 @@
 GESCHUETZT
 SYNOPSIS
-        void set_environment(objet was, object env);
+        void set_environment(objet was, object env)
 
 BESCHREIBUNG
         Das Objekt <was> wird in die Umgebung <env> bewegt, welche auch 0
@@ -10,7 +10,7 @@ BESCHREIBUNG
 
         Sprich: nicht in eigenen Objekten verwenden!
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2.1.@1 als 'efun308()'.
         In 3.2.6 umbenannt zu 'set_environment()'.
 

@@ -1,6 +1,6 @@
 OPTIONAL
 SYNOPSIS
-        string * db_coldefs (int handle)
+        string * db_coldefs(int handle)
 
 BESCHREIBUNG
         Resultat ist ein Array mit den Spaltennamen der Tabelle des

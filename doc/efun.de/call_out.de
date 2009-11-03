@@ -1,6 +1,6 @@
 SYNOPSIS
-        void call_out(string fun, int delay, mixed arg, ...);
-        void call_out(closure cl, int delay, mixed arg, ...);
+        void call_out(string fun, int delay, mixed arg, ...)
+        void call_out(closure cl, int delay, mixed arg, ...)
 
 BESCHREIBUNG
         Ruft zeitverzoegert die Funktion <fun> im aktuellen Objekt oder

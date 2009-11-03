@@ -1,5 +1,5 @@
 SYNOPSIS
-        object *heart_beat_info()
+        object * heart_beat_info()
 
 BESCHREIBUNG
         Resultat ist ein Array mit allen Objekten, die einen aktiven

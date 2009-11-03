@@ -1,8 +1,8 @@
 OPTIONAL, VERALTET
 SYNOPSIS
-        int   assoc(mixed key, mixed *keys);
-        mixed assoc(mixed key, mixed *alist [, mixed fail]);
-        mixed assoc(mixed key, mixed *keys, mixed *data [, mixed fail]);
+        int   assoc(mixed key, mixed *keys)
+        mixed assoc(mixed key, mixed *alist [, mixed fail])
+        mixed assoc(mixed key, mixed *keys, mixed *data [, mixed fail])
 
 BESCHREIBUNG
         Alle drei Aufrufe suchen nach einem <key> in einem <alist> (einem
@@ -10,7 +10,7 @@ BESCHREIBUNG
         Array <keys>. Der Versuch, in einem anderen Konstrukt zu suchen,
         fuehrt zu einem unvorhersehbaren Ergebnis.
 
-        Komplexitaet: O( lg(n) ), wobei <n> die Anzahl Keys ist.
+        Komplexitaet: O(lg(n)), wobei <n> die Anzahl Keys ist.
 
         1.  Form: Key-Suche
             <key> wird im Array <keys> gesucht. Das Resultat ist der Index,

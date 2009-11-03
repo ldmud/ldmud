@@ -1,13 +1,13 @@
 SYNOPSIS
-        int rmember(mixed *array, mixed elem);
-        int rmember(string str, int elem);
+        int rmember(mixed *array, mixed elem)
+        int rmember(string str, int elem)
 
 BESCHREIBUNG
         Liefert fuer Arrays und Strings den Index des letzten Auftretens des
         Arguments <elem> im Array <*array>  bzw. im String <str>. Wenn <elem>
         nicht gefunden wird, liefert die Funktion -1 zurueck.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.10.
 
 SIEHE AUCH

@@ -1,5 +1,5 @@
 SYNOPSIS
-        int set_heart_beat(int flag);
+        int set_heart_beat(int flag)
 
 BESCHREIBUNG
         Schaltet den Heartbeat ein oder aus. Der Treiber wendet die Lfun

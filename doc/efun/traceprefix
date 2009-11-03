@@ -1,4 +1,6 @@
 SYNOPSIS
+        #include <trace.h>
+
         string traceprefix(string prefix)
         string traceprefix(int dummy)
 
@@ -13,23 +15,23 @@ DESCRIPTION
         The master-lfun valid_trace() is called with ("traceprefix", prefix)
         as arguments to verify the use of this efun.
 
-EXAMPLE
+EXAMPLES
         object obj;
         string prefix;
         obj = find_player("wessex");
         prefix = object_name(obj);
-        prefix = prefix[1..strlen(prefix)-1]; /* cut off the leading "/" */
+        prefix = prefix[1..];  /* cut off the leading "/" */
         traceprefix(prefix);
           /* From here on, only code in the object "std/player#69"
            * will be traced.
            */
-        trace(1|2|4|8);
+        trace(TRACE_CALL | TRACE_CALL_OTHER | TRACE_RETURN | TRACE_ARGS);
         ...
-        trace(0);
+        trace(TRACE_NOTHING);
 
 HISTORY
         LDMud 3.2.9 passes the <prefix> argument to the valid_trace()
-            apply as well.
+        apply as well.
 
 SEE ALSO
         trace(E)

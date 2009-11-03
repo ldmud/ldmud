@@ -1,6 +1,6 @@
 GESCHUETZT
 SYNOPSIS
-        mixed get_extra_wizinfo(object|string|int wiz);
+        mixed get_extra_wizinfo(object|string|int wiz)
 
 BESCHREIBUNG
         Liefert die <extra> Information, die in der Wizlist fuer den

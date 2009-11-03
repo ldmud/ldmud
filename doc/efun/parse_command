@@ -1,7 +1,7 @@
 OPTIONAL
 SYNOPSIS
-        int parse_command (string cmd, object  env, string fmt, mixed &var, ...)
-        int parse_command (string cmd, object* arr, string fmt, mixed &var, ...)
+        int parse_command(string cmd, object  env, string fmt, mixed &var, ...)
+        int parse_command(string cmd, object *arr, string fmt, mixed &var, ...)
 
 DESCRIPTION
         parse_command() is basically a spiffed up sscanf operating
@@ -152,11 +152,11 @@ DESCRIPTION -- compat mode -- DEPRECATED
               function doesn't exist, the last word from the result
               of short() is used instead.
 
-EXAMPLE
+EXAMPLES
 
         object *items;
-        parse_command( "take apple",environment(this_player())
-                     , " 'get' / 'take' %i ",items);
+        parse_command("take apple",environment(this_player()),
+                      " 'get' / 'take' %i ",items);
 
 SEE ALSO
         sscanf(E)

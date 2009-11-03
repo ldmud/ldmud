@@ -18,7 +18,7 @@ DESCRIPTION
         0 if no such file or no lines to read (if start or len is < 0,
         or if the file has less than start lines).
 
-EXAMPLE
+EXAMPLES
         cat("/doc/efun/cat", 5, 9);
 
         This will print out the file "/doc/efun/cat" begining at line

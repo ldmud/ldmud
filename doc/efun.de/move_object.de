@@ -1,6 +1,6 @@
 GESCHUETZT
 SYNOPSIS
-        void move_object(mixed item, mixed dest);
+        void move_object(mixed item, mixed dest)
 
 BESCHREIBUNG
         <item> wird in die neue Umgebung <dest> bewegt. <item> und <dest>
@@ -10,7 +10,7 @@ BESCHREIBUNG
         Mudlib enthalten und verwendet dort die M_MOVE_OBJECT0/1 Treiber Hooks.
         move_object() kann so auch eine simul-efun sein.
 
-        In der traditionellen Implemenierung war <item> im Compat Modus auf
+        In der traditionellen Implemenierung war <item> im COMPAT-Modus auf
         das aufrufende Objekt beschraenkt.
 
 SIEHE AUCH

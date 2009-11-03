@@ -1,7 +1,7 @@
 PRELIMINARY
 SYNOPSIS
-        mixed *tls_check_certificate()
-        mixed *tls_check_certificate(object obj);
+        mixed * tls_check_certificate()
+        mixed * tls_check_certificate(object obj)
 
 DESCRIPTION
         tls_check_certificate() checks the certificate of the secured

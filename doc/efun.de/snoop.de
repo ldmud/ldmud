@@ -1,7 +1,7 @@
 GESCHUETZT
 SYNOPSIS
-        int snoop(object snooper);
-        int snoop(object snooper, object snoopee);
+        int snoop(object snooper)
+        int snoop(object snooper, object snoopee)
 
 BESCHREIBUNG
         Beginnt die Beobachtung des Objekts <snoopee> durch <snooper>. Wenn

@@ -1,8 +1,8 @@
 GESCHUETZT
 SYNOPSIS
-        #include <sys/wizlist.h>
+        #include <wizlist.h>
 
-        *mixed wizlist_info();
+        mixed * wizlist_info()
 
 BESCHREIBUNG
         Liefert ein Array mit Eintraegen aus der Wizlist (der internen
@@ -13,7 +13,7 @@ BESCHREIBUNG
         Jeder Eintrag enthaelt wiederum ein Array mit folgenden Elementen:
 
             string  w[WL_NAME]          Name des Gottes
-            int w[WL_COMMANDS]          Gewichtete Anzahl Kommandi, die von
+            int w[WL_COMMANDS]          Gewichtete Anzahl Kommandos, die von
                                         Objekten dieses Gottes ausgefuehrt
                                         wurden
             int w[WL_COSTE]             Gewichtete Summe der Eval-Kosten
@@ -29,9 +29,9 @@ BESCHREIBUNG
 
         Die "gewichteten" Werte verfallen pro Stunde um 10%.
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.10 trennte das alte WL_EVAL_COST in WL_COST und WL_GIGACOST,
-            um laengern Uptimes gerecht zu werden. Ausserdem wurde
+            um laengeren Uptimes gerecht zu werden. Ausserdem wurde
             WL_TOTAL_COST und WL_TOTAL_GIGACOST eingefuehrt.
 
 SIEHE AUCH

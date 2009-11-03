@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed get_type_info(mixed arg, int flag);
+        mixed get_type_info(mixed arg, int flag)
 
 BESCHREIBUNG
         Liefert Informationen uber den Typ von <arg>, wie von <flag>
@@ -28,14 +28,14 @@ BESCHREIBUNG
           - fuer gemeinsam verwendete Strings 0, ungleich 0 fuer andere Strings
           - -1 fuer alle anderen Datentypen
 
-BUGS
+FEHLER
         Diese Funktion unterliegt haeufigen Veraenderungen im Zug der
         Treiberentwicklung.
 
-AENDERUNGEN
-        Eingefuehrt in 3.2@127
-        Flagwert 2 eingefuehrt in 3.2.1@84
-        Zusatzinformationen zu Strings eingefuehrt in 3.2.7
+GESCHICHTE
+        Eingefuehrt in 3.2@127.
+        Flagwert 2 eingefuehrt in 3.2.1@84.
+        Zusatzinformationen zu Strings eingefuehrt in 3.2.7.
         Bis und mit 3.2.7 lieferte get_type_info(closure, 2) keine Objekte
             von Lamda Closures und gebundenen Lambda Closures.
         Bis und mit 3.2.7 lieferte get_type_info(closure, 2) keine Objekte von

@@ -1,7 +1,7 @@
 GESCHUETZT
 SYNOPSIS
-        int command(string str);
-        int command(string str, object ob);
+        int command(string str)
+        int command(string str, object ob)
 
 BESCHREIBUNG
         Wertet <str> wie ein Kommando aus, das direkt von einem interaktiven
@@ -18,14 +18,14 @@ BESCHREIBUNG
         diesem Wege keine "static" deklarierten Funktionen aufgerufen werden,
         um etwas Schutz vor unerlaubten Aufrufen zu geben.
 
-        Kommandi werden gestapelt, das heisst, nach der Ausfuehrung von <str>
+        Kommandos werden gestapelt, das heisst, nach der Ausfuehrung von <str>
         werden die alten Werte fuer this_player(), query_verb() etc. wieder
         hergestellt.
 
-AENDERUNGEN
-        Bis 3.2.6 im Native-Modus konnten Kommandi nur auf das aktuelle Objekt
-            angewendet werden.
-        Seit 3.2.7 werden Kommandi gestapelt.
+GESCHICHTE
+        Bis 3.2.6 im Native-Modus konnten Kommandos nur auf das aktuelle 
+            Objekt angewendet werden.
+        Seit 3.2.7 werden Kommandos gestapelt.
 
 SIEHE AUCH
         command_stack(E), notify_fail(E), enable_commands(E), get_eval_cost(E)

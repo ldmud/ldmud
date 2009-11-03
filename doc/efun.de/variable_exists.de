@@ -1,8 +1,8 @@
 SYNOPSIS
         #include <functionlist.h>
 
-        string variable_exists(string str [, int flags]);
-        string variable_exists(string str, object obj [, int flags]);
+        string variable_exists(string str [, int flags])
+        string variable_exists(string str, object obj [, int flags])
 
 BESCHREIBUNG
         Sucht eine Varialbe <str> in this_object() oder (falls angegeben)
@@ -22,7 +22,7 @@ BESCHREIBUNG
         sie fuer das aufrufende Objekt nicht sichtbar sind), wird 0 zurueck
         geliefert.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.10.
 
 SIEHE AUCH

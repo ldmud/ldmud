@@ -37,7 +37,8 @@ DESCRIPTION
         Variables without explicit initializers are always initialized to 0.
 
 
-EXAMPLE
+
+EXAMPLES
         // Clone a torch (filename in non-compat format)
         object torch;
         torch = clone_object("/obj/torch");

@@ -1,5 +1,5 @@
 SYNOPSIS
-        mapping m_add (mapping map, mixed key, [mixed data...])
+        mapping m_add(mapping map, mixed key, [mixed data...])
 
 DESCRIPTION
         Add (or replace) an entry with index <key> in mapping <map>.

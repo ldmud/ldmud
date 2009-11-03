@@ -1,10 +1,10 @@
 SYNOPSIS
-        #include <sys/strings.h>
+        #include <strings.h>
 
-        string trim (string s)
-        string trim (string s, int where)
-        string trim (string s, int where, int ch)
-        string trim (string s, int where, string ch)
+        string trim(string s)
+        string trim(string s, int where)
+        string trim(string s, int where, int ch)
+        string trim(string s, int where, string ch)
 
 DESCRIPTION
         Remove all leading and trailing characters <ch> from the string
@@ -19,7 +19,7 @@ DESCRIPTION
           TRIM_RIGHT (2):      remove the trailing characters
           TRIM_BOTH  (3 or 0): remove both leading and trailing characters
 
-EXAMPLE
+EXAMPLES
         trim("   1234   ")                  --> "1234"
         trim("   1234   ", TRIM_RIGHT)      --> "   1234"
         trim("   1234   ", TRIM_BOTH, " 1") --> "234"

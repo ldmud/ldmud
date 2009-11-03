@@ -1,7 +1,7 @@
 SYNOPSIS
-        string or_bits (string str1, string str2)
+        string or_bits(string str1, string str2)
 
-DESTRIPTION
+DESCRIPTION
         <str1> and <str2> are both bitstrings. The result of the function
         is a bitstring with the binary-or of <str1> and <str2>,
         ie. a string in which a bit is set if the corresponding

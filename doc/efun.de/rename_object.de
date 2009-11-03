@@ -1,13 +1,13 @@
 GESCHUETZT
 SYNOPSIS
-        void rename_object(object obj, string neuer_name);
+        void rename_object(object obj, string neuer_name)
 
 BESCHREIBUNG
         Gibt dem Objekt <obj> einen neuen Namen <neuer_name> und verursacht
         eine Schutzverletzung (einen Fehler). <neuer_name> darf kein #
         enthalten, ausser am Ende, um Verwirrung mit Clones zu vermeiden.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2@55.
 
 SIEHE AUCH

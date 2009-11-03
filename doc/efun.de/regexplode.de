@@ -1,12 +1,12 @@
 SYNOPSIS
-        string *regexplode(string text, string pattern);
+        string * regexplode(string text, string pattern)
 
 BESCHREIBUNG
         regexplode() verhaelt sich aehnlich wie explode(), akzeptiert aber
         auch regulaere Ausdruecke als Trennzeichen. Im Ergebnisarray ist
         jedes zweite Element ein Trennzeichen.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2@61.
 
 SIEHE AUCH

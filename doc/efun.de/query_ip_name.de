@@ -1,6 +1,6 @@
 GESCHUETZT
 SYNOPSIS
-        string query_ip_name(object ob);
+        string query_ip_name(object ob)
 
 BESCHREIBUNG
         Liefert den IP-Namen des Users <ob> oder des aktuellen Benutzers, wenn

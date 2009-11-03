@@ -1,5 +1,5 @@
 SYNOPSIS
-        string make_shared_string (string str);
+        string make_shared_string(string str)
 
 BESCHREIBUNG
         Fuegt <str> in die Liste der gemeinsam verwendeten String des Spiels
@@ -9,9 +9,9 @@ BESCHREIBUNG
         spart dies Speicher. Keys von Alists und Mappings sind immer gemeinsam
         verwendete Strings.
 
-BUGS
+FEHLER
         Ein besseres Stringhandling im Driver sollte diese Efun ueberfluessig
         machen.
 
-AENDERUNGEN
-        Eingefuehrt in LDMud 3.2.6, auf Vorschlag von TubMud.
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.6, auf Vorschlag von Tubmud.

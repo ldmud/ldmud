@@ -12,7 +12,7 @@ DESCRIPTION
         by a call_out or the heart beat.  Also when a user logs in
         query_command() returns 0.
 
-EXAMPLE
+EXAMPLES
         void init() {
            ...
            add_action("sing","sing");

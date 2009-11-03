@@ -24,7 +24,7 @@ EXAMPLES
         symbol_function("QueryProp", other_obj) -> other_obj->QueryProp()
 
 HISTORY
-        Introduced in 3.2@70
+        Introduced in 3.2@70.
 
 SEE ALSO
         lambda(E), quote(E)

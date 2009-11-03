@@ -1,5 +1,5 @@
 SYNOPSIS
-        void printf(string format, ...);
+        void printf(string format, ...)
 
 BESCHREIBUNG
         Eine Mischung aus sprintf() und write(). Gibt void zurueck und den

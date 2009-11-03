@@ -1,5 +1,5 @@
 SYNOPSIS
-        int last_bit (string str)
+        int last_bit(string str)
 
 DESCRIPTION
         Return the number of the last set bit in bitstring <str>.

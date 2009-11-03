@@ -1,8 +1,8 @@
 SYNOPSIS
-        #include <sys/files.h>
+        #include <files.h>
 
-        mixed *get_dir(string str)
-        mixed *get_dir(string str, int mask)
+        mixed * get_dir(string str)
+        mixed * get_dir(string str, int mask)
 
 DESCRIPTION
         This function takes a path as argument and returns an array of file
@@ -50,6 +50,9 @@ DESCRIPTION
 
         The values of mask can be added together.
 
+        COMPAT mode: GETDIR_PATH will return the paths without leading /.
+
+
 EXAMPLES
         function                         returns
         -------------------------------------------------------------------
@@ -79,10 +82,10 @@ EXAMPLES
                                          contains for each file in /obj its
                                          name, its size and its modification
                                          date, sorted by names, for example
-                                         ({
-                                             "axe.c"  ,  927, 994539583,
-                                             "sword.c", 1283, 998153903,
-                                             }).
+                                           ({
+                                              "axe.c"  ,  927, 994539583,
+                                              "sword.c", 1283, 998153903,
+                                           }).
 
         get_dir("/obj/sword.c", GETDIR_NAMES|GETDIR_PATH)
                                          ({ "/obj/sword.c" }) if applicable.
@@ -94,10 +97,11 @@ EXAMPLES
                          , get_dir(str, GETDIR_DATES) }));
         This returns an array of arrays, with filename, size and
         filetime as elements, not sorted by names, for example
-        ({
-            ({ "sword.c", 1283, 998153903 }),
-            ({ "axe.c"  ,  927, 994539583 }),
-            }).
+          ({
+             ({ "sword.c", 1283, 998153903 }),
+             ({ "axe.c"  ,  927, 994539583 }),
+          }).
+
 
 HISTORY
         LDMud 3.2.9 added GETDIR_PATH.

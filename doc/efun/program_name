@@ -18,7 +18,7 @@ DESCRIPTION
 
         CAVEAT: This efun swaps in the program if it is swapped out.
 
-EXAMPLE
+EXAMPLES
         object o;
         o = clone_object("/std/thing");
         write(program_name(o));  --> writes "/std/thing.c" in !compat mode

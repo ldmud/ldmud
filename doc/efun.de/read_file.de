@@ -1,5 +1,5 @@
 SYNOPSIS
-        string read_file(string file, int start, int anzahl);
+        string read_file(string file, int start, int anzahl)
 
 BESCHREIBUNG
         Liest Zeilen aus einem File <file>. Wenn <start> angegeben ist und
@@ -9,7 +9,7 @@ BESCHREIBUNG
         wird das gesamte File gelesen, sonst nur <anzahl> Zeilen.
 
         Wenn <start> ausserhalb der Groesse des Files liegt, liefert
-        read_file() 0 zurureck anstelle eines Strings.
+        read_file() anstelle eines Strings 0 zurueck.
 
 SIEHE AUCH
         read_bytes(E), write_file(E)

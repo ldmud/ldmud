@@ -1,7 +1,6 @@
 PRELIMINARY
 SYNOPSIS
-
-        int execute_command (string command, object origin, object player)
+        int execute_command(string command, object origin, object player)
 
 DESCRIPTION
         Low-level access to the command parser: take the <command>, parse it
@@ -21,7 +20,7 @@ DESCRIPTION
         but must be evaluated by the caller.
 
 HISTORY
-        Introduced in LDMud 3.2.7
+        Introduced in LDMud 3.2.7.
 
 SEE ALSO
         hooks(C), command(E), notify_fail(E), command_stack(E)

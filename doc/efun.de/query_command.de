@@ -1,5 +1,5 @@
 SYNOPSIS
-        string query_command();
+        string query_command()
 
 BESCHREIBUNG
         Liefert den Text des aktuellen Kommandos oder 0, wenn keines
@@ -9,20 +9,19 @@ BESCHREIBUNG
         modify_command() ausgefuehrt und nachfolgende Leerzeichen
         abgeschnitten wurden.
 
-        query_command() liefert 0, wenn es von einer Funktion gestartet wurde,
-        die wiederum von einem call_out() oder dem heart_beat() aufgerufen
-        wurde. Auch Kommandi, die beim Userlogin aufgerufen werden, liefern 0.
+        query_command() liefert 0, wenn es von einer Funktion gestartet
+        wurde, die wiederum von einem call_out() oder dem heart_beat()
+        aufgerufen wurde. Auch Kommandos, die beim Userlogin aufgerufen
+        werden, liefern 0.
 
-BEISPIEL
-        void init()
-        {
+BEISPIELE
+        void init() {
             ...
             add_action("sing","sing");
             ...
         }
 
-        int sing(string str)
-        {
+        int sing(string str) {
             write("Dein Kommando war:"+query_command()+"\n");
             return 1;
         }

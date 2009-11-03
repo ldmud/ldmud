@@ -1,6 +1,6 @@
 SYNOPSIS
-        mixed catch(expr, expr, ...);
-        mixed catch(expr, expr, ...; modifiers);
+        mixed catch(expr, expr, ...)
+        mixed catch(expr, expr, ...; modifiers)
 
 BESCHREIBUNG
         Wertet die Ausdruecke <expr> aus. Wenn kein Fehler auftritt, wird 0
@@ -14,7 +14,7 @@ BESCHREIBUNG
 
         Wenn zum Zeitpunkt, zu dem catch() aufgerufen wird, weniger als
         __CATCH_EVAL_COST__ Rechenticks uebrig sind, wird ein Laufzeitfehler
-        RTE erzeugt und es werden keine Ausdruecke <expr> aus catch()
+        (RTE) erzeugt und es werden keine Ausdruecke <expr> aus catch()
         ausgewertet.
 
         Das Verhalten von catch() kann durch <modifiers> veraendert werden:
@@ -27,16 +27,16 @@ BESCHREIBUNG
                         diesem <modifier> wird runtime_error() trotzdem
                         aufgerufen.
 
-        Catch ist nicht im eigentlichen Sinne eine Efun, sondern eine Compiler
-        Anweisung.
+        Catch ist nicht im eigentlichen Sinne eine Efun, sondern eine
+        Compileranweisung.
 
-BEISPIEL
+BEISPIELE
         object obj;
         string err;
-        if(err = catch(obj = clone_object("/foo/bar/baz")))
+        if (err = catch(obj = clone_object("/foo/bar/baz")))
             write("Kann das Objekt nicht clonen. Grund: "+err+"\n");
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.9 fuehrte den 'nolog' catch() als experimentelles Feature
             ein.
         LDMud 3.2.10 implementierte 'nolog' als offizielle Form und fuehrte

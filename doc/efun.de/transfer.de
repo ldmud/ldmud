@@ -18,7 +18,7 @@ BESCHREIBUNG
         6: <item> kann nicht aufgenommen werden.
 
         Die Funktion ruft die lfuns add_weight(), drop(), get(),
-        prevent_insert(), add_weight(), und can_put_and_get() nach Bedarf..
+        prevent_insert(), add_weight(), und can_put_and_get() nach Bedarf auf.
 
 SIEHE AUCH
          move_object(E), drop(A), get(A), prevent_insert(A),

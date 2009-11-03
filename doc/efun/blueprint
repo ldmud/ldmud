@@ -1,7 +1,7 @@
 PRELIMINARY
 SYNOPSIS
-        object blueprint ()
-        object blueprint (string|object ob)
+        object blueprint()
+        object blueprint(string|object ob)
 
 DESCRIPTION
         The efuns returns the blueprint for the given object <ob>, or for
@@ -10,6 +10,7 @@ DESCRIPTION
         If the blueprint is destructed, the efun returns 0.
         For objects with replaced programs, the efun returns the blueprint
         for the replacement program.
+        In COMPAT mode the returned blueprint does not start with a "/".
 
 EXAMPLES
         blueprint("/std/thing"))               -> /std/thing
@@ -17,7 +18,7 @@ EXAMPLES
         blueprint(clone_object("/std/thing"))  -> /std/thing
 
 HISTORY
-        Introduced in LDMud 3.2.9 .
+        Introduced in LDMud 3.2.9.
 
 SEE ALSO
         clones(E), clone_object(E)

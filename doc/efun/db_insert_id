@@ -1,6 +1,6 @@
 OPTIONAL
 SYNOPSIS
-        int db_insert_id (int handle)
+        int db_insert_id(int handle)
 
 DESCRIPTION
         After inserting a line into a table with an AUTO_INCREMENT field,

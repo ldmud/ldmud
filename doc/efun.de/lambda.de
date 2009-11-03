@@ -1,5 +1,5 @@
 SYNOPSIS
-        closure lambda(mixed *arr, mixed);
+        closure lambda(mixed *arr, mixed)
 
 BESCHREIBUNG
         Erzeugt eine Lambda Closure, entsprechend den Lamda Closures in LISP.
@@ -10,7 +10,7 @@ BESCHREIBUNG
         beschreibt, die der Closure bei ihrer Auswertung durch funcall()
         oder apply() uebergeben werden.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2@70.
 
 SIEHE AUCH

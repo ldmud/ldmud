@@ -1,16 +1,16 @@
 SYNOPSIS
-        float pow(int|flaot base, int|flaot exp);
+        float pow(int|float base, int|float exp)
 
 BESCHREIBUNG
         Die Potenzfunktion. Sie liefert das Resultat von "<base> hoch <exp>".
 
-BEISPIEL
-        pow(-2, 3) -> liefert -8.0
+BEISPIELE
+        pow(-2, 3)      -> liefert -8.0
         pow(8, 1.0/3.0) -> liefert 2.0
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.7.
-        LDMud 3.2.9. erlaubte neu Integer als Argumente.
+        LDMud 3.2.9 erlaubte Integer als Argumente.
 
 SIEHE AUCH
         exp(E), log(E)

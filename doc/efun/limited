@@ -1,11 +1,12 @@
 PRELIMINARY
 SYNOPSIS
 
-        #include <sys/rtlimits.h>
+        #include <rtlimits.h>
 
         mixed limited(closure fun)
         mixed limited(closure fun, int tag, int value, ...)
-        mixed limited(closure fun, int * limits [, mixed args...] )
+        mixed limited(closure fun, int *limits)
+        mixed limited(closure fun, int *limits, mixed *args)
 
 DESCRIPTION
         Call the function <fun> with any given <args> as parameters,
@@ -30,6 +31,7 @@ DESCRIPTION
         A special case is the relaxation of the eval_cost limit: in such
         a case the closure costs only 10 ticks regardless of how many
         ticks it actually needed.
+
 
 EXAMPLES
         limited(#'function)

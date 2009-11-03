@@ -1,14 +1,14 @@
 SYNOPSIS
-        void throw(mixed arg);
+        void throw(mixed arg)
 
 BESCHREIBUNG
         Bricht die Programmverarbeitung ab. Wenn die Verarbeitung mit catch()
         gestartet wurde, gibt dieses catch() <arg> als Fehlermeldung aus.
 
-        Der Aufruf von throw() ohne vorheriges catch() macht keine Sinn und
+        Der Aufruf von throw() ohne vorheriges catch() macht keinen Sinn und
         erzeugt einen "throw without catch" Fehler.
 
-BEISPIEL
+BEISPIELE
         catch(throw("Verarbeitung abgebrochen!"));
         Das macht nichts als "Verarbeitung abgebrochen!" auszugeben.
 

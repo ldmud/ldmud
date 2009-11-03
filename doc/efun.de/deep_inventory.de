@@ -1,6 +1,6 @@
 SYNOPSIS
-        *object deep_inventory();
-        *object deep_inventory(object ob);
+        object * deep_inventory()
+        object * deep_inventory(object ob)
 
 BESCHREIBUNG
         Gibt ein Array der Objekte zurueck, die in <obj> enthalten sind.
@@ -12,7 +12,7 @@ BESCHREIBUNG
         <ob>
             ob1
             ob2
-                ob21 -> deep_inventory(obj) == ({ob1,ob2,ob3,ob4,ob21,ob31})
+                ob21 -> deep_inventory(obj) == ({ ob1,ob2,ob3,ob4,ob21,ob31 })
             ob3
                 ob31
             ob4

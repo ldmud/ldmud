@@ -18,5 +18,11 @@ BESCHREIBUNG
         MCCP-Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
         __MCCP__ definiert.
 
+GESCHICHTE
+        Hinzugefuegt in LDMud 3.3.447, rueckportiert nach LDMud 3.2.10.
+        LDMud 3.3.666 fuegte die Moeglichkeit der Kompression des ausgehenden
+            Datenverkehrs hinzu, falls die Telnetmaschine enabled ist
+            (diese Moeglichkeit wurde nicht rueckportiert).
+
 SIEHE AUCH
         end_mccp_compress(E), query_mccp(E), query_mccp_stats(E), mccp(C)

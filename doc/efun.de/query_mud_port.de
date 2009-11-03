@@ -1,7 +1,7 @@
 SYNOPSIS
-        int query_mud_port();
-        int query_mud_port(object user);
-        int query_mud_port(int num);
+        int query_mud_port()
+        int query_mud_port(object user)
+        int query_mud_port(int num)
 
 BESCHREIBUNG
         Liefert die Portnummer, ueber die der Parser Benutzerverbindungen
@@ -18,5 +18,5 @@ BESCHREIBUNG
         Benutzern verwendet wird. Wenn <num> -1 ist, wird die Anzahl fuer
         Verbindungen offener Ports geliefert.
 
-VERGLEICHE
+SIEHE AUCH
         query_udp_port(E)

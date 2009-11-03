@@ -1,10 +1,10 @@
 SYNOPSIS
-        mixed *sort_array(mixed *arr, string wrong_order)
-        mixed *sort_array(mixed *arr, string wrong_order, object|string ob)
-        mixed *sort_array(mixed *arr, string wrong_order, object|string ob
-                         , mixed extra...)
-        mixed *sort_array(mixed *arr, closure cl)
-        mixed *sort_array(mixed *arr, closure cl, mixed extra...)
+        mixed * sort_array(mixed *arr, string wrong_order)
+        mixed * sort_array(mixed *arr, string wrong_order, object|string ob)
+        mixed * sort_array(mixed *arr, string wrong_order, object|string ob
+                           , mixed extra...)
+        mixed * sort_array(mixed *arr, closure cl)
+        mixed * sort_array(mixed *arr, closure cl, mixed extra...)
 
 DESCRIPTION
         Create a shallow copy of the array <arr> and sort the copy
@@ -15,9 +15,8 @@ DESCRIPTION
         If the 'arr' argument equals 0, the result is also 0.
 
         'ob' is the object in which the ordering function is called
-        and may be given as object or by its filename.         If <ob> is omitted,
+        and may be given as object or by its filename. If <ob> is omitted
         or neither a string nor an object, it defaults to this_object().
-
 
         The elements from the array to be sorted are passed in pairs to
         the function 'wrong_order' as arguments, followed by the <extra>

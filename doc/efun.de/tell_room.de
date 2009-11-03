@@ -1,9 +1,9 @@
 VERALTET
 SYNOPSIS
-        void tell_room(string|object obj, string str);
-        void tell_room(string|object obj, string str, object *exclude);
+        void tell_room(string|object obj, string str)
+        void tell_room(string|object obj, string str, object *exclude)
         void tell_room(string|object obj, mixed *msg)
-        void tell_room(string|object obj, mixed *msg, object *exlcude);
+        void tell_room(string|object obj, mixed *msg, object *exclude)
 
 BESCHREIBUNG
         Gibt einen Text <str> an den Raum <obj> aus. <obj> kann auch der
@@ -14,8 +14,8 @@ BESCHREIBUNG
         wird der Text hier ausgewertet und nicht an den User ausgegeben.
         Wenn das Empfaengerobjekt mit seinem Namen angegeben ist, sucht der
         Driver das Objekt unter diesem Namen und laedt es, falls notwendig.
-        Wenn das Array <*exclude> angegeben ist, wird der Text an die
-        Objekte in <*exclude> nicht ausgegeben.
+        Wenn das Array *exclude angegeben ist, wird der Text an die
+        Objekte in *exclude nicht ausgegeben.
 
         Wenn das zweite Argument ein Array ist, wird in allen Lebewesen, die
         den Text erhalten, catch_msg() aufgerufen (statt catch_tell()).
@@ -29,14 +29,12 @@ BEISPIELE
         funktioniert.
 
         Objekt1 (ein Lebewesen):
-            void catch_tell(string str)
-            {
+            void catch_tell(string str) {
                 write("Empfangen: "+str+"\n");
             }
 
         Objekt2:
-            void fun()
-            {
+            void fun() {
                 tell_room(environment(this_player()), "Hallo Welt!\n");
             }
 

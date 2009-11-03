@@ -1,5 +1,5 @@
 SYNOPSIS
-        int rm(string file);
+        int rm(string file)
 
 BESCHREIBUNG
         Loescht die Datei <file>. Gibt 0 zurueck, wenn etwas nicht geklappt

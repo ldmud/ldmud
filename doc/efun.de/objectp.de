@@ -1,5 +1,5 @@
 SYNOPSIS
-        int objectp(mixed arg);
+        int objectp(mixed arg)
 
 BESCHREIBUNG
         Liefert 1, wenn <arg> ein Objekt ist.

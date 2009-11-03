@@ -1,6 +1,6 @@
 SYNOPSIS
-        object *deep_inventory(void)
-        object *deep_inventory(object ob)
+        object * deep_inventory(void)
+        object * deep_inventory(object ob)
 
 DESCRIPTION
         Returns an array of the objects contained in the inventory of

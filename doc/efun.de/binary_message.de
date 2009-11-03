@@ -1,6 +1,6 @@
 GESCHUETZT
 SYNOPSIS
-        int binary_message(int *|string messages, int flags);
+        int binary_message(int *|string messages, int flags)
 
 BESCHREIBUNG
         Liest den Output aus und sendet diesen direkt mit write() OHNE IAC
@@ -26,10 +26,10 @@ BESCHREIBUNG
             Die Idee hinter den Flags ist, dass das Senden von Kommandocodes
             zum Beispiel fuer Farben an den vorhandenen Filtern fuer erlaubte
             Zeichen vorbeigeschleust werden muss, jedoch nicht wichtig genug
-            ist, um die Verschweundung von Bandbreite mittels einer
+            ist, um die Verschwendung von Bandbreite mittels einer
             synchronen Uebertragung zu rechtfertigen.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in 3.2.1@40.
 
 SIEHE AUCH

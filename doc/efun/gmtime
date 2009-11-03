@@ -1,8 +1,8 @@
 SYNOPSIS
-        #include <sys/time.h>
+        #include <time.h>
 
         int * gmtime(int clock)
-        int * gmtime(int* uclock)
+        int * gmtime(int *uclock)
 
 DESCRIPTION
         Interpret the argument clock as number of seconds since Jan,
@@ -25,15 +25,14 @@ DESCRIPTION
           int TM_YDAY  (7) : Day of the year (0..365)
           int TM_ISDST (8) : TRUE: Daylight saving time
 
-EXAMPLES
 
-        printf("Today is %s\n"
-              , ({ "Sunday", "Monday", "Tuesday", "Wednesday"
-                 , "Thursday", "Friday", "Saturday"
-                })[gmtime()[TM_WDAY]]);
+EXAMPLES
+        printf("Today is %s\n",
+               ({ "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday",
+                  "Friday", "Saturday" })[gmtime()[TM_WDAY]]);
 
 HISTORY
-        Introduced in LDMud 3.2.9
+        Introduced in LDMud 3.2.9.
 
 SEE ALSO
         ctime(E), localtime(E), time(E), utime(E)

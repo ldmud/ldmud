@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/debug_info.h>
+        #include <debug_info.h>
 
         mixed debug_info(int flag)
         mixed debug_info(int flag, mixed arg)
@@ -82,7 +82,6 @@ DESCRIPTION
             <arg2> == "opcodes": dump usage information about the opcodes.
               Default filename is '/OPC_DUMP', the valid_write() will read
               'opcdump' for the function.
-
 
 
         DINFO_DATA (6): Return raw information about an aspect of

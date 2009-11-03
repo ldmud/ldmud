@@ -1,10 +1,10 @@
 SYNOPSIS
-        float log(int|float arg);
+        float log(int|float arg)
 
 BESCHREIBUNG
         Liefert den natuerlichen Logarithmus von <arg>.
 
-AENDERUNGEN
+GESCHICHTE
         LDMud 3.2.9 fuehrte Integers als Argumente ein.
 
 SIEHE AUCH

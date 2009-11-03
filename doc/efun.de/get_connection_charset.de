@@ -1,7 +1,7 @@
 SYNOPSIS
-        #include <sys/comm.h>
+        #include <comm.h>
 
-        mixed get_connection_charset(int mode);
+        mixed get_connection_charset(int mode)
 
 BESCHREIBUNG
         Die Efun liefert den Zeichensatz des aktuellen interaktiven Benutzers,
@@ -15,7 +15,7 @@ BESCHREIBUNG
             <mode> == CHARSET_QUOTE_IAC: liefert 0, wenn IACs nicht gequotet
                 werden, 1 sonst.
 
-        Der Bitvektor wird interpretiert als Array von 8-Bit-Werten und
+        Der Bitvektor wird als Array von 8-Bit-Werten interpretiert und
         kann bis zu 32 Elemente enthalten. Das Zeichen n ist "kombinierbar",
         wenn gilt:
 
@@ -23,7 +23,7 @@ BESCHREIBUNG
 
         Wenn kein interaktiver Benutzer gesetzt ist, liefert die Funktion 0.
 
-AENDERUNGEN
+GESCHICHTE
         Eingefuehrt in LDMud 3.2.10.
 
 SIEHE AUCH

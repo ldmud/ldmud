@@ -8,7 +8,6 @@ SYNOPSIS
                                             , mixed extra...)
         mapping map(mapping arg, closure cl, mixed extra...)
 
-
 DESCRIPTION
         Call the function <ob>-><func>() resp. the closure <cl> for
         every element of the array or mapping <arg>, and return a result
