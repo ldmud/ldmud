@@ -8851,7 +8851,8 @@ static int nesting = 0;  /* Used to detect recursive calls */
     cur = buff;
     while(1)
     {
-        svalue_t *v;
+        svalue_t *v;        // the svalue to restore into
+        fulltype_t vtype;    // the type of the variable being restored.
         char *pt;
 
         if (file)
@@ -8941,6 +8942,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
                 if (var_rest > 0)
                 {
                     v = &ob->variables[num_var-var_rest];
+                    vtype = ob->prog->variables[num_var-var_rest].type;
                     break;
                 }
 
@@ -8957,6 +8959,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
                 if (var_rest > 0)
                 {
                     v = &ob->variables[num_var-var_rest];
+                    vtype = ob->prog->variables[num_var-var_rest].type;
                     break;
                 }
             }
@@ -9022,6 +9025,24 @@ static int nesting = 0;  /* Used to detect recursive calls */
                       , get_txt(current_object->name));
             /* NOTREACHED */
             return sp;
+        }
+        // now check if the type of the just restored svalue is compatible to
+        // the type of the variable we restored to.
+        // TODO: it would be nice to check P_RTT_CHECKS in the program defining
+        // TODO::the var instead of ob->prog. But finding the right prog is not
+        // TODO::trivial.
+        if (ob->prog->flags & P_RTT_CHECKS)
+        {
+            vartype_t tmp = {.type = vtype.typeflags & TYPEID_MASK, .t_struct = vtype.t_struct};
+            if (!check_rtt_compatibility(tmp, v))
+            {
+                free_svalue(v);
+                *v = const0;
+                errorf("Bad type when restoring %s from %s line %d. Expected "
+                       "%s, got %s.\n",
+                       get_txt(current_object->name), name, lineno,
+                       get_type_name(vtype), typename(v->type));
+            }
         }
 
         cur = pt;
