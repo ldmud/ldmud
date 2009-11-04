@@ -10,6 +10,7 @@
 
 #include "driver.h"
 #include "typedefs.h"
+#include "exec.h"
 
 #include "backend.h"
 #include "bytecode.h"
@@ -143,11 +144,7 @@ extern void mark_end_evaluation(void);
 
 extern Bool eval_instruction(bytecode_p first_instruction, svalue_t *initial_sp);
 extern void free_string_svalue(svalue_t *v);
-#ifdef USE_NEW_INLINES
 extern void push_control_stack(svalue_t *sp, bytecode_p pc, svalue_t *fp, svalue_t *context);
-#else
-extern void push_control_stack(svalue_t *sp, bytecode_p pc, svalue_t *fp);
-#endif /* USE_NEW_INLINES */
 extern void pop_control_stack(void);
 extern struct longjump_s *push_error_context(svalue_t *sp, int catch_flags);
 extern void pop_error_context (void);
@@ -190,6 +187,8 @@ extern Bool privilege_violation(string_t *what, svalue_t *arg, svalue_t *sp);
 extern Bool privilege_violation2(string_t *what, svalue_t *arg, svalue_t *arg2, svalue_t *sp);
 extern Bool privilege_violation4(string_t *what, object_t *whom, string_t *how_str, int how_num, svalue_t *sp);
 extern Bool privilege_violation_n(string_t *what, object_t *whom, svalue_t *sp, int num_arg);
+
+extern Bool check_rtt_compatibility(vartype_t formaltype, svalue_t *svp) __attribute__((nonnull(2)));
 
 extern svalue_t *sapply_int(string_t *fun, object_t *ob, int num_arg, Bool b_ign_prot, Bool b_use_default);
 #define sapply(f,o,n) sapply_int(f,o,n, MY_FALSE, MY_TRUE)

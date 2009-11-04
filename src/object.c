@@ -7666,6 +7666,7 @@ restore_struct (svalue_t *svp, char **str)
     struct_type_t *stt;
     char *pt, *end;
     int siz, extra;
+    Bool rtt_checks; // are RTT checks enabled for this objects program?
 
     end = *str;
 
@@ -7774,11 +7775,20 @@ restore_struct (svalue_t *svp, char **str)
     st = struct_new(stt);
     put_struct(svp, st);
 
+    // check if the objects program has RTT checks enabled.
+    if (current_object->prog->flags & P_RTT_CHECKS)
+        rtt_checks = MY_TRUE;
+    // get a pointer to the structs members in the struct_type_t for checking the types.
+    struct_member_t *member = stt->member;
+    
     /* Restore the values */
-
-    for ( svp = st->member; --siz >= 0; svp++)
+    for ( svp = st->member; --siz >= 0; ++svp, ++member)
     {
         if (!restore_svalue(svp, str, ','))
+        {
+            return MY_FALSE;
+        }
+        if (rtt_checks && !check_rtt_compatibility(member->type, svp))
         {
             return MY_FALSE;
         }

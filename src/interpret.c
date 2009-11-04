@@ -217,7 +217,6 @@
 #include "closure.h"
 #include "comm.h"
 #include "efuns.h"
-#include "exec.h"
 #include "filestat.h"
 #include "gcollect.h"
 #include "heartbeat.h"
@@ -6389,8 +6388,8 @@ test_efun_args (int instr, int args, svalue_t *argp)
 
 
 /*-------------------------------------------------------------------------*/
-static INLINE
-Bool check_rtt_compatibility(vartype_t formaltype, svalue_t *svp)
+static INLINE Bool
+check_rtt_compatibility_inl(vartype_t formaltype, svalue_t *svp)
 // This function checks if <formal_type> and the svalue pointed to by <svp>
 // are compatible (that means, it is allowed to assign *svp to an LPC variable
 // having the type described by <formal_type>. The function handles lvalues,
@@ -6486,6 +6485,13 @@ Bool check_rtt_compatibility(vartype_t formaltype, svalue_t *svp)
     // Fall-through
     return MY_FALSE;
 } // check_rtt_compatibility()
+
+Bool
+check_rtt_compatibility(vartype_t formaltype, svalue_t *svp) 
+{
+    return check_rtt_compatibility_inl(formaltype, svp);
+}
+#define check_rtt_compatibility(ft, svp) check_rtt_compatibility_inl(ft, svp)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
