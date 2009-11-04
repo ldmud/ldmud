@@ -1,6 +1,7 @@
 SYNOPSIS
         mixed to_struct(mixed *|mapping data)
         mixed to_struct(mixed *|mapping data, struct template)
+        mixed to_struct(struct data)
         mixed to_struct(struct data, struct template)
 
 DESCRIPTION
