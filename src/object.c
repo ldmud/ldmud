@@ -193,9 +193,7 @@
 #include "simul_efun.h"
 #include "stdstrings.h"
 #include "strfuns.h"
-#ifdef USE_STRUCTS
 #include "structs.h"
-#endif /* USE_STRUCTS */
 #include "swap.h"
 #include "svalue.h"
 #include "wiz_list.h"
@@ -545,18 +543,14 @@ void
 do_free_sub_strings (int num_strings,   string_t **strings
                     ,int num_variables, variable_t *variables
                     ,int num_includes,  include_t *includes
-#ifdef USE_STRUCTS
                     ,int num_structs,  struct_def_t *struct_defs
-#endif /* USE_STRUCTS */
                     )
 
 /* Free a bunch of shared strings used in connection with an object:
  * the <num_strings> strings in the array <strings>,
  * the <num_variables> names and type objects of the vars in array <variables>, 
  * the <num_includes> names of the includes in array <includes>,
-#ifdef USE_STRUCTS
  * the <num_structs> names of the struct defs in array <struct_defs>, and.
-#endif
  *
  * The function is called from free_prog() and from the compiler epilog().
  */
@@ -582,13 +576,11 @@ do_free_sub_strings (int num_strings,   string_t **strings
         free_mstring(includes[i].filename);
     }
 
-#ifdef USE_STRUCTS
     /* Free all struct names */
     for  (i = num_structs; --i >= 0; )
     {
         free_struct_type(struct_defs[i].type);
     }
-#endif /* USE_STRUCTS */
 }
 
 /*-------------------------------------------------------------------------*/
@@ -705,9 +697,7 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
         do_free_sub_strings( progp->num_strings, progp->strings
                            , progp->num_variables, progp->variables
                            , progp->num_includes, progp->includes
-#ifdef USE_STRUCTS
                            , progp->num_structs, progp->struct_defs
-#endif /* USE_STRUCTS */
                            );
 
         /* Free all inherited objects */
@@ -4761,9 +4751,7 @@ e_say (svalue_t *v, vector_t *avoid)
     case T_OBJECT:
     case T_POINTER:
     case T_MAPPING:
-#ifdef USE_STRUCTS
     case T_STRUCT:
-#endif /* USE_STRUCTS */
         /* tell_room()'s evil twin: send <v> to all recipients' catch_msg() lfun */
 
         for (curr_recipient = recipients; NULL != (ob = *curr_recipient++) ; )
@@ -4777,9 +4765,7 @@ e_say (svalue_t *v, vector_t *avoid)
             case T_OBJECT:  push_ref_object(inter_sp, v->u.ob, "say"); break;
             case T_POINTER: push_ref_array(inter_sp, v->u.vec); break;
             case T_MAPPING: psh_ref_mapping(inter_sp, v->u.map); break;
-#ifdef USE_STRUCTS
             case T_STRUCT:  push_ref_struct(inter_sp, v->u.strct); break;
-#endif /* USE_STRUCTS */
             }
             push_ref_object(inter_sp, origin, "say");
             sapply(STR_CATCH_MSG, ob, 2);
@@ -4790,11 +4776,7 @@ e_say (svalue_t *v, vector_t *avoid)
 
     default:
         errorf("Invalid argument to say(): expected '%s', got '%s'.\n"
-#ifdef USE_STRUCTS
               , efun_arg_typename(T_POINTER|T_MAPPING|T_STRUCT|T_STRING|T_OBJECT)
-#else
-              , efun_arg_typename(T_POINTER|T_MAPPING|T_STRING|T_OBJECT)
-#endif /* USE_STRUCTS */
               , typename(v->type));
     }
 
@@ -4980,9 +4962,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     case T_OBJECT:
     case T_POINTER:
     case T_MAPPING:
-#ifdef USE_STRUCTS
     case T_STRUCT:
-#endif /* USE_STRUCTS */
       {
         /* say()s evil brother: send <v> to all recipients'
          * catch_msg() lfun
@@ -5003,9 +4983,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
             case T_OBJECT:  push_ref_object(inter_sp, v->u.ob, "tell_room"); break;
             case T_POINTER: push_ref_array(inter_sp, v->u.vec); break;
             case T_MAPPING: psh_ref_mapping(inter_sp, v->u.map); break;
-#ifdef USE_STRUCTS
             case T_STRUCT:  push_ref_struct(inter_sp, v->u.strct); break;
-#endif /* USE_STRUCTS */
             }
             push_ref_object(inter_sp, origin, "tell_room");
             sapply(STR_CATCH_MSG, ob, 2);
@@ -5015,11 +4993,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
 
     default:
         errorf("Invalid argument to tell_room(): expected '%s', got '%s'.\n"
-#ifdef USE_STRUCTS
               , efun_arg_typename(T_POINTER|T_MAPPING|T_STRUCT|T_STRING|T_OBJECT)
-#else
-              , efun_arg_typename(T_POINTER|T_MAPPING|T_STRING|T_OBJECT)
-#endif /* USE_STRUCTS */
               , typename(v->type));
     }
 
@@ -5873,7 +5847,6 @@ save_array (vector_t *v)
     }
 } /* save_array() */
 
-#ifdef USE_STRUCTS
 /*-------------------------------------------------------------------------*/
 static void
 save_struct (struct_t *st)
@@ -5924,7 +5897,6 @@ save_struct (struct_t *st)
         L_PUTC_EPILOG
     }
 } /* save_struct() */
-#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -6280,11 +6252,9 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         save_array(v->u.vec);
         break;
 
-#ifdef USE_STRUCTS
     case T_STRUCT:
         save_struct(v->u.strct);
         break;
-#endif /* USE_STRUCTS */
 
     case T_NUMBER:
       {
@@ -6399,7 +6369,6 @@ register_array (vector_t *vec)
     }
 } /* register_array() */
 
-#ifdef USE_STRUCTS
 /*-------------------------------------------------------------------------*/
 static void
 register_struct (struct_t *st)
@@ -6423,7 +6392,6 @@ register_struct (struct_t *st)
         register_svalue(v);
     }
 } /* register_struct() */
-#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -6523,11 +6491,9 @@ register_svalue (svalue_t *svp)
         register_array(svp->u.vec);
         break;
 
-#ifdef USE_STRUCTS
       case T_STRUCT:
         register_struct(svp->u.strct);
         break;
-#endif /* USE_STRUCTS */
 
       case T_MAPPING:
         register_mapping(svp->u.map);
@@ -7189,9 +7155,7 @@ restore_map_size (struct rms_parameters *parameters)
 
             parameters->str = pt + 2;
             if (pt[1] == '{'
-#ifdef USE_STRUCTS
              || pt[1] == '<'
-#endif /* USE_STRUCTS */
                )
                 tsiz = restore_size(&parameters->str);
             else if (pt[1] == '[')
@@ -7459,9 +7423,7 @@ restore_size (char **str)
         switch(*pt)
         {
         case '}':  /* End of array */
-#ifdef USE_STRUCTS
         case '>':  /* End of struct */
-#endif /* USE_STRUCTS */
           {
             if (pt[1] != ')')
                 return -1;
@@ -7499,9 +7461,7 @@ restore_size (char **str)
 
             tmp_par.str = pt + 2;
             if (pt[1] == '{'
-#ifdef USE_STRUCTS
              || pt[1] == '<'
-#endif /* USE_STRUCTS */
                )
                 tsiz = restore_size(&tmp_par.str);
             else if (pt[1] == '[')
@@ -7648,7 +7608,6 @@ restore_array (svalue_t *svp, char **str)
     return MY_TRUE;
 } /* restore_array() */
 
-#ifdef USE_STRUCTS
 /*-------------------------------------------------------------------------*/
 static INLINE Bool
 restore_struct (svalue_t *svp, char **str)
@@ -7819,7 +7778,6 @@ restore_struct (svalue_t *svp, char **str)
     *str = pt;
     return MY_TRUE;
 } /* restore_struct() */
-#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 static INLINE Bool
@@ -8346,7 +8304,6 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
             break;
           }
 
-#ifdef USE_STRUCTS
         case '<':
           {
             if ( !restore_struct(svp, pt) )
@@ -8355,7 +8312,6 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
             }
             break;
           }
-#endif /* USE_STRUCTS */
 
         default:
             *svp = const0;
