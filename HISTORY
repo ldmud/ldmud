@@ -23,6 +23,9 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          if the array is passed as reference. (#224)
        + to_struct() can convert a struct into another one if one of them is
          a (indirect) base of the other. (#646)
+       + restore_object() checks if the types of restored data are compatible
+         with the declared types of variables, if runtime type checks are
+         enabled in the program of the object.
 
     - Removed Efuns:
        + The deprecated efuns cat() and tail() were removed. They can be

@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Nov-2009 (Zesstra)
+  - Check types in restore_object().
+    The types of restored variables are checked for compatibility with their
+    type declaration if the objects program sets the pragma rtt_checks. If
+    the types are not compatible, restore_object() will raise an error.
+    (object.c)
+  - Check types of members upon restoring structs.
+    While restoring struct members, the types of the members are checked for
+    compability with their declared types.
+    (interpret.c, interpret.h, object.c)
+
 03-Nov 2009 (Zesstra)
   - to_struct() converts a given struct into a struct with the same type as
     the template struct given as optional second argument.
