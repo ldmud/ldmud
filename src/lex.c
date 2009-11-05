@@ -3449,6 +3449,11 @@ handle_pragma (char *str)
             pragma_rtt_checks = MY_TRUE;
             validPragma = MY_TRUE;
         }
+        else if (strncmp(base, "no_rtt_checks", namelen) == 0)
+        {
+            pragma_rtt_checks = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
         else if (strncmp(base, "share_variables", namelen) == 0)
         {
             if (variables_defined)

@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Nov-2009 (Zesstra)
+  - Added pragma 'no_rtt_checks' for disabling the runtime type checks.
+    (lex.c)
+
 04-Nov-2009 (Zesstra)
   - Check types in restore_object().
     The types of restored variables are checked for compatibility with their
