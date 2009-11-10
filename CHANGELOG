@@ -7,6 +7,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
     (mapping.c)
   - Pass all unknown telnet options to the mudlib. (#670)
     (comm.c)
+  - Let the player_for_flush list point to interactive_t* directly.
+    This avoids inconsistencies between objects and their interactive
+    structure caused when exec()ing. (Bug #683)
+    (comm.c)
 
 22-Oct-2009 (Zesstra)
   - sort_array(): sort in-place if array is given as reference. (#224)

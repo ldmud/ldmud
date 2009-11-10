@@ -428,9 +428,9 @@ static volatile mp_int urgent_data_time;
   /* The backend::current_time when urgent_data was set last.
    */
 
-static object_t *first_player_for_flush = NULL;
-  /* First interactive user object to flush. Marks the head
-   * of the list formed by interactive.{next,previous}_player_for_flush
+static interactive_t *first_player_for_flush = NULL;
+  /* First interactive user to flush. Marks the head of the list
+   * formed by interactive.{next,previous}_player_for_flush
    */
 
 
@@ -786,10 +786,10 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       putc('\n', stderr);
     fprintf(stderr, "  .message_length:    %d (%p)\n", ip->message_length, ip->message_buf+ip->message_length);
     fprintf(stderr, "  .next_for_flush:    %p", ip->next_player_for_flush);
-      if (ip->next_player_for_flush) fprintf(stderr, " (%s)", get_txt(ip->next_player_for_flush->name));
+      if (ip->next_player_for_flush) fprintf(stderr, " (%s)", get_txt(ip->next_player_for_flush->ob->name));
       putc('\n', stderr);
     fprintf(stderr, "  .prev_for_flush:    %p", ip->previous_player_for_flush);
-      if (ip->previous_player_for_flush) fprintf(stderr, " (%s)", get_txt(ip->previous_player_for_flush->name));
+      if (ip->previous_player_for_flush) fprintf(stderr, " (%s)", get_txt(ip->previous_player_for_flush->ob->name));
       putc('\n', stderr);
     fprintf(stderr, "  .access_class:      %ld\n", ip->access_class);
     fprintf(stderr, "  .charset:          ");
@@ -2075,16 +2075,15 @@ add_flush_entry (interactive_t *ip)
  */
 
 {
-    if ( ip->previous_player_for_flush || first_player_for_flush == ip->ob)
+    if ( ip->previous_player_for_flush || first_player_for_flush == ip)
         return;
 
     if ( NULL != (ip->next_player_for_flush = first_player_for_flush) )
     {
-        O_GET_INTERACTIVE(first_player_for_flush)->
-          previous_player_for_flush = ip->ob;
+        first_player_for_flush->previous_player_for_flush = ip;
     }
     ip->previous_player_for_flush = NULL;
-    first_player_for_flush = ip->ob;
+    first_player_for_flush = ip;
 } /* add_flush_entry() */
 
 /*-------------------------------------------------------------------------*/
@@ -2106,17 +2105,17 @@ remove_flush_entry (interactive_t *ip)
 
     if ( ip->previous_player_for_flush )
     {
-        O_GET_INTERACTIVE(ip->previous_player_for_flush)->next_player_for_flush
+        ip->previous_player_for_flush->next_player_for_flush
           = ip->next_player_for_flush;
     }
-    else if (first_player_for_flush == ip->ob)
+    else if (first_player_for_flush == ip)
     {
         first_player_for_flush = ip->next_player_for_flush;
     }
 
     if ( ip->next_player_for_flush )
     {
-        O_GET_INTERACTIVE(ip->next_player_for_flush)->previous_player_for_flush
+        ip->next_player_for_flush->previous_player_for_flush
           = ip->previous_player_for_flush;
     }
 
@@ -2134,16 +2133,14 @@ flush_all_player_mess (void)
  */
 
 {
-    object_t *p, *np;
-    interactive_t *ip;
+    interactive_t *ip, *nip;
     object_t *save = command_giver;
 
-    for ( p = first_player_for_flush; p != NULL; p = np)
+    for ( ip = first_player_for_flush; ip != NULL; ip = nip)
     {
-        ip = O_GET_INTERACTIVE(p);
-        np = ip->next_player_for_flush;
-          /* add_message() will clobber (p)->next_player_for_flush! */
-        command_giver = p;
+        nip = ip->next_player_for_flush;
+          /* add_message() will clobber (ip)->next_player_for_flush! */
+        command_giver = ip->ob;
         add_message(message_flush);
 
         if(ip->msg_discarded == DM_SEND_INFO)
@@ -3348,6 +3345,8 @@ remove_interactive (object_t *ob, Bool force)
         static unsigned char erq_welcome[] = { IAC, TELOPT_BINARY };
 
         add_message(message_flush);
+        remove_flush_entry(interactive); /* To be sure */
+
         erq_demon = interactive->socket;
         erq_proto_demon = -1;
         socket_write(erq_demon, erq_welcome, sizeof erq_welcome);

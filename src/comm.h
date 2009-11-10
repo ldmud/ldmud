@@ -236,9 +236,9 @@ struct interactive_s {
                                    as name prefix. NULL traces everything. */
     int message_length;         /* Current length of message in message_buf[] */
 
-    object_t *next_player_for_flush;
-    object_t *previous_player_for_flush;
-      /* Double linked list of all active user objects with data pending
+    interactive_t *next_player_for_flush;
+    interactive_t *previous_player_for_flush;
+      /* Double linked list of all interactive users with data pending
        * in message_buf[].
        */
 
