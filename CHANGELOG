@@ -5,6 +5,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - Check for references to destructed objects before entering them as
     keys into a mapping. (#689)
     (mapping.c)
+  - Pass all unknown telnet options to the mudlib. (#670)
+    (comm.c)
 
 22-Oct-2009 (Zesstra)
   - sort_array(): sort in-place if array is given as reference. (#224)
