@@ -1,10 +1,14 @@
 SYNOPSIS
         mixed * map_objects(object *arr, string fun, mixed extra, ...)
+        mixed * map_objects(string *arr, string fun, mixed extra, ...)
 
 BESCHREIBUNG
         map_objects() verhaelt sich aehnlich wie map(), ruft jedoch
-        arr[n]->fun(extra, ...) auf. Der Rueckgabewert ersetzt das Objekt
-        in <arr>. Es ist eine beliebige Anzahl <extra> Argumente erlaubt.
+        arr[n]->fun(extra, ...) auf. Der Rueckgabewert ersetzt das Objekt bzw.
+        den Objektnamen in <arr>.
+        <arr> kann auch eine Mischung aus Objekten und Objektnamen enthalten.
+        Es ist eine beliebige Anzahl <extra> Argumente erlaubt, welche alle an
+        die Funktion <fun> uebergeben werden.
         0-Eintraege in <arr> werden ignoriert.
 
 SIEHE AUCH
