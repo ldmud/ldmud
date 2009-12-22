@@ -12756,7 +12756,12 @@ function_call:
               }
 
               CURRENT_PROGRAM_SIZE--;
-              last_expression--;
+
+              /* If last_expression lies within the program area
+               * that was moved one bytecode adjust it accordingly.
+               */
+              if(last_expression > $<function_call_head>2.start)
+                  last_expression--;
           }
 
           argument_level--;
@@ -12805,6 +12810,9 @@ function_call:
                */
               p[1] = F_SAVE_ARG_FRAME;
               CURRENT_PROGRAM_SIZE += 1;
+
+              /* No expression to optimize here anymore. */
+              last_expression = -1;
           }
 
           if (argument_level+1 == sizeof(got_ellipsis)/sizeof(got_ellipsis[0]))
@@ -13027,6 +13035,12 @@ function_call:
               }
 
               CURRENT_PROGRAM_SIZE--;
+
+              /* If last_expression lies within the program area
+               * that was moved one bytecode adjust it accordingly.
+               */
+              if(last_expression > $<function_call_head>4.start)
+                  last_expression--;
           }
 
           argument_level--;
