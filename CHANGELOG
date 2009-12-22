@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Dec-2009 (Gnomi)
+  - When removing unnecessary F_SAVE_ARG_FRAMEs the compiler didn't
+    adjust last_expression correctly in same cases leading to false
+    program optimizations. (#683, #708, #709)
+    (prolang.y)
+
 10-Nov-2009 (Gnomi)
   - Check for references to destructed objects before entering them as
     keys into a mapping. (#689)
