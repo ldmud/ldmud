@@ -474,13 +474,7 @@ typedef fulltype_t funflag_t;  /* Function flags */
 #define TYPE_MOD_PROTECTED  0x01000000  /* cannot be called externally    */
 #define TYPE_MOD_XVARARGS   0x00800000  /* accepts optional arguments     */
 #define TYPE_MOD_NOSAVE     0x00400000  /* vars: can't be saved           */
-
-#define FUNSTART_MASK       0x000fffff
-  /* Function not inherited: unsigned address of the function code relative
-   * to the begin of the program block (struct program_s->program).
-   */
-
-#define NAME_CROSS_DEFINED  0x00080000
+#define NAME_CROSS_DEFINED  0x00200000
   /* Two functions with the same name inherited from A and B into C.
    * The compiler usually prefers A, and the value 'flags & INHERIT_MASK'
    * (in bias-0x20000 representation) stored as B.offset.func is the
@@ -488,6 +482,11 @@ typedef fulltype_t funflag_t;  /* Function flags */
    * A special use is A uses a function from B. The function is marked
    * in A as undefined, but the compiler will use cross-defining in C
    * to resolve the function calls in A to call the function in B.
+   */
+
+#define FUNSTART_MASK       0x000fffff
+  /* Function not inherited: unsigned address of the function code relative
+   * to the begin of the program block (struct program_s->program).
    */
 
 #define INHERIT_MASK        0x0003ffff
