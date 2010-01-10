@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Jan-2010 (LDMud Team)  (3.2.17)
+  - Created snapshot.
+
 23-Dec-2009 (Gnomi)
   - Wrongly calculated the jump offset of the default label in big switches
     due to a sign error. (Backport of #622 from 3.3)

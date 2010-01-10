@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-xx-xxx-xxxx (LDMud Team) -- 3.2.17
+10-Jan-2010 (LDMud Team) -- 3.2.17
 
     - Fixed Crashers:
        + Removed a crash pkg-tls: we implicitly free'd the client CA list,
