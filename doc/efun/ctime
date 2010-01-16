@@ -21,4 +21,4 @@ HISTORY
         LDMud 3.2.9 introduced the second form.
 
 SEE ALSO
-        gmtime(E), localtime(E), time(E), utime(E)
+        gmtime(E), localtime(E), mktime(E), strftime(E), time(E), utime(E)
