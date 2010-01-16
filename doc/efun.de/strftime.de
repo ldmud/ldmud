@@ -114,4 +114,4 @@ GESCHICHTE
     Eingefuehrt in LDMud 3.3.718.
 
 SIEHE AUCH
-     gmtime(E), localtime(E), mktime(E), time(E), utime(E)
+     ctime(E), gmtime(E), localtime(E), mktime(E), time(E), utime(E)
