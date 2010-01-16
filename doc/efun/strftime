@@ -117,5 +117,5 @@ HISTORY
      Introduced in LDMud 3.3.718.
 
 SEE ALSO
-     gmtime(E), localtime(E), mktime(E), time(E), utime(E)
+     ctime(E), gmtime(E), localtime(E), mktime(E), time(E), utime(E)
 
