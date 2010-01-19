@@ -8951,6 +8951,8 @@ static int nesting = 0;  /* Used to detect recursive calls */
                 rcp->dp = tmp;
                 v = &tmp->v;
                 v->type = T_NUMBER;
+                vtype.typeflags = TYPE_ANY;
+                vtype.t_struct = NULL;
                 break;
             }
 

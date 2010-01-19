@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Jan-2010 (Gnomi)
+  - RTTC in restore_object() didn't handle non-existant variables
+    correctly. (#714)
+    (object.c)
+
 22-Dec-2009 (Gnomi)
   - When removing unnecessary F_SAVE_ARG_FRAMEs the compiler didn't
     adjust last_expression correctly in same cases leading to false
