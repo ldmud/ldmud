@@ -4067,6 +4067,9 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
         call_lambda(&(cb->function.lambda), num_arg + nargs);
         transfer_svalue(&apply_return_value, inter_sp);
         inter_sp--;
+
+        if (toplevel)
+            current_prog = NULL;
     }
     else
     {

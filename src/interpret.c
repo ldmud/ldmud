@@ -6527,7 +6527,9 @@ check_function_args(int fx, program_t *progp, fun_hdr_p funstart)
                 // raise error
                 // At this point, a control frame was already created for this call.
                 // To attribute error to caller, pop that one from the control stack.
-                pop_control_stack();
+                // But only do this, when this is not the first frame.
+                if (csp > CONTROL_STACK)
+                    pop_control_stack();
                 string_t *function_name;
                 memcpy(&function_name, FUNCTION_NAMEP(funstart), sizeof function_name);
                 fulltype_t ft = { .typeflags = arg_type[i].type, .t_struct = arg_type[i].t_struct };

@@ -1,8 +1,15 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Jan-2010 (Gnomi)
+  - RTTC on a toplevel function call doesn't remove the first control
+    stack frame anymore. (#715)
+    (interpret.c)
+  - Heartbeats and call_outs now clear current_prog afterwards. (#715)
+    (simulate.c, heartbeat.c)
+
 19-Jan-2010 (Gnomi)
-  - RTTC in restore_object() didn't handle non-existant variables
+  - RTTC in restore_object() didn't handle nonexistent variables
     correctly. (#714)
     (object.c)
 

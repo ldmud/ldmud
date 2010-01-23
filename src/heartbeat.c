@@ -302,6 +302,7 @@ call_heart_beat (void)
     avg_num_hb_done += hb_num_done  - (avg_num_hb_done >> 10);
 
     current_heart_beat = NULL;
+    current_prog = NULL;
 } /* call_heart_beat() */
 
 /*-------------------------------------------------------------------------*/
