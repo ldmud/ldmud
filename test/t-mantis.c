@@ -1,6 +1,7 @@
 #include "/inc/base.inc"
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
+#include "/sys/debug_info.h"
 
 private float testfloat = 3.499965555966e-01;
 
@@ -356,6 +357,22 @@ nosave mixed *tests = ({
             return 1;
         :)
     }),
+    ({ "0000712", 0,
+        (:
+            // If get_type_info() looses refcounts to the function name, this
+            // will cause the string "get_master_uid" to be free'd
+            // erroneously - reducing the number of tabled strings. This must
+            // not happen here.
+            closure cl = #'get_master_uid;
+            int num = debug_info(DINFO_DATA, DID_STATUS, DID_ST_TABLED);
+            foreach(int i: 10000)
+                if(get_type_info(cl, 4) != "get_master_uid" ||
+                   num != debug_info(DINFO_DATA, DID_STATUS, DID_ST_TABLED))
+                    return 0;
+            return 1;
+        :)
+    }),
+
 });
 
 void run_test()

@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Jan-2010 (Zesstra)
+  - get_type_info() failed to reference the function name it returns, causing
+    the string to loose refcounts and being eventually free'd erronenously.
+    (#712)
+    (efuns.c)
+
 22-Dec-2009 (Gnomi)
   - When removing unnecessary F_SAVE_ARG_FRAMEs the compiler didn't
     adjust last_expression correctly in same cases leading to false
