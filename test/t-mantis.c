@@ -22,40 +22,40 @@ nosave mixed *tests = ({
         (: ctime(({__INT_MAX__,1})); return 1; :)
     }),
     ({ "0000537-1", 0,
-	(:
-	    int a;
-	    { int b = 42; }
-	    int c;
-	    
-	    return c==0;
-	:)
+       (:
+           int a;
+           { int b = 42; }
+           int c;
+
+           return c==0;
+       :)
     }),
     ({ "0000537-2", 0,
-	(:
-	    mapping m = ([ "": 1]);
-	    string key;
-	    foreach (key, int val: &m)
-	    {
-		val++;
-	    }
-	    int tmp=-1;
-	    
-	    return m[""] == 2;
-	:)
+       (:
+           mapping m = ([ "": 1]);
+           string key;
+           foreach (key, int val: &m)
+           {
+              val++;
+           }
+           int tmp=-1;
+
+           return m[""] == 2;
+       :)
     }),
     ({ "0000537-3", 0,
-	(:
+       (:
             {
                 int a;
                 { int b = 42; }
                 int c;
-	    
+
                 return c==0;
             }
-	:)
+       :)
     }),
     ({ "0000537-4", 0,
-	(:
+       (:
             {
                 mapping m = ([ "": 1]);
                 string key;
@@ -67,7 +67,7 @@ nosave mixed *tests = ({
 
                 return m[""] == 2;
             }
-	:)
+       :)
     }),
     ({ "0000528", 0,
        function int ()
@@ -365,14 +365,14 @@ void run_test()
           "--------------------------\n");
 
     run_array(tests,
-	(:
-	    if($1)
-		shutdown(1);
-	    else
-		start_gc(#'shutdown);
-	
-	    return 0;
-	:));
+       (:
+           if($1)
+              shutdown(1);
+           else
+              start_gc(#'shutdown);
+
+           return 0;
+       :));
 }
 
 string *epilog(int eflag)
