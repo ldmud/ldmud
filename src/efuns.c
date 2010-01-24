@@ -6907,7 +6907,8 @@ v_get_type_info (svalue_t *sp, int num_arg)
             if (!function_name)
                 put_number(sp, 0);
             else
-                put_string(sp, function_name);
+                // don't forget to reference the function name
+                put_ref_string(sp, function_name);
             return sp;
             /* NOTREACHED */
         }

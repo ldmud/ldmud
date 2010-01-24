@@ -10,6 +10,8 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          order during initialization of libxml2 (#671) and could lead to
          memory corruption, because the memory used by libxml2 was subject to
          the garbage collector and would be free'd by it while still in use.
+       + get_type_info() lost refcounts to the function name of a closure,
+         causing it eventually being free'd prematurely (#712).
 
     - Changed Efuns:
        + add_action(): The function can be given as a closure. (#243)
