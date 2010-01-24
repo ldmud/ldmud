@@ -5882,7 +5882,6 @@ f_to_array (svalue_t *sp)
     return sp;
 } /* f_to_array() */
 
-#ifdef USE_STRUCTS
 /*-------------------------------------------------------------------------*/
 
 /* -- struct mtos_member_s --
@@ -5949,7 +5948,7 @@ v_to_struct (svalue_t *sp, int num_arg)
  *
  *   mixed to_struct(mixed *|mapping)
  *   mixed to_struct(mixed *|mapping, struct)
- *   mixed to_struct(struct)
+ *   mixed to_struct(struct, struct)
  *
  * An array is converted into a struct of the same length.
  * A mapping is converted into a struct, using those keys with string
@@ -5958,7 +5957,11 @@ v_to_struct (svalue_t *sp, int num_arg)
  * The returned struct is anonymous, or if a template struct is given, a
  * struct of the same type.
  *
- * structs are returned unchanged.
+ * Structs are converted to the template struct (2nd arg) if given. If no 
+ * template given, they are returned unchanged.
+ * Struct conversion is only possible between either a base struct and its
+ * children or a child and one of its base structs, otherwise an error is
+ * raised.
  */
 
 {
@@ -6155,8 +6158,77 @@ v_to_struct (svalue_t *sp, int num_arg)
       }
 
     case T_STRUCT:
-        /* Good as it is */
-        break;
+        {
+            if (num_arg > 1)
+            {
+                int rc;
+                p_int size;
+                
+                struct_t *oldstruct = argp->u.strct;
+                struct_t *newstruct = argp[1].u.strct;
+                svalue_t *memberp; // pointer to the first member of the new struct
+                svalue_t *omemberp; // pointer to the first member of the old struct
+
+                if (argp[1].type != T_STRUCT)
+                    fatal("Bad arg 2 to to_struct(): type %s\n"
+                          , typename(argp[1].type));
+
+                // a template struct was given for conversion
+                // check if template is a base of the old struct or the old struct is
+                // a base of the template.
+                rc = baseof(newstruct->type, oldstruct->type);
+                
+                // special case, same structs.
+                if (rc == 2)
+                {
+                    // no change required, we leave oldstruct on the stack.
+                    break;
+                }
+                if (rc == 1)
+                    size = struct_size(newstruct); // newstruct is base and has <= members than oldstruct.
+                else if (baseof(oldstruct->type, newstruct->type) == 1)
+                    size = struct_size(oldstruct); // oldstruct is base and has <= members than newstruct.
+                else
+                {
+                    // completely unrelated structs? Then we don't convert.
+                    errorf("Can't convert struct %s into struct %s. Neither is a base of the other.\n",
+                           get_txt(struct_unique_name(argp->u.strct)), 
+                           get_txt(struct_unique_name(argp[1].u.strct)));
+                }
+                
+                if (oldstruct->ref == 1 
+                    && struct_size(newstruct) == struct_size(oldstruct))
+                {
+                    // special case, the structs have the same number of members. Since it
+                    // is not possible to remove/change members inherited from a base struct,
+                    // the two structs have the same members. We can just exchange the types
+                    // of the structs.
+                    struct_free_type(oldstruct->type);
+                    oldstruct->type = ref_struct_type(newstruct->type);
+                    break;
+                }
+                
+                newstruct = struct_new(newstruct->type);
+                if (!newstruct)
+                    outofmemory("new struct in to_struct()");
+                for (memberp = newstruct->member, omemberp = oldstruct->member; 
+                     --size >= 0;
+                     ++memberp, ++omemberp)
+                {
+                    // *_no_free, because the members of the new struct only contain 0,
+                    // which need not to be freed.
+                    assign_svalue_no_free(memberp, omemberp);
+                }
+                // the new struct may have more members than the old one (if oldstruct was
+                // the base. That is OK, the extra svalues just remain 0. On the other hand,
+                // if the old struct has more members, we just ignore them.
+                
+                put_struct(argp, newstruct);
+                break;
+            }
+            /* No conversion template given - good as it is, leave it on the stack. */
+            break;
+        }
     }
 
     while (num_arg > 1)
@@ -6169,7 +6241,6 @@ v_to_struct (svalue_t *sp, int num_arg)
     /* sp is now argp */
     return sp;
 } /* f_to_struct() */
-#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
