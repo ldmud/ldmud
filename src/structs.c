@@ -1411,6 +1411,31 @@ x_map_struct (svalue_t *sp, int num_arg)
     return arg;
 } /* x_map_struct () */
 
+
+/*-------------------------------------------------------------------------*/
+int
+baseof(struct_type_t *base, struct_type_t *st)
+/* Test if the struct type <base> is a base of the struct type *st
+ * Results are:
+ *   0: <base> is not a base of <st>, nor is <base> of equal type as <st> 
+ *      (though <st> might be a base of <base>).
+ *   1: <base> is a true base of <st>
+ *   2: <base> and <st> are the same struct type
+ */
+{
+    if (st == base)
+        return 2;
+    
+    while ((st = st->base) != NULL)
+    {
+        if (st == base)
+            return 1;
+    }
+    
+    return 0;
+    
+} // baseof
+
 /*-------------------------------------------------------------------------*/
 svalue_t *
 f_baseof (svalue_t *sp)
@@ -1420,7 +1445,7 @@ f_baseof (svalue_t *sp)
  *    int baseof(struct b, struct s)
  *
  * Test if the type of struct <b> is a base of struct <s> (the values of
- * <b> and <s> are irrelevant). Results is:
+ * <b> and <s> are irrelevant). Results are:
  *   0: <b> is not a base of <s>, nor is <b> of equal type as <s> (though <s>
  *      might be a base of <b>).
  *   1: <b> is a true base of <s>
@@ -1428,29 +1453,11 @@ f_baseof (svalue_t *sp)
  */
 
 {
-    struct_type_t *base, *st;
     int rc;
 
     /* Get the arguments from the stack */
-    base = sp[-1].u.strct->type;
-    st = sp[0].u.strct->type;
-  
-    if (st == base)
-        rc = 2;
-    else
-    {
-        rc = 0;
-
-        while ((st = st->base) != NULL)
-        {
-            if (st == base)
-            {
-                rc = 1;
-                break;
-            }
-        }
-    }
-
+    rc = baseof(sp[-1].u.strct->type, sp[0].u.strct->type);
+    
     /* Remove the arguments and push the result */
     free_svalue(sp); sp--;
     free_svalue(sp);
