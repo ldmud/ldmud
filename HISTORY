@@ -19,7 +19,12 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
        + tail(): marked as deprecated (#228)
        + sort_array() will sort in-place instead of a copying the array first,
          if the array is passed as reference. (#224)
+       + to_struct() can convert a struct into another one if one of them is
+         a (indirect) base of the other. (#646)
 
+    - Runtime
+       + A base struct is recorded as base struct in a child struct even if
+         the base struct has no members. (#695)
 
 30-May-2009 (LDMud Team) -- 3.3.719
     - Fixed Crashes:

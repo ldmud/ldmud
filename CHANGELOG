@@ -6,6 +6,17 @@ See the file HISTORY for a user-oriented summary of all the changes.
     the string to loose refcounts and being eventually free'd erronenously.
     (#712)
     (efuns.c)
+  - Removed a potential double free in struct_new_anonymous(). (structs.c)
+  - Record a base struct as base struct in a child struct even if the base
+    struct has no members. (#695)
+    (prolang.y)
+  - to_struct() converts a given struct into a struct with the same type as
+    the template struct given as optional second argument. (#646)
+    This conversion is only done if the template struct is a base of the given
+    struct or vice versa. Otherwise an error is raised.
+    (efuns.c)
+  - Renamed baseof() to struct_baseof().
+    (structs.c, interpret.c, efuns.c)
 
 22-Dec-2009 (Gnomi)
   - When removing unnecessary F_SAVE_ARG_FRAMEs the compiler didn't
