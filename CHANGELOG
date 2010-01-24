@@ -17,6 +17,11 @@ See the file HISTORY for a user-oriented summary of all the changes.
     (efuns.c)
   - Renamed baseof() to struct_baseof().
     (structs.c, interpret.c, efuns.c)
+  - Use shrink_array() only for alists.
+    Intersecting empty arrays or mappings references the null_vector instead
+    of creating a new empty array with shrink_array(vec,0). shrink_array is
+    only used in intersect_ordered_arr().
+    (array.c, mapping.c)
 
 22-Dec-2009 (Gnomi)
   - When removing unnecessary F_SAVE_ARG_FRAMEs the compiler didn't

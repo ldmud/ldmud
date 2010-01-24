@@ -109,7 +109,9 @@ extern svalue_t *v_unique_array(svalue_t *sp, int num_arg);
 extern void set_vector_user(vector_t *p, object_t *owner);
 extern long total_array_size(void);
 
+#ifdef USE_ALISTS
 extern vector_t * shrink_array (vector_t *p, mp_int n);
+#endif
 
 #if defined(GC_SUPPORT)
 extern void clear_array_size (void);
