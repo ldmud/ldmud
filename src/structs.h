@@ -206,7 +206,7 @@ extern mp_int total_struct_size (strbuf_t *sbuf, Bool verbose);
 extern void   struct_dinfo_status(svalue_t *svp, int value);
 extern string_t * struct_t_unique_name (struct_type_t *pSType);
 #define struct_unique_name(pStruct) struct_t_unique_name(pStruct->type)
-extern int baseof(struct_type_t *base, struct_type_t *st) __attribute__((nonnull(1,2)));
+extern int struct_baseof(struct_type_t *base, struct_type_t *st) __attribute__((nonnull(1,2)));
 
 #ifdef GC_SUPPORT
 
