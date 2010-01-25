@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Jan-2010 (Gnomi)
+  - add_action() leaked the function name string. (#713)
+    (actions.c)
+
 23-Jan-2010 (Zesstra)
   - get_type_info() failed to reference the function name it returns, causing
     the string to loose refcounts and being eventually free'd erronenously.
