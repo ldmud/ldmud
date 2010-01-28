@@ -3194,7 +3194,7 @@ get_string_item ( svalue_t * svp, svalue_t * i, Bool make_singular
 
         if (ind > (mp_int)mstrsize(svp->u.str) )
         {
-            ERRORF(("Index out for [] of bounds: %"PRIdMPINT
+            ERRORF(("Index out of bounds for []: %"PRIdMPINT
                     ", string length: %zu.\n"
                    , ind, mstrsize(svp->u.str)));
             return NULL;
@@ -3288,7 +3288,7 @@ get_string_r_item (svalue_t * svp, svalue_t * i, Bool make_singular
         {
             if (!allow_one_past)
             {
-                ERRORF(("Index out for [<] of bounds: %"PRIdMPINT
+                ERRORF(("Index out of bounds for [<]: %"PRIdMPINT
                         ", string length: %zu.\n"
                        , ind, mstrsize(svp->u.str)));
                 return NULL;
@@ -3367,7 +3367,7 @@ get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
         {
             if (!allow_one_past)
             {
-                ERRORF(("Index out for [>] of bounds: %"PRIdMPINT
+                ERRORF(("Index out of bounds for [>]: %"PRIdMPINT
                         ", string length: %zu.\n"
                        , ind, mstrsize(svp->u.str)));
                 return NULL;
