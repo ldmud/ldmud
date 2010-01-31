@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Jan-2010 (Zesstra)
+  - Increased UDP receive buffer, because UDP datagrams can be much larger
+    than 1024 bytes and the rest of the datagram would be discarded upon
+    recvfrom(). Datagram lengths up to 65507 bytes (including UDP and IPv4
+    headers: 65535) are supported now.
+    (comm.c)
+  - Removed dirty BeOS hack. (comm.c)
+
 23-Jan-2010 (Zesstra)
   - get_type_info() failed to reference the function name it returns, causing
     the string to loose refcounts and being eventually free'd erronenously.

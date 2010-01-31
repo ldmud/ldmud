@@ -238,6 +238,17 @@ p_int write_buffer_max_size = WRITE_BUFFER_MAX_SIZE;
    *  -1: Infinite queue.
    */
 
+static char udp_buf[65536];
+  /* Buffer for incoming UDP datagrams in get_message(). 
+   * If it is too small, the rest of the to be received datagram will be
+   * discarded. As UDP datagrams get be as large as (65536 - UDP-Header -
+   * IP-Header) we will just play safe here.
+   * static (file-scope) buffer, because we don't want to allocate such a
+   * large buffer on the stack or by xalloc (it is used often, we're not
+   * multi-threaded nor is get_message() re-entrant).
+   * Note for IPv6: IPv6 supports so-called jumbograms with payloads up to
+   * 2^32-1 octets in length (rfc2675). Obviously, we don't support that. ;-)
+   */
 
 #ifdef COMM_STAT
 
@@ -2710,7 +2721,7 @@ get_message (char *buff)
         if (udp_s >= 0 && FD_ISSET(udp_s, &readfds))
 #endif
         {
-            char udp_buf[1024+1], *st;
+            char *ipaddr_str;
             int cnt;
 
             length = sizeof addr;
@@ -2733,11 +2744,11 @@ get_message (char *buff)
                     current_object = NULL;
                     trace_level = 0;
 #ifndef USE_IPV6
-                    st = inet_ntoa(addr.sin_addr);
+                    ipaddr_str = inet_ntoa(addr.sin_addr);
 #else
-                    st = inet6_ntoa(addr.sin_addr);
+                    ipaddr_str = inet6_ntoa(addr.sin_addr);
 #endif
-                    push_c_string(inter_sp, st);
+                    push_c_string(inter_sp, ipaddr_str);
                     push_string(inter_sp, udp_data); /* adopts the ref */
                     push_number(inter_sp, ntohs(addr.sin_port));
                     RESET_LIMITS;
