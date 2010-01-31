@@ -2329,8 +2329,7 @@ get_message (char *buff)
                 res = socket_select(nfds, &readfds, &writefds, 0, &timeout);
                 if (res == -1)
                 {
-                    /* BeOS <= PR2 returns errno -1 instead of EINTR :-( */
-                    if (errno == EINTR || errno == -1)
+                    if (errno == EINTR)
                     {
                         /* We got an alarm, probably need heart_beat.
                          * But finish the select call since we already have
@@ -2700,7 +2699,7 @@ get_message (char *buff)
          * We don't test readfds so that we can accept udp messages with
          * short latency. But for the same reason, it was necessary to
          * include the descriptor number in the set to be selected on.
-         * Note for BeOS and Cygwin: since making sockets non-blocking
+         * Note for Cygwin: since making sockets non-blocking
          *   is a bit tricky, we check if the socket is actually ready,
          *   to prevent freezing.
          * TODO: Always use the readfds information.
