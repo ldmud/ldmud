@@ -81,6 +81,10 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
        + A base struct is recorded as base struct in a child struct even if
          the base struct has no members. (#695)
 
+    - Networking
+       + UDP datagrams with lengths up to 65507 (including UDP and IPv4
+         headers: 65535) bytes are supported.
+
     - Other
        + The driver requires a C99 compatible build system. Some checks and
          work-arounds for non-C99 were removed.
