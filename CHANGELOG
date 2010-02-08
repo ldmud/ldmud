@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Feb-2010 (Gnomi)
+  - Explicit context variables overwrote the types of the closure's
+    arguments. (#711)
+    (prolang.y)
+
 31-Jan-2010 (Zesstra)
   - Increased UDP receive buffer, because UDP datagrams can be much larger
     than 1024 bytes and the rest of the datagram would be discarded upon

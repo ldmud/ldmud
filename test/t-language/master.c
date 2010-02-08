@@ -26,7 +26,7 @@ void run_test()
 	if((err = catch(res = load_object(file[0..<3])->run_test();nolog)))
 	{
 	    errors++;
-	    msg(" FAILURE! (%s)\n", err[1..]);
+	    msg(" FAILURE! (%s)\n", err[1..<2]);
 	}
         else if(!res)
 	{
