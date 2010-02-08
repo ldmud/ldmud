@@ -1,5 +1,10 @@
+import os
 import sys
-sys.path.insert(0, "../gdb")
+
+if gdb.current_objfile():
+    sys.path.insert(0, os.path.join(os.path.dirname(gdb.current_objfile().filename), "..", "gdb"))
+else:
+    sys.path.insert(0, "../gdb")
 
 import ldmud
 ldmud.register_printers()
