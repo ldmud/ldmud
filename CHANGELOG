@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Feb-2010 (Gnomi)
+  - optpat() shouldn't read over the end of the given ed command. (#722)
+    (ed.c)
+
 08-Feb-2010 (Gnomi)
   - Explicit context variables overwrote the types of the closure's
     arguments. (#711)

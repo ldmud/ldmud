@@ -1649,9 +1649,11 @@ optpat (void)
     char delim, str[MAXPAT], *cp;
     string_t *buf;
 
-    delim = *inptr++;
+    delim = *inptr;
     if (delim == NL)
         return P_OLDPAT;
+
+    inptr++;
 
     cp = str;
     while (*inptr != delim
