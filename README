@@ -1,10 +1,18 @@
-This is 'LDMud', a continuation of the Amylaar LPMud Gamedriver 3.1.2.
+This is 'LDMud', a gamedriver for LPMuds.
+(LPC compiler, interpreter and runtime environment.)
 
-The latest stable version is available on
+LDMud started as a project to clean up and modernize Amylaar's LPMud
+gamedriver. Primary goals are full documentation, a commented source body and
+out-of-the-box support for the major mudlibs, of which the commented source
+body has been pretty much completed. During the course of work a lot of bug
+fixes and improvements found their way into the driver - much more than
+originally expected, and definitely enough to make LDMud a driver in its own
+right.
 
-  <ftp://ftp.mud.de/pub/software/gamedriver/ldmud/>,
+The latest stable version is available on our homepage at
 
-the homepage is currently <http://www.bearnip.com/lars/proj/ldmud.html>.
+  <http://www.ldmud.de/>
+
 
 The files in this directory are:
 
@@ -13,15 +21,20 @@ The files in this directory are:
   CREDITS     : the list of contributors.
   HISTORY     : a user-oriented history of the last changes.
   CHANGELOG   : the last changes in minute detail.
-  COPYING.LIB : the GNU Library Public License.
   INSTALL     : installation hints and notes.
 
   doc/    : the collected documentation
   src/    : the driver source
-  pkg/    : additional packages (unsupported and supported) for the driver.
+  src/settings:
+            settings for configure for a number of muds
+  src/util: misc. utils like ERQ daemons
   mudlib/ : various LPC (example) files.
+  mudlib/deprecated/:
+            sefuns for removed efuns.
   mudlib/sys/:
             standard include files to copy into your mudlib. Some of these are
-            also used by the src/ files. 
+            also used by the src/ files.
   mud/    : the lp-245 mudlib, and support files for other mudlibs.
-
+  etc/    : misc. scripts, images and syntax files for editors.
+  gdb/    : pretty printers for GDB7 for the main data structures.
+  test/   : the driver test suite, run with ./run.sh after compilation.
