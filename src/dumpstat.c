@@ -105,8 +105,16 @@ svalue_size (svalue_t *v, mp_int * pTotal)
 
     case T_STRING:
     case T_SYMBOL:
-        *pTotal = mstr_mem_size(v->u.str);
-        return *pTotal / v->u.str->info.ref;
+        // If ref==0 the string is probably shared a lot, but we can't estimate
+        // the correct number, so we return 0 as memory consumption for the
+        // string.
+        if (v->u.str->info.ref)
+        {
+            *pTotal = mstr_mem_size(v->u.str);
+            return *pTotal / v->u.str->info.ref;
+        }
+        else
+            return 0;
 
     case T_MAPPING:
     {
