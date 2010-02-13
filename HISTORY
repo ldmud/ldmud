@@ -12,6 +12,7 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
          the garbage collector and would be free'd by it while still in use.
        + get_type_info() lost refcounts to the function name of a closure,
          causing it eventually being free'd prematurely (#712).
+       + 'dumpallobj' crashed if there are strings with 0 refcounts (#725).
 
     - Changed Efuns:
        + get_dir(): prepend '/' in plain mode for entries in the root directory,

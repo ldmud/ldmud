@@ -106,7 +106,7 @@ svalue_size (svalue_t *v, mp_int * pTotal)
     case T_STRING:
     case T_SYMBOL:
         *pTotal = mstr_mem_size(v->u.str);
-        return *pTotal / v->u.str->info.ref;
+        return *pTotal / (v->u.str->info.ref ? v->u.str->info.ref : 1);
 
     case T_MAPPING:
     {
