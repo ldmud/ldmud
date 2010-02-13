@@ -82,9 +82,6 @@ Philip Hazel. LDMud contains just the files required for the driver (with
 small modifications); see pcre/LICENCE for the licence terms and the location
 of the full package, and pcre/README.LDMUD for an explanation of the changes.
 
-The lpc-mode.el for EMACS is Copyright (C) 2002 Vivek Dasmohapatra
-<vivek@etla.org>, and distributed under the GPL.
-
 The PostgreSQL package is based on code written and donated 2001 by Florian
 Heinz.
 
