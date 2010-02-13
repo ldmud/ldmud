@@ -1,6 +1,6 @@
 LDMud, a LPmud gamedriver.
 Copyright 1997-2007 by Lars Duening.
-Copyright 2008-2009 by Bertram Felgenhauer, Alexander Motzkau and
+Copyright 2008-2010 by Bertram Felgenhauer, Alexander Motzkau and
                        Dominik Schaefer.
 
 LDMud is based on LPmud, which is
@@ -62,11 +62,10 @@ the original authors. Use for other purposes than LPmud drivers or under
 licenses significantly different from the original LPmud license needs
 explicite permission.
 
-The random() efun is implemented using the Mersenne Twister generator which is
-Copyright (C) 1997 - 2002, Makoto Matsumoto and Takuji Nishimura, and subject
-to a BSD-style license. The implementation is the faster implementation based
-on Shawn Cokus and Matthew Belle's improvements.  See random.c for the full
-text of the license.
+The random() efun is implemented using the SIMD oriented Fast Mersenne 
+Twister (SFMT) which is Copyright (C) 2006, 2007 Mutsuo Saito, Makoto
+Matsumoto and Hiroshima University, and subject to a BSD-style license.
+See random.c for the full text of the license.
 
 The xerq demon is Copyright (C) 1995 by Brian Gerst. Use of the source
 code is subject to the restriction that it must not be used for monetary
@@ -82,9 +81,6 @@ The PCRE (Perl Compatible Regular Expression) is Copyright (C) 1997-2001 by
 Philip Hazel. LDMud contains just the files required for the driver (with
 small modifications); see pcre/LICENCE for the licence terms and the location
 of the full package, and pcre/README.LDMUD for an explanation of the changes.
-
-The lpc-mode.el for EMACS is Copyright (C) 2002 Vivek Dasmohapatra
-<vivek@etla.org>, and distributed under the GPL.
 
 The PostgreSQL package is based on code written and donated 2001 by Florian
 Heinz.
