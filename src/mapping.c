@@ -1218,7 +1218,12 @@ check_map_for_destr_keys (mapping_t *m)
     p_int             num_values;
     mapping_cond_t *cm;
     mapping_hash_t *hm;
-        
+
+    // If no object was destructed since the last check, there can't be a
+    // key referencing a destructed object in the mapping.
+    if (m->last_destr_check == destructed_ob_counter)
+        return;
+    
     num_values = m->num_values;
     
     /* Scan the condensed part for destructed object references used as keys.
@@ -1324,6 +1329,9 @@ check_map_for_destr_keys (mapping_t *m)
         } /* walk all chains */
     } /* if (hash part exists) */
 
+    // finally, record the current counter of destructed objects.
+    m->last_destr_check = destructed_ob_counter;
+
 } /* check_map_for_destr_keys() */
 
 /*-------------------------------------------------------------------------*/
@@ -1406,17 +1414,8 @@ check_map_for_destr (mapping_t *m)
  */
 
 {
-    // If no object was destructed since the last check, there can't be a
-    // destructed object in the mapping.
-    if (m->last_destr_check == destructed_ob_counter)
-        return;
-
     check_map_for_destr_keys(m);
     check_map_for_destr_values(m);
-
-    // finally, record the current counter of destructed objects.
-    m->last_destr_check = destructed_ob_counter;
-
 } /* check_map_for_destr() */
 
 /*-------------------------------------------------------------------------*/
