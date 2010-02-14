@@ -201,6 +201,13 @@ long num_newly_destructed = 0;
   /* Statistics: Number of objects in the newly_destructed_objs list.
    */
 
+uint32_t destructed_ob_counter = 0;
+  /* this is incremented for each destructed object. The primary purpose is an
+   * optimization for sizeof(): it has to check for destructed objects in
+   * mappings only when this number here changed.
+   * Note: this may (and probably will) overflow and wraparound.
+   */
+
 object_t *master_ob = NULL;
   /* The master object.
    */
@@ -2682,7 +2689,8 @@ destruct (object_t *ob)
     if (ob == obj_list_end)
         obj_list_end = ob->prev_all;
 
-    num_listed_objs--;
+    --num_listed_objs;
+    ++destructed_ob_counter;
 
     ob->super = NULL;
     ob->next_inv = NULL;

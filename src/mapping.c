@@ -521,6 +521,9 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
     m->next = NULL;
     m->num_values = num_values;
     m->num_entries = 0;
+    // there can't be a destructed object in the mapping now, record the
+    // current counter.
+    m->last_destr_check = destructed_ob_counter;
     m->ref = 1;
 
     /* Statistics */
@@ -1218,6 +1221,11 @@ check_map_for_destr (mapping_t *m)
     mapping_cond_t *cm;
     mapping_hash_t *hm;
 
+    // If no object was destructed since the last check, there can't be a
+    // destructed object in the mapping.
+    if (m->last_destr_check == destructed_ob_counter)
+        return;
+
     num_values = m->num_values;
 
     /* Scan the condensed part for destructed object references used as keys.
@@ -1343,6 +1351,9 @@ check_map_for_destr (mapping_t *m)
             } /* walk this chain */
         } /* walk all chains */
     } /* if (hash part exists) */
+
+    // finally, record the current counter of destructed objects.
+    m->last_destr_check = destructed_ob_counter;
 
 } /* check_map_for_destr() */
 

@@ -22,6 +22,7 @@ struct mapping_s {
     wiz_list_t *user;              /* Who made the mapping */
     p_int       num_values;        /* Number of values for a key */
     p_int       num_entries;       /* Number of valid entries */
+    uint32_t    last_destr_check;  /* Last check for destr. object.*/
     struct mapping_cond_s * cond;  /* Condensed entries */
     struct mapping_hash_s * hash;  /* Hashed entries */
     mapping_t  *next;

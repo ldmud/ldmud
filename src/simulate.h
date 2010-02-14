@@ -213,6 +213,7 @@ extern object_t *destructed_objs;
 extern object_t *newly_destructed_objs;
 extern long num_destructed;
 extern long num_newly_destructed;
+extern uint32_t destructed_ob_counter;
 
 extern object_t *current_object;
 extern object_t *current_interactive;
