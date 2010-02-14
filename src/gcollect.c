@@ -445,7 +445,7 @@ cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
 
                 extra.width = p->u.map->num_values;
                 extra.context = context;
-                check_map_for_destr(p->u.map);
+                check_map_for_destr(p->u.map); // Need to check both keys and values
                 walk_mapping(p->u.map, cleanup_mapping_filter, &extra);
 
                 /* Remember the mapping for later compaction (unless

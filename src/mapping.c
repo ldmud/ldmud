@@ -1003,7 +1003,7 @@ static svalue_t local_const0;
             || (max_mapping_keys && MAP_SIZE(m)+1 > max_mapping_keys)
            )
         {
-            check_map_for_destr(m);
+            check_map_for_destr_keys(m);
             msize = (mp_int)MAP_TOTAL_SIZE(m) + m->num_values + 1;
         }
         if (max_mapping_size && msize > (mp_int)max_mapping_size)
@@ -3337,7 +3337,7 @@ m_indices (mapping_t *m)
     svalue_t *svp;
     mp_int size;
 
-    check_map_for_destr(m);
+    check_map_for_destr_keys(m);
     size = MAP_SIZE(m);
     v = allocate_array(size); /* might cause error */
     svp = v->item;

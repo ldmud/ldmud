@@ -10462,7 +10462,9 @@ again:
              || (max_mapping_keys && MAP_SIZE(m) > (p_int)max_mapping_keys)
                )
             {
-                check_map_for_destr(m);
+                // very unlikely that there are destructed keys... But anyway, this is a 
+                // rare error condition.
+                check_map_for_destr_keys(m);
                 if (max_mapping_size && MAP_TOTAL_SIZE(m) > (p_int)max_mapping_size)
                     ERRORF(("Illegal mapping size: %"PRIdPINT
                             " elements (%"PRIdPINT" x %"PRIdPINT")\n"
@@ -12111,7 +12113,7 @@ again:
                  || (max_mapping_keys && MAP_SIZE(argp->u.map) > (p_int)max_mapping_keys)
                   )
                 {
-                    check_map_for_destr(argp->u.map);
+                    check_map_for_destr_keys(argp->u.map);
                     if (max_mapping_size && MAP_TOTAL_SIZE(argp->u.map) > (p_int)max_mapping_size)
                         ERRORF(("Illegal mapping size: %"PRIdMPINT" elements "
                                 "(%"PRIdPINT" x %"PRIdPINT")\n"
@@ -12206,6 +12208,7 @@ again:
         /* Subtract sp[-1] from the value designated by lvalue sp[0] (the
          * order is important), assign the result to sp[0] and also leave
          * it on the stack.
+         * Ex. v1 -= v2;
          *
          * Possible type combinations:
          *   int         - int                -> int
@@ -12398,7 +12401,9 @@ again:
                 m = sp->u.map;
                 check_map_for_destr(m);
 
-                /* Test for the special case 'm - m' */
+                /* Test for the special case 'm - m'
+                 * Note: do not return a new empty mapping, argp->u.map must be changed.
+                 */
                 if (m == argp->u.map)
                 {
                     /* m->ref is > 1, because the content of the lvalue is
@@ -16384,7 +16389,7 @@ again:
         if (sp->type == T_MAPPING)
         {
             mapping_t *m = sp->u.map;
-            check_map_for_destr(m); /* Don't count the destructed keys! */
+            check_map_for_destr_keys(m); /* Don't count the destructed keys! */
             i = MAP_SIZE(m);
             free_svalue(sp);
             put_number(sp, i);
