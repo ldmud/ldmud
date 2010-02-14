@@ -1208,57 +1208,49 @@ mapping_references_objects (mapping_t *m)
 
 /*-------------------------------------------------------------------------*/
 void
-check_map_for_destr (mapping_t *m)
+check_map_for_destr_keys (mapping_t *m)
 
-/* Check the mapping <m> for references to destructed objects.
- * Where they appear as keys, both key and associated values are
- * deleted from the mapping. Where they appear as values, they are
- * replaced by svalue-0.
+/* Check the mapping <m> for keys referencing destructed objects
+ * If one is found, both key and associated values are deleted from the mapping.
  */
 
 {
     p_int             num_values;
     mapping_cond_t *cm;
     mapping_hash_t *hm;
-
-    // If no object was destructed since the last check, there can't be a
-    // destructed object in the mapping.
-    if (m->last_destr_check == destructed_ob_counter)
-        return;
-
+        
     num_values = m->num_values;
-
+    
     /* Scan the condensed part for destructed object references used as keys.
      */
-
     if (NULL != (cm = m->cond))
     {
         size_t ix;
         svalue_t * entry;
-
-        /* First, scan the keys */
+        
+        /* Scan the keys */
         for (ix = 0, entry = &(cm->data[0]); ix < cm->size; ++ix, ++entry)
         {
             if (T_INVALID == entry->type)
                 continue;
-
+            
             if (destructed_object_ref(entry))
             {
                 p_int i;
                 svalue_t * data = COND_DATA(cm, ix, num_values);
-
+                
                 /* Destructed key: remove the whole entry */
                 m->num_entries--;
-
+                
                 free_svalue(entry);
                 entry->type = T_INVALID;
-
+                
                 for (i = num_values; i > 0; --i, data++)
                 {
                     free_svalue(data);
                     put_number(data, 0);
                 }
-
+                
                 /* Count the deleted entry in the hash part.
                  * Create it if necessary.
                  */
@@ -1274,50 +1266,41 @@ check_map_for_destr (mapping_t *m)
                     m->hash = hm;
                     num_dirty_mappings++;
                 }
-
+                
                 hm->cond_deleted++;
-
+                
                 continue;
             }
         } /* for (all keys) */
-
-        /* Second, scan the values */
-        for ( ix = 0, entry = &(cm->data[cm->size])
-            ; ix < num_values * cm->size; ++ix, ++entry)
-        {
-            if (destructed_object_ref(entry))
-            {
-                assign_svalue(entry, &const0);
-            }
-        } /* for (all values) */
+        
     } /* if (m->cond) */
-
+    
     /* If it exists, scan the hash part for destructed objects.
      */
-
+    
     if ( NULL != (hm = m->hash) )
     {
         map_chain_t **mcp, **mcp2, *mc;
-        p_int i, j;
-
+        p_int i;
+        
         /* Walk all chains */
-
+        
         for (mcp = hm->chains, i = hm->mask + 1; --i >= 0;)
         {
             /* Walk this chain */
-
+            
             for (mcp2 = mcp++; NULL != (mc = *mcp2); )
             {
                 /* Destructed object as key: remove entry */
-
+                
                 svalue_t * entry = &(mc->data[0]);
-
+                
                 if (destructed_object_ref(entry))
                 {
                     m->num_entries--;
-
+                    
                     *mcp2 = mc->next;
-
+                    
                     /* If the mapping is a protector mapping, move
                      * the entry into the 'deleted' list, else
                      * just deallocate it.
@@ -1335,22 +1318,101 @@ check_map_for_destr (mapping_t *m)
                     continue;
                 }
 
-                /* Scan the values of this entry (not reached
-                 * if the entry was removed above
-                 */
-                for (entry++, j = num_values; j > 0; --j, ++entry)
+                mcp2 = &mc->next;
+                
+            } /* walk this chain */
+        } /* walk all chains */
+    } /* if (hash part exists) */
+
+} /* check_map_for_destr_keys() */
+
+/*-------------------------------------------------------------------------*/
+void
+check_map_for_destr_values (mapping_t *m)
+
+/* Check the mapping <m> for values referencing destructed objects.
+ * Any such values replaced by svalue-0.
+ */
+
+{
+    p_int             num_values;
+    mapping_cond_t *cm;
+    mapping_hash_t *hm;
+        
+    num_values = m->num_values;
+    
+    /* Scan the condensed part for destructed object references in values
+     */
+    if (NULL != (cm = m->cond))
+    {
+        size_t ix;
+        svalue_t * entry;
+                
+        /* Scan the values */
+        for ( ix = 0, entry = &(cm->data[cm->size])
+             ; ix < num_values * cm->size; ++ix, ++entry)
+        {
+            if (destructed_object_ref(entry))
+            {
+                assign_svalue(entry, &const0);
+            }
+        } /* for (all values) */
+    } /* if (m->cond) */
+    
+    /* If it exists, scan the hash part for destructed objects.
+     */
+    
+    if ( NULL != (hm = m->hash) )
+    {
+        map_chain_t **mcp, **mcp2, *mc;
+        p_int i, j;
+        
+        /* Walk all chains */
+        
+        for (mcp = hm->chains, i = hm->mask + 1; --i >= 0;)
+        {
+            /* Walk this chain */
+            
+            for (mcp2 = mcp++; NULL != (mc = *mcp2); )
+            {
+
+                svalue_t * entry = &(mc->data[0]); // this is the key
+                                
+                /* Scan the values of this entry */
+                for (++entry, j = num_values; j > 0; --j, ++entry)
                 {
                     if (destructed_object_ref(entry))
                     {
                         assign_svalue(entry, &const0);
                     }
                 }
-
+                
                 mcp2 = &mc->next;
-
+                
             } /* walk this chain */
         } /* walk all chains */
     } /* if (hash part exists) */
+        
+} /* check_map_for_destr_values() */
+
+/*-------------------------------------------------------------------------*/
+void
+check_map_for_destr (mapping_t *m)
+
+/* Check the mapping <m> for references to destructed objects.
+ * Where they appear as keys, both key and associated values are
+ * deleted from the mapping. Where they appear as values, they are
+ * replaced by svalue-0.
+ */
+
+{
+    // If no object was destructed since the last check, there can't be a
+    // destructed object in the mapping.
+    if (m->last_destr_check == destructed_ob_counter)
+        return;
+
+    check_map_for_destr_keys(m);
+    check_map_for_destr_values(m);
 
     // finally, record the current counter of destructed objects.
     m->last_destr_check = destructed_ob_counter;
