@@ -6,7 +6,7 @@ DESCRIPTION
 
         The arg will be automatically included into every compiled LPC
         object. This is useful to enforce global definitions, e.g.
-        ``#pragma combine_strings'' or ``#pragma strict_types''.  The
+        ``#pragma rtt_checks'' or ``#pragma strict_types''.  The
         calling object needs to be privileged by the master object.
 
         Note that the auto-include-string is cleared when the master

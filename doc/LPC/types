@@ -74,14 +74,11 @@ DESCRIPTION
                   \r   : Carriage Return (0x0d)
                   \"   : The double quote (")
                   \<other character>: the given character
-                
+
                 Adjacent string literals are automatically
                 concatenated by the driver when the LPC program is
                 compiled. String literals joined with '+' are
-                concatenated by the LPC compiler if the #pragma
-                combine_strings is set (the default); if the pragma is
-                not set, the string literals are conacatenated at run
-                time.
+                concatenated by the LPC compiler as well.
 
     o object    Pointer to an object. Objects are always passed by
                 reference.

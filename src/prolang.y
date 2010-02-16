@@ -9254,11 +9254,11 @@ expr0:
           current_size = CURRENT_PROGRAM_SIZE;
           p = &(PROGRAM_BLOCK[current_size]);
 
-          /* Check if we can combine strings: the pragma must agree
-           * and the last four bytes must be two CSTRINGx instructions.
+          /* Check if we can combine strings: the last four bytes must be two 
+           * CSTRINGx instructions.
+           * TODO: handle F_STRING as well.
            */
-          if (pragma_combine_strings
-           && last_expression + 2 == current_size
+          if (last_expression + 2 == current_size
            && $<numbers>3[0] + 4 == (mp_int)current_size
            && ((p[-2]-(F_CSTRING0)) & ~3) == 0
            && ((p[-4]-(F_CSTRING0)) & ~3) == 0

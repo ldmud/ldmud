@@ -166,10 +166,6 @@ Bool pragma_save_types;
   /* True: save argument types after compilation.
    */
 
-Bool pragma_combine_strings;
-  /* True: perform '+'-addition of constant strings at compile time.
-   */
-
 Bool pragma_verbose_errors;
   /* True: give info on the context of an error.
    */
@@ -3344,14 +3340,13 @@ handle_pragma (char *str)
             pragma_save_types = MY_TRUE;
             validPragma = MY_TRUE;
         }
+        // the following two pragmas are ignored.
         else if (strncmp(base, "combine_strings", namelen) == 0)
         {
-            pragma_combine_strings = MY_TRUE;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "no_combine_strings", namelen) == 0)
         {
-            pragma_combine_strings = MY_FALSE;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "verbose_errors", namelen) == 0)
@@ -5367,7 +5362,6 @@ start_new_file (int fd, const char * fname)
     pragma_warn_deprecated = MY_FALSE;
     pragma_range_check = MY_FALSE;
     pragma_warn_empty_casts = MY_TRUE;
-    pragma_combine_strings = MY_TRUE;
     pragma_share_variables = share_variables;
     pragma_rtt_checks = MY_FALSE;
 

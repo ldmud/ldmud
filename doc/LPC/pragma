@@ -6,18 +6,6 @@ DESCRIPTION
         several compilation options. Multiple options can be selected
         in one #pragma directive by separating them with commas.
 
-        combine_strings: Perform the addition of string literals at
-                compile time instead of run time, e.g. "foo"+"bar"
-                will be compiled as "foobar". Like the concatenation
-                of adjacent string literals ("foo" "bar" is compiled
-                as "foobar" as well) already done by the preprocessor,
-                the combine_strings will save memory, because the combined
-                strings can be shared between a blueprint and it's clones,
-                and the strings also have a good chance to be entered
-                into the global shared-string-table.
-        no_combine_string: Contrary to combine_strings, may be used to
-                deactivate a combine_strings pragma.
-
         no_clone: The blueprint object can't be cloned.
         no_inherit: The program can't be inherited.
         no_shadow: The program can't be shadowed (similar to declaring
@@ -132,6 +120,7 @@ HISTORY
         LDMud 3.3.378 added init_variables, share_variables.
         LDMud 3.3.357 added (no_)warn_missing_return.
         LDMud 3.3.646 added (no_)range_check.
+        LDMud 3.5.0 removed combine_strings and no_combine_strings.
 
 SEE ALSO
         inheritance(LPC), initialisation(LPC), objects(C),

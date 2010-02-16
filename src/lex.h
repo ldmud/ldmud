@@ -221,7 +221,6 @@ extern source_loc_t current_loc;
 extern Bool pragma_strict_types;
 extern Bool pragma_use_local_scopes;
 extern Bool pragma_save_types;
-extern Bool pragma_combine_strings;
 extern Bool pragma_verbose_errors;
 extern Bool pragma_no_clone;
 extern Bool pragma_no_inherit;
