@@ -47,8 +47,8 @@ DESCRIPTION
         no_range_check: Turns off range_check (the default).
 
         warn_deprecated: Use of deprecated efuns or indexing operations
-                causes the compiler to issue a warning.
-        no_warn_deprecated: Turns off warn_deprecated (the default).
+                causes the compiler to issue a warning (the default).
+        no_warn_deprecated: Turns off warn_deprecated.
 
         warn_empty_casts: A cast of a value to its own type generates
                 a warning (the default). Exception are casts to type
@@ -111,6 +111,7 @@ HISTORY
         LDMud 3.5.0 removed combine_strings and no_combine_strings.
         LDMud 3.5.0 removed local_scopes and no_local_scopes.
         LDMud 3.5.0 removed verbose_errors (making its behaviour mandatory).
+        LDMud 3.5.0 enabled warn_deprecated by default.
 
 SEE ALSO
         inheritance(LPC), initialisation(LPC), objects(C),

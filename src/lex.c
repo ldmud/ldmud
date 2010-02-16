@@ -5348,7 +5348,7 @@ start_new_file (int fd, const char * fname)
     pragma_no_shadow = MY_FALSE;
     pragma_pedantic = MY_FALSE;
     pragma_warn_missing_return = MY_TRUE;
-    pragma_warn_deprecated = MY_FALSE;
+    pragma_warn_deprecated = MY_TRUE;
     pragma_range_check = MY_FALSE;
     pragma_warn_empty_casts = MY_TRUE;
     pragma_share_variables = share_variables;
