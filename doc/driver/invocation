@@ -109,16 +109,16 @@ DESCRIPTION
         Set the granularity of call_out() and heartbeat timing. Minimum
         value is 1.
 
-      --heart-interval <seconds>
+      --heart-beat-interval <seconds>
         Set the interval between two heartbeats. Minimum value is 1.
 
-      --sync-heart
+      --synchronous-heart-beat
         All heartbeats occur at the same time (modulo granularity).
-      
-      --async-heart
+
+      --asynchronous-heart-beat
         Heartbeats occur when they are due (modulo granularity).
 
-      -t|--no-heart
+      -t|--no-heart-beat
         Disable heartbeats and call_outs.
 
       -f|--funcall <word>

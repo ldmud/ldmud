@@ -1103,7 +1103,7 @@ typedef enum OptNumber {
  , cMaster          /* --master             */
  , cMudlib          /* --mudlib             */
  , cDebugFile       /* --debug-file         */
- , cHBInterval      /* --heart-interval     */
+ , cHBInterval      /* --heart-beat-interval     */
  , cHostname        /* --hostname           */
  , cHostaddr        /* --hostaddr           */
  , cAccessFile      /* --access-file        */
@@ -1140,8 +1140,8 @@ typedef enum OptNumber {
  , cSwapVars        /* --swap-variables     */
  , cSwapFile        /* --swap-file          */
  , cSwapCompact     /* --swap-compact       */
- , cSyncHB          /* --sync-heart         */
- , cASyncHB         /* --async-heart        */
+ , cSyncHB          /* --synchronous-heart-beat         */
+ , cASyncHB         /* --asynchronous-heart-beat        */
  , cWizlistFile     /* --wizlist-file       */
  , cNoWizlistFile   /* --no-wizlist-file    */
 #ifdef GC_SUPPORT
@@ -1314,26 +1314,26 @@ static Option aOptions[]
       }
 
     , { 0,   "heart-interval",     cHBInterval,   MY_TRUE
-      , "  --heart-interval <time>\n"
-      , "  --heart-interval <time>\n"
+      , "  --heart-beat-interval <time>\n"
+      , "  --heart-beat-interval <time>\n"
         "    The time to elapse between two heartbeats (minimum: 1).\n"
       }
 
     , { 0,   "sync-heart",         cSyncHB,       MY_FALSE
-      , "  --sync-heart\n"
-      , "  --sync-heart\n"
+      , "  --synchronous-heart-beat\n"
+      , "  --synchronous-heart-beat\n"
         "    All heartbeats are executed at the same time (modulo granularity).\n"
       }
 
-    , { 0,   "async-heart",        cASyncHB,       MY_FALSE
-      , "  --async-heart\n"
-      , "  --async-heart\n"
+    , { 0,   "asynchronous-heart-beat",        cASyncHB,       MY_FALSE
+      , "  --asynchronous-hear-beat\n"
+      , "  --asynchronous-hear-beatt\n"
         "    Heartbeats are executed immediately when they are due (modulo granularity).\n"
       }
 
-    , { 't', "no-heart",           cNoHeart,        MY_FALSE
-      , "  -t|--no-heart\n"
-      , "  -t|--no-heart\n"
+    , { 't', "no-heart-beat",           cNoHeart,        MY_FALSE
+      , "  -t|--no-heart-beat\n"
+      , "  -t|--no-heart-beat\n"
         "    Disable heartbeats and call_outs.\n"
       }
 

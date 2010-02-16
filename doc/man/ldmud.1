@@ -100,19 +100,19 @@ Don't start the erq demon (if it would be started at all).
 .IP
 The granularity of call_out()s and heartbeats (minimum: 1).
 .HP
-\fB\-\-heart\-interval\fR <time>
+\fB\-\-heart\-beat\-interval\fR <time>
 .IP
 The time to elapse between two heartbeats (minimum: 1).
 .HP
-\fB\-\-sync\-heart\fR
+\fB\-\-synchronous\-heart\-beat\fR
 .IP
 All heartbeats are executed at the same time (modulo granularity).
 .HP
-\fB\-\-async\-heart\fR
+\fB\-\-asynchronous\-heart\-beat\fR
 .IP
 Heartbeats are executed immediately when they are due (modulo granularity).
 .HP
-\fB\-t\fR|--no-heart
+\fB\-t\fR|--no-heart-beat
 .IP
 Disable heartbeats and call_outs.
 .HP

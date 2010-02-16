@@ -92,6 +92,11 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
        + A bunch of statistic counters (string handler, object table, swapper,
          network layer,...) were changed to a larger type to prevent them from
          overflowing. (#521, #608)
+       + Renamed some command-line flags to match the LPC defines better (#704)
+         --heart-interval -> --heart-beat-interval
+         --sync-heart     -> --synchronous-heart-beat
+         --async-heart    -> --asynchronous-heart-beat
+         --no-heart       -> --no-heart-beat
 
 30-May-2009 (LDMud Team) -- 3.3.719
     - Fixed Crashes:
