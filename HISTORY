@@ -81,6 +81,10 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
            'no_rtt_checks', which disables runtime type checks.
        + A base struct is recorded as base struct in a child struct even if
          the base struct has no members. (#695)
+       + The behaviour of the pragmas combine_strings, verbose_errors and
+         local_scopes are mandatory. These three pragmas plus their no_* 
+         variants are ignored.
+       + The pragma warn_deprecated is no enabled by default.
 
     - Networking
        + UDP datagrams with lengths up to 65507 (including UDP and IPv4
