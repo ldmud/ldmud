@@ -142,10 +142,6 @@ static const char *object_file;
   /* Name of the file for which the lexer was originally called.
    */
 
-Bool pragma_use_local_scopes;
-  /* True: treat all local scopes as one.
-   */
-
 Bool pragma_warn_missing_return;
   /* True: generate a runtime warning if a value-returning function
    * does end with an explicit return statement.
@@ -3379,14 +3375,13 @@ handle_pragma (char *str)
             pragma_pedantic = MY_FALSE;
             validPragma = MY_TRUE;
         }
+        // These two pragmas are ignored.
         else if (strncmp(base, "no_local_scopes", namelen) == 0)
         {
-            pragma_use_local_scopes = MY_FALSE;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "local_scopes", namelen) == 0)
         {
-            pragma_use_local_scopes = MY_TRUE;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "warn_missing_return", namelen) == 0)
@@ -5351,7 +5346,6 @@ start_new_file (int fd, const char * fname)
     pragma_strict_types = PRAGMA_WEAK_TYPES;
     instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_ANY;
     instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_ANY;
-    pragma_use_local_scopes = MY_TRUE;
     pragma_save_types = MY_FALSE;
     pragma_verbose_errors = MY_FALSE;
     pragma_no_clone = MY_FALSE;

@@ -219,7 +219,6 @@ extern struct lpc_predef_s * lpc_predefs;
 extern int total_lines;
 extern source_loc_t current_loc;
 extern Bool pragma_strict_types;
-extern Bool pragma_use_local_scopes;
 extern Bool pragma_save_types;
 extern Bool pragma_verbose_errors;
 extern Bool pragma_no_clone;

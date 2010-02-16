@@ -25,7 +25,7 @@ DESCRIPTION
         outer blocks.
 
 HISTORY
-        Up to 3.2.7, local variables were visible (from their point of
+        Up to 3.2.7 local variables were visible (from their point of
         definition) in the whole function. That is, code like
 
             do {
@@ -38,9 +38,11 @@ HISTORY
         was perfectly legal. It is no longer, as 'res' ceases to exist
         with the closing '}' of the while().
 
-        You can get this old behaviour back with the #pragma no_local_scopes.
-        To turn it off again, use #pragma local_scopes.
+        Up to 3.5.0 you could get this old behaviour back with the 
+        #pragma no_local_scopes and switch it off again with 
+        #pragma local_scopes.
 
+        Since 3.5.0 it is not possible to disable the local scope behaviour.
 
         Up to 3.2.8, local variables could not be initialised in their
         definition.

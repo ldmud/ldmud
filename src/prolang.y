@@ -582,12 +582,6 @@ static int block_depth;
    *             > 2: vars of nested blocks within the function
    */
 
-static Bool use_local_scopes;
-  /* Copy of pragma_use_local_scopes, updated at every entry into
-   * a function. Reason is that the pragma must not change inside
-   * a function.
-   */
-
 /*-------------------------------------------------------------------------*/
 /* Information describing inline closures.
 */
@@ -2853,34 +2847,29 @@ init_scope (int depth)
 static void
 enter_block_scope (void)
 
-/* Enter a new scope and initialize it (if use_local_scopes requires it).
+/* Enter a new scope and initialize it.
  */
 
 {
     if (block_depth == COMPILER_STACK_SIZE)
         yyerror("Too deep nesting of local blocks.\n");
 
-    if (use_local_scopes)
-    {
-        block_depth++;
-        init_scope(block_depth);
-    }
+    block_depth++;
+    init_scope(block_depth);
+
 } /* enter_block_scope() */
 
 /*-------------------------------------------------------------------------*/
 static void
 leave_block_scope (Bool dontclobber)
 
-/* Leave the current scope (if use_local_scopes requires it), freeing
- * all local names defined in that scope.
+/* Leave the current scope, freeing all local names defined in that scope.
  *
  * <dontclobber> should be MY_TRUE if the stack of the to-be-left scope
  * is independent of the outer scope (i.e. the scope of closures).
  */
 
 {
-    if (use_local_scopes)
-    {
         free_local_names(block_depth);
         block_depth--;
         if (block_depth && !dontclobber
@@ -2890,7 +2879,6 @@ leave_block_scope (Bool dontclobber)
             /* the block we just left may have clobbered local variables */
             block_scope[block_depth-1].clobbered = MY_TRUE;
         }
-    }
 } /* leave_block_scope() */
 
 
@@ -3783,7 +3771,6 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident, Bool is_inline)
     }
     else
     {
-        use_local_scopes = pragma_use_local_scopes;
         block_depth = 1;
         init_scope(block_depth);
     }
@@ -5082,12 +5069,6 @@ prepare_inline_closure (fulltype_t returntype)
     char name[256+MAXPATHLEN+1];
     ident_t * ident;
 
-    if (!use_local_scopes)
-    {
-        yyerror("Inline closures require local scoping");
-        return MY_FALSE;
-    }
-
     /* Create the name of the new inline function.
      * We have to make sure the name is really unique.
      */
@@ -6118,7 +6099,7 @@ printf("DEBUG: After L_END_INLINE: program size %"PRIuMPINT"\n", CURRENT_PROGRAM
          /* Complete the F_CLEAR_LOCALS at the beginning of the block. */
          block_scope_t *scope = block_scope + block_depth - 1;
 
-         if (use_local_scopes && scope->num_locals > scope->num_cleared)
+         if (scope->num_locals > scope->num_cleared)
          {
               mem_block[A_PROGRAM].block[scope->addr+2]
                 = (char)(scope->num_locals - scope->num_cleared);
@@ -6988,7 +6969,7 @@ statements_block:
           {
               block_scope_t *scope = block_scope + block_depth - 1;
 
-              if (use_local_scopes && scope->num_locals > scope->num_cleared)
+              if (scope->num_locals > scope->num_cleared)
               {
                   mem_block[A_PROGRAM].block[scope->addr+2]
                     = (char)(scope->num_locals - scope->num_cleared);
@@ -7617,7 +7598,7 @@ for:
           {
               block_scope_t *scope = block_scope + block_depth - 1;
 
-              if (use_local_scopes && scope->num_locals > scope->num_cleared)
+              if (scope->num_locals > scope->num_cleared)
               {
                   mem_block[A_PROGRAM].block[scope->addr+2]
                     = (char)(scope->num_locals - scope->num_cleared);
@@ -7851,7 +7832,7 @@ foreach:
           {
               block_scope_t *scope = block_scope + block_depth - 1;
 
-              if (use_local_scopes && scope->num_locals > scope->num_cleared)
+              if (scope->num_locals > scope->num_cleared)
               {
                   mem_block[A_PROGRAM].block[scope->addr+2]
                     = (char)(scope->num_locals - scope->num_cleared);
@@ -13825,7 +13806,7 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
             q = add_local_name(name, actual_type, block_depth);
     }
 
-    if (use_local_scopes && scope->clobbered)
+    if (scope->clobbered)
     {
         /* finish the previous CLEAR_LOCALS, if any */
         if (scope->num_locals - 1 > scope->num_cleared)
@@ -13835,7 +13816,7 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
         scope->num_cleared = scope->num_locals - 1;
     }
 
-    if (use_local_scopes && scope->num_locals == scope->num_cleared + 1)
+    if (scope->num_locals == scope->num_cleared + 1)
     {
         /* First definition of a local, so insert the
          * clear_locals bytecode and remember its position
@@ -15916,7 +15897,6 @@ prolog (const char * fname, Bool isMasterObj)
     current_break_address    = 0;
     num_parse_error  = 0;
     block_depth      = 0;
-    use_local_scopes = MY_TRUE;
     default_varmod = 0;
     default_funmod = 0;
     current_inline = NULL;

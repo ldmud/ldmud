@@ -41,14 +41,6 @@ DESCRIPTION
                 the actual context of the errorenous text. This is
                 helpful with errors within long expressions.
 
-        no_local_scopes, local_scopes: when local scoping is turned
-                off, local variables are visible even outside
-                their defining blocks. The setting of this pragma is
-                considered upon entry into a function only. By default,
-                local scoping is on.
-        local_scopes: local variables are visible only inside their
-                defining blocks.
-
         pedantic: Certain warnings are treated as errors:
                 - failure to pass enough arguments to simul efuns
         sloppy: Turns off pedantic (the default).
@@ -121,6 +113,7 @@ HISTORY
         LDMud 3.3.357 added (no_)warn_missing_return.
         LDMud 3.3.646 added (no_)range_check.
         LDMud 3.5.0 removed combine_strings and no_combine_strings.
+        LDMud 3.5.0 removed local_scopes and no_local_scopes.
 
 SEE ALSO
         inheritance(LPC), initialisation(LPC), objects(C),
