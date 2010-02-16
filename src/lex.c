@@ -162,10 +162,6 @@ Bool pragma_save_types;
   /* True: save argument types after compilation.
    */
 
-Bool pragma_verbose_errors;
-  /* True: give info on the context of an error.
-   */
-
 Bool pragma_no_clone;
   /* True: prevent the object from being clone.
    */
@@ -3345,9 +3341,9 @@ handle_pragma (char *str)
         {
             validPragma = MY_TRUE;
         }
+        // verbose_error is ignored, its behaviour is always enabled.
         else if (strncmp(base, "verbose_errors", namelen) == 0)
         {
-            pragma_verbose_errors = MY_TRUE;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "no_clone", namelen) == 0)
@@ -5347,7 +5343,6 @@ start_new_file (int fd, const char * fname)
     instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_ANY;
     instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_ANY;
     pragma_save_types = MY_FALSE;
-    pragma_verbose_errors = MY_FALSE;
     pragma_no_clone = MY_FALSE;
     pragma_no_inherit = MY_FALSE;
     pragma_no_shadow = MY_FALSE;
@@ -7368,9 +7363,6 @@ lex_error_context (void)
     static char buf[21];
     char *end;
     mp_int len;
-
-    if (!pragma_verbose_errors)
-        return "";
 
     strcpy(buf, ((signed char)yychar == -1 || yychar == CHAR_EOF)
                 ? (len = 6, " near ")

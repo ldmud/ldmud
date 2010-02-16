@@ -37,10 +37,6 @@ DESCRIPTION
                 recommended.
         no_rtt_checks: disable runtime type checks for this program (default).
 
-        verbose_errors: upon a compilation error, the driver displays
-                the actual context of the errorenous text. This is
-                helpful with errors within long expressions.
-
         pedantic: Certain warnings are treated as errors:
                 - failure to pass enough arguments to simul efuns
         sloppy: Turns off pedantic (the default).
@@ -114,6 +110,7 @@ HISTORY
         LDMud 3.3.646 added (no_)range_check.
         LDMud 3.5.0 removed combine_strings and no_combine_strings.
         LDMud 3.5.0 removed local_scopes and no_local_scopes.
+        LDMud 3.5.0 removed verbose_errors (making its behaviour mandatory).
 
 SEE ALSO
         inheritance(LPC), initialisation(LPC), objects(C),
