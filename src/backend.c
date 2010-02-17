@@ -329,7 +329,6 @@ handle_usr1 (int sig UNUSED)
     extra_jobs_to_do = MY_TRUE;
     master_will_be_updated = MY_TRUE;
     eval_cost += max_eval_cost >> 3;
-    (void)signal(SIGUSR1, handle_usr1);
 #ifndef RETSIGTYPE_VOID
     return 0;
 #endif
@@ -347,7 +346,6 @@ handle_usr2 (int sig UNUSED)
 #    pragma unused(sig)
 #endif
     reopen_debug_log = MY_TRUE;
-    (void)signal(SIGUSR2, handle_usr2);
 #ifndef RETSIGTYPE_VOID
     return 0;
 #endif
@@ -404,6 +402,28 @@ cleanup_stuff (void)
 } /* cleanup_stuff() */
 
 /*-------------------------------------------------------------------------*/
+void install_signal_handlers()
+/* Installs the signal handlers for those signals the driver responds to. */
+{
+    struct sigaction sa; // for installing the signal handlers
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART; // restart syscalls after handling a signal
+ 
+    //TODO: should we abort the startup if we can't install a handler?
+    sa.sa_handler = handle_hup;
+    if (sigaction(SIGHUP, &sa, NULL) == -1)
+        perror("Unable to install signal handler for SIGHUP");
+
+    sa.sa_handler = handle_usr1;
+    if (sigaction(SIGUSR1, &sa, NULL) == -1)
+        perror("%s Unable to install signal handler for SIGUSR1");
+
+    sa.sa_handler = handle_usr2;
+    if (sigaction(SIGUSR2, &sa, NULL) == -1)
+        perror("%s Unable to install signal handler for SIGUSR2");
+    
+}
+/*-------------------------------------------------------------------------*/
 void
 backend (void)
 
@@ -422,16 +442,13 @@ backend (void)
          * cleanup_all_objects(), as it turns out that a single
          * cleanup doesn't always remove enough destructed objects.
          */
-
+    
     /*
      * Set up.
      */
 
     prepare_ipc();
 
-    (void)signal(SIGHUP,  handle_hup);
-    (void)signal(SIGUSR1, handle_usr1);
-    (void)signal(SIGUSR2, handle_usr2);
     if (!t_flag) {
         /* Start the first alarm */
         ALARM_HANDLER_FIRST_CALL(catch_alarm);

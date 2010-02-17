@@ -601,7 +601,9 @@ main (int argc, char **argv)
         free(hostaddr); hostaddr = NULL;
 
         initialize_host_access();
-
+        
+        install_signal_handlers();
+        
         (void)signal(SIGFPE, SIG_IGN);
         current_object = &dummy_current_object_for_loads;
         if (setjmp(toplevel_context.con.text)) {
