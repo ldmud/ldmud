@@ -300,6 +300,23 @@ do_state_check (int minlvl, const char *where)
 
 /*-------------------------------------------------------------------------*/
 static RETSIGTYPE
+handle_term_signal (int sig UNUSED)
+
+/* SIGTERM handler: request a game shutdown.
+ */
+{
+#ifdef __MWERKS__
+#    pragma unused(sig)
+#endif
+    extra_jobs_to_do = MY_TRUE;
+    game_is_being_shut_down = MY_TRUE;
+#ifndef RETSIGTYPE_VOID
+    return 0;
+#endif
+} /* handle_term_signal() */
+
+/*-------------------------------------------------------------------------*/
+static RETSIGTYPE
 handle_hup (int sig UNUSED)
 
 /* SIGHUP handler: request a game shutdown.
@@ -410,6 +427,10 @@ void install_signal_handlers()
     sa.sa_flags = SA_RESTART; // restart syscalls after handling a signal
  
     //TODO: should we abort the startup if we can't install a handler?
+    sa.sa_handler = handle_term_signal;
+    if (sigaction(SIGTERM, &sa, NULL) == -1)
+        perror("Unable to install signal handler for SIGTERM");
+
     sa.sa_handler = handle_hup;
     if (sigaction(SIGHUP, &sa, NULL) == -1)
         perror("Unable to install signal handler for SIGHUP");
