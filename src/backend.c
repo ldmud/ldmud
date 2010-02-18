@@ -455,13 +455,27 @@ backend (void)
     prepare_ipc();
 
     if (!t_flag) {
-        /* Setup the alarm timer. */
+        /* Setup the alarm timer. We set it up in a way that it expires on
+         * full seconds to synchronize mud time to host time.
+         */
         struct itimerval timer_value;
-        timer_value.it_interval.tv_sec = alarm_time;
+        struct timeval cur_time;
         timer_value.it_interval.tv_usec = 0;
-        timer_value.it_value.tv_sec = alarm_time;
         timer_value.it_value.tv_usec = 0;
-
+        if (gettimeofday(&cur_time, NULL))
+        {
+            // no sync with host time.
+            perror("Could not get current time with gettimeofday, host and mud time will be out of sync");
+            timer_value.it_interval.tv_sec = alarm_time;
+            timer_value.it_value.tv_sec = alarm_time;
+        }
+        else
+        {
+            // the first timer will be a little bit shorter (<=1s)
+            timer_value.it_interval.tv_sec = alarm_time;
+            timer_value.it_value.tv_sec = alarm_time - 1;
+            timer_value.it_value.tv_usec = 1000000 - cur_time.tv_usec;
+        }
         if(setitimer( ITIMER_REAL, &timer_value, NULL ))
         {
             fatal("Could not initialize the alarm timer: %s\n",
@@ -725,7 +739,7 @@ backend (void)
         }
         else
         {
-            /* No new message, just reate the new time_stamp string in
+            /* No new message, just create the new time_stamp string in
              * the function's local buffer.
              */
             (void)time_stamp();
@@ -749,9 +763,9 @@ backend (void)
             next_call_out_cycle();
 
             /* Do the timed events */
-	    if (!synch_heart_beats
-             || time_of_last_hb + heart_beat_interval <= current_time)
-	    {
+            if (!synch_heart_beats
+                || time_of_last_hb + heart_beat_interval <= current_time)
+            {
                 do_state_check(2, "before heartbeat");
                 call_heart_beat();
                 time_of_last_hb = current_time;
@@ -843,6 +857,7 @@ void check_alarm (void)
     else if (curtime - last_alarm_time > 15)
     {
         struct itimerval timer_value = { {0,0}, {0,0} };
+        struct timeval cur_time;
         debug_message("%s Last alarm was %"PRIdMPINT" seconds ago "
                       "- restarting it.\n",
                       time_stamp(), curtime - last_alarm_time);
@@ -859,9 +874,22 @@ void check_alarm (void)
             fatal("Could not re-install the alarm (SIGALRM) handler: %s\n",
                   strerror(errno));
 
-        // setup new timer
-        timer_value.it_value.tv_sec = alarm_time;
-        timer_value.it_interval.tv_sec = alarm_time;
+        // setup new timer (to full seconds)
+        if (gettimeofday(&cur_time, NULL))
+        {
+            // no sync with host time.
+            perror("Could not get current time with gettimeofday, host and mud time will be out of sync");
+            timer_value.it_interval.tv_sec = alarm_time;
+            timer_value.it_value.tv_sec = alarm_time;
+        }
+        else
+        {
+            // the first timer will be a little bit shorter (<=1s)
+            timer_value.it_interval.tv_sec = alarm_time;
+            timer_value.it_value.tv_sec = alarm_time - 1;
+            timer_value.it_value.tv_usec = 1000000 - cur_time.tv_usec;
+        }
+
         if(setitimer( ITIMER_REAL, &timer_value, NULL )) {
           fatal("Could not re-initialize the alarm timer: %s\n",
                 strerror(errno));
