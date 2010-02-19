@@ -164,6 +164,10 @@ static time_t time_last_slow_shut = 0;
    * calls while the previous ones are still working.
    */
 
+static sigset_t pending_signals = 0;
+/* The pending signals which should be delivered to the mudlib master.
+ */
+
 /*-------------------------------------------------------------------------*/
 
 /* --- Forward declarations --- */
@@ -317,56 +321,55 @@ handle_term_signal (int sig UNUSED)
 
 /*-------------------------------------------------------------------------*/
 static RETSIGTYPE
-handle_hup (int sig UNUSED)
+handle_signal (int sig)
 
-/* SIGHUP handler: request a game shutdown.
+/* General signal handler: store the signal in a flag
  */
 {
-#ifdef __MWERKS__
-#    pragma unused(sig)
-#endif
+    sigaddset(&pending_signals, sig);
     extra_jobs_to_do = MY_TRUE;
-    game_is_being_shut_down = MY_TRUE;
 #ifndef RETSIGTYPE_VOID
     return 0;
 #endif
-} /* handle_hup() */
+} /* handle_signal() */
+
 
 /*-------------------------------------------------------------------------*/
-static RETSIGTYPE
-handle_usr1 (int sig UNUSED)
-
-/* SIGUSR1 handler: request a master update.
- */
-
+static INLINE void
+process_pending_signals (void)
+// processes the pending signals, but only: SIGHUP, SIGUSR1, SIGUSR2, SIGINT
 {
-#ifdef __MWERKS__
-#    pragma unused(sig)
-#endif
-    extra_jobs_to_do = MY_TRUE;
-    master_will_be_updated = MY_TRUE;
-    eval_cost += max_eval_cost >> 3;
-#ifndef RETSIGTYPE_VOID
-    return 0;
-#endif
-} /* handle_usr1() */
+    if (sigismember(&pending_signals, SIGHUP))
+    {
+        // SIGHUP: request a game shutdown.
+        sigdelset(&pending_signals, SIGHUP);
+        extra_jobs_to_do = MY_TRUE;
+        game_is_being_shut_down = MY_TRUE;
+        // ignore the rest of the signals
+        sigemptyset(&pending_signals);
+        return;
+    }
+    if (sigismember(&pending_signals, SIGUSR1))
+    {
+        // SIGUSR1: request a master update.
+        sigdelset(&pending_signals, SIGUSR1);
+        extra_jobs_to_do = MY_TRUE;
+        master_will_be_updated = MY_TRUE;
+        eval_cost += max_eval_cost >> 3;
+    }
+    if (sigismember(&pending_signals, SIGUSR2))
+    {
+        // SIGUSR2: reopen the debug.log file.
+        sigdelset(&pending_signals, SIGUSR2);
+        reopen_debug_log = MY_TRUE;
+    }
+    if (sigismember(&pending_signals, SIGINT))
+    {
+        // SIGINT: notify the master about the signal
+        sigdelset(&pending_signals, SIGINT);
+    }
 
-/*-------------------------------------------------------------------------*/
-static RETSIGTYPE
-handle_usr2 (int sig UNUSED)
-
-/* SIGUSR2 handler: reopen the debug.log file.
- */
-
-{
-#ifdef __MWERKS__
-#    pragma unused(sig)
-#endif
-    reopen_debug_log = MY_TRUE;
-#ifndef RETSIGTYPE_VOID
-    return 0;
-#endif
-} /* handle_usr2() */
+} // process_pending_signals
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -423,6 +426,10 @@ void install_signal_handlers()
 /* Installs the signal handlers for those signals the driver responds to. */
 {
     struct sigaction sa; // for installing the signal handlers
+
+    // empty the pending signals
+    sigemptyset(&pending_signals);
+
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART; // restart syscalls after handling a signal
  
@@ -431,22 +438,19 @@ void install_signal_handlers()
     if (sigaction(SIGTERM, &sa, NULL) == -1)
         perror("Unable to install signal handler for SIGTERM");
 
-    sa.sa_handler = handle_hup;
-    if (sigaction(SIGHUP, &sa, NULL) == -1)
-        perror("Unable to install signal handler for SIGHUP");
-
-    sa.sa_handler = handle_usr1;
-    if (sigaction(SIGUSR1, &sa, NULL) == -1)
-        perror("%s Unable to install signal handler for SIGUSR1");
-
-    sa.sa_handler = handle_usr2;
-    if (sigaction(SIGUSR2, &sa, NULL) == -1)
-        perror("%s Unable to install signal handler for SIGUSR2");
-
     sa.sa_handler = catch_alarm;
     if (sigaction(SIGALRM, &sa, NULL) == -1)
         fatal("Could not install the alarm (SIGALRM) handler: %s\n",
               strerror(errno));
+
+    // install the general signal handler for some signals
+    sa.sa_handler = handle_signal;
+    if (sigaction(SIGHUP, &sa, NULL) == -1)
+        perror("Unable to install signal handler for SIGHUP");
+    if (sigaction(SIGUSR1, &sa, NULL) == -1)
+        perror("%s Unable to install signal handler for SIGUSR1");
+    if (sigaction(SIGUSR2, &sa, NULL) == -1)
+        perror("%s Unable to install signal handler for SIGUSR2");
 
 }
 /*-------------------------------------------------------------------------*/
@@ -573,6 +577,12 @@ backend (void)
         if (extra_jobs_to_do) {
 
             current_interactive = NULL;
+
+            // process the pending signals we received since last time. Do
+            // this first, because some flags may be set which cause some
+            // extra jobs to done.
+            process_pending_signals();
+
             if (game_is_being_shut_down)
             {
                 command_giver = NULL;
