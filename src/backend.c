@@ -391,12 +391,28 @@ process_pending_signals (void)
     }
     if (sigismember(&pending_signals, SIGINT))
     {
-        // SIGINT: notify the master about the signal and do nothing else.
+        // SIGINT: standard behaviour is process termination. If the mudlib
+        // does not handle the signal, we restore the standard signal handler
+        // for SIGINT and send us the signal again.
         sigdelset(&pending_signals, SIGINT);
-        // just inform
-        defer_signal_to_master(LPC_SIGINT);
+        if (!defer_signal_to_master(LPC_SIGINT))
+        {
+            struct sigaction sa;
+            sigemptyset(&sa.sa_mask);
+            sa.sa_flags = 0;
+            sa.sa_handler = SIG_DFL;
+            // if anything goes wrong, we terminate ourself, because it is the
+            // standard behaviour if SIGINT.
+            if (sigaction(SIGINT, &sa, NULL) == -1)
+                fatal("%s Could not restore default signal handler for SIGINT: %s\n",
+                      time_stamp(), strerror(errno));
+            if (kill(getpid(), SIGINT))
+                fatal("%s Could not send ourself the SIGINT signal: %s\n",
+                      time_stamp(), strerror(errno));
+                
+            return;
+        }
     }
-
 } // process_pending_signals
 
 /*-------------------------------------------------------------------------*/
