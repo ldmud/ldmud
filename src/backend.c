@@ -165,7 +165,7 @@ static time_t time_last_slow_shut = 0;
    * calls while the previous ones are still working.
    */
 
-static sigset_t pending_signals = 0;
+static sigset_t pending_signals;
 /* The pending signals which should be delivered to the mudlib master.
  */
 
