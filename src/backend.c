@@ -76,6 +76,7 @@
 
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/debug_message.h"
+#include "../mudlib/sys/signals.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -304,26 +305,11 @@ do_state_check (int minlvl, const char *where)
 
 /*-------------------------------------------------------------------------*/
 static RETSIGTYPE
-handle_term_signal (int sig UNUSED)
-
-/* SIGTERM handler: request a game shutdown.
- */
-{
-#ifdef __MWERKS__
-#    pragma unused(sig)
-#endif
-    extra_jobs_to_do = MY_TRUE;
-    game_is_being_shut_down = MY_TRUE;
-#ifndef RETSIGTYPE_VOID
-    return 0;
-#endif
-} /* handle_term_signal() */
-
-/*-------------------------------------------------------------------------*/
-static RETSIGTYPE
 handle_signal (int sig)
 
 /* General signal handler: store the signal in a flag
+ * Note: If we receive the same signal again before it is processed, the second
+ *       signal will be lost.
  */
 {
     sigaddset(&pending_signals, sig);
@@ -358,11 +344,20 @@ process_pending_signals (void)
  * handles the signal, if the master does not.
  */
 {
+    if (sigismember(&pending_signals, SIGTERM))
+    {
+        // SIGTERM: shutdown gracefully, but inform the mudlib master first.
+        defer_signal_to_master(LPC_SIGTERM);
+        game_is_being_shut_down = MY_TRUE;
+        // ignore the rest of the signals
+        sigemptyset(&pending_signals);
+        return;
+    }
     if (sigismember(&pending_signals, SIGHUP))
     {
         // SIGHUP: request a game shutdown.
         sigdelset(&pending_signals, SIGHUP);
-        if (!defer_signal_to_master(SIGHUP))
+        if (!defer_signal_to_master(LPC_SIGHUP))
         {
             // master did not handle it, shut down.
             extra_jobs_to_do = MY_TRUE;
@@ -376,7 +371,7 @@ process_pending_signals (void)
     {
         // SIGUSR1: request a master update.
         sigdelset(&pending_signals, SIGUSR1);
-        if (!defer_signal_to_master(SIGUSR1))
+        if (!defer_signal_to_master(LPC_SIGUSR1))
         {
             // Master did not handle it, update the master
             extra_jobs_to_do = MY_TRUE;
@@ -388,7 +383,7 @@ process_pending_signals (void)
     {
         // SIGUSR2: reopen the debug.log file.
         sigdelset(&pending_signals, SIGUSR2);
-        if (!defer_signal_to_master(SIGUSR2))
+        if (!defer_signal_to_master(LPC_SIGUSR2))
         {
             // Master did not handle it, re-open the log
             reopen_debug_log = MY_TRUE;
@@ -396,10 +391,10 @@ process_pending_signals (void)
     }
     if (sigismember(&pending_signals, SIGINT))
     {
-        // SIGINT: notify the master about the signal
+        // SIGINT: notify the master about the signal and do nothing else.
         sigdelset(&pending_signals, SIGINT);
         // just inform
-        defer_signal_to_master(SIGINT);
+        defer_signal_to_master(LPC_SIGINT);
     }
 
 } // process_pending_signals
@@ -466,18 +461,16 @@ void install_signal_handlers()
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART; // restart syscalls after handling a signal
  
-    //TODO: should we abort the startup if we can't install a handler?
-    sa.sa_handler = handle_term_signal;
-    if (sigaction(SIGTERM, &sa, NULL) == -1)
-        perror("Unable to install signal handler for SIGTERM");
-
     sa.sa_handler = catch_alarm;
     if (sigaction(SIGALRM, &sa, NULL) == -1)
         fatal("Could not install the alarm (SIGALRM) handler: %s\n",
               strerror(errno));
 
     // install the general signal handler for some signals
+    // TODO: should we abort the startup if we can't install a handler?
     sa.sa_handler = handle_signal;
+    if (sigaction(SIGTERM, &sa, NULL) == -1)
+        perror("Unable to install signal handler for SIGTERM");
     if (sigaction(SIGHUP, &sa, NULL) == -1)
         perror("Unable to install signal handler for SIGHUP");
     if (sigaction(SIGUSR1, &sa, NULL) == -1)
