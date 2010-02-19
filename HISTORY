@@ -71,6 +71,10 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          returning from a lfun or sefun, if runtime type checks are enabled
          for the program defining the function (and save_types is used as
          well). (experimental feature)
+       + When the driver receives SIGTERM, SIGINT, SIGHUP, SIGUSR1 or SIGUSR2
+         it calls handle_external_signal() in the mudlib master. If the master
+         does not handle the signal, the driver defaults back to the standard
+         behaviour.
 
     - Language
        + Added a sefun:: specifier to explicitly call simul-efuns. (#669)
