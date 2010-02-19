@@ -17670,7 +17670,7 @@ apply_master_ob (string_t *fun, int num_arg, Bool external)
  * necessary, a new one is compiled or, failing that, an old one is
  * reactivated.
  *
- * Errors during the execution are caught and case the function to
+ * Errors during the execution are caught and cause the function to
  * return NULL.
  *
  * The function operates on an execution tick reserve of MASTER_RESERVED_COST

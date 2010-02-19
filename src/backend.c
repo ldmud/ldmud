@@ -333,40 +333,73 @@ handle_signal (int sig)
 #endif
 } /* handle_signal() */
 
+/*-------------------------------------------------------------------------*/
+static INLINE Bool
+defer_signal_to_master(int sig)
+// Notifies master about the signal <sig>.
+// Returns 1 if the master returns anything != 0. In this case it is assumed,
+// the master handled the signal.
+{
+    svalue_t *res;
+    push_number(inter_sp, sig);
+    res = callback_master(STR_HANDLE_EXTERNAL_SIGNAL, 1);
+    if (res && res->type == T_NUMBER && res->u.number != 0)
+    {
+        return MY_TRUE;
+    }
+    return MY_FALSE;
+} /* defer_signal_to_master() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
 process_pending_signals (void)
-// processes the pending signals, but only: SIGHUP, SIGUSR1, SIGUSR2, SIGINT
+/* processes the pending signals: SIGHUP, SIGUSR1, SIGUSR2, SIGINT
+ * informs the master by applying handle_external_signal() in it and
+ * handles the signal, if the master does not.
+ */
 {
     if (sigismember(&pending_signals, SIGHUP))
     {
         // SIGHUP: request a game shutdown.
         sigdelset(&pending_signals, SIGHUP);
-        extra_jobs_to_do = MY_TRUE;
-        game_is_being_shut_down = MY_TRUE;
-        // ignore the rest of the signals
-        sigemptyset(&pending_signals);
-        return;
+        if (!defer_signal_to_master(SIGHUP))
+        {
+            // master did not handle it, shut down.
+            extra_jobs_to_do = MY_TRUE;
+            game_is_being_shut_down = MY_TRUE;
+            // ignore the rest of the signals
+            sigemptyset(&pending_signals);
+            return;
+        }
     }
     if (sigismember(&pending_signals, SIGUSR1))
     {
         // SIGUSR1: request a master update.
         sigdelset(&pending_signals, SIGUSR1);
-        extra_jobs_to_do = MY_TRUE;
-        master_will_be_updated = MY_TRUE;
-        eval_cost += max_eval_cost >> 3;
+        if (!defer_signal_to_master(SIGUSR1))
+        {
+            // Master did not handle it, update the master
+            extra_jobs_to_do = MY_TRUE;
+            master_will_be_updated = MY_TRUE;
+            eval_cost += max_eval_cost >> 3;
+        }
     }
     if (sigismember(&pending_signals, SIGUSR2))
     {
         // SIGUSR2: reopen the debug.log file.
         sigdelset(&pending_signals, SIGUSR2);
-        reopen_debug_log = MY_TRUE;
+        if (!defer_signal_to_master(SIGUSR2))
+        {
+            // Master did not handle it, re-open the log
+            reopen_debug_log = MY_TRUE;
+        }
     }
     if (sigismember(&pending_signals, SIGINT))
     {
         // SIGINT: notify the master about the signal
         sigdelset(&pending_signals, SIGINT);
+        // just inform
+        defer_signal_to_master(SIGINT);
     }
 
 } // process_pending_signals
@@ -451,6 +484,8 @@ void install_signal_handlers()
         perror("%s Unable to install signal handler for SIGUSR1");
     if (sigaction(SIGUSR2, &sa, NULL) == -1)
         perror("%s Unable to install signal handler for SIGUSR2");
+    if (sigaction(SIGINT, &sa, NULL) == -1)
+        perror("%s Unable to install signal handler for SIGINT");
 
 }
 /*-------------------------------------------------------------------------*/
