@@ -6754,7 +6754,7 @@ do_trace (char *msg, char *fname, char *post)
                , msg, objname, fname, post);
     add_message("%s", buf);
 #ifdef DEBUG
-    add_message("%s", message_flush);
+    add_message(message_flush);
 #endif
 } /* do_trace() */
 
