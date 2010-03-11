@@ -13,6 +13,8 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
        + get_type_info() lost refcounts to the function name of a closure,
          causing it eventually being free'd prematurely (#712).
        + 'dumpallobj' crashed if there are strings with 0 refcounts (#725).
+       + fixed a crash during tracing caused by a wrong call to add_message()
+         in do_trace(), when compiled with --enable-debug (#736).
 
     - Changed Efuns:
        + add_action(): The function can be given as a closure. (#243)
