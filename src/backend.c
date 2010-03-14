@@ -523,7 +523,7 @@ backend (void)
 
     prepare_ipc();
 
-    if (!t_flag) {
+    if (!disable_timers_flag) {
         /* Setup the alarm timer. We set it up in a way that it expires on
          * full seconds to synchronize mud time to host time.
          */
@@ -918,7 +918,7 @@ void check_alarm (void)
     static mp_int last_alarm_time = 0;
     mp_int curtime = get_current_time();
 
-    if (t_flag)  /* Timing turned off? */
+    if (disable_timers_flag)  /* Timing turned off? */
         return;
 
     if (!last_alarm_time) /* initialize it */

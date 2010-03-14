@@ -108,7 +108,7 @@
 
 int d_flag    = 0;  /* Debuglevel */
 /* TODO: Make this bitflags, one for 'trace refcounts' etc */
-Bool t_flag    = MY_FALSE;  /* True: Disable heart beat and reset */
+Bool disable_timers_flag    = MY_FALSE;  /* True: Disable heart beat and reset */
 static int e_flag = MY_FALSE;  /* Passed to preload(), usually disables it */
 Bool comp_flag = MY_FALSE;  /* Trace compilations */
 #ifdef DEBUG
@@ -1122,7 +1122,7 @@ typedef enum OptNumber {
  , cMinMalloc       /* --min-malloc         */
  , cMinSmallMalloc  /* --min-small-malloc   */
  , cNoERQ           /* --no-erq             */
- , cNoHeart         /* --no-heart           */
+ , cNoTimers        /* --no-timers          */
  , cNoPreload       /* --no-preload         */
  , cPidFile         /* --pidfile            */
  , cRandomdevice    /* --randomdevice       */
@@ -1333,9 +1333,9 @@ static Option aOptions[]
         "    Heartbeats are executed immediately when they are due (modulo granularity).\n"
       }
 
-    , { 't', "no-heart-beat",           cNoHeart,        MY_FALSE
-      , "  -t|--no-heart-beat\n"
-      , "  -t|--no-heart-beat\n"
+    , { 't', "no-timers",           cNoTimers,        MY_FALSE
+      , "  -t|--no-timers\n"
+      , "  -t|--no-timers\n"
         "    Disable heartbeats and call_outs.\n"
       }
 
@@ -2496,8 +2496,8 @@ eval_arg (int eOption, const char * pValue)
         synch_heart_beats = MY_FALSE;
         break;
 
-    case cNoHeart:
-        t_flag = MY_TRUE;
+    case cNoTimers:
+        disable_timers_flag = MY_TRUE;
         break;
 
     case cCleanupTime:

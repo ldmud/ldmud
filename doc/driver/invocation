@@ -118,7 +118,7 @@ DESCRIPTION
       --asynchronous-heart-beat
         Heartbeats occur when they are due (modulo granularity).
 
-      -t|--no-heart-beat
+      -t|--no-timers
         Disable heartbeats and call_outs.
 
       -f|--funcall <word>

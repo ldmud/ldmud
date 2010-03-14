@@ -9,7 +9,7 @@
 /* --- Variables --- */
 
 extern int d_flag;
-extern Bool t_flag;
+extern Bool disable_timers_flag;
 extern Bool comp_flag;
 extern Bool strict_euids;
 extern Bool share_variables;
