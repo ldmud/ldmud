@@ -21,6 +21,7 @@ extern long time_to_swap_variables;
 extern long alarm_time;
 extern long heart_beat_interval;
 extern Bool synch_heart_beats;
+extern Bool heart_beats_enabled;
 extern svalue_t const0, const1;
 extern double avg_consts[5];
 extern char *mud_lib;

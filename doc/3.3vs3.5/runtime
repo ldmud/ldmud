@@ -1,0 +1,8 @@
+Listed herein are language incompatibilites between 3.3 and 3.5,
+that you should pay attention to when updating.
+
+- Heartbeats were called only when players are logged on. They are now
+  called regardless of logged-on players.
+  However, the mudlib can activate/deactivate the calls to heartbeats
+  globally by using configure_driver()
+

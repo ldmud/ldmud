@@ -130,8 +130,8 @@ call_heart_beat (void)
  * next_hb will point to the next object with a due heartbeat.
  *
  * If the object in question (or one of its shadows) is living, command_giver
- * is set to the object, else it is set to NULL. If there are no players
- * in the game, no heart_beat() will be called (but the call outs will!).
+ * is set to the object, else it is set to NULL. If heart_beats_active is 
+ * false, no heart_beat() will be called (but the call outs will!).
  *
  * The function does not change the time_to_call-flags or messes with alarm().
  * It may be aborted prematurely if an error occurs during the heartbeat.
@@ -154,7 +154,7 @@ call_heart_beat (void)
     /* Set this new round through the hb list */
     hb_num_done = 0;
 
-    if (num_player < 1 || !num_hb_objs)
+    if (!heart_beats_enabled || !num_hb_objs)
     {
         next_hb = NULL;
         return;

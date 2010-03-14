@@ -10,6 +10,7 @@
 
 /* Possible options for configure_driver().
  */
-#define DC_MEMORY_LIMIT 0
+#define DC_MEMORY_LIMIT        0
+#define DC_ENABLE_HEART_BEATS  1
 
 #endif /* LPC_CONFIGURATION_H_ */

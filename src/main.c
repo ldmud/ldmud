@@ -154,6 +154,9 @@ Bool synch_heart_beats      = MY_TRUE;
 Bool synch_heart_beats      = MY_FALSE;
 #endif
 
+Bool heart_beats_enabled    = MY_TRUE;
+  /* heart beats are currently active and will be called. */
+
 int port_numbers[MAXNUMPORTS] = { PORTNO };
   /* The login port numbers.
    * Negative numbers are not ports, but the numbers of inherited

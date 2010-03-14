@@ -14,10 +14,15 @@ DESCRIPTION
            <data> is expected to be an array with two elements, which have to
            be integers giving the amount of memory in bytes.
            ({<soft memory limit>, <hard memory limit>})
-
+        <what> == DC_ENABLE_HEART_BEATS
+           Globally enable the calling of Heartbeats, if <data> is 1,
+           globally disable them if <data> is 0.
+           If called during heartbeat processing, the change comes into effect
+           at the next backend cycle.
 
 HISTORY
         Introduced in LDMud 3.3.719.
+        DC_ENABLE_HEART_BEATS was added in 3.5.0.
 
 SEE ALSO
         configure_interactive(E)

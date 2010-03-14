@@ -7844,10 +7844,12 @@ f_configure_driver (svalue_t *sp)
  * This efun configures several aspects of the driver at run-time.
  * 
  * <what> is an identifier the setting:
- *        - DC_MEMORY_LIMIT (0): configures the memory limits
+ *        - DC_MEMORY_LIMIT        (0): configures the memory limits
+ *        - DC_ENABLE_HEART_BEATS  (1): activate/deactivate heart beats globally
  * 
  * <data> is dependent on <what>:
- *   DC_MEMORY_LIMIT: ({soft-limit, hard-limit}) both <int>, given in Bytes.
+ *   DC_MEMORY_LIMIT:        ({soft-limit, hard-limit}) both <int>, given in Bytes.
+ *   DC_ENABLE_HEART_BEATS:  0/1 (int)
  *
  */
 
@@ -7883,6 +7885,12 @@ f_configure_driver (svalue_t *sp)
             if (!set_memory_limit(MALLOC_HARD_LIMIT, sp->u.vec->item[1].u.number))
                 errorf("Could not set the hard memory limit (%"PRIdPINT") in configure_driver()\n",
                        sp->u.vec->item[1].u.number);
+            break;
+            
+        case DC_ENABLE_HEART_BEATS:
+            if (sp->type != T_NUMBER)
+                efun_arg_error(1, T_NUMBER, sp->type, sp);
+            heart_beats_enabled = sp->u.number != 0 ? MY_TRUE : MY_FALSE;
             break;
     }
 
