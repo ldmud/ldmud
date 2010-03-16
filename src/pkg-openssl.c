@@ -527,11 +527,8 @@ tls_write (interactive_t *ip, char *buffer, int length)
     int ret;
     int err;
 
-    do {
-        ret = SSL_write(ip->tls_session, buffer, length);
-    } while  (ret < 0 && (err = SSL_get_error(ip->tls_session, ret))
-              && (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE));
-
+    ret = SSL_write(ip->tls_session, buffer, length);
+    
     if (ret == 0)
     {
         tls_deinit_connection(ip);
@@ -539,10 +536,18 @@ tls_write (interactive_t *ip, char *buffer, int length)
     else if (ret < 0)
     {
         err = SSL_get_error(ip->tls_session, ret);
-        debug_message("%s TLS: Sending data failed (%d). "
-                      "Closing the connection.\n"
-                     , time_stamp(), err);
-        tls_deinit_connection(ip);
+        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
+        {
+            // recoverable error, caller will try again with the same content.
+            errno = EWOULDBLOCK;
+        }
+        else
+        {
+            debug_message("%s TLS: Sending data failed (%d). "
+                          "Closing the connection.\n"
+                          , time_stamp(), err);
+            tls_deinit_connection(ip);
+        }
     }
 
     return (ret<0 ? -1 : ret);
