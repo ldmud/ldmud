@@ -483,14 +483,14 @@ tls_read (interactive_t *ip, char *buffer, int length)
  */
 
 {
-    int ret = -11;
-
+    int ret;
     int err;
     int retries = 6;
 
     do {
         ret = SSL_read(ip->tls_session, buffer, length);
-    } while  (ret < 0 && (err = SSL_get_error(ip->tls_session, ret))
+    }
+    while  (ret < 0 && (err = SSL_get_error(ip->tls_session, ret))
               && (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
               && (--retries));
 
@@ -500,10 +500,10 @@ tls_read (interactive_t *ip, char *buffer, int length)
     }
     else if (ret < 0)
     {
-        ret = SSL_get_error(ip->tls_session, ret);
+        err = SSL_get_error(ip->tls_session, ret);
         debug_message("%s TLS: Received corrupted data (%d). "
                       "Closing the connection.\n"
-                     , time_stamp(), ret);
+                     , time_stamp(), err);
         tls_deinit_connection(ip);
         /* get_message() expects an errno value.
          * ESHUTDOWN will close the connection.
@@ -524,8 +524,7 @@ tls_write (interactive_t *ip, char *buffer, int length)
  */
 
 {
-    int ret = -1;
-
+    int ret;
     int err;
 
     do {
@@ -539,10 +538,10 @@ tls_write (interactive_t *ip, char *buffer, int length)
     }
     else if (ret < 0)
     {
-        ret = SSL_get_error(ip->tls_session, ret);
+        err = SSL_get_error(ip->tls_session, ret);
         debug_message("%s TLS: Sending data failed (%d). "
                       "Closing the connection.\n"
-                     , time_stamp(), ret);
+                     , time_stamp(), err);
         tls_deinit_connection(ip);
     }
 
