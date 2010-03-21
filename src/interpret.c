@@ -8656,10 +8656,10 @@ again:
          *
          * For <ix>:
          * Values 0xf000..0xffff are efun and simul-efun symbols, the others
-         * are operators and literals.
+         * are operators and literals (0xf000 == CLOSURE_EFUN_OFFS)
          * Simul-efun symbols (0xf800..0xffff) and true efun symbolx (0xf000..
          * 0xf7ff for which instrs[].Default >= 0) are made signed and stored
-         * as they are.
+         * as they are. (0xf800 == CLOSURE_SIMUL_EFUN_OFFS)
          * Operator symbols (0xf000..0xf7ff for which instrs[].Default == -1)
          * are moved into their 0xe800..0xefff range, then made signed and
          * stored.
@@ -8706,7 +8706,7 @@ again:
 #endif /* USE_NEW_INLINES */
 
         ix = tmp_ushort;
-        if (ix < 0xf000)
+        if (ix < CLOSURE_EFUN_OFFS)
         {
             sp++;
             inter_sp = sp;
@@ -17105,7 +17105,7 @@ retry_for_shadow:
 
                 // check for deprecated functions before pushing a new control stack frame.
                 if (progp->functions[fx] & TYPE_MOD_DEPRECATED)
-                    warnf("Callother to deprecated function \'%s\' in object %s.\n",
+                    warnf("Callother to deprecated function \'%s\' in object %s (%s).\n",
                           get_txt(fun), get_txt(ob->name), get_txt(ob->prog->name));
                 
 #ifdef USE_NEW_INLINES

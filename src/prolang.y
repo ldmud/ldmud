@@ -9639,7 +9639,7 @@ expr0:
            * We have to distinguish virtual and non-virtual
            * variables here.
            */
-
+          variable_t *varp;
           fulltype_t lvtype;
           int i;
           PREPARE_INSERT(4)
@@ -9654,8 +9654,8 @@ expr0:
           {
               add_f_code(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
               add_byte(i);
-              lvtype = V_VARIABLE(i)->type;
-              lvtype.typeflags &= TYPE_MOD_MASK;
+              varp = V_VARIABLE(i);
+              lvtype = varp->type;
           }
           else
           {
@@ -9670,10 +9670,17 @@ expr0:
                   add_f_code(F_PUSH_IDENTIFIER_LVALUE);
                   add_byte(i + num_virtual_variables);
               }
-              lvtype = NV_VARIABLE(i)->type;
-              lvtype.typeflags &= TYPE_MOD_MASK;
+              varp = NV_VARIABLE(i);
+              lvtype = varp->type;
           }
+          lvtype.typeflags &= TYPE_MOD_MASK;
 
+          // warn about deprecated variables.
+          if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
+              yywarnf("Using deprecated global variable %s.\n",
+                      get_txt(varp->name));
+
+              
           if (exact_types.typeflags
            && !BASIC_TYPE(lvtype, Type_Number)
            && !BASIC_TYPE(lvtype, Type_Float))
@@ -10145,18 +10152,32 @@ expr4:
               ins_byte(F_NO_WARN_DEPRECATED);
           ix = $1.number;
           inhIndex = $1.inhIndex;
-          // check for deprecated functions, but only for closures not directly to
-          // inherited functions (#'::fun), they were checked by the lexxer.
-          if (!inhIndex &&
-              ix <= FUNCTION_COUNT)
+
+          // check for deprecated functions
+          if (ix < CLOSURE_EFUN_OFFS)
           {
-              // ok, closure to lfun.
-              function_t *fun = FUNCTION(ix);
-              if (fun->flags & TYPE_MOD_DEPRECATED)
+              // check only closures not directly to inherited functions (#'::fun),
+              // they were checked by the lexxer.
+              if (!inhIndex && ix < FUNCTION_COUNT)
               {
-                  yywarnf("Creating lfun closure to deprecated function %s",
-                          get_txt(fun->name));
+                  // ok, closure to lfun.
+                  function_t *fun = FUNCTION(ix);
+                  if (fun->flags & TYPE_MOD_DEPRECATED)
+                  {
+                      yywarnf("Creating lfun closure to deprecated function %s",
+                              get_txt(fun->name));
+                  }
               }
+              else if (ix >= CLOSURE_IDENTIFIER_OFFS)
+              {
+                  // closure to global variable
+                  // the lexxer only creates closure to non-virtual variables - our luck ;)
+                  variable_t *varp = NV_VARIABLE(ix - CLOSURE_IDENTIFIER_OFFS);
+                  if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
+                      yywarnf("Creating closure to deprecated global variable %s.\n",
+                              get_txt(varp->name));
+                      
+                      }
           }
           ins_f_code(F_CLOSURE);
           ins_short(ix);
@@ -10617,6 +10638,7 @@ expr4:
           int i;
           mp_uint current;
           bytecode_p p;
+          variable_t *varp;
 %line
           i = verify_declared($2);
           if (i == -1)
@@ -10637,6 +10659,7 @@ expr4:
           {
               *p++ = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
               *p = i;
+              varp = V_VARIABLE(i);
           }
           else
           {
@@ -10650,6 +10673,7 @@ expr4:
                   *p++ = F_PUSH_IDENTIFIER_LVALUE;
                   *p = i + num_virtual_variables;
               }
+              varp = NV_VARIABLE(i);
           }
 
           CURRENT_PROGRAM_SIZE = current + 2;
@@ -10657,7 +10681,11 @@ expr4:
               $$.type = Type_Ref_Any;
           else
           {
-              $$.type = VARIABLE(i)->type;
+              if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
+                  yywarnf("Referencing deprecated global variable %s.\n",
+                          get_txt(varp->name));
+              
+              $$.type = varp->type;
               $$.type.typeflags = ($$.type.typeflags & TYPE_MOD_MASK)
                                   | TYPE_MOD_REFERENCE;
           }
@@ -10860,10 +10888,10 @@ expr4:
     | L_IDENTIFIER
       {
           /* Access a global variable */
-
           int i;
           mp_uint current;
           bytecode_p p;
+          variable_t *varp;
 %line
           i = verify_declared($1);
           if (i == -1)
@@ -10887,8 +10915,8 @@ expr4:
               $$.code = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
               *p++ = F_VIRTUAL_VARIABLE;
               *p = i;
-              $$.type = V_VARIABLE(i)->type;
-              $$.type.typeflags &= TYPE_MOD_MASK;
+              varp = V_VARIABLE(i);
+              $$.type = varp->type;
           }
           else
           {
@@ -10907,9 +10935,15 @@ expr4:
                   *p++ = F_IDENTIFIER;
                   *p = i + num_virtual_variables;
               }
-              $$.type = NV_VARIABLE(i)->type;
-              $$.type.typeflags &= TYPE_MOD_MASK;
+              varp = NV_VARIABLE(i);
+              $$.type = varp->type;
           }
+          if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
+          {
+              yywarnf("Using deprecated global variable %s.\n",
+                      get_txt(varp->name));
+          }
+          $$.type.typeflags &= TYPE_MOD_MASK;
 
           CURRENT_PROGRAM_SIZE = current + 2;
           if (i == -1)
@@ -11483,9 +11517,10 @@ name_lvalue:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     L_IDENTIFIER
       {
-          /* Generate the lvalue for a global */
+          /* Generate the lvalue for a global variable */
 
           int i;
+          variable_t *varp;
 %line
           $$.length = 0;
           i = verify_declared($1);
@@ -11497,10 +11532,9 @@ name_lvalue:
           {
               $$.u.simple[0] = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
               $$.u.simple[1] = i;
-              $$.type = V_VARIABLE(i)->type;
+              varp = V_VARIABLE(i);
+              $$.type = varp->type;
               $$.type.typeflags &= TYPE_MOD_MASK;
-              if (i == -1)
-                  $$.type = Type_Any;
           }
           else
           {
@@ -11521,9 +11555,14 @@ name_lvalue:
                   $$.u.simple[0] = F_PUSH_IDENTIFIER_LVALUE;
                   $$.u.simple[1] = i + num_virtual_variables;
               }
-              $$.type = NV_VARIABLE(i)->type;
+              varp = NV_VARIABLE(i);
+              $$.type = varp->type;
               $$.type.typeflags &= TYPE_MOD_MASK;
           }
+          if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
+              yywarnf("Using deprecated global variable %s.\n",
+                      get_txt(varp->name));
+          
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13512,6 +13551,7 @@ lvalue_list:
           /* Push the lvalue for a global variable */
 
           int i;
+          variable_t *varp;
 %line
           $$ = 1 + $1;
 
@@ -13524,6 +13564,7 @@ lvalue_list:
           {
               ins_f_code(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
               ins_byte(i);
+              varp = V_VARIABLE(i);
           }
           else
           {
@@ -13537,7 +13578,13 @@ lvalue_list:
                   ins_f_code(F_PUSH_IDENTIFIER_LVALUE);
                   ins_byte(i + num_virtual_variables);
               }
+              varp = NV_VARIABLE(i);
           }
+          if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
+          {
+              yywarnf("Using deprecated global variable %s.\n",
+                      get_txt(varp->name));
+          }          
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/

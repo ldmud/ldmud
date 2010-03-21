@@ -6353,7 +6353,13 @@ f_symbol_variable (svalue_t *sp)
         n = num_var - n - 1;
       }
     }
-
+    // check for deprecated object / global variable.
+    if (current_prog->variables[n].type.typeflags & TYPE_MOD_DEPRECATED)
+    {
+        warnf("Creating closure to deprecated global variable %s.\n",
+              get_txt(current_prog->variables[n].name));
+    }
+    
     /* Create the result closure and put it onto the stack */
     closure_identifier( sp, current_object
                       , (unsigned short)(n + (current_variables - current_object->variables))
