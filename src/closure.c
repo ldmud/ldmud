@@ -1171,17 +1171,10 @@ closure_identifier (svalue_t *dest, object_t * obj, int ix, Bool raise_error)
 } /* closure_identifier() */
 
 /*-------------------------------------------------------------------------*/
-#ifndef USE_NEW_INLINES
-void
-closure_lfun ( svalue_t *dest, object_t *obj, program_t *prog, int ix
-             , Bool raise_error)
-#else /* USE_NEW_INLINES */
 void
 closure_lfun ( svalue_t *dest, object_t *obj, program_t *prog, int ix
              , unsigned short num
              , Bool raise_error)
-#endif /* USE_NEW_INLINES */
-
 /* Create a literal lfun closure, bound to the object <obj>. The resulting
  * svalue is stored in *<dest>.
  *
@@ -1201,11 +1194,7 @@ closure_lfun ( svalue_t *dest, object_t *obj, program_t *prog, int ix
     lambda_t *l;
 
     /* Allocate and initialise a new lambda structure */
-#ifndef USE_NEW_INLINES
-    l = closure_new_lambda(obj, raise_error);
-#else /* USE_NEW_INLINES */
     l = closure_new_lambda(obj, num, raise_error);
-#endif /* USE_NEW_INLINES */
     if (!l)
     {
         put_number(dest, 0);
@@ -1231,7 +1220,6 @@ closure_lfun ( svalue_t *dest, object_t *obj, program_t *prog, int ix
     l->function.lfun.inhProg = prog;
     if (prog)
         reference_prog(prog, "closure_lfun");
-#ifdef USE_NEW_INLINES
     l->function.lfun.context_size = num;
 
     /* Init the context variables */
@@ -1240,7 +1228,6 @@ closure_lfun ( svalue_t *dest, object_t *obj, program_t *prog, int ix
         num--;
         put_number(&(l->context[num]), 0);
     }
-#endif /* USE_NEW_INLINES */
 
     /* Fill in the rest of the lambda and of the result svalue */
 
@@ -6209,26 +6196,26 @@ f_symbol_function (svalue_t *sp)
          )
        )
     {
+        // check for deprecated functions.
+        if (prog->functions[i] & TYPE_MOD_DEPRECATED)
+        {
+            warnf("Creating lfun closure to deprecated function \'%s\' in object %s (%s).\n",
+                  get_txt(sp[-1].u.str),
+                  get_txt(ob->name),
+                  get_txt(ob->prog->name));
+        }
+        
         /* Clean up the stack */
         sp--;
         free_mstring(sp->u.str);
         inter_sp = sp-1;
 
-#ifndef USE_NEW_INLINES
-        closure_lfun(sp, ob, NULL, (unsigned short)i
-                    , /* raise_error: */ MY_FALSE);
-#else /* USE_NEW_INLINES */
         closure_lfun(sp, ob, NULL, (unsigned short)i, 0
                     , /* raise_error: */ MY_FALSE);
-#endif /* USE_NEW_INLINES */
         if (sp->type != T_CLOSURE)
         {
             inter_sp = sp - 1;
-#ifndef USE_NEW_INLINES
-            outofmem(sizeof(lambda_t), "symbol_function");
-#else /* USE_NEW_INLINES */
             outofmem(SIZEOF_LAMBDA(0), "symbol_function");
-#endif /* USE_NEW_INLINES */
         }
 
         /* The lambda was bound to the wrong object */

@@ -7534,7 +7534,7 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
 } /* setup_new_frame2() */
 
 /*-------------------------------------------------------------------------*/
-static funflag_t
+static void
 setup_new_frame (int fx, program_t *inhProg)
 
 /* Setup a call for function <fx> in the current program.
@@ -7624,7 +7624,6 @@ setup_new_frame (int fx, program_t *inhProg)
         current_variables += variable_index_offset;
     current_strings = current_prog->strings;
 
-    return flags;
 } /* setup_new_frame() */
 
 /*-------------------------------------------------------------------------*/
@@ -17030,9 +17029,8 @@ retry_for_shadow:
             
             // check for deprecated functions before pushing a new control stack frame.
             if (cache[ix].flags & TYPE_MOD_DEPRECATED)
-                warnf("Callother to deprecated function \'%s\' in object %s (%s) by %s (%s).\n",
-                      get_txt(fun), get_txt(ob->name), get_txt(ob->prog->name),
-                      get_txt(current_object->name), get_txt(current_prog->name));
+                warnf("Callother to deprecated function \'%s\' in object %s (%s).\n",
+                      get_txt(fun), get_txt(ob->name), get_txt(ob->prog->name));
             
 #ifdef USE_NEW_INLINES
             push_control_stack(inter_sp, inter_pc, inter_fp, inter_context);
@@ -17107,9 +17105,8 @@ retry_for_shadow:
 
                 // check for deprecated functions before pushing a new control stack frame.
                 if (progp->functions[fx] & TYPE_MOD_DEPRECATED)
-                    warnf("Callother to deprecated function \'%s\' in object %s (%s) by %s (%s).\n",
-                          get_txt(fun), get_txt(ob->name), get_txt(ob->prog->name),
-                          get_txt(current_object->name),get_txt(current_prog->name));
+                    warnf("Callother to deprecated function \'%s\' in object %s.\n",
+                          get_txt(fun), get_txt(ob->name), get_txt(ob->prog->name));
                 
 #ifdef USE_NEW_INLINES
                 push_control_stack(inter_sp, inter_pc, inter_fp, inter_context);
@@ -18079,7 +18076,6 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
     case CLOSURE_LFUN:  /* --- lfun closure --- */
       {
         Bool      extra_frame;
-        funflag_t flags;
 
         /* Can't call from a destructed object */
         if (l->ob->flags & O_DESTRUCTED)
@@ -18129,7 +18125,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
                  , l->function.lfun.ob->prog->num_functions
                 );
 #endif
-
+          
         /* If the object creating the closure wasn't the one in which
          * it will be executed, we need to record the fact in a second
          * 'dummy' control frame. If we didn't, major security holes
@@ -18158,21 +18154,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         current_object = l->function.lfun.ob;
         current_prog = current_object->prog;
         /* inter_sp == sp */
-        flags = setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg);
-
-        // check for deprecated functions.
-        // TODO: This should be done before pushing a control stack frame, because otherwise
-        // TODO::warnf() will search in the wrong program, but we need the function flags...
-        if (flags & TYPE_MOD_DEPRECATED) {
-            string_t *function_name;
-            memcpy(&function_name, FUNCTION_NAMEP(csp->funstart), sizeof function_name);
-            warnf("Call to deprecated function %s in object %s (%s) by %s (%s).\n",
-                  get_txt(function_name),
-                  get_txt(current_object->name),
-                  get_txt(current_object->prog->name),
-                  get_txt(l->ob->name),
-                  get_txt(l->ob->prog->name));
-        }
+        setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg);
           
         // check arguments
         check_function_args(FUNCTION_INDEX(csp->funstart), current_prog, csp->funstart);
