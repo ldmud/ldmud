@@ -10145,6 +10145,19 @@ expr4:
               ins_byte(F_NO_WARN_DEPRECATED);
           ix = $1.number;
           inhIndex = $1.inhIndex;
+          // check for deprecated functions, but only for closures not directly to
+          // inherited functions (#'::fun), they were checked by the lexxer.
+          if (!inhIndex &&
+              ix <= FUNCTION_COUNT)
+          {
+              // ok, closure to lfun.
+              function_t *fun = FUNCTION(ix);
+              if (fun->flags & TYPE_MOD_DEPRECATED)
+              {
+                  yywarnf("Creating lfun closure to deprecated function %s",
+                          get_txt(fun->name));
+              }
+          }
           ins_f_code(F_CLOSURE);
           ins_short(ix);
           ins_short(inhIndex);
@@ -14519,6 +14532,7 @@ short
 find_inherited_function ( const char * super_name
                         , const char * real_name
                         , unsigned short * pInherit
+                        , funflag_t * flags
                         )
 
 /* Lookup an inherited function <super_name>::<real_name> and return
@@ -14538,12 +14552,11 @@ find_inherited_function ( const char * super_name
 {
     inherit_t *ip;
     string_t *rname;
-    funflag_t flags;
     short     ix;
 
     rname = find_tabled_str(real_name);
 
-    ix =  rname ? lookup_inherited(super_name, rname, &ip, &flags) : -1;
+    ix =  rname ? lookup_inherited(super_name, rname, &ip, flags) : -1;
     if (ix >= 0) /* Also return the inherit index. */
         *pInherit = ip - (inherit_t *)mem_block[A_INHERITS].block;
     else

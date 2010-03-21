@@ -4018,10 +4018,11 @@ closure (char *in_yyp)
     {
         short ix;
         unsigned short inhIndex;
+        funflag_t flags;
 
         *yyp = '\0'; /* c holds the char at this place */
         *(wordstart-2) = '\0';
-        ix = find_inherited_function(super_name, wordstart, &inhIndex);
+        ix = find_inherited_function(super_name, wordstart, &inhIndex, &flags);
         inhIndex++;
         if (ix < 0)
         {
@@ -4034,6 +4035,14 @@ closure (char *in_yyp)
 
         yylval.closure.number = ix;
         yylval.closure.inhIndex = inhIndex;
+        // check for deprecated functions
+        // this is done here, because here we directly have the flags of the inherited function.
+        if (flags & TYPE_MOD_DEPRECATED)
+        {
+            yywarnf("Creating lfun closure to deprecated function %.50s::%.50s",
+                    super_name, wordstart);
+        }
+        
         return L_CLOSURE;
     }
 
