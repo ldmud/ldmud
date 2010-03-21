@@ -95,6 +95,9 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          local_scopes are mandatory. These three pragmas plus their no_* 
          variants are ignored.
        + The pragma warn_deprecated is no enabled by default.
+       + A new modifier 'deprecated' can be used to mark lfuns, sefuns and
+         global variable as deprecated. Using/Calling them will cause
+         warnings.
 
     - Networking
        + UDP datagrams with lengths up to 65507 (including UDP and IPv4

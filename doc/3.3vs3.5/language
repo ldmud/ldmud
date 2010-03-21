@@ -31,3 +31,9 @@ that you should pay attention to when updating.
     This pragma is ignored  (#702)
   + The pragma warn_deprecated is no enabled by default. (#702)
 
+- 'deprecated' modifier
+  The deprecated modifier can be used for lfuns (and sefuns) and global
+  variables. Upon creating and closure to them or using/calling them the
+  compiler will issue a warning. The same occurs in symbol_function(),
+  symbol_variable() and call_other/call_direct/call_resolved().
+
