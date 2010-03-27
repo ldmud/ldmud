@@ -6529,7 +6529,14 @@ check_function_args(int fx, program_t *progp, fun_hdr_p funstart)
                 // To attribute error to caller, pop that one from the control stack.
                 // But only do this, when this is not the first frame.
                 if (csp > CONTROL_STACK)
+                {
                     pop_control_stack();
+                    // int_call_lambda() pushes a dummy control frame with funstart==0. This
+                    // has to removed as well. (Assumption: there are not other control stack frames
+                    // with funstart==0.)
+                    if (csp > CONTROL_STACK && !csp->funstart)
+                        pop_control_stack();
+                }
                 string_t *function_name;
                 memcpy(&function_name, FUNCTION_NAMEP(funstart), sizeof function_name);
                 fulltype_t ft = { .typeflags = arg_type[i].type, .t_struct = arg_type[i].t_struct };
@@ -19175,8 +19182,9 @@ not_catch:  /* The frame does not point at a catch here */
         /* Efun symbol? */
         if (!prog || !dump_pc)
         {
-            /* TODO: See comments in call_lambda(): this code
-             * TODO:: should never be reached.
+            /* TODO: See comments in call_lambda(): this code should never be reached.
+             * TODO: this is reached - when handling the dummy control frame int_call_lambda() pushes.
+             * TODO::But this handling might be changed, because it is not an efun symbol?
              */
             if (sbuf)
 #ifndef EVAL_COST_TRACE
