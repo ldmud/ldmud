@@ -17,12 +17,15 @@ DESCRIPTION
 
         As a special case, if <ob> is 0, the function returns 0.
 
-        For virtual objects this efun of course returns the virtual filename.
+        For virtual objects this efun returns the original load_name of the
+        object created by the virtual compiler.
+
         If <obj> is omitted, the name for the current object is returned.
 
         In contrast to the object_name(), the load name can not be changed
-        by with rename_object(). However, if an object uses replace_program()
-        the load name no longer reflects the actual behaviour of an object.
+        by with rename_object() or a VC. However, if an object uses 
+        replace_program() the load name no longer reflects the actual 
+        behaviour of an object.
 
         The returned name starts with a '/', unless the driver is running
         in COMPAT mode.
