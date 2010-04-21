@@ -18,15 +18,16 @@ BESCHREIBUNG
 
         Als Spezialfall liefert die Funktion 0, wenn <ob> 0 ist.
 
-        Fuer virtuelle Objekte liefert load_name() den virtuellen Dateinamen.
+        Fuer virtuelle Objekte liefert load_name() den originalen Ladenamen
+        des Objekts, welches der virtuelle Compiler erzeugte.
 
         Wird <obj> nicht angegeben, wird der Name fuer das momentan gueltige
         Objekt angegeben.
 
         Im Gegensatz zum object_name() kann der load_name() nicht durch
-        rename_object() veraendert werden. Ist ein <obj> jedoch einem
-        replace_program() unterworfen, spiegelt der load_name() nicht mehr
-        das effektive Verhalten des Objekts wider.
+        rename_object() oder einen VC veraendert werden. Ist ein <obj> jedoch
+        einem replace_program() unterworfen, spiegelt der load_name() nicht
+        mehr das effektive Verhalten des Objekts wider.
 
 BEISPIELE
         object o;
