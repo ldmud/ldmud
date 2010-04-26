@@ -26,6 +26,8 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
          a (indirect) base of the other. (#646)
        + clone_object() does not deactivate an active heart_beat in a 
          blueprint. (#747)
+       + Fixed result of convert_charset(): returns now the unchanged string
+         if it gets an empty string for conversion. (#739)
 
     - Runtime
        + A base struct is recorded as base struct in a child struct even if

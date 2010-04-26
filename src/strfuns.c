@@ -415,11 +415,9 @@ f_convert_charset (svalue_t *sp)
      */
     if (!in_len)
     {
-        sp -= 2;
-        free_string_svalue(sp);
-        free_string_svalue(sp+1);
-        put_string(sp, sp[2].u.str);
-
+        // just free the 2nd and 3rd argument, return the first one unchanged.
+        free_string_svalue(sp--);
+        free_string_svalue(sp--);
         return sp;
     }
 
