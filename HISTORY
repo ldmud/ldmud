@@ -30,6 +30,10 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
     - Runtime
        + A base struct is recorded as base struct in a child struct even if
          the base struct has no members. (#695)
+       + Improved the determination of the drivers current_time which fixes
+         issues with wrongly timed heart_beats or apparantly wrong timings.
+         (e.g. #743)
+
     - Networking
        + UDP datagrams with lengths up to 65507 (including UDP and IPv4
          headers: 65535) bytes are supported.
