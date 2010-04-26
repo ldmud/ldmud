@@ -81,6 +81,9 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          called regardless of logged-on players.
          However, the mudlib can activate/deactivate the calls to heartbeats
          globally by using configure_driver(). (#731)
+       + Improved the determination of the drivers current_time which fixes
+         issues with wrongly timed heart_beats or apparantly wrong timings.
+         (e.g. #743)
 
     - Language
        + Added a sefun:: specifier to explicitly call simul-efuns. (#669)

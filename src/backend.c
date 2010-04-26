@@ -824,8 +824,18 @@ backend (void)
          */
         if (time_to_call_heart_beat)
         {
-            current_time = get_current_time();
-
+            struct timeval cur_time;
+            gettimeofday(&cur_time, NULL);
+            // Round the time. This prevents problems with tv_sec fluctuating between
+            // values very near of whole seconds (e.g. .99999s and .000001s) which
+            // leads to wrong timings in the backend (because it works with a granularity
+            // of seconds). See bug #743.
+            if (cur_time.tv_usec < 500000)
+                current_time = cur_time.tv_sec;
+            else
+                current_time = cur_time.tv_sec + 1;
+            
+            
             current_object = NULL;
 
             /* Start the next alarm */
