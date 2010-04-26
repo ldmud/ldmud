@@ -31,6 +31,8 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
        + restore_object() checks if the types of restored data are compatible
          with the declared types of variables, if runtime type checks are
          enabled in the program of the object.
+       + clone_object() does not deactivate an active heart_beat in a 
+         blueprint. (#747)
 
     - Removed Efuns:
        + The deprecated efuns cat() and tail() were removed. They can be
