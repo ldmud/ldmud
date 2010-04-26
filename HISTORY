@@ -24,6 +24,8 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
          if the array is passed as reference. (#224)
        + to_struct() can convert a struct into another one if one of them is
          a (indirect) base of the other. (#646)
+       + clone_object() does not deactivate an active heart_beat in a 
+         blueprint. (#747)
 
     - Runtime
        + A base struct is recorded as base struct in a child struct even if

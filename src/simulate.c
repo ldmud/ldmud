@@ -2281,11 +2281,6 @@ clone_object (string_t *str1)
 
     ob->time_of_ref = current_time;
 
-    /* We do not want the heart beat to be running for unused copied objects */
-
-    if (!(ob->flags & O_CLONE) && ob->flags & O_HEART_BEAT)
-        set_heart_beat(ob, MY_FALSE);
-
     /* Got the blueprint - now get a new object */
 
     new_ob = get_empty_object(ob->prog->num_variables);
