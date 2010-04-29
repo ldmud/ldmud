@@ -6527,15 +6527,35 @@ check_function_args(int fx, program_t *progp, fun_hdr_p funstart)
                 // raise error
                 // At this point, a control frame was already created for this call.
                 // To attribute error to caller, pop that one from the control stack.
-                // But only do this, when this is not the first frame.
-                if (csp > CONTROL_STACK)
+                // But there are some special cases to take care of...
+                if (csp > CONTROL_STACK + 1)
                 {
+                    // at least 3 frames on the stack. We can get rid of at least one of them.
                     pop_control_stack();
                     // int_call_lambda() pushes a dummy control frame with funstart==0. This
-                    // has to removed as well. (Assumption: there are not other control stack frames
-                    // with funstart==0.)
-                    if (csp > CONTROL_STACK && !csp->funstart)
+                    // has to removed as well if existing.
+                    // (Assumption: there are not other control stack frames with funstart==0.)
+                    if (!csp->funstart)
                         pop_control_stack();
+                }
+                else if (csp == CONTROL_STACK + 1)
+                {
+                    // exactly 2 frames on the stack. We might pop one, but only if the
+                    // bottom (remaining) frame is NOT a dummy control frame from
+                    // int_call_lambda(). If it is the dummy frame, we would be at the 
+                    // start of a top-level evaluation and both frames have to remain.
+                    // In that case, we have to set inter_pc to a valid value.
+                    if (CONTROL_STACK->funstart)
+                        pop_control_stack();
+                    else
+                        inter_pc = FUNCTION_CODE(funstart);
+                }
+                else
+                {
+                    // this is a top-level call. This one frame must stay. But we have to set 
+                    // inter_pc because it might be either 0 because no code was evaluated yet 
+                    // or it is a left-over from last execution.
+                    inter_pc = FUNCTION_CODE(funstart);
                 }
                 string_t *function_name;
                 memcpy(&function_name, FUNCTION_NAMEP(funstart), sizeof function_name);
