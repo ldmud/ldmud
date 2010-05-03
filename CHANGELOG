@@ -10,6 +10,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
     variables into account while looking up a variable index in the
     non-virtual variable block.
     (prolang.y)
+  - Corrected an error message for wrong types in restore_object().
+    (object.c)
 
 13-Feb-2010 (Zesstra)
   - Fixed Div-by-Zero in svalue_size().

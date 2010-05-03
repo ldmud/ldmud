@@ -8994,12 +8994,17 @@ static int nesting = 0;  /* Used to detect recursive calls */
             vartype_t tmp = {.type = vtype.typeflags & TYPEID_MASK, .t_struct = vtype.t_struct};
             if (!check_rtt_compatibility(tmp, v))
             {
+                int type = v->type;
                 free_svalue(v);
                 *v = const0;
+
+                // VAR_INITIALIZED is the same as TYPE_MOD_VARARGS
+                // for functions,  so mask it for get_type_name().
+                vtype.typeflags &= ~VAR_INITIALIZED;
                 errorf("Bad type when restoring %s from %s line %d. Expected "
                        "%s, got %s.\n",
                        get_txt(current_object->name), name, lineno,
-                       get_type_name(vtype), typename(v->type));
+                       get_type_name(vtype), typename(type));
             }
         }
 
