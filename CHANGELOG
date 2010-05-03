@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-May-2010 (Gnomi)
+  - insert_inherited() returned the function index for the first match
+    and the program pointer for the last match on wildcarded super calls,
+    resulting in memory access beyond the program block.
+    (prolang.y)
+
 13-Feb-2010 (Zesstra)
   - Fixed Div-by-Zero in svalue_size().
     svalue_size() divides the memory used for a string by its refcount, but

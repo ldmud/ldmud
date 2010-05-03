@@ -14767,9 +14767,6 @@ insert_inherited (char *super_name, string_t *real_name
                 /* duplicate inherit */
                 continue;
 
-            if (!calls) /* First function found */
-                first_index = i;
-
             /* Generate the function call.
              */
             add_f_code(F_CALL_INHERITED_NOARGS);
@@ -14780,13 +14777,19 @@ insert_inherited (char *super_name, string_t *real_name
             /* Mark this function as called */
             was_called[ip_index] = MY_TRUE;
 
-            /* Return the program pointer to the caller */
-            *super_p = ip->prog;
+            if (!calls) /* First function found */
+            {
+                first_index = i;
 
-            /* Return a copy of the function structure to the caller */
-            fun_p->flags = flags & ~INHERIT_MASK;
-            get_function_information(fun_p, ip->prog, i);
-            fun_p->name = real_name;
+                /* Return the program pointer to the caller */
+                *super_p = ip->prog;
+
+                /* Return a copy of the function structure to the caller */
+                fun_p->flags = flags & ~INHERIT_MASK;
+                get_function_information(fun_p, ip->prog, i);
+                fun_p->name = real_name;
+            }
+
             calls++;
         } /* for() */
 
