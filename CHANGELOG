@@ -6,6 +6,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
     and the program pointer for the last match on wildcarded super calls,
     resulting in memory access beyond the program block.
     (prolang.y)
+  - The check for deprecated variables didn't take the number of virtual
+    variables into account while looking up a variable index in the
+    non-virtual variable block.
+    (prolang.y)
 
 13-Feb-2010 (Zesstra)
   - Fixed Div-by-Zero in svalue_size().

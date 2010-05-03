@@ -10172,12 +10172,11 @@ expr4:
               {
                   // closure to global variable
                   // the lexxer only creates closure to non-virtual variables - our luck ;)
-                  variable_t *varp = NV_VARIABLE(ix - CLOSURE_IDENTIFIER_OFFS);
+                  variable_t *varp = NV_VARIABLE(ix - CLOSURE_IDENTIFIER_OFFS - num_virtual_variables);
                   if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
                       yywarnf("Creating closure to deprecated global variable %s.\n",
                               get_txt(varp->name));
-                      
-                      }
+              }
           }
           ins_f_code(F_CLOSURE);
           ins_short(ix);
