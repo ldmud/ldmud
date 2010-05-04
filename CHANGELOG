@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-May-2010 (Gnomi)
+  - Corrected wrong follow-up error messages about bad efun arguments.
+    (prolang.y)
+
 03-May-2010 (Gnomi)
   - insert_inherited() returned the function index for the first match
     and the program pointer for the last match on wildcarded super calls,

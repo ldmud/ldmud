@@ -12661,10 +12661,9 @@ function_call:
 
                           assign_var_to_fulltype(&tmp1, *aargp); aargp++;
                           tmp1.typeflags &= TYPE_MOD_MASK;
-                          for (;;)
+                          for (;;argp++)
                           {
                               tmp2 = *argp;
-                              argp++;
                               if ( !tmp2.typeflags )
                               {
                                   /* Possible types for this arg exhausted */
