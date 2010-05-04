@@ -94,6 +94,16 @@ DESCRIPTION
           db_conv_string()
 
 
+	-- Caveats --
+
+        The driver enables automatic reconnects on the database connections.
+        This means that if a connection is lost - the most common case for
+        this is timeouts, which by default happen after 28800 seconds of
+        inactivity - an attempt will be made to establish a new connection to
+        the database server. When that happens, all session state (temprary
+        tables and state changes from SET statements) will be lost. It's best
+        not to rely on such state.
+
 EXAMPLE
         A simple server to store aliases could be implemented like this:
 

@@ -7,8 +7,9 @@ SYNOPSIS
 BESCHREIBUNG
         Stelle eine Verbindung zur SQL-Datenbank <database> des
         lokalen SQL-Servers her. Das Ergebnis ist die Handle-Nummer fuer diese
-        Verbindung und muss fuer alle Anfragen zu dieser Datenbank verwendet
-        werden.
+        Verbindung und kann fuer Anfragen zu dieser Datenbank verwendet
+        werden. Bei der Verbindung ist die automatische Wiederverbindung
+        aktiv - moegliche Folgen davon finden sich in mysql(C).
 
         Existiert die Datenbank nicht, oder kann der lokale SQL-Server nicht
         gefunden werden, wird ein Laufzeitfehler erzeugt.
