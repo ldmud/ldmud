@@ -499,6 +499,26 @@ v_db_connect (svalue_t *sp, int num_args)
         return sp;
     }
 
+    /* MySQL before 5.0.3 used to reconnect to servers automatically when
+     * the connection was lost. For later versions, we have to enable this
+     * this feature ourselves.
+     *
+     * Note that while this is convenient, any session state like SET ...
+     * commands or temporary tables will be lost silently on reconnects. If
+     * this becomes a problem for anybody we need to rethink this default.
+     */
+#if MYSQL_VERSION_ID >= 50003
+    {
+        my_bool my_true = MY_TRUE;
+        if (!mysql_options(tmp->mysql_dat, MYSQL_OPT_RECONNECT, &my_true))
+        {
+            raise_db_error(tmp);
+            /* NOTREACHED */
+            return sp;
+        }
+    }
+#endif
+
     switch (num_args)
     {
       case 3:

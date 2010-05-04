@@ -6,7 +6,9 @@ SYNOPSIS
 
 DESCRIPTION
         Connect to the database <database> on the local mySQL-server.
-        The return-value is the handle for this connection.
+        The return-value is the handle for this connection. Automatic
+        reconnects are enabled for this connection; see mysql(C) for
+        implications.
         If the database does not exist or the server is NOT started,
         a runtime-error is raised.
 
