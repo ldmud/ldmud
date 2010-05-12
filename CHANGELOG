@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-May-2010 (Gnomi)
+  - Corrected the call to mysql_options. Use the generic error message
+    when mysql returned an empty one.
+    (pkg-mysql.c)
+
 04-May-2010 (Fuchur)
   - enable automatic reconnects on MySQL database handles. (see #750)
     (pkg-mysql.c, doc/concepts/mysql, doc/efun[.de]/db_connect[.de])
