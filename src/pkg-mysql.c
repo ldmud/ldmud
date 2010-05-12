@@ -314,14 +314,13 @@ raise_db_error (db_dat_t *dat)
     const char *tmp;
     char *err_string;
 
-    if ( !dat )
+    if ( !dat || !(tmp = mysql_error(dat->mysql_dat))[0] )
     {
         errorf( "An unknown error occured during the current database-"
                "operation\n");
         /* NOTREACHED */
        abort();
     }
-    tmp = mysql_error(dat->mysql_dat);
     err_string = alloca(strlen(tmp) + 2);
     strcpy(err_string, tmp);
     strcat(err_string, "\n");
@@ -510,7 +509,7 @@ v_db_connect (svalue_t *sp, int num_args)
 #if MYSQL_VERSION_ID >= 50003
     {
         my_bool my_true = MY_TRUE;
-        if (!mysql_options(tmp->mysql_dat, MYSQL_OPT_RECONNECT, &my_true))
+        if (mysql_options(tmp->mysql_dat, MYSQL_OPT_RECONNECT, &my_true))
         {
             raise_db_error(tmp);
             /* NOTREACHED */
