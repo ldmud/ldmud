@@ -9,9 +9,10 @@ BESCHREIBUNG
         als auch Grossschrift ist zulaessig).
 
         Die Funktion ist nur verfuegbar auf Systemen mit installierter
-        libiconv.
+        libiconv und ihre tatsaechlichen Faehigkeiten bzw. die verfuegbaren
+        Zeichensaetze haengen von der libiconv/libc des Hostsystems ab.
 
-        Erlaubte Zeichensaetze sind:
+        Ueblichcherweise bekannte Zeichensaetze sind:
 
            Der derzeitige Systemzeichensatz:
                "" (der Leerstring)

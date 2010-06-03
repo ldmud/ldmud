@@ -8,9 +8,12 @@ DESCRIPTION
         The charsets for <from_cs> and <to_cs> are given by name, and both
         lowercase and uppercase are accepted.
 
-        The efun is only available on systems with libiconv installed.
+        The efun is only available on systems with libiconv installed and the
+        actual capabilities / available charsets depend on the host systems's
+        libiconv/libc.
 
-        Allowed charsets for <from_cs> and <to_cs> are:
+        Usually, the following charsets for <from_cs> and <to_cs> are
+        available:
 
            The Locale the driver is running under
                "" (the empty string)
