@@ -1141,26 +1141,6 @@ initialize_host_ip_number (const char *hname, const char * haddr)
 
 /*-------------------------------------------------------------------------*/
 static void
-ignore_handler (int signo)
-
-/* Signal handler for ignored signals: it just reinitializes the signal
- * handler for this signal. It is used for OS where a signal(,SIG_IGN)
- * is implemented with a one-shot handler (e.g. Linux).
- */
-
-{
-#ifdef DEBUG
-    if (signo != SIGPIPE) /* the only ignored signal so far */
-    {
-        fprintf(stderr, "%s Error: OS passes signo %d instead of SIGPIPE (%d) to handler.\n", time_stamp(), signo, SIGPIPE);
-        signo = SIGPIPE;
-    }
-#endif
-    signal(signo, (RETSIGTYPE(*)(int))ignore_handler);
-}
-
-/*-------------------------------------------------------------------------*/
-static void
 urgent_data_handler (int signo)
 
 /* Signal handler for SIGURG/SIGIO: set the urgent_data flag and
@@ -1172,7 +1152,6 @@ urgent_data_handler (int signo)
         write(2, "received urgent data\n", 21);
     urgent_data = MY_TRUE;
     urgent_data_time = current_time;
-    signal(signo, (RETSIGTYPE(*)(int))urgent_data_handler);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1185,6 +1164,7 @@ prepare_ipc(void)
 {
     length_t tmp;
     int i;
+    struct sigaction sa; // for installing the signal handlers
 
 #ifdef ERQ_DEMON
     /* Initialize the IP name lookup table */
@@ -1261,19 +1241,21 @@ prepare_ipc(void)
             min_nfds = socket_number(sos[i])+1;
     } /* for(i = 0..numports) */
 
-    /* We handle SIGPIPEs ourself */
-#if defined(__linux__)
-    signal(SIGPIPE, (RETSIGTYPE(*)(int))ignore_handler);
-#else
-    signal(SIGPIPE, SIG_IGN);
-#endif
+    // install some signal handlers
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART; // restart syscalls after handling a signal
+    
+    /* We ignore SIGPIPE and handle the errors on write/send ourself */
+    sa.sa_handler = SIG_IGN;
+    if (sigaction(SIGPIPE, &sa, NULL) == -1)
+        perror("Unable to install signal handler for SIGPIPE");   // uhoh. SIGPIPE terminates...
 
-#if defined(SIGURG)
-    signal(SIGURG, (RETSIGTYPE(*)(int))urgent_data_handler);
-#endif
-#if defined(SIGIO)
-    signal(SIGIO, (RETSIGTYPE(*)(int))urgent_data_handler);
-#endif
+    sa.sa_handler = urgent_data_handler;
+    if (sigaction(SIGURG, &sa, NULL) == -1)
+        perror("Unable to install signal handler for SIGURG");
+    if (sigaction(SIGIO, &sa, NULL) == -1)
+        perror("Unable to install signal handler for SIGIO");   // uhoh. SIGIO terminates...
+
 } /* prepare_ipc() */
 
 /*-------------------------------------------------------------------------*/
