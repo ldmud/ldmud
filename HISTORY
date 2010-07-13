@@ -35,6 +35,9 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
        + Improved the determination of the drivers current_time which fixes
          issues with wrongly timed heart_beats or apparantly wrong timings.
          (e.g. #743)
+       + Migrated from signal() to sigaction() and alarm() to setitimer() to
+         set the alarm and its handler, which seems to fix some issue with
+         lost alarm signals. (#607)
 
     - Networking
        + UDP datagrams with lengths up to 65507 (including UDP and IPv4

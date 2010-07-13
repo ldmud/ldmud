@@ -88,7 +88,7 @@ mp_int time_of_last_hb = 0;
   /* For synchronous heart beats: the time of the last beat.
    */
 
-Bool time_to_call_heart_beat;
+Bool time_to_call_heart_beat = MY_FALSE;
   /* True: It's time to call the heart beat. Set by comm.c when it recognizes
    *   an alarm(). */
 
@@ -421,7 +421,12 @@ void install_signal_handlers()
     sa.sa_handler = handle_usr2;
     if (sigaction(SIGUSR2, &sa, NULL) == -1)
         perror("%s Unable to install signal handler for SIGUSR2");
-    
+
+    sa.sa_handler = catch_alarm;
+    if (sigaction(SIGALRM, &sa, NULL) == -1)
+        fatal("Could not install the alarm (SIGALRM) handler: %s\n",
+              strerror(errno));
+
 }
 /*-------------------------------------------------------------------------*/
 void
@@ -450,12 +455,19 @@ backend (void)
     prepare_ipc();
 
     if (!t_flag) {
-        /* Start the first alarm */
-        ALARM_HANDLER_FIRST_CALL(catch_alarm);
+        /* Setup the alarm timer. */
+        struct itimerval timer_value;
+        timer_value.it_interval.tv_sec = alarm_time;
+        timer_value.it_interval.tv_usec = 0;
+        timer_value.it_value.tv_sec = alarm_time;
+        timer_value.it_value.tv_usec = 0;
+
+        if(setitimer( ITIMER_REAL, &timer_value, NULL ))
+        {
+            fatal("Could not initialize the alarm timer: %s\n",
+                  strerror(errno));
+        }
         current_time = get_current_time();
-        comm_time_to_call_heart_beat = MY_FALSE;
-        time_to_call_heart_beat = MY_FALSE;
-        alarm(alarm_time);
     }
 
     printf("%s LDMud ready for users.\n", time_stamp());
@@ -740,7 +752,6 @@ backend (void)
             /* Start the next alarm */
             comm_time_to_call_heart_beat = MY_FALSE;
             time_to_call_heart_beat = MY_FALSE;
-            alarm(alarm_time);
 
             /* So call_outs from heart_beats are
              * correctly timed.
@@ -801,7 +812,6 @@ catch_alarm (int dummy UNUSED)
 #ifdef __MWERKS__
 #    pragma unused(dummy)
 #endif
-    (void)signal(SIGALRM, (RETSIGTYPE(*)(int))catch_alarm);
     alarm_called = MY_TRUE;
     comm_time_to_call_heart_beat = MY_TRUE;
     total_alarms++;
@@ -818,11 +828,11 @@ void check_alarm (void)
 /* Check the time since the last recorded call to the alarm handler.
  * If it is longer than a limit, assume that the alarm died and restart it.
  *
- * This function is necessary especially for Cygwin on Windows, where it
- * is not unusual that the driver process receives so few cycles that it
- * loses its alarm.
+ * This function should not really be necessary any more, because the alarm
+ * set with setitimer automatically recurs.
+ *
  * TODO: It should be possible to get rid of alarms altogether if all
- * TODO:: timebound methods check the time since the last checkpoint.
+ * TODO::timebound methods check the time since the last checkpoint.
  */
 
 {
@@ -842,17 +852,34 @@ void check_alarm (void)
     }
     else if (curtime - last_alarm_time > 15)
     {
+        struct itimerval timer_value = { {0,0}, {0,0} };
         debug_message("%s Last alarm was %"PRIdMPINT" seconds ago "
                       "- restarting it.\n",
                       time_stamp(), curtime - last_alarm_time);
 
-        alarm(0); /* stop alarm in case it is still alive, but just slow */
+        // stop alarm in case it is still alive, but just slow
+        setitimer( ITIMER_REAL, &timer_value, NULL );
+
+        // just to sure: re-install the handler. TODO: necessary?
+        struct sigaction sa; // for installing the signal handlers
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = SA_RESTART; // restart syscalls after handling a signal
+        sa.sa_handler = catch_alarm;
+        if (sigaction(SIGALRM, &sa, NULL) == -1)
+            fatal("Could not re-install the alarm (SIGALRM) handler: %s\n",
+                  strerror(errno));
+
+        // setup new timer
+        timer_value.it_value.tv_sec = alarm_time;
+        timer_value.it_interval.tv_sec = alarm_time;
+        if(setitimer( ITIMER_REAL, &timer_value, NULL )) {
+          fatal("Could not re-initialize the alarm timer: %s\n",
+                strerror(errno));
+        }
+        last_alarm_time = curtime; /* Since we just restarted it */
+
         comm_time_to_call_heart_beat = MY_TRUE;
         time_to_call_heart_beat = MY_TRUE;
-        (void)signal(SIGALRM, (RETSIGTYPE(*)(int))catch_alarm);
-        alarm(alarm_time);
-
-        last_alarm_time = curtime; /* Since we just restarted it */
     }
 
     alarm_called = MY_FALSE;
