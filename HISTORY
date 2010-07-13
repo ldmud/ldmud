@@ -38,6 +38,7 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
        + Migrated from signal() to sigaction() and alarm() to setitimer() to
          set the alarm and its handler, which seems to fix some issue with
          lost alarm signals. (#607)
+       + Host system time and mud-internal time are now better synchronized.
 
     - Networking
        + UDP datagrams with lengths up to 65507 (including UDP and IPv4
