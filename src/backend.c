@@ -392,25 +392,31 @@ process_pending_signals (void)
     if (sigismember(&pending_signals, SIGINT))
     {
         // SIGINT: standard behaviour is process termination. If the mudlib
-        // does not handle the signal, we restore the standard signal handler
-        // for SIGINT and send us the signal again.
+        // does not handle the signal, we send us the signal again (which terminates
+        // us).
         sigdelset(&pending_signals, SIGINT);
         if (!defer_signal_to_master(LPC_SIGINT))
         {
-            struct sigaction sa;
-            sigemptyset(&sa.sa_mask);
-            sa.sa_flags = 0;
-            sa.sa_handler = SIG_DFL;
             // if anything goes wrong, we terminate ourself, because it is the
-            // standard behaviour if SIGINT.
-            if (sigaction(SIGINT, &sa, NULL) == -1)
-                fatal("%s Could not restore default signal handler for SIGINT: %s\n",
-                      time_stamp(), strerror(errno));
+            // standard behaviour in case of SIGINT.
             if (kill(getpid(), SIGINT))
                 fatal("%s Could not send ourself the SIGINT signal: %s\n",
                       time_stamp(), strerror(errno));
                 
             return;
+        }
+        // Otherwise we install our own handler again (the signal handler for
+        // SIGINT is installed with the SA_RESETHAND flag and thus reset upon 
+        // signal delivery)
+        else
+        {
+            struct sigaction sa;
+            sigemptyset(&sa.sa_mask);
+            sa.sa_flags = SA_RESTART|SA_RESETHAND;
+            sa.sa_handler = handle_signal;
+            if (sigaction(SIGINT, &sa, NULL) == -1)
+                debug_message("%s Unable to reinstall signal handler for SIGINT: %s",
+                      time_stamp(), strerror(errno));
         }
     }
 } // process_pending_signals
@@ -485,16 +491,20 @@ void install_signal_handlers()
     // install the general signal handler for some signals
     // TODO: should we abort the startup if we can't install a handler?
     sa.sa_handler = handle_signal;
-    if (sigaction(SIGTERM, &sa, NULL) == -1)
-        perror("Unable to install signal handler for SIGTERM");
     if (sigaction(SIGHUP, &sa, NULL) == -1)
         perror("Unable to install signal handler for SIGHUP");
     if (sigaction(SIGUSR1, &sa, NULL) == -1)
-        perror("%s Unable to install signal handler for SIGUSR1");
+        perror("Unable to install signal handler for SIGUSR1");
     if (sigaction(SIGUSR2, &sa, NULL) == -1)
-        perror("%s Unable to install signal handler for SIGUSR2");
+        perror("Unable to install signal handler for SIGUSR2");
+    // for SIGTERM and SIGINT the default handler should be restored upon signal
+    // delivery, so that a repeated signal is handled immediately with the 
+    // default action and not only in the next backend cycle.
+    sa.sa_flags |= SA_RESETHAND;
     if (sigaction(SIGINT, &sa, NULL) == -1)
-        perror("%s Unable to install signal handler for SIGINT");
+        perror("Unable to install signal handler for SIGINT");
+    if (sigaction(SIGTERM, &sa, NULL) == -1)
+        perror("Unable to install signal handler for SIGTERM");
 
 }
 /*-------------------------------------------------------------------------*/
