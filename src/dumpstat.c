@@ -122,14 +122,19 @@ svalue_size (svalue_t *v, mp_int * pTotal)
 
         if (NULL == register_pointer(ptable, v->u.map) ) return 0;
 
-        overhead = (mp_uint)mapping_overhead(v->u.map);
-        locals.total = 0;
-        locals.composite = 0;
-        locals.num_values = v->u.map->num_values;
-        walk_mapping(v->u.map, svalue_size_map_filter, &locals);
+        if (v->u.map->ref)
+        {
+            overhead = (mp_uint)mapping_overhead(v->u.map);
+            locals.total = 0;
+            locals.composite = 0;
+            locals.num_values = v->u.map->num_values;
+            walk_mapping(v->u.map, svalue_size_map_filter, &locals);
 
-        *pTotal = locals.total + overhead;
-        return (overhead + locals.composite) / v->u.map->ref;
+            *pTotal = locals.total + overhead;
+            return (overhead + locals.composite) / v->u.map->ref;
+        }
+        else
+            return 0;
     }
 
     case T_POINTER:
@@ -137,14 +142,20 @@ svalue_size (svalue_t *v, mp_int * pTotal)
     {
         if (v->u.vec == &null_vector) return 0;
         if (NULL == register_pointer(ptable, v->u.vec) ) return 0;
-        overhead = sizeof *v->u.vec - sizeof v->u.vec->item +
-          sizeof(svalue_t) * v->u.vec->size + sizeof(char *);
-        for (i=0; i < (mp_int)VEC_SIZE(v->u.vec); i++) {
-            composite += svalue_size(&v->u.vec->item[i], &total);
-            *pTotal += total;
+        if (v->u.vec->ref)
+        {
+            overhead = sizeof *v->u.vec - sizeof v->u.vec->item +
+              sizeof(svalue_t) * v->u.vec->size + sizeof(char *);
+            for (i=0; i < (mp_int)VEC_SIZE(v->u.vec); i++) {
+                composite += svalue_size(&v->u.vec->item[i], &total);
+                *pTotal += total;
+            }
+            *pTotal += overhead;
+
+            return (overhead + composite) / v->u.vec->ref;
         }
-        *pTotal += overhead;
-        return (overhead + composite) / v->u.vec->ref;
+        else
+            return 0;
     }
 
 #ifdef USE_STRUCTS
@@ -152,14 +163,20 @@ svalue_size (svalue_t *v, mp_int * pTotal)
     {
         struct_t *st = v->u.strct;
         if (NULL == register_pointer(ptable, st) ) return 0;
-        overhead = sizeof *st - sizeof st->member
-                   + sizeof(svalue_t) * struct_size(st);
-        for (i=0; i < (mp_int)struct_size(st); i++) {
-            composite += svalue_size(&st->member[i], &total);
-            *pTotal += total;
+        if (st->ref)
+        {
+            overhead = sizeof *st - sizeof st->member
+                      + sizeof(svalue_t) * struct_size(st);
+            for (i=0; i < (mp_int)struct_size(st); i++) {
+                composite += svalue_size(&st->member[i], &total);
+                *pTotal += total;
+            }
+            *pTotal += overhead;
+
+            return (overhead + composite) / st->ref;
         }
-        *pTotal += overhead;
-        return (overhead + composite) / st->ref;
+        else
+            return 0;
     }
 #endif /* USE_STRUCTS */
 
@@ -226,7 +243,10 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         }
 
         *pTotal += overhead;
-        return (overhead + composite) / l->ref;
+        if (l->ref)
+            return (overhead + composite) / l->ref;
+        else
+            return 0;
     }
 
     default:
