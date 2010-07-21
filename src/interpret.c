@@ -6386,6 +6386,34 @@ test_efun_args (int instr, int args, svalue_t *argp)
     }
 } /* test_efun_args() */
 
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+unravel_lvalue_indirection(svalue_t *svp)
+// unravels any lvalue indirection if there is one
+{
+    switch(svp->type)
+    {
+        // handle lvalues/references.
+        case T_LVALUE:
+        case T_PROTECTED_LVALUE:
+            // trace LVALUE chain to the real svalue.
+            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
+                svp = svp->u.lvalue;
+            return svp;
+            
+        // these point directly to the referenced svalue.
+        case T_PROTECTED_STRING_RANGE_LVALUE:
+        case T_STRING_RANGE_LVALUE:
+        case T_PROTECTED_CHAR_LVALUE:
+        case T_POINTER_RANGE_LVALUE:
+        case T_PROTECTED_POINTER_RANGE_LVALUE:
+        case T_PROTECTOR_MAPPING:
+            return svp->u.lvalue;
+            
+    }
+    // Fall-through, no lvalue
+    return svp;
+} // unravel_lvalue_indirection
 
 /*-------------------------------------------------------------------------*/
 static INLINE Bool
@@ -6396,6 +6424,9 @@ check_rtt_compatibility_inl(vartype_t formaltype, svalue_t *svp)
 // but the lvalue property is ignored for assessing the compatibility.
 // returns MY_TRUE if *<svp> is compatible to <formal_type>, MY_FALSE otherwise.
 {
+    
+    svp = unravel_lvalue_indirection(svp);
+    
     // mixed accepts anything... Also zero (0) is considered to be an element
     // of any type.
     if ((formaltype.type & PRIMARY_TYPE_MASK) == TYPE_ANY
@@ -6462,24 +6493,9 @@ check_rtt_compatibility_inl(vartype_t formaltype, svalue_t *svp)
                     return MY_TRUE;
             }
             return MY_FALSE;
-
-        // handle lvalues/references.
-        case T_LVALUE:
-        case T_PROTECTED_LVALUE:
-            // trace LVALUE chain to the real svalue.
-            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
-                svp = svp->u.lvalue;
-            return check_rtt_compatibility(formaltype, svp);
+        
+        // any lvalue indirections must have been unraveled before.
             
-        // these point directly to the referenced svalue.
-        case T_PROTECTED_STRING_RANGE_LVALUE:
-        case T_STRING_RANGE_LVALUE:
-        case T_PROTECTED_CHAR_LVALUE:
-        case T_POINTER_RANGE_LVALUE:
-        case T_PROTECTED_POINTER_RANGE_LVALUE:
-        case T_PROTECTOR_MAPPING:
-            // check for correct types.
-            return check_rtt_compatibility(formaltype,svp->u.lvalue);
     } // switch(svp->type)
 
     // Fall-through
@@ -6560,8 +6576,10 @@ check_function_args(int fx, program_t *progp, fun_hdr_p funstart)
                 string_t *function_name;
                 memcpy(&function_name, FUNCTION_NAMEP(funstart), sizeof function_name);
                 fulltype_t ft = { .typeflags = arg_type[i].type, .t_struct = arg_type[i].t_struct };
+                // unravel any lvalue indirection (if any)
+                svalue_t *svp = unravel_lvalue_indirection(&firstarg[i]);
                 errorf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
-                       , i+1, get_txt(function_name), typename(firstarg[i].type),
+                       , i+1, get_txt(function_name), typename(svp->type),
                        get_type_name(ft));
             }
             ++i;
