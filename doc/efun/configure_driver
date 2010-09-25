@@ -19,10 +19,17 @@ DESCRIPTION
            globally disable them if <data> is 0.
            If called during heartbeat processing, the change comes into effect
            at the next backend cycle.
+        <what> == DC_LONG_EXEC_TIME
+           Set the time considered as (too) long for top-level executions. If
+           an execution exceeds this time, a stack trace will be written to
+           the debug log. The execution will continue at that point.
+           <data> is an integer and measured in microseconds.
+           A time of 0 disables the detection of long executions.
 
 HISTORY
         Introduced in LDMud 3.3.719.
         DC_ENABLE_HEART_BEATS was added in 3.5.0.
+        DC_LONG_EXEC_TIME was added in 3.5.0.
 
 SEE ALSO
         configure_interactive(E)

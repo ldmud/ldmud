@@ -566,6 +566,8 @@ int32 assigned_eval_cost;
    * assign_eval_cost().
    */
 
+
+
 svalue_t apply_return_value = { T_NUMBER };
   /* This variable holds the result from a call to apply(), transferred
    * properly from the interpreter stack where the called function
@@ -738,6 +740,13 @@ statistic_t stat_eval_duration = { 0 };
   /* Weighted statistics of evaluation cost and duration.
    */
 
+struct timeval profiling_timevalue = {0, 0};
+  /* timer value for the profiling timer for detection of long executions,
+   * Default: 0ms (detection deactivated)
+   */
+
+static Bool received_prof_signal = MY_FALSE;
+
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
@@ -797,6 +806,16 @@ assign_eval_cost_inl(void)
 void assign_eval_cost(void) { assign_eval_cost_inl(); }
 
 /*-------------------------------------------------------------------------*/
+RETSIGTYPE
+handle_profiling_signal(int ignored)
+/* signal handler for the SIGPROF signal. Just sets a flag which is checked in
+ * eval_instruction() at the end of each instruction.
+ */
+{
+    received_prof_signal = MY_TRUE;
+} // handle_prof()
+
+/*-------------------------------------------------------------------------*/
 void
 mark_start_evaluation (void)
 
@@ -804,8 +823,19 @@ mark_start_evaluation (void)
  */
 
 {
+    // .it_interval is always zero (no auto-repeat), .it_value will be set later
+    static struct itimerval prof_time_val = { {0,0}, {0,0} };
+
     total_evalcost = 0;
     eval_number++;
+
+    // start the profiling timer if enabled
+    if (profiling_timevalue.tv_usec || profiling_timevalue.tv_sec)
+    {
+        prof_time_val.it_value = profiling_timevalue;
+        setitimer(ITIMER_PROF, &prof_time_val, NULL);
+    }
+
     if (gettimeofday(&eval_begin, NULL))
     {
         eval_begin.tv_sec = eval_begin.tv_usec = 0;
@@ -820,6 +850,12 @@ mark_end_evaluation (void)
  */
 
 {
+    static struct itimerval prof_time_val = { {0,0}, {0,0} };
+
+    // disable the profiling timer
+    if (profiling_timevalue.tv_usec || profiling_timevalue.tv_sec)
+        setitimer(ITIMER_PROF, &prof_time_val, NULL);
+
     if (total_evalcost == 0)
         return;
 
@@ -16916,6 +16952,22 @@ again:
     }
 #endif /* DEBUG */
 
+    // Did we receive a SIGPROF signal and should dump a trace into the debuglog?
+    if (received_prof_signal)
+    {
+        received_prof_signal = MY_FALSE;
+        char     *ts = time_stamp();
+        string_t *object_name = NULL;
+        debug_message("%s Received profiling signal, evaluation time > %ld.%06lds\n",
+                      ts, (long)profiling_timevalue.tv_sec, (long)profiling_timevalue.tv_usec);
+        printf("%s Received profiling signal, evaluation time > %ld.%06lds\n",
+                      ts, (long)profiling_timevalue.tv_sec, (long)profiling_timevalue.tv_usec);
+        // dump stack trace and continue execution
+        object_name = dump_trace(MY_FALSE, NULL);
+        debug_message("%s ... execution continues.\n", ts);
+        printf("%s ... execution continues.\n", ts);
+    }
+
     /* Execute the next instruction */
 
     goto again;
@@ -21127,4 +21179,29 @@ f_traceprefix (svalue_t *sp)
     return sp;
 } /* f_traceprefix() */
 
+/*-------------------------------------------------------------------------*/
+Bool
+set_profiling_time_limit(mp_int limit)
+/* Sets the profiling time limit to <limit> us.
+ * return TRUE on success and FALSE otherwise.
+ */
+{
+    if (limit >= 0)
+    {
+        profiling_timevalue.tv_sec = limit / 1000000;
+        profiling_timevalue.tv_usec = limit % 1000000;
+        return MY_TRUE;
+    }
+    
+    return MY_FALSE;
+} /* set_memory_limit */
+
+mp_int
+get_profiling_time_limit()
+/* Gets the profiling time limit in microseconds.
+*/
+{
+    return profiling_timevalue.tv_sec * 1000000 + profiling_timevalue.tv_usec;
+} /* get_memory_limit */
+                            
 /***************************************************************************/

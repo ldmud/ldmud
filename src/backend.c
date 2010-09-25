@@ -497,6 +497,14 @@ void install_signal_handlers()
         perror("Unable to install signal handler for SIGUSR1");
     if (sigaction(SIGUSR2, &sa, NULL) == -1)
         perror("Unable to install signal handler for SIGUSR2");
+    // Profiling signal handler for the detection of long executions.
+    sa.sa_handler = handle_profiling_signal;
+    if (sigaction(SIGPROF, &sa, NULL) == -1) {
+        profiling_timevalue.tv_sec = 0;
+        profiling_timevalue.tv_usec = 0;
+        debug_message("%s Unable to install signal handler for SIGPROF - profiling "
+            "not available\n", time_stamp());
+    }
     // for SIGTERM and SIGINT the default handler should be restored upon signal
     // delivery, so that a repeated signal is handled immediately with the 
     // default action and not only in the next backend cycle.

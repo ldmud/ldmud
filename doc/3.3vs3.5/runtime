@@ -6,3 +6,7 @@ that you should pay attention to when updating.
   However, the mudlib can activate/deactivate the calls to heartbeats
   globally by using configure_driver()
 
+- Long exections can be detected and traced by setting DC_LONG_EXEC_TIME with
+  configure_driver(). If an execution exceeds this time, the current LPC stack
+  will be dumped into the debug log (execution will continue).
+

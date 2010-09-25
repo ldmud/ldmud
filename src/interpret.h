@@ -135,6 +135,7 @@ extern unsigned long last_total_evalcost;
 extern struct timeval last_eval_duration;
 extern statistic_t stat_total_evalcost;
 extern statistic_t stat_eval_duration;
+extern struct timeval profiling_timevalue;
 
 /* --- Prototypes --- */
 
@@ -252,6 +253,11 @@ extern void count_extra_ref_in_vector(svalue_t *svp, size_t num);
 extern void check_a_lot_ref_counts(program_t *search_prog);
 #endif
 
+// signal handler for profiling (SIGPROF)
+extern RETSIGTYPE handle_profiling_signal(int ignored);
+extern Bool set_profiling_time_limit(mp_int limit);
+extern mp_int get_profiling_time_limit();
+
 extern size_t interpreter_overhead(void);
 
 #ifdef GC_SUPPORT
@@ -260,5 +266,6 @@ extern void count_interpreter_refs(void);
 #endif
 
 extern int  control_stack_depth(void);
+
 
 #endif /* INTERPRET_H__ */

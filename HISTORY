@@ -88,6 +88,8 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
        + Improved the determination of the drivers current_time which fixes
          issues with wrongly timed heart_beats or apparantly wrong timings.
          (e.g. #743)
+       + A profiling feature for detecting long executions was introduced. It
+         can be configured with configure_driver().
 
     - Language
        + Added a sefun:: specifier to explicitly call simul-efuns. (#669)

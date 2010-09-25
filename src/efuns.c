@@ -7846,10 +7846,12 @@ f_configure_driver (svalue_t *sp)
  * <what> is an identifier the setting:
  *        - DC_MEMORY_LIMIT        (0): configures the memory limits
  *        - DC_ENABLE_HEART_BEATS  (1): activate/deactivate heart beats globally
+ *        - DC_LONG_EXEC_TIME      (2): execution time considered (too) 'long'
  * 
  * <data> is dependent on <what>:
  *   DC_MEMORY_LIMIT:        ({soft-limit, hard-limit}) both <int>, given in Bytes.
  *   DC_ENABLE_HEART_BEATS:  0/1 (int)
+ *   DC_LONG_EXEC_TIME:      0 - __INT_MAX__ (int), given in microseconds.
  *
  */
 
@@ -7891,6 +7893,15 @@ f_configure_driver (svalue_t *sp)
             if (sp->type != T_NUMBER)
                 efun_arg_error(1, T_NUMBER, sp->type, sp);
             heart_beats_enabled = sp->u.number != 0 ? MY_TRUE : MY_FALSE;
+            break;
+            
+        case DC_LONG_EXEC_TIME:
+            if (sp->type != T_NUMBER)
+                efun_arg_error(1, T_NUMBER, sp->type, sp);
+            if (!set_profiling_time_limit(sp->u.number))
+                errorf("Could not set the profiling time limit for long executions "
+                       "(%"PRIdPINT") in configure_driver()\n",
+                       sp->u.vec->item[0].u.number);
             break;
     }
 

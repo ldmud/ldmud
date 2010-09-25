@@ -12,5 +12,6 @@
  */
 #define DC_MEMORY_LIMIT        0
 #define DC_ENABLE_HEART_BEATS  1
+#define DC_LONG_EXEC_TIME      2
 
 #endif /* LPC_CONFIGURATION_H_ */
