@@ -29,7 +29,7 @@ that you should pay attention to when updating.
   + The behaviour of the pragma verbose_errors is mandatory, the compiler will
     always give information about the context of an error.
     This pragma is ignored  (#702)
-  + The pragma warn_deprecated is no enabled by default. (#702)
+  + The pragma warn_deprecated is now enabled by default. (#702)
 
 - 'deprecated' modifier
   The deprecated modifier can be used for lfuns (and sefuns) and global
