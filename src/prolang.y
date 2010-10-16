@@ -9071,6 +9071,13 @@ function_call:
               char *p, *q;
               p_int left;
 
+              if (!realloc_a_program(6))
+              {
+                  yyerrorf("Out of memory: program size %lu\n"
+                          , CURRENT_PROGRAM_SIZE + 6);
+                  YYACCEPT;
+              }
+
               /* Move the generated code forward by 6 */
               p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE;
               q = p + 6;

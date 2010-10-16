@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Oct-2010 (Gnomi)
+  - Adjustments for a call_other simul-efun didn't check whether enough
+    space is available. (#759)
+    (prolang.y)
+
 10-Jan-2010 (LDMud Team)  (3.2.17)
   - Created snapshot.
 
