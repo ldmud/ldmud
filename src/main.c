@@ -683,7 +683,7 @@ main (int argc, char **argv)
         rc = exit_code;
         printf("%s LDMud shutting down.\n", time_stamp());
 
-        callback_master(STR_SHUTDOWN, 0);
+        callback_master(STR_NOTIFY_SHUTDOWN, 0);
         ipc_remove();
         remove_all_players();
         handle_newly_destructed_objects();

@@ -645,7 +645,7 @@ fatal (const char *fmt, ...)
 
     /* Before shutting down, try to inform the game about it */
     push_ref_string(inter_sp, STR_FATAL_ERROR);
-    callback_master(STR_SHUTDOWN, 1);
+    callback_master(STR_NOTIFY_SHUTDOWN, 1);
 
     /* Mandatory cleanups */
 #ifdef USE_TLS
