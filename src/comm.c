@@ -4629,18 +4629,6 @@ send_do (int option)
 
 /*-------------------------------------------------------------------------*/
 static void
-reply_nil (int option UNUSED)
-
-/* Dummy function which does nothing. */
-
-{
-#ifdef __MWERKS__
-#    pragma unused(option)
-#endif
-}
-
-/*-------------------------------------------------------------------------*/
-static void
 reply_to_do_echo (int option)
 
 /* Send IAC WONT <option> if we don't want noecho mode.

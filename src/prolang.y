@@ -1962,6 +1962,7 @@ ins_uint32 (uint32_t l)
 } /* ins_uint32() */
 
 /*-------------------------------------------------------------------------*/
+static void upd_uint32 (bc_offset_t offset, uint32_t l) UNUSED;
 static void
 upd_uint32 (bc_offset_t offset, uint32_t l)
 /* Store the uint32_t <l> at <offset> in the A_PROGRAM are.
@@ -1971,6 +1972,7 @@ upd_uint32 (bc_offset_t offset, uint32_t l)
 } /* upd_uint32() */
 
 /*-------------------------------------------------------------------------*/
+static uint32 read_uint32 (bc_offset_t offset) UNUSED;
 static uint32
 read_uint32 (bc_offset_t offset)
 // Return the uint32_t stored at <offset> in the A_PROGRAM area.
