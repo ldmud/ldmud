@@ -14,8 +14,10 @@ BESCHREIBUNG
         wenn man sie nicht verwenden darf. Sorry, das darf hier nicht
         bekannt gegeben werden. Streng geheim.
 
+        Diese efun ist privilegiert.
+
 GESCHICHTE
         LDMud 3.2.11 fuehrte das 'exit_code' Argument ein.
-
+        LDMud 3.5.0 machte die efun privilegiert.
 SIEHE AUCH
-        break_point(E), swap(E)
+        break_point(E), swap(E), privilege_violation(M)

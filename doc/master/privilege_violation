@@ -54,6 +54,8 @@ DESCRIPTION
         set_this_object   Set this_object() to <arg>.
         shadow_add_action Add an action to function <arg2> of object <arg>
                           from the shadow <who> which is shadowing <arg>.
+        shutdown          Object <who> calls the efun shutdown with <arg> as
+                          argument.
         sqlite_pragma     Execute pragma statement in SQLite.
         symbol_variable   Attempt to make a symbol from a hidden
                           inherited variable. <arg> is the object in

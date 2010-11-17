@@ -9176,9 +9176,13 @@ f_shutdown (svalue_t *sp)
  */
 
 {
-    extra_jobs_to_do = MY_TRUE;
-    game_is_being_shut_down = MY_TRUE;
-    exit_code = sp->u.number;
+    // privilege violation check
+    if (privilege_violation(STR_SHUTDOWN, sp, sp))
+    {
+        extra_jobs_to_do = MY_TRUE;
+        game_is_being_shut_down = MY_TRUE;
+        exit_code = sp->u.number;
+    }
     return --sp;
 } /* f_shutdown() */
 

@@ -11,8 +11,11 @@ DESCRIPTION
         if you're not supposed to use it why is it here?  Sorry, I
         cannot answer that.  Its top secret.
 
+        The efun causes a privilege violation.
+
 HISTORY
         LDMud 3.2.11 introduced the exit code.
+        LDMud 3.5.0 made the efun privileged.
 
 SEE ALSO
-        break_point(E), swap(E)
+        break_point(E), swap(E), privilege_violation(M)
