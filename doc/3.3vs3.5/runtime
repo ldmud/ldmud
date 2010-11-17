@@ -10,3 +10,7 @@ that you should pay attention to when updating.
   configure_driver(). If an execution exceeds this time, the current LPC stack
   will be dumped into the debug log (execution will continue).
 
+- Some more efuns cause a privilege violation:
+  * shutdown() (bug #178)
+  * garbage_collection() (bug #178)
+
