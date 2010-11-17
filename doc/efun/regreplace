@@ -42,7 +42,9 @@ EXAMPLES
         txt = regreplace(txt, "<underline>", "<ESC>[5m", 1);
 
         /* Put the word HOUSE into lower case. */
-        txt = regreplace(txt, "HOUSE", #'lower_case, 1);
+        txt = regreplace(txt, "HOUSE",
+                function string (string s) {return lower_case(s);},
+                1);
 
 
 HISTORY
