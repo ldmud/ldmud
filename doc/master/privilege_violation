@@ -26,6 +26,8 @@ DESCRIPTION
                           <arg>.
         erq               A the request <arg2> is to be send to the
                           erq-demon by the object <who>.
+        garbage_collection  Object <who> calls the efun garbage_collectio()
+                          with <arg> as filename and <arg2> as flag.
         input_to          Object <who> redirects the next input from
                           commandgiver <arg>, using <arg2> as value
                           for the flags. This is used for flag values

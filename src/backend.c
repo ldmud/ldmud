@@ -1503,6 +1503,31 @@ v_garbage_collection (svalue_t *sp, int num_arg)
  */
 
 {
+    // check privilege violation first.
+    svalue_t *fname = &const0;
+    svalue_t *flag = NULL; // the second arg to priv_vio2 may be NULL.
+    switch (num_arg)
+    {
+        case 2:
+            flag = sp;
+            fname = sp - 1;
+            break;
+        case 1:
+            fname = sp;
+            break;
+        case 0:
+            // NOOP
+            break;
+        default:
+            // This should never happen.
+            errorf("garbage_collection() called with more than 2 args.\n");
+    }
+    if (!privilege_violation2(STR_GARBAGE_COLLECTION, fname, flag, sp))
+    {
+        return pop_n_elems(num_arg, sp);
+    }
+
+
     if (num_arg > 0)
     {
 #ifdef GC_SUPPORT

@@ -26,6 +26,8 @@ DESCRIPTION
         If a different memory allocator is used, the GC does not produce
         output and the <filename> and <flag> arguments are ignored.
 
+        Calling this efun causes a privilege_violation.
+
 EXAMPLES
         garbage_collection()
          [ GC occurs -> logs into default file ]
@@ -47,6 +49,7 @@ EXAMPLES
 HISTORY
         LDMud 3.2.9 added the <filename> argument.
         LDMud 3.3.209 added the <flag> argument.
+        LDMUd 3.5.0 made the efun privileged.
 
 SEE ALSO
-        rusage(E), valid_write(M)
+        rusage(E), valid_write(M), privilege_violation(M)

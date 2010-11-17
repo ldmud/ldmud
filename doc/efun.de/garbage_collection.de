@@ -18,8 +18,12 @@ BESCHREIBUNG
         Fuer andere Memory Allocators erzeugt garbage_collection() keinen
         Output. Ein allfaelliges Argument <filename> wird ignoriert.
 
+        Diese efun verursacht den Aufruf von privilege_violation().
+
 GESCHICHTE
         LDMud 3.2.9 fuehrte das Argument <filename> ein.
+        LDMud 3.3.209 fuehrte das Argument <flag> ein.
+        LDMud 3.5.0 machte die efun privilegiert.
 
 SIEHE AUCH
-        rusage(E), valid_write(M)
+        rusage(E), valid_write(M), privilege_violation(M)
