@@ -415,6 +415,10 @@ tls_global_init (void)
     /* Avoid small subgroup attacks */
     SSL_CTX_set_options(context, SSL_OP_SINGLE_DH_USE);
 
+    // OpenSSL must accept a different buffer address for retries after
+    // SSL_write() returned -1 with SSL_WANT_READ/_WRITE, because we transfer
+    // the content to a queue of buffers before we try again (#737).
+    SSL_CTX_set_mode(context, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
     /* OpenSSL successfully initialised */
     tls_is_available = MY_TRUE;
     return;
