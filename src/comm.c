@@ -2222,8 +2222,8 @@ get_message (char *buff)
     static int CmdsGiven = 0;
       /* Number of commands the current user gave in this cycle. */
 
-#   define StartCmdGiver  (max_player)
-#   define IncCmdGiver    NextCmdGiver--
+#   define StartCmdGiver       (max_player)
+#   define DecreaseCmdGiver    NextCmdGiver--
 
     int    i;
     interactive_t * ip = NULL;
@@ -2742,7 +2742,7 @@ get_message (char *buff)
 
         /* --- The Scan for User Commands --- */
 
-        for (; NextCmdGiver >= 0; IncCmdGiver)
+        for (; NextCmdGiver >= 0; DecreaseCmdGiver)
         {
             object_t *snooper;
 
@@ -3091,7 +3091,7 @@ get_message (char *buff)
 
                     command_giver = ip->ob;
                     trace_level = ip->trace_level;
-                    IncCmdGiver;
+                    DecreaseCmdGiver;
                     CmdsGiven = 0;
 
                     if (ip->last_time != current_time)
@@ -3168,7 +3168,7 @@ get_message (char *buff)
                 }
                 else
                 {
-                    IncCmdGiver;
+                    DecreaseCmdGiver;
                     CmdsGiven = 0;
                 }
 
@@ -3230,7 +3230,7 @@ get_message (char *buff)
 
     /* NOTREACHED */
 #   undef StartCmdGiver
-#   undef IncCmdGiver
+#   undef DecreaseCmdGiver
 
 } /* get_message() */
 
