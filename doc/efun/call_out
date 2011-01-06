@@ -5,9 +5,10 @@ SYNOPSIS
 DESCRIPTION
         Set up a call to function fun in the current object, or to
         closure cl. The call will take place after <delay> seconds, with the
-        remaining argument list provided. <delay> can be a minimum time
-        of one second, but will be rounded up to the next multiple of
-        __ALARM_TIME__ internally.
+        remaining argument list provided.
+        <delay> can be a minimum time of 0 (negative values are implicitly
+        treated as 0), but the real delay will be something between <delay>
+        and <delay> + __ALARM_TIME__.
 
         call_out() saves and restores the current user. It is now
         possible to use say() or write() which rely on a current
