@@ -6873,7 +6873,9 @@ _expand_define (struct defn *p, ident_t * macro)
                     }
 
                   default:
-                    *q++ = (char)c;
+                    // skip whitespace chars
+                    if (!lexwhite(c))
+                        *q++ = (char)c;
                     continue;
                 } /* end switch */
 
