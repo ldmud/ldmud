@@ -94,5 +94,6 @@ HISTORY
         LDMud 3.3.113 introduced the H_DEFAULT_METHOD hook.
 
 SEE ALSO
-        call_direct(E), call_resolved(E), create(A), pragma(LPC),
-        extern_call(E), function_exists(E), functions(LPC)
+        call_direct(E), call_direct_resolved(E), call_resolved(E), create(A),
+        pragma(LPC), extern_call(E), function_exists(E), functions(LPC),
+        map_objects(E)

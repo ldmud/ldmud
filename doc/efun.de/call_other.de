@@ -20,7 +20,7 @@ BESCHREIBUNG
         Die Elemente von *<ob> koennen Objekte oder Namen von Objekten sein.
         Zerstoerte Objekte und 0 als Element geben eine 0 zurueck, fuehren
         aber nicht zu einem Fehler.
-        
+
         Falls Arrays von Objekten akzeptiert werden, ist das Makro
         __LPC_ARRAY_CALLS__ gesetzt.
 
@@ -91,5 +91,6 @@ GESCHICHTE
         LDMud 3.3.113 fuehrte den Hook H_DEFAULT_METHOD ein.
 
 SIEHE AUCH
-        function_exists(E), call_resolved(E), create(A), pragma(LPC),
-        extern_call(E), functions(LPC)
+        call_direct(E), call_direct_resolved(E), call_resolved(E), create(A),
+        pragma(LPC), extern_call(E), function_exists(E), functions(LPC),
+        map_objects(E)
