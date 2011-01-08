@@ -6768,8 +6768,11 @@ _expand_define (struct defn *p, ident_t * macro)
                         parcnt--;
                         if (parcnt < 0)
                         {
-                            /* We found the end of the argument list */
-                            *q++ = '\0';
+                            /* We found the end of the argument list. Remove
+                             * trailing whitespace and terminate the arg. */
+                            while( lexwhite(*(--q)) ) ;
+                            ++q; // last non-whitespace char, increase by one
+                            *q++ = '\0'; // then terminate the arg.
                             n++;
                             break;
                         }
@@ -6831,7 +6834,14 @@ _expand_define (struct defn *p, ident_t * macro)
                      */
                     if (!parcnt && !dquote && !squote && !brakcnt)
                     {
-                        *q++ = '\0';
+                        /* Remove trailing whitespace and terminate the arg. */
+                        while( lexwhite(*(--q)) ) NOOP;
+                        ++q; // last non-whitespace char, increase by one
+                        *q++ = '\0'; // then terminate the arg.
+                        // I don't skip the leading whitespace for the next
+                        // argument because there may be things like
+                        // linebreaks between two args which I don't want to
+                        // deal with in this case. This will be done below.
                         args[++n] = q;
                         if (n == NARGS - 1)
                         {
@@ -6873,9 +6883,7 @@ _expand_define (struct defn *p, ident_t * macro)
                     }
 
                   default:
-                    // skip whitespace chars
-                    if (!lexwhite(c))
-                        *q++ = (char)c;
+                    *q++ = (char)c;
                     continue;
                 } /* end switch */
 
@@ -6918,7 +6926,12 @@ _expand_define (struct defn *p, ident_t * macro)
                     *b++ = *e++;
                 else
                 {
-                    for (q = args[*e++ - MARKS - 1]; *q; )
+                    q = args[*e++ - MARKS - 1];
+                    // the args may have leading whitespace (see above),
+                    // we skip it here.
+                    while(lexwhite(*q)) ++q;
+
+                    for ( ; *q ; )
                     {
                         *b++ = *q++;
                         if (b >= buf+DEFMAX)
