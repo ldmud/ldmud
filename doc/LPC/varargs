@@ -35,7 +35,7 @@ DESCRIPTION
 
         void fun (string arg1, int arg2, varargs int * arg3)
 
-    This allows fun() to be called with three or more arguments.
+    This allows fun() to be called with two or more arguments.
     The arguments, except those assigned to the other parameters,
     in this case arg1 and arg2, and collected into an array which
     is then passed as arg3. For example
