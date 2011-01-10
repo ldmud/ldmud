@@ -37,7 +37,7 @@
 #include "sha1.h"
 #include "svalue.h"
 #include "xalloc.h"
-     
+
 #include "../mudlib/sys/tls.h"
 
 /*-------------------------------------------------------------------------*/
@@ -513,7 +513,7 @@ tls_read (interactive_t *ip, char *buffer, int length)
 {
     int ret;
     int err;
-    int retries = 6;
+    int retries = 5;
 
     do {
         ret = SSL_read(ip->tls_session, buffer, length);
@@ -522,11 +522,7 @@ tls_read (interactive_t *ip, char *buffer, int length)
               && (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
               && (--retries));
 
-    if (ret == 0)
-    {
-        tls_deinit_connection(ip);
-    }
-    else if (ret < 0)
+    if (ret <= 0)
     {
         err = SSL_get_error(ip->tls_session, ret);
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
@@ -569,18 +565,11 @@ tls_write (interactive_t *ip, char *buffer, int length)
  */
 
 {
-    int ret;
-    int err;
+    int ret = SSL_write(ip->tls_session, buffer, length);
 
-    ret = SSL_write(ip->tls_session, buffer, length);
-    
-    if (ret == 0)
+    if (ret <= 0)
     {
-        tls_deinit_connection(ip);
-    }
-    else if (ret < 0)
-    {
-        err = SSL_get_error(ip->tls_session, ret);
+        int err = SSL_get_error(ip->tls_session, ret);
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
         {
             // recoverable error, caller will try again with the same content.
@@ -666,7 +655,6 @@ tls_init_connection (interactive_t *ip)
         SSL_free(session);
         return -ERR_get_error();
     }
-
     if (ip->outgoing_conn)
         SSL_set_connect_state(session);
     else
