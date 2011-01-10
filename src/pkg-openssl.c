@@ -40,6 +40,9 @@
      
 #include "../mudlib/sys/tls.h"
 
+// add some entropy by calling RAND_poll() every 15-45min.
+#define PRNG_RESEED_PERIOD 1800
+
 /*-------------------------------------------------------------------------*/
 /* Variables */
 
@@ -159,6 +162,39 @@ tls_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
     }
     return MY_TRUE;
 } /* tls_verify_callback() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+tls_add_entropy()
+/* Always add the current time to the openssl entropy pool - as little as it
+ * may be. From time to time, call RAND_poll() to add some entropy from
+ * external sources.
+ */
+{
+    static time_t nextpoll = 0;
+    struct timeval tv;
+#ifdef HAVE_GETTIMEOFDAY
+    gettimeofday(&tv, NULL);
+#else
+    tv.tv_sec = time(NULL);
+#endif
+    RAND_add(&tv, sizeof(tv), 0.0); // under-estimate entropy.
+
+   /* OpenSSL 0.9.6 adds a RAND_poll function that knows about more kinds of
+    * entropy than we do. We use that, but not more often than once per
+    * PRNG_RESEED_PERIOD/2 + random(PRNG_RESEED_PERIOD) seconds.
+    */
+    if (nextpoll < tv.tv_sec)
+    {
+        unsigned char rbyte;
+        RAND_pseudo_bytes(&rbyte, 1);
+        nextpoll = tv.tv_sec + PRNG_RESEED_PERIOD/2
+                   + ((PRNG_RESEED_PERIOD * rbyte) / UCHAR_MAX);
+        if (RAND_poll() == 0)
+            debug_message("%s TLS: Warning: Reseeding the PRNG with "
+                          "RAND_poll() failed\n", time_stamp());
+    }
+} /* tls_add_entropy */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -357,9 +393,9 @@ tls_global_init (void)
     // RAND_status() will call RAND_poll() and seed the PRNG.
     if (RAND_status() != 1)
     {
-        printf("%s TLS: OpenSSL PRNG not seeded - TLS not available.\n"
+        printf("%s TLS: OpenSSL PRNG not seeded - TLS not available. Please file a bug report.\n"
                , time_stamp());
-        debug_message("%s TLS: OpenSSL PRNG not seeded - TLS not available.\n"
+        debug_message("%s TLS: OpenSSL PRNG not seeded - TLS not available. Please file a bug report.\n"
                       , time_stamp());
         return;
     }
@@ -609,6 +645,9 @@ tls_init_connection (interactive_t *ip)
  */
 
 {
+    // Add some fresh entropy to the PRNG state.
+    tls_add_entropy();
+
     SSL * session = SSL_new(context);
 
     if (session == NULL)
