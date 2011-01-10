@@ -422,6 +422,11 @@ tls_global_init (void)
     // SSL_write() returned -1 with SSL_WANT_READ/_WRITE, because we transfer
     // the content to a queue of buffers before we try again (#737).
     SSL_CTX_set_mode(context, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+#ifdef SSL_MODE_RELEASE_BUFFERS
+    // OpenSSL 1.0.0a can save some memory for idle SSL connections
+    SSL_CTX_set_mode(context, SSL_MODE_RELEASE_BUFFERS);
+#endif
+
     /* OpenSSL successfully initialised */
     tls_is_available = MY_TRUE;
     return;
