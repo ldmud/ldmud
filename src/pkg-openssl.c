@@ -505,14 +505,30 @@ tls_read (interactive_t *ip, char *buffer, int length)
     else if (ret < 0)
     {
         err = SSL_get_error(ip->tls_session, ret);
-        debug_message("%s TLS: Received corrupted data (%d). "
-                      "Closing the connection.\n"
-                     , time_stamp(), err);
-        tls_deinit_connection(ip);
-        /* get_message() expects an errno value.
-         * ESHUTDOWN will close the connection.
-         */
-        errno = ESHUTDOWN;
+        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
+        {
+            // recoverable errors and likely to succeed later. Caller should
+            // try again.
+            errno = EAGAIN;
+            return -1;
+        }
+        else if (err == SSL_ERROR_SYSCALL
+                 && (errno==EINTR || errno==EAGAIN))
+        {
+            // in these cases, we should also try again later.
+            return -1;
+        }
+        else
+        {
+            // in case of other errors, disconnect...
+            debug_message("%s TLS: Received corrupted data (%d). "
+                          "Closing the connection.\n"
+                          , time_stamp(), err);
+            tls_deinit_connection(ip);
+            // get_message() expects an errno value. ESHUTDOWN will close the connection.
+            errno = ESHUTDOWN;
+            return -1;
+        }
     }
 
     return (ret < 0 ? -1 : ret);
