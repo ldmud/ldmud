@@ -477,6 +477,22 @@ tls_global_deinit (void)
 } /* tls_global_deinit() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE void
+dump_openssl_error_stack()
+{
+#ifdef DEBUG
+    unsigned long lerr;
+    // dump the error stack of openssl
+    debug_message("%s Dumping OpenSSL error stack...\n",time_stamp());
+    while ( (lerr = ERR_get_error()) )
+    {
+        debug_message("  %4ld: %s\n",lerr, ERR_error_string(lerr, NULL));
+    }
+    debug_message("%s end of OpenSSL error stack dump.\n",time_stamp());
+#endif
+} // dump_ssl_error_stack
+
+/*-------------------------------------------------------------------------*/
 int
 tls_read (interactive_t *ip, char *buffer, int length)
 
@@ -524,6 +540,7 @@ tls_read (interactive_t *ip, char *buffer, int length)
             debug_message("%s TLS: Received corrupted data (%d). "
                           "Closing the connection.\n"
                           , time_stamp(), err);
+            dump_openssl_error_stack();
             tls_deinit_connection(ip);
             // get_message() expects an errno value. ESHUTDOWN will close the connection.
             errno = ESHUTDOWN;
@@ -566,6 +583,7 @@ tls_write (interactive_t *ip, char *buffer, int length)
             debug_message("%s TLS: Sending data failed (%d). "
                           "Closing the connection.\n"
                           , time_stamp(), err);
+            dump_openssl_error_stack();
             tls_deinit_connection(ip);
         }
     }
