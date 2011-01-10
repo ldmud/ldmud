@@ -2806,79 +2806,34 @@ get_message (char *buff)
 #endif
                     l = socket_read(ip->socket, ip->text + ip->text_end, (size_t)l);
                 DTN(("# chars read: %d\n", l));
-                /* TODO: Check if the block below can be simplified by using
-                 * TODO::strerror().*/
-                if (l == -1) {
-                    if (errno == ENETUNREACH) {
-                        debug_message("%s Net unreachable detected.\n"
-                                     , time_stamp());
-                        remove_interactive(ip->ob, MY_FALSE);
-                        continue;
+                if (l == -1)
+                {
+                    switch (errno)
+                    {
+                        case EAGAIN:
+                            // There was no data for available for immediate read.
+                            // This should not happen for plain TCP connections, but
+                            // may for TLS connections.
+#ifdef USE_TLS
+                            if (ip->tls_status == TLS_INACTIVE)
+#endif
+                                debug_message("%s Got unexpected EAGAIN upon socket read. Retrying later.\n");
+                            // Fall-through
+                        case EINTR:
+                            // read was interrupted by a signal. Ignore and retry later again.
+                            continue;
+                        default:
+                            // we regard other errors as non-recoverable.
+                            debug_message("%s Error (%d) upon reading socket %d (ip %p '%s'), closing connection: %s\n"
+                                          , time_stamp(), errno, ip->socket, ip,
+                                          (ip->ob ? get_txt(ip->ob->name) : "<no name>"),
+                                          strerror(errno));
+                            remove_interactive(ip->ob, MY_FALSE);
+                            continue;
                     }
-                    if (errno == EHOSTUNREACH) {
-                        debug_message("%s Host unreachable detected.\n"
-                                     , time_stamp());
-                        remove_interactive(ip->ob, MY_FALSE);
-                        continue;
-                    }
-                    if (errno == ETIMEDOUT) {
-                        debug_message("%s Connection timed out detected.\n"
-                                     , time_stamp());
-                        remove_interactive(ip->ob, MY_FALSE);
-                        continue;
-                    }
-                    if (errno == ECONNRESET) {
-                        debug_message("%s Connection reset by peer detected.\n"
-                                     , time_stamp());
-                        remove_interactive(ip->ob, MY_FALSE);
-                        continue;
-                    }
-                    if (errno == ECONNREFUSED) {
-                        debug_message("%s Connection refused detected.\n"
-                                     , time_stamp());
-                        remove_interactive(ip->ob, MY_FALSE);
-                        continue;
-                    }
-                    if (errno == EWOULDBLOCK) {
-                        debug_message("%s read would block socket %d!\n"
-                                     , time_stamp(), ip->socket);
-                        remove_interactive(ip->ob, MY_FALSE);
-                        continue;
-                    }
-                    if (errno == EMSGSIZE) {
-                        debug_message("%s read EMSGSIZE\n", time_stamp());
-                        continue;
-                    }
-                    if (errno == ESHUTDOWN) {
-                        debug_message("%s Connection to socket %d lost.\n"
-                                     , time_stamp(), ip->socket);
-                        remove_interactive(ip->ob, MY_FALSE);
-                        continue;
-                    }
-                    if (errno == EBADF) {
-                        if (ip->ob)
-                            debug_message("%s Socket %d (ip %p '%s') is a bad descriptor.\n"
-                                         , time_stamp(), ip->socket, ip
-                                         , get_txt(ip->ob->name));
-                        else
-                            debug_message("%s Socket %d (ip %p) is a bad descriptor.\n"
-                                         , time_stamp(), ip->socket, ip);
-                        remove_interactive(ip->ob, MY_FALSE);
-                        continue;
-                    }
-                    if (errno == EINTR || errno == EAGAIN) {
-                        // read was interrupted by a signal. Or there was no data available.
-                        // The latter may at least happen for TLS connections, despite of our select.
-                        // Ignore both and retry later again.
-                        continue;
-                    }
-                    perror("read");
-                    debug_message("%s Unexpected errno %d\n"
-                                 , time_stamp(), errno);
-                    remove_interactive(ip->ob, MY_FALSE);
-                    continue;
                 }
-                if (l == 0) {
+                if (l == 0) // TODO: is this really such a severe error?
+                {
                     if (ip->closing)
                         comm_fatal(ip, "Tried to read from closing socket.\n");
                         /* This will forcefully disconnect the user */
