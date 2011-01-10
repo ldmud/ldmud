@@ -324,47 +324,44 @@ tls_global_init (void)
     if (!SSL_library_init())
     {
         printf("%s TLS: Initialising the SSL library failed.\n"
-              , time_stamp());
+               , time_stamp());
         debug_message("%s TLS: Initialising the SSL library failed.\n"
-                     , time_stamp());
+                      , time_stamp());
         return;
     }
 
-    /* SSL uses the rand(3) generator from libcrypto(), which needs
-     * to be seeded.
+    /* We deliberately DO NOT seed the pseudo random number generator from
+     * OpenSSL. We don't have any reliable source of entropy available. OpenSSL
+     * will use e.g. /dev/urandom, /dev/random, /dev/srandom, the EGD or
+     * CryptoAPI automagically for adding entropy to its state. This is _way_
+     * better than anything we can do.
+     * If OpenSSL fails to get enough entropy by the built-in methods, it will
+     * fail with an error message. On the other hand, if we add now some entropy
+     * and overestimate its quality (easy for e.g. uninitialized memory), we
+     * will disable this safeguard in OpenSSL, because it thinks, it has enough
+     * entropy. We believe it better, that OpenSSL fails completely than working
+     * with bad random numbers.
+     * So, on platforms without strong source of entropy, which is automatically
+     * used by OpenSSL, it will fail completely. Should this happen, we will
+     * deal with the problem. Please file a bug report.
+     * Background information: http://mantis.bearnip.com/view.php?id=678
+     *
+     * Note: in former times, we used to add uname, uid, euid, gid, egid, the
+     * PID, an address from the stack and the current time to the entropy pool.
+     * All this is not really random and contains very little (if any at all)
+     * entropy. PID, UID and time is used automatically by OpenSSL and was
+     * redundant. Additionally, there was some uninitialized memory used, which
+     * was initialized to zero on some systems.
      */
+
+    // RAND_status() will call RAND_poll() and seed the PRNG.
+    if (RAND_status() != 1)
     {
-        struct {
-            struct utsname uname;
-            int uname_1;
-            int uname_2;
-            uid_t uid;
-            uid_t euid;
-            gid_t gid;
-            gid_t egid;
-        } data1;
-
-        struct {
-            pid_t pid;
-            time_t time;
-            void *stack;
-        } data2;
-
-        data1.uname_1 = uname(&data1.uname);
-        data1.uname_2 = errno; /* Let's hope that uname fails randomly :-) */
-
-        data1.uid = getuid();
-        data1.euid = geteuid();
-        data1.gid = getgid();
-        data1.egid = getegid();
-
-        RAND_seed((const void *)&data1, sizeof data1);
-
-        data2.pid = getpid();
-        data2.time = time(NULL);
-        data2.stack = (void *)&data2;
-
-        RAND_seed((const void *)&data2, sizeof data2);
+        printf("%s TLS: OpenSSL PRNG not seeded - TLS not available.\n"
+               , time_stamp());
+        debug_message("%s TLS: OpenSSL PRNG not seeded - TLS not available.\n"
+                      , time_stamp());
+        return;
     }
 
     context = SSL_CTX_new (SSLv23_method());
