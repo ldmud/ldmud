@@ -1803,7 +1803,7 @@ lookfor_shared_identifier (const char *s, size_t len, int n, int depth, Bool bCr
                         curr->next = inferior->next;
                         curr->type = I_TYPE_UNKNOWN;
                         curr->inferior = inferior;
-                        curr->hash = (short)h;
+                        curr->hash = h;
                         ident_table[h] = curr;
                     }
                 }
