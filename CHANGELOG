@@ -4,6 +4,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
 25-Jan-2011 (Gnomi)
   - optpat() shouldn't read over the end of the given ed command. (#722)
     (ed.c)
+  - Explicit context variables overwrote the types of the closure's
+    arguments. (#711)
+    (prolang.y)
 
 12-May-2010 (Gnomi)
   - Corrected the call to mysql_options. Use the generic error message

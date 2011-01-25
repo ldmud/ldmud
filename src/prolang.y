@@ -6147,13 +6147,27 @@ printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROG
           block_scope[current_inline->block_depth+1].accessible = MY_FALSE;
           current_inline->parse_context = MY_TRUE;
           assert(block_scope[current_inline->block_depth].first_local == 0);
+
+          /* Set the context scope as it would belong to the enclosing function. */
           if (current_inline->prev != -1 && INLINE_CLOSURE(current_inline->prev).parse_context)
           {
+              /* If we are within the context of another closure, count from there.
+               * Get its context scope and take their current variable count
+               * (Its first_local was adjusted the same way, so just add its current
+               * number of context variables.)
+               */
               block_scope_t *scope = block_scope + INLINE_CLOSURE(current_inline->prev).block_depth;
               block_scope[current_inline->block_depth].first_local = scope->first_local + scope->num_locals;
           }
           else
               block_scope[current_inline->block_depth].first_local = current_inline->num_locals;
+
+          type_of_locals = &(LOCAL_TYPE(current_inline->full_local_type_start));
+          /* Note, that type_of_context must not be reset, as add_context_name()
+           * needs it where it points now. check_for_context_local() will take
+           * care of finding the right type for context variables.
+           */
+
       }
 
       inline_opt_context
@@ -6178,6 +6192,7 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
           block_scope[current_inline->block_depth+1].accessible = MY_TRUE;
           current_inline->parse_context = MY_FALSE;
           adapt_context_names();
+          type_of_locals = type_of_context + MAX_LOCAL;
 
           /* Find the correct max_num_locals to update.
            * That is the one of the last closure with parse_context set.
