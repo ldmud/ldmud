@@ -605,7 +605,7 @@ static void add_permanent_define(char *, short, void *, Bool);
 static Bool expand_define(void);
 static Bool _expand_define(struct defn*, ident_t*);
 static INLINE void myungetc(char);
-static int cond_get_exp(int, svalue_t *);
+static p_int cond_get_exp(int, svalue_t *);
 static int exgetc(void);
 static char *get_current_file(char **);
 static char *get_current_line(char **);
@@ -6673,7 +6673,7 @@ exgetc (void)
 } /* exgetc() */
 
 /*-------------------------------------------------------------------------*/
-static int
+static p_int
 cond_get_exp (int priority, svalue_t *svp)
 
 /* Evaluate the expression in the input buffer at a priority of at least
@@ -6689,8 +6689,8 @@ cond_get_exp (int priority, svalue_t *svp)
 
 {
     int c;
-    int value = 0;
-    int value2, x;
+    p_int value = 0;
+    p_int value2, x;
     svalue_t sv2;
 
     svp->type = T_INVALID;
