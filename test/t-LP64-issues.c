@@ -5,6 +5,9 @@
 
 // Name, Flag, Function
 nosave mixed *tests = ({
+// these tests can only performed if the driver is compiled for a LP64
+// platform.
+#if __INT_MAX__ > 2147483647
     ({ "0000770-1 (bitwise AND)", 0,
        (: return (0x1000000000 & 0x1000000000) == 0x1000000000; :)
     }),
@@ -37,6 +40,7 @@ nosave mixed *tests = ({
           i ^= 0x01000000000;
           return i == 0x11000000000; :)
     }),
+#endif
 });
 
 void run_test()

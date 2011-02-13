@@ -11085,7 +11085,7 @@ again:
          *   int         % int                -> int
          */
 
-        int i;
+        p_int i;
 
         TYPE_TEST_LEFT((sp-1), T_NUMBER);
         TYPE_TEST_RIGHT(sp, T_NUMBER);
@@ -11094,13 +11094,6 @@ again:
             ERROR("Modulus by zero.\n");
             break;
         }
-        else if (sp->u.number == 1
-              || sp->u.number == -1
-                )
-            i = 0;
-              /* gcc 2.91 on Linux/x86 generates buggy code
-               * for MIN_INT % -1. Might as well catch it all.
-               */
         else
             i = (sp-1)->u.number % sp->u.number;
         sp--;
@@ -11527,8 +11520,6 @@ again:
          *
          */
 
-        int i;
-
         if (sp->type == T_POINTER && (sp-1)->type == T_POINTER)
         {
             inter_sp = sp - 2;
@@ -11561,7 +11552,7 @@ again:
 
         if (sp->type == T_NUMBER && (sp-1)->type == T_NUMBER)
         {
-            i = (sp-1)->u.number & sp->u.number;
+            p_int i = (sp-1)->u.number & sp->u.number;
             sp--;
             sp->u.number = i;
             break;
@@ -11596,13 +11587,11 @@ again:
          * TODO: Extend this to mappings.
          */
 
-        int i;
-
         TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_POINTER);
         if ((sp-1)->type == T_NUMBER)
         {
             TYPE_TEST_RIGHT(sp, T_NUMBER);
-            i = (sp-1)->u.number | sp->u.number;
+            p_int i = (sp-1)->u.number | sp->u.number;
             sp--;
             sp->u.number = i;
         }
@@ -11630,13 +11619,11 @@ again:
          * TODO: Extend this to mappings.
          */
 
-        int i;
-
         TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_POINTER);
         if ((sp-1)->type == T_NUMBER)
         {
             TYPE_TEST_RIGHT(sp, T_NUMBER);
-            i = (sp-1)->u.number ^ sp->u.number;
+            p_int i = (sp-1)->u.number ^ sp->u.number;
             sp--;
             sp->u.number = i;
         }
@@ -11662,14 +11649,12 @@ again:
          * TODO: Implement an arithmetic shift.
          */
 
-        int i;
-
         TYPE_TEST_LEFT((sp-1), T_NUMBER);
         TYPE_TEST_RIGHT(sp, T_NUMBER);
 
-        i = sp->u.number;
+        p_uint shift = sp->u.number;
         sp--;
-        sp->u.number = (uint)i > MAX_SHIFT ? 0 : sp->u.number << i;
+        sp->u.number = shift > MAX_SHIFT ? 0 : sp->u.number << shift;
         break;
     }
 
@@ -11684,15 +11669,13 @@ again:
          * TODO: Extend this to vectors and mappings.
          */
 
-        int i;
-
         TYPE_TEST_LEFT((sp-1), T_NUMBER);
         TYPE_TEST_RIGHT(sp, T_NUMBER);
 
-        i = sp->u.number;
+        p_uint shift = sp->u.number;
         sp--;
-        if ((uint)i <= MAX_SHIFT)
-            sp->u.number >>= i;
+        if (shift <= MAX_SHIFT)
+            sp->u.number >>= shift;
         else if (sp->u.number >= 0)
             sp->u.number = 0;
         else
@@ -11711,17 +11694,15 @@ again:
          * TODO: Extend this to vectors and mappings.
          */
 
-        int i;
-
         TYPE_TEST_LEFT((sp-1), T_NUMBER);
         TYPE_TEST_RIGHT(sp, T_NUMBER);
 
-        i = sp->u.number;
+        p_uint shift = sp->u.number;
         sp--;
-        if ((uint)i > MAX_SHIFT)
+        if (shift > MAX_SHIFT)
             sp->u.number = 0;
         else
-            sp->u.number = (p_uint)sp->u.number >> i;
+            sp->u.number = (p_uint)sp->u.number >> shift;
         break;
     }
 
@@ -13290,7 +13271,7 @@ again:
          * TODO: Implement an arithmetic shift.
          */
 
-        int i;
+        p_uint shift;
         svalue_t *argp;
 
 #ifdef DEBUG
@@ -13312,8 +13293,8 @@ again:
                 OP_ARG_ERROR(2, TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
-            i = sp->u.number;
-            argp->u.number <<= (uint)i > MAX_SHIFT ? (int)MAX_SHIFT : i;
+            shift = sp->u.number;
+            argp->u.number <<= shift > MAX_SHIFT ? MAX_SHIFT : shift;
             sp->u.number = argp->u.number;
             break;
         }
@@ -13326,8 +13307,8 @@ again:
                 OP_ARG_ERROR(2, TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
-            i = sp->u.number;
-            *argp->u.charp <<= (uint)i > MAX_SHIFT ? (int)MAX_SHIFT : i;
+            shift = sp->u.number;
+            *argp->u.charp <<= shift > MAX_SHIFT ? MAX_SHIFT : shift;
             sp->u.number = (unsigned char)(*argp->u.charp);
             break;
         }
@@ -13343,10 +13324,10 @@ again:
          * sp[-1], assign the result to sp[0] and also leave it on the stack.
          *
          * Possible type combinations:
-         *   int        << int                -> int
+         *   int        >> int                -> int
          */
 
-        int i;
+        p_uint shift;
         svalue_t *argp;
 
 #ifdef DEBUG
@@ -13368,8 +13349,8 @@ again:
                 OP_ARG_ERROR(2, TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
-            i = sp->u.number;
-            argp->u.number >>= (uint)i > MAX_SHIFT ? (int)(MAX_SHIFT+1) : i;
+            shift = sp->u.number;
+            argp->u.number >>= shift > MAX_SHIFT ? (MAX_SHIFT+1) : shift;
             sp->u.number = argp->u.number;
             break;
         }
@@ -13382,8 +13363,8 @@ again:
                 OP_ARG_ERROR(2, TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
-            i = sp->u.number;
-            *argp->u.charp >>= (uint)i > MAX_SHIFT ? (int)MAX_SHIFT : i;
+            shift = sp->u.number;
+            *argp->u.charp >>= shift > MAX_SHIFT ? MAX_SHIFT : shift;
             sp->u.number = (unsigned char)(*argp->u.charp);
             break;
         }
@@ -13398,10 +13379,10 @@ again:
          * sp[-1], assign the result to sp[0] and also leave it on the stack.
          *
          * Possible type combinations:
-         *   int        << int                -> int
+         *   int        >>> int                -> int
          */
 
-        int i;
+        p_uint shift;
         svalue_t *argp;
 #ifdef DEBUG
         TYPE_TEST_LEFT(sp, T_LVALUE);
@@ -13422,11 +13403,11 @@ again:
                 OP_ARG_ERROR(2, TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
-            i = sp->u.number;
-            if ((uint)i > MAX_SHIFT)
+            shift = sp->u.number;
+            if (shift > MAX_SHIFT)
                 argp->u.number = 0;
             else
-                argp->u.number = (p_uint)argp->u.number >> i;
+                argp->u.number = (p_uint)argp->u.number >> shift;
             sp->u.number = argp->u.number;
             break;
         }
@@ -13439,11 +13420,11 @@ again:
                 OP_ARG_ERROR(2, TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
-            i = sp->u.number;
-            if ((uint)i > MAX_SHIFT)
+            shift = sp->u.number;
+            if (shift > MAX_SHIFT)
                 *argp->u.charp = 0;
             else
-                *argp->u.charp = (p_uint)*argp->u.charp >> i;
+                *argp->u.charp = (p_uint)*argp->u.charp >> shift;
             sp->u.number = (unsigned char)*argp->u.charp;
             break;
         }
