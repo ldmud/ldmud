@@ -12,18 +12,12 @@ DESCRIPTION
         The second form converts the given struct <st> into a mapping
         using the struct member names as index values.
 
-        Normally, mappings are extended by simply inserting new elements.
-        This function is useful if you can estimate the needed size of
-        the mapping in advance, to reduce the malloc overhead. Any
-        unused allocated space will be freed after the current function
-        returns.
-
 EXAMPLES
         mkmapping( ({ 1, 2 }), ({ 10, 11 }), ({ 20, 21, 22}))
           returns ([ 1:10;20, 2:11;21 ])
 
-        struct s { int a, b, c; };
-        mkmapping( (<s> 1, ({ 2, 3 }), 3 )
+        struct s { int a; int *b; int c; };
+        mkmapping( (<s> a: 1, b: ({ 2, 3 }), c: 3 )
           returns ([ "a":1, "b":({2,3}), "c":3 ])
 
 HISTORY
