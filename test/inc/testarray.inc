@@ -7,13 +7,9 @@
 #define TF_ERROR          1       // The function should generate an error.
 #define TF_DONTCHECKERROR 2       // Doesn't matter if error or not, as long as it does not crash.
 
-void run_array(mixed* testarray, closure callback)
+int run_array_without_callback(mixed* testarray)
 {
     int errors;
-    
-    // If there's an error:
-    call_out(callback, 0, 1);
-    
     foreach(mixed test: testarray)
     {
         msg("Running Test %s...", test[TI_NAME]);
@@ -45,7 +41,18 @@ void run_array(mixed* testarray, closure callback)
             }
         }
     }
-    
+    return errors;
+}
+
+void run_array(mixed* testarray, closure callback)
+{
+    int errors;
+
+    // If there's an error:
+    call_out(callback, 0, 1);
+
+    errors = run_array_without_callback(testarray);
+
     remove_call_out(callback);
 
     funcall(callback, errors && 1);
