@@ -916,22 +916,6 @@ mem_mem_used()
 }
 
 /*-------------------------------------------------------------------------*/
-#ifdef CHECK_MAPPING_TOTAL
-mp_int
-available_memory(void)
-
-/* Return the amount of memory actually used by the driver. */
-
-{
-    return large_alloc_stat.size * GRANULARITY
-    - small_free_stat.size
-    - large_alloc_stat.counter * ML_OVERHEAD * GRANULARITY
-    - small_alloc_stat.counter * M_OVERHEAD * GRANULARITY;
-} /* available_memory() */
-#endif /* CHECK_MAPPING_TOTAL */
-
-
-/*-------------------------------------------------------------------------*/
 void
 mem_dump_data (strbuf_t *sbuf)
 

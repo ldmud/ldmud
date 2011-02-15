@@ -2596,14 +2596,11 @@ m_check_total_mapping_size (const char * file, int line)
     static Bool last_size_ok = MY_TRUE;
     wiz_list_t *wl;
     mp_int total;
-#if defined(MALLOC_smalloc) || defined(MALLOC_slaballoc)
-    mp_int available;
-#endif
     Bool this_size_ok = MY_TRUE;
-
 #if defined(MALLOC_smalloc) || defined(MALLOC_slaballoc)
-    available = available_memory();
+    mp_int mem_in_use = xalloc_used();
 #endif
+    
     total = default_wizlist_entry.mapping_total;
     for (wl = all_wiz; wl; wl = wl->next)
     {
@@ -2612,7 +2609,7 @@ m_check_total_mapping_size (const char * file, int line)
 
     if (total < 0
 #if defined(MALLOC_smalloc) || defined(MALLOC_slaballoc)
-     || total > available
+     || total > mem_in_use
 #endif
        )
         this_size_ok = MY_FALSE;
@@ -2622,7 +2619,7 @@ m_check_total_mapping_size (const char * file, int line)
         dprintf3(gcollect_outfd, "DEBUG: (%s : %d) Invalid total mapping size %d"
                   , (p_int)file, (p_int)line, (p_int)total);
 #if defined(MALLOC_smalloc) || defined(MALLOC_slaballoc)
-        dprintf1(gcollect_outfd, " (avail %d)", (p_int)available);
+        dprintf1(gcollect_outfd, " (memory usage: %d)", (p_int)mem_in_use);
 #endif
         dprintf1(gcollect_outfd, ", was %d\n", (p_int)last_size);
     }

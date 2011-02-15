@@ -1090,22 +1090,6 @@ mem_dinfo_data (svalue_t *svp, int value)
 #undef ST_NUMBER
 } /* mem_dinfo_data() */
 
-/*-------------------------------------------------------------------------*/
-#ifdef CHECK_MAPPING_TOTAL
-mp_int
-available_memory(void)
-
-/* Return the amount of memory actually used by the driver. */
-
-{
-    return large_alloc_stat.size * GRANULARITY
-           - small_free_stat.size
-           - small_chunk_wasted.size
-           - large_alloc_stat.counter * ML_OVERHEAD * GRANULARITY
-           - small_alloc_stat.counter * M_OVERHEAD * GRANULARITY;
-} /* available_memory() */
-#endif /* CHECK_MAPPING_TOTAL */
-
 /*=========================================================================*/
 
 /*                            SMALL BLOCKS                                 */
