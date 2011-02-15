@@ -50,6 +50,7 @@ BEISPIELE
 GESCHICHTE
         Eingefuehrt in LDMud 3.2.7.
         LDMud 3.3.563 fuehrte LIMIT_COST ein.
+        LDMud 3.5.0 fuehrte LIMIT_MEMORY ein.
 
 SIEHE AUCH
         query_limits(E), set_limits(E)

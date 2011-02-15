@@ -2,6 +2,7 @@
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
 #include "/sys/debug_info.h"
+#include "/sys/rtlimits.h"
 
 private float testfloat = 3.499965555966e-01;
 
@@ -373,7 +374,19 @@ nosave mixed *tests = ({
             return 1;
         :)
     }),
-
+    ({ "0000302", TF_ERROR,
+        (:
+           // must raise an error in the 19th iteration when it exceeds
+           // LIMIT_MEMORY.
+           limited(function void (void) {
+              string s="a";
+              foreach(int i: 20) {
+                s+=s;
+              }
+           }, LIMIT_MEMORY, 500000);
+           return 1; // never reached
+        :)
+    }),
 });
 
 void run_test()

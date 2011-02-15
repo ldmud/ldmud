@@ -161,8 +161,5 @@ int run_test()
 {
     msg("\nRunning basic operators test suite:\n"
           "--------------------------\n");
-#if __INT_MAX__ > 2147483647
-    msg("\n LP64 \n");
-#endif
     return !run_array_without_callback(tests);
 }

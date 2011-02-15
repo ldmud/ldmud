@@ -747,6 +747,11 @@ struct timeval profiling_timevalue = {0, 0};
 
 static Bool received_prof_signal = MY_FALSE;
 
+p_int used_memory_at_eval_start = 0;
+  /* used memory (in bytes) at the beginning of the current execution,
+   * set by mark_start_evaluation() (and v_limited()).
+   */
+
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
@@ -840,6 +845,8 @@ mark_start_evaluation (void)
     {
         eval_begin.tv_sec = eval_begin.tv_usec = 0;
     }
+    
+    used_memory_at_eval_start = xalloc_used();
 } /* mark_start_evaluation() */
 
 /*-------------------------------------------------------------------------*/
@@ -16947,6 +16954,16 @@ again:
         object_name = dump_trace(MY_FALSE, NULL);
         debug_message("%s ... execution continues.\n", ts);
         printf("%s ... execution continues.\n", ts);
+    }
+    
+    // Did we allocate too much memory in this execution/evaluation thread?
+    if (max_memory
+        && xalloc_used() - used_memory_at_eval_start > max_memory)
+    {
+        ERRORF(("Additional memory allocation in this execution thread "
+                "exceeded limit: %"PRIdPINT", allowed: %"PRIdPINT".\n",
+                xalloc_used() - used_memory_at_eval_start,
+                max_memory));
     }
 
     /* Execute the next instruction */

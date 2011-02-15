@@ -20,12 +20,15 @@ DESCRIPTION
                                 one read_file()/write_file() call.
           int[LIMIT_CALLOUTS]: the number of callouts at one time.
           int[LIMIT_COST]:    how to account the current cost.
+          int[LIMIT_MEMROY]:  the max. number of bytes which can be 
+                              _additionally_ allocated/used 
+                              _per top-level execution thread_
 
         For all limits except LIMIT_COST a limit of '0' aka LIMIT_UNLIMITED
         means 'no limit'.
 
         The value for LIMIT_COST has these meanings:
-          
+
           value > 0: the execution will cost minimum(<value>, actual cost) .
 
           value = 0: if the current LIMIT_EVAL is larger than the calling
@@ -47,6 +50,7 @@ HISTORY
         LIMIT_CALLOUTS introduced in LDMud 3.2.9.
         LIMIT_COST introduced in LDMud 3.3.563.
         LDMud 3.3.677 introduced LIMIT_MAPPING_KEYS, LIMIT_MAPPING_SIZE.
+        LDMud 3.5.0 introduced LIMIT_MEMORY.
 
 SEE ALSO
         limited(E), set_limits(E)

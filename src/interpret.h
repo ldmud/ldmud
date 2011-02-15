@@ -136,6 +136,7 @@ extern struct timeval last_eval_duration;
 extern statistic_t stat_total_evalcost;
 extern statistic_t stat_eval_duration;
 extern struct timeval profiling_timevalue;
+extern p_int used_memory_at_eval_start;
 
 /* --- Prototypes --- */
 

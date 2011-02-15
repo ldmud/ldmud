@@ -19,12 +19,15 @@ BESCHREIBUNG
                                 bzw. write_file() bearbeitet werden koennen
         int[LIMIT_CALLOUTS]:    die maximale Anzahl gleichzeitiger call_out()s
         int[LIMIT_COST]:        wie die aktuellen Kosten einzurechnen sind
+        int[LIMIT_MEMORY]:      wieviele Bytes _zusaetzlich pro_ top-level
+                                Ausfuehrungsthread allokiert/genutzt werden
+                                koennen.
 
         Fuer alle Limits ausser LIMIT_COST bedeutet ein Limit von '0'
         (bzw. LIMIT_UNLIMITED) den Wert 'kein Limit'.
 
         LIMIT_COST hat diese Bedeutungen:
-          
+
           wert > 0: Maximal <wert> fuer als Kosten fuer die aktuelle
                     Ausfuehrung verwendet, ungeachtet wie lange sie
                     tatsaechlich dauert.
@@ -43,6 +46,7 @@ BEISPIELE
 GESCHICHTE
         Eingefuehrt in LDMud 3.2.7.
         LIMIT_CALLOUTS wurde in LDMud 3.2.9 eingefuehrt.
+        LDMud 3.5.0 fuehrte LIMIT_MEMORY ein.
 
 SIEHE AUCH
         limited(E), set_limits(E)

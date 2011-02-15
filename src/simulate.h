@@ -169,6 +169,7 @@ extern void update_object_sent(object_t *obj, sentence_t *new_sent);
                      , max_file_xfer = def_file_xfer \
                      , max_byte_xfer = def_byte_xfer \
                      , max_callouts = def_callouts \
+                     , max_memory = def_memory \
                      , use_eval_cost = DEF_USE_EVAL_COST \
                      )
 
@@ -195,6 +196,7 @@ extern int32  def_eval_cost;
 extern int32  def_file_xfer;
 extern int32  def_byte_xfer;
 extern int32  def_callouts;
+extern p_int  def_memory;
 #define DEF_USE_EVAL_COST (-100)
 
 extern size_t max_array_size;
@@ -204,6 +206,7 @@ extern int32  max_eval_cost;
 extern int32  max_file_xfer;
 extern int32  max_byte_xfer;
 extern int32  max_callouts;
+extern p_int  max_memory;
 extern int32  use_eval_cost;
 
 extern object_t *obj_list;

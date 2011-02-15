@@ -99,6 +99,8 @@ struct limits_context_s
     int32  max_callouts; /* max callouts */
     int32  use_cost;     /* the desired cost of the evaluation */
     int32  eval_cost;    /* the then-current eval costs used */
+    p_int  max_memory;   /* max memory newly allocated _per execution thread_ */
+    p_int  used_memory;  /* the then-current memory allocation */
 };
 
 
@@ -327,6 +329,12 @@ int32 max_callouts = MAX_CALLOUTS;
   /* If != 0: the max. number of callouts at one time.
    */
 
+p_int def_memory = 0;
+p_int max_memory = 0;
+/* If != 0: the max. number of freshly allocated memory per execution thread.
+ * By default there is no limit.
+ */
+
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
@@ -494,6 +502,9 @@ save_limits_context (struct limits_context_s * context)
     context->max_byte = max_byte_xfer;
     context->max_file = max_file_xfer;
     context->use_cost = use_eval_cost;
+    context->max_memory = max_memory;
+    context->used_memory = used_memory_at_eval_start;
+    
 } /* save_limits_context() */
 
 /*-------------------------------------------------------------------------*/
@@ -544,6 +555,9 @@ restore_limits_context (struct limits_context_s * context)
     max_byte_xfer = context->max_byte;
     max_file_xfer = context->max_file;
     use_eval_cost = context->use_cost;
+    max_memory = context->max_memory;
+    used_memory_at_eval_start = context->used_memory;
+    
 } /* restore_limits_context() */
 
 /*-------------------------------------------------------------------------*/
@@ -4992,7 +5006,8 @@ set_single_limit ( struct limits_context_s * result
 
 {
     static char * limitnames[] = { "LIMIT_EVAL", "LIMIT_ARRAY", "LIMIT_MAPPING"
-                                 , "LIMIT_BYTE", "LIMIT_FILE", "LIMIT_COST" };
+                                 , "LIMIT_MAPPING_SIZE", "LIMIT_BYTE"
+                                 , "LIMIT_FILE", "LIMIT_COST", "LIMIT_MEMORY"};
 
     p_int val;
 
@@ -5022,6 +5037,16 @@ set_single_limit ( struct limits_context_s * result
             case LIMIT_BYTE:          result->max_byte = val;     break;
             case LIMIT_FILE:          result->max_file = val;     break;
             case LIMIT_CALLOUTS:      result->max_callouts = val; break;
+            case LIMIT_MEMORY:        
+                result->max_memory = val;
+                // LIMIT_MEMORY should be not set to low, otherwise Armageddon
+                // will reign upon the world...
+                if (result->max_memory > 0 && result->max_memory < 50000)
+                {
+                    errorf("Illegal LIMIT_MEMORY: %"PRIdPINT", must be 0 or "
+                           ">=50000.\n", result->max_memory);
+                }
+                break;
             default: errorf("Unimplemented limit #%d\n", limit);
             }
         }
@@ -5045,6 +5070,8 @@ set_single_limit ( struct limits_context_s * result
                                  break;
             case LIMIT_CALLOUTS: result->max_callouts = def_callouts;
                                  break;
+            case LIMIT_MEMORY:   result->max_memory = def_memory;
+                                 break;            
             default: errorf("Unimplemented limit #%d\n", limit);
             }
         }
@@ -5079,6 +5106,7 @@ extract_limits ( struct limits_context_s * result
     result->max_callouts = max_callouts;
     result->max_byte = max_byte_xfer;
     result->max_file = max_file_xfer;
+    result->max_memory = max_memory;
     result->use_cost = 0;
 
     if (!tagged)
@@ -5132,6 +5160,7 @@ create_limits_array (struct limits_context_s * rtlimits)
         put_number(vec->item+LIMIT_FILE,     rtlimits->max_file);
         put_number(vec->item+LIMIT_CALLOUTS, rtlimits->max_callouts);
         put_number(vec->item+LIMIT_COST,     rtlimits->use_cost);
+        put_number(vec->item+LIMIT_MEMORY,   rtlimits->max_memory);
     }
 
     return vec;
@@ -5186,6 +5215,7 @@ v_limited (svalue_t * sp, int num_arg)
         limits.max_callouts = 0;
         limits.max_byte = 0;
         limits.max_file = 0;
+        limits.max_memory = 0;
         limits.use_cost = 1; /* smallest we can do */
     }
     else if (argp[1].type == T_POINTER && VEC_SIZE(argp[1].u.vec) < INT_MAX)
@@ -5258,6 +5288,8 @@ v_limited (svalue_t * sp, int num_arg)
         max_byte_xfer = limits.max_byte;
         max_file_xfer = limits.max_file;
         max_callouts = limits.max_callouts;
+        max_memory = limits.max_memory;
+        used_memory_at_eval_start = xalloc_used();
         use_eval_cost = limits.use_cost;
 
         assign_eval_cost();
@@ -5358,6 +5390,7 @@ v_set_limits (svalue_t * sp, int num_arg)
         def_byte_xfer = limits.max_byte;
         def_file_xfer = limits.max_file;
         def_callouts = limits.max_callouts;
+        def_memory = limits.max_memory;
     }
 
     sp = pop_n_elems(num_arg, sp);
@@ -5413,6 +5446,7 @@ f_query_limits (svalue_t * sp)
     put_number(vec->item+LIMIT_FILE,     def ? def_file_xfer : max_file_xfer);
     put_number(vec->item+LIMIT_CALLOUTS, def ? def_callouts : max_callouts);
     put_number(vec->item+LIMIT_COST,     def ? DEF_USE_EVAL_COST : use_eval_cost);
+    put_number(vec->item+LIMIT_MEMORY,   def ? def_memory : max_memory);
 
     /* No free_svalue: sp is a number */
     put_array(sp, vec);
