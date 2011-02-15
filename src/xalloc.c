@@ -1692,4 +1692,25 @@ get_memory_limit(enum memory_limit_types what)
     return 0;
 #endif
 }
+
+/*-------------------------------------------------------------------------*/
+p_int
+xalloc_allocated()
+/* The amount of memory currently allocated from the allocator, including 
+ * the overhead for the allocator.
+ */
+{
+    return mem_mem_allocated();
+}
+
+/*-------------------------------------------------------------------------*/
+p_int
+xalloc_used()
+/* The amount of memory currently used for driver data, excluding the 
+ * overhead from the allocator.
+ */
+{
+    return mem_mem_used();
+}
+
 /***************************************************************************/

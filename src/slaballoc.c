@@ -889,6 +889,48 @@ mem_update_stats (void)
 } /* mem_update_stats() */
 #endif /* MALLOC_EXT_STATISTICS */
 
+
+/*-------------------------------------------------------------------------*/
+static INLINE p_int
+mem_mem_allocated()
+/* The amount of memory currently allocated from the allocator, including 
+ * the overhead for the allocator.
+ */
+{
+    return large_alloc_stat.size * GRANULARITY
+          -small_free_stat.size
+          -small_slab_stat.counter * (sizeof(mslab_t) - GRANULARITY + M_OVERHEAD * GRANULARITY);
+}
+
+/*-------------------------------------------------------------------------*/
+static INLINE p_int
+mem_mem_used()
+/* The amount of memory currently used for driver data, excluding the 
+ * overhead from the allocator.
+ */
+{
+    return mem_mem_allocated()
+          -large_alloc_stat.counter * ML_OVERHEAD * GRANULARITY
+          -small_alloc_stat.counter * M_OVERHEAD * GRANULARITY
+          -xalloc_stat.counter * XM_OVERHEAD_SIZE;
+}
+
+/*-------------------------------------------------------------------------*/
+#ifdef CHECK_MAPPING_TOTAL
+mp_int
+available_memory(void)
+
+/* Return the amount of memory actually used by the driver. */
+
+{
+    return large_alloc_stat.size * GRANULARITY
+    - small_free_stat.size
+    - large_alloc_stat.counter * ML_OVERHEAD * GRANULARITY
+    - small_alloc_stat.counter * M_OVERHEAD * GRANULARITY;
+} /* available_memory() */
+#endif /* CHECK_MAPPING_TOTAL */
+
+
 /*-------------------------------------------------------------------------*/
 void
 mem_dump_data (strbuf_t *sbuf)
@@ -989,11 +1031,8 @@ mem_dump_data (strbuf_t *sbuf)
                );
     strbuf_addf(sbuf
                , "Total storage in use: (b-g-h)     %10lu net available:   %10lu\n"
-               , l_alloc.size - s_free.size - s_overhead
-               , l_alloc.size - s_free.size - s_overhead
-                 - l_alloc.counter * ML_OVERHEAD * GRANULARITY
-                 - s_alloc.counter * M_OVERHEAD * GRANULARITY
-                 - xalloc_st.counter * XM_OVERHEAD_SIZE
+               , mem_mem_allocated()
+               , mem_mem_used()
                );
     strbuf_addf(sbuf
                , "Total storage unused: (c+d+g)     %10lu\n\n"
@@ -1205,16 +1244,8 @@ mem_dinfo_data (svalue_t *svp, int value)
     ST_NUMBER(DID_MEM_PERM, perm_alloc_stat.counter);
     ST_NUMBER(DID_MEM_PERM_SIZE, perm_alloc_stat.size);
     ST_NUMBER(DID_MEM_OVERHEAD, T_OVERHEAD * GRANULARITY);
-    ST_NUMBER(DID_MEM_ALLOCATED, large_alloc_stat.size * GRANULARITY
-                              - small_free_stat.size
-                              - small_overhead);
-    ST_NUMBER(DID_MEM_USED, large_alloc_stat.size * GRANULARITY
-                              - small_free_stat.size
-                              - small_overhead
-                              - large_alloc_stat.counter * ML_OVERHEAD * GRANULARITY
-                              - small_alloc_stat.counter * M_OVERHEAD * GRANULARITY
-                              - xalloc_stat.counter * XM_OVERHEAD_SIZE
-             );
+    ST_NUMBER(DID_MEM_ALLOCATED, mem_mem_allocated());
+    ST_NUMBER(DID_MEM_USED, mem_mem_used());
     ST_NUMBER(DID_MEM_TOTAL_UNUSED, large_free_stat.size * GRANULARITY
                                     + large_wasted_stat.size
                                     + small_free_stat.size
@@ -1285,20 +1316,6 @@ mem_dinfo_data (svalue_t *svp, int value)
 #undef ST_NUMBER
 } /* mem_dinfo_data() */
 
-/*-------------------------------------------------------------------------*/
-#ifdef CHECK_MAPPING_TOTAL
-mp_int
-available_memory(void)
-
-/* Return the amount of memory actually used by the driver. */
-
-{
-    return large_alloc_stat.size * GRANULARITY
-           - small_free_stat.size
-           - large_alloc_stat.counter * ML_OVERHEAD * GRANULARITY
-           - small_alloc_stat.counter * M_OVERHEAD * GRANULARITY;
-} /* available_memory() */
-#endif /* CHECK_MAPPING_TOTAL */
 
 /*=========================================================================*/
 

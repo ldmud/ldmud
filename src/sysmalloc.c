@@ -229,4 +229,24 @@ mem_update_stats (void)
 } /* mem_update_stats() */
 #endif /* MALLOC_EXT_STATISTICS */
 
+/*-------------------------------------------------------------------------*/
+static INLINE p_int
+mem_mem_allocated()
+/* The amount of memory currently allocated from the allocator, including 
+ * the overhead for the allocator.
+ */
+{
+    return 0;
+}
+
+/*-------------------------------------------------------------------------*/
+static INLINE p_int
+mem_mem_used()
+/* The amount of memory currently used for driver data, excluding the 
+ * overhead from the allocator.
+ */
+{
+    return 0;
+}
+
 /***************************************************************************/

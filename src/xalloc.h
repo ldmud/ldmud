@@ -217,4 +217,7 @@ extern void notify_lowmemory_condition(enum memory_limit_types what);
 extern Bool   set_memory_limit(enum memory_limit_types what, mp_int limit);
 extern mp_int get_memory_limit(enum memory_limit_types what);
 
+extern p_int  xalloc_allocated();
+extern p_int  xalloc_used();
+
 #endif /* XALLOC_H__ */

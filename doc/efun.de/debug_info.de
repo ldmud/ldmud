@@ -280,68 +280,69 @@ BESCHREIBUNG
 
             <arg2> == DID_MEMORY (2): Liefert die "status malloc"-Information:
                   - string DID_MEM_NAME
-                        Der Name des Allokators: "sysmalloc" oder "smalloc"
+                        Der Name des Allokators: "sysmalloc", "smalloc",
+                        "slaballoc"
                   - int DID_MEM_SBRK
                   - int DID_MEM_SBRK_SIZE
                         Anzahl und Groesse der Speicherbloecke, die vom
-                        Betriebssystem angefordert wurden (nur smalloc)
+                        Betriebssystem angefordert wurden (smalloc, slaballoc)
                   - int DID_MEM_LARGE
                   - int DID_MEM_LARGE_SIZE
                   - int DID_MEM_LFREE
                   - int DID_MEM_LFREE_SIZE
                         Anzahl und Groesse der grossen allozierten bzw.
-                        freien Bloecke (nur smalloc)
+                        freien Bloecke (smalloc, slaballoc)
                   - int DID_MEM_LWASTED
                   - int DID_MEM_LWASTED_SIZE
                         Anzahl und Groesse der unbrauchbaren grossen
-                        Speicherfragmente (nur smalloc)
+                        Speicherfragmente (smalloc, slaballoc)
                   - int DID_MEM_CHUNK
                   - int DID_MEM_CHUNK_SIZE
                         Anzahl und Groesse kleiner Speicherbloecke (chunk
-                        blocks; nur smalloc)
+                        blocks; smalloc, slaballoc)
                   - int DID_MEM_SMALL
                   - int DID_MEM_SMALL_SIZE
                   - int DID_MEM_SFREE
                   - int DID_MEM_SFREE_SIZE
                         Anzahl und groesse der allozierten bzw. freien
-                        kleinen Speicherbloecke (nur smalloc)
+                        kleinen Speicherbloecke (smalloc, slaballoc)
                   - int DID_MEM_SWASTED
                   - int DID_MEM_SWASTED_SIZE
                         Anzahl und Groesse der unbrauchbar kleinen
-                        Speicherfragmente (nur smalloc)
+                        Speicherfragmente (smalloc, slaballoc)
                   - int DID_MEM_MINC_CALLS
                   - int DID_MEM_MINC_SUCCESS
                   - int DID_MEM_MINC_SIZE
                         Anzahl Aufrufe von malloc_increment(), Anzahl der
                         erfolgreichen Aufrufe und die Groesse des auf diese
-                        Art allozierten Speichers (nur smalloc)
+                        Art allozierten Speichers (smalloc, slaballoc)
                   - int DID_MEM_PERM
                   - int DID_MEM_PERM_SIZE
                         Anzahl und Groesse permanenter (non-GCable)
-                        Allokationen (nur smalloc)
+                        Allokationen (smalloc, slaballoc)
                   - int DID_MEM_CLIB
                   - int DID_MEM_CLIB_SIZE
                         Anzahl und Groesse der Allokationen durch Clib
-                        Funktionen (nur smalloc mit SBRK_OK)
+                        Funktionen (nur smalloc, slaballoc mit SBRK_OK)
                   - int DID_MEM_OVERHEAD
-                        Overhead fuer jede Allokation (nur smalloc)
+                        Overhead fuer jede Allokation (smalloc, slaballoc)
                   - int DID_MEM_ALLOCATED
                         Der Speicher, der durch die Speicherverwaltung
                         alloziert wurde, inklusive den Overhead fuer die
-                        Speicherverwaltung (nur smalloc)
+                        Speicherverwaltung (smalloc, slaballoc)
                   - int DID_MEM_USED
                         Der Speicher, der durch den Driver belegt ist, ohne
                         den durch die Speicherverwaltung belegten Speicher
-                        (nur smalloc only)
+                        (smalloc, slaballoc)
                   - int DID_MEM_TOTAL_UNUSED
                         Der Speicher, der vom System zur Verfuegung gestellt,
                         aber vom Treiber nicht benoetigt wird.
-                  - int DID_MEM_AVL_NODES          (smalloc)
+                  - int DID_MEM_AVL_NODES          (smalloc, slaballoc)
                         Anzahl der AVL-Knoten, die zur Verwaltung der
                         freien grossen Speicherbloecke verwendet werden
                         (nur smalloc). Dieser Wert kann in Zukunft
                         wieder verschwinden.
-                  - mixed * DID_MEM_EXT_STATISTICS (smalloc)
+                  - mixed * DID_MEM_EXT_STATISTICS (smalloc, slaballoc)
                         Detaillierte Statistiken des Allokators sofern
                         diese aktiviert wurden; 0 anderenfalls.
 
