@@ -498,6 +498,7 @@ static struct s_reswords reswords[]
    , { "mixed",          L_MIXED         }
    , { "nomask",         L_NO_MASK       }
    , { "nosave",         L_NOSAVE        }
+   , { "deprecated",     L_DEPRECATED    }
    , { "object",         L_OBJECT        }
 #ifdef USE_PARSE_COMMAND
    , { "parse_command",  L_PARSE_COMMAND }
@@ -4033,10 +4034,11 @@ closure (char *in_yyp)
     {
         short ix;
         unsigned short inhIndex;
+        funflag_t flags;
 
         *yyp = '\0'; /* c holds the char at this place */
         *(wordstart-2) = '\0';
-        ix = find_inherited_function(super_name, wordstart, &inhIndex);
+        ix = find_inherited_function(super_name, wordstart, &inhIndex, &flags);
         inhIndex++;
         if (ix < 0)
         {
@@ -4049,6 +4051,14 @@ closure (char *in_yyp)
 
         yylval.closure.number = ix;
         yylval.closure.inhIndex = inhIndex;
+        // check for deprecated functions
+        // this is done here, because here we directly have the flags of the inherited function.
+        if (flags & TYPE_MOD_DEPRECATED)
+        {
+            yywarnf("Creating lfun closure to deprecated function %.50s::%.50s",
+                    super_name, wordstart);
+        }
+        
         return L_CLOSURE;
     }
 
@@ -4202,7 +4212,8 @@ closure (char *in_yyp)
             if (p->u.global.variable & VIRTUAL_VAR_TAG) {
                 /* Handling this would require an extra coding of
                  * this closure type, and special treatment in
-                 * replace_program_lambda_adjust() .
+                 * replace_program_lambda_adjust(). Also deprecated-check in the
+                 * L_CLOSURE rule in prolang.y must be adjusted.
                  */
                 yyerrorf("closure of virtual variable");
                 yylval.closure.number = CLOSURE_IDENTIFIER_OFFS;
