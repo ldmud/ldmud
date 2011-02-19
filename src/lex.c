@@ -498,6 +498,7 @@ static struct s_reswords reswords[]
    , { "mixed",          L_MIXED         }
    , { "nomask",         L_NO_MASK       }
    , { "nosave",         L_NOSAVE        }
+   , { "deprecated",     L_DEPRECATED    }
    , { "object",         L_OBJECT        }
 #ifdef USE_PARSE_COMMAND
    , { "parse_command",  L_PARSE_COMMAND }

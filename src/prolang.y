@@ -1469,7 +1469,7 @@ get_f_visibility (funflag_t flags)
  */
 
 {
-    static char buff[100];
+    static char buff[120];
     size_t len;
 
     buff[0] = '\0';
@@ -1485,6 +1485,8 @@ get_f_visibility (funflag_t flags)
         strcat(buff, "public ");
     if (flags & TYPE_MOD_VARARGS)
         strcat(buff, "varargs ");
+    if (flags & TYPE_MOD_DEPRECATED)
+        strcat(buff, "deprecated ");
 
     len = strlen(buff);
     if (len)
@@ -1513,7 +1515,7 @@ get_type_name (fulltype_t type)
  */
 
 {
-    static char buff[100];
+    static char buff[120];
     static char *type_name[] = { "unknown", "int", "string", "void", "object",
                                  "mapping", "float", "mixed", "closure",
                                  "symbol", "quoted_array", "struct" };
@@ -1533,6 +1535,8 @@ get_type_name (fulltype_t type)
         strcat(buff, "public ");
     if (type.typeflags & TYPE_MOD_VARARGS)
         strcat(buff, "varargs ");
+    if (type.typeflags & TYPE_MOD_DEPRECATED)
+        strcat(buff, "deprecated ");
 
     type.typeflags &= TYPE_MOD_MASK;
 
@@ -3178,10 +3182,11 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                      && ((f1 ^ f2) & TYPE_MOD_VIS)
                        )
                     {
-                        char buff[100];
+                        char buff[120];
 
                         t2 = funp->type;
-                        strcpy(buff, get_visibility(t2));
+                        strncpy(buff, get_visibility(t2), sizeof(buff)-1);
+                        buff[sizeof(buff) - 1] = '\0'; // strncpy() does not guarantee NUL-termination
                         yywarnf("Inconsistent declaration of '%s': Visibility changed from '%s' to '%s'"
                                , get_txt(p->name), buff, get_visibility(type));
                     }
@@ -4232,9 +4237,10 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
 
             if ( ((f1 ^ f2) & TYPE_MOD_VIS) )
             {
-                char buff[100];
+                char buff[120];
 
-                strcpy(buff, get_f_visibility(pdef->flags));
+                strncpy(buff, get_f_visibility(pdef->flags), sizeof(buff)-1);
+                buff[sizeof(buff)-1] = '\0'; // strncpy() does not guarantee NUL termination
                 yywarnf("Inconsistent declaration of struct %s: "
                         "Visibility changed from '%s' to '%s'"
                        , get_txt(p->name), buff, get_f_visibility(flags));
@@ -5667,6 +5673,7 @@ delete_prog_string (void)
 %token L_NE
 %token L_NO_MASK
 %token L_NOSAVE
+%token L_DEPRECATED
 %token L_NOT
 %token L_NUMBER
 %token L_OBJECT
@@ -6885,21 +6892,22 @@ default_visibility:
     L_DEFAULT inheritance_qualifiers ';'
       {
           if ($2[0] & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                       | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)
+                       | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC | TYPE_MOD_DEPRECATED)
              )
           {
               yyerror("Default visibility specification for functions "
-                      "accepts only 'private', 'protected', 'public' or "
-                      "'static'");
+                      "accepts only 'private', 'protected', 'public', "
+                      "'static' or 'deprecated'");
               YYACCEPT;
           }
 
           if ($2[1] & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                       | TYPE_MOD_PROTECTED)
+                       | TYPE_MOD_PROTECTED | TYPE_MOD_DEPRECATED)
              )
           {
               yyerror("Default visibility specification for variables "
-                      "accepts only 'private', 'protected' or 'public'"
+                      "accepts only 'private', 'protected', 'public' "
+                      "or 'deprecated'"
                       );
               YYACCEPT;
           }
@@ -6946,6 +6954,7 @@ type_modifier:
     | L_VARARGS    { $$ = TYPE_MOD_VARARGS; }
     | L_PROTECTED  { $$ = TYPE_MOD_PROTECTED; }
     | L_NOSAVE     { $$ = TYPE_MOD_NOSAVE; }
+    | L_DEPRECATED   { $$ = TYPE_MOD_DEPRECATED; }
 ;
 
 
@@ -12558,7 +12567,11 @@ function_call:
                       }
 
                   }
-
+                  
+                  if (funp->flags & TYPE_MOD_DEPRECATED)
+                      yywarnf("Calling deprecated simul_efun \'%s\'",
+                              get_txt(funp->name));
+                      
                   if (funp->num_arg == SIMUL_EFUN_VARARGS
                    || (funp->flags & TYPE_MOD_XVARARGS)
                    || has_ellipsis)
@@ -12683,6 +12696,11 @@ function_call:
                           yyerrorf("Function %.50s is private", get_txt(funp->name));
                       }
                   }
+                  // warn about obsoleted functions
+                  if (funp->flags & TYPE_MOD_DEPRECATED)
+                      yywarnf("Calling deprecated function \'%s\'",
+                              get_txt(funp->name));
+
 
                   $$.type = funp->type; /* Result type */
                   $$.type.typeflags &= TYPE_MOD_MASK;

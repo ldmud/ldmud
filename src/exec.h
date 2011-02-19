@@ -465,6 +465,7 @@ enum function_flags {
     TYPE_MOD_XVARARGS  = 0x00800000,  /* accepts optional arguments     */
     TYPE_MOD_NOSAVE    = 0x00400000,  /* vars: can't be saved           */
     NAME_CROSS_DEFINED = 0x00200000,
+    TYPE_MOD_DEPRECATED  = 0x00100000, /* lfun is marked deprecated     */
   /* Two functions with the same name inherited from A and B into C.
    * The compiler usually prefers A, and the value 'flags & INHERIT_MASK'
    * (in bias-0x20000 representation) stored as B.offset.func is the

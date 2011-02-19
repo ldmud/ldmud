@@ -6209,6 +6209,15 @@ f_symbol_function (svalue_t *sp)
          )
        )
     {
+        // check for deprecated functions.
+        if (prog->functions[i] & TYPE_MOD_DEPRECATED)
+        {
+            warnf("Creating lfun closure to deprecated function \'%s\' in object %s (%s).\n",
+                  get_txt(sp[-1].u.str),
+                  get_txt(ob->name),
+                  get_txt(ob->prog->name));
+        }
+        
         /* Clean up the stack */
         sp--;
         free_mstring(sp->u.str);
