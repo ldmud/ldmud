@@ -484,14 +484,21 @@ tls_write (interactive_t *ip, char *buffer, int length)
  */
 
 {
-    int ret = -1;
-
-    ret = gnutls_record_send( ip->tls_session, buffer, length );
+    int ret = gnutls_record_send( ip->tls_session, buffer, length );
     if (ret < 0)
     {
         /* Let comm.c handle EINTR and EWOULDBLOCK.
          * We are then called again later with the
-         * same content.
+         * same content. Whats happening here is the following:
+         * GnuTLS stores the content in an internal buffer in case of
+         * GNUTLS_E_INTERRUPTED or GNUTLS_E_AGAIN. If gnutls_record_send()
+         * is called and there is content in this buffer, it will send the
+         * content of this internal buffer instead the content of <buffer>.
+         * According to the documentation we should call again with NULL as
+         * buffer in this case, but GnuTLS does not care and we will anyway
+         * try to send the same content. It is way easier for us to not call
+         * with NULL, we just have to ensure to try to re-send the same
+         * content.
          */
         if (ret == GNUTLS_E_INTERRUPTED)
         {
