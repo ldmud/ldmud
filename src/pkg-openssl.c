@@ -9,6 +9,7 @@
 #if defined(USE_TLS) && defined(HAS_OPENSSL)
 
 #include <stdio.h>
+#include <assert.h>
 
 #include <openssl/ssl.h>
 #include <openssl/rand.h>
@@ -76,6 +77,8 @@ openssl_malloc (size_t size)
 }
 
 static void
+openssl_free (void * ptr) __attribute__((nonnull));
+static void
 openssl_free (void * ptr)
 /*
  * Wrapper function for using our own allocator in openssl.
@@ -84,6 +87,8 @@ openssl_free (void * ptr)
     pfree(ptr);
 }
 
+static void *
+openssl_realloc (void * ptr, size_t size) __attribute__((nonnull));
 static void *
 openssl_realloc (void * ptr, size_t size)
 /*
@@ -142,6 +147,8 @@ set_dhe1024 (void)
 } /* set_dhe1024() */
 
 /*-------------------------------------------------------------------------*/
+static int
+tls_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) __attribute__((nonnull));
 static int
 tls_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) 
 
@@ -535,6 +542,8 @@ dump_openssl_error_stack()
 
 /*-------------------------------------------------------------------------*/
 int
+tls_read (interactive_t *ip, char *buffer, int length) __attribute__((nonnull));
+int
 tls_read (interactive_t *ip, char *buffer, int length)
 
 /* Read up to <length> bytes data for the TLS connection of <ip>
@@ -590,6 +599,8 @@ tls_read (interactive_t *ip, char *buffer, int length)
 
 /*-------------------------------------------------------------------------*/
 int
+tls_write (interactive_t *ip, char *buffer, int length) __attribute__((nonnull));
+int
 tls_write (interactive_t *ip, char *buffer, int length)
 
 /* Write <length> bytes from <buffer> to the TLS connection of <ip>
@@ -598,6 +609,10 @@ tls_write (interactive_t *ip, char *buffer, int length)
  */
 
 {
+#ifdef DEBUG
+    // should never happen since OpenSSL's behaviour is undefined for length==0
+    assert(length > 0);
+#endif
     int ret = SSL_write(ip->tls_session, buffer, length);
 
     if (ret <= 0)
@@ -622,6 +637,8 @@ tls_write (interactive_t *ip, char *buffer, int length)
 } /* tls_write() */
 
 /*-------------------------------------------------------------------------*/
+int
+tls_do_handshake (interactive_t *ip) __attribute__((nonnull));
 int
 tls_do_handshake (interactive_t *ip)
 
@@ -667,6 +684,8 @@ tls_do_handshake (interactive_t *ip)
 
 /*-------------------------------------------------------------------------*/
 int
+tls_init_connection (interactive_t *ip) __attribute__((nonnull));
+int
 tls_init_connection (interactive_t *ip)
 
 /* Starts a TLS secured connection to the interactive <ip>.
@@ -706,6 +725,8 @@ tls_init_connection (interactive_t *ip)
 } /* tls_init_connection() */
 
 /*-------------------------------------------------------------------------*/
+vector_t *
+tls_check_certificate (interactive_t *ip, Bool more) __attribute__((nonnull));
 vector_t *
 tls_check_certificate (interactive_t *ip, Bool more)
 
@@ -859,6 +880,8 @@ tls_check_certificate (interactive_t *ip, Bool more)
 
 /*-------------------------------------------------------------------------*/
 void
+tls_deinit_connection (interactive_t *ip) __attribute__((nonnull));
+void
 tls_deinit_connection (interactive_t *ip)
 
 /* Close the TLS connection for the interactive <ip> if there is one.
@@ -894,6 +917,8 @@ tls_error (int err)
 } /* tls_error() */
 
 /*-------------------------------------------------------------------------*/
+vector_t *
+tls_query_connection_info (interactive_t *ip) __attribute__((nonnull));
 vector_t *
 tls_query_connection_info (interactive_t *ip)
 
@@ -934,6 +959,8 @@ tls_available ()
  * Interface to the openssl cryptography api
  *------------------------------------------------------------------
  */
+Bool
+get_digest (int num, digest_t * md, size_t *len) __attribute__((nonnull));
 Bool
 get_digest (int num, digest_t * md, size_t *len)
 
@@ -1007,6 +1034,9 @@ get_digest (int num, digest_t * md, size_t *len)
 } /* get_digest() */
 
 /*-------------------------------------------------------------------------*/
+void
+calc_digest (digest_t md, void *dest, size_t destlen, void *msg, size_t msglen, void *key, size_t keylen)
+             __attribute__((nonnull(2,4)));
 void
 calc_digest (digest_t md, void *dest, size_t destlen, void *msg, size_t msglen, void *key, size_t keylen)
 
