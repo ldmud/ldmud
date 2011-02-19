@@ -43,6 +43,9 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
     - Networking
        + UDP datagrams with lengths up to 65507 (including UDP and IPv4
          headers: 65535) bytes are supported.
+       + SSLv2 connections are rejected, since they are insecure and long
+         obsolete.
+       + Some reasons for SSL disconnects were removed.
 
 30-May-2009 (LDMud Team) -- 3.3.719
     - Fixed Crashes:
