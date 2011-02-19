@@ -2866,6 +2866,12 @@ get_message (char *buff)
                         remove_interactive(ip->ob, MY_FALSE);
                         continue;
                     }
+                    if (errno == EINTR || errno == EAGAIN) {
+                        // read was interrupted by a signal. Or there was no data available.
+                        // The latter may at least happen for TLS connections, despite of our select.
+                        // Ignore both and retry later again.
+                        continue;
+                    }
                     perror("read");
                     debug_message("%s Unexpected errno %d\n"
                                  , time_stamp(), errno);
