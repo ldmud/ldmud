@@ -435,8 +435,8 @@ tls_read (interactive_t *ip, char *buffer, int length)
  */
 
 {
-    int ret = -11;
-    int retries = 6;
+    int ret;
+    int retries = 5;
 
     do {
            ret = gnutls_record_recv(ip->tls_session, buffer, length);
@@ -444,12 +444,23 @@ tls_read (interactive_t *ip, char *buffer, int length)
            && (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN)
            && (--retries) );
 
-    if (ret == 0)
+    if (ret <= 0)
     {
-        tls_deinit_connection(ip);
-    }
-    else if (ret < 0)
-    {
+        /* Let comm.c handle EINTR and EWOULDBLOCK.
+         * We are then called again later with the
+         * same content.
+         */
+        if (ret == GNUTLS_E_INTERRUPTED)
+        {
+            errno = EINTR;
+            return -1;
+        }
+        else if (ret == GNUTLS_E_AGAIN)
+        {
+            errno = EWOULDBLOCK;
+            return -1;
+        }
+        // all other errors are fatal.
         debug_message("%s GnuTLS: Error in receiving data (%s). "
                       "Closing the connection.\n"
                      , time_stamp(), gnutls_strerror(ret));
