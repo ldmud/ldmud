@@ -1469,7 +1469,7 @@ get_f_visibility (funflag_t flags)
  */
 
 {
-    static char buff[120];
+    static char buff[100];
     size_t len;
 
     buff[0] = '\0';
@@ -1485,8 +1485,6 @@ get_f_visibility (funflag_t flags)
         strcat(buff, "public ");
     if (flags & TYPE_MOD_VARARGS)
         strcat(buff, "varargs ");
-    if (flags & TYPE_MOD_DEPRECATED)
-        strcat(buff, "deprecated ");
 
     len = strlen(buff);
     if (len)
@@ -1515,7 +1513,7 @@ get_type_name (fulltype_t type)
  */
 
 {
-    static char buff[120];
+    static char buff[100];
     static char *type_name[] = { "unknown", "int", "string", "void", "object",
                                  "mapping", "float", "mixed", "closure",
                                  "symbol", "quoted_array", "struct" };
@@ -1535,8 +1533,6 @@ get_type_name (fulltype_t type)
         strcat(buff, "public ");
     if (type.typeflags & TYPE_MOD_VARARGS)
         strcat(buff, "varargs ");
-    if (type.typeflags & TYPE_MOD_DEPRECATED)
-        strcat(buff, "deprecated ");
 
     type.typeflags &= TYPE_MOD_MASK;
 
@@ -3182,11 +3178,10 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                      && ((f1 ^ f2) & TYPE_MOD_VIS)
                        )
                     {
-                        char buff[120];
+                        char buff[100];
 
                         t2 = funp->type;
-                        strncpy(buff, get_visibility(t2), sizeof(buff)-1);
-                        buff[sizeof(buff) - 1] = '\0'; // strncpy() does not guarantee NUL-termination
+                        strcpy(buff, get_visibility(t2));
                         yywarnf("Inconsistent declaration of '%s': Visibility changed from '%s' to '%s'"
                                , get_txt(p->name), buff, get_visibility(type));
                     }
@@ -4237,10 +4232,9 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
 
             if ( ((f1 ^ f2) & TYPE_MOD_VIS) )
             {
-                char buff[120];
+                char buff[100];
 
-                strncpy(buff, get_f_visibility(pdef->flags), sizeof(buff)-1);
-                buff[sizeof(buff)-1] = '\0'; // strncpy() does not guarantee NUL termination
+                strcpy(buff, get_f_visibility(pdef->flags));
                 yywarnf("Inconsistent declaration of struct %s: "
                         "Visibility changed from '%s' to '%s'"
                        , get_txt(p->name), buff, get_f_visibility(flags));
@@ -5673,7 +5667,6 @@ delete_prog_string (void)
 %token L_NE
 %token L_NO_MASK
 %token L_NOSAVE
-%token L_DEPRECATED
 %token L_NOT
 %token L_NUMBER
 %token L_OBJECT
@@ -6892,22 +6885,21 @@ default_visibility:
     L_DEFAULT inheritance_qualifiers ';'
       {
           if ($2[0] & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                       | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC | TYPE_MOD_DEPRECATED)
+                       | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)
              )
           {
               yyerror("Default visibility specification for functions "
-                      "accepts only 'private', 'protected', 'public', "
-                      "'static' or 'deprecated'");
+                      "accepts only 'private', 'protected', 'public' or "
+                      "'static'");
               YYACCEPT;
           }
 
           if ($2[1] & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                       | TYPE_MOD_PROTECTED | TYPE_MOD_DEPRECATED)
+                       | TYPE_MOD_PROTECTED)
              )
           {
               yyerror("Default visibility specification for variables "
-                      "accepts only 'private', 'protected', 'public' "
-                      "or 'deprecated'"
+                      "accepts only 'private', 'protected' or 'public'"
                       );
               YYACCEPT;
           }
@@ -6954,7 +6946,6 @@ type_modifier:
     | L_VARARGS    { $$ = TYPE_MOD_VARARGS; }
     | L_PROTECTED  { $$ = TYPE_MOD_PROTECTED; }
     | L_NOSAVE     { $$ = TYPE_MOD_NOSAVE; }
-    | L_DEPRECATED   { $$ = TYPE_MOD_DEPRECATED; }
 ;
 
 
@@ -9857,7 +9848,7 @@ expr0:
            * We have to distinguish virtual and non-virtual
            * variables here.
            */
-          variable_t *varp;
+
           fulltype_t lvtype;
           int i;
           PREPARE_INSERT(4)
@@ -9872,8 +9863,8 @@ expr0:
           {
               add_f_code(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
               add_byte(i);
-              varp = V_VARIABLE(i);
-              lvtype = varp->type;
+              lvtype = V_VARIABLE(i)->type;
+              lvtype.typeflags &= TYPE_MOD_MASK;
           }
           else
           {
@@ -9888,17 +9879,10 @@ expr0:
                   add_f_code(F_PUSH_IDENTIFIER_LVALUE);
                   add_byte(i + num_virtual_variables);
               }
-              varp = NV_VARIABLE(i);
-              lvtype = varp->type;
+              lvtype = NV_VARIABLE(i)->type;
+              lvtype.typeflags &= TYPE_MOD_MASK;
           }
-          lvtype.typeflags &= TYPE_MOD_MASK;
 
-          // warn about deprecated variables.
-          if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
-              yywarnf("Using deprecated global variable %s.\n",
-                      get_txt(varp->name));
-
-              
           if (exact_types.typeflags
            && !BASIC_TYPE(lvtype, Type_Number)
            && !BASIC_TYPE(lvtype, Type_Float))
@@ -10382,32 +10366,6 @@ expr4:
               ins_byte(F_NO_WARN_DEPRECATED);
           ix = $1.number;
           inhIndex = $1.inhIndex;
-
-          // check for deprecated functions
-          if (ix < CLOSURE_EFUN_OFFS)
-          {
-              // check only closures not directly to inherited functions (#'::fun),
-              // they were checked by the lexxer.
-              if (!inhIndex && ix < FUNCTION_COUNT)
-              {
-                  // ok, closure to lfun.
-                  function_t *fun = FUNCTION(ix);
-                  if (fun->flags & TYPE_MOD_DEPRECATED)
-                  {
-                      yywarnf("Creating lfun closure to deprecated function %s",
-                              get_txt(fun->name));
-                  }
-              }
-              else if (ix >= CLOSURE_IDENTIFIER_OFFS)
-              {
-                  // closure to global variable
-                  // the lexxer only creates closure to non-virtual variables - our luck ;)
-                  variable_t *varp = NV_VARIABLE(ix - CLOSURE_IDENTIFIER_OFFS - num_virtual_variables);
-                  if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
-                      yywarnf("Creating closure to deprecated global variable %s.\n",
-                              get_txt(varp->name));
-              }
-          }
           ins_f_code(F_CLOSURE);
           ins_short(ix);
           ins_short(inhIndex);
@@ -10869,7 +10827,6 @@ expr4:
           int i;
           mp_uint current;
           bytecode_p p;
-          variable_t *varp;
 %line
           i = verify_declared($2);
           if (i == -1)
@@ -10890,7 +10847,6 @@ expr4:
           {
               *p++ = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
               *p = i;
-              varp = V_VARIABLE(i);
           }
           else
           {
@@ -10904,7 +10860,6 @@ expr4:
                   *p++ = F_PUSH_IDENTIFIER_LVALUE;
                   *p = i + num_virtual_variables;
               }
-              varp = NV_VARIABLE(i);
           }
 
           CURRENT_PROGRAM_SIZE = current + 2;
@@ -10912,11 +10867,7 @@ expr4:
               $$.type = Type_Ref_Any;
           else
           {
-              if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
-                  yywarnf("Referencing deprecated global variable %s.\n",
-                          get_txt(varp->name));
-              
-              $$.type = varp->type;
+              $$.type = VARIABLE(i)->type;
               $$.type.typeflags = ($$.type.typeflags & TYPE_MOD_MASK)
                                   | TYPE_MOD_REFERENCE;
           }
@@ -11128,10 +11079,10 @@ expr4:
     | L_IDENTIFIER
       {
           /* Access a global variable */
+
           int i;
           mp_uint current;
           bytecode_p p;
-          variable_t *varp;
 %line
           i = verify_declared($1);
           if (i == -1)
@@ -11155,8 +11106,8 @@ expr4:
               $$.code = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
               *p++ = F_VIRTUAL_VARIABLE;
               *p = i;
-              varp = V_VARIABLE(i);
-              $$.type = varp->type;
+              $$.type = V_VARIABLE(i)->type;
+              $$.type.typeflags &= TYPE_MOD_MASK;
           }
           else
           {
@@ -11175,15 +11126,9 @@ expr4:
                   *p++ = F_IDENTIFIER;
                   *p = i + num_virtual_variables;
               }
-              varp = NV_VARIABLE(i);
-              $$.type = varp->type;
+              $$.type = NV_VARIABLE(i)->type;
+              $$.type.typeflags &= TYPE_MOD_MASK;
           }
-          if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
-          {
-              yywarnf("Using deprecated global variable %s.\n",
-                      get_txt(varp->name));
-          }
-          $$.type.typeflags &= TYPE_MOD_MASK;
 
           CURRENT_PROGRAM_SIZE = current + 2;
           if (i == -1)
@@ -11767,10 +11712,9 @@ name_lvalue:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     L_IDENTIFIER
       {
-          /* Generate the lvalue for a global variable */
+          /* Generate the lvalue for a global */
 
           int i;
-          variable_t *varp;
 %line
           $$.length = 0;
           i = verify_declared($1);
@@ -11782,9 +11726,10 @@ name_lvalue:
           {
               $$.u.simple[0] = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
               $$.u.simple[1] = i;
-              varp = V_VARIABLE(i);
-              $$.type = varp->type;
+              $$.type = V_VARIABLE(i)->type;
               $$.type.typeflags &= TYPE_MOD_MASK;
+              if (i == -1)
+                  $$.type = Type_Any;
           }
           else
           {
@@ -11805,14 +11750,9 @@ name_lvalue:
                   $$.u.simple[0] = F_PUSH_IDENTIFIER_LVALUE;
                   $$.u.simple[1] = i + num_virtual_variables;
               }
-              varp = NV_VARIABLE(i);
-              $$.type = varp->type;
+              $$.type = NV_VARIABLE(i)->type;
               $$.type.typeflags &= TYPE_MOD_MASK;
           }
-          if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
-              yywarnf("Using deprecated global variable %s.\n",
-                      get_txt(varp->name));
-          
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12618,11 +12558,7 @@ function_call:
                       }
 
                   }
-                  
-                  if (funp->flags & TYPE_MOD_DEPRECATED)
-                      yywarnf("Calling deprecated simul_efun \'%s\'",
-                              get_txt(funp->name));
-                      
+
                   if (funp->num_arg == SIMUL_EFUN_VARARGS
                    || (funp->flags & TYPE_MOD_XVARARGS)
                    || has_ellipsis)
@@ -12747,11 +12683,6 @@ function_call:
                           yyerrorf("Function %.50s is private", get_txt(funp->name));
                       }
                   }
-                  // warn about obsoleted functions
-                  if (funp->flags & TYPE_MOD_DEPRECATED)
-                      yywarnf("Calling deprecated function \'%s\'",
-                              get_txt(funp->name));
-
 
                   $$.type = funp->type; /* Result type */
                   $$.type.typeflags &= TYPE_MOD_MASK;
@@ -13887,7 +13818,6 @@ lvalue_list:
           /* Push the lvalue for a global variable */
 
           int i;
-          variable_t *varp;
 %line
           $$ = 1 + $1;
 
@@ -13900,7 +13830,6 @@ lvalue_list:
           {
               ins_f_code(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
               ins_byte(i);
-              varp = V_VARIABLE(i);
           }
           else
           {
@@ -13914,13 +13843,7 @@ lvalue_list:
                   ins_f_code(F_PUSH_IDENTIFIER_LVALUE);
                   ins_byte(i + num_virtual_variables);
               }
-              varp = NV_VARIABLE(i);
           }
-          if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
-          {
-              yywarnf("Using deprecated global variable %s.\n",
-                      get_txt(varp->name));
-          }          
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -14952,7 +14875,6 @@ short
 find_inherited_function ( const char * super_name
                         , const char * real_name
                         , unsigned short * pInherit
-                        , funflag_t * flags
                         )
 
 /* Lookup an inherited function <super_name>::<real_name> and return
@@ -14972,11 +14894,12 @@ find_inherited_function ( const char * super_name
 {
     inherit_t *ip;
     string_t *rname;
+    funflag_t flags;
     short     ix;
 
     rname = find_tabled_str(real_name);
 
-    ix =  rname ? lookup_inherited(super_name, rname, &ip, flags) : -1;
+    ix =  rname ? lookup_inherited(super_name, rname, &ip, &flags) : -1;
     if (ix >= 0) /* Also return the inherit index. */
         *pInherit = ip - (inherit_t *)mem_block[A_INHERITS].block;
     else

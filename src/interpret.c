@@ -8530,10 +8530,10 @@ again:
          *
          * For <ix>:
          * Values 0xf000..0xffff are efun and simul-efun symbols, the others
-         * are operators and literals (0xf000 == CLOSURE_EFUN_OFFS)
+         * are operators and literals.
          * Simul-efun symbols (0xf800..0xffff) and true efun symbolx (0xf000..
          * 0xf7ff for which instrs[].Default >= 0) are made signed and stored
-         * as they are. (0xf800 == CLOSURE_SIMUL_EFUN_OFFS)
+         * as they are.
          * Operator symbols (0xf000..0xf7ff for which instrs[].Default == -1)
          * are moved into their 0xe800..0xefff range, then made signed and
          * stored.
@@ -8580,7 +8580,7 @@ again:
 #endif /* USE_NEW_INLINES */
 
         ix = tmp_ushort;
-        if (ix < CLOSURE_EFUN_OFFS)
+        if (ix < 0xf000)
         {
             sp++;
             inter_sp = sp;
@@ -16921,7 +16921,7 @@ retry_for_shadow:
           /* Static functions may not be called from outside.
            * Protected functions not even from the inside
            */
-          && (   !(cache[ix].flags & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED)) /* -> neither static nor protected */
+          && (   !cache[ix].flags /* -> neither static nor protected */
               || b_ign_prot
               || (   !(cache[ix].flags & TYPE_MOD_PROTECTED)
                   && current_object == ob
@@ -16933,12 +16933,7 @@ retry_for_shadow:
              * where.
              */
             fun_hdr_p funstart;
-            
-            // check for deprecated functions before pushing a new control stack frame.
-            if (cache[ix].flags & TYPE_MOD_DEPRECATED)
-                warnf("Callother to deprecated function \'%s\' in object %s (%s).\n",
-                      get_txt(fun), get_txt(ob->name), get_txt(ob->prog->name));
-            
+
 #ifdef USE_NEW_INLINES
             push_control_stack(inter_sp, inter_pc, inter_fp, inter_context);
 #else
@@ -17006,11 +17001,6 @@ retry_for_shadow:
                 funflag_t flags;
                 fun_hdr_p funstart;
 
-                // check for deprecated functions before pushing a new control stack frame.
-                if (progp->functions[fx] & TYPE_MOD_DEPRECATED)
-                    warnf("Callother to deprecated function \'%s\' in object %s (%s).\n",
-                          get_txt(fun), get_txt(ob->name), get_txt(ob->prog->name));
-                
 #ifdef USE_NEW_INLINES
                 push_control_stack(inter_sp, inter_pc, inter_fp, inter_context);
 #else
@@ -17030,7 +17020,6 @@ retry_for_shadow:
                 csp->num_local_variables = num_arg;
                 current_prog = progp;
                 flags = setup_new_frame1(fx, 0, 0);
-                
                 current_strings = current_prog->strings;
 
                 cache[ix].progp = current_prog;
@@ -17051,12 +17040,12 @@ retry_for_shadow:
 
                 cache[ix].funstart = funstart;
                 cache[ix].flags = progp->functions[fx]
-                                  & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|TYPE_MOD_DEPRECATED);
+                                  & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED);
 
                 /* Static functions may not be called from outside,
                  * Protected functions not even from the inside.
                  */
-                if (0 != (cache[ix].flags & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED))
+                if (0 != cache[ix].flags
                   && (   (cache[ix].flags & TYPE_MOD_PROTECTED)
                       || current_object != ob)
                   && !b_ign_prot
@@ -18024,7 +18013,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
                  , l->function.lfun.ob->prog->num_functions
                 );
 #endif
-          
+
         /* If the object creating the closure wasn't the one in which
          * it will be executed, we need to record the fact in a second
          * 'dummy' control frame. If we didn't, major security holes

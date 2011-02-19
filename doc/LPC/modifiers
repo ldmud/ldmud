@@ -62,9 +62,6 @@ DESCRIPTION
                      function to be declared varargs to omit any arguments,
                      but it is good style to use this modifier to document
                      the code by this.
-        deprecated - Whenever this function is called, a warning is issued.
-                     Usually this is done at compile-time. Exceptions are
-                     call_others and symbol_function() which warn at run-time.
 
         For object-global variables:
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -88,9 +85,6 @@ DESCRIPTION
                      private or static by inheriting. No error will occur,
                      only the type will not be modified by the inherit
                      statement.
-        deprecated - Whenever this variable is used, a warning is issue.
-                     Usually this is done at compile-time, but
-                     symbol_variable() warns at run-time.
 
         It is no good style to let inheriting objects have access to
         internal variables so declare them as private and offer functions

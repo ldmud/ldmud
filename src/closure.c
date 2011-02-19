@@ -6209,15 +6209,6 @@ f_symbol_function (svalue_t *sp)
          )
        )
     {
-        // check for deprecated functions.
-        if (prog->functions[i] & TYPE_MOD_DEPRECATED)
-        {
-            warnf("Creating lfun closure to deprecated function \'%s\' in object %s (%s).\n",
-                  get_txt(sp[-1].u.str),
-                  get_txt(ob->name),
-                  get_txt(ob->prog->name));
-        }
-        
         /* Clean up the stack */
         sp--;
         free_mstring(sp->u.str);
@@ -6375,13 +6366,7 @@ f_symbol_variable (svalue_t *sp)
         n = num_var - n - 1;
       }
     }
-    // check for deprecated object / global variable.
-    if (current_prog->variables[n].type.typeflags & TYPE_MOD_DEPRECATED)
-    {
-        warnf("Creating closure to deprecated global variable %s.\n",
-              get_txt(current_prog->variables[n].name));
-    }
-    
+
     /* Create the result closure and put it onto the stack */
     closure_identifier( sp, current_object
                       , (unsigned short)(n + (current_variables - current_object->variables))
