@@ -4212,7 +4212,8 @@ closure (char *in_yyp)
             if (p->u.global.variable & VIRTUAL_VAR_TAG) {
                 /* Handling this would require an extra coding of
                  * this closure type, and special treatment in
-                 * replace_program_lambda_adjust() .
+                 * replace_program_lambda_adjust(). Also deprecated-check in the
+                 * L_CLOSURE rule in prolang.y must be adjusted.
                  */
                 yyerrorf("closure of virtual variable");
                 yylval.closure.number = CLOSURE_IDENTIFIER_OFFS;
