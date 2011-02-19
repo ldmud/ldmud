@@ -1352,17 +1352,13 @@ comm_send_buf (char *msg, size_t size, interactive_t *ip)
             }
         }
 
-        if (n == 0)
-            break;
+        if (n == 0) // don't close for EWOULDBLOCK/EINTR
+            return 0;
 
         ip->do_close = FLAG_DO_CLOSE;
         return -1;
 
     } /* for (retries) */
-
-    /* EWOULDBLOCK and EINTR are not real failures. */
-    if (n == -1)
-        return 0;
 
 #ifdef COMM_STAT
     inet_packets++;
