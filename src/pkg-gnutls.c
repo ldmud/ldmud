@@ -99,6 +99,8 @@ generate_dh_params (void)
 
 /*-------------------------------------------------------------------------*/
 static void
+initialize_tls_session (gnutls_session *session) __attribute__((nonnull));
+static void
 initialize_tls_session (gnutls_session *session)
 
 /* GnuTLS: Initialise a TLS <session>.
@@ -134,6 +136,8 @@ tls_xalloc (size_t size)
 
 /*-------------------------------------------------------------------------*/
 static void *
+tls_rexalloc (void *old, size_t size) __attribute__((nonnull));
+static void *
 tls_rexalloc (void *old, size_t size)
 
 /* Wrapper function so that (gnu)tls will use the driver's allocator.
@@ -145,6 +149,8 @@ tls_rexalloc (void *old, size_t size)
 } /* tls_rexalloc() */
 
 /*-------------------------------------------------------------------------*/
+static void
+tls_xfree (void *p) __attribute__((nonnull));
 static void
 tls_xfree (void *p)
 
@@ -426,6 +432,8 @@ tls_global_deinit (void)
 
 /*-------------------------------------------------------------------------*/
 int
+tls_read (interactive_t *ip, char *buffer, int length) __attribute__((nonnull));
+int
 tls_read (interactive_t *ip, char *buffer, int length)
 
 /* Read up to <length> bytes data for the TLS connection of <ip>
@@ -476,6 +484,8 @@ tls_read (interactive_t *ip, char *buffer, int length)
 
 /*-------------------------------------------------------------------------*/
 int
+tls_write (interactive_t *ip, char *buffer, int length) __attribute__((nonnull));
+int
 tls_write (interactive_t *ip, char *buffer, int length)
 
 /* Write <length> bytes from <buffer> to the TLS connection of <ip>
@@ -522,6 +532,8 @@ tls_write (interactive_t *ip, char *buffer, int length)
 
 /*-------------------------------------------------------------------------*/
 int
+tls_do_handshake (interactive_t *ip) __attribute__((nonnull));
+int
 tls_do_handshake (interactive_t *ip)
 
 /* Continue the TLS initialisation handshake for interactive <ip>.
@@ -561,6 +573,8 @@ tls_do_handshake (interactive_t *ip)
 
 /*-------------------------------------------------------------------------*/
 int
+tls_init_connection (interactive_t *ip) __attribute__((nonnull));
+int
 tls_init_connection (interactive_t *ip)
 
 /* Starts a TLS secured connection to the interactive <ip>.
@@ -577,6 +591,8 @@ tls_init_connection (interactive_t *ip)
 } /* tls_init_connection() */
 
 /*-------------------------------------------------------------------------*/
+vector_t *
+tls_check_certificate (interactive_t *ip, Bool more) __attribute__((nonnull));
 vector_t *
 tls_check_certificate (interactive_t *ip, Bool more)
 
@@ -815,6 +831,8 @@ tls_check_certificate (interactive_t *ip, Bool more)
 
 /*-------------------------------------------------------------------------*/
 void
+tls_deinit_connection (interactive_t *ip) __attribute__((nonnull));
+void
 tls_deinit_connection (interactive_t *ip)
 
 /* Close the TLS connection for the interactive <ip> if there is one.
@@ -850,6 +868,8 @@ tls_error(int err)
 } /* tls_error() */
 
 /*-------------------------------------------------------------------------*/
+vector_t *
+tls_query_connection_info (interactive_t *ip) __attribute__((nonnull));
 vector_t *
 tls_query_connection_info (interactive_t *ip)
 
