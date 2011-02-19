@@ -45,7 +45,7 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
          headers: 65535) bytes are supported.
        + SSLv2 connections are rejected, since they are insecure and long
          obsolete.
-       + Some reasons for SSL disconnects were removed.
+       + Some reasons for SSL disconnects were removed. (#737)
 
 30-May-2009 (LDMud Team) -- 3.3.719
     - Fixed Crashes:
