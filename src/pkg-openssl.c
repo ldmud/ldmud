@@ -448,6 +448,9 @@ tls_global_init (void)
     /* Avoid small subgroup attacks */
     SSL_CTX_set_options(context, SSL_OP_SINGLE_DH_USE);
 
+    // Disallow SSLv2 connections (only allow SSLv3 and TLSv1 connections.)
+    SSL_CTX_set_options(context, SSL_OP_NO_SSLv2);
+
     // OpenSSL must accept a different buffer address for retries after
     // SSL_write() returned -1 with SSL_WANT_READ/_WRITE, because we transfer
     // the content to a queue of buffers before we try again (#737).
