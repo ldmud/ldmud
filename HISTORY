@@ -32,6 +32,13 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
     - Runtime
        + A base struct is recorded as base struct in a child struct even if
          the base struct has no members. (#695)
+       + Improved the determination of the drivers current_time which fixes
+         issues with wrongly timed heart_beats or apparantly wrong timings.
+         (e.g. #743)
+       + Migrated from signal() to sigaction() and alarm() to setitimer() to
+         set the alarm and its handler, which seems to fix some issue with
+         lost alarm signals. (#607)
+       + Host system time and mud-internal time are now better synchronized.
 
     - Language
        + A new modifier 'deprecated' can be used to mark lfuns, sefuns and
