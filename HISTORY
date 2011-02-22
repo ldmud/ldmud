@@ -10,11 +10,21 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
          order during initialization of libxml2 (#671) and could lead to
          memory corruption, because the memory used by libxml2 was subject to
          the garbage collector and would be free'd by it while still in use.
+       + xml_generate(), xml_parse() could also crash the driver due to
+         a wrong order during cleaning up, where a buffer could be
+         freed prematurely.
        + get_type_info() lost refcounts to the function name of a closure,
          causing it eventually being free'd prematurely (#712).
        + 'dumpallobj' crashed if there are strings with 0 refcounts (#725).
        + fixed a crash during tracing caused by a wrong call to add_message()
          in do_trace(), when compiled with --enable-debug (#736).
+       + Entering destructed objects as keys into a mapping could
+         crash the driver later on.
+       + Very long function names with symbol_function() could crash
+         the driver due to a corrupted stack.
+       + exec() when the player's socket buffer was full crashed.
+       + Destroying objects during initialisation, process_string()
+         or transfer() could crash the driver.
 
     - Changed Efuns:
        + get_dir(): prepend '/' in plain mode for entries in the root directory,
@@ -51,6 +61,9 @@ xx-xxx-200x (LDMud Team) -- 3.3.720
        + SSLv2 connections are rejected, since they are insecure and long
          obsolete.
        + Some reasons for SSL disconnects were removed. (#737)
+       + Configuration option tls_trustdirectory is deactivated by default.
+       + All unknown telnet options are now passed to the H_TELNET_NEG hook.
+         (#670)
 
 30-May-2009 (LDMud Team) -- 3.3.719
     - Fixed Crashes:
