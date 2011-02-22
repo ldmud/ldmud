@@ -5313,7 +5313,8 @@ f_transfer (svalue_t *sp)
             ret = sapply(STR_CANPUTGET, from, 0);
             if (!ret
              || (ret->type == T_NUMBER && ret->u.number == 0)
-             || (from->flags & O_DESTRUCTED))
+             || (from->flags & O_DESTRUCTED)
+             || (ob->flags & O_DESTRUCTED))
             {
                 result = 3;
                 break;
