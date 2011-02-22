@@ -1,35 +1,288 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-22-Feb-2011 (Gnomi)
+2011-02-22 (Gnomi)
   - Added checks for destroyed objects in clone_object(), process_string()
     and transfer(). (fixes #772)
     (simulate.c, efuns.c, object.c)
 
-25-Jan-2011 (Gnomi)
-  - optpat() shouldn't read over the end of the given ed command. (#722)
-    (ed.c)
+2011-02-19 (Zesstra)
+  - Check 'deprecated' modifier for global variables.
+    In addition to functions the compiler and symbol_variable() check if a
+    global variable is deprecated and issue a warning.
+    Local variables are not checked.
+    (closure.c, prolang.y, interpret.c, prolang.y)
+
+2011-02-19 (Zesstra)
+  - Added check for 'deprecated' for lfun closures.
+    Added a check for deprecated lfuns upon creation of closures by #'fun
+    or #'::fun (compile-time).
+    (lex.c, prolang.c)
+
+2011-02-19 (Zesstra)
+  - New modifier 'deprecated' for lfuns.
+    Functions can be marked with 'deprecated', which causes a warning when
+    they are called. Intra-object calls will cause compile-time warnings,
+    inter-objects calls (callother, lfun closure calls) compile-time
+    warnings.
+    (prolang.y, lex.c, interpret.c, closure.c)
+
+2011-02-19 (Zesstra)
+  - Added testcases for some basic operators dealing with ints.
+    Added some testcases for bitwise AND, OR, XOR, left shift, right shift,
+    logical right shift, modulus and their respective assignment operators.
+
+2011-02-19 (Zesstra)
+  - pkg-gnutls: added some attributes for nonnull pointer arguments.
+    Some functions should never get NULL pointers as args. Marked these
+    args as 'nonnull'.
+    (pkg-gnutls.c)
+
+2011-02-19 (Zesstra)
+  - pkg-gnutls:tls_write(): added comment about retries.
+    GnuTLS and OpenSSL require a specific behaviour in case of interupted
+    or blocking sockets. This adds a comment about the specifics of GnuTLS.
+    (pkg-gnutls.c)
+
+2011-02-19 (Zesstra)
+  - pkg-gnutls:tls_read(): let caller retry reading later.
+    If the internal retry counter in tls_read() is not sufficient and the
+    error is still GNUTLS_E_INTERRUPTED or GNUTLS_E_AGAIN return EINTR or
+    EWOULDBLOCK to get_message() which will try again later. (bug #737)
+    (pkg-gnutls.c)
+
+2011-02-19 (Zesstra)
+  - comm_send_buf(): Removed dead code.
+    Removed code that was never executed. Additionally, don't increment the
+    inet_packets counter if nothing was sent.
+    (comm.c)
+
+2011-02-19 (Zesstra)
+  - Added some function attributes and assert().
+    Some functions should never get NULL pointers as args.
+    Lengths of 0 in SSL_write() lead to undefined behaviour. Should never
+    happen and will be asserted now.
+    (pkg-openssl.c)
+
+2011-02-19 (Zesstra)
+  - Simplified error handling in tls_read/tls_write().
+    Combined cases for err==0 and err<0 into one if block. (bug #737)
+    (pkg-openssl.c)
+
+2011-02-19 (Zesstra)
+  - Dump error stack to debug logs on disconnects.
+    If compiled with DEBUG, the OpenSSL error stack will be dumped into
+    the debug log on disconnects in tls_read()/tls_write(). May help finding
+    the reasons for disconnects. (bug #737)
+    (pkg-openssl.c)
+
+2011-02-19 (Zesstra)
+  - Simplified error handling in get_message().
+    Converted a bunch of if() into a switch and use strerror() to ouput
+    meaningful error messages in the default case (bug #737).
+    (comm.c)
+
+2011-02-19 (Zesstra)
+  - Removed some disconnects in case of recoverable errors.
+    Sockets reads might be interupted by signals and return EINTR. In this
+    case it will just be retried later again.
+    tls_read() may stumble upon SSL_ERROR_WANT_READ/_WRITE. In these cases
+    it now sets errno to EAGAIN instead of disconnecting the user. It also
+    keeps the connection in case of SSL_ERROR_SYSCALL if errno is EAGAIN
+    or EINTR (bug #737)
+    (comm.c, pkg-openssl.c)
+
+2011-02-19 (Zesstra)
+  - Set SSL_MODE_RELEASE_BUFFERS in SSL context.
+    The flag configures OpenSSL to release unused buffers in idle SSL
+    connections.
+    (pkg-openssl.c)
+
+2011-02-19 (Zesstra)
+  - Disallow SSLv2 connections.
+    SSLv2 is long deprecated and should not be used anymore.
+    (pkg-openssl.c)
+
+2011-01-25 (Gnomi)
   - Explicit context variables overwrote the types of the closure's
-    arguments. (#711)
+    arguments. (fixes #711)
     (prolang.y)
 
-12-May-2010 (Gnomi)
+2011-01-25 (Gnomi)
+  - optpat() shouldn't read over the end of the given ed command. (fixes #722)
+    (ed.c)
+
+2011-01-11 (Zesstra)
+  - Add some fresh entropy to the PRNG from time to time.
+    Everytime a new TLS connection is initialized, the current time
+    (gettimeofday) is added to the entropy pool of OpenSSL.
+    Additionally, for the next new connection after PRNG_RESEED_PERIOD/2
+    + random(PRNG_RESEED_PERIOD) seconds RAND_poll() from OpenSSL is
+    called to add fresh entropy from a stronger source of entropy.
+    (pkg-openssl.c)
+
+2011-01-11 (Zesstra)
+  - Do not seed the OpenSSL PRNG with little entropy (#678)
+    We used to seed OpenSSL's PRNG by using very weak sources of entropy. On
+    system without a strong source of entropy (/dev/urandom, EGD etc.) this
+    could lead to false sense of security. By not seeding ourselves, we force
+    TLS to fail completely, if OpenSSL can't get enough entropy automagically.
+
+2011-01-09 (Zesstra)
+  - Removed an error from varargs manpage (fixes #767).
+
+2011-01-08 (Zesstra)
+  - _expand_define(): skip only leading/trailing whitespace.
+    Commit 05202ac2b5789057de7f6d24e43fb59e969b4c12 skipped also the
+    whitespace within the arguments, which has to be preserved. This commit
+    changes the behaviour to only skip leading and trailing whitespace in
+    the macro arguments. (fixes #729)
+    (lex.c)
+
+2011-01-06 (Zesstra)
+  - Fixed manpage of call_out.
+    The manpage incorrectly stated a minimum delay of 1 second and mentioned
+    rounding up to the next multiple of __ALARM_TIME__.
+    Additionally added a comment about the real delay being between
+    <delay> and <delay>+__ALARM_TIME__.
+
+2011-01-06 (Zesstra)
+  - Rename IncCmdGiver to DecreaseCmdGiver.
+    This define suggests to increment something, but it decrements.
+    (comm.c)
+
+2011-01-06 (Zesstra)
+  - _expand_define(): skip whitelist in argument list (fixes #729)
+    _expand_define() skipped whitespace only at the start of the argument
+    list, but not in between or trailing whitespace which lead to
+    unexpected behaviour in case of #define quote(X) "X".
+    (lex.c)
+
+2011-01-05 (Zesstra)
+  - Set SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER in SSL context.
+    SSL_write() of OpenSSL requires to be called with the same arguments for
+    a retry after SSL_WANT_READ/SSL_WANT_WRITE. With this flag, it also
+    accepts a different buffer as long as its content is the same.
+    Should solve some SSL/TLS disconnects (bug #737)
+    (pkg-openssl.c)
+
+2010-11-17 (Zesstra)
+  - Typo fix in m_contains manpage (fixes #761).
+
+2010-11-17 (Zesstra)
+  - Corrected example for regreplace usage (fixes #760).
+
+2010-07-15 (Zesstra)
+  - Check refcounter before division in svalue_size().
+    Reference counters are all checked to be != 0 before divisions, because
+    the counters might overflow to 0 and might be constantly 0 from then on
+    because reference counting is disabled for that entity.
+    (dumpstat.c)
+
+2010-07-14 (Zesstra)
+  - Changed signal handling in comm to sigaction().
+    Use sigaction() in comm.c as well.
+    Removed the signal handler for SIGPIPE and ignore the signal (our old
+    handler ignored it as well).
+    (comm.c)
+
+2010-07-14 (Zesstra)
+  - Synchronize the alarm timer to full seconds.
+    As the mud internal time is only updated each alarm time this resulted in
+    up to (alarm_time+1) seconds delay between the two. When the first
+    timer is set up, we now take care to expire it on a full second to improve
+    synchronicity (to a max. difference of (alarm_time)s).
+    (backend.c)
+
+2010-07-14 (Zesstra)
+  - Changed from alarm() to setitimer(ITIMER_REAL,)
+    The alarm had to be (re-)set every time after an alarm occurred and if an
+    alarm was missed somehow, this could lead to switched off alarms (main
+    reason for check_alarm).
+    We now use setitimer(ITIMER_REAL,...) to set a recurring realtime alarm,
+    which simplifies matters and should make the check_alarm() obsolete.
+    (backend.c)
+
+2010-07-14 (Zesstra)
+  - Use sigaction for installing signal handlers.
+    Because signal() can not be used in portable way to install signal
+    handlers but sigaction() can, the driver installs the handlers now with
+    sigaction(). Another advantage is, that the handler don't have to
+    re-install themselves.
+    (main.c, backend.c)
+
+2010-06-03 (Zesstra)
+  - Added note about host system dependency for convert_charset().
+    The capabilities of convert_charset() depend on the libiconv of the host
+    system. The manpage now has a hint about this.
+
+2010-05-12 (Gnomi)
   - Corrected the call to mysql_options. Use the generic error message
     when mysql returned an empty one.
     (pkg-mysql.c)
 
-04-May-2010 (Fuchur)
-  - enable automatic reconnects on MySQL database handles. (see #750)
-    (pkg-mysql.c, doc/concepts/mysql, doc/efun[.de]/db_connect[.de])
+2010-05-04 (Fuchur)
+  - Enable automatic reconnects on MySQL database handles. (#750)
 
-13-Feb-2010 (Zesstra)
+2010-05-01 (Zesstra)
+  - Updated settings for Avalon.
+
+2010-04-26 (Zesstra)
+  - Fixed result of convert_charset().
+    If convert_charset() got an empty string for conversion, it returned its
+    3rd argument (to-charset). It now returns the unchanged string. (#739)
+    (strfuns.c)
+
+2010-04-26 (Zesstra)
+  - Don't deactivate a blueprints heartbeart upon cloning.
+    The blueprints HB were supposedly deactivated upon cloning to prevent
+    copying the active HB state to the new object. But since this anyway
+    does not happen and clone_object() should not deactivate the blueprints
+    HB permanently, this deactivation was removed (#747).
+    (simulate.c)
+
+2010-04-21 (Zesstra)
+  - Changed mk-patchlevel to create correct revision data.
+    mk-patchlevel uses information from version.sh to add version and
+    revision information to patchlevel.h. Unfortunately, version.sh seems
+    to be updated by some unknown release script and contains horribly
+    outdated information. mk-patchlevel tries now to extract the current
+    revision from either SVN or git first and then tries version.sh.
+
+2010-04-21 (Zesstra)
+  - Fixed manpages of load_name concerning VC objects.
+    load_name() returns the original loadname of the object created by the
+    VC.
+
+2010-03-16 (Zesstra)
+  - Removed indefinite retries in tls_write().
+    tls_write() had no retry counter and retried for as long as the error
+    was SSL_ERROR_WANT_READ/_WRITE. Similar to pkg-gnutls.c we just set
+    errno to EWOULDBLOCK and let the caller handle the retries.
+    (pkg-openssl.c)
+
+2010-03-16 (Zesstra)
+  - Fixed return value of tls_read/tls_write().
+    A wrong usage of the variable ret could in some error conditions lead
+    to a wrong return value and return a positive number of bytes read/written
+    where nothing was read/written.
+    (pkg-openssl.c)
+
+2010-03-11 (Zesstra)
+  - Fixed add_message() call in do_trace().
+    do_trace() called add_message("%s",message_flush), which should be
+    add_message(message_flush); Otherwise add_message() calls strlen() with
+    the NULL pointer, leading to crashes (#736).
+    (interpret.c)
+
+2010-02-13 (Zesstra)
   - Fixed Div-by-Zero in svalue_size().
     svalue_size() divides the memory used for a string by its refcount, but
     0 refs are valid for strings. This leads to a crash in then wiz command
     'dumpallobj', unless the refcount is checked before division. (#725).
     (dumpstat.c)
 
-31-Jan-2010 (Zesstra)
+2010-01-31 (Zesstra)
   - Increased UDP receive buffer, because UDP datagrams can be much larger
     than 1024 bytes and the rest of the datagram would be discarded upon
     recvfrom(). Datagram lengths up to 65507 bytes (including UDP and IPv4
@@ -37,7 +290,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
     (comm.c)
   - Removed dirty BeOS hack. (comm.c)
 
-23-Jan-2010 (Zesstra)
+2010-01-24 (Zesstra)
   - get_type_info() failed to reference the function name it returns, causing
     the string to loose refcounts and being eventually free'd erronenously.
     (#712)
