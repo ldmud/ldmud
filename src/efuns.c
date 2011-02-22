@@ -3007,6 +3007,9 @@ process_value (const char *str, Bool original)
     if (strlen(str) < 1 || !isalpha((unsigned char)(str[0])))
         return NULL;
 
+    if (current_object->flags & O_DESTRUCTED)
+        return NULL;
+
     /* If necessary, copy the argument so that we can separate the various
      * parts with \0 characters.
      */
@@ -3052,7 +3055,7 @@ process_value (const char *str, Bool original)
         free_mstring(objstr);
     }
 
-    if (!ob)
+    if (!ob || (ob->flags & O_DESTRUCTED))
     {
         /* free the error handler if necessary. */
         if (original)

@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Feb-2011 (Gnomi)
+  - Added checks for destroyed objects in clone_object(), process_string()
+    and transfer(). (fixes #772)
+    (simulate.c, efuns.c, object.c)
+
 25-Jan-2011 (Gnomi)
   - optpat() shouldn't read over the end of the given ed command. (#722)
     (ed.c)

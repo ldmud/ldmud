@@ -2105,20 +2105,32 @@ load_object (const char *lname, Bool create_super, int depth
         {
             /* The master object is loaded with no current object */
             current_object = NULL;
-            init_object_variables(ob, NULL);
-            reset_object(ob, create_super ? H_CREATE_SUPER : H_CREATE_OB);
-
-            /* If the master inherits anything -Ugh- we have to have
-             * some object to attribute initialized variables to.
-             */
-            current_object = save_current;
         }
         else
         {
             current_object = save_current;
-            init_object_variables(ob, NULL);
-            reset_object(ob, create_super ? H_CREATE_SUPER : H_CREATE_OB);
         }
+
+        if (ob->flags & O_DESTRUCTED)
+        {
+            warnf("Object '%s' was destroyed before initialization.\n"
+                 , get_txt(ob->name));
+            return NULL;
+        }
+        init_object_variables(ob, NULL);
+
+        if (ob->flags & O_DESTRUCTED)
+        {
+            warnf("Object '%s' was destroyed during initialization.\n"
+                 , get_txt(ob->name));
+            return NULL;
+        }
+        reset_object(ob, create_super ? H_CREATE_SUPER : H_CREATE_OB);
+
+        /* If the master inherits anything -Ugh- we have to have
+         * some object to attribute initialized variables to.
+         */
+        current_object = save_current;
     }
 
     if ( !(ob->flags & O_DESTRUCTED))
@@ -2323,7 +2335,21 @@ clone_object (string_t *str1)
     push_ref_object(inter_sp, ob, "clone_object");
     push_ref_string(inter_sp, new_ob->name);
     give_uid_to_object(new_ob, H_CLONE_UIDS, 2);
+
+    if (new_ob->flags & O_DESTRUCTED)
+    {
+        warnf("Object '%s' was destroyed before initialization.\n"
+             , get_txt(new_ob->name));
+        return NULL;
+    }
     init_object_variables(new_ob, ob);
+
+    if (new_ob->flags & O_DESTRUCTED)
+    {
+        warnf("Object '%s' was destroyed during initialization.\n"
+             , get_txt(new_ob->name));
+        return NULL;
+    }
     reset_object(new_ob, H_CREATE_CLONE);
     command_giver = check_object(save_command_giver);
 
