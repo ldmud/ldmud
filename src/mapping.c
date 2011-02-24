@@ -417,7 +417,7 @@ get_new_hash ( mapping_t *m, mp_int hash_size)
      * range than array indices which are size_t.
      * TODO: The 0x100000 seems to be a safety offset, but is it?
      */
-    if (hash_size > (mp_int)((MAXINT - sizeof *hm - 0x100000) / sizeof *mcp)
+    if (hash_size > (mp_int)((SIZE_MAX - sizeof *hm - 0x100000) / sizeof *mcp)
      || !(hm = xalloc(sizeof *hm + sizeof *mcp * hash_size) ) )
     {
         return NULL;

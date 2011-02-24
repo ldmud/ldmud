@@ -6792,19 +6792,19 @@ store_case_labels( p_int total_length
          */
 
         /* Compute the needed offset size for the switch */
-        if (        !( (total_length + key_num*(sizeof(p_int)+1))     & ~0xff) ) {
+        if ( !( (total_length + key_num*(sizeof(p_int)+1)) & ~0xff) ) {
             len = 1;
-            maxspan = MAXINT/len;
+            maxspan = PINT_MAX/len;
         }
         else if ( !( (total_length + key_num*(sizeof(p_int)+2) + 1) & ~0xffff) )
         {
             len = 2;
-            maxspan = MAXINT/len;
+            maxspan = PINT_MAX/len;
         }
         else if ( !( (total_length + key_num*(sizeof(p_int)+3) + 2) & ~0xffffff) )
         {
             len = 3;
-            maxspan = MAXINT/len;
+            maxspan = PINT_MAX/len;
         }
         else
         {

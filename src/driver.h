@@ -159,10 +159,6 @@ extern unsigned char _my_ctype[];
 #define isalunum( c) (_my_ctype[(unsigned char)(c)]&_MCTa)
 #define lexdigit( c) (_my_ctype[(unsigned char)(c)]&_MCTd)
 
-#ifndef MAXINT
-#    define MAXINT (0x7fffffffU)
-#endif
-
 /* A define to point out empty loop bodies. */
 #define NOOP
 

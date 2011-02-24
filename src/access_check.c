@@ -407,7 +407,7 @@ read_access_file (void)
                 break;
             }
             acp->id = class_id;
-            acp->max_usage = max_usage == -1 ? (mp_int)MAXINT : max_usage;
+            acp->max_usage = max_usage == -1 ? MPINT_MAX : max_usage;
             acp->usage = 0;
             strcpy(acp->message, message);
             acp->next = all_access_classes;
