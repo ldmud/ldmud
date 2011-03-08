@@ -14683,9 +14683,66 @@ insert_inherited (char *super_name, string_t *real_name
         int first_index;
         short i;
 
-        /* Wildcarded supercalls only work without arguments */
+        /* Prepare wildcard calls with arguments. */
         if (num_arg)
-            return INHERITED_WILDCARDED_ARGS;
+        {
+            /* We have to put an array on the stack, behind the argument
+             * frame. The size of the array we'll have to insert later,
+             * as we don't know the number of calls yet.
+             *
+             * For each call we'll duplicate the argument frame, and enter
+             * the result into that array. So the opcodes are as follows:
+             *
+             *   Initialize array:
+             *     F_ARRAY <calls>
+             *     F_MOVE_VALUE <num_arg>
+             *
+             *   Copy argument frame, call, enter the result:
+             *     F_SAVE_ARG_FRAME
+             *     F_DUP_N 1 <num_arg>
+             *
+             *     F_CALL_INHERITED <inh> <fx>
+             *
+             *     F_RESTORE_ARG_FRAME
+             *     F_PUT_ARRAY_ELEMENT <num_arg+1> <num_call>
+             *
+             *   Repeat the step for each call.
+             *
+             *   Remove the arguments from the stack and move the resulting
+             *   array before the argument frame.
+             *     F_POP_N <num_arg>
+             *     F_MOVE_VALUE 0
+             *
+             * As an optimization the last call doesn't need to duplicate the
+             * arguments. Also the F_RESTORE_ARG_FRAME and F_SAVE_ARG_FRAME
+             * between consecutive calls can be omitted.
+             */
+
+            /* 6 bytes are already reserved in the program. */
+            bytecode_p __PREPARE_INSERT__p = __prepare_insert__p;
+
+            /* Create array for the return values. */
+            add_f_code(F_ARRAY0);
+            add_short(0);
+            /* Move array behind arguments and argument frame. */
+            add_f_code(F_MOVE_VALUE);
+            add_byte(num_arg);
+
+            CURRENT_PROGRAM_SIZE += 5;
+        }
+        else
+        {
+            /* Without arguments we call with F_CALL_INHERITED_NOARGS.
+             *
+             * All the results are put consecutively on the stack.
+             * There is special handling for F_CALL_INHERITED_NOARGS, so
+             * that the results are not taken as arguments even though
+             * they lie within the argument frame (above ap).
+             *
+             * Afterwards we call F_AGGREGATE to make the resulting
+             * array of them.
+             */
+        }
 
         *super_p = NULL;
         num_inherits = INHERIT_COUNT;
@@ -14702,7 +14759,7 @@ insert_inherited (char *super_name, string_t *real_name
                                        : INHERITED_NOT_FOUND;
         for (; num_inherits > 0; ip0++, num_inherits--)
         {
-            PREPARE_INSERT(10)
+            PREPARE_INSERT(13)
 
             /* ip->prog->name includes .c */
             int l = mstrsize(ip0->prog->name) - 2;
@@ -14769,10 +14826,29 @@ insert_inherited (char *super_name, string_t *real_name
 
             /* Generate the function call.
              */
-            add_f_code(F_CALL_INHERITED_NOARGS);
-            add_short(ip_index);
-            add_short(i);
-            CURRENT_PROGRAM_SIZE += 5;
+            if (num_arg)
+            {
+                if (!calls)
+                    add_f_code(F_SAVE_ARG_FRAME);
+                add_f_code(F_DUP_N);
+                add_byte(1);
+                add_byte(num_arg);
+                add_f_code(F_CALL_INHERITED);
+                add_short(ip_index);
+                add_short(i);
+                add_f_code(F_PUT_ARRAY_ELEMENT);
+                add_short(num_arg+2);
+                add_byte(calls);
+
+                CURRENT_PROGRAM_SIZE += (calls ? 12 : 13);
+            }
+            else
+            {
+                add_f_code(F_CALL_INHERITED_NOARGS);
+                add_short(ip_index);
+                add_short(i);
+                CURRENT_PROGRAM_SIZE += 5;
+            }
 
             /* Mark this function as called */
             was_called[ip_index] = MY_TRUE;
@@ -14796,11 +14872,66 @@ insert_inherited (char *super_name, string_t *real_name
         /* The calls above left their results on the stack.
          * Combine them into a single array (which might be empty).
          */
+        if (!num_arg)
         {
             PREPARE_INSERT(3)
             add_f_code(F_AGGREGATE);
             add_short(calls);
             CURRENT_PROGRAM_SIZE += 3;
+        }
+        else
+        {
+            /* Backpatch number of calls. */
+            put_short(__prepare_insert__p+1, calls);
+
+            /* And now a lot of backpatching, depending on how
+             * many calls we made.
+             */
+            if (!calls)
+            {
+                /* Remove our code altogether and add some to
+                 * remove the arguments and put an empty array
+                 * as a result on the stack.
+                 */
+                bytecode_p __PREPARE_INSERT__p = __prepare_insert__p;
+
+                add_f_code(F_POP_N);
+                add_byte(num_arg);
+                add_f_code(F_ARRAY0);
+                add_short(0);
+                /* 5 bytes like the original code. */
+            }
+            else if (calls == 1)
+            {
+                /* There was only one call, remove the F_DUP_N
+                 * call above and patch the F_PUT_ARRAY_ELEMENT
+                 * accordingly.
+                 */
+                memmove(__prepare_insert__p + 5,  __prepare_insert__p + 9, 9);
+                put_short(__prepare_insert__p + 11,  1);
+                put_uint8(__prepare_insert__p + 14, instrs[F_MOVE_VALUE].opcode);
+                put_uint8(__prepare_insert__p + 15, 0);
+
+                CURRENT_PROGRAM_SIZE -= 2;
+            }
+            else
+            {
+                /* In the last but one call an F_RESTORE_ARG_FRAME
+                 * has to be inserted. In the last call the F_DUP_N
+                 * must be removed.
+                 */
+                bytecode_p addr = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE - 16;
+                put_uint8(addr++, instrs[F_RESTORE_ARG_FRAME].opcode);
+                put_uint8(addr++, instrs[F_PUT_ARRAY_ELEMENT].opcode);
+                put_short(addr, num_arg+1); addr+=2;
+                put_uint8(addr++, calls-2);
+
+                memmove(addr, addr + 2, 9);
+                put_short(addr + 6, 1);
+                addr += 9;
+                put_uint8(addr++, instrs[F_MOVE_VALUE].opcode);
+                put_uint8(addr++, 0);
+            }
         }
 
         return first_index;

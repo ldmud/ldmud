@@ -236,6 +236,11 @@
         jump
         no_warn_deprecated
         array_range_check
+        array0
+        move_value
+        dup_n
+        pop_n
+        put_array_element
 
 /*---------------------------------------------------------------------------
  * efuns with a single-byte code.

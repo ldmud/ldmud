@@ -16098,6 +16098,91 @@ again:
         break;
     }
 
+    CASE(F_ARRAY0);                 /* --- array0 <size>  --- */
+    {
+        /* Push a zero-initialized array on the stack.
+         */
+
+        unsigned short size;
+        vector_t *v;
+
+        LOAD_SHORT(size, pc);
+        v = allocate_array(size);
+        push_array(sp, v);
+        break;
+    }
+
+    CASE(F_MOVE_VALUE);             /* --- move_value <offset>  --- */
+    {
+        /* Move sp[0] to sp[-offset-1] and the values sp[-1] to sp[-offset-1]
+         * one position up. This opcode also takes care of at most one
+         * argument frame.
+         */
+
+        int i, offset = LOAD_UINT8(pc);
+        svalue_t sv = sp[0];
+
+        for (i = 0; i >= -offset; i--)
+            sp[i] = sp[i-1];
+        sp[i] = sv;
+
+        if (ap == sp+1) // Argument frame moved?
+            ap = sp+i+1;
+        else if (ap > sp+i)
+            ap++;
+        break;
+    }
+
+    CASE(F_DUP_N);                  /* --- dup_n <offset> <num>  --- */
+    {
+        /* Copy <num> elements (ignoring the topmost <offset> elements)
+         * of the top of stack on top of the stack.
+         */
+
+        int offset, num;
+
+        offset = LOAD_UINT8( pc);
+        num = LOAD_UINT8(pc);
+
+        inter_sp = sp;
+        push_svalue_block(num, sp-offset-num+1);
+        sp = inter_sp;
+        break;
+    }
+
+    CASE(F_POP_N);                  /* --- pop_n <num>  --- */
+    {
+        /* Pop the <num> topmost elements off the stack.
+         */
+
+        pop_n_elems(LOAD_UINT8(pc));
+        break;
+    }
+
+    CASE(F_PUT_ARRAY_ELEMENT); /* --- put_array_element <offset> <ix>  --- */
+    {
+        /* Remove the top value off the stack und put it into the array
+         * at sp[-offset-1] at index <ix>.
+         */
+
+        unsigned short offset;
+        int ix;
+
+        LOAD_SHORT(offset, pc);
+        ix = LOAD_UINT8(pc);
+
+#ifdef DEBUG
+        if (sp[-offset-1].type != T_POINTER)
+            FATALF(("Illegal type '%s' for F_PUT_ARRAY_ELEMENT.\n"
+                   , typename(sp[-offset-1].type)
+                   ));
+#endif
+
+        transfer_svalue_no_free(sp[-offset-1].u.vec->item+ix, sp);
+        sp--;
+        break;
+    }
+
     /* --- Efuns: Miscellaneous --- */
 
     CASE(F_CLONEP);                 /* --- clonep              --- */
