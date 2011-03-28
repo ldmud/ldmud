@@ -4,8 +4,7 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/home/tubmud --bindir=/home/tubmud/mudbin --libdir=/ho
-me/tubmud/mudlib --libexec=/home/tubmud/mudbin/erqdir --with-setting=tubmud $*
+exec ./configure --prefix=/home/tubmud --bindir=/home/tubmud/mudbin --libdir=/home/tubmud/mudlib --libexec=/home/tubmud/mudbin/erqdir --with-setting=tubmud $*
 exit 1
 
 # --- Commandline argument defaults ---
