@@ -3997,8 +3997,12 @@ closure (char *in_yyp)
         int i;
 
         if ((i = symbol_operator(yyp, (const char **)&outp)) < 0)
+        {
             yyerror("Missing function name after #'");
-        yylval.closure.number = i + CLOSURE_EFUN_OFFS;
+            yylval.closure.number = CLOSURE_EFUN_OFFS;
+        }
+        else
+            yylval.closure.number = i + CLOSURE_EFUN_OFFS;
         yylval.closure.inhIndex = 0;
         return L_CLOSURE;
     }
