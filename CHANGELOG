@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Apr-2011 (Gnomi)
+  - Upon a parse error (eg. #';) the lexer returned a closure with an
+    illegal function index (instead of the one for F_ILLEGAL) that could
+    result in a crash later in the compiler.
+    (lex.c)
+
 08-Mar-2011 (Gnomi)
   - Allow wildcarded super calls with arguments. (fixes #257)
     (prolang.y, interpret.c)
