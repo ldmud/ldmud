@@ -220,7 +220,7 @@
 #    include <sys/mman.h>
 #endif
 
-#ifdef HAVE_MADVIE
+#ifdef HAVE_MADVISE
 #    define MADVISE(new,old)  madvise(new,old,MADV_RANDOM)
 #else
 #    define MADVISE(new,old)  NOOP
