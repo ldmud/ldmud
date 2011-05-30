@@ -69,14 +69,6 @@
 #    include <sys/select.h>
 #endif
 
-#ifdef WEXITSTATUS
-#    define wait_status_t int
-#else
-#    define wait_status_t union wait
-#    define WEXITSTATUS(status) ((status).w_retcode)
-#    define WTERMSIG(status) ((status).w_termsig)
-#endif
-
 #ifdef sun
 time_t time(time_t *);
 #endif
@@ -115,6 +107,8 @@ typedef int length_t;
 #ifndef ERQ_DEBUG
 #  define ERQ_DEBUG 0
 #endif
+
+typedef int wait_status_t;
 
 /*-------------------------------------------------------------------------*/
 
