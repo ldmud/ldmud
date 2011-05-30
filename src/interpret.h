@@ -255,7 +255,7 @@ extern void check_a_lot_ref_counts(program_t *search_prog);
 #endif
 
 // signal handler for profiling (SIGPROF)
-extern RETSIGTYPE handle_profiling_signal(int ignored);
+extern void handle_profiling_signal(int ignored);
 extern Bool set_profiling_time_limit(mp_int limit);
 extern mp_int get_profiling_time_limit();
 

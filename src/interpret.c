@@ -811,7 +811,7 @@ assign_eval_cost_inl(void)
 void assign_eval_cost(void) { assign_eval_cost_inl(); }
 
 /*-------------------------------------------------------------------------*/
-RETSIGTYPE
+void
 handle_profiling_signal(int ignored)
 /* signal handler for the SIGPROF signal. Just sets a flag which is checked in
  * eval_instruction() at the end of each instruction.

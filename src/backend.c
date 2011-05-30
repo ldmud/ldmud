@@ -304,7 +304,7 @@ do_state_check (int minlvl, const char *where)
 #endif
 
 /*-------------------------------------------------------------------------*/
-static RETSIGTYPE
+static void
 handle_signal (int sig)
 
 /* General signal handler: store the signal in a flag
@@ -314,9 +314,6 @@ handle_signal (int sig)
 {
     sigaddset(&pending_signals, sig);
     extra_jobs_to_do = MY_TRUE;
-#ifndef RETSIGTYPE_VOID
-    return 0;
-#endif
 } /* handle_signal() */
 
 /*-------------------------------------------------------------------------*/
@@ -913,7 +910,7 @@ ALARM_HANDLER(catch_alarm, alarm_called = MY_TRUE; comm_time_to_call_heart_beat 
 
 #else
 
-RETSIGTYPE
+void
 catch_alarm (int dummy UNUSED)
 {
 #ifdef __MWERKS__
@@ -922,9 +919,6 @@ catch_alarm (int dummy UNUSED)
     alarm_called = MY_TRUE;
     comm_time_to_call_heart_beat = MY_TRUE;
     total_alarms++;
-#ifndef RETSIGTYPE_VOID
-    return 0;
-#endif
 }
 
 #endif

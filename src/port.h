@@ -378,7 +378,7 @@ typedef char  CBool;
 
 #define HOST_DEPENDENT_INIT
 
-#define ALARM_HANDLER_PROT(name)  extern RETSIGTYPE name(int)
+#define ALARM_HANDLER_PROT(name)  extern void name(int)
 
 /* #undef ALARM_HANDLER(name, body): use default in backend.c */
 

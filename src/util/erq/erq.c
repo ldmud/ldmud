@@ -598,11 +598,11 @@ count_sigcld (int sig)
     if (!calling_signal)
     {
         calling_signal = 1;
-        (void)signal(SIGCLD, (RETSIGTYPE(*)())count_sigcld);
+        (void)signal(SIGCLD, (void(*)())count_sigcld);
         while (call_signal_again)
         {
             --call_signal_again;
-            (void)signal(SIGCLD, (RETSIGTYPE(*)())count_sigcld);
+            (void)signal(SIGCLD, (void(*)())count_sigcld);
         }
         calling_signal = 0;
     }
@@ -834,7 +834,7 @@ start_subserver (long server_num, long seed)
     childs_waited_for = 0;
 
     /* possible race conditions make switching the signal handler awkward */
-    (void)signal(SIGCLD, (RETSIGTYPE(*)())count_sigcld);
+    (void)signal(SIGCLD, (void(*)())count_sigcld);
 
     for (;;) /* The Loop (tm) */
     {
@@ -1548,7 +1548,7 @@ main (int argc, char **argv)
     FD_ZERO(&current_fds);
     FD_ZERO(&current_fds2);
     FD_SET(1, &current_fds);
-    (void)signal(SIGCLD, (RETSIGTYPE(*)())count_sigcld);
+    (void)signal(SIGCLD, (void(*)())count_sigcld);
 
     /* The main loop */
     
