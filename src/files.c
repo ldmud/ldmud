@@ -21,14 +21,6 @@
 extern int lstat(const char *, struct stat *);
 #endif
 
-#ifndef S_ISDIR
-#    define S_ISDIR(m) (((m)&S_IFMT) == S_IFDIR)
-#endif
-
-#ifndef S_ISREG
-#    define S_ISREG(m) (((m)&S_IFMT) == S_IFREG)
-#endif
-
 /*-------------------------------------------------------------------------*/
 
 #include "files.h"
