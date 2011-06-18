@@ -155,7 +155,6 @@ erq_rlookupv6(char *mesg, int msglen)
 
     memset(&req, 0, sizeof(struct addrinfo));
     req.ai_family = AF_INET6;
-    req.ai_flags = AI_CANONNAME;
     i = getaddrinfo(buf, NULL, &req, &ai);
     if (!i)
         for (ai2 = ai
@@ -163,19 +162,28 @@ erq_rlookupv6(char *mesg, int msglen)
                   && (ai2->ai_family != AF_INET6)
             ; ai2 = ai2->ai_next) NOOP;
 
-    if (!i && ai2 && ai2->ai_canonname)
+    if (!i && ai2)
     {
-        mbuff = malloc(strlen(ai2->ai_canonname)+1+buflen);
+        int res;
+        char *cbuff;
+
+        mbuff = malloc(buflen + 256);
         if (!mbuff)
         {
             free(buf);
+            freeaddrinfo(ai);
             reply1(get_handle(mesg), msg_nomem, strlen(msg_nomem)+1);
             return;
         }
-        strcpy(mbuff, buf);
-        strcat(mbuff, " ");
-        strcat(mbuff, ai2->ai_canonname);
-        reply1(get_handle(mesg), mbuff, strlen(mbuff)+1);
+        memcpy(mbuff, buf, buflen-1);
+        mbuff[buflen-1] = ' ';
+
+        res = getnameinfo(ai2->ai_addr, ai2->ai_addrlen, mbuff + buflen, 256, NULL, 0, NI_NAMEREQD);
+        if(!res)
+            reply1(get_handle(mesg), mbuff, strlen(mbuff)+1);
+        else
+            reply1(get_handle(mesg), msg_invalid, strlen(msg_invalid)+1);
+
         free(mbuff);
     }
     else
