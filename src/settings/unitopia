@@ -4,17 +4,17 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/UNItopia/mudadm/magyra --libexecdir=/UNItopia/mudadm/magyra/erq --libdir=/tmp --with-setting=unitopia $*
+exec ./configure --prefix=/UNItopia/mudadm/magyra --libexecdir=/UNItopia/mudadm/magyra/erq --libdir=/tmp --with-setting=unitopia EXTRA_CFLAGS=-m32 LDFLAGS=-m32 $*
 exit 1
 
 # --- The actual settings ---
 
 # --- Runtime limits ---
-with_max_array_size=5000
-with_max_mapping_keys=5000
-with_max_mapping_size=50000
-with_max_byte_transfer=50000
-with_read_file_max_size=50000
+with_max_array_size=10000
+with_max_mapping_keys=10000
+with_max_mapping_size=100000
+with_max_byte_transfer=100000
+with_read_file_max_size=100000
 with_write_buffer_max_size=524288
 
 # --- Timing ---
@@ -43,6 +43,7 @@ with_max_cost=500000
 # --- Communication ---
 with_portno=3333
 with_udp_port=3335
+enable_use_ipv6=yes
 enable_use_mccp=yes
 enable_use_tls=gnu
 with_tls_keyfile=no
