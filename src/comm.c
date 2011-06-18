@@ -537,8 +537,7 @@ static INLINE ssize_t comm_send_buf(char *msg, size_t size, interactive_t *ip);
 static inline void CREATE_IPV6_MAPPED(struct in_addr *v6, uint32 v4) {
   v6->s6_addr32[0] = 0;
   v6->s6_addr32[1] = 0;
-  v6->s6_addr32[2] = 0x0000ffff;
-  v6->s6_addr32[2] = 0xffff0000;
+  v6->s6_addr32[2] = htonl(0x0000ffff);
   v6->s6_addr32[3] = v4;
 }
 
@@ -1002,6 +1001,7 @@ initialize_host_ip_number (const char *hname, const char * haddr)
     {
         struct hostent *hp;
 
+#ifndef USE_IPV6
         hp = gethostbyname(host_name);
         if (!hp) {
             fprintf(stderr, "%s gethostbyname: unknown host '%s'.\n"
@@ -1010,6 +1010,25 @@ initialize_host_ip_number (const char *hname, const char * haddr)
         }
         memcpy(&host_ip_addr_template.sin_addr, hp->h_addr, (size_t)hp->h_length);
         host_ip_addr_template.sin_family = (unsigned short)hp->h_addrtype;
+#else
+        hp = gethostbyname2(host_name, AF_INET6);
+        if (!hp)
+            hp = gethostbyname2(host_name, AF_INET);
+        if (!hp)
+        {
+            fprintf(stderr, "%s gethostbyname2: unknown host '%s'.\n"
+                          , time_stamp(), host_name);
+            exit(1);
+        }
+        memcpy(&host_ip_addr_template.sin_addr, hp->h_addr, (size_t)hp->h_length);
+
+        if (hp->h_addrtype == AF_INET)
+        {
+            CREATE_IPV6_MAPPED(&host_ip_addr_template.sin_addr, *(u_int32_t*)hp->h_addr_list[0]);
+        }
+        host_ip_addr_template.sin_family = AF_INET6;
+#endif
+
         host_ip_number = host_ip_addr_template.sin_addr;
 
         /* Now set the template to the proper _ANY value */
@@ -6798,7 +6817,7 @@ f_send_udp (svalue_t *sp)
 
         if (hp->h_addrtype == AF_INET)
         {
-            CREATE_IPV6_MAPPED(&name.sin_addr, (u_int32_t)hp->h_addr_list[0]);
+            CREATE_IPV6_MAPPED(&name.sin_addr, *(u_int32_t*)hp->h_addr_list[0]);
         }
         name.sin_family = AF_INET6;
 #endif /* USE_IPV6 */

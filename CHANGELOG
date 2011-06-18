@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all glory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Jun-2011 (Gnomi)
+  - Corrected handling of IPv4 addresses with USE_IPV6.
+    (comm.c)
+
 28-Apr-2011 (Gnomi)
   - Upon a parse error (eg. #';) the lexer returned a closure with an
     illegal function index (instead of the one for F_ILLEGAL) that could

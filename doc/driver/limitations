@@ -66,3 +66,11 @@ Memory management
 * max. size of single large block in slaballo.c and smalloc.c:
   0x07ffffff (134217727, defined by M_MASK)
 
+
+Language
+========
+* maximum number of simul-efuns: 2048
+  Only values 0xf800-0xffff in .x.closure_type of
+  a T_CLOSURE svalue are reserved for simul-efuns.
+  F_SIMUL_EFUN however takes a short int, so there 65536
+  simul-efuns would be possible.
