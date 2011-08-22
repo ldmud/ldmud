@@ -137,13 +137,14 @@ ADVANCED USAGE
 
         * Wildcarded multiple inheritance
 
-        LDMUD 3.2.1@117 introduces an advanced voodoo syntax which allows
-        you to call several methods in model classes at once, but for some
-        technical reasons it cannot pass any arguments. This works by
+        LDMud 3.2.1@117 introduces an advanced voodoo syntax which allows
+        you to call several methods in model classes at once. This works by
         writing a glob type match ('*' and '?' wildcards) into the string
-        in front of the double colon, as in "*"::create(). I wouldn't
-        recommend you to use this, it's better to be clearly conscious of
-        what you inherit and do. But if you're desperate, there you go.
+        in front of the double colon, as in "*"::create().
+        I wouldn't recommend you to use this, it's better to be clearly
+        conscious of what you inherit and do. But if you're desperate, there
+        you go.
+        Since LDMud 3.5.0 it is possible to pass arguments as well.
 
 ADVANCED EXAMPLE
 
