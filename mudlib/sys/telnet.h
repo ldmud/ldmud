@@ -99,11 +99,14 @@ char *telcmds[] = {
 #define  TELOPT_LFLOW         33        /* remote flow control */
 #define  TELOPT_LINEMODE      34        /* Linemode option */
 #define  TELOPT_XDISPLOC      35        /* X Display Location */
-#define	 TELOPT_ENVIRON	      36        /* Environment opt for Port ID */
+#define  TELOPT_ENVIRON	      36        /* Environment opt for Port ID */
 #define  TELOPT_AUTHENTICATION 37       /* authentication */
 #define  TELOPT_ENCRYPT       38        /* authentication */
-#define	 TELOPT_NEWENV        39        /* Environment opt for Port ID */
+#define  TELOPT_NEWENV        39        /* Environment opt for Port ID */
 #define  TELOPT_STARTTLS      46        /* Transport Layer Security */
+#define  TELOPT_KERMIT        47        /* Telnet KERMIT */
+#define  TELOPT_SEND_URL      48        /* Send URL */
+#define  TELOPT_EXOPL        255        /* extended-options-list */
 
 /* Inofficial, mud specific telnet options */
 #define  TELOPT_MSSP          70        /* Mud Server Status Protocol */
@@ -114,7 +117,6 @@ char *telcmds[] = {
 #define  TELOPT_ZMP           93        /* Zenith Mud Protocol */
 #define  TELOPT_MUSHCLIENT   102        /* Mushclient/Aardwolf Protocol */
 #define  TELOPT_ATCP         200        /* Achaea Telnet Client Protocol */
-#define  TELOPT_EXOPL        255        /* extended-options-list */
 
 #define  NTELOPTS            256        /* was: (1+TELOPT_NEWENV) */
 
@@ -133,8 +135,8 @@ char *telopts[NTELOPTS]
    , "TSPEED", "LFLOW", "LINEMODE", "XDISPLOC"
    , "ENVIRON", "AUTH", "ENCRYPT", "NEWENV"
    , "TELOPT 40", "TELOPT 41", "TELOPT 42", "TELOPT 43"
-   , "TELOPT 44", "TELOPT 45", "STARTTLS", "TELOPT 47"
-   , "TELOPT 48", "TELOPT 49", "TELOPT 50", "TELOPT 51"
+   , "TELOPT 44", "TELOPT 45", "STARTTLS", "TELOPT_KERMIT"
+   , "TELOPT_SEND_URL", "TELOPT 49", "TELOPT 50", "TELOPT 51"
    , "TELOPT 52", "TELOPT 53", "TELOPT 54", "TELOPT 55"
    , "TELOPT 56", "TELOPT 57", "TELOPT 58", "TELOPT 59"
    , "TELOPT 60", "TELOPT 61", "TELOPT 62", "TELOPT 63"
