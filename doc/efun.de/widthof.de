@@ -6,7 +6,7 @@ BESCHREIBUNG
         ist das Resultat 0.
 
 BEISPIELE
-        mapping map = (["foo" : 1,2]);
+        mapping map = (["foo" : 1;2]);
         widthof(map)    ergibt 2.
 
 GESCHICHTE
