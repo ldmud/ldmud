@@ -6,7 +6,7 @@ BESCHREIBUNG
         durch catch() aufgerufen wurde, liefert dieses catch() <arg> als
         Fehlercode, sonst wird <arg> als Fehlermeldung ausgegeben.
 
-        raise_error() gleich in der Funktion throw(), aber waehrend throw()
+        raise_error() gleicht in der Funktion throw(), aber waehrend throw()
         aus catch() heraus aufgerufen werden soll, kann raise_error() von
         ueberall her aufgerufen werden.
 
