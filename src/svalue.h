@@ -59,9 +59,15 @@ union u {
     lambda_t *lambda;
       /* T_CLOSURE: allocated closures: the closure structure.
        */
+#ifdef FLOAT_FORMAT_2
+    double  float_number;
+    /* T_FLOAT: the double value for this float in FLOAT_FORMAT_2.
+     */
+#else
     int32_t mantissa;
       /* T_FLOAT: The mantissa (or at least one half of the float bitpattern).
        */
+#endif // FLOAT_FORMAT_2
     callback_t *cb;
       /* T_CALLBACK: A callback structure referenced from the stack
        *   to allow proper cleanup during error recoveries. The interpreter
@@ -140,7 +146,9 @@ struct svalue_s
 {
     ph_int type;  /* Primary type information */
     union {       /* Secondary type information */
+#ifndef FLOAT_FORMAT_2
         int16_t exponent;    /* Exponent of a T_FLOAT */
+#endif
         ph_int closure_type; /* Type of a T_CLOSURE */
         ph_int lvalue_type;  /* Type of a T_LVALUE */
         ph_int quotes;       /* Number of quotes of a quoted array or symbol */
@@ -349,53 +357,66 @@ struct svalue_s
  * defined:
  *
  *   int FLOAT_FORMAT:
- *     0 for the portable format, 1 for the fast format.
+ *     0 for the old, tradition format with 48 bit floats
+ *     1 for an old, now removed format
+ *     2 for using native doubles
  *     Additional numbers may be defined for more formats.
  *
  *   double READ_DOUBLE(struct svalue * sp)
  *     Return the floating point number stored in *sp.
  *
- *   long SPLIT_DOUBLE (double d, int * p)
+ *   int32_t SPLIT_DOUBLE (double d, int * p)
  *     Store the bytes 4..5 of <d> to the address given in <p>, and
  *     return the bytes 0..3 of <d> as a long.
  *     Used by the compiler to generate F_FLOAT instructions.
  *     TODO: This code makes heave assumptions about data sizes and layout
  *     TODO:: of integral types.
  *
- *   unknown STORE_DOUBLE (struct svalue * dest, double d)
+ *   void STORE_DOUBLE (struct svalue * dest, double d)
  *     Store the float <d> into the svalue *dest.
  *
  *   STORE_DOUBLE_USED
- *     Declaration of a local variable which STORE_DOUBLE needs.
+ *     UNUSED and defined empty.
+ *     Did declare a local variable which STORE_DOUBLE needed.
  */
-
-
-/* --- The portable format, used if no other format is defined */
-
-#ifndef STORE_DOUBLE
-
-#define FLOAT_FORMAT_0
-
-static INLINE double READ_DOUBLE(svalue_t *sv) {
-    return ldexp( (double)(sv->u.mantissa), sv->x.exponent - 31 );
-}
-/* if your machine doesn't use the exponent to designate powers of two,
-   the use of ldexp in SPLIT_DOUBLE won't work; you'll have to multiply
-   with 32768. in this case */
-
-static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
-    return (int32_t)ldexp( frexp( doublevalue, int_p ), 31);
-}
 
 // STORE_DOUBLE_USED is not needed anymore and defined empty.
 #define STORE_DOUBLE_USED
-static INLINE void STORE_DOUBLE(svalue_t *dest, double doublevalue) {
-    int exponent;
-    dest->u.mantissa = SPLIT_DOUBLE(doublevalue, &exponent);
-    dest->x.exponent = exponent;
-}
 
-#endif /* ifndef STORE_DOUBLE */
+// used for joining/splitting the native, internal format used in FLOAT_FORMAT_0
+// into a native double. Needed in all FLOAT_FORMAT_* because this is used
+// during save_/restore_svalue() for saving/restoring older savefile versions.
+static INLINE double JOIN_DOUBLE(int32_t mantissa, int16_t exponent) {
+    return ldexp( (double)(mantissa), exponent - 31 );
+}
+static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
+    return (int32_t)ldexp( frexp( doublevalue, int_p ), 31);
+}
+/* if your machine doesn't use the exponent to designate powers of two,
+ the use of ldexp in SPLIT_DOUBLE won't work; you'll have to multiply
+ with 32768. in this case */
+
+#ifdef FLOAT_FORMAT_2
+    static INLINE double READ_DOUBLE(svalue_t *sv) {
+        return sv->u.float_number;
+    }
+
+    static INLINE void STORE_DOUBLE(svalue_t *dest, double doublevalue) {
+        dest->u.float_number = doublevalue;
+    }
+#else
+/* --- The portable format, used if no other format is defined */
+#   define FLOAT_FORMAT_0
+    static INLINE double READ_DOUBLE(svalue_t *sv) {
+        return JOIN_DOUBLE(sv->u.mantissa, sv->x.exponent);
+    }
+
+    static INLINE void STORE_DOUBLE(svalue_t *dest, double doublevalue) {
+        int exponent;
+        dest->u.mantissa = SPLIT_DOUBLE(doublevalue, &exponent);
+        dest->x.exponent = exponent;
+    }
+#endif // FLOAT_FORMAT_2
 
 /* --- svalue macros --- */
 

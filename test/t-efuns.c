@@ -172,7 +172,10 @@ mixed *tests = ({
     ({ "implode 1", 0, (: implode(({ "foo", "bar", "" }), "*") == "foo*bar*":) }),
     ({ "implode 2", 0, (: implode(({ "a", 2, this_object(), "c" }), "b") == "abc" :) }),
     ({ "implode 3", 0, (: implode(({ "", "" }), "") == "":) }),
-
+    ({ "save_/restore_value 1", 0, 
+        (: restore_value(save_value(__FLOAT_MAX__)) == __FLOAT_MAX__ :) }),
+    ({ "save_/restore_value 2", 0, 
+        (: restore_value(save_value(__FLOAT_MIN__)) == __FLOAT_MIN__ :) }),
     ({ "sort_array 1", 0, (: deep_eq(sort_array(({4,5,2,6,1,3,0}),#'>),
                                      ({0,1,2,3,4,5,6})) :) }),
     ({ "sort_array 2", 0, // sort in-place

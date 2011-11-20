@@ -759,6 +759,7 @@ AC_CHECK_SIZEOF(long)
 AC_CHECK_SIZEOF(long long)
 AC_CHECK_SIZEOF(intptr_t)
 AC_CHECK_SIZEOF(intmax_t)
+AC_CHECK_SIZEOF(double)
 
 
 # Checking for programs

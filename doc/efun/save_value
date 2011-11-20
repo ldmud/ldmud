@@ -13,6 +13,10 @@ DESCRIPTION
             0: original format, used by Amylaar LPMud and LDMud <= 3.2.8 .
             1: LDMud >= 3.2.9: no-lambda closures, symbols, quoted arrays
                  can be saved.
+            2: LDMUd >= 3.5.0: floats are stored in a different way, which is
+                 more compact and can store the new floats losslessly.
+
+        It is recommended to use version 2 or higher.
 
         The created string consists of two lines, each terminated with
         a newline character: the first line describes the format used to
@@ -27,6 +31,7 @@ HISTORY
         LDMud 3.2.9 added the saving of non-lambda closures, symbols,
           and quoted arrays, using the new savefile format version 1.
         LDMud 3.2.10 added the <format> argument.
-
+        LDMud 3.5.0 added savefile format version 2.
+        
 SEE ALSO
         restore_value(E), restore_object(E), save_object(E)

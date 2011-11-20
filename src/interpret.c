@@ -8694,43 +8694,34 @@ again:
         /* Push the float 0.0 onto the stack.
          * The binary format is the one determined by STORE_DOUBLE in
          * datatypes.h
-         * TODO: This code makes heavy assumptions about data sizes and
-         * TODO:: layout. E.g. there need not be a 16-Bit integral type
-         * TODO:: available.
-         * TODO: It should be rewritten to use the LOAD_ macros (but
-         * TODO:: then the compiler needs to use them, too.
          */
-
-        double zero = 0.0;
-        STORE_DOUBLE_USED
 
         sp++;
         sp->type = T_FLOAT;
-        STORE_DOUBLE(sp, zero);
+        STORE_DOUBLE(sp, 0.0);
         break;
     }
 
     CASE(F_FLOAT);                  /* --- float <mant> <exp>  --- */
+                                    /* --- float double  --- */
     {
-        /* Push the float build from <mant> (4 bytes) and <exp> (2 bytes)
-         * onto the stack. The binary format is the one determined
-         * by STORE_DOUBLE in datatypes.h
-         * TODO: This code makes heavy assumptions about data sizes and
-         * TODO:: layout. E.g. there need not be a 16-Bit integral type
-         * TODO:: available.
-         * TODO: short doesn't to be a 16 bit wide type (which the float format
-         * TODO:: expects). LOAD_INT16 would be nice (change in compiler as well).
+        /* Push a float onto the stack. The binary format is the one determined
+         * by STORE_DOUBLE in svalue.h.
+         * The float is either build from <mant> (4 bytes) and <exp> (2 bytes)
+         * or a double (8 bytes) is directly read from the bytecode.
          */
-
-        int32_t mantissa;
-        int16_t exponent;
 
         sp++;
         sp->type = T_FLOAT;
-        mantissa = load_uint32(&pc);
-        exponent = load_uint16(&pc);
+#ifdef FLOAT_FORMAT_2
+        STORE_DOUBLE(sp,load_double(&pc));
+#else
+        // TODO: It would be reasonable to use JOIN_DOUBLE + STORE_DOUBLE here.
+        int32_t mantissa = load_uint32(&pc);
+        int16_t exponent = load_uint16(&pc);
         sp->u.mantissa = mantissa;
         sp->x.exponent = exponent;
+#endif // FLOAT_FORMAT_2
         break;
     }
 

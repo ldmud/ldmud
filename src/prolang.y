@@ -1962,6 +1962,23 @@ ins_uint32 (uint32_t l)
 } /* ins_uint32() */
 
 /*-------------------------------------------------------------------------*/
+static void
+ins_double (double d)
+/* Add the double <d> to the A_PROGRAM area.
+ */
+{
+    if (realloc_a_program(sizeof(double)))
+    {
+        put_double(PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE, d);
+        CURRENT_PROGRAM_SIZE += sizeof(double);
+    }
+    else
+    {
+        yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
+                 , CURRENT_PROGRAM_SIZE + sizeof(double));
+    }
+} /* ins_double() */
+/*-------------------------------------------------------------------------*/
 static void upd_uint32 (bc_offset_t offset, uint32_t l) UNUSED;
 static void
 upd_uint32 (bc_offset_t offset, uint32_t l)
@@ -10219,13 +10236,16 @@ expr4:
       {
           /* Generate a float literal */
 
-          int exponent;
-
           $$.start = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
           ins_f_code(F_FLOAT);
+#ifdef FLOAT_FORMAT_2
+          ins_double($1);
+#else
+          int exponent;
           ins_uint32 ( SPLIT_DOUBLE( $1, &exponent) );
           ins_uint16 ( exponent );
+#endif  // FLOAT_FORMAT_2
           $$.type = Type_Float;
       }
 

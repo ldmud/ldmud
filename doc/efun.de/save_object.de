@@ -24,6 +24,12 @@ BESCHREIBUNG
              0: das Originalformat nach Amylaar's LPMud und LDMud <=3.2.8
              1: LDMud >= 3.2.9: Non-Lambda Closures, Symbole und gequotete
                 Arrays koennen gespeichert werden
+             2: LDMUd >= 3.5.0: Gleitkommazahlen werden in einem neuen Format
+                geschrieben, welches kompakter ist die Gleitkommazahlen aus
+                3.5.x verlustfrei speichern kann.
+        
+        Es wird empfohlen, die Angabe des Formats wegzulassen oder in Version
+        2 (oder hoeher) zu speichern.
 
         Eine Variable wird als 'speicherbar' betrachtet, wenn sie nicht als
         'nosave' oder 'static' deklariert ist.
@@ -37,6 +43,7 @@ GESCHICHTE
             Closures, Symbolen und gequoteten Arrays. Dazu wurde ein neues
             Format fuer die Speicherdatei eingefuehrt.
         LDMud 3.2.10 fuehrte das Argument <format> ein.
+        LDMud 3.5.0 fuehrte Formatversion 2 ein.
 
 SIEHE AUCH
         restore_object(E), save_value(E)

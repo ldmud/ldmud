@@ -37,3 +37,10 @@ that you should pay attention to when updating.
   compiler will issue a warning. The same occurs in symbol_function(),
   symbol_variable() and call_other/call_direct/call_resolved().
 
+- LPC types
+  + the 'float' type on 64 bit platforms (specifically LP64) has a higher
+    precision and larger value ranges, because the driver uses the native
+    'double' types of the host system to store them. On most host systems they
+    conform to the IEEE 754 double precision floating point format.
+    WARNING: If you want to save them losslessly with save_object/save_value(),
+             you MUST use savefile format version 2 or higher!

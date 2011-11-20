@@ -5428,15 +5428,17 @@ f_transfer (svalue_t *sp)
 /* The 'version' of each savefile is given in the first line as
  *   # <version>:<host>
  *
- * <version> is currently 1
+ * <version> is currently 2
  *    Version 0 didn't allow the saving of non-lambda closures, symbols
  *    or quoted arrays.
- * <host> is 1 for Atari ST and Amiga, and 0 for everything else.
- *    The difference lies in the handling of float numbers (see datatypes.h).
+ *    Version 2 uses only one representation for storing LPC floats:
+ *     the one used by sprintf("%la").
+ * <host> is 2 for drivers using the FLOAT_FORMAT_2, and 0 for everything else.
+ *    The difference lies in the handling of float numbers (see svalue.h).
  */
 
-#define SAVE_OBJECT_VERSION '1'
-#define CURRENT_VERSION 1
+#define SAVE_OBJECT_VERSION '2'
+#define CURRENT_VERSION 2
   /* Current version of new save files, expressed as char and as int.
    */
 
@@ -5445,11 +5447,10 @@ f_transfer (svalue_t *sp)
 #    define CURRENT_HOST 0
 #endif
 
-#ifdef FLOAT_FORMAT_1
-#    define SAVE_OBJECT_HOST '1'
-#    define CURRENT_HOST 1
+#ifdef FLOAT_FORMAT_2
+#    define SAVE_OBJECT_HOST '2'
+#    define CURRENT_HOST 2
 #endif
-
 
 /*-------------------------------------------------------------------------*/
 /* Forward Declarations */
@@ -5481,8 +5482,8 @@ static struct pointer_table *ptable = NULL;
    */
 
 static char number_buffer[36];
-  /* Buffer to create numbers in - big enough for 64 Bit uints and our 48 Bit
-   * floats.
+  /* Buffer to create numbers in - big enough for 64 Bit uints, our 48 Bit
+   * floats and the native doubles used in FLOAT_FORMAT_2.
    */
 
 static char *save_object_bufstart;
@@ -5522,6 +5523,10 @@ struct restore_context_s {
 
     int restored_host;
       /* Type of the host which wrote the savefile being restored.
+       */
+    
+    int restored_version;
+      /* Version used in the savefile/string currently being restored.
        */
 
     long current_shared_restored;
@@ -6280,19 +6285,33 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
 
         L_PUTC_PROLOG
         char *source, c;
-
+        
+        double dtmpval = READ_DOUBLE(v);
+        
         source = number_buffer;
-        // Casting to uint16_t is done because PRIx16 on some systems is %x, not
-        // %hx, although int16_t is a short. That causes conversion of the 
-        // exponent to signed integer and in case of negative exponents wrong 
-        // data and too many chars will be written (ffffffff instead of ffff).
-        // And because on the same system SCNx16 is "%hx", different values 
-        // would be restored than written.
-        // Casting to unsigned keeps the bit pattern.
-        (void)snprintf(source, sizeof(number_buffer)
-                     ,  "%.12e=%"PRIx16":%"PRIx32
-                     , READ_DOUBLE(v), (uint16_t)v->x.exponent
-                     , (int32_t)v->u.mantissa);
+        
+        if (save_version >= 2)
+        {
+            (void)snprintf(source, sizeof(number_buffer),
+                          "%la", dtmpval);
+        }
+        else
+        {
+            int32_t mantissa;
+            int exponent;
+            mantissa = SPLIT_DOUBLE(dtmpval, &exponent);
+            // Casting to uint16_t is done because PRIx16 on some systems is %x, not
+            // %hx, although int16_t is a short. That causes conversion of the 
+            // exponent to signed integer and in case of negative exponents wrong 
+            // data and too many chars will be written (ffffffff instead of ffff).
+            // And because on the same system SCNx16 is "%hx", different values 
+            // would be restored than written.
+            // Casting to unsigned keeps the bit pattern.
+            (void)snprintf(source, sizeof(number_buffer)
+                         ,  "%.12e=%"PRIx16":%"PRIx32
+                         , dtmpval, (uint16_t)exponent
+                         , (int32_t)mantissa);
+        }
         c = *source++;
         do L_PUTC(c) while ( '\0' != (c = *source++) );
         L_PUTC(delimiter);
@@ -8327,44 +8346,56 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         char c, *numstart = cp;
         int nega = 0;
         long l = 0;
+        double dval;
 
         if (*cp == '-')
         {
             nega = 1;
             cp++;
         }
-
-        while(lexdigit(c = *cp++)) l = (((l << 2) + l) << 1) + (c - '0');
-        if (c != '.')
+        
+        while(lexdigit(c = *cp++))
+            l = (((l << 2) + l) << 1) + (c - '0');
+        
+        if ( (restore_ctx->restored_version >= 2  && c != 'x')
+            || (restore_ctx->restored_version < 2 && c != '.' ) )
         {
             put_number(svp, nega ? -l : l);
             *pt = cp;
             return c == delimiter;
         }
-
-        /* If a float was written by the same host type as we are using,
-         * restore the internal representation.
-         * Otherwise, parse the float normally.
-         */
+        
         svp->type = T_FLOAT;
-        if ( NULL != (cp = strchr(cp, '=')) &&  restore_ctx->restored_host == CURRENT_HOST)
+        if (restore_ctx->restored_version >= 2 )
         {
-            cp++;
-            int32_t mantissa;
-            int16_t exponent;
-            if (sscanf(cp, "%"SCNx16":%"SCNx32, &exponent, &mantissa) != 2)
-                return 0;
-            svp->x.exponent=exponent;
-            svp->u.mantissa=mantissa;
+            // In version 2 (and above) restore the string written by sprintf("%a")
+            cp = numstart;
+            dval = strtod(cp, &cp);
         }
         else
         {
-            STORE_DOUBLE_USED
-            double d;
-
-            d = atof(cp = numstart);
-            STORE_DOUBLE(svp, d);
+            /* If a float was written by the same host type as we are using,
+             * restore the internal representation.
+             * Otherwise, parse the float normally.
+             */
+            cp = strchr(cp, '=');
+            if (restore_ctx->restored_host == CURRENT_HOST 
+                && NULL != cp)
+            {
+                ++cp;
+                int32_t mantissa;
+                int16_t exponent;
+                if (sscanf(cp, "%"SCNx16":%"SCNx32, &exponent, &mantissa) != 2)
+                    return 0;
+                dval = JOIN_DOUBLE(mantissa, exponent);
+            }
+            else
+            {
+                cp = numstart;
+                dval = atof(cp);
+            }
         }
+        STORE_DOUBLE(svp,dval);
         cp = strchr(cp, delimiter);
         *pt = cp+1;
         return cp != NULL;
@@ -8593,7 +8624,6 @@ f_restore_object (svalue_t *sp)
 
 {
 static int nesting = 0;  /* Used to detect recursive calls */
-    int restored_version; /* Formatversion of the saved data */
     char *name;      /* Full name of the file to read */
     char *file;      /* Filename passed, NULL if restoring from a string */
     int   lineno;    /* Line number in file, for error messages */
@@ -8650,6 +8680,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
     rcp->filename = NULL;
 
     ctx->restored_host = -1;
+    ctx->restored_version = -1;
     ctx->current_shared_restored = 0;
     ctx->shared_restored_values = NULL;
     ctx->previous = restore_ctx;
@@ -8800,8 +8831,6 @@ static int nesting = 0;  /* Used to detect recursive calls */
   
     num_var = ob->prog->num_variables;
     var_rest = 0;
-    restored_version = -1;
-    ctx->restored_host = -1;
 
     /* Loop until we run out of text to parse */
 
@@ -8846,8 +8875,8 @@ static int nesting = 0;  /* Used to detect recursive calls */
             {
                 int i;
 
-                i = sscanf(cur+1, "%d:%d", &restored_version, &(ctx->restored_host));
-                if (i > 0 && (i == 2 || restored_version >= CURRENT_VERSION) )
+                i = sscanf(cur+1, "%d:%d", &(ctx->restored_version), &(ctx->restored_host));
+                if (i > 0 && (i == 2 || ctx->restored_version >= CURRENT_VERSION) )
                 {
                     if (pt)
                         cur = pt+1;
@@ -8967,7 +8996,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
         /* ...and set it to the new one */
 
         pt = space+1;
-        if ( (restored_version < 0 && pt[0] == '\"')
+        if ( (ctx->restored_version < 0 && pt[0] == '\"')
              ? !old_restore_string(v, pt)
              : !restore_svalue(v, &pt, '\n')
            )
@@ -9062,7 +9091,6 @@ f_restore_value (svalue_t *sp)
  */
 
 {
-    int        restored_version; /* Formatversion of the saved data */
     char      *buff;  /* The string to parse */
     char      *p;
     svalue_t  *arg;   /* pointer to the argument on the stack - for convenience */
@@ -9096,6 +9124,7 @@ f_restore_value (svalue_t *sp)
     rcp->buff = NULL;
 
     ctx->restored_host = -1;
+    ctx->restored_version = -1;
     ctx->current_shared_restored = 0;
     ctx->shared_restored_values = NULL;
     ctx->previous = restore_ctx;
@@ -9124,8 +9153,6 @@ f_restore_value (svalue_t *sp)
         rcp->buff = buff;
     }
 
-    restored_version = -1;
-
     /* Initialise the shared value table */
 
     ctx->max_shared_restored = 64;
@@ -9142,7 +9169,7 @@ f_restore_value (svalue_t *sp)
     {
         int i;
 
-        i = sscanf(buff+1, "%d:%d", &restored_version, &(ctx->restored_host));
+        i = sscanf(buff+1, "%d:%d", &(ctx->restored_version), &(ctx->restored_host));
 
         /* Advance to the next line */
         p = strchr(buff, '\n');
@@ -9159,7 +9186,7 @@ f_restore_value (svalue_t *sp)
 
     /* Now parse the value in buff[] */
 
-    if ( (restored_version < 0 && p[0] == '\"')
+    if ( (ctx->restored_version < 0 && p[0] == '\"')
          ? !old_restore_string(sp, p)
          : !restore_svalue(sp, &p, '\n')
        )

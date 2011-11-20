@@ -11,7 +11,8 @@ for x in \
     unsigned\ short/short \
     bytecode_t/code \
     bc_offset_t/bc_offset \
-    bc_shortoffset_t/bc_shortoffset
+    bc_shortoffset_t/bc_shortoffset \
+    double/double
 do
     type=$(echo $x | sed -e 's/\/.*//')
     suffix=$(echo $x | sed -e 's/.*\///')
@@ -51,5 +52,6 @@ static INLINE $type rstore_$suffix(bytecode_p *p, $type c)
     put_$suffix(*p, c);
     return c;
 }
+
 EOF
 done

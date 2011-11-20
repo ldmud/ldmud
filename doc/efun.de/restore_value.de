@@ -4,14 +4,20 @@ SYNOPSIS
 BESCHREIBUNG
         Wandelt die String-Entsprechung <str> eines Wertes zurueck in den Wert
         selbst und gibt diesen Wert zurueck. <str> ist ein String, wie er von
-        save_value() erzeugt wird. Die Spezifikation des Speicherformates
-        '#x:y' ist optional.
+        save_value() erzeugt wird.
+        
+        Die Spezifikation des Speicherformates '#x:y' ist optional. Allerdings
+        nimmt der Driver in diesem Fall das aelteste Format (Version 0) an.
+        In neu gespeicherten Werten sollte die Formatspezifikation daher nicht
+        als optional angesehen werden.
 
 GESCHICHTE
         Eingefuehrt in LDMud 3.2.8.
         Mit LDMud 3.2.9 kam das Laden von Non-Lambda Closures, Symbolen und
         gequoteten Arrays hinzu, wozu ein neues Format fuer die Speicherdatei
         verwendet wird.
-
+        LDMud 3.5.0 unterstuetzt das Einlesen von Formatversion 2 mit hoeherer
+        Praezision der Gleitkommazahlen.
+        
 SIEHE AUCH
         save_value(E), restore_object(E), save_object(E)

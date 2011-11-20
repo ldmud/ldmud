@@ -192,4 +192,11 @@ extern unsigned char _my_ctype[];
  */
 #define USE_NEW_INLINES 1
 
+/* Select the float format to use. If the p_int are anyway as large as doubles,
+ * we just use native double in svalues.
+ */
+#if SIZEOF_PINT >= SIZEOF_DOUBLE && !defined(FLOAT_FORMAT_0) && !defined(FLOAT_FORMAT_2)
+#   define FLOAT_FORMAT_2 1
+#endif
+
 #endif /* DRIVER_H__ */

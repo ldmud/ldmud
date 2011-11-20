@@ -12,6 +12,12 @@ BESCHREIBUNG
              0: das Originalformat nach Amylaar's LPMud und LDMud <=3.2.8
              1: LDMud >= 3.2.9: Non-Lambda Closures, Symbole und gequotete
                 Arrays koennen gespeichert werden
+             2: LDMUd >= 3.5.0: Gleitkommazahlen werden in einem neuen Format
+                geschrieben, welches kompakter ist die Gleitkommazahlen aus
+                3.5.x verlustfrei speichern kann.
+        
+        Es wird empfohlen, die Angabe des Formats wegzulassen oder in Version
+        2 (oder hoeher) zu speichern.
 
         Der erzeugte String besteht aus zwei Zeilen, die jeweils mit einem
         Zeilenumbruch enden. Die erste Zeile beschreibt das Format, in dem der
@@ -27,6 +33,7 @@ GESCHICHTE
             Closures, Symbole und gequotete Arrays zu speichern. Dazu wurde
             ein neues Format fuer den String eingefuehrt.
         LDMud 3.2.10 fuehrte das Argument <format> ein.
+        LDMud 3.5.0 fuehrte Formatversion 2 ein.
 
 SIEHE AUCH
         restore_value(E), restore_object(E), save_object(E)

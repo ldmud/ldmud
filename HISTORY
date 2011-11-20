@@ -107,6 +107,9 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
        + A new modifier 'deprecated' can be used to mark lfuns, sefuns and
          global variable as deprecated. Using/Calling them will cause
          warnings.
+       + 'float' variables on LP64 architectures (64 bit) now have the same 
+         precision as 'double' in C (the driver uses internally 'double'
+         instead of the traditional self-built format).
 
     - Networking
        + UDP datagrams with lengths up to 65507 (including UDP and IPv4
@@ -123,6 +126,11 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          --sync-heart     -> --synchronous-heart-beat
          --async-heart    -> --asynchronous-heart-beat
          --no-heart       -> --no-heart-beat
+       + A new savefile format (version 2) was added to store the new 'double'
+         floats losslessly. It additionally is simpler to write/restore and
+         makes the savefiles more compact because only one representation of
+         the float value is stored.
+
 
 30-May-2009 (LDMud Team) -- 3.3.719
     - Fixed Crashes:
