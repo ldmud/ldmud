@@ -8370,7 +8370,12 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         {
             // In version 2 (and above) restore the string written by sprintf("%a")
             cp = numstart;
+            errno = 0;
             dval = strtod(cp, &cp);
+            if (errno == ERANGE)
+            {
+                warnf("Floating point number out of range in restore_svalue().\n");
+            }
         }
         else
         {
