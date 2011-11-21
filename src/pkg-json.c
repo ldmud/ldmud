@@ -103,6 +103,17 @@ ldmud_json_parse (svalue_t *sp, struct json_object *jobj)
     case json_type_int:
         put_number(sp, json_object_get_int(jobj));
         break;
+#ifdef JSON_64_SUPPORT
+    case json_type_int64:
+        int64_t val = json_object_get_int64(jobj);
+#if SIZEOF_PINT < 8
+        if (val < PINT_MIN || val > PINT_MAX)
+            warnf("json_parse(): 64 bit long integer %"PRId64" was truncated to 32 bit.\n",
+                  val);
+#endif
+        put_number(sp, val);
+        break;
+#endif // JSON_64_SUPPORT
     case json_type_double:
         put_float(sp, json_object_get_double(jobj));
         break;
@@ -173,7 +184,18 @@ ldmud_json_serialize (svalue_t *sp)
     struct json_object *jobj;
     switch(sp->type) {
     case T_NUMBER:
+#if SIZEOF_PINT > SIZEOF_INT     // we use 64 bit ints for PINT
+#   ifdef JSON_64_SUPPORT
+        jobj = json_object_new_int64(sp->u.number);
+#   else
         jobj = json_object_new_int(sp->u.number);
+        if (sp->u.number > INT32_MAX || sp->u.number < INT32_MIN)
+            warnf("json_serialize(): truncated 64 bit long number %ld to 32 bit due missing support in JSON-C.\n",
+                  sp->u.number);
+#   endif   // JSON_64_SUPPORT
+#else
+        jobj = json_object_new_int(sp->u.number);
+#endif  // SIZEOF_PINT
         break;
     case T_STRING:
         jobj = json_object_new_string(get_txt(sp->u.str));

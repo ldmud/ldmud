@@ -1733,6 +1733,21 @@ AC_MY_SEARCH_LIB(JSON,json,lp_cv_has_json,json,json_path,
 
 if test "$lp_cv_has_json" = "yes"; then
     AC_DEFINE(HAS_JSON, 1, [Does the machine offer JSON?])
+    if test "x$enable_use_json" = "xyes"; then
+        savelibs="$LIBS"
+        LIBS="$LIBS $PKGLIBS"
+        # Check if it supports 64 bit values
+        AC_SEARCH_LIBS(json_object_new_int64,,
+            lp_cv_json_64bit=yes,
+            lp_cv_json_64bit=no
+        )
+
+        if test "$lp_cv_json_64bit" = "yes" ; then
+            AC_DEFINE(JSON_64_SUPPORT, 1, [JSON-C supports 64 bit values.])
+        fi
+
+        LIBS="$savelibs"
+    fi
 else
     if test "$enable_use_json" = "yes"; then
         echo "libjson library not found - disabling JSON support"
