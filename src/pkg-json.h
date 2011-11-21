@@ -13,8 +13,8 @@
 
 /* --- Prototypes --- */
 
-extern svalue_t *f_json_parse (svalue_t *sp);
-extern svalue_t *f_json_serialize (svalue_t *sp);
+extern svalue_t *f_json_parse (svalue_t *sp) __attribute__((nonnull(1)));
+extern svalue_t *f_json_serialize (svalue_t *sp) __attribute__((nonnull(1)));
 
 #endif /* USE_JSON */
 

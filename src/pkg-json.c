@@ -42,10 +42,12 @@ struct json_error_handler_s {
     struct json_object *jobj;
 };
 
-static void json_error_cleanup(error_handler_t *arg);
-static INLINE Bool push_json_error_handler(struct json_object *jobj);
-svalue_t *ldmud_json_parse (svalue_t *sp, struct json_object *val);
-struct json_object *ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key);
+static void json_error_cleanup(error_handler_t *arg) __attribute__((nonnull(1)));
+static INLINE Bool push_json_error_handler(struct json_object *jobj) __attribute__((nonnull(1)));
+static void ldmud_json_walker(svalue_t *key, svalue_t *val, void *parent) __attribute__((nonnull(1,2,3)));
+static INLINE void ldmud_json_attach(struct json_object *parent, const char *key, struct json_object *val) __attribute__((nonnull(1,3)));
+svalue_t *ldmud_json_parse (svalue_t *sp, struct json_object *val) __attribute__((nonnull(1,2)));
+struct json_object *ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key) __attribute__((nonnull(1)));
 
 /*-------------------------------------------------------------------------*/
 /*                           EFUNS                                         */
