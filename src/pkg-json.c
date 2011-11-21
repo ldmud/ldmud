@@ -68,10 +68,11 @@ f_json_serialize (svalue_t *sp)
  */
 
 {
-    struct json_object *val = ldmud_json_serialize(sp);
+    struct json_object *jobj = ldmud_json_serialize(sp);
     free_svalue(sp);
-    put_c_string(sp, json_object_to_json_string(val));
-    // TODO: free json object?
+    put_c_string(sp, json_object_to_json_string(jobj));
+    json_object_put(jobj); // free json object
+
     return sp;
 } /* f_json_serialize() */
 
@@ -80,50 +81,48 @@ f_json_serialize (svalue_t *sp)
 /*                           IMPLEMENTATION                                */
 /*-------------------------------------------------------------------------*/
 svalue_t *
-ldmud_json_parse (svalue_t *sp, struct json_object *val)
+ldmud_json_parse (svalue_t *sp, struct json_object *jobj)
+/*
+    * WARNING: might call (indirectly) errorf().
+ */
 {
-    if (is_error(val)) {
-        errorf("json_inner_parse: error");
+    if (jobj == NULL || is_error(jobj)) {
+        errorf("json_parse(): error while parsing json object.\n");
         /* NOTREACHED */
         return sp;
 
     }
-    if (val == NULL) {
-        /* TODO: I (fippo) am not sure, if this is a really good idea... */
-        put_number(sp, 0);
-        return sp;
-    }
-    switch(json_object_get_type(val)) {
+
+    switch(json_object_get_type(jobj)) {
     case json_type_null:
         put_number(sp, 0);
         break;
     case json_type_boolean:
-        put_number(sp, json_object_get_boolean(val));
-        break;
-    case json_type_double:
-        put_float(sp, json_object_get_double(val));
+        put_number(sp, json_object_get_boolean(jobj));
         break;
     case json_type_int:
-        put_number(sp, json_object_get_int(val));
+        put_number(sp, json_object_get_int(jobj));
+        break;
+    case json_type_double:
+        put_float(sp, json_object_get_double(jobj));
         break;
     case json_type_string:
-        put_c_string(sp, json_object_get_string(val));
+        put_c_string(sp, json_object_get_string(jobj));
         break;
     case json_type_object:
       {
         mapping_t *m;
-        struct lh_entry *e;
-        char *key;
-        struct json_object *newval;
 
-        m = allocate_mapping(json_object_get_object(val)->count, 1);
-        for (e = json_object_get_object(val)->head; e ? (key = (char*)e->k, newval = (struct json_object *)e->v, e) : 0; e = e->next) {
+        m = allocate_mapping(json_object_get_object(jobj)->count, 1);
+
+        json_object_object_foreach(jobj, key, val) {
             svalue_t mkey, *mval;
             put_c_string(&mkey, key);
             mval = get_map_lvalue(m, &mkey);
             free_svalue(&mkey);
-            ldmud_json_parse(mval, newval);
+            ldmud_json_parse(mval, val);
         }
+
         put_mapping(sp, m);
         break;
       }
@@ -132,67 +131,78 @@ ldmud_json_parse (svalue_t *sp, struct json_object *val)
         vector_t *v;
         struct array_list *a;
         int size, i;
-        size = json_object_array_length(val);
+        size = json_object_array_length(jobj);
         v = allocate_array(size);
-        a = json_object_get_array(val);
+        a = json_object_get_array(jobj);
         for (i = 0; i < size; i++) {
             ldmud_json_parse(&(v->item[i]), array_list_get_idx(a, i));
         }
         put_array(sp, v);
         break;
       }
+    default:
+      errorf("json_parse(): unknown json object type.\n");
     }
     return sp;
 } // ldmud_json_parse
 
 void
 ldmud_json_walker(svalue_t *key, svalue_t *val, void *parent)
+/*
+   * WARNING: might call errorf().
+*/
 {
     struct json_object *obj = (struct json_object *)parent;
     if (key->type != T_STRING)
-        errorf("json only serializes string keys\n");
+    {
+        errorf("json_serialize(): can only serialize string keys.\n");
         /* NOTREACHED */
+    }
     json_object_object_add(obj, get_txt(key->u.str),
                            ldmud_json_serialize(val));
 } // ldmud_json_walker
 
 struct json_object *
-ldmud_json_serialize (svalue_t *sp) {
-    struct json_object *val;
+ldmud_json_serialize (svalue_t *sp)
+/*
+   * The returned JSON object will have one reference count.
+ */
+{
+    struct json_object *jobj;
     switch(sp->type) {
     case T_NUMBER:
-        val = json_object_new_int(sp->u.number);
+        jobj = json_object_new_int(sp->u.number);
         break;
     case T_STRING:
-        val = json_object_new_string(get_txt(sp->u.str));
+        jobj = json_object_new_string(get_txt(sp->u.str));
         break;
     case T_POINTER:
       {
         int i;
-        val = json_object_new_array();
+        jobj = json_object_new_array();
         for (i = VEC_SIZE(sp->u.vec) - 1; i >= 0; i--)
-            json_object_array_put_idx(val, i,
+            json_object_array_put_idx(jobj, i,
                         ldmud_json_serialize(&sp->u.vec->item[i]));
         break;
       }
     case T_MAPPING:
       {
         int i;
-        val = json_object_new_object();
+        jobj = json_object_new_object();
         //TODO: Fehler: for ist unsinn und ldmud_json_walker braucht in extra
         //die Mappingbreite...
         for (i = 0; i < MAP_SIZE(sp->u.map); i++)
-            walk_mapping(sp->u.map, &ldmud_json_walker, val);
+            walk_mapping(sp->u.map, &ldmud_json_walker, jobj);
         break;
       }
     case T_FLOAT:
-        val = json_object_new_double(READ_DOUBLE(sp));
+        jobj = json_object_new_double(READ_DOUBLE(sp));
         break;
     default: /* those are unimplemented */
-        val = json_object_new_object();
+        jobj = json_object_new_object();
         break;
     }
-    return val;
+    return jobj;
 } // ldmud_json_serialize
 
 /***************************************************************************/
