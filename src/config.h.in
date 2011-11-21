@@ -360,6 +360,11 @@
  */
 @cdef_use_sqlite@ USE_SQLITE
 
+/*Define this if you want JSON support (assuming that your host
+ * actually offers this.
+ */
+@cdef_use_json@ USE_JSON
+
 /* Define this if you want alist support.
  */
 @cdef_use_alists@ USE_ALISTS

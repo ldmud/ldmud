@@ -221,6 +221,7 @@ AC_MY_ARG_ENABLE(use-mccp,no,,[Enables MCCP support])
 AC_MY_ARG_ENABLE(use-mysql,no,,[Enables mySQL support])
 AC_MY_ARG_ENABLE(use-pgsql,no,,[Enables PostgreSQL support])
 AC_MY_ARG_ENABLE(use-sqlite,no,,[Enables SQLite support])
+AC_MY_ARG_ENABLE(use-json,no,,[Enables JSON-C Support])
 AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE: no/yes])
 AC_MY_ARG_ENABLE(use-xml,no,,[Enables XML support: no/xml2/iksemel/yes])
 AC_MY_ARG_WITH(xml-path,,,[Optional location of the XML include/ and lib/ directory])
@@ -436,6 +437,20 @@ if test "x$with_xml_path" = "x" -o "x$with_xml_path" = "xno" ; then
   xml_path=""
 else
   xml_path="$with_xml_path"
+fi
+
+AC_UPDATE_VAR(enable_use_json)
+if test "x$enable_use_json" = "x" || test "x$enable_use_json" = "xyes"; then
+  cdef_use_json="#define"
+  json_path=
+  enable_use_json="yes"
+elif test "x$enable_use_json" = "xno"; then
+  cdef_use_json="#undef"
+  json_path=
+else
+  cdef_use_json="#define"
+  json_path="$enable_use_json"
+  enable_use_json="yes"
 fi
 
 AC_UPDATE_VAR(enable_use_tls)
@@ -1761,6 +1776,23 @@ if test "$has_xml" = "no"; then
 fi
 
 
+# --- JSON ---
+cdef_enable_use_json="#undef"
+AC_CHECK_HEADER(json/json.h,,[
+		enable_use_json=no
+		lp_cv_has_json=no
+		])
+
+# The system has the json include files - now search for the libraries.
+if test "x$enable_use_json" = "x" || test "x$enable_use_json" = "xyes"; then
+    AC_CHECK_LIB(json, main, [
+		 AC_DEFINE(HAS_JSON, 1, [Support JSON?])
+		 PKGLIBS="$PKGLIBS -ljson"
+		 lp_cv_has_json=yes
+		 cdef_use_json="#define"
+		 ])
+fi
+
 # --- Check if we need zlib libraries for mccp ---
 
 if test "x$enable_use_mccp" = "x" || test "x$enable_use_mccp" = "xyes"; then
@@ -2661,6 +2693,7 @@ AC_SUBST(cdef_use_ipv6)
 AC_SUBST(cdef_use_mysql)
 AC_SUBST(cdef_use_pgsql)
 AC_SUBST(cdef_use_sqlite)
+AC_SUBST(cdef_use_json)
 AC_SUBST(cdef_use_xml)
 AC_SUBST(cdef_use_alists)
 AC_SUBST(cdef_use_mccp)
