@@ -48,30 +48,6 @@ svalue_t *ldmud_json_parse (svalue_t *sp, struct json_object *val);
 struct json_object *ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key);
 
 /*-------------------------------------------------------------------------*/
-static INLINE Bool
-push_json_error_handler(struct json_object * jobj)
-/* An error handler is pushed onto the value stack so that the given json_object
- * is safely freed either by manually freeing the svalue on the stack or during
- * stack unwinding during errorf().
- * inter_sp has to point to the top-of-stack before calling and is updated to
- * point to the error handler svalue!
- */
-{
-    struct json_error_handler_s *handler;
-    /* get the memory for the handler first and fail if out-of-memory */
-    handler = xalloc(sizeof(*handler));
-    if (!handler)
-    {
-        return FALSE;
-    }
-    handler->jobj = jobj;
-    /* now push error handler onto the value stack */
-    push_error_handler(json_error_cleanup, &(handler->head));
-    return TRUE;
-} /* alloc_with_error_handler */
-
-
-/*-------------------------------------------------------------------------*/
 /*                           EFUNS                                         */
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -80,8 +56,24 @@ f_json_parse (svalue_t *sp)
  *
  *   mixed json_parse(string jsonstr)
  *
- * This efun parses a JSON object encoded in as string in <jsonstr> into a
+ * This efun parses the JSON object encoded as string in <jsonstr> into a
  * suitable LPC type.
+ *
+ * Handles the following JSON types:
+ *   <null>        -> int (0)
+ *   <boolean>     -> int (0 or 1)
+ *   <int | int64> -> int
+ *   <double>      -> float
+ *   <string>      -> string
+ *   <object>      -> mapping
+ *   <array>       -> arrays
+ * All other JSON types cause a runtime error.
+ *
+ * CAVEATS: 64 bit wide integers can only be parsed losslessly on hosts with
+ *          a 64 bit wide LPC int and json-c library newer than 0.90.
+ *
+ * BUGS: __FLOAT_MIN__ is not serialized/parsed losslessly.
+ *
  * TODO: introduce (dynamic) evalcost for recursive calls.
  */
 {
@@ -122,7 +114,28 @@ f_json_serialize (svalue_t *sp)
  *   string json_serialize(mixed value)
  *
  * This efun creates a JSON object from the given LPC variable and returns the
- * object encoded as a LPC string.
+ * object encoded as a LPC string. For container types like arrays, mappings
+ * and structs, this will be done recursively.
+ *
+ * Only the following LPC types are serialized. All other LPC types cause a 
+ * runtime error.
+ * 
+ *   <int>        -> JSON int
+ *   <float>      -> JSON double
+ *   <string>     -> JSON string
+ *   <mapping>    -> JSON objects
+ *   <array>      -> JSON arrays
+ *   <struct>     -> JSON objects
+ *
+ * CAVEATS: On host platforms with 64 bit wide integers, the whole value range
+ *          of the LPC int can only be serialized if the used json-c version
+ *          on the host system supports it. Otherwise they could be truncated.
+ *          Structs can be serialized, but since they are serialized into a
+ *          JSON object, they will be parsed into LPC mappings. If you need a
+ *          LPC struct, you have to use to_struct() later on.
+ *
+ * BUGS: __FLOAT_MIN__ is not serialized/parsed losslessly.
+ *
  * TODO: introduce (dynamic) evalcost for recursive calls.
  */
 
@@ -190,9 +203,34 @@ f_json_serialize (svalue_t *sp)
 /*                           IMPLEMENTATION                                */
 /*-------------------------------------------------------------------------*/
 
+/*-------------------------------------------------------------------------*/
+static INLINE Bool
+push_json_error_handler(struct json_object * jobj)
+/* An error handler is pushed onto the value stack so that the given json_object
+ * is safely freed either by manually freeing the svalue on the stack or during
+ * stack unwinding during errorf().
+ * inter_sp has to point to the top-of-stack before calling and is updated to
+ * point to the error handler svalue!
+ */
+{
+    struct json_error_handler_s *handler;
+    /* get the memory for the handler first and fail if out-of-memory */
+    handler = xalloc(sizeof(*handler));
+    if (!handler)
+    {
+        return FALSE;
+    }
+    handler->jobj = jobj;
+    /* now push error handler onto the value stack */
+    push_error_handler(json_error_cleanup, &(handler->head));
+    return TRUE;
+} /* alloc_with_error_handler */
+
+/*-------------------------------------------------------------------------*/
 static void
 json_error_cleanup (error_handler_t *arg)
-/* frees the json object contained in the error handler and the handler.
+/* Frees the json object contained in the error handler and the handler.
+ * Called from free_svalue() (e.g. during stack unwinding in case of errors).
  */
 {
     struct json_error_handler_s *info = (struct json_error_handler_s *)arg;
@@ -202,13 +240,26 @@ json_error_cleanup (error_handler_t *arg)
     xfree(info);
 }
 
+/*-------------------------------------------------------------------------*/
 svalue_t *
 ldmud_json_parse (svalue_t *sp, struct json_object *jobj)
 /*
     * Creates an svalue containing the data in the json object <jobj> and
     * stores it in <sp>.
-    * <jobj> and <sp> must not be NULL.
-    * WARNING: might call (indirectly) errorf().
+    * Handles the following JSON types:
+    *   <null>        -> T_NUMBER (0)
+    *   <boolean>     -> T_NUMBER (0 or 1)
+    *   <int | int64> -> T_NUMBER
+    *   <double>      -> T_FLOAT
+    *   <string>      -> T_STRING
+    *   <object>      -> T_MAPPING
+    *   <array>       -> T_POINTER
+    * All other JSON types cause a runtime error.
+    *
+    * <jobj> MUST point to a valid struct json_object and <sp> MUST point to
+    * an empty svalue_t.
+    *
+    * WARNING: might call (indirectly) errorf() and not return.
  */
 {
     // although the function recurses, this static value does not pose a
@@ -293,11 +344,17 @@ ldmud_json_parse (svalue_t *sp, struct json_object *jobj)
     return sp;
 } // ldmud_json_parse
 
+/*-------------------------------------------------------------------------*/
 static void
 ldmud_json_walker(svalue_t *key, svalue_t *val, void *parent)
 /*
-   * Note: The mapping MUST have at least one value per key.
-   *       Does only serialize the first value of a key.
+   * Adds svalue <val> to json object <parent> under the key <key>.
+   * 
+   * Note: <key> must be of type T_STRING.
+   *       The mapping MUST have at least one value per key.
+   *       Does only serialize the value <val> is pointing to (i.e in mappings
+   *       then first value of a key is serialized).
+   *
    * WARNING: might call errorf().
 */
 {
@@ -312,8 +369,15 @@ ldmud_json_walker(svalue_t *key, svalue_t *val, void *parent)
     ldmud_json_serialize(val, jobj, get_txt(key->u.str));
 } // ldmud_json_walker
 
+/*-------------------------------------------------------------------------*/
 static INLINE void
 ldmud_json_attach(struct json_object *parent, const char *key, struct json_object *val)
+/*
+   * Attaches the object <val> to the object <parent>. If <key> is given, the
+   * <parent> is assumed to be a json object, otherwise a json array.
+   * Asserts that the <parent> is of the correct type.
+   * <parent> MUST be a valid json object or array.
+ */
 {
     if (key)
     {
@@ -327,12 +391,25 @@ ldmud_json_attach(struct json_object *parent, const char *key, struct json_objec
     }
 }
 
+/*-------------------------------------------------------------------------*/
 struct json_object *
 ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
 /*
    * Creates a JSON object containing the data of the svalue <sp> points to.
-   * To do this, it might call itself recursively.
-   * The returned JSON object will have one reference count.
+   * To do this, it calls itself recursively if needed (for container types).
+   * Only T_NUMBER, T_FLOAT, T_STRINGS, T_POINTER, T_MAPPING and T_STRUCT are 
+   * serialized. All other LPC types cause a runtime error.
+   *
+   * The returned JSON object will have one reference count (Refcount of json-c).
+   *
+   * The created object will be attached to the json object or array in <parent>
+   * to prevent leakages in case of errors. The top-level <parent> must be
+   * placed on the value stack within an error handler by the top-level caller.
+   * <parent> MUST be a valid json object if <key> is given.
+   * If <parent> is given, but no <key>, <parent> is assumed to be an array.
+   * If neither <parent> nor <key> are given, the created object will not be
+   * attached to another object but only returned. Do NOT do this for container
+   * like LPC types!
    *
    * WARNING: might call errorf() and not return.
  */

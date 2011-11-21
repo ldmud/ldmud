@@ -41,6 +41,12 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          easily and more flexibly replaced by sefuns, which are supplied with
          the driver. (#637, #228)
 
+    - New Efuns:
+       + json_parse() parses strings encoding a JSON object into an
+         appropriate LPC value. (optional efun)
+       + json_serialize() converts a LPC value into an JSON object and
+         serializes it as LPC string. (optional efun)
+         
     - Portability
        + Removed built-in PCRE package, because it was awfully out of date.
          Since libpcre is installed on nearly every halfway POSIX compatible

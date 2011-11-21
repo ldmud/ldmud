@@ -14,11 +14,17 @@ that you should pay attention to when updating.
   DID_MEM_FFREE_SIZE, DID_MEM_MAX_ALLOCATED and DID_MEM_KEEP_COST were
   removed.
 
-- removed efuns:
+- Removed efuns:
   + The deprecated efuns cat() and tail() were removed. They can be
     easily and more flexibly replaced by sefuns, which are supplied with
     the driver in /mudlib/deprecated/. (#637, #228)
 
+- New efuns:
+  + json_parse() parses strings encoding a JSON object into an
+    appropriate LPC value. (optional efun)
+  + json_serialize() converts a LPC value into an JSON object and
+    serializes it as LPC string. (optional efun)
+    
 - Pragmas
   + The behaviour of the pragma combine_strings is mandatory, that means
     string literals concatenated by '+' will always be combined at

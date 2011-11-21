@@ -1,0 +1,45 @@
+OPTIONAL
+EXPERIMENTAL
+SYNOPSIS
+
+        mixed json_parse(string jsonstring)
+
+DESCRIPTION
+        This efun parses the JSON object encoded as string in <jsonstr> into a
+        suitable LPC type.
+        
+        Handles the following JSON types:
+        <null>        -> int (0)
+        <boolean>     -> int (0 or 1)
+        <int | int64> -> int
+        <double>      -> float
+        <string>      -> string
+        <object>      -> mapping
+        <array>       -> arrays
+        All other JSON types cause a runtime error.
+
+        The JSON object can nest other JSON objects.
+        
+        The function is available only if the driver is compiled with Iksemel
+        support. In that case, __JSON__ is defined. 
+ 
+LIMITATIONS
+        64 bit wide integers can only be parsed losslessly on hosts with
+        a 64 bit wide LPC int and json-c library newer than 0.90.
+
+BUGS
+        __FLOAT_MIN__ is not serialized/parsed losslessly.
+
+EXAMPLES
+        json_parse("42")              -> 42
+        json_parse("42.0")            -> 42.0
+        json_parse("\"hello world\\n\"")   -> "hello world\n"
+        json_parse("[ 1, 2, 3, 4, 5, 6 ]") -> ({1,2,3,4,5,6})
+        json_parse("{ \"test 2\": 42.000000, \"test 1\": 42 }")
+                                      -> ([ "test 1": 42, "test 2": 42.0 ])
+        
+HISTORY
+        Added in LDMud 3.5.0
+
+SEE ALSO
+        json_serialize(E)

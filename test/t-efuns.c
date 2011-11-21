@@ -195,6 +195,7 @@ mixed *tests = ({
            return deep_eq(a, b) && deep_eq(a, ({0,1,2,3,4,5,6}) );
         :)
     }),
+#ifdef __JSON__
     ({ "json_parse/_serialize 1", 0,
         (: json_parse(json_serialize(1) ) == 1:) }),
     ({ "json_parse/_serialize 2", 0,
@@ -213,10 +214,13 @@ mixed *tests = ({
         (: json_parse(json_serialize(__FLOAT_MAX__) ) == __FLOAT_MAX__:) }),
 //    ({ "json_parse/_serialize 9", 0,
 //        (: json_parse(json_serialize(__FLOAT_MIN__) ) == __FLOAT_MIN__ :) }),
-//    ({ "json_parse/_serialize 10", 0,
-//        (: json_parse(json_serialize(__INT_MAX__) ) == __INT_MAX__:) }),
-//    ({ "json_parse/_serialize 11", 0,
-//        (: json_parse(json_serialize(__INT_MIN__) ) == __INT_MIN__ :) }),
+#if __INT_MAX__ <= 2147483647
+    // 64 bit values work on only few systems with a very new json-c library.
+    ({ "json_parse/_serialize 10", 0,
+        (: json_parse(json_serialize(__INT_MAX__) ) == __INT_MAX__:) }),
+    ({ "json_parse/_serialize 11", 0,
+        (: json_parse(json_serialize(__INT_MIN__) ) == __INT_MIN__ :) }),
+#endif
     ({ "json_parse 1", 0,
         (: json_parse("true") == 1 :) }),
     ({ "json_parse 2", 0,
@@ -225,7 +229,7 @@ mixed *tests = ({
         (: deep_eq(json_parse(json_teststring), json_testdata) :) }),
     ({ "json_serialize 1", 0,
         (: json_serialize(json_testdata) == json_teststring :) }),
-
+#endif // __JSON__
 });
 
 void run_test()

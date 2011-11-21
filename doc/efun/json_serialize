@@ -1,0 +1,45 @@
+OPTIONAL
+EXPERIMENTAL
+SYNOPSIS
+
+        string json_serialize(mixed <data>)
+
+DESCRIPTION
+        This efun creates a JSON object from the given LPC variable and
+        returns the object encoded as a LPC string. For container types like 
+        arrays, mappings and structs, this will be done recursively.
+        
+        Only the following LPC types are serialized. All other LPC types cause
+        a  runtime error.
+        <int>        -> JSON int
+        <float>      -> JSON double
+        <string>     -> JSON string
+        <mapping>    -> JSON objects
+        <array>      -> JSON arrays
+        <struct>     -> JSON objects
+        
+        The function is available only if the driver is compiled with Iksemel
+        support. In that case, __JSON__ is defined. 
+
+LIMITATIONS 
+        Only mappings with a width of 1 value per key and only string keys
+        can be serialized.
+        64 bit wide integers can only be serialized losslessly on hosts with
+        a 64 bit wide LPC int and json-c library newer than 0.90.
+
+BUGS
+        __FLOAT_MIN__ is not serialized/parsed losslessly.
+
+EXAMPLES
+        json_serialize(42)              -> "42"
+        json_serialize(42.0)            -> "42.0"
+        json_serialize("hello world\n") -> "\"hello world\\n\""
+        json_serialize(({1,2,3,4,5,6})) -> "[ 1, 2, 3, 4, 5, 6 ]"
+        json_serialize(([ "test 1": 42, "test 2": 42.0 ]))
+                                -> "{ \"test 2\": 42.000000, \"test 1\": 42 }"
+        
+HISTORY
+        Added in LDMud 3.5.0
+
+SEE ALSO
+        json_parse(E)
