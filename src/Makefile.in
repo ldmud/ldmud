@@ -102,7 +102,7 @@ SRC = access_check.c actions.c array.c arraylist.c backend.c bitstrings.c \
       lex.c main.c mapping.c md5.c mempools.c mregex.c mstrings.c object.c \
       otable.c\
       parser.c parse.c pkg-alists.c pkg-iksemel.c pkg-xml2.c pkg-idna.c \
-      pkg-mccp.c pkg-mysql.c pkg-gcrypt.c \
+      pkg-mccp.c pkg-mysql.c pkg-gcrypt.c pkg-json.c \
       pkg-pgsql.c pkg-sqlite.c pkg-tls.c pkg-openssl.c pkg-gnutls.c \
       port.c ptrtable.c \
       random.c regexp.c sha1.c simulate.c simul_efun.c stdstrings.c \
@@ -114,7 +114,7 @@ OBJ = access_check.o actions.o array.o arraylist.o backend.o bitstrings.o \
       lex.o main.o mapping.o md5.o mempools.o mregex.o mstrings.o object.o \
       otable.o \
       parser.o parse.o pkg-alists.o pkg-iksemel.o pkg-xml2.o pkg-idna.o \
-      pkg-mccp.o pkg-mysql.o pkg-gcrypt.o \
+      pkg-mccp.o pkg-mysql.o pkg-gcrypt.o pkg-json.o \
       pkg-pgsql.o pkg-sqlite.o pkg-tls.o pkg-openssl.o pkg-gnutls.o \
       port.o ptrtable.o \
       random.o regexp.o sha1.o simulate.o simul_efun.o stdstrings.o \
@@ -473,10 +473,9 @@ pkg-pgsql.o : ../mudlib/sys/pgsql.h xalloc.h stdstrings.h simulate.h \
     strfuns.h sent.h bytecode.h hash.h backend.h exec.h port.h config.h \
     bytecode_gen.h machine.h
 
-pkg-sqlite.o : xalloc.h stdstrings.h object.h svalue.h simulate.h \
-    mstrings.h interpret.h array.h my-alloca.h typedefs.h driver.h \
-    strfuns.h sent.h bytecode.h hash.h backend.h port.h config.h \
-    bytecode_gen.h main.h machine.h
+pkg-sqlite.o : stdstrings.h svalue.h simulate.h mstrings.h interpret.h \
+    array.h typedefs.h driver.h strfuns.h port.h config.h bytecode_gen.h \
+    machine.h
 
 pkg-tls.o : ../mudlib/sys/tls.h xalloc.h svalue.h sha1.h object.h \
     mstrings.h main.h interpret.h comm.h array.h actions.h pkg-tls.h \

@@ -724,10 +724,10 @@ mixed  *tls_check_certificate(object, int default: F_CONST0);
 
 #endif /* USE_TLS */
 
-#ifdef HAS_JSON
-string	json_serialize(mixed);
-mixed	json_parse(string);
-#endif /* HAS_JSON */
+#ifdef USE_JSON
+string  json_serialize(mixed);
+mixed   json_parse(string);
+#endif /* USE_JSON */
 
 /* The following functions are optional and can be configured out.
  */
