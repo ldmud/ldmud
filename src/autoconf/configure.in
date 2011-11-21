@@ -1719,6 +1719,31 @@ else
     sqlite=
 fi
 
+# --- JSON ---
+AC_MY_SEARCH_LIB(JSON,json,lp_cv_has_json,json,json_path,
+[
+    #include <json/json.h>
+
+    json_object *foo(void)
+    {
+        struct json_object *ob;
+        return ob=json_object_new_int(1);
+    }
+],json,json_object_get_type,enable_use_json)
+
+if test "$lp_cv_has_json" = "yes"; then
+    AC_DEFINE(HAS_JSON, 1, [Does the machine offer JSON?])
+else
+    if test "$enable_use_json" = "yes"; then
+        echo "libjson library not found - disabling JSON support"
+        AC_NOT_AVAILABLE(use-json)
+    fi
+
+    cdef_use_json="#undef"
+    enable_use_json="no"
+    json_package=
+fi
+
 # --- XML ---
 
 has_xml=no
@@ -1773,24 +1798,6 @@ if test "$has_xml" = "no"; then
 
     cdef_use_xml="#undef"
     enable_use_xml=no
-fi
-
-
-# --- JSON ---
-cdef_enable_use_json="#undef"
-AC_CHECK_HEADER(json/json.h,,[
-		enable_use_json=no
-		lp_cv_has_json=no
-		])
-
-# The system has the json include files - now search for the libraries.
-if test "x$enable_use_json" = "x" || test "x$enable_use_json" = "xyes"; then
-    AC_CHECK_LIB(json, main, [
-		 AC_DEFINE(HAS_JSON, 1, [Support JSON?])
-		 PKGLIBS="$PKGLIBS -ljson"
-		 lp_cv_has_json=yes
-		 cdef_use_json="#define"
-		 ])
 fi
 
 # --- Check if we need zlib libraries for mccp ---
