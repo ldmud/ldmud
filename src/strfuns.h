@@ -41,8 +41,4 @@ extern string_t * intersect_strings (const string_t * left, const string_t * rig
 extern svalue_t * x_map_string (svalue_t *sp, int num_arg);
 extern svalue_t * x_filter_string (svalue_t *sp, int num_arg);
 
-#ifdef USE_JSON
-extern void ldmud_json_walker(svalue_t *key, svalue_t *val, void *parent);
-#endif
-
 #endif /* STRFUNS_H_ */
