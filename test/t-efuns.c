@@ -5,6 +5,15 @@
 
 #define TESTFILE "/log/testfile"
 
+mapping json_testdata = ([ "test 1": 42, "test 2": 42.0,
+                          "test 3": "hello world\n",
+                          "test 4": ({1,2,3,4,5,42.0,"teststring"}),
+                          "test 5": (["a": 26, "b": 27.0, "c": "letter",
+                                      "d": (["x":1,"y":2,"z":3]),
+                                      "e": ({10,11,12,13}) ])
+                          ]);
+string json_teststring = "{ \"test 5\": { \"d\": { \"z\": 3, \"y\": 2, \"x\": 1 }, \"e\": [ 10, 11, 12, 13 ], \"b\": 27.000000, \"a\": 26, \"c\": \"letter\" }, \"test 1\": 42, \"test 3\": \"hello world\\n\", \"test 4\": [ 1, 2, 3, 4, 5, 42.000000, \"teststring\" ], \"test 2\": 42.000000 }";
+
 int f(int arg);
 
 mixed *tests = ({
@@ -186,6 +195,37 @@ mixed *tests = ({
            return deep_eq(a, b) && deep_eq(a, ({0,1,2,3,4,5,6}) );
         :)
     }),
+    ({ "json_parse/_serialize 1", 0,
+        (: json_parse(json_serialize(1) ) == 1:) }),
+    ({ "json_parse/_serialize 2", 0,
+        (: json_parse(json_serialize(42.0) ) == 42.0:) }),
+    ({ "json_parse/_serialize 3", 0,
+        (: json_parse(json_serialize("hello world\n") ) == "hello world\n":) }),
+    ({ "json_parse/_serialize 4", 0,
+        (: json_parse(json_serialize( ({}) ) ) == ({}) :) }),
+    ({ "json_parse/_serialize 5", 0,
+        (: deep_eq(json_parse(json_serialize( ({1,2,3,4,5,6}) ) ), ({1,2,3,4,5,6}) ) :) }),
+    ({ "json_parse/_serialize 6", 0,
+        (: deep_eq(json_parse(json_serialize( ([]) ) ), ([]) ) :) }),
+    ({ "json_parse/_serialize 7", 0,
+        (: deep_eq(json_parse(json_serialize( json_testdata ) ), json_testdata) :) }),
+    ({ "json_parse/_serialize 8", 0,
+        (: json_parse(json_serialize(__FLOAT_MAX__) ) == __FLOAT_MAX__:) }),
+//    ({ "json_parse/_serialize 9", 0,
+//        (: json_parse(json_serialize(__FLOAT_MIN__) ) == __FLOAT_MIN__ :) }),
+//    ({ "json_parse/_serialize 10", 0,
+//        (: json_parse(json_serialize(__INT_MAX__) ) == __INT_MAX__:) }),
+//    ({ "json_parse/_serialize 11", 0,
+//        (: json_parse(json_serialize(__INT_MIN__) ) == __INT_MIN__ :) }),
+    ({ "json_parse 1", 0,
+        (: json_parse("true") == 1 :) }),
+    ({ "json_parse 2", 0,
+        (: json_parse("false") == 0 :) }),
+    ({ "json_parse 3", 0,
+        (: deep_eq(json_parse(json_teststring), json_testdata) :) }),
+    ({ "json_serialize 1", 0,
+        (: json_serialize(json_testdata) == json_teststring :) }),
+
 });
 
 void run_test()
