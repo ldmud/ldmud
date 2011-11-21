@@ -149,6 +149,8 @@ ldmud_json_parse (svalue_t *sp, struct json_object *jobj)
 void
 ldmud_json_walker(svalue_t *key, svalue_t *val, void *parent)
 /*
+   * Note: The mapping MUST have at least one value per key.
+   *       Does only serialize the first value of a key.
    * WARNING: might call errorf().
 */
 {
@@ -187,12 +189,11 @@ ldmud_json_serialize (svalue_t *sp)
       }
     case T_MAPPING:
       {
-        int i;
         jobj = json_object_new_object();
-        //TODO: Fehler: for ist unsinn und ldmud_json_walker braucht in extra
-        //die Mappingbreite...
-        for (i = 0; i < MAP_SIZE(sp->u.map); i++)
-            walk_mapping(sp->u.map, &ldmud_json_walker, jobj);
+        if (sp->u.map->num_values != 1)
+            errorf("json_serialize(): can only serialize mappings with width 1, "
+                   "but got mapping with width %ld.\n",sp->u.map->num_values);
+        walk_mapping(sp->u.map, &ldmud_json_walker, jobj);
         break;
       }
     case T_FLOAT:
