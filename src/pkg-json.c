@@ -199,11 +199,12 @@ ldmud_json_serialize (svalue_t *sp)
         jobj = json_object_new_double(READ_DOUBLE(sp));
         break;
     default: /* those are unimplemented */
-        jobj = json_object_new_object();
+        errorf("json_serialize(): encountered unimplemented LPC type %s\n",
+               typename(sp->type));
         break;
     }
     return jobj;
 } // ldmud_json_serialize
 
 /***************************************************************************/
-#endif /* USE_FOO */
+#endif /* USE_JSON */
