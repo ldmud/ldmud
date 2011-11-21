@@ -26,6 +26,7 @@
 
 #include "array.h"
 #include "mapping.h"
+#include "structs.h"
 #include "mstrings.h"
 #include "interpret.h"
 #include "simulate.h"
@@ -388,7 +389,22 @@ ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
 
         walk_mapping(sp->u.map, &ldmud_json_walker, jobj);
         break;
+    case T_STRUCT:
+    {
+        struct_t  * st = sp->u.strct;
+        jobj = json_object_new_object();
+        // the created object has to be attached to the parent immediately to
+        // prevent any memory leaks in case there is a call to errorf() later.
+        ldmud_json_attach(parent, key, jobj);
+        
+        // Now loop over all members and assign the data
+        for (int i  = 0; i < struct_size(st); ++i)
+        {
+            ldmud_json_serialize(&(st->member[i]),jobj,get_txt(st->type->member[i].name));
+        }
         break;
+    }
+
     default: /* those are unimplemented */
         errorf("json_serialize(): can't serialize LPC type %s\n",
                typename(sp->type));
