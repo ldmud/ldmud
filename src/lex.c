@@ -814,6 +814,9 @@ init_lexer(void)
 #ifdef USE_XML
     add_permanent_define("__XML_DOM__", -1, string_copy("1"), MY_FALSE);
 #endif
+#ifdef USE_JSON
+    add_permanent_define("__JSON__", -1, string_copy("1"), MY_FALSE);
+#endif
 #ifdef USE_ALISTS
     add_permanent_define("__ALISTS__", -1, string_copy("1"), MY_FALSE);
 #endif
