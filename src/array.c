@@ -1798,13 +1798,6 @@ v_allocate (svalue_t *sp, int num_arg)
             size_t i;
             svalue_t *svp;
 
-            /* If the initialisation value is a mapping, remove all
-             * destructed elements so that we can use copy_mapping()
-             * later on.
-             */
-            if (sp->type == T_MAPPING)
-                check_map_for_destr(sp->u.map);
-
             v = allocate_uninit_array(new_size);
             for (svp = v->item, i = 0; i < new_size; i++, svp++)
                 copy_svalue_no_free(svp, sp);
@@ -1845,13 +1838,6 @@ v_allocate (svalue_t *sp, int num_arg)
         if (num_arg == 2 && (sp->type != T_NUMBER || sp->u.number != 0))
         {
             hasInitValue = MY_TRUE;
-
-            /* If the initialisation value is a mapping, remove all
-             * destructed elements so that we can use copy_mapping()
-             * later on.
-             */
-            if (sp->type == T_MAPPING)
-                check_map_for_destr(sp->u.map);
         }
 
         /* Check the size array for consistency, and also count how many
