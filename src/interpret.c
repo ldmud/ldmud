@@ -10526,9 +10526,6 @@ again:
             mapping_t *m;
 
             TYPE_TEST_RIGHT(sp, T_MAPPING);
-            check_map_for_destr((sp-1)->u.map);
-            check_map_for_destr(sp->u.map);
-              /* required for add_mapping() */
             inter_pc = pc;
             inter_sp = sp;
             m = add_mapping((sp-1)->u.map,sp->u.map);
