@@ -1540,7 +1540,8 @@ resize_mapping (mapping_t *m, mp_int new_width)
  * <new_width> values per key, and return it.
  * The copy of a protector mapping is a normal mapping.
  *
- * check_map_for_destr(m) should be called before.
+ * This function takes care of keys referencing destructed objects (although
+ * not of such values, but that should pose no problem).
  */
 
 {

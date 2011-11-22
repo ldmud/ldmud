@@ -6384,7 +6384,6 @@ f_copy (svalue_t *sp)
         if (old->ref != 1)
         {
             DYN_MAPPING_COST(old->num_entries);
-            check_map_for_destr(old);
             new = copy_mapping(old);
             if (!new)
                 errorf("(copy) Out of memory: mapping[%"PRIdPINT"] for copy.\n"
