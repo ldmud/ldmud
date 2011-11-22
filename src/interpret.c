@@ -12455,7 +12455,6 @@ again:
 
                 sp--;
                 m = sp->u.map;
-                check_map_for_destr(m);
 
                 /* Test for the special case 'm - m'
                  * Note: do not return a new empty mapping, argp->u.map must be changed.
