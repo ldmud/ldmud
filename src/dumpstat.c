@@ -28,9 +28,7 @@
 #include "ptrtable.h"
 #include "simulate.h"
 #include "stdstrings.h"
-#ifdef USE_STRUCTS
 #include "structs.h"
-#endif /* USE_STRUCTS */
 #include "svalue.h"
 #include "xalloc.h"
 
@@ -157,8 +155,6 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         else
             return 0;
     }
-
-#ifdef USE_STRUCTS
     case T_STRUCT:
     {
         struct_t *st = v->u.strct;
@@ -178,7 +174,6 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         else
             return 0;
     }
-#endif /* USE_STRUCTS */
 
     case T_CLOSURE:
     {

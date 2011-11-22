@@ -47,11 +47,9 @@ union u {
        * T_(PROTECTED_)POINTER_RANGE_LVALUE: the target vector holding
        *   the range.
        */
-#ifdef USE_STRUCTS
      struct_t *strct;
       /* T_STRUCT: pointer to the structure instance.
        */
-#endif
     mapping_t *map;
       /* T_MAPPING: pointer to the mapping structure.
        * T_PROTECTOR_MAPPING: TODO: ???
@@ -191,9 +189,7 @@ struct svalue_s
 #define T_CLOSURE       0x8  /* a closure */
 #define T_SYMBOL        0x9  /* a symbol */
 #define T_QUOTED_ARRAY  0xa  /* a quoted array */
-#ifdef USE_STRUCTS
 #define T_STRUCT        0xb  /* a struct */
-#endif /* USE_STRUCTS */
 
 #define T_CHAR_LVALUE                     0xc
   /* .u.string points to the referenced character in a string */
@@ -337,9 +333,7 @@ struct svalue_s
 #define TF_SYMBOL        (1 << T_SYMBOL)
 #define TF_QUOTED_ARRAY  (1 << T_QUOTED_ARRAY)
 #define TF_NULL          (1 << T_NULL)
-#ifdef USE_STRUCTS
 #define TF_STRUCT        (1 << T_STRUCT)
-#endif /* USE_STRUCTS */
 
 #define TF_ANYTYPE       (~0)
   /* This is used in the efun_lpc_types[]
@@ -469,12 +463,10 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
 #define put_array(sp,arr) \
     ( (sp)->type = T_POINTER, (sp)->u.vec = arr )
 
-#ifdef USE_STRUCTS
 #define put_ref_struct(sp,st) \
     ( (sp)->type = T_STRUCT, (sp)->u.strct = ref_struct(st) )
 #define put_struct(sp,st) \
     ( (sp)->type = T_STRUCT, (sp)->u.strct = st )
-#endif /* USE_STRUCTS */
 
 #define put_ref_mapping(sp,val) \
     ( (sp)->type = T_MAPPING, (sp)->u.map = ref_mapping(val) )
@@ -513,12 +505,10 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
 #define push_array(sp,arr) \
     ( (sp)++, put_array(sp, arr) )
 
-#ifdef USE_STRUCTS
 #define push_ref_struct(sp,st) \
     ( (sp)++, put_ref_struct(sp, st) )
 #define push_struct(sp,st) \
     ( (sp)++, put_struct(sp, st) )
-#endif /* USE_STRUCTS */
 
 #define psh_ref_mapping(sp,val) \
     ( (sp)++, put_ref_mapping(sp,val) )

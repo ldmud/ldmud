@@ -163,9 +163,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#ifdef USE_STRUCTS
 #include "structs.h"
-#endif /* USE_STRUCTS */
 #include "svalue.h"
 #include "swap.h"
 #include "switch.h"
@@ -3495,7 +3493,6 @@ compile_value (svalue_t *value, int opt_flags)
                     break;
                   }
 
-#ifdef USE_STRUCTS
                 /* ({#'(<, <template>, <expr1>, ..., <exprN> })
                  */
                 case F_S_AGGREGATE:
@@ -3538,7 +3535,6 @@ compile_value (svalue_t *value, int opt_flags)
                     STORE_UINT8(current.codep, (unsigned char)size);
                     break;
                   }
-#endif /* USE_STRUCTS */
 
                 /* ({#'return })
                  * ({#'return, <expr> })
@@ -4176,7 +4172,6 @@ compile_value (svalue_t *value, int opt_flags)
                     if (current.code_left < 8)
                         realloc_code();
 
-#ifdef USE_STRUCTS
                     /* The 'efun' #'-> needs a hidden argument
                      * for the struct type index.
                      */
@@ -4185,7 +4180,6 @@ compile_value (svalue_t *value, int opt_flags)
                         current.code_left--;
                         STORE_CODE(current.codep, (bytecode_t)F_NCONST1);
                     }
-#endif /* USE_STRUCTS */
 
                     p = current.codep;
                     if (num_arg < min)
@@ -4715,9 +4709,7 @@ is_lvalue (svalue_t *argp, int index_lvalue)
               case F_INDEX +CLOSURE_EFUN:
               case F_RINDEX+CLOSURE_EFUN:
               case F_AINDEX+CLOSURE_EFUN:
-#ifdef USE_STRUCTS
               case F_S_INDEX +CLOSURE_EFUN:
-#endif /* USE_STRUCTS */
               case CLOSURE_IDENTIFIER:
                 return MY_TRUE;
             }
@@ -4792,9 +4784,7 @@ compile_lvalue (svalue_t *argp, int flags)
             case F_INDEX +CLOSURE_EFUN:
             case F_RINDEX+CLOSURE_EFUN:
             case F_AINDEX+CLOSURE_EFUN:
-#ifdef USE_STRUCTS
             case F_S_INDEX +CLOSURE_EFUN:
-#endif /* USE_STRUCTS */
                 if (VEC_SIZE(block) == 3)
                 {
                     /* Indexing of an array or normal mapping.
@@ -4803,7 +4793,6 @@ compile_lvalue (svalue_t *argp, int flags)
                     {
                         compile_value(argp+2, 0);
 
-#ifdef USE_STRUCTS
                         if (!(flags & PROTECT_LVALUE)
                          && argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN
                            )
@@ -4813,7 +4802,6 @@ compile_lvalue (svalue_t *argp, int flags)
                             current.code_left--;
                             STORE_CODE(current.codep, (bytecode_t) F_NCONST1);
                         }
-#endif /* USE_STRUCTS */
 
                         compile_lvalue(argp+1, flags & PROTECT_LVALUE);
                         if (current.code_left < 3)
@@ -4833,7 +4821,6 @@ compile_lvalue (svalue_t *argp, int flags)
                                 STORE_CODE(current.codep
                                           , (bytecode_t)
                                             (F_PROTECTED_AINDEX_LVALUE));
-#ifdef USE_STRUCTS
                             else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
                             {
                                 current.code_left -= 1;
@@ -4842,7 +4829,6 @@ compile_lvalue (svalue_t *argp, int flags)
                                           , (bytecode_t)
                                             (F_PROTECTED_INDEX_S_LVALUE));
                             }
-#endif /* USE_STRUCTS */
                         } else {
                             current.code_left -= 1;
                             if (argp->x.closure_type == F_INDEX + CLOSURE_EFUN)
@@ -4857,14 +4843,12 @@ compile_lvalue (svalue_t *argp, int flags)
                                 STORE_CODE(current.codep
                                           , (bytecode_t)
                                             (F_AINDEX_LVALUE));
-#ifdef USE_STRUCTS
                             else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
                             {
                                 STORE_CODE(current.codep
                                           , (bytecode_t)
                                             (F_INDEX_S_LVALUE));
                             }
-#endif /* USE_STRUCTS */
                         }
                         return;
                     }
@@ -4887,7 +4871,6 @@ compile_lvalue (svalue_t *argp, int flags)
                             STORE_CODE(current.codep
                                       , (bytecode_t)
                                         (F_PUSH_PROTECTED_AINDEXED_LVALUE));
-#ifdef USE_STRUCTS
                         else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
                         {
                             current.code_left -= 1;
@@ -4896,7 +4879,6 @@ compile_lvalue (svalue_t *argp, int flags)
                                       , (bytecode_t)
                                         (F_PUSH_PROTECTED_INDEXED_S_LVALUE));
                         }
-#endif /* USE_STRUCTS */
                     } else {
                         current.code_left -= 1;
                         if (argp->x.closure_type == F_INDEX + CLOSURE_EFUN)
@@ -4911,7 +4893,6 @@ compile_lvalue (svalue_t *argp, int flags)
                             STORE_CODE(current.codep
                                       , (bytecode_t)
                                         (F_PUSH_AINDEXED_LVALUE));
-#ifdef USE_STRUCTS
                         else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
                         {
                             current.code_left -= 1;
@@ -4920,7 +4901,6 @@ compile_lvalue (svalue_t *argp, int flags)
                                       , (bytecode_t)
                                         (F_PUSH_INDEXED_S_LVALUE));
                         }
-#endif /* USE_STRUCTS */
                     }
                     return;
                 } /* if (VEC_SIZE(block) == 3) */

@@ -100,9 +100,7 @@
 #include "simul_efun.h"
 #include "stdstrings.h"
 #include "strfuns.h"
-#ifdef USE_STRUCTS
 #include "structs.h"
-#endif /* USE_STRUCTS */
 #include "svalue.h"
 #include "wiz_list.h"
 #include "xalloc.h"
@@ -328,9 +326,7 @@ locate_out (program_t *prog)
     prog->strings        = MAKEOFFSET(string_t**, strings);
     prog->variables      = MAKEOFFSET(variable_t *, variables);
     prog->inherit        = MAKEOFFSET(inherit_t *, inherit);
-#ifdef USE_STRUCTS
     prog->struct_defs    = MAKEOFFSET(struct_def_t *, struct_defs);
-#endif /* USE_STRUCTS */
     prog->includes       = MAKEOFFSET(include_t *, includes);
     if (prog->type_start)
     {
@@ -374,9 +370,7 @@ locate_in (program_t *prog)
     prog->strings        = MAKEPTR(string_t**, strings);
     prog->variables      = MAKEPTR(variable_t*, variables);
     prog->inherit        = MAKEPTR(inherit_t*, inherit);
-#ifdef USE_STRUCTS
     prog->struct_defs    = MAKEPTR(struct_def_t*, struct_defs);
-#endif /* USE_STRUCTS */
     prog->includes       = MAKEPTR(include_t*, includes);
     if (prog->type_start)
     {
@@ -968,7 +962,6 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
             break;
           }
 
-#ifdef USE_STRUCTS
         case T_STRUCT:
           {
             struct_t *st = svp->u.strct;
@@ -989,7 +982,6 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
             swapping_alist = MY_FALSE;
             break;
           }
-#endif /* USE_STRUCTS */
 
         case T_QUOTED_ARRAY:
           {
@@ -1179,7 +1171,6 @@ check_swapped_values (mp_int num, unsigned char * p)
             break;
           }
 
-#ifdef USE_STRUCTS
         case T_STRUCT | T_MOD_SWAPPED:
           {
             wiz_list_t *user;
@@ -1196,7 +1187,6 @@ check_swapped_values (mp_int num, unsigned char * p)
             CHECK_SWAPSIZE();
             break;
           }
-#endif /* USE_STRUCTS */
 
         case T_MAPPING | T_MOD_SWAPPED:
           {
@@ -1221,9 +1211,7 @@ check_swapped_values (mp_int num, unsigned char * p)
         case T_STRING:
         case T_SYMBOL:
         case T_POINTER:
-#ifdef USE_STRUCTS
         case T_STRUCT:
-#endif /* USE_STRUCTS */
         case T_QUOTED_ARRAY:
         case T_MAPPING:
         case T_NUMBER:
@@ -1338,7 +1326,6 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
             break;
           }
 
-#ifdef USE_STRUCTS
         case T_STRUCT | T_MOD_SWAPPED:
           {
             wiz_list_t *user;
@@ -1357,7 +1344,6 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
             CHECK_SWAPSIZE();
             break;
           }
-#endif /* USE_STRUCTS */
 
         case T_MAPPING | T_MOD_SWAPPED:
           {
@@ -1384,9 +1370,7 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
         case T_STRING:
         case T_SYMBOL:
         case T_POINTER:
-#ifdef USE_STRUCTS
         case T_STRUCT:
-#endif /* USE_STRUCTS */
         case T_QUOTED_ARRAY:
         case T_MAPPING:
         case T_NUMBER:
@@ -1502,7 +1486,6 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             CHECK_SWAPSIZE();
             break;
 
-#ifdef USE_STRUCTS
         case T_STRUCT | T_MOD_SWAPPED:
           {
             p += 1;
@@ -1514,7 +1497,6 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             CHECK_SWAPSIZE();
             break;
           }
-#endif /* USE_STRUCTS */
 
         case T_MAPPING | T_MOD_SWAPPED:
           {
@@ -1574,9 +1556,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_STRING:
         case T_SYMBOL:
         case T_POINTER:
-#ifdef USE_STRUCTS
         case T_STRUCT:
-#endif /* USE_STRUCTS */
         case T_QUOTED_ARRAY:
         case T_MAPPING:
         case T_NUMBER:
@@ -1939,7 +1919,6 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             break;
           }
 
-#ifdef USE_STRUCTS
         case T_STRUCT | T_MOD_SWAPPED:
           {
             wiz_list_t *user;
@@ -1979,7 +1958,6 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
 #endif
             break;
           }
-#endif /* USE_STRUCTS */
 
         case T_MAPPING | T_MOD_SWAPPED:
           {
@@ -2078,9 +2056,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_STRING:
         case T_SYMBOL:
         case T_POINTER:
-#ifdef USE_STRUCTS
         case T_STRUCT:
-#endif /* USE_STRUCTS */
         case T_QUOTED_ARRAY:
         case T_MAPPING:
         case T_NUMBER:

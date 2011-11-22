@@ -90,9 +90,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#ifdef USE_STRUCTS
 #include "structs.h"
-#endif /* USE_STRUCTS */
 #include "svalue.h"
 #include "swap.h"
 #include "xalloc.h"
@@ -792,7 +790,6 @@ svalue_to_string ( fmt_state_t *st
         break;
       }
 
-#ifdef USE_STRUCTS
     case T_STRUCT:
       {
         struct_t *strct = obj->u.strct;
@@ -865,7 +862,6 @@ svalue_to_string ( fmt_state_t *st
         }
         break;
       }
-#endif /* USE_STRUCTS */
 
     case T_MAPPING:
       {

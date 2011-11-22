@@ -32,9 +32,7 @@
  *      int32  heart_beats;
  *      mp_int size_array;
  *      mp_int mapping_total;
-#ifdef USE_STRUCTS
  *      mp_int struct_total;
-#endif
  *      svalue_t extra;
  *      int32  last_call_out;
  *      int32  call_out_cost;
@@ -128,9 +126,7 @@ wiz_list_t default_wizlist_entry
     , 0             /* heart_beats */
     , 0             /* size_array */
     , 0             /* mapping_total */
-#ifdef USE_STRUCTS
     , 0             /* struct_total */
-#endif
     , { T_NUMBER }  /* extra */
     , 0             /* last_call_out */
     , 0             /* call_out_cost */
@@ -242,9 +238,7 @@ add_name (string_t * str)
     wl->heart_beats    = 0;
     wl->size_array     = 0;
     wl->mapping_total  = 0;
-#ifdef USE_STRUCTS
     wl->struct_total   = 0;
-#endif /* USE_STRUCTS */
 #if 0
     wl->quota_allowance = 0;
     wl->quota_usage   = 0;
@@ -493,9 +487,7 @@ f_wizlist_info (svalue_t *sp)
  *   int    w[WL_CALL_OUT]    = Reserved for call_out() (unused yet).
  *   int    w[WL_ARRAY_TOTAL] = Total size of arrays in elements.
  *   int    w[WL_MAPPING_TOTAL] = Total size of mappings in elements.
-#ifdef USE_STRUCTS
  *   int    w[WL_STRUCT_TOTAL] = Total size of mappings in elements.
-#endif
  *   mixed  w[WL_EXTRA]       = Extra wizlist-info if set.
  */
 
@@ -528,11 +520,8 @@ f_wizlist_info (svalue_t *sp)
             put_number(&(svp[WL_CALL_OUT]), 0); /* TODO: Implement me */
             put_number(&(svp[WL_ARRAY_TOTAL]), w->size_array);
             put_number(&(svp[WL_MAPPING_TOTAL]), w->mapping_total);
-#ifdef USE_STRUCTS
             put_number(&(svp[WL_STRUCT_TOTAL]), w->struct_total);
-#else
-            put_number(&(svp[WL_STRUCT_TOTAL]), 0);
-#endif /* USE_STRUCTS */
+
             if (w->extra.type == T_POINTER)
             {
                 vector_t *v = w->extra.u.vec;

@@ -1888,9 +1888,7 @@ options (void)
 #ifdef NO_NEGATIVE_RANGES
                               , "assignments to negative ranges disabled\n"
 #endif
-#ifdef USE_STRUCTS
                               , "structs enabled\n"
-#endif
 #ifdef USE_NEW_INLINES
                               , "new inline closures enabled\n"
 #endif

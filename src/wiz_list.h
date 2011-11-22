@@ -21,9 +21,7 @@ struct wiz_list_s
     int32  heart_beats;      /* Number of heart_beat() calls */
     mp_int size_array;       /* Total size of this wizards arrays. */
     mp_int mapping_total;    /* Total size of this wizards mappings */
-#ifdef USE_STRUCTS
     mp_int struct_total ;    /* Total size of this wizards structs */
-#endif
     svalue_t extra;          /* Extra information for this wizard */
     int32  last_call_out;    /* Time of the last call_out() */
     int32  call_out_cost;    /* Collected cost of call_outs for this time */

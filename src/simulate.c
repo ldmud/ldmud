@@ -63,9 +63,7 @@
 #include "simul_efun.h"
 #include "stdstrings.h"
 #include "strfuns.h"
-#ifdef USE_STRUCTS
 #include "structs.h"
-#endif
 #include "swap.h"
 #include "svalue.h"
 #include "wiz_list.h"
@@ -3336,9 +3334,7 @@ status_parse (strbuf_t * sbuf, char * buff)
         tot += add_string_status(sbuf, verbose);
         tot += call_out_status(sbuf, verbose);
         tot += total_mapping_size();
-#ifdef USE_STRUCTS
         tot += total_struct_size(sbuf, verbose);
-#endif
         tot += rxcache_status(sbuf, verbose);
         if (verbose)
         {

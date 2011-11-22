@@ -127,8 +127,6 @@
 
 #include "driver.h"
 
-#ifdef USE_STRUCTS
-
 #include "structs.h"
 
 #include <stdio.h>
@@ -1581,4 +1579,3 @@ f_struct_info (svalue_t *sp)
 
 /***************************************************************************/
 
-#endif /* USE_STRUCTS */

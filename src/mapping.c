@@ -230,9 +230,7 @@
 #include "mstrings.h"
 #include "object.h"
 #include "simulate.h"
-#ifdef USE_STRUCTS
 #include "structs.h"
-#endif /* USE_STRUCTS */
 #include "svalue.h"
 #include "wiz_list.h"
 #include "xalloc.h"
@@ -4623,12 +4621,10 @@ v_mkmapping (svalue_t *sp, int num_arg)
  * will only contain as much elements as are in the smallest
  * array.
  *
-#ifdef USE_STRUCTS
  *   mapping mkmapping(struct st)
  *
  * Return a mapping with all values from struct <st>, indexed by
  * the struct's member names.
-#endif
  */
 
 {
@@ -4636,7 +4632,6 @@ v_mkmapping (svalue_t *sp, int num_arg)
 
     m = NULL;
 
-#ifdef USE_STRUCTS
     if (sp[-num_arg+1].type == T_STRUCT)
     {
         struct_t * st;
@@ -4670,7 +4665,6 @@ v_mkmapping (svalue_t *sp, int num_arg)
             assign_svalue(data, &st->member[i]);
         }
     }
-#endif
 
     if (sp[-num_arg+1].type == T_POINTER)
     {

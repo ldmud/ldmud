@@ -18,17 +18,10 @@
    * the compiler.
    */
 #define NAME_CROSS_DEFINED  0x00080000 /* function defined from other program */
-#if defined(__LPC_STRUCTS__) || defined(USE_STRUCTS)
 #define NAME_HIDDEN         0x00020000 /* Not visible for inheritance    */
 #define NAME_PROTOTYPE      0x00010000 /* Defined by a prototype only    */
 #define NAME_UNDEFINED      0x00008000 /* Not defined yet                */
 #define NAME_TYPES_LOST     0x00004000 /* inherited, no save_types       */
-#else /* !USE_STRUCTS */
-#define NAME_HIDDEN         0x00000800 /* Not visible for inheritance    */
-#define NAME_PROTOTYPE      0x00000400 /* Defined by a prototype only    */
-#define NAME_UNDEFINED      0x00000200 /* Not defined yet                */
-#define NAME_TYPES_LOST     0x00000100 /* inherited, no save_types       */
-#endif /* USE_STRUCTS */
 
 #endif /* !__DRIVER_SOURCE__ */
 

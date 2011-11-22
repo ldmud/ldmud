@@ -413,9 +413,7 @@ assert_simul_efun_object (void)
             simul_efunp[j].name  = function_name;
             simul_efunp[j].flags = flags;
             simul_efunp[j].type.typeflags = type.type;
-#ifdef USE_STRUCTS
             simul_efunp[j].type.t_struct = type.t_struct;
-#endif
 
             /* If possible, make an entry in the simul_efun table */
             if ((size_t)j < SEFUN_TABLE_SIZE)

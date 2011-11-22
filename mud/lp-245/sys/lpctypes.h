@@ -14,9 +14,7 @@
 #define TYPE_CLOSURE    8
 #define TYPE_SYMBOL     9
 #define TYPE_QUOTED_ARRAY 10
-#if defined(USE_STRUCTS) || defined(__LPC_STRUCTS__)
 #define TYPE_STRUCT     11
-#endif
 
 #define TYPE_MOD_POINTER        0x0040  /* Pointer to a basic type        */
 
@@ -33,9 +31,7 @@
 #define T_CLOSURE       0x8
 #define T_SYMBOL        0x9
 #define T_QUOTED_ARRAY  0xa
-#if defined(USE_STRUCTS) || defined(__LPC_STRUCTS__)
 #define T_STRUCT        0xb
-#endif
 
 /* Closure types, stored as secondary type info */
 

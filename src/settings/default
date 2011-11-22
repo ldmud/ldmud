@@ -567,12 +567,6 @@ with_rxcache_table=8192
 # These options can be used to disable developments-in-progress if their
 # code turns out to be interrrupting.
 
-# Define this to enable LPC structs.
-enable_use_structs=yes
-
-# Define this to enable the new inline closure syntax.
-enable_use_new_inlines=yes
-
 
 # --- Profiling ---
 # For profiling of the VM instruction implementations, refer to the Makefile
