@@ -2,6 +2,7 @@ SYNOPSIS
         int sizeof(mixed * val)
         int sizeof(string  val)
         int sizeof(mapping val)
+        int sizeof(struct xxx val)
 
 BESCHREIBUNG
         Liefert die Anzahl Elemente in einem Array <val>, die Anzahl
@@ -11,8 +12,16 @@ BESCHREIBUNG
         Als Spezialfall kann <val> auch 0 sein. In diesem Fall liefert die
         Funktion 0 zurueck.
 
+        Falls im Spiel Objekte zerstoert wurde, seit das Mapping zuletzt auf
+        zerstoerte Keys geprueft wurde, muss es zuerst auf zerstoerte Objekte
+        in Keys geprueft werden. In diesem Fall steigt die Laufzeit mit der
+        Anzahl der Keys im Mapping (O(n)).
+        Anderenfalls ist die Laufzeit unabhaengig der Anzahl der Schluessel
+        (O(1)).
+
 GESCHICHTE
-        LDMud 3.2.9 fuehrte Strings als moegliche Attribute ein.
+        LDMud 3.2.9 fuehrte Strings als moegliche Argumente ein.
+        LDMud 3.3 fuehrte Structs als moegliche Argumente ein.
 
 SIEHE AUCH
         strlen(E), allocate(E), pointerp(E), mappingp(E), m_allocate(E),
