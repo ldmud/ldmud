@@ -3401,7 +3401,7 @@ f_m_values (svalue_t *sp)
                PRIdPINT".\n", num, m->num_values-1);
 
     /* Get the size of the mapping */
-    check_map_for_destr(m);
+    check_map_for_destr_keys(m);
     size = MAP_SIZE(m);
 
     if (size > 0 && m->num_values < 1)
@@ -3958,7 +3958,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
 
     /* Preparations */
 
-    check_map_for_destr(m);
+    check_map_for_destr_keys(m); // no keys referencing destructed objects
     assign_eval_cost();
 
     read_pointer = walk_mapping_prologue(m, sp, &cb);
@@ -4066,7 +4066,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
     /* Preparations */
 
-    check_map_for_destr(m);
+    check_map_for_destr_keys(m); // better no destructed objects
     assign_eval_cost();
 
     num_values = m->num_values;
@@ -4766,7 +4766,7 @@ f_unmkmapping (svalue_t *sp)
     m = sp->u.map;
 
     /* Determine the size of the mapping and allocate the result vector */
-    check_map_for_destr(m);
+    check_map_for_destr_keys(m);
     size = MAP_SIZE(m);
     v = allocate_array(m->num_values+1);
 
