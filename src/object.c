@@ -5791,7 +5791,7 @@ save_mapping (mapping_t *m)
 
     MY_PUTC('(')
     MY_PUTC('[')
-    check_map_for_destr(m);
+
     old_written = bytes_written - buf_left;
     walk_mapping(m, save_mapping_filter, (void *)(p_int)m->num_values);
 

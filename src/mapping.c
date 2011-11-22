@@ -1412,6 +1412,9 @@ check_map_for_destr (mapping_t *m)
  * Where they appear as keys, both key and associated values are
  * deleted from the mapping. Where they appear as values, they are
  * replaced by svalue-0.
+ * Note: this might be implemented fast by copying and combining the two
+ *       functions here, because then only one iteration is necessary.
+ *       However, that duplicates the code...
  */
 
 {
