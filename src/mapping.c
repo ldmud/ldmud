@@ -4591,7 +4591,6 @@ f_m_reallocate (svalue_t *sp)
     m = sp->u.map;
 
     /* Resize the mapping */
-    check_map_for_destr(m);
     new_m = resize_mapping(m, new_width);
     if (!new_m)
     {
