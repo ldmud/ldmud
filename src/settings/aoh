@@ -35,7 +35,6 @@ exec ./configure \
 --enable-use-set-is-wizard=yes \
 --enable-use-parse-command=no \
 --enable-use-set-light=no \
---enable-use-new-inlines=yes \
 --enable-opcprof=yes \
 --enable-filename-spaces=yes \
 --enable-use-tls=gnu \

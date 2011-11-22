@@ -18,7 +18,6 @@
 --enable-dynamic-costs \
 --enable-opcprof \
 --enable-verbose-opcprof \
---enable-use-structs \
 --enable-use-new-inlines=yes \
 --enable-use-system-crypt=no \
 --enable-use-deprecated=no \

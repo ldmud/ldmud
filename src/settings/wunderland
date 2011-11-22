@@ -26,9 +26,7 @@
 --disable-use-pthreads \
 --enable-use-pcre \
 --disable-use-deprecated \
---enable-use-structs \
 --disable-use-tls \
---enable-use-new-inlines \
 --disable-use-set-light \
 --enable-use-set-is-wizard \
 --disable-use-parse-command \
