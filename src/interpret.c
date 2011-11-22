@@ -12162,7 +12162,6 @@ again:
             }
             else
             {
-                check_map_for_destr(u2.map);
                 add_to_mapping(argp->u.map, u2.map);
                 sp -= 2;
                 free_mapping(u2.map);

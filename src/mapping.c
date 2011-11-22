@@ -2054,6 +2054,7 @@ walk_mapping ( mapping_t *m
  * function.
  *
  * <func> may modify the value(s), but not the key.
+ * Deals correctly with keys referencing destructed objects.
  */
 
 {
@@ -3426,6 +3427,7 @@ add_to_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 
 /* Auxiliary function to add_to_mapping():
  * Add/overwrite (key:data) to mapping <extra>.
+ * Assumes not to be called with <key> referencing destructed objects.
  */
 
 {
@@ -3461,6 +3463,7 @@ add_to_mapping (mapping_t *m1, mapping_t *m2)
  * immediately.
  *
  * Called by interpret.c as part of F_ADD_EQ and F_VOID_ADD_EQ.
+ * Note: Handles keys referencing destructed objects (skips them).
  */
 
 {
