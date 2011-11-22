@@ -778,6 +778,8 @@ check_wizlist_for_destr (void)
                 check_for_destr(item->u.vec);
                 break;
             case T_MAPPING:
+                // called during GC and wiz_decay(), should check for destructed
+                // keys as well as values, therefore check_map_for_destr().
                 check_map_for_destr(item->u.map);
                 break;
             case T_OBJECT:

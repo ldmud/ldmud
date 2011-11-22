@@ -810,7 +810,8 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
  * If the key is not found, NULL is returned.
  *
  * Sideeffect: <map_index>.x.generic information is generated for types
- *   which usually have none (required for hashing).
+ *   which usually have none (required for hashing) and keys referencing
+ *   destructed objects are replaced by const0.
  */
 
 {
