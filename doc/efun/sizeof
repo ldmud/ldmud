@@ -11,6 +11,12 @@ DESCRIPTION
         As a special case, the number 0 can be passed, and the function
         will return 0.
 
+        One could assume, that this efun is very fast for mappings.
+        Unfortunately, this is not really true. The reason is, that mappings
+        need to be checked for keys which are destructed objects first.
+        Therefore the runtime of sizeof(mapping) is linear with the mapping
+        size (O(n)).
+
 HISTORY
         LDMud 3.2.9 added strings to the possible parameters.
         LDMud 3.3 added support for structs.

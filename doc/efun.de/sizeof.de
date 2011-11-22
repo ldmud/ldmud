@@ -2,17 +2,24 @@ SYNOPSIS
         int sizeof(mixed * val)
         int sizeof(string  val)
         int sizeof(mapping val)
+        int sizeof(struct xxx val)
 
 BESCHREIBUNG
-        Liefert die Anzahl Elemente in einem Array <val>, die Anzahl
-        Zeichen in einem String <val> oder die Anzal Keys in einem Mapping
-        <val>.
+        Liefert die Anzahl Elemente in einem Array oder einer Struct <val>,
+        die Anzahl Zeichen in einem String <val> oder die Anzal Keys in einem
+        Mapping <val>.
 
         Als Spezialfall kann <val> auch 0 sein. In diesem Fall liefert die
         Funktion 0 zurueck.
 
+        Diese Funktion ist mit einem Mapping als Argument nicht so schnell,
+        wie man erwarten koennte. Der Grund hierfuer ist, dass dabei zuerst
+        alle Keys auf zerstoerte Objekte geprueft werden muessen. Dies fuehrt
+        zu einer Laufzeit, die linear mit der Anzahl der Keys steigt (O(n)).
+
 GESCHICHTE
-        LDMud 3.2.9 fuehrte Strings als moegliche Attribute ein.
+        LDMud 3.2.9 fuehrte Strings als moegliche Argumente ein.
+        LDMud 3.3 fuehrte Structs als moegliche Argumente ein.
 
 SIEHE AUCH
         strlen(E), allocate(E), pointerp(E), mappingp(E), m_allocate(E),
