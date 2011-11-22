@@ -2128,9 +2128,6 @@ compact_mapping (mapping_t *m, Bool force)
     int old_malloc_privilege = malloc_privilege;
       /* Since it will be set temporarily to MALLOC_SYSTEM */
 
-    Bool checked_map_for_destr = MY_FALSE;
-      /* Flag if check_map_for_destr() has been called. */
-
     mapping_hash_t *hm;
       /* The hash part of m (guaranteed to exist!) */
     mapping_cond_t *cm;
@@ -2188,12 +2185,11 @@ compact_mapping (mapping_t *m, Bool force)
               PRIdPINT"!\n", hm->ref);
     }
 
-    /* Test if the mapping is dirty at all.
+    /* First test if the mapping is dirty at all.
      */
     if (!hm)
     {
-        check_map_for_destr(m); /* may create a hash part */
-        checked_map_for_destr = MY_TRUE;
+        check_map_for_destr_keys(m); // may create a hash part
         hm = m->hash;
         cm = m->cond;
     }
@@ -2208,7 +2204,7 @@ compact_mapping (mapping_t *m, Bool force)
     }
 
     /* Test the compaction criterium.
-     * By testing it before check_map_for_destr(), the size related
+     * By testing it before check_map_for_destr_keys(), the size related
      * criterias might trigger later than desired, but the time criterium
      * makes sure that we won't miss one.
      */
@@ -2228,16 +2224,13 @@ compact_mapping (mapping_t *m, Bool force)
         return MY_FALSE;
     }
 
-    /* Detect all destructed entries - the compaction algorithm
+    /* Detect all keys referencing destructed keys - the compaction algorithm
      * relies on it.
+     * Note: it will not check the keys (again) if not necessary.
      */
-    if (!checked_map_for_destr)
-    {
-        check_map_for_destr(m);
-        checked_map_for_destr = MY_TRUE;
-        hm = m->hash;
-        cm = m->cond;
-    }
+    check_map_for_destr_keys(m);
+    hm = m->hash;
+    cm = m->cond;
 
     /* Test if the mapping needs compaction at all.
      * If not, just delete the hash part (if any).
