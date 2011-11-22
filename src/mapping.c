@@ -1765,10 +1765,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
  * We leave it to the later compaction phase to get rid of all these
  * entries - if the mapping is still alive then.
  *
- * Note: The mappings (or at least mapping m2) should not contain destructed
- * objects, ie.  check_map_for_destr() should be called on both mappings
- * before the addition. If this is not done, strange things may happen to your
- * mappings, though the exact reasons are unclear (b-001204).
+ * Note: Skips keys referencing destructed objects.
  */
 
 {
@@ -1992,6 +1989,9 @@ add_mapping (mapping_t *m1, mapping_t *m2)
                 p_int i;
 
                 src = &(mc->data[0]);
+                if (destructed_object_ref(src))
+                    continue;
+
                 dest = get_map_lvalue_unchecked(m3, src);
                 if (!dest)
                 {
@@ -2022,6 +2022,9 @@ add_mapping (mapping_t *m1, mapping_t *m2)
                 p_int i;
 
                 src = &(mc->data[0]);
+                if (destructed_object_ref(src))
+                    continue;
+
                 dest = get_map_lvalue_unchecked(m3, src);
                 if (!dest)
                 {
