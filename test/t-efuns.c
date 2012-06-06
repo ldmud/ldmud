@@ -227,8 +227,9 @@ mixed *tests = ({
         (: json_parse("false") == 0 :) }),
     ({ "json_parse 3", 0,
         (: deep_eq(json_parse(json_teststring), json_testdata) :) }),
-    ({ "json_serialize 1", 0,
-        (: json_serialize(json_testdata) == json_teststring :) }),
+    ({ "json_serialize + json_parse 1", 0,
+        (: deep_eq(json_parse(json_serialize(json_testdata)), json_testdata) 
+         :) }),
 #endif // __JSON__
 });
 
