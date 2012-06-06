@@ -873,11 +873,6 @@ static int prog_string_indizes[0x100];
    * for the hash chains.
    */
 
-static char prog_string_tags[32];
-  /* Bitflags showing which entries in prog_string_indizes[] are valid:
-   * if (_tags[n] & (1 << b)) then _indizes[n*8 + b] is valid.
-   */
-
 static string_t *last_string_constant = NULL;
   /* The current (last) string constant, a tabled string.
    * It is also used to optimize "foo"+"bar" constructs.
@@ -5360,27 +5355,24 @@ store_prog_string (string_t *str)
 
 /* Add the tabled string <str> to the strings used by the program.
  * The function takes care that the same string is not stored twice.
- * Result is the index of the string in the table, the function
- * adopts the reference of <str>.
+ * The function adopts the reference of <str>.
+ * Result is the index of the string in the table or -1 in case of errors (out of memory).
  */
 
 {
     mp_uint str_size, next_size;
     long hash;
-    char mask, *tagp;
     int i, *indexp;
 
     /* Compute the hash and the tagmask for the hash table */
     /* TODO: This assumes 32-Bit pointers */
     hash = (long)str ^ (long)str >> 16;
     hash = (hash ^ hash >> 8);
-    mask = 1 << (hash & 7);
     hash = hash & 0xff;
 
     indexp = &prog_string_indizes[hash];
-    tagp = &prog_string_tags[hash >> 3];
 
-    if (*tagp & mask)
+    if (*indexp >= 0)
     {
         /* There is a hash chain for this hash: search the
          * string in there.
@@ -5390,6 +5382,7 @@ store_prog_string (string_t *str)
         {
             if ( PROG_STRING(i) == str )
             {
+                // same string as the new one.
                 free_mstring(str); /* Drop the extra ref. */
                 last_string_is_new = MY_FALSE;
                 return i;
@@ -5398,15 +5391,17 @@ store_prog_string (string_t *str)
                 break;
         }
 
-        /* Not found: re-get the initial 'next'-index */
+        /* Not found: re-get the initial 'next'-index. After insertation of the
+         * new string its PROG_STRING_NEXT will point to i (the old *indexp)
+         */
         i = *indexp;
     }
     else
     {
         /* The first time this hash shows up (which also implies
-         * that <str> is a new string.
+         * that <str> is a new string. i will be used to terminate this
+         * hash chain below.
          */
-        *tagp |= mask;
         i = -1;
     }
 
@@ -5423,22 +5418,23 @@ store_prog_string (string_t *str)
         if (!realloc_mem_block(&mem_block[A_STRINGS], 0)
          || !realloc_mem_block(&mem_block[A_STRING_NEXT], 0))
         {
-            if (i < 0)
-                *tagp &= ~mask;
+            yyerrorf("Out of memory for new program string (%zu bytes).",
+                    sizeof(string_t *) + sizeof(int));
             last_string_is_new = MY_FALSE;
-            return 0;
+            return -1;
         }
     }
 
-    /* Add the string pointer */
-    mem_block[A_STRINGS].current_size = str_size + sizeof(string_t *);
+    /* Add the string pointer to the A_STRING area. */
+    mem_block[A_STRINGS].current_size += sizeof(string_t *);
     *((string_t **)(mem_block[A_STRINGS].block+str_size)) = str;
 
-    /* Add the old prog_string_index[] */
-    mem_block[A_STRING_NEXT].current_size = next_size + sizeof(int);
+    /* Add the old prog_string_index[] as a new entry in A_STRING_NEXT */
+    mem_block[A_STRING_NEXT].current_size += sizeof(int);
     *((int *)(mem_block[A_STRING_NEXT].block+next_size)) = i;
 
-    /* Store the string index as new prog_string_index[] */
+    /* Store the string index in A_STRINGS as new prog_string_index[] at its
+     * hash position. */
     *indexp = str_size / sizeof str;
 
     last_string_is_new = MY_TRUE;
@@ -5456,19 +5452,16 @@ delete_prog_string (void)
     string_t *str;
     int size;
     long hash;
-    char mask, *tagp;
     int *indexp;
 
-    /* Remove the string from the A_STRINGS area and free it */
+    /* Remove the string from the A_STRINGS area */
     size = mem_block[A_STRINGS].current_size - sizeof(string_t *);
-    free_mstring(
-      str = *(string_t**)(mem_block[A_STRINGS].block+size)
-    );
+    str = *(string_t**)(mem_block[A_STRINGS].block + size);
     mem_block[A_STRINGS].current_size = size;
 
     /* Remove the string from the hash table */
-
-    size = (mem_block[A_STRING_NEXT].current_size -= sizeof(int));
+    mem_block[A_STRING_NEXT].current_size -= sizeof(int);
+    size = mem_block[A_STRING_NEXT].current_size;
 
     /* TODO: Assumes 32-Bit pointers */
     hash = (long)str ^ (long)str >> 16;
@@ -5476,11 +5469,12 @@ delete_prog_string (void)
     mask = 1 << (hash & 7);
     hash = hash & 0xff;
     indexp = &prog_string_indizes[hash];
-    tagp = &prog_string_tags[hash >> 3];
+    // let *indexp in the hash table point to the former next string.
+    *indexp = *((int *)(mem_block[A_STRING_NEXT].block+size));
+    // BTW: if that is now -1, the hash chain is empty.
 
-    if ( ( *indexp = *((int *)(mem_block[A_STRING_NEXT].block+size)) ) < 0)
-        /* Hash chain empty */
-        *tagp &= ~mask;
+    // and finally free the string
+    free_mstring(str);
 
 } /* delete_prog_string() */
 
@@ -16159,7 +16153,7 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
     stored_lines = 0;
     stored_bytes = 0;
     last_include_start = -1;
-    memset(prog_string_tags, 0, sizeof prog_string_tags);
+    memset(prog_string_indizes, -1, sizeof prog_string_indizes);
     num_virtual_variables = 0;
     case_state.free_block = NULL;
     case_state.next_free = NULL;
