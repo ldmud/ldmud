@@ -34,6 +34,10 @@ static INLINE hash32_t hashmem32_chained(void const * key, size_t len, hash32_t 
                         __attribute__((nonnull(1))) __attribute__((pure))
                         __attribute__((flatten));
 
+// Hash a pointer into a hash32_t.
+static INLINE hash32_t hashpointer(void const * ptr)
+                        __attribute__((nonnull)) __attribute__((pure))
+                        __attribute__((flatten));
 
 static INLINE hash32_t hashmem32(void const * key, size_t len)
 {
@@ -49,6 +53,11 @@ static INLINE hash32_t hashmem32_chained(void const * key, size_t len, hash32_t 
     return result;
 }
 
-
+static INLINE hash32_t hashpointer(void const * ptr)
+{
+    uint32_t result;
+    MurmurHash3_x86_32(ptr, sizeof(void *), INITIAL_HASH, &result);
+    return result;
+}
 
 #endif /* HASH_H__ */
