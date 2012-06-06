@@ -12,17 +12,14 @@ BESCHREIBUNG
         Funktion <fun> geliefert wird (oder 0 fuer nicht existierende oder
         als void deklarierte  Funktionen).
 
-        Optional kann der Driver so konfigueriert werden, dass auch ein Array
-        von Objekten *<ob> akzeptiert wird. Die Funktion <fun> wird dann fuer
-        jedes Objekt <ob> im Array mit den Argumenten <arg...> aufgerufen.
+        Weiterhin wird auch ein Array von Objekten *<ob> akzeptiert. Die
+        Funktion <fun> wird dann fuer jedes Objekt <ob> im Array mit den
+        Argumenten <arg...> aufgerufen.
         Die einzelnen Resultate werden in einem Array zusammen gefasst und
         dieses Array dann als Endresultat von call_other() zurueck gegeben.
         Die Elemente von *<ob> koennen Objekte oder Namen von Objekten sein.
         Zerstoerte Objekte und 0 als Element geben eine 0 zurueck, fuehren
         aber nicht zu einem Fehler.
-
-        Falls Arrays von Objekten akzeptiert werden, ist das Makro
-        __LPC_ARRAY_CALLS__ gesetzt.
 
         Das Objekt (bzw. die Objekte) kann direkt oder ueber einen String
         (d.h. den Objektnamen) angegeben werden. Wenn ein String angegeben
@@ -89,6 +86,7 @@ GESCHICHTE
           - call_other kann auch auf Arrays von Objekten angewandt werden.
         LDMud 3.2.10 machte den Aufruf von Objektarrays konfigurierbar.
         LDMud 3.3.113 fuehrte den Hook H_DEFAULT_METHOD ein.
+        LDMud 3.5.0 machte den Aufruf von Objektarrays nicht mehr optional.
 
 SIEHE AUCH
         call_direct(E), call_direct_resolved(E), call_resolved(E), create(A),

@@ -825,13 +825,9 @@ init_lexer(void)
 #ifdef USE_DEPRECATED
     add_permanent_define("__DEPRECATED__", -1, string_copy("1"), MY_FALSE);
 #endif
-
     add_permanent_define("__LPC_STRUCTS__", -1, string_copy("1"), MY_FALSE);
     add_permanent_define("__LPC_INLINE_CLOSURES__", -1, string_copy("1"), MY_FALSE);
-
-#ifdef USE_ARRAY_CALLS
     add_permanent_define("__LPC_ARRAY_CALLS__", -1, string_copy("1"), MY_FALSE);
-#endif
 #ifdef USE_TLS
     add_permanent_define("__TLS__", -1, string_copy("1"), MY_FALSE);
 #ifdef HAS_GNUTLS

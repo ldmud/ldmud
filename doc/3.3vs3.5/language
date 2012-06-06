@@ -24,7 +24,12 @@ that you should pay attention to when updating.
     appropriate LPC value. (optional efun)
   + json_serialize() converts a LPC value into an JSON object and
     serializes it as LPC string. (optional efun)
-    
+
+- Changed efuns:
+  + call_other() and call_direct() now always accept an array of objects or
+    strings (object names) as argument and call the function in all of these
+    objects.
+
 - Pragmas
   + The behaviour of the pragma combine_strings is mandatory, that means
     string literals concatenated by '+' will always be combined at

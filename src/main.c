@@ -1862,9 +1862,6 @@ options (void)
     /* Print the language options, nicely indented. */
     {
         char * optstrings[] = { "" /* have at least one string in here */
-#ifdef USE_ARRAY_CALLS
-                              , "call_other() on (object*) enabled\n"
-#endif
 #ifdef USE_PARSE_COMMAND
                               , "parse_command() enabled\n"
 #endif
