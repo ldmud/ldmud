@@ -20,7 +20,8 @@ typedef uint32_t  hash32_t;
 #define hashsize(n) (((uint32_t)1<<(n))-1)
 #define hashmask(n) (hashsize(n) - 1)
 
-extern uint32_t MurmurHash2 (void const * const key, size_t len, uint32_t seed);
+extern void MurmurHash3_x86_32 ( const void * key, int len,
+                                uint32_t seed, void * out );
 
 // Hash <len> characters into a uint32_t integer and return the result.
 static INLINE hash32_t hashmem32(void const * key, size_t len)
@@ -34,15 +35,18 @@ static INLINE hash32_t hashmem32_chained(void const * key, size_t len, hash32_t 
                         __attribute__((flatten));
 
 
-
 static INLINE hash32_t hashmem32(void const * key, size_t len)
 {
-    return MurmurHash2(key, len, INITIAL_HASH);
+    uint32_t result;
+    MurmurHash3_x86_32(key, len, INITIAL_HASH, &result);
+    return result;
 }
 
 static INLINE hash32_t hashmem32_chained(void const * key, size_t len, hash32_t initval)
 {
-    return MurmurHash2(key, len, initval);
+    uint32_t result;
+    MurmurHash3_x86_32(key, len, initval, &result);
+    return result;
 }
 
 
