@@ -5361,14 +5361,11 @@ store_prog_string (string_t *str)
 
 {
     mp_uint str_size, next_size;
-    long hash;
+    hash32_t hash;
     int i, *indexp;
 
     /* Compute the hash and the tagmask for the hash table */
-    /* TODO: This assumes 32-Bit pointers */
-    hash = (long)str ^ (long)str >> 16;
-    hash = (hash ^ hash >> 8);
-    hash = hash & 0xff;
+    hash = hashpointer(str) & 0xff;
 
     indexp = &prog_string_indizes[hash];
 
@@ -5451,7 +5448,7 @@ delete_prog_string (void)
 {
     string_t *str;
     int size;
-    long hash;
+    hash32_t hash;
     int *indexp;
 
     /* Remove the string from the A_STRINGS area */
@@ -5462,12 +5459,7 @@ delete_prog_string (void)
     /* Remove the string from the hash table */
     mem_block[A_STRING_NEXT].current_size -= sizeof(int);
     size = mem_block[A_STRING_NEXT].current_size;
-
-    /* TODO: Assumes 32-Bit pointers */
-    hash = (long)str ^ (long)str >> 16;
-    hash = (hash ^ hash >> 8);
-    mask = 1 << (hash & 7);
-    hash = hash & 0xff;
+    hash = hashpointer(str) & 0xff;
     indexp = &prog_string_indizes[hash];
     // let *indexp in the hash table point to the former next string.
     *indexp = *((int *)(mem_block[A_STRING_NEXT].block+size));
