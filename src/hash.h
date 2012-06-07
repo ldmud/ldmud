@@ -53,11 +53,44 @@ static INLINE hash32_t hashmem32_chained(void const * key, size_t len, hash32_t 
     return result;
 }
 
+
+// This is Thomas Wang's hash32shiftmult function:
+// http://www.concentric.net/~Ttwang/tech/inthash.htm
+static INLINE uint32_t hash32shiftmult(uint32_t key) {
+    key = (key ^ 61) ^ (key >> 16);
+    key = key + (key << 3);
+    key = key ^ (key >> 4);
+    key = key * 0x27d4eb2d;
+    key = key ^ (key >> 15);
+    return key;
+}
+
+// This is Thomas Wang's 64 bit to 32 bit Hash Function:
+// http://www.concentric.net/~Ttwang/tech/inthash.htm
+static INLINE uint32_t hash6432shift(uint64_t key)
+{
+    key = (~key) + (key << 18); // key = (key << 18) - key - 1;
+    key = key ^ (key >> 31);
+    key = key * 21; // key = (key + (key << 2)) + (key << 4);
+    key = key ^ (key >> 11);
+    key = key + (key << 6);
+    key = key ^ (key >> 22);
+    return (uint32_t) key;
+}
+
+
 static INLINE hash32_t hashpointer(void const * ptr)
 {
+#if UINTPTR_MAX <= UINT32_MAX   // ILP32 platform (or other with small pointers)
+    return hash32shiftmult((uintptr_t)ptr);
+#elif UINTPTR_MAX <= UINT64_MAX // LP64 platform
+    return hash6432shift((uintptr_t)ptr);
+#else   // fallback if pointer sizes are neither 4 bytes nor 8 bytes.
+#warning Neither ILP32 nor LP64 platform - using generic hashing for pointers.
     uint32_t result;
     MurmurHash3_x86_32(ptr, sizeof(void *), INITIAL_HASH, &result);
     return result;
+#endif
 }
 
 #endif /* HASH_H__ */
