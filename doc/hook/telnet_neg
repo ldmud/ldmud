@@ -15,24 +15,14 @@ DESCRIPTION
         minimal negotiation takes place).
 
         The hook is called whenever the driver receives a demand for
-        option negotiation for:
+        option negotiation for any option the driver does not handle itself.
+        By default, the driver deals with the following options:
+            TELOPT_ECHO:      Echo option
+            TELOPT_SGA:       Suppress Go Ahead (nearly always on)
+            TELOPT_COMPRESS:  Mud client compression protocol (obsolete)
+            TELOPT_COMPRESS2: Mud client compression protocol V2
 
-            SB:               Suboption negotiation
-            TELOPT_LINEMODE:  linemode
-            TELOPT_NAWS:      window size
-            TELOPT_TTYPE:     terminal type
-            TELOPT_TM:        timing mark
-            TELOPT_NEWENV:    remote environment variables
-            TELOPT_ENVIRON:   remote environment variables
-            TELOPT_XDISPLOC:  remote X display address
-            TELOPT_TSPEED:    terminal speed
-            TELOPT_BINARY:    binary data, needed for non-ASCII charsets
-            TELOPT_EOR:       TinyFugue prompt marker (together with EOR)
-
-            TELOPT_COMPRESS:  Mud Compression Protocol
-            TELOPT_COMPRESS2: Mud Compression Protocol
-            TELOPT_MSP:       Mud Sound Protocol
-            TELOPT_MXP:       Mud Extension Protocol
+        For all other telnet options negotiations, this hook is called.
 
         The hook has then to perform the negotiation using the efun
         binary_message().
@@ -55,6 +45,26 @@ DESCRIPTION
         followed by IAC SB/SE,  the hook is called with 'SB' as first
         argument, <opt> as second, and <opts> as an array of integers as
         third argument.
+
+REMARKS
+        An incomplete list of telnet negotiations this hook is called
+        for includes the following:
+            SB:               Suboption negotiation
+            TELOPT_LINEMODE:  linemode
+            TELOPT_NAWS:      window size
+            TELOPT_TTYPE:     terminal type
+            TELOPT_TM:        timing mark
+            TELOPT_NEWENV:    remote environment variables
+            TELOPT_ENVIRON:   remote environment variables
+            TELOPT_XDISPLOC:  remote X display address
+            TELOPT_TSPEED:    terminal speed
+            TELOPT_BINARY:    binary data, needed for non-ASCII charsets
+            TELOPT_EOR:       TinyFugue prompt marker (together with EOR)
+
+            TELOPT_MSP:       Mud Sound Protocol
+            TELOPT_MXP:       Mud Extension Protocol
+            TELOPT_MSSP:      Mud Server Status Protocol
+            TELOPT_GMCP:      Generic Mud Communication Protocol
 
 HISTORY
 
