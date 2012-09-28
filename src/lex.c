@@ -68,7 +68,7 @@
 
 /* TODO: Implement the # and ## operators. With this, #define X(a) (a + "a")
  * TODO:: can be made sane (X(b) -> 'b + "a"' instead of 'b + "b"').
- * TODO: New predefs' __BASENAME__, __FUNCTION__.
+ * TODO: New predefs' __BASENAME__.
  * TODO: #define macro(a,b,...) -> ... is assigned to __VA_ARGS__ (see oncoming
  * TODO:: C standard).
  * TODO: Does Standard-C allow recursive macro expansion? If not, we
@@ -609,6 +609,7 @@ static p_int cond_get_exp(int, svalue_t *);
 static int exgetc(void);
 static char *get_current_file(char **);
 static char *get_current_line(char **);
+static char *get_current_function(char **);
 static char *get_version(char **);
 static char *get_hostname(char **);
 static char *get_domainname(char **);
@@ -747,6 +748,7 @@ init_lexer(void)
 
     add_permanent_define("__MASTER_OBJECT__", -1, string_copy(mtext), MY_FALSE);
     add_permanent_define("__FILE__", -1, (void *)get_current_file, MY_TRUE);
+    add_permanent_define("__FUNCTION__", -1, (void *)get_current_function, MY_TRUE);
     add_permanent_define("__DIR__", -1, (void *)get_current_dir, MY_TRUE);
     add_permanent_define("__PATH__", 1, (void *)get_sub_path, MY_TRUE);
     add_permanent_define("__LINE__", -1, (void *)get_current_line, MY_TRUE);
@@ -7085,6 +7087,28 @@ get_current_file (char ** args UNUSED)
         sprintf(buf, "\"/%s\"", current_loc.file->name);
     return buf;
 } /* get_current_file() */
+
+/*-------------------------------------------------------------------------*/
+static char *
+get_current_function (char ** args UNUSED)
+
+/* Dynamic macro __FUNCTION__: expands to the name of the function
+ * currently being defined.
+ */
+{
+    const char *name = get_current_function_name();
+
+    if (!name) {
+        lexerror("__FUNCTION__ outside of function definition");
+        return string_copy("");
+    }
+
+    char *buf = xalloc(strlen(name) + 4);
+    if (!buf)
+        return NULL;
+    sprintf(buf, "\"%s\"", name);
+    return buf;
+}
 
 /*-------------------------------------------------------------------------*/
 static char *

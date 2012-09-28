@@ -2464,6 +2464,7 @@ free_all_local_names (void)
     max_number_of_locals = 0;
     current_break_stack_need = 0;
     max_break_stack_need = 0;
+    def_function_ident = NULL;
 } /* free_all_local_names() */
 
 /*-------------------------------------------------------------------------*/
@@ -2903,6 +2904,20 @@ leave_block_scope (Bool dontclobber)
 /* ======================   GLOBALS and FUNCTIONS   ====================== */
 
 /*-------------------------------------------------------------------------*/
+const char *
+get_current_function_name()
+
+/* Get the name of the function currently being defined. If there is
+ * no such function, return NULL.
+ */
+{
+    if (def_function_ident)
+        return get_txt(def_function_ident->name);
+    else
+        return NULL;
+}
+
+/*-------------------------------------------------------------------------*/
 static unsigned short
 store_argument_types ( int num_arg )
 
@@ -2961,7 +2976,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
  * This function is called at least twice for all function definitions:
  * first as prototype (flags & NAME_PROTOTYPE) when the function def is
  * encountered, then a second time for real when the function has been
- * completed. Explicite prototypes can cause additional calls.
+ * completed. Explicit prototypes can cause additional calls.
  */
 
 {
