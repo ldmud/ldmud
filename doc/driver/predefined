@@ -18,7 +18,8 @@ DESCRIPTION
                           without leading '/').
       __FILE__          : the name of the compiled file (in compat mode
                           without leading '/').
-      __LINE__          : the actual line number.
+      __LINE__          : the current line number.
+      __FUNCTION__      : the current function name.
       __DIR__           : the directory path of the compiled file (in
                           compat mode without leading '/').
       __PATH__(n)       : the directory path of the compiled file without
@@ -117,6 +118,7 @@ HISTORY
     3.3.718 added __XML_DOM__.
     3.3.719 removed __PTHREADS__, AMIGA, MSDOS_FS, __BEOS__  
 		    and added __GCRYPT__.
+    3.3.721 added __FUNCTION__.
 
 SEE ALSO
     pragma(LPC), preprocessor(LPC)
