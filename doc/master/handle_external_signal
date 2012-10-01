@@ -22,4 +22,5 @@ DESCRIPTION
                 immediate and non-graceful shutdown.
        SIGUSR1: the driver will reload the master object
        SIGUSR2: the driver will re-open its debug log file
+                (this will happen the next time the driver writes to it)
 
