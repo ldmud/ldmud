@@ -35,6 +35,7 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          blueprint. (#747)
        + Fixed result of convert_charset(): returns now the unchanged string
          if it gets an empty string for conversion. (#739)
+       + tls_init_connection() supports outgoing connections also with GnuTLS.
 
     - Removed Efuns:
        + The deprecated efuns cat() and tail() were removed. They can be

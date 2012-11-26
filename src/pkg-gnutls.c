@@ -99,16 +99,16 @@ generate_dh_params (void)
 
 /*-------------------------------------------------------------------------*/
 static void
-initialize_tls_session (gnutls_session *session) __attribute__((nonnull));
+initialize_tls_session (gnutls_session *session, Bool outgoing) __attribute__((nonnull));
 static void
-initialize_tls_session (gnutls_session *session)
+initialize_tls_session (gnutls_session *session, Bool outgoing)
 
 /* GnuTLS: Initialise a TLS <session>.
  * tls_is_available must be TRUE.
  */
 
 {
-    gnutls_init(session, GNUTLS_SERVER);
+    gnutls_init(session, outgoing ? GNUTLS_CLIENT : GNUTLS_SERVER);
 
     /* avoid calling all the priority functions, since the defaults
      * are adequate.
@@ -584,7 +584,7 @@ tls_init_connection (interactive_t *ip)
  */
 
 {
-    initialize_tls_session(&ip->tls_session);
+    initialize_tls_session(&ip->tls_session, ip->outgoing_conn);
     gnutls_transport_set_ptr(ip->tls_session, (gnutls_transport_ptr)(ip->socket));
 
     return 0;
