@@ -255,19 +255,19 @@ mdb_log_sbrk (p_int size)
  * The allocator is free to use any information found in xalloc.
  * In return, the allocator has to provide this interface:
  *
- *   static POINTER mem_alloc(size_t size)
+ *   static void * mem_alloc(size_t size)
  *     to allocate a memory block
  *
- *   static void mem_free(POINTER p)
+ *   static void mem_free(void * p)
  *     to deallocate a memory block
  *
- *   static POINTER mem_realloc (POINTER p, size_t size)
+ *   static void * mem_realloc (void * p, size_t size)
  *     reallocate a block.
  *
  *   static void * mem_increment_size (void *vp, size_t size)
  *     Increase a block size in place. If not possible, return NULL.
  *
- *   static static size_t mem_block_size (POINTER p)
+ *   static static size_t mem_block_size (void * p)
  *     Return the size of an allocated block.
  *     If this value is not available, implement this function as a dummy,
  *     but also #define NO_MEM_BLOCK_SIZE.
@@ -277,8 +277,8 @@ mdb_log_sbrk (p_int size)
  *   static static size_t mem_overhead ()
  *     Return the size of the allocators internal overhead.
  *
- *   static void mem_mark_permanent (POINTER p)
- *   static void mem_mark_collectable (POINTER p)
+ *   static void mem_mark_permanent (void * p)
+ *   static void mem_mark_collectable (void * p)
  *     Mark a block as permanent resp. collectable
  *
  *   void mem_consolidate (bool force)
@@ -303,9 +303,9 @@ mdb_log_sbrk (p_int size)
  *
 #endif
 #ifdef GC_SUPPORT
- *   static void mem_clear_ref (POINTER p)
- *   static void mem_mark_ref (POINTER p)
- *   static Bool mem_test_ref (POINTER p)
+ *   static void mem_clear_ref (void * p)
+ *   static void mem_mark_ref (void * p)
+ *   static Bool mem_test_ref (void * p)
  *     Clear, set, test the 'referenced' marker.
  *
  *   void mem_clear_ref_flags()
@@ -316,7 +316,7 @@ mdb_log_sbrk (p_int size)
  *     This routine also has to accordingly adjust xalloc_stat.
  *
 #ifdef MALLOC_TRACE
- *   static Bool mem_is_freed (POINTER p, size_t minsize)
+ *   static Bool mem_is_freed (void * p, size_t minsize)
  *     Return true if <p> is a free block.
 #endif
 #endif
@@ -359,7 +359,7 @@ mdb_log_sbrk (p_int size)
 
 /*-------------------------------------------------------------------------*/
 size_t
-xalloced_size (POINTER p
+xalloced_size (void * p
 #ifdef NO_MEM_BLOCK_SIZE
                          UNUSED
 #endif /* NO_MEM_BLOCK_SIZE */
@@ -525,7 +525,7 @@ check_max_malloced (void)
 } /* check_max_malloced() */
 
 /*-------------------------------------------------------------------------*/
-POINTER
+void *
 xalloc_traced (size_t size MTRACE_DECL)
 
 /* Allocate <size> bytes of memory like malloc() does.
@@ -576,12 +576,12 @@ xalloc_traced (size_t size MTRACE_DECL)
     if (check_max_malloced())
         return NULL;
 #endif
-    return (POINTER)(p + XM_OVERHEAD);
+    return (void *)(p + XM_OVERHEAD);
 } /* xalloc_traced() */
 
 /*-------------------------------------------------------------------------*/
 void
-xfree (POINTER p)
+xfree (void * p)
 
 /* Free the memory block <p>.
  */
@@ -600,7 +600,7 @@ xfree (POINTER p)
 } /* xfree() */
 
 /*-------------------------------------------------------------------------*/
-POINTER
+void *
 pxalloc_traced (size_t size MTRACE_DECL)
 
 /* Allocate a block of <size> bytes - like xalloc(), just that the
@@ -608,7 +608,7 @@ pxalloc_traced (size_t size MTRACE_DECL)
  */
 
 {
-    POINTER temp;
+    void * temp;
 
     temp = xalloc_traced(size MTRACE_PASS);
     if (temp)
@@ -620,7 +620,7 @@ pxalloc_traced (size_t size MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 void
-pfree (POINTER p)
+pfree (void * p)
 
 /* Deallocate a permanent block <p>.
  */
@@ -634,8 +634,8 @@ pfree (POINTER p)
 } /* pfree() */
 
 /*-------------------------------------------------------------------------*/
-POINTER
-prexalloc_traced (POINTER p, size_t size MTRACE_DECL)
+void *
+prexalloc_traced (void * p, size_t size MTRACE_DECL)
 
 /* Reallocate block <p> to the new size of <size> and return the pointer.
  * The memory is not subject to GC.
@@ -647,7 +647,7 @@ prexalloc_traced (POINTER p, size_t size MTRACE_DECL)
  */
 
 {
-    POINTER temp;
+    void * temp;
 
     if (p)
     {
@@ -699,8 +699,8 @@ malloc_increment_size (void *vp, size_t size)
 } /* malloc_increment_size() */
 
 /*-------------------------------------------------------------------------*/
-POINTER
-rexalloc_traced (POINTER p, size_t size MTRACE_DECL
+void *
+rexalloc_traced (void * p, size_t size MTRACE_DECL
 #ifndef MALLOC_SBRK_TRACE
                                                     UNUSED
 #endif /* MALLOC_SBRK_TRACE */
@@ -772,7 +772,7 @@ rexalloc_traced (POINTER p, size_t size MTRACE_DECL
         t += XM_OVERHEAD;
     }
     
-    return (POINTER)t;
+    return (void *)t;
 } /* rexalloc() */
 
 /*=========================================================================*/
@@ -782,7 +782,7 @@ rexalloc_traced (POINTER p, size_t size MTRACE_DECL
 #ifdef GC_SUPPORT
 /*-------------------------------------------------------------------------*/
 void
-x_clear_ref (POINTER p)
+x_clear_ref (void * p)
 
 /* GC Support: Clear the 'referenced' flag for block <p>.
  */
@@ -793,7 +793,7 @@ x_clear_ref (POINTER p)
 
 /*-------------------------------------------------------------------------*/
 int
-x_mark_ref (POINTER p)
+x_mark_ref (void * p)
 
 /* GC Support: Set the 'referenced' flag for block <p>.
  * This function returns a value (1) so that it can be used in macros
@@ -806,7 +806,7 @@ x_mark_ref (POINTER p)
 
 /*-------------------------------------------------------------------------*/
 Bool
-x_test_ref (POINTER p)
+x_test_ref (void * p)
 
 /* GC Support: Check the memory block marker for <p>, return TRUE if _not_
  * set.
@@ -1167,7 +1167,7 @@ dump_malloc_trace (int d
 #if defined(REPLACE_MALLOC)
 
 /*-------------------------------------------------------------------------*/
-POINTER
+void *
 malloc (size_t size)
 
 /* Allocate an empty memory block of size <sizel>.
@@ -1175,7 +1175,7 @@ malloc (size_t size)
  */
 
 {
-    POINTER result = pxalloc(size);
+    void * result = pxalloc(size);
     if (!result)
     {
         int save_privilege = malloc_privilege;
@@ -1193,8 +1193,8 @@ malloc (size_t size)
 } /* malloc() */
 
 /*-------------------------------------------------------------------------*/
-FREE_RETURN_TYPE
-free (POINTER ptr)
+void
+free (void * ptr)
 
 /* Free the memory block <ptr> which was allocated with malloc().
  */
@@ -1206,11 +1206,10 @@ free (POINTER ptr)
     }
 
     pfree(ptr);
-    FREE_RETURN
 } /* free() */
 
 /*-------------------------------------------------------------------------*/
-POINTER
+void *
 calloc (size_t nelem, size_t sizel)
 
 /* Allocate an empty memory block for <nelem> objects of size <sizel>.
@@ -1230,8 +1229,8 @@ calloc (size_t nelem, size_t sizel)
 } /* calloc() */
 
 /*-------------------------------------------------------------------------*/
-POINTER
-realloc (POINTER p, size_t size)
+void *
+realloc (void * p, size_t size)
 
 /* Reallocate block <p> to the new size of <size> and return the pointer.
  * The memory is aligned and not subject to GC.
@@ -1239,7 +1238,7 @@ realloc (POINTER p, size_t size)
 
 {
    size_t old_size;
-   POINTER t;
+   void * t;
 
    if (!p)
         return malloc(size);

@@ -684,7 +684,7 @@ extstat_update_max (extstat_t * pStat)
 
 /*-------------------------------------------------------------------------*/
 static INLINE size_t
-mem_block_total_size (POINTER p)
+mem_block_total_size (void * p)
 
 /* Return the size of block <p> (including internal overhead) in bytes.
  */
@@ -699,7 +699,7 @@ mem_block_total_size (POINTER p)
 
 /*-------------------------------------------------------------------------*/
 static INLINE size_t
-mem_block_size (POINTER p)
+mem_block_size (void * p)
 
 /* Return the size of block <p> (sans internal overhead) in bytes.
  */
@@ -715,7 +715,7 @@ mem_block_size (POINTER p)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-mem_mark_permanent (POINTER p)
+mem_mark_permanent (void * p)
 
 /* Mark the allocated block at <p> as permanent, ie. it won't be subject
  * to the GC.
@@ -732,7 +732,7 @@ mem_mark_permanent (POINTER p)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-mem_mark_collectable (POINTER p)
+mem_mark_collectable (void * p)
 
 /* Mark the allocated block at <p> as non-permant, ie. it is subject
  * to the GC.
@@ -1459,7 +1459,7 @@ defragment_small_block (word_t *block)
 #endif
 
 /*-------------------------------------------------------------------------*/
-static POINTER
+static void *
 mem_alloc (size_t size)
 
 /* Allocate a memory block for <size> bytes at the source <file>:<line>.
@@ -1560,7 +1560,7 @@ mem_alloc (size_t size)
             MADVISE(temp, orig_size);
 
             in_malloc--;
-            return (POINTER)temp;
+            return (void *)temp;
         }
 
         /* There is nothing suitable in the normal free list - next try
@@ -1636,7 +1636,7 @@ mem_alloc (size_t size)
 #endif
 
                 in_malloc--;
-                return (POINTER)this;
+                return (void *)this;
             }
         } /* allocation from oversized lists */
 
@@ -1687,7 +1687,7 @@ mem_alloc (size_t size)
 #endif
 
             in_malloc--;
-            return (POINTER)pt;
+            return (void *)pt;
         } /* allocation from larger blocks */
 
         /* At this point, there was nothing in the free lists.
@@ -1784,13 +1784,13 @@ mem_alloc (size_t size)
 
         MADVISE(temp, orig_size);
         in_malloc--;
-        return (POINTER)temp;
+        return (void *)temp;
     } /* allocate from a new small chunk */
 } /* mem_alloc() */
 
 /*-------------------------------------------------------------------------*/
 static void
-sfree (POINTER ptr)
+sfree (void * ptr)
 
 /* Return the memoryblock <ptr> to the allocator.
  * This function does the actual freeing, without checking for mutexes
@@ -1852,7 +1852,7 @@ sfree (POINTER ptr)
 
 /*-------------------------------------------------------------------------*/
 static void
-mem_free (POINTER ptr)
+mem_free (void * ptr)
 
 /* Return the memoryblock <ptr> to the allocator.
  * This is a wrapper for sfree() which performs checks for stack-gaps
@@ -1879,15 +1879,15 @@ mem_free (POINTER ptr)
 } /* mem_free() */
 
 /*-------------------------------------------------------------------------*/
-static POINTER
-mem_realloc (POINTER p, size_t size)
+static void *
+mem_realloc (void * p, size_t size)
 
 /* Reallocate block <p> to the new size of <size> and return the pointer.
  * The memory is not aligned and subject to GC.
  */
 
 {
-    POINTER t;
+    void * t;
     size_t old_size;
 
     old_size = mem_block_size(p);
@@ -3636,7 +3636,7 @@ mem_increment_size (void *vp, size_t size)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-mem_clear_ref (POINTER p)
+mem_clear_ref (void * p)
 
 /* GC Support: Clear the 'referenced' flag for block <p>.
  */
@@ -3647,7 +3647,7 @@ mem_clear_ref (POINTER p)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-mem_mark_ref (POINTER p)
+mem_mark_ref (void * p)
 
 /* GC Support: Set the 'referenced' flag for block <p>.
  */
@@ -3658,7 +3658,7 @@ mem_mark_ref (POINTER p)
 
 /*-------------------------------------------------------------------------*/
 static INLINE Bool
-mem_test_ref (POINTER p)
+mem_test_ref (void * p)
 
 /* GC Support: Check the memory block marker for <p>, return TRUE if _not_
  * set.

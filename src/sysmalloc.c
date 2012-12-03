@@ -29,7 +29,7 @@ static char * heap_end = NULL;
    */
 
 /*-------------------------------------------------------------------------*/
-static inline POINTER
+static inline void *
 mem_alloc (size_t size)
 
 /* Allocate a memory block for <size> bytes at the source <file>:<line>.
@@ -37,7 +37,7 @@ mem_alloc (size_t size)
  */
 
 {
-    POINTER rc;
+    void * rc;
 
     rc = malloc(size);
 
@@ -53,7 +53,7 @@ mem_alloc (size_t size)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-mem_free (POINTER ptr)
+mem_free (void * ptr)
 
 /* Return the memoryblock <ptr> to the allocator.
  */
@@ -63,8 +63,8 @@ mem_free (POINTER ptr)
 } /* mem_free() */
 
 /*-------------------------------------------------------------------------*/
-static POINTER
-mem_realloc (POINTER p, size_t size)
+static void *
+mem_realloc (void * p, size_t size)
 
 /* Reallocate block <p> to the new size of <size> and return the pointer.
  */
@@ -75,7 +75,7 @@ mem_realloc (POINTER p, size_t size)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-mem_mark_permanent (POINTER p UNUSED)
+mem_mark_permanent (void * p UNUSED)
 
 /* Mark the allocated block at <p> as permanent, ie. it won't be subject
  * to the GC.
@@ -90,7 +90,7 @@ mem_mark_permanent (POINTER p UNUSED)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-mem_mark_collectable (POINTER p UNUSED)
+mem_mark_collectable (void * p UNUSED)
 
 /* Mark the allocated block at <p> as non-permant, ie. it is subject
  * to the GC.
@@ -105,7 +105,7 @@ mem_mark_collectable (POINTER p UNUSED)
 
 /*-------------------------------------------------------------------------*/
 static INLINE size_t
-mem_block_size (POINTER p UNUSED)
+mem_block_size (void * p UNUSED)
 
 /* Return the size of block <p> (sans internal overhead) in bytes.
  */

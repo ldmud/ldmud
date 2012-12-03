@@ -111,8 +111,6 @@ extern int stack_direction;
 /* TODO: It would be nice to have a 'safe xalloc' which would either return
  * TODO:: a pointer or throw an Out-of-memory error. Alas, with all the
  * TODO:: local copies of inter_sp/inter_pc this is not so easy.
- * TODO: Check what  C99 says about free() and friends; if possible, exchange
- * TODO:: all POINTER with void*.
  */
 /* xalloc(): normal allocation
  * xalloc_traced(): allocation with given file/line
@@ -140,30 +138,30 @@ extern int stack_direction;
 #define xalloc_pass(size)       xalloc_traced((size) MTRACE_PASS)
 #define rexalloc_pass(old,size) rexalloc_traced((old),(size) MTRACE_PASS)
 
-extern size_t  xalloced_size (POINTER p)  __attribute__((nonnull(1)));
+extern size_t  xalloced_size (void * p)  __attribute__((nonnull(1)));
 extern size_t  xalloc_overhead (void);
 
-extern POINTER xalloc_traced(size_t size MTRACE_DECL)
+extern void * xalloc_traced(size_t size MTRACE_DECL)
        MALLOC __attribute__ ((warn_unused_result));
 
-extern void    xfree(POINTER);
+extern void    xfree(void *);
 
-extern POINTER rexalloc_traced(POINTER, size_t size MTRACE_DECL) 
+extern void * rexalloc_traced(void *, size_t size MTRACE_DECL) 
        MALLOC __attribute__((warn_unused_result));
 
-extern POINTER pxalloc_traced(size_t size MTRACE_DECL)
+extern void * pxalloc_traced(size_t size MTRACE_DECL)
        MALLOC __attribute__ ((warn_unused_result));
-extern POINTER prexalloc_traced(POINTER, size_t size MTRACE_DECL)
+extern void * prexalloc_traced(void *, size_t size MTRACE_DECL)
        MALLOC __attribute__((warn_unused_result));
 
-extern void    pfree(POINTER);
+extern void    pfree(void *);
 extern void  * malloc_increment_size (void *vp, size_t size)
                                 __attribute__((nonnull(1)));
 
 #ifdef GC_SUPPORT
-extern void x_clear_ref (POINTER p)  __attribute__((nonnull(1)));
-extern int x_mark_ref (POINTER p)  __attribute__((nonnull(1)));
-extern Bool x_test_ref (POINTER p)  __attribute__((nonnull(1)));
+extern void x_clear_ref (void * p)  __attribute__((nonnull(1)));
+extern int x_mark_ref (void * p)  __attribute__((nonnull(1)));
+extern Bool x_test_ref (void * p)  __attribute__((nonnull(1)));
 #endif /* GC_SUPPORT */
 
 #ifdef MALLOC_TRACE

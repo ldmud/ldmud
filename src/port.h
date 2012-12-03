@@ -336,16 +336,6 @@ typedef char  CBool;
 #define MY_FALSE (false)
 
 
-/* TODO: This should go into my-malloc.h? */
-#ifdef FREE_RETURNS_VOID
-#    define FREE_RETURN_TYPE void
-#    define FREE_RETURN return;
-#else
-#    define FREE_RETURN_TYPE int
-#    define FREE_RETURN return 1;
-#endif
-
-
 /*------------------------------------------------------------------
  * Provide functions, types and defines missing from the system headers.
  */
