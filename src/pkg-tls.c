@@ -29,6 +29,7 @@
 /* Variables */
 
 char * tls_keyfile = NULL;
+char * tls_keydirectory = NULL;
 char * tls_certfile = NULL;
 char * tls_trustfile = NULL;
 char * tls_trustdirectory = NULL;

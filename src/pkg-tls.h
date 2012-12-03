@@ -24,6 +24,7 @@
 /* --- Variables --- */
 
 extern char * tls_keyfile;
+extern char * tls_keydirectory;
 extern char * tls_certfile;
 extern char * tls_trustdirectory;
 extern char * tls_trustfile;

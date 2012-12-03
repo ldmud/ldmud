@@ -335,6 +335,7 @@
 /* Default paths for TLS.
  */
 @cdef_tls_keyfile@        TLS_DEFAULT_KEYFILE        @val_tls_keyfile@
+@cdef_tls_keydirectory@   TLS_DEFAULT_KEYDIRECTORY   @val_tls_keydirectory@
 @cdef_tls_certfile@       TLS_DEFAULT_CERTFILE       @val_tls_certfile@
 @cdef_tls_trustfile@      TLS_DEFAULT_TRUSTFILE      @val_tls_trustfile@
 @cdef_tls_trustdirectory@ TLS_DEFAULT_TRUSTDIRECTORY @val_tls_trustdirectory@
