@@ -617,7 +617,7 @@ cleanup_object (object_t * obj)
  * to destructed objects and removes them. Also, untabled strings
  * are made tabled. The time for the next cleanup is set to 
  * a time in the interval [0.9*time_to_cleanup .. 1.1 * time_to_cleanup]
- * from now (if time_to_cleanup is 0, DEFAULT_CLEANUP_TIME is assumed).
+ * from now.
  *
  * This function is called by the backend.
  */
@@ -699,8 +699,7 @@ cleanup_driver_structures (void)
 /* Cleanup the fixed driver structures if it is time.
  *
  * The time for the next cleanup is set to a time in the interval
- * [0.9*time_to_cleanup .. 1.1 * time_to_cleanup] from now (if time_to_cleanup
- * is 0, DEFAULT_CLEANUP_TIME is assumed).
+ * [0.9*time_to_cleanup .. 1.1 * time_to_cleanup] from now.
  *
  * This function is called by the backend.
  */
