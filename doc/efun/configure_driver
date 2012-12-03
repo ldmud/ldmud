@@ -4,6 +4,8 @@ SYNOPSIS
         void configure_driver(int what, mixed data)
 
 DESCRIPTION
+        This efun configures runtime adjustable bahviour of the driver.
+
         Sets the option <what> to the value <data>.
 
         This function always causes the privilege_violation
@@ -25,11 +27,22 @@ DESCRIPTION
            the debug log. The execution will continue at that point.
            <data> is an integer and measured in microseconds.
            A time of 0 disables the detection of long executions.
+        <what> == DC_DATA_CLEAN_TIME
+           Sets the average time between clean-ups of an objects data
+           structures. This is not to be confused with the standard cleanup
+           time which determines when H_CLEAN_UP is called. A long time for
+           data cleanup may lead to larger memory consumption and prevents
+           destructed objects being cleaned up. A too short time may lead to
+           high loads and lag on the machine. The actual time delay will be a
+           time between 0.9*DC_DATA_CLEAN_TIME and 1.1*DC_DATA_CLEAN_TIME.
+           Default at driver startup are 3600s.
+           <data> is an integer and measured in seconds.
 
 HISTORY
         Introduced in LDMud 3.3.719.
         DC_ENABLE_HEART_BEATS was added in 3.5.0.
         DC_LONG_EXEC_TIME was added in 3.5.0.
+        DC_DATA_CLEAN_TIME was added in 3.5.0.
 
 SEE ALSO
         configure_interactive(E)
