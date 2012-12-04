@@ -8396,7 +8396,12 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
             else
             {
                 cp = numstart;
-                dval = atof(cp);
+                errno=0;
+                dval = strtod(numstart, &cp);
+                if (errno == ERANGE)
+                {
+                    warnf("Floating point number out of range in restore_svalue().\n");
+                }
             }
         }
         STORE_DOUBLE(svp,dval);
