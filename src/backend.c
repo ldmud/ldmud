@@ -1225,8 +1225,7 @@ no_clean_up:
         /* ------ Data Cleanup ------ */
 
         /* Objects are processed at intervals determined by their
-         * time to clean up (or DEFAULT_CLEANUP_TIME if the stored time
-         * is 0).
+         * time to clean up.
          */
         if ( (num_last_data_cleaned == 0 || !comm_time_to_call_heart_beat)
          && (unsigned long)obj->time_cleanup < (unsigned long)current_time

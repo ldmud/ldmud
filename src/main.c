@@ -224,8 +224,9 @@ mp_int boot_time = 0;
   /* The time() the driver was started.
    */
 
-long time_to_data_cleanup = 0;
-  /* The time delay between two data cleans, derived from time_to_cleanup. */
+long time_to_data_cleanup = 10800;
+  /* The time delay between two data cleans 
+     Default maybe a bit higher, because it can't be easily changed. */
 
 int exit_code = 0; /* TODO: There are constants for this */
   /* Exit code from the program, can be changed with the shutdown()
@@ -463,7 +464,7 @@ main (int argc, char **argv)
           /* This also assures the existance of the fd for the debug log */
 
         time_to_data_cleanup = (time_to_cleanup > 0) ? time_to_cleanup
-                                                     : DEFAULT_CLEANUP_TIME;
+                                                     : 10800;
         reserve_memory();
         mstring_init();
           /* Also initializes the standard strings, which may be required
