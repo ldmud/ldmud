@@ -4683,8 +4683,9 @@ v_object_info (svalue_t *sp, int num_args)
 
         {
             mp_int totalsize;
+            mp_int datasize = data_size(o, &totalsize);
 
-            ST_NUMBER(OIM_DATA_SIZE, data_size(o, &totalsize));
+            ST_NUMBER(OIM_DATA_SIZE, datasize);
             ST_NUMBER(OIM_TOTAL_DATA_SIZE, totalsize);
         }
 
