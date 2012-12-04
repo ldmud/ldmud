@@ -8342,28 +8342,36 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9':
       {
-        char c, *numstart = cp;
-        int nega = 0;
-        long l = 0;
+        char *numstart = cp;
         double dval;
+        intmax_t ival;
 
-        if (*cp == '-')
-        {
-            nega = 1;
-            cp++;
+        // first try to restore the number as integer number.
+        errno=0;
+        ival = strtoimax(numstart, &cp, 10);
+        if (errno == EINVAL || numstart == cp)
+            errorf("Could not restore integer in restore_svalue() (probably "
+              "illegal value format).\n");
+        else if (errno == ERANGE || ival > PINT_MAX || ival < PINT_MIN) {
+            warnf("Integer value out of range in restore_svalue(). Value was "
+              "truncated!\n");
+            if (ival < 0)
+                ival = PINT_MIN;
+            else
+                ival = PINT_MAX;
         }
-        
-        while(lexdigit(c = *cp++))
-            l = (((l << 2) + l) << 1) + (c - '0');
-        
-        if ( (restore_ctx->restored_version >= 2  && c != 'x')
-            || (restore_ctx->restored_version < 2 && c != '.' ) )
+
+        // if strtoimax stopped at a 'x' or '.', this seems to be a floating
+        // number (then start again below), otherwise this is regarded as
+        // integer number and put into svp and we return.
+        if ( (restore_ctx->restored_version >= 2  && *cp != 'x')
+            || (restore_ctx->restored_version < 2 && *cp != '.' ) )
         {
-            put_number(svp, nega ? -l : l);
-            *pt = cp;
-            return c == delimiter;
+            put_number(svp, (p_int)ival);
+            *pt = cp+1;   // cp points to the delimeter, pt to one char after that...
+            return *cp == delimiter;  // if everything is OK.
         }
-        
+
         svp->type = T_FLOAT;
         if (restore_ctx->restored_version >= 2 )
         {
