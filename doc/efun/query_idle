@@ -2,7 +2,8 @@ SYNOPSIS
         int query_idle(object ob)
 
 DESCRIPTION
-        Query how many seconds a user object has been idle
+        Query how many seconds an interactive object <ob> has been idle.
+        If <ob> is not an interactive object an error will be thrown.
 
 SEE ALSO
         interactive(E)

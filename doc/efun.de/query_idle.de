@@ -2,7 +2,10 @@ SYNOPSIS
         int query_idle(object ob)
 
 BESCHREIBUNG
-        Gibt an, seit wie vielen Sekunden ein Player Objekt <ob> idle ist.
+        Gibt an, seit wie vielen Sekunden ein interaktives Objekt <ob> idle
+        ist.
+        Falls <ob> kein interaktives Objekt ist, wird ein Fehler
+        ausgeloest.
 
 SIEHE AUCH
         interactive(E)
