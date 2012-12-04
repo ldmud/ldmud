@@ -433,8 +433,7 @@ static mp_int last_id = 0;
 #endif
     ob->variables = ob_vars;
 
-    ob->time_cleanup = current_time + ((time_to_cleanup > 0) ? time_to_cleanup
-                                                             : 3600);
+    ob->time_cleanup = current_time + time_to_data_cleanup;
 
     /* Initialize the variables */
 
