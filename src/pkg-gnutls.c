@@ -149,12 +149,111 @@ tls_xfree (void *p)
 } /* tls_xfree() */
 
 /*-------------------------------------------------------------------------*/
+
+/* Helper function for reading regular files in a directory.
+ *
+ * This structure keeps all needed variables for reading a directory.
+ */
+struct tls_dir
+{
+    DIR * d;
+    char * fname;
+    size_t dirlen;
+};
+
+/*-------------------------------------------------------------------------*/
+static Bool
+tls_opendir (const char * dir, const char * desc, struct tls_dir * info)
+
+/* Wrapper around opendir(), that prints error messages and
+ * and prepares the tls_dir structure for use with tls_readdir.
+ *
+ * When successful it returns MY_TRUE and info->d will not be NULL.
+ */
+
+{
+    info->d = NULL;
+    if (!dir)
+        return MY_FALSE;
+
+    printf("%s TLS: (GnuTLS) %s from directory '%s'.\n"
+          , time_stamp(), desc, dir);
+    debug_message("%s TLS: (GnuTLS) %s from directory '%s'.\n"
+                 , time_stamp(), desc, dir);
+
+    info->dirlen = strlen(dir);
+    info->fname = (char*) xalloc(info->dirlen + NAME_MAX + 2);
+    if (!info->fname)
+    {
+        errno = ENOMEM;
+    }
+    else
+    {
+        strcpy(info->fname, dir);
+        info->fname[info->dirlen++] = '/';
+        info->d = opendir(dir);
+    }
+
+    if (info->d == NULL)
+    {
+        printf("%s TLS: Can't read %s directory: %s.\n"
+              , time_stamp(), desc, strerror(errno));
+        debug_message("%s TLS: Can't read %s directory: %s\n"
+                     , time_stamp(), desc, strerror(errno));
+
+        if(info->fname)
+            xfree(info->fname);
+
+        return MY_FALSE;
+    }
+
+    return MY_TRUE;
+}
+
+/*-------------------------------------------------------------------------*/
+static const char *
+tls_readdir (struct tls_dir * info)
+
+/* Wrapper around readdir() that looks for a regular file and
+ * returns the concatenation of the directory and file name.
+ *
+ * Returns NULL at the end of the directory and then frees
+ * all variables in the tls_dir structure.
+ */
+
+{
+    struct dirent *file;
+
+    if (info->d == NULL)
+        return NULL;
+
+    while ((file = readdir(info->d)) != NULL)
+    {
+        struct stat st;
+
+        strcpy(info->fname+info->dirlen, file->d_name);
+        stat(info->fname, &st);
+
+        if (S_ISREG(st.st_mode))
+            return info->fname;
+    }
+
+    closedir(info->d);
+    info->d = NULL;
+    xfree(info->fname);
+    return NULL;
+}
+
+/*-------------------------------------------------------------------------*/
 void
 tls_verify_init (void)
 
 /* initialize or reinitialize tls certificate storage and revocation lists.
  */
 {
+    struct tls_dir dir;
+    const char* fname;
+
     gnutls_certificate_free_cas(x509_cred);
 
     if (tls_trustfile != NULL)
@@ -175,75 +274,27 @@ tls_verify_init (void)
                          , time_stamp(), gnutls_strerror(err));
         }
     }
-
-    if (tls_trustdirectory)
-    {
-        DIR * d;
-        char *fname;
-        size_t dirlen;
-        int err;
-
-        printf("%s TLS: (GnuTLS) trusted x509 certificates from directory '%s'.\n"
-              , time_stamp(), tls_trustdirectory);
-        debug_message("%s TLS: (GnuTLS) trusted x509 certificates from directory '%s'.\n"
-                     , time_stamp(), tls_trustdirectory);
-
-        dirlen = strlen(tls_trustdirectory);
-        fname = (char*) xalloc(dirlen + NAME_MAX + 2);
-        if (!fname)
-        {
-            errno = ENOMEM;
-            d = NULL;
-        }
-        else
-        {
-            strcpy(fname, tls_trustdirectory);
-            fname[dirlen++] = '/';
-            d = opendir(tls_trustdirectory);
-        }
-
-        if (d == NULL)
-        {
-            printf("%s TLS: Can't read trust directory: %s.\n"
-                  , time_stamp(), strerror(errno));
-            debug_message("%s TLS: Can't read trust directory: %s\n"
-                         , time_stamp(), strerror(errno));
-        }
-        else
-        {
-            struct dirent *file;
-
-            while ((file = readdir(d)) != NULL)
-            {
-                struct stat st;
-
-                strcpy(fname+dirlen, file->d_name);
-                stat(fname, &st);
-
-                if (S_ISREG(st.st_mode))
-                {
-                    err = gnutls_certificate_set_x509_trust_file(x509_cred, fname, GNUTLS_X509_FMT_PEM);
-                    if (err < 0)
-                    {
-                        printf("%s TLS: Error setting x509 verification certificates from '%s': %s\n"
-                              , time_stamp(), fname, gnutls_strerror(err));
-                        debug_message("%s TLS: Error setting x509 verification certificates from '%s': %s\n"
-                                     , time_stamp(), fname, gnutls_strerror(err));
-                    }
-                }
-            }
-
-            closedir(d);
-        }
-
-        xfree(fname);
-    }
-    else if(tls_trustfile == NULL)
+    else if(tls_trustdirectory == NULL)
     {
         printf("%s TLS: (GnuTLS) Trusted x509 certificates locations not specified.\n"
               , time_stamp());
         debug_message("%s TLS: (GnuTLS) trusted x509 certificates locations not specified.\n"
                      , time_stamp());
+    }
+
+    tls_opendir(tls_trustdirectory, "trusted x509 certificates", &dir);
+    while ((fname = tls_readdir(&dir)) != NULL)
+    {
+        int err;
+
+        err = gnutls_certificate_set_x509_trust_file(x509_cred, fname, GNUTLS_X509_FMT_PEM);
+        if (err < 0)
+        {
+            printf("%s TLS: Error setting x509 verification certificates from '%s': %s\n"
+                  , time_stamp(), fname, gnutls_strerror(err));
+            debug_message("%s TLS: Error setting x509 verification certificates from '%s': %s\n"
+                         , time_stamp(), fname, gnutls_strerror(err));
+        }
     }
 
     gnutls_certificate_free_crls(x509_cred);
@@ -265,75 +316,27 @@ tls_verify_init (void)
                          , time_stamp(), gnutls_strerror(err));
         }
     }
-
-    if (tls_crldirectory)
-    {
-        DIR * d;
-        char *fname;
-        size_t dirlen;
-        int err;
-
-        printf("%s TLS: (GnuTLS) CRLs from directory '%s'.\n"
-              , time_stamp(), tls_crldirectory);
-        debug_message("%s TLS: (GnuTLS) CRLs from directory '%s'.\n"
-                     , time_stamp(), tls_crldirectory);
-
-        dirlen = strlen(tls_crldirectory);
-        fname = (char*) xalloc(dirlen + NAME_MAX + 2);
-        if (!fname)
-        {
-            errno = ENOMEM;
-            d = NULL;
-        }
-        else
-        {
-            strcpy(fname, tls_crldirectory);
-            fname[dirlen++] = '/';
-            d = opendir(tls_crldirectory);
-        }
-
-        if (d == NULL)
-        {
-            printf("%s TLS: Can't read CRL directory: %s.\n"
-                  , time_stamp(), strerror(errno));
-            debug_message("%s TLS: Can't read CRL directory: %s\n"
-                         , time_stamp(), strerror(errno));
-        }
-        else
-        {
-            struct dirent *file;
-
-            while ((file = readdir(d)) != NULL)
-            {
-                struct stat st;
-
-                strcpy(fname+dirlen, file->d_name);
-                stat(fname, &st);
-
-                if (S_ISREG(st.st_mode))
-                {
-                    err = gnutls_certificate_set_x509_crl_file(x509_cred, fname, GNUTLS_X509_FMT_PEM);
-                    if (err < 0)
-                    {
-                        printf("%s TLS: Error loading CRL from '%s': %s\n"
-                              , time_stamp(), fname, gnutls_strerror(err));
-                        debug_message("%s TLS: Error loading CRL from '%s': %s\n"
-                                     , time_stamp(), fname, gnutls_strerror(err));
-                    }
-                }
-            }
-
-            closedir(d);
-        }
-
-        xfree(fname);
-    }
-    else if(!tls_crlfile)
+    else if(!tls_crldirectory)
     {
         printf("%s TLS: (GnuTLS) CRL checking disabled.\n"
               , time_stamp());
         debug_message("%s TLS: (GnuTLS) CRL checking disabled.\n"
                      , time_stamp());
+    }
+
+    tls_opendir(tls_crldirectory, "CRLs", &dir);
+    while ((fname = tls_readdir(&dir)) != NULL)
+    {
+        int err;
+
+        err = gnutls_certificate_set_x509_crl_file(x509_cred, fname, GNUTLS_X509_FMT_PEM);
+        if (err < 0)
+        {
+            printf("%s TLS: Error loading CRL from '%s': %s\n"
+                  , time_stamp(), fname, gnutls_strerror(err));
+            debug_message("%s TLS: Error loading CRL from '%s': %s\n"
+                         , time_stamp(), fname, gnutls_strerror(err));
+        }
     }
 }
 
