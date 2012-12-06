@@ -77,7 +77,7 @@
  * This is also the maximum size for one command.
  */
 
-#define MAX_TEXT  2048
+#define MAX_TEXT  20480
 
 /* 'Format string' to use with add_message() when sending
  * a string_t* string to the player.
