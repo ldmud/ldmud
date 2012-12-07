@@ -59,6 +59,7 @@ extern const char *tls_error(int err);
 extern vector_t *tls_query_connection_info(interactive_t *ip);
 extern vector_t *tls_check_certificate(interactive_t *ip, Bool more);
 extern Bool tls_available ();
+extern Bool tls_set_certificate(char *fingerprint, int len);
 
 #endif /* USE_TLS */
 

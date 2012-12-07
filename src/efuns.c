@@ -130,6 +130,9 @@
 #ifdef USE_STRUCTS
 #include "structs.h"
 #endif /* USE_STRUCTS */
+#ifdef USE_TLS
+#include "pkg-tls.h"
+#endif /* USE_TLS */
 #include "swap.h"
 #include "svalue.h"
 #include "wiz_list.h"
@@ -7908,6 +7911,7 @@ f_configure_driver (svalue_t *sp)
                        "(%"PRIdPINT") in configure_driver()\n",
                        sp->u.vec->item[0].u.number);
             break;
+
         case DC_DATA_CLEAN_TIME:
             if (sp->type != T_NUMBER)
                 efun_arg_error(1, T_NUMBER, sp->type, sp);
@@ -7918,6 +7922,57 @@ f_configure_driver (svalue_t *sp)
                     ", but is (%"PRIdPINT") in configure_driver()\n",
                     PINT_MAX/9,sp->u.number);
             break;
+
+#ifdef USE_TLS
+        case DC_TLS_CERTIFICATE:
+            if (sp->type != T_STRING)
+                efun_arg_error(1, T_STRING, sp->type, sp);
+            else
+            {
+                int len = mstrsize(sp->u.str);
+                int out = 0;
+                char * text = get_txt(sp->u.str);
+                char * buf = xalloc(len/2);
+                char * ptr = buf;
+
+                for (int pos = 0; pos < len; ++pos, ++text)
+                {
+                    char c = *text;
+                    if (c >= '0' && c <= '9')
+                        c -= '0';
+                    else if (c >= 'a' && c <= 'f')
+                        c -= 'a' - 10;
+                    else if (c >= 'A' && c <= 'F')
+                        c -= 'A' - 10;
+                    else if (c == ':')
+                        continue;
+                    else
+                    {
+                        xfree(buf);
+                        errorf("Illegal char in fingerprint '%c'\n", c);
+                    }
+
+                    if (out & 1)
+                        *(ptr++) |= c;
+                    else
+                        *ptr = c << 4;
+                    out++;
+                }
+
+                if (out & 1)
+                {
+                    xfree(buf);
+                    errorf("Unexpected end of fingerprint.\n");
+                }
+                else if (!tls_set_certificate(buf, out/2))
+                {
+                    xfree(buf);
+                    errorf("Certificate not found.\n");
+                }
+            }
+
+            break;
+#endif /* USE_TLS */
     }
 
     // free arguments
