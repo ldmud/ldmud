@@ -44,11 +44,14 @@
 /*-------------------------------------------------------------------------*/
 /* Structs */
 
+#define MAX_CHAIN_LENGTH 10
+
 struct tls_key
 {
     char fingerprint[20]; /* SHA1 */
-    gnutls_x509_crt_t cert;
+    gnutls_x509_crt_t cert[MAX_CHAIN_LENGTH];
     gnutls_x509_privkey_t key;
+    unsigned int num_certs;
 };
 
 /*-------------------------------------------------------------------------*/
@@ -383,16 +386,15 @@ tls_read_cert (int pos, const char * key, const char * cert)
         }
     }
 
-    gnutls_x509_crt_init(&keys[pos].cert);
-    err = gnutls_x509_crt_import(keys[pos].cert, &data, GNUTLS_X509_FMT_PEM);
-    if (err < 0)
+    keys[pos].num_certs = MAX_CHAIN_LENGTH;
+    err = gnutls_x509_crt_list_import(keys[pos].cert, &keys[pos].num_certs, &data, GNUTLS_X509_FMT_PEM, GNUTLS_X509_CRT_LIST_FAIL_IF_UNSORTED);
+    if (err < 0 || keys[pos].num_certs == 0)
     {
         printf("%s TLS: Error loading x509 certificate from '%s': %s\n"
               , time_stamp(), cert ? cert : key, gnutls_strerror(err));
         debug_message("%s TLS: Error loading x509 certificate from '%s': %s\n"
                      , time_stamp(), cert ? cert : key, gnutls_strerror(err));
         gnutls_x509_privkey_deinit(keys[pos].key);
-        gnutls_x509_crt_deinit(keys[pos].cert);
         xfree(data.data);
         return MY_FALSE;
     }
@@ -400,15 +402,17 @@ tls_read_cert (int pos, const char * key, const char * cert)
     xfree(data.data);
 
     fpsize = sizeof(keys[pos].fingerprint);
-    err = gnutls_x509_crt_get_fingerprint(keys[pos].cert, GNUTLS_DIG_SHA1, keys[pos].fingerprint, &fpsize);
+    err = gnutls_x509_crt_get_fingerprint(keys[pos].cert[0], GNUTLS_DIG_SHA1, keys[pos].fingerprint, &fpsize);
     if (err < 0)
     {
         printf("%s TLS: Error calculating fingerprint from '%s': %s\n"
               , time_stamp(), cert ? cert : key, gnutls_strerror(err));
         debug_message("%s TLS: Error calculating fingerprint from '%s': %s\n"
                      , time_stamp(), cert ? cert : key, gnutls_strerror(err));
+
         gnutls_x509_privkey_deinit(keys[pos].key);
-        gnutls_x509_crt_deinit(keys[pos].cert);
+        for (int i = 0; i < keys[pos].num_certs; ++i)
+            gnutls_x509_crt_deinit(keys[pos].cert[i]);
         return MY_FALSE;
     }
 
@@ -468,7 +472,8 @@ tls_verify_init (void)
             for (int i = 0; i < num_keys; ++i)
             {
                 gnutls_x509_privkey_deinit(keys[i].key);
-                gnutls_x509_crt_deinit(keys[i].cert);
+                for (int j = 0; j < keys[i].num_certs; ++j)
+                    gnutls_x509_crt_deinit(keys[i].cert[j]);
             }
             xfree(keys);
         }
@@ -626,8 +631,8 @@ tls_select_certificate (gnutls_session_t session
     if (keyidx >= num_keys)
         keyidx = current_key;
 
-    st->ncerts = 1;
-    st->cert.x509 = &keys[keyidx].cert;
+    st->ncerts = keys[keyidx].num_certs;
+    st->cert.x509 = keys[keyidx].cert;
     st->key.x509 = keys[keyidx].key;
     st->cert_type = GNUTLS_CRT_X509;
     st->key_type = GNUTLS_PRIVKEY_X509;
