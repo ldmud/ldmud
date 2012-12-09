@@ -436,6 +436,25 @@ tls_read_cert (int pos, const char * key, const char * cert)
 }
 
 /*-------------------------------------------------------------------------*/
+static void
+tls_free_keys (void)
+
+/* Free all keys and certificates held in <keys>.
+ */
+{
+    if (keys)
+    {
+        for (int i = 0; i < num_keys; ++i)
+        {
+            gnutls_x509_privkey_deinit(keys[i].key);
+            for (int j = 0; j < keys[i].num_certs; ++j)
+                gnutls_x509_crt_deinit(keys[i].cert[j]);
+        }
+        xfree(keys);
+    }
+}
+
+/*-------------------------------------------------------------------------*/
 void
 tls_verify_init (void)
 
@@ -467,16 +486,7 @@ tls_verify_init (void)
 
     if (num)
     {
-        if (keys)
-        {
-            for (int i = 0; i < num_keys; ++i)
-            {
-                gnutls_x509_privkey_deinit(keys[i].key);
-                for (int j = 0; j < keys[i].num_certs; ++j)
-                    gnutls_x509_crt_deinit(keys[i].cert[j]);
-            }
-            xfree(keys);
-        }
+        tls_free_keys();
 
         num_keys = 0;
         keys = xalloc(sizeof(struct tls_key) * num);
@@ -721,6 +731,8 @@ tls_global_deinit (void)
     {
         gnutls_certificate_free_credentials(x509_cred);
         gnutls_dh_params_deinit(dh_params);
+
+        tls_free_keys();
     }
 
     gnutls_global_deinit();
