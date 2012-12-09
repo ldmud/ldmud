@@ -46,7 +46,7 @@
 
 #define MAX_CHAIN_LENGTH 10
 
-struct tls_key
+struct tls_key_s
 {
     char fingerprint[20]; /* SHA1 */
     gnutls_x509_crt_t cert[MAX_CHAIN_LENGTH];
@@ -67,7 +67,7 @@ static gnutls_certificate_server_credentials x509_cred;
 static gnutls_dh_params dh_params;
   /* The Diffie-Hellmann parameters */
 
-static struct tls_key* keys;
+static struct tls_key_s* keys;
   /* Our certificate-key-pairs. */
 
 static int num_keys;
@@ -489,7 +489,7 @@ tls_verify_init (void)
         tls_free_keys();
 
         num_keys = 0;
-        keys = xalloc(sizeof(struct tls_key) * num);
+        keys = xalloc(sizeof(struct tls_key_s) * num);
 
         if (!keys)
         {
