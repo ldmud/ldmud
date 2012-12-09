@@ -9,6 +9,28 @@
 #ifdef USE_TLS
 
 #include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#if defined(HAVE_DIRENT_H) || defined(_POSIX_VERSION)
+#    include <dirent.h>
+#    define generic_dirent dirent
+#else /* not (DIRENT or _POSIX_VERSION) */
+#    define generic_dirent direct
+#    ifdef HAVE_SYS_NDIR_H
+#        include <sys/ndir.h>
+#    endif /* SYSNDIR */
+#    ifdef HAVE_SYS_DIR_H
+#        include <sys/dir.h>
+#    endif /* SYSDIR */
+#    ifdef HAVE_NDIR_H
+#        include <ndir.h>
+#    endif /* NDIR */
+#endif /* not (HAVE_DIRENT_H or _POSIX_VERSION) */
+
+#ifndef S_ISREG
+#    define S_ISREG(m) (((m)&S_IFMT) == S_IFREG)
+#endif
 
 #include "pkg-tls.h"
 
@@ -38,6 +60,96 @@ char * tls_crldirectory = NULL;
   /* The filenames of the x509 key and cert file, set by the argument
    * parser. If not set, the package will use defaults.
    */
+
+/*-------------------------------------------------------------------------*/
+
+Bool
+tls_opendir (const char * dir, const char * desc, struct tls_dir_s * info)
+
+/* Wrapper around opendir(), that prints error messages and
+ * and prepares the tls_dir_s structure for use with tls_readdir.
+ *
+ * When successful it returns MY_TRUE and info->dir will not be NULL.
+ */
+
+{
+    info->dir = NULL;
+    if (!dir)
+        return MY_FALSE;
+
+    if (desc)
+    {
+        printf("%s TLS: %s from directory '%s'.\n"
+              , time_stamp(), desc, dir);
+        debug_message("%s TLS: %s from directory '%s'.\n"
+                     , time_stamp(), desc, dir);
+    }
+
+    info->dirlen = strlen(dir);
+    info->fname = (char*) xalloc(info->dirlen + NAME_MAX + 2);
+    if (!info->fname)
+    {
+        errno = ENOMEM;
+    }
+    else
+    {
+        strcpy(info->fname, dir);
+        info->fname[info->dirlen++] = '/';
+        info->dir = opendir(dir);
+    }
+
+    if (info->dir == NULL)
+    {
+        if (desc)
+        {
+            printf("%s TLS: Can't read %s directory: %s.\n"
+                  , time_stamp(), desc, strerror(errno));
+            debug_message("%s TLS: Can't read %s directory: %s\n"
+                         , time_stamp(), desc, strerror(errno));
+        }
+
+        if(info->fname)
+            xfree(info->fname);
+
+        return MY_FALSE;
+    }
+
+    return MY_TRUE;
+}
+
+/*-------------------------------------------------------------------------*/
+const char *
+tls_readdir (struct tls_dir_s * info)
+
+/* Wrapper around readdir() that looks for a regular file and
+ * returns the concatenation of the directory and file name.
+ *
+ * Returns NULL at the end of the directory and then frees
+ * all variables in the tls_dir_s structure.
+ */
+
+{
+    struct dirent *file;
+
+    if (info->dir == NULL)
+        return NULL;
+
+    while ((file = readdir((DIR*)info->dir)) != NULL)
+    {
+        struct stat st;
+
+        strcpy(info->fname+info->dirlen, file->d_name);
+        stat(info->fname, &st);
+
+        if (S_ISREG(st.st_mode))
+            return info->fname;
+    }
+
+    closedir((DIR*)info->dir);
+    info->dir = NULL;
+    xfree(info->fname);
+    return NULL;
+}
 
 /*-------------------------------------------------------------------------*/
 /* To protect the tls callback during it's execution, it is pushed onto

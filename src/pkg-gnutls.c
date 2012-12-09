@@ -13,16 +13,6 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <dirent.h>
-#define generic_dirent dirent
-#define DIRENT_NLENGTH(dirent) (strlen((dirent)->d_name))
-
-#ifndef S_ISREG
-#    define S_ISREG(m) (((m)&S_IFMT) == S_IFREG)
-#endif
-
 
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
@@ -172,108 +162,6 @@ tls_xfree (void *p)
 {
     return pfree(p);
 } /* tls_xfree() */
-
-/*-------------------------------------------------------------------------*/
-
-/* Helper function for reading regular files in a directory.
- *
- * This structure keeps all needed variables for reading a directory.
- */
-struct tls_dir
-{
-    DIR * d;
-    char * fname;
-    size_t dirlen;
-};
-
-/*-------------------------------------------------------------------------*/
-static Bool
-tls_opendir (const char * dir, const char * desc, struct tls_dir * info)
-
-/* Wrapper around opendir(), that prints error messages and
- * and prepares the tls_dir structure for use with tls_readdir.
- *
- * When successful it returns MY_TRUE and info->d will not be NULL.
- */
-
-{
-    info->d = NULL;
-    if (!dir)
-        return MY_FALSE;
-
-    if (desc)
-    {
-        printf("%s TLS: (GnuTLS) %s from directory '%s'.\n"
-              , time_stamp(), desc, dir);
-        debug_message("%s TLS: (GnuTLS) %s from directory '%s'.\n"
-                     , time_stamp(), desc, dir);
-    }
-
-    info->dirlen = strlen(dir);
-    info->fname = (char*) xalloc(info->dirlen + NAME_MAX + 2);
-    if (!info->fname)
-    {
-        errno = ENOMEM;
-    }
-    else
-    {
-        strcpy(info->fname, dir);
-        info->fname[info->dirlen++] = '/';
-        info->d = opendir(dir);
-    }
-
-    if (info->d == NULL)
-    {
-        if (desc)
-        {
-            printf("%s TLS: Can't read %s directory: %s.\n"
-                  , time_stamp(), desc, strerror(errno));
-            debug_message("%s TLS: Can't read %s directory: %s\n"
-                         , time_stamp(), desc, strerror(errno));
-        }
-
-        if(info->fname)
-            xfree(info->fname);
-
-        return MY_FALSE;
-    }
-
-    return MY_TRUE;
-}
-
-/*-------------------------------------------------------------------------*/
-static const char *
-tls_readdir (struct tls_dir * info)
-
-/* Wrapper around readdir() that looks for a regular file and
- * returns the concatenation of the directory and file name.
- *
- * Returns NULL at the end of the directory and then frees
- * all variables in the tls_dir structure.
- */
-
-{
-    struct dirent *file;
-
-    if (info->d == NULL)
-        return NULL;
-
-    while ((file = readdir(info->d)) != NULL)
-    {
-        struct stat st;
-
-        strcpy(info->fname+info->dirlen, file->d_name);
-        stat(info->fname, &st);
-
-        if (S_ISREG(st.st_mode))
-            return info->fname;
-    }
-
-    closedir(info->d);
-    info->d = NULL;
-    xfree(info->fname);
-    return NULL;
-}
 
 /*-------------------------------------------------------------------------*/
 static gnutls_datum_t
@@ -461,7 +349,7 @@ tls_verify_init (void)
 /* initialize or reinitialize tls certificate storage and revocation lists.
  */
 {
-    struct tls_dir dir;
+    struct tls_dir_s dir;
     const char* fname;
     char oldfingerprint[sizeof(keys[0].fingerprint)];
     Bool havefingerprint = MY_FALSE;

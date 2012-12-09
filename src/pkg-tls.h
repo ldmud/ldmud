@@ -21,6 +21,20 @@
 /* Number of bits for the Diffie Hellmann parameters. */
 #define DH_BITS 1024
 
+/* --- Structures --- */
+
+/* Helper function for reading regular files in a directory.
+ *
+ * This structure keeps all needed variables for reading a directory.
+ */
+
+struct tls_dir_s
+{
+    void * dir;
+    char * fname;
+    size_t dirlen;
+};
+
 /* --- Variables --- */
 
 extern char * tls_keyfile;
@@ -44,6 +58,8 @@ extern svalue_t *f_tls_available (svalue_t *sp);
 extern svalue_t *f_tls_check_certificate(svalue_t *sp);
 extern svalue_t *v_hash(svalue_t *sp, int num_arg);
 extern svalue_t *f_hmac(svalue_t *sp);
+extern Bool tls_opendir(const char * dir, const char * desc, struct tls_dir_s * info);
+extern const char * tls_readdir(struct tls_dir_s * info);
 
 /* --- Prototypes for TLS packages --- */
 
