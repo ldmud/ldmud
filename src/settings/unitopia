@@ -4,7 +4,7 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/UNItopia/mudadm/magyra --libexecdir=/UNItopia/mudadm/magyra/erq --libdir=/tmp --with-setting=unitopia EXTRA_CFLAGS=-m32 LDFLAGS=-m32 $*
+exec ./configure --prefix=/UNItopia/mudadm/magyra --libexecdir=/UNItopia/mudadm/magyra/erq --libdir=/tmp --with-setting=unitopia $*
 exit 1
 
 # --- The actual settings ---
