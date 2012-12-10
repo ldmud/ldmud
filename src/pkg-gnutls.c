@@ -275,7 +275,13 @@ tls_read_cert (int pos, const char * key, const char * cert)
     }
 
     keys[pos].num_certs = MAX_CHAIN_LENGTH;
-    err = gnutls_x509_crt_list_import(keys[pos].cert, &keys[pos].num_certs, &data, GNUTLS_X509_FMT_PEM, GNUTLS_X509_CRT_LIST_FAIL_IF_UNSORTED);
+    err = gnutls_x509_crt_list_import(keys[pos].cert, &keys[pos].num_certs, &data, GNUTLS_X509_FMT_PEM, 
+#if GNUTLS_VERSION_MAJOR >= 3
+        GNUTLS_X509_CRT_LIST_FAIL_IF_UNSORTED
+#else
+        0
+#endif
+    );
     if (err < 0 || keys[pos].num_certs == 0)
     {
         printf("%s TLS: Error loading x509 certificate from '%s': %s\n"
@@ -504,6 +510,7 @@ tls_verify_init (void)
 }
 
 /*-------------------------------------------------------------------------*/
+#if GNUTLS_VERSION_MAJOR >= 3 || (GNUTLS_VERSION_MAJOR == 2 && GNUTLS_VERSION_MINOR >= 11)
 static int
 tls_select_certificate (gnutls_session_t session
                        , const gnutls_datum_t *requested_dns
@@ -538,7 +545,49 @@ tls_select_certificate (gnutls_session_t session
 
     return 0;
 }
+#else
+static int
+tls_select_server_certificate (gnutls_session_t session
+                              , gnutls_retr_st * st)
 
+/* Called from GnuTLS to select a certificate and key to use.
+ */
+
+{
+    int keyidx = (intptr_t) gnutls_session_get_ptr( session );
+
+    if (!keys)
+    {
+        st->ncerts = 0;
+
+        return 0;
+    }
+
+    /* There was a tls_refresh_certs() during handshake? */
+    if (keyidx >= num_keys)
+        keyidx = current_key;
+
+    st->ncerts = keys[keyidx].num_certs;
+    st->cert.x509 = keys[keyidx].cert;
+    st->key.x509 = keys[keyidx].key;
+    st->type = GNUTLS_CRT_X509;
+    st->deinit_all = 0;
+
+    return 0;
+}
+
+static int
+tls_select_client_certificate (gnutls_session_t session
+                              , const gnutls_datum_t *requested_dns
+                              , int num_requested_dns
+                              , const gnutls_pk_algorithm_t *available_algos
+                              , int num_available_algos
+                              , gnutls_retr_st * st)
+{
+    return tls_select_server_certificate(session, st);
+}
+
+#endif
 /*-------------------------------------------------------------------------*/
 Bool
 tls_set_certificate (char *fingerprint, int len)
@@ -595,7 +644,12 @@ tls_global_init (void)
 
     gnutls_certificate_allocate_credentials(&x509_cred);
 
+#if GNUTLS_VERSION_MAJOR >= 3 || (GNUTLS_VERSION_MAJOR == 2 && GNUTLS_VERSION_MINOR >= 11)
     gnutls_certificate_set_retrieve_function(x509_cred, &tls_select_certificate);
+#else
+    gnutls_certificate_client_set_retrieve_function(x509_cred, &tls_select_client_certificate);
+    gnutls_certificate_server_set_retrieve_function(x509_cred, &tls_select_server_certificate);
+#endif
 
     tls_verify_init();
 
