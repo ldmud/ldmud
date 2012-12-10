@@ -1056,14 +1056,14 @@ clear_program_ref (program_t *p, Bool clear_ref)
     /* Variables */
     for (i = p->num_variables; --i >= 0;)
     {
-        clear_fulltype_ref(&p->variables[i].type);
+        clear_fulltype_ref(p->variables[i].type);
     }
 
     /* Non-inherited functions */
 
     for (i = p->num_function_headers; --i >= 0; )
     {
-        clear_fulltype_ref(&p->function_headers[i].type);
+        clear_lpctype_ref(p->function_headers[i].type);
     }
 
 #ifdef USE_STRUCTS
@@ -1087,6 +1087,14 @@ clear_program_ref (program_t *p, Bool clear_ref)
             clear_program_ref(p2, MY_TRUE);
         }
     }
+
+    if (p->argument_types)
+    {
+        lpctype_t** arg_type = p->argument_types;
+        for (i = p->num_argument_types; --i >= 0; arg_type++)
+            clear_lpctype_ref(*arg_type);
+    }
+
 } /* clear_program_ref() */
 
 /*-------------------------------------------------------------------------*/
@@ -1175,7 +1183,10 @@ gc_mark_program_ref (program_t *p)
         /* Non-inherited functions */
 
         for (i = p->num_function_headers; --i >= 0; )
+        {
             MARK_MSTRING_REF(p->function_headers[i].name);
+            count_lpctype_ref(p->function_headers[i].type);
+        }
 
         /* String literals */
 
@@ -1192,7 +1203,7 @@ gc_mark_program_ref (program_t *p)
         for (i = p->num_variables; --i >= 0; variables++)
         {
             MARK_MSTRING_REF(variables->name);
-            count_fulltype_ref(&variables->type);
+            count_fulltype_ref(variables->type);
         }
 
         /* Inherited programs */
@@ -1215,6 +1226,13 @@ gc_mark_program_ref (program_t *p)
             string_t *str;
             str = p->includes[i].name; MARK_MSTRING_REF(str);
             str = p->includes[i].filename; MARK_MSTRING_REF(str);
+        }
+
+        if (p->argument_types)
+        {
+            lpctype_t** arg_type = p->argument_types;
+            for (i = p->num_argument_types; --i >= 0; arg_type++)
+                count_lpctype_ref(*arg_type);
         }
     }
     else
@@ -2030,6 +2048,7 @@ garbage_collection(void)
 #if defined(USE_PARSE_COMMAND)
     clear_parse_refs();
 #endif
+    clear_compiler_refs();
     clear_simul_efun_refs();
     clear_interpreter_refs();
     clear_comm_refs();

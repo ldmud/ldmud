@@ -38,7 +38,7 @@ struct struct_s
 struct struct_member_s
 {
     string_t * name;  /* Tabled name of the struct member */
-    vartype_t  type;  /* The compile type of the member (see exec.h) */
+    lpctype_t* type;  /* The compile type of the member (see exec.h) */
 };
 
 
@@ -72,6 +72,9 @@ struct struct_type_s
                                   * .prog_id. It is created the first
                                   * time it is queried.
                                   */
+    lpctype_t     * lpctype;   /* The corresponding lpctype.
+                                * Read via get_struct_type().
+                                */
     unsigned short  num_members;  /* Number of data members */
     struct_member_t * member;
       /* The description of the struct members, including those from the
@@ -264,7 +267,7 @@ static INLINE void free_struct_member_data(struct_member_t *v)
 {
     if (v->name)
         free_mstring(v->name);
-    free_vartype_data(&(v->type));
+    free_lpctype(v->type);
 }
 
 #endif /* STRUCTS_H_ */

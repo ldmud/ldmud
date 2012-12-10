@@ -330,7 +330,7 @@ locate_out (program_t *prog)
     prog->includes       = MAKEOFFSET(include_t *, includes);
     if (prog->type_start)
     {
-        prog->argument_types = MAKEOFFSET(vartype_t *, argument_types);
+        prog->argument_types = MAKEOFFSET(lpctype_t **, argument_types);
         prog->type_start = MAKEOFFSET(unsigned short *, type_start);
     }
     return MY_TRUE;
@@ -374,7 +374,7 @@ locate_in (program_t *prog)
     prog->includes       = MAKEPTR(include_t*, includes);
     if (prog->type_start)
     {
-        prog->argument_types = MAKEPTR(vartype_t *, argument_types);
+        prog->argument_types = MAKEPTR(lpctype_t **, argument_types);
         prog->type_start     = MAKEPTR(unsigned short *, type_start);
     }
 

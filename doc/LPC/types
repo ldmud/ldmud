@@ -114,18 +114,23 @@ DESCRIPTION
     o mixed     A variable allowed to take a value of any type (int,
                 string, object, array, mapping, float or closure).
 
+    o struct    A collection of values. See structs(LPC).
+
+    o union     A range of types, either of which the variable
+                can contain at runtime. See unions(LPC).
+
     All uninitialized variables have the value 0.
 
     The type of a variable is really only for documentation. Unless
-    you define #pragma strict_types, variables can actually be of
-    any type and has no effect at all on the program. However, it's
-    extremely bad style to declare one type but use another, so
-    please try to avoid this.
+    you define #pragma strong_types or rtt_checks, variables can
+    actually be of any type and has no effect at all on the program.
+    However, it's extremely bad style to declare one type but use
+    another, so please try to avoid this.
 
     A pointer to a destructed object will always have the value 0.
 
 
 SEE ALSO
-    alists(LPC), arrays(LPC), mappings(LPC), closures(LPC),
-    typeof(E), get_type_info(E), inheritance(LPC), pragma(LPC),
-    modifiers(LPC), escape(LPC)
+    alists(LPC), arrays(LPC), mappings(LPC), closures(LPC), structs(LPC),
+    unions(LPC), typeof(E), get_type_info(E), inheritance(LPC),
+    pragma(LPC), modifiers(LPC), escape(LPC)

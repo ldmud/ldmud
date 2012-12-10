@@ -190,7 +190,8 @@ extern Bool privilege_violation2(string_t *what, svalue_t *arg, svalue_t *arg2, 
 extern Bool privilege_violation4(string_t *what, object_t *whom, string_t *how_str, int how_num, svalue_t *sp);
 extern Bool privilege_violation_n(string_t *what, object_t *whom, svalue_t *sp, int num_arg);
 
-extern Bool check_rtt_compatibility(vartype_t formaltype, svalue_t *svp) __attribute__((nonnull(2)));
+extern Bool check_rtt_compatibility(lpctype_t *formaltype, svalue_t *svp) __attribute__((nonnull(2)));
+extern lpctype_t* get_rtt_type(lpctype_t *formaltype, svalue_t *svp) __attribute__((nonnull(2)));
 
 extern svalue_t *sapply_int(string_t *fun, object_t *ob, int num_arg, Bool b_ign_prot, Bool b_use_default);
 #define sapply(f,o,n) sapply_int(f,o,n, MY_FALSE, MY_TRUE)

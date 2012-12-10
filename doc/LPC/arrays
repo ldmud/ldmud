@@ -2,9 +2,14 @@ CONCEPT
         arrays
 
 DESCRIPTION
-        There is support for arrays. The arrays can't be declared, but
-        should be allocated dynamically with the function 'allocate()'
-        (see efun/allocate).
+        There is support for arrays. Arrays can be declared with the
+        type of its members appended by a star (e.g. string* for an
+        array with string elements). But this declaration is not
+        sufficient to actually create an array at runtime,  as all
+        variables (even arrays) are initialized with 0 which is not
+        a valid array. Arrays must either be allocated dynamically
+        with the function 'allocate()' (see efun/allocate), or
+        created with the ({}) array constructor.
 
         Arrays are stored by reference, so all assignments of whole
         arrays will just copy the address. The array will be

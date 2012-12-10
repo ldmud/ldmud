@@ -117,6 +117,7 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
        + 'float' variables on LP64 architectures (64 bit) now have the same 
          precision as 'double' in C (the driver uses internally 'double'
          instead of the traditional self-built format).
+       + Implemented union types. (#721)
 
     - Networking
        + UDP datagrams with lengths up to 65507 (including UDP and IPv4

@@ -128,7 +128,7 @@ void show_age();
 void move_player(string dir_dest, object optional_dest_ob)
 {
     string dir;
-    object dest;
+    mixed dest;
     object ob;
     int is_light, i;
 

@@ -3313,22 +3313,22 @@ handle_pragma (char *str)
         else if (strncmp(base, "strict_types", namelen) == 0)
         {
             pragma_strict_types = PRAGMA_STRICT_TYPES;
-            instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_UNKNOWN;
-            instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_UNKNOWN;
+            instrs[F_CALL_OTHER].ret_type = lpctype_unknown;
+            instrs[F_CALL_DIRECT].ret_type = lpctype_unknown;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "strong_types", namelen) == 0)
         {
             pragma_strict_types = PRAGMA_STRONG_TYPES;
-            instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_ANY;
-            instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_ANY;
+            instrs[F_CALL_OTHER].ret_type = lpctype_mixed;
+            instrs[F_CALL_DIRECT].ret_type = lpctype_mixed;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "weak_types", namelen) == 0)
         {
             pragma_strict_types = PRAGMA_WEAK_TYPES;
-            instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_ANY;
-            instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_ANY;
+            instrs[F_CALL_OTHER].ret_type = lpctype_mixed;
+            instrs[F_CALL_DIRECT].ret_type = lpctype_mixed;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "save_types", namelen) == 0)
@@ -5358,8 +5358,8 @@ start_new_file (int fd, const char * fname)
 
     pragma_check_overloads = MY_TRUE;
     pragma_strict_types = PRAGMA_WEAK_TYPES;
-    instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_ANY;
-    instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_ANY;
+    instrs[F_CALL_OTHER].ret_type = lpctype_mixed;
+    instrs[F_CALL_DIRECT].ret_type = lpctype_mixed;
     pragma_save_types = MY_FALSE;
     pragma_no_clone = MY_FALSE;
     pragma_no_inherit = MY_FALSE;

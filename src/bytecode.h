@@ -133,6 +133,9 @@
 typedef int32_t         bc_offset_t;
 typedef int16_t         bc_shortoffset_t;
 
+#define PRIdBcOffset      PRId32
+#define PRIdBcShortOffset PRId16
+
 // get_foo(), put_foo(), load_foo(), store_foo() and rstore_foo() functions
 #include "bytecode_gen.h"
 

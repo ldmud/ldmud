@@ -477,7 +477,7 @@ init_object_variables (object_t *ob, object_t *templ)
 
         for (i = ob->prog->num_variables; --i >= 0; )
         {
-            if (p_vars[i].type.typeflags & VAR_INITIALIZED)
+            if (p_vars[i].type.t_flags & VAR_INITIALIZED)
                 continue;
             if (!templ_vars)
                 errorf("Can't initialize object '%s': no blueprint given.\n"
@@ -565,7 +565,7 @@ do_free_sub_strings (int num_strings,   string_t **strings
     for (i = num_variables; --i >= 0; )
     {
         free_mstring(variables[i].name);
-        free_fulltype_data(&variables[i].type);
+        free_fulltype(variables[i].type);
     }
 
     /* Free all include names */
@@ -679,7 +679,14 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
 
         /* Free all function names. */
         for (i = progp->num_function_headers; --i >= 0; )
+        {
             free_mstring(progp->function_headers[i].name);
+            free_lpctype(progp->function_headers[i].type);
+        }
+
+        /* Free all argument types. */
+        for (i = progp->num_argument_types; --i >= 0; )
+            free_lpctype(progp->argument_types[i]);
 
         /* Free the strings, variable names and include filenames. */
         do_free_sub_strings( progp->num_strings, progp->strings
@@ -706,7 +713,7 @@ static string_t *
 function_exists (string_t *fun, object_t *ob, Bool show_hidden
                 , string_t ** prog_name, uint32 * prog_line
                 , int * num_arg,  uint32 * fun_flags
-                , vartype_t * fun_type
+                , lpctype_t ** fun_type
                 )
 
 /* Search for the function <fun> in the object <ob>. If existing, return
@@ -784,8 +791,7 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
 
     /* Set the additional information */
     *num_arg = header->num_arg;
-    fun_type->type = header->type.typeflags & TYPE_MOD_MASK;
-    fun_type->t_struct = header->type.t_struct;
+    *fun_type = header->type;
 
     /* And after all this, the function may be undefined */
     if (is_undef_function(funstart))
@@ -1417,6 +1423,39 @@ renumber_programs (void)
     return ++current_id_number;
 }
 
+/*-------------------------------------------------------------------------*/
+
+/* The same definitions are in sys/lpctypes.h for the mudlibs. */
+#define COMPAT_TYPE_STRUCT    11
+#define COMPAT_MOD_POINTER    0x0040
+
+static int
+get_type_compat_int (lpctype_t *t)
+
+/* Calculates an integer for a type that can be
+ * returned by function_exists() and functionlist()
+ * as the function return type.
+ */
+
+{
+    switch(t->t_class)
+    {
+        case TCLASS_PRIMARY:
+            return t->t_primary;
+
+        case TCLASS_STRUCT:
+            return COMPAT_TYPE_STRUCT;
+
+        case TCLASS_ARRAY:
+            return get_type_compat_int(t->t_array.element) | COMPAT_MOD_POINTER;
+
+        case TCLASS_UNION:
+            return TYPE_ANY;
+    }
+
+    return TYPE_UNKNOWN; /* Shouldn't happen. */
+}
+
 /*=========================================================================*/
 /*                                EFUNS                                    */
 
@@ -1476,7 +1515,7 @@ v_function_exists (svalue_t *sp, int num_arg)
 
     uint32    fun_flags;
     int       fun_num_arg;
-    vartype_t fun_type;
+    lpctype_t *fun_type;
 
     /* Evaluate arguments */
     argp = sp - num_arg + 1;
@@ -1586,7 +1625,7 @@ v_function_exists (svalue_t *sp, int num_arg)
             put_number(vec->item+FEXISTS_LINENO, prog_line);
 
             put_number(vec->item+FEXISTS_NUMARG, fun_num_arg);
-            put_number(vec->item+FEXISTS_TYPE, fun_type.type);
+            put_number(vec->item+FEXISTS_TYPE, get_type_compat_int(fun_type));
             put_number(vec->item+FEXISTS_FLAGS, (p_int)fun_flags);
 
             push_array(sp, vec);
@@ -1897,7 +1936,7 @@ f_functionlist (svalue_t *sp)
 
         if (mode_flags & RETURN_FUNCTION_TYPE) {
             svp--;
-            svp->u.number = header->type.typeflags & TYPE_MOD_MASK;
+            svp->u.number = get_type_compat_int(header->type);
         }
 
         if (mode_flags & RETURN_FUNCTION_FLAGS) {
@@ -2072,7 +2111,7 @@ v_variable_exists (svalue_t *sp, int num_arg)
             break;
 
         /* Is it visible for the caller? */
-        flags = progp->variables[ix].type.typeflags;
+        flags = progp->variables[ix].type.t_flags;
 
         if (!(mode_flags & NAME_HIDDEN)
          && (   (flags & TYPE_MOD_PRIVATE)
@@ -2095,7 +2134,7 @@ v_variable_exists (svalue_t *sp, int num_arg)
                     continue;
                 ix -= ip->variable_index_offset;
                 progp = ip->prog;
-                flags = progp->variables[ix].type.typeflags;
+                flags = progp->variables[ix].type.t_flags;
             }
         }
 
@@ -2274,7 +2313,7 @@ f_variable_list (svalue_t *sp)
     var = prog->variables;
     i = prog->num_variables;
     while ( --i >= 0 ) {
-        if (!(var[i].type.typeflags & flags) )
+        if (!(var[i].type.t_flags & flags) )
         {
             vis_tags[i] = VISTAG_NAMED|VISTAG_VIS;
             num_variables++;
@@ -2297,7 +2336,7 @@ f_variable_list (svalue_t *sp)
         for (i = prog->num_variables; --i >= 0; )
         {
             if (!(vis_tags[i] & VISTAG_NAMED)
-             && !(var[i].type.typeflags & flags)
+             && !(var[i].type.t_flags & flags)
                )
             {
                 vis_tags[i] = VISTAG_VIS;
@@ -2340,7 +2379,7 @@ f_variable_list (svalue_t *sp)
         if ((vis_tags[i] & (VISTAG_ALL|VISTAG_VIS)) == VISTAG_INVIS)
             continue; /* Don't list this one */
 
-        flags = var->type.typeflags;
+        flags = var->type.t_flags;
 
         active_flags = (flags & ~INHERIT_MASK);
         if (!(vis_tags[i] & VISTAG_NAMED))
@@ -2358,7 +2397,7 @@ f_variable_list (svalue_t *sp)
         if (mode_flags & RETURN_FUNCTION_TYPE)
         {
             svp--;
-            svp->u.number = var->type.typeflags & TYPE_MOD_MASK;
+            svp->u.number = 0; /* TODO: convert var->type */
         }
 
         if (mode_flags & RETURN_FUNCTION_FLAGS)
@@ -3539,7 +3578,7 @@ v_replace_program (svalue_t *sp, int num_arg)
 
         for (i = 0; i < new_prog->num_variables; i++)
         {
-            if (new_prog->variables[i].type.typeflags & TYPE_MOD_VIRTUAL)
+            if (new_prog->variables[i].type.t_flags & TYPE_MOD_VIRTUAL)
             {
                 warnf("Object '%s', program '%s': Cannot schedule "
                       "replace_program(): "
@@ -6755,7 +6794,7 @@ v_save_object (svalue_t *sp, int numarg)
     names = ob->prog->variables;
     for (i = ob->prog->num_variables; --i >= 0; v++, names++)
     {
-        if (names->type.typeflags & TYPE_MOD_STATIC)
+        if (names->type.t_flags & TYPE_MOD_STATIC)
             continue;
 
         register_svalue(v);
@@ -6777,7 +6816,7 @@ v_save_object (svalue_t *sp, int numarg)
     names = ob->prog->variables;
     for (i = ob->prog->num_variables; --i >= 0; v++, names++)
     {
-        if (names->type.typeflags & TYPE_MOD_STATIC)
+        if (names->type.t_flags & TYPE_MOD_STATIC)
             continue;
 
         /* Write the variable name */
@@ -7896,7 +7935,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         for (n = num_var; --n >= 0; var++)
         {
             if (mstreq(var->name, s)
-             && !(var->type.typeflags & NAME_HIDDEN))
+             && !(var->type.t_flags & NAME_HIDDEN))
                 break;
         }
         if (n < 0)
@@ -8911,7 +8950,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
                     rover++;
                 while ( --var_rest > 0
                      && (rover->name != var
-                         || rover->type.typeflags & TYPE_MOD_STATIC)
+                         || rover->type.t_flags & TYPE_MOD_STATIC)
                       );
 
                 if (var_rest > 0)
@@ -8929,7 +8968,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
                     rover++;
                 while (--var_rest > 0
                    &&  (rover->name != var
-                        || rover->type.typeflags & TYPE_MOD_STATIC)
+                        || rover->type.t_flags & TYPE_MOD_STATIC)
                       );
                 if (var_rest > 0)
                 {
@@ -8970,8 +9009,8 @@ static int nesting = 0;  /* Used to detect recursive calls */
                 rcp->dp = tmp;
                 v = &tmp->v;
                 v->type = T_NUMBER;
-                vtype.typeflags = TYPE_ANY;
-                vtype.t_struct = NULL;
+                vtype.t_flags = 0;
+                vtype.t_type = NULL;
                 break;
             }
 
@@ -9010,20 +9049,21 @@ static int nesting = 0;  /* Used to detect recursive calls */
         // TODO::trivial.
         if (ob->prog->flags & P_RTT_CHECKS)
         {
-            vartype_t tmp = {.type = vtype.typeflags & TYPEID_MASK, .t_struct = vtype.t_struct};
-            if (!check_rtt_compatibility(tmp, v))
+            if (!check_rtt_compatibility(vtype.t_type, v))
             {
                 int type = v->type;
+                static char realtypebuf[512];
+                lpctype_t *realtype = get_rtt_type(vtype.t_type, v);
+                get_lpctype_name_buf(realtype, realtypebuf, sizeof(realtypebuf));
+                free_lpctype(realtype);
+
                 free_svalue(v);
                 *v = const0;
 
-                // VAR_INITIALIZED is the same as TYPE_MOD_VARARGS
-                // for functions,  so mask it for get_type_name().
-                vtype.typeflags &= ~VAR_INITIALIZED;
                 errorf("Bad type when restoring %s from %s line %d. Expected "
                        "%s, got %s.\n",
                        get_txt(current_object->name), name, lineno,
-                       get_type_name(vtype), typename(type));
+                       get_lpctype_name(vtype.t_type), realtypebuf);
             }
         }
 

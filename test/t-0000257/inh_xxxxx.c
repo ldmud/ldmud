@@ -1,4 +1,4 @@
-string fun(varargs mixed* args)
+string* fun(varargs mixed* args)
 {
     return ({"Inh5"})+args;
 }

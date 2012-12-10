@@ -97,7 +97,7 @@
  *   struct_member_s
  *   {
  *       string_t * name;
- *       vartype_t  type;
+ *       lpctype_t* type;
  *   }
  *
  *   .name is the name of the member, .type it's compile-time type.
@@ -463,6 +463,7 @@ struct_new_prototype ( string_t *name )
         pSType->unique_name = NULL;
         pSType->hash = 0;
         pSType->prog_id = 0;
+        pSType->lpctype = NULL;
         pSType->num_members = 0;
         pSType->member = NULL;
         pSType->base = NULL;
@@ -660,24 +661,24 @@ struct_type_equivalent (struct_type_t * pSType1, struct_type_t *pSType2)
         struct_member_t * pMember1 = &pSType1->member[num];
         struct_member_t * pMember2 = &pSType2->member[num];
         if (!mstreq(pMember1->name, pMember2->name)
-         || pMember1->type.type != pMember2->type.type
+         || pMember1->type != pMember2->type
            )
             return MY_FALSE;
 
         /* For structs members, a deep comparison is necessary.
          */
-        if ((pMember1->type.type & PRIMARY_TYPE_MASK) == TYPE_STRUCT)
+        if (pMember1->type->t_class == TCLASS_STRUCT)
         {
             Bool rc;
-            vartype_t t_member1 = pMember1->type;
-            vartype_t t_member2 = pMember2->type;
+            lpctype_t *t_member1 = pMember1->type;
+            lpctype_t *t_member2 = pMember2->type;
 
             /* Prevent recursion by blocking out the structs */
-            pMember1->type.type = TYPE_NUMBER;
-            pMember2->type.type = TYPE_NUMBER;
+            pMember1->type = lpctype_int;
+            pMember2->type = lpctype_int;
 
-            rc = struct_type_equivalent( t_member1.t_struct
-                                       , t_member2.t_struct
+            rc = struct_type_equivalent( t_member1->t_struct
+                                       , t_member2->t_struct
                                        );
 
             /* Restore the original member types */
@@ -717,12 +718,12 @@ struct_type_update ( struct_type_t * pSType
     {
         struct_member_t * pMember = &pSType->member[num];
 
-        if ((pMember->type.type & PRIMARY_TYPE_MASK) == TYPE_STRUCT
-         && pMember->type.t_struct == pOld
+        if (pMember->type->t_class == TCLASS_STRUCT
+         && pMember->type->t_struct == pOld
            )
         {
-            free_struct_type(pMember->type.t_struct);
-            pMember->type.t_struct = ref_struct_type(pNew);
+            free_lpctype(pMember->type);
+            pMember->type = get_struct_type(pNew);
         }
     }
 } /* struct_type_update() */
@@ -782,8 +783,7 @@ struct_new_anonymous (int num_members)
             gotError = MY_TRUE;
             break;
         }
-        pType->member[i].type.type = TYPE_ANY;
-        pType->member[i].type.t_struct = NULL;
+        pType->member[i].type = lpctype_mixed;
     }
 
     if (gotError)
@@ -1071,6 +1071,7 @@ clear_struct_type_ref (struct_type_t * pSType)
 
         pSType->ref = 0;
         pSType->name->info.ref = 0;
+        pSType->lpctype = NULL;
         if (pSType->prog_name)
             pSType->prog_name->info.ref = 0;
         if (pSType->unique_name)
@@ -1081,7 +1082,7 @@ clear_struct_type_ref (struct_type_t * pSType)
         for (num = struct_t_size(pSType); num-- > 0; )
         {
             pSType->member[num].name->info.ref = 0;
-            clear_vartype_ref(&pSType->member[num].type);
+            clear_lpctype_ref(pSType->member[num].type);
         }
     }
 
@@ -1136,7 +1137,7 @@ count_struct_type_ref (struct_type_t * pSType)
         for (num = struct_t_size(pSType); num-- > 0; )
         {
             count_ref_from_string(pSType->member[num].name);
-            count_vartype_ref(&pSType->member[num].type);
+            count_lpctype_ref(pSType->member[num].type);
         }
     }
 } /* count_struct_type_ref() */
@@ -1500,10 +1501,11 @@ single_struct_info (struct_type_t * st, Bool include_base)
         member = allocate_array(SIM_MAX);
         put_array(&rc->item[SI_MEMBER+i-offset], member);
         put_ref_string(&member->item[SIM_NAME], pMember->name);
-        put_number(&member->item[SIM_TYPE], pMember->type.type);
-        if ((pMember->type.type & PRIMARY_TYPE_MASK) == T_STRUCT)
+        put_number(&member->item[SIM_TYPE], 0); /* TODO: Convert pMember->type to int */
+
+        if (pMember->type->t_class == TCLASS_STRUCT)
             put_ref_string(&member->item[SIM_EXTRA]
-                          , struct_t_name(pMember->type.t_struct)
+                          , struct_t_name(pMember->type->t_struct)
                           );
     }
 

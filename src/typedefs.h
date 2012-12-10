@@ -19,6 +19,7 @@ typedef struct callback_s         callback_t;         /* simulate.h */
 typedef struct case_list_entry_s  case_list_entry_t;  /* switch.h */
 typedef struct case_state_s       case_state_t;       /* switch.h */
 typedef struct error_handler_s    error_handler_t;    /* interpret.h */
+typedef struct fulltype_s         fulltype_t;         /* types.h */
 typedef struct function_s         function_t;         /* exec.h */
 typedef struct ident_s            ident_t;            /* lex.h */
 typedef struct include_s          include_t;          /* exec.h */
@@ -28,6 +29,7 @@ typedef struct input_s            input_t;            /* comm.h */
 typedef struct instr_s            instr_t;            /* exec.h */
 typedef struct lambda_s           lambda_t;           /* closure.h */
 typedef struct linenumbers_s      linenumbers_t;      /* exec.h */
+typedef struct lpctype_s          lpctype_t;          /* types.h */
 typedef struct mapping_s          mapping_t;          /* mapping.h */
 typedef struct object_s           object_t;           /* object.h */
 typedef struct program_s          program_t;          /* exec.h */

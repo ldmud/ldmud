@@ -16,10 +16,6 @@
  *
  *    %line:  generates a #line statement to synchronize the C compiler.
  *
- *    %typemap TYPE<name>:<value>,...,TYPE_<name>:<value>
- *       Generates a lookup table TYPE_<name> -> <value>. Unspecified
- *       TYPEs are given the value 0.
- *
  *    %hookmap <hookname>:<value>,...,<hookname>:<value>
  *       Generates a lookup table <hookname> -> <value>. Unspecified
  *       driverhook entries are given the value 0.
@@ -108,6 +104,7 @@
 #include "svalue.h"
 #include "swap.h"
 #include "switch.h"
+#include "types.h"
 #include "wiz_list.h"
 #include "xalloc.h"
 
@@ -246,7 +243,7 @@ struct const_list_svalue_s
 struct struct_init_s
 {
     struct_init_t * next;  /* Next member entry */
-    vartype_t       type;  /* Type of expression */
+    fulltype_t      type;  /* Type of expression */
     string_t      * name;  /* Member name, or NULL if unnamed */
 };
 
@@ -280,12 +277,9 @@ struct efun_shadow_s
    * and -1 otherwise.
    */
 
-#define set_vartype(t, id, ptr) \
-    ( t.type = (id), t.t_struct = (ptr) )
-#define set_fulltype(t, id, ptr) \
-    ( t.typeflags = (id), t.t_struct = (ptr) )
-  /* Set the full/vartype <t> to type(flags) <id> and the struct
-   * typeobject pointer to <ptr>.
+#define set_fulltype(t, flags, ptr) \
+    ( t.t_flags = (flags), t.t_type = (ptr) )
+  /* Set the fulltype <t> to type <ptr> with modifiers <flags>.
    */
 
 #define NEW_INHERITED_INDEX (0xfffff)
@@ -328,9 +322,10 @@ enum e_saved_areas {
     /* (inherit_t) The information for the inherited programs.
      */
  , A_ARGUMENT_TYPES
-    /* (vartype_t) Types of the arguments of all functions with
+    /* (lpctype_t*) Types of the arguments of all functions with
      * typechecking. The argument types for a specific function
-     * can be found using the ARGUMENT_INDEX
+     * can be found using the ARGUMENT_INDEX. All entries
+     * are counted references.
      */
  , A_ARGUMENT_INDEX
     /* (unsigned short) Index of the first argument type of function <n>.
@@ -349,6 +344,17 @@ enum e_saved_areas {
  , NUMPAREAS  /* Number of saved areas */
 };
 
+typedef bytecode_t     A_PROGRAM_t;
+typedef string_t*      A_STRINGS_t;
+typedef variable_t     A_VARIABLES_t;
+typedef variable_t     A_VIRTUAL_VAR_t;
+typedef char           A_LINENUMBERS_t;
+typedef inherit_t      A_INHERITS_t;
+typedef lpctype_t*     A_ARGUMENT_TYPES_t;
+typedef unsigned short A_ARGUMENT_INDEX_t;
+typedef include_t      A_INCLUDES_t;
+typedef struct_def_t   A_STRUCT_DEFS_t;
+
 enum e_internal_areas {
    A_FUNCTIONS = NUMPAREAS
      /* (function_t): Function definitions
@@ -362,7 +368,7 @@ enum e_internal_areas {
     */
 
  , A_LOCAL_TYPES
-   /* (fulltype_t) The full types of local and context variables.
+   /* (lpctype_t*) The full types of local and context variables.
     * For normal functions, only the beginning of the area is used.
     * The rest is used stack-wise for nested inline closures.
     */
@@ -385,6 +391,14 @@ enum e_internal_areas {
  , NUMAREAS  /* Total number of areas */
 };
 
+typedef struct inline_closure_s inline_closure_t;
+
+typedef function_t       A_FUNCTIONS_t;
+typedef int              A_STRING_NEXT_t;
+typedef fulltype_t       A_LOCAL_TYPES_t;
+typedef bytecode_t       A_INLINE_PROGRAM_t;
+typedef inline_closure_t A_INLINE_CLOSURE_t;
+typedef struct_member_t  A_STRUCT_MEMBERS_t;
 
 /* --- struct mem_block_s: One memory area ---
  * Every mem_block keeps one memory area. As it grows by using realloc(),
@@ -407,133 +421,142 @@ static mem_block_t mem_block[NUMAREAS];
   /* All memory areas.
    */
 
+#define GET_BLOCK(BLOCK_NAME)            ((BLOCK_NAME##_t*)(mem_block[BLOCK_NAME].block))
+#define GET_BLOCK_COUNT(BLOCK_NAME)      (mem_block[BLOCK_NAME].current_size / sizeof(BLOCK_NAME##_t))
+#define GET_BLOCK_SIZE(BLOCK_NAME)       (mem_block[BLOCK_NAME].current_size)
 
-#define PROGRAM_BLOCK ((bytecode_p)(mem_block[A_PROGRAM].block))
+#define PROGRAM_BLOCK           GET_BLOCK(A_PROGRAM)
   /* The current program block, properly typed.
    */
 
-#define CURRENT_PROGRAM_SIZE (mem_block[A_PROGRAM].current_size)
+#define CURRENT_PROGRAM_SIZE    GET_BLOCK_SIZE(A_PROGRAM)
   /* The current program size.
    */
 
 
-#define LINENUMBER_BLOCK ((char *)(mem_block[A_LINENUMBERS].block))
+#define LINENUMBER_BLOCK        GET_BLOCK(A_LINENUMBERS)
   /* The current linenumber block, properly typed.
    */
 
-#define LINENUMBER_SIZE (mem_block[A_LINENUMBERS].current_size)
+#define LINENUMBER_SIZE         GET_BLOCK_SIZE(A_LINENUMBERS)
   /* The current linenumber data size.
    */
 
 
-#define FUNCTION(n) ((function_t *)mem_block[A_FUNCTIONS].block + (n))
+#define FUNCTION(n)             (GET_BLOCK(A_FUNCTIONS) + (n))
   /* Return the function_t* for function number <n>.
    */
 
-#define FUNCTION_COUNT (mem_block[A_FUNCTIONS].current_size / sizeof (function_t))
+#define FUNCTION_COUNT          GET_BLOCK_COUNT(A_FUNCTIONS)
   /* Number of function_t stored so far in A_FUNCTIONS.
    */
 
 
-#define INHERIT_COUNT (mem_block[A_INHERITS].current_size / sizeof(inherit_t))
+#define INHERIT_COUNT           GET_BLOCK_COUNT(A_INHERITS)
   /* Number of inherit_t stored so far in A_INHERITS.
    */
 
 
-#define ARGUMENT_INDEX(n) ((unsigned short *)mem_block[A_ARGUMENT_INDEX].block)[n]
+#define ARGUMENT_INDEX(n)       GET_BLOCK(A_ARGUMENT_INDEX)[n]
   /* Lookup the start index of the types for function number <n>.
    */
 
 
-#define ARGTYPE_COUNT (mem_block[A_ARGUMENT_TYPES].current_size / sizeof(vartype_t))
-  /* Number of vartype_t stored so far in A_ARGUMENT_TYPES.
+#define ARGTYPE_COUNT           GET_BLOCK_COUNT(A_ARGUMENT_TYPES)
+  /* Number of lpctype_t* stored so far in A_ARGUMENT_TYPES.
    */
 
-#define ARGUMENT_TYPE(n)  ((vartype_t *)mem_block[A_ARGUMENT_TYPES].block)[n]
-  /* Index the vartype_t <n>.
+#define ARGUMENT_TYPE(n)        GET_BLOCK(A_ARGUMENT_TYPES)[n]
+  /* Index the lpctype_t* <n>.
    */
 
-
-#define NV_VARIABLE(n) ((variable_t *)mem_block[A_VARIABLES].block + (n))
+#define NV_VARIABLE(n)          (GET_BLOCK(A_VARIABLES) + (n))
   /* Return the variable_t* for the non-virtual variable <n>.
    */
 
-#define NV_VARIABLE_COUNT (mem_block[A_VARIABLES].current_size / sizeof(variable_t))
-#define V_VARIABLE_COUNT  (mem_block[A_VIRTUAL_VAR].current_size / sizeof(variable_t))
+#define NV_VARIABLE_COUNT       GET_BLOCK_COUNT(A_VARIABLES)
+#define V_VARIABLE_COUNT        GET_BLOCK_COUNT(A_VIRTUAL_VAR)
   /* Number of variables stored so var in A_VARIABLES resp. A_VIRTUAL_VAR.
    */
 
-#define V_VARIABLE(n)  ((variable_t *)mem_block[A_VIRTUAL_VAR].block + \
-                        (n) - VIRTUAL_VAR_TAG)
+#define V_VARIABLE(n)           (GET_BLOCK(A_VIRTUAL_VAR) + (n) - VIRTUAL_VAR_TAG)
   /* Return the variable_t* for the virtual variable <n> (still including
    * the offset).
    */
 
-#define VARIABLE(n) ((n) & VIRTUAL_VAR_TAG ? V_VARIABLE(n) : NV_VARIABLE(n))
+#define VARIABLE(n)             ((n) & VIRTUAL_VAR_TAG ? V_VARIABLE(n) : NV_VARIABLE(n))
   /* Return the variable_t* for the variable <n>, virtual or not.
    */
 
-#define INHERIT(n)     ((inherit_t *)mem_block[A_INHERITS].block)[n]
+#define INHERIT(n)              GET_BLOCK(A_INHERITS)[n]
   /* Index the inherit_t <n>.
    */
 
-#define INHERIT_COUNT  (mem_block[A_INHERITS].current_size / sizeof(inherit_t))
+#define INHERIT_COUNT           GET_BLOCK_COUNT(A_INHERITS)
   /* Return the number of inherits encountered so far.
    */
 
-#define STRUCT_DEF(n)     ((struct_def_t *)mem_block[A_STRUCT_DEFS].block)[n]
+#define STRUCT_DEF(n)           GET_BLOCK(A_STRUCT_DEFS)[n]
   /* Index the struct_def_t <n>.
    */
 
-#define STRUCT_COUNT  (mem_block[A_STRUCT_DEFS].current_size / sizeof(struct_def_t))
+#define STRUCT_COUNT            GET_BLOCK_COUNT(A_STRUCT_DEFS)
   /* Return the number of structs encountered so far.
    */
 
-#define STRUCT_MEMBER(n)   ((struct_member_t *)mem_block[A_STRUCT_MEMBERS].block)[n]
+#define STRUCT_MEMBER(n)        GET_BLOCK(A_STRUCT_MEMBERS)[n]
   /* Index the struct_member_t <n>.
    */
 
-#define STRUCT_MEMBER_COUNT (mem_block[A_STRUCT_MEMBERS].current_size / sizeof(struct_member_t))
+#define STRUCT_MEMBER_COUNT     GET_BLOCK_COUNT(A_STRUCT_MEMBERS)
   /* Return the number of struct members stored.
    */
 
-#define PROG_STRING(n) ((string_t **)mem_block[A_STRINGS].block)[n]
+#define PROG_STRING(n)          GET_BLOCK(A_STRINGS)[n]
   /* Index the pointer for program string <n>.
    */
 
-#define STRING_COUNT  (mem_block[A_STRINGS].current_size / sizeof(string_t *))
+#define STRING_COUNT            GET_BLOCK_COUNT(A_STRINGS)
   /* Return the number of program strings encountered so far.
    */
 
-#define PROG_STRING_NEXT(n) ((int *)mem_block[A_STRING_NEXT].block)[n]
+#define PROG_STRING_NEXT(n)     GET_BLOCK(A_STRING_NEXT)[n]
   /* Index the chain-index for program string <n>.
    */
 
-#define INCLUDE_COUNT  (mem_block[A_INCLUDES].current_size / sizeof(include_t))
+#define STRING_NEXT_COUNT       GET_BLOCK_COUNT(A_STRING_NEXT)
+  /* Return the number of entries in A_STRING_NEXT.
+   */
+
+#define INCLUDE(n)              GET_BLOCK(A_INCLUDES)[n]
+  /* Returns the include_t <n>.
+   */
+
+#define INCLUDE_COUNT           GET_BLOCK_COUNT(A_INCLUDES)
   /* Return the total number of include files encountered so far.
    */
 
-#define LOCAL_TYPE_COUNT  (mem_block[A_LOCAL_TYPES].current_size / sizeof(fulltype_t))
+#define LOCAL_TYPE_COUNT        GET_BLOCK_COUNT(A_LOCAL_TYPES)
   /* Return the total number of types.
    */
 
-#define LOCAL_TYPE(n) ((fulltype_t *)mem_block[A_LOCAL_TYPES].block)[n]
+#define LOCAL_TYPE(n)           GET_BLOCK(A_LOCAL_TYPES)[n]
   /* Return the local/context var type at index <n>.
    */
 
-#define INLINE_PROGRAM_BLOCK(n) ((bytecode_p)(mem_block[A_INLINE_PROGRAM].block + (n)))
+#define INLINE_PROGRAM_BLOCK(n) (GET_BLOCK(A_INLINE_PROGRAM) + (n))
   /* Return the inline-closure program block at address <n>, properly typed.
    */
 
-#define INLINE_PROGRAM_SIZE (mem_block[A_INLINE_PROGRAM].current_size)
+#define INLINE_PROGRAM_SIZE     GET_BLOCK_SIZE(A_INLINE_PROGRAM)
   /* The current program size.
    */
 
-#define INLINE_CLOSURE(n) ((inline_closure_t *)mem_block[A_INLINE_CLOSURE].block)[n]
+#define INLINE_CLOSURE(n)       GET_BLOCK(A_INLINE_CLOSURE)[n]
   /* Return the inline-closure program block at address <n>, properly typed.
    */
 
-#define INLINE_CLOSURE_COUNT  (mem_block[A_INLINE_CLOSURE].current_size/sizeof(inline_closure_t))
+#define INLINE_CLOSURE_COUNT    GET_BLOCK_COUNT(A_INLINE_CLOSURE)
   /* Return the number of saved inline-closures.
    */
 
@@ -585,8 +608,6 @@ static int block_depth;
 /*-------------------------------------------------------------------------*/
 /* Information describing inline closures.
 */
-
-typedef struct inline_closure_s inline_closure_t;
 
 struct inline_closure_s
 {
@@ -645,7 +666,7 @@ struct inline_closure_s
     void * include_handle;
       /* Current include state.
        */
-    fulltype_t exact_types;
+    lpctype_t * exact_types;
       /* The enclosing return type setting (reference not counted).
        */
     int block_depth;
@@ -732,20 +753,20 @@ static int        def_function_num_args;
    */
 
 static mem_block_t type_of_arguments;
-  /* The vartypes of arguments when calling functions must be saved,
+  /* The fulltypes of arguments when calling functions must be saved,
    * to be used afterwards for checking. And because function calls
    * can be done as an argument to a function calls, a stack of argument types
    * is needed. This stack does not need to be freed between compilations,
    * but will be reused.
    */
 
-static fulltype_t * type_of_locals = NULL;
+static A_LOCAL_TYPES_t* type_of_locals = NULL;
   /* The full types of the local variables.
    * Points to a location in mem_block A_LOCAL_TYPES, it is NULL between
    * compilations.
    */
 
-static fulltype_t * type_of_context = NULL;
+static A_LOCAL_TYPES_t* type_of_context = NULL;
   /* The full types of the context variables.
    * Points to a location in mem_block A_LOCAL_TYPES, it is NULL between
    * compilations.
@@ -766,10 +787,11 @@ static ident_t *all_locals = NULL;
    * nested block scopes.
    */
 
-static fulltype_t exact_types;
-  /* If .typeflags is 0, don't check nor require argument and function types.
-   * Otherwise it's the full return type of the function, including
-   * visibility (reference not counted).
+static lpctype_t * exact_types;
+  /* If NULL, don't check nor require argument and function types.
+   * Otherwise it's the return type of the function. (Reference
+   * is not counted, a counted reference is held in
+   * def_function_returntype or current_inline->returntype.)
    */
 
 static funflag_t default_varmod;
@@ -924,30 +946,29 @@ static const char * compiled_file;
    * the program's name. Set by prolog().
    */
 
-static const fulltype_t Type_Any     = { TYPE_ANY, NULL };
-static const fulltype_t Type_Unknown = { TYPE_UNKNOWN, NULL };
-static const vartype_t  VType_Unknown = { TYPE_UNKNOWN, NULL };
-static const fulltype_t Type_Number  = { TYPE_NUMBER, NULL };
-static const fulltype_t Type_Float   = { TYPE_FLOAT, NULL };
-static const fulltype_t Type_String  = { TYPE_STRING, NULL };
-static const fulltype_t Type_Object  = { TYPE_OBJECT, NULL };
-static const fulltype_t Type_Closure = { TYPE_CLOSURE, NULL };
-static const fulltype_t Type_Mapping = { TYPE_MAPPING, NULL };
-static const fulltype_t Type_Symbol  = { TYPE_SYMBOL, NULL };
-static const fulltype_t Type_Void    = { TYPE_VOID, NULL };
-static const fulltype_t Type_Quoted_Array = { TYPE_QUOTED_ARRAY, NULL };
-static const fulltype_t Type_Ptr_Any = { TYPE_ANY|TYPE_MOD_POINTER, NULL };
-static const fulltype_t Type_Ref_Any = { TYPE_ANY|TYPE_MOD_REFERENCE, NULL };
-static const fulltype_t Type_Ref_Number = { TYPE_NUMBER|TYPE_MOD_REFERENCE, NULL };
-  /* Constants for the known simple types.
+  /* A few standard types we often need.
+   * We'll initialize them later (using the type functions, so all pointers
+   * are correctly set) and then put them into a static storage (and set
+   * their ref count to zero).
    */
+
+static bool _lpctypes_initialized = false;
+lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_float,
+          _lpctype_int_array,     _lpctype_string_array, _lpctype_object_array;
+lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
+          *lpctype_any_array     = &_lpctype_any_array,
+          *lpctype_int_float     = &_lpctype_int_float,
+          *lpctype_int_array     = &_lpctype_int_array,
+          *lpctype_string_array  = &_lpctype_string_array,
+          *lpctype_object_array  = &_lpctype_object_array;
+
 
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
 struct lvalue_s; /* Defined within YYSTYPE aka %union */
 
-static void define_local_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_star, struct lvalue_s *lv, Bool redeclare, Bool with_init);
+static void define_local_variable (ident_t* name, lpctype_t* actual_type, struct lvalue_s *lv, Bool redeclare, Bool with_init);
 static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2);
 static Bool add_lvalue_code ( struct lvalue_s * lv, int instruction);
 static void insert_pop_value(void);
@@ -1233,6 +1254,35 @@ add_to_mem_block (int n, void *data, size_t size)
 } /* add_to_mem_block() */
 
 /*-------------------------------------------------------------------------*/
+
+/* Define functions like add_to_mem_block() but with the correct
+ * type for the corresponding block.
+ */
+
+#define DEFINE_ADD_TO_BLOCK_BY_PTR(FUN, BLOCK_NAME)               \
+    static INLINE void                                            \
+    FUN (BLOCK_NAME##_t *element)                                 \
+    {                                                             \
+        add_to_mem_block(BLOCK_NAME, element, sizeof(*element));  \
+    }
+#define DEFINE_ADD_TO_BLOCK_BY_VALUE(FUN, BLOCK_NAME)             \
+    static INLINE void                                            \
+    FUN (BLOCK_NAME##_t element)                                  \
+    {                                                             \
+        add_to_mem_block(BLOCK_NAME, &element, sizeof(element));  \
+    }
+
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_ARGUMENT_TYPE, A_ARGUMENT_TYPES)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_ARGUMENT_INDEX, A_ARGUMENT_INDEX)
+DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_FUNCTION, A_FUNCTIONS)
+DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_VIRTUAL_VAR, A_VIRTUAL_VAR)
+DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_VARIABLE, A_VARIABLES)
+DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_STRUCT_DEF, A_STRUCT_DEFS)
+DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_STRUCT_MEMBER, A_STRUCT_MEMBERS)
+DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INLINE_CLOSURE, A_INLINE_CLOSURE)
+DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INCLUDE, A_INCLUDES)
+DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INHERIT, A_INHERITS)
+
 #define byte_to_mem_block(n, b) \
     ((void)((mem_block[n].current_size == mem_block[n].max_size \
              ? !!realloc_mem_block(&mem_block[n],0) : 1) \
@@ -1246,146 +1296,47 @@ add_to_mem_block (int n, void *data, size_t size)
 /* ==============================   TYPES   ============================== */
 
 /*-------------------------------------------------------------------------*/
-static INLINE void
-assign_full_to_vartype(vartype_t * dest, fulltype_t src)
-
-/* Assign a fulltype_t variable to a vartype_t variable.
- */
-
-{
-    dest->type = src.typeflags;
-    dest->t_struct = src.t_struct;
-
-} /* assign_full_to_vartype() */
-
 /*-------------------------------------------------------------------------*/
-static INLINE void
-assign_var_to_fulltype(fulltype_t * dest, vartype_t src)
 
-/* Assign a vartype_t variable to a fulltype_t variable.
+static size_t
+get_f_visibility_buf (typeflags_t flags, char *buf, size_t bufsize)
+
+/* Write a textual representation of the visibility flags in <flags>
+ * into <buf> with maximum size <bufsize>.
  */
 
 {
-    dest->typeflags = src.type;
-    dest->t_struct = src.t_struct;
+    size_t len;
 
-} /* assign_var_to_fulltype() */
+    if (bufsize <= 0)
+        return 0;
 
-/*-------------------------------------------------------------------------*/
-static INLINE Bool
-equal_types (fulltype_t e, fulltype_t t)
+    buf[0] = '\0';
+    if (flags & TYPE_MOD_STATIC)
+        strncat(buf, "static ", bufsize);
+    if (flags & TYPE_MOD_NO_MASK)
+        strncat(buf, "nomask ", bufsize);
+    if (flags & TYPE_MOD_PRIVATE)
+        strncat(buf, "private ", bufsize);
+    if (flags & TYPE_MOD_PROTECTED)
+        strncat(buf, "protected ", bufsize);
+    if (flags & TYPE_MOD_PUBLIC)
+        strncat(buf, "public ", bufsize);
+    if (flags & TYPE_MOD_VARARGS)
+        strncat(buf, "varargs ", bufsize);
+    if (flags & TYPE_MOD_DEPRECATED)
+        strncat(buf, "deprecated ", bufsize);
 
-/* Return TRUE if <e> and <t> are compatible basic types.
- */
+    len = strlen(buf);
+    if (len && buf[len-1] == ' ')
+        buf[--len] = '\0';
 
-{
-    return (e.typeflags & TYPEID_MASK) == (t.typeflags & TYPEID_MASK)
-      && e.t_struct == t.t_struct;
-
-} /* equal_types() */
-
-
-static INLINE Bool
-basic_type (typeflags_t e, typeflags_t t)
-
-/* Return TRUE if <e> and <t> are compatible basic types.
- */
-
-{
-    e &= TYPEID_MASK;
-    t &= TYPEID_MASK;
-
-    return e == TYPE_ANY
-        || e == t
-        || t == TYPE_ANY
-    ;
-} /* basic_type() */
-
-
-static INLINE Bool
-BASIC_TYPE (fulltype_t e, fulltype_t t)
-
-/* Return TRUE if <e> and <t> are compatible basic types.
- */
-
-{
-    return basic_type(e.typeflags, t.typeflags);
-} /* BASIC_TYPE() */
-
-
-static INLINE Bool
-TYPE (fulltype_t e, fulltype_t t)
-
-/* Return TRUE if <e> and <t> are compatible basic xor pointer types.
- */
-
-{
-    typeflags_t ef = e.typeflags & TYPEID_MASK;
-    typeflags_t tf = t.typeflags & TYPEID_MASK;
-
-    return basic_type(ef & TYPE_MOD_MASK, tf & TYPE_MOD_MASK)
-        || (   (ef & TYPE_MOD_POINTER) && (tf & TYPE_MOD_POINTER) 
-            && basic_type( ef & (TYPE_MOD_MASK & ~TYPE_MOD_POINTER)
-                         , tf & (TYPE_MOD_MASK & ~TYPE_MOD_POINTER))
-           )
-    ;
-} /* TYPE() */
-
-
-static INLINE Bool
-vtype (vartype_t e, vartype_t t)
-
-/* Return TRUE if <e> and <t> are compatible basic xor pointer types.
- */
-
-{
-    fulltype_t et, tt;
-
-    assign_var_to_fulltype(&et, e);
-    assign_var_to_fulltype(&tt, t);
-    return TYPE(et, tt);
-} /* vtype() */
-
-static INLINE Bool
-MASKED_TYPE (fulltype_t e, fulltype_t t)
-
-/* Return TRUE if <e> and <t> are compatible basic types, or if both
- * are pointer types and one of them is a *ANY.
- */
-
-{
-    typeflags_t ef = e.typeflags & TYPEID_MASK;
-    typeflags_t tf = t.typeflags & TYPEID_MASK;
-
-    return  basic_type(ef, tf) 
-        || ( ef == (TYPE_MOD_POINTER|TYPE_ANY) && ef & TYPE_MOD_POINTER ) 
-        || ( tf == (TYPE_MOD_POINTER|TYPE_ANY) && ef & TYPE_MOD_POINTER ) 
-    ;
-
-} /* MASKED_TYPE() */
-
-
-static INLINE Bool
-REDEFINED_TYPE (fulltype_t e, fulltype_t t)
-
-/* Return TRUE if type <t> is a proper redefinition of <e>.
- * This is the case if <e> and <t> are compatible base types,
- * or if one of them is *ANY.
- */
-
-{
-    typeflags_t ef = e.typeflags & TYPEID_MASK;
-    typeflags_t tf = t.typeflags & TYPEID_MASK;
-    return basic_type(ef, tf ) 
-        || (tf == (TYPE_MOD_POINTER|TYPE_ANY) ) 
-        || (ef == (TYPE_MOD_POINTER|TYPE_ANY) ) 
-    ;
-} /* REDEFINED_TYPE() */
-
+    return len;
+} /* get_f_visibility_buf() */
 
 /*-------------------------------------------------------------------------*/
 static char *
-get_f_visibility (funflag_t flags)
+get_f_visibility (typeflags_t flags)
 
 /* Return (in a static buffer) a textual representation of the visibility
  * flags in <flags>.
@@ -1393,30 +1344,21 @@ get_f_visibility (funflag_t flags)
 
 {
     static char buff[120];
-    size_t len;
-
-    buff[0] = '\0';
-    if (flags & TYPE_MOD_STATIC)
-        strcat(buff, "static ");
-    if (flags & TYPE_MOD_NO_MASK)
-        strcat(buff, "nomask ");
-    if (flags & TYPE_MOD_PRIVATE)
-        strcat(buff, "private ");
-    if (flags & TYPE_MOD_PROTECTED)
-        strcat(buff, "protected ");
-    if (flags & TYPE_MOD_PUBLIC)
-        strcat(buff, "public ");
-    if (flags & TYPE_MOD_VARARGS)
-        strcat(buff, "varargs ");
-    if (flags & TYPE_MOD_DEPRECATED)
-        strcat(buff, "deprecated ");
-
-    len = strlen(buff);
-    if (len)
-        buff[len-1] = '\0';
-
+    get_f_visibility_buf(flags, buff, sizeof(buff));
     return buff;
 } /* get_f_visibility() */
+
+/*-------------------------------------------------------------------------*/
+static size_t
+get_visibility_buf (fulltype_t type, char *buf, size_t bufsize)
+
+/* Write a textual representation of the visibility portion of <type>
+ * into <buf> with maximum size <bufsize>.
+ */
+
+{
+    return get_f_visibility_buf(type.t_flags, buf, bufsize);
+} /* get_visibility_buf() */
 
 /*-------------------------------------------------------------------------*/
 static char *
@@ -1427,126 +1369,300 @@ get_visibility (fulltype_t type)
  */
 
 {
-    return get_f_visibility(type.typeflags);
+    return get_f_visibility(type.t_flags);
 } /* get_visibility() */
 
 /*-------------------------------------------------------------------------*/
+size_t
+get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
+
+/* Write a textual representation of <type> into <buf>.
+ * At most <bufsize> bytes (including the trailing '\0') are written.
+ * Returns the number of bytes written (excluding the trailing '\0').
+ */
+{
+    static char *type_name[] = { "unknown", "int", "string", "void",
+                                 "object", "mapping", "float", "mixed",
+                                 "closure", "symbol", "quoted_array", "struct" };
+
+    if (bufsize <= 0)
+        return 0;
+
+    switch(type->t_class)
+    {
+    case TCLASS_PRIMARY:
+        {
+            char* name;
+            size_t len;
+
+            if (type->t_primary >= sizeof type_name / sizeof type_name[0])
+                fatal("Bad type %"PRIu32": %s line %d\n"
+                     , type->t_primary,  current_loc.file->name
+                     , current_loc.line);
+
+            name = type_name[type->t_primary];
+            len = strlen(name);
+
+            if(len < bufsize)
+            {
+                memcpy(buf, name, len+1);
+                return len;
+            }
+            else
+            {
+                buf[0] = '\0';
+                return 0;
+            }
+        }
+
+    case TCLASS_STRUCT:
+        {
+            char pbuf[SIZEOF_CHAR_P * 2 + 4];
+            size_t pbuflen;
+
+            if (type->t_struct)
+            {
+                snprintf(pbuf, sizeof(pbuf), " %p", type->t_struct);
+                pbuflen = strlen(pbuf);
+            }
+            else
+                pbuflen = 0;
+
+            if(7 + mstrsize(type->t_struct->name) + pbuflen < bufsize)
+            {
+                memcpy(buf, "struct ", 7);
+                memcpy(buf+7, get_txt(type->t_struct->name), mstrsize(type->t_struct->name));
+                memcpy(buf+7+mstrsize(type->t_struct->name), pbuf, pbuflen+1);
+                return 7 + mstrsize(type->t_struct->name) + pbuflen;
+            }
+            else
+            {
+                buf[0] = '\0';
+                return 0;
+            }
+        }
+
+    case TCLASS_ARRAY:
+        {
+            size_t sublen;
+            lpctype_t *basetype;
+
+            basetype = type->t_array.base;
+            if(basetype->t_class == TCLASS_UNION)
+            {
+                buf[0] = '<';
+                sublen = get_lpctype_name_buf(basetype, buf + 1, bufsize - type->t_array.depth - 2);
+                if(sublen)
+                {
+                    buf[sublen+1] = '>';
+                    sublen += 2;
+                }
+            }
+            else
+                sublen = get_lpctype_name_buf(basetype, buf, bufsize - type->t_array.depth);
+
+            if(sublen)
+            {
+                memset(buf + sublen, '*', type->t_array.depth);
+                sublen += type->t_array.depth;
+            }
+
+            buf[sublen] = '\0';
+            return sublen;
+        }
+
+    case TCLASS_UNION:
+        {
+            lpctype_t *curtype = type;
+            char* curbuf = buf;
+            size_t sublen;
+
+            if (bufsize < 5)
+            {
+                buf[0] = 0;
+                return 0;
+            }
+
+            while (curtype->t_class == TCLASS_UNION)
+            {
+                sublen = get_lpctype_name_buf(curtype->t_union.member, curbuf, bufsize - 4);
+                if(!sublen)
+                    break;
+
+                curbuf[sublen] = '|';
+                curbuf += sublen + 1;
+                curtype = curtype->t_union.head;
+            }
+
+            if(sublen)
+            {
+                sublen = get_lpctype_name_buf(curtype, curbuf, bufsize);
+                curbuf += sublen;
+            }
+
+            if(!sublen)
+            {
+                if(curbuf == buf)
+                    return 0;
+                memcpy(curbuf, "...", 4);
+                return curbuf - buf + 3;
+            }
+
+            return curbuf - buf;
+        }
+    }
+
+    /* Not reached. */
+    buf[0] = '\0';
+    return 0;
+} /* get_lpctype_name_buf() */
+
+/*-------------------------------------------------------------------------*/
 char *
-get_type_name (fulltype_t type)
+get_lpctype_name (lpctype_t *type)
 
 /* Return (in a static buffer) a textual representation of <type>.
  */
 
 {
-    static char buff[120];
-    static char *type_name[] = { "unknown", "int", "string", "void", "object",
-                                 "mapping", "float", "mixed", "closure",
-                                 "symbol", "quoted_array", "struct" };
+    static char buff[512];
 
-    Bool pointer = MY_FALSE, reference = MY_FALSE;
+    get_lpctype_name_buf(type, buff, sizeof(buff));
+    return buff;
+} /* get_lpctype_name() */
 
-    buff[0] = '\0';
-    if (type.typeflags & TYPE_MOD_STATIC)
-        strcat(buff, "static ");
-    if (type.typeflags & TYPE_MOD_NO_MASK)
-        strcat(buff, "nomask ");
-    if (type.typeflags & TYPE_MOD_PRIVATE)
-        strcat(buff, "private ");
-    if (type.typeflags & TYPE_MOD_PROTECTED)
-        strcat(buff, "protected ");
-    if (type.typeflags & TYPE_MOD_PUBLIC)
-        strcat(buff, "public ");
-    if (type.typeflags & TYPE_MOD_VARARGS)
-        strcat(buff, "varargs ");
-    if (type.typeflags & TYPE_MOD_DEPRECATED)
-        strcat(buff, "deprecated ");
+/*-------------------------------------------------------------------------*/
+size_t
+get_fulltype_name_buf (fulltype_t type, char *buf, size_t bufsize)
 
-    type.typeflags &= TYPE_MOD_MASK;
+/* Write a textual representation of <type> into <buf>.
+ * At most <bufsize> bytes (including the trailing '\0') are written.
+ * Returns the number of bytes written (excluding the trailing '\0').
+ */
+{
+    size_t len;
 
-    if (type.typeflags & TYPE_MOD_POINTER)
+    if (bufsize <= 0)
+        return 0;
+
+    if (type.t_flags & TYPE_MOD_REFERENCE)
     {
-        pointer = MY_TRUE;
-        type.typeflags &= ~TYPE_MOD_POINTER;
-    }
-    if (type.typeflags & TYPE_MOD_REFERENCE)
-    {
-        reference = MY_TRUE;
-        type.typeflags &= ~TYPE_MOD_REFERENCE;
-    }
-
-    if (type.typeflags >= sizeof type_name / sizeof type_name[0])
-        fatal("Bad type %"PRIu32": %s line %d\n"
-             , type.typeflags,  current_loc.file->name, current_loc.line);
-
-    strcat(buff, type_name[type.typeflags]);
-
-    if  (type.typeflags == TYPE_STRUCT)
-    {
-        strcat(buff, " ");
-        if (type.t_struct)
+        if(bufsize < 4)
         {
-            char buff2[100];
-            strcat(buff, get_txt(type.t_struct->name));
-            sprintf(buff2, " %p", type.t_struct);
-            strcat(buff, buff2);
+            buf[0] = '\0';
+            return 0;
         }
+
+        bufsize -= 2;
     }
 
-    if (pointer)
-        strcat(buff, " *");
-    if (reference)
-        strcat(buff, " &");
+    len = get_f_visibility_buf(type.t_flags, buf, bufsize);
+    if(len && len + 1 < bufsize)
+        buf[len++] = ' ';
+    len += get_lpctype_name_buf(type.t_type, buf + len, bufsize - len);
 
+    if (type.t_flags & TYPE_MOD_REFERENCE)
+    {
+        memcpy(buf + len, " &", 3);
+        len += 2;
+    }
+
+    return len;
+} /* get_fulltype_name_buf() */
+
+/*-------------------------------------------------------------------------*/
+char *
+get_fulltype_name (fulltype_t type)
+
+/* Return (in a static buffer) a textual representation of <type>.
+ */
+
+{
+    static char buff[1024];
+
+    get_fulltype_name_buf(type, buff, sizeof(buff));
     return buff;
-} /* get_type_name() */
+} /* get_fulltype_name() */
 
 /*-------------------------------------------------------------------------*/
 static char *
-get_two_types (fulltype_t type1, fulltype_t type2)
+get_two_fulltypes (fulltype_t type1, fulltype_t type2)
 
 /* Return (in a static buffer) the text "(<type1> vs. <type2>)".
  */
 {
-    static char buff[100];
+    static char buff[1024];
+    size_t len, len2;
 
-    strcpy(buff, "(");
-    strcat(buff, get_type_name(type1));
-    strcat(buff, " vs ");
-    strcat(buff, get_type_name(type2));
-    strcat(buff, ")");
+    buff[0] = '(';
+    len = 1 + get_fulltype_name_buf(type1, buff+1, sizeof(buff)-10);
+
+    memcpy(buff + len, " vs ", 4);
+    len += 4;
+
+    len2 = get_fulltype_name_buf(type2, buff+len, sizeof(buff)-len-1);
+    if(!len2)
+        memcpy(buff + len, "...)", 5);
+    else
+        memcpy(buff + len + len2, ")", 2);
+
     return buff;
-} /* get_two_types() */
+} /* get_two_fulltypes() */
 
 /*-------------------------------------------------------------------------*/
 static char *
-get_two_vtypes (vartype_t type1, vartype_t type2)
+get_two_lpctypes (lpctype_t *type1, lpctype_t *type2)
 
 /* Return (in a static buffer) the text "(<type1> vs. <type2>)".
  */
 {
-    fulltype_t ftype1, ftype2;
+    static char buff[1024];
+    size_t len, len2;
 
-    assign_var_to_fulltype(&ftype1, type1);
-    assign_var_to_fulltype(&ftype2, type2);
-    return get_two_types(ftype1, ftype2);
-} /* get_two_vtypes() */
+    buff[0] = '(';
+    len = 1 + get_lpctype_name_buf(type1, buff+1, sizeof(buff)-10);
+
+    memcpy(buff + len, " vs ", 4);
+    len += 4;
+
+    len2 = get_lpctype_name_buf(type2, buff+len, sizeof(buff)-len-1);
+    if(!len2)
+        memcpy(buff + len, "...)", 5);
+    else
+        memcpy(buff + len + len2, ")", 2);
+
+    return buff;
+} /* get_two_lpctypes() */
 
 /*-------------------------------------------------------------------------*/
 static void
-type_error (char *str, fulltype_t type)
+fulltype_error (char *str, fulltype_t type)
 
 /* Generate an yyerror with the message "<str>: <type>".
  */
 {
     char *p;
 
-    p = get_type_name(type);
+    p = get_fulltype_name(type);
     yyerrorf("%s: \"%s\"", str, p);
-} /* type_error() */
+} /* fulltype_error() */
 
 /*-------------------------------------------------------------------------*/
 static void
-argument_type_error (int instr, fulltype_t type)
+lpctype_error (char *str, lpctype_t *type)
+
+/* Generate an yyerror with the message "<str>: <type>".
+ */
+{
+    char *p;
+
+    p = get_lpctype_name(type);
+    yyerrorf("%s: \"%s\"", str, p);
+} /* lpctype_error() */
+
+/*-------------------------------------------------------------------------*/
+static void
+argument_type_error (int instr, lpctype_t *type)
 
 /* Generate an yyerror with the message "Bad argument to <instr>: <type>".
  */
@@ -1554,7 +1670,7 @@ argument_type_error (int instr, fulltype_t type)
 {
     char *p;
 
-    p = get_type_name(type);
+    p = get_lpctype_name(type);
     yyerrorf("Bad argument to %s: \"%s\"", instrs[instr].name, p);
 } /* argument_type_error() */
 
@@ -1567,95 +1683,726 @@ efun_argument_error(int arg, int instr
     char msg[1024];
 
     msg[0] = '\0';
-    for (; expected->typeflags; expected++)
+    for (; expected->t_type; expected++)
     {
         if (msg[0] != '\0')
-            strcat(msg, "/");
-        strcat(msg, get_type_name(*expected));
+            strcat(msg, "|");
+        strcat(msg, get_fulltype_name(*expected));
     }
     yyerrorf("Bad arg %d type to %s(): got %s, expected %s"
-            , arg, instrs[instr].name, get_type_name(got), msg);
+            , arg, instrs[instr].name, get_fulltype_name(got), msg);
 } /* efun_argument_error() */
 
 /*-------------------------------------------------------------------------*/
-static Bool
-compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
+typedef struct unary_op_types_s unary_op_types_t;
+typedef struct binary_op_types_s binary_op_types_t;
 
-/* Compare the two types <t1> and <t2> and return TRUE if they are compatible.
- * Rules:
- *   - every type is compatible to itself
- *   - TYPE_UNKNOWN is incompatible to everything
- *   - TYPE_ANY is compatible to everything
- *   - two POINTER types are compatible if at least one is *TYPE_ANY.
- *
- * If <is_assign> is true, it is assumed that <t2> will be assigned
- * to a var of <t1>, and the following rules have to match as well:
- *   - a struct <t1> is compatible to a derived struct <t2>.
- *   - if <t1> is a struct, <t2> must be a struct or TYPE_ANY.
+struct unary_op_types_s
+{
+    lpctype_t* t;       /* argument to the operator. */
+    lpctype_t* result;  /* result type for this operation. */
+
+    lpctype_t* (*resultfun)(lpctype_t* t);
+      /* if <resultfun> is not NULL it is called with the argument
+       * type, and only if it returns a non-NULL value, this entry
+       * matches. If <result> is NULL then the function's result
+       * will be regarded as the operator result type.
+       * (otherwise <result> will be taken).
+       */
+};
+
+struct binary_op_types_s
+{
+    lpctype_t* t1;      /* first argument to the operator. */
+    lpctype_t* t2;      /* second argument to the operator. */
+    lpctype_t* result;  /* result type for this type combination. */
+
+    lpctype_t* (*resultfun)(lpctype_t* t1, lpctype_t* t2);
+      /* If <resultfun> is not NULL it is called with the argument
+       * types, and only if it returns a non-NULL value, this
+       * entry matches. If <result> is NULL then the function's
+       * result will be regarded as the operator result type
+       * (otherwise <result> will be taken).
+       */
+
+    lpctype_t* (*expfun)(lpctype_t* t1, lpctype_t* t2);
+      /* If <expfun> is not NULL it is called with the argument
+       * types when this entry didn't match. It can then
+       * return a suggested type, that will be printed in the
+       * error message.
+       */
+};
+
+static lpctype_t*
+get_array_member_type (lpctype_t* array)
+
+/* <array> is an array or a union of arrays.
+ * Determine the type of its members.
  */
 
 {
-    t1.typeflags &= TYPEID_MASK;
-    t2.typeflags &= TYPEID_MASK;
-    if (t1.typeflags == TYPE_UNKNOWN || t2.typeflags == TYPE_UNKNOWN)
-        return MY_FALSE;
-    if (t1.typeflags == TYPE_ANY || t2.typeflags == TYPE_ANY)
-        return MY_TRUE;
+    lpctype_t *result = NULL;
+    lpctype_t *head = array;
 
-    if (is_assign
-     && (t1.typeflags & PRIMARY_TYPE_MASK) == T_STRUCT
-     && (t2.typeflags & PRIMARY_TYPE_MASK) == T_STRUCT
-       )
+    while (true)
     {
-        struct_type_t * id1, * id2;
+        lpctype_t *member = head->t_class == TCLASS_UNION ? head->t_union.member : head;
 
-        /* Check if t1 is a base-struct of t2 */
-        id1 = t1.t_struct;
-        id2 = t2.t_struct;
-
-        while (id2 != NULL && id1 != id2)
+        if(member->t_class == TCLASS_ARRAY)
         {
-            id2 = id2->base;
+            lpctype_t *oldresult = result;
+            result = get_union_type(result, member->t_array.element);
+            free_lpctype(oldresult);
+        }
+        else /* must be mixed or unknown */
+        {
+            free_lpctype(result);
+            return ref_lpctype(member);
         }
 
-        /* If the base structs match, just pretend that t2 is the
-         * same struct as t1. This will make the following tests
-         * work as normal.
+        if (head->t_class == TCLASS_UNION)
+            head = head->t_union.head;
+        else
+            break;
+    }
+
+    return result;
+}
+
+static lpctype_t*
+get_union_array_type (lpctype_t* t1, lpctype_t* t2)
+
+/* <t1> and <t2> are arrays. This function creates an array type
+ * of the union of the members of both types.
+ */
+
+{
+    lpctype_t *member, *result;
+    lpctype_t *element1 = get_array_member_type(t1),
+              *element2 = get_array_member_type(t2);
+
+    member = get_union_type(element1, element2);
+    result = get_array_type(member);
+
+    free_lpctype(member);
+    free_lpctype(element1);
+    free_lpctype(element2);
+
+    return result;
+}
+
+static lpctype_t*
+get_sub_array_type (lpctype_t* t1, lpctype_t* t2)
+
+/* <t1> and <t2> are arrays. This function returns <t1> if
+ * there are any common member types, otherwise this functions fails.
+ */
+
+{
+    lpctype_t *common;
+    lpctype_t *element1 = get_array_member_type(t1),
+              *element2 = get_array_member_type(t2);
+
+    common = get_common_type(element1, element2);
+
+    free_lpctype(element1);
+    free_lpctype(element2);
+
+    if(common == NULL)
+        return NULL;
+
+    free_lpctype(common);
+    return ref_lpctype(t1);
+}
+
+
+static lpctype_t*
+get_first_type (lpctype_t* t1, lpctype_t* t2)
+
+/* Return <t1> as the result type in the type table.
+ */
+
+{
+    return ref_lpctype(t1);
+}
+
+
+static lpctype_t*
+get_second_type (lpctype_t* t1, lpctype_t* t2)
+
+/* Return <t2> as the result type in the type table.
+ */
+
+{
+    return ref_lpctype(t2);
+}
+
+static lpctype_t*
+get_argument_type (lpctype_t* t)
+
+/* Return <t> as the result type in the type table.
+ * This is the intersection between the type in
+ * the table and the type of the argument.
+ */
+
+{
+    return ref_lpctype(t);
+}
+
+
+/* Operator type table for assignment with addition.
+ */
+binary_op_types_t types_add_assignment[] = {
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_string,    &_lpctype_float,     &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_union_array_type , NULL                  },
+    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for assignment with subtraction.
+ */
+binary_op_types_t types_sub_assignment[] = {
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
+    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type       },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for assignment with multiplication.
+ */
+binary_op_types_t types_mul_assignment[] = {
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
+    { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_any_array, &_lpctype_int,       NULL,              &get_first_type       , NULL                  },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for assignment with division.
+ */
+binary_op_types_t types_div_assignment[] = {
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for assignment with the binary and.
+ */
+binary_op_types_t types_binary_and_assignment[] = {
+    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
+    { &_lpctype_mapping,   &_lpctype_any_array, &_lpctype_mapping, NULL                  , NULL                  },
+    { &_lpctype_any_array, &_lpctype_mapping,   NULL,              &get_first_type       , NULL                  },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_common_type      , NULL                  },
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for the binary or and xor,
+ * allowing <int>|<int> and <mixed*>|<mixed*>.
+ */
+binary_op_types_t types_binary_or[] = {
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_union_array_type , NULL                  },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for the binary and.
+ */
+binary_op_types_t types_binary_and[] = {
+    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
+    { &_lpctype_mapping,   &_lpctype_any_array, &_lpctype_mapping, NULL                  , NULL                  },
+    { &_lpctype_any_array, &_lpctype_mapping,   NULL,              &get_first_type       , NULL                  },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_common_type      , NULL                  },
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for equality tests.
+ * Basically there must be a common type, but ints can be compared with floats also.
+ */
+binary_op_types_t types_equality[] = {
+    { &_lpctype_mixed,     &_lpctype_mixed,     &_lpctype_int,     &get_common_type      , NULL                  },
+    { &_lpctype_int,       &_lpctype_float,     &_lpctype_int,     NULL                  , NULL                  },
+    { &_lpctype_float,     &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for shift operations.
+ * Only ints are allowed.
+ */
+binary_op_types_t types_shift[] = {
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for addition.
+ */
+binary_op_types_t types_addition[] = {
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_string,    &_lpctype_float,     &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_int,       &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                  },
+    { &_lpctype_float,     &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_union_array_type , NULL                  },
+    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for subtraction.
+ */
+binary_op_types_t types_subtraction[] = {
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                  },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
+    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type       },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for multiplication.
+ */
+binary_op_types_t types_multiplication[] = {
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                  },
+    { &_lpctype_int,       &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_int,       &_lpctype_any_array, NULL,              &get_second_type      , NULL                  },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
+    { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_any_array, &_lpctype_int,       NULL,              &get_first_type       , NULL                  },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for the modulus operation.
+ */
+binary_op_types_t types_modulus[] = {
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for division.
+ */
+binary_op_types_t types_division[] = {
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
+    { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                  },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
+    { NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for the unary minus, increment and decrement operation.
+ */
+unary_op_types_t types_unary_math[] = {
+    { &_lpctype_int,                            &_lpctype_int,     NULL                  },
+    { &_lpctype_float,                          &_lpctype_float,   NULL                  },
+    { NULL, NULL, NULL }
+};
+
+/* Operator type table for the range index operation (arg[x..y])
+ */
+unary_op_types_t types_range_index[] = {
+    { &_lpctype_string,                         &_lpctype_string,  NULL                  },
+    { &_lpctype_any_array,                      NULL,              &get_argument_type    },
+    { NULL, NULL, NULL }
+};
+
+/*-------------------------------------------------------------------------*/
+static lpctype_t*
+check_unary_op_type (lpctype_t* t, const char* op_name, unary_op_types_t* type_table, lpctype_t *error_type)
+
+/* Checks the argument <t> against the possible combinations in type_table.
+ * The result is the union of all result types of matching entries.
+ * If there are no matching entries, a compile error is thrown
+ * (unless <op_name> is NULL) and <error_type> is returned.
+ */
+
+{
+    lpctype_t* result = NULL;
+
+    /* No type info? Use the fallback. */
+    if (t == NULL)
+        return ref_lpctype(error_type);
+
+    for (unary_op_types_t* entry = type_table; entry->t; ++entry)
+    {
+        /* Is there any commonality between our
+         * argument type and the entry in the table?
          */
-        if (id2 != NULL)
-            t2.t_struct = id1;
-    }
+        lpctype_t *m = get_common_type(entry->t, t);
+        lpctype_t *mresult, *oldresult;
+        if (m == NULL)
+            continue;
 
-    if (t1.typeflags == t2.typeflags)
-    {
-        if (t1.t_struct == t2.t_struct)
-            return MY_TRUE;
-    }
+        mresult = ref_lpctype(entry->result);
 
-    if ((t1.typeflags & TYPE_MOD_POINTER) && (t2.typeflags & TYPE_MOD_POINTER))
-    {
-        if ((t1.typeflags & TYPE_MOD_MASK) == (TYPE_ANY|TYPE_MOD_POINTER)
-         || (t2.typeflags & TYPE_MOD_MASK) == (TYPE_ANY|TYPE_MOD_POINTER))
-            return MY_TRUE;
-    }
-
-    if (is_assign && (t1.typeflags & PRIMARY_TYPE_MASK) == T_STRUCT)
-    {
-        /* Check if t2 is a struct.  If it is, the above
-         * check already made sure that the type matches.
+        /* Then check resultfun, if it exists.
+         * It is an additional condition (must return != NULL)
+         * and returns the result type unless given in entry->result.
          */
-        if ((t2.typeflags & PRIMARY_TYPE_MASK) != T_STRUCT)
-            return MY_FALSE;
+        if (entry->resultfun != NULL)
+        {
+            lpctype_t *funresult = (*entry->resultfun)(m);
+            if (funresult == NULL)
+            {
+                free_lpctype(m);
+                free_lpctype(mresult);
+                continue;
+            }
+
+            if (mresult == NULL)
+                mresult = funresult;
+            else
+                free_lpctype(funresult);
+        }
+
+        oldresult = result;
+        result = get_union_type(result, mresult);
+        free_lpctype(m);
+        free_lpctype(mresult);
+        free_lpctype(oldresult);
     }
 
-    return MY_FALSE;
-} /* compatible_types() */
+    if (result != NULL || op_name == NULL)
+        return result;
+
+    /* Now get the error message:
+     * "Bad argument to <op_name>: <t>, expected ..."
+     * and show the unions of all first types in the table.
+     */
+    if (exact_types)
+    {
+        lpctype_t* expected = NULL;
+        char expbuff[1024];
+
+        for (unary_op_types_t* entry = type_table; entry->t; ++entry)
+        {
+            lpctype_t *oldexpected = expected;
+            expected = get_union_type(expected, entry->t);
+            free_lpctype(oldexpected);
+        }
+
+        get_lpctype_name_buf(expected, expbuff, sizeof(expbuff));
+        free_lpctype(expected);
+
+        yyerrorf("Bad argument to %s: got %s, expected %s"
+            , op_name, get_lpctype_name(t), expbuff);
+    }
+
+    return ref_lpctype(error_type);
+
+} /* check_unary_op_type() */
+
+/*-------------------------------------------------------------------------*/
+static lpctype_t*
+check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary_op_types_t* type_table, lpctype_t *error_type)
+
+/* Checks the arguments <t1> and <t2> against the possible combinations
+ * in type_table. The result is the union of all result types of
+ * matching entries. If there are no matching entries, a compile error
+ * is thrown (unless <op_name> is NULL) and <error_type> is returned.
+ */
+
+{
+    Bool t1_matched = MY_FALSE;
+    lpctype_t* result = NULL;
+
+    /* No type info? Use the fallback as a shortcut. */
+    if (t1 == NULL && t2 == NULL)
+        return ref_lpctype(error_type);
+
+    if (t1 == NULL)
+        t1 = lpctype_mixed;
+
+    if (t2 == NULL)
+        t2 = lpctype_mixed;
+
+    for (binary_op_types_t* entry = type_table; entry->t1; ++entry)
+    {
+        /* Is there any commonality between our first
+         * argument type and the entry in the table?
+         */
+        lpctype_t *m1 = get_common_type(entry->t1, t1);
+        lpctype_t *m2, *mresult, *oldresult;
+        if (m1 == NULL)
+            continue;
+
+        t1_matched = MY_TRUE;
+        /* And if so, is there some intersection
+         * between <t2> and the table entry?
+         */
+        m2 = get_common_type(entry->t2, t2);
+        if (m2 == NULL)
+        {
+            free_lpctype(m1);
+            continue;
+        }
+
+        mresult = ref_lpctype(entry->result);
+
+        /* Then check resultfun, if it exists.
+         * It is an additional condition (must return != NULL)
+         * and returns the result type unless given in entry->result.
+         */
+        if (entry->resultfun != NULL)
+        {
+            lpctype_t *funresult = (*entry->resultfun)(m1,m2);
+            if (funresult == NULL)
+            {
+                free_lpctype(m1);
+                free_lpctype(m2);
+                free_lpctype(mresult);
+                continue;
+            }
+
+            if (mresult == NULL)
+                mresult = funresult;
+            else
+                free_lpctype(funresult);
+        }
+
+        oldresult = result;
+        result = get_union_type(result, mresult);
+        free_lpctype(m1);
+        free_lpctype(m2);
+        free_lpctype(mresult);
+        free_lpctype(oldresult);
+    }
+
+    if (result != NULL || op_name == NULL)
+        return result;
+
+    /* For the error message, remember whether at least <t1> matched somewhere.
+     * If so, "Bad argument 2 to <op_name>: <t2>, expected ..." and show the
+     * unions of all second types for each match for t1. Otherwise
+     * "Bad argument 1 to <op_name>: <t1>, expected ..." and show the unions
+     * of all first types in the table.
+     */
+    if (!exact_types)
+    {
+        /* No strong type check, don't print error messages. */
+    }
+    else if (t1_matched)
+    {
+        lpctype_t* expected = NULL;
+        char expbuff[1024];
+
+        for (binary_op_types_t* entry = type_table; entry->t1; ++entry)
+        {
+            lpctype_t *m1 = get_common_type(entry->t1, t1);
+            lpctype_t *oldexpected, *newexpected;
+            if (m1 == NULL)
+                continue;
+
+            oldexpected = expected;
+            if (entry->expfun)
+            {
+                lpctype_t *m2 = get_common_type(entry->t2, t2);
+                if (m2 == NULL)
+                    newexpected = ref_lpctype(entry->t2);
+                else
+                {
+                    newexpected = (*entry->expfun)(m1, m2);
+                    free_lpctype(m2);
+                }
+            }
+            else
+                newexpected = ref_lpctype(entry->t2);
+
+            expected = get_union_type(expected, newexpected);
+
+            free_lpctype(m1);
+            free_lpctype(oldexpected);
+            free_lpctype(newexpected);
+        }
+
+        get_lpctype_name_buf(expected, expbuff, sizeof(expbuff));
+        free_lpctype(expected);
+
+        yyerrorf("Bad argument 2 to %s: got %s, expected %s"
+            , op_name, get_lpctype_name(t2), expbuff);
+    }
+    else
+    {
+        lpctype_t* expected = NULL;
+        char expbuff[1024];
+
+        for (binary_op_types_t* entry = type_table; entry->t1; ++entry)
+        {
+            lpctype_t *oldexpected = expected;
+            expected = get_union_type(expected, entry->t1);
+            free_lpctype(oldexpected);
+        }
+
+        get_lpctype_name_buf(expected, expbuff, sizeof(expbuff));
+        free_lpctype(expected);
+
+        yyerrorf("Bad argument 1 to %s: got %s, expected %s"
+            , op_name, get_lpctype_name(t1), expbuff);
+    }
+
+    return ref_lpctype(error_type);
+
+} /* check_binary_op_types() */
+
+/*-------------------------------------------------------------------------*/
+static lpctype_t*
+get_index_result_type (lpctype_t* aggregate, fulltype_t index, int inst, lpctype_t* error_type)
+
+/* Determines the result type of a single index operation on <aggregate>.
+ * Also checks whether the <index> and the index operation <inst> are
+ * legal for <aggregate>.
+ *
+ * The result is the union of all possible result types. If there are no
+ * possible results, a compile erorr is thrown (and <error_type> is
+ * returned, reference added).
+ */
+{
+    lpctype_t* result = NULL;
+    lpctype_t* head = aggregate;
+    bool can_be_mapping = false;
+    bool can_be_array_or_string = false;
+
+    if (index.t_flags & TYPE_MOD_REFERENCE)
+        yyerror("Reference used as index");
+
+    /* [<n] or [>n] can only index an array or string,
+     * [n] (F_INDEX) can also index a mapping.
+     */
+    if (inst == F_INDEX)
+        can_be_mapping = true;
+
+    /* Array or string indexing need an integer as an index. */
+    if (lpctype_contains(lpctype_int, index.t_type))
+        can_be_array_or_string = true;
+    else if(inst != F_INDEX)
+    {
+        /* [<n] or [>n] need an integer. */
+        if (exact_types)
+            lpctype_error("Bad type of index", index.t_type);
+        return ref_lpctype(error_type);
+    }
+
+    /* Now walk through <aggregate>. */
+    while (true)
+    {
+        lpctype_t *member = head->t_class == TCLASS_UNION ? head->t_union.member : head;
+
+        switch (member->t_class)
+        {
+        case TCLASS_PRIMARY:
+            switch (member->t_primary)
+            {
+            case TYPE_UNKNOWN:
+            case TYPE_ANY:
+                /* Can't do anything here... */
+                return ref_lpctype(member);
+
+            case TYPE_STRING:
+                if (can_be_array_or_string)
+                {
+                    /* Indexing a string, add int to the result. */
+                    lpctype_t *oldresult = result;
+                    result = get_union_type(result, lpctype_int);
+                    free_lpctype(oldresult);
+                }
+                break;
+
+            case TYPE_MAPPING:
+                if (can_be_mapping)
+                {
+                    /* Values can be anything... */
+                    free_lpctype(result);
+                    result = lpctype_mixed;
+                }
+                break;
+
+            default:
+                /* All other cases we ignore, they cannot be indexed. */
+                break;
+            }
+            break;
+
+        case TCLASS_ARRAY:
+            if (can_be_array_or_string)
+            {
+                /* Add the array member type to the result. */
+                lpctype_t *oldresult = result;
+                result = get_union_type(result, member->t_array.element);
+                free_lpctype(oldresult);
+            }
+            break;
+        }
+
+        if (head->t_class == TCLASS_UNION)
+            head = head->t_union.head;
+        else
+            break;
+    }
+
+    if (!result)
+    {
+        if (exact_types)
+            lpctype_error("Bad type to index", aggregate);
+        return ref_lpctype(error_type);
+    }
+
+    return result;
+} /* get_index_result_type() */
+
+/*-------------------------------------------------------------------------*/
+static lpctype_t*
+get_flattened_type (lpctype_t* t)
+
+/* Determines the result type of argument flattening.
+ *
+ * The result is the union of all non-array types in <t> and the type
+ * of all elements of arrays in <t>.
+ */
+{
+    lpctype_t *result = NULL;
+    lpctype_t* head = t;
+
+    /* Let's walk through all types in <t>. */
+    while (true)
+    {
+        lpctype_t *oldresult = result;
+        lpctype_t *member = head->t_class == TCLASS_UNION ? head->t_union.member : head;
+        lpctype_t *add = NULL;
+
+        if (member->t_class == TCLASS_ARRAY)
+            add = member->t_array.element;
+        else
+            add = member;
+
+        result = get_union_type(result, add);
+        free_lpctype(oldresult);
+
+        if (head->t_class == TCLASS_UNION)
+            head = head->t_union.head;
+        else
+            break;
+    }
+
+    return result;
+
+} /* check_binary_op_types() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
 i_add_arg_type (fulltype_t type)
 
 /* Add another function argument type to the argument type stack.
+ * The reference of <type> is adopted.
  */
 
 {
@@ -1666,8 +2413,9 @@ i_add_arg_type (fulltype_t type)
         mbp->max_size *= 2;
         mbp->block = rexalloc((char *)mbp->block, mbp->max_size);
     }
-    assign_full_to_vartype((vartype_t*)(mbp->block + mbp->current_size), type);
-    mbp->current_size += sizeof(vartype_t);
+
+    *(fulltype_t*)(mbp->block + mbp->current_size) = type;
+    mbp->current_size += sizeof(fulltype_t);
 } /* i_add_arg_type() */
 
 #define add_arg_type(t) i_add_arg_type(t)
@@ -1680,19 +2428,21 @@ pop_arg_stack (int n)
  */
 
 {
-    vartype_t * vp;
+    fulltype_t * vp;
 
-    vp = (vartype_t*)(type_of_arguments.block + type_of_arguments.current_size);
+    vp = (fulltype_t*)(type_of_arguments.block + type_of_arguments.current_size);
     while (n > 0)
     {
-        type_of_arguments.current_size -= sizeof (vartype_t);
+        type_of_arguments.current_size -= sizeof (fulltype_t);
         n--;
         vp--;
+
+        free_fulltype(*vp);
     }
 } /* pop_arg_stack() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE vartype_t *
+static INLINE fulltype_t *
 get_argument_types_start (int n)
 
 /* Get the type of the <n>th last argument from the stack.
@@ -1701,37 +2451,52 @@ get_argument_types_start (int n)
 
 {
     return
-        &((vartype_t *)
+        &((fulltype_t *)
          (type_of_arguments.block + type_of_arguments.current_size))[ - n];
 } /* get_arguments_type_start() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE void
-check_aggregate_types (int n)
+static INLINE lpctype_t *
+get_aggregate_type (int n)
 
 /* The last <n> types on the argument stack are an aggregate type.
- * Combine the single types and make sure that none is a reference type.
+ * Combine the single types to a union type and remove them
+ * from the argument stack.
  */
 
 {
-    vartype_t *argp;
-    typeid_t   mask;
+    fulltype_t *argp;
+    lpctype_t *result = NULL;
+    typeflags_t mask = 0;
 
-    argp = (vartype_t *) (type_of_arguments.block +
-          (type_of_arguments.current_size -= sizeof (vartype_t) * n) );
+    argp = (fulltype_t *) (type_of_arguments.block +
+          (type_of_arguments.current_size -= sizeof (fulltype_t) * n) );
 
-    /* We're just interested in TYPE_MOD_REFERENCE, so we preset all
-     * other bits with 1.
-     */
-    for (mask = ~TYPE_MOD_REFERENCE; --n >= 0; )
+    while (--n >= 0 )
     {
-        mask |= argp->type;
+        lpctype_t *oldresult = result;
+
+        result = get_union_type(result, argp->t_type);
+        mask |= argp->t_flags;
+
+        free_lpctype(oldresult);
+        free_fulltype(*argp);
         argp++;
     }
 
-    if (!(~mask & 0xffff))
+    if (mask & TYPE_MOD_REFERENCE)
         yyerror("Can't trace reference assignments.");
-} /* check_aggregate_types() */
+
+    if (result)
+    {
+        lpctype_t *arrtype = get_array_type(result);
+        free_lpctype(result);
+        return arrtype;
+    }
+
+    return lpctype_any_array;
+
+} /* get_aggregate_type() */
 
 
 /*-------------------------------------------------------------------------*/
@@ -2456,7 +3221,15 @@ free_all_local_names (void)
     while (current_number_of_locals > 0 && type_of_locals)
     {
         current_number_of_locals--;
-        free_fulltype_data(&type_of_locals[current_number_of_locals]);
+        free_fulltype(type_of_locals[current_number_of_locals]);
+    }
+
+    /* Free also types of context variables. */
+    if (type_of_context && type_of_context != &(LOCAL_TYPE(0)))
+    {
+        int i;
+        for (i=0; i<MAX_LOCAL; i++)
+            free_fulltype(type_of_context[i]);
     }
 
     all_locals = NULL;
@@ -2498,8 +3271,15 @@ free_local_names (int depth)
         q = all_locals;
         all_locals = q->next_all;
         free_shared_identifier(q);
-        current_number_of_locals--;
-        free_fulltype_data(&type_of_locals[current_number_of_locals]);
+        if (q->u.local.context >= 0)
+        {
+            free_fulltype(type_of_context[q->u.local.context]);
+        }
+        else
+        {
+            current_number_of_locals--;
+            free_fulltype(type_of_locals[current_number_of_locals]);
+        }
     }
 } /* free_local_names() */
 
@@ -2508,12 +3288,12 @@ static ident_t *
 add_local_name (ident_t *ident, fulltype_t type, int depth)
 
 /* Declare a new local variable <ident> with the type <type> on
- * the scope depth <depth>. The references of <type> are NOT adopted.
+ * the scope depth <depth>. The references of <type> ARE adopted.
  * Return the (adjusted) ident for the new variable.
  */
 
 {
-    if ((type.typeflags & PRIMARY_TYPE_MASK) == TYPE_VOID)
+    if (type.t_type == lpctype_void)
     {
         yyerrorf( "Illegal to define variable '%s' as type 'void'"
                 , get_txt(ident->name));
@@ -2524,8 +3304,6 @@ add_local_name (ident_t *ident, fulltype_t type, int depth)
 
     else
     {
-        ref_fulltype_data(&type);
-
         if (ident->type != I_TYPE_UNKNOWN)
         {
             /* We're overlaying some other definition.
@@ -2578,7 +3356,7 @@ static ident_t *
 redeclare_local (ident_t *ident, fulltype_t type, int depth)
 
 /* Redeclare a local name <ident>, to <type> at <depth>; the references
- * of <type> are NOT adopted (nor freed on error).
+ * of <type> ARE adopted (and freed on error, except fatal ones).
  * If this happens on a deeper level, it is legal: the new declaration
  * is added and the new identifier is returned.
  * If it is illegal, an yyerror() is risen and the ident of the older
@@ -2601,6 +3379,7 @@ redeclare_local (ident_t *ident, fulltype_t type, int depth)
        )
     {
         yyerrorf("Illegal to redeclare local name '%s'", get_txt(ident->name));
+        free_fulltype(type);
     }
     else
     {
@@ -2612,7 +3391,7 @@ redeclare_local (ident_t *ident, fulltype_t type, int depth)
 
 /*-------------------------------------------------------------------------*/
 static ident_t *
-add_context_name (inline_closure_t *closure, ident_t *ident, fulltype_t type, int num)
+add_context_name (inline_closure_t *closure, ident_t *ident, lpctype_t *type, int num)
 
 /* Declare a new context variable <ident> with the type <type> for the
  * currently compiled inline closure. The references of <type> are NOT adopted.
@@ -2626,7 +3405,7 @@ add_context_name (inline_closure_t *closure, ident_t *ident, fulltype_t type, in
     block_scope_t * block;
 
     depth = closure->block_depth+1;
-    block = & block_scope[depth-1];
+    block = & block_scope[depth-1]; /* The context block scope. */
 
 #ifdef DEBUG_INLINES
 printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n", 
@@ -2644,8 +3423,6 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n",
     }
     else
     {
-        ref_fulltype_data(&type);
-
         if (ident->type != I_TYPE_UNKNOWN)
         {
             /* We're overlaying some other definition, but that's ok.
@@ -2695,9 +3472,10 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n",
         }
 
         /* Record the type */
-        type_of_context[block->num_locals] = type;
+        type_of_context[block->num_locals] = get_fulltype(ref_lpctype(type));
+
         if (num < 0)
-            type_of_locals[ident->u.local.num] = type;
+            type_of_locals[ident->u.local.num] = get_fulltype(ref_lpctype(type));
 
         block->num_locals++;
     }
@@ -2707,14 +3485,14 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n",
 
 /*-------------------------------------------------------------------------*/
 static ident_t *
-check_for_context_local (ident_t *ident, fulltype_t * pType)
+check_for_context_local (ident_t *ident, lpctype_t ** pType)
 
 /* The LPC code uses local variable <ident>. If we're compiling
  * an inline closure, check if it is an inherited local for which
  * no context variable has been created yet. If yes, create the context
  * variable.
  * Return the (possibly updated) ident, and store the variables type
- * in *<pType>.
+ * in *<pType> (the reference count is not increased).
  */
 
 {
@@ -2730,7 +3508,7 @@ check_for_context_local (ident_t *ident, fulltype_t * pType)
     {
         inline_closure_t *closure;
         mp_int closure_nr;
-        fulltype_t type;
+        lpctype_t* type;
 
         closure = current_inline;
         closure_nr = closure - &(INLINE_CLOSURE(0));
@@ -2769,14 +3547,14 @@ check_for_context_local (ident_t *ident, fulltype_t * pType)
             /* It's a context variable. */
             type = LOCAL_TYPE(closure->full_context_type_start
                               + ident->u.local.context
-                             );
+                             ).t_type;
         }
         else
         {
             /* It's a local variable. */
             type = LOCAL_TYPE(closure->full_local_type_start
                               + ident->u.local.num
-                             );
+                             ).t_type;
         }
 
         /* Now pass this context variable through
@@ -2790,7 +3568,6 @@ check_for_context_local (ident_t *ident, fulltype_t * pType)
              */
             if (!closure->parse_context)
             {
-                ref_fulltype_data(&type);
                 ident = add_context_name(closure, ident, type,
                      ident->u.local.context >= 0
                      ? CONTEXT_VARIABLE_BASE + ident->u.local.context
@@ -2806,9 +3583,9 @@ check_for_context_local (ident_t *ident, fulltype_t * pType)
         *pType = type;
     }
     else if (ident->u.local.context >= 0)
-        *pType = type_of_context[ident->u.local.context];
+        *pType = type_of_context[ident->u.local.context].t_type;
     else
-        *pType = type_of_locals[ident->u.local.num];
+        *pType = type_of_locals[ident->u.local.num].t_type;
 
     return ident;
 } /* check_for_context_local() */
@@ -2838,6 +3615,8 @@ adapt_context_names (void)
 
         while (q != NULL && q->u.local.depth == depth)
         {
+            free_fulltype(type_of_locals[q->u.local.num]);
+
             q->u.local.context = q->u.local.num - scope->first_local;
             q->u.local.num = -1;
 
@@ -2934,7 +3713,7 @@ store_argument_types ( int num_arg )
 
     /* Store the function arguments, if required.
      */
-    if (!exact_types.typeflags)
+    if (!exact_types)
     {
         argument_start_index = INDEX_START_NONE;
     }
@@ -2947,11 +3726,7 @@ store_argument_types ( int num_arg )
         argument_start_index = ARGTYPE_COUNT;
         for (i = 0; i < num_arg; i++)
         {
-            vartype_t vt;
-
-            assign_full_to_vartype(&vt, type_of_locals[i]);
-            ref_vartype_data(&vt);
-            add_to_mem_block(A_ARGUMENT_TYPES, &vt, sizeof vt);
+            ADD_ARGUMENT_TYPE(ref_lpctype(type_of_locals[i].t_type));
         }
     }
 
@@ -2985,7 +3760,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
     unsigned short argument_start_index;
 
     /* Move the visibility-info into flags */
-    flags |= type.typeflags & ~TYPE_MOD_MASK;
+    flags |= type.t_flags & ~TYPE_MOD_MASK;
 
     do {
         function_t *funp;
@@ -3045,9 +3820,9 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
              *
              * 'nomask' functions may not be redefined.
              */
-            if (exact_types.typeflags && funp->type.typeflags != TYPE_UNKNOWN)
+            if (exact_types && funp->type != lpctype_unknown && funp->type != NULL)
             {
-                fulltype_t t1, t2;
+                lpctype_t *t1, *t2;
 
                 if (funp->num_arg > num_arg && !(funp->flags & TYPE_MOD_VARARGS))
                     yyerrorf("Incorrect number of arguments in redefinition of '%s'.", get_txt(p->name));
@@ -3095,8 +3870,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                     {
                         char buff[120];
 
-                        t2 = funp->type;
-                        strncpy(buff, get_visibility(t2), sizeof(buff)-1);
+                        strncpy(buff, get_f_visibility(f1), sizeof(buff)-1);
                         buff[sizeof(buff) - 1] = '\0'; // strncpy() does not guarantee NUL-termination
                         yywarnf("Inconsistent declaration of '%s': Visibility changed from '%s' to '%s'"
                                , get_txt(p->name), buff, get_visibility(type));
@@ -3104,17 +3878,17 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 #                   undef TYPE_MOD_VIS
                 }
 
-                /* Check if the 'varargs' attribute is conserved */
-
-                t1 = type;       t1.typeflags &= TYPE_MOD_MASK;
-                t2 = funp->type; t2.typeflags &= TYPE_MOD_MASK;
-                if (!MASKED_TYPE(t1, t2))
+                t1 = type.t_type;
+                t2 = funp->type;
+                if (!has_common_type(t1, t2))
                 {
                     if (pragma_pedantic)
-                        yyerrorf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_types(t2, t1));
+                        yyerrorf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_lpctypes(t2, t1));
                     else if (pragma_check_overloads)
-                        yywarnf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_types(t2, t1));
+                        yywarnf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_lpctypes(t2, t1));
                 }
+
+                /* Check if the 'varargs' attribute is conserved */
 
                 if (pragma_pedantic
                  && (funp->flags ^ flags) & TYPE_MOD_VARARGS
@@ -3131,7 +3905,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                 {
                     int i;
                     unsigned short first_arg;
-                    vartype_t *argp;
+                    lpctype_t **argp;
                     int num_args = num_arg;
 
                     /* Don't check newly added arguments */
@@ -3139,33 +3913,31 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                         num_args = funp->num_arg;
 
                     first_arg = ARGUMENT_INDEX(num);
-
-                    argp = (vartype_t *)mem_block[A_ARGUMENT_TYPES].block
-                           + first_arg;
+                    argp = GET_BLOCK(A_ARGUMENT_TYPES) + first_arg;
 
                     if (funp->flags & TYPE_MOD_XVARARGS)
                         num_args--; /* last argument is ok */
 
                     for (i = 0; i < num_args; i++ )
                     {
-                        t1 = type_of_locals[i];
-                        t1.typeflags &= TYPE_MOD_RMASK;
-                        assign_var_to_fulltype(&t2, argp[i]);
-                        t2.typeflags &= TYPE_MOD_MASK;
-                        if (!MASKED_TYPE(t1, t2))
+                        t1 = type_of_locals[i].t_type;
+                        t2 = argp[i];
+                        if (!has_common_type(t1, t2))
                         {
                             args_differ = MY_TRUE;
                             if (pragma_pedantic)
                                 yyerrorf("Argument type mismatch in "
                                          "redefinition of '%s': arg %d %s"
-                                        , get_txt(p->name), i+1, get_two_types(t1, t2)
+                                        , get_txt(p->name), i+1, get_two_lpctypes(t1, t2)
                                         );
                             else if (pragma_check_overloads)
                                 yywarnf("Argument type mismatch in "
                                          "redefinition of '%s': arg %d %s"
-                                        , get_txt(p->name), i+1, get_two_types(t1, t2)
+                                        , get_txt(p->name), i+1, get_two_lpctypes(t1, t2)
                                         );
                         }
+                        else if (t1 != t2)
+                            args_differ = MY_TRUE;
                     } /* for (all args) */
 
                 } /* if (compare_args) */
@@ -3212,12 +3984,14 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
         }
 
+        if (funp->flags & NAME_INHERITED) /* We didn't adopt the reference yet. */
+            ref_mstring(funp->name);
+
         funp->num_locals = num_local;
         funp->flags = flags;
         funp->offset.pc = offset;
-        free_fulltype_data(&funp->type);
-        funp->type = type;
-        ref_fulltype_data(&funp->type);
+        free_lpctype(funp->type);
+        funp->type = ref_lpctype(type.t_type);
 
         /* That's it */
         return num;
@@ -3235,9 +4009,8 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
     fun.flags     = flags;
     fun.num_arg   = num_arg;
     fun.num_locals= num_local; /* will be updated later */
-    fun.type      = type;
+    fun.type      = ref_lpctype(type.t_type);
     ref_mstring(fun.name);
-    ref_fulltype_data(&fun.type);
 
     num = FUNCTION_COUNT;
 
@@ -3277,14 +4050,13 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
     p->u.global.function = num;
 
     /* Store the function_t in the functions area */
-    add_to_mem_block(A_FUNCTIONS, &fun, sizeof fun);
+    ADD_FUNCTION(&fun);
 
     /* Store the function arguments, if required,
      * and save the position of the argument types.
      */
     argument_start_index = store_argument_types(num_arg);
-    add_to_mem_block( A_ARGUMENT_INDEX, &argument_start_index
-                    , sizeof argument_start_index);
+    ADD_ARGUMENT_INDEX(argument_start_index);
 
     return num;
 } /* define_new_function() */
@@ -3299,10 +4071,10 @@ define_variable (ident_t *name, fulltype_t type)
 
 {
     variable_t dummy;
-    typeflags_t flags = type.typeflags;
+    typeflags_t flags = type.t_flags;
     int n;
 
-    if ((flags & PRIMARY_TYPE_MASK) == TYPE_VOID)
+    if (type.t_type == lpctype_void)
     {
         yyerrorf( "Illegal to define variable '%s' as type 'void'"
                 , get_txt(name->name));
@@ -3353,7 +4125,7 @@ define_variable (ident_t *name, fulltype_t type)
     /* If the variable already exists, make sure that we can redefine it */
     if ( (n = name->u.global.variable) >= 0)
     {
-        typeflags_t vn_flags = VARIABLE(n)->type.typeflags;
+        typeflags_t vn_flags = VARIABLE(n)->type.t_flags;
 
         /* Visible nomask variables can't be redefined */
         if ( vn_flags & TYPE_MOD_NO_MASK && !(flags & NAME_HIDDEN))
@@ -3402,27 +4174,26 @@ define_variable (ident_t *name, fulltype_t type)
         else
         {
             vn_flags |=   ~flags & TYPE_MOD_STATIC;
-            VARIABLE(n)->type.typeflags = vn_flags;
+            VARIABLE(n)->type.t_flags = vn_flags;
         }
     }
 
-    type.typeflags = flags;
+    type.t_flags = flags;
 
     dummy.name = ref_mstring(name->name);
-    dummy.type = type;
-    ref_fulltype_data(&dummy.type);
+    dummy.type = ref_fulltype(type);
 
     if (flags & TYPE_MOD_VIRTUAL)
     {
         if (!(flags & NAME_HIDDEN))
             name->u.global.variable = VIRTUAL_VAR_TAG | V_VARIABLE_COUNT;
-        add_to_mem_block(A_VIRTUAL_VAR, &dummy, sizeof dummy);
+        ADD_VIRTUAL_VAR(&dummy);
     }
     else
     {
         if (!(flags & NAME_HIDDEN))
             name->u.global.variable = NV_VARIABLE_COUNT;
-        add_to_mem_block(A_VARIABLES, &dummy, sizeof dummy);
+        ADD_VARIABLE(&dummy);
     }
 } /* define_variable() */
 
@@ -3432,10 +4203,11 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
 
 /* The variable <name> is inherited virtually with number <n>.
  * Redeclare it from its original type to <type>.
+ * The references of <type> are NOT adopted.
  */
 
 {
-    typeflags_t flags = type.typeflags;
+    typeflags_t flags = type.t_flags;
 
     if (name->type != I_TYPE_GLOBAL)
     {
@@ -3473,13 +4245,13 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
 
     if (name->u.global.variable >= 0 && name->u.global.variable != n)
     {
-        if (VARIABLE(name->u.global.variable)->type.typeflags & TYPE_MOD_NO_MASK )
+        if (VARIABLE(name->u.global.variable)->type.t_flags & TYPE_MOD_NO_MASK )
             yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
                     , get_txt(name->name));
     }
-    else if (V_VARIABLE(n)->type.typeflags & TYPE_MOD_NO_MASK
-          && !(V_VARIABLE(n)->type.typeflags & NAME_HIDDEN)
-          && (V_VARIABLE(n)->type.typeflags ^ flags) & TYPE_MOD_STATIC )
+    else if (V_VARIABLE(n)->type.t_flags & TYPE_MOD_NO_MASK
+          && !(V_VARIABLE(n)->type.t_flags & NAME_HIDDEN)
+          && (V_VARIABLE(n)->type.t_flags ^ flags) & TYPE_MOD_STATIC )
     {
         yyerrorf("Illegal to redefine 'nomask' variable \"%s\""
                 , get_txt(name->name));
@@ -3492,12 +4264,12 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
         flags ^= TYPE_MOD_NOSAVE;
     }
 
-    type.typeflags = flags;
+    type.t_flags = flags;
 
     name->u.global.variable = n;
-    free_fulltype_data(&V_VARIABLE(n)->type);
-    V_VARIABLE(n)->type = type;
-    ref_fulltype_data(&V_VARIABLE(n)->type);
+
+    free_fulltype(V_VARIABLE(n)->type);
+    V_VARIABLE(n)->type = ref_fulltype(type);
 } /* redeclare_variable() */
 
 /*-------------------------------------------------------------------------*/
@@ -3523,34 +4295,32 @@ verify_declared (ident_t *p)
 
 /*-------------------------------------------------------------------------*/
 static int
-define_global_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_star, Bool with_init)
+define_global_variable (ident_t* name, fulltype_t actual_type, Bool with_init)
 
-/* This is called directly from a parser rule: <type> [*] <name>
+/* This is called directly from a parser rule: <type> <name>
  * if with_init is true, then an initialization of this variable will follow.
  * It creates the global variable and returns its index.
  */
 
 {
     int i;
-    
+
     variables_defined = MY_TRUE;
 
-    if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+    if (!(actual_type.t_flags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
                           | TYPE_MOD_PROTECTED)))
     {
-        actual_type.typeflags |= default_varmod;
+        actual_type.t_flags |= default_varmod;
     }
 
-    if (actual_type.typeflags & TYPE_MOD_VARARGS)
+    if (actual_type.t_flags & TYPE_MOD_VARARGS)
     {
         yyerror("can't declare a variable as varargs");
-            actual_type.typeflags &= ~TYPE_MOD_VARARGS;
+            actual_type.t_flags &= ~TYPE_MOD_VARARGS;
     }
-  
-    actual_type.typeflags |= opt_star;
 
     if (!pragma_share_variables)
-        actual_type.typeflags |= VAR_INITIALIZED;
+        actual_type.t_flags |= VAR_INITIALIZED;
 
     define_variable(name, actual_type);
     i = verify_declared(name); /* Is the var declared? */
@@ -3561,10 +4331,7 @@ define_global_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_s
 #endif
 
     /* Initialize float values with 0.0. */
-    if (with_init
-       || (!(actual_type.typeflags & TYPE_MOD_POINTER)
-         && (actual_type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
-          ))
+    if (with_init || actual_type.t_type == lpctype_float)
     {
 
         /* Prepare the init code */
@@ -3606,7 +4373,7 @@ define_global_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_s
 #endif
             variables_initialized = MY_TRUE; /* We have __INIT code */
             if (!pragma_share_variables)
-                VARIABLE(i)->type.typeflags |= VAR_INITIALIZED;
+                VARIABLE(i)->type.t_flags |= VAR_INITIALIZED;
 
             /* Push the variable reference and create the assignment */
 
@@ -3635,9 +4402,9 @@ define_global_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_s
 /*-------------------------------------------------------------------------*/
 static void
 init_global_variable (int i, ident_t* name, fulltype_t actual_type
-                     , typeflags_t opt_star, int assign_op, fulltype_t exprtype)
+                     , int assign_op, fulltype_t exprtype)
 
-/* This is called directly from a parser rule: <type> [*] <name> = <expr>
+/* This is called directly from a parser rule: <type> <name> = <expr>
  * It will be called after the call to define_global_variable().
  * It assigns the result of <expr> to the variable.
  */
@@ -3645,13 +4412,11 @@ init_global_variable (int i, ident_t* name, fulltype_t actual_type
 {
     PREPARE_INSERT(4)
 
-    if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+    if (!(actual_type.t_flags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
                           | TYPE_MOD_PROTECTED)))
     {
-        actual_type.typeflags |= default_varmod;
+        actual_type.t_flags |= default_varmod;
     }
-
-    actual_type.typeflags |= opt_star;
 
 #ifdef DEBUG
     if (i & VIRTUAL_VAR_TAG)
@@ -3685,11 +4450,11 @@ init_global_variable (int i, ident_t* name, fulltype_t actual_type
        yyerror("Illegal initialization");
 
     /* Do the types match? */
-    actual_type.typeflags &= TYPE_MOD_MASK;
-    if (!compatible_types(actual_type, exprtype, MY_TRUE))
+    actual_type.t_flags &= TYPE_MOD_MASK;
+    if (!has_common_type(exprtype.t_type, actual_type.t_type))
     {
         yyerrorf("Type mismatch %s when initializing %s"
-                , get_two_types(actual_type, exprtype)
+                , get_two_lpctypes(actual_type.t_type, exprtype.t_type)
                 , get_txt(name->name));
     }
 
@@ -3717,8 +4482,7 @@ get_function_information (function_t * fun_p, program_t * prog, int ix)
     function_t * header = get_function_header_extended(prog, ix, &inhprogp, &inhfx);
 
     fun_p->name = header->name;
-    fun_p->type = header->type;
-    ref_fulltype_data(&fun_p->type);
+    fun_p->type = ref_lpctype(header->type);
 
     fun_p->num_arg = header->num_arg;
     if (is_undef_function(inhprogp->program + (inhprogp->functions[inhfx] & FUNSTART_MASK)))
@@ -3753,30 +4517,26 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident, Bool is_inline)
         init_scope(block_depth);
     }
 
-    if (!(returntype.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+    if (!(returntype.t_flags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
                                   | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)))
     {
-        returntype.typeflags |= default_funmod;
+        returntype.t_flags |= default_funmod;
     }
 
     /* Require exact types? */
-    if (returntype.typeflags & TYPE_MOD_MASK)
-    {
-        exact_types = returntype;
-    }
-    else
+    exact_types = returntype.t_type;
+    if (exact_types == NULL)
     {
         if (pragma_strict_types != PRAGMA_WEAK_TYPES)
             yyerrorf("\"#pragma %s_types\" requires type of function"
                     , pragma_strict_types == PRAGMA_STRICT_TYPES
                       ? "strict" : "strong" );
-        exact_types.typeflags = 0;
     }
 
-    if (returntype.typeflags & TYPE_MOD_NOSAVE)
+    if (returntype.t_flags & TYPE_MOD_NOSAVE)
     {
         yyerror("can't declare a function as nosave");
-        returntype.typeflags &= ~TYPE_MOD_NOSAVE;
+        returntype.t_flags &= ~TYPE_MOD_NOSAVE;
     }
 
     if (ident->type == I_TYPE_UNKNOWN)
@@ -3791,11 +4551,11 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident, Bool is_inline)
     if (is_inline)
     {
         current_inline->ident = ident;
-        current_inline->returntype = returntype;
+        current_inline->returntype = ref_fulltype(returntype);
     }
     else
     {
-        def_function_returntype = returntype;
+        def_function_returntype = ref_fulltype(returntype);
         def_function_ident = ident;
     }
 } /* def_function_typecheck() */
@@ -3814,45 +4574,41 @@ def_function_prototype (int num_args, Bool is_inline)
 
 {
     ident_t * ident;
-    fulltype_t returntype;
+    fulltype_t * returntype;
     int fun;
 
     if (is_inline)
     {
         ident = current_inline->ident;
-        returntype = current_inline->returntype;
+        returntype = &current_inline->returntype;
     }
     else
     {
         ident = def_function_ident;
-        returntype = def_function_returntype;
+        returntype = &def_function_returntype;
     }
 
     /* We got the complete prototype: define it */
 
     if ( current_number_of_locals
-     && (type_of_locals[current_number_of_locals-1].typeflags
+     && (type_of_locals[current_number_of_locals-1].t_flags
          & TYPE_MOD_VARARGS)
        )
     {
         /* The last argument has to allow an array. */
         fulltype_t *t;
 
-        returntype.typeflags |= TYPE_MOD_XVARARGS;
+        returntype->t_flags |= TYPE_MOD_XVARARGS;
 
         t = type_of_locals + (current_number_of_locals-1);
-        if (!(t->typeflags & TYPE_MOD_POINTER)
-         && (t->typeflags & TYPE_MOD_RMASK) != TYPE_ANY
-           )
+        if (!lpctype_contains(lpctype_unknown_array, t->t_type))
         {
-            if ((t->typeflags & TYPE_MOD_RMASK) != TYPE_UNKNOWN)
-                yyerror(
-                  "varargs parameter must be declared array or mixed");
-            /* Keep the visibility, but change the type to
-             * '&any'
+            yyerror("varargs parameter must be declared array or mixed");
+
+            /* Keep the visibility, but change the type to 'mixed'.
              */
-            t->typeflags &= ~TYPE_MOD_RMASK;
-            t->typeflags |= TYPE_ANY;
+            free_lpctype(t->t_type);
+            t->t_type = lpctype_mixed;
         }
     }
 
@@ -3861,18 +4617,16 @@ def_function_prototype (int num_args, Bool is_inline)
      */
     fun = define_new_function( MY_FALSE, ident, num_args, 0, 0
                              , NAME_UNDEFINED|NAME_PROTOTYPE
-                             , returntype);
+                             , *returntype);
 
     /* Store the data */
     if (is_inline)
     {
-        current_inline->returntype = returntype;
         current_inline->num_args = num_args;
         current_inline->function = fun;
     }
     else
     {
-        def_function_returntype = returntype;
         def_function_num_args = num_args;
     }
 } /* def_function_prototype() */
@@ -3921,7 +4675,7 @@ def_function_complete ( p_int body_start, Bool is_inline)
         flagp = (funflag_t *)(&FUNCTION(ident->u.global.function)->flags);
         if (!(*flagp & NAME_INHERITED))
         {
-            *flagp |= returntype.typeflags
+            *flagp |= returntype.t_flags
                       & (*flagp & TYPE_MOD_PUBLIC
                         ? (TYPE_MOD_NO_MASK)
                         : (TYPE_MOD_NO_MASK|TYPE_MOD_PRIVATE
@@ -3945,8 +4699,8 @@ def_function_complete ( p_int body_start, Bool is_inline)
                             , 0, returntype);
 
         /* Catch a missing return if the function has a return type */
-        if ((returntype.typeflags & PRIMARY_TYPE_MASK) != TYPE_VOID
-         && (   (returntype.typeflags & PRIMARY_TYPE_MASK) != TYPE_UNKNOWN
+        if (returntype.t_type != lpctype_void
+         && (   returntype.t_type != lpctype_unknown
              || pragma_strict_types
             )
            )
@@ -4127,7 +4881,7 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
         p->u.global.struct_id = num;
 
     /* Store the function_t in the functions area */
-    add_to_mem_block(A_STRUCT_DEFS, &sdef, sizeof sdef);
+    ADD_STRUCT_DEF(&sdef);
 
     return num;
 } /* define_new_struct() */
@@ -4157,7 +4911,7 @@ find_struct ( string_t * name )
 
 /*-------------------------------------------------------------------------*/
 static void
-add_struct_member ( string_t *name, vartype_t type
+add_struct_member ( string_t *name, lpctype_t *type
                   , struct_type_t * from_struct )
 
 /* Add a new member <name> with type <type> to A_STRUCT_MEMBERS for the
@@ -4165,6 +4919,7 @@ add_struct_member ( string_t *name, vartype_t type
  * If <from_struct> is not NULL, it is the type of the struct from
  * which the member is inherited.
  * Raise an error if a member of the same name already exists.
+ * The references of <type> are NOT adopted.
  */
 
 {
@@ -4211,9 +4966,8 @@ add_struct_member ( string_t *name, vartype_t type
         struct_member_t member;
 
         member.name = ref_mstring(name);
-        member.type = type;
-        ref_vartype_data(&member.type);
-        add_to_mem_block(A_STRUCT_MEMBERS, &member, sizeof member);
+        member.type = ref_lpctype(type);
+        ADD_STRUCT_MEMBER(&member);
     }
 } /* add_struct_member() */
 
@@ -4300,18 +5054,18 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
         /* Simplest case: all members assigned by position. */
 
         /* Check the types */
-        if (exact_types.typeflags && length > 0)
+        if (exact_types && length > 0)
         {
             for (member = 0, pmember = pdef->type->member, p = list
                 ; member < length && member < struct_t_size(pdef->type)
                 ; member++, pmember++, p = p->next
                 )
             {
-                if (!vtype(pmember->type, p->type) )
+                if (!has_common_type(pmember->type, p->type.t_type) )
                 {
                     yyerrorf("Type mismatch %s for member '%s' "
                              "in struct '%s'"
-                            , get_two_vtypes(pmember->type, p->type)
+                            , get_two_lpctypes(pmember->type, p->type.t_type)
                             , get_txt(pmember->name)
                             , get_txt(struct_t_name(pdef->type))
                             );
@@ -4391,12 +5145,12 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
                     );
             got_error = MY_TRUE;
         }
-        else if (exact_types.typeflags
-              && !vtype( pmember->type , p->type) )
+        else if (exact_types
+              && !has_common_type( pmember->type , p->type.t_type) )
         {
             yyerrorf("Type mismatch %s when initializing member '%s' "
                      "in struct '%s'"
-                    , get_two_vtypes(pmember->type, p->type)
+                    , get_two_lpctypes(pmember->type, p->type.t_type)
                     , get_txt(p->name)
                     , get_txt(struct_t_name(pdef->type))
                     );
@@ -4581,6 +5335,172 @@ find_struct_by_member (string_t * name, int * pNum)
 } /* find_struct_by_member() */
 
 /*-------------------------------------------------------------------------*/
+static lpctype_t*
+get_struct_member_result_type (lpctype_t* structure, string_t* member_name, short* struct_index, int* member_index)
+
+/* Determines the result type of a struct member lookup operation
+ * <structure> -> <member>. It checks whether <structure> is a valid
+ * struct type for access to <member>.
+ *
+ * If <member> is non-NULL, then the corresponding struct index will
+ * be written into <struct_index> and the member index into <member_index>.
+ * Otherwise both will get -1 as a result.
+ *
+ * Returns the member type or NULL upon a compile error.
+ */
+{
+    lpctype_t* head = structure;    /* Used to walk over the type. */
+    struct_type_t* fstruct = NULL;  /* Found structure definition. */
+    bool is_struct = false;
+
+    *struct_index = -1;
+
+    while (true)
+    {
+        /* Let's go through <structure> and see, if there are any structs in it. */
+        lpctype_t *member = head->t_class == TCLASS_UNION ? head->t_union.member : head;
+
+        switch (member->t_class)
+        {
+        case TCLASS_PRIMARY:
+            switch (member->t_primary)
+            {
+            case TYPE_UNKNOWN:
+            case TYPE_ANY:
+                /* Can be anything, even a struct... */
+                is_struct = true;
+
+                if (member_name != NULL)
+                {
+                    *struct_index = find_struct_by_member(member_name, member_index);
+                    if (*struct_index < 0)
+                    {
+                        *member_index = -1;
+                        return NULL;
+                    }
+
+                    fstruct = STRUCT_DEF(*struct_index).type;
+                }
+                else
+                {
+                    *struct_index = -1;
+                    *member_index = -1;
+                    return lpctype_mixed;
+                }
+
+                break;
+
+            default:
+                /* All other cases we ignore, they cannot be indexed. */
+                break;
+            }
+            break;
+
+        case TCLASS_STRUCT:
+            {
+                int midx = -1;
+                is_struct = true;
+
+                if (member_name != NULL)
+                {
+                    /* Let's see, if this one has <member>. */
+                    midx = struct_find_member(structure->t_struct, member_name);
+                    if (midx < 0)
+                        break;
+                }
+
+                if (!fstruct)
+                {
+                    fstruct = structure->t_struct;
+                    *member_index = midx;
+                }
+                else
+                {
+                    struct_type_t* test;
+                    /* Is this a child of <fstruct>? Then skip it.*/
+
+                    for ( test = structure->t_struct
+                        ; test != NULL && test != fstruct
+                        ; test = test->base
+                        )
+                        NOOP;
+
+                    if (test == NULL)
+                    {
+                        /* It's not a child. Check the other way around. */
+
+                        for ( test = fstruct
+                            ; test != NULL && test != structure->t_struct
+                            ; test = test->base
+                            )
+                            NOOP;
+
+                        if (test == NULL)
+                        {
+                            /* They are unrelated. But we need a unique index... */
+                            /* TODO: Maybe compile it as a dynamic member lookup. */
+                            yyerrorf("Multiple structs found for member '%s': struct %s, struct %s"
+                                    , get_txt(member_name)
+                                    , get_txt(struct_t_name(fstruct))
+                                    , get_txt(struct_t_name(structure->t_struct))
+                                    );
+
+                            *struct_index = -1;
+                            *member_index = -1;
+                            return NULL;
+                        }
+                        else
+                        {
+                            /* Remember the base struct. */
+                            fstruct = structure->t_struct;
+                            *member_index = midx;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+
+        if (head->t_class == TCLASS_UNION)
+            head = head->t_union.head;
+        else
+            break;
+    }
+
+    if (!fstruct)
+    {
+        if (is_struct)
+            yyerrorf("No such member '%s' for struct '%s'"
+                    , get_txt(member_name)
+                    , get_lpctype_name(structure)
+                    );
+        else
+            yyerrorf("Bad type for struct lookup: %s"
+                    , get_lpctype_name(structure));
+
+        *struct_index = -1;
+        *member_index = -1;
+        return NULL;
+    }
+
+    if (*struct_index == -1)
+        *struct_index = get_struct_index(structure->t_struct);
+    if (*struct_index == -1)
+    {
+        yyerrorf("Unknown type in struct dereference: %s\n"
+                , get_lpctype_name(structure));
+
+        *member_index = -1;
+        return NULL;
+    }
+
+    if (*member_index < 0)
+        return lpctype_mixed;
+    else
+        return ref_lpctype(fstruct->member[*member_index].type);
+} /* get_struct_member_result_type() */
+
+/*-------------------------------------------------------------------------*/
 static void
 struct_epilog (void)
 
@@ -4613,6 +5533,7 @@ struct_epilog (void)
     {
         struct_type_t *pSType = STRUCT_DEF(i).type;
         struct_type_t *pOld;
+        lpctype_t *tOld;
         int ii;
 
         if (STRUCT_DEF(i).inh >= 0)
@@ -4621,6 +5542,8 @@ struct_epilog (void)
         pOld = struct_lookup_type(pSType);
         if (!pOld || !struct_type_equivalent(pSType, pOld))
             continue;
+
+        tOld = get_struct_type(pOld);
 
         /* pOld has the same structure as pSType, so lets
          * replace the latter with the former.
@@ -4636,34 +5559,34 @@ struct_epilog (void)
 
         for (ii = 0; (size_t)ii < NV_VARIABLE_COUNT; ii++)
         {
-            fulltype_t * pType = &NV_VARIABLE(ii)->type;
+            lpctype_t ** pType = &(NV_VARIABLE(ii)->type.t_type);
 
-            if ((pType->typeflags & PRIMARY_TYPE_MASK) == TYPE_STRUCT
-             && pType->t_struct == pSType
+            if ((*pType)->t_class == TCLASS_STRUCT
+             && (*pType)->t_struct == pSType
                )
             {
-                free_struct_type(pType->t_struct);
-                pType->t_struct = ref_struct_type(pOld);
+                free_lpctype(*pType);
+                *pType = ref_lpctype(tOld);
             }
         }
 
         for (ii = 0; (size_t)ii < V_VARIABLE_COUNT; ii++)
         {
-            fulltype_t * pType = &V_VARIABLE(ii)->type;
+            lpctype_t ** pType = &(V_VARIABLE(ii | VIRTUAL_VAR_TAG)->type.t_type);
 
-            if ((pType->typeflags & PRIMARY_TYPE_MASK) == TYPE_STRUCT
-             && pType->t_struct == pSType
+            if ((*pType)->t_class == TCLASS_STRUCT
+             && (*pType)->t_struct == pSType
                )
             {
-                free_struct_type(pType->t_struct);
-                pType->t_struct = ref_struct_type(pOld);
+                free_lpctype(*pType);
+                *pType = ref_lpctype(tOld);
             }
         }
 
         /* Update the function return types */
         {
             int num_functions = FUNCTION_COUNT;
-            function_t * f = (function_t *)mem_block[A_FUNCTIONS].block;
+            function_t * f = FUNCTION(0);
 
             for (ii = num_functions; --ii >= 0; f++)
             {
@@ -4673,12 +5596,12 @@ struct_epilog (void)
                 if (f->flags & (NAME_INHERITED|NAME_UNDEFINED|NAME_CROSS_DEFINED))
                     continue;
 
-                if ((f->type.typeflags & PRIMARY_TYPE_MASK) == TYPE_STRUCT
-                 && f->type.t_struct == pSType
+                if (f->type->t_class == TCLASS_STRUCT
+                 && f->type->t_struct == pSType
                    )
                 {
-                    free_struct_type(f->type.t_struct);
-                    f->type.t_struct = ref_struct_type(pOld);
+                    free_lpctype(f->type);
+                    f->type = ref_lpctype(tOld);
                 }
             } /* for(ii) */
         }
@@ -4687,19 +5610,20 @@ struct_epilog (void)
 
         for (ii = 0; (size_t)ii < ARGTYPE_COUNT; ii++)
         {
-            vartype_t * pType = &ARGUMENT_TYPE(ii);
+            lpctype_t ** pType = &(ARGUMENT_TYPE(ii));
 
-            if ((pType->type & PRIMARY_TYPE_MASK) == TYPE_STRUCT
-             && pType->t_struct == pSType
+            if ((*pType)->t_class == TCLASS_STRUCT
+             && (*pType)->t_struct == pSType
                )
             {
-                free_struct_type(pType->t_struct);
-                pType->t_struct = ref_struct_type(pOld);
+                free_lpctype(*pType);
+                *pType = ref_lpctype(tOld);
             }
         }
 
         /* And finally, replace the struct in the A_STRUCT memblock */
         free_struct_type(pSType);
+        free_lpctype(tOld);
         STRUCT_DEF(i).type = ref_struct_type(pOld);
     } /* for(i) */
 
@@ -4747,8 +5671,8 @@ printf("DEBUG: new inline #%"PRIuMPINT": prev %"PRIdMPINT"\n", INLINE_CLOSURE_CO
     ict.li_length = 0;
     ict.function = -1;
     ict.ident = NULL;
-    ict.returntype.typeflags = 0;
-    ict.returntype.t_struct = NULL;
+    ict.returntype.t_flags = 0;
+    ict.returntype.t_type = NULL;
     ict.num_args = 0;
     ict.parse_context = MY_FALSE;
     ict.start_line = stored_lines;
@@ -4778,9 +5702,9 @@ printf("DEBUG:   local types: %"PRIuMPINT", context types: %"PRIuMPINT"\n",
     {
         mp_uint type_count = LOCAL_TYPE_COUNT;
 
-        extend_mem_block(A_LOCAL_TYPES, 2 * MAX_LOCAL * sizeof(fulltype_t));
+        extend_mem_block(A_LOCAL_TYPES, 2 * MAX_LOCAL * sizeof(A_LOCAL_TYPES_t));
         memset(&LOCAL_TYPE(type_count), 0
-              , (LOCAL_TYPE_COUNT - type_count) * sizeof(fulltype_t));
+              , (LOCAL_TYPE_COUNT - type_count) * sizeof(A_LOCAL_TYPES_t));
 
         type_of_context = &(LOCAL_TYPE(type_count));
         type_of_locals = &(LOCAL_TYPE(type_count+MAX_LOCAL));
@@ -4794,7 +5718,7 @@ printf("DEBUG:   type ptrs: %p, %p\n",
     max_number_of_locals = current_number_of_locals = 0;
 
     /* Add the structure to the memblock */
-    add_to_mem_block(A_INLINE_CLOSURE, &ict, sizeof(ict));
+    ADD_INLINE_CLOSURE(&ict);
     current_inline = &(INLINE_CLOSURE(INLINE_CLOSURE_COUNT-1));
 } /* new_inline_closure() */
 
@@ -4913,6 +5837,8 @@ printf("DEBUG:   move li data forward: from %"PRIuMPINT", length %"PRIuMPINT
 
     free_local_names(current_inline->block_depth+1);
 
+
+
     /* Restore the globals */
     block_depth              = current_inline->block_depth;
     current_number_of_locals = current_inline->num_locals;
@@ -4933,15 +5859,7 @@ printf("DEBUG:   type ptrs: %p, %p\n", type_of_locals, type_of_context );
 
     /* Don't free the current_inline->returntype as it's not counted. */
 
-    while (mem_block[A_LOCAL_TYPES].current_size
-           > current_inline->full_local_type_size)
-    {
-        mem_block[A_LOCAL_TYPES].current_size -= sizeof(fulltype_t);
-        free_fulltype_data( (fulltype_t*)
-                            (mem_block[A_LOCAL_TYPES].block
-                             + mem_block[A_LOCAL_TYPES].current_size)
-                          );
-    }
+    mem_block[A_LOCAL_TYPES].current_size = current_inline->full_local_type_size;
 
     /* Remove the structure from the lexical nesting stack */
     if (current_inline->prev == -1)
@@ -5016,7 +5934,7 @@ printf("DEBUG:        li_start %"PRIuMPINT", li_length %"PRIuMPINT
 
 /*-------------------------------------------------------------------------*/
 static Bool
-prepare_inline_closure (fulltype_t returntype)
+prepare_inline_closure (lpctype_t *returntype)
 
 /* Called after parsing 'func <type>', this creates the identifier
  * with the synthetic function name. The function also sets up the inline
@@ -5027,6 +5945,7 @@ prepare_inline_closure (fulltype_t returntype)
 
 {
     char name[256+MAXPATHLEN+1];
+    fulltype_t funtype;
     ident_t * ident;
 
     /* Create the name of the new inline function.
@@ -5059,9 +5978,10 @@ prepare_inline_closure (fulltype_t returntype)
      * be callable directly (without the CLOSURE svalue), and also not
      * overrideable.
      */
-    returntype.typeflags |= TYPE_MOD_NO_MASK | TYPE_MOD_PRIVATE;
+    funtype = get_fulltype(returntype);
+    funtype.t_flags |= TYPE_MOD_NO_MASK | TYPE_MOD_PRIVATE;
 
-    def_function_typecheck(returntype, ident, MY_TRUE);
+    def_function_typecheck(funtype, ident, MY_TRUE);
 #ifdef DEBUG_INLINES
 printf("DEBUG: New inline closure name: '%s'\n", name);
 printf("DEBUG:   current_inline->depth: %d\n", current_inline->block_depth);
@@ -5363,12 +6283,12 @@ store_prog_string (string_t *str)
     }
 
     /* Add the string pointer to the A_STRING area. */
-    mem_block[A_STRINGS].current_size += sizeof(string_t *);
-    *((string_t **)(mem_block[A_STRINGS].block+str_size)) = str;
+    PROG_STRING(STRING_COUNT) = str;
+    mem_block[A_STRINGS].current_size += sizeof(A_STRINGS_t);
 
     /* Add the old prog_string_index[] as a new entry in A_STRING_NEXT */
-    mem_block[A_STRING_NEXT].current_size += sizeof(int);
-    *((int *)(mem_block[A_STRING_NEXT].block+next_size)) = i;
+    PROG_STRING_NEXT(STRING_NEXT_COUNT) = i;
+    mem_block[A_STRING_NEXT].current_size += sizeof(A_STRING_NEXT_t);
 
     /* Store the string index in A_STRINGS as new prog_string_index[] at its
      * hash position. */
@@ -5387,22 +6307,20 @@ delete_prog_string (void)
 
 {
     string_t *str;
-    int size;
     hash32_t hash;
     int *indexp;
 
     /* Remove the string from the A_STRINGS area */
-    size = mem_block[A_STRINGS].current_size - sizeof(string_t *);
-    str = *(string_t**)(mem_block[A_STRINGS].block + size);
-    mem_block[A_STRINGS].current_size = size;
+    mem_block[A_STRINGS].current_size -= sizeof(A_STRINGS_t);
+    str = PROG_STRING(STRING_COUNT);
 
     /* Remove the string from the hash table */
-    mem_block[A_STRING_NEXT].current_size -= sizeof(int);
-    size = mem_block[A_STRING_NEXT].current_size;
     hash = hashpointer(str) & 0xff;
     indexp = &prog_string_indizes[hash];
+
     // let *indexp in the hash table point to the former next string.
-    *indexp = *((int *)(mem_block[A_STRING_NEXT].block+size));
+    mem_block[A_STRING_NEXT].current_size -= sizeof(int);
+    *indexp = PROG_STRING_NEXT(STRING_NEXT_COUNT);
     // BTW: if that is now -1, the hash chain is empty.
 
     // and finally free the string
@@ -5502,9 +6420,9 @@ delete_prog_string (void)
 /*-------------------------------------------------------------------------*/
 /* The yacc stack type */
 
-/* Note: vartype_t and fulltype_t references are not counted!
- * Throughout the compiler fulltype_ts are used even if the values
- * are not intended to have visibility information.
+/* Throughout the compiler fulltype_ts are used even if the values
+ * are not intended to have visibility information, to record
+ * the TYPE_MOD_REFERENCE flag.
  */
 
 %union
@@ -5543,12 +6461,12 @@ delete_prog_string (void)
       /* Just the typeflags (reference, pointer, visibility).
        */
 
-    fulltype_t type;
-      /* The datatype, not intended to have visibility flags.
-       */
-
     fulltype_t fulltype;
       /* The fulltype (datatype plus visibility) of entities.
+       */
+
+    lpctype_t *lpctype;
+      /* An LPC type without modifiers.
        */
 
     funflag_t inh_flags[2];
@@ -5633,7 +6551,7 @@ delete_prog_string (void)
             bytecode_t simple[2];
         } u;
         unsigned short length;
-        fulltype_t type;
+        lpctype_t *type;
     } lvalue;
       /* Used in assigns to communicate how an lvalue has to be accessed
        * (by passing on the bytecode to create) and what type it is.
@@ -5681,13 +6599,23 @@ delete_prog_string (void)
 
     struct {
         string_t * name;  /* Member name, or NULL if unnamed */
-        vartype_t  type;  /* Member expr type */
+        fulltype_t type;  /* Member expr type */
     } struct_init_member;
       /* For runtime struct literals: information about a single
        * member initializer.
        */
 
 } /* YYSTYPE */
+
+/*-------------------------------------------------------------------------*/
+/* Destructors in case of an error. */
+
+%destructor { free_lpctype($$);       } <lpctype>
+%destructor { free_fulltype($$);      } <fulltype>
+%destructor { free_lpctype($$.type);  } <lvalue>
+%destructor { free_fulltype($$.type); } <lrvalue> <struct_init_member>
+%destructor { free_fulltype($$.type1);
+              free_fulltype($$.type2); } <index>
 
 /*-------------------------------------------------------------------------*/
 
@@ -5697,21 +6625,23 @@ delete_prog_string (void)
 %type <symbol>       L_SYMBOL
 %type <number>       L_QUOTED_AGGREGATE
 %type <ident>        L_IDENTIFIER L_INLINE_FUN L_LOCAL
-%type <typeflags>    optional_star type_modifier type_modifier_list
-%type <fulltype>     type
-%type <fulltype>     opt_basic_type basic_type
-%type <fulltype>     non_void_type opt_basic_non_void_type basic_non_void_type
-%type <fulltype>     name_list local_name_list
+%type <typeflags>    type_modifier type_modifier_list
+
+%type <number>       optional_stars
+%type <fulltype>     type non_void_type
+%type <lpctype>      opt_basic_type basic_type opt_basic_non_void_type
+%type <lpctype>      basic_non_void_type single_basic_non_void_type
+%type <fulltype>     name_list 
+%type <lpctype>      local_name_list
 %type <inh_flags>    inheritance_qualifier inheritance_qualifiers
 %type <typeflags>    inheritance_modifier_list inheritance_modifier
-%type <fulltype>     inline_opt_type
-%type <type>         decl_cast cast
-%type <lrvalue>      note_start comma_expr expr0 expr4
+%type <lpctype>      inline_opt_type
+%type <lpctype>      decl_cast cast
+%type <address>      note_start
+%type <lrvalue>      comma_expr expr0 expr4
 %type <lrvalue>      function_call
 %type <lrvalue>      inline_func
 %type <lrvalue>      catch sscanf
-%type <lrvalue>      for_init_expr for_expr
-%type <lrvalue>      comma_expr_decl expr_decl
 %ifdef USE_PARSE_COMMAND
 %type <lrvalue>      parse_command
 %endif
@@ -5721,7 +6651,7 @@ delete_prog_string (void)
 %type <address>      optional_else
 %type <string>       anchestor
 %type <sh_string>    call_other_name identifier
-%type <fulltype>     member_name_list
+%type <lpctype>      member_name_list
 %type <struct_init_member> struct_init
 %type <struct_init_list>   opt_struct_init opt_struct_init2
 %type <sh_string>    struct_member_name
@@ -5737,7 +6667,7 @@ delete_prog_string (void)
 %type <number> inline_opt_args
   /* number of arguments */
 
-%type <number> expr_list expr_list3 e_expr_list2 expr_list2
+%type <number> expr_list arg_expr_list arg_expr_list2 expr_list2
   /* Number of expressions in an expression list */
 
 %type <number> m_expr_values
@@ -5810,7 +6740,7 @@ possible_semi_colon:
       /* empty */
     | ';' { yywarn("Extra ';' ignored"); };
 
-note_start: { $$.start = CURRENT_PROGRAM_SIZE; };
+note_start: { $$ = CURRENT_PROGRAM_SIZE; };
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -5821,29 +6751,30 @@ note_start: { $$.start = CURRENT_PROGRAM_SIZE; };
  * Default visibility
  */
 
-def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
+def:  type L_IDENTIFIER  /* Function definition or prototype */
 
       {
-          $1.typeflags |= $2;
-          def_function_typecheck($1, $3, MY_FALSE);
+          def_function_typecheck($1, $2, MY_FALSE);
       }
 
       '(' argument ')'
 
       {
-          def_function_prototype($6, MY_FALSE);
+          def_function_prototype($5, MY_FALSE);
       }
 
       function_body
 
       {
-          def_function_complete($9, MY_FALSE);
+          def_function_complete($8, MY_FALSE);
           insert_pending_inline_closures();
+          free_fulltype($1);
       }
 
     | name_list ';' /* Variable definition */
       {
           insert_pending_inline_closures();
+          free_fulltype($1);
       }
 
     | struct_decl
@@ -5893,7 +6824,10 @@ inline_func:
 printf("DEBUG: After inline_opt_type: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
           if (!prepare_inline_closure($2))
+          {
+              free_lpctype($2);
               YYACCEPT;
+          }
       }
 
       inline_opt_args
@@ -5922,12 +6856,13 @@ printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROG
           else
               block_scope[current_inline->block_depth].first_local = current_inline->num_locals;
 
+          /* Set type of locals back to the locals of the outer block.*/
           type_of_locals = &(LOCAL_TYPE(current_inline->full_local_type_start));
+
           /* Note, that type_of_context must not be reset, as add_context_name()
            * needs it where it points now. check_for_context_local() will take
            * care of finding the right type for context variables.
            */
-
       }
 
       inline_opt_context
@@ -5987,7 +6922,10 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
           }
 
           if (!inline_closure_prototype($4))
+          {
+              free_lpctype($2);
               YYACCEPT;
+          }
       }
 
       block
@@ -5998,9 +6936,10 @@ printf("DEBUG: After inline block: program size %"PRIuMPINT"\n", CURRENT_PROGRAM
 #endif /* DEBUG_INLINES */
          $$.start = current_inline->end;
          $$.code = -1;
-         $$.type = Type_Closure;
+         $$.type = get_fulltype(lpctype_closure);
 
          complete_inline_closure();
+         free_lpctype($2);
       }
 
 
@@ -6012,7 +6951,7 @@ printf("DEBUG: After inline block: program size %"PRIuMPINT"\n", CURRENT_PROGRAM
 #ifdef DEBUG_INLINES
 printf("DEBUG: After L_BEGIN_INLINE: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
-          if (!prepare_inline_closure(Type_Any))
+          if (!prepare_inline_closure(lpctype_mixed))
               YYACCEPT;
 
           /* Synthesize $1..$9 as arguments */
@@ -6023,7 +6962,7 @@ printf("DEBUG: After L_BEGIN_INLINE: program size %"PRIuMPINT"\n", CURRENT_PROGR
 
               sprintf(name, "$%d", i);
               ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
-              add_local_name(ident, Type_Any, block_depth);
+              add_local_name(ident, get_fulltype(lpctype_mixed), block_depth);
           }
 
           if (!inline_closure_prototype(9))
@@ -6061,7 +7000,7 @@ printf("DEBUG: After L_END_INLINE: program size %"PRIuMPINT"\n", CURRENT_PROGRAM
 
          $$.start = current_inline->end;
          $$.code = -1;
-         $$.type = Type_Closure;
+         $$.type = get_fulltype(lpctype_closure);
 
          complete_inline_closure();
       }
@@ -6081,7 +7020,7 @@ inline_opt_args:
 
               sprintf(name, "$%d", i);
               ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
-              add_local_name(ident, Type_Any, block_depth);
+              add_local_name(ident, get_fulltype(lpctype_mixed), block_depth);
           }
 
           $$ = 9;
@@ -6095,14 +7034,14 @@ inline_opt_type:
 #ifdef DEBUG_INLINES
           printf("DEBUG: inline_opt_type default: ANY\n");
 #endif /* DEBUG_INLINES */
-          $$ = Type_Any;
+          $$ = lpctype_mixed;
       }
-    | basic_type optional_star
+    | basic_type
       {
 #ifdef DEBUG_INLINES
-          printf("DEBUG: inline_opt_type: %c%s\n", $2 ? '*' : ' ', get_type_name($1));
+          printf("DEBUG: inline_opt_type: %s\n", get_lpctype_name($1));
 #endif /* DEBUG_INLINES */
-          set_fulltype($$, $1.typeflags | $2, $1.t_struct);
+          $$ = $1;
       }
 ; /* inline_opt_type */
 
@@ -6125,7 +7064,7 @@ inline_context_list:
 
 context_decl:
       local_name_list
-      { /* Empty action to void value from local_name_list */ }
+      { free_lpctype($1); }
 ; /* context_decl */
 
 
@@ -6135,6 +7074,7 @@ inline_comma_expr:
       {
           /* Add a F_RETURN to complete the statement */
           ins_f_code(F_RETURN);
+          free_fulltype($1.type);
       }
 ; /* inline_comma_expr */
 
@@ -6149,7 +7089,7 @@ struct_decl:
           (void)define_new_struct(MY_TRUE, $3, $1);
       }
     | type_modifier_list L_STRUCT L_IDENTIFIER
-      { 
+      {
           size_t i;
 
           /* Free any struct members left over from a previous
@@ -6167,7 +7107,7 @@ struct_decl:
               YYACCEPT;
       }
       opt_base_struct '{' opt_member_list '}' ';'
-      { 
+      {
           finish_struct(compiled_file, current_id_number+1);
       }
 ; /* struct_decl */
@@ -6211,7 +7151,7 @@ opt_base_struct:
                   struct_type_t *ctype = STRUCT_DEF(current_struct).type;
                   // record pointer to base struct even if the base struct has no members
                   ctype->base = ref_struct_type(ptype);
-                  
+
                   if (struct_t_size(ptype) > 0)
                   {
                       int count;
@@ -6242,32 +7182,21 @@ member:
       member_name_list ';'
       {
           /* The member_name_list adds the struct members. */
+          free_lpctype($1);
       }
 ; /* member */
 
 member_name_list:
-      basic_non_void_type optional_star L_IDENTIFIER
+      basic_non_void_type L_IDENTIFIER
       {
-          fulltype_t actual_type = $1;
-          vartype_t type;
-
-          actual_type.typeflags |= $2;
-
-          assign_full_to_vartype(&type, actual_type);
-          add_struct_member($3->name, type, NULL);
-
+          add_struct_member($2->name, $1, NULL);
           $$ = $1;
       }
-    | member_name_list ',' optional_star L_IDENTIFIER
+    | member_name_list ',' optional_stars L_IDENTIFIER
       {
-          fulltype_t actual_type = $1;
-          vartype_t type;
-
-          actual_type.typeflags |= $3;
-
-          assign_full_to_vartype(&type, actual_type);
+          lpctype_t* type = get_array_type_with_depth($1, $3);
           add_struct_member($4->name, type, NULL);
-
+          free_lpctype(type);
           $$ = $1;
       }
 ; /* member_name_list */
@@ -6299,10 +7228,7 @@ inheritance:
           inherit_t inherit;
 
           if (CURRENT_PROGRAM_SIZE
-           && !(((function_t *)(mem_block[A_FUNCTIONS].block+
-                         mem_block[A_FUNCTIONS].current_size))[-1].flags &
-                         NAME_INHERITED)
-             )
+           && !(FUNCTION(FUNCTION_COUNT-1)->flags & NAME_INHERITED))
           {
               yyerror("illegal to inherit after defining functions");
           }
@@ -6440,9 +7366,9 @@ inheritance:
               int j;
               Bool duplicate_toplevel = MY_FALSE;
 
-              inheritp = (inherit_t *)(mem_block[A_INHERITS].block);
-              j = mem_block[A_INHERITS].current_size;
-              for (; (j -= sizeof(inherit_t)) >= 0; inheritp++)
+              inheritp = GET_BLOCK(A_INHERITS);
+              j = INHERIT_COUNT;
+              for (; --j >= 0; inheritp++)
               {
                   if (inheritp->prog == ob->prog)
                   {
@@ -6524,7 +7450,7 @@ inheritance:
                   ? V_VARIABLE_COUNT - ob->prog->num_variables
                   : (NV_VARIABLE_COUNT - ob->prog->num_variables)
                     | NON_VIRTUAL_OFFSET_TAG;
-              add_to_mem_block(A_INHERITS, &inherit, sizeof inherit);
+              ADD_INHERIT(&inherit);
               num_virtual_variables = V_VARIABLE_COUNT;
           } /* if (!(inherit.inherit_type & INHERIT_TYPE_DUPLICATE)) */
       }
@@ -6573,60 +7499,69 @@ inheritance_modifier_list:
 
 
 inheritance_qualifier:
-      type optional_star L_IDENTIFIER
+      type L_IDENTIFIER
       {
           static ident_t    *last_identifier;
           static typeflags_t last_modifier;
 %line
-
-          /* The inherit statement must only specify visibility
-           * e.g. not "inherit int * foobar"
+          /* We use 'type' instead of only 'type_modifier_list'
+           * to avoid parser conflicts between:
+           *
+           *    private functions(int i) {}
+           * and
+           *    private functions inherit "i";
+           *
+           * So this is the same right hand side as 'def'
+           * for function definitions.
+           * TODO: If 'functions' and 'variables' would become
+           * keywords, then this wouldn't be ambiguous.
+           *
+           * But for now we just check that no type was given.
            */
-          if ($1.typeflags & TYPE_MOD_MASK)
+          if ($1.t_type)
           {
               yyerror("syntax error");
+              free_fulltype($1);
           }
 
           /* Check if there were any modifiers at all */
-          if ( !($1.typeflags & ~TYPE_MOD_MASK) )
+          do
           {
-              /* take lookahead into account */
-              if ($3 == last_identifier)
+              if ( !$1.t_flags )
               {
-                  last_identifier = NULL;
-                  $$[0] = $$[1] = 0;
-                  break; /* TODO: Assumes that byacc uses a switch() */
+                  /* take lookahead into account */
+                  if ($2 == last_identifier)
+                  {
+                      last_identifier = NULL;
+                      $$[0] = $$[1] = 0;
+                      break;
+                  }
               }
-          }
-          else
-          {
-              last_modifier = $1.typeflags & ~TYPE_MOD_MASK;
-          }
+              else
+              {
+                  last_modifier = $1.t_flags;
+              }
 
-          last_identifier = $3;
+              last_identifier = $2;
 
-          if ($2) /* No "*" allowed TODO: So why it's there? */
-          {
-              yyerror("syntax error");
-          }
-
-          /* The L_IDENTIFIER must be one of "functions" or "variables" */
-          if (mstreq(last_identifier->name, STR_FUNCTIONS))
-          {
-                $$[0] = last_modifier;
-                $$[1] = 0;
-          }
-          else if (mstreq(last_identifier->name, STR_VARIABLES))
-          {
-                $$[0] = 0;
-                $$[1] = last_modifier;
-          }
-          else
-          {
-              yyerrorf("Unrecognized inheritance modifier '%s'"
-                      , get_txt(last_identifier->name));
-              $$[0] = $$[1] = 0;
-          }
+              /* The L_IDENTIFIER must be one of "functions" or "variables" */
+              if (mstreq(last_identifier->name, STR_FUNCTIONS))
+              {
+                    $$[0] = last_modifier;
+                    $$[1] = 0;
+              }
+              else if (mstreq(last_identifier->name, STR_VARIABLES))
+              {
+                    $$[0] = 0;
+                    $$[1] = last_modifier;
+              }
+              else
+              {
+                  yyerrorf("Unrecognized inheritance modifier '%s'"
+                          , get_txt(last_identifier->name));
+                  $$[0] = $$[1] = 0;
+              }
+          } while(0);
       }
 ; /* inheritance_qualifier */
 
@@ -6673,20 +7608,19 @@ default_visibility:
  * or just visibility e.g for inheritance.
  */
 
-optional_star:
-      /* empty */ { $$ = 0; }
-    | '*'         { $$ = TYPE_MOD_POINTER; } ;
-
+optional_stars:
+      /* empty */        { $$ = 0; }
+    | optional_stars '*' { $$ = $1+1; } ;
 
 type: type_modifier_list opt_basic_type
       {
-          set_fulltype($$, $1 | $2.typeflags, $2.t_struct);
+          set_fulltype($$, $1, $2);
       } ;
 
 
 non_void_type: type_modifier_list opt_basic_non_void_type
       {
-          set_fulltype($$, $1 | $2.typeflags, $2.t_struct);
+          set_fulltype($$, $1, $2);
       } ;
 
 
@@ -6709,24 +7643,35 @@ type_modifier:
 
 opt_basic_type:
       basic_type
-    | /* empty */ { $$ = Type_Unknown; } ;
+    | /* empty */ { $$ = NULL; } ;
 
 
 opt_basic_non_void_type:
       basic_non_void_type
-    | /* empty */ { $$ = Type_Unknown; } ;
+    | /* empty */ { $$ = NULL; } ;
 
 
 basic_non_void_type:
-      L_STATUS       { $$ = Type_Number;  }
-    | L_INT          { $$ = Type_Number;  }
-    | L_STRING_DECL  { $$ = Type_String;  }
-    | L_OBJECT       { $$ = Type_Object;  }
-    | L_CLOSURE_DECL { $$ = Type_Closure; }
-    | L_SYMBOL_DECL  { $$ = Type_Symbol;  }
-    | L_FLOAT_DECL   { $$ = Type_Float;   }
-    | L_MAPPING      { $$ = Type_Mapping; }
-    | L_MIXED        { $$ = Type_Any;     }
+      single_basic_non_void_type
+    | basic_non_void_type '|' single_basic_non_void_type
+      {
+          $$ = get_union_type($1, $3);
+          free_lpctype($1);
+          free_lpctype($3);
+      }
+; /* basic_non_void_type */
+
+
+single_basic_non_void_type:
+      L_STATUS       { $$ = lpctype_int;        }
+    | L_INT          { $$ = lpctype_int;        }
+    | L_STRING_DECL  { $$ = lpctype_string;     }
+    | L_OBJECT       { $$ = lpctype_object;     }
+    | L_CLOSURE_DECL { $$ = lpctype_closure;    }
+    | L_SYMBOL_DECL  { $$ = lpctype_symbol;     }
+    | L_FLOAT_DECL   { $$ = lpctype_float;      }
+    | L_MAPPING      { $$ = lpctype_mapping;    }
+    | L_MIXED        { $$ = lpctype_mixed;      }
     | L_STRUCT identifier
       {
           int num;
@@ -6735,39 +7680,46 @@ basic_non_void_type:
           if (num < 0)
           {
               yyerrorf("Unknown struct '%s'", get_txt($2));
-              $$ = Type_Unknown;
+              $$ = lpctype_any_struct;
           }
           else
           {
-              $$.typeflags = TYPE_STRUCT;
-              $$.t_struct = STRUCT_DEF(num).type;
+              $$ = get_struct_type(STRUCT_DEF(num).type);
           }
 
           free_mstring($2);
       }
-
-; /* basic_non_void_type */
+    | single_basic_non_void_type '*'
+      {
+          $$ = get_array_type($1);
+          free_lpctype($1);
+      }
+    | '<' basic_non_void_type '>'
+      {
+          $$ = $2;
+      }
+; /* single_basic_non_void_type */
 
 
 basic_type:
       basic_non_void_type
-    | L_VOID         { $$ = Type_Void;    }
+    | L_VOID         { $$ = lpctype_void;    }
 ; /* basic_type */
 
 
 cast:
-      '(' basic_type optional_star ')'
+      '(' single_basic_non_void_type ')'
       {
-          set_fulltype($$, $2.typeflags | $3, $2.t_struct);
+          $$ = $2;
       }
 ;
 
 
 /* TODO: Remove decl_casts - they are practically useless */
 decl_cast:
-      '(' '{' basic_type optional_star '}' ')'
+      '(' '{' basic_type '}' ')'
       {
-          set_fulltype($$, $3.typeflags | $4, $3.t_struct);
+          $$ = $3;
       }
 ;
 
@@ -6808,24 +7760,21 @@ argument_list:
 
 
 new_arg_name:
-      non_void_type optional_star L_IDENTIFIER
+      non_void_type L_IDENTIFIER
       {
-          if (exact_types.typeflags && $1.typeflags == 0)
+          if (exact_types && !$1.t_type)
           {
               yyerror("Missing type for argument");
-              add_local_name($3, Type_Any, block_depth);
+              add_local_name($2, get_fulltype(lpctype_mixed), block_depth);
                 /* Supress more errors */
           }
           else
           {
-              fulltype_t argtype;
-
-              set_fulltype(argtype, $1.typeflags | $2, $1.t_struct);
-              add_local_name($3, argtype, block_depth);
+              add_local_name($2, $1, block_depth);
           }
       }
 
-    | non_void_type optional_star L_LOCAL
+    | non_void_type L_LOCAL
       {
           /* A local name is redeclared. */
           if (current_inline == NULL)
@@ -6834,16 +7783,14 @@ new_arg_name:
                * legal.
                */
               yyerror("Illegal to redeclare local name");
+              free_fulltype($1);
           }
           else
           {
               /* However, it is legal for the argument list of an inline
                * closure.
                */
-              fulltype_t argtype;
-
-              set_fulltype(argtype, $1.typeflags | $2, $1.t_struct);
-              redeclare_local($3, argtype, block_depth);
+              redeclare_local($2, $1, block_depth);
           }
       }
 ; /* new_arg_name */
@@ -6852,48 +7799,66 @@ new_arg_name:
 
 name_list:
       /* Simple variable definition */
-      type optional_star L_IDENTIFIER
+      type L_IDENTIFIER
       {
 %line
-          if ($1.typeflags == 0)
+          if ($1.t_type == NULL)
               yyerror("Missing type");
 
-          define_global_variable($3, $1, $2, MY_FALSE);
+          define_global_variable($2, $1, MY_FALSE);
           $$ = $1;
       }
 
     /* Variable definition with initialization */
 
-    | type optional_star L_IDENTIFIER
+    | type L_IDENTIFIER
       {
-          if ($1.typeflags == 0)
+          if ($1.t_type == NULL)
               yyerror("Missing type");
 
-          $<number>$ = define_global_variable($3, $1, $2, MY_TRUE); 
+          $<number>$ = define_global_variable($2, $1, MY_TRUE);
       }
 
       L_ASSIGN expr0
       {
-          init_global_variable($<number>4, $3, $1, $2, $5, $6.type);
+          init_global_variable($<number>3, $2, $1, $4, $5.type);
+          free_fulltype($5.type);
           $$ = $1;
       }
 
-    | name_list ',' optional_star L_IDENTIFIER
+    | name_list ',' optional_stars L_IDENTIFIER
       {
-          define_global_variable($4, $1, $3, MY_FALSE);
+          fulltype_t type;
+          type.t_type = get_array_type_with_depth($1.t_type, $3);
+          type.t_flags = $1.t_flags;
+
+          define_global_variable($4, type, MY_FALSE);
+          free_fulltype(type);
           $$ = $1;
       }
 
     /* Variable definition with initialization */
 
-    | name_list ',' optional_star L_IDENTIFIER
+    | name_list ',' optional_stars L_IDENTIFIER
       {
-          $<number>$ = define_global_variable($4, $1, $3, MY_TRUE); 
+          fulltype_t type;
+          type.t_type = get_array_type_with_depth($1.t_type, $3);
+          type.t_flags = $1.t_flags;
+
+          $<number>$ = define_global_variable($4, type, MY_TRUE); 
+          free_fulltype(type);
       }
 
       L_ASSIGN expr0
       {
-          init_global_variable($<number>5, $4, $1, $3, $6, $7.type);
+          fulltype_t type;
+          type.t_type = get_array_type_with_depth($1.t_type, $3);
+          type.t_flags = $1.t_flags;
+
+          init_global_variable($<number>5, $4, type, $6, $7.type);
+
+          free_fulltype(type);
+          free_fulltype($7.type);
           $$ = $1;
       }
 
@@ -6937,78 +7902,90 @@ statements_block:
 
 statements:
       /* empty */
-    | statements local_name_list ';'
+    | statements local_name_list ';' { free_lpctype($2); }
     | statements statement
 ;
 
 
 local_name_list:
-      basic_type optional_star L_IDENTIFIER
+      basic_type L_IDENTIFIER
       {
           struct lvalue_s lv;
-          define_local_variable($3, $1, $2, &lv, MY_FALSE, MY_FALSE);
-          
+          define_local_variable($2, $1, &lv, MY_FALSE, MY_FALSE);
+
           $$ = $1;
       }
-    | basic_type optional_star L_LOCAL
+    | basic_type L_LOCAL
       {
           struct lvalue_s lv;
-          define_local_variable($3, $1, $2, &lv, MY_TRUE, MY_FALSE);
-          
+          define_local_variable($2, $1, &lv, MY_TRUE, MY_FALSE);
+
           $$ = $1;
       }
-    | basic_type optional_star L_IDENTIFIER
+    | basic_type L_IDENTIFIER
       {
-          define_local_variable($3, $1, $2, &$<lvalue>$, MY_FALSE, MY_TRUE);
+          define_local_variable($2, $1, &$<lvalue>$, MY_FALSE, MY_TRUE);
       }
       L_ASSIGN expr0
       {
-          init_local_variable($3, &$<lvalue>4, $5, $6.type);
-          
+          init_local_variable($2, &$<lvalue>3, $4, $5.type);
+
+          free_fulltype($5.type);
           $$ = $1;
       }
-    | basic_type optional_star L_LOCAL
+    | basic_type L_LOCAL
       {
-          define_local_variable($3, $1, $2, &$<lvalue>$, MY_TRUE, MY_TRUE);
+          define_local_variable($2, $1, &$<lvalue>$, MY_TRUE, MY_TRUE);
       }
       L_ASSIGN expr0
       {
-          init_local_variable($3, &$<lvalue>4, $5, $6.type);
-          
+          init_local_variable($2, &$<lvalue>3, $4, $5.type);
+
+          free_fulltype($5.type);
           $$ = $1;
       }
-    | local_name_list ',' optional_star L_IDENTIFIER
+    | local_name_list ',' optional_stars L_IDENTIFIER
       {
           struct lvalue_s lv;
-          define_local_variable($4, $1, $3, &lv, MY_FALSE, MY_FALSE);
-          
+          lpctype_t* type = get_array_type_with_depth($1, $3);
+          define_local_variable($4, type, &lv, MY_FALSE, MY_FALSE);
+          free_lpctype(type);
+
           $$ = $1;
       }
-    | local_name_list ',' optional_star L_LOCAL
+    | local_name_list ',' optional_stars L_LOCAL
       {
           struct lvalue_s lv;
-          define_local_variable($4, $1, $3, &lv, MY_TRUE, MY_FALSE);
-          
+          lpctype_t* type = get_array_type_with_depth($1, $3);
+          define_local_variable($4, type, &lv, MY_TRUE, MY_FALSE);
+          free_lpctype(type);
+
           $$ = $1;
       }
-    | local_name_list ',' optional_star L_IDENTIFIER
+    | local_name_list ',' optional_stars  L_IDENTIFIER
       {
-          define_local_variable($4, $1, $3, &$<lvalue>$, MY_FALSE, MY_TRUE);
+          lpctype_t* type = get_array_type_with_depth($1, $3);
+          define_local_variable($4, type, &$<lvalue>$, MY_FALSE, MY_TRUE);
+          free_lpctype(type);
       }
       L_ASSIGN expr0
       {
           init_local_variable($4, &$<lvalue>5, $6, $7.type);
-          
+
+          free_fulltype($7.type);
           $$ = $1;
       }
-    | local_name_list ',' optional_star L_LOCAL
+    | local_name_list ',' optional_stars L_LOCAL
       {
-          define_local_variable($4, $1, $3, &$<lvalue>$, MY_TRUE, MY_TRUE);
+          lpctype_t* type = get_array_type_with_depth($1, $3);
+          define_local_variable($4, type, &$<lvalue>$, MY_TRUE, MY_TRUE);
+          free_lpctype(type);
       }
       L_ASSIGN expr0
       {
           init_local_variable($4, &$<lvalue>5, $6, $7.type);
-          
+
+          free_fulltype($7.type);
           $$ = $1;
       }
 ; /* local_name_list */
@@ -7022,9 +7999,8 @@ statement:
           if (d_flag)
               ins_f_code(F_BREAK_POINT);
 #endif /* F_BREAK_POINT */
-          /* if (exact_types && !BASIC_TYPE($1.type, TYPE_VOID))
-           *    yyerror("Value thrown away");
-           */
+
+          free_fulltype($1.type);
       }
 
     | error ';' /* Synchronisation point */
@@ -7054,7 +8030,7 @@ statement:
               ins_jump_offset(current_break_address & BREAK_ADDRESS_MASK);
               current_break_address = CURRENT_PROGRAM_SIZE - sizeof(int32);
               if (current_break_address > BREAK_ADDRESS_MASK)
-                  yyerrorf("Compiler limit: (L_BREAK) value too large: %"PRIdPINT
+                  yyerrorf("Compiler limit: (L_BREAK) value too large: %"PRIdBcOffset
                           , current_break_address);
           }
       }
@@ -7111,13 +8087,8 @@ statement:
 return:
       L_RETURN
       {
-          fulltype_t rtype = exact_types;
-
-          rtype.typeflags &= TYPE_MOD_MASK;
-
-          if (exact_types.typeflags
-           && !BASIC_TYPE(rtype, Type_Void))
-              type_error("Must return a value for a function declared",
+          if (exact_types && exact_types != lpctype_void && exact_types != lpctype_mixed)
+              lpctype_error("Must return a value for a function declared",
                          exact_types);
           ins_f_code(F_RETURN0);
       }
@@ -7127,25 +8098,22 @@ return:
 %line
           fulltype_t type2 = $2.type;
 
-          if (exact_types.typeflags)
+          if (exact_types)
           {
-              fulltype_t rtype = exact_types;
-
-              rtype.typeflags &= TYPE_MOD_MASK;
-
               /* More checks, ie. mixed vs non-mixed, would be nice,
                * but the general type tracking is too lacking for it.
                */
-              if (!MASKED_TYPE(type2, rtype))
+              if (!has_common_type(type2.t_type, exact_types))
               {
-                  char tmp[100];
-                  strcpy(tmp, get_type_name(type2));
+                  char tmp[512];
+                  get_fulltype_name_buf(type2, tmp, sizeof(tmp));
+
                   yyerrorf("Return type not matching: got %s, expected %s"
-                         , tmp, get_type_name(rtype));
+                         , tmp, get_lpctype_name(exact_types));
               }
           }
 
-          if (type2.typeflags & TYPE_MOD_REFERENCE)
+          if (type2.t_flags & TYPE_MOD_REFERENCE)
           {
               yyerror("May not return a reference");
           }
@@ -7161,6 +8129,8 @@ return:
           }
           else
               ins_f_code(F_RETURN);
+
+          free_fulltype($2.type);
       }
 ; /* return */
 
@@ -7307,6 +8277,8 @@ while:
           /* Restore the previous environment */
           current_continue_address = $<numbers>1[0];
           current_break_address    = $<numbers>1[1];
+
+          free_fulltype($4.type);
       }
 ; /* while */
 
@@ -7427,6 +8399,8 @@ do:
           /* Restore the previous environment */
           current_continue_address = $<numbers>1[0];
           current_break_address    = $<numbers>1[1];
+
+          free_fulltype($7.type);
       }
 ; /* do */
 
@@ -7662,6 +8636,7 @@ for_init_expr:
 ; /* for_init_expr */
 
 
+
 comma_expr_decl:
       expr_decl
     | comma_expr_decl
@@ -7674,20 +8649,22 @@ comma_expr_decl:
 
 expr_decl:
       expr0 /* compile the expression as usual */
-
+      {
+          free_fulltype($1.type);
+      }
     | local_name_lvalue L_ASSIGN expr0
       {
           /* We got a "int <name> = <expr>" type expression. */
 
 %line
           fulltype_t type2;
+          Bool res;
 
           /* Check the assignment for validity */
           type2 = $3.type;
-          if (exact_types.typeflags
-           && !compatible_types($1.type, type2, MY_TRUE))
+          if (exact_types && !has_common_type(type2.t_type, $1.type))
           {
-              yyerrorf("Bad assignment %s", get_two_types($1.type, type2));
+              yyerrorf("Bad assignment %s", get_two_lpctypes($1.type, type2.t_type));
           }
 
           if ($2 != F_ASSIGN)
@@ -7695,13 +8672,18 @@ expr_decl:
               yyerror("Only plain assignments allowed here");
           }
 
-          if (type2.typeflags & TYPE_MOD_REFERENCE)
+          if (type2.t_flags & TYPE_MOD_REFERENCE)
               yyerror("Can't trace reference assignments");
 
           /* Add the bytecode to create the lvalue and do the
            * assignment.
            */
-          if (!add_lvalue_code(&$1, $2))
+          res = add_lvalue_code(&$1, $2);
+
+          free_lpctype($1.type);
+          free_fulltype($3.type);
+
+          if (!res)
               YYACCEPT;
       }
 
@@ -7711,6 +8693,7 @@ expr_decl:
            * Compile it as if it was a "int <name> = 0" expression.
            */
 %line
+          Bool res;
 
           /* Insert the implied push of number 0 */
           ins_number(0);
@@ -7718,7 +8701,11 @@ expr_decl:
           /* Add the bytecode to create the lvalue and do the
            * assignment.
            */
-          if (!add_lvalue_code(&$1, F_ASSIGN))
+          res = add_lvalue_code(&$1, F_ASSIGN);
+
+          free_lpctype($1.type);
+
+          if (!res)
               YYACCEPT;
       }
 ; /* expr_decl */
@@ -7731,6 +8718,9 @@ for_expr:
           ins_number(1);
       }
     | comma_expr
+      {
+          free_fulltype($1.type);
+      }
 ; /* for_expr */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -7926,7 +8916,11 @@ foreach_var_decl:  /* Generate the code for one lvalue */
            */
 
 %line
-          if (!add_lvalue_code(&$1, 0))
+          Bool res = add_lvalue_code(&$1, 0);
+
+          free_lpctype($1.type);
+
+          if (!res)
               YYACCEPT;
       }
 
@@ -7962,63 +8956,68 @@ foreach_in:
 foreach_expr:
       expr0
       {
-          fulltype_t dtype;
+          lpctype_t *dtype;
           Bool       gen_refs;
 
 %line
-          gen_refs = ($1.type.typeflags & TYPE_MOD_MASK & (~TYPE_MOD_RMASK)) != 0;
-          set_fulltype(dtype, $1.type.typeflags & TYPE_MOD_RMASK, $1.type.t_struct);
+          gen_refs = ($1.type.t_flags & TYPE_MOD_REFERENCE) != 0;
+          dtype = $1.type.t_type;
 
-          if (!(dtype.typeflags & TYPE_MOD_POINTER)
-           && dtype.typeflags != TYPE_ANY
-           && dtype.typeflags != TYPE_STRING
-           && dtype.typeflags != TYPE_MAPPING
-           && (dtype.typeflags != TYPE_NUMBER || gen_refs)
-           && (exact_types.typeflags || dtype.typeflags != TYPE_UNKNOWN)
+          /* Allowed are arrays of all kinds, strings, mappings,
+           * ints (but not &int), mixed and unknown (when !exact_types).
+           */
+          if (!has_common_type(lpctype_any_array, dtype)
+           && !lpctype_contains(lpctype_string, dtype)
+           && !lpctype_contains(lpctype_mapping, dtype)
+           && (gen_refs || !lpctype_contains(lpctype_int, dtype))
+           && (exact_types || dtype != lpctype_unknown)
              )
           {
-              type_error("Expression for foreach() of wrong type", $1.type);
+              fulltype_error("Expression for foreach() of wrong type", $1.type);
           }
 
           $$ = gen_refs ? FOREACH_REF : FOREACH_LOOP;
+
+          free_fulltype($1.type);
       }
 
     | expr0 L_RANGE expr0
       {
-          fulltype_t dtype;
+          lpctype_t *dtype;
 
 %line
-          if (($1.type.typeflags & (~TYPE_MOD_RMASK)) != 0)
+          if (($1.type.t_flags & TYPE_MOD_REFERENCE) != 0)
           {
-              type_error("Expression for foreach() of wrong type", $1.type);
+              fulltype_error("Expression for foreach() of wrong type", $1.type);
           }
 
-          set_fulltype(dtype, $1.type.typeflags & TYPE_MOD_RMASK, $1.type.t_struct);
+          dtype = $1.type.t_type;
 
-          if (dtype.typeflags != TYPE_ANY
-           && dtype.typeflags != TYPE_NUMBER
-           && (exact_types.typeflags || dtype.typeflags != TYPE_UNKNOWN)
+          if (!lpctype_contains(lpctype_int, dtype)
+           && (exact_types || dtype != lpctype_unknown)
              )
           {
-              type_error("Expression for foreach() of wrong type", $1.type);
+              fulltype_error("Expression for foreach() of wrong type", $1.type);
           }
 
-          if (($3.type.typeflags & (~TYPE_MOD_RMASK)) != 0)
+          if (($3.type.t_flags & TYPE_MOD_REFERENCE) != 0)
           {
-              type_error("Expression for foreach() of wrong type", $3.type);
+              fulltype_error("Expression for foreach() of wrong type", $3.type);
           }
 
-          set_fulltype(dtype, $3.type.typeflags & TYPE_MOD_RMASK, $3.type.t_struct);
+          dtype = $3.type.t_type;
 
-          if (dtype.typeflags != TYPE_ANY
-           && dtype.typeflags != TYPE_NUMBER
-           && (exact_types.typeflags || dtype.typeflags != TYPE_UNKNOWN)
+          if (!lpctype_contains(lpctype_int, dtype)
+           && (exact_types || dtype != lpctype_unknown)
              )
           {
-              type_error("Expression for foreach() of wrong type", $3.type);
+              fulltype_error("Expression for foreach() of wrong type", $3.type);
           }
 
           $$ = FOREACH_RANGE;
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
       }
 ; /* foreach_expr */
 
@@ -8133,6 +9132,8 @@ switch:
         if (current_continue_address)
             current_continue_address -= SWITCH_DEPTH_UNIT;
         current_break_stack_need--;
+
+        free_fulltype($3.type);
       }
 ; /* switch */
 
@@ -8329,6 +9330,8 @@ condStart:
 
           $$[1] = current;
           CURRENT_PROGRAM_SIZE = current + 1;
+
+          free_fulltype($3.type);
       }
 ; /* condStart */
 
@@ -8493,6 +9496,8 @@ comma_expr:
 
       {
           $$.type = $4.type;
+
+          free_fulltype($1.type);
       }
 ; /* comma_expr */
 
@@ -8518,7 +9523,10 @@ expr0:
           if ($2 == F_LAND_EQ || $2 == F_LOR_EQ)
           {
               if (!add_lvalue_code(&$1, 0))
+              {
+                  free_lpctype($1.type);
                   YYACCEPT;
+              }
 
               /* Add the operator specific code */
 
@@ -8542,7 +9550,7 @@ expr0:
               }
           }
       }
-      
+
       expr0 %prec L_ASSIGN
 
       {
@@ -8550,131 +9558,79 @@ expr0:
 %line
           $$ = $4;
 
-          type1 = $1.type;
+          type1.t_type = $1.type;
+          type1.t_flags = 0;
           type2 = $4.type;
-          restype = type2; /* Assume normal assignment */
 
           /* Check the validity of the assignment */
-          if (exact_types.typeflags
-           && !compatible_types(type1, type2, MY_TRUE)
-             )
+          /* There only need to be a common subset:
+           *
+           * int|string val = 10;
+           * int result;
+           *
+           * if(intp(val))
+           *    result = val;
+           *
+           * But if it's a zero (0), pass lpctype_mixed as the result type, because of:
+           *
+           *  string a;
+           *  int b;
+           *
+           *  a = b = 0;
+           */
+          if(type2.t_type == lpctype_mixed && !type2.t_flags)
+              restype.t_type = lpctype_mixed;
+          else
+              restype.t_type = get_common_type(type1.t_type, type2.t_type);
+          restype.t_flags = type2.t_flags;
+          if (exact_types && !restype.t_type)
           {
-              Bool ok = MY_FALSE;
-
               switch($2)
               {
               case F_LAND_EQ:
               case F_LOR_EQ:
-                  ok = MY_TRUE;
                   break;
 
               case F_ADD_EQ:
-                  switch(type1.typeflags)
-                  {
-                  case TYPE_STRING:
-                      if (type2.typeflags == TYPE_NUMBER
-                       || type2.typeflags == TYPE_FLOAT)
-                      {
-                          ok = MY_TRUE;
-                      }
-                      break;
-                  case TYPE_FLOAT:
-                      if (type2.typeflags == TYPE_NUMBER)
-                      {
-                          ok = MY_TRUE;
-                      }
-                      break;
-                  }
+                  free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, "+=", types_add_assignment, NULL));
                   break;
 
               case F_SUB_EQ:
-                  switch(type1.typeflags)
-                  {
-                  case TYPE_FLOAT:
-                      if (type2.typeflags == TYPE_NUMBER)
-                      {
-                          ok = MY_TRUE;
-                      }
-                      break;
-                  }
+                  free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, "-=", types_sub_assignment, NULL));
                   break;
 
               case F_MULT_EQ:
-                  switch(type1.typeflags)
-                  {
-                  case TYPE_STRING:
-                      if (type2.typeflags == TYPE_NUMBER)
-                      {
-                          ok = MY_TRUE;
-                      }
-                      break;
-                  case TYPE_FLOAT:
-                      if (type2.typeflags == TYPE_NUMBER)
-                      {
-                          ok = MY_TRUE;
-                      }
-                      break;
-                  default:
-                      if ((type1.typeflags & TYPE_MOD_POINTER) && type2.typeflags == TYPE_NUMBER)
-                      {
-                          ok = MY_TRUE;
-                      }
-                  }
+                  free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, "*=", types_mul_assignment, NULL));
                   break;
 
               case F_DIV_EQ:
-                  switch(type1.typeflags)
-                  {
-                  case TYPE_FLOAT:
-                      if (type2.typeflags == TYPE_NUMBER)
-                      {
-                          ok = MY_TRUE;
-                      }
-                      break;
-                  }
+                  free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, "/=", types_div_assignment, NULL));
                   break;
 
               case F_AND_EQ:
-                  switch(type1.typeflags)
-                  {
-                  case TYPE_MAPPING:
-                      if (type2.typeflags & TYPE_MOD_POINTER)
-                      {
-                          ok = MY_TRUE;
-                      }
-                      break;
-                  default:
-                      if ((type1.typeflags & TYPE_MOD_POINTER)
-                       && type2.typeflags == TYPE_MAPPING
-                         )
-                      {
-                          ok = MY_TRUE;
-                      }
-                      break;
-                  }
+                  free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, "&=", types_binary_and_assignment, NULL));
                   break;
 
-              } /* switch(assign op) */
+              default:
+                  yyerrorf("Bad assignment %s", get_two_fulltypes(type1, type2));
 
-              if (!ok)
-              {
-                  yyerrorf("Bad assignment %s", get_two_types(type1, type2));
-              }
+              } /* switch(assign op) */
 
               /* Operator assignment: result type is determined by assigned-to
                * type.
                */
-              restype = type1;
+              restype = ref_fulltype(type1);
           }
 
-          if (type2.typeflags & TYPE_MOD_REFERENCE)
+          if (type2.t_flags & TYPE_MOD_REFERENCE)
               yyerror("Can't trace reference assignments.");
 
           /* Special checks for struct assignments */
-          if (IS_TYPE_STRUCT(type1) || IS_TYPE_STRUCT(type2)
+          if (is_type_struct(type1.t_type) || is_type_struct(type2.t_type)
              )
           {
-              restype = type1;
+              free_fulltype(restype);
+              restype = ref_fulltype(type1);
               if ($2 != F_ASSIGN)
                   yyerror("Only plain assigment allowed for structs");
           }
@@ -8700,18 +9656,29 @@ expr0:
           else
           {
               if (!add_lvalue_code(&$1, $2))
+              {
+                  free_lpctype($1.type);
+                  free_fulltype($4.type);
+                  free_fulltype(restype);
                   YYACCEPT;
+              }
           }
           $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = restype;
+
+          free_lpctype($1.type);
+          free_fulltype($4.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | error L_ASSIGN expr0  %prec L_ASSIGN
       {
           yyerror("Bad assignment: illegal lhs (target)");
+
           $$ = $3;
-          $$.type = Type_Any;
+          $$.type.t_type = lpctype_mixed;
+          $$.type.t_flags = 0;
+          free_fulltype($3.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -8815,24 +9782,11 @@ expr0:
 
           $$ = $1;
           $$.end = CURRENT_PROGRAM_SIZE;
-          if (!compatible_types(type1, type2, MY_FALSE))
-          {
-              $$.type = Type_Any;
-              if ((type1.typeflags & TYPE_MOD_POINTER) != 0
-               && (type2.typeflags & TYPE_MOD_POINTER) != 0)
-                  $$.type.typeflags |= TYPE_MOD_POINTER;
-              /* TODO: yyinfof("Different types to ?: */
-          }
-          else if (type1.typeflags == TYPE_ANY)
-              $$.type = type2;
-          else if (type2.typeflags == TYPE_ANY)
-              $$.type = type1;
-          else if (type1.typeflags == (TYPE_MOD_POINTER|TYPE_ANY) )
-              $$.type = type2;
-          else if (type2.typeflags == (TYPE_MOD_POINTER|TYPE_ANY) )
-              $$.type = type1;
-          else
-              $$.type = type1;
+          $$.type = get_fulltype(get_union_type(type1.t_type, type2.t_type));
+
+          free_fulltype($1.type);
+          free_fulltype($4.type);
+          free_fulltype($7.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -8856,10 +9810,10 @@ expr0:
           $$.end = CURRENT_PROGRAM_SIZE;
 
           /* Determine the result type */
-          if (equal_types($1.type, $4.type))
-              $$.type = $1.type;
-          else
-              $$.type = Type_Any;  /* Return type can't be known */
+          $$.type.t_type = get_union_type($1.type.t_type, $4.type.t_type);
+
+          free_fulltype($1.type);
+          free_fulltype($4.type);
       } /* LOR */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -8882,42 +9836,24 @@ expr0:
           $$ = $1;
           $$.end = CURRENT_PROGRAM_SIZE;
 
-          /* Determine the return type */
-          if (equal_types($1.type, $4.type))
-              $$.type = $1.type;
-          else
-              $$.type = Type_Any;        /* Return type can't be known */
+          /* Determine the result type */
+          $$.type = get_fulltype(get_union_type($1.type.t_type, $4.type.t_type));
+
+          free_fulltype($1.type);
+          free_fulltype($4.type);
        } /* LAND */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '|' expr0
       {
-          $$ = $1;
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "|", types_binary_or, lpctype_mixed);
 
-          if (($1.type.typeflags | $3.type.typeflags) & TYPE_MOD_POINTER)
-          {
-              if (exact_types.typeflags
-               && ($1.type.typeflags ^ $3.type.typeflags) & TYPE_MOD_POINTER
-                 )
-                  yyerrorf("Incompatible types for arguments to | %s"
-                          , get_two_types($1.type, $3.type));
-              if (equal_types($1.type, $3.type))
-                  $$.type = $1.type;
-              else
-              {
-                  $$.type = Type_Ptr_Any;
-              }
-          }
-          else
-          {
-              if (exact_types.typeflags
-               && !BASIC_TYPE($1.type, Type_Number))
-                  type_error("Bad argument 1 to |", $1.type);
-              if (exact_types.typeflags
-               && !BASIC_TYPE($3.type, Type_Number))
-                  type_error("Bad argument 2 to |", $3.type);
-              $$.type = Type_Number;
-          }
+          $$ = $1;
+          $$.type = get_fulltype(result);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+
           ins_f_code(F_OR);
 
           $$.end = CURRENT_PROGRAM_SIZE;
@@ -8926,28 +9862,14 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '^' expr0
       {
-          $$ = $1;
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "^", types_binary_or, lpctype_mixed);
 
-          if (($1.type.typeflags | $3.type.typeflags) & TYPE_MOD_POINTER)
-          {
-              if (exact_types.typeflags
-               && ($1.type.typeflags ^ $3.type.typeflags) & TYPE_MOD_POINTER
-                 )
-                  yyerrorf("Incompatible types for arguments to | %s"
-                          , get_two_types($1.type, $3.type));
-              if (equal_types($1.type, $3.type))
-                  $$.type = $1.type;
-              else
-                  $$.type = Type_Ptr_Any;
-          }
-          else
-          {
-              if (exact_types.typeflags && !BASIC_TYPE($1.type, Type_Number))
-                  type_error("Bad argument 1 to ^", $1.type);
-              if (exact_types.typeflags && !BASIC_TYPE($3.type, Type_Number))
-                  type_error("Bad argument 2 to ^", $3.type);
-              $$.type = Type_Number;
-          }
+          $$ = $1;
+          $$.type = get_fulltype(result);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+
           ins_f_code(F_XOR);
 
           $$.end = CURRENT_PROGRAM_SIZE;
@@ -8956,164 +9878,104 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '&' expr0
       {
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "&", types_binary_and, lpctype_mixed);
+
           $$ = $1;
+          $$.type = get_fulltype(result);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+
           ins_f_code(F_AND);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = Type_Any;
-
-          /* Check the types */
-          /* TODO: Implement the typechecks, including result type
-           * TODO:: by table lookups.
-           */
-          if (exact_types.typeflags)
-          {
-              fulltype_t first_type  = $1.type;
-              fulltype_t second_type = $3.type;
-              if ( first_type.typeflags == TYPE_ANY
-               &&  second_type.typeflags == TYPE_ANY )
-              {
-                    /* $$ == TYPE_ANY is correct */
-              }
-              else if (first_type.typeflags == TYPE_MAPPING)
-              {
-                  if (second_type.typeflags != TYPE_MAPPING
-                   && !(second_type.typeflags & TYPE_MOD_POINTER)
-                   && second_type.typeflags != TYPE_ANY
-                     )
-                  {
-                      type_error("Bad argument 2 to &", second_type );
-                  }
-                  $$.type = Type_Mapping;
-              }
-              else if ( (first_type.typeflags | second_type.typeflags) & TYPE_MOD_POINTER)
-              {
-                  if ((first_type.typeflags & TYPE_MOD_POINTER)
-                   && second_type.typeflags == TYPE_MAPPING
-                     )
-                  {
-                      $$.type = first_type;
-                  }
-                  else if (first_type.typeflags  == TYPE_NUMBER
-                   || second_type.typeflags == TYPE_NUMBER)
-                  {
-                      yyerrorf("Incompatible types for arguments to & %s"
-                              , get_two_types(first_type, second_type));
-                  }
-                  else if (( !( first_type.typeflags & TYPE_MOD_POINTER )
-                           || first_type.typeflags & TYPE_MOD_REFERENCE)
-                        && first_type.typeflags != TYPE_ANY)
-                  {
-                      type_error("Bad argument 1 to &", first_type );
-                  }
-                  else if (( !( second_type.typeflags & TYPE_MOD_POINTER )
-                           ||   second_type.typeflags & TYPE_MOD_REFERENCE)
-                        && second_type.typeflags != TYPE_ANY)
-                  {
-                      type_error("Bad argument 2 to &", first_type );
-                  }
-                  else {
-                      fulltype_t f_type = first_type;
-                      fulltype_t s_type = second_type;
-
-                      f_type.typeflags &= ~TYPE_MOD_POINTER;
-                      s_type.typeflags &= ~TYPE_MOD_POINTER;
-                      if ( !BASIC_TYPE(f_type, s_type) )
-                      {
-                          yyerrorf("Incompatible types for arguments to & %s"
-                                  , get_two_types(first_type, second_type));
-                      }
-                      else
-                      {
-                          $$.type = Type_Ptr_Any;
-                      }
-                  }
-              }
-              else
-              {
-                  if ( !BASIC_TYPE(first_type, Type_Number)
-                   &&  !BASIC_TYPE(first_type, Type_String) )
-                      type_error("Bad argument 1 to &", first_type );
-                  if ( !BASIC_TYPE(second_type, Type_Number)
-                   &&  !BASIC_TYPE(second_type, Type_String) )
-                      type_error("Bad argument 2 to &", second_type);
-                  if ( first_type.typeflags == TYPE_ANY )
-                      $$.type =   BASIC_TYPE(second_type, Type_Number)
-                                ? Type_Number : Type_String;
-                  else
-                      $$.type =   BASIC_TYPE(first_type, Type_Number)
-                                ? Type_Number : Type_String;
-              }
-          } /* end of exact_types code */
       } /* end of '&' code */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_EQ expr0
       {
-          fulltype_t t1 = $1.type, t2 = $3.type;
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality, NULL);
 
-          $$ = $1;
-          if (exact_types.typeflags
-           && !equal_types(t1, t2)
-           && t1.typeflags != TYPE_ANY && t2.typeflags != TYPE_ANY
-           && !(t1.typeflags == TYPE_NUMBER && t2.typeflags == TYPE_FLOAT)
-           && !(t1.typeflags == TYPE_FLOAT && t2.typeflags == TYPE_NUMBER)
-             )
+          if (result == NULL)
           {
               yyerrorf("== always false because of different types %s"
-                      , get_two_types($1.type, $3.type));
+                      , get_two_fulltypes($1.type, $3.type));
           }
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+          free_lpctype(result);
+
           ins_f_code(F_EQ);
-          $$.type = Type_Number;
+
+          $$ = $1;
+          $$.type = get_fulltype(lpctype_int);
           $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_NE expr0
       {
-          fulltype_t t1 = $1.type, t2 = $3.type;
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality, NULL);
+
+          if (result == NULL)
+          {
+              yyerrorf("!= always true because of different types %s"
+                      , get_two_fulltypes($1.type, $3.type));
+          }
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+          free_lpctype(result);
+
+          ins_f_code(F_NE);
 
           $$ = $1;
-          if (exact_types.typeflags
-           && !equal_types(t1, t2)
-           && t1.typeflags != TYPE_ANY && t2.typeflags != TYPE_ANY
-           && !(t1.typeflags == TYPE_NUMBER && t2.typeflags == TYPE_FLOAT)
-           && !(t1.typeflags == TYPE_FLOAT && t2.typeflags == TYPE_NUMBER)
-             )
-           {
-              yyerrorf("!= always true because of different types %s"
-                      , get_two_types($1.type, $3.type));
-          }
-          ins_f_code(F_NE);
+          $$.type = get_fulltype(lpctype_int);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = Type_Number;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '>'  expr0
       {
           $$ = $1;
-          $$.type = Type_Number;;
+          $$.type = get_fulltype(lpctype_int);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+
           ins_f_code(F_GT);
           $$.end = CURRENT_PROGRAM_SIZE;
       }
     | expr0 L_GE  expr0
       {
           $$ = $1;
-          $$.type = Type_Number;
+          $$.type = get_fulltype(lpctype_int);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+
           ins_f_code(F_GE);
           $$.end = CURRENT_PROGRAM_SIZE;
       }
     | expr0 '<'  expr0
       {
           $$ = $1;
-          $$.type = Type_Number;
+          $$.type = get_fulltype(lpctype_int);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+
           ins_f_code(F_LT);
           $$.end = CURRENT_PROGRAM_SIZE;
       }
     | expr0 L_LE  expr0
       {
           $$ = $1;
-          $$.type = Type_Number;
+          $$.type = get_fulltype(lpctype_int);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+
           ins_f_code(F_LE);
           $$.end = CURRENT_PROGRAM_SIZE;
       }
@@ -9121,49 +9983,47 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_LSH expr0
       {
+          /* Just check the types. */
+          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, "<<", types_shift, NULL));
+
           $$ = $1;
+          $$.type = get_fulltype(lpctype_int);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+
           ins_f_code(F_LSH);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = Type_Number;
-          if (exact_types.typeflags)
-          {
-              if (!BASIC_TYPE($1.type, Type_Number))
-                  type_error("Bad argument 1 to '<<'", $1.type);
-              if (!BASIC_TYPE($3.type, Type_Number))
-                  type_error("Bad argument 2 to '<<'", $3.type);
-          }
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_RSH expr0
       {
+          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, ">>", types_shift, NULL));
+
           $$ = $1;
+          $$.type = get_fulltype(lpctype_int);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+
           ins_f_code(F_RSH);
-          $$.type = Type_Number;
           $$.end = CURRENT_PROGRAM_SIZE;
-          if (exact_types.typeflags)
-          {
-              if (!BASIC_TYPE($1.type, Type_Number))
-                  type_error("Bad argument 1 to '>>'", $1.type);
-              if (!BASIC_TYPE($3.type, Type_Number))
-                  type_error("Bad argument 2 to '>>'", $3.type);
-          }
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_RSHL expr0
       {
+          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, ">>>", types_shift, NULL));
+
           $$ = $1;
+          $$.type = get_fulltype(lpctype_int);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+
           ins_byte(F_RSHL);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = Type_Number;
-          if (exact_types.typeflags)
-          {
-              if (!BASIC_TYPE($1.type, Type_Number))
-                  type_error("Bad argument 1 to '>>>'", $1.type);
-              if (!BASIC_TYPE($3.type, Type_Number))
-                  type_error("Bad argument 2 to '>>>'", $3.type);
-          }
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9175,12 +10035,6 @@ expr0:
       }
       expr0
       {
-          /* Type checks of this case are complicated, therefore
-           * we'll do almost all of them at run-time.
-           * Here we just try to fold "string" + "string", and
-           * disallow additions of structs.
-           */
-
           mp_uint current_size;
           bytecode_p p;
 %line
@@ -9207,10 +10061,8 @@ expr0:
               /* Retrieve both strings from the A_STRINGS area
                * and catenate them.
                */
-              str1 = ((string_t**)(mem_block[A_STRINGS].block))
-                [p[-3] | (p[-4]-(F_CSTRING0))<<8 ];
-              str2 = ((string_t**)(mem_block[A_STRINGS].block))
-                [p[-1] | (p[-2]-(F_CSTRING0))<<8 ];
+              str1 = PROG_STRING( p[-3] | (p[-4]-(F_CSTRING0))<<8 );
+              str2 = PROG_STRING( p[-1] | (p[-2]-(F_CSTRING0))<<8 );
               sum = mstr_add(str1, str2);
               if (!sum)
               {
@@ -9252,31 +10104,19 @@ expr0:
                   upd_short(current_size - 3, i);
                   CURRENT_PROGRAM_SIZE = current_size - 1;
               }
-              $$.type = Type_String;
+              $$.type = get_fulltype(lpctype_string);
           }
           else
           {
               /* Just add */
+              lpctype_t *result = check_binary_op_types($1.type.t_type, $4.type.t_type, "+", types_addition, lpctype_mixed);
+              $$.type = get_fulltype(result);
+
               ins_f_code(F_ADD);
-              $$.type = Type_Any;
-              if (equal_types($1.type, $4.type))
-                  $$.type = $1.type;
-              else if ($1.type.typeflags == TYPE_STRING)
-                  $$.type = Type_String;
-              else if (($1.type.typeflags == TYPE_NUMBER || $1.type.typeflags == TYPE_FLOAT)
-                     && $4.type.typeflags == TYPE_STRING)
-                  $$.type = Type_String;
-              else if ($1.type.typeflags == TYPE_FLOAT
-                    && ($4.type.typeflags == TYPE_NUMBER || $4.type.typeflags == TYPE_ANY))
-                  $$.type = Type_Float;
-              else if (($1.type.typeflags == TYPE_NUMBER || $1.type.typeflags == TYPE_ANY)
-                    && $4.type.typeflags == TYPE_FLOAT)
-                  $$.type = Type_Float;
-              else if (IS_TYPE_STRUCT($1.type) || IS_TYPE_STRUCT($4.type))
-                  yyerrorf("Bad arguments to '+': %s"
-                          , get_two_types($1.type, $4.type)
-                          );
           }
+
+          free_fulltype($1.type);
+          free_fulltype($4.type);
           $$.end = CURRENT_PROGRAM_SIZE;
       } /* '+' */
 
@@ -9285,295 +10125,146 @@ expr0:
       {
 %line
           $$ = $1;
-          $$.type = Type_Any;
-
-          if (exact_types.typeflags)
-          {
-              fulltype_t type1 = $1.type;
-              fulltype_t type2 = $3.type;
-
-              if (equal_types(type1, type2))
-              {
-                  static char matchok[] =
-%typemap TYPE_ANY:1,TYPE_NUMBER:1,TYPE_FLOAT:1,TYPE_MAPPING:1,TYPE_STRING:1
-
-                  if ( type1.typeflags & (TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)
-                       ? (type1.typeflags & (TYPE_MOD_POINTER|TYPE_MOD_REFERENCE))
-                         == TYPE_MOD_POINTER
-                       : matchok[type1.typeflags]
-                       )
-                  {
-                      $$.type = type1;
-                  }
-                  else
-                  {
-                      type_error("Bad arguments to '-'", type1);
-                  }
-              }
-              else if (   (type1.typeflags & (TYPE_MOD_POINTER|TYPE_MOD_REFERENCE))
-                       == TYPE_MOD_POINTER)
-              {
-                  if ((type2.typeflags | TYPE_MOD_POINTER) == (TYPE_MOD_POINTER|TYPE_ANY)
-                   || (   type2.typeflags & TYPE_MOD_POINTER
-                       && type1.typeflags == (TYPE_MOD_POINTER|TYPE_ANY))
-                     )
-                  {
-                      $$.type = type1;
-                  }
-                  else
-                  {
-                      yyerror("Arguments to '-' don't match");
-                  }
-              }
-              else switch (type1.typeflags)
-              {
-              case TYPE_ANY:
-                  switch (type2.typeflags)
-                  {
-                  case TYPE_NUMBER:
-                      /* number or float -> TYPE_ANY */
-                      break;
-                  case TYPE_MAPPING:
-                  case TYPE_FLOAT:
-                  case TYPE_STRING:
-                      $$.type = type2;
-                      break;
-                  default:
-                      if ( (type2.typeflags & (TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) ==
-                             TYPE_MOD_POINTER)
-                      {
-                          $$.type = Type_Ptr_Any;
-                          break;
-                      }
-                      else
-                      {
-                          type_error("Bad argument number 2 to '-'", type2);
-                          break;
-                      }
-                  }
-                  break;
-
-              case TYPE_NUMBER:
-                  if (type2.typeflags == TYPE_FLOAT || type2.typeflags == TYPE_ANY)
-                  {
-                      $$.type = type2;
-                  }
-                  else
-                  {
-                      yyerror("Arguments to '-' don't match");
-                  }
-                  break;
-
-              case TYPE_FLOAT:
-                  if (type2.typeflags == TYPE_NUMBER || type2.typeflags == TYPE_ANY)
-                  {
-                      $$.type = Type_Float;
-                  }
-                  else
-                  {
-                      yyerror("Arguments to '-' don't match");
-                  }
-                  break;
-
-              case TYPE_STRING:
-                  if (type2.typeflags == TYPE_STRING || type2.typeflags == TYPE_ANY)
-                  {
-                      $$.type = Type_String;
-                  }
-                  else
-                  {
-                      yyerror("Arguments to '-' don't match");
-                  }
-                  break;
-
-              case TYPE_MAPPING:
-                  if (type2.typeflags == TYPE_ANY)
-                  {
-                      $$.type = type1;
-                  }
-                  else
-                  {
-                      yyerror("Arguments to '-' don't match");
-                  }
-                    break;
-
-              default:
-                  type_error("Bad argument number 1 to '-'", type1);
-                  break;
-              }
-          } /* if (exact_types) */
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "-", types_subtraction, lpctype_mixed);
+          $$.type = get_fulltype(result);
 
           ins_f_code(F_SUBTRACT);
+          free_fulltype($1.type);
+          free_fulltype($3.type);
           $$.end = CURRENT_PROGRAM_SIZE;
       } /* '-' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '*' expr0
       {
-          fulltype_t type1, type2;
-
           $$ = $1;
-
-          type1 = $1.type;
-          type2 = $3.type;
-
-          if (exact_types.typeflags)
-          {
-              if (!BASIC_TYPE(type1, Type_Number)
-               && type1.typeflags != TYPE_FLOAT
-               && type1.typeflags != TYPE_STRING
-               && !(type1.typeflags & TYPE_MOD_POINTER)
-                 )
-                  type_error("Bad argument number 1 to '*'", type1);
-              if (!BASIC_TYPE(type2, Type_Number)
-               && type2.typeflags != TYPE_FLOAT
-               && type2.typeflags != TYPE_STRING
-               && !(type2.typeflags & TYPE_MOD_POINTER)
-                 )
-                  type_error("Bad argument number 2 to '*'", type2);
-          }
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "*", types_multiplication, lpctype_mixed);
+          $$.type = get_fulltype(result);
 
           ins_f_code(F_MULTIPLY);
+          free_fulltype($1.type);
+          free_fulltype($3.type);
           $$.end = CURRENT_PROGRAM_SIZE;
-
-          if (type1.typeflags == TYPE_FLOAT || type2.typeflags == TYPE_FLOAT )
-          {
-              $$.type = Type_Float;
-          }
-          else if (type1.typeflags == TYPE_STRING || type2.typeflags == TYPE_STRING)
-          {
-              $$.type = Type_String;;
-          }
-          else if (type1.typeflags & TYPE_MOD_POINTER)
-          {
-              $$.type = type1;
-          }
-          else if (type2.typeflags & TYPE_MOD_POINTER)
-          {
-              $$.type = type2;
-          }
-          else if (type1.typeflags == TYPE_ANY || type2.typeflags == TYPE_ANY)
-          {
-              $$.type = Type_Any;
-          }
-          else
-          {
-              $$.type = Type_Number;
-          }
       } /* '*' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '%' expr0
       {
-          if (exact_types.typeflags)
-          {
-              if (!BASIC_TYPE($1.type, Type_Number))
-                  type_error("Bad argument number 1 to '%'", $1.type);
-              if (!BASIC_TYPE($3.type, Type_Number))
-                  type_error("Bad argument number 2 to '%'", $3.type);
-          }
-
           $$ = $1;
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "%", types_modulus, lpctype_int);
+          $$.type = get_fulltype(result);
+
           ins_f_code(F_MOD);
+          free_fulltype($1.type);
+          free_fulltype($3.type);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = Type_Number;
       }
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '/' expr0
       {
-          fulltype_t type1, type2;
-
           $$ = $1;
-
-          type1 = $1.type;
-          type2 = $3.type;
-
-          if (exact_types.typeflags)
-          {
-              if ( !BASIC_TYPE(type1, Type_Number) && type1.typeflags != TYPE_FLOAT)
-                  type_error("Bad argument number 1 to '/'", type1);
-              if ( !BASIC_TYPE(type2, Type_Number) && type2.typeflags != TYPE_FLOAT)
-                  type_error("Bad argument number 2 to '/'", type2);
-          }
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "/", types_division, lpctype_int);
+          $$.type = get_fulltype(result);
 
           ins_f_code(F_DIVIDE);
+          free_fulltype($1.type);
+          free_fulltype($3.type);
           $$.end = CURRENT_PROGRAM_SIZE;
-
-          if (type1.typeflags == TYPE_FLOAT || type2.typeflags == TYPE_FLOAT )
-          {
-              $$.type = Type_Float;
-          }
-          else
-          {
-              $$.type = Type_Number;
-          }
       } /* '/' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | decl_cast expr0 %prec '~'
       {
+          /* Declarative casts are legal from general to more specialized types.
+           * So we're getting the common type between the cast expression
+           * and the value, and if it's different, that means, it's more specialized.
+           *
+           * We always allow casts from lpctype_unknown and lpctype_mixed
+           * (because lpctype_unknown must be cast to avoid type errors,
+           * and changing the strict_types pragma to strong_types - and therefore
+           * the result type of call_other from unknown to mixed - should not
+           * introduce additional errors).
+           */
+
           $$ = $2;
-          $$.type = $1;
-          if (exact_types.typeflags
-           && $2.type.typeflags != TYPE_ANY
-           && $2.type.typeflags != TYPE_UNKNOWN
-           && $1.typeflags != TYPE_VOID
-             )
-              type_error("Casts are only legal for type mixed, or when unknown", $2.type);
+
+          if ($2.type.t_type == lpctype_unknown || $2.type.t_type == lpctype_mixed)
+          {
+              $$.type = get_fulltype($1);
+          }
+          else
+          {
+              lpctype_t *result = get_common_type($1, $2.type.t_type);
+
+              if(result == NULL || result == $2.type.t_type)
+              {
+                  /* No common type or not specialized. */
+                  yyerrorf("Declarative casts are only legal from general to specialized types: %s", get_two_lpctypes($2.type.t_type, $1));
+              }
+
+              if(result == NULL)
+                  $$.type = get_fulltype($1);
+              else
+              {
+                  $$.type = get_fulltype(result);
+                  free_lpctype($1);
+              }
+          }
+
+          free_fulltype($2.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | cast expr0 %prec '~'
       {
           $$ = $2;
-          $$.type = $1;
-          if ($2.type.typeflags != TYPE_ANY
-           && $2.type.typeflags != TYPE_UNKNOWN
-           && $1.typeflags != TYPE_VOID
-           && !equal_types($1, $2.type)
-             )
+          $$.type = get_fulltype($1);
+
+          /* We are trying to convert the value to the new type
+           * and give an error, when we can't find a suitable conversion.
+           * If the source or destination type is mixed or unknown,
+           * we just do a declarative cast.
+           */
+
+          if($1 == lpctype_mixed || $2.type.t_type == lpctype_mixed || $2.type.t_type == lpctype_unknown)
           {
-              switch($1.typeflags)
-              {
-              default:
-                  if (IS_TYPE_STRUCT($1))
-                      break; /* Do nothing, just adapt the type information */
-                  type_error("Illegal cast", $1);
-                  break;
-              case TYPE_ANY:
-                  /* Do nothing, just adapt the type information */
-                  break;
-              case TYPE_NUMBER:
-                  ins_f_code(F_TO_INT);
-                  break;
-              case TYPE_FLOAT:
-                  ins_f_code(F_TO_FLOAT);
-                  break;
-              case TYPE_STRING:
-                  ins_f_code(F_TO_STRING);
-                  break;
-              case TYPE_OBJECT:
-                  ins_f_code(F_TO_OBJECT);
-                  break;
-              case TYPE_NUMBER|TYPE_MOD_POINTER:
-                  ins_f_code(F_TO_ARRAY);
-                  break;
-              }
+              /* Do nothing... */
           }
-          else if (pragma_warn_empty_casts)
+          else if($1 == $2.type.t_type)
           {
-              if (equal_types($1, $2.type))
-              {   if ($2.type.typeflags != TYPE_ANY)
-                      yywarnf("casting a value to its own type: %s"
-                             , get_type_name($1));
-              }
-              else if ($2.type.typeflags != TYPE_UNKNOWN
-                    && $2.type.typeflags != TYPE_ANY)
-                  yywarnf("cast will not convert the value: %s"
-                         , get_two_types($1, $2.type)
-                      );
+              if(pragma_warn_empty_casts)
+                  yywarnf("casting a value to its own type: %s", get_lpctype_name($1));
+          }
+          else if($1 == lpctype_int)
+          {
+              ins_f_code(F_TO_INT);
+          }
+          else if($1 == lpctype_float)
+          {
+              ins_f_code(F_TO_FLOAT);
+          }
+          else if($1 == lpctype_string)
+          {
+              ins_f_code(F_TO_STRING);
+          }
+          else if($1 == lpctype_object)
+          {
+              ins_f_code(F_TO_OBJECT);
+          }
+          else if($1 == lpctype_int_array)
+          {
+              ins_f_code(F_TO_ARRAY);
+          }
+          else if(is_type_struct($1))
+          {
+              /* Do nothing, just adapt the type information */
+          }
+          else
+          {
+              lpctype_error("Illegal cast", $1);
           }
 
+          free_fulltype($2.type);
           $$.end = CURRENT_PROGRAM_SIZE;
       }
 
@@ -9618,19 +10309,24 @@ expr0:
               varp = NV_VARIABLE(i);
               lvtype = varp->type;
           }
-          lvtype.typeflags &= TYPE_MOD_MASK;
 
           // warn about deprecated variables.
-          if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
+          if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
               yywarnf("Using deprecated global variable %s.\n",
                       get_txt(varp->name));
 
-              
-          if (exact_types.typeflags
-           && !BASIC_TYPE(lvtype, Type_Number)
-           && !BASIC_TYPE(lvtype, Type_Float))
+          // Remove visibility flags
+          lvtype.t_flags &= TYPE_MOD_MASK;
+
+          lpctype_t *result = get_common_type(lvtype.t_type, lpctype_int_float);
+          if(result == NULL)
           {
-              argument_type_error($1.code, lvtype);
+              argument_type_error($1.code, lvtype.t_type);
+              ref_fulltype(lvtype);
+          }
+          else
+          {
+              lvtype.t_type = result;
           }
 
           last_expression = CURRENT_PROGRAM_SIZE + 2;
@@ -9645,7 +10341,7 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | pre_inc_dec L_LOCAL %prec L_INC
       {
-          fulltype_t lvtype;
+          lpctype_t *lvtype, *result;
           PREPARE_INSERT(3)
 %line
           $$.start = $1.start;
@@ -9665,13 +10361,18 @@ expr0:
           CURRENT_PROGRAM_SIZE =
             (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
           add_f_code($1.code);
-          if (exact_types.typeflags
-           && !BASIC_TYPE(lvtype, Type_Number)
-           && !BASIC_TYPE(lvtype, Type_Float))
+
+          result = get_common_type(lvtype, lpctype_int_float);
+          if(result == NULL)
           {
               argument_type_error($1.code, lvtype);
+              $$.type = get_fulltype(ref_lpctype(lvtype));
           }
-          $$.type = lvtype;
+          else
+          {
+              $$.type = get_fulltype(result);
+          }
+
           $$.end = CURRENT_PROGRAM_SIZE;
       }
 
@@ -9681,47 +10382,30 @@ expr0:
           mp_uint current;
           bytecode_p p;
           int start;
-          fulltype_t restype;
+          lpctype_t* result;
 %line
           $$.start = $1.start;
 
-          if ($3.type1.typeflags & TYPE_MOD_REFERENCE)
-              yyerror("Reference used as index");
-
-          restype = Type_Any;
-
           /* Check the types */
-          if (exact_types.typeflags)
+          result = lpctype_int_float;
+          if (exact_types)
           {
-              fulltype_t type;
-
-              type = $2.type;
-              type.typeflags &= TYPEID_MASK;
-              if (type.typeflags & TYPE_MOD_POINTER)
+              lpctype_t* element = get_index_result_type($2.type.t_type, $3.type1, $3.inst, NULL);
+              if (element)
               {
-                  if (type.typeflags != (TYPE_MOD_POINTER|TYPE_ANY)
-                   && type.typeflags != (TYPE_MOD_POINTER|TYPE_NUMBER) )
-                      argument_type_error($1.code, type);
-              }
-              else switch (type.typeflags)
-              {
-              case TYPE_MAPPING:
-                  if ($3.inst == F_INDEX)
-                      break;
-                  /* FALLTHROUGH */
-              default:
-                  type_error("Bad type to indexed lvalue", type);
-              case TYPE_ANY:
-                  if ($3.inst == F_INDEX)
-                      break;
-                  /* FALLTHROUGH */
-              case TYPE_STRING:
-                  if (!BASIC_TYPE($3.type1, Type_Number))
-                      type_error("Bad type of index", $3.type1);
-                  restype = Type_Number;
-                  break;
+                  result = get_common_type(element, lpctype_int_float);
+                  if (!result)
+                  {
+                      argument_type_error($1.code, element);
+                      result = lpctype_int_float;
+                  }
+                  free_lpctype(element);
               }
           } /* if (exact_types) */
+
+          free_fulltype($2.type);
+          free_fulltype($3.type1);
+          free_fulltype($3.type2);
 
           /* Create the code to index the lvalue */
 
@@ -9740,6 +10424,7 @@ expr0:
                   {
                       yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                               , current+length);
+                      free_lpctype(result);
                       YYACCEPT;
                   }
                   p = PROGRAM_BLOCK;
@@ -9769,6 +10454,7 @@ expr0:
                   {
                       yyerrorf("Out of memory: program size %"PRIuMPINT"\n",
                                current+3);
+                      free_lpctype(result);
                       YYACCEPT;
                   }
                   p = PROGRAM_BLOCK + start;
@@ -9792,6 +10478,7 @@ expr0:
               {
                   yyerrorf("Out of memory: program size %"PRIuMPINT"\n", 
                            current+2);
+                  free_lpctype(result);
                   YYACCEPT;
               }
               p = PROGRAM_BLOCK + start;
@@ -9808,7 +10495,8 @@ expr0:
           last_expression = current + 1;
           CURRENT_PROGRAM_SIZE = current + 2;
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = restype;
+          $$.type = get_fulltype(result);
+
       } /* pre_inc_dec expr4 [index_expr] */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9819,27 +10507,16 @@ expr0:
 %line
           $$.start = $1.start;
 
-          if ($4.type.typeflags & TYPE_MOD_REFERENCE
-           || $6.type.typeflags & TYPE_MOD_REFERENCE)
+          if ($4.type.t_flags & TYPE_MOD_REFERENCE
+           || $6.type.t_flags & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
 
           /* Check the types */
-          if (exact_types.typeflags)
-          {
-              fulltype_t type;
+          if (exact_types && !lpctype_contains(lpctype_mapping, $2.type.t_type))
+              fulltype_error("Bad type to indexed lvalue", $2.type);
 
-              type = $2.type;
-              type.typeflags &= TYPEID_MASK;
-              switch (type.typeflags)
-              {
-              default:
-                  type_error("Bad type to indexed lvalue", type);
-                  break;
-              case TYPE_ANY:
-              case TYPE_MAPPING:
-                  break;
-              }
-          } /* if (exact_types) */
+          if (exact_types && !lpctype_contains(lpctype_int, $6.type.t_type))
+              fulltype_error("Bad type of index", $6.type);
 
           /* We don't have to do much: we can take the rvalue
            * produced by <expr4> and add our PUSH_INDEXED_MAP_LVALUE
@@ -9849,6 +10526,9 @@ expr0:
           {
               yyerrorf("Out of memory: program size %"PRIuMPINT"\n", 
                        current+2);
+              free_fulltype($2.type);
+              free_fulltype($4.type);
+              free_fulltype($6.type);
               YYACCEPT;
           }
           p = PROGRAM_BLOCK + current;
@@ -9859,7 +10539,11 @@ expr0:
           last_expression = current + 1;
           CURRENT_PROGRAM_SIZE = current + 2;
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = Type_Any;
+          $$.type = get_fulltype(lpctype_mixed);
+
+          free_fulltype($2.type);
+          free_fulltype($4.type);
+          free_fulltype($6.type);
       } /* pre_inc_dec expr4 [expr0 ',' expr0] */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9869,7 +10553,9 @@ expr0:
           last_expression = CURRENT_PROGRAM_SIZE;
           ins_f_code(F_NOT);        /* Any type is valid here. */
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = Type_Number;
+          $$.type = get_fulltype(lpctype_int);
+
+          free_fulltype($2.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9877,20 +10563,20 @@ expr0:
       {
 %line
           $$ = $2;
+          if (exact_types && !lpctype_contains(lpctype_int, $2.type.t_type))
+              fulltype_error("Bad argument to ~", $2.type);
+
           ins_f_code(F_COMPL);
-          if (exact_types.typeflags && !BASIC_TYPE($2.type, Type_Number))
-              type_error("Bad argument to ~", $2.type);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = Type_Number;
+          $$.type = get_fulltype(lpctype_int);
+
+          free_fulltype($2.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '-' expr0 %prec '~'
       {
-          fulltype_t type;
 %line
-          $$ = $2;
-
           if (CURRENT_PROGRAM_SIZE - last_expression == 2
            && mem_block[A_PROGRAM].block[last_expression] ==
                 F_CLIT )
@@ -9918,13 +10604,12 @@ expr0:
           {
               ins_f_code(F_NEGATE);
           }
-          $$.end = CURRENT_PROGRAM_SIZE;
 
-          type = $2.type;
-          if (exact_types.typeflags
-           && !BASIC_TYPE(type, Type_Number)
-           && type.typeflags != TYPE_FLOAT )
-              type_error("Bad argument to unary '-'", type);
+          $$ = $2;
+          $$.end = CURRENT_PROGRAM_SIZE;
+          $$.type = get_fulltype(check_unary_op_type($2.type.t_type, "unary '-'", types_unary_math, lpctype_mixed));
+
+          free_fulltype($2.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9934,17 +10619,16 @@ expr0:
           /* Create the code to push the lvalue plus POST_INC */
           $$.start = CURRENT_PROGRAM_SIZE;
           if (!add_lvalue_code(&$1, F_POST_INC))
+          {
+              free_lpctype($1.type);
               YYACCEPT;
-          $$.end = CURRENT_PROGRAM_SIZE;
+          }
 
           /* Check the types */
-          if (exact_types.typeflags
-           && !BASIC_TYPE($1.type, Type_Number)
-           && !BASIC_TYPE($1.type, Type_Float)
-             )
-              type_error("Bad argument to ++", $1.type);
+          $$.type = get_fulltype(check_unary_op_type($1.type, "++", types_unary_math, lpctype_mixed));
+          $$.end = CURRENT_PROGRAM_SIZE;
 
-          $$.type = $1.type;
+          free_lpctype($1.type);
       } /* post-inc */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9955,17 +10639,16 @@ expr0:
 
           /* Create the code to push the lvalue plus POST_DEC */
           if (!add_lvalue_code(&$1, F_POST_DEC))
+          {
+              free_lpctype($1.type);
               YYACCEPT;
+          }
 
           /* Check the types */
-          if (exact_types.typeflags
-           && !BASIC_TYPE($1.type, Type_Number)
-           && !BASIC_TYPE($1.type, Type_Float)
-             )
-              type_error("Bad argument to --", $1.type);
-
+          $$.type = get_fulltype(check_unary_op_type($1.type, "--", types_unary_math, NULL));
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = $1.type;
+
+          free_lpctype($1.type);
       } /* post-dec */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9985,7 +10668,7 @@ pre_inc_dec:
 
 expr4:
       function_call  %prec '~'
-    | inline_func    %prec '~' {}
+    | inline_func    %prec '~'
     | catch          %prec '~'
     | sscanf         %prec '~'
 %ifdef USE_PARSE_COMMAND
@@ -10004,7 +10687,7 @@ expr4:
           p = last_lex_string;
           last_lex_string = NULL;
           $$.start = last_expression = CURRENT_PROGRAM_SIZE;
-          $$.type = Type_String;
+          $$.type = get_fulltype(lpctype_string);
           $$.code = -1;
 
           string_number = store_prog_string(p);
@@ -10053,35 +10736,35 @@ expr4:
           {
               current++;
               add_f_code(F_CONST0);
-              $$.type = Type_Any;
+              $$.type = get_fulltype(lpctype_mixed);
               /* TODO: Introduce a TYPE_NULL instead */
           }
           else if ( number == 1 )
           {
               add_f_code(F_CONST1);
               current++;
-              $$.type = Type_Number;
+              $$.type = get_fulltype(lpctype_int);
           }
           else if ( number >= 0 && number <= 0xff )
           {
               add_f_code(F_CLIT);
               add_byte(number);
               current += 2;
-              $$.type = Type_Number;
+              $$.type = get_fulltype(lpctype_int);
           }
           else if ( number < 0 && number >= -0x0ff )
           {
               add_f_code(F_NCLIT);
               add_byte(-number);
               current += 2;
-              $$.type = Type_Number;
+              $$.type = get_fulltype(lpctype_int);
           }
           else
           {
               add_f_code(F_NUMBER);
               upd_p_int((char*)__PREPARE_INSERT__p - mem_block[A_PROGRAM].block, $1);
               current += 1 + sizeof (p_int);
-              $$.type = Type_Number;
+              $$.type = get_fulltype(lpctype_int);
           }
           CURRENT_PROGRAM_SIZE = current;
       }
@@ -10118,7 +10801,7 @@ expr4:
                   // closure to global variable
                   // the lexxer only creates closure to non-virtual variables - our luck ;)
                   variable_t *varp = NV_VARIABLE(ix - CLOSURE_IDENTIFIER_OFFS - num_virtual_variables);
-                  if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
+                  if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
                       yywarnf("Creating closure to deprecated global variable %s.\n",
                               get_txt(varp->name));
               }
@@ -10126,7 +10809,7 @@ expr4:
           ins_f_code(F_CLOSURE);
           ins_short(ix);
           ins_short(inhIndex);
-          $$.type = Type_Closure;
+          $$.type = get_fulltype(lpctype_closure);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10154,7 +10837,7 @@ expr4:
                 ins_short(string_number);
                 ins_byte(quotes);
           }
-          $$.type = Type_Symbol;
+          $$.type = get_fulltype(lpctype_symbol);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10171,8 +10854,8 @@ expr4:
           int exponent;
           ins_uint32 ( SPLIT_DOUBLE( $1, &exponent) );
           ins_uint16 ( exponent );
-#endif  // FLOAT_FORMAT_2
-          $$.type = Type_Float;
+#endif  /* FLOAT_FORMAT_2 */
+          $$.type = get_fulltype(lpctype_float);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10181,7 +10864,7 @@ expr4:
           /* A nested expression */
 
           $$.type = $3.type;
-          $$.start = $2.start;
+          $$.start = $2;
           $$.code = -1;
       }
 
@@ -10190,17 +10873,12 @@ expr4:
       {
           /* Generate an array */
 
-          check_aggregate_types($4);
-            /* We don't care about these types,
-             * unless a reference appears
-             */
-
           ins_f_code(F_AGGREGATE);
           ins_short($4);
           if (max_array_size && $4 > (p_int)max_array_size)
               yyerror("Illegal array size");
-          $$.type = Type_Ptr_Any;
-          $$.start = $3.start;
+          $$.type = get_fulltype(get_aggregate_type($4));
+          $$.start = $3;
           $$.code = -1;
       }
 
@@ -10214,17 +10892,14 @@ expr4:
 
           int quotes;
 
-          check_aggregate_types($3);
-            /* We don't care about these types,
-             * unless a reference appears
-             */
+          pop_arg_stack($3);
 
           ins_f_code(F_AGGREGATE);
           ins_short($3);
           if (max_array_size && $3 > (p_int)max_array_size)
               yyerror("Illegal array size");
-          $$.type = Type_Quoted_Array;
-          $$.start = $2.start;
+          $$.type = get_fulltype(lpctype_quoted_array);
+          $$.start = $2;
           $$.code = -1;
           quotes = $1;
           do {
@@ -10246,9 +10921,11 @@ expr4:
       {
           ins_f_code(F_M_ALLOCATE);
 
-          $$.type = Type_Mapping;
-          $$.start = $4.start;
+          $$.type = get_fulltype(lpctype_mapping);
+          $$.start = $4;
           $$.code = -1;
+
+          free_fulltype($6.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10258,7 +10935,7 @@ expr4:
 
           mp_int num_keys;
 
-          check_aggregate_types($4[0]);
+          pop_arg_stack($4[0]);
           num_keys = $4[0] / ($4[1]+1);
 
           if ((num_keys|$4[1]) & ~0xffff)
@@ -10278,8 +10955,8 @@ expr4:
               ins_byte($4[1]);
           }
 
-          $$.type = Type_Mapping;
-          $$.start = $3.start;
+          $$.type = get_fulltype(lpctype_mapping);
+          $$.start = $3;
           $$.code = -1;
       }
 
@@ -10287,15 +10964,15 @@ expr4:
     | '(' '<' note_start '>' ')'
       {
           yyerror("Missing identifier for empty struct literal");
-          $$.type = Type_Unknown;
-          $$.start = $3.start;
+          $$.type = get_fulltype(lpctype_unknown);
+          $$.start = $3;
           $$.code = -1;
       }
     | '(' '<' note_start error ')'
       {
           /* Rule allows the parser to resynchronize after errors */
-          $$.type = Type_Unknown;
-          $$.start = $3.start;
+          $$.type = get_fulltype(lpctype_unknown);
+          $$.start = $3;
           $$.code = -1;
       }
     | '(' '<' identifier '>'
@@ -10326,13 +11003,13 @@ expr4:
               /* Too many elements - create an empty struct */
               yyerrorf("Too many elements for literal struct '%s'"
                       , get_txt(struct_t_name(pdef->type)));
-              CURRENT_PROGRAM_SIZE = $6.start;
+              CURRENT_PROGRAM_SIZE = $6;
               create_struct_literal(pdef, 0, NULL);
           }
           else if (!create_struct_literal(pdef, $7.length, $7.list))
           {
               /* Creation failed - create an empty struct */
-              CURRENT_PROGRAM_SIZE = $6.start;
+              CURRENT_PROGRAM_SIZE = $6;
               create_struct_literal(pdef, 0, NULL);
           }
 
@@ -10343,12 +11020,12 @@ expr4:
               $7.list = p->next;
               if (p->name != NULL)
                   free_mstring(p->name);
+              free_fulltype(p->type);
               xfree(p);
           }
 
-          $$.type.typeflags = TYPE_STRUCT;
-          $$.type.t_struct = pdef->type;
-          $$.start = $6.start;
+          $$.type = get_fulltype(get_struct_type(pdef->type));
+          $$.start = $6;
           $$.code = -1;
       }
 
@@ -10357,80 +11034,26 @@ expr4:
       {
           /* Lookup a struct member */
           short s_index = -1;
+          int m_index = -1;
+
+          lpctype_t* result = get_struct_member_result_type($1.type.t_type, $3, &s_index, &m_index);
+          if (!result)
+              result = lpctype_mixed;
 
           $$.start = $1.start;
           $$.code = -1;
-          $$.type = $1.type; /* default */
+          $$.type = get_fulltype(result);
 
-          if (!IS_TYPE_ANY($1.type) && !IS_TYPE_STRUCT($1.type))
-          {
-              yyerrorf("Bad type for struct lookup: %s"
-                      , get_type_name($1.type));
-          }
-          else
-          {
-              if (IS_TYPE_STRUCT($1.type))
-              {
-                  s_index = get_struct_index($1.type.t_struct);
-                  if (s_index == -1)
-                      yyerrorf("Unknown type in struct dereference: %s\n"
-                              , get_type_name($1.type)
-                              );
-              }
+          if ($3 != NULL) /* Compile time lookup. */
+              ins_number(m_index);
 
-              /* At this point: s_index >= 0: $1 is of type struct
-               *                         < 0: $1 is of type mixed
-               */
+          ins_number(s_index);
+          ins_f_code(F_S_INDEX);
 
-              if ($3 != NULL)
-              {
-                  int num;
-                  struct_type_t * ptype = NULL;
-
-                  if (s_index >= 0)
-                  {
-                      ptype = $1.type.t_struct;
-
-                      num = struct_find_member(ptype, $3);
-                      if (num < 0)
-                      {
-                          yyerrorf("No such member '%s' for struct '%s'"
-                                  , get_txt($3)
-                                  , get_txt(struct_t_name(ptype))
-                                  );
-                      }
-                  }
-                  else /* $1 is of type mixed */
-                  {
-                      s_index = find_struct_by_member($3, &num);
-                      if (s_index >= 0)
-                          ptype = STRUCT_DEF(s_index).type;
-                  }
-
-                  /* If this is a legal struct lookup, num >= 0 at this point
-                   */
-                  if (num >= 0)
-                  {
-                      ins_number(num);
-                      ins_number(s_index);
-                      ins_f_code(F_S_INDEX);
-                      if (ptype != NULL)
-                          assign_var_to_fulltype(&$$.type
-                                                , ptype->member[num].type);
-                  }
-              }
-              else /* Runtime lookup */
-              {
-                  ins_number(s_index);
-                  ins_f_code(F_S_INDEX);
-                  $$.type = Type_Any;
-              }
-
-              $$.end = CURRENT_PROGRAM_SIZE-1;
-          }
-
+          $$.end = CURRENT_PROGRAM_SIZE-1;
           if ($3 != NULL)
               free_mstring($3);
+          free_fulltype($1.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10439,102 +11062,40 @@ expr4:
       {
           /* Create a reference to a struct member */
           short s_index = -1;
+          int m_index = -1;
+
+          lpctype_t* result = get_struct_member_result_type($3.type.t_type, $5, &s_index, &m_index);
+          if (!result)
+              result = lpctype_mixed;
 
           $$.start = $3.start;
           $$.code = -1;
-          $$.type = $3.type; /* default */
+          $$.type = get_fulltype(result);
+          $$.type.t_flags |= TYPE_MOD_REFERENCE;
 
-          if (!IS_TYPE_ANY($3.type) && !IS_TYPE_STRUCT($3.type))
+          /* '&(struct->member->member)' generates a simple
+           * F_S_INDEX for the first lookup instead of a suitable
+           * lvalue lookup. I don't understand the lvalue generation
+           * well enough to correct the generated code, so for now
+           * I restrict the lookup to one level.
+           */
+          if ($3.end != 0
+           && F_S_INDEX == mem_block[A_PROGRAM].block[$3.end]
+             )
           {
-              yyerrorf("Bad type for struct lookup: %s"
-                      , get_type_name($3.type));
-          }
-          else
-          {
-              /* '&(struct->member->member)' generates a simple
-               * F_S_INDEX for the first lookup instead of a suitable
-               * lvalue lookup. I don't understand the lvalue generation
-               * well enough to correct the generated code, so for now
-               * I restrict the lookup to one level.
-               */
-              if ($3.end != 0
-               && F_S_INDEX == mem_block[A_PROGRAM].block[$3.end]
-                 )
-              {
-                  yyerror("Implementation restriction: Only a single struct "
-                          "member lookup allowed inside a &()");
-              }
-
-              if (IS_TYPE_STRUCT($3.type))
-              {
-                  s_index = get_struct_index($3.type.t_struct);
-                  if (s_index == -1)
-                      yyerrorf("Unknown type in lvalue struct derefence: %s\n"
-                              , get_type_name($3.type)
-                              );
-              }
-
-              /* At this point: s_index >= 0: $1 is of type struct
-               *                         < 0: $1 is of type mixed
-               */
-
-              if ($5 != NULL)
-              {
-                  int num;
-                  struct_type_t * ptype = NULL;
-
-                  if (s_index >= 0)
-                  {
-                      ptype = $3.type.t_struct;
-
-                      num = struct_find_member(ptype, $5);
-                      if (num < 0)
-                      {
-                          yyerrorf("No such member '%s' for struct '%s'"
-                                  , get_txt($5)
-                                  , get_txt(struct_t_name(ptype))
-                                  );
-                      }
-                  }
-                  else /* $3 is of type mixed */
-                  {
-                      s_index = find_struct_by_member($5, &num);
-                      if (s_index >= 0)
-                          ptype = STRUCT_DEF(s_index).type;
-                  }
-
-                  /* If this is a legal struct lookup, num >= 0 at this point
-                   */
-                  if (num >= 0)
-                  {
-                      ins_number(num);
-                      ins_number(s_index);
-                      arrange_protected_lvalue($3.start, $3.code, $3.end,
-                         F_PROTECTED_INDEX_S_LVALUE
-                      );
-                      if (ptype != NULL)
-                      {
-                          assign_var_to_fulltype(&$$.type
-                                                , ptype->member[num].type);
-                          $$.type.typeflags |= TYPE_MOD_REFERENCE;
-                      }
-                  }
-              }
-              else /* Runtime lookup */
-              {
-                  ins_number(s_index);
-                  arrange_protected_lvalue($3.start, $3.code, $3.end,
-                     F_PROTECTED_INDEX_S_LVALUE
-                  );
-
-                  $$.type = Type_Ref_Any;
-              }
-
-              $$.end = CURRENT_PROGRAM_SIZE-1;
+              yyerror("Implementation restriction: Only a single struct "
+                      "member lookup allowed inside a &()");
           }
 
+          if ($5 != NULL) /* Compile time lookup. */
+              ins_number(m_index);
+          ins_number(s_index);
+          arrange_protected_lvalue($3.start, $3.code, $3.end, F_PROTECTED_INDEX_S_LVALUE);
+
+          $$.end = CURRENT_PROGRAM_SIZE-1;
           if ($5 != NULL)
               free_mstring($5);
+          free_fulltype($3.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10542,36 +11103,22 @@ expr4:
       {
 %line
           /* Generate a range expression */
-
           $$.start = $1.start;
           $$.code = -1;
 
           ins_f_code($2.inst);
 
           /* Check the types */
-          if (exact_types.typeflags)
-          {
-              fulltype_t type;
+          $$.type = get_fulltype(check_unary_op_type($1.type.t_type, "range index", types_range_index, lpctype_mixed));
 
-              $1.type.typeflags &= TYPEID_MASK;
-              $$.type = type = $1.type;
-              if ((type.typeflags & TYPE_MOD_POINTER) == 0
-               && type.typeflags != TYPE_ANY && type.typeflags != TYPE_STRING)
-              {
-                  type_error("Bad type of argument used for range", type);
-                  $$.type = Type_Any;
-              }
-              type = $2.type1;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
-                  type_error("Bad type of index", type);
-              type = $2.type2;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
-                  type_error("Bad type of index", type);
-          }
-          else
-          {
-              $$.type = Type_Any;
-          }
+          if (!lpctype_contains(lpctype_int, $2.type1.t_type))
+              fulltype_error("Bad type of index", $2.type1);
+          if (!lpctype_contains(lpctype_int, $2.type2.t_type))
+              fulltype_error("Bad type of index", $2.type2);
+
+          free_fulltype($1.type);
+          free_fulltype($2.type1);
+          free_fulltype($2.type2);
       } /* expr4 index_range */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10625,17 +11172,16 @@ expr4:
 
           CURRENT_PROGRAM_SIZE = current + 2;
           if (i == -1)
-              $$.type = Type_Ref_Any;
+              $$.type = get_fulltype(lpctype_mixed);
           else
           {
-              if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
+              if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
                   yywarnf("Referencing deprecated global variable %s.\n",
                           get_txt(varp->name));
-              
-              $$.type = varp->type;
-              $$.type.typeflags = ($$.type.typeflags & TYPE_MOD_MASK)
-                                  | TYPE_MOD_REFERENCE;
+
+              $$.type = ref_fulltype(varp->type);
           }
+          $$.type.t_flags = TYPE_MOD_REFERENCE; /* Clear all other flags. */
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10648,8 +11194,9 @@ expr4:
 
           mp_uint current;
           bytecode_p p;
+          lpctype_t *type;
 %line
-          $2 = check_for_context_local($2, &$$.type);
+          $2 = check_for_context_local($2, &type);
 
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
@@ -10671,7 +11218,8 @@ expr4:
               *p++ = F_PUSH_LOCAL_VARIABLE_LVALUE;
               *p = $2->u.local.num;
           }
-          $$.type.typeflags |= TYPE_MOD_REFERENCE;
+          $$.type.t_type = ref_lpctype(type);
+          $$.type.t_flags = TYPE_MOD_REFERENCE;
           CURRENT_PROGRAM_SIZE = current + 2;
       }
 
@@ -10697,47 +11245,13 @@ expr4:
           $$.start = $3.start;
           $$.code = -1;
 
-          if ($4.type1.typeflags & TYPE_MOD_REFERENCE)
-                yyerror("Reference used as index");
-
           /* Compute the result type */
-          if (!exact_types.typeflags)
-          {
-                $$.type = Type_Ref_Any;
-          }
-          else
-          {
-              fulltype_t type;
+          $$.type.t_type = get_index_result_type($3.type.t_type, $4.type1, $4.inst, lpctype_mixed);
+          $$.type.t_flags = TYPE_MOD_REFERENCE;
 
-              type = $3.type;
-              type.typeflags &= TYPEID_MASK;
-              if (type.typeflags & TYPE_MOD_POINTER)
-              {
-                    $$.type = type;
-                    $$.type.typeflags &= ~TYPE_MOD_POINTER;
-              }
-              else if (type.typeflags == TYPE_MAPPING && $4.inst == F_INDEX)
-              {
-                  $4.type1 = Type_Any;
-                  $$.type = Type_Ref_Any;
-              }
-              else switch (type.typeflags)
-              {
-              default:
-                  type_error("Bad type to indexed reference", type);
-                  /* FALLTHROUGH */
-              case TYPE_ANY:
-                  if ($4.inst == F_INDEX)
-                      $4.type1 = Type_Any;
-                  $$.type = Type_Ref_Any;
-                  break;
-              case TYPE_STRING:
-                  $$.type = Type_Ref_Number;
-                  break;
-              }
-              if (!BASIC_TYPE($4.type1, Type_Number))
-                  type_error("Bad type of index", $4.type1);
-          }
+          free_fulltype($3.type);
+          free_fulltype($4.type1);
+          free_fulltype($4.type2);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10748,27 +11262,24 @@ expr4:
 
           $$.start = $3.start;
           $$.code = -1;
-          $$.type = Type_Ref_Any;
+          $$.type.t_type = lpctype_mixed;
+          $$.type.t_flags = TYPE_MOD_REFERENCE;
+
           ins_f_code(F_PUSH_PROTECTED_INDEXED_MAP_LVALUE);
 
-          if ($5.type.typeflags & TYPE_MOD_REFERENCE)
-                yyerror("Reference used as index");
+          if ($5.type.t_flags & TYPE_MOD_REFERENCE
+           || $7.type.t_flags & TYPE_MOD_REFERENCE)
+              yyerror("Reference used as index");
 
-          /* Compute the result type */
-          if (exact_types.typeflags)
-          {
-              fulltype_t type;
+          if (exact_types && !lpctype_contains(lpctype_mapping, $3.type.t_type))
+              fulltype_error("Bad type to indexed lvalue", $3.type);
 
-              type = $3.type;
-              type.typeflags &= TYPEID_MASK;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_MAPPING)
-              {
-                  type_error("Bad type to indexed value", type);
-              }
-              type = $7.type;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
-                  type_error("Bad type of index", type);
-          }
+          if (exact_types && !lpctype_contains(lpctype_int, $7.type.t_type))
+              fulltype_error("Bad type of index", $7.type);
+
+          free_fulltype($3.type);
+          free_fulltype($5.type);
+          free_fulltype($7.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10799,35 +11310,22 @@ expr4:
 
           arrange_protected_lvalue($3.start, $3.code, $3.end
                                   , prot_op
-          );
+                                  );
 
           $$.start = $3.start;
           $$.code = -1;
 
           /* Compute the result type */
-          if (!exact_types.typeflags)
-          {
-              $$.type = Type_Ref_Any;
-          }
-          else
-          {
-              fulltype_t type;
+          $$.type = get_fulltype(check_unary_op_type($3.type.t_type, "range index", types_range_index, lpctype_mixed));
 
-              $3.type.typeflags &= TYPEID_MASK;
-              $$.type = type = $3.type;
-              if ((type.typeflags & TYPE_MOD_POINTER) == 0
-               && type.typeflags != TYPE_ANY && type.typeflags != TYPE_STRING)
-              {
-                  type_error("Bad type of argument used for range", type);
-                  $$.type = Type_Any;
-              }
-              type = $4.type1;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
-                  type_error("Bad type of index", type);
-              type = $4.type2;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
-                  type_error("Bad type of index", type);
-          }
+          if (exact_types && !lpctype_contains(lpctype_int, $4.type1.t_type))
+              fulltype_error("Bad type of index", $4.type1);
+          if (exact_types && !lpctype_contains(lpctype_int, $4.type2.t_type))
+              fulltype_error("Bad type of index", $4.type2);
+
+          free_fulltype($3.type);
+          free_fulltype($4.type1);
+          free_fulltype($4.type2);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10855,7 +11353,9 @@ expr4:
           }
           p = PROGRAM_BLOCK + current;
 
-          if (i & VIRTUAL_VAR_TAG)
+          if (i == -1)
+              $$.type = get_fulltype(lpctype_mixed);
+          else if (i & VIRTUAL_VAR_TAG)
           {
               /* Access a virtual variable */
 
@@ -10863,7 +11363,7 @@ expr4:
               *p++ = F_VIRTUAL_VARIABLE;
               *p = i;
               varp = V_VARIABLE(i);
-              $$.type = varp->type;
+              $$.type = ref_fulltype(varp->type);
           }
           else
           {
@@ -10883,18 +11383,16 @@ expr4:
                   *p = i + num_virtual_variables;
               }
               varp = NV_VARIABLE(i);
-              $$.type = varp->type;
+              $$.type = ref_fulltype(varp->type);
           }
-          if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
+          if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
           {
               yywarnf("Using deprecated global variable %s.\n",
                       get_txt(varp->name));
           }
-          $$.type.typeflags &= TYPE_MOD_MASK;
+          $$.type.t_flags = 0;
 
           CURRENT_PROGRAM_SIZE = current + 2;
-          if (i == -1)
-              $$.type = Type_Any;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10904,9 +11402,11 @@ expr4:
 
           mp_uint current;
           bytecode_p p;
+          lpctype_t *type;
 %line
-          $1 = check_for_context_local($1, &$$.type);
+          $1 = check_for_context_local($1, &type);
 
+          $$.type = get_fulltype(ref_lpctype(type));
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.end = 0;
           if (!realloc_a_program(2))
@@ -10955,43 +11455,12 @@ expr4:
               ins_f_code(F_AINDEX);
           }
 
-          if ($2.type1.typeflags & TYPE_MOD_REFERENCE)
-              yyerror("Reference used as index");
-
           /* Check and compute the types */
-          if (exact_types.typeflags)
-          {
-              fulltype_t type;
+          $$.type = get_fulltype(get_index_result_type($1.type.t_type, $2.type1, $2.inst, lpctype_mixed));
 
-              type = $1.type;
-              type.typeflags &= TYPEID_MASK;
-              if (type.typeflags & TYPE_MOD_POINTER)
-              {
-                  $$.type = type;
-                  $$.type.typeflags &= ~TYPE_MOD_POINTER;
-              }
-              else if (type.typeflags == TYPE_MAPPING && $2.inst == F_INDEX)
-              {
-                  $2.type1 = Type_Any;
-                  $$.type = Type_Any;
-              }
-              else switch (type.typeflags)
-              {
-              default:
-                  type_error("Bad type to indexed value", type);
-                  /* FALLTHROUGH */
-              case TYPE_ANY:
-                  if ($2.inst == F_INDEX)
-                      $2.type1 = Type_Any;
-                  $$.type = Type_Any;
-                  break;
-              case TYPE_STRING:
-                  $$.type = Type_Number;
-                  break;
-              }
-              if (!BASIC_TYPE($2.type1, Type_Number))
-                  type_error("Bad type of index", $2.type1);
-          }
+          free_fulltype($1.type);
+          free_fulltype($2.type1);
+          free_fulltype($2.type2);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11003,28 +11472,23 @@ expr4:
           $$.start = $1.start;
           $$.end = CURRENT_PROGRAM_SIZE;
           $$.code = F_PUSH_INDEXED_MAP_LVALUE;
-          $$.type = Type_Any;
+          $$.type = get_fulltype(lpctype_mixed);
           ins_f_code(F_MAP_INDEX);
 
-          if ($3.type.typeflags & TYPE_MOD_REFERENCE)
+          /* Check and compute types */
+          if ($3.type.t_flags & TYPE_MOD_REFERENCE
+           || $5.type.t_flags & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
 
-          /* Check and compute types */
-          if (exact_types.typeflags)
-          {
-              fulltype_t type;
+          if (exact_types && !lpctype_contains(lpctype_mapping, $1.type.t_type))
+              fulltype_error("Bad type to indexed lvalue", $1.type);
 
-              type = $1.type;
-              type.typeflags &= TYPEID_MASK;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_MAPPING)
-              {
-                  type_error("Bad type to indexed value", type);
-              }
-              type = $5.type;
-              type.typeflags &= TYPEID_MASK;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
-                  type_error("Bad type of index", type);
-          }
+          if (exact_types && !lpctype_contains(lpctype_int, $5.type.t_type))
+              fulltype_error("Bad type of index", $5.type);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+          free_fulltype($5.type);
       }
 ; /* expr4 */
 
@@ -11110,47 +11574,12 @@ lvalue:
           CURRENT_PROGRAM_SIZE = start;
           last_expression = -1;
 
-          if ($2.type1.typeflags & TYPE_MOD_REFERENCE)
-              yyerror("Reference used as index");
+          /* Check and compute the types */
+          $$.type = get_index_result_type($1.type.t_type, $2.type1, $2.inst, lpctype_mixed);
 
-          /* Check and compute types */
-          if (exact_types.typeflags)
-          {
-              fulltype_t type;
-
-              type = $1.type;
-              type.typeflags &= TYPEID_MASK;
-              if (type.typeflags & TYPE_MOD_POINTER)
-              {
-                  $$.type = type;
-                  $$.type.typeflags &= ~TYPE_MOD_POINTER;
-              }
-              else if (type.typeflags == TYPE_MAPPING && $2.inst == F_INDEX)
-              {
-                  $2.type1 = Type_Any;
-                  $$.type = Type_Any;
-              }
-              else switch (type.typeflags)
-              {
-              default:
-                  type_error("Bad type to indexed lvalue", type);
-                  /* FALLTHROUGH */
-              case TYPE_ANY:
-                  if ($2.inst == F_INDEX)
-                      $2.type1 = Type_Any;
-                  $$.type = Type_Any;
-                  break;
-              case TYPE_STRING:
-                  $$.type = Type_Number;
-                  break;
-              }
-              if (!BASIC_TYPE($2.type1, Type_Number))
-                  type_error("Bad type of index", $2.type1);
-          }
-          else
-          {
-              $$.type = Type_Any;
-          }
+          free_fulltype($1.type);
+          free_fulltype($2.type1);
+          free_fulltype($2.type2);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11174,29 +11603,24 @@ lvalue:
 
           $$.length = current + 1 - start;
           $$.u.p = q;
-          $$.type = Type_Any;
+          $$.type = lpctype_mixed;
           CURRENT_PROGRAM_SIZE = start;
           last_expression = -1;
 
-          if ($3.type.typeflags & TYPE_MOD_REFERENCE)
+          /* Check and compute types */
+          if ($3.type.t_flags & TYPE_MOD_REFERENCE
+           || $5.type.t_flags & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
 
-          /* Check and compute types */
-          if (exact_types.typeflags)
-          {
-              fulltype_t type;
+          if (exact_types && !lpctype_contains(lpctype_mapping, $1.type.t_type))
+              fulltype_error("Bad type to indexed lvalue", $1.type);
 
-              type = $1.type;
-              type.typeflags &= TYPEID_MASK;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_MAPPING)
-              {
-                  type_error("Bad type to indexed value", type);
-              }
-              type = $5.type;
-              type.typeflags &= TYPEID_MASK;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
-                  type_error("Bad type of index", type);
-          }
+          if (exact_types && !lpctype_contains(lpctype_int, $5.type.t_type))
+              fulltype_error("Bad type of index", $5.type);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+          free_fulltype($5.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11284,101 +11708,32 @@ lvalue:
           last_expression = -1;
 
           /* Compute and check the types */
-          if (exact_types.typeflags)
-          {
-              fulltype_t type;
+          $$.type = check_unary_op_type($1.type.t_type, "range index", types_range_index, lpctype_mixed);
 
-              $1.type.typeflags &= TYPEID_MASK;
-              $$.type = type = $1.type;
-              if ((type.typeflags & TYPE_MOD_POINTER) == 0
-               &&  type.typeflags != TYPE_ANY
-               &&  type.typeflags != TYPE_STRING)
-              {
-                  type_error("Bad type of argument used for range", type);
-                  $$.type = Type_Any;
-              }
-              type = $2.type1;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
-                  type_error("Bad type of index", type);
-              type = $2.type2;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
-                  type_error("Bad type of index", type);
-          }
+          if (exact_types && !lpctype_contains(lpctype_int, $2.type1.t_type))
+              fulltype_error("Bad type of index", $2.type1);
+          if (exact_types && !lpctype_contains(lpctype_int, $2.type2.t_type))
+              fulltype_error("Bad type of index", $2.type2);
+
+          free_fulltype($1.type);
+          free_fulltype($2.type1);
+          free_fulltype($2.type2);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr4 L_ARROW struct_member_name
       {
           /* Create a struct member lvalue */
-
           short s_index = -1;
-          int num;
-          vartype_t member_type;
+          int m_index = -1;
 
-          /* If the struct lookup is ok, set num and member_type */
-
-          num = 0;
-          member_type = VType_Unknown;
-
-          if (!IS_TYPE_ANY($1.type) && !IS_TYPE_STRUCT($1.type))
-          {
-              yyerrorf("Bad type for struct lookup: %s"
-                      , get_type_name($1.type));
-          }
-          else
-          {
-              if (IS_TYPE_STRUCT($1.type))
-              {
-                  s_index = get_struct_index($1.type.t_struct);
-                  if (s_index == -1)
-                      yyerrorf("Unknown type in lvalue struct dereference: %s\n"
-                              , get_type_name($1.type)
-                              );
-              }
-
-              /* At this point: s_index >= 0: $1 is of type struct
-               *                         < 0: $1 is of type mixed
-               */
-
-              if ($3 != NULL)
-              {
-                  struct_type_t * ptype = NULL;
-
-                  if (s_index >= 0)
-                  {
-                      ptype = $1.type.t_struct;
-
-                      num = struct_find_member(ptype, $3);
-                      if (num < 0)
-                      {
-                          yyerrorf("No such member '%s' for struct '%s'"
-                                  , get_txt($3)
-                                  , get_txt(struct_t_name(ptype))
-                                  );
-                      }
-                      else
-                          member_type = ptype->member[num].type;
-                  }
-                  else /* $1 is of type mixed */
-                  {
-                      s_index = find_struct_by_member($3, &num);
-                      if (s_index >= 0)
-                      {
-                          ptype = STRUCT_DEF(s_index).type;
-                          member_type = ptype->member[num].type;
-                      }
-                  }
-              }
-              else /* Runtime lookup */
-              {
-                  assign_full_to_vartype(&member_type, Type_Any);
-              }
-          }
-
+          lpctype_t* result = get_struct_member_result_type($1.type.t_type, $3, &s_index, &m_index);
+          if (!result)
+              result = lpctype_mixed;
 
           /* We have to generate some code, so if the struct lookup is
            * invalid, we just play along and generate code to look up
-           * member #0 in whatever we got.
+           * member #-1 in whatever we got.
            */
 
           {
@@ -11388,7 +11743,7 @@ lvalue:
               if ($3 != NULL)
               {
                   /* Insert the index code */
-                  ins_number(num);
+                  ins_number(m_index);
               }
 
               /* Insert the struct type index */
@@ -11450,11 +11805,12 @@ lvalue:
               CURRENT_PROGRAM_SIZE = start;
               last_expression = -1;
 
-              assign_var_to_fulltype(&$$.type, member_type);
+              $$.type = result;
           }
 
           if ($3 != NULL)
               free_mstring($3);
+          free_fulltype($1.type);
       }
 
 ; /* lvalue */
@@ -11480,8 +11836,7 @@ name_lvalue:
               $$.u.simple[0] = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
               $$.u.simple[1] = i;
               varp = V_VARIABLE(i);
-              $$.type = varp->type;
-              $$.type.typeflags &= TYPE_MOD_MASK;
+              $$.type = ref_lpctype(varp->type.t_type);
           }
           else
           {
@@ -11494,8 +11849,6 @@ name_lvalue:
                   $$.u.p = q;
                   q[0] = F_PUSH_IDENTIFIER16_LVALUE;
                   PUT_SHORT(q+1, i + num_virtual_variables);
-                  $$.type = NV_VARIABLE(i)->type;
-                  $$.type.typeflags &= TYPE_MOD_MASK;
               }
               else
               {
@@ -11503,22 +11856,23 @@ name_lvalue:
                   $$.u.simple[1] = i + num_virtual_variables;
               }
               varp = NV_VARIABLE(i);
-              $$.type = varp->type;
-              $$.type.typeflags &= TYPE_MOD_MASK;
+              $$.type = ref_lpctype(varp->type.t_type);
           }
-          if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
+          if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
               yywarnf("Using deprecated global variable %s.\n",
                       get_txt(varp->name));
-          
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | L_LOCAL
       {
+          lpctype_t *type;
 %line
           /* Generate the lvalue for a local */
 
-          $1 = check_for_context_local($1, &$$.type);
+          $1 = check_for_context_local($1, &type);
+
+          $$.type = ref_lpctype(type);
 
           if ($1->u.local.context >= 0)
           {
@@ -11536,13 +11890,15 @@ name_lvalue:
 
 
 local_name_lvalue:
-      basic_type optional_star L_IDENTIFIER
+      basic_type L_IDENTIFIER
       {
-          define_local_variable($3, $1, $2, &$$, MY_FALSE, MY_TRUE);
+          define_local_variable($2, $1, &$$, MY_FALSE, MY_TRUE);
+          free_lpctype($1);
       }
-    | basic_type optional_star L_LOCAL
+    | basic_type L_LOCAL
       {
-          define_local_variable($3, $1, $2, &$$, MY_TRUE, MY_TRUE);
+          define_local_variable($2, $1, &$$, MY_TRUE, MY_TRUE);
+          free_lpctype($1);
       }
 ; /* local_name_lvalue */
 
@@ -11559,6 +11915,7 @@ index_expr :
             $$.start = $2.start;
             $$.end = $2.end;
             $$.type1 = $2.type;
+            $$.type2.t_type = NULL;
             if (!pragma_warn_deprecated)
             {
                 ins_byte(F_NO_WARN_DEPRECATED);
@@ -11573,6 +11930,7 @@ index_expr :
             $$.start = $3.start;
             $$.end = $3.end;
             $$.type1 = $3.type;
+            $$.type2.t_type = NULL;
             if (!pragma_warn_deprecated)
             {
                 ins_byte(F_NO_WARN_DEPRECATED);
@@ -11586,6 +11944,7 @@ index_expr :
             $$.start = $3.start;
             $$.end = $3.end;
             $$.type1 = $3.type;
+            $$.type2.t_type = NULL;
             if (!pragma_warn_deprecated)
             {
                 ins_byte(F_NO_WARN_DEPRECATED);
@@ -11613,6 +11972,7 @@ index_range :
           if (!realloc_a_program(1))
           {
               yyerrorf("Out of memory: program size %"PRIdPINT"\n", current+1);
+              free_fulltype($3.type);
               YYACCEPT;
           }
 
@@ -11635,7 +11995,7 @@ index_range :
           $$.inst  = F_RANGE;
           $$.start = $3.start;
           $$.end   = $3.end;
-          $$.type1 = Type_Number;
+          $$.type1 = get_fulltype(lpctype_int);
           $$.type2 = $3.type;
       }
 
@@ -11656,6 +12016,7 @@ index_range :
           if (!realloc_a_program(1))
           {
               yyerrorf("Out of memory: program size %"PRIdPINT"\n", current+1);
+              free_fulltype($4.type);
               YYACCEPT;
           }
 
@@ -11678,7 +12039,7 @@ index_range :
           $$.inst  = F_NR_RANGE;
           $$.start = $4.start;
           $$.end   = $4.end;
-          $$.type1 = Type_Number;
+          $$.type1 = get_fulltype(lpctype_int);
           $$.type2 = $4.type;
       }
 
@@ -11699,6 +12060,7 @@ index_range :
           if (!realloc_a_program(1))
           {
               yyerrorf("Out of memory: program size %"PRIdPINT"\n", current+1);
+              free_fulltype($4.type);
               YYACCEPT;
           }
 
@@ -11721,7 +12083,7 @@ index_range :
           $$.inst  = F_NA_RANGE;
           $$.start = $4.start;
           $$.end   = $4.end;
-          $$.type1 = Type_Number;
+          $$.type1 = get_fulltype(lpctype_int);
           $$.type2 = $4.type;
       }
 
@@ -11882,7 +12244,7 @@ index_range :
           $$.start = $2.start;
           $$.end   = $2.end;
           $$.type1 = $2.type;
-          $$.type2 = Type_Number;
+          $$.type2 = get_fulltype(lpctype_int);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11902,7 +12264,7 @@ index_range :
           $$.start = $3.start;
           $$.end   = $3.end;
           $$.type1 = $3.type;
-          $$.type2 = Type_Number;
+          $$.type2 = get_fulltype(lpctype_int);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11922,7 +12284,7 @@ index_range :
           $$.start = $3.start;
           $$.end   = $3.end;
           $$.type1 = $3.type;
-          $$.type2 = Type_Number;
+          $$.type2 = get_fulltype(lpctype_int);
       }
 ; /* index_range */
 
@@ -11944,14 +12306,31 @@ expr_list2:
     | expr_list2 ',' expr0  { $$ = $1 + 1; add_arg_type($3.type); }
 ; /* expr_list2 */
 
-e_expr_list2:
+
+/* Expression lists for function call arguments.
+ * These can contain ellipsis ('arr..').
+ */
+
+arg_expr_list:
+      /* empty */    { $$ = 0; }
+    | arg_expr_list2 { $$ = $1; }
+; /* arg_expr_list */
+
+arg_expr_list2:
       expr0
       {
           $$ = 1;
           if (!got_ellipsis[argument_level])
               add_arg_type($1.type);
           else
-              add_arg_type(Type_Any);
+          {
+              /* Can't determine the exact type of argument <X>,
+               * because we don't know the number of previous
+               * arguments due to the ellipsis.
+               */
+              add_arg_type(get_fulltype(lpctype_mixed));
+              free_fulltype($1.type);
+          }
       }
 
     | expr0 L_ELLIPSIS
@@ -11961,71 +12340,33 @@ e_expr_list2:
           $$ = 0;
           got_ellipsis[argument_level] = MY_TRUE;
           add_f_code(F_FLATTEN_XARG);
+          free_fulltype($1.type);
           CURRENT_PROGRAM_SIZE++;
       }
 
-    | e_expr_list2 ',' expr0
+    | arg_expr_list2 ',' expr0
       {
           $$ = $1 + 1;
           if (!got_ellipsis[argument_level])
               add_arg_type($3.type);
           else
-              add_arg_type(Type_Any);
+          {
+              add_arg_type(get_fulltype(lpctype_mixed));
+              free_fulltype($3.type);
+          }
       }
 
-    | e_expr_list2 ',' expr0 L_ELLIPSIS
+    | arg_expr_list2 ',' expr0 L_ELLIPSIS
       {
           PREPARE_INSERT(2);
 
           $$ = $1;
           got_ellipsis[argument_level] = MY_TRUE;
           add_f_code(F_FLATTEN_XARG);
+          free_fulltype($3.type);
           CURRENT_PROGRAM_SIZE++;
       }
-; /* e_expr_list2 */
-
-expr_list3:
-      /* empty */
-      { $$ = 0; }
-
-    | expr0
-      {
-          $$ = 1;
-          if (!got_ellipsis[argument_level])
-              add_arg_type($1.type);
-          else
-              add_arg_type(Type_Any);
-      }
-
-    | expr0 L_ELLIPSIS
-      {
-          PREPARE_INSERT(2);
-
-          $$ = 0;
-          got_ellipsis[argument_level] = MY_TRUE;
-          add_f_code(F_FLATTEN_XARG);
-          CURRENT_PROGRAM_SIZE++;
-      }
-
-    | e_expr_list2 ',' expr0
-      {
-          $$ = $1 + 1;
-          if (!got_ellipsis[argument_level])
-              add_arg_type($3.type);
-          else
-              add_arg_type(Type_Any);
-      }
-
-    | e_expr_list2 ',' expr0 L_ELLIPSIS
-      {
-          PREPARE_INSERT(2);
-
-          $$ = $1;
-          got_ellipsis[argument_level] = MY_TRUE;
-          add_f_code(F_FLATTEN_XARG);
-          CURRENT_PROGRAM_SIZE++;
-      }
-; /* expr_list3 */
+; /* arg_expr_list2 */
 
 
 m_expr_list:
@@ -12080,13 +12421,11 @@ struct_member_name:
     |  '(' expr0 ')'
       {
           $$ = NULL;
-          if ($2.type.typeflags != TYPE_STRING
-           && (pragma_strict_types != PRAGMA_WEAK_TYPES
-               || $2.type.typeflags != TYPE_UNKNOWN)
-           && $2.type.typeflags != TYPE_ANY
-           && $2.type.typeflags != TYPE_NUMBER
-              )
-              type_error("Illegal type for struct member name", $2.type);
+          if (!lpctype_contains(lpctype_string, $2.type.t_type)
+           && !lpctype_contains(lpctype_int, $2.type.t_type))
+              fulltype_error("Illegal type for struct member name", $2.type);
+
+          free_fulltype($2.type);
       }
 
 ; /* struct_member_name */
@@ -12143,12 +12482,12 @@ struct_init:
       identifier ':' expr0
       {
           $$.name = $1;
-          assign_full_to_vartype(&$$.type, $3.type);
+          $$.type = $3.type;
       }
     | expr0
       {
           $$.name = NULL;
-          assign_full_to_vartype(&$$.type, $1.type);
+          $$.type = $1.type;
       }
 ; /* struct_init */
 
@@ -12251,19 +12590,19 @@ function_call:
           }
       }
 
-      '(' expr_list3 ')'
+      '(' arg_expr_list ')'
 
       {
           /* We got the arguments. Now we have to generate the
            * proper instructions to call the function.
            */
 %line
-          int        f = 0;             /* Function index */
-          int        simul_efun;
-          vartype_t *arg_types = NULL;  /* Argtypes from the program */
-          int        first_arg;         /* Startindex in arg_types[] */
-          Bool       ap_needed;         /* TRUE if arg frame is needed */
-          Bool       has_ellipsis;      /* TRUE if '...' was used */
+          int         f = 0;             /* Function index */
+          int         simul_efun;
+          lpctype_t **arg_types = NULL; /* Argtypes from the program */
+          int         first_arg;         /* Startindex in arg_types[] */
+          Bool        ap_needed;         /* TRUE if arg frame is needed */
+          Bool        has_ellipsis;      /* TRUE if '...' was used */
 
           has_ellipsis = got_ellipsis[argument_level];
           ap_needed = MY_FALSE;
@@ -12348,8 +12687,7 @@ function_call:
                       add_short(simul_efun);
                       CURRENT_PROGRAM_SIZE += 3;
                   }
-                  $$.type = funp->type;
-                  $$.type.typeflags &= TYPE_MOD_MASK;
+                  $$.type = get_fulltype(ref_lpctype(funp->type));
               } /* if (simul-efun) */
 
               else if ($1.super ? ($<function_call_head>2.efun_override == OVERRIDE_NONE)
@@ -12397,7 +12735,7 @@ function_call:
                               break;
                           }
 
-                          $$.type = Type_Any;
+                          $$.type = get_fulltype(lpctype_mixed);
                           break; /* Out of do..while(0) */
                       }
 
@@ -12422,7 +12760,7 @@ function_call:
                       add_f_code(F_CALL_FUNCTION);
                       add_short(f);
                       funp = FUNCTION(f);
-                      arg_types = (vartype_t *)mem_block[A_ARGUMENT_TYPES].block;
+                      arg_types = GET_BLOCK(A_ARGUMENT_TYPES);
                       first_arg = ARGUMENT_INDEX(f);
                       CURRENT_PROGRAM_SIZE += 3;
                   }
@@ -12433,7 +12771,7 @@ function_call:
                   if (funp->flags & (NAME_UNDEFINED|NAME_HIDDEN))
                   {
                       if ( !(funp->flags & (NAME_PROTOTYPE|NAME_INHERITED))
-                       && exact_types.typeflags )
+                       && exact_types)
                       {
                           yyerrorf("Function %.50s undefined", get_txt(funp->name));
                       }
@@ -12450,15 +12788,14 @@ function_call:
                               get_txt(funp->name));
 
 
-                  $$.type = funp->type; /* Result type */
-                  $$.type.typeflags &= TYPE_MOD_MASK;
+                  $$.type = get_fulltype(ref_lpctype(funp->type)); /* Result type */
 
                   /* Check number of arguments.
                    */
                   if (funp->num_arg != $4
                    && !(funp->flags & TYPE_MOD_VARARGS)
                    && (first_arg != INDEX_START_NONE)
-                   && exact_types.typeflags
+                   && exact_types
                    && !has_ellipsis)
                   {
                       if (funp->num_arg-1 > $4 || !(funp->flags & TYPE_MOD_XVARARGS))
@@ -12470,10 +12807,10 @@ function_call:
 
                   /* Check the argument types.
                    */
-                  if (exact_types.typeflags && first_arg != INDEX_START_NONE)
+                  if (exact_types && first_arg != INDEX_START_NONE)
                   {
                       int i;
-                      vartype_t *argp;
+                      fulltype_t *argp;
                       int num_arg, anum_arg;
 
                       if ( 0 != (num_arg = funp->num_arg) )
@@ -12493,46 +12830,32 @@ function_call:
 
                           for (argno = 1, i = num_arg; --i >= 0; argno++)
                           {
-                              fulltype_t tmp1, tmp2;
-
-                              assign_var_to_fulltype(&tmp1, *argp);
-                              tmp1.typeflags &= TYPE_MOD_RMASK;
-                              assign_var_to_fulltype(&tmp2, *arg_types);
-                              tmp2.typeflags &= TYPE_MOD_MASK;
-
-                              argp++;
-                              arg_types++;
-
-                              if (!REDEFINED_TYPE(tmp1, tmp2))
+                              if (!has_common_type(argp->t_type, *arg_types))
                               {
                                   yyerrorf("Bad type for argument %d of %s %s",
                                     argno,
                                     get_txt(funp->name),
-                                    get_two_types(tmp2, tmp1));
+                                    get_two_lpctypes(*arg_types, argp->t_type));
                               }
+
+                              argp++;
+                              arg_types++;
                           } /* for (all args) */
 
                           if (funp->flags & TYPE_MOD_XVARARGS)
                           {
-                              fulltype_t tmp1, tmp2;
-                              /* varargs argument is either a pointer type or mixed */
-                              assign_var_to_fulltype(&tmp2, *arg_types);
-                              tmp2.typeflags &= TYPE_MOD_MASK;
-                              tmp2.typeflags &= ~TYPE_MOD_POINTER;
+                              lpctype_t *flat_type = get_flattened_type(*arg_types);
 
                               for (i = anum_arg - num_arg; --i >=0; )
                               {
-                                  assign_var_to_fulltype(&tmp1, *argp);
-                                  tmp1.typeflags &= TYPE_MOD_RMASK;
-                                  argp++;
-
-                                  if (!MASKED_TYPE(tmp1,tmp2))
+                                  if (!has_common_type(argp->t_type, flat_type))
                                   {
                                       yyerrorf("Bad type for argument %d of %s %s",
                                           anum_arg - i,
                                           get_txt(funp->name),
-                                          get_two_types(tmp2, tmp1));
+                                          get_two_lpctypes(flat_type, argp->t_type));
                                   }
+                                  argp++;
                               }
                           } /* if (xvarargs) */
 
@@ -12554,7 +12877,7 @@ function_call:
                   min = instrs[f].min_arg;
                   max = instrs[f].max_arg;
                   def = instrs[f].Default;
-                  $$.type = instrs[f].ret_type;
+                  $$.type = get_fulltype(ref_lpctype(instrs[f].ret_type));
                   argp = &efun_arg_types[instrs[f].arg_index];
 
                   /* Warn if the efun is deprecated */
@@ -12592,10 +12915,10 @@ function_call:
 
                   /* Check the types of the arguments
                    */
-                  if (max != -1 && exact_types.typeflags && num_arg)
+                  if (max != -1 && exact_types && num_arg)
                   {
-                      int        argn;
-                      vartype_t *aargp;
+                      int         argn;
+                      fulltype_t *aargp;
 
                       aargp = get_argument_types_start(num_arg);
 
@@ -12604,60 +12927,31 @@ function_call:
                        */
                       for (argn = 0; argn < num_arg; argn++)
                       {
-                          fulltype_t tmp1, tmp2;
                           fulltype_t *beginArgp = argp;
 
-                          assign_var_to_fulltype(&tmp1, *aargp); aargp++;
-                          tmp1.typeflags &= TYPE_MOD_MASK;
                           for (;;argp++)
                           {
-                              tmp2 = *argp;
-                              if ( !tmp2.typeflags )
+                              if ( argp->t_type == NULL )
                               {
                                   /* Possible types for this arg exhausted */
                                   efun_argument_error(argn+1, f, beginArgp
-                                                     , tmp1);
+                                                     , *aargp);
                                   break;
                               }
 
-                              /* break if types are compatible; take care to
-                               * handle references correctly
+                              /* Break if types are compatible.
                                */
-                              if (equal_types(tmp1, tmp2)
-                               || (IS_TYPE_STRUCT(tmp1) && IS_TYPE_STRUCT(tmp2))
-                                 )
+                              if (has_common_type(argp->t_type, aargp->t_type))
                                   break;
-
-                              if ((tmp1.typeflags &
-                                     ~(TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) ==
-                                    TYPE_ANY)
-                              {
-                                  if (tmp1.typeflags & TYPE_MOD_POINTER & ~tmp2.typeflags)
-                                  {
-                                      if ((tmp2.typeflags & ~TYPE_MOD_REFERENCE) !=
-                                            TYPE_ANY)
-                                      {
-                                          continue;
-                                      }
-                                  }
-                                  if ( !( (tmp1.typeflags ^ tmp2.typeflags) & TYPE_MOD_REFERENCE) )
-                                      break;
-                              }
-                              else if ((tmp2.typeflags &
-                                     ~(TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) ==
-                                    TYPE_ANY)
-                              {
-                                  if (tmp2.typeflags & TYPE_MOD_POINTER & ~tmp1.typeflags)
-                                      continue;
-                                  if ( !( (tmp1.typeflags ^ tmp2.typeflags) & TYPE_MOD_REFERENCE) )
-                                      break;
-                              }
                           } /* end for (efun_arg_types) */
 
                           /* Advance argp to point to the allowed argtypes
                            * of the next arg.
                            */
-                          while((argp++)->typeflags) NOOP;
+                          while((argp++)->t_type) NOOP;
+
+                          /* The pointer on the argument type stack. */
+                          aargp++;
                       } /* for (all args) */
                   } /* if (check arguments) */
 
@@ -12695,7 +12989,7 @@ function_call:
                    * This is especially important is ap_needed, as the
                    * restore_arg_frame expects a result on the stack.
                    */
-                  if ( instrs[f].ret_type.typeflags == TYPE_VOID )
+                  if ( instrs[f].ret_type == lpctype_void )
                   {
                       last_expression = mem_block[A_PROGRAM].current_size;
                       add_f_code(F_CONST0);
@@ -12707,7 +13001,7 @@ function_call:
               {
                   yyerrorf(($<function_call_head>2.efun_override == OVERRIDE_EFUN)
                       ? "Unknown efun: %s" : "Unknown simul-efun: %s", get_txt($1.real->name));
-                  $$.type = Type_Any;
+                  $$.type = get_fulltype(lpctype_mixed);
               }
               else
               {
@@ -12717,17 +13011,14 @@ function_call:
                    */
                   PREPARE_INSERT(4)
 
-                  function_t *funp;
-
                   f = define_new_function(MY_FALSE,
-                      $1.real, 0, 0, 0, NAME_UNDEFINED, Type_Unknown
+                      $1.real, 0, 0, 0, NAME_UNDEFINED, get_fulltype(lpctype_unknown)
                   );
                   ap_needed = MY_TRUE;
                   add_f_code(F_CALL_FUNCTION);
                   add_short(f);
                   CURRENT_PROGRAM_SIZE += 3;
-                  funp = FUNCTION(f);
-                  if (exact_types.typeflags)
+                  if (exact_types)
                   {
                       yyerrorf("Undefined function '%.50s'", get_txt($1.real->name));
                   }
@@ -12735,7 +13026,7 @@ function_call:
                   {
                       yywarnf("Undefined function '%.50s'", get_txt($1.real->name));
                   }
-                  $$.type = Type_Any;  /* Just a guess */
+                  $$.type = get_fulltype(lpctype_mixed);  /* Just a guess */
               }
           } while (0); /* Function handling */
 
@@ -12806,6 +13097,7 @@ function_call:
               {
                   yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                           , mem_block[A_PROGRAM].current_size + 2);
+                  free_fulltype($1.type);
                   YYACCEPT;
               }
 
@@ -12830,6 +13122,7 @@ function_call:
           if (argument_level+1 == sizeof(got_ellipsis)/sizeof(got_ellipsis[0]))
           {
               yyerror("Functions nested too deeply.");
+              free_fulltype($1.type);
               YYACCEPT;
           }
           argument_level++;
@@ -12856,6 +13149,7 @@ function_call:
               {
                   yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                           , mem_block[A_PROGRAM].current_size + 2);
+                  free_fulltype($1.type);
                   YYACCEPT;
               }
 
@@ -12921,7 +13215,7 @@ function_call:
 
       }
 
-      '(' expr_list3 ')'
+      '(' arg_expr_list ')'
 
       {
           /* Now generate the CALL_OTHER resp. the SIMUL_EFUN instruction. */
@@ -13004,14 +13298,13 @@ function_call:
                   add_short(call_other_sefun);
                   CURRENT_PROGRAM_SIZE += 3;
               }
-              $$.type = funp->type;
-              $$.type.typeflags &= TYPE_MOD_MASK;
+              $$.type = get_fulltype(funp->type);
           }
           else /* true call_other */
           {
               add_f_code(F_CALL_OTHER);
               CURRENT_PROGRAM_SIZE++;
-              $$.type = instrs[F_CALL_OTHER].ret_type;
+              $$.type = get_fulltype(instrs[F_CALL_OTHER].ret_type);
           }
           $$.code = -1;
           $$.start = $1.start;
@@ -13057,6 +13350,7 @@ function_call:
 
           argument_level--;
 
+          free_fulltype($1.type);
       }
 
 ; /* function_call */
@@ -13078,11 +13372,9 @@ call_other_name:
     |  '(' expr0 ')'
       {
           $$ = NULL;
-          if ($2.type.typeflags != TYPE_STRING
-           && (pragma_strict_types != PRAGMA_WEAK_TYPES
-               || $2.type.typeflags != TYPE_UNKNOWN)
-           && $2.type.typeflags != TYPE_ANY)
-              type_error("Illegal type for lfun name", $2.type);
+          if (!lpctype_contains(lpctype_string, $2.type.t_type))
+              fulltype_error("Illegal type for lfun name", $2.type);
+          free_fulltype($2.type);
       }
 
 ; /* call_other_name */
@@ -13290,7 +13582,9 @@ catch:
            * and of the modifications
            */
           origstart = start = $<address>2;
-          modstart = $5.start;
+          modstart = $5;
+
+          free_fulltype($4.type);
 
           /* If there were code creating modifiers, move their code
            * before the F_CATCH (currently only 'reserve' does that).
@@ -13360,7 +13654,7 @@ catch:
           ins_f_code(F_RESTORE_ARG_FRAME);
 
           $$.start = origstart;
-          $$.type  = Type_Any;
+          $$.type  = get_fulltype(lpctype_string);
           $$.code = -1;
       }
 ; /* catch */
@@ -13432,13 +13726,10 @@ opt_catch_modifier :
           }
           else if (mstreq($1, STR_RESERVE))
           {
-              if ($2.type.typeflags != TYPE_NUMBER
-               && $2.type.typeflags != TYPE_UNKNOWN
-               && $2.type.typeflags != TYPE_ANY
-                 )
+              if (!lpctype_contains(lpctype_int, $2.type.t_type))
                   yyerrorf("Bad 'reserve' expression type to catch(): %s, "
                            "expected int"
-                          , get_type_name($2.type)
+                          , get_fulltype_name($2.type)
                           );
               $$ = CATCH_FLAG_RESERVE;
           }
@@ -13448,6 +13739,7 @@ opt_catch_modifier :
                       , get_txt($1)
                       );
           free_mstring($1);
+          free_fulltype($2.type);
       }
 ; /* opt_catch_modifier */
 
@@ -13467,9 +13759,12 @@ sscanf:
       {
           ins_f_code(F_SSCANF);
           ins_byte($7 + 2);
-          $$.start = $2.start;
-          $$.type = Type_Number;
+          $$.start = $2;
+          $$.type = get_fulltype(lpctype_int);
           $$.code = -1;
+
+          free_fulltype($4.type);
+          free_fulltype($6.type);
       }
 ; /* sscanf */
 
@@ -13480,9 +13775,13 @@ parse_command:
       {
           ins_f_code(F_PARSE_COMMAND);
           ins_byte($9 + 3);
-          $$.start = $2.start;
-          $$.type = Type_Number;
+          $$.start = $2;
+          $$.type = get_fulltype(lpctype_int);
           $$.code = -1;
+
+          free_fulltype($4.type);
+          free_fulltype($6.type);
+          free_fulltype($8.type);
       }
 ; /* parse_command */
 %endif /* USE_PARSE_COMMAND */
@@ -13526,7 +13825,7 @@ lvalue_list:
               }
               varp = NV_VARIABLE(i);
           }
-          if (varp->type.typeflags & TYPE_MOD_DEPRECATED)
+          if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
           {
               yywarnf("Using deprecated global variable %s.\n",
                       get_txt(varp->name));
@@ -13539,7 +13838,7 @@ lvalue_list:
 %line
           /* Push the lvalue for a local variable */
 
-          fulltype_t dummy;
+          lpctype_t *dummy;
           $3 = check_for_context_local($3, &dummy);
 
           if ($3->u.local.context >= 0)
@@ -13575,39 +13874,12 @@ lvalue_list:
                 F_PROTECTED_AINDEX_LVALUE
               );
 
-          if ($4.type1.typeflags & TYPE_MOD_REFERENCE)
-              yyerror("Reference used as index");
+          /* Check the types. */
+          free_lpctype(get_index_result_type($3.type.t_type, $4.type1, $4.inst, NULL));
 
-          if (exact_types.typeflags)
-          {
-              fulltype_t type;
-
-              type = $3.type;
-              type.typeflags &= TYPEID_MASK;
-              if ( !(type.typeflags & TYPE_MOD_POINTER) )
-                 switch (type.typeflags)
-                 {
-                 case TYPE_MAPPING:
-                     if ($4.inst == F_INDEX)
-                     {
-                        $4.type1 = Type_Any;
-                        break;
-                     }
-                     /* FALLTHROUGH */
-                 default:
-                     type_error("Bad type to indexed lvalue", type);
-                     /* FALLTHROUGH */
-                 case TYPE_ANY:
-                     if ($4.inst == F_INDEX)
-                         $4.type1 = Type_Any;
-                     $4.type1 = Type_Any;
-                     break;
-                 case TYPE_STRING:
-                     break;
-                 }
-                 if (!BASIC_TYPE($4.type1, Type_Number))
-                     type_error("Bad type of index", $4.type1);
-          }
+          free_fulltype($3.type);
+          free_fulltype($4.type1);
+          free_fulltype($4.type2);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13618,25 +13890,19 @@ lvalue_list:
 
           $$ = 1 + $1;
           ins_f_code(F_PUSH_PROTECTED_INDEXED_MAP_LVALUE);
-          if ($5.type.typeflags & TYPE_MOD_REFERENCE)
+          if ($5.type.t_flags & TYPE_MOD_REFERENCE)
                 yyerror("Reference used as index");
 
           /* Compute and check types */
-          if (exact_types.typeflags)
-          {
-              fulltype_t type;
+          if (exact_types && !lpctype_contains(lpctype_mapping, $3.type.t_type))
+              fulltype_error("Bad type to indexed lvalue", $3.type);
 
-              type = $3.type;
-              type.typeflags &= TYPEID_MASK;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_MAPPING)
-              {
-                  type_error("Bad type to indexed value", type);
-              }
-              type = $7.type;
-              type.typeflags &= TYPEID_MASK;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
-                  type_error("Bad type of index", type);
-          }
+          if (exact_types && !lpctype_contains(lpctype_int, $7.type.t_type))
+              fulltype_error("Bad type of index", $7.type);
+
+          free_fulltype($3.type);
+          free_fulltype($5.type);
+          free_fulltype($7.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13672,26 +13938,17 @@ lvalue_list:
           );
 
           /* Compute and check types */
-          if (exact_types.typeflags)
-          {
-              fulltype_t type;
+          free_lpctype(check_unary_op_type($3.type.t_type, "range index", types_range_index, NULL));
 
-              type = $3.type;
-              type.typeflags &= TYPEID_MASK;
-              if ((type.typeflags & TYPE_MOD_POINTER) == 0
-                && type.typeflags != TYPE_ANY && type.typeflags != TYPE_STRING)
-              {
-                  type_error("Bad type of argument used for range", type);
-              }
-              type = $4.type1;
-              type.typeflags &= TYPEID_MASK;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
-                  type_error("Bad type of index", type);
-              type = $4.type2;
-              type.typeflags &= TYPEID_MASK;
-              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
-                  type_error("Bad type of index", type);
-          }
+          if (exact_types && !lpctype_contains(lpctype_int, $4.type1.t_type))
+              fulltype_error("Bad type of index", $4.type1);
+          if (exact_types && !lpctype_contains(lpctype_int, $4.type2.t_type))
+              fulltype_error("Bad type of index", $4.type2);
+
+          free_fulltype($3.type);
+          free_fulltype($4.type1);
+          free_fulltype($4.type2);
+
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13699,73 +13956,20 @@ lvalue_list:
       {
           /* Create a reference to a struct member */
           short s_index = -1;
+          int m_index = -1;
 
           $$ = 1 + $1;
 
-          if (!IS_TYPE_ANY($3.type) && !IS_TYPE_STRUCT($3.type))
-          {
-              yyerrorf("Bad type for struct lookup: %s"
-                      , get_type_name($3.type));
-          }
-          else
-          {
-              if (IS_TYPE_STRUCT($3.type))
-              {
-                  s_index = get_struct_index($3.type.t_struct);
-                  if (s_index == -1)
-                      yyerrorf("Unknown type in lvalue struct dereference: %s\n"
-                              , get_type_name($3.type)
-                              );
-              }
+          free_lpctype(get_struct_member_result_type($3.type.t_type, $5, &s_index, &m_index));
 
-              /* At this point: s_index >= 0: $1 is of type struct
-               *                         < 0: $1 is of type mixed
-               */
-
-              if ($5 != NULL)
-              {
-                  int num;
-
-                  if (s_index >= 0)
-                  {
-                      struct_type_t * ptype = $3.type.t_struct;
-
-                      num = struct_find_member(ptype, $5);
-                      if (num < 0)
-                      {
-                          yyerrorf("No such member '%s' for struct '%s'"
-                                  , get_txt($5)
-                                  , get_txt(struct_t_name(ptype))
-                                  );
-                      }
-                  }
-                  else /* $3 is of type mixed */
-                  {
-                      s_index = find_struct_by_member($5, &num);
-                  }
-
-                  /* If this is a legal struct lookup, num >= 0 at this point
-                   */
-                  if (num >= 0)
-                  {
-                      ins_number(num);
-                      ins_number(s_index);
-                      arrange_protected_lvalue($3.start, $3.code, $3.end,
-                         F_PROTECTED_INDEX_S_LVALUE
-                      );
-                  }
-              }
-              else /* Runtime lookup */
-              {
-                  ins_number(s_index);
-                  arrange_protected_lvalue($3.start, $3.code, $3.end,
-                     F_PROTECTED_INDEX_S_LVALUE
-                  );
-              }
-          }
+          if ($5 != NULL) /* Compile time lookup. */
+              ins_number(m_index);
+          ins_number(s_index);
+          arrange_protected_lvalue($3.start, $3.code, $3.end, F_PROTECTED_INDEX_S_LVALUE);
 
           if ($5 != NULL)
               free_mstring($5);
+          free_fulltype($3.type);
       }
 
 ; /* lvalue_list */
@@ -13784,13 +13988,14 @@ lvalue_list:
 
 /*-------------------------------------------------------------------------*/
 static void
-define_local_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_star, struct lvalue_s *lv, Bool redeclare, Bool with_init)
+define_local_variable (ident_t* name, lpctype_t* actual_type, struct lvalue_s *lv, Bool redeclare, Bool with_init)
 
-/* This is called directly from a parser rule: <type> [*] <name>
+/* This is called directly from a parser rule: <type> <name>
  * if with_init is true, then an initialization of this variable will follow.
  * if redeclare is true, then a local name is redeclared.
  * It creates the local variable and returns the corresponding lvalue
  * in lv.
+ * The references of <actual_type> are NOT adopted.
  */
 
 {
@@ -13802,8 +14007,6 @@ define_local_variable (ident_t* name, fulltype_t actual_type, typeflags_t opt_st
 
     block_scope_t *scope = block_scope + block_depth - 1;
     ident_t *q;
-
-    actual_type.typeflags |= opt_star;
 
     if (current_inline && current_inline->parse_context)
     {
@@ -13825,9 +14028,9 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
     else
     {
         if(redeclare)
-            q = redeclare_local(name, actual_type, block_depth);
+            q = redeclare_local(name, get_fulltype(ref_lpctype(actual_type)), block_depth);
         else
-            q = add_local_name(name, actual_type, block_depth);
+            q = add_local_name(name, get_fulltype(ref_lpctype(actual_type)), block_depth);
     }
 
     if (scope->clobbered)
@@ -13864,9 +14067,7 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
          */
 
 %line
-        if (!(actual_type.typeflags & TYPE_MOD_POINTER)
-         && (actual_type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
-          )
+        if (actual_type == lpctype_float)
         {
             ins_f_code(F_FCONST0);
             if (!add_lvalue_code(lv, F_VOID_ASSIGN))
@@ -13879,9 +14080,9 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
 /*-------------------------------------------------------------------------*/
 static void
 init_local_variable ( ident_t* name, struct lvalue_s *lv, int assign_op
-                    , fulltype_t type2)
+                    , fulltype_t exprtype)
 
-/* This is called directly from a parser rule: <type> [*] <name> = <expr>
+/* This is called directly from a parser rule: <type> <name> = <expr>
  * It will be called after the call to define_local_variable().
  * It assigns the result of <expr> to the variable.
  */
@@ -13897,12 +14098,10 @@ if (current_inline && current_inline->parse_context)
          CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
 
-    type2.typeflags &= TYPEID_MASK;
-
     /* Check the assignment for validity */
-    if (exact_types.typeflags && !compatible_types(lv->type, type2, MY_TRUE))
+    if (exact_types && !has_common_type(exprtype.t_type, lv->type))
     {
-        yyerrorf("Bad assignment %s", get_two_types(lv->type, type2));
+        yyerrorf("Bad assignment %s", get_two_lpctypes(lv->type, exprtype.t_type));
     }
 
     if (assign_op != F_ASSIGN)
@@ -13910,7 +14109,7 @@ if (current_inline && current_inline->parse_context)
         yyerror("Only plain assignments allowed here");
     }
 
-    if (type2.typeflags & TYPE_MOD_REFERENCE)
+    if (exprtype.t_flags & TYPE_MOD_REFERENCE)
         yyerror("Can't trace reference assignments");
 
     if (!add_lvalue_code(lv, F_VOID_ASSIGN))
@@ -14427,7 +14626,7 @@ lookup_inherited (const char *super_name, string_t *real_name
      * from the back in order to get the topmost definition; however,
      * with virtual inherits the order gets messed up.
      */
-    ip = (inherit_t *)mem_block[A_INHERITS].block;
+    ip = GET_BLOCK(A_INHERITS);
     for ( foundp = NULL ; num_inherits > 0 ; ip++, num_inherits--)
     {
         short i;
@@ -14494,9 +14693,9 @@ lookup_inherited (const char *super_name, string_t *real_name
 
             if ( 0 != (numvar2 = prog2->num_variables)
              && prog1->variables[ip2->variable_index_offset+numvar2-1
-                                ].type.typeflags
+                                ].type.t_flags
                  & TYPE_MOD_VIRTUAL
-             &&  !(prog2->variables[numvar2-1].type.typeflags & TYPE_MOD_VIRTUAL) )
+             &&  !(prog2->variables[numvar2-1].type.t_flags & TYPE_MOD_VIRTUAL) )
             {
                 /* The source was virtually inherited - we have to find
                  * the first inheritance of the program.
@@ -14544,7 +14743,7 @@ find_inherited_function ( const char * super_name
 
     ix =  rname ? lookup_inherited(super_name, rname, &ip, flags) : -1;
     if (ix >= 0) /* Also return the inherit index. */
-        *pInherit = ip - (inherit_t *)mem_block[A_INHERITS].block;
+        *pInherit = ip - GET_BLOCK(A_INHERITS);
     else
         *pInherit = 0;
     return ix;
@@ -14596,7 +14795,7 @@ insert_inherited (char *super_name, string_t *real_name
 
         /* Generate the function call */
         add_f_code(F_CALL_INHERITED);
-        add_short(ip - (inherit_t *)mem_block[A_INHERITS].block);
+        add_short(ip - GET_BLOCK(A_INHERITS));
         add_short(found_ix);
         CURRENT_PROGRAM_SIZE += 5;
 
@@ -14693,7 +14892,7 @@ insert_inherited (char *super_name, string_t *real_name
         /* Test every inherit if the name matches and if
          * it does, generate the function call.
          */
-        ip0 = (inherit_t *)mem_block[A_INHERITS].block;
+        ip0 = GET_BLOCK(A_INHERITS);
         first_index = num_inherits > 0 ? INHERITED_WILDCARDED_NOT_FOUND
                                        : INHERITED_NOT_FOUND;
         for (; num_inherits > 0; ip0++, num_inherits--)
@@ -14740,9 +14939,9 @@ insert_inherited (char *super_name, string_t *real_name
 
                 if ( 0 != (numvar2 = prog2->num_variables)
                  &&  prog1->variables[ip2->variable_index_offset+numvar2-1
-                                     ].type.typeflags
+                                     ].type.t_flags
                      & TYPE_MOD_VIRTUAL
-                 &&  !(prog2->variables[numvar2-1].type.typeflags & TYPE_MOD_VIRTUAL) )
+                 &&  !(prog2->variables[numvar2-1].type.t_flags & TYPE_MOD_VIRTUAL) )
                 {
                     /* The function was virtually inherited - we have to find
                      * the first inheritance of that program and adjust the
@@ -14753,7 +14952,7 @@ insert_inherited (char *super_name, string_t *real_name
                 } /* if (virtually inherited) */
             } /* if (inherited) */
 
-            ip_index = ip - (inherit_t *)mem_block[A_INHERITS].block;
+            ip_index = ip - GET_BLOCK(A_INHERITS);
 
             /* The (new) ip might be duplicate inherit, or point to
              * a virtually inherited function we called already.
@@ -14915,7 +15114,6 @@ get_virtual_function_id (program_t *progp, int fx)
 
 {
     funflag_t flags;
-    funflag_t *last;
 
     flags = progp->functions[fx];
 
@@ -14925,9 +15123,6 @@ get_virtual_function_id (program_t *progp, int fx)
         fx += CROSSDEF_NAME_OFFSET(flags);
         flags = progp->functions[fx];
     }
-    
-    /* This one is inherited virtual. We wont get called otherwise. */
-    last = &progp->functions[fx];
 
     /* Walk the inherit chain */
     while((flags & (NAME_INHERITED|TYPE_MOD_VIRTUAL)) == (NAME_INHERITED|TYPE_MOD_VIRTUAL))
@@ -15046,17 +15241,16 @@ copy_functions (program_t *from, funflag_t type)
     /* Make space for the inherited function structures */
     if (mem_block[A_FUNCTIONS].max_size <
         mem_block[A_FUNCTIONS].current_size +
-          from->num_functions * sizeof(function_t) )
+          from->num_functions * sizeof(A_FUNCTIONS_t) )
     {
         if (!realloc_mem_block(&mem_block[A_FUNCTIONS],
                           mem_block[A_FUNCTIONS].current_size +
-                            from->num_functions * sizeof(function_t)))
+                            from->num_functions * sizeof(A_FUNCTIONS_t)))
             return 0;
     }
 
     /* The new functions will be stored from here */
-    fun_p = (function_t *)
-        (mem_block[A_FUNCTIONS].block + mem_block[A_FUNCTIONS].current_size);
+    fun_p = FUNCTION(FUNCTION_COUNT);
 
     /* Copy the function definitions one by one and adjust the flags.
      * For now, we mask out the INHERIT field in the flags and
@@ -15097,8 +15291,7 @@ copy_functions (program_t *from, funflag_t type)
     } /* for (inherited functions) pass 1 */
 
     /* Point back to the begin of the copied function data */
-    fun_p = (function_t *)
-        (mem_block[A_FUNCTIONS].block + mem_block[A_FUNCTIONS].current_size);
+    fun_p = FUNCTION(FUNCTION_COUNT);
 
     /* Unhide all function for which names exist */
     ixp = from->function_names;
@@ -15107,8 +15300,7 @@ copy_functions (program_t *from, funflag_t type)
         fun_p[*ixp++].flags &= ~NAME_HIDDEN;
     }
 
-    first_func_index = current_func_index =
-      mem_block[A_FUNCTIONS].current_size / sizeof (function_t);
+    first_func_index = current_func_index = FUNCTION_COUNT;
     mem_block[A_FUNCTIONS].current_size += sizeof *fun_p * from->num_functions;
 
     /* Loop again over the inherited functions, checking visibility
@@ -15406,11 +15598,11 @@ copy_functions (program_t *from, funflag_t type)
                     add_to_mem_block(
                       A_ARGUMENT_TYPES,
                       &from->argument_types[from->type_start[i]],
-                      (sizeof (vartype_t)) * fun.num_arg
+                      (sizeof (A_ARGUMENT_TYPES_t)) * fun.num_arg
                     );
 
                     for ( ; (size_t)ix < ARGTYPE_COUNT; ix++)
-                        ref_vartype_data(&ARGUMENT_TYPE(ix));
+                        ref_lpctype(ARGUMENT_TYPE(ix));
                 }
 
             }
@@ -15423,7 +15615,7 @@ copy_functions (program_t *from, funflag_t type)
         /* Save the index where they started. Every function will have an
          * index where the type info of arguments starts.
          */
-        add_to_mem_block(A_ARGUMENT_INDEX, &tmp_short, sizeof tmp_short);
+        ADD_ARGUMENT_INDEX(tmp_short);
 
         /* Finally update the entry in the A_FUNCTIONS area */
         fun_p[i] = fun;
@@ -15458,9 +15650,9 @@ copy_variables (program_t *from, funflag_t type)
     from_variable_index_offset = -1;
     if (type & TYPE_MOD_VIRTUAL)
     {
-        inheritp = (inherit_t *)(mem_block[A_INHERITS].block);
-        j = mem_block[A_INHERITS].current_size;
-        for (; (j -= sizeof(inherit_t)) >= 0; inheritp++)
+        inheritp = GET_BLOCK(A_INHERITS);
+        j = INHERIT_COUNT;
+        for (; --j >= 0; inheritp++)
         {
             if (inheritp->prog == from
              && !(inheritp->variable_index_offset & NON_VIRTUAL_OFFSET_TAG) )
@@ -15504,8 +15696,8 @@ copy_variables (program_t *from, funflag_t type)
             /* Has a new virtual variable been introduced in this program?
              */
             if (progp->num_variables
-             && from->variables[new_bound-1].type.typeflags & TYPE_MOD_VIRTUAL
-             && !(progp->variables[progp->num_variables-1].type.typeflags
+             && from->variables[new_bound-1].type.t_flags & TYPE_MOD_VIRTUAL
+             && !(progp->variables[progp->num_variables-1].type.t_flags
                   & TYPE_MOD_VIRTUAL)
                )
             {
@@ -15525,9 +15717,9 @@ copy_variables (program_t *from, funflag_t type)
                 /* Find the first (virtual) inheritance of this
                  * program.
                  */
-                inheritp2 = (inherit_t *)(mem_block[A_INHERITS].block);
-                j = mem_block[A_INHERITS].current_size;
-                for (; (j -= sizeof(inherit_t)) >= 0; inheritp2++)
+                inheritp2 = GET_BLOCK(A_INHERITS);
+                j = INHERIT_COUNT;
+                for (; --j >= 0; inheritp2++)
                 {
                     if (inheritp2->prog == inherit.prog
                      && !(inheritp2->variable_index_offset &
@@ -15553,10 +15745,9 @@ copy_variables (program_t *from, funflag_t type)
                 else
                     inherit.inherit_type |= INHERIT_TYPE_DUPLICATE;
 
-                inherit_index = (mem_block[A_INHERITS].current_size) /
-                   sizeof(inherit_t);
+                inherit_index = INHERIT_COUNT;
                 inherit.function_index_offset += fun_index_offset;
-                add_to_mem_block(A_INHERITS, (char *)&inherit, sizeof inherit);
+                ADD_INHERIT(&inherit);
                   /* If a function is directly inherited from a program that
                    * introduces a virtual variable, the code therein is not
                    * aware of virtual inheritance. For this reason, there are
@@ -15570,8 +15761,7 @@ copy_variables (program_t *from, funflag_t type)
                  * already cross-defined to something else.)
                  */
                 flagp = from->functions + inheritp->function_index_offset;
-                funp = (function_t *)mem_block[A_FUNCTIONS].block +
-                    inherit.function_index_offset;
+                funp = FUNCTION(inherit.function_index_offset);
                 for (k = inherit.prog->num_functions; --k >= 0; funp++)
                 {
                     if ( !(funp->flags & NAME_CROSS_DEFINED)
@@ -15637,17 +15827,17 @@ copy_variables (program_t *from, funflag_t type)
             /* 'public' variables should not become private when inherited
              * 'private'.
              */
-            if (from->variables[j].type.typeflags & TYPE_MOD_PUBLIC)
+            if (from->variables[j].type.t_flags & TYPE_MOD_PUBLIC)
                 new_type &= ~TYPE_MOD_PRIVATE;
 
             /* define_variable checks for previous 'nomask' definition. */
             if (previous_variable_index_offset >= 0)
             {
-                if ( !(from->variables[j].type.typeflags & TYPE_MOD_PRIVATE) )
+                if ( !(from->variables[j].type.t_flags & TYPE_MOD_PRIVATE) )
                 {
                     fulltype_t vartype = from->variables[j].type;
 
-                    vartype.typeflags |= new_type | NAME_INHERITED;
+                    vartype.t_flags |= new_type | NAME_INHERITED;
                     redeclare_variable(p, vartype,
                                        previous_variable_index_offset + j
                     );
@@ -15657,8 +15847,8 @@ copy_variables (program_t *from, funflag_t type)
             {
                 fulltype_t vartype = from->variables[j].type;
 
-                vartype.typeflags |= new_type 
-                        | (from->variables[j].type.typeflags & TYPE_MOD_PRIVATE
+                vartype.t_flags |= new_type 
+                        | (from->variables[j].type.t_flags & TYPE_MOD_PRIVATE
                            ? (NAME_HIDDEN|NAME_INHERITED)
                            :  NAME_INHERITED
                           )
@@ -15688,10 +15878,7 @@ fix_function_inherit_indices (program_t *from)
     function_t *funp;
 
     inherit_index = INHERIT_COUNT;
-    funp =
-      (function_t *)
-        (mem_block[A_FUNCTIONS].block+mem_block[A_FUNCTIONS].current_size) -
-      from->num_functions;
+    funp = FUNCTION(FUNCTION_COUNT - from->num_functions);
 
     for (i = from->num_functions; --i >= 0; funp++)
     {
@@ -15928,8 +16115,8 @@ store_include_info (char *name, char * filename, char delim, int depth)
 
         /* Complete the structure and store it */
         inc.depth = depth;
-        rc = mem_block[A_INCLUDES].current_size;
-        add_to_mem_block(A_INCLUDES, &inc, sizeof inc);
+        rc = INCLUDE_COUNT;
+        ADD_INCLUDE(&inc);
     }
 
     /* Store the information for the linenumber tracing */
@@ -15983,7 +16170,7 @@ store_include_end (mp_uint inc_offset, int include_line)
     stored_lines = include_line;
     if (last_include_start == mem_block[A_LINENUMBERS].current_size)
     {
-        include_t * inc = (include_t *)(mem_block[A_INCLUDES].block + inc_offset);
+        include_t * inc = &(INCLUDE(inc_offset));
         /* No code was generated in this include - remove the
          * line number information stored by store_include_info()
          * and tag the include information in A_INCLUDES.
@@ -16037,6 +16224,19 @@ prolog (const char * fname, Bool isMasterObj)
     }
     type_of_arguments.current_size = 0;
 
+    if (!_lpctypes_initialized)
+    {
+        make_static_type(get_array_type(lpctype_unknown),            &_lpctype_unknown_array);
+        make_static_type(get_array_type(lpctype_mixed),              &_lpctype_any_array);
+        make_static_type(get_union_type(lpctype_int, lpctype_float), &_lpctype_int_float);
+        make_static_type(get_array_type(lpctype_int),                &_lpctype_int_array);
+        make_static_type(get_array_type(lpctype_string),             &_lpctype_string_array);
+        make_static_type(get_array_type(lpctype_object),             &_lpctype_object_array);
+
+        _lpctypes_initialized = true;
+    }
+
+
     /* Initialize all the globals */
     variables_defined = MY_FALSE;
     disable_sefuns   = isMasterObj;
@@ -16065,8 +16265,8 @@ prolog (const char * fname, Bool isMasterObj)
         mem_block[i].max_size = START_BLOCK_SIZE;
     }
 
-    extend_mem_block(A_LOCAL_TYPES, MAX_LOCAL * sizeof(fulltype_t));
-    memset(&LOCAL_TYPE(0), 0, LOCAL_TYPE_COUNT * sizeof(fulltype_t));
+    extend_mem_block(A_LOCAL_TYPES, MAX_LOCAL * sizeof(A_LOCAL_TYPES_t));
+    memset(&LOCAL_TYPE(0), 0, LOCAL_TYPE_COUNT * sizeof(A_LOCAL_TYPES_t));
 
     type_of_locals = &(LOCAL_TYPE(0));
     type_of_context = type_of_locals;
@@ -16196,7 +16396,7 @@ epilog (void)
         if (ip)
         {
             define_new_function(MY_FALSE, ip, 0, 0, first_initializer_start
-                                , TYPE_MOD_PROTECTED, Type_Unknown);
+                                , TYPE_MOD_PROTECTED, get_fulltype(lpctype_unknown));
         }
         /* ref count for ip->name was incremented by transfer_init_control() */
 
@@ -16212,7 +16412,7 @@ epilog (void)
     /* Check the string block. We don't have to count the include file names
      * as those won't be accessed from the program code.
      */
-    if (mem_block[A_STRINGS].current_size > 0x10000 * sizeof (string_t *))
+    if (STRING_COUNT > 0x10000)
         yyerror("Too many strings");
 
     /* Get and check the numbers of functions, strings, and variables */
@@ -16238,7 +16438,7 @@ epilog (void)
 
         function_t **link1, **link2;  /* Linkpointer for the sort */
 
-        f = (function_t *)mem_block[A_FUNCTIONS].block;
+        f = FUNCTION(0);
         link1 = &funname_start2;
         link2 = &funname_start1;
 
@@ -16447,7 +16647,7 @@ epilog (void)
             function_t *functions;
 
             yyerror("Program too large");
-            functions = (function_t *)mem_block[A_FUNCTIONS].block;
+            functions = FUNCTION(0);
             for (i = num_functions; --i >= 0; functions++)
             {
                 if ( !(functions->flags & (NAME_UNDEFINED|NAME_INHERITED)) ==
@@ -16549,7 +16749,7 @@ epilog (void)
         if (!pragma_save_types)
         {
             for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
-                free_vartype_data(&ARGUMENT_TYPE(i));
+                free_lpctype(ARGUMENT_TYPE(i));
             mem_block[A_ARGUMENT_TYPES].current_size = 0;
             mem_block[A_ARGUMENT_INDEX].current_size = 0;
         }
@@ -16611,15 +16811,15 @@ epilog (void)
         /* Add the function headers right after the program code
          */
         prog->num_function_headers = num_function_headers;
-        prog->function_headers = (function_t*)p;
+        prog->function_headers = (A_FUNCTIONS_t*)p;
 
-        f = (function_t *)mem_block[A_FUNCTIONS].block;
+        f = GET_BLOCK(A_FUNCTIONS);
         fx = 0;
         for (i = 0; i< num_functions; i++, f++)
         {
             if ( !(f->flags & (NAME_INHERITED)))
             {
-                function_t * head = ((function_t*)p) + fx;
+                function_t * head = ((A_FUNCTIONS_t*)p) + fx;
 
                 *head = *f;
                 head->offset.fx = i;
@@ -16644,8 +16844,7 @@ epilog (void)
             if ( NULL != (f = funname_start1) || NULL != (f = funname_start2) )
             {
                 do {
-                    *namep++ =
-                      f - (function_t *)mem_block[A_FUNCTIONS].block;
+                    *namep++ = f - FUNCTION(0);
                 } while ( NULL != (f = f->offset.next) );
             }
         }
@@ -16658,7 +16857,7 @@ epilog (void)
         {
             funflag_t *flagp;
 
-            f = (function_t *)mem_block[A_FUNCTIONS].block;
+            f = FUNCTION(0);
             flagp = (funflag_t *)p;
             for (i = num_functions; --i >= 0; f++)
             {
@@ -16669,7 +16868,7 @@ epilog (void)
 
         /* Add the program strings
          */
-        prog->strings = (string_t **)p;
+        prog->strings = (A_STRINGS_t *)p;
         prog->num_strings = num_strings;
         if (mem_block[A_STRINGS].current_size)
             memcpy(p, mem_block[A_STRINGS].block,
@@ -16679,7 +16878,7 @@ epilog (void)
 
         /* Add the variable descriptions
          */
-        prog->variables = (variable_t *)p;
+        prog->variables = (A_VIRTUAL_VAR_t *)p;
         prog->num_variables = num_variables;
         if (mem_block[A_VIRTUAL_VAR].current_size)
             memcpy(p, mem_block[A_VIRTUAL_VAR].block,
@@ -16690,13 +16889,12 @@ epilog (void)
         /* Add the inheritance information, and don't forget
          * to delete our internal flags.
          */
-        prog->num_inherited = mem_block[A_INHERITS].current_size /
-            sizeof (inherit_t);
+        prog->num_inherited = INHERIT_COUNT;
         if (prog->num_inherited)
         {
             memcpy(p, mem_block[A_INHERITS].block,
                    mem_block[A_INHERITS].current_size);
-            prog->inherit = (inherit_t *)p;
+            prog->inherit = (A_INHERITS_t *)p;
         } else {
             prog->inherit = NULL;
         }
@@ -16709,7 +16907,7 @@ epilog (void)
         {
             memcpy(p, mem_block[A_STRUCT_DEFS].block,
                    mem_block[A_STRUCT_DEFS].current_size);
-            prog->struct_defs = (struct_def_t *)p;
+            prog->struct_defs = (A_STRUCT_DEFS_t *)p;
         } else {
             prog->struct_defs = NULL;
         }
@@ -16721,7 +16919,7 @@ epilog (void)
         {
             memcpy(p, mem_block[A_INCLUDES].block
                     , mem_block[A_INCLUDES].current_size);
-            prog->includes = (include_t *)p;
+            prog->includes = (A_INCLUDES_t *)p;
         }
         else
             prog->includes = NULL;
@@ -16734,18 +16932,24 @@ epilog (void)
             if (mem_block[A_ARGUMENT_TYPES].current_size)
                 memcpy(p, mem_block[A_ARGUMENT_TYPES].block,
                        mem_block[A_ARGUMENT_TYPES].current_size);
-            prog->argument_types = (vartype_t *)p;
+            prog->argument_types = (A_ARGUMENT_TYPES_t *)p;
+            prog->num_argument_types = ARGTYPE_COUNT;
             p += align(mem_block[A_ARGUMENT_TYPES].current_size);
+
             if (mem_block[A_ARGUMENT_INDEX].current_size)
                 memcpy(p, mem_block[A_ARGUMENT_INDEX].block,
                        mem_block[A_ARGUMENT_INDEX].current_size);
-            prog->type_start = (unsigned short *)p;
+            prog->type_start = (A_ARGUMENT_INDEX_t *)p;
             p += align(mem_block[A_ARGUMENT_INDEX].current_size);
         }
         else
         {
             prog->argument_types = NULL;
             prog->type_start = NULL;
+            prog->num_argument_types = 0;
+
+            for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
+                free_lpctype(ARGUMENT_TYPE(i));
         }
 
         /* Add the linenumber information.
@@ -16780,11 +16984,12 @@ epilog (void)
 
         /* Free the memareas */
 
-        for (i = 0; (size_t)i < LOCAL_TYPE_COUNT; i++)
-            free_fulltype_data(&LOCAL_TYPE(i));
-
-        for (i = 0; (size_t)i < FUNCTION_COUNT; i++)
-            free_fulltype_data(&FUNCTION(i)->type);
+        f = FUNCTION(0);
+        for (i = 0; i< num_functions; i++, f++)
+            /* All other references were adopted by the
+             * function headers in the program.. */
+            if ( (f->flags & (NAME_INHERITED)))
+                free_lpctype(f->type);
 
         for (i = 0; i < NUMAREAS; i++)
         {
@@ -16817,7 +17022,7 @@ epilog (void)
         function_t *functions;
 
         /* Free all function names and type data. */
-        functions = (function_t *)mem_block[A_FUNCTIONS].block;
+        functions = FUNCTION(0);
         for (i = num_functions; --i >= 0; functions++)
         {
             if ( !(functions->flags & NAME_INHERITED) && functions->name )
@@ -16825,29 +17030,22 @@ epilog (void)
                 /* The other references have been adopted. */
                 free_mstring(functions->name);
             }
-            free_fulltype_data(&functions->type);
+            free_lpctype(functions->type);
         }
 
         do_free_sub_strings( num_strings
-                           , (string_t **)mem_block[A_STRINGS].block
+                           , GET_BLOCK(A_STRINGS)
                            , num_variables
-                           , (variable_t *)mem_block[A_VIRTUAL_VAR].block
+                           , GET_BLOCK(A_VIRTUAL_VAR)
                            , INCLUDE_COUNT
-                           , (include_t *)mem_block[A_INCLUDES].block
+                           , GET_BLOCK(A_INCLUDES)
                            , STRUCT_COUNT
-                           , (struct_def_t *)mem_block[A_STRUCT_DEFS].block
+                           , GET_BLOCK(A_STRUCT_DEFS)
                            );
 
         /* Free the type information */
         for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
-        {
-            free_vartype_data(&ARGUMENT_TYPE(i));
-        }
-
-        for (i = 0; (size_t)i < LOCAL_TYPE_COUNT; i++)
-        {
-            free_fulltype_data(&LOCAL_TYPE(i));
-        }
+            free_lpctype(ARGUMENT_TYPE(i));
 
         compiled_prog = NULL;
 
@@ -16934,6 +17132,22 @@ show_code_window (void)
 /*-------------------------------------------------------------------------*/
 #ifdef GC_SUPPORT
 void
+clear_compiler_refs (void)
+
+/* GC support: clear the references of memory held by the compiler environment.
+ */
+
+{
+    /* clear_lpctype_ref handles NULL pointers, so we don't need to check. */
+    clear_lpctype_ref(lpctype_unknown_array);
+    clear_lpctype_ref(lpctype_any_array);
+    clear_lpctype_ref(lpctype_int_float);
+    clear_lpctype_ref(lpctype_int_array);
+    clear_lpctype_ref(lpctype_string_array);
+    clear_lpctype_ref(lpctype_object_array);
+}
+
+void
 count_compiler_refs (void)
 
 /* GC support: mark the memory held by the compiler environment.
@@ -16944,6 +17158,13 @@ count_compiler_refs (void)
     {
         note_malloced_block_ref(type_of_arguments.block);
     }
+
+    count_lpctype_ref(lpctype_unknown_array);
+    count_lpctype_ref(lpctype_any_array);
+    count_lpctype_ref(lpctype_int_float);
+    count_lpctype_ref(lpctype_int_array);
+    count_lpctype_ref(lpctype_string_array);
+    count_lpctype_ref(lpctype_object_array);
 }
 
 #endif

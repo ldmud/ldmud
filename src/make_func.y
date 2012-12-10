@@ -492,7 +492,7 @@ int ungetc(int c, FILE *f);
 static const char *type_str(int);
 static long type2flag (int n);
 static const char *etype(long);
-static const char *ctype(int);
+static const char *lpctypestr(int);
 #ifndef toupper
 int toupper(int);
 #endif
@@ -738,31 +738,19 @@ code:     optional_name ID optional_optype
         check_for_duplicate_instr(f_name, $2, 0);
         instr[num_buff].code_class = current_code_class;
         num_instr[current_code_class]++;
-#ifdef USE_STRUCTS
+
         if ($3 == 0)
-            sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, { 0, NULL } , -1, -1, \"%s\", NULL },\n"
+            sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, NULL , -1, -1, \"%s\", NULL },\n"
                         , classprefix[instr[num_buff].code_class]
                         , f_name, classtag[instr[num_buff].code_class]
                         , $1);
         else
-            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, 0, { TYPE_ANY, NULL }, -1, -1, \"%s\", NULL },\n"
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, 0, &_lpctype_mixed, -1, -1, \"%s\", NULL },\n"
                         , classprefix[instr[num_buff].code_class]
                         , f_name, classtag[instr[num_buff].code_class]
                         , $3, $3
                         , $1);
-#else
-        if ($3 == 0)
-            sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, { 0 } , -1, -1, \"%s\", NULL },\n"
-                        , classprefix[instr[num_buff].code_class]
-                        , f_name, classtag[instr[num_buff].code_class]
-                        , $1);
-        else
-            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, 0, { TYPE_ANY }, -1, -1, \"%s\", NULL },\n"
-                        , classprefix[instr[num_buff].code_class]
-                        , f_name, classtag[instr[num_buff].code_class]
-                        , $3, $3
-                        , $1);
-#endif /* USE_STRUCTS */
+
         if (strlen(buff) > sizeof buff)
             fatal("Local buffer overflow!\n");
         instr[num_buff].f_name = f_name;
@@ -934,33 +922,20 @@ func: type ID optional_ID '(' arg_list optional_default ')' optional_name ';'
             char * tag;
 
             tag = (code_class == C_EFUN) ? classtag[C_CODE] : classtag[code_class];
-#ifdef USE_STRUCTS
-            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, { %s, NULL }, %d, %d, \"%s\""
+
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, %s, %d, %d, \"%s\""
                         , f_prefix, f_name, tag
                         , unlimit_max ? -1 : max_arg, min_arg
-                        , $6, ctype($1), arg_index, lpc_index, $2
+                        , $6, lpctypestr($1), arg_index, lpc_index, $2
                    );
-#else
-            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, { %s }, %d, %d, \"%s\""
-                        , f_prefix, f_name, tag
-                        , unlimit_max ? -1 : max_arg, min_arg
-                        , $6, ctype($1), arg_index, lpc_index, $2
-                   );
-#endif /* USE_STRUCTS */
+
         }
         else
         {
-#ifdef USE_STRUCTS
-            sprintf(buff, "{ 0, 0, %d, %d, %s, { %s, NULL}, %d, %d, \"%s\""
+            sprintf(buff, "{ 0, 0, %d, %d, %s, %s, %d, %d, \"%s\""
                         , unlimit_max ? -1 : max_arg, min_arg
-                        , $6, ctype($1), arg_index, lpc_index, $2
+                        , $6, lpctypestr($1), arg_index, lpc_index, $2
                    );
-#else
-            sprintf(buff, "{ 0, 0, %d, %d, %s, { %s }, %d, %d, \"%s\""
-                        , unlimit_max ? -1 : max_arg, min_arg
-                        , $6, ctype($1), arg_index, lpc_index, $2
-                   );
-#endif /* USE_STRUCTS */
         }
 
         if ($8 != NULL)
@@ -1557,42 +1532,6 @@ handle_endif (void)
         fprintf(stderr, "Unexpected #/%%endif line %d\n", current_line);
         abort();
     }
-}
-
-/*-------------------------------------------------------------------------*/
-static int
-name_to_type (char *name)
-
-/* Return the proper TYPE_ value for the type <name> which must
- * start with 'TYPE_'.
- * Return -1 if the name was not recognized.
- */
-
-{
-    while (isspace((unsigned char)*name))
-        name++;
-    if ( strncmp(name, "TYPE_", (size_t)5) )
-        return -1;
-    name += 5;
-    if ( !strcmp(name, "ANY") )
-        return TYPE_ANY;
-    if ( !strcmp(name, "NUMBER") )
-        return TYPE_NUMBER;
-    if ( !strcmp(name, "FLOAT") )
-        return TYPE_FLOAT;
-    if ( !strcmp(name, "STRING") )
-        return TYPE_STRING;
-    if ( !strcmp(name, "OBJECT") )
-        return TYPE_OBJECT;
-    if ( !strcmp(name, "MAPPING") )
-        return TYPE_MAPPING;
-    if ( !strcmp(name, "CLOSURE") )
-        return TYPE_CLOSURE;
-#ifdef USE_STRUCTS
-    if ( !strcmp(name, "STRUCT") )
-        return TYPE_STRUCT;
-#endif
-    return -1;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -2509,7 +2448,51 @@ type2flag (int n)
 
 /*-------------------------------------------------------------------------*/
 static const char *
-ctype (int n)
+lpctypestr (int n)
+
+/* Express type <n> in the compiler type symbols of exec.h.
+ * Return a pointer to a constant string.
+ */
+
+{
+    const char *p = NULL;
+
+    switch(n) {
+      case VOID:    p = "&_lpctype_void";         break;
+      case STRING:  p = "&_lpctype_string";       break;
+      case INT:     p = "&_lpctype_int";          break;
+      case OBJECT:  p = "&_lpctype_object";       break;
+      case MAPPING: p = "&_lpctype_mapping";      break;
+      case FLOAT:   p = "&_lpctype_float";        break;
+      case CLOSURE: p = "&_lpctype_closure";      break;
+      case SYMBOL:  p = "&_lpctype_symbol";       break;
+      case MIXED:   p = "&_lpctype_mixed";        break;
+      case UNKNOWN: p = "&_lpctype_unknown";      break;
+      case NUL:     p = "NULL";                   break;
+      case QUOTED_ARRAY:
+                    p = "&_lpctype_quoted_array"; break;
+
+      case MF_TYPE_MOD_POINTER|MIXED:
+                    p = "&_lpctype_any_array";    break;
+      case MF_TYPE_MOD_POINTER|INT:
+                    p = "&_lpctype_int_array";    break;
+      case MF_TYPE_MOD_POINTER|STRING:
+                    p = "&_lpctype_string_array"; break;
+      case MF_TYPE_MOD_POINTER|OBJECT:
+                    p = "&_lpctype_object_array"; break;
+
+#ifdef USE_STRUCTS
+      case STRUCT:  p = "&_lpctype_any_struct";   break;
+#endif
+      default: yyerror("(lpctypestr) Bad type!"); return 0;
+    }
+
+    return p;
+} /* lpctypestr() */
+
+/*-------------------------------------------------------------------------*/
+static const char *
+fulltypestr (int n)
 
 /* Express type <n> in the compiler type symbols of exec.h.
  * Return a pointer to a constant string.
@@ -2517,38 +2500,14 @@ ctype (int n)
 
 {
     static char buff[100];        /* 100 is such a comfortable size :-) */
-    const char *p = NULL;
 
-    buff[0] = '\0';
-    if (n & MF_TYPE_MOD_REFERENCE)
-        strcat(buff, "TYPE_MOD_REFERENCE|");
-    if (n & MF_TYPE_MOD_POINTER)
-        strcat(buff, "TYPE_MOD_POINTER|");
-    n &= ~(MF_TYPE_MOD_REFERENCE|MF_TYPE_MOD_POINTER);
-    switch(n) {
-      case VOID:    p = "TYPE_VOID";    break;
-      case STRING:  p = "TYPE_STRING";  break;
-      case INT:     p = "TYPE_NUMBER";  break;
-      case OBJECT:  p = "TYPE_OBJECT";  break;
-      case MAPPING: p = "TYPE_MAPPING"; break;
-      case FLOAT:   p = "TYPE_FLOAT";   break;
-      case CLOSURE: p = "TYPE_CLOSURE"; break;
-      case SYMBOL:  p = "TYPE_SYMBOL";  break;
-      case MIXED:   p = "TYPE_ANY";     break;
-      case UNKNOWN: p = "TYPE_UNKNOWN"; break;
-      case NUL:     p = "0";             break;
-      case QUOTED_ARRAY:
-        p = "TYPE_QUOTED_ARRAY"; break;
-#ifdef USE_STRUCTS
-      case STRUCT:  p = "TYPE_STRUCT"; break;
-#endif
-    default: yyerror("(ctype) Bad type!"); return 0;
-    }
-    strcat(buff, p);
-    if (strlen(buff) + 1 > sizeof buff)
-        fatal("Local buffer overwritten in ctype()");
+    if (snprintf(buff, sizeof(buff), "{ %s, %s }",
+        lpctypestr(n & ~MF_TYPE_MOD_REFERENCE),
+        (n & MF_TYPE_MOD_REFERENCE) ? "TYPE_MOD_REFERENCE" : "0") >= sizeof(buff))
+            fatal("Local buffer overwritten in fulltypestr()");
+
     return buff;
-} /* ctype() */
+} /* fulltypestr() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -2890,7 +2849,9 @@ create_efun_defs (void)
 " * It is meant to be included in lex.c\n"
 " */\n"
 "\n"
-"#include \"exec.h\"  /* struct instr_s == instr_t */\n"
+"#include \"exec.h\"    /* struct instr_s == instr_t */\n"
+"#include \"types.h\"   /* lpctype_* definitions     */\n"
+"#include \"prolang.h\" /* Some aggregate types      */\n"
 "\n"
            );
 
@@ -2964,20 +2925,13 @@ create_efun_defs (void)
     {
         if (arg_types[i] == 0)
         {
-#ifdef USE_STRUCTS
-            fprintf(fpw, "{ 0, NULL },\n");
-#else
-            fprintf(fpw, "{ 0 },\n");
-#endif /* USE_STRUCTS */
+            fprintf(fpw, "{ NULL, 0 },\n");
+
             if (i < last_current_type - 1)
                 fprintf(fpw, "    /* %3d */ ", i+1);
         }
         else
-#ifdef USE_STRUCTS
-            fprintf(fpw, "{ %s, NULL }, ", ctype(arg_types[i]));
-#else
-            fprintf(fpw, "{ %s }, ", ctype(arg_types[i]));
-#endif /* USE_STRUCTS */
+            fprintf(fpw, "%s, ", fulltypestr(arg_types[i]));
     }
     fprintf(fpw, "};\n\n\n");
 
@@ -3300,10 +3254,6 @@ create_lang (void)
                 fprintf(fpw, "#line %d \"%s\"\n", current_line+1, PRO_LANG);
                 continue;
             }
-            if MATCH("typemap") {
-                handle_map(line_buffer+9, TYPEMAP_SIZE, name_to_type);
-                continue;
-            }
             if MATCH("hookmap") {
                 handle_map(line_buffer+9, NUM_DRIVER_HOOKS, name_to_hook);
                 continue;
@@ -3330,6 +3280,11 @@ create_lang (void)
                     continue;
                 }
             }
+        }
+        else if(strspn(line_buffer, " \t{\n") == strlen(line_buffer) && strchr(line_buffer, '{'))
+        {
+             /* Add a #line pragma for each block. */
+            fprintf(fpw, "#line %d \"%s\"\n", current_line, PRO_LANG);
         }
         fputs(line_buffer, fpw);
     }
