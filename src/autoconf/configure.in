@@ -1239,8 +1239,8 @@ lp_cv_has_pcre_lib="no"
 AC_CHECK_LIB(pcre,main, lp_cv_has_pcre_lib="yes")
 
 if test "$lp_cv_has_pcre_lib" = "yes"; then
-    saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS -lpcre"
+    savelibs="$LIBS"
+    LIBS="$LIBS -lpcre"
     AC_CACHE_CHECK(for PCRE usability,lp_cv_has_pcre,
         AC_TRY_RUN([
 #include <pcre.h>
@@ -1257,7 +1257,7 @@ int main(void)
             lp_cv_has_pcre=yes,
             lp_cv_has_pcre=no
         ))
-    CFLAGS="$saveflags"
+    LIBS="$savelibs"
 
     if test "$lp_cv_has_pcre" = "yes"; then
         AC_DEFINE(HAS_PCRE, 1, [Does the machine offer PCRE?])
