@@ -1,9 +1,7 @@
 CONCEPT
-        memory
-        swapping
+        memory / swapping
 
 DESCRIPTION
-
         TODO: This is out of date. Also document the relation with reset
 
         (Collected from the Changelogs of the driver source)
@@ -54,5 +52,4 @@ DESCRIPTION
 
 SEE ALSO
         clean_up(A), slow_shut_down(M), quota_demon(M), low_memory(M)
-        malloc(D),
-        garbage_collection(E)
+        malloc(D), garbage_collection(E)

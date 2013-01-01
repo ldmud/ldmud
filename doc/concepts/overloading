@@ -37,12 +37,12 @@ EXAMPLE
 
             foo() {
               a::foo();
-	      b::foo();
-	      write("C");
-	    }
+              b::foo();
+              write("C");
+            }
 
-	To call "players/alfe/c"->foo() will now result in the output of
-	ABC.
+        To call "players/alfe/c"->foo() will now result in the output of
+        ABC.
 
 SEE ALSO
         modifiers(LPC), inheritance(C), functions(LPC)

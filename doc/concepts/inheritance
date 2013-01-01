@@ -52,7 +52,6 @@ DESCRIPTION
         variant.
 
 EXAMPLE
-
         Let's imagine very simple food in a file called "/the/food.c":
 
                 // unless "modified" variables are accessible by inheritors
@@ -124,7 +123,6 @@ EXAMPLE
                 }
 
 ADVANCED USAGE
-
         * Doing multiple inheritance
 
         While the Java(TM) language has so-called interfaces as a kludge,
@@ -147,7 +145,6 @@ ADVANCED USAGE
         Since LDMud 3.5.0 it is possible to pass arguments as well.
 
 ADVANCED EXAMPLE
-
           inherit "foo";
           inherit "bar";
           inherit "baz";

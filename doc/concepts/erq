@@ -544,7 +544,6 @@ DESCRIPTION
           Once the port is open, it is treated as if is just another
           spawned program.
 
-
 EXAMPLE
         Assume you have a script 'welcome-mail' to send a welcome mail
         to a new player. Put this script into the directory for the callable
@@ -562,7 +561,6 @@ EXAMPLE
                     , "welcome-mail '"+player_name+"' '"+player_email+"'"
                     , #'erq_response);
         }
-
 
 HISTORY
         The erq was introduced with 3.2.1@61.

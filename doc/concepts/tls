@@ -3,26 +3,26 @@ CONCEPT
         tls (transport layer security)
 
 DESCRIPTION
-	TLS stands for Transport Layer Security which is the successor
-	of the well known SSL (Secure Socket Layer). Both techniques 
-	provide a way to authenticate and encrypt the data send through
-	a network connection.
-	By enabling TLS during compilation of the driver you can provide
-	a secure channel into the mud to your players.
-	In difference to other solutions as "sslwrap" or "stunnel" the
-	driver integrated approach has the advantage that the mud sees 
-	the real IP of the player, not the IP of the local mud host.
+        TLS stands for Transport Layer Security which is the successor
+        of the well known SSL (Secure Socket Layer). Both techniques
+        provide a way to authenticate and encrypt the data send through
+        a network connection.
+        By enabling TLS during compilation of the driver you can provide
+        a secure channel into the mud to your players.
+        In difference to other solutions as "sslwrap" or "stunnel" the
+        driver integrated approach has the advantage that the mud sees
+        the real IP of the player, not the IP of the local mud host.
 
 USAGE
-	To use TLS configure your driver with --enable-tls option.
-	After starting your driver you have five new efuns
-	(tls_init_connection(), tls_deinit_connection(), tls_error(),
-	 tls_query_connection_info(), tls_query_connection_state()).
+        To use TLS configure your driver with --enable-tls option.
+        After starting your driver you have five new efuns
+        (tls_init_connection(), tls_deinit_connection(), tls_error(),
+        tls_query_connection_info(), tls_query_connection_state()).
 
-	You can switch on TLS by calling tls_init_connection().
-	This can happen in three ways:
+        You can switch on TLS by calling tls_init_connection().
+        This can happen in three ways:
 
-	1) in telnet_neg()
+        1) in telnet_neg()
 
             Advantage of this method is that you can offer TLS on a normal 
             mud port. If you have a limited number of ports this can 
@@ -36,7 +36,7 @@ USAGE
             Call tls_init_connection() to initiate the TLS handshake.
 
 
-	2) in master_ob->connect()
+        2) in master_ob->connect()
 
             Advantage of this method is that your users can connect with
             any program that supports TLS/SSL. Examples are telnet-ssl,

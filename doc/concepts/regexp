@@ -1,7 +1,6 @@
 SYNOPSIS
         Regular Expressions
 
-
 DESCRIPTION
         LDMud supports both the traditional regular expressions as
         implemented by Henry Spencer ("HS" or "traditional"), and 
@@ -27,7 +26,6 @@ DESCRIPTION
 
         For details, refer to the detailed manpages: hsregexp(C) for
         the Henry Spencer package, pcre(C) for the PCRE package.
-
 
 REGULAR EXPRESSION DETAILS
         A regular expression is a pattern that is matched against  a
@@ -86,7 +84,6 @@ REGULAR EXPRESSION DETAILS
 
           \<      HS: Match begin of word.
           \>      HS: Match end of word.
-
 
 OPTIONS
         The package is selected with these option flags:

@@ -1,129 +1,138 @@
 NAME
-    predefined - predefined #defines by the parser
+        predefined - predefined #defines by the parser
 
 DESCRIPTION
-    Several preprocessor macros are pre#defined by the parser,
-    to provide information about parser version, compile time
-    options and parser invocation options:
+        Several preprocessor macros are pre#defined by the parser,
+        to provide information about parser version, compile time
+        options and parser invocation options:
 
-      LPC3            : always defined.
-      __LDMUD__       : always defined.
-      __EUIDS__       : always (for compatibility).
-      COMPAT_FLAG     : defined if the driver runs in compat mode.
-      __COMPAT_MODE__ : ditto
-      __STRICT_EUIDS__: defined if strict euid usage is enforced.
-      __FILENAME_SPACES__: defined if filenames may contain spaces.
+        LPC3                       : always defined.
+        __LDMUD__                  : always defined.
+        __EUIDS__                  : always (for compatibility).
+        COMPAT_FLAG                : defined if the driver runs in compat mode.
+        __COMPAT_MODE__            : ditto
+        __STRICT_EUIDS__           : defined if strict euid usage is enforced.
+        __FILENAME_SPACES__        : defined if filenames may contain spaces.
 
-      __MASTER_OBJECT__ : the name of the master object (in compat mode
-                          without leading '/').
-      __FILE__          : the name of the compiled file (in compat mode
-                          without leading '/').
-      __LINE__          : the current line number.
-      __FUNCTION__      : the current function name.
-      __DIR__           : the directory path of the compiled file (in
-                          compat mode without leading '/').
-      __PATH__(n)       : the directory path of the compiled file without
-                          the <n> trailing elements (in compat mode without
-                          leading '/').
-      __VERSION__       : the version string of the driver.
-      __VERSION_MAJOR__ : the major version number of the driver.
-      __VERSION_MINOR__ : the minor version number of the driver.
-      __VERSION_MICRO__ : the micro version number of the driver.
-      __VERSION_PATCH__ : the patchlevel of the driver; a 0 here means
-                          'no patchlevel'.
-      __VERSION_COMMITID__ : the commit ID of the source of the driver 
-                             (attention: it might be <unknown>, if the driver
-                              was not compiled from a git repository)
-      __VERSION_LOCAL__ : the (optional) LOCAL_LEVEL, the user has defined.
+        __MASTER_OBJECT__          : the name of the master object (in compat
+                                     mode without leading '/').
+        __FILE__                   : the name of the compiled file (in compat
+                                     mode without leading '/').
+        __LINE__                   : the current line number.
+        __FUNCTION__               : the current function name.
+        __DIR__                    : the directory path of the compiled file
+                                     (in compat mode without leading '/').
+        __PATH__(n)                : the directory path of the compiled file
+                                     without the <n> trailing elements (in
+                                     compat mode without leading '/').
+        __VERSION__                : the version string of the driver.
+        __VERSION_MAJOR__          : the major version number of the driver.
+        __VERSION_MINOR__          : the minor version number of the driver.
+        __VERSION_MICRO__          : the micro version number of the driver.
+        __VERSION_PATCH__          : the patchlevel of the driver; a 0 here
+                                     means 'no patchlevel'.
+        __VERSION_COMMITID__       : the commit ID of the source of the driver
+                                     (attention: it might be <unknown>, if the
+                                     driver was not compiled from a git
+                                     repository)
+        __VERSION_LOCAL__          : the (optional) LOCAL_LEVEL, the user has
+                                     defined.
 
+        __DOMAIN_NAME__            : the domain the host is part of.
+        __HOST_IP_NUMBER__         : the hosts IP number (as a string).
+        __HOST_NAME__              : the full hostname.
+        __MAX_RECURSION__          : the max count of nested function calls
+                                     (this is config.h:MAX_USER_TRACE).
+        __MAX_EVAL_COST__          : the max evaluation cost.
+        __RESET_TIME__             : default interval time between object
+                                     resets.
+        __CLEANUP_TIME__           : default interval time between object
+                                     cleanups.
+        __ALARM_TIME__             : the configured timing granularity.
+        __HEART_BEAT_INTERVAL__    : the configured heartbeat time.
+        __SYNCHRONOUS_HEART_BEAT__ : defined if synchronous heartbeats are
+                                     enabled.
+        __MAX_COMMAND_LENGTH__     : the maximum length a command can have.
+        __EFUN_DEFINED__(name)     : if the efun 'name' exists, this
+                                     macro evaluates to " 1 ", else to " 0 ".
+        __DRIVER_LOG__             : the name of the default debug.log file
+                                     (within the mudlib); undefined if a
+                                     different name has been specified on the
+                                     commandline.
+        __WIZLIST__                : the name of the (mudlib) file from where
+                                     the driver read the initial WIZLIST
+                                     information. It is undefined if the driver
+                                     was configured to not read the
+                                     information.
 
-      __DOMAIN_NAME__    : the domain the host is part of.
-      __HOST_IP_NUMBER__ : the hosts IP number (as a string).
-      __HOST_NAME__      : the full hostname.
-      __MAX_RECURSION__  : the max count of nested function calls
-                           (this is config.h:MAX_USER_TRACE).
-      __MAX_EVAL_COST__  : the max evaluation cost.
-      __RESET_TIME__     : default interval time between object resets.
-      __CLEANUP_TIME__   : default interval time between object cleanups.
-      __ALARM_TIME__     : the configured timing granularity.
-      __HEART_BEAT_INTERVAL__: the configured heartbeat time.
-      __SYNCHRONOUS_HEART_BEAT__: defined if synchronous heartbeats are
-                           enabled.
-      __MAX_COMMAND_LENGTH__: the maximum length a command can have.
-      __EFUN_DEFINED__(name) : if the efun 'name' exists, this
-                               macro evaluates to " 1 ", else to " 0 ".
-      __DRIVER_LOG__     : the name of the default debug.log file (within
-                           the mudlib); undefined if a different name
-                           has been specified on the commandline.
-      __WIZLIST__        : the name of the (mudlib) file from where the
-                           driver read the initial WIZLIST information.
-                           It is undefined if the driver was configured
-                           to not read the information.
-      __MAX_MALLOC__     : the internal upper limit for total memory
-                           usage.
-      __INT_MAX__        : the largest integer number
-      __INT_MIN__        : the smallest integer number
-      __FLOAT_MAX__      : the largest (positive) float number
-      __FLOAT_MIN__      : the smallest (positive) float number
+        __MAX_MALLOC__             : the internal upper limit for total memory
+                                     usage.
+        __INT_MAX__                : the largest integer number
+        __INT_MIN__                : the smallest integer number
+        __FLOAT_MAX__              : the largest (positive) float number
+        __FLOAT_MIN__              : the smallest (positive) float number
 
-      __LPC_NOSAVE__     : always defined
-      __LPC_STRUCTS__    : always defined
-      __LPC_INLINE_CLOSURES__: always defined
-      __LPC_ARRAY_CALLS__: always defined
-      __BOOT_TIME__      : the time() the driver was started.
+        __LPC_NOSAVE__             : always defined
+        __LPC_STRUCTS__            : always defined
+        __LPC_INLINE_CLOSURES__    : always defined
+        __LPC_ARRAY_CALLS__        : always defined
+        __BOOT_TIME__              : the time() the driver was started.
 
-    If the ERQ is supported, the following macros are defined:
+        If the ERQ is supported, the following macros are defined:
 
-      __ERQ_MAX_SEND__  : the max size of the send buffer
-      __ERQ_MAX_REPLY__ : the max size of the reply buffer
+        __ERQ_MAX_SEND__           : the max size of the send buffer
+        __ERQ_MAX_REPLY__          : the max size of the reply buffer
 
-    The following macros are defined if their associated package
-    has been compiled into the driver:
+        The following macros are defined if their associated package
+        has been compiled into the driver:
 
-      __IDNA__ :      support for IDNA
-      __IPV6__ :      support for IP v.6
-      __MYSQL__ :     support for mySQL
-      __PGSQL__ :     support for PostgreSQL
-      __SQLITE__ :    support for SQLite 3.
-      __XML_DOM__ :   support for XML parsing.
-      __JSON__ :      support for JSON parsing/serializing.
-      __MCCP__:       support for MCCP http://www.randomly.org/projects/MCCP
-      __PCRE__:       support for PCRE
-      __TLS__:        support for TLS (internal)
-      __GNUTLS__:     if __TLS__: TLS support provided by GnuTLS.
-      __OPENSSL__:    if __TLS__: TLS support provided by OpenSSL.
-      __GCRYPT__:     cryptographic routines provided by libgcrypt.
-      __DEPRECATED__: support for obsolete and deprecated efuns.
-
+        __IDNA__                   : support for IDNA
+        __IPV6__                   : support for IP v.6
+        __MYSQL__                  : support for mySQL
+        __PGSQL__                  : support for PostgreSQL
+        __SQLITE__                 : support for SQLite 3.
+        __XML_DOM__                : support for XML parsing.
+        __MCCP__                   : support for MCCP
+                                     http://www.randomly.org/projects/MCCP
+        __ALISTS__                 : support for alists
+        __PCRE__                   : support for PCRE (always defined)
+        __TLS__                    : support for TLS (internal)
+        __GNUTLS__                 : if __TLS__: TLS support provided by
+                                     GnuTLS.
+        __OPENSSL__                : if __TLS__: TLS support provided by
+                                     OpenSSL.
+        __GCRYPT__                 : cryptographic routines provided by
+                                     libgcrypt.
+        __DEPRECATED__             : support for obsolete and deprecated efuns.
 
 HISTORY
-    3.2.1 added __DOMAIN_NAME__, __HOST_IP_NUMBER__, __HOST_NAME__,
-        __MAX_RECURSION__, __EFUN_DEFINED__().
-    3.2.5 added __COMPAT_MODE__, __NATIVE_MODE__, __EUIDS__,
-        __ERQ_MAX_SEND__ and __ERQ_MAX_REPLY__.
-    3.2.6 added __MAX_EVAL_COST__.
-    3.2.7 added __STRICT_EUIDS__ and made __EUIDS__ standard.
-    3.2.8 added __IPV6__, __LPC_NOSAVE__, __DIR__, __PATH__().
-    3.2.9 added __LDMUD__, __MYSQL__, __DEPRECATED__, __VERSION_MAJOR__,
-         __VERSION_MINOR__, __VERSION_MICRO__, __VERSION_PATCH__,
-         __INT_MAX__, __INT_MIN__, __FLOAT_MIN__, __FLOAT_MAX__,
-        __CATCH_EVAL_COST__, __MASTER_EVAL_COST__, __RESET_TIME__,
-        __CLEANUP_TIME__, __DRIVER_LOG__, and __WIZLIST__.
-    3.2.10 added __MAX_MALLOC__, __MSDOS_FS__, __LPC_ARRAY_CALLS__
-        and __FILENAME_SPACES__.
-    3.3 made __LPC_NOSAVE__ always defined and added __ALISTS__,
-        __MCCP__, __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__, __PGSQL__,
-        __PTHREADS__, __TLS__, __BOOT_TIME__, __ALARM_TIME__,
-        __HEART_BEAT_INTERVAL__, __SYNCHRONOUS_HEART_BEAT__, and __PCRE__.
-    3.3.713 added __IDNA__, __SQLITE__.
-    3.3.714 added __OPENSSL__, __GNUTLS__.
-    3.3.718 added __XML_DOM__.
-    3.3.719 removed __PTHREADS__, AMIGA, MSDOS_FS, __BEOS__  
+        3.2.1 added __DOMAIN_NAME__, __HOST_IP_NUMBER__, __HOST_NAME__,
+            __MAX_RECURSION__, __EFUN_DEFINED__().
+        3.2.5 added __COMPAT_MODE__, __NATIVE_MODE__, __EUIDS__,
+            __ERQ_MAX_SEND__ and __ERQ_MAX_REPLY__.
+        3.2.6 added __MAX_EVAL_COST__.
+        3.2.7 added __STRICT_EUIDS__ and made __EUIDS__ standard.
+        3.2.8 added __IPV6__, __LPC_NOSAVE__, __DIR__, __PATH__().
+        3.2.9 added __LDMUD__, __MYSQL__, __DEPRECATED__, __VERSION_MAJOR__,
+            __VERSION_MINOR__, __VERSION_MICRO__, __VERSION_PATCH__,
+            __INT_MAX__, __INT_MIN__, __FLOAT_MIN__, __FLOAT_MAX__,
+            __CATCH_EVAL_COST__, __MASTER_EVAL_COST__, __RESET_TIME__,
+            __CLEANUP_TIME__, __DRIVER_LOG__, and __WIZLIST__.
+        3.2.10 added __MAX_MALLOC__, __MSDOS_FS__, __LPC_ARRAY_CALLS__
+            and __FILENAME_SPACES__.
+        3.3 made __LPC_NOSAVE__ always defined and added __ALISTS__,
+            __MCCP__, __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__, __PGSQL__,
+            __PTHREADS__, __TLS__, __BOOT_TIME__, __ALARM_TIME__,
+            __HEART_BEAT_INTERVAL__, __SYNCHRONOUS_HEART_BEAT__, and __PCRE__.
+        3.3.713 added __IDNA__, __SQLITE__.
+        3.3.714 added __OPENSSL__, __GNUTLS__.
+        3.3.718 added __XML_DOM__.
+        3.3.719 removed __PTHREADS__, AMIGA, MSDOS_FS, __BEOS__
             and added __GCRYPT__.
-    3.3.721 added __FUNCTION__.
-    3.5.0 changed __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__,
-          __LPC_ARRAY_CALLS__ to be always on.
-          removed __ALISTS__
+        3.3.721 added __FUNCTION__.
+        3.5.0 changed __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__,
+            __LPC_ARRAY_CALLS__ to be always on.
+            removed __ALISTS__
 
 SEE ALSO
-    pragma(LPC), preprocessor(LPC)
+        pragma(LPC), preprocessor(LPC)
