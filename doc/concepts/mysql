@@ -1,5 +1,5 @@
 CONCEPT
-            mysql - mySQL support
+        mysql - mySQL support
 
 DESCRIPTION
         On hosts with the mySQL package installed, the driver can be
@@ -94,7 +94,7 @@ DESCRIPTION
           db_conv_string()
 
 
-	-- Caveats --
+        -- Caveats --
 
         The driver enables automatic reconnects on the database connections.
         This means that if a connection is lost - the most common case for

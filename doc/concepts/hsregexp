@@ -1,12 +1,10 @@
 SYNOPSIS
         Henry Spencer Regular Expressions
 
-
 DESCRIPTION
         This document describes the regular expressions supported by the
         implementation by Henry Spencer (the traditional package for
         LPMud).
-
 
 OPTIONS
         The following bitflag options modify the behaviour of the
@@ -19,7 +17,6 @@ OPTIONS
         If this bit is set, the pattern is interpreted as the UNIX ed
         editor would do it: () match literally, and the \( \) group
         expressions.
-
 
 REGULAR EXPRESSION DETAILS
         A regular expression is a pattern that is matched against  a
@@ -77,7 +74,6 @@ REGULAR EXPRESSION DETAILS
           \c      match character c even if it's one of the special
                   characters.
 
-
 NOTES
         The \< and \> metacharacters from Henry Spencers package
         are not available in PCRE, but can be emulate with \b,
@@ -87,13 +83,11 @@ NOTES
         limit, to avoid freezing the driver with a match
         like regexp(({"=XX==================="}), "X(.+)+X").
 
-
 AUTHOR
         Mark H. Colburn, NAPS International (mark@jhereg.mn.org)
         Henry Spencer, University of Torronto (henry@utzoo.edu)
         Joern Rennecke
         Ian Phillipps
-
 
 SEE ALSO
         regexp(C), pcre(C)
