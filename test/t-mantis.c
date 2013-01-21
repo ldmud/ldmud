@@ -387,6 +387,35 @@ nosave mixed *tests = ({
            return 1; // never reached
         :)
     }),
+    ({ "0000791-a", 0,
+        (:
+            // try to restore a __INT_MAX__ from a LP64 system. If there is
+            // truncation, there must be a warning.
+            last_rt_warning=0;
+            int i = restore_value("#2:2\n9223372036854775807\n");
+            if (to_string(i) != "9223372036854775807"
+                && (!last_rt_warning || member(last_rt_warning,
+                          "Integer value out of range in restore_svalue(). "
+                          "Value was truncated!\n") == -1) )
+              return 0;
+            return 1;
+        :)
+    }),
+    ({ "0000791-b", 0,
+        (:
+            // try to restore a too large integer (on ILP32 as well as LP64).
+            // There must be a warning.
+            last_rt_warning=0;
+            int i = restore_value("#2:2\n922337203685477580742\n");
+            if (to_string(i) != "922337203685477580742"
+                && (!last_rt_warning || member(last_rt_warning,
+                          "Integer value out of range in restore_svalue(). "
+                          "Value was truncated!\n") == -1) )
+              return 0;
+            return 1;
+        :)
+    }),
+
 });
 
 void run_test()

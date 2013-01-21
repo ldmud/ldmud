@@ -51,3 +51,14 @@ mixed prepare_destruct (object obj)
     return 0;
 }
 #endif
+
+#ifndef OWN_RUNTIME_WARNING
+string *last_rt_warning;
+void runtime_warning( string msg, string curobj, string prog, int line,
+                      int inside_catch)
+{
+    if (!last_rt_warning) last_rt_warning = ({msg});
+    else last_rt_warning += ({msg});
+}
+#endif
+
