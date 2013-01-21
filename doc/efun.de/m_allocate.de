@@ -10,11 +10,13 @@ BESCHREIBUNG
 
         Die Funktion ist nur sinnvoll, wenn man ein Mapping erzeugt, dessen
         ungefaehre Groesse von vornherein bekannt ist, um so den Overhead
-        bei der Speicherallokation zu minimieren. Wenn nicht alle allozierten
-        Datenelemente mit Daten bestueck werden, werden die Ueberbleibsel
-        am Ende des Funktionsaufrufs freigegeben. m_allocate() ist auch
-        nuetzlich, wenn ein Mapping bestimmter Breite erzeugt werden soll,
-        ohne bereits die Daten zu den Keys bereit zu stellen.
+        von wiederholten Speicherallokation zu minimieren. Wenn nicht alle
+        allozierten Datenelemente mit Daten bestueckt werden, werden die
+        Ueberbleibsel einige Zeit spaeter bei Gelegenheit wieder freigegeben
+        (s. Bemerkungen).
+        m_allocate() ist auch nuetzlich, wenn ein Mapping bestimmter Breite
+        erzeugt werden soll, ohne bereits die Daten zu den Keys bereit zu
+        stellen.
 
         Wenn bloss ein leeres Mapping bestimmter Breite erzeugt werden soll,
         so kann folgende Notation verwendet werden:
@@ -29,6 +31,12 @@ BEISPIELE
         m_allocate(3,7) -> erzeugt ein Mapping mit 7 Werten pro Key und Platz
            fuer 3 Eintraege.
        ([:2*3]) -> entspricht m_allocate(0,6).
+
+BEMERKUNGEN
+        Ungenutzer Speicher des allozierten Mappins wird waehrend des sog.
+        Kompaktierens des Mappings freigegeben. Dies passiert waehrend eines
+        "data cleanups" oder einer "garbage collection". Die Zeit zwischen
+        "data cleanups" ist mit configure_driver() konfigurierbar.
 
 GESCHICHTE
         Umbenannt von allocate_mapping() in LDMud 3.2.6.

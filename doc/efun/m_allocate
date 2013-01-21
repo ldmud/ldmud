@@ -10,12 +10,12 @@ DESCRIPTION
         omitted, 1 is used as default.
 
         This is useful only when you are going to construct a mapping
-        whose approximate size you know beforehand, to save on malloc
-        overhead. If you don't fill in data for all the allocated
-        elements, any leftovers will be freed after the current
-        function execution ended. It is also useful if you want the
-        mapping to have a certain width even if you don't provide
-        all the data items for the keys yet.
+        whose approximate size you know beforehand, to save overhead on
+        repeated memory allocations. If you don't fill in data for all the
+        allocated elements, any leftovers will be eventually freed some time
+        later (see remark below).
+        It is also useful if you want the mapping to have a certain width
+        even if you don't provide all the data items for the keys yet.
 
         If the goal is just to create an empty mapping with a certain
         width, the following notations can be used:
@@ -31,6 +31,12 @@ EXAMPLES
         for 3 entries.
 
         ([:2*3 ]) -> same as m_allocate(0, 6)
+
+REMARKS
+        Unused memory in the allocated mapping will be freed during the
+        so-called compacting of the mapping. This is done during the
+        data-cleanup or the garbage collection. The time between
+        data-cleanups is configurable by configure_driver().
 
 HISTORY
         Renamed from 'allocate_mapping' in LDMud 3.2.6.
