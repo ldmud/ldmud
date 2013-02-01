@@ -5,7 +5,7 @@ SYNOPSIS
 
 DESCRIPTION
         The argument is converted to a string. Works with int, float,
-        object, arrays, structs, symbols, strings, and closures.
+        object, arrays, structs, symbols, strings and closures.
 
         Converts closures and structs into an appropriate name (this
         has mostly debugging purposes).

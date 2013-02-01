@@ -3,7 +3,7 @@ SYNOPSIS
 
 BESCHREIBUNG
         <arg> wird in einen String umgewandelt. Das klappt mit Werten vom Typ
-        integer, float, object, array, symbol, string oder closure.
+        int, float, object, array, struct, symbol, string oder closure.
 
         Closures werden in einen passenden Namen umgewandelt (vorwiegend fuer
         Debugging-Zwecke geeignet).
@@ -23,6 +23,7 @@ FEHLER
 
 GESCHICHTE
         LDMud 3.2.8 laesst Lambdaclosures als gueltige Datentypen zu.
+        LDMud 3.3.250 laesst structs als gueltige Datentypen zu.
 
 SIEHE AUCH
-        to_array(E), to_int(E), to_object(E), sprintf(E)
+        to_array(E), to_int(E), to_object(E), to_struct(E), sprintf(E)
