@@ -1636,7 +1636,10 @@ resize_mapping (mapping_t *m, mp_int new_width)
 
             for (mc = *mcp++; mc; mc = mc->next)
                 if(destructed_object_ref(&(mc->data[0])))
-                    num_entries--;
+                {
+                    --num_entries;
+                    --hm2->used;
+                }
                 else
                 {
                     svalue_t *src, *dest;
