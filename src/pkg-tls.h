@@ -74,8 +74,13 @@ extern void tls_deinit_connection (interactive_t *ip);
 extern const char *tls_error(int err);
 extern vector_t *tls_query_connection_info(interactive_t *ip);
 extern vector_t *tls_check_certificate(interactive_t *ip, Bool more);
-extern Bool tls_available ();
+extern Bool tls_available();
 extern Bool tls_set_certificate(char *fingerprint, int len);
+
+#ifdef GC_SUPPORT
+extern void tls_clear_refs();
+extern void tls_count_refs();
+#endif /* GC_SUPPORT */
 
 #endif /* USE_TLS */
 

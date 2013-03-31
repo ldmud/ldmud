@@ -22,6 +22,7 @@
 #include "actions.h"
 #include "array.h"
 #include "comm.h"
+#include "gcollect.h"
 #include "interpret.h"
 #include "main.h"
 #include "mstrings.h"
@@ -1161,6 +1162,32 @@ tls_available ()
     return tls_is_available;
 } /* tls_available() */
 
+
+#ifdef GC_SUPPORT
+
+/*-------------------------------------------------------------------------*/
+void
+tls_clear_refs ()
+
+/* GC Support: Clear all reference counts.
+ */
+
+{
+    /* Nothing to do, we reference no ref-counted objects. */
+} /* tls_clear_refs() */
+
+/*-------------------------------------------------------------------------*/
+void
+tls_count_refs ()
+
+/* GC Support: Mark all references to xalloc'ed memory.
+ */
+
+{
+    note_malloced_block_ref(keys);
+} /* tls_count_refs() */
+
+#endif /* GC_SUPPORT */
 
 /***************************************************************************/
 #endif /* USE_TLS && HAS_GNUTLS */
