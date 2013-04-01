@@ -7969,6 +7969,8 @@ f_configure_driver (svalue_t *sp)
                     xfree(buf);
                     errorf("Certificate not found.\n");
                 }
+
+                xfree(buf);
             }
 
             break;
