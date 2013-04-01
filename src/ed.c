@@ -2734,6 +2734,7 @@ docmd (Bool glob)
         clrbuf();
         (void)doread(0, fptr);
 
+        free_mstring(P_FNAME);
         P_FNAME = fptr;
         P_FCHANGED = FALSE;
         break;
@@ -2749,6 +2750,7 @@ docmd (Bool glob)
 
         if (P_NOFNAME)
         {
+            free_mstring(fptr);
             if (P_FNAME)
                 add_message("%s\n", get_txt(P_FNAME));
             else
@@ -2758,6 +2760,7 @@ docmd (Bool glob)
         {
             if (fptr == NULL)
                 return ERR;
+            free_mstring(P_FNAME);
             P_FNAME = fptr;
         }
         break;
