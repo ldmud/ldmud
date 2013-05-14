@@ -7468,7 +7468,8 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
  * and allocate the local variables on the stack.
  *
  * If <allowRefs> is TRUE, references may be passed as extended varargs
- * ('(varargs mixed *)'). Currently this is used only for simul efuns.
+ * ('(varargs mixed *)'). Currently this is used only for simul efuns
+ * and driver hooks.
  * TODO: Investigate if holding references in arrays is really such a
  * TODO:: a bad thing. Maybe it's just an implementation issue.
  * TODO:: This also affects apply_low() and call_lambda().
@@ -7623,11 +7624,13 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
 
 /*-------------------------------------------------------------------------*/
 static void
-setup_new_frame (int fx, program_t *inhProg)
+setup_new_frame (int fx, program_t *inhProg, Bool allowRefs)
 
 /* Setup a call for function <fx> in the current program.
  * If <inhProg> is not NULL, it is the program of the inherited function
  * to call.
+ * If <allowRefs> is TRUE, references may be passed as extended varargs
+ * ('(varargs mixed *)').
  * Result are the flags for the function. Global csp->funstart is set
  * to the start of the function bytecode.
  */
@@ -7699,7 +7702,7 @@ setup_new_frame (int fx, program_t *inhProg)
      */
     csp->funstart = current_prog->program + (flags & FUNSTART_MASK);
 
-    inter_sp = setup_new_frame2(csp->funstart, inter_sp, MY_FALSE, MY_FALSE);
+    inter_sp = setup_new_frame2(csp->funstart, inter_sp, allowRefs, MY_FALSE);
 #ifdef DEBUG
     if (!current_object->variables && variable_index_offset)
         fatal("%s Fatal: new frame for object %p '%s' w/o variables, "
@@ -17065,7 +17068,8 @@ apply_low ( string_t *fun, object_t *ob, int num_arg
  * apply_low() takes care of calling shadows where necessary.
  *
  * If <allowRefs> is TRUE, references may be passed as extended varargs
- * ('(varargs mixed *)'). Currently this is used only for simul efuns.
+ * ('(varargs mixed *)'). Currently this is used only for simul efuns
+ * and driver hooks.
  *
  * When apply_low() returns true, the call was successful, the arguments
  * one the stack have been popped and replaced with the result. But note
@@ -18186,10 +18190,11 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
 
 /* Call the closure <lsvp> with <num_arg> arguments on the stack. On
  * success, the arguments are replaced with the result, else an errorf()
+ * is generated.
  *
  * If <allowRefs> is TRUE, references may be passed as extended varargs
- * ('(varargs mixed *)'). Currently this is used only for simul efuns.
- * is generated.
+ * ('(varargs mixed *)'). Currently this is used only for simul efuns
+ * and driver hooks.
  *
  * If <external> is TRUE, the eval_instruction is called to execute the
  * closure. Otherwise inter_pc is just set and int_call_lambda returns
@@ -18308,7 +18313,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         current_object = l->function.lfun.ob;
         current_prog = current_object->prog;
         /* inter_sp == sp */
-        setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg);
+        setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg, allowRefs);
           
         // check arguments
         check_function_args(FUNCTION_INDEX(csp->funstart), current_prog, csp->funstart);
@@ -18777,7 +18782,7 @@ call_function (program_t *progp, int fx)
 #endif
     csp->num_local_variables = 0;
     current_prog = progp;
-    setup_new_frame(fx, NULL);
+    setup_new_frame(fx, NULL, MY_FALSE);
     previous_ob = current_object;
     tracedepth = 0;
     eval_instruction(FUNCTION_CODE(csp->funstart), inter_sp);
