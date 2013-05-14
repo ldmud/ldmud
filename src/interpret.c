@@ -7468,7 +7468,8 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
  * and allocate the local variables on the stack.
  *
  * If <allowRefs> is TRUE, references may be passed as extended varargs
- * ('(varargs mixed *)'). Currently this is used only for simul efuns.
+ * ('(varargs mixed *)'). Currently this is used only for simul efuns
+ * and driver hooks.
  * TODO: Investigate if holding references in arrays is really such a
  * TODO:: a bad thing. Maybe it's just an implementation issue.
  * TODO:: This also affects apply_low() and call_lambda().
@@ -17067,7 +17068,8 @@ apply_low ( string_t *fun, object_t *ob, int num_arg
  * apply_low() takes care of calling shadows where necessary.
  *
  * If <allowRefs> is TRUE, references may be passed as extended varargs
- * ('(varargs mixed *)'). Currently this is used only for simul efuns.
+ * ('(varargs mixed *)'). Currently this is used only for simul efuns
+ * and driver hooks.
  *
  * When apply_low() returns true, the call was successful, the arguments
  * one the stack have been popped and replaced with the result. But note
@@ -18188,10 +18190,11 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
 
 /* Call the closure <lsvp> with <num_arg> arguments on the stack. On
  * success, the arguments are replaced with the result, else an errorf()
+ * is generated.
  *
  * If <allowRefs> is TRUE, references may be passed as extended varargs
- * ('(varargs mixed *)'). Currently this is used only for simul efuns.
- * is generated.
+ * ('(varargs mixed *)'). Currently this is used only for simul efuns
+ * and driver hooks.
  *
  * If <external> is TRUE, the eval_instruction is called to execute the
  * closure. Otherwise inter_pc is just set and int_call_lambda returns
