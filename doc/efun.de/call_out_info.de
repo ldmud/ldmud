@@ -2,7 +2,7 @@ SYNOPSIS
         mixed * call_out_info()
 
 BESCHREIBUNG
-        Liefert Informationen ueber alle haengigen call_out()s. Das Resultat
+        Liefert Informationen ueber alle laufenden call_out()s. Das Resultat
         ist ein Array, bei dem jedes Element wiederum aus einem Array besteht,
         das einen call_out() beschreibt. Jedes dieser Unter-Arrays enthaelt 3
         oder mehr Elemente:

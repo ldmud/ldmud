@@ -2,8 +2,8 @@ SYNOPSIS
         mixed * input_to_info(object player)
 
 BESCHREIBUNG
-        Liefert ein Array aller fuer <player> haengigen input_to()s. Der
-        erste Eintrag im Array ist der aelteste haengige input_to()
+        Liefert ein Array aller fuer <player> anhaengigen input_to()s.
+        Der erste Eintrag im Array ist der aelteste anhaengige input_to()
         (derjenige, welcher als erstes gestartet wurde), der letzte
         Eintrag ist der neuste input_to().
 

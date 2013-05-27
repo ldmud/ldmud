@@ -6,7 +6,7 @@ SYNOPSIS
         int remove_input_to(object player, object obj, string fun)
 
 BESCHREIBUNG
-        Entfernt ein haengiges input_to() aus dem interaktiven Playerobjekt.
+        Entfernt ein anhaengiges input_to() aus dem interaktiven Playerobjekt.
         Wenn <fun> nicht angegeben ist, wird der zuletzt aufgerufen input_to()
         entfernt.
 
@@ -26,8 +26,8 @@ BESCHREIBUNG
         kein haengiges input_to() auf dem Objekt).
 
 BEISPIELE
-        Entfernt alle haengigen input_to()s des aktuellen Spielers, falls
-        vorhanden:
+        Entfernt alle anhaengigen input_to()s des aktuellen Spielers,
+        falls vorhanden:
             while (remove_input_to(this_interactive()));
 
 GESCHICHTE

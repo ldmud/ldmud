@@ -3,12 +3,12 @@ SYNOPSIS
         int remove_call_out(closure fun)
 
 BESCHREIBUNG
-        Entfern den naechsten haengigen call_out() auf die Funktion <fun> im
-        aktuellen Objekt bzw. den naechsten haengigen call_out() auf die
-        Closure <fun>. Die verbleibende Zeit wird zurueck geliefert.
+        Entfernt den naechsten anhaengigen call_out() auf die Funktion <fun>
+        im aktuellen Objekt bzw. den naechsten anhaengigen call_out() auf
+        die Closure <fun>. Die verbleibende Zeit wird zurueck geliefert.
 
-        Wenn es keine haengigen call_out()s auf <fun> gibt, wird -1 zurueck
-        geliefert.
+        Wenn es keine anhaengigen call_out()s auf <fun> gibt, wird -1
+        zurueckgeliefert.
 
 BEISPIELE
         Um alle call_out()s auf MeineFunktion() zu entfernen:

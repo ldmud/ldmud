@@ -33,14 +33,14 @@ BEISPIELE
         Dies ruft die Funktion RefreshMe() nach Ablauf von 10 Sekunden ohne
         irgendwelche Argumente auf. Die Funktion RefresMe() kann dann
         wiederum selbst call_out()s starten, auch auf sich selbst, was
-        einen Loop erzeug (keine Rekurison). Mit einem solchen Loop koennen
-        Anweisungen in einem Objekt in regelmaessigen Zeitintervallen
+        eine Schleife erzeugt (keine Rekursion). Mit einer solchen Schleife
+        koennen Anweisungen in einem Objekt in regelmaessigen Zeitintervallen
         ausgefuehrt werden. Es ist allerdings zu beachten, dass call_out()s
         in einer linearen Liste gespeichert werden, und deshalb ziemlich
         rechenaufwendig fuer den Treiber sind.
 
         Und JA: selbst-replizierende call_out()s, bei denen jeder call_out()
-        selbst zwei oder mehr call_out()s in einem Loop erzeugt (so genannte
+        selbst zwei oder mehr call_out()s in einem Loop erzeugt (sogenannte
         Rabbits) verlangsamen das Mud ungemein und koennen es sogar zum
         Crash bringen. Kein Grund, es selbst auszuprobieren.
 

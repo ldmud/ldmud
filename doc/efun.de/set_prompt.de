@@ -12,7 +12,7 @@ BESCHREIBUNG
         Wird fuer <prompt> 0 angegeben, so liefert die Funktion lediglich
         den Prompt zurueck, ohne ihn zu aendern.
 
-        Der Prompt wird nicht ausgegeben, wenn ein input_to() haengig ist.
+        Der Prompt wird nicht ausgegeben, wenn ein input_to() anhaengig ist.
 
 SIEHE AUCH
         input_to(E)

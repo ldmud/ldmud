@@ -6,7 +6,7 @@ BESCHREIBUNG
         Findet den ersten call_out() auf die Funktion fun im aktuellen Objekt
         (bzw. auf die Closure cl) der ausgefuehrt werden soll. Zurueck gegeben
         wird die verbleibende Zeit bis zum Aufruf. Wenn kein call_out()
-        haengig ist, wird -1 zurueck gegeben.
+        anhaengig ist, wird -1 zurueck gegeben.
 
 FEHLER
         Die Suche nach call_out()s auf Closures funktioniert nur, wenn der
