@@ -731,7 +731,7 @@ rx_exec (regexp_t *pRegexp, string_t * string, size_t start)
         pHints->flags |= PCRE_EXTRA_MATCH_LIMIT_RECURSION;
         pHints->match_limit_recursion = LD_PCRE_RECURSION_LIMIT;
 #else
-        pHints->flags &= ~PCRE_EXTRA_MATCH_LIMIT_RECURSION
+        pHints->flags &= ~PCRE_EXTRA_MATCH_LIMIT_RECURSION;
 #endif  /* LD_PCRE_RECURSION_LIMIT */
 
         rc = pcre_exec( prog->pProg, pHints
@@ -791,7 +791,7 @@ rx_exec_str (regexp_t *pRegexp, char * string, char * start)
         pHints->flags |= PCRE_EXTRA_MATCH_LIMIT_RECURSION;
         pHints->match_limit_recursion = LD_PCRE_RECURSION_LIMIT;
 #else
-        pHints->flags &= ~PCRE_EXTRA_MATCH_LIMIT_RECURSION
+        pHints->flags &= ~PCRE_EXTRA_MATCH_LIMIT_RECURSION;
 #endif  /* LD_PCRE_RECURSION_LIMIT */
 
         rc = pcre_exec( prog->pProg, pHints
