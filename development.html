@@ -1,0 +1,68 @@
+---
+layout: page
+title: Development
+---
+<h2>Maintainer</h2>
+<p>
+  LDMud is currently maintained by Fuchur@Wunderland, Zesstra@Morgengrauen and Gnomi@UNItopia.
+  We can be best reached by mail at <a href="mailto:ldmud-dev@UNItopia.DE">ldmud-dev@UNItopia.DE</a>
+  or at the mailing list <a href="mailto:ldmud-talk@lists.bearnip.com">ldmud-talk@lists.bearnip.com</a>.
+  We also read the usenet groups rec.games.mud.lp and de.alt.mud.
+  You may also find us occasionally in our MUDs.
+</p>
+
+<h2>Participation</h2>
+<p>
+  There is a <a href="https://mail63.csoft.net/mailman/listinfo/ldmud-talk">mailing list for all kinds of discussions about the driver</a>.
+  Feel free to join in.
+</p>
+
+<p>
+  If you happen to find bugs or have ideas for future features
+  you're welcome to post them in our bug tracker at <a href="https://www.ldmud.eu/mantis/">https://www.ldmud.eu/mantis/</a>.
+</p>
+
+<p>
+  Our main source code repository is at github: <a href="https://github.com/ldmud/ldmud">https://github.com/ldmud/ldmud</a>.
+</p>
+
+<h2>Roadmap</h2>
+
+<h3>Work currently in progress:</h3>
+<dl>
+  <dt><a href="https://www.ldmud.eu/mantis/view.php?id=555">64-bit support</a></dt>
+  <dd>
+    Complete support for 64-bit architectures.
+  </dd>
+
+  <dt><a href="https://www.ldmud.eu/mantis/view.php?id=721">Union types</a></dt>
+  <dd>
+    Implement a new internal type system, which allows to specify unions of types like
+    'int|string' to be used in variable, parameter, or return type declarations.
+  </dd>
+
+  <dt><a href="https://www.ldmud.eu/mantis/view.php?id=546">References revised</a></dt>
+  <dd>
+    Value references (&x) currently need to be carefully used by the LPC wizard,
+    because their lifetime must not exceed the lifetime of the original value,
+    otherwise it may crash the driver. This work focusses on increasing the
+    robustness of references and filling all the holes the current implementation
+    has.
+  </dd>
+</dl>
+
+<h3>Future plans:</h3>
+<dl>
+  <dt><a href="https://www.ldmud.eu/mantis/view.php?id=596">Efuns cleanup</a></dt>
+  <dd>
+    Implement a few generic efuns to configure and inspect the driver, interactives
+    or objects, and replace a lot of other efuns by them.
+  </dd>
+
+  <dt><a href="https://www.ldmud.eu/mantis/view.php?id=432">Unicode support</a></dt>
+  <dd>
+    Make LPC strings accept unicode characters by converting all external
+    input into an internal unicode encoding (eg. UTF-8) and make all
+    string routines unicode-aware.
+  </dd>
+</dl>

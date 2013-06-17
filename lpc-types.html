@@ -1,0 +1,166 @@
+---
+layout: page
+title: LPC Data Types
+topic: doc
+---
+<h2>Data Types</h2>
+
+<p>
+  LPC is a dynamically typed language, but has some also some elements
+  of static typing. That means at runtime each value has some specific
+  type and you cannot determine from the source code what type that
+  will be. But it is possible to specify types in the LPC source code
+  and thus prevent some type errors on compile-time. But this is
+  voluntary, you can always use the type <code>mixed</code> which
+  means that it can take any type.
+</p>
+
+<h3>Value Types</h3>
+
+<p>
+  There are two kind of types: value and reference types.
+  Value types are copied with each assignment. When you change
+  a variable containing a value type only that instance is modified.
+  On the other hand for a reference type value an instance is
+  created in memory, and all variables it gets assigned to
+  just get a reference to that one instance.
+  When you change that value it's modified in all
+  variables that contain a reference to that.
+</p>
+
+<p>
+  LPC offers the following value types:
+</p>
+
+<dl>
+  <dt><code>int</code></dt>
+  <dd>
+    A signed integral number ranging from <code>__INT_MIN__</code> to <code>__INT_MAX__</code>,
+    on 32 bit platforms it's 32 bit wide, and on 64 bit platforms it's 64 bit wide.
+
+{% highlight c %}
+    int i = 10;
+{% endhighlight %}
+  </dd>
+
+  <dt><code>float</code></dt>
+  <dd>
+    A floating point number ranging from <code>__FLOAT_MIN__</code> to <code>__FLOAT_MAX__</code>.
+
+{% highlight c %}
+    float f = 10.42;
+{% endhighlight %}
+  </dd>
+
+  <dt><code>string</code></dt>
+  <dd>
+    A text. LPC strings are mutable and have variable length.
+{% highlight c %}
+    string str = "Hello!";
+{% endhighlight %}
+  </dd>
+
+  <dt><code>symbol</code></dt>
+  <dd>
+    Symbols are identifier names. There are used for variable names
+    in lambda closures.
+{% highlight c %}
+    symbol s = 'var;
+{% endhighlight %}
+  </dd>
+</dl>
+
+<h3>Reference Types</h3>
+
+<dl>
+  <dt>Arrays</dt>
+  <dd>
+    An array is a list of values. Arrays are reference types: When you modify an element inside
+    an array all variables holding a reference to that array see that change.
+    But as an exception every operation that changes the length of the array creates a
+    new array instance leaving the original instance alone. So only the variable
+    this size changing operation was carried out with references the new array.
+    Arrays are specified with the type of the member elements followed by a star.
+{% highlight c %}
+    int* numbers = ({1, 2, 4, 8});
+{% endhighlight %}
+
+    Members can be accessed using the <code>[]</code> operator.
+    Arrays are zero-based, so the first element has index 0.
+{% highlight c %}
+    numbers[3] = 9;
+{% endhighlight %}
+  </dd>
+
+  <dt><code>mapping</code></dt>
+  <dd>
+    A mapping, also known as associative array, dictionary or hash table,
+    maps a key to one or more values. In LPC there are also
+    mappings without a value implementing a set.
+{% highlight c %}
+    mapping m = ([ "key1": 10, "key2": 20 ]);
+    mapping set = ([ "abc", "def", "xyz" ]);
+{% endhighlight %}
+
+    Similar to arrays values are accessed using the <code>[]</code> operator:
+{% highlight c %}
+    m["key3"] = 30;
+{% endhighlight %}
+  </dd>
+
+  <dt><code>struct</code></dt>
+  <dd>
+    Structs group a collection of values together.
+    Each struct must be defined first:
+{% highlight c %}
+    struct Foo
+    {
+        int member1, member2;
+        string text;
+    };
+{% endhighlight %}
+
+    Usage:
+{% highlight c %}
+    struct Foo var = (<Foo> 10, 20, "text");
+    var->member2 = 42;
+{% endhighlight %}
+  </dd>
+
+  <dt><code>object</code></dt>
+  <dd>
+    As LPC is an object-oriented language, objects are the main ingredient.
+    An object variable contains the reference to one.
+
+{% highlight c %}
+    object ob = this_player();
+
+    ob->query_name();
+{% endhighlight %}
+  </dd>
+
+  <dt><code>closure</code></dt>
+  <dd>
+    Closures reference executable code, usually other functions in
+    an object, but may also reference efuns (driver functions)
+    or code that was compiled at run-time (lambda functions).
+
+{% highlight c %}
+    closure cl = #'write;
+{% endhighlight %}
+
+    Closures are usually not mutable. They are executed with funcall:
+{% highlight c %}
+    funcall(cl, "Hello, World!");
+{% endhighlight %}
+  </dd>
+</dl>
+
+<p>
+  As a specialty of LPC each variable can always contain the value <code>0</code> regardles of its specified type.
+  That is also the initial value of each variable and the one value that is considered 'false' in
+  conditional expressions.
+</p>
+
+<a class="prev" href="lpc-intro.html">Previous</a>
+<a class="next" href="lpc-flow.html">Next</a>

@@ -1,0 +1,88 @@
+---
+layout: page
+title: LPC Inheritance
+topic: doc
+---
+<h2>Inheritance</h2>
+
+<p>
+Objects consist of variables and functions which are written in one file per object blueprint.
+But it would be wearisome if we had to write every function anew just because we'd like
+to have a torch beside a lamp. That's where inheritance comes into play. The <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/concepts/inheritance">inherit</a></code>
+statement allows to include all the variable declarations and functions of a blueprint
+into another object. After that you can modify the behaviour by overloading functions.
+</p>
+
+{% highlight c %}
+    inherit "/i/item";
+
+    int take_it(string arg)
+    {
+        write("You can't take this!\n");
+        return 1;
+    }
+{% endhighlight %}
+
+<p>
+The inherit statement must come before any variable or function declaration. If there is
+no blueprint for the given file name then this file will be compiled first.
+Also there may be more than one inherit statement to combine functionality from
+several blueprints
+</p>
+
+<h3>Access to inherited variables and functions</h3>
+
+<p>
+When inheriting the variables and functions of a blueprint <a href="lpc-functions.html#modifiers">their modifiers</a> are applied.
+That means as <code>private</code> declared variables or functions are not accessible for the inheriting object.
+<code>protected</code> functions however are. It's also possible to add modifiers to all inherited variables and functions:
+</p>
+
+{% highlight c %}
+    private functions nosave variables inherit "/i/item";
+{% endhighlight %}
+
+<p>
+But it's not possible to make private variables or functions public or vice-versa.
+</p>
+
+<h3>Overloading</h3>
+
+<p>
+After having inherited a lot of functions it's possible to overwrite some of them
+simply by defining functions with them same name in the object's file. Whenever
+the function with this name is called (even by other inherited functions) then
+your new function will be called instead. This is called <em>overloading</em>.
+</p>
+
+<p>
+Nevertheless you can explicitly call the original inherited function by prepending
+the function name with <code>::</code>.
+</p>
+
+{% highlight c %}
+    int take_it(string arg)
+    {
+        write("You slowly approach this item.\n");
+        return ::take_it(arg);
+    }
+{% endhighlight %}
+
+<p>
+This calls <code>take_it</code> in the first inherited blueprint that defines this function.
+You can specify the inherited blueprints name to avoid ambiguitiy:
+</p>
+
+{% highlight c %}
+    int take_it(string arg)
+    {
+        write("You slowly approach this item.\n");
+        return item::take_it(arg);
+    }
+{% endhighlight %}
+
+<p>
+To call a function in all inherited programs use <code>"*"::fun</code>.
+</p>
+
+<a class="prev" href="lpc-objects.html">Previous</a>

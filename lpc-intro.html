@@ -1,0 +1,71 @@
+---
+layout: page
+title: LPC Introduction
+topic: doc
+---
+<h2>A Quick Tour of LPC - Introduction</h2>
+
+<p>
+  LPC is an object oriented language based on C.
+  A simple program would look like:
+</p>
+
+{% highlight c %}
+    void create()
+    {
+        write("Hello, World!");
+    }
+{% endhighlight %}
+
+<p>
+  In the above example you see a function called <code>create()</code>.
+  This function has no return value (<code>void</code>) and is
+  usually called on instantiation of the program, just like
+  <code>main()</code> in an ordinary C program.
+</p>
+
+<p>
+  In this function a driver function <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/write">write</a></code>, a so-called efun,
+  is called with a string as an argument. <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/write">write</a></code> just prints
+  the text to the current user. This is where you'll initialize your
+  object (set up all variables, load other needed objects, etc.).
+</p>
+
+<p>
+  In an LPMud there are no long-running functions. Each LPC functions
+  needs to return almost immediately. There is no sleep function or
+  mechanisms to wait for something. That's because the virtual machine
+  is single-threaded. While one LPC function is running, nothing else
+  will be executed. And if you manage to have an endless loop, the
+  whole VM hangs. To prevent such a situation there is an evaluation
+  counter: Each VM instruction that is executed upon an external
+  event (like some player entering a command) is counted and if that
+  count exceeds a given limit an error is thrown and the execution
+  usually ends.
+</p>
+
+<p>
+  To react on external events you'll have to implement that as a
+  function and register that function for the desired event (eg.
+  with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/add_action">add_action</a></code>
+  for a command entered by a player, or <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/call_out">call_out</a></code>
+  for a countdown). Some functions don't need to be registered and
+  only need to have just the right name, like
+  <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/applied/create">create()</a></code> for object creation, or
+  <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/applied/init">init()</a></code> for some player entering into the vicinity of the object.
+  But we'll have more of that later.
+</p>
+
+<p>
+  This documentation is just a quick introduction into the
+  core LPC language. A more complete documentation you'll find
+  in the <a href="https://github.com/ldmud/ldmud/tree/master/doc">LDMud source</a>.
+  Also to implement a MUD you'll need
+  an additional library poviding items, rooms,
+  non-player and player handling, grammar, etc.,
+  the so-called mudlib.
+  There are several different mudlibs out there,
+  their discussion is not part if this introduction.
+</p>
+
+<a class="next" href="lpc-types.html">Next</a>

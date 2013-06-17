@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>{{site.title}} - {{page.title}}</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>LDMud</h1>
+        <p>Home of LDMud</p>
+
+        <ul id="topmenu">
+          <li class="topmenuitem menuitem"><a href="index.html">Overview</a></li>
+          <li class="topmenuitem menuitem"><a href="history.html">History</a></li>
+          <li class="topmenuitem menuitem"><a href="development.html">Development</a></li>
+          <li class="topmenuitem menuitem"><a href="documentation.html">Documentation</a>
+            {% if page.topic == "doc" %}
+              <ul class="submenu">
+                <li class="submenuitem menuitem"><a href="https://github.com/ldmud/ldmud/blob/master/INSTALL">Installation</a></li>
+                <li class="submenuitem menuitem"><a href="lpc-intro.html">A Quick Tour of LPC</a>
+                  <ul class="submenu">
+                    <li class="submenuitem menuitem"><a href="lpc-intro.html">Introduction</a></li>
+                    <li class="submenuitem menuitem"><a href="lpc-types.html">Data Types</a></li>
+                    <li class="submenuitem menuitem"><a href="lpc-flow.html">Control Flow</a></li>
+                    <li class="submenuitem menuitem"><a href="lpc-functions.html">Functions</a></li>
+                    <li class="submenuitem menuitem"><a href="lpc-efuns.html">Efuns</a></li>
+                    <li class="submenuitem menuitem"><a href="lpc-objects.html">Objects</a></li>
+                    <li class="submenuitem menuitem"><a href="lpc-inheritance.html">Inheritance</a></li>
+                  </ul>
+                </li>
+              </ul>
+            {% endif %}
+          </li>
+          <li class="topmenuitem menuitem"><a href="download.html">Download</a></li>
+          <li class="topmenuitem menuitem"><a href="resources.html">Additional Resources</a></li>
+        </ul>
+
+        <p class="view"><a href="https://github.com/ldmud/ldmud">View the Project on GitHub <small>ldmud/ldmud</small></a></p>
+
+        <!--ul class="download">
+          <li><a href="https://github.com/amotzkau/ldmud/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/amotzkau/ldmud/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/amotzkau/ldmud">View On <strong>GitHub</strong></a></li>
+        </ul-->
+      </header>
+      <section>
+        {{ content }}
+      </section>
+    </div>
+
+    <script src="javascripts/scale.fix.js"></script>
+  </body>
+</html>

@@ -1,0 +1,121 @@
+---
+layout: page
+title: LPC Functions
+topic: doc
+---
+<h2>Functions</h2>
+
+<p>
+  Functions are code blocks that have a name. Every LPC code that wants to
+  be executed must be somewhere within a function. (There is just
+  one exception: the initialization of global variables.)
+</p>
+
+<p>
+  A function has a name, a return type, arguments (i.e. values given
+  to the function when called) and its code block:
+</p>
+
+{% highlight c %}
+    int get_square(int x)
+    {
+        return x*x;
+    }
+{% endhighlight %}
+
+<p>
+  In this example the first <code>int</code> denotes the return type.
+  It's followed by the function name and the arguments in parenthesis.
+  After that comes the code block in braces.
+</p>
+
+<p>
+  To call a function within the object just write the name
+  and the values for its arguments in parenthesis,
+</p>
+
+{% highlight c %}
+    x = get_square(42);
+{% endhighlight %}
+
+<p>
+  To call a function in another object there is an <a href="lpc-efuns.html">efun</a>
+  <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/call_other">call_other</a></code> which can be abbreviated with <code>-&gt;</code>.
+</p>
+
+{% highlight c %}
+    x = ob->get_square(42);
+    x = call_other(ob, "get_square", 42);
+{% endhighlight %}
+
+<h3><a name="modifiers">Modifiers</h3>
+
+<p>
+Functions and global variables can have modifiers to change the behaviour of
+the function resp. variable. The modifier is written just before the return
+type.
+</p>
+
+<dl>
+  <dt><code>private</code></dt>
+  <dd>
+    This function can only be called from within this program (this file and included
+    files). Calls from other objects or inheriting programs will ignore this
+    function. For global variables this means that inheriting programs
+    can't access the variable.
+  </dd>
+
+  <dt><code>protected</code></dt>
+  <dd>
+    This function can only be called from within this object. 
+    Calls via <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/call_other">call_other</a></code> (from this object or another object)
+    will ignore this function.
+  </dd>
+
+  <dt><code>static</code></dt>
+  <dd>
+    This function can only be called from within this object, even
+    via call_other. Calls from other objects (via <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/call_other">call_other</a></code>) will ignore
+    this function.
+  </dd>
+
+  <dt><code>public</code></dt>
+  <dd>
+    The function can be called from within this object or
+    from other objects. This is the default for functions.
+    For global variables it prevents changing the visibility
+    to private or static by inheritance. The variable will
+    stay visible in inheriting programs.
+  </dd>
+
+  <dt><code>nomask</code></dt>
+  <dd>
+    This function cannot be overriden by inheriting objects.
+    Nor can shadows shadow this function.
+  </dd>
+
+  <dt><code>deprecated</code></dt>
+  <dd>
+    Issue a warning whenever this function is called or the
+    variable is used.
+  </dd>
+
+  <dt><code>varargs</code></dt>
+  <dd>
+    When calling this function from within the object
+    arguments can be ommitted. Ommitted arguments will
+    be set to <code>0</code>. Please note that calls
+    via <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/call_other">call_other</a></code> are always treated as
+    <code>varargs</code> calls.
+  </dd>
+  
+  <dt><code>nosave</code></dt>
+  <dd>
+    Declare that this variable should not be stored
+    with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/save_object">save_object</a></code> or restored
+    by <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/restore_object">restore_object</a></code>
+  </dd>
+</dl>
+
+<a class="prev" href="lpc-flow.html">Previous</a>
+<a class="next" href="lpc-efuns.html">Next</a>

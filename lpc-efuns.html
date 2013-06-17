@@ -1,0 +1,225 @@
+---
+layout: page
+title: LPC Efuns
+topic: doc
+---
+<h2>Efuns</h2>
+
+<p>
+Aside from the functions within an object (so-called <strong>lfuns</strong>) there are driver-supplied functions, the <strong>efuns</strong>.
+Efuns are always available, but can't be called with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/call_other">call_other</a></code>, because they do not belong to an object.
+</p>
+
+<p>
+We'll give here a short overview over commonly used efuns. For the full list, please consult <a href="https://github.com/ldmud/ldmud/tree/master/doc/efun">the documentation
+in the LDMud source</a>.
+<p>
+
+<h3>Object handling</h3>
+
+<dl>
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/this_object">object this_object()</a></code></dt>
+  <dd>
+    Returns the object pointer for the current object.
+    Use this when you need to give another object a reference of yourself.
+  </dd>
+  
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/environment">object environment(object ob)</a></code></dt>
+  <dd>
+    An object can have a surrounding object (which can be set with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/move_object">move_object</a></code>/<code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/set_environment">set_environment</a></code>).
+    This efun returns the surrounding object of 'ob'.
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/all_inventory">object* all_inventory(object ob)</a></code></dt>
+  <dd>
+    Returns an array with all objects that have 'ob' as their surrounding object.
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/load_object">object load_object(string filename)</a></code></dt>
+  <dd>
+    Compiles the given file into an LPC object and returns a reference to it.
+    The file should have the ending <code>.c</code> and the filename
+    is always interpretated relatively to the mudlib directory
+    (which is a command line argument to the LDMud binary).
+  </dt>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/clone_object">object clone_object(string filename)</a></code></dt>
+  <dd>
+    Create a copy of the object, that is a result of compiling 'filename'.
+  </dt>
+  
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/destruct">void destruct(object ob)</a></code></dt>
+  <dd>
+    Bring the existance of the given object to an end.
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/call_other">mixed call_other(object ob, string fun, args...)</a></code></dt>
+  <dd>
+    Call the function 'fun' in the object 'ob' with the arguments given
+    after 'fun'.
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/call_out">void call_out(string fun, int delay, args...)</a></code></dt>
+  <dd>
+    Call the function 'fun' in the current object after 'delay' seconds.
+    Nevertheless this efun will return immediately. The call to 'fun'
+    will happen later independant of the current execution.
+  </dd>
+  
+  
+</dl>
+
+<h3>Player Handling</h3>
+
+<dl>
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/this_interactive">object this_interactive()</a></code></dt>
+  <dd>
+    If this code was executed because of a player entered a command,
+    then this efuns will return a reference to the object representing
+    the player. These player objects are special objects that have
+    a network connection associated with them.
+  </dd>
+  
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/this_player">object this_player()</a></code></dt>
+  <dd>
+    Returns the current command giver. The command giver can be a real player,
+    but can also be a non-player character that issued a command using
+    <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/command">command</a></code>. The current command giver will also
+    be preserved when a calling functions via <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/call_out">call_out</a></code>.
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/users">object* users()</a></code></dt>
+  <dd>
+    Returns an array with all player objects (i.e. object that have
+    a live network connection).
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/add_action">void add_action(string fun, string command)</a></code></dt>
+  <dd>
+    Registers the function 'fun' to be called when the current command
+    giver enters the command 'command'. The function will be called with
+    any text the player entered after the command and must return
+    a non-zero value if it succeeded. (Otherwise the next matching
+    function will be called, until one succeeded.)
+  </dt>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/input_to">void input_to(string fun)</a></code></dt>
+  <dd>
+    Registers the function 'fun' to be called on the next command
+    entered by the current command giver. This overrides all registered
+    actions, but is just for one command.
+  </dt>
+  
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/command">int command(string str, object ob)</a></code></dt>
+  <dd>
+    Let the object 'ob' execute the command 'str'. That means
+    all via <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/add_action">add_action</a></code> to 'ob' registered functions will
+    be searched for matching functions that will be executd.
+  </dd>
+  
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/write">void write(string msg)</a></code></dt>
+  <dd>
+    Write the given text to the current command giver.
+  </dt>
+  
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/say">void say(string msg)</a></code></dt>
+  <dd>
+    Write the given text to all living objects in the environment
+    of the current command giver.
+  </dt>
+  
+</dl>
+
+<h3>Data</h3>
+
+<dl>
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/copy">mixed copy(mixed arg)</a></code><dt>
+  <dd>
+    Creats a copy of an array or mapping. (For all other
+    types this efun just returns the value.) Please
+    note that if the array or mapping itself contains
+    other reference types as values these are not
+    copied, the values in the original and copy will
+    reference the same data. For deeper copies
+    look at <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/deep_copy">deep_copy</a></code>.
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/filter">mixed filter(mixed arg, string fun, object ob, ...)</a></code><dt>
+  <dd>
+    For each element in arg (may be an array, mapping or string)
+    call <code>ob->fun(element, ...)</code> (for mappings calls
+    <code>ob->fun(key, value, ...)</code>). If the function returns
+    a non-zero value that element or key-value-pair is included
+    in the return array/mapping/string.
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/map">mixed map(mixed arg, string fun, object ob, ...)</a></code><dt>
+  <dd>
+    Similar to <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/filter">filter</a></code> calls the function for each element,
+    but replaces the element (in mappings the value) with the function's
+    result.
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/member">int member(mixed container, mixed element)</a></code><dt>
+  <dd>
+    Returns the position of element in the container (may be 
+    an array, string or mapping). For mappings just <code>1</code>
+    for existance and <code>0</code> otherwise is returned.
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/sizeof">int sizeof(mixed val)</a></code><dt>
+  <dd>
+    Returns the number of elements in the array or struct,
+    number of characters in the string, or the number
+    of keys in a mapping.
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/intp">int intp(mixed val)</a></code><dt>
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/floatp">int floatp(mixed val)</a></code><dt>
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/stringp">int stringp(mixed val)</a></code><dt>
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/symbolp">int symbolp(mixed val)</a></code><dt>
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/pointerp">int pointerp(mixed val)</a></code><dt>
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/mappingp">int mappingp(mixed val)</a></code><dt>
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/structp">int structp(mixed val)</a></code><dt>
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/objectp">int objectp(mixed val)</a></code><dt>
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/closurep">int closurep(mixed val)</a></code><dt>
+  <dd>
+    Returns 1 if the value if an integer, floating point number, string,
+    symbol, array, mapping, struct, object, resp. closure.
+  </dd>
+</dl>
+
+<h3>Files</h3>
+
+<dl>
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/read_file">string read_file(string file, int start, int number)</a></code><dt>
+  <dd>
+    Reads 'number' lines from 'file' starting at line 'start'.
+    If 'number' is 0, then everything is read. If you want to
+    read byte-wise try <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/read_bytes">read_bytes</a></code>.
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/write_file">int write_file(string file, string str)</a></code><dt>
+  <dd>
+    Appends 'str' to the file 'file'.
+    Returns 1 for success, 0 otherwise.
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/save_object">int save_object(string file)</a></code><dt>
+  <dd>
+    Writes all saveable variables (i.e. the ones without
+    the <code>nosave</code> modifier) from the current
+    object to the file in
+    an own format suitable to be restored with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/restore_object">restore_object</a></code>.
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/restore_object">int restore_object(string file)</a></code><dt>
+  <dd>
+    Restores all variables from the given file to the current
+    object. Any existing values will be overwritten.
+  </dd>
+
+</dl>
+
+<a class="prev" href="lpc-functions.html">Previous</a>
+<a class="next" href="lpc-objects.html">Next</a>

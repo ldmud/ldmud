@@ -1,0 +1,141 @@
+---
+layout: page
+title: LPC Control Flow
+topic: doc
+---
+<h2>Control Flow</h2>
+
+<p>
+  LPC has the same control flow statements as C (and one addition <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/foreach">foreach</a></code>):
+</p>
+
+<dl>
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/if">if</a></code></dt>
+  <dd>
+{% highlight c %}
+    if(expression)
+    {
+        // Evaluate this, when 'expression' yields a non-zero value.
+    }
+    else
+    {
+        // Evaluate this, when 'expression' yields zero.
+    }
+{% endhighlight %}
+  </dd>
+
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/while">while</a></code></dt>
+  <dd>
+{% highlight c %}
+    while(expression)
+    {
+        // Evaluate this repeatedly,
+        // as long 'expression' yields a non-zero value.
+    }
+{% endhighlight %}
+
+    There's also the <code>do-while</code> loop where the loop body is
+    at least executed once and the condition is evaluated first after
+    the first loop.
+{% highlight c %}
+    do
+    {
+        // Evaluate this repeatedly,
+        // as long 'expression' yields a non-zero value.
+        // But evaluate this at least once.
+    }
+    while(expression);
+{% endhighlight %}
+  </dd>
+  
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/for">for</a></code></dt>
+  <dd>
+    <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/for">for</a></code> loops contain three expressions and a loop body.
+    The first expression is executed at the beginning of the loop.
+    The second expression is evaluated each time before the loop body
+    is executed. If this expression yields zero then the loop will end.
+    The third expression is executed at the end of each loop.
+{% highlight c %}
+    for(int i = 0; i < 10; i++)
+    {
+        // Evaluate this repeatedly, with i going from 0 to 9.
+    }
+{% endhighlight %}
+  </dd>
+  
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/foreach">foreach</a></code></dt>
+  <dd>
+    <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/foreach">foreach</a></code> iterates over a range, which can be
+    an array, mapping, struct (iterating over each member variable),
+    string (iterating over each character of the string), or an
+    integer range.
+
+{% highlight c %}
+    foreach(string elem: textarray)
+    {
+        printf("%s\n", elem);
+    }
+
+    foreach(string key, mixed val: somemapping)
+    {
+        printf("%s: %Q\n", key, val);
+    }
+
+    foreach(int nr: 10..100)
+    {
+        printf("%d\n", nr);
+    }
+{% endhighlight %}
+  </dd>
+  
+  <dt><code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/switch">switch</a></code></dt>
+  <dd>
+    <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/switch">switch</a></code> executes code blocks depending on a value.
+{% highlight c %}
+    switch(value)
+    {
+        case 0:
+          // Evaluate this, if value == 0.
+          break;
+
+        case 1:
+          // Evaluate this, if value == 1.
+          break;
+
+        default:
+          // Evaluate this, when no case label matched.
+          break;
+    }
+{% endhighlight %}
+
+    When there is no <code>break</code> statement at the end of a <code>case</code> block
+    then the following block is executed as well.
+  </dd>
+  
+  <dt><code>break</code></dt>
+  <dd>
+    <code>break</code> exits the innermost <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/while">while</a></code>, <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/for">for</a></code>, <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/foreach">foreach</a></code> loop, or <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/switch">switch</a></code> block.
+  </dd>
+  
+  <dt><code>continue</code></dt>
+  <dd>
+    <code>continue</code> will continue the execution from the beginning of the innermost <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/while">while</a></code>, <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/for">for</a></code>, or <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/foreach">foreach</a></code> loop.
+    In a <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/for">for</a></code> loop the third expression (loop end) and second expression (loop condition) are evaluated. If the loop condition yields zero,
+    the loop ends. Similarly the loop condition of <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/while">while</a></code> is evaluated. In <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/foreach">foreach</a></code> loops the loop starts with the next value.
+  </dd>
+  
+  <dt><code>return</code></dt>
+  <dd>
+    <code>return</code> exits the current function and optionally returns a value.
+{% highlight c %}
+    int query_number()
+    {
+        return 42;
+    }
+{% endhighlight %}
+  </dd>
+  
+</dl>
+
+<a class="prev" href="lpc-types.html">Previous</a>
+<a class="next" href="lpc-functions.html">Next</a>

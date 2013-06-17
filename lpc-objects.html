@@ -1,0 +1,142 @@
+---
+layout: page
+title: LPC Objects
+topic: doc
+---
+<h2>Objects</h2>
+
+<p>
+An object is the combination of LPC code (collection of functions)
+and corresponding data (the global variables of the object).
+Objects are the main components of a virtual world with LDMud.
+Every code you want to execute must belong to an object.
+Objects are accessed via functions. To manipulate the data of
+an object there must exist a function within the object that
+does so, and this function can be called via <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/call_other">call_other</a></code>.
+</p>
+
+<h3>Compilation</h3>
+
+<p>
+Originally the code for an object will be an LPC file in the mud's
+directory structure. This file usually has the ending <code>.c</code>
+and is compiled via <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/load_object">load_object</a></code> or <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/clone_object">clone_object</a></code>.
+It can four things: Comments (as in C with <code>/* ... */</code>, or
+</code>// ...</code> till the end of line), preprocessor statements
+(as in C like <code>#include</code>, <code>#if</code>, <code>#ifdef</code>,
+<code>#else</code>, or <code>#endif</code>), declaration of global
+variables and functions.
+</p>
+
+<p>
+Each loaded object has a name (you can get it with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/object_name">object_name</a></code>,
+and given a name look for the corresponding object with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/find_object">find_object</a></code>).
+When using <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/load_object">load_object</a></code> this name is the same as its filename
+without the ending <code>.c</code>. Such an object is called <em>blueprint</em>.
+That's because when cloning with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/clone_object">clone_object</a></code> LDMud first looks
+for an already loaded blueprint. If a blueprint doesn't exist, it is loaded
+first. And after that the <em>clone</em> is created. Clones have also the
+filename in their object name, but its appended by a <code>#</code> and a
+number. So all objects have unique names.
+</p>
+
+<h3>The Master Object</h3>
+
+<p>
+There is one holy object that has the ultimate power. It's called the <em>master</em> object.
+It's whereabouts are given as a command line argument (default is secure/master.c in the
+mudlib directory) and it is loaded as the first object. The master object can or in some
+instances must set <a href="https://github.com/ldmud/ldmud/blob/master/doc/concepts/hooks">driver hooks</a>
+to customize several aspects of the LDMud virtual machine, manages access to files and privileged
+efuns, deals with errors in LPC code, handles incoming network connections, etc.. For a more
+complete list look at <a href="https://github.com/ldmud/ldmud/blob/master/doc/master/master-all">master-all</a>
+in the documentation of the driver source code.
+</p>
+
+<h3>Environment and inventory</h3>
+
+<p>
+An object can have a surrounding object. This object is then called the object's <em>environment</em>.
+So in a virtual world there are player objects and room objects and the player objects have their
+room object set as their environment (as do the furniture, monsters, or items lying around).
+The environment of an object can be set with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/move_object">move_object</a></code>/<code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/set_environment">set_environment</a></code> and queried with
+<code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/environment">environment</a></code>. The other way round you can get all the objects that have the
+same environment with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/all_inventory">all_inventory</a></code>. It's also possible that an environment
+has a surrounding object itself. So there are efuns to look further at the other or inner objects
+with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/all_environment">all_environment</a></code> resp. <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/deep_inventory">deep_inventory</a></code>.
+</p>
+
+<h3>Living and interactive objects</h3>
+
+<p>
+There are a special kind of objects that can have <em>actions</em> defined for them.
+Actions are just functions that are called when a specific command was given.
+And objects that can give commands are called <em>living</em> objects. Commands
+are enabled with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/enable_commands">enable_commands</a></code> (making the current object a living
+object) and disabled with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/disable_commands">disable_commands</a></code> (making it a dead object).
+An action can only be registered by an object in the environment or the inventory
+of the object, or by the environment or the object itself. Actions are defined
+with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/add_action">add_action</a></code>:
+</p>
+
+{% highlight c %}
+    int hello_fun(string args)
+    {
+        write("Hello you too!\n");
+        return 1;
+    }
+
+    void init()
+    {
+        add_action("hello_fun", "hello");
+    }
+{% endhighlight %}
+
+<p>
+In the above example, whenever a living object enters "hello"
+or something like "hello y'all" the function hello_fun is called
+and the efun <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/this_player">this_player</a></code> will return that living
+object. The function will get one argument and that is the string
+following "hello" on the command (e.g. "y'all") or 0 if there
+was none. The function must return a non-zero value if it was
+successful. If it returns zero LDMud look for further matching
+actions and calls their functions. If there was no successful
+action an error message is printed. The error message can be
+set with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/notify_fail">notify_fail</a></code> during the exection of
+an action's function.
+Please note that in the <code>init</code> function
+in the example will not automatically called by LDMud. It is
+customary that mudlibs call such a function in all nearby objects
+when a living object moved.
+</p>
+
+<p>
+There are also special special objects, these are living objects that
+have a network connection associated with them. These are usually
+the players in your world and these are called <em>interactive</em>
+objects. These network connections are treated as telnet connections
+and the telnet negotations done there are handled by the driver per default.
+And all text messages coming through there will be interpreted as
+commands. Incoming network connections are given to the master object
+when calling it's <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/master/connect">connect</a></code> function and can be transferred
+to other objects with the <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/exec">exec</a></code> efun. The efun <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/users">users</a></code>
+returns a list of all interactive objects, and the efun <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/interactive">interactive</a></code>
+returns a non-zero value if the given object is interactive (as does
+<code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/living">living</a></code> with living objects).
+</p>
+
+<h3>Shadows</h3>
+
+<p>
+An object can catch external function calls to another object and answer these
+calls itself. Such an object is called <em>shadow</em>. One object may only
+shadow one other object and mustn't be shadowed itself. Shadowing is started
+with the <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/shadow">shadow</a></code> efun and needs permission by the master object.
+After then each <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/call_other">call_other</a></code> to the shadowed object will be
+redirected to the shadow. If the shadow doesn't define then this call will
+be passed to the shadowed object. The only calls that will not be redirected
+are the ones from the shadow itself.
+</p>
+
+<a class="prev" href="lpc-efuns.html">Previous</a>
+<a class="next" href="lpc-inheritance.html">Next</a>

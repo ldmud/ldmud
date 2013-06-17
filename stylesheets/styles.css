@@ -57,10 +57,10 @@ blockquote {
   font-style:italic;
 }
 
-code, pre {
+code, pre, code > a {
   font-family:Monaco, Bitstream Vera Sans Mono, Lucida Console, Terminal;
   color:#333;
-  font-size:12px;
+  font-size:14px;
 }
 
 pre {
@@ -82,9 +82,10 @@ th, td {
   border-bottom:1px solid #e5e5e5;
 }
 
-dt {
+dt, dt code, dt code > a {
   color:#444;
   font-weight:700;
+  margin-top: 1em;
 }
 
 th {
@@ -101,7 +102,88 @@ header {
   position:fixed;
 }
 
-header ul {
+header ul#topmenu {
+  list-style:none;
+  float: left;
+  padding: 0;
+  
+  background: #eee;
+  background: -moz-linear-gradient(top, #f8f8f8 0%, #dddddd 100%);
+  background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#f8f8f8), color-stop(100%,#dddddd));
+  background: -webkit-linear-gradient(top, #f8f8f8 0%,#dddddd 100%);
+  background: -o-linear-gradient(top, #f8f8f8 0%,#dddddd 100%);
+  background: -ms-linear-gradient(top, #f8f8f8 0%,#dddddd 100%);
+  background: linear-gradient(top, #f8f8f8 0%,#dddddd 100%);
+  
+  border-radius:5px;
+  border:1px solid #d2d2d2;
+  box-shadow:inset #fff 0 1px 0, inset rgba(0,0,0,0.03) 0 -1px 0;
+}
+
+header ul#topmenu + * {
+  clear: left;
+}
+
+header ul#topmenu li.topmenuitem {
+  border-bottom: 1px solid #d2d2d2;
+  padding-left: 2ex;
+  padding-right: 5ex;
+}
+
+header ul#topmenu li.topmenuitem + li.topmenuitem {
+  border-top: 1px solid #ffffff;
+}
+
+ul#topmenu a {
+  color:#000000;
+}
+
+
+ul#topmenu ul {
+  padding-left: 2em;
+  margin-bottom: 0;
+}
+
+li.submenuitem {
+  list-style-type: disc;
+}
+
+li.submenuitem li.submenuitem{
+  list-style-type: circle;
+}
+
+a.prev, a.next {
+  display: block;
+  padding-left: 1ex;
+  padding-right: 1ex;
+  min-width: 8ex;
+  
+  background: #eee;
+  background: -moz-linear-gradient(top, #f8f8f8 0%, #dddddd 100%);
+  background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#f8f8f8), color-stop(100%,#dddddd));
+  background: -webkit-linear-gradient(top, #f8f8f8 0%,#dddddd 100%);
+  background: -o-linear-gradient(top, #f8f8f8 0%,#dddddd 100%);
+  background: -ms-linear-gradient(top, #f8f8f8 0%,#dddddd 100%);
+  background: linear-gradient(top, #f8f8f8 0%,#dddddd 100%);
+  
+  border-radius:5px;
+  border:1px solid #d2d2d2;
+  box-shadow:inset #fff 0 1px 0, inset rgba(0,0,0,0.03) 0 -1px 0;
+
+  color:#000000;
+}
+
+a.prev {
+  float: left;
+  text-align: left;
+}
+
+a.next {
+  float: right;
+  text-align: right;
+}
+
+ul.download {
   list-style:none;
   height:40px;
   
@@ -121,14 +203,14 @@ header ul {
   width:270px;
 }
 
-header li {
+ul.download li {
   width:89px;
   float:left;
   border-right:1px solid #d2d2d2;
   height:40px;
 }
 
-header ul a {
+ul.download a {
   line-height:1;
   font-size:11px;
   color:#999;
@@ -143,17 +225,17 @@ strong {
   font-weight:700;
 }
 
-header ul li + li {
+ul.download li + li {
   width:88px;
   border-left:1px solid #fff;
 }
 
-header ul li + li + li {
+ul.download li + li + li {
   border-right:none;
   width:89px;
 }
 
-header ul a strong {
+ul.download a strong {
   font-size:14px;
   display:block;
   color:#222;
@@ -211,7 +293,7 @@ footer {
     display:inline;
   }
   
-  header ul {
+  header ul.download {
     position:absolute;
     right:50px;
     top:52px;
@@ -227,7 +309,7 @@ footer {
     padding:0;
   }
   
-  header ul, header p.view {
+  ul.download, header p.view {
     position:static;
   }
   
@@ -241,7 +323,7 @@ footer {
     padding:15px;
   }
   
-  header ul {
+  ul.download {
     display:none;
   }
 }
