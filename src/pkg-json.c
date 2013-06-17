@@ -1,4 +1,4 @@
-    /*------------------------------------------------------------------
+/*------------------------------------------------------------------
  * JSON Efuns.
  * support for javascript object notation
  * depends on the json-c library
@@ -280,19 +280,22 @@ ldmud_json_parse (svalue_t *sp, struct json_object *jobj)
         put_number(sp, json_object_get_boolean(jobj));
         break;
     case json_type_int:
-        put_number(sp, json_object_get_int(jobj));
-        break;
+        {
 #ifdef JSON_64_SUPPORT
-    case json_type_int64:
         int64_t val = json_object_get_int64(jobj);
-#if SIZEOF_PINT < 8
+#if PINT_MAX < INT64_MAX
+        // if val may exceed the numerical limits of our p_int.
         if (val < PINT_MIN || val > PINT_MAX)
             warnf("json_parse(): 64 bit long integer %"PRId64" was truncated to 32 bit.\n",
                   val);
 #endif
-        put_number(sp, val);
-        break;
+#else
+        int32_t val = json_object_get_int(jobj);
+        // val is only 32 bit wide, no check needed.
 #endif // JSON_64_SUPPORT
+        put_number(sp, val);
+        }
+        break;
     case json_type_double:
         put_float(sp, json_object_get_double(jobj));
         break;
@@ -417,21 +420,18 @@ ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
  */
 {
     struct json_object *jobj;
-    
+
     switch(sp->type) {
     case T_NUMBER:
-#if SIZEOF_PINT > SIZEOF_INT     // we use 64 bit ints for PINT
-#   ifdef JSON_64_SUPPORT
+#ifdef JSON_64_SUPPORT
         jobj = json_object_new_int64(sp->u.number);
-#   else
-        jobj = json_object_new_int(sp->u.number);
+#else
         if (sp->u.number > INT32_MAX || sp->u.number < INT32_MIN)
             warnf("json_serialize(): truncated 64 bit long number %ld to 32 bit due missing support in JSON-C.\n",
                   sp->u.number);
-#   endif   // JSON_64_SUPPORT
-#else
         jobj = json_object_new_int(sp->u.number);
-#endif  // SIZEOF_PINT
+#endif   // JSON_64_SUPPORT
+
         if (parent) ldmud_json_attach(parent, key, jobj);
         break;
     
