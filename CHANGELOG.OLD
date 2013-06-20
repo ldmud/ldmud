@@ -1,4 +1,6 @@
-This file lists all changes made to the game driver in all glory detail.
+This file lists all changes made to the game driver in all glory detail up
+until June 2011. For more recent changes please have a look at the changelog
+of the source repository (git log).
 See the file HISTORY for a user-oriented summary of all the changes.
 
 18-Jun-2011 (Gnomi)
