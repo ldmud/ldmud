@@ -276,3 +276,13 @@ Lars Duening thanks:
      Xtian@Avalon
      Zonk AT FinalFrontier (zonk AT finalfrontier DOT mud DOT de, rueschi AT berit-broese DOT de)
      The Wizards of Evermore
+
+ -----------------------------------------------------------------------------
+
+Bertram Felgenhauer, Alexander Motzkau and Dominik Schaefer thank:
+
+     - Heiko Kopp (hkopp AT informatik DOT uni-rostock DOT de, bardioc AT bardioc DOT com, Bardioc@Evermore)
+       for the XML implementation using iksemel and libxml2 (donated in 2008/2009)
+     - Philipp Hancke (fippo AT goodadvice DOT pages DOT de)
+       for the JSON support package
+
