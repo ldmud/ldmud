@@ -1,4 +1,5 @@
 SYNOPSIS
+        #include <comm.h>
         int net_connect(string host, int port)
 
 DESCRIPTION
@@ -6,7 +7,19 @@ DESCRIPTION
         <port>.  On success, the connection is bound to the current
         object and the lfun logon() is called in the object.
 
-        Return 0 on success, and a Unix ERRNO on failure.
+        Returns one of the following values:
+          NC_SUCCESS        Success
+          NC_EUNKNOWNHOST   the host address could not be resolved
+          NC_ENOSOCKET      error during socket creation
+          NC_ENOBIND        socket could not be bound
+          NC_ENOCONNECT     socket could not be connected
+        (Details of the last three errors can be found in the driver's error
+         log.)
+          NC_ECONNREFUSED   remote host not listening/refusing
+          NC_EMCONN         too many pending connections (transient, try
+                            again later)
+          NC_ENORESSOURCES  insufficient system ressources (transient, try
+                            again later)
 
         If the driver is configured to support IPv6, <host> is first
         interpreted as IPv6 hostname. If that fails, <host> is then

@@ -1,4 +1,5 @@
 SYNOPSIS
+        #include <comm.h>
         int net_connect(string host, int port)
 
 BESCHREIBUNG
@@ -7,7 +8,19 @@ BESCHREIBUNG
         aufrufenden Objekt gebunden und die lfun logon() wird in dem
         Objekt aufgerufen.
 
-        Resultat ist 0 bei Erfolg, und eine Unix ERRNO bei Misserfolg.
+        Resultat ist einer der folgenden Werte:
+          NC_SUCCESS        net_connect() erfolgreich
+          NC_EUNKNOWNHOST   Host-Adresse nicht ermittelbar
+          NC_ENOSOCKET      Fehler beim Erstellen des Sockets
+          NC_ENOBIND        Fehler beim Binden des Sockets
+          NC_ENOCONNECT     Fehler beim Verbindgen des Sockets
+        (Details ueber die letzten drei Fehler lassen sich im Fehlerlog des
+         Drivers ermitteln.)
+          NC_ECONNREFUSED   Ziel ignoriert Verbindungsversuch
+          NC_EMCONN         zuviele unerledigte Verbindungen im Aufbau
+                            (voruebergehender Fehler, spaeter probieren)
+          NC_ENORESSOURCES  ungenuegende Ressourcen fuer Verbindungs-
+                            versuch (spaeter nochmal versuchen)
 
         Ist der Driver fuer IPv6 konfiguriert, wird <host> erst als
         IPv6-Name interpretiert, und wenn das fehlschlaegt, als

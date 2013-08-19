@@ -8934,7 +8934,7 @@ f_net_connect (svalue_t *sp)
 
         if (!stored)
         {
-            rc = EMFILE;
+            rc = NC_EMCONN;
             break;
         }
 
@@ -8952,15 +8952,25 @@ f_net_connect (svalue_t *sp)
                                    : inet_addr(host);
         if (!target.sin_addr.s_addr)
         {
-            rc = -1;
+            rc = NC_EUNKNOWNHOST;
             break;
         }
 
         target.sin_family = h ? h -> h_addrtype : AF_INET;
         d = socket (target.sin_family, SOCK_STREAM, 0);
         if (d == -1) {
-            perror ("socket");
-            rc = errno;
+            switch(errno)
+            {
+                case EMFILE:
+                case ENFILE:
+                case ENOBUFS:
+                case ENOMEM:
+                    // insufficient system ressources, probably transient error
+                    rc = NC_ENORESSOURCES;
+                default:
+                    perror("socket during net_connect");
+                    rc = NC_ENOSOCKET;
+            }
             break;
         }
 
@@ -8971,8 +8981,16 @@ f_net_connect (svalue_t *sp)
          */
         ret = bind(d, (struct sockaddr *) &host_ip_addr_template, sizeof(host_ip_addr_template));
         if (ret == -1) {
-            perror("bind during net_connect");
-            rc = errno;
+            if (errno==ENOBUFS)
+            {
+                // insufficient system ressources, probably transient error
+                rc = NC_ENORESSOURCES;
+            }
+            else
+            {
+                perror("bind during net_connect");
+                rc = NC_ENOBIND;
+            }
             break;
         } 
 
@@ -8983,13 +9001,21 @@ f_net_connect (svalue_t *sp)
         if (ret == -1 && errno != EINPROGRESS)
         {
             /* error with connection */
-            perror("net_connect");
+            if (errno==ECONNREFUSED)
+            {
+                // no one listening at remote end...
+                rc = NC_ECONNREFUSED;
+            }
+            else
+            {
+                perror("connect during net_connect");
+                rc = NC_ENOCONNECT;
+            }
             socket_close(d);
-            rc = errno;
             break;
         }
 
-        rc = 0;
+        rc = NC_SUCCESS;
 
         /* Store the connection in the outconn[] table even if
          * we can complete it immediately. For the reason see below.
