@@ -515,7 +515,6 @@ static string_t * lookup_ip_entry (struct in_addr addr, Bool useErq);
 static void add_ip_entry(struct in_addr addr, const char *name);
 #ifdef USE_IPV6
 static void update_ip_entry(const char *oldname, const char *newname);
-static int open_ipv6_conn(const char *hostname, const unsigned short int port, struct sockaddr_in *pTarget);
 #endif
 
 #endif /* ERQ_DEMON */
@@ -5971,89 +5970,9 @@ update_ip_entry (const char *oldname, const char *newname)
 } /* update_ip_entry() */
 
 /*-------------------------------------------------------------------------*/
-static int
-open_ipv6_conn( const char *hostname, const unsigned short int port
-              , struct sockaddr_in * pTarget)
-
-/* Create a non-blocking IPv6/IPv4 tcp connnection to the given
- * <hostname>:<port>. The <hostname> is first interpreted as IPv6
- * address, and if that fails, as IPv4 address.
- *
- * Result is the socket (with the connnection possibly still in process
- * of being opened), or -1 on a failure.
- *
- * The completed sockaddr_in is passed back in *<pTarget> as well.
- *
- * WARNING: Not threadsafe!
- */
-
-{
-    int sock;
-    int con = 0;
-    int fd_flags;
-
-    struct hostent *h;
-    struct protoent *p;
-    struct sockaddr_in6 addr;
-
-    p = getprotobyname("TCP");
-    if(!p) return -1;
-
-    sock = socket(AF_INET6, SOCK_STREAM, p->p_proto);
-    if(sock == -1)
-    {
-        perror("socket");
-        return -1;
-    }
-    endprotoent();
-
-    fd_flags = fcntl(sock, F_GETFL, 0);
-#if defined(O_NONBLOCK)
-    fd_flags |= O_NONBLOCK;
-#elif defined(O_NDELAY)
-    fd_flags |= O_NDELAY;
-#elif defined(FNDELAY)
-    fd_flags |= O_FNDELAY;
-#endif
-    if (fcntl(sock, F_SETFL, fd_flags) == -1)
-    {
-        perror("setsockopt/fcntl");
-        close(sock);
-        return -1;
-    }
-    addr.sin6_port=htons(port);
-    addr.sin6_family=AF_INET6;
-    addr.sin6_flowinfo=0;
-    addr.sin6_scope_id=IPV6_ADDR_SCOPE_GLOBAL;
-
-    h = gethostbyname2(hostname, AF_INET6);
-    if(h)
-    {
-        memcpy(&addr.sin6_addr, h->h_addr, h->h_length);
-        con = connect(sock, (struct sockaddr *) &addr, sizeof(addr));
-        perror("con");
-    }
-    else if(!h || (con && con != EINPROGRESS))
-    {
-        h = gethostbyname2(hostname, AF_INET);
-        if(h)
-        {
-            CREATE_IPV6_MAPPED(&addr.sin6_addr, *((u_int32_t *)h->h_addr_list[0]));
-            con = connect(sock, (struct sockaddr *) &addr, sizeof(addr));
-        }
-    }
-    endhostent();
-
-    if (pTarget)
-        memcpy(pTarget, &addr, sizeof(*pTarget));
- 
-    return (!con || (con == -1 && errno == EINPROGRESS))
-           ? sock
-           : (close(sock),-1);
-} /* open_ipv6_conn() */
 
 #endif /* USE_IPV6 */
-
+    
 /*-------------------------------------------------------------------------*/
 static string_t *
 lookup_ip_entry (struct in_addr addr, Bool useErq)
@@ -6812,7 +6731,7 @@ f_send_udp (svalue_t *sp)
             /* TODO: Uh-oh, blocking DNS in the execution thread */
             hp = gethostbyname(to_host);
             if (hp == 0)
-                break;
+                break;            
             memcpy(&name.sin_addr, hp->h_addr, (size_t)hp->h_length);
             name.sin_family = AF_INET;
         }
@@ -8908,17 +8827,16 @@ f_net_connect (svalue_t *sp)
 
     /* Try the connection */
     rc = 0;
-    do{
-        int d, n, ret;
+    do {
+        int sfd, n, ret;
         object_t *user;
-        struct sockaddr_in target;
+        struct addrinfo hints;
+        struct addrinfo *result, *rp;
+        char port_string[6];
 
-#ifndef USE_IPV6
-
-        struct hostent *h;
-
-#endif
-
+        // port is needed as a string
+        snprintf(port_string, sizeof(port_string), "%u", port);
+        
         /* Find a place to store the pending connection,
          * store the index in n
          */
@@ -8938,90 +8856,117 @@ f_net_connect (svalue_t *sp)
             break;
         }
 
-#ifndef USE_IPV6
-
         /* Attempt the connection */
-
-        target.sin_port = htons(port);
+        
+        memset(&hints, 0, sizeof(struct addrinfo));
+#ifndef USE_IPV6
+        hints.ai_family = AF_INET;      // Allow only IPv4
+        hints.ai_flags = AI_ADDRCONFIG;  // only IPv4 if at least one interface with IPv4 and only IPv6 if at least one interface with IPv6
+#else
+        hints.ai_family = AF_INET6;      // Allow only IPv6
+        // only IPv6 if at least one interface with IPv6.
+        // And list IPv4 addresses as IPv4-mapped IPv6 addresses if no IPv6 addresses could be found.
+        hints.ai_flags = AI_ADDRCONFIG|AI_V4MAPPED;
+#endif
+        hints.ai_socktype = SOCK_STREAM; // TCP socket
+        hints.ai_protocol = 0;          // Any protocol
+        
         /* TODO: Uh-oh, blocking DNS in the execution thread.
          * TODO:: Better would be to start an ERQ lookup and fill in the
          * TODO:: data in the background.
          */
-        h = gethostbyname(host);
-        target.sin_addr.s_addr = h ? ** (uint32 **) (h -> h_addr_list)
-                                   : inet_addr(host);
-        if (!target.sin_addr.s_addr)
+        ret = getaddrinfo(host, port_string, &hints, &result);
+        if (ret != 0)
         {
             rc = NC_EUNKNOWNHOST;
             break;
         }
-
-        target.sin_family = h ? h -> h_addrtype : AF_INET;
-        d = socket (target.sin_family, SOCK_STREAM, 0);
-        if (d == -1) {
-            switch(errno)
-            {
-                case EMFILE:
-                case ENFILE:
-                case ENOBUFS:
-                case ENOMEM:
-                    // insufficient system ressources, probably transient error
-                    rc = NC_ENORESSOURCES;
-                default:
-                    perror("socket during net_connect");
-                    rc = NC_ENOSOCKET;
-            }
-            break;
-        }
-
-        set_socket_nonblocking(d);
-
-        /* On multihomed machines it is important to bind the socket to
-         * the proper IP address.
-         */
-        ret = bind(d, (struct sockaddr *) &host_ip_addr_template, sizeof(host_ip_addr_template));
-        if (ret == -1) {
-            if (errno==ENOBUFS)
-            {
-                // insufficient system ressources, probably transient error
-                rc = NC_ENORESSOURCES;
-            }
-            else
-            {
-                perror("bind during net_connect");
-                rc = NC_ENOBIND;
-            }
-            break;
-        } 
-
-        ret = connect(d, (struct sockaddr *) &target, sizeof(target));
-#else
-        d = ret = open_ipv6_conn(host, port, &target);
-#endif
-        if (ret == -1 && errno != EINPROGRESS)
+        // try each address until we successfully connect or run out of
+        // addresses. In case of errors, close the socket.
+        for (rp = result; rp != NULL; rp = rp->ai_next)
         {
-            /* error with connection */
+            sfd = socket (rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+            if (sfd==-1)
+            {
+                if (errno == EMFILE || errno == ENFILE
+                    || errno == ENOBUFS || errno == ENOMEM)
+                {
+                    // insufficient system ressources, probably transient error,
+                    // but it is unlikely to be different for the next address.
+                    // We exit here, the caller should try again.
+                    rc = NC_ENORESSOURCES;
+                    rp = NULL;
+                    break;
+                }
+                else
+                {
+                    // store only last error
+                    rc = NC_ENOSOCKET;
+                }
+                continue; // try next address
+            }
+            
+            set_socket_nonblocking(sfd);
+
+            /* On multihomed machines it is important to bind the socket to
+             * the proper IP address.
+             */
+            ret = bind(sfd, (struct sockaddr *) &host_ip_addr_template, sizeof(host_ip_addr_template));
+            if (ret==-1)
+            {
+                if (errno==ENOBUFS)
+                {
+                    // insufficient system ressources, probably transient error,
+                    // but unlikely to be different for the next address. Caller
+                    // should try again later.
+                    rc = NC_ENORESSOURCES;
+                    rp = NULL;
+                    socket_close(sfd);
+                    break;
+                }
+                else
+                {
+                    // store only last error.
+                    rc = NC_ENOBIND;
+                }
+                socket_close(sfd);
+                continue;
+            }
+            
+            ret = connect(sfd, rp->ai_addr, rp->ai_addrlen);
+            if (ret != -1 || errno == EINPROGRESS)
+                break;  // success! no need to try further
+
+            // no succes connecting. :-( Store last error in rc.
             if (errno==ECONNREFUSED)
             {
-                // no one listening at remote end...
+                // no one listening at remote end... happens, no real error...
                 rc = NC_ECONNREFUSED;
             }
             else
             {
-                perror("connect during net_connect");
                 rc = NC_ENOCONNECT;
             }
-            socket_close(d);
+            socket_close(sfd);
+        }
+        // no longer need the results from getaddrinfo()
+        freeaddrinfo(result);
+        
+        if (rp == NULL)
+        {
+            // No address succeeded, rc contains the last 'error', we just
+            // exit here.
             break;
         }
+        // at this point we a connected socket
 
         rc = NC_SUCCESS;
 
         /* Store the connection in the outconn[] table even if
          * we can complete it immediately. For the reason see below.
          */
-        outconn[n].socket = d;
-        outconn[n].target = target;
+        outconn[n].socket = sfd;
+        outconn[n].target = *((struct sockaddr_in *)rp->ai_addr);
         outconn[n].curr_obj = ref_object(current_object, "net_conect");
 
         if (errno == EINPROGRESS)
@@ -9039,7 +8984,7 @@ f_net_connect (svalue_t *sp)
 
         user = command_giver;
         inter_sp = sp;
-        new_player(current_object, d, &target, sizeof(target), 0);
+        new_player(current_object, sfd, (struct sockaddr_in *)rp->ai_addr, sizeof(struct sockaddr_in), 0);
         command_giver = user;
 
         /* All done - clean up */
