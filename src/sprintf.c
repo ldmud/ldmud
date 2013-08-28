@@ -2228,7 +2228,7 @@ add_table_now:
                     // only strcat if at least 2 bytes (1 byte after this bit) left
                     while ( --isize > -1  && --tmpl >= 1)
                     {
-                       if ( ( carg->u.number & ( 1 << isize ) ) != 0 )
+                       if ( ( carg->u.number & ( (p_int)1 << isize ) ) != 0 )
                        {
                           // Gnomi: strcat is quite inefficient. isize
                           // or tmpl could be used for direct indexing
