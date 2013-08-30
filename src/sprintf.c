@@ -184,6 +184,7 @@ enum format_err {
   ERR_ARRAY_EXPECTED     =        0xC, /* array expected */
   ERR_NOMEM              =        0xD, /* Out of memory */
   ERR_SIZE_OVERFLOW      =        0xE, /* Fieldsize/precision numeric overflow */
+  ERR_LOCAL_BUFF_OVERFLOW =       0xF, /* local buffer on stack overflowed */
 };
 
 #define ERROR(x) (longjmp(st->error_jmp, (x)))
@@ -1540,6 +1541,10 @@ static char buff[BUFF_SIZE];         /* For error messages */
         case ERR_BUFF_OVERFLOW:
             err = "BUFF_SIZE overflowed...";
             break;
+                
+        case ERR_LOCAL_BUFF_OVERFLOW:
+            err = "Local buffer on stack in sprintf() overflowed...";
+            break;
 
         case ERR_TO_FEW_ARGS:
             err = "More arguments specified than passed.";
@@ -1603,22 +1608,23 @@ static char buff[BUFF_SIZE];         /* For error messages */
 
             file = NULL;
             line = get_line_number_if_any(&file);
-            sprintf(st->buff, "%s:%d: ", get_txt(file), line);
+            snprintf(st->buff, sizeof(st->buff), "%s:%d: ", get_txt(file), line);
 
             if (file)
                 free_mstring(file);
         }
 
 #ifdef RETURN_ERROR_MESSAGES
-        strcat(st->buff, "(s)printf() error: ");
+        strncat(st->buff, "(s)printf() error: ", sizeof(st->buff)-strlen(st->buff)-1);
 #else
-        strcat(st->buff, "(s)printf(): ");
+        strncat(st->buff, "(s)printf(): ",sizeof(st->buff)-strlen(st->buff)-1);
 #endif
-        sprintf(st->buff + strlen(st->buff)
+        snprintf(st->buff + strlen(st->buff), sizeof(st->buff)-strlen(st->buff)
                , err, EXTRACT_ERR_ARGUMENT(err_num));
-        strcat(st->buff, "\n");
+        strncat(st->buff, "\n",sizeof(st->buff)-strlen(st->buff)-1);
 #ifndef RETURN_ERROR_MESSAGES
-        strcpy(buff, st->buff);
+        strncpy(buff, st->buff, sizeof(buff)-1); // leave one for \0.
+        buff[sizeof(buff)-1]='\0';  // ensure \0 termination
         if (st == &static_fmt)
             static_fmt_used = MY_FALSE;
         else
@@ -2210,7 +2216,6 @@ add_table_now:
                     int signi = 0;
                     int isize = sizeof(carg->u.number) * CHAR_BIT;
                     char temp[sizeof(carg->u.number) * CHAR_BIT + 1];
-                    int tmpl;
                     
                     memset(temp, '\0', sizeof(temp));
                     
@@ -2219,19 +2224,29 @@ add_table_now:
                         ERROR1(ERR_INCORRECT_ARG, format_char);
                     }
                     /* Calculate binary representation (2's compliment) */
-                    while ( --isize > -1 )
+                    size_t tmpl = sizeof(temp);
+                    // only strcat if at least 2 bytes (1 byte after this bit) left
+                    while ( --isize > -1  && --tmpl >= 1)
                     {
-                       if ( ( carg->u.number & ( 1 << isize ) ) != 0 )
+                       if ( ( carg->u.number & ( (p_int)1 << isize ) ) != 0 )
                        {
+                          // Gnomi: strcat is quite inefficient. isize
+                          // or tmpl could be used for direct indexing
+                          // (temp[sizeof(temp)-tmpl-1] = '0')
+                          // True. But strcat is much more readable, this code is
+                          // anyway crappy to read. And this particular piece here
+                          // is executed really seldom. Very few people want to
+                          // print numbers in binary representation and if they to,
+                          // they use mostly small numbers.
                           signi = 1;
                           strcat( temp, "1" );
                        }
                        else if ( signi )
                           strcat( temp, "0" );
                     }
-                    tmpl = strlen(temp);
-                    if ((size_t)tmpl >= sizeof(temp))
-                        fatal("Local buffer overflow in sprintf() for int.\n");
+                    // if still bits left, but buffer is full, throw error.
+                    if (isize > -1 && tmpl < 1)
+                        ERROR(ERR_LOCAL_BUFF_OVERFLOW);
                     if (pres && tmpl > pres)
                         tmpl = pres; /* well.... */
                     if ((unsigned int)tmpl < fs)
@@ -2254,7 +2269,7 @@ add_table_now:
                     int    numdig;  /* (Estimated) number of digits before the '.' */
                     Bool zeroCharHack = MY_FALSE;
                     char *p = cheat; /* pointer to the format buffer */
-                    int tmpl;
+                    size_t tmpl; // no of bytes written to buffer temp
 
                     *(p++) = '%';
                     switch (finfo & INFO_PP)
@@ -2288,10 +2303,10 @@ add_table_now:
                         {
                             pres = sizeof(temp) - 12 - numdig;
                         }
-                        sprintf(temp, cheat, pres, READ_DOUBLE(carg));
-                        tmpl = strlen(temp);
-                        if ((size_t)tmpl >= sizeof(temp))
-                            fatal("Local buffer overflow in sprintf() for float.\n");
+                        tmpl = snprintf(temp, sizeof(temp), cheat, pres, READ_DOUBLE(carg));
+                        if (tmpl >= sizeof(temp))
+                            ERROR(ERR_LOCAL_BUFF_OVERFLOW);
+                            /* NOT REACHED */
                     }
                     else
                     {
@@ -2321,10 +2336,10 @@ add_table_now:
                         }
                         *(p++) = format_char;
                         *p = '\0';
-                        sprintf(temp, cheat, carg->u.number);
-                        tmpl = strlen(temp);
-                        if ((size_t)tmpl >= sizeof(temp))
-                            fatal("Local buffer overflow in sprintf() for int.\n");
+                        tmpl = snprintf(temp, sizeof(temp), cheat, carg->u.number);
+                        if (tmpl >= sizeof(temp))
+                            ERROR(ERR_LOCAL_BUFF_OVERFLOW);
+
                         if (pres && tmpl > pres)
                             tmpl = pres; /* well.... */
 
