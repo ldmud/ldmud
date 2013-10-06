@@ -7935,6 +7935,9 @@ f_configure_driver (svalue_t *sp)
                 char * buf = xalloc(len/2);
                 char * ptr = buf;
 
+                /* Let's convert the hex string into raw bytes.
+                 * We'll ignore any colons inbetween.
+                 */
                 for (int pos = 0; pos < len; ++pos, ++text)
                 {
                     char c = *text;
@@ -7944,7 +7947,7 @@ f_configure_driver (svalue_t *sp)
                         c -= 'a' - 10;
                     else if (c >= 'A' && c <= 'F')
                         c -= 'A' - 10;
-                    else if (c == ':')
+                    else if (c == ':' || c == ' ')
                         continue;
                     else
                     {
@@ -7959,6 +7962,9 @@ f_configure_driver (svalue_t *sp)
                     out++;
                 }
 
+                /* <out> is the count of nibbles (hex characters),
+                 * so there should be an even number of them at the end.
+                 */
                 if (out & 1)
                 {
                     xfree(buf);

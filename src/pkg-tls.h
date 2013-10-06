@@ -30,9 +30,9 @@
 
 struct tls_dir_s
 {
-    void * dir;
-    char * fname;
-    size_t dirlen;
+    void * dir;    /* The DIR pointer for opendir/readdir. If it's NULL, then we're finished. */
+    char * fname;  /* The full pathname. xallocated. */
+    size_t dirlen; /* The length of the directory name. fname + dirlen point to the plain filename. */
 };
 
 /* --- Variables --- */

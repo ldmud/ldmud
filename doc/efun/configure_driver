@@ -47,9 +47,14 @@ DESCRIPTION
            (command line option --tls-keydirectory) or the main
            certificate (given with --tls-certfile).
            Default is the main certificate or else the first
-           certificate found in the directory.
+           certificate found in the directory. The chosen certificate at the
+           time of the tls_init_connection() call is used for that connection.
            <data> is a string containing the SHA1 fingerprint
-           of the certificate with hexadecimal numbers.
+           of the certificate with hexadecimal numbers,
+           it may contain colons or whitespaces (for example
+           "5A:FE:CA:57:1E:50:5E:1E:C7:ED:BA:11:AD:50:10:75:0F:7A:1E:50").
+           When loading certificates their fingerprints are printed
+           on stdout and into the logfile.
 
 HISTORY
         Introduced in LDMud 3.3.719.

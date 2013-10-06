@@ -70,6 +70,11 @@ tls_opendir (const char * dir, const char * desc, struct tls_dir_s * info)
  * and prepares the tls_dir_s structure for use with tls_readdir.
  *
  * When successful it returns MY_TRUE and info->dir will not be NULL.
+ * After success tls_readdir() must(!) be called until it returns NULL,
+ * so all resources are closed and freed.
+ *
+ * If <desc> is given then (in any case) a message will be printed
+ * to the log with <desc> as the description of the file type.
  */
 
 {
@@ -79,12 +84,16 @@ tls_opendir (const char * dir, const char * desc, struct tls_dir_s * info)
 
     if (desc)
     {
+        /* Inform the user where we looked for his files. */
         printf("%s TLS: %s from directory '%s'.\n"
               , time_stamp(), desc, dir);
         debug_message("%s TLS: %s from directory '%s'.\n"
                      , time_stamp(), desc, dir);
     }
 
+    /* Initialize fname and dirlen with the directory name,
+     * so readdir later has just to append the plain filename.
+     */
     info->dirlen = strlen(dir);
     info->fname = (char*) xalloc(info->dirlen + NAME_MAX + 2);
     if (!info->fname)
@@ -123,6 +132,7 @@ tls_readdir (struct tls_dir_s * info)
 
 /* Wrapper around readdir() that looks for a regular file and
  * returns the concatenation of the directory and file name.
+ * tls_opendir() must be called prior to this to initialize <info>.
  *
  * Returns NULL at the end of the directory and then frees
  * all variables in the tls_dir_s structure.
@@ -131,6 +141,7 @@ tls_readdir (struct tls_dir_s * info)
 {
     struct dirent *file;
 
+    /* Are we already finished? This shouldn't happen. */
     if (info->dir == NULL)
         return NULL;
 

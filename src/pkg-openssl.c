@@ -48,6 +48,7 @@
 /*-------------------------------------------------------------------------*/
 /* Structs */
 
+/* One server key and corresponding certificate. */
 struct tls_key_s
 {
     unsigned char fingerprint[SHA_DIGEST_LENGTH]; /* SHA1 */
@@ -228,6 +229,8 @@ static Bool
 tls_read_cert (int pos, const char * key, const char * cert)
 
 /* Reads a key and certificate into keys[pos].
+ * <key> and <cert> should be absolute filenames
+ * (or relative to current i.e. mudlib directory).
  * cert may be NULL, then it will be read from the key file.
  *
  * Returns MY_TRUE on success.
@@ -236,6 +239,8 @@ tls_read_cert (int pos, const char * key, const char * cert)
 {
     FILE *file;
     unsigned int fpsize;
+
+    /* Load the key. */
 
     file  = fopen(key, "rt");
     if (!file)
@@ -271,8 +276,11 @@ tls_read_cert (int pos, const char * key, const char * cert)
         return MY_FALSE;
     }
 
+    /* Load our certificate (chain). */
+
     if (cert)
     {
+        /* The certificate has its own file. */
         fclose(file);
         file = fopen(cert, "rt");
         if (!file)
@@ -286,6 +294,7 @@ tls_read_cert (int pos, const char * key, const char * cert)
         }
     }
     else
+        /* It's in the key file, read again. */
         fseek(file, 0, SEEK_SET);
 
     keys[pos].cert = PEM_read_X509(file, NULL, NULL, NULL);
@@ -315,6 +324,8 @@ tls_read_cert (int pos, const char * key, const char * cert)
     }
 
     fclose(file);
+
+    /* Generate and log its fingerprint. */
 
     fpsize = sizeof(keys[pos].fingerprint);
     if (!X509_digest(keys[pos].cert, EVP_sha1(), keys[pos].fingerprint, &fpsize))
@@ -382,6 +393,12 @@ void
 tls_verify_init (void)
 
 /* initialize or reinitialize tls certificate storage and revocation lists
+ *
+ * If there are no keys and certificates to be loaded, then this function
+ * will keep the current keys, because there should be at least one key
+ * to keep TLS working. We might still end up with no keys, if all files
+ * are unreadable or contain no valid keys and certificates.
+ * CAs and CRLs are cleared and reloaded in any case.
  */
 {
     STACK_OF(X509_NAME) *stack = NULL;
@@ -391,6 +408,7 @@ tls_verify_init (void)
     const char * fname;
     int num = 0;
 
+    /* Remember the current key. */
     if (keys)
     {
         memcpy(oldfingerprint, keys[current_key].fingerprint, sizeof(oldfingerprint));
@@ -481,6 +499,10 @@ tls_verify_init (void)
                      , time_stamp());
     }
 
+    /* CRLs are reloaded in any case, even if there are no certificates there.
+     * Only skip this, if there were never any (nothing specified on the command line or
+     * at compile time).
+     */
     if (tls_crlfile != NULL || tls_crldirectory != NULL)
     {
         X509_STORE *store = X509_STORE_new();
@@ -551,6 +573,7 @@ tls_verify_init (void)
         }
     }
 
+    /* CAs are also reloaded in any case, even if there are no certificates there. */
     if (!SSL_CTX_load_verify_locations(context, tls_trustfile, tls_trustdirectory))
     {
         printf("%s TLS: Error preparing x509 verification certificates\n",
@@ -584,6 +607,9 @@ Bool
 tls_set_certificate (char *fingerprint, int len)
 
 /* Sets the certificate used for the next sessions.
+ * <fingerprint> contains the certificate's fingerprint as
+ * <len> raw bytes. As long as we're using SHA1 <len>
+ * should by 20.
  */
 
 {

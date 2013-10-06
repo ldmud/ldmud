@@ -35,8 +35,13 @@
 /*-------------------------------------------------------------------------*/
 /* Structs */
 
+/* Maximum number of certificates in a certificate chain.
+ * If there are more certificates in the chain, the chain will not be loaded
+ * and an error is logged.
+ */
 #define MAX_CHAIN_LENGTH 10
 
+/* One server key and corresponding certicate chain. */
 struct tls_key_s
 {
     char fingerprint[20]; /* SHA1 */
@@ -170,7 +175,11 @@ tls_read_file (const char * fname, const char * desc)
 
 /* Reads a file fully into memory.
  *
- * On error returns .data = NULL.
+ * On error returns .data = NULL and logs the error
+ * (with <desc> as the description of the file type).
+ *
+ * Otherwise .data contains the file's content in an xalloced memory block
+ * (of .size bytes). It's the caller's responsibility to xfree it afterwards.
  */
 
 {
@@ -236,7 +245,9 @@ tls_read_file (const char * fname, const char * desc)
 static Bool
 tls_read_cert (int pos, const char * key, const char * cert)
 
-/* Reads a key and certificate into keys[pos].
+/* Reads a key and certificate from the given files into keys[pos].
+ * <key> and <cert> should be absolute filenames
+ * (or relative to current i.e. mudlib directory).
  * cert may be NULL, then it will be read from the key file.
  *
  * Returns MY_TRUE on success.
@@ -246,6 +257,8 @@ tls_read_cert (int pos, const char * key, const char * cert)
     int err;
     size_t fpsize;
     gnutls_datum_t data;
+
+    /* Load the key. */
 
     data = tls_read_file(key, cert ? "key" : "key and certificate");
     if (data.data == NULL)
@@ -264,8 +277,11 @@ tls_read_cert (int pos, const char * key, const char * cert)
         return MY_FALSE;
     }
 
+    /* Load the ceriticate chain. */
+
     if (cert)
     {
+        /* The certificate has its own file. */
         xfree(data.data);
         data = tls_read_file(cert, "certificate");
         if (data.data == NULL)
@@ -278,9 +294,9 @@ tls_read_cert (int pos, const char * key, const char * cert)
     keys[pos].num_certs = MAX_CHAIN_LENGTH;
     err = gnutls_x509_crt_list_import(keys[pos].cert, &keys[pos].num_certs, &data, GNUTLS_X509_FMT_PEM, 
 #if GNUTLS_VERSION_MAJOR >= 3
-        GNUTLS_X509_CRT_LIST_FAIL_IF_UNSORTED
+        GNUTLS_X509_CRT_LIST_FAIL_IF_UNSORTED | GNUTLS_X509_CRT_LIST_IMPORT_FAIL_IF_EXCEED
 #else
-        0
+        GNUTLS_X509_CRT_LIST_IMPORT_FAIL_IF_EXCEED
 #endif
     );
     if (err < 0 || keys[pos].num_certs == 0)
@@ -295,6 +311,8 @@ tls_read_cert (int pos, const char * key, const char * cert)
     }
 
     xfree(data.data);
+
+    /* Generate and log its fingerprint. */
 
     fpsize = sizeof(keys[pos].fingerprint);
     err = gnutls_x509_crt_get_fingerprint(keys[pos].cert[0], GNUTLS_DIG_SHA1, keys[pos].fingerprint, &fpsize);
@@ -353,7 +371,13 @@ tls_free_keys (void)
 void
 tls_verify_init (void)
 
-/* initialize or reinitialize tls certificate storage and revocation lists.
+/* Initialize or reinitialize tls certificate storage and revocation lists.
+ *
+ * If there are no keys and certificates to be loaded, then this function
+ * will keep the current keys, because there should be at least one key
+ * to keep TLS working. We might still end up with no keys, if all files
+ * are unreadable or contain no valid keys and certificates.
+ * CAs and CRLs are cleared and reloaded in any case.
  */
 {
     struct tls_dir_s dir;
@@ -362,6 +386,7 @@ tls_verify_init (void)
     Bool havefingerprint = MY_FALSE;
     int num = 0;
 
+    /* Remember the current key. */
     if (keys)
     {
         memcpy(oldfingerprint, keys[current_key].fingerprint, sizeof(oldfingerprint));
@@ -419,11 +444,20 @@ tls_verify_init (void)
             }
         }
 
+        /* Restore the old current key, if it's there.
+         * Otherwise fail silently (then the first
+         * found key will be the new current key).
+         *
+         * We do this silently because it's the usual
+         * case with just a key file and no key directory.
+         * In the other case the mudlib will hopefully
+         * select the right key before the next TLS session starts.
+         */
         if (havefingerprint)
             tls_set_certificate(oldfingerprint, sizeof(oldfingerprint));
     }
 
-
+    /* CAs are reloaded in any case, even if there are no certificates there. */
     gnutls_certificate_free_cas(x509_cred);
 
     if (tls_trustfile != NULL)
@@ -467,6 +501,7 @@ tls_verify_init (void)
         }
     }
 
+    /* CRLs are also reloaded in any case, even if it's empty. */
     gnutls_certificate_free_crls(x509_cred);
     if (tls_crlfile != NULL)
     {
@@ -521,6 +556,10 @@ tls_select_certificate (gnutls_session_t session
                        , gnutls_retr2_st * st)
 
 /* Called from GnuTLS to select a certificate and key to use.
+ *
+ * We store the index into our key list as the GnuTLS session
+ * pointer (pointer for private use in a session object).
+ * Note that it's really not a pointer, just the plain index.
  */
 
 {
@@ -594,6 +633,9 @@ Bool
 tls_set_certificate (char *fingerprint, int len)
 
 /* Sets the certificate used for the next sessions.
+ * <fingerprint> contains the certificate's fingerprint as
+ * <len> raw bytes. As long as we're using SHA1 <len>
+ * should by 20.
  */
 
 {
