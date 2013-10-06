@@ -11,26 +11,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-#if defined(HAVE_DIRENT_H) || defined(_POSIX_VERSION)
-#    include <dirent.h>
-#    define generic_dirent dirent
-#else /* not (DIRENT or _POSIX_VERSION) */
-#    define generic_dirent direct
-#    ifdef HAVE_SYS_NDIR_H
-#        include <sys/ndir.h>
-#    endif /* SYSNDIR */
-#    ifdef HAVE_SYS_DIR_H
-#        include <sys/dir.h>
-#    endif /* SYSDIR */
-#    ifdef HAVE_NDIR_H
-#        include <ndir.h>
-#    endif /* NDIR */
-#endif /* not (HAVE_DIRENT_H or _POSIX_VERSION) */
-
-#ifndef S_ISREG
-#    define S_ISREG(m) (((m)&S_IFMT) == S_IFREG)
-#endif
+#include <dirent.h>
 
 #include "pkg-tls.h"
 
