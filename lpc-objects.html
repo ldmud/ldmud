@@ -75,7 +75,7 @@ And objects that can give commands are called <em>living</em> objects. Commands
 are enabled with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/enable_commands">enable_commands</a></code> (making the current object a living
 object) and disabled with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/disable_commands">disable_commands</a></code> (making it a dead object).
 An action can only be registered by an object in the environment or the inventory
-of the object, or by the environment or the object itself. Actions are defined
+of the living object, or by the environment or the object itself. Actions are defined
 with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/add_action">add_action</a></code>:
 </p>
 
@@ -99,7 +99,7 @@ and the efun <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/
 object. The function will get one argument and that is the string
 following "hello" on the command (e.g. "y'all") or 0 if there
 was none. The function must return a non-zero value if it was
-successful. If it returns zero LDMud look for further matching
+successful. If it returns zero LDMud will look for further matching
 actions and calls their functions. If there was no successful
 action an error message is printed. The error message can be
 set with <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/notify_fail">notify_fail</a></code> during the exection of
