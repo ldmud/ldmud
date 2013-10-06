@@ -21,9 +21,24 @@
 /* Number of bits for the Diffie Hellmann parameters. */
 #define DH_BITS 1024
 
+/* --- Structures --- */
+
+/* Helper function for reading regular files in a directory.
+ *
+ * This structure keeps all needed variables for reading a directory.
+ */
+
+struct tls_dir_s
+{
+    void * dir;    /* The DIR pointer for opendir/readdir. If it's NULL, then we're finished. */
+    char * fname;  /* The full pathname. xallocated. */
+    size_t dirlen; /* The length of the directory name. fname + dirlen point to the plain filename. */
+};
+
 /* --- Variables --- */
 
 extern char * tls_keyfile;
+extern char * tls_keydirectory;
 extern char * tls_certfile;
 extern char * tls_trustdirectory;
 extern char * tls_trustfile;
@@ -43,6 +58,8 @@ extern svalue_t *f_tls_available (svalue_t *sp);
 extern svalue_t *f_tls_check_certificate(svalue_t *sp);
 extern svalue_t *v_hash(svalue_t *sp, int num_arg);
 extern svalue_t *f_hmac(svalue_t *sp);
+extern Bool tls_opendir(const char * dir, const char * desc, struct tls_dir_s * info);
+extern const char * tls_readdir(struct tls_dir_s * info);
 
 /* --- Prototypes for TLS packages --- */
 
@@ -57,7 +74,13 @@ extern void tls_deinit_connection (interactive_t *ip);
 extern const char *tls_error(int err);
 extern vector_t *tls_query_connection_info(interactive_t *ip);
 extern vector_t *tls_check_certificate(interactive_t *ip, Bool more);
-extern Bool tls_available ();
+extern Bool tls_available();
+extern Bool tls_set_certificate(char *fingerprint, int len);
+
+#ifdef GC_SUPPORT
+extern void tls_clear_refs();
+extern void tls_count_refs();
+#endif /* GC_SUPPORT */
 
 #endif /* USE_TLS */
 

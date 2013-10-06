@@ -316,6 +316,9 @@ main (int argc, char **argv)
 #  ifdef TLS_DEFAULT_KEYFILE
     tls_keyfile = strdup(TLS_DEFAULT_KEYFILE);
 #  endif
+#  ifdef TLS_DEFAULT_KEYDIRECTORY
+    tls_keydirectory = strdup(TLS_DEFAULT_KEYDIRECTORY);
+#  endif
 #  ifdef TLS_DEFAULT_CERTFILE
     tls_certfile = strdup(TLS_DEFAULT_CERTFILE);
 #  endif
@@ -1154,6 +1157,7 @@ typedef enum OptNumber {
 #endif
 #ifdef USE_TLS
  , cTLSkey          /* --tls-key            */
+ , cTLSkeydir       /* --tls-keydirectory   */
  , cTLScert         /* --tls-cert           */
  , cTLStrustdir     /* --tls-trustdirectory */
  , cTLStrustfile    /* --tls-trustfile      */
@@ -1553,7 +1557,21 @@ static Option aOptions[]
         "    Use <pathname> as the x509 keyfile, default is 'none'.\n"
 #  endif
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
-        "    If 'none' is given TLS is deactivated.\n"
+        "    If 'none' is given and no key directory is specified TLS is deactivated.\n"
+      }
+
+    , { 0,   "tls-keydirectory",      cTLSkeydir,         MY_TRUE
+      , "  --tls-keydirectory <pathname>|none\n"
+      , "  --tls-keydirectory <pathname>|none\n"
+        "    Use <pathname> as the directory where PEM coded files containing\n"
+        "    the private key and corresponding x509 certificate reside,\n"
+#  ifdef TLS_DEFAULT_KEYDIRECTORY
+        "    default is '" TLS_DEFAULT_KEYDIRECTORY "'.\n"
+#  else
+        "    default is 'none'.\n"
+#  endif
+        "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+        "    If 'none' is given and no key file is specified TLS is deactivated.\n"
       }
 
     , { 0,   "tls-cert",              cTLScert,           MY_TRUE
@@ -1965,6 +1983,12 @@ options (void)
                                                ", x509 key: '"
 #  ifdef TLS_DEFAULT_KEYFILE
                                   TLS_DEFAULT_KEYFILE
+#  else
+                                               "none"
+#  endif
+                                               "', x509 dir: '"
+#  ifdef TLS_DEFAULT_KEYDIRECTORY
+                                  TLS_DEFAULT_KEYDIRECTORY
 #  else
                                                "none"
 #  endif
@@ -2795,6 +2819,15 @@ eval_arg (int eOption, const char * pValue)
             tls_keyfile = NULL;
         else
             tls_keyfile = strdup(pValue);
+        break;
+
+    case cTLSkeydir:
+        if (tls_keydirectory != NULL)
+            free(tls_keydirectory);
+        if (!strcmp(pValue, "none"))
+            tls_keydirectory = NULL;
+        else
+            tls_keydirectory = strdup(pValue);
         break;
 
     case cTLScert:

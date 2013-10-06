@@ -9,19 +9,10 @@
 
 #if defined(USE_TLS) && defined(HAS_GNUTLS)
 
+#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <dirent.h>
-#define generic_dirent dirent
-#define DIRENT_NLENGTH(dirent) (strlen((dirent)->d_name))
-
-#ifndef S_ISREG
-#    define S_ISREG(m) (((m)&S_IFMT) == S_IFREG)
-#endif
-
 
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
@@ -31,6 +22,7 @@
 #include "actions.h"
 #include "array.h"
 #include "comm.h"
+#include "gcollect.h"
 #include "interpret.h"
 #include "main.h"
 #include "mstrings.h"
@@ -40,6 +32,24 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/tls.h"
+/*-------------------------------------------------------------------------*/
+/* Structs */
+
+/* Maximum number of certificates in a certificate chain.
+ * If there are more certificates in the chain, the chain will not be loaded
+ * and an error is logged.
+ */
+#define MAX_CHAIN_LENGTH 10
+
+/* One server key and corresponding certicate chain. */
+struct tls_key_s
+{
+    char fingerprint[20]; /* SHA1 */
+    gnutls_x509_crt_t cert[MAX_CHAIN_LENGTH];
+    gnutls_x509_privkey_t key;
+    unsigned int num_certs;
+};
+
 /*-------------------------------------------------------------------------*/
 /* Variables */
 
@@ -52,6 +62,15 @@ static gnutls_certificate_server_credentials x509_cred;
 
 static gnutls_dh_params dh_params;
   /* The Diffie-Hellmann parameters */
+
+static struct tls_key_s* keys;
+  /* Our certificate-key-pairs. */
+
+static int num_keys;
+  /* Number of elements in <keys>. */
+
+static int current_key;
+  /* Index into <keys>. */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -105,6 +124,8 @@ initialize_tls_session (gnutls_session *session, Bool outgoing)
     gnutls_certificate_server_set_request( *session, GNUTLS_CERT_REQUEST);
 
     gnutls_dh_set_prime_bits( *session, DH_BITS);
+
+    gnutls_session_set_ptr( *session, (void*)(intptr_t) current_key);
 } /* initialize_tls_session() */
 
 /*-------------------------------------------------------------------------*/
@@ -149,12 +170,294 @@ tls_xfree (void *p)
 } /* tls_xfree() */
 
 /*-------------------------------------------------------------------------*/
+static gnutls_datum_t
+tls_read_file (const char * fname, const char * desc)
+
+/* Reads a file fully into memory.
+ *
+ * On error returns .data = NULL and logs the error
+ * (with <desc> as the description of the file type).
+ *
+ * Otherwise .data contains the file's content in an xalloced memory block
+ * (of .size bytes). It's the caller's responsibility to xfree it afterwards.
+ */
+
+{
+    gnutls_datum_t result = { NULL, 0 };
+    FILE * file;
+
+    file = fopen(fname, "rt");
+    if (!file)
+        return result;
+
+    fseek(file, 0, SEEK_END);
+    result.size = ftell(file);
+    if (result.size < 0)
+    {
+        fclose(file);
+        if (desc)
+        {
+            printf("%s TLS: Can't read %s: %s.\n"
+                  , time_stamp(), desc, strerror(errno));
+            debug_message("%s TLS: Can't read %s: %s\n"
+                         , time_stamp(), desc, strerror(errno));
+        }
+        return result;
+    }
+
+    result.data = xalloc(result.size);
+    if (result.data == NULL)
+    {
+        fclose(file);
+        if (desc)
+        {
+            printf("%s TLS: Can't read %s: Out of memory.\n"
+                  , time_stamp(), desc);
+            debug_message("%s TLS: Can't read %s: Out of memory.\n"
+                         , time_stamp(), desc);
+        }
+        return result;
+    }
+
+    fseek(file, 0, SEEK_SET);
+    if (fread(result.data, 1, result.size, file) < result.size)
+    {
+        fclose(file);
+        xfree(result.data);
+        result.data = NULL;
+
+        if (desc)
+        {
+            printf("%s TLS: Can't read %s: %s.\n"
+                  , time_stamp(), desc, strerror(errno));
+            debug_message("%s TLS: Can't read %s: %s\n"
+                         , time_stamp(), desc, strerror(errno));
+        }
+        return result;
+    }
+
+    fclose(file);
+
+    return result;
+}
+
+/*-------------------------------------------------------------------------*/
+static Bool
+tls_read_cert (int pos, const char * key, const char * cert)
+
+/* Reads a key and certificate from the given files into keys[pos].
+ * <key> and <cert> should be absolute filenames
+ * (or relative to current i.e. mudlib directory).
+ * cert may be NULL, then it will be read from the key file.
+ *
+ * Returns MY_TRUE on success.
+ */
+
+{
+    int err;
+    size_t fpsize;
+    gnutls_datum_t data;
+
+    /* Load the key. */
+
+    data = tls_read_file(key, cert ? "key" : "key and certificate");
+    if (data.data == NULL)
+        return MY_FALSE;
+
+    gnutls_x509_privkey_init(&keys[pos].key);
+    err = gnutls_x509_privkey_import(keys[pos].key, &data, GNUTLS_X509_FMT_PEM);
+    if (err < 0)
+    {
+        printf("%s TLS: Error loading x509 key from '%s': %s\n"
+              , time_stamp(), key, gnutls_strerror(err));
+        debug_message("%s TLS: Error loading x509 key from '%s': %s\n"
+                     , time_stamp(), key, gnutls_strerror(err));
+        gnutls_x509_privkey_deinit(keys[pos].key);
+        xfree(data.data);
+        return MY_FALSE;
+    }
+
+    /* Load the ceriticate chain. */
+
+    if (cert)
+    {
+        /* The certificate has its own file. */
+        xfree(data.data);
+        data = tls_read_file(cert, "certificate");
+        if (data.data == NULL)
+        {
+            gnutls_x509_privkey_deinit(keys[pos].key);
+            return MY_FALSE;
+        }
+    }
+
+    keys[pos].num_certs = MAX_CHAIN_LENGTH;
+    err = gnutls_x509_crt_list_import(keys[pos].cert, &keys[pos].num_certs, &data, GNUTLS_X509_FMT_PEM, 
+#if GNUTLS_VERSION_MAJOR >= 3
+        GNUTLS_X509_CRT_LIST_FAIL_IF_UNSORTED | GNUTLS_X509_CRT_LIST_IMPORT_FAIL_IF_EXCEED
+#else
+        GNUTLS_X509_CRT_LIST_IMPORT_FAIL_IF_EXCEED
+#endif
+    );
+    if (err < 0 || keys[pos].num_certs == 0)
+    {
+        printf("%s TLS: Error loading x509 certificate from '%s': %s\n"
+              , time_stamp(), cert ? cert : key, gnutls_strerror(err));
+        debug_message("%s TLS: Error loading x509 certificate from '%s': %s\n"
+                     , time_stamp(), cert ? cert : key, gnutls_strerror(err));
+        gnutls_x509_privkey_deinit(keys[pos].key);
+        xfree(data.data);
+        return MY_FALSE;
+    }
+
+    xfree(data.data);
+
+    /* Generate and log its fingerprint. */
+
+    fpsize = sizeof(keys[pos].fingerprint);
+    err = gnutls_x509_crt_get_fingerprint(keys[pos].cert[0], GNUTLS_DIG_SHA1, keys[pos].fingerprint, &fpsize);
+    if (err < 0)
+    {
+        printf("%s TLS: Error calculating fingerprint from '%s': %s\n"
+              , time_stamp(), cert ? cert : key, gnutls_strerror(err));
+        debug_message("%s TLS: Error calculating fingerprint from '%s': %s\n"
+                     , time_stamp(), cert ? cert : key, gnutls_strerror(err));
+
+        gnutls_x509_privkey_deinit(keys[pos].key);
+        for (int i = 0; i < keys[pos].num_certs; ++i)
+            gnutls_x509_crt_deinit(keys[pos].cert[i]);
+        return MY_FALSE;
+    }
+
+    assert(fpsize == sizeof(keys[pos].fingerprint));
+
+    printf("%s TLS: (GnuTLS) X509 certificate from '%s': "
+          , time_stamp(), cert ? cert : key);
+    debug_message("%s TLS: (GnuTLS) X509 certificate from '%s': "
+                 , time_stamp(), cert ? cert : key);
+
+    for (int i = 0; i < sizeof(keys[pos].fingerprint); ++i)
+    {
+        printf( i ? ":%02X" : "%02X", (unsigned char) keys[pos].fingerprint[i] );
+        debug_message( i ? ":%02X" : "%02X", (unsigned char) keys[pos].fingerprint[i] );
+    }
+
+    printf("\n");
+    debug_message("\n");
+
+    return MY_TRUE;
+}
+
+/*-------------------------------------------------------------------------*/
+static void
+tls_free_keys (void)
+
+/* Free all keys and certificates held in <keys>.
+ */
+{
+    if (keys)
+    {
+        for (int i = 0; i < num_keys; ++i)
+        {
+            gnutls_x509_privkey_deinit(keys[i].key);
+            for (int j = 0; j < keys[i].num_certs; ++j)
+                gnutls_x509_crt_deinit(keys[i].cert[j]);
+        }
+        xfree(keys);
+    }
+}
+
+/*-------------------------------------------------------------------------*/
 void
 tls_verify_init (void)
 
-/* initialize or reinitialize tls certificate storage and revocation lists.
+/* Initialize or reinitialize tls certificate storage and revocation lists.
+ *
+ * If there are no keys and certificates to be loaded, then this function
+ * will keep the current keys, because there should be at least one key
+ * to keep TLS working. We might still end up with no keys, if all files
+ * are unreadable or contain no valid keys and certificates.
+ * CAs and CRLs are cleared and reloaded in any case.
  */
 {
+    struct tls_dir_s dir;
+    const char* fname;
+    char oldfingerprint[sizeof(keys[0].fingerprint)];
+    Bool havefingerprint = MY_FALSE;
+    int num = 0;
+
+    /* Remember the current key. */
+    if (keys)
+    {
+        memcpy(oldfingerprint, keys[current_key].fingerprint, sizeof(oldfingerprint));
+        havefingerprint = MY_TRUE;
+    }
+    current_key = 0;
+
+    if (tls_opendir(tls_keydirectory, "key and certificate", &dir))
+    {
+        /* First get the number of pairs */
+        while (tls_readdir(&dir) != NULL)
+            num++;
+
+    }
+    if (tls_keyfile)
+        num++;
+
+    if (num)
+    {
+        tls_free_keys();
+
+        num_keys = 0;
+        keys = xalloc(sizeof(struct tls_key_s) * num);
+
+        if (!keys)
+        {
+            printf("%s TLS: Error loading %d keys: Out of memory.\n"
+                  , time_stamp(), num);
+            debug_message("%s TLS: Error loading %d keys: Out of memory.\n"
+                         , time_stamp(), num);
+        }
+    }
+
+    if (num && keys)
+    {
+        if (tls_keyfile)
+        {
+            if (tls_read_cert(0, tls_keyfile, tls_certfile))
+                num_keys++;
+        }
+
+        if (num_keys < num)
+        {
+            tls_opendir(tls_keydirectory, NULL, &dir);
+            while ((fname = tls_readdir(&dir)) != NULL)
+            {
+                /* Some files mysteriously appeared,
+                 * but we have to finish the tls_readdir loop.
+                 */
+                if (num_keys >= num)
+                    continue;
+
+                if (tls_read_cert(num_keys, fname, NULL))
+                    num_keys++;
+            }
+        }
+
+        /* Restore the old current key, if it's there.
+         * Otherwise fail silently (then the first
+         * found key will be the new current key).
+         *
+         * We do this silently because it's the usual
+         * case with just a key file and no key directory.
+         * In the other case the mudlib will hopefully
+         * select the right key before the next TLS session starts.
+         */
+        if (havefingerprint)
+            tls_set_certificate(oldfingerprint, sizeof(oldfingerprint));
+    }
+
+    /* CAs are reloaded in any case, even if there are no certificates there. */
     gnutls_certificate_free_cas(x509_cred);
 
     if (tls_trustfile != NULL)
@@ -175,70 +478,7 @@ tls_verify_init (void)
                          , time_stamp(), gnutls_strerror(err));
         }
     }
-
-    if (tls_trustdirectory)
-    {
-        DIR * d;
-        char *fname;
-        size_t dirlen;
-        int err;
-
-        printf("%s TLS: (GnuTLS) trusted x509 certificates from directory '%s'.\n"
-              , time_stamp(), tls_trustdirectory);
-        debug_message("%s TLS: (GnuTLS) trusted x509 certificates from directory '%s'.\n"
-                     , time_stamp(), tls_trustdirectory);
-
-        dirlen = strlen(tls_trustdirectory);
-        fname = (char*) xalloc(dirlen + NAME_MAX + 2);
-        if (!fname)
-        {
-            errno = ENOMEM;
-            d = NULL;
-        }
-        else
-        {
-            strcpy(fname, tls_trustdirectory);
-            fname[dirlen++] = '/';
-            d = opendir(tls_trustdirectory);
-        }
-
-        if (d == NULL)
-        {
-            printf("%s TLS: Can't read trust directory: %s.\n"
-                  , time_stamp(), strerror(errno));
-            debug_message("%s TLS: Can't read trust directory: %s\n"
-                         , time_stamp(), strerror(errno));
-        }
-        else
-        {
-            struct dirent *file;
-
-            while ((file = readdir(d)) != NULL)
-            {
-                struct stat st;
-
-                strcpy(fname+dirlen, file->d_name);
-                stat(fname, &st);
-
-                if (S_ISREG(st.st_mode))
-                {
-                    err = gnutls_certificate_set_x509_trust_file(x509_cred, fname, GNUTLS_X509_FMT_PEM);
-                    if (err < 0)
-                    {
-                        printf("%s TLS: Error setting x509 verification certificates from '%s': %s\n"
-                              , time_stamp(), fname, gnutls_strerror(err));
-                        debug_message("%s TLS: Error setting x509 verification certificates from '%s': %s\n"
-                                     , time_stamp(), fname, gnutls_strerror(err));
-                    }
-                }
-            }
-
-            closedir(d);
-        }
-
-        xfree(fname);
-    }
-    else if(tls_trustfile == NULL)
+    else if(tls_trustdirectory == NULL)
     {
         printf("%s TLS: (GnuTLS) Trusted x509 certificates locations not specified.\n"
               , time_stamp());
@@ -246,6 +486,22 @@ tls_verify_init (void)
                      , time_stamp());
     }
 
+    tls_opendir(tls_trustdirectory, "trusted x509 certificates", &dir);
+    while ((fname = tls_readdir(&dir)) != NULL)
+    {
+        int err;
+
+        err = gnutls_certificate_set_x509_trust_file(x509_cred, fname, GNUTLS_X509_FMT_PEM);
+        if (err < 0)
+        {
+            printf("%s TLS: Error setting x509 verification certificates from '%s': %s\n"
+                  , time_stamp(), fname, gnutls_strerror(err));
+            debug_message("%s TLS: Error setting x509 verification certificates from '%s': %s\n"
+                         , time_stamp(), fname, gnutls_strerror(err));
+        }
+    }
+
+    /* CRLs are also reloaded in any case, even if it's empty. */
     gnutls_certificate_free_crls(x509_cred);
     if (tls_crlfile != NULL)
     {
@@ -265,76 +521,138 @@ tls_verify_init (void)
                          , time_stamp(), gnutls_strerror(err));
         }
     }
-
-    if (tls_crldirectory)
-    {
-        DIR * d;
-        char *fname;
-        size_t dirlen;
-        int err;
-
-        printf("%s TLS: (GnuTLS) CRLs from directory '%s'.\n"
-              , time_stamp(), tls_crldirectory);
-        debug_message("%s TLS: (GnuTLS) CRLs from directory '%s'.\n"
-                     , time_stamp(), tls_crldirectory);
-
-        dirlen = strlen(tls_crldirectory);
-        fname = (char*) xalloc(dirlen + NAME_MAX + 2);
-        if (!fname)
-        {
-            errno = ENOMEM;
-            d = NULL;
-        }
-        else
-        {
-            strcpy(fname, tls_crldirectory);
-            fname[dirlen++] = '/';
-            d = opendir(tls_crldirectory);
-        }
-
-        if (d == NULL)
-        {
-            printf("%s TLS: Can't read CRL directory: %s.\n"
-                  , time_stamp(), strerror(errno));
-            debug_message("%s TLS: Can't read CRL directory: %s\n"
-                         , time_stamp(), strerror(errno));
-        }
-        else
-        {
-            struct dirent *file;
-
-            while ((file = readdir(d)) != NULL)
-            {
-                struct stat st;
-
-                strcpy(fname+dirlen, file->d_name);
-                stat(fname, &st);
-
-                if (S_ISREG(st.st_mode))
-                {
-                    err = gnutls_certificate_set_x509_crl_file(x509_cred, fname, GNUTLS_X509_FMT_PEM);
-                    if (err < 0)
-                    {
-                        printf("%s TLS: Error loading CRL from '%s': %s\n"
-                              , time_stamp(), fname, gnutls_strerror(err));
-                        debug_message("%s TLS: Error loading CRL from '%s': %s\n"
-                                     , time_stamp(), fname, gnutls_strerror(err));
-                    }
-                }
-            }
-
-            closedir(d);
-        }
-
-        xfree(fname);
-    }
-    else if(!tls_crlfile)
+    else if(!tls_crldirectory)
     {
         printf("%s TLS: (GnuTLS) CRL checking disabled.\n"
               , time_stamp());
         debug_message("%s TLS: (GnuTLS) CRL checking disabled.\n"
                      , time_stamp());
     }
+
+    tls_opendir(tls_crldirectory, "CRLs", &dir);
+    while ((fname = tls_readdir(&dir)) != NULL)
+    {
+        int err;
+
+        err = gnutls_certificate_set_x509_crl_file(x509_cred, fname, GNUTLS_X509_FMT_PEM);
+        if (err < 0)
+        {
+            printf("%s TLS: Error loading CRL from '%s': %s\n"
+                  , time_stamp(), fname, gnutls_strerror(err));
+            debug_message("%s TLS: Error loading CRL from '%s': %s\n"
+                         , time_stamp(), fname, gnutls_strerror(err));
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------*/
+#if GNUTLS_VERSION_MAJOR >= 3 || (GNUTLS_VERSION_MAJOR == 2 && GNUTLS_VERSION_MINOR >= 11)
+static int
+tls_select_certificate (gnutls_session_t session
+                       , const gnutls_datum_t *requested_dns
+                       , int num_requested_dns
+                       , const gnutls_pk_algorithm_t *available_algos
+                       , int num_available_algos
+                       , gnutls_retr2_st * st)
+
+/* Called from GnuTLS to select a certificate and key to use.
+ *
+ * We store the index into our key list as the GnuTLS session
+ * pointer (pointer for private use in a session object).
+ * Note that it's really not a pointer, just the plain index.
+ */
+
+{
+    int keyidx = (intptr_t) gnutls_session_get_ptr( session );
+
+    if (!keys)
+    {
+        st->ncerts = 0;
+
+        return 0;
+    }
+
+    /* There was a tls_refresh_certs() during handshake? */
+    if (keyidx >= num_keys)
+        keyidx = current_key;
+
+    st->ncerts = keys[keyidx].num_certs;
+    st->cert.x509 = keys[keyidx].cert;
+    st->key.x509 = keys[keyidx].key;
+    st->cert_type = GNUTLS_CRT_X509;
+    st->key_type = GNUTLS_PRIVKEY_X509;
+    st->deinit_all = 0;
+
+    return 0;
+}
+#else
+static int
+tls_select_server_certificate (gnutls_session_t session
+                              , gnutls_retr_st * st)
+
+/* Called from GnuTLS to select a certificate and key to use.
+ */
+
+{
+    int keyidx = (intptr_t) gnutls_session_get_ptr( session );
+
+    if (!keys)
+    {
+        st->ncerts = 0;
+
+        return 0;
+    }
+
+    /* There was a tls_refresh_certs() during handshake? */
+    if (keyidx >= num_keys)
+        keyidx = current_key;
+
+    st->ncerts = keys[keyidx].num_certs;
+    st->cert.x509 = keys[keyidx].cert;
+    st->key.x509 = keys[keyidx].key;
+    st->type = GNUTLS_CRT_X509;
+    st->deinit_all = 0;
+
+    return 0;
+}
+
+static int
+tls_select_client_certificate (gnutls_session_t session
+                              , const gnutls_datum_t *requested_dns
+                              , int num_requested_dns
+                              , const gnutls_pk_algorithm_t *available_algos
+                              , int num_available_algos
+                              , gnutls_retr_st * st)
+{
+    return tls_select_server_certificate(session, st);
+}
+
+#endif
+/*-------------------------------------------------------------------------*/
+Bool
+tls_set_certificate (char *fingerprint, int len)
+
+/* Sets the certificate used for the next sessions.
+ * <fingerprint> contains the certificate's fingerprint as
+ * <len> raw bytes. As long as we're using SHA1 <len>
+ * should by 20.
+ */
+
+{
+    if (len != sizeof(keys[0].fingerprint))
+        return MY_FALSE;
+
+    if (!keys)
+        return MY_FALSE;
+
+    for (int i = 0; i < num_keys; ++i)
+        if (!memcmp(fingerprint, keys[i].fingerprint, len))
+        {
+            current_key = i;
+            return MY_TRUE;
+        }
+
+    return MY_FALSE;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -345,13 +663,14 @@ tls_global_init (void)
  */
 
 {
-    int f;
-
-    if (tls_keyfile == NULL)
+    if (tls_keyfile == NULL && tls_keydirectory == NULL)
     {
         printf("%s TLS deactivated.\n", time_stamp());
         return;
     }
+
+    keys = NULL;
+    current_key = 0;
 
     /* In order to be able to identify gnutls allocations as such, we redirect
      * all allocations through the driver's allocator. The wrapper functions
@@ -368,31 +687,20 @@ tls_global_init (void)
 
     gnutls_certificate_allocate_credentials(&x509_cred);
 
-    printf("%s TLS: (GnuTLS) x509 keyfile '%s', certfile '%s'\n"
-          , time_stamp(), tls_keyfile, tls_certfile);
-    debug_message("%s TLS: (GnuTLS) Keyfile '%s', Certfile '%s'\n"
-                 , time_stamp(), tls_keyfile, tls_certfile);
+#if GNUTLS_VERSION_MAJOR >= 3 || (GNUTLS_VERSION_MAJOR == 2 && GNUTLS_VERSION_MINOR >= 11)
+    gnutls_certificate_set_retrieve_function(x509_cred, &tls_select_certificate);
+#else
+    gnutls_certificate_client_set_retrieve_function(x509_cred, &tls_select_client_certificate);
+    gnutls_certificate_server_set_retrieve_function(x509_cred, &tls_select_server_certificate);
+#endif
 
-    f = gnutls_certificate_set_x509_key_file(x509_cred, tls_certfile, tls_keyfile, GNUTLS_X509_FMT_PEM);
-    if (f < 0)
-    {
-        printf("%s TLS: Error setting x509 keyfile: %s\n"
-              , time_stamp(), gnutls_strerror(f));
-        debug_message("%s TLS: Error setting x509 keyfile: %s\n"
-                     , time_stamp(), gnutls_strerror(f));
-    }
-    else
-    {
-        printf("%s TLS: x509 keyfile and certificate set.\n", time_stamp());
+    tls_verify_init();
 
-        tls_verify_init();
+    generate_dh_params();
 
-        generate_dh_params();
+    gnutls_certificate_set_dh_params(x509_cred, dh_params);
 
-        gnutls_certificate_set_dh_params( x509_cred, dh_params);
-
-        tls_is_available = MY_TRUE;
-    }
+    tls_is_available = MY_TRUE;
 
 } /* tls_global_init() */
 
@@ -407,6 +715,9 @@ tls_global_deinit (void)
     if (tls_is_available)
     {
         gnutls_certificate_free_credentials(x509_cred);
+        gnutls_dh_params_deinit(dh_params);
+
+        tls_free_keys();
     }
 
     gnutls_global_deinit();
@@ -893,6 +1204,32 @@ tls_available ()
     return tls_is_available;
 } /* tls_available() */
 
+
+#ifdef GC_SUPPORT
+
+/*-------------------------------------------------------------------------*/
+void
+tls_clear_refs ()
+
+/* GC Support: Clear all reference counts.
+ */
+
+{
+    /* Nothing to do, we reference no ref-counted objects. */
+} /* tls_clear_refs() */
+
+/*-------------------------------------------------------------------------*/
+void
+tls_count_refs ()
+
+/* GC Support: Mark all references to xalloc'ed memory.
+ */
+
+{
+    note_malloced_block_ref(keys);
+} /* tls_count_refs() */
+
+#endif /* GC_SUPPORT */
 
 /***************************************************************************/
 #endif /* USE_TLS && HAS_GNUTLS */

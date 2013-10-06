@@ -14,5 +14,6 @@
 #define DC_ENABLE_HEART_BEATS  1
 #define DC_LONG_EXEC_TIME      2
 #define DC_DATA_CLEAN_TIME     3
+#define DC_TLS_CERTIFICATE     4
 
 #endif /* LPC_CONFIGURATION_H_ */

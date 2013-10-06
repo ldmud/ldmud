@@ -31,6 +31,7 @@
 #include "actions.h"
 #include "array.h"
 #include "comm.h"
+#include "gcollect.h"
 #include "interpret.h"
 #include "main.h"
 #include "mstrings.h"
@@ -45,6 +46,17 @@
 #define PRNG_RESEED_PERIOD 1800
 
 /*-------------------------------------------------------------------------*/
+/* Structs */
+
+/* One server key and corresponding certificate. */
+struct tls_key_s
+{
+    unsigned char fingerprint[SHA_DIGEST_LENGTH]; /* SHA1 */
+    X509 *cert;
+    EVP_PKEY *key;
+};
+
+/*-------------------------------------------------------------------------*/
 /* Variables */
 
 static Bool tls_is_available = MY_FALSE;
@@ -56,6 +68,15 @@ static SSL_CTX * context = NULL;
 
 static DH *dhe1024 = NULL;
   /* The Diffie-Hellmann parameters. */
+
+static struct tls_key_s* keys;
+  /* Our certificate-key-pairs. */
+
+static int num_keys;
+  /* Number of elements in <keys>. */
+
+static int current_key;
+  /* Index into <keys>. */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -204,13 +225,250 @@ tls_add_entropy()
 } /* tls_add_entropy */
 
 /*-------------------------------------------------------------------------*/
+static Bool
+tls_read_cert (int pos, const char * key, const char * cert)
+
+/* Reads a key and certificate into keys[pos].
+ * <key> and <cert> should be absolute filenames
+ * (or relative to current i.e. mudlib directory).
+ * cert may be NULL, then it will be read from the key file.
+ *
+ * Returns MY_TRUE on success.
+ */
+
+{
+    FILE *file;
+    unsigned int fpsize;
+
+    /* Load the key. */
+
+    file  = fopen(key, "rt");
+    if (!file)
+    {
+        printf("%s TLS: Can't read %s: %s.\n"
+              , time_stamp(), key, strerror(errno));
+        debug_message("%s TLS: Can't read %s: %s\n"
+                     , time_stamp(), key, strerror(errno));
+        return MY_FALSE;
+    }
+
+    keys[pos].key = PEM_read_PrivateKey(file, NULL, NULL, NULL);
+    if (keys[pos].key == NULL)
+    {
+        int err = ERR_get_error();
+        if (err)
+        {
+            char * errstring = ERR_error_string(err, NULL);
+            printf("%s TLS: Error reading key from '%s': %s.\n"
+                  , time_stamp(), key, errstring);
+            debug_message("%s TLS: Error reading key from '%s': %s.\n"
+                         , time_stamp(), key, errstring);
+        }
+        else
+        {
+            printf("%s TLS: Error reading key from '%s'.\n"
+                  , time_stamp(), key);
+            debug_message("%s TLS: Error reading key from '%s'.\n"
+                         , time_stamp(), key);
+        }
+
+        fclose(file);
+        return MY_FALSE;
+    }
+
+    /* Load our certificate (chain). */
+
+    if (cert)
+    {
+        /* The certificate has its own file. */
+        fclose(file);
+        file = fopen(cert, "rt");
+        if (!file)
+        {
+            printf("%s TLS: Can't read %s: %s.\n"
+                  , time_stamp(), cert ? cert : key, strerror(errno));
+            debug_message("%s TLS: Can't read %s: %s\n"
+                         , time_stamp(), cert ? cert : key, strerror(errno));
+            EVP_PKEY_free(keys[pos].key);
+            return MY_FALSE;
+        }
+    }
+    else
+        /* It's in the key file, read again. */
+        fseek(file, 0, SEEK_SET);
+
+    keys[pos].cert = PEM_read_X509(file, NULL, NULL, NULL);
+    if (keys[pos].cert == NULL)
+    {
+        int err = ERR_get_error();
+        if (err)
+        {
+            char * errstring = ERR_error_string(err, NULL);
+            printf("%s TLS: Error reading certificate from '%s': %s.\n"
+                  , time_stamp(), cert ? cert : key, errstring);
+            debug_message("%s TLS: Error reading key from '%s': %s.\n"
+                         , time_stamp(), cert ? cert : key, errstring);
+        }
+        else
+        {
+            printf("%s TLS: Error reading key from '%s'.\n"
+                  , time_stamp(), cert ? cert : key);
+            debug_message("%s TLS: Error reading key from '%s'.\n"
+                         , time_stamp(), cert ? cert : key);
+        }
+
+        fclose(file);
+        EVP_PKEY_free(keys[pos].key);
+
+        return MY_FALSE;
+    }
+
+    fclose(file);
+
+    /* Generate and log its fingerprint. */
+
+    fpsize = sizeof(keys[pos].fingerprint);
+    if (!X509_digest(keys[pos].cert, EVP_sha1(), keys[pos].fingerprint, &fpsize))
+    {
+        int err = ERR_get_error();
+        if (err)
+        {
+            char * errstring = ERR_error_string(err, NULL);
+            printf("%s TLS: Error calculating fingerprint from '%s': %s.\n"
+                  , time_stamp(), cert ? cert : key, errstring);
+            debug_message("%s TLS: Error calculating fingerprint from '%s': %s.\n"
+                         , time_stamp(), cert ? cert : key, errstring);
+        }
+        else
+        {
+            printf("%s TLS: Error calculating fingerprint from '%s'.\n"
+                  , time_stamp(), cert ? cert : key);
+            debug_message("%s TLS: Error calculating fingerprint from '%s'.\n"
+                         , time_stamp(), cert ? cert : key);
+        }
+
+        EVP_PKEY_free(keys[pos].key);
+        X509_free(keys[pos].cert);
+        return MY_FALSE;
+    }
+    assert(fpsize == sizeof(keys[pos].fingerprint));
+
+    printf("%s TLS: (OpenSSL) X509 certificate from '%s': "
+          , time_stamp(), cert ? cert : key);
+    debug_message("%s TLS: (OpenSSL) X509 certificate from '%s': "
+                 , time_stamp(), cert ? cert : key);
+
+    for (int i = 0; i < sizeof(keys[pos].fingerprint); ++i)
+    {
+        printf( i ? ":%02X" : "%02X", (unsigned char) keys[pos].fingerprint[i] );
+        debug_message( i ? ":%02X" : "%02X", (unsigned char) keys[pos].fingerprint[i] );
+    }
+
+    printf("\n");
+    debug_message("\n");
+
+    return MY_TRUE;
+}
+
+/*-------------------------------------------------------------------------*/
+static void
+tls_free_keys (void)
+
+/* Free all keys and certificates held in <keys>.
+ */
+{
+    if (keys)
+    {
+        for (int i = 0; i < num_keys; ++i)
+        {
+            EVP_PKEY_free(keys[i].key);
+            X509_free(keys[i].cert);
+        }
+        xfree(keys);
+    }
+}
+
+/*-------------------------------------------------------------------------*/
 void
 tls_verify_init (void)
 
 /* initialize or reinitialize tls certificate storage and revocation lists
+ *
+ * If there are no keys and certificates to be loaded, then this function
+ * will keep the current keys, because there should be at least one key
+ * to keep TLS working. We might still end up with no keys, if all files
+ * are unreadable or contain no valid keys and certificates.
+ * CAs and CRLs are cleared and reloaded in any case.
  */
 {
     STACK_OF(X509_NAME) *stack = NULL;
+    char oldfingerprint[sizeof(keys[0].fingerprint)];
+    Bool havefingerprint = MY_FALSE;
+    struct tls_dir_s dir;
+    const char * fname;
+    int num = 0;
+
+    /* Remember the current key. */
+    if (keys)
+    {
+        memcpy(oldfingerprint, keys[current_key].fingerprint, sizeof(oldfingerprint));
+        havefingerprint = MY_TRUE;
+    }
+    current_key = 0;
+
+    if (tls_opendir(tls_keydirectory, "key and certificate", &dir))
+    {
+        /* First get the number of pairs */
+        while (tls_readdir(&dir) != NULL)
+            num++;
+
+    }
+    if (tls_keyfile)
+        num++;
+
+    if (num)
+    {
+        tls_free_keys();
+
+        num_keys = 0;
+        keys = xalloc(sizeof(struct tls_key_s) * num);
+
+        if (!keys)
+        {
+            printf("%s TLS: Error loading %d keys: Out of memory.\n"
+                  , time_stamp(), num);
+            debug_message("%s TLS: Error loading %d keys: Out of memory.\n"
+                         , time_stamp(), num);
+        }
+    }
+
+    if (num && keys)
+    {
+        if (tls_keyfile)
+        {
+            if (tls_read_cert(0, tls_keyfile, tls_certfile))
+                num_keys++;
+        }
+
+        if (num_keys < num)
+        {
+            tls_opendir(tls_keydirectory, NULL, &dir);
+            while ((fname = tls_readdir(&dir)) != NULL)
+            {
+                /* Some files mysteriously appeared,
+                 * but we have to finish the tls_readdir loop.
+                 */
+                if (num_keys >= num)
+                    continue;
+
+                if (tls_read_cert(num_keys, fname, NULL))
+                    num_keys++;
+            }
+        }
+
+        if (havefingerprint)
+            tls_set_certificate(oldfingerprint, sizeof(oldfingerprint));
+    }
 
     if (tls_trustfile != NULL && tls_trustdirectory != NULL)
     {
@@ -241,6 +499,10 @@ tls_verify_init (void)
                      , time_stamp());
     }
 
+    /* CRLs are reloaded in any case, even if there are no certificates there.
+     * Only skip this, if there were never any (nothing specified on the command line or
+     * at compile time).
+     */
     if (tls_crlfile != NULL || tls_crldirectory != NULL)
     {
         X509_STORE *store = X509_STORE_new();
@@ -311,6 +573,7 @@ tls_verify_init (void)
         }
     }
 
+    /* CAs are also reloaded in any case, even if there are no certificates there. */
     if (!SSL_CTX_load_verify_locations(context, tls_trustfile, tls_trustdirectory))
     {
         printf("%s TLS: Error preparing x509 verification certificates\n",
@@ -340,6 +603,33 @@ tls_verify_init (void)
 }
 
 /*-------------------------------------------------------------------------*/
+Bool
+tls_set_certificate (char *fingerprint, int len)
+
+/* Sets the certificate used for the next sessions.
+ * <fingerprint> contains the certificate's fingerprint as
+ * <len> raw bytes. As long as we're using SHA1 <len>
+ * should by 20.
+ */
+
+{
+    if (len != sizeof(keys[0].fingerprint))
+        return MY_FALSE;
+
+    if (!keys)
+        return MY_FALSE;
+
+    for (int i = 0; i < num_keys; ++i)
+        if (!memcmp(fingerprint, keys[i].fingerprint, len))
+        {
+            current_key = i;
+            return MY_TRUE;
+        }
+
+    return MY_FALSE;
+}
+
+/*-------------------------------------------------------------------------*/
 void
 tls_global_init (void)
 
@@ -347,11 +637,14 @@ tls_global_init (void)
  */
 
 {
-    if (tls_keyfile == NULL)
+    if (tls_keyfile == NULL && tls_keydirectory == NULL)
     {
         printf("%s TLS deactivated.\n", time_stamp());
         return;
     }
+
+    keys = NULL;
+    current_key = 0;
 
     printf("%s TLS: (OpenSSL) x509 keyfile '%s', certfile '%s'\n"
           , time_stamp(), tls_keyfile, tls_certfile);
@@ -422,23 +715,6 @@ tls_global_init (void)
     SSL_CTX_set_mode(context, SSL_MODE_ENABLE_PARTIAL_WRITE);
     SSL_CTX_set_session_id_context(context, (unsigned char*) "ldmud", 5);
 
-    if (!SSL_CTX_use_PrivateKey_file(context, tls_keyfile, SSL_FILETYPE_PEM))
-    {
-        printf("%s TLS: Error setting x509 keyfile:\n"
-              , time_stamp());
-        debug_message("%s TLS: Error setting x509 keyfile:\n"
-              , time_stamp());
-        goto ssl_init_err;
-    }
-
-    if (!SSL_CTX_use_certificate_file(context, tls_certfile, SSL_FILETYPE_PEM))
-    {
-        printf("%s TLS: Error setting x509 certfile:\n"
-              , time_stamp());
-        debug_message("%s TLS: Error setting x509 certfile:\n"
-              , time_stamp());
-        goto ssl_init_err;
-    }
     tls_verify_init();
 
     if (!set_dhe1024()
@@ -519,6 +795,8 @@ tls_global_deinit (void)
         SSL_CTX_free(context);
         context = NULL;
     }
+
+    tls_free_keys();
 
     tls_is_available = MY_FALSE;
 
@@ -718,6 +996,11 @@ tls_init_connection (interactive_t *ip)
         /* request a client certificate */
         SSL_set_verify( session, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE
                       , tls_verify_callback);
+    }
+    if (keys)
+    {
+        SSL_use_PrivateKey(session, keys[current_key].key);
+        SSL_use_certificate(session, keys[current_key].cert);
     }
     ip->tls_session = session;
 
@@ -1066,6 +1349,32 @@ calc_digest (digest_t md, void *dest, size_t destlen, void *msg, size_t msglen, 
         EVP_DigestFinal(&ctx, dest, NULL);
     }
 } /* calc_digest() */
+
+#ifdef GC_SUPPORT
+
+/*-------------------------------------------------------------------------*/
+void
+tls_clear_refs ()
+
+/* GC Support: Clear all reference counts.
+ */
+
+{
+    /* Nothing to do, we reference no ref-counted objects. */
+} /* tls_clear_refs() */
+
+/*-------------------------------------------------------------------------*/
+void
+tls_count_refs ()
+
+/* GC Support: Mark all references to xalloc'ed memory.
+ */
+
+{
+    note_malloced_block_ref(keys);
+} /* tls_count_refs() */
+
+#endif /* GC_SUPPORT */
 
 /***************************************************************************/
 #endif /* USE_TLS */

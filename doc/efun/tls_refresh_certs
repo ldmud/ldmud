@@ -5,6 +5,14 @@ SYNOPSIS
 DESCRIPTION
         Reload the certificates and certificate revocation information.
 
+        If there are no key and certificate files to be found, this efun
+        will keep the current keys and certificates, to keep TLS working.
+        CAs and CRLs are cleared and reloaded in any case.
+
+        Note that when using GnuTLS a call to tls_refresh_certs()
+        while a connection is in the middle of a TLS handshake might
+        result in a wrong key to be used.
+
 HISTORY
         Introduced in LDMud 3.3.714/3.2.15.
 
