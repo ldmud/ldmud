@@ -208,17 +208,14 @@ svalue_size (svalue_t *v, mp_int * pTotal)
             composite += total / l->ref;
             l = l->function.lambda;
         }
-        num_values = EXTRACT_UCHAR(&l->function.code[0]);
-        if (num_values == 0xff)
-            num_values = ((svalue_t *)l)[-0xff].u.number;
+        num_values = l->function.code.num_values;
         svp = (svalue_t *)l - num_values;
         if (NULL == register_pointer(ptable, svp)) return 0;
         overhead = sizeof(svalue_t) * num_values + sizeof (char *);
         {
-            bytecode_p p = &l->function.code[2];
+            bytecode_p p = l->function.code.program;
             do {
-                ++p;
-                switch(GET_CODE(p)) {
+                switch(GET_CODE(p++)) {
                   case F_RETURN:
                   case F_RETURN0:
                     break;

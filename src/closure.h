@@ -8,6 +8,7 @@
 #ifdef USE_NEW_INLINES
 #include "svalue.h"
 #endif /* USE_NEW_INLINES */
+#include "exec.h"
 
 /* In case offsetof() is not a compiler builtin include stddef.h which
  * supplies a define as fallback. Needed for LAMBDA_VALUE_OFFSET */
@@ -70,18 +71,16 @@ struct lambda_s
             unsigned short context_size; /* Number of context vars */
         } lfun;
 
-        bytecode_t code[1];
-          /* LAMBDA and UNBOUND_LAMBDA closures: the function code, starting
-           * with uint8 'num_values' and continuing with FUNCTION_NUM_ARGS
-           * (which is where the fun_hdr_p will point to).
-           * 'num_values' is the size of the svalue[] preceeding the lambda;
-           * if it is 0xff, the actual size is stored in
-           * svalue[-0xff].u.number.
+        struct
+        {
+            mp_int num_values;        /* Number of svalues.          */
+            unsigned char num_locals; /* Number of local variables   */
+            unsigned char num_arg;    /* Number of arguments needed. */
+            bytecode_t program[1];
+        } code;
+          /* LAMBDA and UNBOUND_LAMBDA closures: the compiled function code.
+           * 'num_values' is the size of the svalue[] preceeding the lambda.
            */
-#       define LAMBDA_NUM_VALUES(p)  EXTRACT_UCHAR((char *)p)
-#       define LAMBDA_NUM_ARGS(p)    EXTRACT_SCHAR((char *)p + sizeof(char))
-#       define LAMBDA_NUM_VARS(p)    (*((unsigned char *)((char *)p + 2*sizeof(char))))
-#       define LAMBDA_CODE(p)        ((bytecode_p)((unsigned char *)p + 3*sizeof(char)))
 
         lambda_t *lambda;
           /* BOUND_LAMBDA: pointer to the UNBOUND_LAMBDA structure.
@@ -99,7 +98,7 @@ struct lambda_s
 };
 
 #define LAMBDA_VALUE_OFFSET \
-  (sizeof(svalue_t) + offsetof(lambda_t, function.code[1]))
+  (sizeof(svalue_t) + offsetof(lambda_t, function.code.program[0]))
   /* Offset from the fun_hdr_p of a lambda closure to the first
    * constant value (the one with index number 0).
    */

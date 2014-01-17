@@ -43,6 +43,10 @@
  *       Through inheritance and cross-definition these functions can
  *       be resolved on a higher level.
  *
+ *   function_t function_headers[]: Contains the function header information
+ *       for each function in the bytecode. The bytecode contains the
+ *       index into this table.
+ *
  *   string_t *strings[]: An array of pointers to the string literals (stored
  *       as shared strings) used by the program. This way the program can
  *       use the strings simply by an (easily swappable) index. The compiler
@@ -464,46 +468,6 @@ enum function_flags {
 };
 
 
-/* --- Function header ---
- *
- * The bytecode for every function is preceeded by a header with the name
- * and information about arguments and types:
- *
- * struct fun_hdr {
- *     shared string_t * name_of_function;   (usually 4 Bytes)
- *     unsigned short    function_index in defining program (usually 2 Bytes)
- *     vartype_t         return_type;        (usually 6 Byte)
- *         References from the return_type are not counted!
- * --> byte              number_formal_args; (1 Byte)
- *         Bit 7: set if the function has a 'varargs' argument
- * TODO: some code makes use of the fact that this makes the number negative
- *         Bit 6..0: the number of arguments
- *     byte              number_local_vars;  (1 Byte)
- *         This includes the svalues needed for the break stack for
- *         switch() statements.
- *     bytecode_t        opcode[...]
- * }
- *
- * The function address given in the program's function block points to
- * .number_formal_args.
- *
- * Since structs introduce uncontrollable padding, access of all fields
- * is implemented using macros taking the 'function address', typedef'd
- * as fun_hdr_p, as argument and evaluate to the desired value.
- *
- * The whole header structure is aligned properly so that the name_of_function
- * pointer and the return_type short can be used directly.
- *
- * Note: Changes here can affect the struct lambda layout and associated
- *       constants.
- * TODO: the other fields should have proper types, too.
- * TODO: the whole information should be in a table, and not in the
- * TODO:: bytecode. See struct program_s.
- */
-
-typedef bytecode_p fun_hdr_p;
-  /* TODO: Make this a void* for now? */
-
 /* TODO: Ugh. I am not convinced that this is a good idea, although I don't
  * TODO::have a better one right now. */
 static const bytecode_p SIMUL_EFUN_FUNSTART = (bytecode_p)-1;
@@ -517,60 +481,26 @@ static const bytecode_p EFUN_FUNSTART = (bytecode_p)-2;
    */
 
 
-static INLINE void * FUNCTION_NAMEP(const fun_hdr_p const p) 
+static INLINE unsigned short* FUNCTION_HEADER_INDEXP(const bytecode_p const p) 
                           __attribute__((nonnull(1))) __attribute__((const));
-static INLINE void * FUNCTION_NAMEP(const fun_hdr_p const p)
+static INLINE unsigned short* FUNCTION_HEADER_INDEXP(const bytecode_p const p)
 {
-    return (char *)p - sizeof(vartype_t) - sizeof(unsigned short) - sizeof(string_t *);
+    return (unsigned short*)((char *)p - sizeof(unsigned short));
 }
-static INLINE unsigned short *FUNCTION_INDEXP(const fun_hdr_p const p) 
+
+static INLINE unsigned short FUNCTION_HEADER_INDEX(const bytecode_p const p) 
                           __attribute__((nonnull(1))) __attribute__((const));
-static INLINE unsigned short *FUNCTION_INDEXP(const fun_hdr_p const p)
+static INLINE unsigned short FUNCTION_HEADER_INDEX(const bytecode_p const p)
 {
-    return ((unsigned short*)((char *)p - sizeof(vartype_t) - sizeof(unsigned short)));
+    return *FUNCTION_HEADER_INDEXP(p);
 }
-static INLINE unsigned short FUNCTION_INDEX(const fun_hdr_p const p) 
-                          __attribute__((nonnull(1))) __attribute__((const));
-static INLINE unsigned short FUNCTION_INDEX(const fun_hdr_p const p)
-{
-    return *FUNCTION_INDEXP(p);
-}
-static INLINE void * FUNCTION_TYPEP(const fun_hdr_p const p) 
-                          __attribute__((nonnull(1))) __attribute__((const));
-static INLINE void * FUNCTION_TYPEP(const fun_hdr_p const p)
-{
-    return (char *)p - sizeof(vartype_t);
-}
-static INLINE int FUNCTION_NUM_ARGS(const fun_hdr_p const p) 
-                          __attribute__((nonnull(1))) __attribute__((pure));
-static INLINE int FUNCTION_NUM_ARGS(const fun_hdr_p const p)
-{
-    return EXTRACT_SCHAR((char *)p);
-}
-static INLINE int FUNCTION_NUM_VARS(const fun_hdr_p const p)
-                          __attribute__((nonnull(1))) __attribute__((pure));
-static INLINE int FUNCTION_NUM_VARS(const fun_hdr_p const p)
-{
-    return EXTRACT_UCHAR((char *)p + sizeof(char));
-}
-static INLINE bytecode_p FUNCTION_CODE(const fun_hdr_p const p)
-                          __attribute__((nonnull(1))) __attribute__((const));
-static INLINE bytecode_p FUNCTION_CODE(const fun_hdr_p const p)
-{
-    return (unsigned char *)p + 2 * sizeof(char);
-}
-static INLINE bytecode_p FUNCTION_FROM_CODE(const fun_hdr_p const p)
-                          __attribute__((nonnull(1))) __attribute__((const));
-static INLINE bytecode_p FUNCTION_FROM_CODE(const fun_hdr_p const p)
-{
-    return (unsigned char *)p - 2 * sizeof(char);
-}
+
 
 enum function_header_sizes {
     /* Number of function header bytes before the function pointer. */
-    FUNCTION_PRE_HDR_SIZE = sizeof(string_t*) + sizeof(unsigned short) + sizeof(vartype_t),
+    FUNCTION_PRE_HDR_SIZE = sizeof(unsigned short),
     /* Number of function header bytes after the function pointer. */
-    FUNCTION_POST_HDR_SIZE = 2 * sizeof(char),
+    FUNCTION_POST_HDR_SIZE = 0,
     /* Total size of the function header. */
     FUNCTION_HDR_SIZE = FUNCTION_PRE_HDR_SIZE + FUNCTION_POST_HDR_SIZE,
 };
@@ -728,9 +658,13 @@ struct program_s
        * functions, inherited and own.
        * Nameless functions (those without an entry in function_names[])
        * are collected at the end of the table.
-       * TODO: Instead of hiding the function information in the bytecode
-       * TODO:: it should be tabled here.
        */
+
+    function_t *function_headers;
+      /* Array [.num_function_headers] of the headers of all functions
+       * in the bytecode.
+       */
+
     string_t **strings;
       /* Array [.num_strings] of the shared strings used by the program.
        * Stored in reverse order at the end of the array are the pointers
@@ -786,6 +720,11 @@ struct program_s
        */
     unsigned short num_functions;
       /* Number of functions (inherited and own) of this program */
+    unsigned short num_function_headers;
+      /* Number of functions in the bytecode (also includes
+       * prototypes, because they get a real function body in
+       * the bytecode).
+       */
     unsigned short num_strings;
       /* Number of shared strings (including filenames) used by the program */
     unsigned short num_includes;
@@ -845,16 +784,32 @@ struct linenumbers_s
  *
  * Structures of this type hold various important pieces of
  * information about a function.
- * The compiler uses this structure to collect the function information
- * of newly defined and inherited functions, of which the former will also
- * be compiled into the function header
- * The simul_efun module uses this structure to look up quickly functions.
+ *
+ * This structure is used in three ways.
+ *
+ * 1) When compiling a program there is a table of all functions
+ *    in this program (A_FUNCTIONS memory block), this includes
+ *    all inherited and newly defined functions as well as
+ *    function prototypes.
+ *
+ * 2) As part of the compiled program .function_headers contains
+ *    all newly defined functions and prototypes. The index for
+ *    a particular function is stored as a 16-bit-word in the
+ *    bytecode just before the first instruction.
+ *
+ * 3) The simul_efun module uses this structure to manage and
+ *    quickly look up all simul efuns.
  */
 
 struct function_s
 {
-    string_t *name;  /* Name of function (shared string) */
+    string_t *name;
+       /* Name of function (shared string).
+        * The reference is counted.
+        */
+
     union {
+        /* These entries are used by the compiler. */
         uint32 pc;       /* lfuns: Address of function header */
         uint32 inherit;  /* Inherit table index from where inherited. */
          int32 func;
@@ -863,17 +818,26 @@ struct function_s
             * Semantik: real-index = this-index + offset.
             * The offset is also stored in the function flags in
             * the program_t.functions[] array.
-            *
-            * simul_efun.c also uses this field as a 'next'
-            * index in the simul_efun function table for
-            * functions that have been discarded due to a
-            * change in the number of arguments.
             */
         function_t *next;        /* used for mergesort */
+
+        /* These entries are used in the compiled program. */
+        uint32 fx;       /* Function index, this is not an offset. */
+
+        /* These entries are used by simul_efun.c. */
+        uint32 next_sefun;
+           /* Next index in the simul_efun function table for
+            * functions that have been discarded due to a
+            * change in the number of arguments. So all these
+            * discarded sefuns make a single linked list.
+            */
     } offset;
+
     funflag_t     flags;      /* Function flags */
-    fulltype_t    type;       /* Return type of function (counted). */
-    unsigned char num_local;  /* Number of local variables */
+    fulltype_t    type;       /* Return type of function
+                               * (counted only during compilation).
+                               */
+    unsigned char num_locals; /* Number of local variables */
     unsigned char num_arg;    /* Number of arguments needed. */
 };
 
@@ -1022,6 +986,51 @@ static INLINE inherit_t * search_function_inherit(const program_t *const progp,
            inheritp++, inum--) NOOP;
     
     return inheritp;
+}
+
+static INLINE function_t *get_function_header_extended(const program_t *const progp, const int fx, const program_t **inh_progp, int *inh_fx)
+                          __attribute__((pure)) __attribute__((nonnull(1))) __attribute__((returns_nonnull));
+static INLINE function_t *get_function_header_extended(const program_t *const progp, const int fx, const program_t **inhprogp, int *inhfx)
+  /* Gets the function header for the function with the index <fx>.
+   * This function resolves cross-definitions and looks up inherits.
+   * If <inhprogp> and <inhfx> are not null, then the program pointer
+   * and real function index of the function definition are returned there.
+   */
+{
+    funflag_t flags = progp->functions[fx];
+    const program_t *defprogp = progp;
+    int deffx = fx;
+
+    if (flags & NAME_CROSS_DEFINED)
+    {
+        deffx += CROSSDEF_NAME_OFFSET(flags);
+        flags = progp->functions[deffx];
+    }
+
+    while (flags & NAME_INHERITED)
+    {
+        inherit_t *inheritp = defprogp->inherit + (flags & INHERIT_MASK);
+        defprogp = inheritp->prog;
+        deffx -= inheritp->function_index_offset;
+        flags = defprogp->functions[deffx];
+    }
+
+    if (inhprogp)
+        *inhprogp = defprogp;
+    if (inhfx)
+        *inhfx = deffx;
+
+    return defprogp->function_headers + (FUNCTION_HEADER_INDEX(defprogp->program + (flags & FUNSTART_MASK)));
+}
+
+static INLINE function_t *get_function_header(const program_t *const progp, const int fx)
+                          __attribute__((pure)) __attribute__((nonnull(1))) __attribute__((returns_nonnull));
+static INLINE function_t *get_function_header(const program_t *const progp, const int fx)
+  /* Gets the function header for the function with the index <fx>.
+   * This function resolves cross-definitions and looks up inherits.
+   */
+{
+    return get_function_header_extended(progp, fx, NULL, NULL);
 }
 
 #endif /* EXEC_H__ */

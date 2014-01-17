@@ -15,7 +15,7 @@
  */
 struct simul_efun_table_s
 {
-    fun_hdr_p  funstart;
+    bytecode_p  funstart;
         /* The function pointer, NULL for discarded sefuns.
          */
     program_t *program;

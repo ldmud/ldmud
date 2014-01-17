@@ -3212,7 +3212,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
         }
 
-        funp->num_local = num_local;
+        funp->num_locals = num_local;
         funp->flags = flags;
         funp->offset.pc = offset;
         free_fulltype_data(&funp->type);
@@ -3230,12 +3230,13 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         heart_beat = FUNCTION_COUNT;
 
     /* Fill in the function_t */
-    fun.name      = p->name; /* adopt the ref */
+    fun.name      = p->name;
     fun.offset.pc = offset;
     fun.flags     = flags;
     fun.num_arg   = num_arg;
-    fun.num_local = num_local; /* will be updated later */
+    fun.num_locals= num_local; /* will be updated later */
     fun.type      = type;
+    ref_mstring(fun.name);
     ref_fulltype_data(&fun.type);
 
     num = FUNCTION_COUNT;
@@ -3700,49 +3701,6 @@ init_global_variable (int i, ident_t* name, fulltype_t actual_type
 
 /*-------------------------------------------------------------------------*/
 static void
-store_function_header ( p_int start
-                      , string_t * name, unsigned short fx
-                      , fulltype_t returntype, int num_args, int num_vars
-                      )
-
-/* Store a function header into the program block at address <start>.
- * The caller has to make sure that there is enough space.
- * The references of <returntype> are adopted.
- * <fx> is the index of the function in the defining program.
- */
-
-{
-    bytecode_p p;
-    vartype_t  rtype;
-
-    p = &(PROGRAM_BLOCK[start]);
-
-    /* FUNCTION_NAME */
-    memcpy(p, &name, sizeof name);
-    p += sizeof name;
-    (void)ref_mstring(name);
-
-    // FUNCTION_INDEX
-    memcpy(p, &fx, sizeof fx);
-    p+= sizeof fx;
-    
-    /* FUNCTION_TYPE */
-    assign_full_to_vartype(&rtype, returntype);
-    memcpy(p, &rtype, sizeof(rtype));
-    p += sizeof(rtype);
-
-    /* FUNCTION_NUM_ARGS */
-    if (returntype.typeflags & TYPE_MOD_XVARARGS)
-      *p++ = num_args | ~0x7f;
-    else
-      *p++ = num_args;
-
-    /* FUNCTION_NUM_VARS */
-    *p   = num_vars;
-} /* store_function_header() */
-
-/*-------------------------------------------------------------------------*/
-static void
 get_function_information (function_t * fun_p, program_t * prog, int ix)
 
 /* Read the function information for function <ix> in program <prog>
@@ -3754,31 +3712,17 @@ get_function_information (function_t * fun_p, program_t * prog, int ix)
  */
 
 {
-    fun_hdr_p funstart;
-    vartype_t rtype;
-    funflag_t flags;
+    const program_t *inhprogp;
+    int inhfx;
+    function_t * header = get_function_header_extended(prog, ix, &inhprogp, &inhfx);
 
-    /* Find the real function code */
-    while ( (flags = prog->functions[ix]) & NAME_INHERITED)
-    {
-        inherit_t * ip;
-        ip = &prog->inherit[flags & INHERIT_MASK];
-        ix -= ip->function_index_offset;
-        prog = ip->prog;
-    }
-    funstart = &prog->program[flags & FUNSTART_MASK];
-    memcpy(&fun_p->name, FUNCTION_NAMEP(funstart), sizeof fun_p->name);
-
-    memcpy(&rtype, FUNCTION_TYPEP(funstart), sizeof(rtype));
-    assign_var_to_fulltype(&fun_p->type, rtype);
+    fun_p->name = header->name;
+    fun_p->type = header->type;
     ref_fulltype_data(&fun_p->type);
-    fun_p->num_arg = FUNCTION_NUM_ARGS(funstart) & 0x7f;
-    if (FUNCTION_NUM_ARGS(funstart) & ~0x7f)
-        fun_p->type.typeflags |= TYPE_MOD_XVARARGS;
-    if (FUNCTION_CODE(funstart)[0] == F_UNDEF)
-    {
+
+    fun_p->num_arg = header->num_arg;
+    if (is_undef_function(inhprogp->program + (inhprogp->functions[inhfx] & FUNSTART_MASK)))
         fun_p->flags |= NAME_UNDEFINED;
-    }
 } /* get_function_information() */
 
 /*-------------------------------------------------------------------------*/
@@ -3991,24 +3935,14 @@ def_function_complete ( p_int body_start, Bool is_inline)
         /* function_body was a block: generate the
          * function header and update the ident-table entry.
          */
-        int fx; // index of new function in the program
         int num_vars = max_number_of_locals - num_args
                                             + max_break_stack_need;
 
-        fx = define_new_function(MY_TRUE, ident
+        define_new_function(MY_TRUE, ident
                             , num_args
                             , num_vars
                             , body_start + FUNCTION_PRE_HDR_SIZE
                             , 0, returntype);
-
-        store_function_header( body_start
-                             , ident->name
-                             , fx
-                             , returntype
-                             , num_args
-                             , num_vars
-                             );
-
 
         /* Catch a missing return if the function has a return type */
         if ((returntype.typeflags & PRIMARY_TYPE_MASK) != TYPE_VOID
@@ -4743,17 +4677,8 @@ struct_epilog (void)
                  && f->type.t_struct == pSType
                    )
                 {
-                    vartype_t type;
-                    fun_hdr_p funhdr;
-
                     free_struct_type(f->type.t_struct);
                     f->type.t_struct = ref_struct_type(pOld);
-
-                    funhdr = (fun_hdr_p)
-                             &mem_block[A_PROGRAM].block[f->offset.pc];
-                    memcpy(&type, FUNCTION_TYPEP(funhdr), sizeof(type));
-                    type.t_struct = pOld;
-                    memcpy(FUNCTION_TYPEP(funhdr), &type, sizeof(type));
                 }
             } /* for(ii) */
         }
@@ -14394,16 +14319,9 @@ transfer_init_control (void)
          */
 
         CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
-          /* Must happen before store_function_header() */
+          /* Add space for the function header index. */
         realloc_a_program(FUNCTION_HDR_SIZE);
 
-        store_function_header( CURRENT_PROGRAM_SIZE
-                             , STR_VARINIT
-                             , 0 // actually, this is wrong and will be corrected in epilog()
-                             , Type_Any
-                             , 0 /* num_args */
-                             , 0 /* num_vars */
-                             );
         first_initializer_start =   CURRENT_PROGRAM_SIZE
                                   + FUNCTION_PRE_HDR_SIZE;
         CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE;
@@ -16207,11 +16125,12 @@ epilog (void)
  */
 
 {
-    int          i;
+    int          i, fx;
     p_int        size;
     mp_int       num_functions;
     mp_int       num_strings;
     mp_int       num_variables;
+    mp_int       num_function_headers;
     bytecode_p   p;
     ident_t     *g, *q;
     function_t  *f;
@@ -16276,10 +16195,8 @@ epilog (void)
         ip = make_global_identifier(get_txt(STR_VARINIT), I_TYPE_UNKNOWN);
         if (ip)
         {
-            int fx = define_new_function(MY_FALSE, ip, 0, 0, first_initializer_start
-                                         , TYPE_MOD_PROTECTED, Type_Unknown);
-            // correct the index of __INIT in the function header
-            *FUNCTION_INDEXP((fun_hdr_p)(mem_block[A_PROGRAM].block + first_initializer_start)) = fx;
+            define_new_function(MY_FALSE, ip, 0, 0, first_initializer_start
+                                , TYPE_MOD_PROTECTED, Type_Unknown);
         }
         /* ref count for ip->name was incremented by transfer_init_control() */
 
@@ -16312,6 +16229,7 @@ epilog (void)
     }
 
     num_function_names = 0;
+    num_function_headers = 0;
     if (!num_parse_error && !inherit_file)
     {
         /* If the parse was successful, fill in undefined functions,
@@ -16359,11 +16277,6 @@ epilog (void)
                 else
                 {
                     f->offset.pc = CURRENT_PROGRAM_SIZE + FUNCTION_PRE_HDR_SIZE;
-                    store_function_header( CURRENT_PROGRAM_SIZE
-                                         , f->name
-                                         , (f - (function_t *)mem_block[A_FUNCTIONS].block)/sizeof(function_t *) // index of this function
-                                         , f->type, f->num_arg
-                                         , f->num_local);
                     p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE
                         + FUNCTION_HDR_SIZE;
                     /* If __INIT() is undefined (i.e. there was a prototype, but
@@ -16400,6 +16313,9 @@ epilog (void)
                 link2 = &f->offset.next;
                 num_function_names++;
             }
+
+            if ( !(flags & (NAME_INHERITED)))
+                num_function_headers++;
         }
 
         /* End the two chains */
@@ -16645,6 +16561,7 @@ epilog (void)
 
         size += align(num_function_names * sizeof *prog->function_names);
         size += align(num_functions * sizeof *prog->functions);
+        size += align(num_function_headers * sizeof *prog->function_headers);
 
         /* Get the program structure */
         if ( !(p = xalloc(size)) )
@@ -16691,7 +16608,32 @@ epilog (void)
                    mem_block[A_PROGRAM].current_size);
         p += align(mem_block[A_PROGRAM].current_size);
 
-        /* Add the function names right after the program code
+        /* Add the function headers right after the program code
+         */
+        prog->num_function_headers = num_function_headers;
+        prog->function_headers = (function_t*)p;
+
+        f = (function_t *)mem_block[A_FUNCTIONS].block;
+        fx = 0;
+        for (i = 0; i< num_functions; i++, f++)
+        {
+            if ( !(f->flags & (NAME_INHERITED)))
+            {
+                function_t * head = ((function_t*)p) + fx;
+
+                *head = *f;
+                head->offset.fx = i;
+                /* We'll adopt the reference of the name. */
+
+                *FUNCTION_HEADER_INDEXP(prog->program + (f->flags & FUNSTART_MASK)) = fx;
+
+                fx++;
+            }
+        }
+
+        p += align(num_function_headers * sizeof *prog->function_headers);
+
+        /* Add the function names.
          */
         prog->num_function_names = num_function_names;
         prog->function_names = (unsigned short *)p;
@@ -16878,9 +16820,9 @@ epilog (void)
         functions = (function_t *)mem_block[A_FUNCTIONS].block;
         for (i = num_functions; --i >= 0; functions++)
         {
-            if ( !(functions->flags & (NAME_INHERITED|NAME_UNDEFINED))
-             && functions->name )
+            if ( !(functions->flags & NAME_INHERITED) && functions->name )
             {
+                /* The other references have been adopted. */
                 free_mstring(functions->name);
             }
             free_fulltype_data(&functions->type);
@@ -16942,13 +16884,13 @@ compile_file (int fd, const char * fname,  Bool isMasterObj)
 
 /*-------------------------------------------------------------------------*/
 Bool
-is_undef_function (fun_hdr_p fun)
+is_undef_function (bytecode_p fun)
 
 /* Return TRUE if <fun> points to a referenced but undefined function.
  */
 
 {
-    return GET_CODE(FUNCTION_CODE(fun)) == F_UNDEF;
+    return GET_CODE(fun) == F_UNDEF;
 } /* is_undef_function() */
 
 /*-------------------------------------------------------------------------*/

@@ -366,8 +366,7 @@ cleanup_closure (svalue_t *csvp, cleanup_t * context)
         svalue_t *svp;
 
         svp = (svalue_t *)l;
-        if ( (num_values = EXTRACT_UCHAR(l->function.code)) == 0xff)
-            num_values = svp[-0x100].u.number;
+        num_values = l->function.code.num_values;
         svp -= num_values;
         cleanup_vector(svp, (size_t)num_values, context);
     }
@@ -1062,19 +1061,9 @@ clear_program_ref (program_t *p, Bool clear_ref)
 
     /* Non-inherited functions */
 
-    for (i = p->num_functions; --i >= 0; )
+    for (i = p->num_function_headers; --i >= 0; )
     {
-        if ( !(p->functions[i] & NAME_INHERITED) )
-        {
-            vartype_t vt;
-
-            memcpy(
-              &vt,
-              FUNCTION_TYPEP(p->program + (p->functions[i] & FUNSTART_MASK)),
-              sizeof vt
-            );
-            clear_vartype_ref(&vt);
-        }
+        clear_fulltype_ref(&p->function_headers[i].type);
     }
 
 #ifdef USE_STRUCTS
@@ -1185,28 +1174,8 @@ gc_mark_program_ref (program_t *p)
 
         /* Non-inherited functions */
 
-        for (i = p->num_functions; --i >= 0; )
-        {
-            if ( !(functions[i] & NAME_INHERITED) )
-            {
-                string_t *name;
-                vartype_t vt;
-
-                memcpy(
-                  &name,
-                  FUNCTION_NAMEP(program + (functions[i] & FUNSTART_MASK)),
-                  sizeof name
-                );
-                MARK_MSTRING_REF(name);
-
-                memcpy(
-                  &vt,
-                  FUNCTION_TYPEP(program + (functions[i] & FUNSTART_MASK)),
-                  sizeof vt
-                );
-                count_vartype_ref(&vt);
-            }
-        }
+        for (i = p->num_function_headers; --i >= 0; )
+            MARK_MSTRING_REF(p->function_headers[i].name);
 
         /* String literals */
 
@@ -1728,8 +1697,7 @@ gc_count_ref_in_closure (svalue_t *csvp)
         svalue_t *svp;
 
         svp = (svalue_t *)l;
-        if ( (num_values = EXTRACT_UCHAR(l->function.code)) == 0xff)
-            num_values = svp[-0x100].u.number;
+        num_values = l->function.code.num_values;
         svp -= num_values;
         note_ref(svp);
         count_ref_in_vector(svp, (size_t)num_values);
@@ -1779,8 +1747,7 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
         svalue_t *svp;
 
         svp = (svalue_t *)l;
-        if ( (num_values = EXTRACT_UCHAR(l->function.code)) == 0xff)
-            num_values = svp[-0x100].u.number;
+        num_values = l->function.code.num_values;
         svp -= num_values;
         clear_ref_in_vector(svp, (size_t)num_values);
     }

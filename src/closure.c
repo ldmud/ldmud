@@ -95,16 +95,16 @@
  *                   Index in the objects function table
  *           } lfun;
  *
- *           bytecode_t code[1];
+ *           struct
+ *           {
+ *               mp_int num_values;         -- Number of svalues.
+ *               unsigned char num_locals;  -- Number of local variables
+ *               unsigned char num_arg;     -- Number of arguments needed
+ *               bytecode_t program[1];
+ *           } code;
  *               LAMBDA and UNBOUND_LAMBDA closures: the function code.
- *               The first bytes are:
- *                 +0: uint8 num_values
- *                 +1: uint8 num_args
- *                 +2: uint8 num_vars
- *                 +3...: the function code
  *               'num_values' is the number of constants store before
- *               the lambda structure. If it is 0xff, the actual number
- *               is stored in .values[-0x100].u.number.
+ *               the lambda structure.
  *
  *           lambda_t *lambda;
  *               BOUND_LAMBDA: pointer to the UNBOUND_LAMBDA structure.
@@ -362,30 +362,13 @@ function_cmp (const string_t *name, const program_t *prog, int ix)
  */
 
 {
-    funflag_t flags;
-
-    /* Set ix to the memory offset for the (possibly inherited) function
-     * function.
-     */
-    ix = prog->function_names[ix];
-    flags = prog->functions[ix];
-    while (flags & NAME_INHERITED)
-    {
-        inherit_t *inheritp;
-
-        inheritp = &prog->inherit[flags & INHERIT_MASK];
-        prog = inheritp->prog;
-        ix -= inheritp->function_index_offset;
-        flags = prog->functions[ix];
-    }
+    function_t *header = get_function_header(prog, prog->function_names[ix]);
 
     /* Return the result of the comparison */
     /* Compare the two pointers.
      * The comparison operation has to match the one in prolang.y:epilog().
      */
-    return memcmp( &name, FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))
-                 , sizeof name
-    );
+    return memcmp( &name, &(header->name), sizeof name);
 } /* function_cmp() */
 
 /*-------------------------------------------------------------------------*/
@@ -941,13 +924,10 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
     rt_context = (rt_context_t *)&error_recovery_info.rt;
     if (setjmp(error_recovery_info.con.text))
     {
-        bytecode_p p;
-
         lrpp = current_lrpp;
 
         /* Replace the function with "undef" */
-        p = LAMBDA_CODE(lrpp->l.u.lambda->function.code);
-        p[0] = F_UNDEF;
+        lrpp->l.u.lambda->function.code.program[0] = F_UNDEF;
 
         /* Free the protector and all held values */
         free_array(lrpp->args);
@@ -986,12 +966,11 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
             l2 = lambda(lrpp->args, &lrpp->block, l->ob);
 
             svp = (svalue_t *)l;
-            if ( (num_values = LAMBDA_NUM_VALUES(l->function.code)) == 0xff)
-                num_values = svp[-0x100].u.number;
+            num_values = l->function.code.num_values;
 
             svp2 = (svalue_t *)l2;
-            if ( (num_values2 = LAMBDA_NUM_VALUES(l2->function.code)) == 0xff)
-                num_values2 = svp2[-0x100].u.number;
+            num_values2 = l2->function.code.num_values;
+
             code_size2 = current.code_max - current.code_left;
 
             /* If the recompiled lambda differs from the original one, we
@@ -1020,7 +999,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
              */
             while (--num_values >= 0)
                 transfer_svalue(--svp, --svp2);
-            memcpy(l->function.code, l2->function.code, (size_t)code_size2);
+            memcpy(&l->function.code, &l2->function.code, sizeof(l->function.code) - 1 + (size_t)code_size2);
 
             /* Free the (now empty) memory */
             if  (l2->ob)
@@ -4755,7 +4734,11 @@ compile_lvalue (svalue_t *argp, int flags)
         /* Find (or create) the variable for this symbol */
         sym = make_symbol(argp->u.str);
         if (sym->index < 0)
+        {
             sym->index = current.num_locals++;
+            if (current.num_locals > MAX_LOCAL)
+              lambda_error("Too many symbols.\n");
+        }
 
         if (current.code_left < 3)
             realloc_code();
@@ -5152,6 +5135,9 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
      */
     argp = args->item;
     j = (mp_int)VEC_SIZE(args);
+    if (j >= MAX_LOCAL)
+        lambda_error("Too many arguments to lambda()\n");
+
     for (i = 0; i < j; i++, argp++)
     {
         symbol_t *sym;
@@ -5173,16 +5159,11 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
     current.break_stack = current.max_break_stack = 0;
 
     current.code_max = CODE_BUFFER_START_SIZE;
-    current.code_left = CODE_BUFFER_START_SIZE-3;
+    current.code_left = CODE_BUFFER_START_SIZE;
     current.levels_left = MAX_LAMBDA_LEVELS;
     if ( !(current.code = current.codep = xalloc((size_t)current.code_max)) )
        lambda_error("Out of memory (%"PRIdMPINT
                     " bytes) for initial codebuffer\n", current.code_max);
-
-    /* Store the lambda code header */
-    STORE_UINT8(current.codep, 0);          /* dummy for num values */
-    STORE_UINT8(current.codep, current.num_locals); /* num arguments */
-    STORE_UINT8(current.codep, 0);          /* dummy for num variables */
 
     current.value_max = current.values_left = VALUE_START_MAX;
     if ( !(current.values =
@@ -5213,26 +5194,8 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
     values_size = (long)(num_values * sizeof (svalue_t));
     code_size = current.code_max - current.code_left;
 
-    if (num_values == 0xff)
-    {
-        /* Special case: we have exactly 255 values, that means
-         * we are going to use the indirect way of storing the number
-         * of values. At the same time, the extra entry to store
-         * the number of values has not been reserved yet.
-         * Do it now.
-         */
-        num_values++;
-        values_size += (long)sizeof(svalue_t);
-        current.values_left--;
-        (--current.valuep)->type = T_INVALID;
-    }
-
     /* Allocate the memory for values, lambda_t and code */
-#ifndef USE_NEW_INLINES
-    l0 = xalloc(values_size + sizeof *l - sizeof l->function + code_size);
-#else /* USE_NEW_INLINES */
-    l0 = xalloc(values_size + SIZEOF_LAMBDA(0) - sizeof l->function + code_size);
-#endif /* USE_NEW_INLINES */
+    l0 = xalloc(values_size + SIZEOF_LAMBDA(0) - sizeof(l->function) + sizeof(l->function.code) - 1 + code_size);
 
     /* Copy the data */
     memcpy(l0, current.valuep, (size_t)values_size);
@@ -5240,23 +5203,10 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
     l = (lambda_t *)l0;
     closure_init_lambda(l, origin);
 
-    memcpy(l->function.code, current.code, (size_t)code_size);
-
-    /* Fix number of constant values */
-    if (num_values >= 0xff)
-    {
-    	/* The entry in the value block has been reserved for this */
-        ((svalue_t *)l)[-0x100].u.number = num_values;
-        PUT_UINT8(l->function.code, 0xff);
-    }
-    else
-    {
-        PUT_UINT8(l->function.code, (unsigned char)num_values);
-    }
-
-    /* Fix number of variables */
-    PUT_UINT8( l->function.code+2
-             , (unsigned char)(current.num_locals + current.max_break_stack));
+    memcpy(l->function.code.program, current.code, (size_t)code_size);
+    l->function.code.num_arg = VEC_SIZE(args);
+    l->function.code.num_locals = current.num_locals + current.max_break_stack - l->function.code.num_arg;
+    l->function.code.num_values = num_values;
 
     /* Clean up */
     free_symbols();
@@ -5313,11 +5263,10 @@ free_closure (svalue_t *svp)
 
         if (type != CLOSURE_UNBOUND_LAMBDA)
             free_object(l->ob, "free_closure");
+
         svp = (svalue_t *)l;
-        if ( (num_values = EXTRACT_UCHAR(l->function.code)) == 0xff)
-        {
-            num_values = svp[-0x100].u.number;
-        }
+        num_values = l->function.code.num_values;
+
         while (--num_values >= 0)
             free_svalue(--svp);
         xfree(svp);
@@ -5345,8 +5294,8 @@ free_closure (svalue_t *svp)
             free_object(l2->prog_ob, "free_closure: unbound lambda creator");
 
         svp = (svalue_t *)l2;
-        if ( (num_values = EXTRACT_UCHAR(l2->function.code)) == 0xff)
-            num_values = svp[-0x100].u.number;
+        num_values = l2->function.code.num_values;
+
         while (--num_values >= 0)
             free_svalue(--svp);
         xfree(svp);
@@ -5421,9 +5370,6 @@ closure_lookup_lfun_prog ( lambda_t * l
     object_t       *ob;
     int             ix;
     program_t      *prog;
-    fun_hdr_p       fun;
-    funflag_t       flags;
-    inherit_t      *inheritp;
     Bool            is_inherited;
 
     is_inherited = MY_FALSE;
@@ -5445,6 +5391,8 @@ closure_lookup_lfun_prog ( lambda_t * l
     {
         while (prog != l->function.lfun.inhProg)
         {
+            inherit_t *inheritp;
+
 #ifdef DEBUG
             if (!prog->num_inherited)
                 errorf("(closure_lookup_lfun_prog): Couldn't find "
@@ -5456,7 +5404,7 @@ closure_lookup_lfun_prog ( lambda_t * l
                      , get_txt(prog->name)
                      );
 #endif
-            
+
             inheritp = search_function_inherit(prog, ix);
             ix -= inheritp->function_index_offset;
             prog = inheritp->prog;
@@ -5474,20 +5422,11 @@ closure_lookup_lfun_prog ( lambda_t * l
 
         is_inherited = MY_TRUE;
     }
-    
-    flags = prog->functions[ix];
-    while (flags & NAME_INHERITED)
-    {
-        is_inherited = MY_TRUE;
-        inheritp = &prog->inherit[flags & INHERIT_MASK];
-        ix -= inheritp->function_index_offset;
-        prog = inheritp->prog;
-        flags = prog->functions[ix];
-    }
 
     /* Copy the function name pointer (a shared string) */
-    fun = prog->program + (flags & FUNSTART_MASK);
-    memcpy(pName, FUNCTION_NAMEP(fun) , sizeof *pName);
+    *pName = get_function_header_extended(prog, ix, (const program_t**)pProg, NULL)->name;
+    if (*pProg != prog)
+        is_inherited = MY_TRUE;
 
     /* Copy the other result values */
     *pProg = prog;

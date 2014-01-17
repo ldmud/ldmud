@@ -297,7 +297,7 @@ struct cache
     funflag_t flags;
       /* Copy of the _MOD_STATIC and _MOD_PROTECTED flags of the function.
        */
-    fun_hdr_p funstart;
+    bytecode_p funstart;
       /* Pointer to the function.
        */
     int function_index_offset;
@@ -6554,7 +6554,7 @@ check_rtt_compatibility(vartype_t formaltype, svalue_t *svp)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-check_function_args(int fx, program_t *progp, fun_hdr_p funstart)
+check_function_args(int fx, program_t *progp, bytecode_p funstart)
 /* Check the argument types of the function <fx> in <progp>.
  * The proper number of arguments must be on the stack, so this must be called
  * after setup_new_frame2().
@@ -6573,9 +6573,9 @@ check_function_args(int fx, program_t *progp, fun_hdr_p funstart)
         // check for the correct argument types
         vartype_t *arg_type = progp->argument_types + progp->type_start[fx];
         svalue_t *firstarg = inter_sp - csp->num_local_variables + 1;
-        char formal_args = FUNCTION_NUM_ARGS(funstart);
-        if (formal_args < 0)
-            formal_args &= 0x7f;
+        function_t *header = current_prog->function_headers + FUNCTION_HEADER_INDEX(funstart);
+
+        int formal_args = header->num_arg;
         int i = 0;
         while (i < formal_args)
         {
@@ -6607,22 +6607,20 @@ check_function_args(int fx, program_t *progp, fun_hdr_p funstart)
                     if (CONTROL_STACK->funstart)
                         pop_control_stack();
                     else
-                        inter_pc = FUNCTION_CODE(funstart);
+                        inter_pc = funstart;
                 }
                 else
                 {
                     // this is a top-level call. This one frame must stay. But we have to set 
                     // inter_pc because it might be either 0 because no code was evaluated yet 
                     // or it is a left-over from last execution.
-                    inter_pc = FUNCTION_CODE(funstart);
+                    inter_pc = funstart;
                 }
-                string_t *function_name;
-                memcpy(&function_name, FUNCTION_NAMEP(funstart), sizeof function_name);
                 fulltype_t ft = { .typeflags = arg_type[i].type, .t_struct = arg_type[i].t_struct };
                 // unravel any lvalue indirection (if any)
                 svalue_t *svp = unravel_lvalue_indirection(&firstarg[i]);
                 errorf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
-                       , i+1, get_txt(function_name), typename(svp->type),
+                       , i+1, get_txt(header->name), typename(svp->type),
                        get_type_name(ft));
             }
             ++i;
@@ -6978,7 +6976,7 @@ do_trace (char *msg, char *fname, char *post)
 
 /*-------------------------------------------------------------------------*/
 static void
-do_trace_call (fun_hdr_p funstart, Bool is_lambda)
+do_trace_call (bytecode_p funstart, Bool is_lambda)
 
 /* Trace a call to the function starting at <funstart>.
  */
@@ -6986,18 +6984,25 @@ do_trace_call (fun_hdr_p funstart, Bool is_lambda)
 {
     if (!++traceing_recursion || !TRACE_IS_INTERACTIVE()) /* Do not recurse! */
     {
+        int num_args;
         int save_var_ix_offset = variable_index_offset;
           /* TODO: Might be clobbered, but where? */
 
         /* Trace the function itself */
         if (is_lambda)
+        {
+            lambda_t *l = current_lambda.u.lambda;
+            if (current_lambda.x.closure_type == CLOSURE_BOUND_LAMBDA)
+                l = l->function.lambda;
+
             do_trace("Call direct ", "lambda-closure", " ");
+            num_args = l->function.code.num_arg;
+        }
         else
         {
-            string_t *name;
-
-            memcpy(&name, FUNCTION_NAMEP(funstart), sizeof name);
-            do_trace("Call direct ", get_txt(name), " ");
+            function_t *header = current_prog->function_headers + FUNCTION_HEADER_INDEX(funstart);
+            do_trace("Call direct ", get_txt(header->name), " ");
+            num_args = header->num_arg;
         }
 
         /* If requested, also trace the arguments */
@@ -7008,10 +7013,9 @@ do_trace_call (fun_hdr_p funstart, Bool is_lambda)
                 int i;
                 svalue_t *svp;
 
-                add_message(" with %d arguments: "
-                           , FUNCTION_NUM_ARGS(funstart) & 0x7f);
+                add_message(" with %d arguments: ", num_args);
                 svp = inter_fp;
-                for (i = (FUNCTION_NUM_ARGS(funstart) & 0x7f); --i >= 0; )
+                for (i = num_args; --i >= 0; )
                 {
                     print_svalue(svp++);
                     add_message(" ");
@@ -7459,7 +7463,7 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
+setup_new_frame2 (bytecode_p funstart, svalue_t *sp
                  , Bool allowRefs, Bool is_lambda)
 
 /* Before calling the function at <funstart>, massage the data on the
@@ -7490,6 +7494,8 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
                    * Number of (uninitialized) local variables
                    */
     int num_arg;  /* Number of formal args */
+    int num_vars; /* Number of local variables */
+    bool has_varargs; /* Function has an varargs parameter. */
 
     /* Setup the frame pointer */
     inter_fp = sp - csp->num_local_variables + 1;
@@ -7499,103 +7505,107 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
     inter_context = NULL;
 #endif /* USE_NEW_INLINES */
 
-    /* (Re)move excessive arguments.
-     * TODO: This code uses that bit7 makes num_arg negative.
-     */
-    num_arg = FUNCTION_NUM_ARGS(funstart);
-    if ((i = csp->num_local_variables - num_arg) > 0)
+    /* (Re)move excessive arguments.  */
+    if (is_lambda)
     {
-        /* More actual than formal args, or the function has
-         * a 'varargs' argument.
-         */
+        lambda_t *l = current_lambda.u.lambda;
+        if (current_lambda.x.closure_type == CLOSURE_BOUND_LAMBDA)
+            l = l->function.lambda;
 
-        if (num_arg < 0)
-        {
-            /* Function has a 'varargs' argument */
-
-            num_arg &= 0x7f;
-
-            if ((i = csp->num_local_variables - num_arg + 1) < 0)
-            {
-                /* More formal than actual parameters. */
-
-                csp->num_local_variables = num_arg;
-
-                /* First, fill in zero for the rest... */
-                do {
-                    *++sp = const0;
-                } while (++i);
-
-                /* ...and an empty array for the varargs portion */
-                ++sp;
-                put_array(sp, allocate_uninit_array(0));
-            }
-            else
-            {
-                /* More actual than formal parameters */
-
-                vector_t *v;
-
-                csp->num_local_variables = num_arg;
-
-                /* Move the extra args into an array and put that
-                 * onto the stack
-                 */
-                v = allocate_uninit_array(i);
-                while (--i >= 0)
-                {
-                    if (!allowRefs && sp->type == T_LVALUE)
-                        num_arg = -1; /* mark error condition */
-                    v->item[i] = *sp--;
-                }
-
-                ++sp;
-                put_array(sp, v);
-
-                if (num_arg < 0)
-                {
-                    bytecode_p pc = funstart; /* for the ERROR() macro */
-
-                    ERROR("Varargs argument passed by reference.\n");
-                }
-            }
-        }
-        else
-        {
-            /* Function takes a fixed number of arguments */
-
-            /* Pop the extraneous args */
-            do {
-                free_svalue(sp--);
-                csp->num_local_variables--;
-            } while(--i);
-
-        } /* if(varargs or fixedargs) */
-
-        /* Clear the local variables */
-
-        if ( 0 != (i = FUNCTION_NUM_VARS(funstart)) )
-        {
-            csp->num_local_variables += i;
-            do {
-                *++sp = const0;
-            } while (--i);
-        }
+        num_arg = l->function.code.num_arg;
+        num_vars = l->function.code.num_locals;
+        has_varargs = false;
     }
     else
     {
-        /* Enough or too little arguments supplied to a fixed-args
-         * function: initialize the missing args and the locals
-         * in one swoop.
-         */
+        function_t *header = current_prog->function_headers + FUNCTION_HEADER_INDEX(funstart);
+        num_arg = header->num_arg;
+        num_vars = header->num_locals;
+        has_varargs = (header->flags & TYPE_MOD_XVARARGS) != 0;
+    }
 
-        if ( 0 != (i = FUNCTION_NUM_VARS(funstart) - i) )
+    if (has_varargs)
+    {
+        /* Function has a 'varargs' argument */
+        if ((i = csp->num_local_variables - num_arg + 1) < 0)
         {
-            csp->num_local_variables += i;
+            /* More formal than actual parameters. */
+
+            csp->num_local_variables = num_arg;
+
+            /* First, fill in zero for the rest... */
             do {
                 *++sp = const0;
-            } while (--i);
+            } while (++i);
+
+            /* ...and an empty array for the varargs portion */
+            ++sp;
+            put_array(sp, allocate_uninit_array(0));
+
+            /* At this point i == 0, because all args are there. */
         }
+        else
+        {
+            /* More actual than formal parameters */
+
+            vector_t *v;
+
+            csp->num_local_variables = num_arg;
+
+            /* Move the extra args into an array and put that
+             * onto the stack
+             */
+            v = allocate_uninit_array(i);
+            while (--i >= 0)
+            {
+                if (!allowRefs && sp->type == T_LVALUE)
+                    num_arg = -1; /* mark error condition */
+                v->item[i] = *sp--;
+            }
+
+            ++sp;
+            put_array(sp, v);
+
+            if (num_arg < 0)
+            {
+                bytecode_p pc = funstart; /* for the ERROR() macro */
+
+                ERROR("Varargs argument passed by reference.\n");
+            }
+
+            i = 0; /* All arguments are there now. */
+        }
+    }
+    else if ((i = csp->num_local_variables - num_arg) > 0)
+    {
+        /* Function takes a fixed number of arguments,
+         * but more actual than formal args.
+         */
+
+        /* Pop the extraneous args */
+        do {
+            free_svalue(sp--);
+            csp->num_local_variables--;
+        } while(--i);
+
+        /* At this point i == 0, because all args are there. */
+    }
+    /* else
+     *
+     * Enough or too little arguments supplied to a fixed-args
+     * function: initialize the missing args and the locals
+     * in one swoop (i = minus the number of missing arguments)
+     *
+     * For all other cases i == 0, so we're just initializing
+     * the local vars here.
+     */
+
+    if ( 0 != (i = num_vars - i) )
+    {
+        csp->num_local_variables += i;
+        do {
+            *++sp = const0;
+        } while (--i);
     }
 
     /* Check for stack overflow. Since the actual stack size is
@@ -8276,7 +8286,7 @@ again:
         {
             /* Copy the function name pointer into name.
              */
-            memcpy(&name, FUNCTION_NAMEP(FUNCTION_FROM_CODE(pc-1)), sizeof name);
+            name = current_prog->function_headers[FUNCTION_HEADER_INDEX(pc-1)].name;
         }
         else
         {
@@ -8971,17 +8981,18 @@ again:
             && !(current_lambda.type == T_CLOSURE && current_lambda.x.closure_type != CLOSURE_LFUN)
             && csp->funstart != EFUN_FUNSTART)
         {
-            vartype_t rtype = *((vartype_t *)FUNCTION_TYPEP(csp->funstart));
+            function_t *header = current_prog->function_headers + FUNCTION_HEADER_INDEX(csp->funstart);
+            vartype_t rtype;
+
+            rtype.type = header->type.typeflags & TYPE_MOD_MASK;
+            rtype.t_struct = header->type.t_struct;
             // functions declared without type may return anything... *sigh*
             if (rtype.type != TYPE_UNKNOWN && !check_rtt_compatibility(rtype, sp))
             {
-                string_t *function_name;
-                memcpy(&function_name, FUNCTION_NAMEP(csp->funstart), sizeof function_name);
-                fulltype_t ft = { .typeflags = rtype.type, .t_struct = rtype.t_struct };
                 inter_sp = sp;
                 errorf("Bad return type in %s(): got '%s', expected '%s'.\n",
-                       get_txt(function_name), typename(sp->type),
-                       get_type_name(ft));
+                       get_txt(header->name), typename(sp->type),
+                       get_type_name(header->type));
             }
         }
         
@@ -13779,13 +13790,13 @@ again:
          * might not be the current_program.
          */
 
-        unsigned short func_index;   /* function index within program */
-        unsigned short func_offset;
+        unsigned short prog_func_index;   /* function index within current program */
+        unsigned short obj_func_index;
           /* function index within the current object's program.
            * This way local function may be redefined through inheritance.
            */
         funflag_t  flags;     /* the function flags */
-        fun_hdr_p  funstart;  /* the actual function (code) */
+        bytecode_p  funstart;  /* the actual function (code) */
         
         /* Make sure that we are not calling from a set_this_object()
          * context.
@@ -13798,32 +13809,32 @@ again:
         }
 
         /* Get the function's index */
-        LOAD_SHORT(func_index, pc);
-        func_offset = (unsigned short)(func_index + function_index_offset);
+        LOAD_SHORT(prog_func_index, pc);
+        obj_func_index = (unsigned short)(prog_func_index + function_index_offset);
 
         /* Find the function in the function table. As the function may have
          * been redefined by inheritance, we must look in the last table,
          * which is pointed to by current_object.
          */
 
-        if (func_offset >= current_object->prog->num_functions)
+        if (obj_func_index >= current_object->prog->num_functions)
         {
             fatal("call_function: "
-                  "Illegal function index: offset %hu (index %hu), "
+                  "Illegal function index: within object %hu (within program %hu), "
                   "%d functions - current object %s\n"
-                 , func_offset, func_index
+                 , obj_func_index, prog_func_index
                  , current_object->prog->num_functions
                  , get_txt(current_object->name)
                  );
         }
 
         /* NOT current_prog, which can be an inherited object. */
-        flags = current_object->prog->functions[func_offset];
+        flags = current_object->prog->functions[obj_func_index];
 
         /* If the function was cross-defined, get the real offset */
         if (flags & NAME_CROSS_DEFINED)
         {
-            func_offset += CROSSDEF_NAME_OFFSET(flags);
+            obj_func_index += CROSSDEF_NAME_OFFSET(flags);
         }
 
         /* Save all important global stack machine registers */
@@ -13838,17 +13849,17 @@ again:
         /* Search for the function definition and determine the offsets.
          */
         csp->num_local_variables = sp - ap + 1;
-        flags = setup_new_frame1(func_offset, 0, 0);
-        funstart = (fun_hdr_p)(current_prog->program + (flags & FUNSTART_MASK));
+        flags = setup_new_frame1(obj_func_index, 0, 0);
+        funstart = current_prog->program + (flags & FUNSTART_MASK);
         csp->funstart = funstart;
 
         /* Setup the stack, arguments and local vars */
         sp = setup_new_frame2(funstart, sp, MY_FALSE, MY_FALSE);
         inter_sp = sp;
-        
+
         // check the argument types
-        check_function_args(FUNCTION_INDEX(funstart), current_prog, funstart);
-        
+        check_function_args(obj_func_index - function_index_offset, current_prog, funstart);
+
         /* Finish the setup */
 
 #ifdef DEBUG
@@ -13863,9 +13874,9 @@ again:
             current_variables += variable_index_offset;
         current_strings = current_prog->strings;
         fp = inter_fp;
-        pc = FUNCTION_CODE(funstart);
+        pc = funstart;
         csp->extern_call = MY_FALSE;
-                
+
         break;
     }
 
@@ -13895,7 +13906,7 @@ again:
         unsigned short prog_index;  /* Index within the inherit table */
         unsigned short func_index;  /* Index within the function table */
         funflag_t flags;            /* the functions flags */
-        fun_hdr_p funstart;         /* the actual function (code) */
+        bytecode_p funstart;        /* the actual function (code) */
         inherit_t *inheritp;        /* the inheritance descriptor */
 
         /* Make sure that we are not calling from a set_this_object()
@@ -13940,19 +13951,19 @@ again:
           function_index_offset + inheritp->function_index_offset,
           inheritp->variable_index_offset
         );
-        funstart = (fun_hdr_p)(current_prog->program + (flags & FUNSTART_MASK));
+        funstart = current_prog->program + (flags & FUNSTART_MASK);
         csp->funstart = funstart;
 
         /* Setup the stack, arguments and local vars */
         sp = setup_new_frame2(funstart, sp, MY_FALSE, MY_FALSE);
         inter_sp = sp;
-        
+
         // check the arguments
-        check_function_args(FUNCTION_INDEX(funstart), current_prog, funstart);
-        
+        check_function_args(current_prog->function_headers[FUNCTION_HEADER_INDEX(funstart)].offset.fx, current_prog, funstart);
+
         /* Finish the setup */
         fp = inter_fp;
-        pc = FUNCTION_CODE(funstart);
+        pc = funstart;
         current_variables += variable_index_offset;
         current_strings = current_prog->strings;
         csp->extern_call = MY_FALSE;
@@ -14983,7 +14994,7 @@ again:
          */
 
         unsigned short      code;      /* the function index */
-        fun_hdr_p           funstart;  /* the actual function */
+        bytecode_p          funstart;  /* the actual function */
         object_t           *ob;        /* the simul_efun object */
         int                 def_narg;  /* expected number of arguments */
         simul_efun_table_t *entry;
@@ -15095,13 +15106,13 @@ again:
                 current_variables += entry->variable_index_offset;
             new_sp = setup_new_frame2(funstart, sp, MY_TRUE, MY_FALSE);
             inter_sp = new_sp;
-            check_function_args(FUNCTION_INDEX(funstart), current_prog, funstart);
-            
+            check_function_args(prog->function_headers[FUNCTION_HEADER_INDEX(funstart)].offset.fx, current_prog, funstart);
+
             /* The simul_efun object should not use simul_efuns itself... */
             previous_ob = current_object;
             current_object = ob;
             current_strings = prog->strings;
-            eval_instruction(FUNCTION_CODE(funstart), new_sp);
+            eval_instruction(funstart, new_sp);
             sp -= num_arg - 1;
             /*
              * The result of the function call is on the stack.
@@ -17183,7 +17194,7 @@ retry_for_shadow:
             /* the cache will tell us in wich program the function is, and
              * where.
              */
-            fun_hdr_p funstart;
+            bytecode_p funstart;
             
             // check for deprecated functions before pushing a new control stack frame.
             if (cache[ix].flags & TYPE_MOD_DEPRECATED)
@@ -17215,12 +17226,12 @@ retry_for_shadow:
             inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs, MY_FALSE);
                         
             // check argument types
-            check_function_args(FUNCTION_INDEX(funstart), cache[ix].progp, funstart);
+            check_function_args(cache[ix].progp->function_headers[FUNCTION_HEADER_INDEX(funstart)].offset.fx, cache[ix].progp, funstart);
             
             previous_ob = current_object;
             current_object = ob;
             save_csp = csp;
-            eval_instruction(FUNCTION_CODE(funstart), inter_sp);
+            eval_instruction(funstart, inter_sp);
 #ifdef DEBUG
             if (save_csp-1 != csp)
                 fatal("Bad csp after execution in apply_low\n");
@@ -17259,7 +17270,7 @@ retry_for_shadow:
                  */
 
                 funflag_t flags;
-                fun_hdr_p funstart;
+                bytecode_p funstart;
 
                 // check for deprecated functions before pushing a new control stack frame.
                 if (progp->functions[fx] & TYPE_MOD_DEPRECATED)
@@ -17336,14 +17347,14 @@ retry_for_shadow:
                 }
                 csp->funstart = funstart;
                 inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs, MY_FALSE);
-                                
+
                 // check argument types
                 check_function_args(fx, progp, funstart);
 
                 previous_ob = current_object;
                 current_object = ob;
                 save_csp = csp;
-                eval_instruction(FUNCTION_CODE(funstart), inter_sp);
+                eval_instruction(funstart, inter_sp);
 #ifdef DEBUG
                 if (save_csp-1 != csp)
                     fatal("Bad csp after execution in apply_low\n");
@@ -18316,13 +18327,13 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg, allowRefs);
           
         // check arguments
-        check_function_args(FUNCTION_INDEX(csp->funstart), current_prog, csp->funstart);
+        check_function_args(current_prog->function_headers[FUNCTION_HEADER_INDEX(csp->funstart)].offset.fx, current_prog, csp->funstart);
         if (l->function.lfun.context_size > 0)
             inter_context = l->context;
         if (external)
-            eval_instruction(FUNCTION_CODE(csp->funstart), inter_sp);
+            eval_instruction(csp->funstart, inter_sp);
         else
-            inter_pc = FUNCTION_CODE(csp->funstart);
+            inter_pc = csp->funstart;
 
         /* If l->ob selfdestructs during the call, l might have been
          * deallocated at this point!
@@ -18421,7 +18432,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
 
     case CLOSURE_LAMBDA:
       {
-        fun_hdr_p funstart;
+        bytecode_p funstart;
 
         /* Can't call from a destructed object */
         if (l->ob->flags & O_DESTRUCTED)
@@ -18455,7 +18466,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         current_lambda = *lsvp; addref_closure(lsvp, "call_lambda()");
         variable_index_offset = 0;
         function_index_offset = 0;
-        funstart = l->function.code + 1;
+        funstart = l->function.code.program;
         csp->funstart = funstart;
         csp->extern_call = external;
         sp = setup_new_frame2(funstart, sp, allowRefs, MY_TRUE);
@@ -18463,10 +18474,10 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         current_variables = current_object->variables;
         current_strings = current_prog->strings;
         if (external)
-            eval_instruction(FUNCTION_CODE(funstart), sp);
+            eval_instruction(funstart, sp);
         else
         {
-            inter_pc = FUNCTION_CODE(funstart);
+            inter_pc = funstart;
             inter_sp = sp;
         }
         /* The result is on the stack (inter_sp). */
@@ -18785,7 +18796,7 @@ call_function (program_t *progp, int fx)
     setup_new_frame(fx, NULL, MY_FALSE);
     previous_ob = current_object;
     tracedepth = 0;
-    eval_instruction(FUNCTION_CODE(csp->funstart), inter_sp);
+    eval_instruction(csp->funstart, inter_sp);
     free_svalue(inter_sp--);  /* Throw away the returned result */
 } /* call_function() */
 
@@ -19310,7 +19321,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
                 pc2 += offset;
             }
 
-            if (pc2 - FUNCTION_CODE(p->funstart) < 1)
+            if (pc2 - p->funstart < 1)
                 goto not_catch;
 
             if (GET_CODE(pc2-1) != F_END_CATCH)
@@ -19434,13 +19445,13 @@ not_catch:  /* The frame does not point at a catch here */
                            , (long)p[0].funstart
                            , get_txt(ob->prog->name)
                            , get_txt(ob->name)
-                           , (long)(FUNCTION_FROM_CODE(dump_pc) - p[0].funstart)
+                           , (long)(dump_pc - p[0].funstart)
                            );
             if (rvec)
             {
                 NEW_ENTRY(entry, TRACE_TYPE_LAMBDA, ob->prog->name, dump_eval_cost);
                 put_number(entry->vec->item+TRACE_NAME, (p_int)p[0].funstart);
-                PUT_LOC(entry, (FUNCTION_FROM_CODE(dump_pc) - p[0].funstart));
+                PUT_LOC(entry, (dump_pc - p[0].funstart));
             }
             continue;
         }
@@ -19449,7 +19460,7 @@ not_catch:  /* The frame does not point at a catch here */
         if (file)
             free_mstring(file);
         line = get_line_number(dump_pc, prog, &file);
-        memcpy(&name, FUNCTION_NAMEP(p[0].funstart), sizeof name);
+        name = prog->function_headers[FUNCTION_HEADER_INDEX(p[0].funstart)].name;
 
 name_computed: /* Jump target from the catch detection */
 
@@ -20389,8 +20400,8 @@ count_extra_ref_in_closure (lambda_t *l, ph_int type)
         svalue_t *svp;
 
         svp = (svalue_t *)l;
-        if ( (num_values = EXTRACT_UCHAR(l->function.code)) == 0xff)
-            num_values = svp[-0x100].u.number;
+        num_values = l->function.code.num_values;
+
         svp -= num_values;
         count_extra_ref_in_vector(svp, (size_t)num_values);
     }

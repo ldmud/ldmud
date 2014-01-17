@@ -134,7 +134,7 @@ invalidate_simul_efuns (void)
         j = id->u.global.sim_efun;
         if ((size_t)j < SIZE_SEFUN_TABLE)
         {
-            simul_efunp[j].offset.func = all_discarded_simul_efun;
+            simul_efunp[j].offset.next_sefun = all_discarded_simul_efun;
             all_discarded_simul_efun = j;
         }
         id->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
@@ -150,7 +150,7 @@ invalidate_simul_efuns (void)
 
         all_simul_efuns = all_simul_efuns->next_all;
 
-        simul_efunp[j].offset.func = all_discarded_simul_efun;
+        simul_efunp[j].offset.next_sefun = all_discarded_simul_efun;
         all_discarded_simul_efun = j;
 
         free_shared_identifier(id);
@@ -291,9 +291,10 @@ assert_simul_efun_object (void)
     {
         int        ix;
         funflag_t  flags, flags2;
-        fun_hdr_p  funstart;
+        bytecode_p funstart;
         mp_int     fun_ix_offs, var_ix_offs;
         program_t *inherit_progp;
+        function_t*funheader;
 
         if (!visible[i])
             continue;
@@ -321,6 +322,7 @@ assert_simul_efun_object (void)
         fun_ix_offs -= ix;
 
         funstart = inherit_progp->program + (flags2 & FUNSTART_MASK);
+        funheader = inherit_progp->function_headers + FUNCTION_HEADER_INDEX(funstart);
 
         /* Don't stumble over undefined functions */
         if (is_undef_function(funstart))
@@ -331,11 +333,7 @@ assert_simul_efun_object (void)
         /* If the function is __INIT, pretend it's a private function */
         if ( !(flags & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|NAME_UNDEFINED)) )
         {
-            string_t *function_name;
-
-            memcpy(  &function_name, FUNCTION_NAMEP(funstart)
-                   , sizeof function_name);
-            if (mstreq(function_name, STR_VARINIT))
+            if (mstreq(funheader->name, STR_VARINIT))
                 flags |= TYPE_MOD_PRIVATE;
         }
 
@@ -344,14 +342,10 @@ assert_simul_efun_object (void)
         {
             string_t *function_name;
             ident_t *p;
-            vartype_t type;
-            unsigned char num_arg, num_locals;
+            unsigned char num_arg;
 
-            memcpy(  &function_name, FUNCTION_NAMEP(funstart)
-                   , sizeof function_name);
-            memcpy(&type, FUNCTION_TYPEP(funstart), sizeof(type));
-            num_arg = FUNCTION_NUM_ARGS(funstart) & 0x7f;
-            num_locals = FUNCTION_NUM_VARS(funstart);
+            function_name = funheader->name;
+            num_arg = funheader->num_arg;
 
             /* Find or make the identifier for the function */
             p = make_shared_identifier_mstr(function_name, I_TYPE_GLOBAL, 0);
@@ -369,14 +363,14 @@ assert_simul_efun_object (void)
             switch(0) { default: /* TRY... */
 
                 /* Try to find a discarded sefun entry with matching
-                 * arguments to reuse.
+                 * name, number of arguments and XVARARGS flag to reuse.
                  */
                 if (all_discarded_simul_efun >= 0)
                 {
                     int last;
 
                     j = all_discarded_simul_efun;
-                    while ( (j = simul_efunp[last = j].offset.func) >= 0)
+                    while ( (j = simul_efunp[last = j].offset.next_sefun) >= 0)
                     {
                         if (num_arg != simul_efunp[j].num_arg
                          || 0 != ((simul_efunp[j].flags ^ flags) & TYPE_MOD_XVARARGS)
@@ -386,8 +380,8 @@ assert_simul_efun_object (void)
                             continue;
 
                         /* Found one: remove it from the 'discarded' list */
-                        simul_efunp[last].offset.func =
-                              simul_efunp[j].offset.func;
+                        simul_efunp[last].offset.next_sefun =
+                              simul_efunp[j].offset.next_sefun;
                         break;
                     }
                     if (j >= 0)
@@ -404,16 +398,16 @@ assert_simul_efun_object (void)
                                           , sizeof (function_t) * num_fun
                       );
                 }
+                simul_efunp[j].name    = function_name;
                 simul_efunp[j].num_arg = num_arg;
             } /* switch() */
 
             /* j now indexes the simul_efunp[] entry to use */
 
             p->u.global.sim_efun = j;
-            simul_efunp[j].name  = function_name;
-            simul_efunp[j].flags = flags;
-            simul_efunp[j].type.typeflags = type.type;
-            simul_efunp[j].type.t_struct = type.t_struct;
+            simul_efunp[j].flags      = funheader->flags;
+            simul_efunp[j].type       = funheader->type;
+            simul_efunp[j].num_locals = funheader->num_locals;
 
             /* If possible, make an entry in the simul_efun table */
             if ((size_t)j < SEFUN_TABLE_SIZE)

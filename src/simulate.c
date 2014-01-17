@@ -4578,26 +4578,7 @@ validate_shadowing (object_t *ob)
      */
     for (i = shadow->num_function_names; --i >= 0; )
     {
-        funflag_t flags;
-        string_t *name;
-        program_t *progp;
-
-        j = shadow->function_names[i];
-        flags = shadow->functions[j];
-        progp = shadow;
-        while (flags & NAME_INHERITED)
-        {
-            inherit_t *inheritp;
-
-            inheritp = &progp->inherit[flags & INHERIT_MASK];
-            j -= inheritp->function_index_offset;
-            progp = inheritp->prog;
-            flags = progp->functions[j];
-        }
-
-        memcpy(&name, FUNCTION_NAMEP(progp->program + (flags & FUNSTART_MASK))
-              , sizeof name
-              );
+        string_t *name = get_function_header(shadow, shadow->function_names[i])->name;
 
         if ( (j = find_function(name, victim)) >= 0
          && victim->functions[j] & TYPE_MOD_NO_MASK )

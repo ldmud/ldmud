@@ -678,19 +678,8 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
         functions = progp->functions;
 
         /* Free all function names. */
-        for (i = progp->num_functions; --i >= 0; )
-        {
-            if ( !(functions[i] & NAME_INHERITED) )
-            {
-                string_t *name;
-                memcpy(
-                  &name,
-                  FUNCTION_NAMEP(program + (functions[i] & FUNSTART_MASK)),
-                  sizeof name
-                );
-                free_mstring(name);
-            }
-        }
+        for (i = progp->num_function_headers; --i >= 0; )
+            free_mstring(progp->function_headers[i].name);
 
         /* Free the strings, variable names and include filenames. */
         do_free_sub_strings( progp->num_strings, progp->strings
@@ -736,8 +725,9 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
 
 {
     string_t *shared_name;
-    fun_hdr_p funstart;
+    bytecode_p funstart;
     program_t *progp;
+    function_t  *header;
     int ix;
     funflag_t flags;
 
@@ -790,10 +780,12 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
     }
 
     funstart = progp->program  + (flags & FUNSTART_MASK);
+    header = progp->function_headers + FUNCTION_HEADER_INDEX(funstart);
 
     /* Set the additional information */
-    *num_arg = FUNCTION_NUM_ARGS(funstart) & 0x7f;
-    memcpy(fun_type, FUNCTION_TYPEP(funstart), sizeof(*fun_type));
+    *num_arg = header->num_arg;
+    fun_type->type = header->type.typeflags & TYPE_MOD_MASK;
+    fun_type->t_struct = header->type.t_struct;
 
     /* And after all this, the function may be undefined */
     if (is_undef_function(funstart))
@@ -852,7 +844,7 @@ reset_object (object_t *ob, int arg)
 
         l = driver_hook[arg].u.lambda;
         free_object(l->ob, "reset_object");
-        if (l->function.code[1] && arg != H_RESET)
+        if (l->function.code.num_arg && arg != H_RESET)
         {
             /* closure accepts arguments, presumably one, so
              * give it the target object and bind to the current
@@ -1849,8 +1841,9 @@ f_functionlist (svalue_t *sp)
 
     for (i = prog->num_functions, fun = prog->functions + i; --i >= 0; )
     {
-        fun_hdr_p funstart; /* Pointer to function in the executable */
+        bytecode_p funstart; /* Pointer to function in the executable */
         uint32 active_flags;  /* A functions definition status flags */
+        function_t *header;
 
         fun--;
 
@@ -1892,21 +1885,19 @@ f_functionlist (svalue_t *sp)
          */
 
         funstart = defprog->program + (flags & FUNSTART_MASK);
+        header = defprog->function_headers + FUNCTION_HEADER_INDEX(funstart);
 
         /* Add the data to the result vector as <flags> determines.
          */
 
         if (mode_flags & RETURN_FUNCTION_NUMARG) {
             svp--;
-            svp->u.number = FUNCTION_NUM_ARGS(funstart) & 0x7f;
+            svp->u.number = header->num_arg;
         }
 
         if (mode_flags & RETURN_FUNCTION_TYPE) {
-            vartype_t rtype;
-
-            memcpy(&rtype, FUNCTION_TYPEP(funstart), sizeof(rtype));
             svp--;
-            svp->u.number = rtype.type;
+            svp->u.number = header->type.typeflags & TYPE_MOD_MASK;
         }
 
         if (mode_flags & RETURN_FUNCTION_FLAGS) {
@@ -1925,8 +1916,7 @@ f_functionlist (svalue_t *sp)
         if (mode_flags & RETURN_FUNCTION_NAME) {
             svp--;
             svp->type = T_STRING;
-            memcpy( &svp->u.str, FUNCTION_NAMEP(funstart)
-                  , sizeof svp->u.str);
+            svp->u.str = header->name;
             (void)ref_mstring(svp->u.str);
         }
     } /* for() */
@@ -5933,8 +5923,6 @@ save_closure (svalue_t *cl, Bool writable)
             program_t      *prog;
             program_t      *inhProg = 0;
             int             ix;
-            funflag_t       flags;
-            string_t       *function_name;
             char           *source, c;
             object_t       *ob;
 
@@ -5956,23 +5944,7 @@ save_closure (svalue_t *cl, Bool writable)
                 }
             }
 
-            flags = prog->functions[ix];
-            
-            while (flags & NAME_INHERITED)
-            {
-                inherit_t *inheritp;
-
-                inheritp = &prog->inherit[flags & INHERIT_MASK];
-                ix -= inheritp->function_index_offset;
-                prog = inheritp->prog;
-                flags = prog->functions[ix];
-            }
-
-            memcpy(&function_name
-                  , FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))
-                  , sizeof function_name
-                  );
-            source = get_txt(function_name);
+            source = get_txt(get_function_header(prog, ix)->name);
 
             {
                 L_PUTC_PROLOG
