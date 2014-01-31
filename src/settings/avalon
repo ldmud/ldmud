@@ -21,9 +21,15 @@ with_catch_reserved_cost=10000
 with_master_reserved_cost=0x800
 enable_dynamic_costs=no
 
+# needs to be at least 10 lager than with_max_user_trace
+with_max_trace=72
+
 with_time_to_clean_up=5400
-with_time_to_swap=1800
-with_time_to_swap_variables=3600
+#new: time_to_clean_up < time_to_swap. lets try this out:
+#with_time_to_swap=1800
+#with_time_to_swap_variables=3600
+with_time_to_swap=25200
+with_time_to_swap_variables=39600
 with_time_to_reset=2400
 
 enable_compat_mode=no
@@ -35,6 +41,8 @@ enable_share_variables=no
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
 enable_malloc_sbrk_trace=yes
+enable_eval_cost_trace=yes
+
 enable_use_mysql=/usr/lib/mysql
 
 with_htable_size=65536
@@ -42,12 +50,13 @@ with_otable_size=8192
 
 #with_hard_malloc_limit=0x23000000
 with_hard_malloc_limit=0x7fffffff
+#with_hard_malloc_limit= 0xfffffffe
 
 with_max_array_size=10000
 with_max_mapping_keys=40000
 with_max_mapping_size=120000
 with_max_byte_transfer=100000
-with_read_file_max_size=100000
+with_read_file_max_size=200000
 
 with_optmize=medium
 
@@ -55,6 +64,7 @@ enable_use_mccp=yes
 enable_use_pcre=yes
 enable_use_tls=gnu
 enable_use_xml=yes
+enable_use_json=yes
 
 with_tls_trustdirectory=no
 
