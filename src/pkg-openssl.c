@@ -1371,7 +1371,8 @@ tls_count_refs ()
  */
 
 {
-    note_malloced_block_ref(keys);
+    if (keys)
+        note_malloced_block_ref(keys);
 } /* tls_count_refs() */
 
 #endif /* GC_SUPPORT */
