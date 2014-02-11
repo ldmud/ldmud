@@ -726,34 +726,61 @@ count_lpctype_ref (lpctype_t *t)
  */
 
 {
-    if (!t || t->t_static)
+    bool repair = false;
+    if (!t)
         return;
 
-    t->ref++;
-    if (test_memory_reference(t))
+    if (t->t_static)
     {
-        note_malloced_block_ref(t);
+        /* Just repair not-refcounted references. */
+        repair = true;
+    }
+    else
+    {
+        t->ref++;
+        if (test_memory_reference(t))
+        {
+            note_malloced_block_ref(t);
+            repair = true;
+
+            switch(t->t_class)
+            {
+            case TCLASS_PRIMARY:
+                break; /* Can't happen. See above. */
+
+            case TCLASS_STRUCT:
+                if (t->t_struct)
+                {
+                    count_struct_type_ref(t->t_struct);
+                    t->t_struct->lpctype = t;
+                }
+                break;
+
+            case TCLASS_ARRAY:
+                count_lpctype_ref(t->t_array.element);
+                break;
+
+            case TCLASS_UNION:
+                count_lpctype_ref(t->t_union.head);
+                count_lpctype_ref(t->t_union.member);
+                break;
+            }
+        }
+    }
+
+    if (repair)
+    {
         switch(t->t_class)
         {
         case TCLASS_PRIMARY:
-            break; /* Can't happen. See above. */
-
         case TCLASS_STRUCT:
-            if (t->t_struct)
-            {
-                count_struct_type_ref(t->t_struct);
-                t->t_struct->lpctype = t;
-            }
-            break;
+            break; /* Nothing to do. */
 
         case TCLASS_ARRAY:
-            count_lpctype_ref(t->t_array.element);
             t->t_array.element->array_of = t;
             break;
 
         case TCLASS_UNION:
-            count_lpctype_ref(t->t_union.head);
-            count_lpctype_ref(t->t_union.member);
             t->t_union.next = t->t_union.head->unions_of;
             t->t_union.head->unions_of = t;
             break;
