@@ -237,12 +237,6 @@ static int max_player = -1;
 int num_player = 0;
   /* The current number of active users */
 
-char *message_flush = NULL;
-  /* Special flush message for add_message().
-   * It is a variable instead of a define to keep gcc from complaining about
-   * a 'null format string'.
-   */
-
 p_int write_buffer_max_size = WRITE_BUFFER_MAX_SIZE;
   /* Amount of data held pending in the write fifo queue.
    *   0: No queue.

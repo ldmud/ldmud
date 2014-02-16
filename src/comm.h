@@ -106,6 +106,10 @@
 
 #endif
 
+/* Special flush message for add_message(). */
+#define message_flush ((const char *)NULL)
+
+
 /* --- Types --- */
 
 /* --- struct write_buffer_s: async write datastructure
@@ -374,7 +378,6 @@ struct interactive_s {
 extern Bool sending_telnet_command;
 extern interactive_t *all_players[MAX_PLAYERS];
 extern int num_player;
-extern char *message_flush;
 extern char *domain_name;
 
 extern p_int write_buffer_max_size;
