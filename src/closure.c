@@ -5628,7 +5628,7 @@ closure_to_string (svalue_t * sp, Bool compact)
 
     if (sp->type != T_CLOSURE)
     {
-        fatal("closure_to_string() called for non-closure value %hd:%hd\n"
+        fatal("closure_to_string() called for non-closure value %"PRIdPHINT":%"PRIdPHINT"\n"
              , sp->type, sp->x.generic
             );
         /* NOTREACHED */

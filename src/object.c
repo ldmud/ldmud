@@ -6339,7 +6339,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         char * source, c;
 
         source = number_buffer;
-        (void)snprintf(source, sizeof(number_buffer), "#%hd:", v->x.quotes);
+        (void)snprintf(source, sizeof(number_buffer), "#%"PRIdPHINT":", v->x.quotes);
         c = *source++;
         do L_PUTC(c) while ( '\0' != (c = *source++) );
         L_PUTC_EPILOG

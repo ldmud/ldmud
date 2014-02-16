@@ -1072,7 +1072,7 @@ free_string_svalue (svalue_t *v)
     if (v->type != T_STRING)
     {
         fatal("free_string_svalue(): Expected string, "
-              "received svalue type (%d:%hd)\n"
+              "received svalue type (%"PRIdPHINT":%"PRIdPHINT")\n"
             , v->type, v->x.generic);
         /* NOTREACHED */
         return;
@@ -1096,7 +1096,7 @@ free_object_svalue (svalue_t *v)
     if (v->type != T_OBJECT)
     {
         fatal("free_object_svalue(): Expected object, "
-              "received svalue type (%d:%hd)\n"
+              "received svalue type (%"PRIdPHINT":%"PRIdPHINT")\n"
             , v->type, v->x.generic);
         /* NOTREACHED */
         return;
