@@ -48,14 +48,6 @@ static inline void count_add(t_stat *a, unsigned long b) {
   a->size += b;
 }
 
-static inline void count(t_stat *a, unsigned long b) {
-  count_add(a, b);
-  if (b < 0)
-    --a->counter;
-  else
-    ++a->counter;
-}
-
 static inline void count_up(t_stat *a, unsigned long b) {
   count_add(a, b);
   ++a->counter;
