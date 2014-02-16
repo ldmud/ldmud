@@ -2967,23 +2967,23 @@ get_message (char *buff)
                          * Set .chars_ready the amount of pure data available
                          * and temporarily suspend the telnet machine.
                          */
-                        length = (TN_START_VALID(ip->tn_state)
-                                   ? ip->tn_start
-                                   : ip->command_end
-                                 ) - ip->command_start;
-                        DTN(("    incomplete negotiation: length %ld\n"
-                           , (long)length));
-                        if (!length)
+                        ssize_t slength = (TN_START_VALID(ip->tn_state)
+                                           ? ip->tn_start
+                                           : ip->command_end
+                                           ) - ip->command_start;
+                        DTN(("    incomplete negotiation: length %zd\n"
+                           , slength));
+                        if (!slength)
                             continue;
-                        if (length < 0)
+                        if (slength < 0)
                         {
-                            comm_fatal(ip, "comm: data length < 0: %ld\n", (long)length);
+                            comm_fatal(ip, "comm: data length < 0: %zd\n", slength);
                             continue;
                         }
                         DTN(("    save machine state %hhd, set to %d (READY)\n"
                           , ip->tn_state, TS_READY));
                         ip->save_tn_state = ip->tn_state;
-                        ip->chars_ready = length;
+                        ip->chars_ready = (int32_t)slength;
                         ip->tn_state = TS_READY;
                     }
                     else if (!ip->chars_ready)
@@ -3115,22 +3115,22 @@ get_message (char *buff)
                 else if (ip->tn_state != TS_READY)
                 {
                     DT(("'%s'   Escaped input\n", get_txt(ip->ob->name)));
-                    length = (TN_START_VALID(ip->tn_state)
-                              ? ip->tn_start
-                              : ip->command_end
-                             ) - ip->command_start;
-                    DTN(("  data length %ld\n", (long)length));
-                    if (length < 0)
+                    ssize_t slength = (TN_START_VALID(ip->tn_state)
+                                       ? ip->tn_start
+                                       : ip->command_end
+                                       ) - ip->command_start;
+                    DTN(("  data length %zd\n", slength));
+                    if (slength < 0)
                     {
-                        comm_fatal(ip, "comm: data length < 0: %ld\n", (long)length);
+                        comm_fatal(ip, "comm: data length < 0: %zd\n", slength);
                         continue;
                     }
-                    if (length > ip->chars_ready)
+                    if (slength > ip->chars_ready)
                     {
                         comm_socket_write(ip->text + ip->chars_ready
-                                        , (size_t)(length - ip->chars_ready)
+                                        , (size_t)(slength - ip->chars_ready)
                                         , ip, 0);
-                        ip->chars_ready = length;
+                        ip->chars_ready = (int32_t)slength;
                     }
                 }
             } /* if (CHARMODE_REQ) */
