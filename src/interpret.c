@@ -6712,7 +6712,6 @@ check_function_args(int fx, program_t *progp, bytecode_p funstart)
                     inter_pc = funstart;
                 }
                 // unravel any lvalue indirection (if any)
-                svalue_t *svp = unravel_lvalue_indirection(&firstarg[i]);
                 errorf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
                        , i+1, get_txt(header->name), buff,
                        get_lpctype_name(arg_type[i]));

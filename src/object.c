@@ -9051,7 +9051,6 @@ static int nesting = 0;  /* Used to detect recursive calls */
         {
             if (!check_rtt_compatibility(vtype.t_type, v))
             {
-                int type = v->type;
                 static char realtypebuf[512];
                 lpctype_t *realtype = get_rtt_type(vtype.t_type, v);
                 get_lpctype_name_buf(realtype, realtypebuf, sizeof(realtypebuf));

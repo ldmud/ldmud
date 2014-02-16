@@ -1144,8 +1144,6 @@ gc_mark_program_ref (program_t *p)
     {
         int i;
 
-        unsigned char *program = p->program;
-        uint32 *functions = p->functions;
         string_t **strings;
         variable_t *variables;
 
