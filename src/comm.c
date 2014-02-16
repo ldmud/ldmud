@@ -2841,7 +2841,8 @@ get_message (char *buff)
 #ifdef USE_TLS
                             if (ip->tls_status == TLS_INACTIVE)
 #endif
-                                debug_message("%s Got unexpected EAGAIN upon socket read. Retrying later.\n");
+                                debug_message("%s Got unexpected EAGAIN upon socket read. Retrying later.\n",
+                                              time_stamp());
                             // Fall-through
                         case EINTR:
                             // read was interrupted by a signal. Ignore and retry later again.
