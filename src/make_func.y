@@ -485,7 +485,7 @@ static void yyerror(const char *) NORETURN;
 static int yylex(void);
 int yyparse(void);
 int ungetc(int c, FILE *f);
-static const char *type_str(int);
+static INLINE const char *type_str(int);
 static long type2flag (int n);
 static const char *etype(long);
 static const char *lpctypestr(int);
@@ -2095,7 +2095,7 @@ ident (char c)
 } /* ident() */
 
 /*-------------------------------------------------------------------------*/
-static const char *
+static INLINE const char *
 type_str (int n)
 
 /* Create a string representation of type <n> in a static buffer
