@@ -6778,7 +6778,7 @@ cond_get_exp (int priority, svalue_t *svp)
               case BNOT  : value = ~value; break;
               case LNOT  : value = !value; break;
               case UMINUS: value = -value; break;
-              case UPLUS : value =  value; break;
+              case UPLUS : break; // no action needed
               default :
                 yyerror("illegal unary operator in #if");
                 free_svalue(svp);

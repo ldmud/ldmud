@@ -1849,7 +1849,7 @@ cond_get_exp (int priority)
         case BNOT  : value = ~value; break;
         case LNOT  : value = !value; break;
         case UMINUS: value = -value; break;
-        case UPLUS : value =  value; break;
+        case UPLUS : break; // nothing to be done
         default :
             yyerror("illegal unary operator in #if");
             return 0;
