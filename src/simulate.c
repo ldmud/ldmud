@@ -601,11 +601,8 @@ dump_core(void)
 {
     /* we want a core dump, and abort() seems to fail for linux and sun */
     (void)signal(SIGFPE, SIG_DFL);
-    {
-        int a = 0;  /* avoids a pesky diagnostic */
-        *((char*)0) = 0/a;
-        *((char*)fatal) = 0/a;
-    }
+    (void)signal(SIGABRT, SIG_DFL);
+    (void)signal(SIGSEGV, SIG_DFL);
     abort();
 } /* dump_core() */
 
