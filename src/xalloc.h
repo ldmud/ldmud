@@ -210,7 +210,7 @@ extern void assert_stack_gap(void);
 extern void reserve_memory (void);
 extern void reallocate_reserved_areas(void);
 extern void check_for_soft_malloc_limit(void);
-extern void notify_lowmemory_condition(enum memory_limit_types what);
+extern void notify_lowmemory_condition(enum low_memory_conditions what);
 
 extern Bool   set_memory_limit(enum memory_limit_types what, mp_int limit);
 extern mp_int get_memory_limit(enum memory_limit_types what);

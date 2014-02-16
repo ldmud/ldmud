@@ -1563,7 +1563,7 @@ string_copy_traced (const char *str MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 void
-notify_lowmemory_condition(enum memory_limit_types what)
+notify_lowmemory_condition(enum low_memory_conditions what)
 /* Calls low_memory(what, <limit>, <memory_consumption>, <reserves> ) 
  * in the master.
  */
