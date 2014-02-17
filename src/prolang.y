@@ -2263,6 +2263,14 @@ get_index_result_type (lpctype_t* aggregate, fulltype_t index, int inst, lpctype
     if (index.t_flags & TYPE_MOD_REFERENCE)
         yyerror("Reference used as index");
 
+    /* No type information, then it might be anything... */
+    if (aggregate == NULL)
+        return lpctype_mixed;
+
+    /* Treat index as anything, if we don't know what it is. */
+    if (index.t_type == NULL)
+        index.t_type = lpctype_mixed;
+
     /* [<n] or [>n] can only index an array or string,
      * [n] (F_INDEX) can also index a mapping.
      */
@@ -2359,6 +2367,9 @@ get_flattened_type (lpctype_t* t)
 {
     lpctype_t *result = NULL;
     lpctype_t* head = t;
+
+    if (t == NULL)
+        return NULL;
 
     /* Let's walk through all types in <t>. */
     while (true)

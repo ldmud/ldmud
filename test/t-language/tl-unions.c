@@ -88,3 +88,17 @@ int run_test()
 
     return 1;
 }
+
+#pragma weak_types
+just_compile_this(arg)
+{
+    /* Initialization and simple operations. */
+    g_str = arg;
+    g_str = g_int + arg;
+    arg = arg + g_int;
+    arg = arg[0];
+    arg = multiply(arg, arg);
+
+    return arg;
+}
+
