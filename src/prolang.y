@@ -11883,11 +11883,13 @@ local_name_lvalue:
       basic_type L_IDENTIFIER
       {
           define_local_variable($2, $1, &$$, MY_FALSE, MY_TRUE);
+          ref_lpctype($$.type);
           free_lpctype($1);
       }
     | basic_type L_LOCAL
       {
           define_local_variable($2, $1, &$$, MY_TRUE, MY_TRUE);
+          ref_lpctype($$.type);
           free_lpctype($1);
       }
 ; /* local_name_lvalue */
@@ -13985,7 +13987,9 @@ define_local_variable (ident_t* name, lpctype_t* actual_type, struct lvalue_s *l
  * if redeclare is true, then a local name is redeclared.
  * It creates the local variable and returns the corresponding lvalue
  * in lv.
- * The references of <actual_type> are NOT adopted.
+ * The references of <actual_type> are NOT adopted. Although this function
+ * puts a type in <lv.type>, it doesn't increment the reference count of it.
+ * The calling function must add the reference, when using <lv> further.
  */
 
 {

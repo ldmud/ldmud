@@ -79,6 +79,12 @@ int run_test()
     g_intarr_strarr = g_int_str_arr[1..5];
     g_int_str = 3;
     g_int_str = g_intarr_strarr[g_int_str];
+    
+    /* Refcounting. */
+    {
+        mapping ** vals = ({});
+        foreach(mapping * val: vals) {}
+    }
 
     return 1;
 }
