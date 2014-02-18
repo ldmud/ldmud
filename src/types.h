@@ -218,7 +218,7 @@ extern bool lpctype_contains(lpctype_t* src, lpctype_t* dest);
  */
 static INLINE bool is_type_struct(lpctype_t *t)
 {
-    if(t == lpctype_unknown)
+    if(t == lpctype_unknown || t == NULL)
         return false;
 
     return lpctype_contains(t, lpctype_any_struct);
