@@ -102,3 +102,12 @@ just_compile_this(arg)
     return arg;
 }
 
+#pragma strong_types
+int call_the_weak()
+{
+    /* Check mixing of available type information
+     * with not-available type information.
+     * Should not result in a compiler error or segfault.
+     */
+    return just_compile_this(10);
+}

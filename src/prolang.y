@@ -1376,6 +1376,9 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
     if (bufsize <= 0)
         return 0;
 
+    if (type == NULL)
+        type = lpctype_unknown;
+
     switch(type->t_class)
     {
     case TCLASS_PRIMARY:

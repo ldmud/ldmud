@@ -297,11 +297,16 @@ internal_get_common_type(lpctype_t *t1, lpctype_t* t2, bool find_one)
 
 {
     /* Hopefully the most common case. */
-    if (t1 == t2)
+    if (t1 && t1 == t2)
         return ref_lpctype(t1);
 
-    if (t1 == NULL || t2 == NULL)
-        return NULL;
+    /* We can't return NULL, as this is an error condition. */
+    if (t1 == NULL && t2 == NULL)
+        return lpctype_mixed;
+    else if (t1 == NULL)
+        return ref_lpctype(t2);
+    else if (t2 == NULL)
+        return ref_lpctype(t1);
 
     if (t2->t_class == TCLASS_UNION && t1->t_class != TCLASS_UNION)
     {
@@ -682,7 +687,10 @@ clear_lpctype_ref (lpctype_t *t)
  */
 
 {
-    if (t && !t->t_static)
+    if (!t)
+        return;
+
+    if (!t->t_static)
     {
         /* Just in case the allocator forgot something... */
         clear_memory_reference(t);
