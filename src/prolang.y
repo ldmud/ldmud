@@ -2703,11 +2703,11 @@ read_jump_offset (bc_offset_t offset)
 } /* read_jump_offset() */
 
 /*-------------------------------------------------------------------------*/
-/* Currently unused. Kept for future use.
+#ifndef FLOAT_FORMAT_2
 static void
 ins_uint32 (uint32_t l)
  // Add the uint32_t <l> to the A_PROGRAM area.
- //
+ // Currently only used when not using FLOAT_FORMAT_2.
 {
     if (realloc_a_program(sizeof(uint32_t)))
     {
@@ -2720,7 +2720,7 @@ ins_uint32 (uint32_t l)
                 , CURRENT_PROGRAM_SIZE + sizeof(uint32_t));
     }
  } // ins_uint32()
-*/
+#endif // FLOAT_FORMAT_2
 /*-------------------------------------------------------------------------*/
 static void
 ins_double (double d)
@@ -2758,11 +2758,11 @@ read_uint32 (bc_offset_t offset)
 } /* read_uint32() */
 
 /*-------------------------------------------------------------------------*/
-/* Currently unused. Kept for future use.
- static void
+#ifndef FLOAT_FORMAT_2
+static void
 ins_uint16 (uint16_t l)
  // Add the uint16_t <l> to the A_PROGRAM area.
- //
+ // Currently only used when not using FLOAT_FORMAT_2.
 {
     if (realloc_a_program(sizeof(l)))
     {
@@ -2775,7 +2775,8 @@ ins_uint16 (uint16_t l)
                  , CURRENT_PROGRAM_SIZE + sizeof(l));
     }
  } // ins_uint16()
-*/
+#endif // FLOAT_FORMAT_2
+
 /*-------------------------------------------------------------------------*/
 static INLINE void
 ins_p_int (p_int num)
