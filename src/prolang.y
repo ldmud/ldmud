@@ -9838,10 +9838,9 @@ expr0:
           $$.end = CURRENT_PROGRAM_SIZE;
 
           /* Determine the result type */
-          $$.type = get_fulltype(get_union_type($1.type.t_type, $4.type.t_type));
+          $$.type = $4.type; /* It's the second value or zero. */
 
           free_fulltype($1.type);
-          free_fulltype($4.type);
        } /* LAND */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
