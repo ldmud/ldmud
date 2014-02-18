@@ -320,14 +320,15 @@ locate_out (program_t *prog)
 
 #define MAKEOFFSET(type, name) (type)&p[(char *)prog->name - (char *)prog]
 
-    prog->program        = MAKEOFFSET(bytecode_p, program);
-    prog->functions      = MAKEOFFSET(uint32*, functions);
-    prog->function_names = MAKEOFFSET(unsigned short *, function_names);
-    prog->strings        = MAKEOFFSET(string_t**, strings);
-    prog->variables      = MAKEOFFSET(variable_t *, variables);
-    prog->inherit        = MAKEOFFSET(inherit_t *, inherit);
-    prog->struct_defs    = MAKEOFFSET(struct_def_t *, struct_defs);
-    prog->includes       = MAKEOFFSET(include_t *, includes);
+    prog->program          = MAKEOFFSET(bytecode_p, program);
+    prog->functions        = MAKEOFFSET(uint32*, functions);
+    prog->function_names   = MAKEOFFSET(unsigned short *, function_names);
+    prog->function_headers = MAKEOFFSET(function_t *, function_headers);
+    prog->strings          = MAKEOFFSET(string_t**, strings);
+    prog->variables        = MAKEOFFSET(variable_t *, variables);
+    prog->inherit          = MAKEOFFSET(inherit_t *, inherit);
+    prog->struct_defs      = MAKEOFFSET(struct_def_t *, struct_defs);
+    prog->includes         = MAKEOFFSET(include_t *, includes);
     if (prog->type_start)
     {
         prog->argument_types = MAKEOFFSET(lpctype_t **, argument_types);
@@ -364,14 +365,15 @@ locate_in (program_t *prog)
 
 #define MAKEPTR(type, name) (type)&p[(char *)prog->name - (char *)0]
 
-    prog->program        = MAKEPTR(bytecode_p, program);
-    prog->functions      = MAKEPTR(uint32*, functions);
-    prog->function_names = MAKEPTR(unsigned short *, function_names);
-    prog->strings        = MAKEPTR(string_t**, strings);
-    prog->variables      = MAKEPTR(variable_t*, variables);
-    prog->inherit        = MAKEPTR(inherit_t*, inherit);
-    prog->struct_defs    = MAKEPTR(struct_def_t*, struct_defs);
-    prog->includes       = MAKEPTR(include_t*, includes);
+    prog->program          = MAKEPTR(bytecode_p, program);
+    prog->functions        = MAKEPTR(uint32*, functions);
+    prog->function_names   = MAKEPTR(unsigned short *, function_names);
+    prog->function_headers = MAKEPTR(function_t *, function_headers);
+    prog->strings          = MAKEPTR(string_t**, strings);
+    prog->variables        = MAKEPTR(variable_t*, variables);
+    prog->inherit          = MAKEPTR(inherit_t*, inherit);
+    prog->struct_defs      = MAKEPTR(struct_def_t*, struct_defs);
+    prog->includes         = MAKEPTR(include_t*, includes);
     if (prog->type_start)
     {
         prog->argument_types = MAKEPTR(lpctype_t **, argument_types);
