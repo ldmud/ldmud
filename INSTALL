@@ -43,6 +43,10 @@ Unix or Unix-like system
   autogen.sh script in src/ to generate the configure script and other
   auto-generated files.]
 
+  If you have git or compile for other people (e.g. to distribute a binary),
+  it is seriously recommended to compile from a cloned git repository.
+  Otherwise the version information of the binary will not be precise.
+
   configure checks for a number of site specific settings and uses this
   information to create the files machine.h (from machine.h.in), Makefile
   (from Makefile.in) and config.h (from config.h.in). We'll come back to

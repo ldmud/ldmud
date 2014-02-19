@@ -418,7 +418,7 @@ main (int argc, char **argv)
          * will follow when we opened it.
          */
         printf("%s LDMud " DRIVER_VERSION LOCAL_LEVEL
-               " (" PROJ_VERSION ")%s\n"
+               " (" COMMIT_ID ")%s\n"
               , time_stamp(), drivertag()
               );
 
@@ -463,9 +463,7 @@ main (int argc, char **argv)
             tmp->next = lpc_predefs;
             lpc_predefs = tmp;
         }
-
-        debug_message("%s LDMud " DRIVER_VERSION LOCAL_LEVEL
-                      " (" PROJ_VERSION ")%s\n"
+        debug_message("%s LDMud " DRIVER_VERSION" "LOCAL_LEVEL" ("COMMIT_ID")%s\n"
                      , time_stamp(), drivertag()
                      );
           /* This also assures the existance of the fd for the debug log */
@@ -1791,16 +1789,17 @@ version (void)
 {
   fputs("LDMud ", stdout);
 
-  fputs(DRIVER_VERSION, stdout);
-
-  fputs(LOCAL_LEVEL " - a LPMud Game Driver.\n"
-        "\nRelease:  " PROJ_VERSION
-       , stdout);
-
+  fputs(DRIVER_VERSION" "LOCAL_LEVEL, stdout);
   fputs(drivertag(), stdout);
 
-  fputs("; " RELEASE_DATE
-        "\nCompiled: " __DATE__
+  fputs(" - a LPMud Game Driver.\n\n"
+        "Last Release: " DRIVER_VERSION " (" RELEASE_DATE ")\n"
+        "Released by: " RELEASE_TAGGER "\n"
+        "Current Commit: " COMMIT_ID "\n"
+        "Local Level: " LOCAL_LEVEL "\n"
+       , stdout);
+
+  fputs("Compiled: " __DATE__
 #ifdef __TIME__
         " " __TIME__
 #endif

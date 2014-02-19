@@ -1,25 +1,44 @@
 # This file defines a number of shell variables to describe the projects
-# version. It is meant to be modified by the bumpversion script.
+# version. It is meant to be modified by a bumpversion script or manually.
 
-# The checkin date
-version_date=$(echo "\$Date$" | sed -e 's/[$]Date: \([0-9]*-[0-9]*-[0-9]*\).*\$/\1/')
+# the release type is either 'release' or 'development'. The type is
+# 'release' if the currently used source for the compilation is tagged with a
+# 3.* tag. Otherwise it is 'development'.
 
-# The checkin time
-version_time=$(echo "\$Date$" | sed -e 's/[$]Date: \([0-9]*-[0-9]*-[0-9]*\) \([0-9]*:[0-9]*:[0-9]*\).*\$/\2/')
+# when in a git repository, determine these values from it automagically and
+# override the defaults
+if test -d ../.git && test -x "`which git 2>&1;true`"; then
+TAGNAME=`git describe --match 3.* |cut -d '-' -f 1`
+version_major=`echo $TAGNAME |cut -d '.' -f 1`
+version_minor=`echo $TAGNAME |cut -d '.' -f 2`
+version_micro=`echo $TAGNAME |cut -d '.' -f 3`
+version_patch=`echo $TAGNAME |cut -d '.' -f 4`
+version_date=`git log --pretty=format:"%ad" -1 $TAGNAME`
+version_tagger=`git log --pretty=format:"%an <%ae>" -1 $TAGNAME`
+version_revision=`git describe --match 3.*`
 
-# The checkin revision
-version_revision=$(echo "\$Revision$" | sed -e 's/[$]Revision: \([0-9][0-9]*\) *\$/\1/')
+# if source not tagged with 3.*, it is no release, but development
+if $( echo $version_revision | grep --quiet '-' ) ;then
+  version_type="dev"
+  version_longtype="development"
+else
+  version_type="rel"
+  version_longtype="release"
+fi;
 
-# The version type: dev, stable, maintenance, release
+# for x.y.z the patch might be empty from above, should then be 0.
+if [ -z "$version_patch" ]; then
+version_patch=0
+fi;
+else
+# The default / fallback for non-git environments)
+version_major=3
+version_minor=5
+version_micro=0
+version_patch=1
 version_type="dev"
 version_longtype="development"
-
-# A timestamp, to be used by bumpversion and other scripts.
-# It can be used, for example, to 'touch' this file on every build, thus
-# forcing revision control systems to add it on every checkin automatically.
-version_stamp="Fr 12 Jun 2009 23:50:32 CEST"
-
-# The version number information
-version_micro=0
-version_minor=5
-version_major=3
+version_date="<unknown>"
+version_tagger="<unknown>"
+version_revision="<unknown>"
+fi;
