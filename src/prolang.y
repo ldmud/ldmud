@@ -3955,39 +3955,42 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         if (mstreq(p->name, STR_HEART_BEAT))
             heart_beat = num;
 
-        /* If it was yet another prototype, then simply return. */
+        /* If it was yet another prototype,
+         * update its types and then return.
+         */
         if (flags & NAME_PROTOTYPE)
         {
+            if (funp->num_arg != num_arg || args_differ)
+            {
+                /* Arguments changed. The only reasonable way this can happen
+                 * is if this function redefined an inherited one.
+                 * For that case, we re-create the arguments, for all other cases
+                 * (to be on the safe side), we turn off type
+                 * checking as we have no way of deciding which definition is the
+                 * correct one.
+                 */
+                if (funp->flags & NAME_INHERITED)
+                {
+                    funp->num_arg = num_arg;
+                    ARGUMENT_INDEX(num) = store_argument_types(num_arg);
+                }
+                else
+                {
+                    funp->num_arg = num_arg;
+                    ARGUMENT_INDEX(num) = INDEX_START_NONE;
+                    flags |= NAME_TYPES_LOST;
+                }
+            }
+
+            free_lpctype(funp->type);
+            funp->type = ref_lpctype(type.t_type);
+
             return num;
         }
 
-        /* This is the completion of an earlier prototype: check
-         * and update the arguments if necessary, and flesh
-         * out the function structure.
+        /* This is the completion of an earlier prototype:
+         * now flesh out the function structure.
          */
-
-        if (funp->num_arg != num_arg || args_differ)
-        {
-            /* Arguments changed. The only reasonable way this can happen
-             * is if this function redefined an inherited one.
-             * For that case, we re-create the arguments, for all other cases
-             * (to be on the safe side), we turn off type
-             * checking as we have no way of deciding which definition is the
-             * correct one.
-             */
-            if (funp->flags & NAME_INHERITED)
-            {
-                funp->num_arg = num_arg;
-                ARGUMENT_INDEX(num) = store_argument_types(num_arg);
-            }
-            else
-            {
-                funp->num_arg = num_arg;
-                ARGUMENT_INDEX(num) = INDEX_START_NONE;
-                flags |= NAME_TYPES_LOST;
-            }
-
-        }
 
         if (funp->flags & NAME_INHERITED) /* We didn't adopt the reference yet. */
             ref_mstring(funp->name);
@@ -3995,8 +3998,6 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         funp->num_locals = num_local;
         funp->flags = flags;
         funp->offset.pc = offset;
-        free_lpctype(funp->type);
-        funp->type = ref_lpctype(type.t_type);
 
         /* That's it */
         return num;
