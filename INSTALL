@@ -13,7 +13,8 @@ Topics covered:
 Prerequisites
 -------------
   - a POSIX.1-2001 conformant platform
-  - a C99 compatible build environment, including make, bison/yacc
+  - a C99 compatible build environment
+  - bison (yacc won't work! bison 2.7.x is known to work)
   - supported architectures: i386, x86_64 (work in progress, see section about
       64 bit systems). Other platforms are not actively supported and tested
       by us, but many will most likely work as well. Please try and tell us
