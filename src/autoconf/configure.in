@@ -790,7 +790,10 @@ AC_CHECK_SIZEOF(double)
 # Checking for programs
 AC_PROG_INSTALL
 AC_CONFIG_HEADERS(machine.h)
-AC_CHECK_PROGS(YACC, byacc "bison -y", yacc)
+AC_PROG_YACC
+if test "$YACC" != "bison -y"; then
+  AC_MSG_ERROR([bison not found, please install it!])
+fi
 AC_PROG_CPP
 
 AH_TOP([
