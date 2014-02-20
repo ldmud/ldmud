@@ -3976,9 +3976,26 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                 }
                 else
                 {
+                    if (!(funp->flags & NAME_TYPES_LOST))
+                    {
+                        /* Warn about type checks being turned off. */
+                        if (pragma_pedantic)
+                            yyerrorf("Multiple inconsistent declarations "
+                                     "of '%s' encountered: "
+                                     "Deactivating argument type checks."
+                                    , get_txt(p->name)
+                                    );
+                        else
+                            yywarnf("Multiple inconsistent declarations "
+                                     "of '%s' encountered: "
+                                     "Deactivating argument type checks."
+                                    , get_txt(p->name)
+                                    );
+                    }
+
                     funp->num_arg = num_arg;
                     ARGUMENT_INDEX(num) = INDEX_START_NONE;
-                    flags |= NAME_TYPES_LOST;
+                    funp->flags |= NAME_TYPES_LOST;
                 }
             }
 
