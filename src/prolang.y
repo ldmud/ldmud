@@ -3976,7 +3976,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                 }
                 else
                 {
-                    if (!(funp->flags & NAME_TYPES_LOST))
+                    if (exact_types && !(funp->flags & NAME_TYPES_LOST))
                     {
                         /* Warn about type checks being turned off. */
                         if (pragma_pedantic)
