@@ -20,6 +20,7 @@
 
 #include "driver.h"
 #include "typedefs.h"
+#include "patchlevel.h"
 
 #include "my-alloca.h"
 #include <fcntl.h>
@@ -599,7 +600,18 @@ dump_core(void)
  */
 
 {
-    /* we want a core dump, and abort() seems to fail for linux and sun */
+    fputs("We are sorry, but LDMud just crashed.\n"
+          "Please report this bug at: " PACKAGE_BUGREPORT "\n"
+          "Don't forget to include logs, version information and if a \n"
+          "coredump is generated, please store it with the corresponding \n"
+          "executable/binary until requested. \n"
+          "Last Release: " DRIVER_VERSION " (" RELEASE_DATE ")\n"
+          "Released by: " RELEASE_TAGGER "\n"
+          "Current Commit: " COMMIT_ID "\n"
+          "Local Level: " LOCAL_LEVEL "\n"
+          "Homepage: " PACKAGE_URL "\n"
+          , stdout);
+
     (void)signal(SIGFPE, SIG_DFL);
     (void)signal(SIGABRT, SIG_DFL);
     (void)signal(SIGSEGV, SIG_DFL);

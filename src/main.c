@@ -1797,6 +1797,8 @@ version (void)
         "Released by: " RELEASE_TAGGER "\n"
         "Current Commit: " COMMIT_ID "\n"
         "Local Level: " LOCAL_LEVEL "\n"
+        "Homepage: " PACKAGE_URL "\n"
+        "Please report bugs to: " PACKAGE_BUGREPORT "\n"
        , stdout);
 
   fputs("Compiled: " __DATE__
