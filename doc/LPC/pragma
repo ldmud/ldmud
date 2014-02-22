@@ -31,10 +31,8 @@ DESCRIPTION
                 upon assignments.)
                 Don't confuse this with strong/strict_types, they only
                 check at compile time.
-                Without save_types this will not work properly, because there
-                will be no information about the types of function arguments
-                at runtime. Also strong_types/strict_types is seriously
-                recommended.
+                strong_types/strict_types is seriously recommended.
+                This pragma implicitly enables save_types as well.
         no_rtt_checks: disable runtime type checks for this program (default).
 
         pedantic: Certain warnings are treated as errors:

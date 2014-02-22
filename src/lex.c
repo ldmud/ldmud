@@ -3439,6 +3439,7 @@ handle_pragma (char *str)
         else if (strncmp(base, "rtt_checks", namelen) == 0)
         {
             pragma_rtt_checks = MY_TRUE;
+            pragma_save_types = MY_TRUE;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "no_rtt_checks", namelen) == 0)
