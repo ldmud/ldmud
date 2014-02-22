@@ -7205,11 +7205,11 @@ get_version(char ** args UNUSED)
     char *buf;
     size_t len;
 
-    len = strlen(DRIVER_VERSION" "LOCAL_LEVEL" ("COMMIT_ID")");
+    len = strlen(DRIVER_VERSION LOCAL_LEVEL" ("COMMIT_ID")");
     buf = xalloc(3 + len);
     if (!buf) return 0;
     buf[0] = '"';
-    strcpy(buf+1, DRIVER_VERSION" "LOCAL_LEVEL" ("COMMIT_ID")");
+    strcpy(buf+1, DRIVER_VERSION LOCAL_LEVEL" ("COMMIT_ID")");
     buf[len+1] = '"';
     buf[len+2] = '\0';
     return buf;

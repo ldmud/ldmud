@@ -463,7 +463,7 @@ main (int argc, char **argv)
             tmp->next = lpc_predefs;
             lpc_predefs = tmp;
         }
-        debug_message("%s LDMud " DRIVER_VERSION" "LOCAL_LEVEL" ("COMMIT_ID")%s\n"
+        debug_message("%s LDMud " DRIVER_VERSION LOCAL_LEVEL" ("COMMIT_ID")%s\n"
                      , time_stamp(), drivertag()
                      );
           /* This also assures the existance of the fd for the debug log */
@@ -1789,7 +1789,7 @@ version (void)
 {
   fputs("LDMud ", stdout);
 
-  fputs(DRIVER_VERSION" "LOCAL_LEVEL, stdout);
+  fputs(DRIVER_VERSION LOCAL_LEVEL, stdout);
   fputs(drivertag(), stdout);
 
   fputs(" - a LPMud Game Driver.\n\n"
