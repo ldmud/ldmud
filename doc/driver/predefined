@@ -31,6 +31,11 @@ DESCRIPTION
       __VERSION_MICRO__ : the micro version number of the driver.
       __VERSION_PATCH__ : the patchlevel of the driver; a 0 here means
                           'no patchlevel'.
+      __VERSION_COMMITID__ : the commit ID of the source of the driver 
+                             (attention: it might be <unknown>, if the driver
+                              was not compiled from a git repository)
+      __VERSION_LOCAL__ : the (optional) LOCAL_LEVEL, the user has defined.
+
 
       __DOMAIN_NAME__    : the domain the host is part of.
       __HOST_IP_NUMBER__ : the hosts IP number (as a string).
