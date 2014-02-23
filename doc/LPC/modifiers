@@ -16,7 +16,8 @@ DESCRIPTION
         private   -- such functions can only be called with an internal
                      call from within this file. Not even inheriting
                      objects can call these functions. You can nevertheless
-                     build an lfun-closure with #' out of a private function.
+                     build an lfun-closure with #' out of a private function
+                     (but you cannot save and restore it).
         protected -- such functions can be called from within the object,
                      or from inheriting objects; but in neither case
                      with call_other(). It is possible to create #' closures
