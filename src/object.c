@@ -168,6 +168,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <assert.h>
 
 #include "object.h"
 
@@ -6297,7 +6298,10 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         char *source, c;
         
         double dtmpval = READ_DOUBLE(v);
-        
+        // infinite (NaN or INF) should never happen in an svalue. If they happen
+        // and are written to the savefile, it is invalid and can't be restored.
+        assert(isfinite(dtmpval));
+
         source = number_buffer;
         
         if (save_version >= 2)
