@@ -28,6 +28,7 @@ DESCRIPTION
                      Inheriting objects can call such functions.
                      But it is not possible to call static functions from
                      other objects via call_other().
+                     The use of 'static' in new code is not recommended.
                      Note that an add_action() is treated like a call
                      from within the object except the player who got the
                      add_action() was forced (thus it is a simple way to
