@@ -3,6 +3,9 @@ SYNOPSIS
 
 BESCHREIBUNG
         Liefert die Laenge eines Strings.
+        Diese efun ist VERALTET und ersetzt durch sizeof().
+        Bitte in neuem Code nicht mehr benutzen und in altem
+        Code sukzessive ersetzen.
 
 SIEHE AUCH
         sizeof(E), extract(E)
