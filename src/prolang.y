@@ -1377,7 +1377,7 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
         return 0;
 
     if (type == NULL)
-        type = lpctype_unknown;
+        type = lpctype_mixed;
 
     switch(type->t_class)
     {
@@ -2109,7 +2109,7 @@ check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary
 
     /* No type info? Use the fallback as a shortcut. */
     if (t1 == NULL && t2 == NULL)
-        return ref_lpctype(error_type);
+        return error_type ? ref_lpctype(error_type) : lpctype_mixed;
 
     if (t1 == NULL)
         t1 = lpctype_mixed;
