@@ -103,6 +103,9 @@ mixed *tests = ({
     ({ "string range memory corruption 3", 0,
        (: string a="abcdefg"; funcall((: $1 = "y"; :), &(a[1..2]),(a="abc")); return a == "abc"; :)
     }),
+    ({ "Lambda error message", 0,
+       (: closure c = lambda(0, ({#'/, 0, 0})); call_out(c, 0); return 1; :)
+   }),
 });
 
 void run_test()

@@ -19217,8 +19217,8 @@ get_line_number_if_any (string_t **name)
             memsafe(*name = new_mstring(name_buffer), strlen(name_buffer)
                    , "lambda name");
             /* Find the beginning of the lambda structure.*/
-            l = (lambda_t *)( (PTRTYPE)(csp->funstart - 1) 
-                             - offsetof(lambda_t, function.code));
+            l = (lambda_t *)( (PTRTYPE)(csp->funstart)
+                             - offsetof(lambda_t, function.code.program));
 
             location = closure_location(l);
 
