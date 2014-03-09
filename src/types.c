@@ -789,8 +789,12 @@ count_lpctype_ref (lpctype_t *t)
             break;
 
         case TCLASS_UNION:
-            t->t_union.next = t->t_union.head->unions_of;
-            t->t_union.head->unions_of = t;
+            /* Did we already set the pointers back? */
+            if (t->t_union.next == NULL)
+            {
+                t->t_union.next = t->t_union.head->unions_of;
+                t->t_union.head->unions_of = t;
+            }
             break;
         }
     }
