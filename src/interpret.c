@@ -6531,14 +6531,20 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
                         if(!check_rtt_compatibility_inl(element, vec->item + i, svptype ? &svpresult : NULL))
                             correct = MY_FALSE;
 
-                        if (svptype)
+                        // mixed is returned when the element is '0'.
+                        // Ignore that when determining the svalue's type.
+                        // We also don't need to call free_lpctype() for it.
+                        if (svptype && svpresult != lpctype_mixed)
                         {
                             lpctype_t *oldval = svpelement;
                             svpelement = get_union_type(svpelement, svpresult);
                             free_lpctype(oldval);
+                            free_lpctype(svpresult);
                         }
 
-                        if (!correct)
+                        // Abort if this element is already incompatible
+                        // and we don't have to determine the full type.
+                        if (!correct && !svptype)
                             break;
                     }
 
@@ -6546,7 +6552,8 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
                     {
                         if (svptype)
                         {
-                            *svptype = get_array_type(svpelement);
+                            // svpelement may be NULL if the array is empty or contains zeroes.
+                            *svptype = get_array_type(svpelement ? svpelement : lpctype_mixed);
                             free_lpctype(svpelement);
                         }
                         return MY_TRUE;
@@ -6612,10 +6619,12 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
     if (valuetype)
     {
         Bool result = lpctype_contains(valuetype, formaltype);
-        free_lpctype(valuetype);
 
         if (svptype)
             *svptype = ref_lpctype(valuetype);
+
+        free_lpctype(valuetype);
+
         return result;
     }
 
