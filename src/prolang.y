@@ -987,11 +987,9 @@ static void store_line_number_relocation(int relocated_from);
 int yyparse(void);
 static void add_new_init_jump(void);
 static void transfer_init_control(void);
-static void copy_variables(program_t *, funflag_t);
-static int copy_functions(program_t *, funflag_t type);
 static void copy_structs(program_t *, funflag_t);
 static void new_inline_closure (void);
-static void fix_function_inherit_indices(program_t *);
+static int inherit_program(program_t *from, funflag_t funmodifier, funflag_t varmodifier);
 static void fix_variable_index_offsets(program_t *);
 static short store_prog_string (string_t *str);
 
@@ -7233,11 +7231,7 @@ inheritance:
            * If the inherited object hasn't been loaded yet, store the
            * name in inherit_file and abort the compile.
            *
-           * copy_variables() might add extra inherits for virtual inheritance.
-           * For this reason, copy_functions() can't know the actual index
-           * of the new inherit, so it sets it to NEW_INHERITED_INDEX instead.
-           * This is changed later to the actual value by
-           * fix_function_inherit_indices() .
+           * Otherwise inherit_program() will do the rest.
            */
 
           object_t *ob;
@@ -7362,52 +7356,21 @@ inheritance:
           free_mstring(last_string_constant);
           last_string_constant = NULL;
 
-          /* Set up the inherit structure */
-          inherit.prog = ob->prog;
-          if ($1[1] & TYPE_MOD_VIRTUAL)
-              inherit.inherit_type = INHERIT_TYPE_VIRTUAL;
-          else
-              inherit.inherit_type = INHERIT_TYPE_NORMAL;
-          inherit.function_index_offset = FUNCTION_COUNT;
-          inherit.inherit_depth = 1;
-
-          /* If it's a virtual inherit, check if it has been
-           * inherited virtually before. If yes, don't bother to insert it
-           * again.
-           * For all types of inherits, check if the same program has already
-           * been inherited at the toplevel.
-           */
+          /* Let's check whether we already have this inherit. */
           {
-              inherit_t *inheritp;
-              int j;
-              Bool duplicate_toplevel = MY_FALSE;
+              inherit_t *inheritp = GET_BLOCK(A_INHERITS);
+              int j = INHERIT_COUNT;
+              bool duplicate_toplevel = false;
 
-              inheritp = GET_BLOCK(A_INHERITS);
-              j = INHERIT_COUNT;
               for (; --j >= 0; inheritp++)
               {
-                  if (inheritp->prog == ob->prog)
+                  if (inheritp->prog == ob->prog && inheritp->inherit_depth == 1)
                   {
-                      /* Check for duplicate toplevel inherit.
-                       * Since the check for duplicate virtual inherits
-                       * may change the inherit_depth, this test must
-                       * come first
-                       */
-                      if (inheritp->inherit_depth == 1)
-                          duplicate_toplevel = MY_TRUE;
-
-                      /* Check for duplicate virtual inherit */
-                      if (($1[1] & TYPE_MOD_VIRTUAL)
-                       && !(inheritp->variable_index_offset & NON_VIRTUAL_OFFSET_TAG)
-                       && !(inherit.inherit_type & INHERIT_TYPE_DUPLICATE)
-                         )
-                      {
-                          inherit.inherit_type |= INHERIT_TYPE_DUPLICATE;
-                          inheritp->inherit_depth = 1;
-                      }
-
+                      duplicate_toplevel = true;
+                      break;
                   }
               }
+
               if  (duplicate_toplevel)
               {
                   if (pragma_pedantic)
@@ -7422,53 +7385,25 @@ inheritance:
               }
           }
 
-          if (!(inherit.inherit_type & INHERIT_TYPE_DUPLICATE))
+          /* Copy the functions and variables, and take
+           * care of the initializer.
+           */
+          int initializer = inherit_program(ob->prog, $1[0], $1[1]);
+          if (initializer > -1)
           {
-              /* Copy the functions and variables, and take
-               * care of the initializer.
-               */
-              int initializer;
+              /* We inherited a __INIT() function: create a call */
 
-              copy_structs(ob->prog, $1[0]);
+              transfer_init_control();
+              ins_f_code(F_SAVE_ARG_FRAME);
+              ins_f_code(F_CALL_INHERITED);
+              ins_short(INHERIT_COUNT-1);
+              ins_short(initializer);
+              ins_f_code(F_RESTORE_ARG_FRAME);
+              ins_f_code(F_POP_VALUE);
+              add_new_init_jump();
+          }
 
-              initializer = copy_functions(ob->prog, $1[0]);
-              copy_variables(ob->prog, $1[1]);
-
-              if (initializer > -1)
-              {
-                  /* We inherited a __INIT() function: create a call */
-
-                  transfer_init_control();
-                  ins_f_code(F_SAVE_ARG_FRAME);
-                  ins_f_code(F_CALL_INHERITED);
-                  ins_short(INHERIT_COUNT);
-                  ins_short(initializer);
-                  ins_f_code(F_RESTORE_ARG_FRAME);
-                  ins_f_code(F_POP_VALUE);
-                  add_new_init_jump();
-              }
-
-              /* Fix up the inherit indices */
-              fix_function_inherit_indices(ob->prog);
-
-              /* Update and store the inherit structure.
-               *
-               * If the program was inherited non-virtual, the v_i_offset
-               * may become negative here if the program itself inherits
-               * other programs with variables virtually. That is ok
-               * because in the final program the sub-inherited virtual
-               * variables no longer are immediately before the programs
-               * non-virtual variables, but the program's code doesn't know
-               * that and continues to 'offset over' them.
-               */
-              inherit.variable_index_offset
-                = $1[1] & TYPE_MOD_VIRTUAL
-                  ? V_VARIABLE_COUNT - ob->prog->num_variables
-                  : (NV_VARIABLE_COUNT - ob->prog->num_variables)
-                    | NON_VIRTUAL_OFFSET_TAG;
-              ADD_INHERIT(&inherit);
-              num_virtual_variables = V_VARIABLE_COUNT;
-          } /* if (!(inherit.inherit_type & INHERIT_TYPE_DUPLICATE)) */
+          num_virtual_variables = V_VARIABLE_COUNT;
       }
 ; /* inheritance */
 
@@ -15236,30 +15171,118 @@ copy_structs (program_t *from, funflag_t flags)
 } /* copy_structs() */
 
 /*-------------------------------------------------------------------------*/
-static int
-copy_functions (program_t *from, funflag_t type)
+static bool
+inherit_variable (variable_t *variable, funflag_t varmodifier)
 
-/* The functions of the program <from> are inherited with visibility <type>.
- * Copy all the function definitions into this program, but as UNDEFINED
- * so that they can be redefined in the current program. The epilog()
- * will later update the non-redefined inherited functions and also copy
- * the types.
+/* Copy a single variable into our program.
  *
- * An explicit call to an inherited function will not be
- * done through this entry (because this entry can be replaced by a new
- * definition). If an function defined by inheritance is called,
- * this is done with F_CALL_INHERITED
+ * Returns true on success, false otherwise (out of memory).
+ */
+
+{
+    ident_t *p;
+    funflag_t new_type = varmodifier;
+
+    p = make_global_identifier(get_txt(variable->name), I_TYPE_GLOBAL);
+    if (!p)
+        return false;
+
+    /* 'public' variables should not become private when inherited
+     * 'private'.
+     */
+    if (variable->type.t_flags & TYPE_MOD_PUBLIC)
+        new_type &= ~TYPE_MOD_PRIVATE;
+
+    fulltype_t vartype = variable->type;
+
+    vartype.t_flags |= new_type 
+                    | (variable->type.t_flags & TYPE_MOD_PRIVATE
+                       ? (NAME_HIDDEN|NAME_INHERITED)
+                       :  NAME_INHERITED
+                      );
+
+    define_variable(p, vartype);
+    return true;
+
+} /* inherit_variable() */
+
+/*-------------------------------------------------------------------------*/
+static bool
+inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_variable_index, int last_variable_index, funflag_t varmodifier)
+
+/* Copy the virtual variables from <from> into our program.
+ * <newinheritp> is the inherit structure that is going to be inserted into
+ * our programm and should already be initialized. <first_variable_index>
+ * and <last_variable_index> are indices into <from>'s variable corresponding
+ * to this virtual inherit (last_variable_index really points one variable
+ * behind the last inherit's variable).
+ *
+ * Returns true on success, false otherwise (out of memory).
+ */
+
+{
+    program_t* progp = newinheritp->prog;
+
+    /* Do we already know this inherit? */
+    inherit_t* inheritdup = GET_BLOCK(A_INHERITS);
+    bool found = false;
+
+    for (int i = INHERIT_COUNT; --i >= 0; inheritdup++)
+    {
+        if (inheritdup->prog == progp && !(inheritdup->variable_index_offset & NON_VIRTUAL_OFFSET_TAG))
+        {
+            /* Found it, use their variables. */
+            newinheritp->variable_index_offset = inheritdup->variable_index_offset;
+            newinheritp->inherit_type |= INHERIT_TYPE_DUPLICATE;
+            found = true;
+            break;
+        }
+    }
+
+    if (!found)
+    {
+        /* First occurence of these virtual variables, we're
+         * going to copy them into our variables.
+         */
+        for (int i = first_variable_index; i < last_variable_index; i++)
+            if (!inherit_variable(from->variables + i, varmodifier))
+                return false;
+    }
+
+    return true;
+
+} /* inherit_virtual_variables() */
+
+
+/*-------------------------------------------------------------------------*/
+static int
+inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
+
+/* Copies struct definitions, functions and variables from the program <from>
+ * into our program. Functions are copied with visibility <funmodifier>,
+ * variables with visibility <varmodifier>.
+ *
+ * We do this by iterating through <from>'s inherit list and copying the
+ * function definitions and variables for each inherit into our program.
+ * It is important that the order of function and variables will be preserved.
  *
  * The result is the function index of the inherited __INIT function,
  * or -1 if the inherited program doesn't have an initializer.
  */
 
 {
-    int initializer = -1;
-    int i;
-    uint32 first_func_index, current_func_index;
-    function_t *fun_p;
-    unsigned short *ixp;
+    int initializer = -1;                      /* Function index of __INIT */
+    function_t *fun_p;                         /* Function pointer as we move
+                                                * through the list. */
+    uint32 first_func_index = FUNCTION_COUNT;  /* Index of the first inherited
+                                                * function. */
+    uint32 first_var_index  = V_VARIABLE_COUNT;/* Index of the first inherited
+                                                * virtual variable. */
+
+
+   /*                                *
+    *   Preparations for functions   *
+    *                                */
 
     /* Make space for the inherited function structures */
     if (mem_block[A_FUNCTIONS].max_size <
@@ -15273,13 +15296,18 @@ copy_functions (program_t *from, funflag_t type)
     }
 
     /* The new functions will be stored from here */
-    fun_p = FUNCTION(FUNCTION_COUNT);
+    fun_p = FUNCTION(first_func_index);
 
     /* Copy the function definitions one by one and adjust the flags.
      * For now, we mask out the INHERIT field in the flags and
      * use NEW_INHERITED_INDEX for the value.
+     *
+     * We'll do cross-definitions and visibility later.
+     * For now we just collect the function information.
+     * We'll need to do it here at the beginning, so we can easily
+     * detect visible definitions (by looping over the function names).
      */
-    for (i = 0; i < from->num_functions; i++, fun_p++)
+    for (int i = 0; i < from->num_functions; i++, fun_p++)
     {
         funflag_t  flags;
         int i2; /* The index of the real function */
@@ -15314,44 +15342,192 @@ copy_functions (program_t *from, funflag_t type)
     } /* for (inherited functions) pass 1 */
 
     /* Point back to the begin of the copied function data */
-    fun_p = FUNCTION(FUNCTION_COUNT);
+    fun_p = FUNCTION(first_func_index);
 
     /* Unhide all function for which names exist */
-    ixp = from->function_names;
-    for (i = from->num_function_names; --i >= 0; )
     {
-        fun_p[*ixp++].flags &= ~NAME_HIDDEN;
+        unsigned short *ixp = from->function_names;
+        for (int i = from->num_function_names; --i >= 0; )
+        {
+            fun_p[*ixp++].flags &= ~NAME_HIDDEN;
+        }
     }
 
-    first_func_index = current_func_index = FUNCTION_COUNT;
     mem_block[A_FUNCTIONS].current_size += sizeof *fun_p * from->num_functions;
 
-    /* Loop again over the inherited functions, checking visibility
+
+    /* Shouldn't have VAR_INITILIALIZED set, but you never know... */
+    varmodifier &= ~VAR_INITIALIZED;
+
+
+   /*                                  *
+    *   Processing <from>'s inherits   *
+    *                                  */
+
+   /* Remember that <from>'s layout looks something like this:
+    *
+    * Inherit list:                V1    V2    I1  V3  V1 I2
+    * Function table:          (H1 V1 H2 V2 H3 I1) V3 (V1 I2) <from>
+    * Variable list:  V1 V2 V3 (H1    H2    H3 I1)        I2  <from>
+    *
+    * Where V1, V2, V3 are virtual inherits either directly or
+    * indirectly from the non-virtual inherit I1,and H1 - H3
+    * are indirectly by I1 inherited non-virtual programs.
+    * The paranthesis denote the area that is indicated by I1's
+    * inherit entry.
+    *
+    * There are two things to pay attention to:
+    * 1) For functions before the functions denoted by an
+    *    INHERIT_TYPE_EXTRA inherit (function_index_offset),
+    *    there may already be (non-virtual) functions from
+    *    other not-mentioned inherits.
+    * 2) Virtual variables are moved to the beginning of the
+    *    variable block (see above). Because of that, for
+    *    regular inherits that have virtual variables, the
+    *    variable_index_offset doesn't necessarily point to
+    *    the begin of its variable block. The
+    *    variable_index_offset is calculated so that
+    *    function_index_offset + progp->num_variables
+    *    point to the end of the variable block. But
+    *    as num_variables also contains the virtual variables
+    *    that might have been moved to the beginning of the
+    *    inheritee's variable block, the inherit's start offset
+    *    can hang somewhere between its virtual and non-virtual
+    *    variables.
+    */
+
+    /* We don't know where the non-virtual variables start.
+     * That's why we're going through the the inherit list
+     * and handle virtual variables only. At the end all
+     * remaining variables are non-virtual ones and will be
+     * copied into our own as well.
+     *
+     * Functions will be handled similarly. First we'll
+     * look at all (already) virtual functions and then
+     * at the rest (the remaining functions will still have
+     * NEW_INHERITED_INDEX as the inherit index). In this
+     * phase we just set the inherit index for each function.
+     * Cross-definitions will be done later in one big loop.
+     */
+
+    /* Remember the last handled variable.
+     * This is the index into <from>'s variables.
+     */
+    int last_bound_variable = 0;
+
+    int inheritnum = from->num_inherited; /* Number of inherits.          */
+
+    for (int inheritidx = 0; inheritidx < inheritnum; inheritidx++)
+    {
+        inherit_t* inheritp = from->inherit + inheritidx;
+        program_t* progp    = inheritp->prog;
+
+        /* We'll handle non-virtual variables and functions at the end. */
+        if (inheritp->inherit_type == INHERIT_TYPE_NORMAL)
+            continue;
+
+        /* Create a new inherit entry. */
+        inherit_t newinherit;
+        newinherit = *inheritp;
+        newinherit.inherit_type = INHERIT_TYPE_EXTRA;
+        newinherit.inherit_depth++;
+        newinherit.function_index_offset += first_func_index;
+        newinherit.variable_index_offset += V_VARIABLE_COUNT - last_bound_variable;
+
+        int next_bound_variable = inheritp->variable_index_offset + progp->num_variables;
+        inherit_virtual_variables(&newinherit, from, last_bound_variable,
+            next_bound_variable, varmodifier);
+        last_bound_variable = next_bound_variable;
+
+        /* Now adjust the function inherit index.
+         * If the function isn't cross-defined or overridden in <from>
+         * (i.e. it really is a call into the virtual inherit),
+         * then call it through <newinherit> now.
+         *
+         * Remember that we haven't done any cross-definitions yet.
+         */
+        fun_p = FUNCTION(newinherit.function_index_offset);
+        funflag_t* flag_p = from->functions + inheritp->function_index_offset;
+        int newinheritidx = INHERIT_COUNT;
+        for (int i = progp->num_functions; --i >= 0; fun_p++, flag_p++)
+        {
+            if ((*flag_p & (NAME_INHERITED|NAME_CROSS_DEFINED)) == NAME_INHERITED
+             && (*flag_p & INHERIT_MASK) == inheritidx )
+            {
+                fun_p->offset.inherit = newinheritidx;
+            }
+        }
+
+        ADD_INHERIT(&newinherit);
+    }
+
+    /* And now to something completely different, <from> itself. */
+
+    inherit_t frominherit;
+    frominherit.prog = from;
+    frominherit.function_index_offset = first_func_index;
+    frominherit.inherit_depth = 1;
+
+    /* We're done with the virtual extra inherits,
+     * copy the remaining variables (variable indices from
+     * last_bound_variables to from->num_variables).
+     */
+    if (varmodifier & TYPE_MOD_VIRTUAL)
+    {
+        /* And they're gonna be virtual, too...
+         */
+        frominherit.inherit_type = INHERIT_TYPE_VIRTUAL;
+        frominherit.variable_index_offset = first_var_index;
+
+        inherit_virtual_variables(&frominherit, from, last_bound_variable,
+            from->num_variables, varmodifier);
+    }
+    else
+    {
+        frominherit.inherit_type = INHERIT_TYPE_NORMAL;
+        frominherit.variable_index_offset = (NV_VARIABLE_COUNT - last_bound_variable) | NON_VIRTUAL_OFFSET_TAG;
+
+        for (int i = last_bound_variable; i < from->num_variables; i++)
+            if (!inherit_variable(from->variables + i, varmodifier))
+                break;
+    }
+
+    /* Hey, we're done with the variables, now to the functions.
+     * Set the inherit index for all functions that have none, yet.
+     */
+    fun_p = FUNCTION(frominherit.function_index_offset);
+    int frominheritidx = INHERIT_COUNT;
+    for (int i = from->num_functions; --i >= 0; fun_p++)
+    {
+        if (fun_p->offset.inherit == NEW_INHERITED_INDEX)
+            fun_p->offset.inherit = frominheritidx;
+    }
+
+    ADD_INHERIT(&frominherit);
+
+    /* And finally, let's do cross-definitions and apply the modifiers.
+     *
+     * Loop again over the inherited functions, checking visibility
      * and re/crossdefinition, and updating their function indices.
      * Do not call define_new_function() from here, as duplicates would
      * be removed.
      */
-    for (i = 0; i < from->num_functions; i++, current_func_index++)
+    fun_p = FUNCTION(first_func_index);
+    for (int i = 0, current_func_index = first_func_index; i < from->num_functions; i++, current_func_index++)
     {
-        function_t fun;
-        funflag_t new_type;
-        unsigned short tmp_short;
-        ident_t* p;
+        function_t fun = fun_p[i];
 
-        fun = fun_p[i];
-          /* Prepare some data to be used if this function will not be
-           * redefined.
-           * fun.name has already it's ref as a newly defined function in from
-           */
-
-        fun.flags |= type & TYPE_MOD_NO_MASK;
+        /* Apply nomask now, visibility later when we know
+         * that this the dominant definition.
+         */
+        fun.flags |= funmodifier & TYPE_MOD_NO_MASK;
 
         /* Perform a lot of tests and actions for the visibility
-         * and definitiability. The switch() allows us to abort
+         * and definitiability. The do-while(false) allows us to abort
          * easily without using gotos.
          */
-        switch (0) {
-        default:
+        do
+        {
             /* Ignore cross defines.
              * They are the only complete invisible entries.
              */
@@ -15359,7 +15535,7 @@ copy_functions (program_t *from, funflag_t type)
                 break;
 
             /* Visible: create a new identifier for it */
-            p = make_global_identifier(get_txt(fun.name), I_TYPE_GLOBAL);
+            ident_t* p = make_global_identifier(get_txt(fun.name), I_TYPE_GLOBAL);
             if (!p)
                 break;
 
@@ -15432,7 +15608,7 @@ copy_functions (program_t *from, funflag_t type)
 
                             p->u.global.function = current_func_index;
                         }
-                        else if ((fun.flags | type) & TYPE_MOD_VIRTUAL
+                        else if ((fun.flags | funmodifier) & TYPE_MOD_VIRTUAL
                               && OldFunction->flags & TYPE_MOD_VIRTUAL
                           &&    get_virtual_function_id(from, i)
   == get_virtual_function_id(INHERIT(OldFunction->offset.inherit).prog
@@ -15458,7 +15634,7 @@ copy_functions (program_t *from, funflag_t type)
                             OldFunction->flags |= fun.flags &
                                 (TYPE_MOD_PUBLIC|TYPE_MOD_NO_MASK);
                             OldFunction->flags &= fun.flags |
-				~(TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|NAME_HIDDEN);
+                                ~(TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|NAME_HIDDEN);
                             cross_define( OldFunction, &fun
                                         , n - current_func_index );
                         }
@@ -15586,7 +15762,7 @@ copy_functions (program_t *from, funflag_t type)
              * Especially: public functions should not become private
              * when inherited 'private'.
              */
-            new_type = type;
+            funflag_t new_type = funmodifier;
             if (fun.flags & TYPE_MOD_PUBLIC)
                 new_type &= ~(TYPE_MOD_PRIVATE|TYPE_MOD_STATIC);
             fun.flags |= new_type;
@@ -15606,12 +15782,12 @@ copy_functions (program_t *from, funflag_t type)
                 initializer = i;
                 fun.flags |= NAME_UNDEFINED;
             }
-        } /* switch() for visibility/redefinability */
+        } while(false); /* do loop for visibility/redefinability */
 
         /* Copy information about the types of the arguments, if it is
          * available.
          */
-        tmp_short = INDEX_START_NONE; /* Presume not available. */
+        A_ARGUMENT_INDEX_t argindex = INDEX_START_NONE; /* Presume not available. */
         if (from->type_start != 0)
         {
             if (from->type_start[i] != INDEX_START_NONE)
@@ -15619,7 +15795,7 @@ copy_functions (program_t *from, funflag_t type)
                 /* They are available for function number 'i'. Copy types of
                  * all arguments, and remember where they started.
                  */
-                tmp_short = ARGTYPE_COUNT;
+                argindex = ARGTYPE_COUNT;
                 if (fun.num_arg)
                 {
                     int ix;
@@ -15646,280 +15822,17 @@ copy_functions (program_t *from, funflag_t type)
         /* Save the index where they started. Every function will have an
          * index where the type info of arguments starts.
          */
-        ADD_ARGUMENT_INDEX(tmp_short);
+        ADD_ARGUMENT_INDEX(argindex);
 
         /* Finally update the entry in the A_FUNCTIONS area */
         fun_p[i] = fun;
     } /* for (inherited functions), pass 2 */
 
+    copy_structs(from, funmodifier);
+
     return initializer;
-} /* copy_functions() */
 
-/*-------------------------------------------------------------------------*/
-static void
-copy_variables (program_t *from, funflag_t type)
-
-/* Inherit the variables of <from> with visibility <type>.
- * The variables are copied into our program, and it is important that
- * they are stored in the same order with the same index.
- */
-
-{
-    int i, j;
-    int new_bound, last_bound;
-    int variable_index_offset, fun_index_offset;
-    uint inheritc;
-    inherit_t *inheritp;
-    int previous_variable_index_offset;
-    int from_variable_index_offset;
-
-    type &= ~VAR_INITIALIZED;
-
-    /* If this is a virtual inherit, find the first inherit
-     * for this program and set the from_variable_index_offset.
-     */
-    from_variable_index_offset = -1;
-    if (type & TYPE_MOD_VIRTUAL)
-    {
-        inheritp = GET_BLOCK(A_INHERITS);
-        j = INHERIT_COUNT;
-        for (; --j >= 0; inheritp++)
-        {
-            if (inheritp->prog == from
-             && !(inheritp->variable_index_offset & NON_VIRTUAL_OFFSET_TAG) )
-            {
-                from_variable_index_offset =
-                  inheritp->variable_index_offset + VIRTUAL_VAR_TAG;
-                break;
-            }
-        }
-
-        if (variables_initialized && from_variable_index_offset < 0)
-            yyerror(
-              "illegal to inherit virtually after initializing variables\n"
-            );
-    }
-
-    fun_index_offset = FUNCTION_COUNT - from->num_functions;
-    variable_index_offset = V_VARIABLE_COUNT;
-
-    /* Loop through the inherits and copy the variables,
-     * and also in the last run the variables of the inherited program.
-     */
-    last_bound = 0;  /* Last variable index handled in the previous run */
-    i = from->num_inherited;
-    for (inheritc = 0, inheritp = from->inherit; MY_TRUE; inheritc++, inheritp++)
-    {
-        if (--i >= 0)
-        {
-            /* It's an inherit */
-
-            program_t *progp;
-
-            progp = inheritp->prog;
-            new_bound =
-              inheritp->variable_index_offset + progp->num_variables;
-              /* The end of this program's variables in the inherited
-               * program <from>. This way we can compare the variables
-               * original type with the type they got through inheritance.
-               */
-
-            /* Has a new virtual variable been introduced in this program?
-             */
-            if (progp->num_variables
-             && from->variables[new_bound-1].type.t_flags & TYPE_MOD_VIRTUAL
-             && !(progp->variables[progp->num_variables-1].type.t_flags
-                  & TYPE_MOD_VIRTUAL)
-               )
-            {
-                inherit_t inherit, *inheritp2;
-                int k, inherit_index;
-                funflag_t *flagp;
-                function_t *funp;
-
-                if (variables_initialized)
-                    yyerror("illegal to inherit virtually after "
-                            "initializing variables\n"
-                    );
-                inherit = *inheritp;
-                inherit.inherit_type = INHERIT_TYPE_EXTRA;
-                inherit.inherit_depth++;
-
-                /* Find the first (virtual) inheritance of this
-                 * program.
-                 */
-                inheritp2 = GET_BLOCK(A_INHERITS);
-                j = INHERIT_COUNT;
-                for (; --j >= 0; inheritp2++)
-                {
-                    if (inheritp2->prog == inherit.prog
-                     && !(inheritp2->variable_index_offset &
-                          NON_VIRTUAL_OFFSET_TAG) )
-                    {
-                        /* Found it: copy the variable_index_offset */
-                        inherit.variable_index_offset =
-                          inheritp2->variable_index_offset;
-                        break;
-                    }
-                }
-
-                if (j < 0)
-                {
-                    /* First occurence of these virtual variables, we're
-                     * going to copy them into our variables.
-                     */
-                    inheritp2 = &inherit;
-                    variable_index_offset += new_bound - last_bound;
-                    inherit.variable_index_offset =
-                      variable_index_offset - progp->num_variables;
-                }
-                else
-                    inherit.inherit_type |= INHERIT_TYPE_DUPLICATE;
-
-                inherit_index = INHERIT_COUNT;
-                inherit.function_index_offset += fun_index_offset;
-                ADD_INHERIT(&inherit);
-                  /* If a function is directly inherited from a program that
-                   * introduces a virtual variable, the code therein is not
-                   * aware of virtual inheritance. For this reason, there are
-                   * the extra inherit_ts with an appropriate
-                   * variable_index_offset; we have to redirect inheritance
-                   * to these inherit_ts.
-                   */
-
-                /* Update the offset.inherit in all these functions to point
-                 * to the new inherit_t structure. (But only, if it wasn't
-                 * already cross-defined to something else.)
-                 */
-                flagp = from->functions + inheritp->function_index_offset;
-                funp = FUNCTION(inherit.function_index_offset);
-                for (k = inherit.prog->num_functions; --k >= 0; funp++)
-                {
-                    if ( !(funp->flags & NAME_CROSS_DEFINED)
-                     && (*flagp & (NAME_INHERITED|NAME_CROSS_DEFINED)) ==
-                           NAME_INHERITED
-                     && (*flagp & INHERIT_MASK) == inheritc )
-                    {
-                        funp->offset.inherit = inherit_index;
-                    }
-                    flagp++;
-                }
-
-                if (j >= 0)
-                {
-                    /* There has been another instance of this virtual
-                     * superclass before: no need to check the visibility
-                     * of the variables again.
-                     */
-                    if (new_bound > last_bound)
-                        last_bound = new_bound;
-                    continue;
-                }
-                previous_variable_index_offset = -1;
-            }
-            else
-            {
-                /* Normal, nonvirtual inherit.
-                 * We wait with the visibility check until it's really
-                 * useful, and then do several inherits in one go.
-                 */
-                continue;
-            }
-        }
-        else
-        {
-            /* Handle the variables of <from>.
-             * After that, we will loop once more in here, but
-             * the if() below will notice that.
-             * As a side effect we terminate immediately if <from>
-             * had no variables on its own.
-             */
-            previous_variable_index_offset = from_variable_index_offset;
-            new_bound = from->num_variables;
-            if (new_bound == last_bound)
-                break;
-        }
-
-        /* Check the visibility of the newly inspected variables
-         * [last_bound..new_bound[.
-         */
-        for (j = last_bound; j < new_bound; j++)
-        {
-            ident_t *p;
-            funflag_t new_type;
-
-            p = make_global_identifier(get_txt(from->variables[j].name)
-                                      , I_TYPE_GLOBAL);
-            if (!p)
-                return;
-
-            new_type = type;
-
-            /* 'public' variables should not become private when inherited
-             * 'private'.
-             */
-            if (from->variables[j].type.t_flags & TYPE_MOD_PUBLIC)
-                new_type &= ~TYPE_MOD_PRIVATE;
-
-            /* define_variable checks for previous 'nomask' definition. */
-            if (previous_variable_index_offset >= 0)
-            {
-                if ( !(from->variables[j].type.t_flags & TYPE_MOD_PRIVATE) )
-                {
-                    fulltype_t vartype = from->variables[j].type;
-
-                    vartype.t_flags |= new_type | NAME_INHERITED;
-                    redeclare_variable(p, vartype,
-                                       previous_variable_index_offset + j
-                    );
-                }
-            }
-            else
-            {
-                fulltype_t vartype = from->variables[j].type;
-
-                vartype.t_flags |= new_type 
-                        | (from->variables[j].type.t_flags & TYPE_MOD_PRIVATE
-                           ? (NAME_HIDDEN|NAME_INHERITED)
-                           :  NAME_INHERITED
-                          )
-                ;
-
-                define_variable(p, vartype);
-            }
-        } /* end loop through variables */
-
-        last_bound = new_bound; /* Mark how far we got */
-
-    } /* end of loop through inherits */
-
-} /* copy_variables() */
-
-/*-------------------------------------------------------------------------*/
-static void
-fix_function_inherit_indices (program_t *from)
-
-/* All functions inherited from <from>, which haven't been resolved
- * to belong to some other inherit, are now assigned to the current
- * inherit.
- */
-
-{
-    int i, inherit_index;
-    function_t *funp;
-
-    inherit_index = INHERIT_COUNT;
-    funp = FUNCTION(FUNCTION_COUNT - from->num_functions);
-
-    for (i = from->num_functions; --i >= 0; funp++)
-    {
-        if ( funp->offset.inherit == NEW_INHERITED_INDEX
-         && !(funp->flags & NAME_CROSS_DEFINED) )
-        {
-            funp->offset.inherit = inherit_index;
-        }
-    }
-} /* fix_function_inherit_indices() */
+} /* inherit_program() */
 
 /*-------------------------------------------------------------------------*/
 static void
