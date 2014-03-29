@@ -5969,7 +5969,8 @@ find_virtual_value (int num)
      */
     inheritp = current_prog->inherit;
     while
-      (   inheritp->variable_index_offset + inheritp->prog->num_variables <= num
+      (   inheritp->inherit_type == INHERIT_TYPE_NORMAL
+       || inheritp->variable_index_offset + inheritp->prog->num_variables <= num
        || inheritp->variable_index_offset > num)
     {
         inheritp++;
@@ -5980,17 +5981,15 @@ find_virtual_value (int num)
     num -= inheritp->variable_index_offset;
 
     /* Set inheritp to the first instance of this inherited program.
-     * A cleaner, but slighly slower way to write the following segment
-     * is: for (inheritp = current_object->prog_inherit
-     *         ; inheritp->prog != progp
-     *         ; inheritp++) NOOP;
+     * We need a virtual inherited instance, so either
+     * INHERIT_TYPE_EXTRA or INHERIT_TYPE_VIRTUAL,
+     * but not INHERIT_TYPE_NORMAL.
      */
     progp = inheritp->prog;
-    progpp = (char *)&current_object->prog->inherit->prog;
-    while (*(program_t **)progpp != progp)
-        progpp += sizeof(inherit_t);
-    inheritp = (inherit_t *)
-                 (((PTRTYPE)(progpp)) - offsetof(inherit_t, prog));
+
+    for (inheritp = current_object->prog->inherit
+       ; inheritp->prog != progp || inheritp->inherit_type == INHERIT_TYPE_NORMAL
+       ; inheritp++) NOOP;
 
     /* Compute the actual variable address */
 
