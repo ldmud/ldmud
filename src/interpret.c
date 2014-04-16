@@ -191,6 +191,7 @@
 #include "typedefs.h"
 
 #include "my-alloca.h"
+#include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -5953,7 +5954,6 @@ find_virtual_value (int num)
 {
     inherit_t *inheritp;
     program_t *progp;
-    char *progpp; /* actually a program_t **, but some compilers... */
 
     /* Make sure that we are not calling from a set_this_object()
      * context.
@@ -5990,6 +5990,22 @@ find_virtual_value (int num)
     for (inheritp = current_object->prog->inherit
        ; inheritp->prog != progp || inheritp->inherit_type == INHERIT_TYPE_NORMAL
        ; inheritp++) NOOP;
+
+    /* Handle obsoleted inherited programs */
+    while (inheritp->inherit_type & INHERIT_TYPE_MAPPED)
+    {
+        inherit_t *new_inheritp = current_object->prog->inherit + inheritp->updated_inherit;
+        num = current_object->prog->update_index_map[num + inheritp->variable_map_offset];
+
+        if (num >= new_inheritp->prog->num_variables)
+        {
+            /* Dangling variable. We'll stay in that variable block. */
+            num -= new_inheritp->prog->num_variables;
+            break;
+        }
+
+        inheritp = new_inheritp;
+    }
 
     /* Compute the actual variable address */
 
@@ -7433,12 +7449,7 @@ adjust_variable_offsets ( const inherit_t * inheritp
     inherit_t * inh = NULL;
 
     if (prog != obj->prog
-     && inheritp->prog->num_variables
-     && (prog->variables[inheritp->variable_index_offset
-                         +inheritp->prog->num_variables-1
-                        ].type.t_flags & TYPE_MOD_VIRTUAL)
-     && !(inheritp->prog->variables[inheritp->prog->num_variables-1
-                                   ].type.t_flags & TYPE_MOD_VIRTUAL)
+     && inheritp->inherit_type != INHERIT_TYPE_NORMAL
        )
     {
         /* Now search for the first virtual inheritance of the program
@@ -7452,9 +7463,7 @@ adjust_variable_offsets ( const inherit_t * inheritp
         while (i)
         {
             if (inh->prog == inheritp->prog
-             && obj->prog->variables[inh->variable_index_offset
-                                     +inh->prog->num_variables-1
-                                    ].type.t_flags&TYPE_MOD_VIRTUAL
+             && inh->inherit_type != INHERIT_TYPE_NORMAL
                )
                 break;
             inh++;
@@ -7490,7 +7499,7 @@ adjust_variable_offsets ( const inherit_t * inheritp
 
 /*-------------------------------------------------------------------------*/
 static inherit_t *
-setup_inherited_call (unsigned short inhIndex)
+setup_inherited_call (unsigned short inhIndex, unsigned short *fx)
 
 /* Setup the global variables for a call to an explicitly inherited
  * function, inherited from <inhIndex>. Result is the pointer to the
@@ -7526,6 +7535,27 @@ setup_inherited_call (unsigned short inhIndex)
             inheritp = inh;
             current_variables = current_object->variables;
             function_index_offset = 0;
+
+            /* Check for obsoleted inherited programs. */
+            while (inheritp->inherit_type & INHERIT_TYPE_MAPPED)
+            {
+                unsigned short prevfx = *fx;
+
+                *fx = current_object->prog->update_index_map[prevfx + inheritp->function_map_offset];
+                if (*fx == USHRT_MAX)
+                {
+                    /* There was no corresponding function in the new program.
+                     * If this was the __INIT function we'll ignore it.
+                     * Otherwise throw an error.
+                     */
+                    function_t* fun = get_function_header(inheritp->prog, prevfx);
+                    if (mstreq(fun->name, STR_VARINIT))
+                        return NULL;
+                    else
+                        errorf("Dangling function call to '%s' in program '%s'.\n", get_txt(fun->name), get_txt(inheritp->prog->name));
+                }
+                inheritp = current_object->prog->inherit + inheritp->updated_inherit;
+            }
         }
     }
 
@@ -7582,6 +7612,8 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
         inherit_t *inheritp;
 
         inheritp = &progp->inherit[flags & INHERIT_MASK];
+        assert(!(inheritp->inherit_type & INHERIT_TYPE_MAPPED));
+
         progp = inheritp->prog;
         fx -= inheritp->function_index_offset;
         var_ix_offs += inheritp->variable_index_offset;
@@ -7820,6 +7852,15 @@ setup_new_frame (int fx, program_t *inhProg, Bool allowRefs)
                 inheritp = inh;
                 fun_ix_offs = 0;
                 var_ix_offs = 0;
+
+                /* Check for obsoleted inherited programs. */
+                while (inheritp->inherit_type & INHERIT_TYPE_MAPPED)
+                {
+                    fx = current_object->prog->update_index_map[fx + inheritp->function_map_offset];
+                    if (fx == USHRT_MAX)
+                        errorf("Dangling function call in program '%s'.\n", get_txt(inheritp->prog->name));
+                    inheritp = current_object->prog->inherit + inheritp->updated_inherit;
+                }
             }
 
             fun_ix_offs += inheritp->function_index_offset;
@@ -14066,7 +14107,16 @@ again:
         /* Save all important global stack machine registers */
         push_control_stack(sp, pc, fp, inter_context);
 
-        inheritp = setup_inherited_call(prog_index);
+        inheritp = setup_inherited_call(prog_index, &func_index);
+        if (!inheritp)
+        {
+            /* Not found anymore and no error thrown.
+             * This can happen for vanished __INIT functions.
+             */
+            pop_control_stack();
+            push_number(sp, 0);
+            break;
+        }
 
         /* Search for the function definition and determine the offsets.
          */
@@ -17304,12 +17354,13 @@ retry_for_shadow:
         if (cache[ix].progp
           /* Static functions may not be called from outside.
            * Protected functions not even from the inside
+           * And undefined functions are never found by name.
            */
-          && (   !(cache[ix].flags & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED)) /* -> neither static nor protected */
-              || b_ign_prot
-              || (   !(cache[ix].flags & TYPE_MOD_PROTECTED)
-                  && current_object == ob
-                 ) /* --> static but not protected, and caller is owner */
+          && !(cache[ix].flags &
+                 ((!b_ign_prot && current_object != ob ? TYPE_MOD_STATIC    : 0)
+                 |(!b_ign_prot                         ? TYPE_MOD_PROTECTED : 0)
+                 | NAME_UNDEFINED
+                 )
              )
            )
         {
@@ -17429,17 +17480,20 @@ retry_for_shadow:
                 funstart = current_prog->program + (flags & FUNSTART_MASK);
 
                 cache[ix].funstart = funstart;
-                cache[ix].flags = progp->functions[fx]
-                                  & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|TYPE_MOD_DEPRECATED);
+                cache[ix].flags = (progp->functions[fx]
+                                   & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|TYPE_MOD_DEPRECATED))
+                                | (GET_CODE(funstart) == F_UNDEF ? NAME_UNDEFINED : 0);
 
                 /* Static functions may not be called from outside,
                  * Protected functions not even from the inside.
+                 * And undefined functions are never found by name.
                  */
-                if (0 != (cache[ix].flags & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED))
-                  && (   (cache[ix].flags & TYPE_MOD_PROTECTED)
-                      || current_object != ob)
-                  && !b_ign_prot
-                    )
+                if (cache[ix].flags &
+                     ((!b_ign_prot && current_object != ob ? TYPE_MOD_STATIC    : 0)
+                     |(!b_ign_prot                         ? TYPE_MOD_PROTECTED : 0)
+                     | NAME_UNDEFINED
+                     )
+                   )
                 {
                     /* Not found */
 
