@@ -30,7 +30,7 @@ Program properties
 * maximum offset for branches: 32765 (0x7ffd)
   (prolang.y)
 
-* number of virtual variables: 255
+* number of virtual variables: 256
 * number of global variables: 65536 (F_IDENTIFIER16)
 * number of local variables: 256 (F_PUSH_LOCAL_VARIABLE_LVALUE)
 * number of context variables: 256 (Should be consistent with local
