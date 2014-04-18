@@ -22,8 +22,8 @@ dns_resolve (string hostname, closure callback)
 	    funcall(callback, hostname);
 	    return;
 	}
-	
-       	c = lambda( ({ 'name }), ({ 
+
+       	c = lambda( ({ 'name }), ({
 	(#'switch), ({ #'sizeof, 'name }),
 	({ 4 }), // ERQ: name resolved!
 	({ (#',),
@@ -40,7 +40,7 @@ dns_resolve (string hostname, closure callback)
 		({ (#'funcall), callback, 'name })
 	}),
 	(#'break),
-	({ 6 + strlen(hostname) }), // XERQ
+	({ 6 + sizeof(hostname) }), // XERQ
 	({ (#',),
                 ({ (#'=),'name,({ (#'map),'name,#'&,255 }) }),
                 ({ (#'=),'name,
