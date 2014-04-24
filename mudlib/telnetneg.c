@@ -9,7 +9,7 @@
 //
 // Find the newest version of this file at
 //   http://wl.mud.de/mud/doc/wwwstd/standardobjekte.html
-// 
+//
 // $Log: telnetneg.c,v $
 // Revision 1.25  2003/07/07 07:08:52  Fiona
 // LM_SLC more save against protocol violations
@@ -33,14 +33,14 @@
 // machine as suggested with RFC 1143.
 //
 // The machine is used with three functions:
-//   set_telnet()    requests a change in the telnet state 
+//   set_telnet()    requests a change in the telnet state
 //   set_callback()  sets our prefered telnet states and a callback
 //                   function which is called on telnet state changes
 //   query_telnet()  query state and sb info
 //
 // The driver communicates with the engine through the H_TELNET_NEG
 // and got_telnet().
-// 
+//
 // Do this in logon() to turn IAC quoting on:
 //   set_connection_charset(({255})*32, 1);
 //
@@ -53,7 +53,7 @@
 nosave mapping ts; // Complete telnet negotation state
 
 // Set preferences and callbacks
-// 
+//
 // r_a_cb is the preference for the state on the remote side. It could be
 //   DO, DONT or a callback closure which decides if we get a request.
 // l_a_cb is the same for the local side.
@@ -132,7 +132,7 @@ static int set_telnet(int command, int option) {
           } else {
 	    // ignore, request sent already
           }
-          break; 
+          break;
       }
       break;
 
@@ -189,7 +189,7 @@ static int set_telnet(int command, int option) {
           } else {
 	    // ignore, request sent already
           }
-          break; 
+          break;
       }
       break;
   }
@@ -219,9 +219,9 @@ void got_telnet(int command, int option, int *optargs) {
   // Make shure it's a driver apply. Hope this never breaks ;)
   if (caller_stack_depth()) return;
 
-  
+
   log = ts[TS_EXTRA, TSE_LOG];
-  if (strlen(log) > 4000) log = "..." + log[<3800..];
+  if (sizeof(log) > 4000) log = "..." + log[<3800..];
   log += "got  " + telnet_to_text(command, option, optargs) + "\n";
   ts[TS_EXTRA, TSE_LOG] = log;
 
@@ -386,7 +386,7 @@ void got_telnet(int command, int option, int *optargs) {
     agree = ts[option, TS_SBCB];
     if (closurep(agree)) funcall(agree, command, option, optargs);
     break;
-      
+
   }
 
   // Do full negotation only if client can telnetneg, means we got some
@@ -434,11 +434,11 @@ private int send(int* x) {
         y[i..i+1] = ({ 0xff });
         --j;
       }
-    } 
+    }
   }
 
   log = ts[TS_EXTRA, TSE_LOG];
-  if (strlen(log) > 4000) log = "..." + log[<3800..];
+  if (sizeof(log) > 4000) log = "..." + log[<3800..];
   log += "sent " + telnet_to_text(x[1], x[2], y) +"\n";
   ts[TS_EXTRA, TSE_LOG] = log;
 
@@ -493,21 +493,21 @@ private string telnet_to_text(int command, int option, int* args) {
           if (i > j) return d_txt;
           args = args[i-3..]; // dump rest (is error)
           break;
-          
+
       }
 
     }
 
     if (command == SB && option != TELOPT_NAWS && option != TELOPT_LINEMODE) {
       d_txt += " " + TELQUAL2STRING(args[0]);
-      if (sizeof(args) > 1) d_txt += " (" + 
+      if (sizeof(args) > 1) d_txt += " (" +
         implode(map(args[1..], (: sprintf("%02x", $1) :)), ",") + ")";
     }
     else if (sizeof(args)) d_txt +=
       " (" + implode(map(args, (: sprintf("%02x", $1) :)), ",") + ")";
   }
   return d_txt;
-}    
+}
 
 // Full negotiation tries to set all our preferences
 // Options with closures as preference are not actively enabled.
@@ -529,7 +529,7 @@ private void tel_error(string err) {
   string log;
 
   log = ts[TS_EXTRA, TSE_LOG];
-  if (strlen(log) > 4000) log = "..." + log[<3800..];
+  if (sizeof(log) > 4000) log = "..." + log[<3800..];
   log += "ERR " + err + "\n";
   ts[TS_EXTRA, TSE_LOG] = log;
 }
@@ -581,7 +581,7 @@ void set_noecho(int flag) {
   //
   //   void noecho_hook(int flag, int ob) {
   //     if (ob) ob->set_noecho(flag);
-  //   } 
+  //   }
   int i, j;
 
   if (object_name(previous_object()) != __MASTER_OBJECT__) return;
@@ -751,7 +751,7 @@ private void start_lm(int command, int option) {
   send(({ IAC, SB, TELOPT_LINEMODE, DO,
     LM_FORWARDMASK, IAC, 0xff, IAC, 0xff, IAC, 0xff, IAC, 0xff, IAC, SE }));
   ts[option, TS_SB][LM_FORWARDMASK] = WANT_YES;
-  
+
 }
 
 private void start_eor(int command, int option) {
@@ -905,9 +905,9 @@ private void sb_xdisp(int command, int option, int* optargs) {
   if (sizeof(optargs) < 2) return;
   if (optargs[0] != TELQUAL_IS) return;
   value = to_string(filter(optargs[1..], (: $1 >= ' ' && $1 <= '~' :)));
-  len = strlen(value);
+  len = sizeof(value);
 
-  if (strlen(value) != sizeof(optargs)-1)
+  if (sizeof(value) != sizeof(optargs)-1)
     tel_error("SB XDISPLOC contained bad characters");
   if (!len)
     return tel_error("SB XDISPLOC empty, ignoring");
@@ -924,9 +924,9 @@ private void sb_ttype(int command, int option, int* optargs) {
   if (sizeof(optargs) < 2) return;
   if (optargs[0] != TELQUAL_IS) return;
   value = to_string(filter(optargs[1..], (: $1 >= ' ' && $1 <= '~' :)));
-  len = strlen(value);
+  len = sizeof(value);
 
-  if (strlen(value) != sizeof(optargs)-1)
+  if (sizeof(value) != sizeof(optargs)-1)
     tel_error("SB TTYPE contained bad characters");
   if (!len)
     return tel_error("SB TTYPE empty, ignoring");
@@ -951,7 +951,7 @@ private void sb_ttype(int command, int option, int* optargs) {
   // some time, especially on slow links. MS windows 2000's and XP's
   // telnet have an emulation with key on-off sequences rather that chars.
   // Commands typed while TTYPE is negotiated may be wrong with that clients.
- 
+
   i = member(all[1], value);
   if (i < 0) {
     all[1] += ({ value });
@@ -968,7 +968,7 @@ private void sb_ttype(int command, int option, int* optargs) {
       case 1:
         if (Q_REMOTE(ts[option, TS_STATE]) == YES) start_sb(WILL, option);
         break; // just retry
-      case 2: 
+      case 2:
         tel_error("could not get initial TTYPE, may be rfc930 client");
         if (value != "vtnt") break;
         tel_error("trying trick to restart TTYPE list on windows client");
@@ -992,7 +992,7 @@ private void sb_ttype(int command, int option, int* optargs) {
     set_telnet(DO, TELOPT_BINARY);
 }
 
-private void sb_tspeed(int command, int option, int* optargs) {            
+private void sb_tspeed(int command, int option, int* optargs) {
   int i, j, os;
 
   os = sizeof(optargs);
@@ -1043,7 +1043,7 @@ private void sb_env(int command, int option, int* optargs) {
     if (optargs[j] <= ENV_USERVAR) {
       if (i != j) {
         s = to_string(filter(optargs[i..j-1], #'>=, ' '));
-        if (strlen(s) != j-i)
+        if (sizeof(s) != j-i)
           tel_error("SB ENV contained bad characters");
         mix += ({ s });
       }
@@ -1054,16 +1054,16 @@ private void sb_env(int command, int option, int* optargs) {
   }
   if (i < j-1) {
     s = to_string(filter(optargs[i..j-1], #'>=, ' '));
-    if (strlen(s) != j-i)
+    if (sizeof(s) != j-i)
       tel_error("SB ENV contained bad characters");
     mix += ({ s });
   }
-        
+
   // Due to some weird implementation mistakes (see RFC 1571)
   // we can't be shure if VALUE or VAR are valid or swapped.
   // So we don't distuingush VAR and USERVAR and assume that every
   // variable's name is followed by its value.
-        
+
   s = 0;
   env = ([]);
   os = sizeof(mix);
@@ -1147,7 +1147,7 @@ private void sb_line(int command, int option, int* optargs) {
       }
       state = ts[option, TS_SB][LM_FORWARDMASK];
       switch (state) {
-        case NO: 
+        case NO:
           tel_error("got spontan WILL FORWARDMASK (denied)");
           break;
         case YES:
@@ -1168,7 +1168,7 @@ private void sb_line(int command, int option, int* optargs) {
       }
       state = ts[option, TS_SB][LM_FORWARDMASK];
       switch (state) {
-        case YES: 
+        case YES:
           send(({ IAC, SB, option, DONT, LM_FORWARDMASK, IAC, SE }));
           ts[option, TS_SB][LM_FORWARDMASK] = NO;
           break;
@@ -1237,7 +1237,7 @@ private void sb_line(int command, int option, int* optargs) {
 void send_telopt_tm() {
   tm_t = utime();
   set_telnet(DO, TELOPT_TM);
-}   
+}
 
 void _dumptelnegs() {
   printf(ts[TS_EXTRA, TSE_LOG]);

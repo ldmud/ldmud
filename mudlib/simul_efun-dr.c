@@ -405,7 +405,7 @@ void ls(string path) {
     for(i = sizeof(dir); i--; ) {
 	if(dir[i--] == -2)
 	    dir[i]+="/";
-	len = strlen(dir[i]);
+	len = sizeof(dir[i]);
 	if (len > max)
 	    max = len;
     }
@@ -415,7 +415,7 @@ void ls(string path) {
     for (i=0; i < sizeof(dir); i+=2) {
 	string name;
 	    name = dir[i];
-	tmp = strlen(name);
+	tmp = sizeof(name);
 	if (len + tmp > 79) {
 	    len = 0;
 	    write("\n");

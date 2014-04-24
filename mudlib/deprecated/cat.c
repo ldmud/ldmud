@@ -1,6 +1,6 @@
 /* This sefun is meant to replace the deprecated efun cat().
  * Feel free to add it to your mudlibs, if you have much code using cat() or
- * want to use cat(). 
+ * want to use cat().
  */
 #define CAT_MAX_LINES 50
 
@@ -19,7 +19,7 @@ varargs int cat(string file, int start, int num)
 
     if (!num || num > CAT_MAX_LINES) {
         num = CAT_MAX_LINES;
-        more = strlen(read_file(file, start+num, 1));
+        more = sizeof(read_file(file, start+num, 1));
     }
 
     string txt = read_file(file, start, num);
@@ -31,6 +31,6 @@ varargs int cat(string file, int start, int num)
     if (more)
         tell_object(this_player(), "*****TRUNCATED****\n");
 
-    return strlen(txt & "\n");
+    return sizeof(txt & "\n");
 }
 

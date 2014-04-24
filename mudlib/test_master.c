@@ -259,7 +259,7 @@ void charinput(string char)
 
     if (!in)
        in = char;
-    else if (!strlen(char) || char[0] == 13)
+    else if (!sizeof(char) || char[0] == 13)
     {
         cmd = in;
         in = char[1..];

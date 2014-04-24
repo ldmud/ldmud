@@ -15,11 +15,11 @@ object player;
 string *keyvalues(mapping m, string key) {
    string *ret = ({});
    int i, rows = widthof(m);
-   
+
    for (i = 0; i < rows; i++) {
       ret += ({ m[key,i] });
    }
-   
+
    return ret;
 }
 
@@ -27,8 +27,8 @@ string *prettytable (mixed res) {
    int rows, cols, i, j, total, tmp;
    string row;
    string *ret, *fnames, line, *fsizes;
-   
-   
+
+
    ret = ({});
    fsizes = ({});
    cols = sizeof(res);
@@ -38,7 +38,7 @@ string *prettytable (mixed res) {
 	ret += ({ implode(res[i], ",") });
       return ret;
    }
-   
+
    fnames = m_indices(res);
    rows = widthof(res);
    for (i = 0; i < cols; i++) {
@@ -47,9 +47,9 @@ string *prettytable (mixed res) {
       fsizes += ({ to_string(tmp) });
    }
    total += sizeof(fsizes)*3 + 1;
-   
+
    ret += ({ sprintf(" +%"+to_string(total-2)+"'-'s+", "") });
-   
+
    line = " | ";
    for (j = 0; j < cols; j++) {
       line += sprintf("%|"+fsizes[j]+"."+fsizes[j]+"s | ", fnames[j]);
@@ -65,13 +65,13 @@ string *prettytable (mixed res) {
       ret += ({ line });
    }
    ret += ({ ret[0] });
-   
+
    return ret;
 }
 
 int result (int nr, mixed res, int id) {
    string *table;
-   
+
    TP("\n");
    switch (nr) {
     case PGRES_COMMAND_OK:
@@ -116,7 +116,7 @@ int result (int nr, mixed res, int id) {
 
 int _sql (string str) {
    string prompt;
-   
+
    if (str && !connected && (lower_case(str[0..6]) == "connect")) {
       str = str[8..];
       if (pg_connect(str, "result") < 0)
@@ -129,8 +129,8 @@ int _sql (string str) {
       TP("Disconnected...");
    } else if (str && ((lower_case(str) == "exit") || (lower_case(str) == "quit")))
      return 1;
-   else if (str && strlen(str)) {
-      if (!connected) 
+   else if (str && sizeof(str)) {
+      if (!connected)
 	TP("Connect first, brainy\n");
       else
 	pg_query(str, RESULT_ASSOC);
@@ -140,7 +140,7 @@ int _sql (string str) {
      prompt = "SQL> ";
    else
      prompt = "sql> ";
-   
+
    input_to("_sql", INPUT_PROMPT, prompt);
    return 1;
 }

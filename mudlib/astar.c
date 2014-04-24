@@ -105,13 +105,13 @@ string find_path( string map, int startx, int starty, int goalx, int goaly, mapp
 
    // Find the length of the longest line in the "map"
    for( i = sizeof(split_map); i-- ; )
-      if( map_width < strlen(split_map[i]) ) map_width = strlen(split_map[i]);
+      if( map_width < sizeof(split_map[i]) ) map_width = sizeof(split_map[i]);
 
    // Make all the lines that length by padding with escape characters.
    // (Note: I use escapes because they are an unlikely character to be
    // chosen for walking over, and unused characters are 'walls')
    for( i = sizeof(split_map); i-- ; )
-      split_map[i] += sprintf( "%" + (map_width-strlen(split_map[i])) + "'\27's", "" );
+      split_map[i] += sprintf( "%" + (map_width-sizeof(split_map[i])) + "'\27's", "" );
 
    // Sanity check
    if( goalx < 0  || goalx >= map_width || goaly < 0 || goaly >= sizeof(split_map) )

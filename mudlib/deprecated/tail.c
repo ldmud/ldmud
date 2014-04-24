@@ -21,7 +21,7 @@ varargs int tail(string file)
     // cut off first (incomplete) line
     int index = strstr(txt, "\n");
     if (index > -1) {
-        if (index + 1 < strlen(txt))
+        if (index + 1 < sizeof(txt))
             txt = txt[index+1..];
         else
             txt = "";
