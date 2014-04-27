@@ -12,5 +12,8 @@ BESCHREIBUNG
         Wenn <start> ausserhalb der Groesse des Files liegt, liefert
         read_file() anstelle eines Strings 0 zurueck.
 
+        Die max. Anzahl einzulesender Bytes (nicht Zeilen!) pro Aufruf dieser
+        Funktion betraegt LIMIT_FILE (s. query_limits()).
+
 SIEHE AUCH
         read_bytes(E), write_file(E)

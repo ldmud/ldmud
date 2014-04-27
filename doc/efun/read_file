@@ -13,5 +13,8 @@ DESCRIPTION
         If <start> would be outside the actual size of the file, 0 is
         returned instead of a string.
 
+        The maximum bytes (not lines!) being read per call is LIMIT_FILE (see
+        query_limits()).
+
 SEE ALSO
         read_bytes(E), write_file(E)
