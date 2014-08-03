@@ -1,9 +1,16 @@
-inherit "b";
+TEST_VIRTUAL inherit "b";
 virtual inherit "a";
+
+private string c_var = "c";
 
 int c_calc(int x)
 {
     return (calc(x) + a::calc(x))/2;
+}
+
+string get_c_var()
+{
+    return c_var;
 }
 
 private string get_program()
