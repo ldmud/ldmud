@@ -4495,13 +4495,13 @@ define_global_variable (ident_t* name, fulltype_t actual_type, Bool with_init)
             if (i + num_virtual_variables > 0xff)
             {
                 add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
-                add_short(i + num_virtual_variables);
+                add_short(i);
                 CURRENT_PROGRAM_SIZE += 1;
             }
             else
             {
                 add_f_code(F_PUSH_IDENTIFIER_LVALUE);
-                add_byte(i + num_virtual_variables);
+                add_byte(i);
             }
 
             /* Ok, assign */
@@ -4551,13 +4551,13 @@ init_global_variable (int i, ident_t* name, fulltype_t actual_type
     if (i + num_virtual_variables > 0xff)
     {
         add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
-        add_short(i + num_virtual_variables);
+        add_short(i);
         CURRENT_PROGRAM_SIZE += 1;
     }
     else
     {
         add_f_code(F_PUSH_IDENTIFIER_LVALUE);
-        add_byte(i + num_virtual_variables);
+        add_byte(i);
     }
 
     /* Only simple assigns are allowed */
@@ -10258,13 +10258,13 @@ expr0:
               if ((i + num_virtual_variables) & ~0xff)
               {
                   add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
-                  add_short(i + num_virtual_variables);
+                  add_short(i);
                   CURRENT_PROGRAM_SIZE += 1;
               }
               else
               {
                   add_f_code(F_PUSH_IDENTIFIER_LVALUE);
-                  add_byte(i + num_virtual_variables);
+                  add_byte(i);
               }
               varp = NV_VARIABLE(i);
               lvtype = varp->type;
@@ -11105,12 +11105,12 @@ expr4:
               if ((i + num_virtual_variables) & ~0xff)
               {
                   *p = F_PUSH_IDENTIFIER16_LVALUE;
-                  upd_short(++current, i + num_virtual_variables);
+                  upd_short(++current, i);
               }
               else
               {
                   *p++ = F_PUSH_IDENTIFIER_LVALUE;
-                  *p = i + num_virtual_variables;
+                  *p = i;
               }
               varp = NV_VARIABLE(i);
           }
@@ -11318,14 +11318,14 @@ expr4:
               {
                   $$.code = F_PUSH_IDENTIFIER16_LVALUE;
                   *p = F_IDENTIFIER16;
-                  upd_short(++current, i + num_virtual_variables);
+                  upd_short(++current, i);
                   $$.end = current+1;
               }
               else
               {
                   $$.code = F_PUSH_IDENTIFIER_LVALUE;
                   *p++ = F_IDENTIFIER;
-                  *p = i + num_virtual_variables;
+                  *p = i;
               }
               varp = NV_VARIABLE(i);
               $$.type = ref_fulltype(varp->type);
@@ -11795,12 +11795,12 @@ name_lvalue:
                   $$.length = 3;
                   $$.u.p = q;
                   q[0] = F_PUSH_IDENTIFIER16_LVALUE;
-                  PUT_SHORT(q+1, i + num_virtual_variables);
+                  PUT_SHORT(q+1, i);
               }
               else
               {
                   $$.u.simple[0] = F_PUSH_IDENTIFIER_LVALUE;
-                  $$.u.simple[1] = i + num_virtual_variables;
+                  $$.u.simple[1] = i;
               }
               varp = NV_VARIABLE(i);
               $$.type = ref_lpctype(varp->type.t_type);
@@ -13757,12 +13757,12 @@ lvalue_list:
               if ((i + num_virtual_variables) & ~0xff)
               {
                   ins_f_code(F_PUSH_IDENTIFIER16_LVALUE);
-                  ins_short(i + num_virtual_variables);
+                  ins_short(i);
               }
               else
               {
                   ins_f_code(F_PUSH_IDENTIFIER_LVALUE);
-                  ins_byte(i + num_virtual_variables);
+                  ins_byte(i);
               }
               varp = NV_VARIABLE(i);
           }
@@ -15369,6 +15369,9 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
     int num_new_virtual_variables = newprogp->num_variables - num_new_variables;
     variable_t *last_additional_var;
 
+    assert(num_old_virtual_variables == oldprogp->num_virtual_variables);
+    assert(num_new_virtual_variables == newprogp->num_virtual_variables);
+
     /* We'll add an additional inherit entry for the
      * updated program.
      */
@@ -15382,10 +15385,9 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
 
     oldinheritp->updated_inherit = INHERIT_COUNT;
     oldinheritp->inherit_type |= INHERIT_TYPE_MAPPED;
-    oldinheritp->variable_index_offset += num_old_virtual_variables;
     oldinheritp->num_additional_variables = 0;
     oldinheritp->variable_map_offset = UPDATE_INDEX_MAP_COUNT;
-    oldinheritp->function_map_offset = UPDATE_INDEX_MAP_COUNT + oldprogp->num_variables;
+    oldinheritp->function_map_offset = UPDATE_INDEX_MAP_COUNT + num_old_variables;
 
     /* And now map *every* old variable to the new one. */
 
@@ -15396,7 +15398,7 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
      * might make them negative (but they are unsigned shorts). So we'll
      * include them for now...
      */
-    if (!RESERVE_UPDATE_INDEX_MAP(oldprogp->num_variables + oldprogp->num_functions))
+    if (!RESERVE_UPDATE_INDEX_MAP(num_old_variables + oldprogp->num_functions))
         return false;
 
     /* We'll walk through the older program's variable and have
@@ -15407,7 +15409,7 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
      * variables with the same name. So we use the same lookup
      * type as restore_object and hope for the correct order of variables.
      */
-    var_map = GET_BLOCK(A_UPDATE_INDEX_MAP) + oldinheritp->variable_map_offset + num_old_virtual_variables;
+    var_map = GET_BLOCK(A_UPDATE_INDEX_MAP) + oldinheritp->variable_map_offset;
     newvx = num_new_virtual_variables;
     last_additional_var = V_VARIABLE(oldinheritp->variable_index_offset + VIRTUAL_VAR_TAG);
 
@@ -15433,7 +15435,7 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
 
         if (varfound)
         {
-            *var_map = newvx;
+            *var_map = newvx - num_new_virtual_variables;
             newvx++;
 
             if (update_existing)
@@ -15465,7 +15467,7 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
              * but it may be referenced by the inherited program,
              * so we have to preserve that variable.
              */
-            *var_map = oldprogp->num_variables + oldinheritp->num_additional_variables;
+            *var_map = num_old_variables + oldinheritp->num_additional_variables;
 
             if (update_existing)
             {
@@ -15873,21 +15875,10 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
             program_t *inhprog = inheritdup->prog;
 
             /* First determine the number of variables. */
-            int first_inh_variable = 0;
-            int last_inh_variable = inheritdup->variable_index_offset + inhprog->num_variables;
+            int first_inh_variable = inheritdup->variable_index_offset;
+            int last_inh_variable = inheritdup->variable_index_offset + inhprog->num_variables - inhprog->num_virtual_variables;
 
-            assert(last_variable_index <= first_variable_index + progp->num_variables);
-
-            for (inherit_t *previous_inherit = inheritdup; --previous_inherit >= first_inherit; )
-            {
-                if(previous_inherit->inherit_type & INHERIT_TYPE_DUPLICATE)
-                    continue;
-
-                if(previous_inherit->inherit_type & INHERIT_TYPE_MAPPED)
-                    first_inh_variable = previous_inherit->variable_index_offset + previous_inherit->num_additional_variables;
-                else
-                    first_inh_variable = previous_inherit->variable_index_offset + previous_inherit->prog->num_variables;
-            }
+            assert(last_variable_index == first_variable_index + progp->num_variables - progp->num_virtual_variables);
 
             if ( (inhprog->load_time == progp->load_time)
                ? (inhprog->id_number > progp->id_number)
@@ -16089,25 +16080,22 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
     *    there may already be (non-virtual) functions from
     *    other not-mentioned inherits.
     * 2) Virtual variables are moved to the beginning of the
-    *    variable block (see above). Because of that, for
-    *    regular inherits that have virtual variables, the
-    *    variable_index_offset doesn't necessarily point to
-    *    the begin of its variable block. The
-    *    variable_index_offset is calculated so that
-    *    function_index_offset + progp->num_variables
-    *    point to the end of the variable block. But
-    *    as num_variables also contains the virtual variables
-    *    that might have been moved to the beginning of the
-    *    inheritee's variable block, the inherit's start offset
-    *    can hang somewhere between its virtual and non-virtual
-    *    variables.
+    *    variable block (see above). Because of that
+    *    variable_index_offset points to the begin of
+    *    its block of non-virtual variables.
+    *    (So variable_index_offset + progp->num_variables
+    *    - progp->num_virtual_variables points to the
+    *    end of the variable block.)
     */
 
-    /* We don't know where the non-virtual variables start.
-     * That's why we're going through the the inherit list
-     * and handle virtual variables only. At the end all
-     * remaining variables are non-virtual ones and will be
-     * copied into our own as well.
+    /* Virtual variables need special treatment,
+     * as we have to copy the corresponding inherit_t
+     * entry from <from> into our own program and
+     * sort duplicates out. Therefore first we're
+     * going through the the inherit list and
+     * handle virtual variables only. At the end all
+     * remaining variables are non-virtual ones and
+     * will be copied into our own as well.
      *
      * Functions will be handled similarly. First we'll
      * look at all (already) virtual functions and then
@@ -16142,11 +16130,10 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
         newinherit.function_index_offset += first_func_index;
         newinherit.variable_index_offset += V_VARIABLE_COUNT - last_bound_variable;
 
+        assert((inheritp->inherit_type & INHERIT_TYPE_DUPLICATE) || (last_bound_variable == inheritp->variable_index_offset));
 
         if (inheritp->inherit_type & INHERIT_TYPE_MAPPED)
         {
-            assert(last_bound_variable == inheritp->variable_index_offset);
-
             inherit_obsoleted_variables(&newinherit, from, last_bound_variable, varmodifier);
             newinherit.inherit_type |= INHERIT_TYPE_MAPPED;
 
@@ -16155,7 +16142,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
         }
         else
         {
-            int next_bound_variable = inheritp->variable_index_offset + progp->num_variables;
+            int next_bound_variable = inheritp->variable_index_offset + progp->num_variables - progp->num_virtual_variables;
 
             inherit_virtual_variables(&newinherit, from,
                 newinherit.function_index_offset - first_func_index,
@@ -16213,7 +16200,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
         /* We can copy the mapping as it is, because the indices
          * are always relative to the inherited program.
          */
-        num_vars = cur_old_inheritp->prog->num_variables;
+        num_vars = cur_old_inheritp->prog->num_variables - cur_old_inheritp->prog->num_virtual_variables;
         num_funs = cur_old_inheritp->prog->num_functions;
 
         cur_old_inheritp->variable_map_offset = UPDATE_INDEX_MAP_COUNT;
@@ -16242,12 +16229,13 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
      * copy the remaining variables (variable indices from
      * last_bound_variables to from->num_variables).
      */
+    assert(last_bound_variable == from->num_virtual_variables);
     if (varmodifier & TYPE_MOD_VIRTUAL)
     {
         /* And they're gonna be virtual, too...
          */
         frominherit.inherit_type = INHERIT_TYPE_VIRTUAL;
-        frominherit.variable_index_offset = V_VARIABLE_COUNT - last_bound_variable;
+        frominherit.variable_index_offset = V_VARIABLE_COUNT;
 
         inherit_virtual_variables(&frominherit, from, 0, last_bound_variable,
             from->num_variables, varmodifier);
@@ -16255,7 +16243,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
     else
     {
         frominherit.inherit_type = INHERIT_TYPE_NORMAL;
-        frominherit.variable_index_offset = (NV_VARIABLE_COUNT - last_bound_variable) | NON_VIRTUAL_OFFSET_TAG;
+        frominherit.variable_index_offset = NV_VARIABLE_COUNT | NON_VIRTUAL_OFFSET_TAG;
 
         for (int i = last_bound_variable; i < from->num_variables; i++)
             if (!inherit_variable(from->variables + i, varmodifier))
@@ -16585,10 +16573,7 @@ fix_variable_index_offsets (program_t *new_prog)
     for (inheritp = new_prog->inherit; --i >= 0; inheritp++)
     {
         if (inheritp->variable_index_offset & NON_VIRTUAL_OFFSET_TAG)
-        {
-            inheritp->variable_index_offset += num_virtual_variables;
             inheritp->variable_index_offset &= ~NON_VIRTUAL_OFFSET_TAG;
-        }
     }
 } /* fix_variable_index_offsets() */
 
@@ -17591,6 +17576,7 @@ epilog (void)
          */
         prog->variables = (A_VIRTUAL_VAR_t *)p;
         prog->num_variables = num_variables;
+        prog->num_virtual_variables = num_virtual_variables;
         if (mem_block[A_VIRTUAL_VAR].current_size)
             memcpy(p, mem_block[A_VIRTUAL_VAR].block,
                    mem_block[A_VIRTUAL_VAR].current_size);

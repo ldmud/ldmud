@@ -1,5 +1,5 @@
-inherit "c";
-inherit "b";
+TEST_VIRTUAL inherit "c";
+TEST_VIRTUAL inherit "b";
 
 int count_both()
 {

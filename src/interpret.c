@@ -536,8 +536,8 @@ int function_index_offset;
    */
 
 static int variable_index_offset;
-  /* Index of current program's variable block within the variables
-   * of the current object (needed for inheritance).
+  /* Index of current program's non-virtual variable block within
+   * the variables of the current object (needed for inheritance).
    */
 
 svalue_t *current_variables;
@@ -5921,12 +5921,13 @@ find_value (int num)
     }
 
 #ifdef DEBUG
-    if (num >= current_object->prog->num_variables)
+    if (num >= current_prog->num_variables - current_prog->num_virtual_variables)
     {
         fatal("Illegal variable access %d(%d).\n",
-            num, current_object->prog->num_variables);
+            num, current_prog->num_variables);
     }
 #endif
+
     return &current_variables[num];
 } /* find_value() */
 
@@ -5935,7 +5936,7 @@ static INLINE svalue_t *
 find_virtual_value (int num)
 
 /* For the virtually inherited variable <num> (given as index within
- * the current object's variable block) return the address of the actual
+ * the current program's variable block) return the address of the actual
  * variable.
  *
  * If the program for this variable was inherited more than one time,
@@ -5968,7 +5969,7 @@ find_virtual_value (int num)
     inheritp = current_prog->inherit;
     while
       (   inheritp->inherit_type == INHERIT_TYPE_NORMAL
-       || inheritp->variable_index_offset + inheritp->prog->num_variables <= num
+       || inheritp->variable_index_offset + inheritp->prog->num_variables - inheritp->prog->num_virtual_variables <= num
        || inheritp->variable_index_offset > num)
     {
         inheritp++;
@@ -5976,7 +5977,7 @@ find_virtual_value (int num)
 
     /* Get the index of the variable within the inherited program.
      */
-    num -= inheritp->variable_index_offset;
+    num = num - inheritp->variable_index_offset;
 
     /* Set inheritp to the first instance of this inherited program.
      * We need a virtual inherited instance, so either
@@ -5995,10 +5996,10 @@ find_virtual_value (int num)
         inherit_t *new_inheritp = current_object->prog->inherit + inheritp->updated_inherit;
         num = current_object->prog->update_index_map[num + inheritp->variable_map_offset];
 
-        if (num >= new_inheritp->prog->num_variables)
+        if (num >= new_inheritp->prog->num_variables - new_inheritp->prog->num_virtual_variables)
         {
             /* Dangling variable. We'll stay in that variable block. */
-            num -= new_inheritp->prog->num_variables;
+            num -= new_inheritp->prog->num_variables - new_inheritp->prog->num_virtual_variables;
             break;
         }
 
@@ -6007,7 +6008,7 @@ find_virtual_value (int num)
 
     /* Compute the actual variable address */
 
-    num += inheritp->variable_index_offset;
+    num = num + inheritp->variable_index_offset;
 
 #ifdef DEBUG
     if (!current_object->variables
@@ -7532,6 +7533,7 @@ setup_inherited_call (unsigned short inhIndex, unsigned short *fx)
             /* Found a virtual base class, so un-adjust the offsets. */
             inheritp = inh;
             current_variables = current_object->variables;
+            variable_index_offset = 0;
             function_index_offset = 0;
 
             /* Check for obsoleted inherited programs. */
@@ -7554,6 +7556,17 @@ setup_inherited_call (unsigned short inhIndex, unsigned short *fx)
                 }
                 inheritp = current_object->prog->inherit + inheritp->updated_inherit;
             }
+        }
+        else if(inheritp->inherit_type != INHERIT_TYPE_NORMAL)
+        {
+            /* Virtual inherit, but we're at the top level.
+             * So nothing to correct, just reset the variable offsets,
+             * because they point to the non-virtual variables.
+             */
+
+            current_variables = current_object->variables;
+            variable_index_offset = 0;
+            assert(function_index_offset == 0); /* We should be at the topmost program. */
         }
     }
 
@@ -7611,6 +7624,14 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
 
         inheritp = &progp->inherit[flags & INHERIT_MASK];
         assert(!(inheritp->inherit_type & INHERIT_TYPE_MAPPED));
+
+        if(inheritp->inherit_type != INHERIT_TYPE_NORMAL)
+        {
+            /* We must be at the top-level for virtual inherits. */
+            assert(var_ix_offs == progp->num_virtual_variables);
+
+            var_ix_offs = 0;
+        }
 
         progp = inheritp->prog;
         fx -= inheritp->function_index_offset;
@@ -7815,16 +7836,19 @@ setup_new_frame (int fx, program_t *inhProg, Bool allowRefs)
 {
     funflag_t flags;
 
+    /* We must be at the topmost level in the inherit hierarchy. */
+    assert(current_prog == current_object->prog);
+
     if (inhProg)
     {
         program_t *progp;
         int       fun_ix_offs;
         int       var_ix_offs;
-        
+
         progp = current_prog;
         fun_ix_offs = 0;
-        var_ix_offs = 0;
-        
+        var_ix_offs = progp->num_virtual_variables;
+
         while (progp != inhProg)
         {
             inherit_t      *inheritp, *inh;
@@ -7881,7 +7905,7 @@ setup_new_frame (int fx, program_t *inhProg, Bool allowRefs)
         flags = setup_new_frame1(fx, fun_ix_offs, var_ix_offs);
     }
     else
-        flags = setup_new_frame1(fx, 0, 0);
+        flags = setup_new_frame1(fx, 0, current_prog->num_virtual_variables);
 
     /* Setting csp->funstart is not just convenient, but also
      * required for proper error handling in setup_new_frame2()
@@ -14016,7 +14040,7 @@ again:
         /* Search for the function definition and determine the offsets.
          */
         csp->num_local_variables = sp - ap + 1;
-        flags = setup_new_frame1(obj_func_index, 0, 0);
+        flags = setup_new_frame1(obj_func_index, 0, current_prog->num_virtual_variables);
         funstart = current_prog->program + (flags & FUNSTART_MASK);
         csp->funstart = funstart;
 
@@ -17457,7 +17481,7 @@ retry_for_shadow:
 
                 csp->num_local_variables = num_arg;
                 current_prog = progp;
-                flags = setup_new_frame1(fx, 0, 0);
+                flags = setup_new_frame1(fx, 0, current_prog->num_virtual_variables);
                 
                 current_strings = current_prog->strings;
 

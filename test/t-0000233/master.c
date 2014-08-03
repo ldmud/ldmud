@@ -28,7 +28,7 @@ void run_test()
 
     rm("a.c");
 
-    for(testnum = 0; testnum < 8; testnum++)
+    for(testnum = 0; testnum < 16; testnum++)
     {
         foreach(string ob: ({"a","b","c"}))
             destruct(find_object(ob));
@@ -87,6 +87,19 @@ void run_test()
                         return d->check_locality();
                     :)
                 }),
+                ({ "Run " + testname + ": Check for non-virtual vars in 'b'.", 0,
+                    (:
+                	asin(1.0);
+                        /* Check doesn't work further up in the inherit chain. */
+                        return d->get_b_var() == "b";
+                    :)
+                }),
+                ({ "Run " + testname + ": Check for non-virtual vars in 'c'.", 0,
+                    (:
+                        /* Check doesn't work further up in the inherit chain. */
+                        return d->get_c_var() == "c";
+                    :)
+                }),
             }));
         }
     }
@@ -103,7 +116,8 @@ string *epilog(int eflag)
             return "#pragma strong_types, save_types\n" +
                 ((testnum & 1) ? "#define OLD_VARIABLES\n" : "") +
                 ((testnum & 2) ? "#define NEW_VARIABLES\n" : "") +
-                ((testnum & 4) ? "#define SUB_INHERIT\n" : "");
+                ((testnum & 4) ? "#define SUB_INHERIT\n" : "") +
+                ((testnum & 8) ? "#define TEST_VIRTUAL virtual\n" : "#define TEST_VIRTUAL\n");
         });
 
     run_test();

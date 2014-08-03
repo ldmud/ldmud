@@ -380,7 +380,9 @@ struct inherit_s
 
     unsigned short variable_index_offset;
       /* Offset of the inherited program's variables block within the
-       * inheriting program's variable block.
+       * inheriting program's variable block. This offset points
+       * to the first non-virtual variable of <prog>.
+       *
        * The NON_VIRTUAL_OFFSET_TAG marks the variables of non-virtual
        * inherits temporarily during compiles.
        */
@@ -407,9 +409,11 @@ struct inherit_s
        * E.g. for access to a variable <ix> into the old program use
        * current_prog->update_index_map[ix + old_inherit->variable_map_offset]
        * as the variable index into <updated_inherit>'s variable block
-       * instead.
+       * instead (the indices are the offsets in the non-virtual variable
+       * block).
        *
-       * But of the new index is larger then .num_variables of
+       * But if the new index is larger then the number of non-virtual
+       * variables (.num_variables - .num_virtual_variables) of
        * <updated_inherit>, then it is an additional variable
        * (see .num_additional_variables) in the old program and the
        * difference is the variable index.
@@ -626,7 +630,11 @@ struct program_s
     unsigned short num_includes;
       /* Number of stored include filenames */
     unsigned short num_variables;
-      /* Number of variables (inherited and own) of this program */
+      /* Number of variables (inherited and own, virtual and non-virtual)
+       * of this program
+       */
+    unsigned short num_virtual_variables;
+      /* Number of virtual variables (naturally inherited) of this program. */
     unsigned short num_inherited;
       /* Number of (directly) inherited programs */
     unsigned short num_structs;
