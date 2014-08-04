@@ -3565,6 +3565,18 @@ v_replace_program (svalue_t *sp, int num_arg)
 
     } /* if (num_arg) */
 
+    /* The offsets of non-virtual inherits are relative to
+     * the non-virtual variables auf the inheriting program.
+     */
+    if (offsets[2])
+        offsets[0] += curprog->num_virtual_variables;
+
+    /* We assume that the virtual variables are
+     * directly before that. (And check that
+     * assumption directly after this.)
+     */
+    offsets[0] -= new_prog->num_virtual_variables;
+
     /* Program found, now check if it contains virtual variables.
      * See b-030119 for an explanation.
      */
@@ -3605,7 +3617,7 @@ v_replace_program (svalue_t *sp, int num_arg)
 
     tmp->new_prog = new_prog;
     tmp->var_offset = offsets[0];
-    tmp->fun_offset = offsets[1] + (offsets[2] ? 0 : curprog->num_virtual_variables);
+    tmp->fun_offset = offsets[1];
 
     return sp;
 } /* v_replace_program() */
