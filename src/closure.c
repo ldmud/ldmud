@@ -1205,11 +1205,19 @@ closure_literal ( svalue_t *dest
     if (ix >= CLOSURE_IDENTIFIER_OFFS)
     {
         ix += - CLOSURE_IDENTIFIER_OFFS
-              + (current_variables - current_object->variables);
-              /* the added difference takes into account that the
+              /* The added difference takes into account that the
                * index is specified relative to the program which might
                * have been inherited.
                */
+              + (current_variables - current_object->variables)
+              /* But current_variables points to the non-virtual
+               * variables, so adjusting for that...
+               * (The lexer forbids closures to virtual variables,
+               * so we don't have to look for them here. But
+               * the variable index takes them into account.)
+               */
+              - current_prog->num_virtual_variables;
+
         closure_identifier(dest, current_object, ix, MY_TRUE);
     }
     else /* lfun closure */

@@ -3,7 +3,7 @@ virtual inherit "i";
 #endif
 
 #ifdef OLD_VARIABLES
-mapping d1 = ([]), d2 = ([]);
+mapping d1 = ([]), d2 = ([]), d3 = ([]);
 #endif
 
 int num;

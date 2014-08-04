@@ -16,3 +16,13 @@ string get_c_var()
 {
     return c_var;
 }
+
+closure get_c_var_cl()
+{
+    return #'c_var;
+}
+
+closure get_c_var_cl2()
+{
+    return lambda(0, ({#'c_var}));
+}

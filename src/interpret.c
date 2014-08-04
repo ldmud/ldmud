@@ -5921,7 +5921,7 @@ find_value (int num)
     }
 
 #ifdef DEBUG
-    if (num >= current_prog->num_variables - current_prog->num_virtual_variables)
+    if (num >= current_prog->num_variables - (variable_index_offset ? current_prog->num_virtual_variables : 0))
     {
         fatal("Illegal variable access %d(%d).\n",
             num, current_prog->num_variables);
