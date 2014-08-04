@@ -47,6 +47,7 @@ struct control_stack {
       /* Index of current program's function block within the functions of the
        * current objects program (needed for inheritance).
        */
+    int variable_index_offset;          /* Same for variables. */
     svalue_t *current_variables;        /* Same */
     int   extern_call;
       /* TRUE if the call came from outside the object (call_others to
