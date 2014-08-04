@@ -7,6 +7,7 @@ string dummy = "Hello, World!"; // Just to change the variable indices...
 #endif
 
 int num;
+string a_var;
 
 void dummy_fun() { raise_error("Please don't call me!\n"); }
 
@@ -34,4 +35,15 @@ string get_program();
 string get_local_program()
 {
     return get_program();
+}
+
+closure get_a_var_cl()
+{
+    a_var = "a";
+    return #'a_var;
+}
+
+closure get_a_var_cl2()
+{
+    return lambda(0, ({#'a_var}));
 }

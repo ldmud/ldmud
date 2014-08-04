@@ -89,15 +89,43 @@ void run_test()
                 }),
                 ({ "Run " + testname + ": Check for non-virtual vars in 'b'.", 0,
                     (:
-                	asin(1.0);
-                        /* Check doesn't work further up in the inherit chain. */
                         return d->get_b_var() == "b";
+                    :)
+                }),
+                ({ "Run " + testname + ": Check for non-virtual variable closures in 'b'.", 0,
+                    (:
+                        return funcall(d->get_b_var_cl()) == "b";
+                    :)
+                }),
+                ({ "Run " + testname + ": Check for non-virtual variable lambda closures in 'b'.", 0,
+                    (:
+                        return funcall(d->get_b_var_cl2()) == "b";
                     :)
                 }),
                 ({ "Run " + testname + ": Check for non-virtual vars in 'c'.", 0,
                     (:
-                        /* Check doesn't work further up in the inherit chain. */
                         return d->get_c_var() == "c";
+                    :)
+                }),
+                ({ "Run " + testname + ": Check for non-virtual variable closures in 'c'.", 0,
+                    (:
+                        return funcall(d->get_c_var_cl()) == "c";
+                    :)
+                }),
+                ({ "Run " + testname + ": Check for non-virtual variable lambda closures in 'c'.", 0,
+                    (:
+                        return funcall(d->get_c_var_cl2()) == "c";
+                    :)
+                }),
+                ({ "Run " + testname + ": Check for virtual variable closures in 'a'.", 0,
+                    (:
+                        asin(0.0);
+                        return funcall(d->get_a_var_cl()) == "a";
+                    :)
+                }),
+                ({ "Run " + testname + ": Check for virtual variable lambda closures in 'a'.", 0,
+                    (:
+                        return funcall(d->get_a_var_cl2()) == "a";
                     :)
                 }),
             }));
