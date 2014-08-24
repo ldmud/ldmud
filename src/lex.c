@@ -491,6 +491,7 @@ static struct s_reswords reswords[]
    , { "symbol",         L_SYMBOL_DECL   }
    , { "varargs",        L_VARARGS       }
    , { "virtual",        L_VIRTUAL       }
+   , { "visible",        L_VISIBLE       }
    , { "void",           L_VOID          }
    , { "while",          L_WHILE         }
    };
