@@ -137,5 +137,7 @@ that you should pay attention to when updating.
     WARNING: If you want to save them losslessly with save_object/save_value(),
              you MUST use savefile format version 2 or higher!
 
-
+- Visibility modifiers
+  + Visibility modifiers are not combinable anymore. (#771)
+  + Added a new modifier: visible (which is the default visibility).
 
