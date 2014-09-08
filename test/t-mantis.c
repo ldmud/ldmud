@@ -415,7 +415,18 @@ nosave mixed *tests = ({
             return 1;
         :)
     }),
-
+    ({ "0000836", 0,
+        (:
+           // load a program that dereferences an unknown struct. Should cause
+           // an error, but no crash.
+           write_file(__DIR__".tmp836.c",
+                      "void testfun(struct unknown a) {return a->id;}",1);
+           mixed err=catch(load_object(__DIR__".tmp836.c");nolog);
+           // still running? test successful...
+           rm(__DIR__".tmp836.c");
+           return err != 0;
+        :)
+    }),
 });
 
 void run_test()

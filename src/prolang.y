@@ -1415,22 +1415,25 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
             {
                 snprintf(pbuf, sizeof(pbuf), " %p", type->t_struct);
                 pbuflen = strlen(pbuf);
+                if(7 + mstrsize(type->t_struct->name) + pbuflen < bufsize)
+                {
+                    memcpy(buf, "struct ", 7);
+                    memcpy(buf+7, get_txt(type->t_struct->name), mstrsize(type->t_struct->name));
+                    memcpy(buf+7+mstrsize(type->t_struct->name), pbuf, pbuflen+1);
+                    return 7 + mstrsize(type->t_struct->name) + pbuflen;
+                }
+                else
+                {
+                    buf[0] = '\0';
+                    return 0;
+                }
             }
-            else
-                pbuflen = 0;
+            else // no struct
+            {
+                snprintf(buf, bufsize, "unknown struct");
+                return strlen(buf);
+            }
 
-            if(7 + mstrsize(type->t_struct->name) + pbuflen < bufsize)
-            {
-                memcpy(buf, "struct ", 7);
-                memcpy(buf+7, get_txt(type->t_struct->name), mstrsize(type->t_struct->name));
-                memcpy(buf+7+mstrsize(type->t_struct->name), pbuf, pbuflen+1);
-                return 7 + mstrsize(type->t_struct->name) + pbuflen;
-            }
-            else
-            {
-                buf[0] = '\0';
-                return 0;
-            }
         }
 
     case TCLASS_ARRAY:
@@ -5421,6 +5424,9 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
 
         case TCLASS_STRUCT:
             {
+                if (structure->t_struct == NULL)
+                    break;
+
                 int midx = -1;
                 is_struct = true;
 
