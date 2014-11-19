@@ -100,7 +100,7 @@ nosave mixed *tests = ({
        (:
             /* calc __INT_MAX__ + 1 */
             string num = to_string(__INT_MAX__);
-            int i = strlen(num);
+            int i = sizeof(num);
 
             while(i && num[i-1]=='9') num[--i] = '0';
             if(!i)
@@ -115,7 +115,7 @@ nosave mixed *tests = ({
        (:
             /* calc 2*__INT_MAX__+1 */
             string num = to_string(__INT_MAX__);
-            int i = strlen(num);
+            int i = sizeof(num);
             int carry = 1;
 
             while(i)
@@ -143,7 +143,7 @@ nosave mixed *tests = ({
        (:
             /* calc __INT_MIN__ - 1 */
             string num = to_string(__INT_MIN__)[1..];
-            int i = strlen(num);
+            int i = sizeof(num);
 
             while(i && num[i-1]=='9') num[--i] = '0';
             if(!i)
@@ -158,7 +158,7 @@ nosave mixed *tests = ({
        (:
             /* calc 2*__INT_MIN__-1 */
             string num = to_string(__INT_MIN__)[1..];
-            int i = strlen(num);
+            int i = sizeof(num);
             int carry = 1;
 
             while(i)
