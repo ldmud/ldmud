@@ -2,6 +2,7 @@
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
 #include "/inc/deep_eq.inc"
+#include "/sys/tls.h"
 
 #define TESTFILE "/log/testfile"
 
@@ -114,6 +115,43 @@ mixed *tests = ({
     ({ "strstr 09", 0, (: strstr("abcdefa","a", 7) == -1 :) }),
     ({ "strstr 10", 0, (: strstr("abcdefabc","a", 7) == -1 :) }),
     ({ "strstr 11", 0, (: strstr("abcdefabc","c") == 2 :) }),
+    ({ "hash string (MD5)", 0, (:
+                         hash(TLS_HASH_MD5, "line 13: Warning: Missing "
+                              "'return <value>' statement") ==
+                         "ccbece3d9a751067260ed4d8537e5b49" :)
+    }),
+    ({ "hash string (SHA1)", 0, (:
+                         hash(TLS_HASH_SHA1, "line 13: Warning: Missing "
+                              "'return <value>' statement") ==
+                         "6c17f98a279bb0f586862f7de4dd9b39c6517e42" :)
+    }),
+#if defined(__GCRYPT__) || defined(__OPENSSL__)
+    ({ "hash string (SHA224)", 0, (:
+                         hash(TLS_HASH_SHA224, "line 13: Warning: Missing "
+                              "'return <value>' statement") ==
+                         "063cb8892f917de2bda98b96e3fc8af3f31fe0091c79bd920fade895" :)
+    }),
+    ({ "hash string (SHA256)", 0, (:
+                         hash(TLS_HASH_SHA256, "line 13: Warning: Missing "
+                              "'return <value>' statement") ==
+                         "b18a6bffef432bba5d97f3910f209446923a4bf71331f8e1a592e72b85a1a8be" :)
+    }),
+    ({ "hash string (SHA384)", 0, (:
+                         hash(TLS_HASH_SHA384, "line 13: Warning: Missing "
+                              "'return <value>' statement") ==
+                         "ba3f63b41e9321757704fbe84904b08b3ddf91a82c694a96df38317b938431f51ef073dc71fe8d8c3a09c028cb2fd82c" :)
+    }),
+    ({ "hash string (SHA512)", 0, (:
+                         hash(TLS_HASH_SHA512, "line 13: Warning: Missing "
+                              "'return <value>' statement") ==
+                         "902588f647e39421f274f94303e7d397bda55cd12b562d36e51ffb37f59d17e63edc77443dfb3a0e92996215b82ae067b1a700f3356baeb513cd619ce05b9a39" :)
+    }),
+    ({ "hash string (RIPEMD160)", 0, (:
+                         hash(TLS_HASH_RIPEMD160, "line 13: Warning: Missing "
+                              "'return <value>' statement") ==
+                         "fe9de95923c1200b31db7905d997a81e121c7640" :)
+    }),
+#endif
     ({ "write_file 1", 0, 
         (:
             int res;
