@@ -3895,32 +3895,26 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                  * visibility is conserved. For redefining inherited functions
                  * different visibility is OK.
                  */
+#               define TYPE_MOD_VIS \
+                        ( TYPE_MOD_NO_MASK \
+                        | TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC \
+                        |TYPE_MOD_STATIC | TYPE_MOD_PROTECTED)
+
+                if (!(old_fflags & (NAME_INHERITED|NAME_TYPES_LOST))
+                    && ((new_fflags ^ old_fflags) & TYPE_MOD_VIS)
+                    )
                 {
-#                   define TYPE_MOD_VIS \
-                           ( TYPE_MOD_NO_MASK \
-                           | TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC \
-                           | TYPE_MOD_PROTECTED)
-
-                    /* Smooth out irrelevant differences */
-                    if (new_fflags & TYPE_MOD_STATIC) new_fflags |= TYPE_MOD_PROTECTED;
-                    if (old_fflags & TYPE_MOD_STATIC) old_fflags |= TYPE_MOD_PROTECTED;
-
-                    if (!(old_fflags & (NAME_INHERITED|NAME_TYPES_LOST))
-                        && ((new_fflags ^ old_fflags) & TYPE_MOD_VIS)
-                       )
-                    {
-                        char buff[120];
-                        strncpy(buff, get_f_visibility(old_fflags), sizeof(buff)-1);
-                        buff[sizeof(buff) - 1] = '\0'; // strncpy() does not guarantee NUL-termination
-                        if (pragma_pedantic)
-                            yyerrorf("Inconsistent declaration of '%s': Visibility changed from '%s' to '%s'"
-                                    , get_txt(p->name), buff, get_visibility(type));
-                        else
-                            yywarnf("Inconsistent declaration of '%s': Visibility changed from '%s' to '%s'"
-                                    , get_txt(p->name), buff, get_visibility(type));
-                    }
-#                   undef TYPE_MOD_VIS
+                    char buff[120];
+                    strncpy(buff, get_f_visibility(old_fflags), sizeof(buff)-1);
+                    buff[sizeof(buff) - 1] = '\0'; // strncpy() does not guarantee NUL-termination
+                    if (pragma_pedantic)
+                        yyerrorf("Inconsistent declaration of '%s': Visibility changed from '%s' to '%s'"
+                                , get_txt(p->name), buff, get_visibility(type));
+                    else
+                        yywarnf("Inconsistent declaration of '%s': Visibility changed from '%s' to '%s'"
+                                , get_txt(p->name), buff, get_visibility(type));
                 }
+#               undef TYPE_MOD_VIS
 
                 /* Check if the 'varargs' attribute is conserved, when pedantic. */
                 if (pragma_pedantic
