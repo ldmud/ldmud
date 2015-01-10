@@ -3949,29 +3949,39 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                     first_arg = ARGUMENT_INDEX(num);
                     argp = GET_BLOCK(A_ARGUMENT_TYPES) + first_arg;
 
-                    if (funp->flags & TYPE_MOD_XVARARGS)
+                    if (old_fflags & TYPE_MOD_XVARARGS)
                         num_args--; /* last argument is ok */
 
                     for (i = 0; i < num_args; i++ )
                     {
                         new_type = type_of_locals[i].t_type;
                         old_type = argp[i];
-                        if (!has_common_type(new_type, old_type))
+                        if (new_type != old_type)
                         {
                             args_differ = MY_TRUE;
-                            if (pragma_pedantic)
-                                yyerrorf("Argument type mismatch in "
-                                         "redefinition of '%s': arg %d %s"
-                                        , get_txt(p->name), i+1, get_two_lpctypes(new_type, old_type)
-                                        );
-                            else if (pragma_check_overloads)
-                                yywarnf("Argument type mismatch in "
-                                         "redefinition of '%s': arg %d %s"
-                                        , get_txt(p->name), i+1, get_two_lpctypes(new_type, old_type)
-                                        );
+                            // If it is a redefinition of an inherited function, it might be OK,
+                            // if the two arguments are at least compatible.
+                            // But if it's a prototype->function redefinition, this is now a error,
+                            // because prototype + definition should always be the same.
+                            if (old_fflags & NAME_INHERITED)
+                            {
+                                if (!has_common_type(new_type, old_type))
+                                {
+                                    if (pragma_pedantic)
+                                        yyerrorf("Argument type mismatch in redefinition of '%s': arg %d %s"
+                                            , get_txt(p->name), i+1, get_two_lpctypes(new_type, old_type));
+                                    else if (pragma_check_overloads)
+                                        yywarnf("Argument type mismatch in redefinition of '%s': arg %d %s"
+                                            , get_txt(p->name), i+1, get_two_lpctypes(new_type, old_type));
+                                }
+                            }
+                            else
+                            {
+                                yyerrorf("Inconsistent declaration of '%s': argument type mismatch in definition: arg %d %s"
+                                         , get_txt(p->name), i+1, get_two_lpctypes(new_type, old_type));
+                            }
+
                         }
-                        else if (new_type != old_type)
-                            args_differ = MY_TRUE;
                     } /* for (all args) */
 
                 } /* if (compare_args) */
