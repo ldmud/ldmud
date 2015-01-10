@@ -3830,8 +3830,42 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
              */
             if (exact_types && funp->type != lpctype_unknown)
             {
-                lpctype_t *t1, *t2;
+                lpctype_t *new_type, *old_type;
 
+                // get old+new functions flags
+                funflag_t new_fflags = flags;
+                funflag_t old_fflags = funp->flags;
+
+                // We first check the return types for consistency.
+                // If the new function has no type, it will be handled as lpctype_mixed.
+                if (type.t_type)
+                    new_type = type.t_type;
+                else
+                    new_type = lpctype_mixed;
+                old_type = funp->type;
+                if (old_fflags & NAME_INHERITED)
+                {
+                    // If the existing function was inherited, we (only) require type compatibility
+                    if (!has_common_type(new_type, old_type))
+                    {
+                        if (pragma_pedantic)
+                            yyerrorf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_lpctypes(old_type, new_type));
+                        else if (pragma_check_overloads)
+                            yywarnf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_lpctypes(old_type, new_type));
+                    }
+                }
+                else
+                {
+                    // In all other cases we require that types are identical.
+                    // (All protoypes+definitions in one file should be consistent.
+                    if (new_type != old_type)
+                    {
+                        yyerrorf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_lpctypes(old_type, new_type));
+                    }
+                }
+
+                // Then check the number of arguments and varargs flags and determine
+                // if we should check the argument types (later).
                 if (funp->num_arg > num_arg && !(funp->flags & TYPE_MOD_VARARGS))
                     yyerrorf("Incorrect number of arguments in redefinition of '%s'.", get_txt(p->name));
                 else if (funp->num_arg == num_arg
@@ -3865,20 +3899,18 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                            ( TYPE_MOD_NO_MASK \
                            | TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC \
                            | TYPE_MOD_PROTECTED)
-                    funflag_t f1 = funp->flags;
-                    funflag_t f2 = flags;
 
                     /* Smooth out irrelevant differences */
-                    if (f1 & TYPE_MOD_STATIC) f1 |= TYPE_MOD_PROTECTED;
-                    if (f2 & TYPE_MOD_STATIC) f2 |= TYPE_MOD_PROTECTED;
+                    if (new_fflags & TYPE_MOD_STATIC) new_fflags |= TYPE_MOD_PROTECTED;
+                    if (old_fflags & TYPE_MOD_STATIC) old_fflags |= TYPE_MOD_PROTECTED;
 
-                    if (!(f1 & (NAME_INHERITED|NAME_TYPES_LOST))
-                     && ((f1 ^ f2) & TYPE_MOD_VIS)
+                    if (!(old_fflags & (NAME_INHERITED|NAME_TYPES_LOST))
+                     && ((new_fflags ^ old_fflags) & TYPE_MOD_VIS)
                        )
                     {
                         char buff[120];
 
-                        strncpy(buff, get_f_visibility(f1), sizeof(buff)-1);
+                        strncpy(buff, get_f_visibility(old_fflags), sizeof(buff)-1);
                         buff[sizeof(buff) - 1] = '\0'; // strncpy() does not guarantee NUL-termination
                         yywarnf("Inconsistent declaration of '%s': Visibility changed from '%s' to '%s'"
                                , get_txt(p->name), buff, get_visibility(type));
@@ -3886,22 +3918,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 #                   undef TYPE_MOD_VIS
                 }
 
-                // We first check the return types for consistency.
-                // If the new function has no type, it will be handled as lpctype_mixed.
-                if (type.t_type)
-                    t1 = type.t_type;
-                else
-                    t1 = lpctype_mixed;
-                t2 = funp->type;
-                if (!has_common_type(t1, t2))
-                {
-                    if (pragma_pedantic)
-                    yyerrorf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_lpctypes(t2, t1));
-                    else if (pragma_check_overloads)
-                    yywarnf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_lpctypes(t2, t1));
-                }
-                /* Check if the 'varargs' attribute is conserved */
-
+                /* Check if the 'varargs' attribute is conserved, when pedantic. */
                 if (pragma_pedantic
                  && (funp->flags ^ flags) & TYPE_MOD_VARARGS
                  &&  funp->flags & TYPE_MOD_VARARGS
@@ -3912,7 +3929,6 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                 }
 
                 /* Check that the two argument lists are compatible */
-
                 if (compare_args)
                 {
                     int i;
@@ -3932,23 +3948,23 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
                     for (i = 0; i < num_args; i++ )
                     {
-                        t1 = type_of_locals[i].t_type;
-                        t2 = argp[i];
-                        if (!has_common_type(t1, t2))
+                        new_type = type_of_locals[i].t_type;
+                        old_type = argp[i];
+                        if (!has_common_type(new_type, old_type))
                         {
                             args_differ = MY_TRUE;
                             if (pragma_pedantic)
                                 yyerrorf("Argument type mismatch in "
                                          "redefinition of '%s': arg %d %s"
-                                        , get_txt(p->name), i+1, get_two_lpctypes(t1, t2)
+                                        , get_txt(p->name), i+1, get_two_lpctypes(new_type, old_type)
                                         );
                             else if (pragma_check_overloads)
                                 yywarnf("Argument type mismatch in "
                                          "redefinition of '%s': arg %d %s"
-                                        , get_txt(p->name), i+1, get_two_lpctypes(t1, t2)
+                                        , get_txt(p->name), i+1, get_two_lpctypes(new_type, old_type)
                                         );
                         }
-                        else if (t1 != t2)
+                        else if (new_type != old_type)
                             args_differ = MY_TRUE;
                     } /* for (all args) */
 
@@ -3963,7 +3979,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
             heart_beat = num;
 
         /* If it was yet another prototype,
-         * update its types and then return.
+         * just update its types and then return.
          */
         if (flags & NAME_PROTOTYPE)
         {
@@ -4015,7 +4031,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                 funp->type  = lpctype_mixed; // static, no need to reference them.
 
             return num;
-        }
+        }  // end of prototype update
 
         /* This is the completion of an earlier prototype:
          * now flesh out the function structure.
