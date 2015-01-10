@@ -3867,11 +3867,11 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                 // Then check the number of arguments and varargs flags and determine
                 // if we should check the argument types (later).
                 if (funp->num_arg > num_arg && !(funp->flags & TYPE_MOD_VARARGS))
-                    yyerrorf("Incorrect number of arguments in redefinition of '%s'.", get_txt(p->name));
+                    yyerrorf("Incorrect number of arguments in redefinition of '%s'", get_txt(p->name));
                 else if (funp->num_arg == num_arg
                       && ((funp->flags ^ flags) & TYPE_MOD_XVARARGS)
                       && !(funp->flags & TYPE_MOD_VARARGS))
-                    yyerrorf("Incorrect number of arguments in redefinition of '%s'.", get_txt(p->name));
+                    yyerrorf("Incorrect number of arguments in redefinition of '%s'", get_txt(p->name));
                 else
                 {
                     unsigned short first_arg;
@@ -3881,7 +3881,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                     {
                         if (num_arg && !(funp->flags & NAME_TYPES_LOST) )
                             yyerrorf(
-                              "Redefined function '%s' not compiled with type testing."
+                              "Redefined function '%s' not compiled with type testing"
                             , get_txt(p->name));
                     }
                     else
@@ -3926,11 +3926,11 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                     if (old_fflags & NAME_INHERITED)
                     {
                         if (pragma_check_overloads)
-                            yywarnf("Redefinition of '%s' loses 'varargs' modifier."
+                            yywarnf("Redefinition of '%s' loses 'varargs' modifier"
                                     , get_txt(p->name));
                     }
                     else
-                        yyerrorf("Inconsistent declaration of '%s': 'varargs' modifier lost."
+                        yyerrorf("Inconsistent declaration of '%s': 'varargs' modifier lost"
                                 , get_txt(p->name));
                 }
 
