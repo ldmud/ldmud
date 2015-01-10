@@ -751,6 +751,7 @@ v_hash (svalue_t *sp, int num_arg)
     memsafe(tmp = xalloc_with_error_handler(hashlen), hashlen, "hash result");
     sp = inter_sp;
 
+    // sp points to the error handler, sp-1 is the message.
     calc_digest(md, tmp, hashlen, get_txt(sp[-1].u.str), mstrsize(sp[-1].u.str), NULL, 0);
 
     while (--iterations > 0)
