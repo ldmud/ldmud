@@ -3828,7 +3828,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
              *
              * 'nomask' functions may not be redefined.
              */
-            if (exact_types && funp->type != lpctype_unknown && funp->type != NULL)
+            if (exact_types && funp->type != lpctype_unknown)
             {
                 lpctype_t *t1, *t2;
 
@@ -3886,16 +3886,20 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 #                   undef TYPE_MOD_VIS
                 }
 
-                t1 = type.t_type;
+                // We first check the return types for consistency.
+                // If the new function has no type, it will be handled as lpctype_mixed.
+                if (type.t_type)
+                    t1 = type.t_type;
+                else
+                    t1 = lpctype_mixed;
                 t2 = funp->type;
                 if (!has_common_type(t1, t2))
                 {
                     if (pragma_pedantic)
-                        yyerrorf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_lpctypes(t2, t1));
+                    yyerrorf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_lpctypes(t2, t1));
                     else if (pragma_check_overloads)
-                        yywarnf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_lpctypes(t2, t1));
+                    yywarnf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_lpctypes(t2, t1));
                 }
-
                 /* Check if the 'varargs' attribute is conserved */
 
                 if (pragma_pedantic
@@ -4003,7 +4007,12 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
             }
 
             free_lpctype(funp->type);
-            funp->type = ref_lpctype(type.t_type);
+            // If the function has no type, it implicitly will be lpctype_mixed from
+            // now on.
+            if (type.t_type)
+                funp->type = ref_lpctype(type.t_type);
+            else
+                funp->type  = lpctype_mixed; // static, no need to reference them.
 
             return num;
         }
@@ -4035,7 +4044,14 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
     fun.flags     = flags;
     fun.num_arg   = num_arg;
     fun.num_locals= num_local; /* will be updated later */
-    fun.type      = ref_lpctype(type.t_type);
+    // If the function has no type, it implicitly will be lpctype_mixed from
+    // now on. Background: fun.type being NULL is a nasty source of NULL pointer
+    // dereferences because this is apparantly the instance a type can be NULL
+    // and is sometimes forgotten.
+    if (type.t_type)
+        fun.type  = ref_lpctype(type.t_type);
+    else
+        fun.type  = lpctype_mixed; // static, no need to reference them.
     ref_mstring(fun.name);
 
     num = FUNCTION_COUNT;
