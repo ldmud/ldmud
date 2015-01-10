@@ -3916,14 +3916,22 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                 }
 #               undef TYPE_MOD_VIS
 
-                /* Check if the 'varargs' attribute is conserved, when pedantic. */
-                if (pragma_pedantic
-                 && (funp->flags ^ flags) & TYPE_MOD_VARARGS
-                 &&  funp->flags & TYPE_MOD_VARARGS
+                /* Check if the 'varargs' attribute is conserved. */
+                if ((old_fflags ^ flags) & TYPE_MOD_VARARGS
+                    &&  old_fflags & TYPE_MOD_VARARGS
                    )
                 {
-                    yywarnf("Redefinition of '%s' loses 'varargs' modifier."
-                           , get_txt(p->name));
+                    // this is a warning in case of re-defining inherited functions
+                    // with pedantic, but always an error when prototype->definition
+                    if (old_fflags & NAME_INHERITED)
+                    {
+                        if (pragma_check_overloads)
+                            yywarnf("Redefinition of '%s' loses 'varargs' modifier."
+                                    , get_txt(p->name));
+                    }
+                    else
+                        yyerrorf("Inconsistent declaration of '%s': 'varargs' modifier lost."
+                                , get_txt(p->name));
                 }
 
                 /* Check that the two argument lists are compatible */
