@@ -79,6 +79,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <sys/ioctl.h>
+#include <poll.h>
 
 #define TELOPTS
 #include "../mudlib/sys/telnet.h"
@@ -8703,8 +8704,10 @@ check_for_out_connections (void)
  */
 
 {
-    int i, ret;
+    int i, ret, err;
+    socklen_t errlen;
     object_t *user;
+    struct pollfd pfd;
 
     for (i = 0; i < MAX_OUTCONN; i++)
     {
@@ -8748,13 +8751,32 @@ check_for_out_connections (void)
             continue;
         }
 
-        ret = connect(outconn[i].socket, (struct sockaddr*) &outconn[i].target
-                     , sizeof(outconn[i].target));
+        /* Check whether the socket is ready.
+         * (Otherwise SO_ERROR won't give meaningful answers on some systems.)
+         */
+        pfd.fd = outconn[i].socket;
+        pfd.events = POLLOUT;
+        ret = poll(&pfd, 1, 0);
+
         if (ret == -1)
+            err = errno;
+        else if (ret == 0)
+            continue; /* Not yet ready */
+        else
         {
-            switch(errno)
+            /* Check for connect errors */
+            errlen = sizeof(err);
+            ret = getsockopt(outconn[i].socket, SOL_SOCKET, SO_ERROR, &err, &errlen);
+            if (ret == -1)
+                err = errno;
+        }
+
+        if (err)
+        {
+            switch(err)
             {
             case EALREADY: /* still trying */
+            case EINTR:
                 continue;
             case EISCONN: /* we are connected! */
                 break;
