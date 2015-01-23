@@ -283,7 +283,7 @@ extern void free_prog(program_t *progp, Bool free_all);
 extern void _free_prog(program_t *progp, Bool free_all, const char * file, int line);
 #endif
 extern void reset_object(object_t *ob, int arg);
-extern void logon_object (object_t *ob);
+extern void logon_object (object_t *ob, p_int flag);
 extern void replace_programs(void);
 extern Bool shadow_catch_message(object_t *ob, const char *str);
 

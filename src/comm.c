@@ -3731,7 +3731,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
     if (new_interactive->tls_status != TLS_HANDSHAKING)
     {
         /* Connection not secure, or already established: logon. */
-        logon_object(ob);
+        logon_object(ob, 0);
     }
     else if (new_interactive->tls_cb == NULL)
     {
@@ -3753,7 +3753,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
     }
     /* else: Connection in TLS handshake and callback set by connect(). */
 #else
-    logon_object(ob);
+    logon_object(ob, 0);
 #endif /* USE_TLS */
     if (!(ob->flags & O_DESTRUCTED))
         print_prompt();
@@ -8784,8 +8784,7 @@ check_for_out_connections (void)
                 /* Error with connection, call logon() with the failure flag
                  */
                 outconn[i].status = ocLoggingOn;
-                push_number(inter_sp, -1);
-                logon_object(outconn[i].curr_obj);
+                logon_object(outconn[i].curr_obj, -1);
 
                 outconn[i].status = ocNotUsed;
                 free_object(outconn[i].curr_obj, "net_connect");

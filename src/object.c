@@ -895,9 +895,9 @@ reset_object (object_t *ob, int arg)
 
 /*-------------------------------------------------------------------------*/
 void
-logon_object (object_t *ob)
+logon_object (object_t *ob, p_int flag)
 
-/* Call the logon() lfun in the object <ob>.
+/* Call the logon() lfun in the object <ob> with the argument <flag>.
  *
  * current_object is temporarily set to <ob> in order to allow logon()
  * to be static (security measure). Doing so is harmless as there is no
@@ -910,7 +910,11 @@ logon_object (object_t *ob)
 
     current_object = ob;
     mark_start_evaluation();
-    ret = apply(STR_LOGON, ob, 0);
+
+    /* Only pass the flag, when != 0. */
+    if (flag)
+        push_number(inter_sp, flag);
+    ret = apply(STR_LOGON, ob, flag ? 1 : 0);
     if (ret == 0)
     {
         errorf("Could not find %s() on the player %s\n", get_txt(STR_LOGON), 
