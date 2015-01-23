@@ -2226,9 +2226,9 @@ add_table_now:
                     /* Calculate binary representation (2's compliment) */
                     size_t tmpl = sizeof(temp);
                     // only strcat if at least 2 bytes (1 byte after this bit) left
-                    while ( --isize > -1  && --tmpl >= 1)
+                    while ( --isize > -1  && tmpl >= 1)
                     {
-                       if ( ( carg->u.number & ( (p_int)1 << isize ) ) != 0 )
+                       if ( ( carg->u.number & ( (p_uint)1 << isize ) ) != 0 )
                        {
                           // Gnomi: strcat is quite inefficient. isize
                           // or tmpl could be used for direct indexing
@@ -2240,9 +2240,13 @@ add_table_now:
                           // they use mostly small numbers.
                           signi = 1;
                           strcat( temp, "1" );
+                          --tmpl;
                        }
-                       else if ( signi )
+                       else if ( signi || !isize)
+                       {
                           strcat( temp, "0" );
+                          --tmpl;
+                       }
                     }
                     // if still bits left, but buffer is full, throw error.
                     if (isize > -1 && tmpl < 1)
@@ -2250,9 +2254,9 @@ add_table_now:
                     if (pres && tmpl > pres)
                         tmpl = pres; /* well.... */
                     if ((unsigned int)tmpl < fs)
-                        add_aligned(st, temp, tmpl, pad, fs, finfo);
+                        add_aligned(st, temp, sizeof(temp) - tmpl, pad, fs, finfo);
                     else
-                        ADD_STRN(st, temp, tmpl);
+                        ADD_STRN(st, temp, sizeof(temp) - tmpl);
                     break;
                   }
                   else

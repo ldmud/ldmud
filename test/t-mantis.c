@@ -427,6 +427,12 @@ nosave mixed *tests = ({
            return err != 0;
         :)
     }),
+    ({ "0000839", 0,
+       function int ()
+       {
+            return sprintf("%b",1470) == "10110111110";
+       }
+    }),
 });
 
 void run_test()
