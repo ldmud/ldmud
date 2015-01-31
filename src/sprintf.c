@@ -2242,7 +2242,7 @@ add_table_now:
                           strcat( temp, "1" );
                           --tmpl;
                        }
-                       else if ( signi || !isize)
+                       else if ( signi || !isize)
                        {
                           strcat( temp, "0" );
                           --tmpl;
