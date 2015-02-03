@@ -4213,6 +4213,56 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
 /*-------------------------------------------------------------------------*/
 static void
+check_variable_redefinition (ident_t *name, typeflags_t flags)
+
+/* Checks whether the redefinition of variable <name> with one having
+ * <flags> is okay. Throws compile errors otherwise.
+ */
+
+{
+    int n = name->u.global.variable;
+    typeflags_t vn_flags = VARIABLE(n)->type.t_flags;
+
+    /* Visible nomask variables can't be redefined */
+    if ( vn_flags & TYPE_MOD_NO_MASK && !(flags & NAME_HIDDEN))
+        yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
+                , get_txt(name->name));
+
+    /* We can redefine inherited variables if they are private or hidden,
+     * or if at least one of them is static.
+     */
+    if (  (   !(vn_flags & NAME_INHERITED)
+           || (   !(vn_flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+               && !((flags | vn_flags) & TYPE_MOD_STATIC)
+              )
+          )
+        && !(flags & NAME_INHERITED)
+       )
+    {
+        if (vn_flags & NAME_INHERITED)
+            yyerrorf("Illegal to redefine inherited variable '%s'"
+                    , get_txt(name->name));
+        else
+            yyerrorf("Illegal to redefine global variable '%s'"
+                    , get_txt(name->name));
+    }
+
+    if (((flags | vn_flags) & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE))
+        == TYPE_MOD_STATIC
+     && !(flags & NAME_INHERITED)
+       )
+    {
+        yywarnf("Redefining inherited %s variable '%s' with a %s variable"
+               , (vn_flags & TYPE_MOD_STATIC)
+                 ? "nosave" : "non-nosave"
+               , get_txt(name->name)
+               , (flags & TYPE_MOD_STATIC) ? "nosave" : "non-nosave"
+               );
+    }
+} /* check_variable_redefinition */
+
+/*-------------------------------------------------------------------------*/
+static void
 define_variable (ident_t *name, fulltype_t type)
 
 /* Define a new global variable <name> of type <type>.
@@ -4281,42 +4331,7 @@ define_variable (ident_t *name, fulltype_t type)
     {
         typeflags_t vn_flags = VARIABLE(n)->type.t_flags;
 
-        /* Visible nomask variables can't be redefined */
-        if ( vn_flags & TYPE_MOD_NO_MASK && !(flags & NAME_HIDDEN))
-            yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
-                    , get_txt(name->name));
-
-        /* We can redefine inherited variables if they are private or hidden,
-         * or if at least one of them is static.
-         */
-        if (  (   !(vn_flags & NAME_INHERITED)
-               || (   !(vn_flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                   && !((flags | vn_flags) & TYPE_MOD_STATIC)
-                  )
-              )
-            && !(flags & NAME_INHERITED)
-           )
-        {
-            if (vn_flags & NAME_INHERITED)
-                yyerrorf("Illegal to redefine inherited variable '%s'"
-                        , get_txt(name->name));
-            else
-                yyerrorf("Illegal to redefine global variable '%s'"
-                        , get_txt(name->name));
-        }
-
-        if (((flags | vn_flags) & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE))
-            == TYPE_MOD_STATIC
-         && !(flags & NAME_INHERITED)
-           )
-        {
-            yywarnf("Redefining inherited %s variable '%s' with a %s variable"
-                   , (vn_flags & TYPE_MOD_STATIC)
-                     ? "nosave" : "non-nosave"
-                   , get_txt(name->name)
-                   , (flags & TYPE_MOD_STATIC) ? "nosave" : "non-nosave"
-                   );
-        }
+        check_variable_redefinition(name, flags);
 
         /* Make sure that at least one of the two definitions is 'static'.
          * The variable which has not been inherited gets first pick.
@@ -4356,12 +4371,14 @@ static void
 redeclare_variable (ident_t *name, fulltype_t type, int n)
 
 /* The variable <name> is inherited virtually with number <n>.
- * Redeclare it from its original type to <type>.
- * The references of <type> are NOT adopted.
+ * Adjust its modifier accordingly. The pure type shouldn't
+ * have changed. The references of <type> are NOT adopted.
  */
 
 {
     typeflags_t flags = type.t_flags;
+    typeflags_t varflags;
+    variable_t *variable;
 
     if (name->type != I_TYPE_GLOBAL)
     {
@@ -4369,7 +4386,14 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
          * make an appropriate entry in the identifier table.
          */
 
-        /* I_TYPE_UNKNOWN */
+        if (name->type != I_TYPE_UNKNOWN)
+        {
+            /* The ident has been used before otherwise, so
+             * get a fresh structure.
+             */
+            name = make_shared_identifier_mstr(name->name, I_TYPE_GLOBAL, 0);
+        }
+
         init_global_identifier(name, /* bVariable: */ MY_TRUE);
         name->next_all = all_globals;
         all_globals = name;
@@ -4401,20 +4425,6 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
     if (flags & NAME_HIDDEN)
         return;
 
-    if (name->u.global.variable >= 0 && name->u.global.variable != n)
-    {
-        if (VARIABLE(name->u.global.variable)->type.t_flags & TYPE_MOD_NO_MASK )
-            yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
-                    , get_txt(name->name));
-    }
-    else if (V_VARIABLE(n)->type.t_flags & TYPE_MOD_NO_MASK
-          && !(V_VARIABLE(n)->type.t_flags & NAME_HIDDEN)
-          && (V_VARIABLE(n)->type.t_flags ^ flags) & TYPE_MOD_STATIC )
-    {
-        yyerrorf("Illegal to redefine 'nomask' variable \"%s\""
-                , get_txt(name->name));
-    }
-
     if (flags & TYPE_MOD_NOSAVE)
     {
         /* 'nosave' is internally saved as 'static' (historical reason) */
@@ -4422,12 +4432,47 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
         flags ^= TYPE_MOD_NOSAVE;
     }
 
-    type.t_flags = flags;
+    if (name->u.global.variable >= 0 && name->u.global.variable != n)
+    {
+        check_variable_redefinition(name, flags);
+    }
 
     name->u.global.variable = n;
 
-    free_fulltype(V_VARIABLE(n)->type);
-    V_VARIABLE(n)->type = ref_fulltype(type);
+    variable = V_VARIABLE(n);
+    varflags = variable->type.t_flags;
+
+    assert(variable->name == name->name);
+    assert(variable->type.t_type == type.t_type);
+
+    /* The most visible modifier wins here. */
+    if ((flags|varflags) & TYPE_MOD_PUBLIC)
+    {
+        varflags &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED | NAME_HIDDEN);
+        varflags |= TYPE_MOD_PUBLIC;
+    }
+    else if (!(flags&(TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED)))
+    {
+        varflags &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED | NAME_HIDDEN);
+    }
+    else if (!(varflags&(TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED)))
+    {
+        /* It's already visible. */
+    }
+    else if (flags & TYPE_MOD_PROTECTED)
+    {
+        varflags &= ~(TYPE_MOD_PRIVATE | NAME_HIDDEN);
+        varflags |= TYPE_MOD_PROTECTED;
+    }
+
+    /* Preserve nosave only, if both of them have it. */
+    if (!(flags & varflags & TYPE_MOD_STATIC))
+        varflags &= ~TYPE_MOD_STATIC;
+
+    /* If either of them is nomask, the resulting var is, too. */
+    varflags |= flags & TYPE_MOD_NO_MASK;
+
+    variable->type.t_flags = varflags;
 } /* redeclare_variable() */
 
 /*-------------------------------------------------------------------------*/
@@ -15394,9 +15439,11 @@ inherit_functions (program_t *from, uint32 inheritidx)
 
 /*-------------------------------------------------------------------------*/
 static bool
-inherit_variable (variable_t *variable, funflag_t varmodifier)
+inherit_variable (variable_t *variable, funflag_t varmodifier, int redeclare)
 
-/* Copy a single variable into our program.
+/* Copy a single variable into our program. If <redeclare> >= 0, then
+ * it's a virtual variable and already exists with that number. The modifiers
+ * of it will then be adjusted accordingly.
  *
  * Returns true on success, false otherwise (out of memory).
  */
@@ -15428,7 +15475,10 @@ inherit_variable (variable_t *variable, funflag_t varmodifier)
     else if (vartype.t_flags & TYPE_MOD_PROTECTED)
         vartype.t_flags &= ~(TYPE_MOD_PUBLIC);
 
-    define_variable(p, vartype);
+    if (redeclare >= 0)
+        redeclare_variable(p, vartype, VIRTUAL_VAR_TAG | redeclare);
+    else
+        define_variable(p, vartype);
     return true;
 
 } /* inherit_variable() */
@@ -15537,7 +15587,6 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
         if (varfound)
         {
             *var_map = newvx - num_new_virtual_variables;
-            newvx++;
 
             if (update_existing)
             {
@@ -15561,6 +15610,15 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
                 free_mstring(cur_oldvar->name);
                 free_fulltype(cur_oldvar->type);
             }
+            else
+            {
+                /* We have to update the modifier. */
+                int cur_newindex = newinheritp->variable_index_offset + newvx - num_new_virtual_variables;
+                if (!inherit_variable(from->variables + first_variable_index + oldvx - num_old_virtual_variables, varmodifier, cur_newindex))
+                    return false;
+            }
+
+            newvx++;
         }
         else
         {
@@ -15598,7 +15656,7 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
                  * instead of <oldprogp>, because the visibility
                  * might have changed.
                  */
-                if (!inherit_variable(from->variables + first_variable_index + oldvx - num_old_virtual_variables, varmodifier))
+                if (!inherit_variable(from->variables + first_variable_index + oldvx - num_old_virtual_variables, varmodifier, -1))
                     return false;
             }
 
@@ -15968,6 +16026,12 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
             newinheritp->variable_index_offset = inheritdup->variable_index_offset;
             newinheritp->inherit_type |= INHERIT_TYPE_DUPLICATE;
             found = true;
+
+            /* Adjust modifier and identifier. */
+            for (int j = first_variable_index; j < last_variable_index; j++)
+                if (!inherit_variable(from->variables + j, varmodifier, inheritdup->variable_index_offset + j - first_variable_index))
+                    return false;
+
             break;
         }
         else if (mstreq(inheritdup->prog->name, progp->name))
@@ -16033,7 +16097,7 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
          * going to copy them into our variables.
          */
         for (int i = first_variable_index; i < last_variable_index; i++)
-            if (!inherit_variable(from->variables + i, varmodifier))
+            if (!inherit_variable(from->variables + i, varmodifier, -1))
                 return false;
     }
 
@@ -16060,7 +16124,7 @@ inherit_obsoleted_variables  (inherit_t *newinheritp, program_t *from, int first
 {
     /* Copy the additional variables. */
     for (int i = first_variable_index, j = 0; j < newinheritp->num_additional_variables; i++, j++)
-        if (!inherit_variable(from->variables + i, varmodifier))
+        if (!inherit_variable(from->variables + i, varmodifier, -1))
             return false;
 
 
@@ -16347,7 +16411,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
         frominherit.variable_index_offset = NV_VARIABLE_COUNT | NON_VIRTUAL_OFFSET_TAG;
 
         for (int i = last_bound_variable; i < from->num_variables; i++)
-            if (!inherit_variable(from->variables + i, varmodifier))
+            if (!inherit_variable(from->variables + i, varmodifier, -1))
                 break;
     }
 
