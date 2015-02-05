@@ -14,11 +14,12 @@
 #include "driver.h"
 #include "typedefs.h"
 
-typedef enum type_classes   type_classes_t;
-typedef enum primary_types  primary_types_t;
-typedef struct array_type_s array_type_t;
-typedef struct union_type_s union_type_t;
-typedef uint32              typeflags_t;
+typedef enum type_classes    type_classes_t;
+typedef enum primary_types   primary_types_t;
+typedef struct struct_info_s struct_info_t;
+typedef struct array_type_s  array_type_t;
+typedef struct union_type_s  union_type_t;
+typedef uint32               typeflags_t;
 
 /* --- Type Information ---
  *
@@ -60,6 +61,21 @@ enum primary_types
     TYPE_CLOSURE      =  8,
     TYPE_SYMBOL       =  9,
     TYPE_QUOTED_ARRAY = 10,
+};
+
+struct struct_info_s
+{
+    /* The name of the struct (refcounted).
+     * This is the identifying and constant element.
+     * If it is NULL it means 'any struct'.
+     */
+    struct_name_t *name;
+
+    /* The current struct definition (not refcounted).
+     * This is only valid at compile time and
+     * NULL otherwise.
+     */
+    struct_type_t *def;
 };
 
 struct array_type_s
@@ -128,7 +144,7 @@ struct lpctype_s
     union
     {
         primary_types_t  t_primary;     /* TCLASS_PRIMARY */
-        struct_type_t   *t_struct;      /* TCLASS_STRUCT */
+        struct_info_t    t_struct;      /* TCLASS_STRUCT */
         array_type_t     t_array;       /* TCLASS_ARRAY */
         union_type_t     t_union;       /* TCLASS_UNION */
     };
@@ -210,6 +226,8 @@ extern lpctype_t *get_common_type(lpctype_t *t1, lpctype_t* t2);
 extern bool has_common_type(lpctype_t *t1, lpctype_t* t2);
 
 extern void make_static_type(lpctype_t *src, lpctype_t *dest);
+extern void update_struct_type(lpctype_t *t, struct_type_t *def);
+extern void clean_struct_type(lpctype_t *t);
 extern void _free_lpctype(lpctype_t *t);
 extern bool lpctype_contains(lpctype_t* src, lpctype_t* dest);
 

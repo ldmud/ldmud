@@ -24,7 +24,7 @@ lpctype_t _lpctype_symbol       = { 0, { TCLASS_PRIMARY, true }, {TYPE_SYMBOL}, 
 lpctype_t _lpctype_quoted_array = { 0, { TCLASS_PRIMARY, true }, {TYPE_QUOTED_ARRAY}, NULL, NULL };
 lpctype_t _lpctype_void         = { 0, { TCLASS_PRIMARY, true }, {TYPE_VOID},         NULL, NULL };
 lpctype_t _lpctype_unknown      = { 0, { TCLASS_PRIMARY, true }, {TYPE_UNKNOWN},      NULL, NULL };
-lpctype_t _lpctype_any_struct   = { 0, { TCLASS_STRUCT,  true }, {.t_struct = NULL},  NULL, NULL };
+lpctype_t _lpctype_any_struct   = { 0, { TCLASS_STRUCT,  true }, {.t_struct = {NULL, NULL}},  NULL, NULL };
 
 /* And are used via pointer. */
 lpctype_t *lpctype_int          = &_lpctype_int;
@@ -92,17 +92,49 @@ get_struct_type (struct_type_t* def)
  */
 
 {
-    lpctype_t *type = def->lpctype;
+    struct_name_t* name = def->name;
+    lpctype_t *type = name->lpctype;
 
     if (type != NULL)
-        return ref_lpctype(type);
+        ref_lpctype(type);
+    else
+    {
+        name->lpctype = type = lpctype_new();
+        type->t_class = TCLASS_STRUCT;
+        type->t_struct.name = ref_struct_name(name);
+    }
 
-    def->lpctype = type = lpctype_new();
-    type->t_class = TCLASS_STRUCT;
-    type->t_struct = ref_struct_type(def);
+    type->t_struct.def = def;
 
     return type;
 } /* get_struct_type() */
+
+/*-------------------------------------------------------------------------*/
+void
+update_struct_type (lpctype_t *t, struct_type_t *def)
+
+/* Updates the .t_struct.def field of <t> to point to <def>.
+ */
+
+{
+    if (t)
+        t->t_struct.def = def;
+
+} /* update_struct_type() */
+
+/*-------------------------------------------------------------------------*/
+void
+clean_struct_type (lpctype_t *t)
+
+/* Clean the .def element in t->t_struct.
+ */
+
+{
+    if(!t || t->t_class != TCLASS_STRUCT)
+        return;
+
+    t->t_struct.def = NULL;
+} /* clean_struct_type */
 
 /*-------------------------------------------------------------------------*/
 lpctype_t *
@@ -345,15 +377,15 @@ internal_get_common_type(lpctype_t *t1, lpctype_t* t2, bool find_one)
     case TCLASS_STRUCT:
         if (t2->t_class != TCLASS_STRUCT)
             return NULL;
-        else if (t1->t_struct == NULL)
+        else if (t1->t_struct.name == NULL)
             return ref_lpctype(t2);
-        else if (t2->t_struct == NULL)
+        else if (t2->t_struct.name == NULL)
             return ref_lpctype(t1);
         /* This is somewhat counterintuitive, but the derived struct
            is more specialized, so it is the result of the intersection. */
-        else if (struct_baseof(t1->t_struct, t2->t_struct))
+        else if (t2->t_struct.def && struct_baseof_name(t1->t_struct.name, t2->t_struct.def))
             return ref_lpctype(t2);
-        else if (struct_baseof(t2->t_struct, t1->t_struct))
+        else if (t1->t_struct.def && struct_baseof_name(t2->t_struct.name, t1->t_struct.def))
             return ref_lpctype(t1);
         else
             return NULL;
@@ -459,8 +491,8 @@ make_static_type (lpctype_t *src, lpctype_t *dest)
         break;
 
     case TCLASS_STRUCT:
-        if (src->t_struct)
-            src->t_struct->lpctype = dest;
+        if (src->t_struct.name)
+            src->t_struct.name->lpctype = dest;
         break;
 
     case TCLASS_ARRAY:
@@ -532,10 +564,10 @@ _free_lpctype (lpctype_t *t)
         break; /* Nothing to do. */
 
     case TCLASS_STRUCT:
-        if (t->t_struct)
+        if (t->t_struct.name)
         {
-            t->t_struct->lpctype = NULL;
-            free_struct_type(t->t_struct);
+            t->t_struct.name->lpctype = NULL;
+            free_struct_name(t->t_struct.name);
         }
         break;
 
@@ -608,16 +640,12 @@ lpctype_contains (lpctype_t* src, lpctype_t* dest)
                 if(destbase->t_class == TCLASS_STRUCT)
                 {
                     /* Check if <src> is a base struct of <dest>. */
-                    struct_type_t *deststruct = destbase->t_struct;
 
-                    if (deststruct == NULL) /* Matches any struct */
+                    if (destbase->t_struct.name == NULL) /* Matches any struct */
                         found = true;
-                    else if (srcbase->t_struct)
+                    else if (srcbase->t_struct.name && destbase->t_struct.def)
                     {
-                        while (deststruct != NULL && deststruct != srcbase->t_struct)
-                            deststruct = deststruct->base;
-
-                        if(deststruct != NULL)
+                        if(struct_baseof_name(srcbase->t_struct.name, destbase->t_struct.def))
                             found = true;
                     }
                 }
@@ -709,8 +737,9 @@ clear_lpctype_ref (lpctype_t *t)
         break; /* Can't happen. See above. */
 
     case TCLASS_STRUCT:
-        if (t->t_struct)
-            clear_struct_type_ref(t->t_struct);
+        if (t->t_struct.name)
+            clear_struct_name_ref(t->t_struct.name);
+        t->t_struct.def = NULL;
         break;
 
     case TCLASS_ARRAY:
@@ -757,10 +786,10 @@ count_lpctype_ref (lpctype_t *t)
                 break; /* Can't happen. See above. */
 
             case TCLASS_STRUCT:
-                if (t->t_struct)
+                if (t->t_struct.name)
                 {
-                    count_struct_type_ref(t->t_struct);
-                    t->t_struct->lpctype = t;
+                    count_struct_name_ref(t->t_struct.name);
+                    t->t_struct.name->lpctype = t;
                 }
                 break;
 

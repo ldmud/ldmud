@@ -1339,7 +1339,7 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
             memcpy(&user, p, sizeof user);
             p += sizeof user;
             fprintf(stderr, " struct '%s': %ld values\n"
-                          , get_txt(stt->name), (long)struct_t_size(stt));
+                          , get_txt(stt->name->name), (long)struct_t_size(stt));
             p = dump_swapped_values(struct_t_size(stt), p, indent+2);
             if (!p)
                 return NULL;

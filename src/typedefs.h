@@ -47,6 +47,7 @@ typedef struct struct_s           struct_t;           /* structs.h */
 typedef struct struct_def_s       struct_def_t;       /* exec.h */
 typedef struct struct_member_s    struct_member_t;    /* structs.h */
 typedef struct struct_type_s      struct_type_t;      /* structs.h */
+typedef struct struct_name_s      struct_name_t;      /* structs.h */
 typedef struct svalue_s           svalue_t;           /* svalue.h */
 typedef struct variable_s         variable_t;         /* exec.h */
 typedef struct vector_s           vector_t;           /* array.h */
