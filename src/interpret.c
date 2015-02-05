@@ -3443,12 +3443,13 @@ get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
+check_struct_op (svalue_t * sp, int off_type, int off_value, int off_index, bytecode_p pc, bool * ignore_error)
 
 /* On the stack are the arguments for a struct indexing operation.
  * In particular: sp[<off_type>]:  the struct type index <idx>
  *               sp[<off_value>]:    <off_value> <= 0: the struct value to idx.
  *               sp[-<off_value>+1]: <off_value> >  0: the struct Lvalue to idx.
+ *               sp[off_index]:    the member index
  *
  * Check the validity of the indexing operation and thrown an error
  * if invalid.
@@ -3458,12 +3459,18 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
  * An negative <idx> accepts any struct.
  *
  * On success, the <idx> svalue is removed from the stack and the
- * new stack pointer is returned.
+ * new stack pointer is returned. <ignore_error> is set to true,
+ * when the operation was changed to a runtime lookup due to a
+ * different struct definition with the same name (and thus read
+ * access to non-existing members shall return 0 instead of an error).
  */
 
 {
     short s_index;
     svalue_t * svp;
+
+    if (ignore_error)
+        *ignore_error = false;
 
     /* These two errors can happen with careless funcall(#'->)s */
     if (sp[off_type].type != T_NUMBER)
@@ -3529,8 +3536,29 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
         struct_type_t * pExpected = current_prog->struct_defs[s_index].type;
         struct_type_t * pType = svp->u.strct->type;
 
-        if (!struct_baseof(pExpected, pType))
+        if (struct_baseof(pExpected, pType))
         {
+            /* Fine, they match! */
+        }
+        else if (struct_baseof_name(pExpected->name, pType))
+        {
+            /* Okay, that's another version of this struct.
+             * We have to change the index to lookup by name.
+             */
+
+            svalue_t * member_idx = &sp[off_index];
+            if (member_idx->type == T_NUMBER)
+            {
+                /* Put the name of the member instead of the index. */
+                put_ref_symbol(member_idx, pExpected->member[member_idx->u.number].name, 1);
+                if (ignore_error)
+                    *ignore_error = true;
+            }
+            /* else it is already a lookup by name. */
+        }
+        else
+        {
+            /* An incompatible struct... */
             string_t * got_name, * exp_name;
 
             got_name = struct_unique_name(svp->u.strct);
@@ -3562,11 +3590,11 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc)
+get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc, bool ignore_error)
 
 /* Index struct <st> with index <i> and return the pointer to the
  * indexed item.
- * If the index is invalid, throw an error.
+ * If the index is invalid throw an error, unless ignore_error is set, then return 0.
  */
 
 {
@@ -3578,6 +3606,9 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc)
         ind = struct_find_member(st->type, i->u.str);
         if (ind < 0)
         {
+            if (ignore_error)
+                return &const0;
+
             ERRORF(("Illegal struct '%s'->(): member '%s' not found.\n"
                    , get_txt(struct_name(st))
                    , get_txt(i->u.str)
@@ -3684,7 +3715,7 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         struct_t * st = vec->u.strct;
         svalue_t * item;
 
-        item = get_struct_item(st, i, sp, pc);
+        item = get_struct_item(st, i, sp, pc, false);
 
         if (st->ref == 1)
         {
@@ -3932,7 +3963,7 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         svalue_t * item;
         struct protected_lvalue * lvalue;
 
-        item = get_struct_item(st, i, sp, pc);
+        item = get_struct_item(st, i, sp, pc, false);
 
         /* Item and set up the protector */
 
@@ -4253,7 +4284,7 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
         struct_t * st = vec->u.strct;
         svalue_t * item;
 
-        item = get_struct_item(st, i, sp, pc);
+        item = get_struct_item(st, i, sp, pc, false);
         
         /* Remove the arguments and push the result */
 
@@ -4522,7 +4553,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
             svalue_t * item;
             struct protected_lvalue *lvalue;
 
-            item = get_struct_item(st, i, sp, pc);
+            item = get_struct_item(st, i, sp, pc, false);
 
             /* Drop the arguments */
             free_svalue(i);
@@ -5464,7 +5495,7 @@ protected_range_lvalue (int code, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-push_indexed_value (svalue_t *sp, bytecode_p pc)
+push_indexed_value (svalue_t *sp, bytecode_p pc, bool ignore_error)
 
 /* Operator F_INDEX (string|vector v=sp[-1], int   i=sp[0])
  *          F_INDEX (mapping       v=sp[-1], mixed i=sp[0])
@@ -5582,7 +5613,7 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         struct_t * st = vec->u.strct;
         svalue_t * item;
 
-        item = get_struct_item(st, i, sp, pc);
+        item = get_struct_item(st, i, sp, pc, ignore_error);
 
         /* Drop the 'i' argument */
         free_svalue(sp);
@@ -14310,7 +14341,7 @@ again:
          * An negative <idx> accepts any struct.
          */
 
-        sp = check_struct_op(sp, 0, -2, pc);
+        sp = check_struct_op(sp, 0, -2, -1, pc, NULL);
         sp = push_indexed_lvalue(sp, pc);
         break;
 
@@ -14373,7 +14404,7 @@ again:
          * An negative <idx> accepts any struct.
          */
 
-        sp = check_struct_op(sp, -1, 1, pc);
+        sp = check_struct_op(sp, -1, 1, -2, pc, NULL);
         sp = index_lvalue(sp, pc);
         break;
 
@@ -14432,6 +14463,7 @@ again:
         break;
 
     CASE(F_S_INDEX);                /* --- s_index            --- */
+    {
         /* Operator F_S_INDEX (struct v=sp[-2], mixed i=sp[-1], short idx=sp[0])
          *
          * Compute the value (v->i) and push it onto the stack.  If the value
@@ -14443,9 +14475,11 @@ again:
          * An negative <idx> accepts any struct.
          */
 
-        sp = check_struct_op(sp, 0, -2, pc);
-        sp = push_indexed_value(sp, pc);
+        bool ignore_error = false;
+        sp = check_struct_op(sp, 0, -2, -1, pc, &ignore_error);
+        sp = push_indexed_value(sp, pc, ignore_error);
         break;
+    }
 
     CASE(F_INDEX);                  /* --- index              --- */
         /* Operator F_INDEX (string|vector v=sp[-1], int   i=sp[0])
@@ -14465,7 +14499,7 @@ again:
                   ));
             /* NOTREACHED */
         }
-        sp = push_indexed_value(sp, pc);
+        sp = push_indexed_value(sp, pc, false);
         break;
 
     CASE(F_RINDEX);                 /* --- rindex              --- */
@@ -14692,7 +14726,7 @@ again:
          * An negative <idx> accepts any struct.
          */
 
-        sp = check_struct_op(sp, 0, 3, pc);
+        sp = check_struct_op(sp, 0, 3, -1, pc, NULL);
         sp = push_protected_indexed_lvalue(sp, pc);
         break;
 
@@ -14765,7 +14799,7 @@ again:
          * An negative <idx> accepts any struct.
          */
 
-        sp = check_struct_op(sp, -1, 1, pc);
+        sp = check_struct_op(sp, -1, 1, -2, pc, NULL);
         sp = protected_index_lvalue(sp, pc);
         break;
 
