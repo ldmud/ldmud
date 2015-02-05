@@ -6623,6 +6623,7 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
         if (svptype)
             *svptype = ref_lpctype(valuetype);
 
+        clean_struct_type(valuetype);
         free_lpctype(valuetype);
 
         return result;

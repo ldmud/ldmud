@@ -151,7 +151,7 @@ USAGE IN CLOSURES
         struct passed as first argument. The content of the template
         struct is irrelevant, so an empty struct suffices. For
         example, to create an instance of struct Foo:
-        
+
             ({ #'(<, (<Foo>), 1, ({ 2 }), (<Bar>) })
 
         The order of the member values is the order in which they
@@ -174,15 +174,14 @@ MISCELLANEOUS
 
         Support for structs is signaled by the macro __LPC_STRUCTS__.
 
-        Since structs are tied to the program they are defined in,
-        re-compiling a program creates new struct types which are
-        in principle incompatible to the old ones. However, the LPC
-        compiler checks if the newly compiled structs have the same
-        structure as their older counterparts of the same name
-        (and defining program). If the structures conform, the existing
-        older struct types are used instead of the new ones. This way
-        an accidental of for example /std/types.c doesn't break
-        the whole mud.
+        Though structs are tied to the program the are defined in,
+        re-compiling a program doesn't make the struct types
+        incompatible. Even if the newly compiled struct has a
+        different structure it will be accepted by routines that
+        expect the old struct definition. When members disappeared
+        in the new struct definition, read access to those members
+        will return 0, write access to vanished members however
+        will result in a runtime error.
 
 
 EXAMPLES

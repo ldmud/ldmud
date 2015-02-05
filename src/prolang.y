@@ -1407,19 +1407,13 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
 
     case TCLASS_STRUCT:
         {
-            char pbuf[SIZEOF_CHAR_P * 2 + 4];
-            size_t pbuflen;
-
-            if (type->t_struct)
+            if (type->t_struct.name)
             {
-                snprintf(pbuf, sizeof(pbuf), " %p", type->t_struct);
-                pbuflen = strlen(pbuf);
-                if(7 + mstrsize(type->t_struct->name) + pbuflen < bufsize)
+                if(7 + mstrsize(type->t_struct.name->name) < bufsize)
                 {
                     memcpy(buf, "struct ", 7);
-                    memcpy(buf+7, get_txt(type->t_struct->name), mstrsize(type->t_struct->name));
-                    memcpy(buf+7+mstrsize(type->t_struct->name), pbuf, pbuflen+1);
-                    return 7 + mstrsize(type->t_struct->name) + pbuflen;
+                    memcpy(buf+7, get_txt(type->t_struct.name->name), mstrsize(type->t_struct.name->name));
+                    return 7 + mstrsize(type->t_struct.name->name);
                 }
                 else
                 {
@@ -4839,7 +4833,7 @@ def_function_complete ( p_int body_start, Bool is_inline)
 
 /*-------------------------------------------------------------------------*/
 static int
-define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
+define_new_struct ( Bool proto, ident_t *p, const char * prog_name, funflag_t flags)
 
 /* Define a new struct <p> with the visibility <flags>.
  * If <proto> is TRUE, the function is called for a struct forward
@@ -4923,10 +4917,13 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
     /* This is a new struct! */
 
     /* Fill in the struct_def_t */
-    sdef.type  = struct_new_prototype(ref_mstring(p->name));
+    sdef.type  = struct_new_prototype(ref_mstring(p->name)
+                                    , new_tabled(prog_name));
     sdef.flags = proto ? (flags | NAME_PROTOTYPE)
                        : (flags & ~NAME_PROTOTYPE);
     sdef.inh = -1;
+
+    update_struct_type(sdef.type->name->lpctype, sdef.type);
 
     num = STRUCT_COUNT;
 
@@ -5046,7 +5043,7 @@ add_struct_member ( string_t *name, lpctype_t *type
 
 /*-------------------------------------------------------------------------*/
 static void
-finish_struct ( const char * prog_name, int32 prog_id)
+finish_struct ( int32 prog_id)
 
 /* The definition for struct <current_struct> has been parsed completely,
  * now complete the struct type object with the A_STRUCT_MEMBERS data.
@@ -5055,7 +5052,7 @@ finish_struct ( const char * prog_name, int32 prog_id)
 {
     struct_def_t *pdef;
     struct_type_t *base;
-    string_t *name;
+    string_t *name, *prog_name;
 
     pdef = &STRUCT_DEF(current_struct);
 
@@ -5066,10 +5063,10 @@ finish_struct ( const char * prog_name, int32 prog_id)
     base = pdef->type->base;
     pdef->type->base = NULL;
     name = ref_mstring(struct_t_name(pdef->type));
+    prog_name = ref_mstring(struct_t_pname(pdef->type));
 
     /* Fill in the prototype */
     pdef->type = struct_fill_prototype(pdef->type
-                                      , new_tabled(prog_name)
                                       , prog_id
                                       , base
                                       , STRUCT_MEMBER_COUNT
@@ -5080,11 +5077,12 @@ finish_struct ( const char * prog_name, int32 prog_id)
     {
         /* Success: Free the safety copies */
         free_mstring(name);
+        free_mstring(prog_name);
     }
     else
     {
         /* Failure: Recreate the prototype as the old one got deleted */
-        pdef->type = struct_new_prototype(name);
+        pdef->type = struct_new_prototype(name, prog_name);
     }
 
     /* Clear the STRUCT_MEMBER block - the definitions have already
@@ -5278,9 +5276,9 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
 /*-------------------------------------------------------------------------*/
 static short
-get_struct_index (struct_type_t * pType)
+get_struct_index (struct_name_t * pName)
 
-/* Return the index of struct type <pType> in this program's A_STRUCT_DEFS.
+/* Return the index of struct name <pName> in this program's A_STRUCT_DEFS.
  * Return -1 if not found.
  */
 
@@ -5289,7 +5287,7 @@ get_struct_index (struct_type_t * pType)
 
     for (i = 0; (size_t)i < STRUCT_COUNT; i++)
     {
-        if (STRUCT_DEF(i).type == pType)
+        if (STRUCT_DEF(i).type->name == pName)
             return i;
     }
     return -1;
@@ -5471,7 +5469,7 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
 
         case TCLASS_STRUCT:
             {
-                if (structure->t_struct == NULL)
+                if (structure->t_struct.def == NULL)
                     break;
 
                 int midx = -1;
@@ -5480,14 +5478,14 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
                 if (member_name != NULL)
                 {
                     /* Let's see, if this one has <member>. */
-                    midx = struct_find_member(structure->t_struct, member_name);
+                    midx = struct_find_member(structure->t_struct.def, member_name);
                     if (midx < 0)
                         break;
                 }
 
                 if (!fstruct)
                 {
-                    fstruct = structure->t_struct;
+                    fstruct = structure->t_struct.def;
                     *member_index = midx;
                 }
                 else
@@ -5495,7 +5493,7 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
                     struct_type_t* test;
                     /* Is this a child of <fstruct>? Then skip it.*/
 
-                    for ( test = structure->t_struct
+                    for ( test = structure->t_struct.def
                         ; test != NULL && test != fstruct
                         ; test = test->base
                         )
@@ -5506,7 +5504,7 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
                         /* It's not a child. Check the other way around. */
 
                         for ( test = fstruct
-                            ; test != NULL && test != structure->t_struct
+                            ; test != NULL && test != structure->t_struct.def
                             ; test = test->base
                             )
                             NOOP;
@@ -5518,7 +5516,7 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
                             yyerrorf("Multiple structs found for member '%s': struct %s, struct %s"
                                     , get_txt(member_name)
                                     , get_txt(struct_t_name(fstruct))
-                                    , get_txt(struct_t_name(structure->t_struct))
+                                    , get_txt(struct_t_name(structure->t_struct.def))
                                     );
 
                             *struct_index = -1;
@@ -5528,7 +5526,7 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
                         else
                         {
                             /* Remember the base struct. */
-                            fstruct = structure->t_struct;
+                            fstruct = structure->t_struct.def;
                             *member_index = midx;
                         }
                     }
@@ -5560,7 +5558,7 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
     }
 
     if (*struct_index == -1)
-        *struct_index = get_struct_index(structure->t_struct);
+        *struct_index = get_struct_index(structure->t_struct.name);
     if (*struct_index == -1)
     {
         yyerrorf("Unknown type in struct dereference: %s\n"
@@ -5609,8 +5607,6 @@ struct_epilog (void)
     {
         struct_type_t *pSType = STRUCT_DEF(i).type;
         struct_type_t *pOld;
-        lpctype_t *tOld;
-        int ii;
 
         if (STRUCT_DEF(i).inh >= 0)
             continue;
@@ -5619,87 +5615,11 @@ struct_epilog (void)
         if (!pOld || !struct_type_equivalent(pSType, pOld))
             continue;
 
-        tOld = get_struct_type(pOld);
-
         /* pOld has the same structure as pSType, so lets
          * replace the latter with the former.
-         * First in the structs themselves.
          */
-        for (ii = 0; (size_t)ii < STRUCT_COUNT; ii++)
-        {
-            if (ii != i)
-                struct_type_update(STRUCT_DEF(ii).type, pSType, pOld); 
-        }
 
-        /* Update variable types */
-
-        for (ii = 0; (size_t)ii < NV_VARIABLE_COUNT; ii++)
-        {
-            lpctype_t ** pType = &(NV_VARIABLE(ii)->type.t_type);
-
-            if ((*pType)->t_class == TCLASS_STRUCT
-             && (*pType)->t_struct == pSType
-               )
-            {
-                free_lpctype(*pType);
-                *pType = ref_lpctype(tOld);
-            }
-        }
-
-        for (ii = 0; (size_t)ii < V_VARIABLE_COUNT; ii++)
-        {
-            lpctype_t ** pType = &(V_VARIABLE(ii | VIRTUAL_VAR_TAG)->type.t_type);
-
-            if ((*pType)->t_class == TCLASS_STRUCT
-             && (*pType)->t_struct == pSType
-               )
-            {
-                free_lpctype(*pType);
-                *pType = ref_lpctype(tOld);
-            }
-        }
-
-        /* Update the function return types */
-        {
-            int num_functions = FUNCTION_COUNT;
-            function_t * f = FUNCTION(0);
-
-            for (ii = num_functions; --ii >= 0; f++)
-            {
-                /* Ignore all functions but those actually defined in
-                 * this program.
-                 */
-                if (f->flags & (NAME_INHERITED|NAME_UNDEFINED|NAME_CROSS_DEFINED))
-                    continue;
-
-                if (f->type->t_class == TCLASS_STRUCT
-                 && f->type->t_struct == pSType
-                   )
-                {
-                    free_lpctype(f->type);
-                    f->type = ref_lpctype(tOld);
-                }
-            } /* for(ii) */
-        }
-
-        /* Update function argument types */
-
-        for (ii = 0; (size_t)ii < ARGTYPE_COUNT; ii++)
-        {
-            lpctype_t ** pType = &(ARGUMENT_TYPE(ii));
-
-            if ((*pType)->t_class == TCLASS_STRUCT
-             && (*pType)->t_struct == pSType
-               )
-            {
-                free_lpctype(*pType);
-                *pType = ref_lpctype(tOld);
-            }
-        }
-
-        /* And finally, replace the struct in the A_STRUCT memblock */
         free_struct_type(pSType);
-        free_lpctype(tOld);
         STRUCT_DEF(i).type = ref_struct_type(pOld);
     } /* for(i) */
 
@@ -7162,7 +7082,7 @@ inline_comma_expr:
 struct_decl:
       type_modifier_list L_STRUCT L_IDENTIFIER ';'
       {
-          (void)define_new_struct(MY_TRUE, $3, $1);
+          (void)define_new_struct(MY_TRUE, $3, compiled_file, $1);
       }
     | type_modifier_list L_STRUCT L_IDENTIFIER
       {
@@ -7178,13 +7098,13 @@ struct_decl:
           }
           mem_block[A_STRUCT_MEMBERS].current_size = 0;
 
-          current_struct = define_new_struct(MY_FALSE, $3, $1);
+          current_struct = define_new_struct(MY_FALSE, $3, compiled_file, $1);
           if (current_struct < 0)
               YYACCEPT;
       }
       opt_base_struct '{' opt_member_list '}' ';'
       {
-          finish_struct(compiled_file, current_id_number+1);
+          finish_struct(current_id_number+1);
       }
 ; /* struct_decl */
 
@@ -15284,10 +15204,11 @@ copy_structs (program_t *from, funflag_t flags)
         /* Create a new struct entry, then replace the struct prototype
          * type with the one we inherited.
          */
-        current_struct = define_new_struct( MY_FALSE, p, f);
+        current_struct = define_new_struct( MY_FALSE, p, get_txt(struct_t_pname(pdef->type)), f);
         free_struct_type(STRUCT_DEF(current_struct).type);
         STRUCT_DEF(current_struct).type = ref_struct_type(pdef->type);
         STRUCT_DEF(current_struct).inh = INHERIT_COUNT;
+        update_struct_type(STRUCT_DEF(current_struct).type->name->lpctype, pdef->type);
     }
 } /* copy_structs() */
 
@@ -16772,6 +16693,10 @@ epilog (void)
     all_globals = NULL;
     
     remove_unknown_identifier();
+
+    /* Remove the concrete struct definition from the lpctype object. */
+    for (i = 0; (size_t)i < STRUCT_COUNT; i++)
+        clean_struct_type(STRUCT_DEF(i).type->name->lpctype);
 
     /* Now create the program structure */
     switch (0) { default:
