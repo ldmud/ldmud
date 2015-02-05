@@ -491,6 +491,11 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
 #define put_string(sp,val) \
     ( (sp)->type = T_STRING, (sp)->u.str = val )
 
+#define put_ref_symbol(sp,val,numquotes) \
+    ( (sp)->type = T_SYMBOL, (sp)->u.str = ref_mstring(val), (sp)->x.quotes = (numquotes) )
+#define put_symbol(sp,val,numquotes) \
+    ( (sp)->type = T_SYMBOL, (sp)->u.str = val, (sp)->x.quotes = (numquotes) )
+
 #define put_callback(sp,val) \
     ( (sp)->type = T_CALLBACK, (sp)->u.cb = val )
 
