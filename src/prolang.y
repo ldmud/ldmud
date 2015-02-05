@@ -15209,6 +15209,7 @@ copy_structs (program_t *from, funflag_t flags)
         free_struct_type(STRUCT_DEF(current_struct).type);
         STRUCT_DEF(current_struct).type = ref_struct_type(pdef->type);
         STRUCT_DEF(current_struct).inh = INHERIT_COUNT;
+        update_struct_type(STRUCT_DEF(current_struct).type->name->lpctype, pdef->type);
     }
 } /* copy_structs() */
 

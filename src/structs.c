@@ -522,6 +522,7 @@ struct_new_prototype ( string_t *name, string_t *prog_name )
         pSName->prog_name = prog_name;
 
         pSName->lpctype = NULL;
+        pSName->current = NULL;
 
         if (!add_struct_name(pSName))
         {
