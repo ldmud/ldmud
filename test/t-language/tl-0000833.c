@@ -54,4 +54,32 @@
  */
 #endif
 
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+#if \
+ __VERSION_MAJOR__ \
+                   < 3
+/* If the previous line exceeds 6144 Bytes in the file,
+ * then the driver can't read the full expression and complains
+ * about conditions being too complex.
+ */
+The expression shouldn't be true, so this shouldn't be parsed;
+#endif
+
 int run_test() { return 1; }

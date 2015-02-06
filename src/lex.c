@@ -4372,7 +4372,10 @@ handle_preprocessor_statement (char * in_yyp)
             while (mygetc() != '\n') NOOP;
         }
         else
+        {
+            myfilbuf();
             handle_cond(cond);
+        }
     }
     else if (strncmp("ifdef", yytext, wlen) == 0)
     {
@@ -4948,6 +4951,12 @@ yylex1 (void)
                 if (lex_fatal)
                 {
                     return -1;
+                }
+
+                if (!*yyp)
+                {
+                    outp = yyp;
+                    yyp = _myfilbuf();
                 }
                 break;
             }
@@ -6638,6 +6647,8 @@ exgetc (void)
             outp++;
             if (outp[-1] == '\r' && *outp == '\n')
                 outp++;
+            myfilbuf();
+
             yyp = yytext;
             for(quote = MY_FALSE;;)
             {
