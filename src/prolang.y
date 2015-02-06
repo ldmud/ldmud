@@ -790,8 +790,7 @@ static ident_t *all_locals = NULL;
 static lpctype_t * exact_types;
   /* If NULL, don't check nor require argument and function types.
    * Otherwise it's the return type of the function. (Reference
-   * is not counted, a counted reference is held in
-   * def_function_returntype or current_inline->returntype.)
+   * is not counted, a counted reference is held in the parser tokens.)
    */
 
 static funflag_t default_varmod;
@@ -4625,11 +4624,11 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident, Bool is_inline)
     if (is_inline)
     {
         current_inline->ident = ident;
-        current_inline->returntype = ref_fulltype(returntype);
+        current_inline->returntype = returntype;
     }
     else
     {
-        def_function_returntype = ref_fulltype(returntype);
+        def_function_returntype = returntype;
         def_function_ident = ident;
     }
 } /* def_function_typecheck() */
