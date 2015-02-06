@@ -720,7 +720,12 @@ clear_lpctype_ref (lpctype_t *t)
     case TCLASS_UNION:
         clear_lpctype_ref(t->t_union.head);
         clear_lpctype_ref(t->t_union.member);
-        t->t_union.next = NULL;
+
+        /* Mark it as not-yet counted. We need this mark
+         * for static lpctype objects, because there
+         * test_memory_reference() doesn't work.
+         */
+        t->t_union.next = lpctype_void;
         break;
     }
 
@@ -790,7 +795,7 @@ count_lpctype_ref (lpctype_t *t)
 
         case TCLASS_UNION:
             /* Did we already set the pointers back? */
-            if (t->t_union.next == NULL)
+            if (t->t_union.next == lpctype_void)
             {
                 t->t_union.next = t->t_union.head->unions_of;
                 t->t_union.head->unions_of = t;
