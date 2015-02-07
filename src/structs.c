@@ -511,6 +511,7 @@ struct_new_prototype ( string_t *name, string_t *prog_name )
         if (pSName == NULL)
         {
             free_mstring(name);
+            free_mstring(prog_name);
             return NULL;
         }
         size_struct_type += STRUCT_NAME_MEMSIZE;
