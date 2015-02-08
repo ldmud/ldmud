@@ -139,8 +139,8 @@ struct callback_s {
        *   - T_INVALID if no arguments
        *   - a single argument
        *   - T_LVALUE with u.lvalue pointing to the svalue_t[] with
-       *     the arguments. If arg.x.extern_args is TRUE, the block
-       *     was allocated from outside and is outside of our control.
+       *     the arguments (which shall be freed together with
+       *     the callback_s structure).
        * No argument can be a LVALUE itself.
        */
 };
