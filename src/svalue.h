@@ -151,8 +151,6 @@ struct svalue_s
         ph_int lvalue_type;  /* Type of a T_LVALUE */
         ph_int quotes;       /* Number of quotes of a quoted array or symbol */
         ph_int num_arg;      /* used by call_out.c to for vararg callouts */
-        ph_int extern_args;  /* Callbacks: true if the argument memory was
-                              * allocated externally */
         ph_int generic;
           /* For types without secondary type information, this is set to
            * a fixed value, usually (u.number << 1).
