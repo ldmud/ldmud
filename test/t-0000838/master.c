@@ -59,7 +59,14 @@ void run_test()
                 ob2 = load_object("changing_use2");
 
                 mixed s = ob1->get_data();
-                return ob2->read_data(s) && ob2->write_data(s);
+
+                msg("\n");
+                return !run_array_without_callback(({
+                    ({ "Check read access with compile-time lookup",  0, (: ob2->read_data_ct(s) :) }),
+                    ({ "Check read access with runtime lookup",       0, (: ob2->read_data_rt(s) :) }),
+                    ({ "Check write access with compile-time lookup", 0, (: ob2->write_data_ct(s) :) }),
+                    ({ "Check write access with runtime lookup",      0, (: ob2->write_data_rt(s) :) }),
+                }));
             :)
         }),
     }), #'shutdown);

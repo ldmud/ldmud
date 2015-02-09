@@ -3551,10 +3551,14 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, int off_index, byte
             {
                 /* Put the name of the member instead of the index. */
                 put_ref_symbol(member_idx, pExpected->member[member_idx->u.number].name, 1);
-                if (ignore_error)
-                    *ignore_error = true;
             }
             /* else it is already a lookup by name. */
+
+            /* However in both cases we need to ignore lookup
+             * errors, because the struct definition changed.
+             */
+            if (ignore_error)
+                *ignore_error = true;
         }
         else
         {
