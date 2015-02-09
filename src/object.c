@@ -1415,7 +1415,12 @@ renumber_programs (void)
             clear_program_id(ob->prog);
     }
 
-    for (ob = obj_list; ob; ob = ob->next_all)
+    /* We'll start here at the list's end, because there are
+     * the older objects. So we try to preserve the notion
+     * that newer programs have greater ids. (Structs use
+     * this characteristic in their .prog_id field.)
+     */
+    for (ob = obj_list_end; ob; ob = ob->prev_all)
     {
 #ifdef DEBUG
         if (ob->flags & O_DESTRUCTED)  /* TODO: Can't happen */
