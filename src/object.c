@@ -1415,7 +1415,7 @@ renumber_programs (void)
             clear_program_id(ob->prog);
     }
 
-    for (ob = obj_list; ob; ob = ob->next_all)
+    for (ob = obj_list_end; ob; ob = ob->prev_all)
     {
 #ifdef DEBUG
         if (ob->flags & O_DESTRUCTED)  /* TODO: Can't happen */
