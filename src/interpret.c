@@ -3598,7 +3598,9 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc, bool 
 
 /* Index struct <st> with index <i> and return the pointer to the
  * indexed item.
- * If the index is invalid throw an error, unless ignore_error is set, then return 0.
+ * If the index is invalid throw an error, unless <ignore_error> is set, then return 0.
+ * <ignore_error> may only be set for read-access, because get_struct_item() might
+ * then return a reference to const0, which must not be changed.
  */
 
 {
@@ -5508,6 +5510,8 @@ push_indexed_value (svalue_t *sp, bytecode_p pc, bool ignore_error)
  * Compute the value (v[i]) and push it onto the stack.
  * If the value would be a destructed object, 0 is pushed onto the stack
  * and the ref to the object is removed from the vector/mapping.
+ * <ignore_error> will just be passed to get_struct_item() and
+ * results in returning 0, when a struct member is not found.
  */
 
 {
