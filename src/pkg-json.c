@@ -22,7 +22,11 @@
 
 #include "pkg-json.h"
 
+#ifdef HAS_JSONC
+#include <json-c/json.h>
+#elif defined(HAS_JSON)
 #include <json/json.h>
+#endif
 
 #include "array.h"
 #include "mapping.h"

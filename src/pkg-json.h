@@ -5,7 +5,7 @@
 
 #ifdef USE_JSON
 
-#ifndef HAS_JSON
+#if !defined(HAS_JSONC) && !defined(HAS_JSON)
 #error "pkg-json configured even though the machine doesn't support json-c."
 #endif
 
