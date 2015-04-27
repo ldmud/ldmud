@@ -238,6 +238,8 @@
 
 #include "i-eval_cost.h"
 
+#include "pkg-python.h"
+
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/driver_info.h"
 #include "../mudlib/sys/trace.h"
@@ -8887,6 +8889,9 @@ again:
          * Operator symbols (0xf000..0xf7ff for which instrs[].Default == -1)
          * are moved into their 0xe800..0xefff range, then made signed and
          * stored.
+#ifdef USE_PYTHON
+         * Values 0xe800..0xeffff are python-defined efun symbols.
+#endif
          *
          * For <inhIndex>:
          * If not 0 for lfun closures, it is the (inheritance index + 1)
@@ -8920,7 +8925,11 @@ again:
         }
 
         ix = tmp_ushort;
+#ifdef USE_PYTHON
+        if (ix < CLOSURE_PYTHON_EFUN_OFFS)
+#else
         if (ix < CLOSURE_EFUN_OFFS)
+#endif
         {
             sp++;
             inter_sp = sp;
@@ -8982,6 +8991,13 @@ again:
                 /* Sefun closure */
                 sp->x.closure_type = (short)ix;
             }
+#ifdef USE_PYTHON
+            if (ix < CLOSURE_EFUN_OFFS)
+            {
+                /* python-defined efun closure */
+                sp->x.closure_type = (short)ix;
+            }
+#endif
             else
             {
                 /* Efun or operator closure */
@@ -15239,6 +15255,33 @@ again:
         break;
     }
 
+#ifdef USE_PYTHON
+    CASE(F_PYTHON_EFUN);             /* --- python_efun <code>   --- */
+    {
+        /* Call the python-defined efun <code> with the arguments on the stack.
+         * The number of arguments is determined through the ap pointer.
+         *
+         * <code> is an ushort and indexes the python_efun_table.
+         */
+
+        unsigned short      code;      /* the function index */
+
+        LOAD_SHORT(code, pc);
+        num_arg = sp - ap + 1;
+        use_ap = MY_FALSE;
+
+        inter_sp = sp;
+        inter_pc = pc;
+
+        call_python_efun(code, num_arg);
+        sp = inter_sp;
+        /*
+         * The result of the function call is on the stack.
+         */
+        break;
+    }
+#endif /* USE_PYTHON */
+
     CASE(F_AGGREGATE);              /* --- aggregate <size>    --- */
     {
         /* Create an array ({ sp[<-size>+1], ..., sp[0] }), remove the
@@ -18603,6 +18646,15 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
                 push_number(inter_sp, 0);
                 return;
             }
+
+#ifdef USE_PYTHON
+            if (i >= CLOSURE_PYTHON_EFUN && i < CLOSURE_EFUN)
+            {
+                call_python_efun(i - CLOSURE_PYTHON_EFUN, num_arg);
+                CLEAN_CSP
+                return;
+            }
+#endif
 
             i -= CLOSURE_EFUN;
               /* Efuns have now a positive value, operators a negative one.

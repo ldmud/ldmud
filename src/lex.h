@@ -178,6 +178,12 @@ struct ident_s
               /* struct index ('id') in the current program's struct table.
                * < 0: undefined
                */
+#ifdef USE_PYTHON
+            short python_efun;
+              /* python-efun: Index into python_efun_table, negative else
+               * < 0: -1: efun/sefun/gvar
+               */
+#endif
         } global;
         struct {             /*   Local identifier: */
             int num;         /*     Number, also the index on the stack */
@@ -209,6 +215,9 @@ struct ident_s
 #define I_GLOBAL_EFUN_OTHER      (-1)
 #define I_GLOBAL_SEFUN_OTHER     (-1)
 #define I_GLOBAL_STRUCT_NONE     (-1)
+#ifdef USE_PYTHON
+#  define I_GLOBAL_PYTHON_EFUN_OTHER (-1)
+#endif
 
 
 #define lookup_predef(p) (p->type == I_TYPE_GLOBAL ? p->u.global.efun : -1)

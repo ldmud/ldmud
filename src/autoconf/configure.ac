@@ -235,6 +235,8 @@ AC_MY_ARG_WITH(tls-trustdirectory,no,,[Default directory holding trusted PEM cer
 AC_MY_ARG_WITH(tls-crlfile,no,,[Default filename holding certificate revocation lists])
 AC_MY_ARG_WITH(tls-crldirectory,no,,[Default directory holding certificate revocation lists])
 AC_MY_ARG_ENABLE(use-gcrypt,yes,,[Enables support for libgcrypt])
+AC_MY_ARG_ENABLE(use-python,no,,[Enables Python extension])
+AC_MY_ARG_WITH(python-script,startup.py,,[Startup python script])
 AC_MY_ARG_ENABLE(use-parse-command,yes,,[Enables efun parse_command()])
 AC_MY_ARG_ENABLE(use-process-string,yes,,[Enables efun process_string()])
 AC_MY_ARG_ENABLE(comm-stat,yes,,[Enable statistics for outgoing packets])
@@ -450,6 +452,20 @@ else
   enable_use_json="yes"
 fi
 
+AC_UPDATE_VAR(enable_use_python)
+if test "x$enable_use_python" = "x" || test "x$enable_use_python" = "xyes"; then
+  cdef_use_python="#define"
+  python_path=
+  enable_use_python="yes"
+elif test "x$enable_use_python" = "xno"; then
+  cdef_use_python="#undef"
+  python_path=
+else
+  cdef_use_python="#define"
+  python_path="$enable_use_python"
+  enable_use_python="yes"
+fi
+
 AC_UPDATE_VAR(enable_use_tls)
 if test "x$enable_use_tls" = "x" || test "x$enable_use_tls" = "xyes"; then
   cdef_use_tls="#define"
@@ -539,6 +555,8 @@ AC_STRING_VAL_FROM_WITH(tls_trustfile)
 AC_STRING_VAL_FROM_WITH(tls_trustdirectory)
 AC_STRING_VAL_FROM_WITH(tls_crlfile)
 AC_STRING_VAL_FROM_WITH(tls_crldirectory)
+
+AC_STRING_VAL_FROM_WITH(python_script)
 
 AC_TEXT_VAL_FROM_WITH(malloc)
 
@@ -687,6 +705,16 @@ fi
 
 if test "x$cdef_tls_crldirectory" = "x#undef"; then
   val_tls_crldirectory=
+fi
+
+if test "x$with_python_script" != "xno"; then
+  cdef_python_script="#define"
+else
+  cdef_python_script="#undef"
+fi
+
+if test "x$cdef_python_script" = "x#undef"; then
+  val_python_script=
 fi
 
 if test "x$cdef_opcprof" = "x#undef"; then
@@ -1763,6 +1791,31 @@ else
     json_package=
 fi
 
+# --- PYTHON ---
+
+AC_MY_SEARCH_LIB(PYTHON,python3,lp_cv_has_python3,python3,python_path,
+[
+    #include <Python.h>
+
+    void init(void)
+    {
+        Py_Initialize();
+        Py_Finalize();
+    }
+],python3,Py_Initialize,enable_use_python)
+
+if test "$lp_cv_has_python3" = "yes"; then
+    AC_DEFINE(HAS_PYTHON3, 1, [Does the machine offer CPython 3?])
+else
+    if test "$enable_use_python" = "yes"; then
+        echo "Python3 library not found - disabling Python support"
+        AC_NOT_AVAILABLE(use-python)
+    fi
+
+    cdef_use_python="#undef"
+    enable_use_python="no"
+fi
+
 # --- XML ---
 
 has_xml=no
@@ -2720,6 +2773,7 @@ AC_SUBST(cdef_use_mysql)
 AC_SUBST(cdef_use_pgsql)
 AC_SUBST(cdef_use_sqlite)
 AC_SUBST(cdef_use_json)
+AC_SUBST(cdef_use_python)
 AC_SUBST(cdef_use_xml)
 AC_SUBST(cdef_use_mccp)
 AC_SUBST(cdef_use_pcre)
@@ -2749,6 +2803,8 @@ AC_SUBST(cdef_tls_trustfile)
 AC_SUBST(cdef_tls_trustdirectory)
 AC_SUBST(cdef_tls_crlfile)
 AC_SUBST(cdef_tls_crldirectory)
+
+AC_SUBST(cdef_python_script)
 
 AC_SUBST(cdef_opcprof)
 AC_SUBST(cdef_verbose_opcprof)
@@ -2829,6 +2885,7 @@ AC_SUBST(val_tls_trustfile)
 AC_SUBST(val_tls_trustdirectory)
 AC_SUBST(val_tls_crlfile)
 AC_SUBST(val_tls_crldirectory)
+AC_SUBST(val_python_script)
 
 dnl finally: some remaining stuff
 dnl

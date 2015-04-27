@@ -241,6 +241,9 @@
         dup_n
         pop_n
         put_array_element
+#ifdef USE_PYTHON
+        python_efun
+#endif
 
 /*---------------------------------------------------------------------------
  * efuns with a single-byte code.

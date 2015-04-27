@@ -1,0 +1,33 @@
+PRELIMINARY
+CONCEPT
+        python
+
+DESCRIPTION
+        Python can be used to extend the LDMud driver. At the startup
+        of LDMud a python script will be called that can register
+        additional efuns. The python script can either be given
+        on the command line using the --python-script option,
+        or at compile time with the --with-python-script configuration
+        option.
+
+        The python script can import the builtin ldmud module.
+        This module provides the following functions:
+
+          - register_efun(name, function) -> None
+
+                Registers a new efun name. This is not allowed during
+                compilation of an LPC object.
+
+EXAMPLE
+        import ldmud
+
+        def hello_world():
+            print("Hello, world!\n")
+
+        ldmud.register_efun("hello", hello_world)
+
+HISTORY
+        LDMud 3.5 implemented the python functionality.
+
+SEE ALSO
+        simul_efun(C)

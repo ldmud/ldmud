@@ -108,6 +108,7 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "pkg-python.h"
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/driver_hook.h"
@@ -4168,7 +4169,11 @@ define_variable (ident_t *name, fulltype_t type)
         all_globals = name;
     }
     else if (name->u.global.function == I_GLOBAL_FUNCTION_OTHER
-          && (name->u.global.efun >= 0 || name->u.global.sim_efun >= 0)
+          && (name->u.global.efun >= 0 || name->u.global.sim_efun >= 0
+#ifdef USE_PYTHON
+           || is_python_efun(name)
+#endif
+             )
             )
     {
         /* The previous _GLOBAL use is the permanent efun definition:
@@ -4290,7 +4295,11 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
         all_globals = name;
     }
     else if (name->u.global.function == I_GLOBAL_FUNCTION_OTHER
-          && (name->u.global.efun >= 0 || name->u.global.sim_efun >= 0)
+          && (name->u.global.efun >= 0 || name->u.global.sim_efun >= 0
+#ifdef USE_PYTHON
+           || is_python_efun(name)
+#endif
+             )
             )
     {
         /* The previous _GLOBAL use is the permanent efun definition:
@@ -10723,7 +10732,11 @@ expr4:
           inhIndex = $1.inhIndex;
 
           // check for deprecated functions
+%ifdef USE_PYTHON
+          if (ix < CLOSURE_PYTHON_EFUN_OFFS)
+%else
           if (ix < CLOSURE_EFUN_OFFS)
+%endif
           {
               // check only closures not directly to inherited functions (#'::fun),
               // they were checked by the lexxer.
@@ -12818,6 +12831,24 @@ function_call:
                   } /* if (check types) */
               } /* if (inherited lfun) */
 
+%ifdef USE_PYTHON
+              else if ($1.real->type == I_TYPE_GLOBAL && is_python_efun($1.real))
+              {
+                  /* python-defined EFUN */
+
+                  PREPARE_INSERT(4)
+
+                  add_f_code(F_USE_ARG_FRAME);
+                  add_f_code(F_PYTHON_EFUN);
+                  add_short($1.real->u.global.python_efun);
+                  CURRENT_PROGRAM_SIZE += 4;
+
+                  /* Always need an arg frame, as these
+                   * calls are always handled as varargs.
+                   */
+                  ap_needed = MY_TRUE;
+              }
+%endif
               else if ( (f = lookup_predef($1.real)) != -1 )
               {
                   /* EFUN */
@@ -15436,7 +15467,11 @@ copy_functions (program_t *from, funflag_t type)
                 /* Handle the non-lfun aspects of the identifier */
                 {
                     if (n != I_GLOBAL_FUNCTION_OTHER
-                     || (p->u.global.efun < 0 && p->u.global.sim_efun < 0)
+                     || (p->u.global.efun < 0 && p->u.global.sim_efun < 0
+#ifdef USE_PYTHON
+                      && !is_python_efun(p)
+#endif
+                        )
                      || (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
                      || (fun.flags & (NAME_UNDEFINED)) != 0
                        )
@@ -15445,7 +15480,11 @@ copy_functions (program_t *from, funflag_t type)
                          * a (simul-)efun.
                          */
 
-                        if (p->u.global.efun >= 0 || p->u.global.sim_efun >= 0)
+                        if (p->u.global.efun >= 0 || p->u.global.sim_efun >= 0
+#ifdef USE_PYTHON
+                         || is_python_efun(p)
+#endif
+                           )
                         {
                             /* This inherited function shadows an efun */
 

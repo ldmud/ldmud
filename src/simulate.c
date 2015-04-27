@@ -4092,7 +4092,7 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
     {
         if (toplevel
          && cb->function.lambda.x.closure_type < CLOSURE_SIMUL_EFUN
-         && cb->function.lambda.x.closure_type >= CLOSURE_EFUN)
+         && cb->function.lambda.x.closure_type >= CLOSURE_OPERATOR)
         {
             /* efun, operator or sefun closure called from the backend:
              * we need the program for a proper traceback. We made sure

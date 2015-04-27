@@ -168,6 +168,7 @@
 #include "swap.h"
 #include "switch.h"
 #include "xalloc.h"
+#include "pkg-python.h"
 #include "i-svalue_cmp.h"
 
 /*-------------------------------------------------------------------------*/
@@ -1655,7 +1656,11 @@ compile_value (svalue_t *value, int opt_flags)
         {
             /* Most common case: closure is an efun or an operator */
 
+#ifdef USE_PYTHON
+            if (type < (ph_int)CLOSURE_PYTHON_EFUN)
+#else
             if (type < (ph_int)CLOSURE_EFUN)
+#endif
             {
                 /* Closure is an operator */
 
@@ -3874,6 +3879,45 @@ compile_value (svalue_t *value, int opt_flags)
                 } /* switch(type - CLOSURE_OPERATOR) */
 
             }
+#ifdef USE_PYTHON
+            else if (type < (ph_int)CLOSURE_EFUN)
+            {
+                /* Closure is an python-defined efun */
+
+                mp_int block_size;  /* Number of entries */
+
+                block_size = (mp_int)VEC_SIZE(block);
+                /* This is compiled as:
+                 *
+                 * <save_arg_frame>
+                 * <arg1>
+                 * <arg2>
+                 * ...
+                 * <argN>
+                 * <python_efun>
+                 * <restore_arg_frame>
+                 */
+
+                int f = type - CLOSURE_PYTHON_EFUN;
+
+                if (current.code_left < 1)
+                    realloc_code();
+                STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
+                current.code_left--;
+
+                /* Compile the arguments */
+                mp_int num_arg = (mp_int)VEC_SIZE(block) - 1;
+                for (mp_int i = block_size; --i > 0; )
+                    compile_value(++argp, 0);
+
+                if (current.code_left < 4)
+                    realloc_code();
+                STORE_CODE(current.codep, F_PYTHON_EFUN);
+                STORE_SHORT(current.codep, (short)f);
+                STORE_CODE(current.codep, F_RESTORE_ARG_FRAME);
+                current.code_left -= 4;
+            }
+#endif
             else /* it's an EFUN closure */
             {
                 mp_int block_size;  /* Number of entries */
@@ -5727,6 +5771,11 @@ closure_to_string (svalue_t * sp, Bool compact)
         {
             switch(type & -0x0800)
             {
+#ifdef USE_PYTHON
+            case CLOSURE_PYTHON_EFUN:
+                strcat(buf, closure_python_efun_to_string(type));
+                break;
+#endif
             case CLOSURE_OPERATOR:
               {
                 const char *str = closure_operator_to_string(type);

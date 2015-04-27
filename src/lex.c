@@ -62,6 +62,7 @@
 #include "wiz_list.h" /* wizlist_name[] */
 #include "xalloc.h"
 
+#include "pkg-python.h"
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/driver_hook.h"
@@ -1515,7 +1516,12 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, efun_override_t is_
 
         if (!p || p->type < I_TYPE_GLOBAL
          || (( efun_override == OVERRIDE_EFUN || p->u.global.sim_efun < 0 )
-          && ( efun_override == OVERRIDE_SEFUN  || p->u.global.efun < 0 ))
+          && ( efun_override == OVERRIDE_SEFUN  || 
+              ( p->u.global.efun < 0
+#ifdef USE_PYTHON
+             && !is_python_efun(p)
+#endif
+              )))
            )
         {
             /* But it's a (new) local identifier or a non-existing function */
@@ -1565,6 +1571,13 @@ undefined_function:
             sp->x.closure_type = (short)(p->u.global.sim_efun + CLOSURE_SIMUL_EFUN);
             sp->u.ob = ref_object(current_object, "symbol_efun");
         }
+#ifdef USE_PYTHON
+        else if (is_python_efun(p))
+        {
+            sp->x.closure_type = (short)(p->u.global.python_efun + CLOSURE_PYTHON_EFUN);
+            sp->u.ob = ref_object(current_object, "symbol_efun");
+        }
+#endif
         else
         {
             /* Handle efuns (possibly aliased).
@@ -1717,6 +1730,9 @@ init_global_identifier (ident_t * ident, Bool bVariable)
     ident->u.global.efun     = I_GLOBAL_EFUN_OTHER;
     ident->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
     ident->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+#ifdef USE_PYTHON
+    ident->u.global.python_efun = I_GLOBAL_PYTHON_EFUN_OTHER;
+#endif
 
 } /* init_global_identifier() */
 
@@ -4113,7 +4129,11 @@ closure (char *in_yyp)
     if (efun_override == OVERRIDE_EFUN
      && p->u.global.sim_efun >= 0
      && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
-     && p->u.global.efun >= 0
+     && (p->u.global.efun >= 0
+#ifdef USE_PYTHON
+      || is_python_efun(p)
+#endif
+        )
      && master_ob
      && (!EVALUATION_TOO_LONG())
        )
@@ -4177,6 +4197,15 @@ closure (char *in_yyp)
               p->u.global.sim_efun + CLOSURE_SIMUL_EFUN_OFFS;
             break;
         }
+
+#ifdef USE_PYTHON
+        /* python-defined efun? */
+        if (efun_override != OVERRIDE_SEFUN && is_python_efun(p))
+        {
+            yylval.closure.number = p->u.global.python_efun + CLOSURE_PYTHON_EFUN_OFFS;
+            break;
+        }
+#endif
 
         /* efun? */
         if (efun_override != OVERRIDE_SEFUN && p->u.global.efun >= 0)
@@ -7291,7 +7320,11 @@ efun_defined (char **args)
     }
 
     add_input(
-      (p && p->type == I_TYPE_GLOBAL && p->u.global.efun >= 0) ?
+      (p && p->type == I_TYPE_GLOBAL && (p->u.global.efun >= 0
+#ifdef USE_PYTHON
+                                      || is_python_efun(p)
+#endif
+      )) ?
         " 1 " : " 0 "
     );
 

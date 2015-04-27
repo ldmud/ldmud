@@ -188,6 +188,8 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "pkg-python.h"
+
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/functionlist.h"
 #include "../mudlib/sys/include_list.h"
@@ -6048,6 +6050,24 @@ save_closure (svalue_t *cl, Bool writable)
         {
             switch(type & -0x0800)
             {
+#ifdef USE_PYTHON
+            case CLOSURE_PYTHON_EFUN:
+              {
+                const char *source = closure_python_efun_to_string(type);
+                L_PUTC_PROLOG
+                char c;
+
+                L_PUTC('#');
+                L_PUTC('e');
+                L_PUTC(':');
+
+                c = *source++;
+                do L_PUTC(c) while ( '\0' != (c = *source++) );
+
+                L_PUTC_EPILOG
+                break;
+              }
+#endif
             case CLOSURE_OPERATOR:
               {
                 const char *s = closure_operator_to_string(type);

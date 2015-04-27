@@ -248,18 +248,26 @@ struct svalue_s
    *   Operator-closure index = CLOSURE_OPERATOR_OFFS + instruction index
    *   Efun-closure index     = CLOSURE_EFUN_OFFS + instruction index
    *   Simul_efun index       = CLOSURE_SIMUL_EFUN_OFFS + function index
-   * Yes, the operator range can be overlaid onto the efun range without
+   * Yes, the operator range could be overlaid onto the efun range without
    * collision, distinguishing them by the struct instr[].Default fields
    * (the 'closure' instruction does that to save space), but this way they
    * are easier to distinguish.
    * TODO: Note: Some code interprets these values as unsigned shorts.
    */
 
-#define CLOSURE_OPERATOR        (-0x1800)  /* == 0xe800 */
+#ifdef USE_PYTHON
+#  define CLOSURE_OPERATOR      (-0x2000)  /* == 0xe000 */
+#  define CLOSURE_PYTHON_EFUN   (-0x1800)  /* == 0xe800 */
+#else
+#  define CLOSURE_OPERATOR      (-0x1800)  /* == 0xe800 */
+#endif
 #define CLOSURE_EFUN            (-0x1000)  /* == 0xf000 */
 #define CLOSURE_SIMUL_EFUN      (-0x0800)  /* == 0xf800 */
 
 #define CLOSURE_OPERATOR_OFFS   (CLOSURE_OPERATOR & 0xffff)
+#ifdef USE_PYTHON
+#  define CLOSURE_PYTHON_EFUN_OFFS (CLOSURE_PYTHON_EFUN & 0xffff)
+#endif
 #define CLOSURE_EFUN_OFFS       (CLOSURE_EFUN & 0xffff)
 #define CLOSURE_SIMUL_EFUN_OFFS (CLOSURE_SIMUL_EFUN & 0xffff)
 
@@ -285,7 +293,11 @@ struct svalue_s
 #define CLOSURE_UNBOUND_LAMBDA  6  /* unbound lambda closure. */
 
 
-#define CLOSURE_IDENTIFIER_OFFS 0xe800
+#ifdef USE_PYTHON
+#  define CLOSURE_IDENTIFIER_OFFS 0xe000
+#else
+#  define CLOSURE_IDENTIFIER_OFFS 0xe800
+#endif
   /* When creating lfun/variable closures, the lfun/variable to bind
    * is given as unsigned number:
    *   number < C_I_OFFS:  number is index into function table

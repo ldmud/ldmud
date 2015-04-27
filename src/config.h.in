@@ -357,6 +357,15 @@
  */
 @cdef_use_json@ USE_JSON
 
+/* Define this if you want Python support (assuming that your host
+ * actually offers this).
+ */
+@cdef_use_python@ USE_PYTHON
+
+/* The python script to call at startup.
+ */
+@cdef_python_script@ PYTHON_STARTUP_SCRIPT @val_python_script@
+
 /* Define this if you want PCRE instead of traditional regexps.
  */
 @cdef_use_pcre@ USE_PCRE

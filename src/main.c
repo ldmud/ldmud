@@ -93,6 +93,10 @@
 #include "pkg-gcrypt.h"
 #endif
 
+#ifdef USE_PYTHON
+#include "pkg-python.h"
+#endif
+
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/regexp.h"
@@ -335,6 +339,11 @@ main (int argc, char **argv)
     tls_crldirectory = strdup(TLS_DEFAULT_CRLDIRECTORY);
 #  endif
 #endif
+#ifdef USE_PYTHON
+#  ifdef PYTHON_STARTUP_SCRIPT
+    python_startup_script = strdup(PYTHON_STARTUP_SCRIPT);
+#  endif
+#endif
 
     do {
         dummy_current_object_for_loads = NULL_object;
@@ -550,6 +559,10 @@ main (int argc, char **argv)
           /* The lexer needs the master_name, but also the VM
            * to throw errors.
            */
+
+#ifdef USE_PYTHON
+        pkg_python_init(argv[0]);
+#endif
 
         RESET_LIMITS;
         CLEAR_EVAL_COST;
@@ -1162,6 +1175,9 @@ typedef enum OptNumber {
  , cTLScrlfile	    /* --tls-crlfile        */
  , cTLScrldir       /* --tls-crldirectory   */
 #endif
+#ifdef USE_PYTHON
+ , cPythonScript    /* --python-script      */
+#endif
 #ifdef DEBUG
  , cCheckRefs       /* --check-refcounts    */
  , cCheckState      /* --check-state        */
@@ -1628,6 +1644,19 @@ static Option aOptions[]
       }
 #endif /* USE_TLS */
 
+#ifdef USE_PYTHON
+    , { 0,   "python-script",      cPythonScript,   MY_TRUE
+      , "  --python-script <pathname>\n"
+      , "  --python-script <pathname>\n"
+#  ifdef PYTHON_STARTUP_SCRIPT
+        "    Execute the python script <pathname> on startup, default is '" PYTHON_STARTUP_SCRIPT "'.\n"
+#  else
+        "    Execute the python script <pathname> on startup, default is none'.\n"
+#  endif
+        "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+      }
+#endif /* USE_PYTHON */
+
     , { 0,   "wizlist-file",       cWizlistFile,    MY_TRUE
       , "  --wizlist-file <filename>\n"
       , "  --wizlist-file <filename>\n"
@@ -1988,6 +2017,16 @@ options (void)
 #  endif
                                                "')\n"
 #endif
+#ifdef USE_PYTHON
+                              , "Python supported (startup script: '"
+#  if defined(PYTHON_STARTUP_SCRIPT)
+                                  PYTHON_STARTUP_SCRIPT
+#  else
+                                               "none"
+#  endif
+                                               "')\n"
+#endif
+
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
         size_t i;
