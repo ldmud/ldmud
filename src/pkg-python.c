@@ -102,7 +102,7 @@ static PyObject* python_register_efun(PyObject *module, PyObject *args)
     return Py_None;
 }
 
-/* Module definition fot the ldmud builtin module */
+/* Module definition for the ldmud builtin module */
 static PyMethodDef ldmud_methods[] =
 {
     {
@@ -161,12 +161,12 @@ svalue_to_python (svalue_t *svp)
 /*-------------------------------------------------------------------------*/
 
 
-static bool
+static char*
 python_to_svalue (svalue_t *dest, PyObject* val)
 
 /* Convert a python value <val> back to an LPC value
- * and puts the result into <dest>. Returns true
- * for success, false for an unknown type.
+ * and puts the result into <dest>. Returns NULL
+ * for success, an error message otherwise.
  *
  * <dest> is assumed to be empty.
  */
@@ -175,7 +175,7 @@ python_to_svalue (svalue_t *dest, PyObject* val)
     if (val == Py_None)
     {
         put_number(dest, 0);
-        return true;
+        return NULL;
     }
 
     if (PyLong_Check(val))
@@ -183,26 +183,23 @@ python_to_svalue (svalue_t *dest, PyObject* val)
         int overflow;
         long num = PyLong_AsLongAndOverflow(val, &overflow);
 
-        if (overflow)
-            return false;
-
-        if (num < PINT_MIN || num > PINT_MAX)
-            return false;
+        if (overflow || num < PINT_MIN || num > PINT_MAX)
+            return "Integer overflow.";
 
         put_number(dest, (p_int)num);
-        return true;
+        return NULL;
     }
 
     if (PyBool_Check(val))
     {
         put_number(dest, val == Py_True ? 1 : 0);
-        return true;
+        return NULL;
     }
 
     if (PyFloat_Check(val))
     {
         put_float(dest, PyFloat_AsDouble(val));
-        return true;
+        return NULL;
     }
 
     if (PyBytes_Check(val))
@@ -212,7 +209,7 @@ python_to_svalue (svalue_t *dest, PyObject* val)
 
         PyBytes_AsStringAndSize(val, &buf, &length);
         put_c_n_string(dest, buf, length);
-        return true;
+        return NULL;
     }
 
     if (PyUnicode_Check(val))
@@ -223,15 +220,15 @@ python_to_svalue (svalue_t *dest, PyObject* val)
 
         utf8 = PyUnicode_AsEncodedString(val, "utf-8", "replace");
         if (utf8 == NULL)
-            return false;
+            return "Undecodable unicode string";
 
         PyBytes_AsStringAndSize(utf8, &buf, &length);
         put_c_n_string(dest, buf, length);
         Py_DECREF(utf8);
-        return true;
+        return NULL;
     }
 
-    return false;
+    return "Unknown type";
 
 } /* svalue_to_python */
 
@@ -372,15 +369,17 @@ call_python_efun (int idx, int num_arg)
     }
     else
     {
-        if (!python_to_svalue(inter_sp + 1, result))
+        char *err = python_to_svalue(inter_sp + 1, result);
+        Py_DECREF(result);
+
+        if (err != NULL)
         {
-            Py_DECREF(result);
-            errorf("Bad return value from %s().\n"
-                  , get_txt(python_efun_names[idx]->name));
+            errorf("Bad return value from %s(): %s\n"
+                  , get_txt(python_efun_names[idx]->name)
+                  , err);
         }
 
         inter_sp++;
-        Py_DECREF(result);
     }
 } /* call_python_efun */
 
