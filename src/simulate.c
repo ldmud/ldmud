@@ -2702,10 +2702,6 @@ destruct (object_t *ob)
         if (ob->super->sent)
             remove_action_sent(ob, ob->super);
 
-#       ifdef USE_SET_LIGHT
-            add_light(ob->super, - ob->total_light);
-#       endif
-
         for (pp = &ob->super->contains; *pp;)
         {
             if ((*pp)->sent)

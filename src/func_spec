@@ -742,10 +742,6 @@ string  process_string(string);
 
         /* Objects */
 
-#ifdef USE_SET_LIGHT
-int     set_light(int);
-#endif
-
 #ifdef USE_SET_IS_WIZARD
 int     set_is_wizard(object, int default: F_CONST1);
 #endif

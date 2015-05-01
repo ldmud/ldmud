@@ -19,9 +19,6 @@
  *   object_t {
  *       unsigned short  flags;
  *       p_int           ref;
-#ifdef USE_SET_LIGHT
- *       short           total_light;
-#endif
  *       mp_int          time_reset;
  *       mp_int          time_of_ref;
  *       mp_int          time_cleanup;
@@ -138,11 +135,6 @@
  * points to an object's surrounding object (and can be NULL), .contains
  * is the head of the list of contained objects. This inventory list
  * is linked by the .next_inv pointer.
- *
- * Related to the environment system is .total_light, which gives
- * total light emitted by the object including all its inventory. The
- * system is very crude and hardly used anymore. There it is completely
- * deactivated if the efun set_light() is not defined.
  *
  * .extra_ref and .extra_num_variables are used by check_a_lot_of_refcounts().
  *
@@ -3873,26 +3865,6 @@ f_getuid (svalue_t *sp)
 /*                             INVENTORIES                                 */
 
 /*-------------------------------------------------------------------------*/
-#ifdef USE_SET_LIGHT
-
-void
-add_light (object_t *p, int n)
-
-/* The light emission of <p> and all surrounding objects is
- * changed by <n>. This is used by the efun set_light() and when
- * moving and destructing objects.
- */
-
-{
-    if (n == 0)
-        return;
-    do {
-        p->total_light += n;
-    } while ( NULL != (p = p->super) );
-} /* add_light() */
-#endif /* USE_SET_LIGHT */
-
-/*-------------------------------------------------------------------------*/
 static void
 move_object (void)
 
@@ -5116,40 +5088,6 @@ v_tell_room (svalue_t *sp, int num_arg)
 } /* v_tell_room() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef USE_SET_LIGHT
-
-svalue_t *
-f_set_light (svalue_t *sp)
-
-/* EFUN set_light()
- *
- * int set_light(int n)
- *
- * An object is by default dark. It can be set to not dark by
- * calling set_light(1). The environment will then also get this
- * light. The returned value is the total number of lights in
- * this room. So if you call set_light(0) it will return the
- * light level of the current object.
- *
- * Note that the value of the argument is added to the light of
- * the current object.
- */
-
-{
-    object_t *o1;
-
-    add_light(current_object, sp->u.number);
-    o1 = current_object;
-    while (o1->super)
-        o1 = o1->super;
-    sp->u.number = o1->total_light;
-
-    return sp;
-} /* f_set_light() */
-
-#endif /* USE_SET_LIGHT */
-
-/*-------------------------------------------------------------------------*/
 svalue_t *
 f_set_environment (svalue_t *sp)
 
@@ -5186,9 +5124,6 @@ f_set_environment (svalue_t *sp)
             if (ob == item)
                 errorf("Can't move object inside itself.\n");
 
-#       ifdef USE_SET_LIGHT
-            add_light(dest, item->total_light);
-#       endif
         dest->flags &= ~O_RESET_STATE;
     }
 
@@ -5208,10 +5143,6 @@ f_set_environment (svalue_t *sp)
 
         if (item->super->sent)
             remove_action_sent(item, item->super);
-
-#       ifdef USE_SET_LIGHT
-            add_light(item->super, - item->total_light);
-#       endif
 
         for (pp = &item->super->contains; *pp;)
         {

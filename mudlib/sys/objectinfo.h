@@ -27,22 +27,21 @@
 #define OIB_LAMBDA_REFERENCED   9
 #define OIB_SHADOW             10
 #define OIB_REPLACED           11
-#define OIB_TOTAL_LIGHT        12
-#define OIB_NEXT_RESET         13
-#define OIB_TIME_OF_REF        14
-#define OIB_REF                15
-#define OIB_GIGATICKS          16
-#define OIB_TICKS              17
-#define OIB_SWAP_NUM           18
-#define OIB_PROG_SWAPPED       19
-#define OIB_VAR_SWAPPED        20
-#define OIB_NAME               21
-#define OIB_LOAD_NAME          22
-#define OIB_NEXT_ALL           23
-#define OIB_PREV_ALL           24
-#define OIB_NEXT_CLEANUP       25
+#define OIB_NEXT_RESET         12
+#define OIB_TIME_OF_REF        13
+#define OIB_REF                14
+#define OIB_GIGATICKS          15
+#define OIB_TICKS              16
+#define OIB_SWAP_NUM           17
+#define OIB_PROG_SWAPPED       18
+#define OIB_VAR_SWAPPED        19
+#define OIB_NAME               20
+#define OIB_LOAD_NAME          21
+#define OIB_NEXT_ALL           22
+#define OIB_PREV_ALL           23
+#define OIB_NEXT_CLEANUP       24
 
-#define OIB_MAX 26  /* Number of OIB_ result elements */
+#define OIB_MAX 25  /* Number of OIB_ result elements */
 
 
 /* Indices in the array resulting from OINFO_POSITION

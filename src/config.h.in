@@ -311,11 +311,6 @@
  */
 @cdef_use_parse_command@ USE_PARSE_COMMAND
 
-/* Define USE_SET_LIGHT if you want the efun set_light() and the
- * simple 2.4.5 light system.
- */
-@cdef_use_set_light@ USE_SET_LIGHT
-
 /* Define USE_SET_IS_WIZARD if you want the efun set_is_wizard().
  */
 @cdef_use_set_is_wizard@ USE_SET_IS_WIZARD

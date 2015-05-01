@@ -19,9 +19,6 @@ struct object_s
 {
     unsigned short flags; /* Bits or'ed together, see below */
     p_int ref;            /* Reference count. */
-#ifdef USE_SET_LIGHT
-    short total_light;    /* Total light */
-#endif
     mp_int time_reset;    /* Time of next reset, or 0 if none */
     mp_int time_of_ref;   /* Time when last referenced. Used by swap */
     mp_int time_cleanup;  /* Time when the next variable cleanup is due. */
@@ -334,11 +331,6 @@ extern svalue_t *v_tell_room(svalue_t *sp, int num_arg);
 extern svalue_t *f_set_environment(svalue_t *sp);
 #ifdef USE_DEPRECATED
 extern svalue_t *f_transfer(svalue_t *svp);
-#endif
-
-#ifdef USE_SET_LIGHT
-extern void add_light(object_t *p, int n);
-extern svalue_t *f_set_light(svalue_t *sp);
 #endif
 
 extern svalue_t *v_save_object(svalue_t *sp, int numarg);

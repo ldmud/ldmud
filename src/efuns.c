@@ -4554,11 +4554,6 @@ v_object_info (svalue_t *sp, int num_args)
         ST_NUMBER(OIB_LAMBDA_REFERENCED, (flags & O_LAMBDA_REFERENCED) ? 1 : 0);
         ST_NUMBER(OIB_SHADOW,            (flags & O_SHADOW) ? 1 : 0);
         ST_NUMBER(OIB_REPLACED,          (flags & O_REPLACED) ? 1 : 0);
-#ifdef USE_SET_LIGHT
-        ST_NUMBER(OIB_TOTAL_LIGHT,       o->total_light);
-#else
-        ST_NUMBER(OIB_TOTAL_LIGHT,       0);
-#endif
         ST_NUMBER(OIB_NEXT_RESET,        o->time_reset);
         ST_NUMBER(OIB_NEXT_CLEANUP,      o->time_cleanup);
         ST_NUMBER(OIB_TIME_OF_REF,       o->time_of_ref);
@@ -8574,9 +8569,6 @@ v_debug_info (svalue_t *sp, int num_arg)
           flags&O_WILL_CLEAN_UP   ?"TRUE":"FALSE");
         add_message("O_REPLACED        : %s\n",
           flags&O_REPLACED        ?"TRUE":"FALSE");
-#ifdef USE_SET_LIGHT
-        add_message("total light : %d\n", (int)ob->total_light);
-#endif
         add_message("time_reset  : %"PRIdMPINT"\n", ob->time_reset);
         add_message("time_of_ref : %"PRIdMPINT"\n", ob->time_of_ref);
         add_message("ref         : %"PRIdPINT"\n", ob->ref);
