@@ -67,12 +67,9 @@ DESCRIPTION
       __FLOAT_MIN__      : the smallest (positive) float number
 
       __LPC_NOSAVE__     : always defined
-      __LPC_STRUCTS__    : defined when struct support is enabled.
-                           Once structs are fully supported, this macro
-                           will always be defined.
-      __LPC_INLINE_CLOSURES__: defined when the 'real' inline closures
-                           are enabled.
-      __LPC_ARRAY_CALLS__: call_other()s on arrays of objects enabled.
+      __LPC_STRUCTS__    : always defined
+      __LPC_INLINE_CLOSURES__: always defined
+      __LPC_ARRAY_CALLS__: always defined
       __BOOT_TIME__      : the time() the driver was started.
 
     If the ERQ is supported, the following macros are defined:
@@ -125,6 +122,8 @@ HISTORY
     3.3.719 removed __PTHREADS__, AMIGA, MSDOS_FS, __BEOS__  
 		    and added __GCRYPT__.
     3.3.721 added __FUNCTION__.
+    3.5.0 changed __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__,
+        __LPC_ARRAY_CALLS__ to be always on.
 
 SEE ALSO
     pragma(LPC), preprocessor(LPC)
