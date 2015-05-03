@@ -4433,6 +4433,49 @@ v_clones (svalue_t *sp, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_configure_object (svalue_t *sp)
+
+/* EFUN configure_object()
+ *
+ *    void configure_object(object ob, int what, mixed data)
+ *
+ * Configures several aspects of the object <ob>, or the default for all objects
+ * if <ob> is 0.
+ *
+ * <what> == OC_...
+ *
+ * If the first argument <ob> is not this_object(), the privilege violation
+ * ("configure_object", this_object(), ob, what, data) occurs.
+ */
+
+{
+    object_t *ob;
+
+    if (sp[-2].type == T_OBJECT)
+        ob = sp[-2].u.ob;
+    else
+        ob = NULL;
+
+    if (ob != current_object
+     && !privilege_violation_n(STR_CONFIGURE_OBJECT, ob, sp, 2))
+    {
+        sp = pop_n_elems(3, sp);
+        return sp;
+    }
+
+    switch (sp[-1].u.number)
+    {
+    default:
+        errorf("Illegal value %"PRIdPINT" for configure_object().\n", sp[-1].u.number);
+        return sp; /* NOTREACHED */
+    }
+
+    sp = pop_n_elems(3, sp);
+    return sp;
+} /* f_configure_object() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 v_object_info (svalue_t *sp, int num_args)
 
 /* EFUN object_info()
@@ -8014,6 +8057,101 @@ f_configure_driver (svalue_t *sp)
     // free arguments
     return pop_n_elems(2, sp);
 } /* f_configure_driver() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_driver_info (svalue_t *sp, int num_arg)
+
+/* EFUN driver_info()
+ *
+ *   mixed driver_info (int what)
+ *
+ * Returns information about the runtime environment.
+ * <what> can either be a configuration option as given to
+ * configure_driver() or one of the following options:
+ *
+ * <what> == DI_...
+ */
+{
+    svalue_t *arg;
+    svalue_t result;
+
+    arg = sp - num_arg + 1;
+
+    switch (arg[0].u.number)
+    {
+        default:
+            errorf("Illegal value %"PRIdPINT" for driver_info().\n", arg[0].u.number);
+            return sp; /* NOTREACHED */
+
+        case DC_MEMORY_LIMIT:
+        {
+            vector_t *v;
+
+            memsafe(v = allocate_array(2), sizeof(*v), "result array");
+
+            put_number(v->item,     get_memory_limit(MALLOC_SOFT_LIMIT));
+            put_number(v->item + 1, get_memory_limit(MALLOC_HARD_LIMIT));
+            put_array(&result, v);
+            break;
+        }
+
+        case DC_ENABLE_HEART_BEATS:
+            put_number(&result, heart_beats_enabled ? 1 : 0);
+            break;
+
+        case DC_LONG_EXEC_TIME:
+            put_number(&result, get_profiling_time_limit());
+            break;
+
+        case DC_DATA_CLEAN_TIME:
+            put_number(&result, time_to_data_cleanup);
+            break;
+
+#ifdef USE_TLS
+        case DC_TLS_CERTIFICATE:
+        {
+            int len;
+            unsigned char *fp;
+
+            fp = (unsigned char*) tls_get_certificate_fingerprint(&len);
+            if (!fp)
+                put_number(&result, 0);
+            else
+            {
+                string_t *str;
+                char * text;
+
+                memsafe(str = alloc_mstring(len*3 - 1), sizeof(*str) + len*3 - 1, "fingerprint");
+                text = get_txt(str);
+
+                for (int pos = 0; pos < len; pos++, fp++, text+=3)
+                {
+                    int b = *fp;
+                    int n1 = b >> 4, n2 = b & 0x0f;
+
+                    text[0] = n1 < 10 ? ('0' + n1) : ('A' + n1 - 10);
+                    text[1] = n2 < 10 ? ('0' + n2) : ('A' + n2 - 10);
+                    if (pos + 1 < len)
+                        text[2] = ':';
+                }
+
+                put_string(&result, str);
+            }
+            break;
+        }
+#endif /* USE_TLS */
+    }
+
+    /* Clean up the stack and return the result */
+
+    sp = pop_n_elems(num_arg, sp);
+
+    sp++;
+    *sp = result;
+    return sp;
+} /* v_driver_info */
+
 /*-------------------------------------------------------------------------*/
 svalue_t *
 v_debug_info (svalue_t *sp, int num_arg)

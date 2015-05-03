@@ -822,6 +822,27 @@ tls_set_certificate (char *fingerprint, int len)
 }
 
 /*-------------------------------------------------------------------------*/
+const char *
+tls_get_certificate_fingerprint (int *len)
+
+/* Returns the current certificate's fingerprint or NULL if there is
+ * no current certificate.
+ * If <len> is given, then the length of the fingerprint will be
+ * stored there. The function returns a pointer to the fingerprint
+ * as <*len> raw bytes. The returned buffer MUST NOT be freed.
+ */
+
+{
+    if (!keys)
+        return NULL;
+
+    if (len)
+        *len = sizeof(keys[current_key].fingerprint);
+
+    return keys[current_key].fingerprint;
+} /* tls_get_certificate_fingerprint() */
+
+/*-------------------------------------------------------------------------*/
 void
 tls_global_init (void)
 

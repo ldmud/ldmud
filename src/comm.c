@@ -9114,4 +9114,66 @@ f_configure_interactive (svalue_t *sp)
     return sp;
 } /* f_configure_interactive() */
 
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_interactive_info (svalue_t *sp)
+
+/* EFUN interactive_info()
+ *
+ *   mixed interactive_info (object ob, int what)
+ *
+ * Returns information about the interactive <ob>.
+ * <what> can either be a configuration option as given to
+ * configure_interactive() or one of the following options:
+ *
+ * <what> == II_...
+ *
+ * <ob> can be 0 to query default configuration options.
+ */
+
+{
+    object_t *ob;
+    interactive_t *ip;
+    svalue_t result;
+
+    if (sp[-1].type == T_OBJECT)
+    {
+        ob = sp[-1].u.ob;
+
+        if (!O_SET_INTERACTIVE(ip, ob))
+        {
+            errorf("Bad arg 1 to interactive_info(): "
+                   "Object '%s' is not interactive.\n"
+                 , get_txt(ob->name)
+                 );
+            return sp; /* NOTREACHED */
+        }
+    }
+    else
+    {
+        ob = NULL;
+        ip = NULL;
+    }
+
+    switch(sp[0].u.number)
+    {
+    default:
+        errorf("Illegal value %"PRIdPINT" for interactive_info().\n", sp[0].u.number);
+        return sp; /* NOTREACHED */
+
+    case IC_MAX_WRITE_BUFFER_SIZE:
+        if (!ip || ip->write_max_size == -2)
+            put_number(&result, write_buffer_max_size);
+        else
+            put_number(&result, ip->write_max_size);
+        break;
+    }
+
+    sp = pop_n_elems(2, sp);
+
+    sp++;
+    *sp = result;
+    return sp;
+} /* f_interactive_info() */
+
 /***************************************************************************/
