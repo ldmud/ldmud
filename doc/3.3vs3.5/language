@@ -18,6 +18,9 @@ that you should pay attention to when updating.
   + The deprecated efuns cat() and tail() were removed. They can be
     easily and more flexibly replaced by sefuns, which are supplied with
     the driver in /mudlib/deprecated/. (#637, #228)
+  + The efun set_light() was removed. This includes the internal light
+    state managment in the driver. The mudlib does a better and more
+    flexible job at managing light in/from objects. (#775)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an

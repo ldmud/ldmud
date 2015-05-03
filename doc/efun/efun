@@ -24,7 +24,6 @@ DESCRIPTION
              process_string()
              rusage()
              set_is_wizard()
-             set_light()
              transfer()
              tls_available()
              tls_check_certificate()

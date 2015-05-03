@@ -42,9 +42,6 @@ BESCHREIBUNG
                                     wurde, sonst 0.
         int [OIB_REPLACED]:         1, wenn das Programm von <ob> ersetzt
                                     wurde (mit replace_program()), sonst 0.
-        int [OIB_TOTAL_LIGHT]:      die von <ob> emittierte Helligkeit. Dieser
-                                    Eintrag ist immer 0, wenn set_light()
-                                    nicht verfuegbar ist.
         int [OIB_NEXT_RESET]:       Zeit bis zum naechsten Reset.
         int [OIB_TIME_OF_REF]:      Zeit des letzen Aufrufs von <ob>.
         int [OIB_REF]:              Anzahl Aufrufe von <ob>.
