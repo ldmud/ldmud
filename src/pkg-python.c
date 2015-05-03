@@ -13,14 +13,18 @@
 #include "interpret.h"
 #include "lex.h"
 #include "mstrings.h"
+#include "object.h"
 #include "pkg-python.h"
 #include "simulate.h"
+#include "structs.h"
 #include "typedefs.h"
 
 /* Python.h defines these again... */
 #undef _GNU_SOURCE
 #undef _POSIX_C_SOURCE
 #undef _XOPEN_SOURCE
+
+#define PY_SSIZE_T_CLEAN
 #include "Python.h"
 
 /* --- Variables --- */
@@ -36,6 +40,10 @@ static ident_t*  python_efun_names[PYTHON_EFUN_TABLE_SIZE];
   /* For each python-defined efun store its identifier
    * here, so we can reverse lookup python efun indices.
    */
+
+/* -- Function prototypes --- */
+static const char* python_to_svalue(svalue_t *dest, PyObject* val);
+static PyObject* svalue_to_python (svalue_t *svp);
 
 /* -- Python definitions and functions --- */
 
@@ -57,7 +65,7 @@ static PyObject* python_register_efun(PyObject *module, PyObject *args)
     ident = make_shared_identifier(name, I_TYPE_GLOBAL, 0);
     if (!ident)
     {
-        PyErr_SetString(PyExc_MemoryError, "Out of memory");
+        PyErr_SetString(PyExc_MemoryError, "out of memory");
         return NULL;
     }
 
@@ -71,7 +79,7 @@ static PyObject* python_register_efun(PyObject *module, PyObject *args)
      */
     if (ident->type != I_TYPE_GLOBAL)
     {
-        PyErr_SetString(PyExc_RuntimeError, "Couldn't create efun entry.");
+        PyErr_SetString(PyExc_RuntimeError, "couldn't create efun entry");
         return NULL;
     }
 
@@ -86,7 +94,7 @@ static PyObject* python_register_efun(PyObject *module, PyObject *args)
     }
     else if(num_python_efun == PYTHON_EFUN_TABLE_SIZE)
     {
-        PyErr_SetString(PyExc_RuntimeError, "Too many efuns registered.");
+        PyErr_SetString(PyExc_RuntimeError, "too many efuns registered");
         return NULL;
     }
     else
@@ -102,6 +110,573 @@ static PyObject* python_register_efun(PyObject *module, PyObject *args)
     return Py_None;
 }
 
+/*=========================================================================*/
+
+/*                                 Types                                   */
+
+/*-------------------------------------------------------------------------*/
+/* Type structures */
+
+struct ldmud_struct_s
+{
+    PyObject_HEAD
+
+    struct_t *lpc_struct;
+};
+
+struct ldmud_object_s
+{
+    PyObject_HEAD
+
+    object_t *lpc_object;
+};
+
+typedef struct ldmud_struct_s ldmud_struct_t;
+typedef struct ldmud_object_s ldmud_object_t;
+
+/*-------------------------------------------------------------------------*/
+/* Objects */
+
+static void
+ldmud_object_dealloc (ldmud_object_t* self)
+
+/* Destroy the ldmud_object_t object
+ */
+
+{
+    if(self->lpc_object)
+        free_object(self->lpc_object, "ldmud_object_dealloc");
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_object_dealloc */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_object_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
+
+/* Implmenent __new__ for ldmud_object_t, i.e. allocate and initialize
+ * the object with null values.
+ */
+
+{
+    ldmud_object_t *self;
+
+    self = (ldmud_object_t *)type->tp_alloc(type, 0);
+    if (self != NULL)
+        self->lpc_object = NULL;
+
+    return (PyObject *)self;
+} /* ldmud_object_new */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_object_init (ldmud_object_t *self, PyObject *args, PyObject *kwds)
+
+/* Implement __init__ for ldmud_object_t, i.e. create a new object object
+ * from the given arguments.
+ */
+
+{
+    /* We expect the filename (object to load)
+     */
+
+    static char *kwlist[] = { "filename", NULL};
+
+    Py_ssize_t length;
+    const char *filename;
+
+    string_t *filename_str;
+
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "s#", kwlist, &filename, &length))
+        return -1;
+
+    filename_str = new_n_mstring(filename, length);
+    if(!filename_str)
+    {
+        PyErr_SetString(PyExc_MemoryError, "out of memory");
+        return -1;
+    }
+    else
+    {
+        /* get_object() can throw errors, we don't want to jump out of this context. */
+
+        /* TODO: We need to detect whether this is an external or internal call,
+         * TODO:: so we can set the runtime limits accordingly, also secure_apply_error
+         * TODO:: needs to know for the same reason.
+         */
+        struct error_recovery_info error_recovery_info;
+        struct control_stack *save_csp;
+        svalue_t *save_sp;
+        object_t *ob;
+
+        error_recovery_info.rt.last = rt_context;
+        error_recovery_info.rt.type = ERROR_RECOVERY_APPLY;
+        rt_context = (rt_context_t *)&error_recovery_info;
+
+        save_sp = inter_sp;
+        save_csp = csp;
+
+        if (setjmp(error_recovery_info.con.text))
+        {
+            PyErr_SetString(PyExc_RuntimeError, get_txt(current_error));
+            secure_apply_error(save_sp, save_csp, MY_FALSE);
+
+            ob = NULL;
+        }
+        else
+        {
+            ob = get_object(filename_str);
+        }
+
+        rt_context = error_recovery_info.rt.last;
+        free_mstring(filename_str);
+
+        if(ob)
+        {
+            if(self->lpc_object)
+                deref_object(self->lpc_object, "ldmud_object_init");
+            self->lpc_object = ref_object(ob, "ldmud_object_init");
+            return 0;
+        }
+        else
+            return -1;
+    }
+}
+
+static PyMethodDef ldmud_object_methods[] =
+{
+    {NULL}
+};
+
+static PyGetSetDef ldmud_object_getset[] =
+{
+    {NULL}
+};
+
+static PyTypeObject ldmud_object_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.Object",                     /* tp_name */
+    sizeof(ldmud_object_t),             /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_object_dealloc,   /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC object",                       /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_object_methods,               /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_object_getset,                /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    (initproc)ldmud_object_init,        /* tp_init */
+    0,                                  /* tp_alloc */
+    ldmud_object_new,                   /* tp_new */
+};
+
+/*-------------------------------------------------------------------------*/
+/* Structs */
+
+static void
+ldmud_struct_dealloc (ldmud_struct_t* self)
+
+/* Destroy the ldmud_struct_t object
+ */
+
+{
+    if(self->lpc_struct)
+        free_struct(self->lpc_struct);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_struct_dealloc */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_struct_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
+
+/* Implmenent __new__ for ldmud_struct_t, i.e. allocate and initialize
+ * the struct with null values.
+ */
+
+{
+    ldmud_struct_t *self;
+
+    self = (ldmud_struct_t *)type->tp_alloc(type, 0);
+    if (self != NULL)
+        self->lpc_struct = NULL;
+
+    return (PyObject *)self;
+} /* ldmud_struct_new */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_struct_init (ldmud_struct_t *self, PyObject *args, PyObject *kwds)
+
+/* Implement __init__ for ldmud_stuct_t, i.e. create a new struct object
+ * from the given arguments.
+ */
+
+{
+    /* We expect:
+     *  - the object whose struct definition it is
+     *  - the name of the struct
+     *  - (optional) the values for the struct, given either as a tuple/list
+     *    or map.
+     */
+
+    static char *kwlist[] = { "object", "name", "values", NULL};
+
+    PyObject *ob, *values;
+    const char* name;
+    Py_ssize_t length;
+
+    object_t *lpc_ob;
+    struct_t *lpc_struct;
+    string_t *lpc_struct_name;
+    struct_type_t *lpc_struct_type;
+
+    values = NULL;
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "O!s#|O", kwlist,
+                                      &ldmud_object_type, &ob, &name, &length, &values))
+        return -1;
+
+    /* Lookup the object (we really only need the program). */
+    lpc_ob = ((ldmud_object_t*)ob)->lpc_object;
+    if(!lpc_ob)
+    {
+        PyErr_SetString(PyExc_TypeError, "uninitialized lpc object");
+        return -1;
+    }
+
+    /* Lookup the struct type. */
+    /* TODO: This lookup also includes NAME_HIDDEN entries, maybe only consider visible structs. */
+    lpc_struct_name = new_n_mstring(name, length);
+    lpc_struct_type = struct_find(lpc_struct_name, lpc_ob->prog);
+    free_mstring(lpc_struct_name);
+
+    if(!lpc_struct_type)
+    {
+        PyErr_Format(PyExc_NameError, "unknown struct '%s'", name);
+        return -1;
+    }
+
+    /* Create the new struct. */
+    lpc_struct = struct_new(lpc_struct_type);
+    if(!lpc_struct)
+    {
+        PyErr_SetString(PyExc_MemoryError, "Out of memory");
+        return -1;
+    }
+
+    /* Now let's have a look if there are any members to initialize. */
+    if(values)
+    {
+        int size = struct_t_size(lpc_struct_type);
+
+        if(PyMapping_Check(values) && !PySequence_Check(values))
+        {
+            /* It is some map-like object. */
+            PyObject *items, *item, *iterator;
+
+            if (PyDict_CheckExact(values))
+                items = PyDict_Items(values);
+            else
+                items = PyObject_CallMethod(values, "items", NULL);
+            if (items == NULL)
+            {
+                free_struct(lpc_struct);
+                return -1;
+            }
+
+            iterator = PyObject_GetIter(items);
+            Py_DECREF(items);
+
+            if(iterator == NULL)
+            {
+                free_struct(lpc_struct);
+                return -1;
+            }
+
+            while ((item = PyIter_Next(iterator)))
+            {
+                const char *err;
+                PyObject *key;
+                int idx;
+
+                if (!PyTuple_Check(item) || PyTuple_Size(item) != 2)
+                {
+                    PyErr_SetString(PyExc_TypeError, "dict items iterator must return 2-tuples");
+                    Py_DECREF(item);
+                    break;
+                }
+
+                key = PyTuple_GetItem(item, 0);
+                if(key == NULL)
+                {
+                    Py_DECREF(item);
+                    break;
+                }
+
+                /* The key can be an index or a member name. */
+                if (PyLong_Check(key))
+                {
+                    int overflow;
+                    long num = PyLong_AsLongAndOverflow(key, &overflow);
+
+                    if (overflow || num < PINT_MIN || num > PINT_MAX)
+                    {
+                        PyErr_SetString(PyExc_TypeError, "integer overflow");
+                        Py_DECREF(item);
+                        break;
+                    }
+
+                    if (num >= (long)size)
+                    {
+                        PyErr_Format(PyExc_ValueError, "index out of bounds: %ld", num);
+                        Py_DECREF(item);
+                        break;
+                    }
+
+                    idx = (int)num;
+                }
+                else if (PyUnicode_Check(key))
+                {
+                    PyObject *utf8;
+                    Py_ssize_t member_length;
+                    char * buf;
+                    string_t *member_name;
+
+                    utf8 = PyUnicode_AsEncodedString(key, "utf-8", "replace");
+                    if (utf8 == NULL)
+                    {
+                        PyErr_SetString(PyExc_ValueError, "undecodable member name");
+                        Py_DECREF(item);
+                        break;
+                    }
+
+                    PyBytes_AsStringAndSize(utf8, &buf, &member_length);
+                    member_name = new_n_mstring(buf, member_length);
+                    idx = struct_find_member(lpc_struct_type, member_name);
+                    free_mstring(member_name);
+
+                    if (idx < 0)
+                    {
+                        PyErr_Format(PyExc_ValueError, "member '%s' not found", buf);
+                        Py_DECREF(utf8);
+                        Py_DECREF(item);
+                        break;
+                    }
+
+                    Py_DECREF(utf8);
+                }
+                else
+                {
+                    PyErr_SetString(PyExc_ValueError, "illegal member index for struct initialization, neither int nor string");
+                    Py_DECREF(item);
+                    break;
+                }
+
+                err = python_to_svalue(lpc_struct->member + idx, PyTuple_GetItem(item, 1));
+                Py_DECREF(item);
+
+                if (err != NULL)
+                {
+                    PyErr_SetString(PyExc_ValueError, err);
+                    break;
+                }
+            }
+
+            Py_DECREF(iterator);
+        }
+        else
+        {
+            /* Hopefully a sequence. */
+            PyObject *iterator = PyObject_GetIter(values);
+            PyObject *item;
+            int idx = 0;
+
+            if (!iterator)
+            {
+                /* PyObject_GetIter will set an exception. */
+                free_struct(lpc_struct);
+                return -1;
+            }
+
+            while ((item = PyIter_Next(iterator)))
+            {
+                const char *err;
+
+                if (idx >= size)
+                {
+                    PyErr_SetString(PyExc_ValueError, "too many elements for struct initialization");
+                    Py_DECREF(item);
+                    break;
+                }
+
+                err = python_to_svalue(lpc_struct->member + (idx++), item);
+                Py_DECREF(item);
+
+                if (err != NULL)
+                {
+                    PyErr_SetString(PyExc_ValueError, err);
+                    break;
+                }
+            }
+
+            Py_DECREF(iterator);
+        }
+
+        /* PyIter_Next may set an error. */
+        if (PyErr_Occurred())
+        {
+            free_struct(lpc_struct);
+            return -1;
+        }
+    }
+
+    if(self->lpc_struct)
+        free_struct(self->lpc_struct);
+    self->lpc_struct = lpc_struct;
+
+    return 0;
+}
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_struct_getattr (ldmud_struct_t *obj, char *name)
+
+/* Implement __getattr__ for ldmud_struct_t.
+ * This is a direct struct member lookup.
+ */
+
+{
+    string_t *member_name;
+    int idx;
+    PyObject *result;
+
+    member_name = new_mstring(name);
+    idx = struct_find_member(obj->lpc_struct->type, member_name);
+    free_mstring(member_name);
+
+    if (idx < 0)
+    {
+        PyErr_Format(PyExc_AttributeError, "Struct object has no attribute '%.400s'", name);
+        return NULL;
+    }
+
+    result = svalue_to_python(obj->lpc_struct->member + idx);
+    if (result == NULL)
+        PyErr_SetString(PyExc_ValueError, "Unsupported data type.");
+
+    return result;
+}
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_struct_setattr (ldmud_struct_t *obj, char *name, PyObject *value)
+
+/* Implement __setattr__ for ldmud_struct_t.
+ * This is a direct struct member lookup.
+ */
+
+{
+    string_t *member_name;
+    int idx;
+    const char *err;
+
+    member_name = new_mstring(name);
+    idx = struct_find_member(obj->lpc_struct->type, member_name);
+    free_mstring(member_name);
+
+    if (idx < 0)
+    {
+        PyErr_Format(PyExc_AttributeError, "Struct object has no attribute '%.400s'", name);
+        return -1;
+    }
+
+    err = python_to_svalue(obj->lpc_struct->member + idx, value);
+    if (err != NULL)
+    {
+        PyErr_SetString(PyExc_ValueError, err);
+        return -1;
+    }
+
+    return 0;
+}
+
+/*-------------------------------------------------------------------------*/
+static PyMethodDef ldmud_struct_methods[] =
+{
+    {NULL}
+};
+
+
+
+static PyTypeObject ldmud_struct_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.Struct",                     /* tp_name */
+    sizeof(ldmud_struct_t),             /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_struct_dealloc,   /* tp_dealloc */
+    0,                                  /* tp_print */
+    (getattrfunc)ldmud_struct_getattr,  /* tp_getattr */
+    (setattrfunc)ldmud_struct_setattr,  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC struct",                       /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_struct_methods,               /* tp_methods */
+    0,                                  /* tp_members */
+    0,                                  /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    (initproc)ldmud_struct_init,        /* tp_init */
+    0,                                  /* tp_alloc */
+    ldmud_struct_new,                   /* tp_new */
+};
+
+
+/*-------------------------------------------------------------------------*/
 /* Module definition for the ldmud builtin module */
 static PyMethodDef ldmud_methods[] =
 {
@@ -125,13 +700,33 @@ static PyModuleDef ldmud_module =
 
 static PyObject* init_ldmud_module()
 {
-    return PyModule_Create(&ldmud_module);
+    PyObject *module;
+
+    /* Initialize types. */
+    if (PyType_Ready(&ldmud_object_type) < 0)
+        return NULL;
+    if (PyType_Ready(&ldmud_struct_type) < 0)
+        return NULL;
+
+    /* Initialize module. */
+    module = PyModule_Create(&ldmud_module);
+    if (module == NULL)
+        return module;
+
+    /* Add types to module. */
+    Py_INCREF(&ldmud_object_type);
+    Py_INCREF(&ldmud_struct_type);
+    PyModule_AddObject(module, "Object", (PyObject*) &ldmud_object_type);
+    PyModule_AddObject(module, "Struct", (PyObject*) &ldmud_struct_type);
+
+    return module;
 }
 
+/*=========================================================================*/
+
+/*                          Helper functions                               */
 
 /*-------------------------------------------------------------------------*/
-/* --- Helper functions --- */
-
 
 static PyObject*
 svalue_to_python (svalue_t *svp)
@@ -142,6 +737,10 @@ svalue_to_python (svalue_t *svp)
 {
     switch (svp->type)
     {
+        case T_LVALUE:
+            // TODO
+            return NULL;
+
         case T_NUMBER:
             return PyLong_FromLong(svp->u.number);
 
@@ -150,6 +749,48 @@ svalue_to_python (svalue_t *svp)
 
         case T_STRING:
             return PyUnicode_Decode(get_txt(svp->u.str), mstrsize(svp->u.str), "utf-8", "replace");
+
+        case T_POINTER:
+            // TODO
+            return NULL;
+
+        case T_OBJECT:
+        {
+            PyObject* val = ldmud_object_new(&ldmud_object_type, NULL, NULL);
+            if (val != NULL)
+                ((ldmud_object_t*)val)->lpc_object = ref_object(svp->u.ob, "svalue_to_python");
+
+            return val;
+        }
+
+        case T_MAPPING:
+            // TODO
+            return NULL;
+
+        case T_CLOSURE:
+            // TODO
+            return NULL;
+
+        case T_SYMBOL:
+            // TODO
+            return NULL;
+
+        case T_QUOTED_ARRAY:
+            // TODO
+            return NULL;
+
+        case T_STRUCT:
+        {
+            PyObject* val = ldmud_struct_new(&ldmud_struct_type, NULL, NULL);
+            if (val != NULL)
+                ((ldmud_struct_t*)val)->lpc_struct = ref_struct(svp->u.strct);
+
+            return val;
+        }
+
+        case T_CHAR_LVALUE:
+            // TODO
+            return NULL;
 
         default:
             return NULL;
@@ -161,7 +802,7 @@ svalue_to_python (svalue_t *svp)
 /*-------------------------------------------------------------------------*/
 
 
-static char*
+static const char*
 python_to_svalue (svalue_t *dest, PyObject* val)
 
 /* Convert a python value <val> back to an LPC value
@@ -178,13 +819,28 @@ python_to_svalue (svalue_t *dest, PyObject* val)
         return NULL;
     }
 
+    /* First we check our own types. */
+    if (PyObject_TypeCheck(val, &ldmud_object_type))
+    {
+        put_ref_object(dest, ((ldmud_object_t*)val)->lpc_object, "python_to_svalue");
+        return NULL;
+    }
+
+    if (PyObject_TypeCheck(val, &ldmud_struct_type))
+    {
+        put_ref_struct(dest, ((ldmud_struct_t*)val)->lpc_struct);
+        return NULL;
+    }
+
+    /* And now the python ones. */
+
     if (PyLong_Check(val))
     {
         int overflow;
         long num = PyLong_AsLongAndOverflow(val, &overflow);
 
         if (overflow || num < PINT_MIN || num > PINT_MAX)
-            return "Integer overflow.";
+            return "integer overflow";
 
         put_number(dest, (p_int)num);
         return NULL;
@@ -220,7 +876,7 @@ python_to_svalue (svalue_t *dest, PyObject* val)
 
         utf8 = PyUnicode_AsEncodedString(val, "utf-8", "replace");
         if (utf8 == NULL)
-            return "Undecodable unicode string";
+            return "undecodable unicode string";
 
         PyBytes_AsStringAndSize(utf8, &buf, &length);
         put_c_n_string(dest, buf, length);
@@ -228,13 +884,16 @@ python_to_svalue (svalue_t *dest, PyObject* val)
         return NULL;
     }
 
-    return "Unknown type";
+    return "unknown type";
 
-} /* svalue_to_python */
+} /* python_to_svalue */
 
+
+/*=========================================================================*/
+
+/*                          Global functions                               */
 
 /*-------------------------------------------------------------------------*/
-/* --- Global functions --- */
 
 
 void
@@ -334,7 +993,7 @@ call_python_efun (int idx, int num_arg)
         /* Make that exception into a string. */
         exc_str = PyObject_Str(exc_value);
         if (exc_str == NULL)
-            msg = "Unknown exception.";
+            msg = "unknown exception";
         else
         {
             /* And convert it to UTF-8 (for now). */
@@ -342,7 +1001,7 @@ call_python_efun (int idx, int num_arg)
 
             exc_utf8 = PyUnicode_AsEncodedString(exc_str, "utf-8", "replace");
             if (exc_utf8 == NULL)
-                msg = "Undecodable exception.";
+                msg = "undecodable exception";
             else
             {
                 /* Copy the message, because it may not
@@ -369,7 +1028,7 @@ call_python_efun (int idx, int num_arg)
     }
     else
     {
-        char *err = python_to_svalue(inter_sp + 1, result);
+        const char *err = python_to_svalue(inter_sp + 1, result);
         Py_DECREF(result);
 
         if (err != NULL)
@@ -397,5 +1056,11 @@ closure_python_efun_to_string (int type)
 {
     return get_txt(python_efun_names[type - CLOSURE_PYTHON_EFUN]->name);
 }
+
+// TODO: Add support for garbage collection.
+// TODO:: We need to keep a root set.
+
+// TODO: Add a submodule 'efuns', where all driver-internal efuns are callable
+// TODO: Add master and simul-efun objects as members to the ldmud module
 
 #endif /* USE_PYTHON && HAS_PYTHON3 */
