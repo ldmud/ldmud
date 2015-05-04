@@ -36,9 +36,7 @@ struct control_stack {
     svalue_t    lambda;     /* Current lambda, counted, or svalue-0 if none */
     bytecode_p  pc;         /* Program counter, points to next bytecode */
     svalue_t   *fp;         /* Frame pointer: first arg on stack */
-#ifdef USE_NEW_INLINES
     svalue_t   *context;    /* Context pointer */
-#endif /* USE_NEW_INLINES */
     bytecode_p  funstart;
       /* Start of the function code.
        * Two magic values (SIMUL_EFUN_FUNSTART and EFUN_FUNSTART) mark

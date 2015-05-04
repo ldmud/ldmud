@@ -168,10 +168,7 @@
 #include "swap.h"
 #include "switch.h"
 #include "xalloc.h"
-
-#ifdef USE_NEW_INLINES
 #include "i-svalue_cmp.h"
-#endif /* USE_NEW_INLINES */
 
 /*-------------------------------------------------------------------------*/
 
@@ -471,7 +468,6 @@ closure_eq (svalue_t * left, svalue_t * right)
                      == right->u.lambda->function.lfun.context_size)
                 ;
 
-#ifdef USE_NEW_INLINES
             if (i)
             {
                 unsigned int context_size, ix;
@@ -496,7 +492,6 @@ closure_eq (svalue_t * left, svalue_t * right)
                 left->u.lambda->function.lfun.context_size = context_size;
                 right->u.lambda->function.lfun.context_size = context_size;
             }
-#endif /* USE_NEW_INLINES */
         }
         else /* CLOSURE_IDENTIFIER */
         {
@@ -543,10 +538,8 @@ closure_cmp (svalue_t * left, svalue_t * right)
 
         if (left->x.closure_type == CLOSURE_LFUN)
         {
-#ifdef USE_NEW_INLINES
             unsigned context_size, i;
             int d;
-#endif /* USE_NEW_INLINES */
 
             if ( left->u.lambda->function.lfun.ob
               != right->u.lambda->function.lfun.ob)
@@ -570,7 +563,6 @@ closure_cmp (svalue_t * left, svalue_t * right)
                         < right->u.lambda->function.lfun.inhProg)
                        ? -1 : 1;
 
-#ifdef USE_NEW_INLINES
             /* The difference is in the context svalues.
              * To prevent recursion, hide them while comparing them.
              */
@@ -599,9 +591,6 @@ closure_cmp (svalue_t * left, svalue_t * right)
             right->u.lambda->function.lfun.context_size = context_size;
 
             return d;
-#else
-            return 0; /* Shouldn't be reached */
-#endif /* USE_NEW_INLINES */
         }
         else /* CLOSURE_IDENTIFIER */
         {
@@ -745,9 +734,7 @@ set_closure_user (svalue_t *svp, object_t *owner)
             /* Update the closure index */
             l->function.lfun.ob = ref_object(owner, "closure");
             l->function.lfun.index = (unsigned short)ix;
-#ifdef USE_NEW_INLINES
             l->function.lfun.context_size = 0;
-#endif /* USE_NEW_INLINES */
         }
 
         /* (Re)Bind the closure */
@@ -1051,15 +1038,9 @@ closure_init_lambda (lambda_t * l, object_t * obj)
 } /* closure_init_lambda() */
 
 /*-------------------------------------------------------------------------*/
-#ifndef USE_NEW_INLINES
-lambda_t *
-closure_new_lambda (object_t * obj, Bool raise_error)
-#else /* USE_NEW_INLINES */
 lambda_t *
 closure_new_lambda ( object_t * obj,  unsigned short context_size
                    , Bool raise_error)
-#endif /* USE_NEW_INLINES */
-
 /* Create a basic lambda closure structure, suitable to hold <context_size>
  * context values, and bound to <obj>. The structure has the generic
  * fields (.ref, .ob, .prog_ob, .prog_pc) initialized.
@@ -1072,21 +1053,13 @@ closure_new_lambda ( object_t * obj,  unsigned short context_size
     lambda_t *l;
 
     /* Allocate a new lambda structure */
-#ifndef USE_NEW_INLINES
-    l = xalloc(sizeof(*l));
-#else /* USE_NEW_INLINES */
     l = xalloc(SIZEOF_LAMBDA(context_size));
-#endif /* USE_NEW_INLINES */
     if (!l)
     {
         if (raise_error)
         {
-#ifndef USE_NEW_INLINES
-            outofmem(sizeof(*l), "closure literal");
-#else /* USE_NEW_INLINES */
             outofmem(SIZEOF_LAMBDA(context_size)
                     , "closure literal");
-#endif /* USE_NEW_INLINES */
             /* NOTREACHED */
         }
     	return NULL;
@@ -1115,11 +1088,7 @@ closure_identifier (svalue_t *dest, object_t * obj, int ix, Bool raise_error)
     lambda_t *l;
 
     /* Allocate an initialise a new lambda structure */
-#ifndef USE_NEW_INLINES
-    l = closure_new_lambda(obj, raise_error);
-#else /* USE_NEW_INLINES */
     l = closure_new_lambda(obj, 0, raise_error);
-#endif /* USE_NEW_INLINES */
     if (!l)
     {
         put_number(dest, 0);
@@ -1213,15 +1182,9 @@ closure_lfun ( svalue_t *dest, object_t *obj, program_t *prog, int ix
 } /* closure_lfun() */
 
 /*-------------------------------------------------------------------------*/
-#ifndef USE_NEW_INLINES
-void
-closure_literal (svalue_t *dest, int ix, unsigned short inhIndex)
-#else /* USE_NEW_INLINES */
 void
 closure_literal ( svalue_t *dest
                 , int ix, unsigned short inhIndex, unsigned short num)
-#endif /* USE_NEW_INLINES */
-
 /* Create a literal closure (lfun or variable closure), bound to the
  * current object. The resulting svalue is stored in *<dest>. The function
  * implements the instruction F_CLOSURE.
@@ -1284,12 +1247,7 @@ closure_literal ( svalue_t *dest
         {
             ix += CROSSDEF_NAME_OFFSET(flags);
         }
-
-#ifndef USE_NEW_INLINES
-        closure_lfun(dest, current_object, prog, ix, MY_TRUE);
-#else
         closure_lfun(dest, current_object, prog, ix, num, MY_TRUE);
-#endif /* USE_NEW_INLINES */
     }
 } /* closure_literal() */
 
@@ -4438,9 +4396,7 @@ compile_value (svalue_t *value, int opt_flags)
             }
             else if (type != CLOSURE_LFUN
              || l->function.lfun.inhProg
-#ifdef USE_NEW_INLINES
              || l->function.lfun.context_size
-#endif
                )
             {
                 /* Compile it using F_CALL_CLOSURE. */
@@ -5309,7 +5265,6 @@ free_closure (svalue_t *svp)
             free_prog(l->function.lfun.inhProg, MY_TRUE);
     }
 
-#ifdef USE_NEW_INLINES
     if (type == CLOSURE_LFUN)
     {
         unsigned short num = l->function.lfun.context_size;
@@ -5321,7 +5276,6 @@ free_closure (svalue_t *svp)
             free_svalue(&(l->context[num]));
         }
     }
-#endif /* USE_NEW_INLINES */
 
     /* else CLOSURE_LFUN || CLOSURE_IDENTIFIER || CLOSURE_PRELIMINARY:
      * no further references held.
@@ -5936,11 +5890,7 @@ v_bind_lambda (svalue_t *sp, int num_arg)
             lambda_t *l2;
 
             l->ref--;
-#ifndef USE_NEW_INLINES
-            l2 = closure_new_lambda(ob, /* raise_error: */ MY_TRUE);
-#else /* USE_NEW_INLINES */
             l2 = closure_new_lambda(ob, 0, /* raise_error: */ MY_TRUE);
-#endif /* USE_NEW_INLINES */
             l2->function.lambda = l->function.lambda;
             l->function.lambda->ref++;
             free_object(ob, "bind_lambda"); /* We adopted the reference */
@@ -5956,12 +5906,7 @@ v_bind_lambda (svalue_t *sp, int num_arg)
          */
 
         lambda_t *l;
-
-#ifndef USE_NEW_INLINES
-        l = closure_new_lambda(ob, /* raise_error: */ MY_TRUE);
-#else /* USE_NEW_INLINES */
         l = closure_new_lambda(ob, 0, /* raise_error: */ MY_TRUE);
-#endif /* USE_NEW_INLINES */
         free_object(ob, "bind_lambda"); /* We adopted the reference */
         l->function.lambda = sp->u.lambda;
           /* The ref to the unbound closure is just transferred from
@@ -6286,11 +6231,7 @@ f_symbol_variable (svalue_t *sp)
     if (sp->type != T_CLOSURE)
     {
         inter_sp = sp - 1;
-#ifndef USE_NEW_INLINES
-        outofmem(sizeof(lambda_t), "variable symbol");
-#else /* USE_NEW_INLINES */
         outofmem(SIZEOF_LAMBDA(0), "variable symbol");
-#endif /* USE_NEW_INLINES */
     }
 
     return sp;

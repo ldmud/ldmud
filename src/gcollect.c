@@ -379,13 +379,11 @@ cleanup_closure (svalue_t *csvp, cleanup_t * context)
         cleanup_closure(&dummy, context);
     }
 
-#ifdef USE_NEW_INLINES
     if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
     {
         unsigned short size = l->function.lfun.context_size;
         cleanup_vector(l->context, size, context);
     }
-#endif /* USE_NEW_INLINES */
 } /* cleanup_closure() */
 
 /*-------------------------------------------------------------------------*/
@@ -1722,7 +1720,6 @@ gc_count_ref_in_closure (svalue_t *csvp)
                 count_ref_in_closure(&sv);
             }
         }
-#ifdef USE_NEW_INLINES
         if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
         {
             unsigned short size = l->function.lfun.context_size;
@@ -1730,7 +1727,6 @@ gc_count_ref_in_closure (svalue_t *csvp)
             count_ref_in_vector(l->context, size);
             l->function.lfun.context_size = size;
         }
-#endif /* USE_NEW_INLINES */
     }
 } /* count_ref_in_closure() */
 
@@ -1774,8 +1770,7 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
         if (l->function.lfun.inhProg)
             clear_program_ref(l->function.lfun.inhProg, MY_TRUE);
     }
-    
-#ifdef USE_NEW_INLINES
+
     if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
     {
         unsigned short size = l->function.lfun.context_size;
@@ -1783,7 +1778,6 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
         clear_ref_in_vector(l->context, size);
         l->function.lfun.context_size = size;
     }
-#endif /* USE_NEW_INLINES */
 } /* clear_ref_in_closure() */
 
 /*-------------------------------------------------------------------------*/
@@ -2868,11 +2862,7 @@ setup_print_block_dispatcher (void)
     free_svalue(inter_sp--);
 
     current_object = master_ob;
-#ifdef USE_NEW_INLINES
     closure_literal(&tmp_closure, 0, 0, 0);
-#else
-    closure_literal(&tmp_closure, 0, 0);
-#endif /* USE_NEW_INLINES */
     store_print_block_dispatch_info(tmp_closure.u.lambda, show_cl_literal);
     free_svalue(&tmp_closure);
 }

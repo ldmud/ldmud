@@ -238,11 +238,7 @@ extern Bool master_will_be_updated;
 
 /* --- Prototypes --- */
 
-#ifndef USE_NEW_INLINES
-extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp, int32 reserve_cost);
-#else
 extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp, int32 reserve_cost, svalue_t *i_context);
-#endif /* USE_NEW_INLINES */
 extern void check_shadow_sent (object_t *ob);
 extern void assert_shadow_sent (object_t *ob);
 extern void init_empty_callback (callback_t *cb);

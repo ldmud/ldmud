@@ -345,9 +345,7 @@ catch_instruction ( int flags, uint offset
                   , volatile svalue_t ** volatile i_sp
                   , bytecode_p i_pc, svalue_t * i_fp
                   , int32 reserve_cost
-#ifdef USE_NEW_INLINES
                   , svalue_t * i_context
-#endif /* USE_NEW_INLINES */
                   )
 
 /* Implement the F_CATCH instruction.
@@ -379,11 +377,7 @@ catch_instruction ( int flags, uint offset
 
     /* 'Fake' a subroutine call from <new_pc>
      */
-#ifdef USE_NEW_INLINES
     push_control_stack(INTER_SP, new_pc, i_fp, i_context);
-#else
-    push_control_stack(INTER_SP, new_pc, i_fp);
-#endif /* USE_NEW_INLINES */
     csp->ob = current_object;
     csp->extern_call = MY_FALSE;
     csp->catch_call = MY_TRUE;

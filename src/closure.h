@@ -5,9 +5,7 @@
 #include "typedefs.h"
 
 #include "bytecode.h"
-#ifdef USE_NEW_INLINES
 #include "svalue.h"
-#endif /* USE_NEW_INLINES */
 #include "exec.h"
 
 /* In case offsetof() is not a compiler builtin include stddef.h which
@@ -87,14 +85,12 @@ struct lambda_s
            */
     } function;
 
-#ifdef USE_NEW_INLINES
     svalue_t context[ /* .lfun.context_size */ 1];
       /* lfun-closure context variables, if any.
        * Putting this array into the function.lfun somehow causes memory
        * corruption because some lambda structures won't be allocated large
        * enough.
        */
-#endif
 };
 
 #define LAMBDA_VALUE_OFFSET \
@@ -103,11 +99,7 @@ struct lambda_s
    * constant value (the one with index number 0).
    */
 
-#ifndef USE_NEW_INLINES
-#define SIZEOF_LAMBDA(num) sizeof(struct lambda_s)
-#else /* USE_NEW_INLINES */
 #define SIZEOF_LAMBDA(num) (sizeof(struct lambda_s) + (((int)num)-1) * sizeof(svalue_t))
-#endif /* USE_NEW_INLINES */
   /* size_t SIZEOF_LAMBDA(int num)
    *   Size of a lambda closure with <num> context variables.
    */
@@ -120,15 +112,9 @@ extern int       closure_cmp (svalue_t * left, svalue_t * right);
 extern void      set_closure_user(svalue_t *svp, object_t *owner);
 extern void      replace_program_lambda_adjust(replace_ob_t *r_ob);
 extern void      closure_init_lambda (lambda_t * l, object_t * obj);
-#ifndef USE_NEW_INLINES
-extern void      closure_literal(svalue_t *dest, int ix, unsigned short inhIndex);
-extern void      closure_lfun (svalue_t *dest, object_t *obj, program_t *prog, int ix, Bool raise_error);
-extern lambda_t *closure_new_lambda (object_t * obj, Bool raise_error);
-#else /* USE_NEW_INLINES */
 extern lambda_t *closure_new_lambda (object_t * obj, unsigned short context_size, Bool raise_error);
 extern void      closure_lfun (svalue_t *dest, object_t *obj, program_t *prog, int ix, unsigned short num, Bool raise_error);
 extern void      closure_literal(svalue_t *dest, int ix, unsigned short inhIndex, unsigned short num);
-#endif /* USE_NEW_INLINES */
 extern void      closure_identifier (svalue_t *dest, object_t * obj, int ix, Bool raise_error);
 extern void      free_closure(svalue_t *svp);
 extern Bool      is_undef_closure (svalue_t *sp);

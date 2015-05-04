@@ -5929,9 +5929,6 @@ save_closure (svalue_t *cl, Bool writable)
             {
                 L_PUTC_PROLOG
                 L_PUTC('#');
-#ifndef USE_NEW_INLINES
-                L_PUTC('l');
-#else
                 if (l->function.lfun.context_size)
                 {
                     L_PUTC('c');
@@ -5940,7 +5937,6 @@ save_closure (svalue_t *cl, Bool writable)
                 {
                     L_PUTC('l');
                 }
-#endif /* USE_NEW_INLINES */
                 L_PUTC(':');
                 c = *source++;
                 do L_PUTC(c) while ( '\0' != (c = *source++) );
@@ -5980,7 +5976,6 @@ save_closure (svalue_t *cl, Bool writable)
                 }
             }
 
-#ifdef USE_NEW_INLINES
             if (l->function.lfun.context_size)
             {
                 int i;
@@ -6025,7 +6020,6 @@ save_closure (svalue_t *cl, Bool writable)
                     L_PUTC_EPILOG
                 }
             }
-#endif /* USE_NEW_INLINES */
         }
         else
         {
@@ -6423,7 +6417,6 @@ register_closure (svalue_t *cl)
         return;
     }
 
-#ifdef USE_NEW_INLINES
     if (type == CLOSURE_LFUN
      && cl->u.lambda->function.lfun.ob == current_object
      && cl->u.lambda->ob == current_object
@@ -6442,7 +6435,6 @@ register_closure (svalue_t *cl)
             register_svalue(val++);
         }
     }
-#endif /* USE_NEW_INLINES */
 } /* register_closure() */
 
 /*-------------------------------------------------------------------------*/
@@ -7908,9 +7900,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         int i;
         program_t *inhProg = NULL;
         int fun_ix_offs = 0;
-#ifdef USE_NEW_INLINES
         size_t context_size = 0;
-#endif
 
         if (name_delim == '|' || name_delim == '-')
         {
@@ -8023,7 +8013,6 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
             }
         }
 
-#ifdef USE_NEW_INLINES
         if (ct == 'c')
         {
             svalue_t num = const0;
@@ -8040,7 +8029,6 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
             }
             context_size = num.u.number;
         }
-#endif
 
         /* If the function exists, it must exist as shared
          * string.
@@ -8062,9 +8050,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         {
             closure_lfun(svp, current_object, inhProg
                         , (unsigned short)i + fun_ix_offs
-#ifdef USE_NEW_INLINES
                         , context_size
-#endif /* USE_NEW_INLINES */
                         , /* raise_error: */ MY_FALSE);
 
             if (svp->type != T_CLOSURE)
@@ -8078,7 +8064,6 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
              * referring to this very closure will be restored
              * as '0'.
              */
-#ifdef USE_NEW_INLINES
             if (context_size > 0)
             {
                 svalue_t context = const0;
@@ -8102,13 +8087,11 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
                     assign_svalue_no_free(l->context+j, context.u.vec->item+j);
                 free_array(context.u.vec);
             }
-#endif /* USE_NEW_INLINES */
         }
         else /* (i < 0) */
         {
             *svp = const0;
 
-#ifdef USE_NEW_INLINES
             if (context_size > 0)
             {
                 svalue_t context = const0;
@@ -8119,7 +8102,6 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
                 else
                     free_svalue(&context);
             }
-#endif /* USE_NEW_INLINES */
         }
         break;
       } /* case 'c', 'l' */

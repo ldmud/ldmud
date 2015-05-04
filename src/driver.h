@@ -178,13 +178,6 @@ extern unsigned char _my_ctype[];
 #define __EVAL_COST_TRACE__
 #endif
 
-/* Always enable new inline closures.
- * TODO: remove this, once all #ifdef USE_NEW_INLINES have been removed.
- * Warning: do not #undef this to disable them. It will produce an
- * inconsistent and buggy driver.
- */
-#define USE_NEW_INLINES 1
-
 /* Select the float format to use. If the p_int are anyway as large as doubles,
  * we just use native double in svalues.
  */
