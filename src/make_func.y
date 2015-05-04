@@ -422,12 +422,8 @@ static long lpc_types[MAX_ARGTYPES];
 #    define LPC_T_CLOSURE       (1 << 8)
 #    define LPC_T_SYMBOL        (1 << 9)
 #    define LPC_T_QUOTED_ARRAY  (1 << 10)
-#ifdef USE_STRUCTS
 #    define LPC_T_STRUCT        (1 << 11)
 #    define LPC_T_NULL          (1 << 12)
-#else
-#    define LPC_T_NULL          (1 << 11)
-#endif
 
 
 static int last_current_type = 0;
@@ -1079,9 +1075,7 @@ static struct type types[]
     , { "mixed",        MIXED }
     , { "null",         NUL }
     , { "unknown",      UNKNOWN }
-#ifdef USE_STRUCTS
     , { "struct",       STRUCT }
-#endif
     };
 
 /*-------------------------------------------------------------------------*/
@@ -2391,9 +2385,7 @@ etype (long n)
     CONVERT(LPC_T_SYMBOL, "TF_SYMBOL");
     CONVERT(LPC_T_QUOTED_ARRAY, "TF_QUOTED_ARRAY");
     CONVERT(LPC_T_NULL, "TF_NULL");
-#ifdef USE_STRUCTS
     CONVERT(LPC_T_STRUCT, "TF_STRUCT");
-#endif /* USE_STRUCTS */
 
 #   undef CONVERT
 
@@ -2439,9 +2431,7 @@ type2flag (int n)
       case UNKNOWN: return LPC_T_ANY;     break;
       case QUOTED_ARRAY:
         return LPC_T_QUOTED_ARRAY; break;
-#ifdef USE_STRUCTS
       case STRUCT:  return LPC_T_STRUCT;  break;
-#endif
     default: yyerror("(type2flag) Bad type!"); return 0;
     }
 } /* type2flag() */
@@ -2481,9 +2471,7 @@ lpctypestr (int n)
       case MF_TYPE_MOD_POINTER|OBJECT:
                     p = "&_lpctype_object_array"; break;
 
-#ifdef USE_STRUCTS
       case STRUCT:  p = "&_lpctype_any_struct";   break;
-#endif
       default: yyerror("(lpctypestr) Bad type!"); return 0;
     }
 

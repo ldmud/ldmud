@@ -118,9 +118,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#ifdef USE_STRUCTS
 #include "structs.h"
-#endif /* USE_STRUCTS */
 #include "swap.h"
 #include "wiz_list.h"
 #include "xalloc.h"
@@ -432,11 +430,9 @@ cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
             }
             break;
 
-#ifdef USE_STRUCTS
         case T_STRUCT:
             cleanup_vector(&p->u.strct->member[0], struct_size(p->u.strct), context);
             break;
-#endif /* USE_STRUCTS */
 
         case T_MAPPING:
             if (register_pointer(context->ptable, p->u.map) != NULL)
@@ -1066,13 +1062,11 @@ clear_program_ref (program_t *p, Bool clear_ref)
         clear_lpctype_ref(p->function_headers[i].type);
     }
 
-#ifdef USE_STRUCTS
     /* struct definitions */
     for (i = 0; i <p->num_structs; i++)
     {
         clear_struct_type_ref(p->struct_defs[i].type);
     }
-#endif /* USE_STRUCTS */
 
     for (i = 0; i < p->num_inherited; i++)
     {
@@ -1209,13 +1203,11 @@ gc_mark_program_ref (program_t *p)
         for (i=0; i< p->num_inherited; i++)
             mark_program_ref(p->inherit[i].prog);
 
-#ifdef USE_STRUCTS
         /* struct definitions */
         for (i = 0; i < p->num_structs; i++)
         {
             count_struct_type_ref(p->struct_defs[i].type);
         }
-#endif /* USE_STRUCTS */
 
         /* Included files */
 
@@ -1390,11 +1382,9 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
             clear_ref_in_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec));
             continue;
 
-#ifdef USE_STRUCTS
         case T_STRUCT:
             clear_struct_ref(p->u.strct);
             continue;
-#endif /* USE_STRUCTS */
 
         case T_MAPPING:
             if (p->u.map->ref)
@@ -1490,11 +1480,9 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
             p->u.vec->ref++;
             continue;
 
-#ifdef USE_STRUCTS
         case T_STRUCT:
             count_struct_ref(p->u.strct);
             continue;
-#endif /* USE_STRUCTS */
 
         case T_MAPPING:
             if (CHECK_REF(p->u.map))
@@ -2051,9 +2039,7 @@ garbage_collection(void)
     clear_interpreter_refs();
     clear_comm_refs();
     clear_rxcache_refs();
-#ifdef USE_STRUCTS
     clear_tabled_struct_refs();
-#endif
 #ifdef USE_PGSQL
     pg_clear_refs();
 #endif /* USE_PGSQL */
@@ -2299,9 +2285,7 @@ garbage_collection(void)
     /* --- Pass 4: remove unreferenced strings and struct types ---
      */
 
-#ifdef USE_STRUCTS
     remove_unreferenced_structs();
-#endif
     mstring_walk_table(mark_unreferenced_string);
     mstring_gc_table();
 
@@ -2402,9 +2386,7 @@ garbage_collection(void)
  * The show_ functions are called from xmalloc directly.
  */
 
-#ifdef USE_STRUCTS
 static void show_struct(int d, void *block, int depth);
-#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -2655,11 +2637,9 @@ show_array(int d, void *block, int depth)
             show_array(d, (char *)svp->u.vec, depth+1);
             break;
 
-#ifdef USE_STRUCTS
         case T_STRUCT:
             show_struct(d, (char *)svp->u.strct, depth+1);
             break;
-#endif /* USE_STRUCTS */
 
         case T_NUMBER:
             writed(d, (p_uint)svp->u.number);
@@ -2702,7 +2682,6 @@ show_array(int d, void *block, int depth)
     }
 } /* show_array() */
 
-#ifdef USE_STRUCTS
 /*-------------------------------------------------------------------------*/
 static void
 show_struct(int d, void *block, int depth)
@@ -2827,7 +2806,6 @@ show_struct(int d, void *block, int depth)
         }
     }
 } /* show_struct() */
-#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 void

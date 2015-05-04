@@ -55,9 +55,7 @@
  *    efun: to_float()
  *    efun: to_string()
  *    efun: to_array()
-#ifdef USE_STRUCTS
  *    efun: to_struct()
-#endif
  *    efun: to_object()
  *    efun: copy()
  *    efun: deep_copy()
@@ -127,9 +125,7 @@
 #include "stdstrings.h"
 #include "simulate.h"
 #include "strfuns.h"
-#ifdef USE_STRUCTS
 #include "structs.h"
-#endif /* USE_STRUCTS */
 #ifdef USE_TLS
 #include "pkg-tls.h"
 #endif /* USE_TLS */
@@ -5765,7 +5761,6 @@ f_to_string (svalue_t *sp)
         break;
       }
 
-#ifdef USE_STRUCTS
     case T_STRUCT:
       {
         string_t *rc;
@@ -5782,7 +5777,6 @@ f_to_string (svalue_t *sp)
         put_string(sp, rc);
         break;
       }
-#endif /* USE_STRUCTS */
 
     case T_CLOSURE:
       {
@@ -5856,7 +5850,6 @@ f_to_array (svalue_t *sp)
         free_svalue(sp);
         put_array(sp, v);
         break;
-#ifdef USE_STRUCTS
     case T_STRUCT:
       {
         vector_t *vec;
@@ -5870,7 +5863,6 @@ f_to_array (svalue_t *sp)
         put_array(sp, vec);
         break;
       }
-#endif
     case T_QUOTED_ARRAY:
         /* Unquote it fully */
         sp->type = T_POINTER;
@@ -6352,7 +6344,6 @@ f_copy (svalue_t *sp)
         }
         break;
       }
-#ifdef USE_STRUCTS
     case T_STRUCT:
       {
         struct_t *old;
@@ -6375,7 +6366,6 @@ f_copy (svalue_t *sp)
         }
         break;
       }
-#endif /* USE_STRUCTS */
     case T_MAPPING:
       {
         mapping_t *old, *new;
@@ -6515,9 +6505,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
                 if (svp->type == T_QUOTED_ARRAY
                  || svp->type == T_MAPPING
                  || svp->type == T_POINTER
-#ifdef USE_STRUCTS
                  || svp->type == T_STRUCT
-#endif /* USE_STRUCTS */
                    )
                     copy_svalue(&new->item[i], svp, ptable, depth+1);
                 else
@@ -6535,8 +6523,6 @@ copy_svalue (svalue_t *dest, svalue_t *src
         }
         break;
       }
-
-#ifdef USE_STRUCTS
     case T_STRUCT:
       {
         struct pointer_record *rec;
@@ -6587,7 +6573,6 @@ copy_svalue (svalue_t *dest, svalue_t *src
         }
         break;
       }
-#endif /* USE_STRUCTS */
 
     case T_MAPPING:
       {
@@ -6690,7 +6675,6 @@ f_deep_copy (svalue_t *sp)
         }
         break;
       }
-#ifdef USE_STRUCTS
     case T_STRUCT:
       {
         struct_t *old;
@@ -6705,7 +6689,6 @@ f_deep_copy (svalue_t *sp)
         free_pointer_table(ptable);
         break;
       }
-#endif /* USE_STRUCTS */
     case T_MAPPING:
       {
         mapping_t *old;
@@ -6781,10 +6764,8 @@ v_get_type_info (svalue_t *sp, int num_arg)
  * If <arg> is a closure, the <flag> setting 2 lets the efun
  * return the object the closure is bound to, resp. for lfun closures
  * it returns the object the closure function is defined in..
-#ifdef USE_STRUCTS
  * If <arg> is a struct, the <flag> setting 2 lets the efun
  * return the basic name of the struct.
-#endif
  * If <arg> is a lfun or context closure, the <flag> setting 3 lets the efun
  * return the name of the program the closure was defined in. For other
  * closures, <flag> setting 3 returns 0.
@@ -6800,9 +6781,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
  *   - for symbols and quoted arrays the number of quotes.
  *   - for closures, the (internal) closure type, as defined in <lpctypes.h>
  *   - for strings 0 for shared strings, and non-0 for others.
-#ifdef USE_STRUCTS
  *   - for structs, the unique name of the struct is returned.
-#endif
  *   - -1 for all other datatypes.
  *
  * TODO: The flags should be defined in an include file.
@@ -6920,7 +6899,6 @@ v_get_type_info (svalue_t *sp, int num_arg)
     case T_QUOTED_ARRAY:
         j = argp->x.generic;
         break;
-#ifdef USE_STRUCTS
     case T_STRUCT:
         if (flag == 2)
         {
@@ -6941,7 +6919,6 @@ v_get_type_info (svalue_t *sp, int num_arg)
             str = ref_mstring(struct_name(sp->u.strct));
         }
         break;
-#endif /* USE_STRUCTS */
     }
 
     /* Depending on flag, return the proper value */
@@ -7052,10 +7029,8 @@ v_map (svalue_t *sp, int num_arg)
         return x_map_mapping(sp, num_arg, MY_TRUE);
     else if (arg[0].type == T_STRING)
         return x_map_string(sp, num_arg);
-#ifdef USE_STRUCTS
     else if (arg[0].type == T_STRUCT)
         return x_map_struct(sp, num_arg);
-#endif /* USE_STRUCTS */
     else /* T_POINTER */
         return x_map_array(sp, num_arg);
 
@@ -7203,9 +7178,7 @@ v_member (svalue_t *sp, int num_arg)
             case T_MAPPING:
             case T_OBJECT:
             case T_POINTER:
-#ifdef USE_STRUCTS
             case T_STRUCT:
-#endif /* USE_STRUCTS */
               {
                 svalue_t *item;
                 short type = sp->type;
@@ -7430,9 +7403,7 @@ v_rmember (svalue_t *sp, int num_arg)
         case T_MAPPING:
         case T_OBJECT:
         case T_POINTER:
-#ifdef USE_STRUCTS
         case T_STRUCT:
-#endif /* USE_STRUCTS */
           {
             svalue_t *item;
             short type = sp->type;
@@ -8898,9 +8869,7 @@ v_debug_info (svalue_t *sp, int num_arg)
             hbeat_dinfo_status(dinfo_arg, value);
             callout_dinfo_status(dinfo_arg, value);
             string_dinfo_status(dinfo_arg, value);
-#ifdef USE_STRUCTS
             struct_dinfo_status(dinfo_arg, value);
-#endif /* USE_STRUCTS */
             rxcache_dinfo_status(dinfo_arg, value);
             mb_dinfo_status(dinfo_arg, value);
 
