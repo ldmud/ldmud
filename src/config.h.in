@@ -573,11 +573,6 @@
  * be removed again later.
  */
 
-/* Enable the automatic data cleanup from the backend.
- * TODO: Remove this macro once it is proven stable.
- */
-#define NEW_CLEANUP
-
 /* Log the details of the automatic data cleanup for each individual object.
  * This is useful if the cleanup is suspected to hog the CPU.
  * TODO: Remove this macro once it is proven stable.

@@ -179,8 +179,6 @@ static lambda_t *stale_lambda_closures;
 /*            Object clean up
  */
 
-#ifdef NEW_CLEANUP
-
 typedef struct cleanup_s cleanup_t;
 typedef struct cleanup_map_extra_s cleanup_map_extra_t;
 
@@ -596,8 +594,6 @@ cleanup_compact_mappings (cleanup_t * context)
     }
 } /* cleanup_compact_mappings() */
 
-#endif /* NEW_CLEANUP */
-
 /*-------------------------------------------------------------------------*/
 void
 cleanup_object (object_t * obj)
@@ -617,9 +613,6 @@ cleanup_object (object_t * obj)
  */
 
 {
-#ifndef NEW_CLEANUP
-    return;
-#else
     cleanup_t      * context = NULL;
 #ifdef LOG_NEW_CLEANUP
     struct timeval   t_begin, t_end;
@@ -682,8 +675,6 @@ cleanup_object (object_t * obj)
               );
     }
 #endif /* LOG_NEW_CLEANUP */
-
-#endif /* NEW_CLEANUP */
 } /* cleanup_object() */
 
 /*-------------------------------------------------------------------------*/
@@ -699,9 +690,6 @@ cleanup_driver_structures (void)
  */
 
 {
-#ifndef NEW_CLEANUP
-    return;
-#else
     cleanup_t      * context = NULL;
 #ifdef LOG_NEW_CLEANUP
     struct timeval   t_begin, t_end;
@@ -765,8 +753,6 @@ static mp_int time_cleanup = 0;
               );
     }
 #endif /* LOG_NEW_CLEANUP */
-
-#endif /* NEW_CLEANUP */
 } /* cleanup_driver_structures() */
 
 /*-------------------------------------------------------------------------*/
@@ -779,9 +765,6 @@ cleanup_all_objects (void)
  */
 
 {
-#ifndef NEW_CLEANUP
-    return;
-#else
     cleanup_t      * context = NULL;
 #ifdef LOG_NEW_CLEANUP_ALL
     struct timeval   t_begin, t_end;
@@ -855,8 +838,6 @@ cleanup_all_objects (void)
               );
     }
 #endif /* LOG_NEW_CLEANUP_ALL */
-
-#endif /* NEW_CLEANUP */
 } /* cleanup_all_objects() */
 
 /*=========================================================================*/

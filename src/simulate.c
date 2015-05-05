@@ -3318,7 +3318,6 @@ status_parse (strbuf_t * sbuf, char * buff)
                        , (float)num_last_processed / (float)num_listed_objs * 100.0
                        , 100.0 * relate_statistics(stat_last_processed, stat_in_list)
                        );
-#ifdef NEW_CLEANUP
             strbuf_addf(sbuf, "Objects data-cleaned in last cycle: "
                                "%5lu (%5.1lf%% - avg. %5.1lf : %5.1lf%%)\n"
                        , (unsigned long)num_last_data_cleaned
@@ -3326,7 +3325,6 @@ status_parse (strbuf_t * sbuf, char * buff)
                        , stat_last_data_cleaned.weighted_avg
                        , 100.0 * relate_statistics(stat_last_data_cleaned, stat_in_list)
                        );
-#endif
         }
         tot += show_otable_status(sbuf, verbose);
         tot += heart_beat_status(sbuf, verbose);

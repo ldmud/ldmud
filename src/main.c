@@ -2225,9 +2225,6 @@ options (void)
 #       if defined(DUMP_GC_REFS)
                               , "DUMP_GC_REFS"
 #       endif
-#       if defined(NEW_CLEANUP)
-                              , "NEW_CLEANUP"
-#       endif
 #       if defined(LOG_NEW_CLEANUP)
                               , "LOG_NEW_CLEANUP"
 #       endif
