@@ -614,18 +614,18 @@ cleanup_object (object_t * obj)
 
 {
     cleanup_t      * context = NULL;
-#ifdef LOG_NEW_CLEANUP
+#ifdef LOG_CLEANUP
     struct timeval   t_begin, t_end;
-#endif /* LOG_NEW_CLEANUP */
+#endif /* LOG_CLEANUP */
     Bool             didSwap = MY_FALSE;
     unsigned long    numValues = 0;
 
-#ifdef LOG_NEW_CLEANUP
+#ifdef LOG_CLEANUP
     if (gettimeofday(&t_begin, NULL))
     {
         t_begin.tv_sec = t_begin.tv_usec = 0;
     }
-#endif /* LOG_NEW_CLEANUP */
+#endif /* LOG_CLEANUP */
 
     context = cleanup_new(MY_FALSE);
     if (context != NULL)
@@ -638,7 +638,7 @@ cleanup_object (object_t * obj)
     obj->time_cleanup = current_time + (9*time_to_data_cleanup)/10
                                      + random_number((2*time_to_data_cleanup)/10);
 
-#ifdef LOG_NEW_CLEANUP
+#ifdef LOG_CLEANUP
     if (t_begin.tv_sec == 0
      || gettimeofday(&t_end, NULL))
     {
@@ -674,7 +674,7 @@ cleanup_object (object_t * obj)
               , didSwap ? " (swapped)" : ""
               );
     }
-#endif /* LOG_NEW_CLEANUP */
+#endif /* LOG_CLEANUP */
 } /* cleanup_object() */
 
 /*-------------------------------------------------------------------------*/
@@ -691,9 +691,9 @@ cleanup_driver_structures (void)
 
 {
     cleanup_t      * context = NULL;
-#ifdef LOG_NEW_CLEANUP
+#ifdef LOG_CLEANUP
     struct timeval   t_begin, t_end;
-#endif /* LOG_NEW_CLEANUP */
+#endif /* LOG_CLEANUP */
     unsigned long    numValues = 0;
 
 static mp_int time_cleanup = 0;
@@ -706,12 +706,12 @@ static mp_int time_cleanup = 0;
     time_cleanup = current_time + (9*time_to_data_cleanup)/10
                                 + random_number((2*time_to_data_cleanup)/10);
 
-#ifdef LOG_NEW_CLEANUP
+#ifdef LOG_CLEANUP
     if (gettimeofday(&t_begin, NULL))
     {
         t_begin.tv_sec = t_begin.tv_usec = 0;
     }
-#endif /* LOG_NEW_CLEANUP */
+#endif /* LOG_CLEANUP */
 
     context = cleanup_new(MY_FALSE);
     if (context != NULL)
@@ -722,7 +722,7 @@ static mp_int time_cleanup = 0;
         cleanup_free(context);
     }
 
-#ifdef LOG_NEW_CLEANUP
+#ifdef LOG_CLEANUP
     if (t_begin.tv_sec == 0
      || gettimeofday(&t_end, NULL))
     {
@@ -752,7 +752,7 @@ static mp_int time_cleanup = 0;
               , numValues
               );
     }
-#endif /* LOG_NEW_CLEANUP */
+#endif /* LOG_CLEANUP */
 } /* cleanup_driver_structures() */
 
 /*-------------------------------------------------------------------------*/
@@ -766,13 +766,13 @@ cleanup_all_objects (void)
 
 {
     cleanup_t      * context = NULL;
-#ifdef LOG_NEW_CLEANUP_ALL
+#ifdef LOG_CLEANUP_ALL
     struct timeval   t_begin, t_end;
-#endif /* LOG_NEW_CLEANUP_ALL */
+#endif /* LOG_CLEANUP_ALL */
     long             numObjects = 0;
     unsigned long    numValues = 0;
 
-#ifdef LOG_NEW_CLEANUP_ALL
+#ifdef LOG_CLEANUP_ALL
     if (gettimeofday(&t_begin, NULL))
     {
         t_begin.tv_sec = t_begin.tv_usec = 0;
@@ -783,7 +783,7 @@ cleanup_all_objects (void)
     printf("%s Data-Clean: All Objects\n"
           , time_stamp()
           );
-#endif /* LOG_NEW_CLEANUP_ALL */
+#endif /* LOG_CLEANUP_ALL */
 
     context = cleanup_new(MY_TRUE);
     if (context != NULL)
@@ -809,7 +809,7 @@ cleanup_all_objects (void)
         cleanup_free(context);
     }
 
-#ifdef LOG_NEW_CLEANUP_ALL
+#ifdef LOG_CLEANUP_ALL
     if (t_begin.tv_sec == 0
      || gettimeofday(&t_end, NULL))
     {
@@ -837,7 +837,7 @@ cleanup_all_objects (void)
               , numValues
               );
     }
-#endif /* LOG_NEW_CLEANUP_ALL */
+#endif /* LOG_CLEANUP_ALL */
 } /* cleanup_all_objects() */
 
 /*=========================================================================*/

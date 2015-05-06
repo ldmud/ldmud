@@ -577,13 +577,13 @@
  * This is useful if the cleanup is suspected to hog the CPU.
  * TODO: Remove this macro once it is proven stable.
  */
-#undef LOG_NEW_CLEANUP
+#undef LOG_CLEANUP
 
 /* Log the details of the automatic data cleanup of all objects. This is
  * useful if the cleanup is suspected to hog the CPU.
  * TODO: Remove this macro once it is proven stable.
  */
-#define LOG_NEW_CLEANUP_ALL
+#define LOG_CLEANUP_ALL
 
 /* Enable the use of freelists in the malloc AVL nodes.
  * Supported by: MALLOC_smalloc, MALLOC_slaballoc.
