@@ -49,8 +49,8 @@ that you should pay attention to when updating.
   + call_other() and call_direct() now always accept an array of objects or
     strings (object names) as argument and call the function in all of these
     objects.
-  + object_info() does not report OIB_TOTAL_LIGHT any more, therefore the
-    array OINFO_BASIC is one element shorter.
+  + object_info() was redesigned to just return a single information including
+    configuration options from configure_object(). (#596)
 
 - Pragmas
   + The behaviour of the pragma combine_strings is mandatory, that means

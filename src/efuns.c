@@ -139,7 +139,7 @@
 #include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/configuration.h"
-#include "../mudlib/sys/objectinfo.h"
+#include "../mudlib/sys/object_info.h"
 #include "../mudlib/sys/regexp.h"
 #include "../mudlib/sys/strings.h"
 #include "../mudlib/sys/time.h"
@@ -4456,8 +4456,9 @@ f_configure_object (svalue_t *sp)
     else
         ob = NULL;
 
-    if (ob != current_object
-     && !privilege_violation_n(STR_CONFIGURE_OBJECT, ob, sp, 2))
+    if ((current_object->flags & O_DESTRUCTED)
+     || (ob != current_object
+      && !privilege_violation_n(STR_CONFIGURE_OBJECT, ob, sp, 2)))
     {
         sp = pop_n_elems(3, sp);
         return sp;
@@ -4468,6 +4469,28 @@ f_configure_object (svalue_t *sp)
     default:
         errorf("Illegal value %"PRIdPINT" for configure_object().\n", sp[-1].u.number);
         return sp; /* NOTREACHED */
+
+    case OC_COMMANDS_ENABLED:
+        if (!ob)
+            errorf("Default value for OC_COMMANDS_ENABLED is not supported.\n");
+        if (sp->type != T_NUMBER)
+            efun_arg_error(2, T_NUMBER, sp->type, sp);
+
+        if (sp->u.number)
+            ob->flags |= O_ENABLE_COMMANDS;
+        else
+            ob->flags &= ~O_ENABLE_COMMANDS;
+        break;
+
+    case OC_HEART_BEAT:
+        if (!ob)
+            errorf("Default value for OC_HEART_BEAT is not supported.\n");
+        if (sp->type != T_NUMBER)
+            efun_arg_error(2, T_NUMBER, sp->type, sp);
+
+        set_heart_beat(ob, sp->u.number != 0);
+        break;
+
     }
 
     sp = pop_n_elems(3, sp);
@@ -4475,289 +4498,342 @@ f_configure_object (svalue_t *sp)
 } /* f_configure_object() */
 
 /*-------------------------------------------------------------------------*/
-svalue_t *
-v_object_info (svalue_t *sp, int num_args)
+static void
+assert_ob_not_swapped (object_t *ob)
 
-/* EFUN object_info()
- *
- *    mixed * object_info(object o, int type)
- *    mixed * object_info(object o, int type, int which)
- *
- * Return an array with information about the object <o>. The
- * type of information returned is determined by <type>.
- *
- * If <which> is specified, the function does not return the full array, but
- * just the single value from index <which>.
+/* Makes sure that <ob> is swapped by swapping in
+ * or throwing an error otherwise.
  */
 
 {
-    vector_t *v;
-    object_t *o, *o2;
-    program_t *prog;
-    svalue_t *svp, *argp;
-    mp_int v0, v1, v2;
-    int flags, pos, value;
+    if ((ob->flags & O_SWAPPED) && load_ob_from_swap(ob) < 0)
+        errorf("Out of memory: unswap object '%s'.\n", get_txt(ob->name));
+} /* assert_ob_not_swapped */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_object_info (svalue_t *sp)
+
+/* EFUN object_info()
+ *
+ *    mixed object_info(object ob, int what)
+ *
+ * Return information about the object <ob>.
+ * <what> can either be a configuration option as given to
+ * configure_object() or one of the OI_xxx options.
+ */
+
+{
+    object_t *ob;
     svalue_t result;
 
-    /* Get the arguments from the stack */
-    argp = sp - num_args + 1;
-    if (num_args == 3)
-    {
-        value = argp[2].u.number;
-        assign_svalue_no_free(&result, &const0);
-    }
+    if (sp[-1].type == T_OBJECT)
+        ob = sp[-1].u.ob;
     else
-        value = -1;
+        ob = NULL;
 
-    o = argp->u.ob;
+    if (!ob && sp[0].u.number < 0)
+        errorf("There is no default value for non-configuration values.\n");
 
-    /* Depending on the <type> argument, determine the
-     * data to return.
-     */
-    switch(argp[1].u.number)
+    switch (sp[0].u.number)
     {
-#define PREP(max) \
-    if (num_args == 2) { \
-        v = allocate_array(max); \
-        if (!v) \
-            errorf("Out of memory: array[%d] for result.\n" \
-                 , max); \
-        svp = v->item; \
-    } else { \
-        v = NULL; \
-        if (value < 0 || value >= max) \
-            errorf("Illegal index for object_info(): %d, " \
-                  "expected 0..%d\n", value, max-1); \
-        svp = &result; \
-    }
-
-#define ST_NUMBER(which,code) \
-    if (value == -1) svp[which].u.number = code; \
-    else if (value == which) svp->u.number = code; \
-    else {}
-
-#define ST_DOUBLE(which,code) \
-    if (value == -1) { \
-        svp[which].type = T_FLOAT; \
-        STORE_DOUBLE(svp+which, code); \
-    } else if (value == which) { \
-        svp->type = T_FLOAT; \
-        STORE_DOUBLE(svp, code); \
-    } else {}
-
-#define ST_STRING(which,code) \
-    if (value == -1) { \
-        put_ref_string(svp+which, code); \
-    } else if (value == which) { \
-        put_ref_string(svp, code); \
-    } else {}
-
-#define ST_NOREF_STRING(which,code) \
-    if (value == -1) { \
-        put_string(svp+which, code); \
-    } else if (value == which) { \
-        put_string(svp, code); \
-    } else {}
-
-#define ST_OBJECT(which,code,tag) \
-    if (value == -1) { \
-        put_ref_object(svp+which, code, tag); \
-    } else if (value == which) { \
-        put_ref_object(svp, code, tag); \
-    } else {}
-
     default:
-        errorf("Illegal value %"PRIdPINT" for object_info().\n", sp->u.number);
-        /* NOTREACHED */
-        return sp;
+        errorf("Illegal value %"PRIdPINT" for object_info().\n", sp[0].u.number);
+        return sp; /* NOTREACHED */
 
-    /* --- The basic information from the object structure */
-    case OINFO_BASIC:
-        PREP(OIB_MAX);
+    /* Configuration */
+    case OC_COMMANDS_ENABLED:
+        if (!ob)
+            errorf("Default value for OC_COMMANDS_ENABLED is not supported.\n");
+        put_number(&result, (ob->flags & O_ENABLE_COMMANDS) ? 1 : 0);
+        break;
 
-        flags = o->flags;
+    case OC_HEART_BEAT:
+        if (!ob)
+            errorf("Default value for OC_HEART_BEAT is not supported.\n");
+        put_number(&result, (ob->flags & O_HEART_BEAT) ? 1 : 0);
+        break;
 
-        ST_NUMBER(OIB_HEART_BEAT,        (flags & O_HEART_BEAT) ? 1 : 0);
-#ifdef USE_SET_IS_WIZARD
-        ST_NUMBER(OIB_IS_WIZARD,         (flags & O_IS_WIZARD) ? 1 : 0);
-#else
-        ST_NUMBER(OIB_IS_WIZARD,         0);
-#endif
-        ST_NUMBER(OIB_ENABLE_COMMANDS,   (flags & O_ENABLE_COMMANDS) ? 1 : 0);
-        ST_NUMBER(OIB_CLONE,             (flags & O_CLONE) ? 1 : 0);
-        ST_NUMBER(OIB_DESTRUCTED,        (flags & O_DESTRUCTED) ? 1 : 0);
-        ST_NUMBER(OIB_SWAPPED,           (flags & O_SWAPPED) ? 1 : 0);
-        ST_NUMBER(OIB_ONCE_INTERACTIVE,  (flags & O_ONCE_INTERACTIVE) ? 1 : 0);
-        ST_NUMBER(OIB_RESET_STATE,       (flags & O_RESET_STATE) ? 1 : 0);
-        ST_NUMBER(OIB_WILL_CLEAN_UP,     (flags & O_WILL_CLEAN_UP) ? 1 : 0);
-        ST_NUMBER(OIB_LAMBDA_REFERENCED, (flags & O_LAMBDA_REFERENCED) ? 1 : 0);
-        ST_NUMBER(OIB_SHADOW,            (flags & O_SHADOW) ? 1 : 0);
-        ST_NUMBER(OIB_REPLACED,          (flags & O_REPLACED) ? 1 : 0);
-        ST_NUMBER(OIB_NEXT_RESET,        o->time_reset);
-        ST_NUMBER(OIB_NEXT_CLEANUP,      o->time_cleanup);
-        ST_NUMBER(OIB_TIME_OF_REF,       o->time_of_ref);
-        ST_NUMBER(OIB_REF,               o->ref);
-        ST_NUMBER(OIB_GIGATICKS,         (p_int)o->gigaticks);
-        ST_NUMBER(OIB_TICKS,             (p_int)o->ticks);
-        ST_NUMBER(OIB_SWAP_NUM,          O_SWAP_NUM(o));
-        ST_NUMBER(OIB_PROG_SWAPPED,      O_PROG_SWAPPED(o) ? 1 : 0);
-        ST_NUMBER(OIB_VAR_SWAPPED,       O_VAR_SWAPPED(o) ? 1 : 0);
+    /* Object flags */
+    case OI_ONCE_INTERACTIVE:
+        put_number(&result, (ob->flags & O_ONCE_INTERACTIVE) ? 1 : 0);
+        break;
 
-        if (compat_mode)
-        {
-            ST_STRING(OIB_NAME, o->name);
-        }
+    case OI_RESET_STATE:
+        put_number(&result, (ob->flags & O_RESET_STATE) ? 1 : 0);
+        break;
+
+    case OI_WILL_CLEAN_UP:
+        put_number(&result, (ob->flags & O_WILL_CLEAN_UP) ? 1 : 0);
+        break;
+
+    case OI_LAMBDA_REFERENCED:
+        put_number(&result, (ob->flags & O_LAMBDA_REFERENCED) ? 1 : 0);
+        break;
+
+    case OI_REPLACED:
+        put_number(&result, (ob->flags & O_REPLACED) ? 1 : 0);
+        break;
+
+    /* Program flags */
+    case OI_NO_INHERIT:
+        assert_ob_not_swapped(ob);
+        put_number(&result, (ob->prog->flags & P_NO_INHERIT) ? 1 : 0);
+        break;
+
+    case OI_NO_CLONE:
+        assert_ob_not_swapped(ob);
+        put_number(&result, (ob->prog->flags & P_NO_CLONE) ? 1 : 0);
+        break;
+
+    case OI_NO_SHADOW:
+        assert_ob_not_swapped(ob);
+        put_number(&result, (ob->prog->flags & P_NO_SHADOW) ? 1 : 0);
+        break;
+
+    case OI_SHARE_VARIABLES:
+        assert_ob_not_swapped(ob);
+        put_number(&result, (ob->prog->flags & P_SHARE_VARIABLES) ? 1 : 0);
+        break;
+
+    /* Swapping */
+    case OI_SWAPPED:
+        put_number(&result, (ob->flags & O_SWAPPED) ? 1 : 0);
+        break;
+
+    case OI_PROG_SWAPPED:
+        put_number(&result, O_PROG_SWAPPED(ob) ? 1 : 0);
+        break;
+
+    case OI_VAR_SWAPPED:
+        put_number(&result, O_VAR_SWAPPED(ob) ? 1 : 0);
+        break;
+
+    case OI_SWAP_NUM:
+        put_number(&result, O_SWAP_NUM(ob));
+        break;
+
+    /* Timing */
+    case OI_NEXT_RESET_TIME:
+        put_number(&result, ob->time_reset);
+        break;
+
+    case OI_NEXT_CLEANUP_TIME:
+        put_number(&result, ob->time_cleanup);
+        break;
+
+    case OI_LAST_REF_TIME:
+        put_number(&result, ob->time_of_ref);
+        break;
+
+    /* Object list */
+    case OI_OBJECT_NEXT:
+        if (ob->next_all)
+            put_ref_object(&result, ob->next_all, "object_info(OI_OBJECT_NEXT)");
         else
-        {
-            ST_NOREF_STRING(OIB_NAME, add_slash(o->name));
-        }
-
-        ST_STRING(OIB_LOAD_NAME, o->load_name);
-
-        o2 = o->next_all;
-        if (o2)
-        {
-            ST_OBJECT(OIB_NEXT_ALL, o2, "object_info(0)");
-        } /* else the element was already allocated as 0 */
-
-        o2 = o->prev_all;
-        if (o2)
-        {
-            ST_OBJECT(OIB_PREV_ALL, o2, "object_info(0)");
-        } /* else the element was already allocated as 0 */
-
+            put_number(&result, 0);
         break;
 
-    /* --- Position in the object list */
-    case OINFO_POSITION:
-        PREP(OIP_MAX);
+    case OI_OBJECT_PREV:
+        if (ob->next_all)
+            put_ref_object(&result, ob->prev_all, "object_info(OI_OBJECT_PREV)");
+        else
+            put_number(&result, 0);
+        break;
 
-        o2 = o->next_all;
-        if (o2)
+    case OI_OBJECT_POS:
         {
-            ST_OBJECT(OIP_NEXT, o2, "object_info(1) next");
-        } /* else the element was already allocated as 0 */
+            int pos = 0;
+            object_t *pos_ob = obj_list;
 
-        o2 = o->prev_all;
-        if (o2)
-        {
-            ST_OBJECT(OIP_PREV, o2, "object_info(1) next");
-        } /* else the element was already allocated as 0 */
-
-        if (value == -1 || value == OIP_POS)
-        {
-            /* Find the non-destructed predecessor of the object */
-            if (obj_list == o)
+            for (; pos_ob; pos_ob = pos_ob->next_all)
             {
-                pos = 0;
-            }
-            else
-            for (o2 = obj_list, pos = 0; o2; o2 = o2->next_all)
-            {
-                pos++;
-                if (o2->next_all == o)
+                if (pos_ob == ob)
                     break;
+                pos++;
             }
 
-            if (!o2) /* Not found in the list (this shouldn't happen) */
+            if (!pos_ob)
                 pos = -1;
-
-            ST_NUMBER(OIP_POS, pos);
+            put_number(&result, pos);
+            break;
         }
 
+    /* Shadows */
+    case OI_SHADOW_NEXT:
+        {
+            object_t *sh = (ob->flags & O_SHADOW) ? O_GET_SHADOW(ob)->shadowed_by : NULL;
+            if (sh)
+                put_ref_object(&result, sh, "object_info(OI_SHADOW_NEXT)");
+            else
+                put_number(&result, 0);
+            break;
+        }
+
+    case OI_SHADOW_PREV:
+        {
+            object_t *sh = (ob->flags & O_SHADOW) ? O_GET_SHADOW(ob)->shadowing : NULL;
+            if (sh)
+                put_ref_object(&result, sh, "object_info(OI_SHADOW_PREV)");
+            else
+                put_number(&result, 0);
+            break;
+        }
+
+    case OI_SHADOW_ALL:
+        {
+            int num = 0;
+            object_t *sh = ob;
+            vector_t *vec;
+
+            for(; sh; sh = (sh->flags & O_SHADOW) ? O_GET_SHADOW(sh)->shadowed_by : NULL)
+                num++;
+
+            /* The first object is <ob> itself, so skipping that. */
+            vec = allocate_array(num-1);
+            num = 0;
+            for(sh = ob; sh; sh = (sh->flags & O_SHADOW) ? O_GET_SHADOW(sh)->shadowed_by : NULL)
+            {
+                if(num)
+                    put_ref_object(vec->item + num - 1, sh, "object_info(OI_SHADOW_ALL)");
+                num++;
+            }
+
+            put_array(&result, vec);
+            break;
+        }
+
+    /* Object Statistics */
+    case OI_OBJECT_REFS:
+        put_number(&result, ob->ref);
         break;
 
-    /* --- Memory and program information */
-    case OINFO_MEMORY:
-        PREP(OIM_MAX);
+    case OI_TICKS:
+        put_number(&result, (p_int)ob->ticks);
+        break;
 
-        if ((o->flags & O_SWAPPED) && load_ob_from_swap(o) < 0)
-            errorf("Out of memory: unswap object '%s'.\n", get_txt(o->name));
+    case OI_GIGATICKS:
+        put_number(&result, (p_int)ob->gigaticks);
+        break;
 
-        prog = o->prog;
-
-        ST_NUMBER(OIM_REF, prog->ref);
-
-        ST_STRING(OIM_NAME, prog->name);
-
-        ST_NUMBER(OIM_PROG_SIZE, (long)(PROGRAM_END(*prog) - prog->program));
-
-          /* Program size */
-        ST_NUMBER(OIM_NUM_FUNCTIONS, prog->num_functions);
-        ST_NUMBER(OIM_SIZE_FUNCTIONS
-                 , (p_int)(prog->num_functions * sizeof(uint32)
-                    + prog->num_function_names * sizeof(short)));
-          /* Number of function names and the memory usage */
-        ST_NUMBER(OIM_NUM_VARIABLES, prog->num_variables);
-        ST_NUMBER(OIM_SIZE_VARIABLES
-                 , (p_int)(prog->num_variables * sizeof(variable_t)));
-          /* Number of variables and the memory usage */
-        v1 = program_string_size(prog, &v0, &v2);
-        ST_NUMBER(OIM_NUM_STRINGS, prog->num_strings);
-        ST_NUMBER(OIM_SIZE_STRINGS, (p_int)v0);
-        ST_NUMBER(OIM_SIZE_STRINGS_DATA, v1);
-        ST_NUMBER(OIM_SIZE_STRINGS_TOTAL, v2);
-          /* Number of strings and the memory usage */
-
-        ST_NUMBER(OIM_NUM_INCLUDES, prog->num_includes);
+    case OI_DATA_SIZE:
+    case OI_DATA_SIZE_TOTAL:
         {
-            int i = prog->num_inherited;
+            mp_int totalsize, datasize;
+
+            assert_ob_not_swapped(ob);
+            datasize = data_size(ob, &totalsize);
+
+            put_number(&result, (sp[0].u.number == OI_DATA_SIZE) ? datasize : totalsize);
+            break;
+        }
+
+    /* Program Statistics */
+    case OI_PROG_REFS:
+        assert_ob_not_swapped(ob);
+        put_number(&result, ob->prog->ref);
+        break;
+
+    case OI_NUM_FUNCTIONS:
+        assert_ob_not_swapped(ob);
+        put_number(&result, ob->prog->num_functions);
+        break;
+
+    case OI_NUM_VARIABLES:
+        assert_ob_not_swapped(ob);
+        put_number(&result, ob->prog->num_variables);
+        break;
+
+    case OI_NUM_STRINGS:
+        assert_ob_not_swapped(ob);
+        put_number(&result, ob->prog->num_strings);
+        break;
+
+    case OI_NUM_INHERITED:
+        assert_ob_not_swapped(ob);
+        {
+            /* Need to filter artificial entries. */
+            int i = ob->prog->num_inherited;
             int cnt = 0;
             inherit_t *inheritp;
 
-            for (inheritp = prog->inherit; i--; inheritp++)
+            for (inheritp = ob->prog->inherit; i--; inheritp++)
             {
                 if (inheritp->inherit_type == INHERIT_TYPE_NORMAL
                  || inheritp->inherit_type == INHERIT_TYPE_VIRTUAL
                    )
                     cnt++;
             }
-            ST_NUMBER(OIM_NUM_INHERITED, cnt);
-        }
-        ST_NUMBER(OIM_SIZE_INHERITED
-                 , (p_int)(prog->num_inherited * sizeof(inherit_t)));
-          /* Number of inherites and the memory usage */
-        ST_NUMBER(OIM_TOTAL_SIZE, prog->total_size);
 
-        {
-            mp_int totalsize;
-            mp_int datasize = data_size(o, &totalsize);
-
-            ST_NUMBER(OIM_DATA_SIZE, datasize);
-            ST_NUMBER(OIM_TOTAL_DATA_SIZE, totalsize);
+            put_number(&result, cnt);
+            break;
         }
 
-        ST_NUMBER(OIM_NO_INHERIT, (prog->flags & P_NO_INHERIT) ? 1 : 0);
-        ST_NUMBER(OIM_NO_CLONE, (prog->flags & P_NO_CLONE) ? 1 : 0);
-        ST_NUMBER(OIM_NO_SHADOW, (prog->flags & P_NO_SHADOW) ? 1 : 0);
-        ST_NUMBER(OIM_SHARE_VARIABLES, (prog->flags & P_SHARE_VARIABLES) ? 1 : 0);
+    case OI_NUM_INCLUDED:
+        assert_ob_not_swapped(ob);
+        put_number(&result, ob->prog->num_includes);
         break;
 
-#undef PREP
-#undef ST_NUMBER
-#undef ST_DOUBLE
-#undef ST_STRING
-#undef ST_RSTRING
-#undef ST_OBJECT
+    case OI_SIZE_FUNCTIONS:
+        assert_ob_not_swapped(ob);
+        put_number(&result, (p_int)
+            ( ob->prog->num_functions      * sizeof(*ob->prog->functions)
+            + ob->prog->num_function_names * sizeof(*ob->prog->function_names)));
+        break;
+
+    case OI_SIZE_VARIABLES:
+        assert_ob_not_swapped(ob);
+        put_number(&result, (p_int)
+            ( ob->prog->num_variables      * sizeof(*ob->prog->variables)));
+        break;
+
+    case OI_SIZE_STRINGS:
+        assert_ob_not_swapped(ob);
+        put_number(&result, (p_int)
+            ( ob->prog->num_strings        * sizeof(*ob->prog->strings)));
+        break;
+
+    case OI_SIZE_STRINGS_DATA:
+    case OI_SIZE_STRINGS_DATA_TOTAL:
+        {
+            mp_int size, total, overhead;
+
+            assert_ob_not_swapped(ob);
+            size = program_string_size(ob->prog, &overhead, &total);
+
+            put_number(&result, (sp[0].u.number == OI_SIZE_STRINGS_DATA) ? size : total);
+            break;
+        }
+
+    case OI_SIZE_INHERITED:
+        assert_ob_not_swapped(ob);
+        put_number(&result, (p_int)
+            ( ob->prog->num_inherited      * sizeof(*ob->prog->inherit)));
+        break;
+
+    case OI_SIZE_INCLUDED:
+        assert_ob_not_swapped(ob);
+        put_number(&result, (p_int)
+            ( ob->prog->num_includes       * sizeof(*ob->prog->includes)));
+
+    case OI_PROG_SIZE:
+        assert_ob_not_swapped(ob);
+        put_number(&result, (long)(PROGRAM_END(*ob->prog) - ob->prog->program));
+        break;
+
+    case OI_PROG_SIZE_TOTAL:
+        assert_ob_not_swapped(ob);
+        put_number(&result, ob->prog->total_size);
+        break;
     }
 
-    free_svalue(sp);
-    sp--;
-    free_svalue(sp);
-    if (num_args == 3)
-    {
-        sp--;
-        free_svalue(sp);
-    }
+    sp = pop_n_elems(2, sp);
 
-    /* Assign the result */
-    if (num_args == 2)
-        put_array(sp, v);
-    else
-        transfer_svalue_no_free(sp, &result);
-
+    sp++;
+    *sp = result;
     return sp;
-} /* v_object_info() */
+
+} /* f_object_info() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

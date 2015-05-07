@@ -490,7 +490,7 @@ int     interactive(object default: F_THIS_OBJECT);
 mixed   interactive_info(null|object, int);
 string  load_name(null|string|object default: F_THIS_OBJECT);
 object  load_object(string);
-mixed   object_info(null|object, int, void|int);
+mixed   object_info(null|object, int);
 string  object_name(null|object default: F_THIS_OBJECT);
 int     object_time(object default: F_THIS_OBJECT);
 object  present_clone(object|string, object|int|void, int|void);

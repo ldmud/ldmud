@@ -8,9 +8,10 @@
  */
 #define IC_MAX_WRITE_BUFFER_SIZE 0
 
-/* Possible options for configure_opbject().
+/* Possible options for configure_object().
  */
-
+#define OC_COMMANDS_ENABLED    0
+#define OC_HEART_BEAT          1
 
 /* Possible options for configure_driver().
  */
