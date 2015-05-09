@@ -7956,7 +7956,8 @@ f_configure_driver (svalue_t *sp)
 {
 
     // Check for privilege_violation.
-    if (!privilege_violation2(STR_CONFIGURE_DRIVER, sp-1, sp, sp))
+    if ((current_object->flags & O_DESTRUCTED)
+     || !privilege_violation2(STR_CONFIGURE_DRIVER, sp-1, sp, sp))
     {
         return pop_n_elems(2, sp);
     }
