@@ -3269,27 +3269,6 @@ f_program_time (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_query_once_interactive (svalue_t *sp)
-
-/* EFUN query_once_interactive()
- *
- *   int query_once_interactive(object ob)
- *
- * True if the object is or once was interactive.
- */
-
-{
-    object_t *obj;
-
-    obj = sp->u.ob;
-    put_number(sp, obj->flags & O_ONCE_INTERACTIVE ? 1 : 0);
-    deref_object(obj, "query_once_interactive");
-
-    return sp;
-} /* f_query_once_interactive() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
 f_rename_object (svalue_t *sp)
 
 /* EFUN rename_object()

@@ -303,7 +303,6 @@ extern svalue_t *f_object_name(svalue_t *sp);
 extern svalue_t *f_object_time(svalue_t *sp);
 extern svalue_t *f_program_name(svalue_t *sp);
 extern svalue_t *f_program_time(svalue_t *sp);
-extern svalue_t *f_query_once_interactive(svalue_t *sp);
 extern svalue_t *f_rename_object(svalue_t *sp);
 extern svalue_t *v_replace_program(svalue_t *sp, int num_arg);
 extern svalue_t *f_tell_object(svalue_t *sp);
