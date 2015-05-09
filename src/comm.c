@@ -9078,8 +9078,9 @@ f_configure_interactive (svalue_t *sp)
         ip = NULL;
     }
 
-    if (ob != current_object
-     && !privilege_violation_n(STR_CONFIGURE_INTERACTIVE, ob, sp, 2))
+    if ((current_object->flags & O_DESTRUCTED)
+     || (ob != current_object
+      && !privilege_violation_n(STR_CONFIGURE_INTERACTIVE, ob, sp, 2)))
     {
         sp = pop_n_elems(3, sp);
         return sp;
