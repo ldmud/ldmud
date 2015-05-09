@@ -294,7 +294,6 @@ extern svalue_t *f_find_object(svalue_t *sp);
 extern svalue_t *f_load_object(svalue_t *sp);
 extern svalue_t *f_set_driver_hook(svalue_t *sp);
 extern svalue_t *f_shadow(svalue_t *sp);
-extern svalue_t *f_query_shadowing(svalue_t *sp);
 extern svalue_t *f_unshadow(svalue_t *sp);
 extern svalue_t *v_limited(svalue_t * sp, int num_arg);
 extern svalue_t *v_set_limits(svalue_t * sp, int num_arg);

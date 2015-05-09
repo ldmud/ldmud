@@ -498,7 +498,6 @@ int     program_time(object default: F_THIS_OBJECT);
 void    replace_program(void|string);
 mixed   query_editing(object);
 int     query_idle(object);
-object  query_shadowing(object);
 object  query_snoop(object);
 int     find_input_to(object, object|string|closure, void|string);
 mixed * input_to_info(object);
@@ -509,7 +508,7 @@ int     restore_object(string);
 mixed   save_object(void|string|int, void|int);
 int     set_next_reset(int);
 void    set_this_object(object);
-object  shadow(object, int);
+int     shadow(object);
 int     snoop(object, void|object);
 void    tell_object(object|string, string|mixed*|mapping|struct|object);
 

@@ -2,9 +2,8 @@ SYNOPSIS
         object shadow(object obj, int flag)
 
 BESCHREIBUNG
-        Wenn <flag> nicht 0 ist, wird das aktuelle Objekt dem Objekt obj
-        als Shadow uebergeworfen. Wenn <flag> 0 ist, wird entweder 0 oder
-        das geshadowte Objekt zurueck gegeben.
+        Damit wird das aktuelle Objekt dem Objekt <obj> als Shadow
+        uebergeworfen. Bei Erfolg liefert es 1, sonst 0 zurueck.
 
         Das aufrufende Objekt muss vom Master-Objekt die Erlaubnis haben,
         als Shadow zu wirken. Normalerweise kann einem Objekt, das

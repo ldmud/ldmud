@@ -44,6 +44,9 @@ that you should pay attention to when updating.
   + The efun query_once_interactive() was removed in favor of
     object_info(ob, OI_ONCE_INTERACTIVE). There is a sefun
     replacement in /mudlib/deprecated/. (#596)
+  + The efun query_shadowing() was removed in favor of
+    object_info(ob, OI_SHADOW_PREV). There is a sefun replacement
+    in /mudlib/deprecated/. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an
@@ -60,6 +63,9 @@ that you should pay attention to when updating.
     objects.
   + object_info() was redesigned to just return a single information including
     configuration options from configure_object(). (#596)
+  + The functionality of shadow(ob, 0) was removed in favor of
+    object_info(ob, OI_SHADOW_NEXT). There is a sefun implementation with
+    the old signature in /mudlib/deprecated/. (#596)
 
 - Pragmas
   + The behaviour of the pragma combine_strings is mandatory, that means

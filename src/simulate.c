@@ -4603,12 +4603,11 @@ f_shadow (svalue_t *sp)
 
 /* EFUN shadow()
  *
- *   object shadow(object ob, int flag)
+ *   object shadow(object ob)
  *
- * If flag is non-zero then the current object will shadow ob. If
- * flag is 0 then either 0 will be returned or the object that is
- * shadowing ob.
- * 	
+ * The current_object will shadow ob. This efun
+ * returns 1 on success, 1 otherwise.
+ *
  * The calling object must be permitted by the master object to
  * do the shadowing. In most installations, an object that
  * defines the function query_prevent_shadow() to return 1
@@ -4635,20 +4634,8 @@ f_shadow (svalue_t *sp)
     object_t *ob;
 
     /* Get the arguments */
-    sp--;
     ob = sp->u.ob;
     deref_object(ob, "shadow");
-
-    if (sp[1].u.number == 0)
-    {
-        /* Just look for a possible shadow */
-        ob = (ob->flags & O_SHADOW) ? O_GET_SHADOW(ob)->shadowed_by : NULL;
-        if (ob)
-            sp->u.ob = ref_object(ob, "shadow");
-        else
-            put_number(sp, 0);
-        return sp;
-    }
 
     sp->type = T_NUMBER; /* validate_shadowing might destruct ob */
     assign_eval_cost();
@@ -4677,7 +4664,7 @@ f_shadow (svalue_t *sp)
 
         co_shadow_sent->shadowing = ob;
         shadow_sent->shadowed_by = current_object;
-        put_ref_object(sp, ob, "shadow");
+        put_number(sp, 1);
         return sp;
     }
 
@@ -4685,33 +4672,6 @@ f_shadow (svalue_t *sp)
     put_number(sp, 0);
     return sp;
 } /* f_shadow() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_query_shadowing (svalue_t *sp)
-
-/* EFUN query_shadowing()
- *
- *   object query_shadowing (object obj)
- *
- * The function returns the object which <obj> is currently
- * shadowing, or 0 if <obj> is not a shadow.
- */
-
-{
-
-    object_t *ob;
-
-    ob = sp->u.ob;
-    deref_object(ob, "shadow");
-    ob = (ob->flags & O_SHADOW) ? O_GET_SHADOW(ob)->shadowing : NULL;
-    if (ob)
-        sp->u.ob = ref_object(ob, "shadow");
-    else
-        put_number(sp, 0);
-
-    return sp;
-} /* f_query_shadowing() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
