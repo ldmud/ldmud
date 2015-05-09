@@ -67,8 +67,6 @@ extern void restore_command_context (rt_context_t *context);
 extern Bool execute_command (char *str, object_t *ob);
 extern svalue_t *v_add_action(svalue_t *sp, int num_arg);
 extern svalue_t *v_command(svalue_t *sp, int num_arg);
-extern svalue_t *f_disable_commands(svalue_t *sp);
-extern svalue_t *f_enable_commands(svalue_t *sp);
 extern svalue_t *f_execute_command(svalue_t *sp);
 extern svalue_t *f_living(svalue_t *sp);
 extern svalue_t *f_notify_fail(svalue_t *sp);

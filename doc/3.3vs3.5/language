@@ -38,6 +38,9 @@ that you should pay attention to when updating.
   + The efun set_heart_beat() was removed in favor of
     configure_object(ob, OC_HEART_BEAT, flag). There is a sefun
     replacement in /mudlib/deprecated/. (#596)
+  + The efuns enable_commands() and disable_commands() were removed in
+    favor of configure_obect(ob, OC_COMMANDS_ENABLED, 1 resp. 0).
+    There is a sefun replacement in /mudlib/deprecated/. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an

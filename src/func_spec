@@ -611,8 +611,6 @@ void    add_action(string|closure, string, void|int);
 int     command(string, void|object);
 mixed  *command_stack();
 int     command_stack_depth();
-void    disable_commands();
-void    enable_commands();
 mixed * match_command(string, object);
 int     execute_command(string, object, object);
 int     living(null|object);

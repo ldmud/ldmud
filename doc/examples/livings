@@ -1,0 +1,20 @@
+NAME
+        doc/examples/livings
+
+DESCRIPTION
+        Living objects need to have commands enabled. This
+        is best done right at the creation of the object.
+
+EXAMPLES
+        #include <configuration.h>
+
+        void create()
+        {
+           configure_object(this_object(), OC_COMMANDS_ENABLED, 1);
+
+           /* Further initialization */
+        }
+
+
+SEE ALSO
+        command(E), living(E), configure_object(E), native(C), hooks(C)

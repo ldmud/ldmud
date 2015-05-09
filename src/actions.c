@@ -2263,68 +2263,6 @@ f_query_actions (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_disable_commands (svalue_t *sp)
-
-/* EFUN disable_commands()
- *
- *   void disable_commands()
- *
- * Disable this object to use commands normally accessible to
- * users.
- */
-
-{
-    if (current_object->flags & O_DESTRUCTED)
-        return sp;
-
-    if (d_flag > 1) {
-        debug_message("%s Disable commands %s (ref %"PRIdPINT")\n"
-                     , time_stamp(), get_txt(current_object->name)
-                     , current_object->ref);
-    }
-
-    current_object->flags &= ~O_ENABLE_COMMANDS;
-    command_giver = NULL;
-
-    return sp;
-} /* f_disable_commands() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_enable_commands (svalue_t *sp)
-
-/* EFUN enable_commands()
- *
- *   void enable_commands()
- *
- * Enable this object to use commands normally accessible to
- * users.
- */
-
-{
-    interactive_t *ip;
-
-    if (current_object->flags & O_DESTRUCTED)
-        return sp;
-
-    if (d_flag > 1) {
-        debug_message("%s Enable commands %s (ref %"PRIdPINT")\n"
-                     , time_stamp(), get_txt(current_object->name)
-                     , current_object->ref);
-    }
-
-    current_object->flags |= O_ENABLE_COMMANDS;
-    command_giver = current_object;
-    if (O_SET_INTERACTIVE(ip, command_giver))
-    {
-        trace_level |= ip->trace_level;
-    }
-
-    return sp;
-} /* f_enable_commands() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
 f_notify_fail (svalue_t *sp)
 
 /* EFUN notify_fail()
