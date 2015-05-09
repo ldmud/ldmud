@@ -1,4 +1,4 @@
-/* This sefun is the provide the old semantics of the efun object_info().
+/* This sefun is to provide the old semantics of the efun object_info().
  * Feel free to add it to your mudlibs, if you have much code relying on that.
  */
 

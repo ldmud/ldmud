@@ -35,6 +35,9 @@ that you should pay attention to when updating.
     intersect_alist, assoc.
   + strlen() was removed. sizeof() can be used as a drop-in replacement, which
     does exactly the same thing.
+  + The efun set_heart_beat() was removed in favor of
+    configure_object(ob, OC_HEART_BEAT, flag). There is a sefun
+    replacement in /mudlib/deprecated/. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an

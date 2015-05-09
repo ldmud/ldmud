@@ -468,7 +468,6 @@ int     call_direct_resolved(mixed &, null|object|string, string, ...);
 object  previous_object(int);
 
 mixed  *heart_beat_info();
-int     set_heart_beat(int);
 
 
         /* Objects */
