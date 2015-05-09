@@ -331,42 +331,6 @@ free_empty_vector (vector_t *p)
 }
 
 /*-------------------------------------------------------------------------*/
-#ifdef USE_ALISTS
-static INLINE vector_t *
-i_shrink_array (vector_t *p, mp_int n)
-
-/* Create and return a new array containing just the first <n> elements
- * of <p>. <p> itself is freed (and thus possibly deallocated).
- * This function is only needed if alists are used.
- */
-
-{
-    vector_t *res;
-
-    if (p->ref == 1 && VEC_SIZE(p) == n)
-        return p;
-        /* This case seems to happen often enough to justify
-         * the shortcut
-         */
-
-    if (n)
-    {
-        res = slice_array(p, 0, n-1);
-    }
-    else
-    {
-        res = ref_array(&null_vector);
-    }
-    free_array(p);
-    return res;
-}
-
-vector_t * shrink_array (vector_t *p, mp_int n) { return i_shrink_array(p, n); }
-
-#define shrink_array(p,n) i_shrink_array(p,n)
-#endif
-
-/*-------------------------------------------------------------------------*/
 void
 set_vector_user (vector_t *p, object_t *owner)
 

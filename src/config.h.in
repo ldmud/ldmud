@@ -361,10 +361,6 @@
  */
 @cdef_use_json@ USE_JSON
 
-/* Define this if you want alist support.
- */
-@cdef_use_alists@ USE_ALISTS
-
 /* Define this if you want PCRE instead of traditional regexps.
  */
 @cdef_use_pcre@ USE_PCRE

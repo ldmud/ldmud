@@ -88,7 +88,6 @@ DESCRIPTION
       __XML_DOM__ :   support for XML parsing.
       __JSON__ :      support for JSON parsing/serializing.
       __MCCP__:       support for MCCP http://www.randomly.org/projects/MCCP
-      __ALISTS__:     support for alists
       __PCRE__:       support for PCRE
       __TLS__:        support for TLS (internal)
       __GNUTLS__:     if __TLS__: TLS support provided by GnuTLS.
@@ -120,10 +119,11 @@ HISTORY
     3.3.714 added __OPENSSL__, __GNUTLS__.
     3.3.718 added __XML_DOM__.
     3.3.719 removed __PTHREADS__, AMIGA, MSDOS_FS, __BEOS__  
-		    and added __GCRYPT__.
+            and added __GCRYPT__.
     3.3.721 added __FUNCTION__.
     3.5.0 changed __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__,
-        __LPC_ARRAY_CALLS__ to be always on.
+          __LPC_ARRAY_CALLS__ to be always on.
+          removed __ALISTS__
 
 SEE ALSO
     pragma(LPC), preprocessor(LPC)

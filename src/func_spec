@@ -648,16 +648,6 @@ string  creator F_GETUID (object);
 
         /* --- Packages --- */
 
-#ifdef USE_ALISTS
-
-mixed   assoc(mixed, mixed *, mixed|void, mixed|void);
-mixed   insert_alist(mixed, mixed, ...);
-mixed  *intersect_alist(mixed *,mixed *);
-mixed  *order_alist(mixed *, void|mixed *, ...);
-
-#endif /* USE_ALISTS */
-
-
 #ifdef USE_MCCP
 
 mixed   query_mccp(object default: F_THIS_PLAYER);

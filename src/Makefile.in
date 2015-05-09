@@ -101,7 +101,7 @@ SRC = access_check.c actions.c array.c arraylist.c backend.c bitstrings.c \
       interpret.c \
       lex.c main.c mapping.c md5.c mempools.c mregex.c mstrings.c object.c \
       otable.c\
-      parser.c parse.c pkg-alists.c pkg-iksemel.c pkg-xml2.c pkg-idna.c \
+      parser.c parse.c pkg-iksemel.c pkg-xml2.c pkg-idna.c \
       pkg-mccp.c pkg-mysql.c pkg-gcrypt.c pkg-json.c \
       pkg-pgsql.c pkg-sqlite.c pkg-tls.c pkg-openssl.c pkg-gnutls.c \
       port.c ptrtable.c \
@@ -113,7 +113,7 @@ OBJ = access_check.o actions.o array.o arraylist.o backend.o bitstrings.o \
       interpret.o \
       lex.o main.o mapping.o md5.o mempools.o mregex.o mstrings.o object.o \
       otable.o \
-      parser.o parse.o pkg-alists.o pkg-iksemel.o pkg-xml2.o pkg-idna.o \
+      parser.o parse.o pkg-iksemel.o pkg-xml2.o pkg-idna.o \
       pkg-mccp.o pkg-mysql.o pkg-gcrypt.o pkg-json.o \
       pkg-pgsql.o pkg-sqlite.o pkg-tls.o pkg-openssl.o pkg-gnutls.o \
       port.o ptrtable.o \
@@ -427,11 +427,6 @@ parser.o : lang.c ../mudlib/sys/driver_hook.h i-eval_cost.h xalloc.h \
     instrs.h interpret.h gcollect.h exec.h closure.h backend.h array.h \
     prolang.h my-alloca.h typedefs.h driver.h strfuns.h hash.h ptrtable.h \
     sent.h bytecode.h port.h config.h bytecode_gen.h machine.h
-
-pkg-alists.o : i-svalue_cmp.h xalloc.h svalue.h simulate.h mstrings.h \
-    main.h interpret.h array.h my-alloca.h pkg-alists.h typedefs.h driver.h \
-    closure.h strfuns.h sent.h bytecode.h hash.h backend.h exec.h port.h \
-    config.h bytecode_gen.h types.h machine.h
 
 pkg-gcrypt.o : ../mudlib/sys/tls.h pkg-gcrypt.h xalloc.h typedefs.h \
     simulate.h main.h driver.h svalue.h strfuns.h sent.h bytecode.h port.h \

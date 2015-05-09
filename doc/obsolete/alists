@@ -1,3 +1,4 @@
+OBSOLETE
 CONCEPT
         alists
 
@@ -47,6 +48,7 @@ NOTE
 
 HISTORY
         LDMud 3.3 made alists an optional efun.
+        LDMud 3.5 removed the support for alists.
 
 SEE ALSO
         mappings(LPC), order_alist(E), insert_alist(E), assoc(E),

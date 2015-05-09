@@ -1,6 +1,16 @@
 Listed herein are language incompatibilites between 3.3 and 3.5,
 that you should pay attention to when updating.
 
+- LPC features
+  + structs are always supported.
+    __LPC_STRUCTS__ is always defined.
+  + inline closures are always supported.
+    __LPC_INLINE_CLOSURES__ is always defined.
+  + call-other on arrays is always supported.
+    __LPC_ARRAY_CALLS__ is always defined.
+  + alists are no longer supported.
+    __ALISTS__ was removed.
+
 - sefun prefix:
   The 3.5 driver allows to explicitly call simul-efuns using a 'sefun::'
   prefix, e.g. sefun::fun(). If a program has inherited another
@@ -21,6 +31,8 @@ that you should pay attention to when updating.
   + The efun set_light() was removed. This includes the internal light
     state managment in the driver. The mudlib does a better and more
     flexible job at managing light in/from objects. (#775)
+  + The supporting efuns for alists were removed: insert_alist, order_alist,
+    intersect_alist, assoc.
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an
@@ -61,11 +73,5 @@ that you should pay attention to when updating.
     WARNING: If you want to save them losslessly with save_object/save_value(),
              you MUST use savefile format version 2 or higher!
 
-- LPC features
-  + structs are always supported.
-    __LPC_STRUCTS__ is always defined.
-  + inline closures are always supported.
-    __LPC_INLINE_CLOSURES__ is always defined.
-  + call-other on arrays is always supported.
-    __LPC_ARRAY_CALLS__ is always defined.
+
 
