@@ -14,10 +14,122 @@ DESCRIPTION
         As <what>, the following arguments are accepted:
 
         <what> == IC_MAX_WRITE_BUFFER_SIZE
-
           Sets the maximum amount of data to be held pending for writing
           per player to <data> bytes. A value of -1 means unlimited,
           0 deactivates the write buffer.
+
+        <what> == IC_SOCKET_BUFFER_SIZE
+          Changes the socket buffer size to the given size in bytes.
+          Not every operating system might provide this option to
+          change the buffer size.
+
+          The buffer size is used for sending, when the remote side isn't
+          getting the data fast enough. When the socket buffer is full,
+          the driver will buffer in its internal write buffer (see
+          IC_MAX_WRITE_BUFFER_SIZE). When that gets full, too, then
+          messages are discarded.
+
+        <what> == IC_COMBINE_CHARSET_AS_STRING
+          Set the set of characters which can be combined into a single
+          string when already received en-bloc in charmode from the
+          interactive user <ob>. Non-combinable characters and single
+          received characters are returned as separate strings as usual.
+
+          The newline '\n' and the NUL character '\0' are always
+          non-combinable.
+
+          The given string should contain all combinable characters.
+          If given as the number 0, the default combine charset is
+          re-established.
+
+        <what> == IC_COMBINE_CHARSET_AS_ARRAY
+          Set the set of characters which can be combined into a single
+          string, just like IC_COMBINE_CHARSET_AS_STRING.
+
+          The given array shall contain an array of up to 32 integers
+          that are interpreted as 8-bit-values. Each character is encoded
+          as one bit (ASCII characters 0-7 in the first integer, and so on).
+          So a character <n> is treated as combinable if
+
+              array[n/8] & (1 << n%8)
+
+          If the array contains less elements, the missing elements will
+          be regarded as 0 (non-combinable characters).
+
+        <what> == IC_CONNECTION_CHARSET_AS_STRING
+          Set the set of characters which can be output to the interactive
+          user <ob>. All other characters are discarded. (This does not
+          apply to binary_message()).
+
+          The given string should contain all allowed characters.
+          If given as the number 0, the default charset is re-established.
+
+        <what> == IC_CONNECTION_CHARSET_AS_ARRAY
+          Set the set of characters which can be output to the interactive
+          user <ob>, just like IC_CONNECTION_CHARSET_AS_STRING.
+
+          The given array shall contain an array of up to 32 integers
+          that are interpreted as 8-bit-values. Each character is encoded
+          as one bit (ASCII characters 0-7 in the first integer, and so on).
+          So a character <n> is allowed to be output if
+
+              array[n/8] & (1 << n%8)
+
+          If the array contains less elements, the missing elements will
+          be regarded as 0 (not allowed, ie. to be discarded).
+
+        <what> == IC_QUOTE_IAC
+          Sets whether the character 255 (telnet IAC) shall be quoted
+          by prepending another IAC character, so it will not be interpreted
+          by the telnet protocol. Enable with 1, disable with 0. By default
+          it is enabled and does only apply if character 255 is allowed to
+          be output (ie. it is part of the connection charset).
+
+        <what> == IC_TELNET_ENABLED
+          Enables (1) or disables (0) the telnet machine for the interactive
+          user <ob>. When deactivated the driver won't handle telnet
+          negotiations (eg. H_TELNET_NEG won't be called), they will be
+          part of the user input. Also INPUT_NOECHO won't be effective
+          as the driver won't send any telnet negotiations itself.
+
+        <what> == IC_MCCP
+          Starts oder ends MCCP compression of the driver -> client traffic.
+          <data> must be the MCCP version (either TELOPT_COMPRESS or
+          TELOPT_COMPRESS2 from <telnet.h>). When the telnet machine
+          is disabled, any value other then zero will do, and the compression
+          starts without a telnet preamble.
+
+          Available only if the driver is compiled with MCCP enabled;
+          __MCCP__ is defined in that case.
+
+        <what> == IC_PROMPT
+          Sets the prompt for the interactive user <ob> to <data>. The
+          prompt can either be a string or a closure that will be called
+          each time the prompt is shown.
+
+        <what> == IC_MAX_COMMANDS
+          Sets the max number of commands the interactive user <ob> is
+          allowed to execute per second to <data>. A negative value means
+          'unlimited' and is the setting for newly created connections.
+
+          A 'command' in this context means every received data packet
+          which causes a LPC call - actions and calls to input_to()
+          alike.
+
+        <what> == IC_MODIFY_COMMAND
+          Sets an object that will act as a modifier for each command.
+          All commands for the interactive user <ob> will be passed to
+          data->modify_command() before actually being executed.
+          <data> must be given as an object.
+
+          When an object is set, the H_MODIFY_COMMAND hook wont be
+          called anymore. 0 as argument will stop the command modification
+          and reinstall the use of that driver hook.
+
+          This mechanism is intended to expand aliases on quicktypers
+          or the like. The name of the lfun called can be changed
+          from modify_command() to something else using the
+          H_MODIFY_COMMAND_FNAME hook.
 
 
 HISTORY

@@ -6,7 +6,18 @@
 
 /* Possible options for configure_interactive().
  */
-#define IC_MAX_WRITE_BUFFER_SIZE 0
+#define IC_MAX_WRITE_BUFFER_SIZE         0
+#define IC_SOCKET_BUFFER_SIZE            1
+#define IC_COMBINE_CHARSET_AS_STRING     2
+#define IC_COMBINE_CHARSET_AS_ARRAY      3
+#define IC_CONNECTION_CHARSET_AS_STRING  4
+#define IC_CONNECTION_CHARSET_AS_ARRAY   5
+#define IC_QUOTE_IAC                     6
+#define IC_TELNET_ENABLED                7
+#define IC_MCCP                          8
+#define IC_PROMPT                        9
+#define IC_MAX_COMMANDS                 10
+#define IC_MODIFY_COMMAND               11
 
 /* Possible options for configure_object().
  */

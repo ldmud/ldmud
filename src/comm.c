@@ -148,6 +148,7 @@
 #include "../mudlib/sys/configuration.h"
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/input_to.h"
+#include "../mudlib/sys/interactive_info.h"
 
 /* if driver is compiled for ERQ demon then include the necessary file
  */
@@ -8059,11 +8060,11 @@ f_query_mud_port (svalue_t *sp)
 /*-------------------------------------------------------------------------*/
 
 
-static inline void translate_bit(char c, int i, int length, string_t *rc, unsigned int bitno)
+static inline void translate_bit(char c, int i, int *length, string_t *rc, unsigned int bitno)
 /* static helper function to translatin bits to characters in get_charset */
 {
   if (c & (1 << bitno))
-    get_txt(rc)[length++] = (char)(i * 8 + bitno);
+    get_txt(rc)[(*length)++] = (char)(i * 8 + bitno);
 } /* translate_bit */
 
 static void
@@ -8135,14 +8136,14 @@ get_charset (svalue_t * sp, p_int mode, char charset[32])
         {
             char c = charset[i];
 
-            translate_bit(c, i, length, rc, 0);
-            translate_bit(c, i, length, rc, 1);
-            translate_bit(c, i, length, rc, 2);
-            translate_bit(c, i, length, rc, 3);
-            translate_bit(c, i, length, rc, 4);
-            translate_bit(c, i, length, rc, 5);
-            translate_bit(c, i, length, rc, 6);
-            translate_bit(c, i, length, rc, 7);
+            translate_bit(c, i, &length, rc, 0);
+            translate_bit(c, i, &length, rc, 1);
+            translate_bit(c, i, &length, rc, 2);
+            translate_bit(c, i, &length, rc, 3);
+            translate_bit(c, i, &length, rc, 4);
+            translate_bit(c, i, &length, rc, 5);
+            translate_bit(c, i, &length, rc, 6);
+            translate_bit(c, i, &length, rc, 7);
         }
 
         put_string(sp, rc);
@@ -8150,6 +8151,57 @@ get_charset (svalue_t * sp, p_int mode, char charset[32])
       } /* case CHARSET_STRING */
     } /* switch(mode) */
 } /* get_charset() */
+
+/*-------------------------------------------------------------------------*/
+static void
+set_charset_from_vector (vector_t* vec, char charset[32], const char* fun, int argnum)
+
+/* Reads the charset from an vector of int <vec>,
+ * where each element represents a byte in the charset.
+ * <fun> and <argnum> is the function name and argument
+ * position for error messages.
+ */
+
+{
+    mp_int i = (mp_int)VEC_SIZE(vec);
+    svalue_t *svp;
+    char *p;
+
+    if (i > 32)
+        errorf("Bad arg %d to %s: int[] too long (%"PRIdMPINT")\n", argnum, fun, i);
+
+    for ( svp = vec->item, p = charset
+        ; --i >= 0
+        ; svp++, p++)
+    {
+        if (svp->type == T_NUMBER)
+            *p = (char)svp->u.number;
+    }
+    memset(p, 0, (size_t)(charset + 32 - p));
+
+} /* set_charset_from_vector */
+
+/*-------------------------------------------------------------------------*/
+static void
+set_charset_from_string (string_t* str, char charset[32], const char* fun, int argnum)
+
+/* Reads the charset from a string <str> containing all
+ * chars of the charset.
+ * <fun> and <argnum> is the function name and argument
+ * position for error messages.
+ */
+
+{
+    int i;
+    char *p;
+
+    memset(charset, 0, 32);
+    for ( i = mstrsize(str), p = get_txt(str)
+        ; i > 0
+        ; i--, p++)
+        charset[(*p & 0xff) / 8] |= 1 << (*p % 8);
+
+} /* set_charset_from_string */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -9109,6 +9161,222 @@ f_configure_interactive (svalue_t *sp)
                 ip->write_max_size = max;
             break;
         }
+
+    case IC_SOCKET_BUFFER_SIZE:
+        if (!ip)
+            errorf("Default value for IC_SOCKET_BUFFER_SIZE is not supported.\n");
+        if (sp->type != T_NUMBER)
+            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+#ifdef SO_SNDBUF
+        {
+            int size = sp->u.number;
+            setsockopt(ip->socket, SOL_SOCKET, SO_SNDBUF, (char *)&size, sizeof(size));
+        }
+#endif
+        break;
+
+    case IC_COMBINE_CHARSET_AS_STRING:
+        if (!ip)
+            errorf("Default value for IC_COMBINE_CHARSET_AS_STRING is not supported.\n");
+        switch (sp->type)
+        {
+            case T_NUMBER:
+                if (sp->u.number != 0)
+                    efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+                set_default_combine_charset(ip->combine_cset);
+                break;
+
+            case T_STRING:
+                set_charset_from_string(sp->u.str, ip->combine_cset, "configure_interactive with IC_COMBINE_CHARSET_AS_STRING", 3);
+                break;
+
+            default:
+                efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+        }
+
+        /* Never combine \n or \0. */
+        ip->combine_cset['\n'/8] &= ~(1 << '\n' % 8);
+        ip->combine_cset['\0'/8] &= ~(1 << '\0' % 8);
+        break;
+
+    case IC_COMBINE_CHARSET_AS_ARRAY:
+        if (!ip)
+            errorf("Default value for IC_COMBINE_CHARSET_AS_ARRAY is not supported.\n");
+        switch (sp->type)
+        {
+            case T_NUMBER:
+                if (sp->u.number != 0)
+                    efun_exp_arg_error(3, TF_POINTER, sp->type, sp);
+                set_default_combine_charset(ip->combine_cset);
+                break;
+
+            case T_POINTER:
+                set_charset_from_vector(sp->u.vec, ip->combine_cset, "configure_interactive with IC_COMBINE_CHARSET_AS_ARRAY", 3);
+                break;
+
+            default:
+                efun_exp_arg_error(3, TF_POINTER, sp->type, sp);
+        }
+
+        /* Never combine \n or \0. */
+        ip->combine_cset['\n'/8] &= ~(1 << '\n' % 8);
+        ip->combine_cset['\0'/8] &= ~(1 << '\0' % 8);
+        break;
+
+    case IC_CONNECTION_CHARSET_AS_STRING:
+        if (!ip)
+            errorf("Default value for IC_CONNECTION_CHARSET_AS_STRING is not supported.\n");
+        switch (sp->type)
+        {
+            case T_NUMBER:
+                if (sp->u.number != 0)
+                    efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+                set_default_conn_charset(ip->charset);
+                break;
+
+            case T_STRING:
+                set_charset_from_string(sp->u.str, ip->charset, "configure_interactive with IC_CONNECTION_CHARSET_AS_STRING", 3);
+                break;
+
+            default:
+                efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+        }
+        break;
+
+    case IC_CONNECTION_CHARSET_AS_ARRAY:
+        if (!ip)
+            errorf("Default value for IC_CONNECTION_CHARSET_AS_ARRAY is not supported.\n");
+        switch (sp->type)
+        {
+            case T_NUMBER:
+                if (sp->u.number != 0)
+                    efun_exp_arg_error(3, TF_POINTER, sp->type, sp);
+                set_default_conn_charset(ip->charset);
+                break;
+
+            case T_POINTER:
+                set_charset_from_vector(sp->u.vec, ip->charset, "configure_interactive with IC_CONNECTION_CHARSET_AS_ARRAY", 3);
+                break;
+
+            default:
+                efun_exp_arg_error(3, TF_POINTER, sp->type, sp);
+        }
+        break;
+
+    case IC_QUOTE_IAC:
+        if (!ip)
+            errorf("Default value for IC_QUOTE_IAC is not supported.\n");
+
+        if (sp->type != T_NUMBER)
+            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+
+        ip->quote_iac = (char)sp->u.number;
+        break;
+
+    case IC_TELNET_ENABLED:
+        if (!ip)
+            errorf("Default value for IC_TELNET_ENABLED is not supported.\n");
+
+        if (sp->type != T_NUMBER)
+            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+
+        ip->tn_enabled = (sp->u.number != 0);
+        break;
+
+#ifdef USE_MCCP
+    case IC_MCCP:
+        if (!ip)
+            errorf("Default value for IC_MCCP is not supported.\n");
+
+        if (sp->type != T_NUMBER)
+            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+        else if(sp->u.number == 0)
+        {
+            /* Deactivating MCCP */
+            end_compress(ip, MY_FALSE);
+        }
+        else
+        {
+            /* Activating MCCP */
+            p_int mccpver;
+
+            if (!ip->tn_enabled)
+                mccpver = -1;
+            else
+            {
+                mccpver = sp->u.number;
+
+                if ((mccpver != TELOPT_COMPRESS)
+                 && (mccpver != TELOPT_COMPRESS2)
+                   )
+                {
+                    errorf("Illegal value to arg 3 of configure_interactive with IC_MCCP: %ld, "
+                          "expected TELOPT_COMPRESS (%d) or TELOPT_COMPRESS2 (%d).\n"
+                         , (long)mccpver, TELOPT_COMPRESS, TELOPT_COMPRESS2
+                         );
+                }
+            }
+
+            start_compress(ip, mccpver);
+        }
+        break;
+#endif /* USE_MCCP*/
+
+    case IC_PROMPT:
+        if (!ip)
+            errorf("Default value for IC_PROMPT is not supported.\n");
+
+        if (sp->type != T_STRING && sp->type != T_CLOSURE)
+            efun_exp_arg_error(3, TF_STRING|TF_CLOSURE, sp->type, sp);
+
+        if (sp->type == T_CLOSURE && sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
+            errorf("Bad arg 3 for configure_interactive with IC_PROMPT: lambda closure not bound\n");
+
+        if (sp->type == T_STRING)
+        {
+            string_t *str = make_tabled_from(sp->u.str);
+
+            if (!str)
+                errorf("Out of memory (%zu bytes) for prompt\n", mstrsize(sp->u.str));
+            else
+            {
+                free_mstring(sp->u.str);
+                sp->u.str = str;
+            }
+        }
+
+        free_svalue(&ip->prompt);
+        assign_svalue_no_free(&ip->prompt, sp);
+        break;
+
+    case IC_MAX_COMMANDS:
+        if (!ip)
+            errorf("Default value for IC_MAX_COMMANDS is not supported.\n");
+
+        if (sp->type != T_NUMBER)
+            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+
+        if (sp->u.number < 0)
+            ip->maxNumCmds = -1;
+        else
+            ip->maxNumCmds = sp->u.number;
+        break;
+
+    case IC_MODIFY_COMMAND:
+        if (!ip)
+            errorf("Default value for IC_MODIFY_COMMAND is not supported.\n");
+
+        if (sp->type != T_OBJECT && (sp->type != T_NUMBER || sp->u.number != 0))
+            efun_exp_arg_error(3, TF_OBJECT, sp->type, sp);
+
+        if (ip->modify_command)
+            free_object(ip->modify_command, "configure_interactive(IC_MODIFY_COMMAND)");
+
+        if (sp->type == T_OBJECT)
+            ip->modify_command = ref_object(sp->u.ob, "configure_interactive(IC_MODIFY_COMMAND)");
+        else
+            ip->modify_command = NULL;
+        break;
     }
 
     sp = pop_n_elems(3, sp);
@@ -9156,6 +9424,9 @@ f_interactive_info (svalue_t *sp)
         ip = NULL;
     }
 
+    if (!ob && sp[0].u.number < 0)
+        errorf("There is no default value for non-configuration values.\n");
+
     switch(sp[0].u.number)
     {
     default:
@@ -9168,6 +9439,111 @@ f_interactive_info (svalue_t *sp)
         else
             put_number(&result, ip->write_max_size);
         break;
+
+    case IC_SOCKET_BUFFER_SIZE:
+        if (!ip)
+            errorf("Default value for IC_SOCKET_BUFFER_SIZE is not supported.\n");
+#ifdef SO_SNDBUF
+        {
+            int size;
+            length_t sizelen = sizeof(size);
+
+            if (!getsockopt(ip->socket, SOL_SOCKET, SO_SNDBUF, (char *)&size, &sizelen))
+                put_number(&result, size);
+            else
+                put_number(&result, -1);
+        }
+#else
+        put_number(&result, -1);
+#endif
+        break;
+
+    case IC_COMBINE_CHARSET_AS_STRING:
+        if (!ip)
+            errorf("Default value for IC_COMBINE_CHARSET_AS_STRING is not supported.\n");
+        get_charset(&result, CHARSET_STRING, ip->combine_cset);
+        break;
+
+    case IC_COMBINE_CHARSET_AS_ARRAY:
+        if (!ip)
+            errorf("Default value for IC_COMBINE_CHARSET_AS_ARRAY is not supported.\n");
+        get_charset(&result, CHARSET_VECTOR, ip->combine_cset);
+        break;
+
+    case IC_CONNECTION_CHARSET_AS_STRING:
+        if (!ip)
+            errorf("Default value for IC_CONNECTION_CHARSET_AS_STRING is not supported.\n");
+        get_charset(&result, CHARSET_STRING, ip->charset);
+        break;
+
+    case IC_CONNECTION_CHARSET_AS_ARRAY:
+        if (!ip)
+            errorf("Default value for IC_CONNECTION_CHARSET_AS_ARRAY is not supported.\n");
+        get_charset(&result, CHARSET_VECTOR, ip->charset);
+        break;
+
+    case IC_QUOTE_IAC:
+        if (!ip)
+            errorf("Default value for IC_QUOTE_IAC is not supported.\n");
+        put_number(&result, ip->quote_iac != 0);
+        break;
+
+    case IC_TELNET_ENABLED:
+        if (!ip)
+            errorf("Default value for IC_TELNET_ENABLED is not supported.\n");
+        put_number(&result, ip->tn_enabled != 0);
+        break;
+
+#ifdef USE_MCCP
+    case IC_MCCP:
+        if (!ip)
+            errorf("Default value for IC_MCCP is not supported.\n");
+
+        put_number(&result, ip->compressing);
+        break;
+#endif /* USE_MCCP*/
+
+    case IC_PROMPT:
+        if (!ip)
+            errorf("Default value for IC_PROMPT is not supported.\n");
+
+        assign_svalue_no_free(&result, &ip->prompt);
+        break;
+
+    case IC_MAX_COMMANDS:
+        if (!ip)
+            errorf("Default value for IC_MAX_COMMANDS is not supported.\n");
+
+        put_number(&result, ip->maxNumCmds);
+        break;
+
+    case IC_MODIFY_COMMAND:
+        if (!ip)
+            errorf("Default value for IC_MODIFY_COMMAND is not supported.\n");
+
+        if (ip->modify_command)
+            put_ref_object(&result, ip->modify_command, "interactive_info(IC_MODIFY_COMMAND)");
+        else
+            put_number(&result, 0);
+        break;
+
+#ifdef USE_MCCP
+    case II_MCCP_STATS:
+        if (ip->compressing > 0)
+        {
+            vector_t *mccp_stats;
+            mccp_stats = allocate_uninit_array(2);
+            put_number(mccp_stats->item,     ip->out_compress->total_in);
+            put_number(mccp_stats->item + 1, ip->out_compress->total_out);
+            put_array(&result, mccp_stats);
+        }
+        else
+        {
+            put_number(&result, 0);
+        }
+        break;
+#endif /* USE_MCCP*/
+
     }
 
     sp = pop_n_elems(2, sp);
