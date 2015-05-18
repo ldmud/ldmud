@@ -9384,6 +9384,29 @@ f_configure_interactive (svalue_t *sp)
 } /* f_configure_interactive() */
 
 /*-------------------------------------------------------------------------*/
+static bool
+valid_query_snoop (object_t *ob)
+
+/* Checks with the master, if it is
+ * allowed to query who is snooping on <ob>.
+ */
+{
+    assert_master_ob_loaded();
+    if (current_object != master_ob)
+    {
+        svalue_t *valid;
+
+        assign_eval_cost();
+        push_ref_object(inter_sp, ob, "valid_query_snoop");
+        valid = apply_master(STR_VALID_QSNOOP, 1);
+        if (!valid || valid->type != T_NUMBER || !valid->u.number)
+            return false;
+    }
+
+    return true;
+} /* valid_query_snoop() */
+
+/*-------------------------------------------------------------------------*/
 svalue_t *
 f_interactive_info (svalue_t *sp)
 
@@ -9527,7 +9550,79 @@ f_interactive_info (svalue_t *sp)
             put_number(&result, 0);
         break;
 
+    /* Connection information */
+    case II_IP_NAME:
+#ifdef ERQ_DEMON
+        {
+            string_t * hname;
+
+            hname = lookup_ip_entry(ip->addr.sin_addr, MY_FALSE);
+            if (hname)
+            {
+                put_ref_string(&result, hname);
+                break;
+            }
+        }
+#endif
+        /* FALLTHROUGH */
+
+    case II_IP_NUMBER:
+        {
+            string_t *haddr;
+
+#ifndef USE_IPV6
+            haddr = new_mstring(inet_ntoa(ip->addr.sin_addr));
+#else
+            haddr = new_mstring(inet6_ntoa(ip->addr.sin_addr));
+#endif
+
+            if (!haddr)
+                errorf("Out of memory for IP address\n");
+
+            put_string(&result, haddr);
+            break;
+        }
+
+    case II_IP_PORT:
+        put_number(&result, ntohs(ip->addr.sin_port));
+        break;
+
+    case II_IP_ADDRESS:
+        {
+            vector_t *v;
+            svalue_t *svp;
+            unsigned char *cp;
+            int i;
+
+            v = allocate_array(sizeof ip->addr);
+
+            if (!v)
+                errorf("Out of memory for IP address\n");
+
+            svp = v->item;
+            cp = (unsigned char*)&ip->addr;
+            for (i = sizeof ip->addr; --i;)
+            {
+                put_number(svp, *cp);
+                cp++;
+                svp++;
+            }
+            put_array(&result, v);
+            break;
+        }
+
+    case II_MUD_PORT:
+        {
+            struct sockaddr_in addr;
+            length_t length = sizeof(addr);
+
+            getsockname(ip->socket, (struct sockaddr *)&addr, &length);
+            put_number(&result, ntohs(addr.sin_port));
+            break;
+        }
+
 #ifdef USE_MCCP
+    /* Telnet related information */
     case II_MCCP_STATS:
         if (ip->compressing > 0)
         {
@@ -9544,6 +9639,97 @@ f_interactive_info (svalue_t *sp)
         break;
 #endif /* USE_MCCP*/
 
+    /* Input handling */
+    case II_INPUT_PENDING:
+        {
+            input_t *ih = get_input_handler(ip, INPUT_TO);
+            put_number(&result, 0);
+
+            if (ih)
+            {
+                object_t *cb = callback_object(&(((input_to_t*)ih)->fun));
+                if (cb)
+                    put_ref_object(&result, cb, "interactive_info(II_INPUT_PENDING)");
+            }
+        }
+        break;
+
+    case II_EDITING:
+        {
+            input_t *ih = get_input_handler(ip, INPUT_ED);
+            put_number(&result, 0);
+
+            if (ih)
+            {
+                object_t *ed = get_ed_object(ih);
+                if (ed)
+                    put_ref_object(&result, ed, "interactive_info(II_EDITING)");
+            }
+        }
+        break;
+
+    case II_IDLE:
+        put_number(&result, current_time - ip->last_time);
+        break;
+
+    /* Output handling */
+    case II_SNOOP_NEXT:
+        put_number(&result, 0);
+
+        if (!valid_query_snoop(ob))
+            break;
+
+        if (ip->snoop_by)
+            put_ref_object(&result, ip->snoop_by, "interactive_info(II_SNOOP_NEXT)");
+        break;
+
+    case II_SNOOP_PREV:
+        put_number(&result, 0);
+
+        if (!ip->snoop_on)
+            break;
+
+        if (!valid_query_snoop(ip->snoop_on->ob))
+            break;
+
+        if (ip->snoop_on)
+            put_ref_object(&result, ip->snoop_on->ob, "interactive_info(II_SNOOP_PREV)");
+        break;
+
+    case II_SNOOP_ALL:
+        {
+            int num = 0, pos = 0;
+            object_t *snooper = ip->snoop_by;
+            object_t *victim = ob;
+            vector_t *vec;
+
+            while (snooper && valid_query_snoop(victim))
+            {
+                interactive_t * snooper_ip;
+                num++;
+
+                if (!O_SET_INTERACTIVE(snooper_ip, snooper))
+                    break;
+                victim = snooper;
+                snooper = snooper_ip->snoop_by;
+            }
+
+            vec = allocate_array(num);
+            snooper = ip->snoop_by;
+            while (snooper && pos < num)
+            {
+                interactive_t * snooper_ip;
+                put_ref_object(vec->item + pos, snooper, "interactive_info(II_SNOOP_ALL)");
+                pos++;
+
+                if (!O_SET_INTERACTIVE(snooper_ip, snooper))
+                    break;
+                snooper = snooper_ip->snoop_by;
+            }
+
+            put_array(&result, vec);
+            break;
+        }
     }
 
     sp = pop_n_elems(2, sp);

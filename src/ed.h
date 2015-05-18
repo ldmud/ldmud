@@ -22,5 +22,6 @@ extern void save_ed_buffer(input_t *ih);
 extern void ed_cmd(char *str, input_t *ih);
 extern svalue_t *v_ed(svalue_t *sp, int num_arg);
 extern svalue_t *f_query_editing(svalue_t *sp);
+extern object_t *get_ed_object(input_t *ih);
 
 #endif /* ED_H__ */

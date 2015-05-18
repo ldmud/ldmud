@@ -3632,6 +3632,17 @@ f_query_editing (svalue_t *sp)
 }
 
 /*-------------------------------------------------------------------------*/
+object_t *
+get_ed_object (input_t *ih)
+
+/* Returns the callback object of the current ed session.
+ * <ih> must be an INPUT_ED handler.
+ */
+{
+    return ((ed_buffer_t*) ih)->exit_ob;
+} /* get_ed_object */
+
+/*-------------------------------------------------------------------------*/
 static void
 print_help (char arg)
 

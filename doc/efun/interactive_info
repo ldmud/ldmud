@@ -1,0 +1,106 @@
+SYNOPSIS
+        #include <interactive_info.h>
+
+        mixed interactive_info(object ob, int what)
+
+DESCRIPTION
+        Returns some internal information about the interactive user <ob>.
+        The argument <what> determines which information is returned.
+
+        It can be either a configuration option as given to
+        configure_interactive() or one of the following options:
+
+
+
+        Connection Information:
+
+        <what> == II_IP_NAME:
+          The hostname of <ob>. The hostname will asynchronously
+          looked up by the ERQ daemon and might therefore not be
+          available at the time of the first connection.
+          If no name is available the address will be returned.
+
+        <what> == II_IP_NUMBER:
+          The IP address of <ob> given as a string.
+
+        <what> == II_IP_PORT:
+          The client port number of <ob>.
+
+        <what> == II_IP_ADDRESS:
+          The full socket address structure given as an array of bytes.
+
+          For IPv4 (sockaddr_in):
+              array[0.. 1]: sin_family
+              array[2.. 3]: sin_port
+              array[4.. 7]: sin_addr
+              array[8..15]: undefined.
+
+          For IPv6 (sockaddr_in6):
+              array[ 0.. 1]: sin6_family
+              array[ 2.. 3]: sin6_port
+              array[ 4.. 7]: sin6_flowinfo
+              array[ 8..23]: sin6_addr
+              array[24..27]: sin6_scope_id
+
+        <what> == II_MUD_PORT:
+          The server port number that <ob> connected to.
+
+
+
+        Telnet Related Information:
+
+        <what> == II_MCCP_STATS:
+          Statistics about the current compression of <ob> given
+          as an array ({ uncompressed bytes, compressed bytes }).
+
+          If the connection is not compressed, 0 is returned.
+
+          Available only if the driver is compiled with MCCP enabled;
+          __MCCP__ is defined in that case.
+
+
+
+        Input Handling:
+
+        <what> == II_INPUT_PENDING:
+          If <ob> has an input_to() pending, the object that has called
+          the input_to() is returned, else 0.
+
+        <what> == II_EDITING:
+          If <ob> is currently editing with ed() and ed() was called with
+          an exit function, then the object that has called ed()
+          will be returned, 0 otherwise.
+
+        <what> == II_IDLE:
+          The number of seconds that the interactive object <ob> has been
+          idle.
+
+
+
+        Output Handling:
+
+        <what> == II_SNOOP_NEXT:
+          Returns the user who is currently snooping <ob>.
+          The calling object must be privileged by the master object
+          via valid_query_snoop().
+
+        <what> == II_SNOOP_PREV:
+          Returns the victim who is currently snooped by <ob>.
+          The calling object must be privileged by the master object
+          via valid_query_snoop().
+
+        <what> == II_SNOOP_ALL:
+          Returns all objects who are currently snooping <ob>.
+          Only one object can snoop <ob> directly, but that user might
+          be snooped, too, and so building a chain that is returned
+          as an array.
+
+          The calling object must be privileged by the master object
+          via valid_query_snoop().
+
+
+HISTORY
+        Introduced in LDMud 3.5.0.
+
+SEE ALSO
+        configure_interactive(E), object_info(E), driver_info(E)
