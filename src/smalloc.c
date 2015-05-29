@@ -4075,12 +4075,12 @@ mem_consolidate (Bool force)
 
 
 /*-------------------------------------------------------------------------*/
-#if !defined(HAVE_GETPAGESIZE)
+#ifndef HAVE_GETPAGESIZE
 static INLINE size_t
 getpagesize()
 /* get the pagesize for this system */
 {
-#ifdef(HAVE_SYSCONF)
+#ifdef HAVE_SYSCONF
     return sysconf(_SC_PAGESIZE);
 #else
 #error Unable to find out the system pagesize. Please report this issue.
