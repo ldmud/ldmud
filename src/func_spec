@@ -530,7 +530,6 @@ object  query_input_pending(object);
 string  query_ip_name(null|object default: F_THIS_PLAYER);
 string  query_ip_number(null|object|mixed &  default: F_THIS_PLAYER);
 int     query_mud_port(int|object default: F_THIS_PLAYER);
-int     set_buffer_size(int);
 mixed   set_prompt(string|closure|int, object default: F_THIS_PLAYER);
 int     get_max_commands(object default: F_THIS_INTERACTIVE);
 void    set_max_commands(int, object default: F_THIS_INTERACTIVE);

@@ -6796,63 +6796,6 @@ f_send_udp (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_set_buffer_size (svalue_t *sp)
-
-/* EFUN: set_buffer_size()
- *
- *   int set_buffer_size(int size)
- *
- * Changes the socket buffer size for this_interactive() to size,
- * up to a preconfigured maximum, result is the old buffer size
- * (or -1 on systems which aren't able to change the socket
- * buffer).
- * Modifying the buffer size may result in a better IO
- * throughput, but can also worsen it.
- */
-
-{
-    int new;
-
-    /* Get the desired buffer size */
-
-    if (sp->u.number > SET_BUFFER_SIZE_MAX)
-    {
-        errorf("Bad arg 1 to set_buffer_size(): value %"PRIdPINT" exceeds maximum %ld\n"
-             , sp->u.number, (long) SET_BUFFER_SIZE_MAX);
-        /* NOTREACHED */
-        return sp;
-    }
-    new = sp->u.number;
-
-    sp->u.number = -1; /* Default result */
-
-#ifdef SO_SNDBUF
-    {
-        int old;
-        length_t optlen;
-        interactive_t *ip;
-
-        if (!(O_SET_INTERACTIVE(ip, current_object))
-         || ip->do_close)
-        {
-            return sp;
-        }
-
-
-        optlen = sizeof old;
-        if (getsockopt(ip->socket, SOL_SOCKET, SO_SNDBUF, (char *)&old, &optlen) < 0)
-            return sp;
-        if (setsockopt(ip->socket, SOL_SOCKET, SO_SNDBUF, (char *)&new, sizeof new) < 0)
-            return sp;
-        sp->u.number = old;
-    }
-#endif /* SO_SNDBUF */
-
-    return sp;
-} /* f_set_buffer_size() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
 f_binary_message (svalue_t *sp)
 
 /* EFUN: binary_message()
