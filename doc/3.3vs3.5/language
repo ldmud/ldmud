@@ -64,6 +64,9 @@ that you should pay attention to when updating.
   + The efun set_buffer_size() was removed in favor of
     configure_interactive(ob, IC_SOCKET_BUFFER_SIZE, size).
     There is a sefun replacement in /mudlib/deprecated/. (#596)
+  + The efun enable_telnet() was removed in favor of
+    configure_interactive(ob, IC_TELNET_ENABLED, state).
+    There is a sefun replacement in /mudlib/deprecated/. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an

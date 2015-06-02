@@ -8388,61 +8388,6 @@ f_set_max_commands (svalue_t *sp)
 } /* f_set_max_commands() */
 
 /*-------------------------------------------------------------------------*/
-svalue_t *
-f_enable_telnet (svalue_t *sp)
-
-/* TEFUN: enable_telnet()
- *
- *   int enable_telnet (int num)
- *   int enable_telnet (int num, object obj)
- *
- * Enable or disable the telnet machine for the interactive object <obj>.
- * Return the previous state of the telnet machine as result.
- *
- * <num> > 0 : enable telnet machine (default)
- *       = 0 : disable telnet machine
- *       < 0 : just query the current state of the telnet machine.
- * <obj> : the interactive object, default is the current interactive.
- *         For non-interactive objects the function raises an error.
- *
- * The function raises a privilege_violation ("enable_telnet", obj, num)
- * if <num> is >= 0. If the privilege is denied, the call is ignored.
- *
- * WARNING: Careless use of this efun can cause great confusion for both
- * driver and clients!
- */
-
-{
-    p_int num;
-    p_int rc;
-    interactive_t *ip;
-
-    num = sp[-1].u.number;
-    if (num < 0)
-        num = -1;
-
-    if (!O_SET_INTERACTIVE(ip, sp->u.ob))
-    {
-        errorf("Bad arg 2 to enable_telnet(): Object '%s' is not interactive.\n"
-             , get_txt(sp->u.ob->name)
-             );
-        /* NOTREACHED */
-        return sp; /* flow control hint */
-    }
-
-    rc = (ip->tn_enabled != 0);
-    if (num >= 0
-     && privilege_violation4(STR_ENABLE_TELNET, sp->u.ob, NULL, num, sp))
-        ip->tn_enabled = (num != 0);
-
-    free_svalue(sp--);
-    free_svalue(sp);
-
-    put_number(sp, rc);
-    return sp;
-} /* f_enable_telnet() */
- 
-/*-------------------------------------------------------------------------*/
 void
 check_for_out_connections (void)
 

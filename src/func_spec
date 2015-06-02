@@ -533,7 +533,6 @@ int     query_mud_port(int|object default: F_THIS_PLAYER);
 mixed   set_prompt(string|closure|int, object default: F_THIS_PLAYER);
 int     get_max_commands(object default: F_THIS_INTERACTIVE);
 void    set_max_commands(int, object default: F_THIS_INTERACTIVE);
-int     enable_telnet(int, object default: F_THIS_INTERACTIVE);
 
 void    write(mixed);
 object *users();
