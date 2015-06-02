@@ -72,6 +72,9 @@ that you should pay attention to when updating.
      * configure_interactive(ob, IC_MCCP, state) and
      * interactive_info(ob, II_MCCP_STATS).
     There are a sefun replacements in /mudlib/deprecated/. (#596)
+  + The efun set_prompt() was removed in favor of
+    configure_interactive(ob, IC_PROMPT, prompt).
+    There is a sefun replacement in /mudlib/deprecated/. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an

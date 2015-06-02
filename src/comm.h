@@ -456,7 +456,6 @@ extern svalue_t *f_query_mud_port(svalue_t *sp);
 extern svalue_t *v_find_input_to (svalue_t *sp, int num_arg);
 extern svalue_t *v_remove_input_to (svalue_t *sp, int num_arg);
 extern svalue_t *f_input_to_info (svalue_t *sp);
-extern svalue_t *f_set_prompt(svalue_t *sp);
 extern svalue_t *v_snoop(svalue_t *sp, int num_arg);
 extern svalue_t *f_users(svalue_t *sp);
 extern svalue_t *f_get_max_commands (svalue_t *sp);
