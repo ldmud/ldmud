@@ -636,16 +636,6 @@ string  creator F_GETUID (object);
 
         /* --- Packages --- */
 
-#ifdef USE_MCCP
-
-mixed   query_mccp(object default: F_THIS_PLAYER);
-int    *query_mccp_stats(object default: F_THIS_PLAYER);
-int     start_mccp_compress(int);
-int     end_mccp_compress();
-
-#endif /* USE_MCCP */
-
-
 #ifdef USE_XML
 
 string  xml_generate(mixed *);
