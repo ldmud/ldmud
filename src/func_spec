@@ -527,8 +527,6 @@ int     query_udp_port();
 int     send_udp(string, int, string|int*);
 
 object  query_input_pending(object);
-string  query_ip_name(null|object default: F_THIS_PLAYER);
-string  query_ip_number(null|object|mixed &  default: F_THIS_PLAYER);
 int     query_mud_port(int|object default: F_THIS_PLAYER);
 
 void    write(mixed);

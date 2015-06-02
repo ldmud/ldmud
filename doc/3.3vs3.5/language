@@ -81,6 +81,11 @@ that you should pay attention to when updating.
   + The efun set_modify_command() was removed in favor of
     configure_interactive(ob, IC_MODIFY_COMMAND, ob).
     There is a sefun replacement in /mudlib/deprecated/. (#596)
+  + The efuns query_ip_name() and query_ip_number() were removed in favor of
+     * interactive_info(ob, II_IP_NAME),
+     * interactive_info(ob, II_IP_NUMBER), and
+     * interactive_info(ob, II_IP_ADDRESS).
+    There are a sefun replacements in /mudlib/deprecated/. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an

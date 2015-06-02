@@ -450,8 +450,6 @@ extern svalue_t *f_binary_message(svalue_t *sp);
 extern svalue_t *f_exec(svalue_t *sp);
 extern svalue_t *f_interactive(svalue_t *sp);
 extern svalue_t *f_query_input_pending(svalue_t *sp);
-extern svalue_t *f_query_ip_name(svalue_t *sp);
-extern svalue_t *f_query_ip_number(svalue_t *sp);
 extern svalue_t *f_query_mud_port(svalue_t *sp);
 extern svalue_t *v_find_input_to (svalue_t *sp, int num_arg);
 extern svalue_t *v_remove_input_to (svalue_t *sp, int num_arg);
