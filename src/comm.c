@@ -8068,24 +8068,18 @@ static inline void translate_bit(char c, int i, int *length, string_t *rc, unsig
 } /* translate_bit */
 
 static void
-get_charset (svalue_t * sp, p_int mode, char charset[32])
+get_charset (svalue_t * sp, bool as_string, char charset[32])
 
 /* Translate the <charset> into an svalue and store it into <sp>:
- *   <mode> == CHARSET_VECTOR: result is a bitvector array
- *   <mode> == CHARSET_STRING: result is a string.
+ *   <as_string> == false: result is a bitvector array
+ *   <as_string> == true:  result is a string.
  */
 
 {
     put_number(sp, 0);
-    switch (mode)
-    {
-    default:
-        fatal("(get_charset): Illegal mode value %"PRIdPINT"\n", mode);
-        /* NOTREACHED */
-        break;
 
-    case CHARSET_VECTOR:
-      {
+    if (!as_string)
+    {
         vector_t * rc;
         int i;
 
@@ -8094,18 +8088,16 @@ get_charset (svalue_t * sp, p_int mode, char charset[32])
         {
             outofmemory("result array");
             /* NOTREACHED */
-            break;
+            return;
         }
 
         for (i = 0; i < 32; i++)
             put_number(rc->item+i, (unsigned char)charset[i]);
 
         put_array(sp, rc);
-        break;
-      }
-
-    case CHARSET_STRING:
-      {
+    }
+    else
+    {
         string_t * rc;
         int length, i;
 
@@ -8128,7 +8120,7 @@ get_charset (svalue_t * sp, p_int mode, char charset[32])
         {
             outofmemory("result string");
             /* NOTREACHED */
-            break;
+            return;
         }
 
         /* Translate the bits into characters */
@@ -8147,9 +8139,7 @@ get_charset (svalue_t * sp, p_int mode, char charset[32])
         }
 
         put_string(sp, rc);
-        break;
-      } /* case CHARSET_STRING */
-    } /* switch(mode) */
+    } /* as_string */
 } /* get_charset() */
 
 /*-------------------------------------------------------------------------*/
@@ -8202,257 +8192,6 @@ set_charset_from_string (string_t* str, char charset[32], const char* fun, int a
         charset[(*p & 0xff) / 8] |= 1 << (*p % 8);
 
 } /* set_charset_from_string */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_get_combine_charset (svalue_t *sp)
-
-/* TEFUN: get_combine_charset()
- *
- *   mixed get_combine_charset (int mode)
- *
- * Return the combine charset of the current interactive in the form requested
- * by <mode>:
- *   <mode> == CHARSET_VECTOR: return as bitvector
- *   <mode> == CHARSET_STRING: return as string
- *
- * The bitvector is interpreted as an array of 8-bit-values and might
- * contain up to 32 elements. Character n is "combinable"
- * if sizeof(bitvector) > n/8 && bitvector[n/8] & (1 << n%8) .
- *
- * If there is no current interactive, the function returns 0. 
- */
-
-{
-    p_int mode;
-    interactive_t *ip;
-
-    mode = sp->u.number;
-    if (mode != CHARSET_VECTOR && mode != CHARSET_STRING)
-    {
-        errorf("Bad arg 1 to get_combine_charset(): %"PRIdPINT", "
-              "expected CHARSET_VECTOR (%d) or CHARSET_STRING (%d)\n"
-             , mode, CHARSET_VECTOR, CHARSET_STRING);
-        /* NOTREACHED */
-        return sp;
-    }
-
-    if (current_interactive && O_SET_INTERACTIVE(ip, current_interactive))
-        get_charset(sp, mode, ip->combine_cset);
-    else
-        put_number(sp, 0);
-
-    return sp;
-} /* f_get_combine_charset() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_set_combine_charset (svalue_t *sp)
-
-/* EFUN: set_combine_charset()
- *
- *   void set_combine_charset (int* bitvector)
- *   void set_combine_charset (string chars)
- *   void set_combine_charset (0)
- *
- * Set the set of characters which can be combined into a single string
- * when received en-bloc in charmode from the current interactive user.
- * Non-combinable characters and single received characters are returned
- * in separate strings as usual. The function must be called with the
- * interactive user being the command giver.
- *
- * The newline '\n' and the NUL character '\0' are always non-combinable.
- *
- * The charset can be given either directly as a string, or indirectly
- * as a bitvector. If the charset is given as the number 0, the default
- * charset is re-established.
- *
- * The bitvector is interpreted as an array of 8-bit-values and might
- * contain up to 32 elements. Character n is "combinable"
- * if sizeof(bitvector) > n/8 && bitvector[n/8] & (1 << n%8) .
- */
-
-{
-    mp_int i;
-    svalue_t *svp;
-    char *p;
-    interactive_t *ip;
-
-    i = 0;
-    if (sp->type == T_POINTER && (i = (mp_int)VEC_SIZE(sp->u.vec)) > 32)
-    {
-        errorf("Bad arg 1 to set_combine_charset(): int[] too long (%"PRIdMPINT")\n"
-             , i);
-        /* NOTREACHED */
-        return sp;
-    }
-
-    if (current_interactive && O_SET_INTERACTIVE(ip, current_interactive))
-    {
-        if (sp->type == T_NUMBER)
-        {
-            set_default_combine_charset(ip->combine_cset);
-        }
-        else if (sp->type == T_STRING)
-        {
-            memset(ip->combine_cset, 0, sizeof ip->combine_cset);
-            for ( i = mstrsize(sp->u.str), p = get_txt(sp->u.str)
-                ; i > 0
-                ; i--, p++)
-                ip->combine_cset[(*p & 0xff) / 8] |= 1 << (*p % 8);
-        }
-        else
-        {
-            /* i was set in the typecheck above */
-            for ( svp = sp->u.vec->item, p = ip->combine_cset
-                ; --i >= 0
-                ; svp++, p++)
-            {
-                if (svp->type == T_NUMBER)
-                    *p = (char)svp->u.number;
-            }
-            memset(p, 0, (size_t)(&ip->combine_cset[sizeof ip->combine_cset] - p));
-        }
-
-        ip->combine_cset['\n'/8] &= ~(1 << '\n' % 8);
-        ip->combine_cset['\0'/8] &= ~(1 << '\0' % 8);
-    }
-    free_svalue(sp);
-    sp--;
-    return sp;
-} /* f_set_combine_charset() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_get_connection_charset (svalue_t *sp)
-
-/* TEFUN: get_connection_charset()
- *
- *   mixed get_connection_charset (int mode)
- *
- * Return the combine charset of the current interactive in the form requested
- * by <mode>:
- *   <mode> == CHARSET_VECTOR: return as bitvector
- *   <mode> == CHARSET_STRING: return as string
- *
- * Alternatively, the status of the IAC quoting can be returned:
- *   <mode> == CHARSET_QUOTE_IAC: return 0 if IACs are not quoted,
- *                                return 1 if they are.
- *
- * The bitvector is interpreted as an array of 8-bit-values and might
- * contain up to 32 elements. Character n is "combinable"
- * if sizeof(bitvector) > n/8 && bitvector[n/8] & (1 << n%8) .
- *
- * If there is no current interactive, the function returns 0. 
- */
-
-{
-    p_int mode;
-    interactive_t *ip;
-
-    mode = sp->u.number;
-    if (mode != CHARSET_VECTOR && mode != CHARSET_STRING
-     && mode != CHARSET_QUOTE_IAC)
-    {
-        errorf("Bad arg 1 to get_connection_charset(): %"PRIdPINT", "
-              "expected CHARSET_VECTOR (%d), _STRING (%d), "
-              "or _QUOTE_IAC (%d)\n"
-             , mode, CHARSET_VECTOR, CHARSET_STRING, CHARSET_QUOTE_IAC);
-        /* NOTREACHED */
-        return sp;
-    }
-
-    if (current_interactive && O_SET_INTERACTIVE(ip, current_interactive))
-    {
-        if (mode == CHARSET_QUOTE_IAC)
-            put_number(sp, ip->quote_iac != 0);
-        else
-            get_charset(sp, mode, ip->charset);
-    }
-    else
-        put_number(sp, 0);
-
-    return sp;
-} /* f_get_connection_charset() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_set_connection_charset (svalue_t *sp)
-
-/* EFUN: set_connection_charset()
- *
- *   void set_connection_charset (int* bitvector, int quote_iac)
- *   void set_connection_charset (string charset, int quote_iac)
- *   void set_connection_charset (0, int quote_iac)
- *
- * Set the set of characters that can be output to the interactive user
- * (this does not apply to binary_message() ). The function must be called
- * by the interactive user object itself.
- *
- * The charset can be given either directly as a string, or indirectly
- * as a bitvector. If the charset is given as 0, the default connection
- * charset is re-established.
- *
- * The bitvector is interpreted as an array of 8-bit-values and might
- * contain up to 32 elements. Character n is allowed to be output
- * if sizeof(bitvector) > n/8 && bitvector[n/8] & (1 << n%8) .
- *
- * If quote_iac is 0 and char 255 is allowed to be output, IAC
- * will be output unmodified.
- * If quote_iac is 1 and char 255 is allowed to be output,
- * char 255 will be quoted so that it is not interpreted as IAC
- * by the telnet protocol.
- */
-
-{
-    mp_int i;
-    svalue_t *svp;
-    char *p;
-    interactive_t *ip;
-
-    i = 0;
-    if (sp[-1].type == T_POINTER && (i = (mp_int)VEC_SIZE(sp[-1].u.vec)) > 32)
-    {
-        errorf("Bad arg 1 to set_connection_charset(): array too big (%"
-             PRIdMPINT")\n", i);
-        /* NOTREACHED */
-        return sp;
-    }
-
-    if (O_SET_INTERACTIVE(ip, current_object))
-    {
-        if (sp[-1].type == T_NUMBER)
-        {
-            set_default_conn_charset(ip->charset);
-        }
-        else if (sp[-1].type == T_STRING)
-        {
-            memset(ip->charset, 0, sizeof ip->charset);
-            for ( i = mstrsize((sp-1)->u.str), p = get_txt(sp[-1].u.str)
-                ; i > 0
-                ; i--, p++)
-                ip->charset[(*p & 0xff) / 8] |= 1 << (*p % 8);
-        }
-        else
-        {
-            /* i was set in the typecheck above */
-            for ( svp = sp[-1].u.vec->item, p = ip->charset
-                ; --i >= 0
-                ; svp++, p++)
-            {
-                if (svp->type == T_NUMBER)
-                    *p = (char)svp->u.number;
-            }
-            memset(p, 0, (size_t)(&ip->charset[sizeof ip->charset] - p));
-        }
-
-        ip->quote_iac = (char)sp->u.number;
-    }
-    sp--;
-    free_svalue(sp);
-    sp--;
-    return sp;
-} /* f_set_connection_charset() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -9484,25 +9223,25 @@ f_interactive_info (svalue_t *sp)
     case IC_COMBINE_CHARSET_AS_STRING:
         if (!ip)
             errorf("Default value for IC_COMBINE_CHARSET_AS_STRING is not supported.\n");
-        get_charset(&result, CHARSET_STRING, ip->combine_cset);
+        get_charset(&result, true, ip->combine_cset);
         break;
 
     case IC_COMBINE_CHARSET_AS_ARRAY:
         if (!ip)
             errorf("Default value for IC_COMBINE_CHARSET_AS_ARRAY is not supported.\n");
-        get_charset(&result, CHARSET_VECTOR, ip->combine_cset);
+        get_charset(&result, false, ip->combine_cset);
         break;
 
     case IC_CONNECTION_CHARSET_AS_STRING:
         if (!ip)
             errorf("Default value for IC_CONNECTION_CHARSET_AS_STRING is not supported.\n");
-        get_charset(&result, CHARSET_STRING, ip->charset);
+        get_charset(&result, true, ip->charset);
         break;
 
     case IC_CONNECTION_CHARSET_AS_ARRAY:
         if (!ip)
             errorf("Default value for IC_CONNECTION_CHARSET_AS_ARRAY is not supported.\n");
-        get_charset(&result, CHARSET_VECTOR, ip->charset);
+        get_charset(&result, false, ip->charset);
         break;
 
     case IC_QUOTE_IAC:

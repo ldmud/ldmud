@@ -47,6 +47,20 @@ that you should pay attention to when updating.
   + The efun query_shadowing() was removed in favor of
     object_info(ob, OI_SHADOW_PREV). There is a sefun replacement
     in /mudlib/deprecated/. (#596)
+  + The efuns set_connection_charset(), get_connection_charset(),
+    set_combine_charset(), and get_combine_charset() were removed in
+    favor of
+     * configure_object(ob, IC_CONNECTION_CHARSET_AS_STRING, val),
+       configure_object(ob, IC_CONNECTION_CHARSET_AS_ARRAY, val) and
+       configure_object(ob, IC_QUOTE_IAC, 1 resp. 0),
+     * object_info(ob, IC_CONNECTION_CHARSET_AS_STRING),
+       object_info(ob, IC_CONNECTION_CHARSET_AS_STRING) and
+       object_info(ob, IC_QUOTE_IAC),
+     * configure_object(ob, IC_COMBINE_CHARSET_AS_STRING, val) and
+       configure_object(ob, IC_COMBINE_CHARSET_AS_ARRAY, val),
+     * object_info(ob, IC_COMBINE_CHARSET_AS_STRING) and
+       object_info(ob, IC_COMBINE_CHARSET_AS_STRING),
+    There are a sefun replacements in /mudlib/deprecated/. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an
