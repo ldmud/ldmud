@@ -49,7 +49,7 @@ Language
 
 Style
 -----
-    All modules (.c-files) have to have their interface in an accompaning
+    All modules (.c-files) have to have their interface in an accompanying
     .h-file. The header file must be guarded against repeated inclusion
     with the normal
         #ifndef HEADERNAME_H
