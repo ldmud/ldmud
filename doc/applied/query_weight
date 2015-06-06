@@ -4,7 +4,7 @@ SYNOPSIS
 
 DESCRIPTION
         In compat mode this lfun is used by the efun transfer().
-        Not that no set_weight() is required by the parser.
+        Note that no set_weight() is required by the parser.
 
 HISTORY
         Deprecated in LDMud 3.3 as transfer() has been deprecated.

@@ -7,7 +7,7 @@ DESCRIPTION
 
         This lfun is not applied by the parser, but by other objects
         to tell the current object to self-destruct. remove() should
-        be supplied by the base classes of the library.  Return 1 if
+        be supplied by the base classes of the library. Return 1 if
         actually self-destructed, 0 otherwise.
 
         An alternative way to ensure the housekeeping on destruction
