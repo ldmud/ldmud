@@ -3,7 +3,7 @@ SYNOPSIS
 
 DESCRIPTION
         Return a login object that the requested connection should be
-        bound to. 
+        bound to.
 
         Note that the connection is at this time bound to the master object,
         and will be re-bound to the returned object.

@@ -11,7 +11,7 @@ DESCRIPTION
         done when remove_player() is called because the udp connectivity is
         already gone then.
 
-        If the gamedriver shuts down normally , this is the last function
+        If the gamedriver shuts down normally, this is the last function
         called before the mud shuts down the udp connections and the accepting
         socket for new players.
 

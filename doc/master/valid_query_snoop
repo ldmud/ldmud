@@ -3,7 +3,7 @@ SYNOPSIS
 
 DESCRIPTION
         Should return 1 if previous_object() (the one that called the
-        efun query_snoop()) is allowed to query wether ob is being
+        efun query_snoop()) is allowed to query whether ob is being
         snooped, 0 if not.
 
         The master object is always allowed to use query_snoop().

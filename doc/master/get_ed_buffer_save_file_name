@@ -3,9 +3,9 @@ SYNOPSIS
 
 DESCRIPTION
         This function is called when an interactive user object is
-        destructed or looses connection through remove_interactive()
-        while editing with ed() the file edite_file (emergency save).
-        this_player() is set to the object that loosing connection.
+        destructed or loses connection through remove_interactive()
+        while editing with ed() the file edited_file (emergency save).
+        this_player() is set to the object that lost connection.
         The function should return a file name for the emergency save
         file.
 

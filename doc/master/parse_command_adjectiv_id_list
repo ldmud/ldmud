@@ -3,7 +3,7 @@ SYNOPSIS
 
 DESCRIPTION
         Used by parse_command(). Return an array of common
-        adjectives in the installations native language.
+        adjectives in the installation's native language.
 
 EXAMPLE
         string * parse_command_adjectiv_id_list() {

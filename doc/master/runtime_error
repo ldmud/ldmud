@@ -48,11 +48,9 @@ DESCRIPTION
                      , err, prg, curobj, line);
           }
 
-
 HISTORY
         LDMud 3.2.9 added the <culprit> argument.
         LDMud 3.2.12/3.3.705 added the <caught> argument.
-
 
 SEE ALSO
         log_error(M), heart_beat_error(M), runtime_warning(M),

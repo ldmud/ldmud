@@ -7,5 +7,5 @@ DESCRIPTION
         the opportunity to return an object that will then serve as if
         compiled from the given filename.
 
-        If 0 is returned, the usual ``Could not load descr for'' error
+        If 0 is returned, the usual "Could not load descr for" error
         will occur.

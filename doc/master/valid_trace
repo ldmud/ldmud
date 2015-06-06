@@ -7,7 +7,7 @@ DESCRIPTION
         The argument <what> denotes the action for which permission is to be
         checked, <arg> is the argument given to the traceing efun:
 
-        "trace"               Is the user allowed to use tracing?
+        "trace"        Is the user allowed to use tracing?
                        <arg> is the tracelevel argument given.
         "traceprefix"  Is the user allowed to set a traceprefix?
                        <arg> is the prefix given.

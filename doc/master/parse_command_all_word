@@ -2,8 +2,8 @@ SYNOPSIS
         string parse_command_all_word(void)
 
 DESCRIPTION
-        Used by parse_command(). Return the word for ``all'' in the
-        installations native language.
+        Used by parse_command(). Return the word for "all" in the
+        installation's native language.
 
 EXAMPLE
         string parse_command_all_word() {

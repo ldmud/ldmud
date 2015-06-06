@@ -9,7 +9,7 @@ DESCRIPTION
         or 1. The function should return an array of strings, which
         traditionally denote the objects to be preloaded with
         master->preload(). Any other return value is interpreted as
-        ``no object to preload''. The resulting strings will be passed
+        "no object to preload". The resulting strings will be passed
         one at a time as arguments to preload().
 
 SEE ALSO

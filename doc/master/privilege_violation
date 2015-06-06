@@ -8,65 +8,72 @@ DESCRIPTION
         and <arg2> are additional arguments, depending on the operation.
 
         The function should return >0 to grant the privilege, 0 to
-        indicate that the caller was probably misleaded and the error
+        indicate that the caller was probably misled and the error
         might be fixed, and anything else to indicate a real
-        violation, that will be handled as run time error.
+        violation that will be handled as run time error.
 
         The privileged operations are:
-        attach_erq_demon  Attach the erq demon to object <arg> with
-                          flag <arg2>.
-        bind_lambda       Bind a lambda-closure to object <arg>.
-        call_out_info     Return an array with all call_out
-                          informations.
-        configure_interactive Set option <arg2> with value <arg3> as
-                          default (<arg>==0) or for object <arg>.
-        configure_driver  Set option <arg1> to value(s) <arg2>.
-        enable_telnet     Enable/disable telnet (<arg2>) for object <arg>.
-        execute_command   Execute command string <arg2> for the object
-                          <arg>.
-        erq               A the request <arg2> is to be send to the
-                          erq-demon by the object <who>.
-        garbage_collection  Object <who> calls the efun garbage_collectio()
-                          with <arg> as filename and <arg2> as flag.
-        input_to          Object <who> redirects the next input from
-                          commandgiver <arg>, using <arg2> as value
-                          for the flags. This is used for flag values
-                          including the 'no bang' option.
-        limited           Execute <arg> with reduced/changed limits
-                          <arg2> (as return by query_limits()).
-        mysql             Object <who> attempted to execute mySQL efun <arg>.
-        pgsql             Object <who> attempted to execute Postgres efun <arg>.
-        net_connect       Attempt to open a connection to host <arg>,
-                          port <arg2>.
-        nomask simul_efun Attempt to get an efun <arg> via efun:: when
-                          it is shadowed by a nomask type simul_efun.
-        rename_object     The object <who> tries to rename the object
-                          <arg> to the name <arg2>.
-        send_udp          Send UDP-data to host <arg>.
-        get_extra_wizinfo Get the additional wiz-list info for user
-                          <arg>.
-        set_extra_wizinfo Set the additional wiz-list info for user
-                          <arg>.
-        set_extra_wizinfo_size Set the size of the additional user
-                          info in the wiz-list to <arg>.
-        set_driver_hook   Set hook <arg> to <arg2>.
-        set_limits        Set limits to <arg> (as returned by query_limits()).
-        set_max_commands  Set the max. number of commands interactive
-                          object <arg> can issue per second to <arg2>.
-        set_this_object   Set this_object() to <arg>.
-        shadow_add_action Add an action to function <arg2> of object <arg>
-                          from the shadow <who> which is shadowing <arg>.
-        shutdown          Object <who> calls the efun shutdown with <arg> as
-                          argument.
-        sqlite_pragma     Execute pragma statement in SQLite.
-        symbol_variable   Attempt to make a symbol from a hidden
-                          inherited variable. <arg> is the object in
-                          question, <arg2> the number of the variable in
-                          the variable table.
-        variable_list     An attempt to return the variable values of object
-                          <arg> is made from a different object <who>.
-        wizlist_info      Return an array with all wiz-list
-                          information.
+        attach_erq_demon       : Attach the erq demon to object <arg> with
+                                 flag <arg2>.
+        bind_lambda            : Bind a lambda-closure to object <arg>.
+        call_out_info          : Return an array with all call_out
+                                 informations.
+        configure_interactive  : Set option <arg2> with value <arg3> as
+                                 default (<arg>==0) or for object <arg>.
+        configure_driver       : Set option <arg1> to value(s) <arg2>.
+        enable_telnet          : Enable/disable telnet (<arg2>) for object
+                                 <arg>.
+        execute_command        : Execute command string <arg2> for the object
+                                 <arg>.
+        erq                    : At the request <arg2> is to be sent to the
+                               : erq-demon by the object <who>.
+        garbage_collection     : Object <who> calls the efun
+                                 garbage_collection() with <arg> as filename
+                                 and <arg2> as flag.
+        input_to               : Object <who> redirects the next input from
+                                 commandgiver <arg>, using <arg2> as value
+                                 for the flags. This is used for flag values
+                                 including the 'no bang' option.
+        limited                : Execute <arg> with reduced/changed limits
+                                 1<arg2> (as return by query_limits()).
+        mysql                  : Object <who> attempted to execute mySQL efun
+                                 <arg>.
+        pgsql                  : Object <who> attempted to execute Postgres efun
+                                 <arg>.
+        net_connect            : Attempt to open a connection to host <arg>,
+                                 port <arg2>.
+        nomask simul_efun      : Attempt to get an efun <arg> via efun:: when
+                                 it is shadowed by a nomask type simul_efun.
+        rename_object          : The object <who> tries to rename the object
+                                 <arg> to the name <arg2>.
+        send_udp               : Send UDP-data to host <arg>.
+        get_extra_wizinfo      : Get the additional wiz-list info for user
+                                 <arg>.
+        set_extra_wizinfo      : Set the additional wiz-list info for user
+                                 <arg>.
+        set_extra_wizinfo_size : Set the size of the additional user
+                                 info in the wiz-list to <arg>.
+        set_driver_hook        : Set hook <arg> to <arg2>.
+        set_limits             : Set limits to <arg> (as returned by
+                                 query_limits()).
+        set_max_commands       : Set the max. number of commands interactive
+                                 object <arg> can issue per second to <arg2>.
+        set_this_object        : Set this_object() to <arg>.
+        shadow_add_action      : Add an action to function <arg2> of object
+                                 <arg> from the shadow <who> which is shadowing
+                                 <arg>.
+        shutdown               : Object <who> calls the efun shutdown with <arg>
+                                 as argument.
+        sqlite_pragma          : Execute pragma statement in SQLite.
+        symbol_variable        : Attempt to make a symbol from a hidden
+                                 inherited variable. <arg> is the object in
+                                 question, <arg2> the number of the variable in
+                                 the variable table.
+        variable_list          : An attempt to return the variable values of
+                                 object <arg> is made from a different object
+                                 <who>.
+        wizlist_info           : Return an array with all wiz-list
+                                 information.
 
         call_out_info() can return the arguments to functions and
         lambda closures to be called by call_out(); you should
@@ -82,7 +89,6 @@ DESCRIPTION
         All other operations are potential sources for direct security
         breaches - any use of them should be scrutinized closely.
 
-
 HISTORY
         LDMud 3.2.10 added the "enable_telnet", "net_connect",
            "set_max_commands" and "variable_list" violations.
@@ -90,7 +96,6 @@ HISTORY
            and "set_limits".
         LDMud 3.2.11/3.3.640 added the "mysql" violation.
         LDMud 3.3.717 added the "sqlite_pragma" violation.
-
 
 SEE ALSO
         net_connect(E), send_erq(E), set_this_object(E), rename_object(E),
