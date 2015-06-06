@@ -65,7 +65,7 @@ DESCRIPTION
 
           --hostaddr <addr>
             Use <addr> as address of this machine, instead of what the
-            system says.  In particular this address will be used to open
+            system says. In particular this address will be used to open
             the driver ports.
 
           --no-compat
@@ -176,7 +176,7 @@ DESCRIPTION
             out. A time less or equal 0 disables swapping.
 
           -s f<name> | --swap-file <name>
-            Swap into file <name> instead of <mudlib>/LP_SWAP.<host> .
+            Swap into file '<name>' instead of '<mudlib>/LP_SWAP.<host>'.
 
           -s c       | --swap-compact
             Reuse free space in the swap file immediately.
@@ -185,19 +185,19 @@ DESCRIPTION
 
           --hard-malloc-limit <size>
             Restrict total memory allocation to <size> bytes.
-            A <size> of 0 or 'unlimited' removes any restriction.\n"
+            A <size> of 0 or 'unlimited' removes any restriction.
 
           --soft-malloc-limit <size>
             This value gives a soft limit of the allocated memory (kind of low
             watermark). If this value is exceeded, the driver will call
             low_memory() in the master to inform the mudlib about the
-            (potenntially) developing low memory situation.
+            (potentially) developing low memory situation.
             A <size> of 0 or 'unlimited' removes this threshold.
 
           --min-malloc <size>
           --min-small-malloc <size>
-            Determine the sizes for the explicite initial large resp. small
-            chunk allocation. A size of 0 disables the explicite initial
+            Determine the sizes for the explicit initial large resp. small
+            chunk allocation. A size of 0 disables the explicit initial
             allocations.
 
           -r u<size> | --reserve-user <size>
@@ -224,12 +224,12 @@ DESCRIPTION
             Write the pid of the driver process into <filename>.\n"
 
           --tls-key <pathname>
-              Use <pathname> as the x509 keyfile, default is 'key.pem'.
-              If relative, <pathname> is interpreted relative to <mudlib>.
+            Use <pathname> as the x509 keyfile, default is 'key.pem'.
+            If relative, <pathname> is interpreted relative to <mudlib>.
 
           --tls-cert <pathname>
-             Use <pathname> as the x509 certfile, default is 'cert.pem'.
-             If relative, <pathname> is interpreted relative to <mudlib>.
+            Use <pathname> as the x509 certfile, default is 'cert.pem'.
+            If relative, <pathname> is interpreted relative to <mudlib>.
 
           --tls-crlfile <pathname>
             Use <pathname> as the filename holding your certificate revocation
@@ -321,7 +321,7 @@ DESCRIPTION
         invocation and distinguishes 'options', which start with a '-', from
         proper arguments. Options are further distinguished by their name and
         may take an additional value. In general, options and arguments can be
-        givein in any order.
+        given in any order.
 
         Options are recognized in two forms. In the short form the option must
         be given as a single '-' followed by a single letter. In the long
