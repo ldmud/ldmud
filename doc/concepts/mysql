@@ -12,9 +12,9 @@ DESCRIPTION
         Create a dedicated user in the mySQL database for the driver.
         Enter this username and password in the file pkg-mysql.c, function
         mysql_real_connect(), and compile the driver (the username and
-        password are built into the driver for security reasons).
-        If you chose to not create either a username and/or a password,
-        leave the corresponding entry at 0.
+        password are built into the driver for security reasons). If you
+        choose to not create either a username and/or a password, leave the
+        corresponding entry at 0.
 
         Use mysqladmin to create any databases you want to provide - the
         names are later used in the efun db_connect() to connect to
@@ -32,7 +32,7 @@ DESCRIPTION
 
         To connect to your mySQL-server, use the efun db_connect(). It
         takes only one argument which is the name of the database (which
-        must exist).  The return-value of db_connect() is an integer
+        must exist). The return-value of db_connect() is an integer
         representing the unique handle to the database with which you will
         identify your connection later.
 

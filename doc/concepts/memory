@@ -33,8 +33,8 @@ DESCRIPTION
         Any feedback of how to best tune these values are welcome. The
         call of reset will be done once, and not yet again until the
         object has been touched. This enables reset'ed objects to stay
-        swapped out. If you have a mudlib that has no ojbects that
-        defines 'clean_up', then you may better define this time as 0,
+        swapped out. If you have a mudlib that has no objects that
+        define 'clean_up', then you may better define this time as 0,
         which means never call clean_up (and thus never swap the
         object in needlessly). A well implemented usage of clean_up is
         better than the swap algorithm, as even cloned objects can be
@@ -42,9 +42,9 @@ DESCRIPTION
         swapping (memory wise).
 
         Changed mechanism of calling clean_up() slightly. Only objects
-        that defines the function will be called. And, only clean_up()
+        that define the function will be called. And, only clean_up()
         that returns non-zero will be called again. This will minimize
-        calls of clean_up(), while still cost very litte to maintain.
+        calls of clean_up(), while still costing little to maintain.
 
         clean_up() now gets a flag as argument, which will be non-zero
         if the the program of this object is used for inheritance by

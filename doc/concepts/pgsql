@@ -40,7 +40,7 @@ DESCRIPTION
                                row).
 
               PGRES_COMMAND_OK: <ret> is a string which contains the
-                                server response (e.g. on INSERT or DELETE) 
+                                server response (e.g. on INSERT or DELETE)
 
               PGRES_BAD_RESPONSE,
               PGRES_NONFATAL_ERROR,
@@ -49,7 +49,7 @@ DESCRIPTION
 
           void <callback>(int type, mixed ret [, mixed extra...])
 
-            <type> is the type of the call, which is not related a
+            <type> is the type of the call, which is not related to a
             specific query:
 
               PGCONN_SUCCESS: The database-connection was established,
@@ -65,7 +65,7 @@ DESCRIPTION
                               we try to re-establish (reset) it. If the
                               reset fails, the connection is closed and
                               this value is returned. Consider the
-                              connection gone and don't try to close or 
+                              connection gone and don't try to close or
                               otherwise operate further on it.
                               <ret> is a dummy string.
 

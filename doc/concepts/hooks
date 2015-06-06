@@ -11,6 +11,7 @@ DESCRIPTION
         Some of the hooks are mandatory, some not. Most hooks accept
         unbound lambda closures as values, some also lfun closures or
         even strings.
+
         The hooks are identified by an ordinal number, for which
         symbolic names are defined in /sys/driverhooks.h.
 
@@ -106,7 +107,7 @@ DESCRIPTION
 
         H_TELNET_NEG
           Optional hook to specifiy how to perform a single telnet
-          negotiation.  If not set, most telnet options are rejected (read:
+          negotiation. If not set, most telnet options are rejected (read:
           only a very minimal negotiation takes place).
 
 

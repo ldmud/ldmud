@@ -48,7 +48,7 @@ AUTHOR
 
 NOTE
         The above is only particularly correct nowadays. Recently a
-        package name ``inetd'' was published, that is based on the IMP
+        package name "inetd" was published, that is based on the IMP
         mechanism in the driver (send_imp() and receive_imp()), but
         it uses a different message format. That package seems to
         enjoy much publicity and is installed in a number of muds. For

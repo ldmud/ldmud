@@ -5,11 +5,11 @@ DESCRIPTION
         Up to version 3.2.1@61, LPMud utilized two external programs
         in an ad-hoc manner to solve problems: the 'hname' program to
         resolve IP addresses into meaningful hostnames, and the
-        'indent' program to properly indent LPC files.
-        In version 3.2.1@61 both functions were united in a
-        generalized 'erq' process, to which additional functions may
-        be attached. Unfortunately it was never documented by Amylaar,
-        so the information presented here had to be reverse engineered
+        'indent' program to properly indent LPC files. In version
+        3.2.1@61 both functions were united in a generalized 'erq'
+        process, to which additional functions may be attached.
+        Unfortunately it was never documented by Amylaar, so the
+        information presented here had to be reverse engineered
         from the sources - better take it with a grain of salt.
 
         The erq feature is available if the driver is compiled with
@@ -34,10 +34,10 @@ DESCRIPTION
         an interactive object as argument, and takes the connection
         away(!) from this object and stores it as the erq connection
         to use (an old erq connection is closed first). The object
-        (which now no longer is interactive) is then no longer needed,
-        but may continue to exist.
-        The erq attached this way of course has to use the sockets it
-        opened to communicate with the driver.
+        (which is now no longer is interactive) is then no longer
+        needed, but may continue to exist. The erq attached this way
+        of course has to use the sockets it opened to communicate
+        with the driver.
 
         Most of the communication between erq and driver is going to
         be initiated by the driver (the erq has to look up the
@@ -97,6 +97,7 @@ DESCRIPTION
         identified by 'header.handle'. Normally, one request results
         in just one response sent by the erq using struct from_erq_msg,
         so the handle is recycled after this response.
+
         Shall the erq send several responses (or break one response
         into several parts), the struct from_erq_keep_msg has to be
         used for all but the last response - this message with its
@@ -298,7 +299,7 @@ DESCRIPTION
             ERQ_E_UNKNOWN : Process terminated for unknown reason.
 
 
-        Authentificate connection (see rfc 931):
+        Authenticate connection (see rfc 931):
 
           request  : ERQ_AUTH
           data sent: struct sockaddr_in remote // the address to check
@@ -313,7 +314,7 @@ DESCRIPTION
           The erq attempts to connect the authd on the remote system
           and to verify the connection between the remote port and the
           mud port. The latter will normally be the port number of the
-          socket on besides of the gamedriver, retrieveable by
+          socket on besides of the gamedriver, retrievable by
           query_ip_number().
 
           The answer from the authd (one line of text) if there is any
@@ -323,7 +324,7 @@ DESCRIPTION
           the xerq as alternative.
 
 
-        Open an UPD port:
+        Open an UDP port:
 
           request  : ERQ_OPEN_UDP
           data sent: char[2] port   // the port number to open (network order)
@@ -398,7 +399,7 @@ DESCRIPTION
           the network from the sender at <addr>, reply port number <port>.
 
 
-        Open an TCP to listen for connections:
+        Open a TCP port to listen for connections:
 
           request  : ERQ_LISTEN
           data sent: struct addr.sin_port port   // the port number to open
@@ -409,7 +410,7 @@ DESCRIPTION
                      char   rc = ERQ_OK
                      char[] ticket  // the connection ticket.
 
-          The erq opens an TCP-port on the host machine with the given
+          The erq opens a TCP-port on the host machine with the given
           port number to listen for connections.
           Possible exit codes are:
             ERQ_OK          : Operation succeeded.
@@ -424,7 +425,7 @@ DESCRIPTION
           spawned program.
 
 
-        Open an TCP port:
+        Open a TCP port:
 
           request  : ERQ_OPEN_TCP
           data sent: struct in_addr.s_addr ip   // the ip to address
@@ -436,7 +437,7 @@ DESCRIPTION
                      char   rc = ERQ_OK
                      char[] ticket  // the connection ticket.
 
-          The erq opens an TCP-port on the host machine and tries to connect
+          The erq opens a TCP-port on the host machine and tries to connect
           it to the address <ip>:<port>.
           Possible exit codes are:
             ERQ_OK          : Operation succeeded.
@@ -529,7 +530,7 @@ DESCRIPTION
                      char[]                ticket  // the new ticket.
 
           The erq accepts a new connection on an accept-TCP-port, creates
-          an child and ticket for it and returns its ticket together with
+          a child and ticket for it, and returns its ticket together with
           the remote's side <ip>:<port> number (in network byte order).
           Possible exit codes are:
             ERQ_OK          : Operation succeeded.
@@ -541,7 +542,7 @@ DESCRIPTION
             ERQ_E_UNKNOWN   : Error <info> occured in one of the system
                               calls done to open the port.
 
-          Once the port is open, it is treated as if is just another
+          Once the port is open, it is treated as if it is just another
           spawned program.
 
 EXAMPLE

@@ -6,14 +6,14 @@ DESCRIPTION
         between a client (the 'telnet' program or a mud client) and a
         server (the game driver). Most of the options offered by the
         protocol are optional and need to be negotiated between the
-        client and the server.  Consequently, and due to their
+        client and the server. Consequently, and due to their
         specialized nature, mud clients don't have to support the full
         telnet option feature set.
 
         For the server to find out if a client supports the telnet
-        protocol at all, one good approach is to a simple, commonly
-        used telnet command to the client. If the client reacts
-        conform to the protocol (or sends telnet commands itself), the
+        protocol at all, one good approach is to issue a simple,
+        commonly used telnet command to the client. If the client reaction
+        conforms to the protocol (or sends telnet commands itself), the
         mud can continue to negotiate further options. If the client
         does not react, the mud can safely refrain from further
         negotiations.
@@ -22,8 +22,8 @@ DESCRIPTION
         the telnet related RFCs (available for example on
         http://www.faqs.org/rfcs):
 
-         RFC Titel                                              rel. Code
-    
+         RFC Title                                              rel. Code
+
          495 TELNET Protocol Specification
          513 Comments on the new TELNET specifications
          559 Comments on the new TELNET Protocol and its Implem
@@ -81,8 +81,7 @@ DESCRIPTION
         255. Negotiations are based on different telnetoptions (their
         values are defined in telnet.h too). Before a negotiation can
         start the client and the server have to agree that they
-        support the option.
-        This works in the following way:
+        support the option. This works in the following way:
 
         If a client wants to send something to the server it has to
         send 'IAC WILL option' (For terminaltype negotation this would
@@ -100,17 +99,17 @@ DESCRIPTION
         sent a WILL or WONT it has to reply with either 'IAC WILL
         option' if it supports the option or 'IAC WONT option' if not.
 
-        A small example: Lets assume we want to negotiating
+        A small example: Lets assume we want to negotiate
         terminaltype. (TELOPT_TTYPE with value 24). client is the
         telnet executable on the playerside, the server is the
         gamedriver.
 
                 client                        server
             IAC WILL TTYPE
-                                    IAC DO TTYPE
+                                           IAC DO TTYPE
 
         Or:
-                                    IAC DO TTYPE
+                                           IAC DO TTYPE
             IAC WILL TTYPE
 
         After this we are ready to transfer the terminaltype from the
@@ -137,18 +136,18 @@ DESCRIPTION
 
         Example: (we have exchanged WILL/DO already)
                   client                                server
-                                        IAC SB TTYPE SEND IAC SE
+                                              IAC SB TTYPE SEND IAC SE
         IAC SB TTYPE IS VT200 IAC SE
-                                        IAC SB TTYPE SEND IAC SE
+                                              IAC SB TTYPE SEND IAC SE
         IAC SB TTYPE IS VT100 IAC SE
-                                        IAC SB TTYPE SEND IAC SE
+                                              IAC SB TTYPE SEND IAC SE
         IAC SB TTYPE IS VT52 IAC SE
-                                        IAC SB TTYPE SEND IAC SE
+                                              IAC SB TTYPE SEND IAC SE
         IAC SB TTYPE IS VT52 IAC SE
         /* this marks that we have all terminaltypes. We decide to use the
          * vt200 mode so we have to skip to VT200
          */
-                                        IAC SB TTYPE SEND IAC SE
+                                              IAC SB TTYPE SEND IAC SE
         IAC SB TTYPE IS VT200 IAC SE
 
 
@@ -166,7 +165,7 @@ DESCRIPTION
         Example: (WILL/DO exchanged)
                 client                                server
         IAC SB NAWS 0 80 0 24 IAC SE         /* the standard vt100 windowsize */
-                                        /* no reply */
+                                             /* no reply */
 
         And, a bit less important but most complex, the LINEMODE (34)
         option. It was implemented it due to the fact, that
@@ -178,7 +177,7 @@ DESCRIPTION
         commandline-editing for the client. If a client supports
         LINEMODE it HAS to support this modechange. The client will
         reply with IAC SB LINEMODE LM_MODE MODE_EDIT|MODE_ACK IAC SE
-        (x|y is bitwise or). Thats it for linemode. (You will perhaps
+        (x|y is bitwise or). That's it for linemode. (You will perhaps
         receive other IAC SB LINEMODEs with other LM_xxx ... you may
         ignore them. (At least IRIX 5.x sends IAC SB LINEMODE LM_SLC
         .... IAC SE which declares the local characterset.)).
@@ -191,9 +190,9 @@ DESCRIPTION
         IAC SB LINEMODE LM_MODE
           MODE_EDIT|MODE_ACK IAC SE
 
-        Note: The option is much more funnier as it looks here, it for
-          example supports a mixed mode between linemode and
-          charactermode... flushing the input at certain characters (at
+        Note: The option is more interesting than it looks here. For
+          example it supports a mixed mode between linemode and
+          charactermode, flushing the input at certain characters (at
           ESC or TAB for shell-like commandline completition). We suggest
           reading RFC 1184.
 
@@ -232,7 +231,7 @@ DESCRIPTION
            using binary_message() (appropiate meaning sending the
            right DO/DONT/WILL/WONT if not sent before and using the SB
            return values).
-        3.1. Sent IAC DO TTYPE IAC DO NAWS IAC DO LINEMODE at the
+        3.1. Send IAC DO TTYPE IAC DO NAWS IAC DO LINEMODE at the
            first time you can do it (before cat()ing /WELCOME perhaps).
         3.2. Note all sent and received WILL/WONT/DO/DONT options for
            conforming to the standard, avoiding endless loops and for
@@ -243,7 +242,7 @@ DESCRIPTION
            linkdead or quits. You won't need to save this data.
         3.4. Lower_case() terminaltypes... ;)
         3.5. Use reasonable defaultvalues if the client does not
-           support one of the options. (columns 80,lines 24 if not
+           support one of the options. (columns 80, lines 24 if not
            NAWS, unknown or vt100 for no terminaltype)
 
         The WILL/WONT/DO/DONT data is best saved in a mapping looking
@@ -287,6 +286,7 @@ DESCRIPTION
 
         Tinyfugue and some other mudclients usually do not support
         negotiations.
+
         Except for TF, which supports the Telnet End-Of-Record option
         as marker for the end of the prompt. So if you send IAC EOR
         after every prompt, it will print the prompt always in the

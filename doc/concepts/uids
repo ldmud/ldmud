@@ -51,9 +51,11 @@ DESCRIPTION
 
         When an object is newly loaded, the H_LOAD_UIDS hook is
         called with the object name as argument.
+
         When an object is cloned, the H_CLONE_UIDS hook is called
         with the blueprint object as first and the clone's designated
         name as second argument.
+
         In both cases the new object already exists, but has 0 uids.
 
         For the result, the following possibilities exist (<num> is
@@ -71,9 +73,8 @@ DESCRIPTION
              ({ <num>, <no-string> })   -> uid = 'default', euid = 0
 
 
-
         Slightly different rules apply to the (e)uid of the master.
-        The masters (e)uid is determined by a call to
+        The master's (e)uid is determined by a call to
         master->get_master_uid():
 
              "<uid"> -> uid = "<uid>", euid = "<uid>"
