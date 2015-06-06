@@ -496,7 +496,6 @@ object  present_clone(object|string, object|int|void, int|void);
 string  program_name(null|object default: F_THIS_OBJECT);
 int     program_time(object default: F_THIS_OBJECT);
 void    replace_program(void|string);
-mixed   query_editing(object);
 int     query_idle(object);
 object  query_snoop(object);
 int     find_input_to(object, object|string|closure, void|string);

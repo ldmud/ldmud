@@ -8966,6 +8966,8 @@ f_interactive_info (svalue_t *sp)
                 object_t *ed = get_ed_object(ih);
                 if (ed)
                     put_ref_object(&result, ed, "interactive_info(II_EDITING)");
+                else
+                    put_number(&result, 1);
             }
         }
         break;

@@ -3595,43 +3595,6 @@ v_ed (svalue_t *sp, int num_arg)
 } /* f_ed() */
 
 /*-------------------------------------------------------------------------*/
-svalue_t *
-f_query_editing (svalue_t *sp)
-
-/* EFUN: query_editing()
- *
- *   mixed query_editing (object ob)
- *
- * Returns 1 if the ob is interactive and currently editing
- * with ed(). If ed() was called with a function name as
- * second argument, the object where ed() was called is returned,
- * else 0.
- */
-
-{
-    object_t      *ob;
-    interactive_t *ip;
-    input_t       *ih;
-
-    ob = sp->u.ob;
-    deref_object(ob, "query_editing");
-
-    if (O_SET_INTERACTIVE(ip, ob)
-     && (ih = get_input_handler(ip, INPUT_ED)) != NULL)
-    {
-        if ( NULL != (ob = ((ed_buffer_t*) ih)->exit_ob) )
-            sp->u.ob = ref_object(ob, "query_editing");
-        else
-            put_number(sp, 1);
-    }
-    else
-    {
-        put_number(sp, 0);
-    }
-    return sp;
-}
-
-/*-------------------------------------------------------------------------*/
 object_t *
 get_ed_object (input_t *ih)
 
