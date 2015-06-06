@@ -18,9 +18,6 @@ DESCRIPTION
         The function this_player() will return this object, but only if
         it is living. Otherwise, this_player() will return 0.
 
-        The function will be called only if there is at least one interactive
-        user in the game.
-
         Note that error messages will be given to the current user
         which will be the object itself or nobody.
 
