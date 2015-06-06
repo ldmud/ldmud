@@ -2,10 +2,10 @@ SYNOPSIS
         void catch_msg(mixed *|struct|mapping|object msg, object obj)
 
 DESCRIPTION
-        When say(), tell_room() or tell_object() are used with an
+        When say(), tell_room() or tell_object() are used with a
         non-string as message, the value will be passed to catch_msg()
         in all living objects that can hear it, instead of writing to
-        the user resp.  sending to catch_tell(). This can be used to
+        the user resp. sending to catch_tell(). This can be used to
         implement communication protocols between livings. The second
         argument denotes the object that has sent the message.
 

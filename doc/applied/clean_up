@@ -8,12 +8,12 @@ DESCRIPTION
         clean_up().
 
         The function is applied by the driver when an object hasn't been
-        used for a long time, to give it a possibility to
-        self-destruct. The refcount <ref> passed as argument will be 0 for
-        clone objects, 1 for a simple loaded object, and greater when
-        the object is cloned or inherited by some existing object.  It
-        is recommended not to self_destruct the object when the
-        reference count is greater than one.
+        used for a long time, to give it a chance to self-destruct. The
+        refcount <ref> passed as argument will be 0 for clone objects,
+        1 for a simple loaded object, and greater when the object is
+        cloned or inherited by some existing object. It is recommended
+        not to self_destruct the object when the reference count is
+        greater than one.
 
         By convention, a refcount < 0 is used if some other object
         asks the called object to clean_up.
@@ -22,7 +22,7 @@ DESCRIPTION
         object to clean up.
 
         If the hook specifies a non-existing lfun, or if the call
-        returns 0, no further attempt to clean up this object will be done.
+        returns 0, no further attempt to clean up this object will be made.
 
         Returning a non-zero value is only recommended when the reason
         why the object can't self-destruct is likely to vanish without

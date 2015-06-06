@@ -55,10 +55,10 @@ EXAMPLE
            n2
 
         If we now move another living object l3 into l1, the call
-        suequence of the init() functions looks like this:
+        sequence of the init() functions looks like this:
 
         l1->init()  first init() of the destination will be called
-        n1->init()  now iterate throw the inventory of the destination
+        n1->init()  now iterate through the inventory of the destination
         l3->init()
         l2->init()
         n2->init()
