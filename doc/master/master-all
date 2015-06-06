@@ -47,7 +47,7 @@ DESCRIPTION
           - The interpreter sets up the IP communication and enters
             the backend loop.
 
-        If the master is reloaded during system operation, this
+        If the master is reloaded during system operation, these
         actions are taken:
           - The master is loaded, and its initialisation lfun is
             called according to the settings of the driverhooks (if set).
@@ -62,7 +62,7 @@ DESCRIPTION
           - inaugurate_master() is called.
 
 
-        Security hint: most of this functions are not useful to be
+        Security hint: most of these functions are not useful to be
         called directly from other objects and can be made private or
         static. Unlike create(), these functions that are applied to
         the master object are found by the interpreter even if not
@@ -118,7 +118,7 @@ DESCRIPTION
             Runtime Support
 
         object compile_object (string filename)
-          Compile an virtual object.
+          Compile a virtual object.
 
         mixed include_file (string file, string compiled_file, int sys_include)
           Return the full pathname for an included file. // 3.2.8 and later

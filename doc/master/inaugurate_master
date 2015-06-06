@@ -17,7 +17,7 @@ DESCRIPTION
                    additionally lost all variable contents.
               = 3: this is a reloaded master.
 
-        This function has at least to set up the driverhooks to use
+        This function has to at least set up the driverhooks to use
         (in 3.2.1). Also, any mudwho or wizlist handling has to be
         initialized here.
 

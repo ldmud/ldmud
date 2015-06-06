@@ -11,8 +11,8 @@ DESCRIPTION
         At time of call, the heart_beat has been turned off.
         Return anything != 0 to restart the heart_beat in culprit.
 
-        If culprit is a user, it should at least get the message ``You
-        have no heartbeat''. A more advanced handling would destruct
+        If culprit is a user, it should at least get the message "You
+        have no heartbeat". A more advanced handling would destruct
         the offending object curobj and and allow the heartbeat to
         restart.
 

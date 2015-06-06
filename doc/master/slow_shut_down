@@ -14,9 +14,11 @@ DESCRIPTION
         delay is to give the users the opportunity to finish their
         current tasks, but don't take the 'minutes' for granted, just
         deduce the urgency from it.
+
         It is possible that the driver may reallocate some memory
         after the function has been called, and then run again into a
         low memory situation, calling this function again.
+
         This function might load an 'Armageddon' object and tell it
         what to do. It is the Armageddon object then which performs
         the shutdown.
@@ -27,6 +29,7 @@ DESCRIPTION
         memory runs out: the user area to give the users time to
         quit normally, the others to enable emergency-logouts when the
         user reserve is used up as well.
+
         The areas are allocated at start of the interpreter, and
         released when no more memory could be obtained from the host.
         In such a case, one of the remaining areas is freed (so the

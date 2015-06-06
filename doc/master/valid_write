@@ -9,7 +9,7 @@ DESCRIPTION
         granted. You can also return 1 to indicate that the path can
         be used unchanged.
 
-        The returned pathname must not contain ``..'', a leading /
+        The returned pathname must not contain "..", a leading /
         will be stripped by the interpreter. By default, the returned
         path must also not contain space characters; if the driver
         is instructed to allow them, the preprocessor macro
@@ -18,20 +18,20 @@ DESCRIPTION
         Func denotes the efun call or other operation that caused
         valid_write() to be called:
 
-          copy_file (for the target file or directory name)
-          rename_from (efun rename(), for the original name)
-          rename_to   (efun rename(), for the new name)
-          ed_start (whenever the builtin ed tries to write to a file),
+          copy_file          : for the target file or directory name
+          rename_from        : efun rename(), for the original name
+          rename_to          : efun rename(), for the new name
+          ed_start           : whenever the builtin ed tries to write to a file
           garbage_collection
-          mkdir,
+          mkdir
           memdump
           objdump
           opcdump
-          remove_file (efun rm()),
-          rmdir,
-          save_object,
-          write_bytes,
-          write_file.
+          remove_file        : efun rm()
+          rmdir
+          save_object
+          write_bytes
+          write_file
 
         For save_object(), the <path> passed is the filename as given
         in the efun call. If for this efun a filename ending in ".c" is

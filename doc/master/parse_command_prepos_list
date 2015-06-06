@@ -3,7 +3,7 @@ SYNOPSIS
 
 DESCRIPTION
         Used by parse_command(). Return an array of common
-        prepositions in the installations native language.
+        prepositions in the installation's native language.
 
 EXAMPLE
         string *parse_command_prepos_list() {

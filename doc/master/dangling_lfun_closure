@@ -19,12 +19,12 @@ DESCRIPTION
           the delayed handling. First is that the program replacement and with
           it the closure adjustment happens at the end of a backend cycle,
           outside of any execution thread: noone would see the error at this
-          time.  Second, smart closures might know/recognize the program
-          replacement  and skip the call to the vanished lfun.
+          time. Second, smart closures might know/recognize the program
+          replacement and skip the call to the vanished lfun.
 
 HISTORY
         Since LDMud 3.2.9, all references to dangling_lfun_closure() are
-          created as alien-lfun closures.
+        created as alien-lfun closures.
 
 SEE ALSO
         closures(LPC)

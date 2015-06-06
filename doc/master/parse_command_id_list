@@ -3,7 +3,7 @@ SYNOPSIS
 
 DESCRIPTION
         Used by parse_command(). Return an array of common
-        singular 'thing' ids in the installations native language.
+        singular 'thing' ids in the installation's native language.
 
 EXAMPLE
         string *parse_command_id_list() {
