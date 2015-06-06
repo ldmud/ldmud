@@ -36,7 +36,7 @@ DESCRIPTION
         following information in the given order:
           - object name
           - number of references
-          - 'NEW' if the object was destructed in this executiong
+          - 'NEW' if the object was destructed in this execution
             thread, nothing if it is older already.
 
 

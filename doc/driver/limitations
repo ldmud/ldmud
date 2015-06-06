@@ -1,4 +1,4 @@
-These file contains a collection of non-configurable limits:
+This file contains a collection of non-configurable limits:
 
 Program properties
 ==================
@@ -57,7 +57,7 @@ Hash tables
 Objects
 =======
 * maximum clone ID number: 2^32-1
-  Not a real limitation, after that the driver starts checking if 
+  Not a real limitation, after that the driver starts checking if
   blueprint name + #cloneid are unique.
 
 
