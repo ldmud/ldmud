@@ -36,7 +36,6 @@ DESCRIPTION
         If the hook can not (or doesn't want to) resolve the call, it
         has to return 0.
 
-
 HISTORY
         Introduced in LDMud 3.3.113
 

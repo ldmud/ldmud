@@ -10,9 +10,8 @@ SYNOPSIS
                           , int sys_include)
 
 DESCRIPTION
-        Optional hook specifying a string to be included before
-        the source of every compiled LPC object.
-        Hook setting can be a string or a closure.
+        Optional hook specifying a string to be included before the source of
+        every compiled LPC object. Hook setting can be a string or a closure.
 
         If the setting is a string, it will be automatically included before
         the source of every compiled LPC object.

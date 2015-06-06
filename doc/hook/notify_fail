@@ -11,7 +11,7 @@ SYNOPSIS
 DESCRIPTION
         Mandatory hook to issue the default message if an entered
         command couldn't be parsed and no notify_fail() command is in
-        effect.  Hook setting can be a any closure, or a string.
+        effect. Hook setting can be a any closure, or a string.
 
         If set to a string, it is the message returned to the
         player.

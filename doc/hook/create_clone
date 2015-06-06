@@ -16,7 +16,7 @@ DESCRIPTION
 
         If the hook is a closure expecting an argument, it is bound
         to the current object and called with the created object as
-        argument. If the hook as a closure without arguments, it is bound to
+        argument. If the hook is a closure without arguments, it is bound to
         the object to be initalized and called.
 
         If the result of the closure call is a non-zero number, it is used
