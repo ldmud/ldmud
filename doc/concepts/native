@@ -97,7 +97,7 @@ DESCRIPTION
             These exist only in compat mode (creator() is
             identical with getuid()).
 
-          object_name(),function_exists()
+          object_name(), function_exists()
             In !compat mode, the returned filenames start with a
             leading '/', in compat mode they don't.
 
@@ -134,18 +134,21 @@ DESCRIPTION
           --- In Detail ---
 
             Userids of the Master
-              The masters (e)uid is determined by a call to
+              The master's (e)uid is determined by a call to
               master->get_master_uid().
+
               In strict-euids mode, the result has to be a string,
                 otherwise the driver won't start up at all. If the result is
-                valid it is set as the masters uid and euid.
+                valid it is set as the master's uid and euid.
+
               In !strict-euids mode, the result may be any value: 0 or a
                 string are treated as the uid to set, a non-zero integer
                 leads to the use of the uid set in the default 'global'
                 wizlist entry, and any other value defaults to 0.
                 The euid is either set to the returned string (if any),
                 or to 0.
-              The masters uid is determined only on startup this way,
+
+              The master's uid is determined only on startup this way;
               at runtime the uids of a reloaded master determined as
               for every object by a call to the appropriate driver
               hooks.
@@ -156,8 +159,10 @@ DESCRIPTION
               evaluated (H_LOAD_UIDS, H_CLONE_UIDS) and the result set
               as (e)uid. The result may be a single value, in which case the
               euid is set to 0, or an array ({ uid, euid }).
+
               In strict-euids mode, both uid and euid must be 0 or a string,
                 any other value causes the load/clone to fail.
+
               In !strict-euids mode, the uid (however returned) may also be
                 a non-zero integer to use the uid of the global
                 wizlist entry as uid. The euid is then

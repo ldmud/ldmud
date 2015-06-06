@@ -10,9 +10,9 @@ DESCRIPTION
         some special changes to it. That doesn't work by copying the
         file.. Ouch! Don't replicate code! But by putting a tiny inherit
         declaration
-        
+
                 inherit "<model-class>";
-                
+
         at the beginning of your new file. This must come before any local
         variables or functions. Once inherited your class will behave just
         like the model class, because all the public methods are available
@@ -142,6 +142,7 @@ ADVANCED USAGE
         I wouldn't recommend you to use this, it's better to be clearly
         conscious of what you inherit and do. But if you're desperate, there
         you go.
+
         Since LDMud 3.5.0 it is possible to pass arguments as well.
 
 ADVANCED EXAMPLE
@@ -172,4 +173,4 @@ SEE ALSO
         functions(LPC), initialisation(LPC), modifiers(LPC), pragma(LPC),
         overloading(C),
         function_exists(E), functionlist(E), inherit_list(E),
-        symbol_variable(E), variable_exists(E), variable_list(E).
+        symbol_variable(E), variable_exists(E), variable_list(E)
