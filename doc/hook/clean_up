@@ -9,9 +9,8 @@ SYNOPSIS
           void|int <name>(int ref)
 
 DESCRIPTION
-        Optional hook to clean up an object.
-        Hook setting can be any closure, or the name of the function
-        to call in the object.
+        Optional hook to clean up an object. Hook setting can be any
+        closure, or the name of the function to call in the object.
 
         This hook is called for an object if it hasn't been used
         for at least TIME_TO_CLEAN_UP seconds, to give it the
@@ -37,7 +36,7 @@ DESCRIPTION
         the call has to result in a non-zero value.
 
         If the hook specifies a non-existing lfun, or if the call
-        returns 0, no further attempt to clean up this object will be done.
+        returns 0, no further attempt to clean up this object will be made.
 
 HISTORY
 

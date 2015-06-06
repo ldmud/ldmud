@@ -14,8 +14,8 @@ DESCRIPTION
 
         The hook can be given as string or as closure. If it is a
         closure, it is called with the commandgiver being the calling
-        object. If the result is a string, it will be printed,
-        otherwise ignored.
+        object. If the result is a string it will be printed,
+        otherwise it will be ignored.
 
 HISTORY
         Introduced in LDMud 3.3.163.

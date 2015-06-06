@@ -11,10 +11,10 @@ SYNOPSIS
 DESCRIPTION
         Optional hook to specifiy how to perform the telnet actions to
         switch the echo mode (used for e.g. password input_to()s).
-        Hook setting may be any closure or a string.  If not set, a
+        Hook setting may be any closure or a string. If not set, a
         default handling is performed.
 
-        If the setting is a string, it used as name of an lfun to call
+        If the setting is a string, it is used as name of an lfun to call
         in the interactive <user>, where <flag> is the echo-flag
         passed to the input_to() statement.
 

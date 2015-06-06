@@ -9,12 +9,12 @@ SYNOPSIS
 
 DESCRIPTION
         Mandatory hooks to determine the uid and euid of cloned
-        objects.  Hook settings can be any closure.
+        objects. Hook settings can be any closure.
 
         When an object is cloned, the H_CLONE_UIDS hook is called with
-        the blueprint object as first and the clone's designated name
-        as second argument. The new object already exists, but has 0
-        uids.
+        the blueprint object as the first argument and the clone's
+        designated name as the second. The new object already exists,
+        but has 0 uids.
 
         For the result, the following possibilities exist (<num> is
         a non-zero number, <no-string> is anything but a string):

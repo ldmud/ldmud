@@ -9,10 +9,10 @@ SYNOPSIS
 
 DESCRIPTION
         Mandatory hooks to determine the uid and euid of loaded or
-        cloned objects.  Hook settings can be any closure.
+        cloned objects. Hook settings can be any closure.
 
         When an object is newly loaded, the H_LOAD_UIDS hook is called
-        with the object name as argument.  The new object already
+        with the object name as argument. The new object already
         exists, but has 0 uids.
 
         For the result, the following possibilities exist (<num> is

@@ -10,7 +10,7 @@ SYNOPSIS
 
 DESCRIPTION
         Optional hook to specifiy how to perform a single telnet
-        negotiation.  Hook setting may be any closure or a string.  If
+        negotiation. Hook setting may be any closure or a string. If
         not set, most telnet options are rejected (read: only a very
         minimal negotiation takes place).
 
@@ -30,10 +30,9 @@ DESCRIPTION
         Alternatively, if H_NOECHO is set, this hook is called for
         _all_ telnet data received.
 
-        If the setting is a string, it used as name of an lfun to call
-        in this_player(). Closures are just called, with unbound
-        lambda-closures being bound to this_player() prior to
-        execution.
+        If the setting is a string, it used as the name of an lfun to
+        call in this_player(). Closures are just called, with unbound
+        lambda-closures being bound to this_player() prior to execution.
 
         The hook is called for a 'DO/DONT/WILL/WONT <opt>' with the action
         (DO/DONT/...) as the first, and <opt> as the second argument.
@@ -42,7 +41,7 @@ DESCRIPTION
 
           IAC SB <opt> <opts>...
 
-        followed by IAC SB/SE,  the hook is called with 'SB' as first
+        followed by IAC SB/SE, the hook is called with 'SB' as first
         argument, <opt> as second, and <opts> as an array of integers as
         third argument.
 
