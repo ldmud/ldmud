@@ -89,6 +89,9 @@ that you should pay attention to when updating.
   + The efun query_editing() was removed in favor of
     interactive_info(ob, II_EDITING). There is a sefun replacement
     in /mudlib/deprecated/. (#596)
+  + The efun query_idle() was removed in favor of
+    interactive_info(ob, II_IDLE). There is a sefun replacement
+    in /mudlib/deprecated/. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an

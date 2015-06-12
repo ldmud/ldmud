@@ -6397,35 +6397,6 @@ f_query_snoop (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_query_idle (svalue_t *sp)
-
-/* EFUN: query_idle()
- *
- *   int query_idle(object ob)
- *
- * Return how many seconds a user object has been idle.
- */
-
-{
-    int i;
-    object_t *ob;
-
-    ob = sp->u.ob;
-    if (!O_IS_INTERACTIVE(ob))
-    {
-        inter_sp = sp;
-        errorf("query_idle() of non-interactive object.\n");
-        return sp;
-    }
-
-    i = current_time - O_GET_INTERACTIVE(ob)->last_time;
-    deref_object(ob, "query_idle");
-    put_number(sp, i);
-    return sp;
-} /* f_query_idle() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
 f_remove_interactive (svalue_t *sp)
 
 /* EFUN: remove_interactive()
