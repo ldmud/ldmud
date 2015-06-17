@@ -390,7 +390,7 @@ Table of Contents
                                           // with 0 now.
                        ({ (#'do),
                           ({ (#'write),'i }),  // give out i
-                          ({ (#'+=),'i,1 })    // increase i
+                          ({ (#'+=),'i,1 }),   // increase i
                           ({ (#'<),'i,10 }),   // condition: i < 10
                           42                   // result is not interesting
                        })
@@ -427,7 +427,7 @@ Table of Contents
                lambda(0,({ (#'while),// loop
                            1,        // condition is 1 ==> endles loop
                            42,       // return value (which will never be used)
-                           ({ (#'write),"grin" })
+                           ({ (#'write),"grin" }),
                            ({ (#'?!),               // ifnot
                               ({ (#'random),10 }),  //       (random(10))
                               ({ (#'return),100 })  //   return 100;
