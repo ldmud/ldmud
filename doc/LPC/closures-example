@@ -102,7 +102,7 @@ DESCRIPTION
 
           map( filter(all_inventory(room), #'living)
           , lambda( ({ 'liv })
-            , ({'#, , ({#'=, 'hp, ({#'call_other, 'liv, "QueryHP" }) })
+            , ({#', , ({#'=, 'hp, ({#'call_other, 'liv, "QueryHP" }) })
                     , ({#'?, ({#'>, 'hp, 10 })
                            , ({#'call_other, 'liv, "SetHP"
                                            , ({#'-, 'hp, 10 })
