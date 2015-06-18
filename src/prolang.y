@@ -6903,7 +6903,7 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
               *outer_max_num_locals = scope->first_local + scope->num_locals;
 
           /* Check whether we clobbered some other local or context variables. */
-          if (scope->num_locals || scope->clobbered)
+          if (current_inline->block_depth > 0 && (scope->num_locals || scope->clobbered))
           {
               if (current_inline->prev != -1)
               {
