@@ -1,0 +1,9 @@
+src/Makefile
+src/config.h
+src/config.log
+src/config.status
+src/machine.h
+src/util/Makefile
+src/util/erq/Makefile
+src/util/indent/Makefile
+src/util/xerq/Makefile
