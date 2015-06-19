@@ -15,7 +15,7 @@ DESCRIPTION
         inherited program. If !compat mode, the returned name always
         begins with a '/'.
 
-        If <flags> can be passed as NAME_HIDDEN to return information
+        <flags> can be passed as NAME_HIDDEN to return information
         about static and protected variables in other objects. It is
         not possible to return information about private variables.
 

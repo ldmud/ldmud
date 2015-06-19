@@ -11,7 +11,7 @@ DESCRIPTION
 
         Note that when using GnuTLS a call to tls_refresh_certs()
         while a connection is in the middle of a TLS handshake might
-        result in a wrong key to be used.
+        cause an incorrect key to be used.
 
 HISTORY
         Introduced in LDMud 3.3.714/3.2.15.

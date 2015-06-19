@@ -21,10 +21,10 @@ DESCRIPTION
         The special keys "%^%^" and "%%^^" are always replaced with the
         literal "%^".
 
-        The parameters wrap and indent are both optional, if only wrap is
-        given then the str will be linewrapped at the column given with
-        wrap. If indent is given too, then all wrapped lines will be
-        indented with the number of blanks specified with indent.
+        The parameters <wrap> and <indent> are both optional. If only <wrap>
+        is given, <str> will be linewrapped at <wrap> columns. If <indent>
+        is also given, all wrapped lines will also be indented by <indent>
+        blanks.
 
         The wrapper itself ignores the length of the color macros and that
         what they contain, it wraps the string based on the length of the
@@ -36,9 +36,7 @@ DESCRIPTION
         line wrapping function, duplicating the functionality also
         provided by sprintf("%-=s").
 
-
         KEY RECOGNITION STRATEGY
-
         As mentioned above, the special keys "%^%^" and "%%^^" are always
         replaced with the literal "%^" and play no role in the following
         considerations.
@@ -56,7 +54,7 @@ DESCRIPTION
 
           key_or_text { '%^' key_or_text }
 
-        or in words: the MudOS efun splits the string at every '%^' and
+        Or in words: the MudOS efun splits the string at every '%^' and
         then tries to treat every substring as color key. One can achieve
         the MudOS behaviour with this LPC function:
 
@@ -84,11 +82,11 @@ EXAMPLES
 
         Caveat: to replace adjacent keys, use the efun like this:
 
-            str = terminal_colour( "%^GREEN%^%^RED%^", trans );
+          str = terminal_colour( "%^GREEN%^%^RED%^", trans );
 
-        A command like
+        A command like:
 
-            str = terminal_colour( "%^GREEN%^RED%^", trans );
+          str = terminal_colour( "%^GREEN%^RED%^", trans );
 
         will return the logical but sometimes unexpected "ansi-greenRED".
 
@@ -97,11 +95,11 @@ EXAMPLES
 
         a string wrapped without indent would look like this:
 
-            "this is the first line\nand this is the second line"
+          "this is the first line\nand this is the second line"
 
         a string wrapped with indent 3 would look like:
 
-            "this is the first line\n   and this is the indented second one"
+          "this is the first line\n   and this is the indented second one"
 
 HISTORY
         Efun idea and initial implementation taken from MudOS; the key

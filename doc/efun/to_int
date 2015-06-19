@@ -7,12 +7,11 @@ SYNOPSIS
         (int)<value>
 
 DESCRIPTION
-        Floats are truncated to integer values, strings with leadings
-        digits are converted to integers up to the first non-digit.
-        lfun-closures are converted into their function index (not adjusted
-        for inheritance), variable closure are converted into their variable
-        index.
-        Integers are just returned.
+        Floats are truncated to integer values; strings with leading
+        digits are converted to integers up to the first non-digit;
+        lfun-closures are converted into their function index (not
+        adjusted for inheritance); variable closure are converted
+        into their variable index; integers are just returned.
 
         Regarding floats, it is important to keep rounding effects
         in mind: to_int(3.1*10.0) does not return 31, but instead 30,

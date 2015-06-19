@@ -4,10 +4,10 @@ SYNOPSIS
 DESCRIPTION
         Abort execution. If the current program execution was
         initiated by catch(), that catch expression will
-        return arg as error code.
+        return <arg> as error code.
 
         Calling throw() without previous catch() does not make sense
-        and will result in an ``throw without catch'' error.
+        and will result in a "Throw with no catch." error.
 
 EXAMPLES
         catch(throw("aborting execution"));

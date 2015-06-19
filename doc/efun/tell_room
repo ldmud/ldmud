@@ -3,23 +3,23 @@ SYNOPSIS
         void tell_room(string|object ob, string str, object *exclude)
 
         void tell_room(string|object ob, mixed *|mapping|struct|object msg)
-        void tell_room(string|object ob, mixed *|mapping|struct|object msg
-                                       , object *exclude)
+        void tell_room(string|object ob, mixed *|mapping|struct|object msg,
+                       object *exclude)
 
 DESCRIPTION
-        Send a message <str> to all living objects in the room ob. ob
+        Send a message <str> to all living objects in the room <ob>. <ob>
         can also be the name of the room given as a string. If a
-        receiving object is not a interactive user the lfun
+        receiving object is not an interactive user, the lfun
         catch_tell() of the object will be invoked with the message as
         argument. If living objects define catch_tell(), the string
-        will also be sent to that instead of being written to the
-        user. If the object is given as its filename, the driver
-        looks up the object under that name, loading it if necessary.
-        If array *exclude is given, all objects contained in
-        *exclude are excluded from the message str.
+        will also be sent to that instead of being written to the user.
+        If <ob> is given by filename, the driver looks up the object
+        under that name, loading it if necessary. If array *<exclude> is
+        given, all objects contained in *<exclude> are excluded from the
+        message str.
 
         If the second arg is an array/mapping/struct/object, catch_msg() will
-        be called in all listening livings.
+        be called in all listening living objects.
 
 EXAMPLES
         tell_object(environment(this_player()), "Hi!\n");
@@ -37,7 +37,7 @@ EXAMPLES
               ...
            }
 
-        This examples shows how tell_room() together with catch_tell() works.
+        This example shows how tell_room() works with catch_tell().
 
 HISTORY
         LDMud 3.3.686 added the use of a mapping/struct/object as second

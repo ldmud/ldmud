@@ -4,6 +4,7 @@ SYNOPSIS
 DESCRIPTION
         Constructs a lambda closure that is not bound to an object,
         like lambda function in LISP.
+
         The closure cannot contain references to global variables, and
         all lfun closures are inserted as is, since there is no native
         object for this closure. You need to bind it before it can be

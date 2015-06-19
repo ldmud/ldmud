@@ -6,29 +6,29 @@ SYNOPSIS
         string xml_generate(mixed *xml)
 
 DESCRIPTION
-        Converts the given <xml> array into an XML conform string, if 
-        possible. The <xml> argument array must have the following structure.
+        Converts the given <xml> array into an XML conformant string, if
+        possible. The <xml> argument array must have the following structure:
 
-        It must contain tag arrays of three elements, with the following 
+        It must contain tag arrays of three elements, with the following
         indices:
 
             string XML_TAG_NAME
                 The name of the XML tag.
 
             mapping XML_TAG_ATTRIBUTES
-                All attributes given to the XML tag as mapping where the key
-                is the attribute name and the value is its string value. 
+                All attributes given to the XML tag as a mapping where the key
+                is the attribute name and the value is its string value.
 
                 If the xml tag does not contain any attributes, this element
-                is set 0:
+                is set to 0:
 
             mixed * XML_TAG_CONTENTS
-                The contents of this xml tag as array. This array may 
-                contain either strings, or arrays of sub-tags again with 
-                three elements (see example)
+                The contents of this xml tag as an array. This array may
+                contain either strings, or arrays of sub-tags again with
+                three elements. (see example)
 
                 If the xml tag does not contain anything, the element is
-                set 0.
+                set to 0.
 
         In case the parameter does not follow these rules, errors are raised.
         The method returns a valid XML string otherwise.
@@ -55,7 +55,7 @@ EXAMPLES
                             , 0
                             , ({ "We want "
                                , ({ "b"
-                                  , 0 
+                                  , 0
                                   , ({ "bold" })
                                  })
                                , "here"

@@ -21,7 +21,7 @@ DESCRIPTION
 
         <flags> determines both which information is returned for every
         variable, and which variables should be considered at all.
-        Its value is created by bin-or'ing together following flags from
+        Its value is created by bin-or'ing together the following flags from
         <functionlist.h>:
 
           Control of returned information:
@@ -45,7 +45,7 @@ DESCRIPTION
             TYPE_MOD_NO_MASK    variable is nomask
             TYPE_MOD_PUBLIC     variable is public
 
-        All these flags are defined in <functionlist.h>, the 
+        All these flags are defined in <functionlist.h>; the
         return types are defined in <lpctypes.h>.
 
 HISTORY
