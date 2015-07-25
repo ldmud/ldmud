@@ -405,7 +405,10 @@ v_sl_exec (svalue_t * sp, int num_arg)
             break;
 
         case T_NUMBER:
-            sqlite3_bind_int(stmt, num, argp->u.number);
+            if (sizeof(argp->u.number) > 4)
+                sqlite3_bind_int64(stmt, num, argp->u.number);
+            else
+                sqlite3_bind_int(stmt, num, argp->u.number);
             break;
     
         case T_STRING:
@@ -468,7 +471,10 @@ v_sl_exec (svalue_t * sp, int num_arg)
                 break;
 
             case SQLITE_INTEGER:
-                put_number(entry, sqlite3_column_int(stmt, col));
+                if (sizeof(entry->u.number) >= 8)
+                    put_number(entry, sqlite3_column_int64(stmt, col));
+                else
+                    put_number(entry, sqlite3_column_int(stmt, col));
                 break;
 
            case SQLITE_FLOAT:
