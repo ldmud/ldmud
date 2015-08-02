@@ -7905,8 +7905,26 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         }
 
         n = num_var - n - 1;
+
+        /* Check for virtual variables */
+        if (n < current_prog->num_virtual_variables)
+        {
+            /* Search for the virtual variable in the current_object's
+             * variable block.
+             */
+            n = translate_virtual_variable_index(n);
+        }
+        else
+        {
+            /* Ordinary variables, translate the index into current_object's
+             * variable block.
+             */
+            n = n - current_prog->num_virtual_variables
+                  + (current_variables - current_object->variables);
+        }
+
         closure_identifier(svp, current_object
-                          , (unsigned short)(n + (current_variables - current_object->variables))
+                          , (unsigned short)(n)
                           , /* raise_error: */ MY_FALSE);
         if (svp->type != T_CLOSURE)
         {
