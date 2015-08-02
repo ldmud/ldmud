@@ -6280,10 +6280,27 @@ f_symbol_variable (svalue_t *sp)
         warnf("Creating closure to deprecated global variable %s.\n",
               get_txt(current_prog->variables[n].name));
     }
-    
+
+    /* Check for virtual variables */
+    if (n < current_prog->num_virtual_variables)
+    {
+        /* Search for the virtual variable in the current_object's
+         * variable block.
+         */
+        n = translate_virtual_variable_index(n);
+    }
+    else
+    {
+        /* Ordinary variables, translate the index into current_object's
+         * variable block.
+         */
+        n = n - current_prog->num_virtual_variables
+              + (current_variables - current_object->variables);
+    }
+
     /* Create the result closure and put it onto the stack */
     closure_identifier( sp, current_object
-                      , (unsigned short)(n + (current_variables - current_object->variables))
+                      , (unsigned short)(n)
                       , /* raise_error: */ MY_FALSE);
     if (sp->type != T_CLOSURE)
     {

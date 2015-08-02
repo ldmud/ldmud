@@ -128,6 +128,16 @@ void run_test()
                         return funcall(d->get_a_var_cl2()) == "a";
                     :)
                 }),
+                ({ "Run " + testname + ": Check for virtual variable closure (via symbol_variable) in 'a'.", 0,
+                    (:
+                        return funcall(d->get_a_var_cl3()) == "a";
+                    :)
+                }),
+                ({ "Run " + testname + ": Check for virtual variable (via symbol_variable) in a lambda closure in 'a'.", 0,
+                    (:
+                        return funcall(d->get_a_var_cl4()) == "a";
+                    :)
+                }),
             }));
         }
     }

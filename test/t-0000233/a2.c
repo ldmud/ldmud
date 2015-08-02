@@ -7,7 +7,7 @@ string dummy = "Hello, World!"; // Just to change the variable indices...
 #endif
 
 int num;
-string a_var;
+protected string a_var;
 
 void dummy_fun() { raise_error("Please don't call me!\n"); }
 
@@ -46,4 +46,14 @@ closure get_a_var_cl()
 closure get_a_var_cl2()
 {
     return lambda(0, ({#'a_var}));
+}
+
+closure get_a_var_cl3()
+{
+    return symbol_variable("a_var");
+}
+
+closure get_a_var_cl4()
+{
+    return lambda(0, ({symbol_variable("a_var")}));
 }
