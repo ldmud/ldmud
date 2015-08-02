@@ -5953,6 +5953,26 @@ find_virtual_value (int num)
  */
 
 {
+    return &current_object->variables[translate_virtual_variable_index(num)];
+} /* find_virtual_value() */
+
+/*-------------------------------------------------------------------------*/
+int
+translate_virtual_variable_index (int num)
+
+/* For the virtually inherited variable <num> (given as index within
+ * the current program's variable block) return its index in the
+ * current_object's variable block.
+ *
+ * Because virtually inherited programs might have another offset
+ * in the current_object then in current_prog (because all virtually
+ * inherited variable blocks are put at the beginn of the final
+ * variable block before any regular variables), we have to look
+ * up the inherit of <num> in the current_object and translate
+ * the variable index accordingly.
+ */
+
+{
     inherit_t *inheritp;
     program_t *progp;
 
@@ -5961,7 +5981,7 @@ find_virtual_value (int num)
      */
     if (is_sto_context())
     {
-        errorf("find_virtual_value: Can't execute with "
+        errorf("translate_virtual_variable_index: Can't execute with "
               "set_this_object() in effect.\n"
              );
     }
@@ -6018,22 +6038,20 @@ find_virtual_value (int num)
        )
     {
         if (num)
-            fatal("%s Fatal: find_virtual_value() on object %p '%s' "
+            fatal("%s Fatal: translate_virtual_variable_index() on object %p '%s' "
                   "w/o variables, num %d\n"
                  , time_stamp(), current_object, get_txt(current_object->name)
                  , num);
         else
-            errorf("%s Error: find_virtual_value() on object %p '%s' "
+            errorf("%s Error: translate_virtual_variable_index() on object %p '%s' "
                   "w/o variables, num %d\n"
                  , time_stamp(), current_object, get_txt(current_object->name)
                  , num);
     }
 #endif
 
-    return &current_object->variables[num];
-      /* TODO: Why not '&current_variables[num]'? */
-} /* find_virtual_value() */
-
+    return num;
+} /* translate_virtual_variable_index() */
 
 /*=========================================================================*/
 
