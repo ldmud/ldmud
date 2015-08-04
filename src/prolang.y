@@ -1409,11 +1409,13 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
         {
             if (type->t_struct.name)
             {
-                if(7 + mstrsize(type->t_struct.name->name) < bufsize)
+                size_t len = 7 + mstrsize(type->t_struct.name->name);
+                if(len < bufsize)
                 {
                     memcpy(buf, "struct ", 7);
-                    memcpy(buf+7, get_txt(type->t_struct.name->name), mstrsize(type->t_struct.name->name));
-                    return 7 + mstrsize(type->t_struct.name->name);
+                    memcpy(buf+7, get_txt(type->t_struct.name->name), len-7);
+                    buf[len] = 0;
+                    return len;
                 }
                 else
                 {
