@@ -8,6 +8,22 @@
 #pragma strong_types
 #pragma rtt_checks
 
+struct base
+{
+    int member;
+};
+
+struct sub1(base)
+{
+    int m1;
+};
+
+struct sub2(base)
+{
+    int m2;
+};
+
+
 string          g_str;
 int             g_int;
 int|string      g_int_str;
@@ -16,6 +32,7 @@ int|string      g_int_str;
 int*|string*    g_intarr_strarr;
 <int*|string*>* g_intarr_strarr_arr;
 int|float       g_nr;
+struct base     g_s1;
 
 string          f_return_str              (string val)          { return val; }
 int             f_return_int              (int val)             { return val; }
@@ -25,6 +42,7 @@ int|string      f_return_int_str          (int|string val)      { return val; }
 int*|string*    f_return_intarr_strarr    (int*|string* val)    { return val; }
 <int*|string*>* f_return_intarr_strarr_arr(<int*|string*>* val) { return val; }
 int|float       f_return_nr               (int|float val)       { return val; }
+int             f_return_member           (struct sub1|struct sub2 val) { return ((struct base)val)->member; }
 
 int|string|mixed* multiply(int|string|mixed* arg, int factor)   {return arg*factor;}
 
@@ -44,6 +62,7 @@ int run_test()
     g_intarr_strarr = ({ 1, 1, 2, 3, 5, 8, 13 });
     g_intarr_strarr_arr = ({ g_intarr_strarr, ({ 3, 1, 4, 1 }), ({ "you" }), ({}) });
     g_nr = -1.5;
+    g_s1 = (<sub1> 42, 1);
 
     /* Pass the values through a function.
      */
@@ -54,7 +73,7 @@ int run_test()
     g_int_str_arrr      = f_return_int_str_arrr(g_int_str_arrr);
     g_intarr_strarr     = f_return_intarr_strarr(g_intarr_strarr);
     g_intarr_strarr_arr = f_return_intarr_strarr_arr(g_intarr_strarr_arr);
-    g_nr                = f_return_nr(g_nr);
+    g_nr                = f_return_nr(g_nr) + f_return_member(g_s1);
 
     /* Mix compatible types. */
     g_str = g_int_str; /* We had a string assigned to g_int_str above. */
