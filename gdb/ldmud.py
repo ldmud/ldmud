@@ -301,6 +301,86 @@ class SValuePrinter:
         else:
             return []
 
+class TypePrinter:
+    "Prints a LPC type"
+
+    TCLASS_PRIMARY    = 0
+    TCLASS_STRUCT     = 1
+    TCLASS_ARRAY      = 2
+    TCLASS_UNION      = 3
+
+    TYPE_UNKNOWN      =  0
+    TYPE_NUMBER       =  1
+    TYPE_STRING       =  2
+    TYPE_VOID         =  3
+    TYPE_OBJECT       =  4
+    TYPE_MAPPING      =  5
+    TYPE_FLOAT        =  6
+    TYPE_ANY          =  7
+    TYPE_CLOSURE      =  8
+    TYPE_SYMBOL       =  9
+    TYPE_QUOTED_ARRAY = 10
+
+    type_names = {
+        TYPE_UNKNOWN:      "unknown",
+        TYPE_NUMBER:       "int",
+        TYPE_STRING:       "string",
+        TYPE_VOID:         "void",
+        TYPE_OBJECT:       "object",
+        TYPE_MAPPING:      "mapping",
+        TYPE_FLOAT:        "float",
+        TYPE_ANY:          "mixed",
+        TYPE_CLOSURE:      "closure",
+        TYPE_SYMBOL:       "symbol",
+        TYPE_QUOTED_ARRAY: "quoted_array",
+    }
+
+    def __init__(self, val):
+        self.val = val
+
+    def calc_name(self, val):
+        if val.address == 0:
+            return "0x0"
+
+        tclass = int(val["t_class"])
+
+        if tclass == self.TCLASS_PRIMARY:
+            primary = int(val["t_primary"])
+            if primary in self.type_names:
+                return self.type_names[primary]
+            return "T_PRIMARY with unknown type %d" % (primary,)
+
+        elif tclass == self.TCLASS_STRUCT:
+            structinfo = val["t_struct"]["name"].dereference()
+            if structinfo.address == 0:
+                return "any struct"
+
+            progname = structinfo["prog_name"]
+            basename = structinfo["name"]
+
+            return "struct %s:%s" % (
+                progname["txt"].string(length = progname["size"]),
+                basename["txt"].string(length = basename["size"]))
+
+        elif tclass == self.TCLASS_ARRAY:
+            return self.calc_name(val["t_array"]["base"].dereference()) + "*"*int(val["t_array"]["depth"])
+
+        elif tclass == self.TCLASS_UNION:
+            typestr = ""
+            union = val
+            while tclass == self.TCLASS_UNION:
+                typestr += self.calc_name(union["t_union"]["member"].dereference()) + "|"
+                union = union["t_union"]["head"].dereference()
+                tclass = int(union["t_class"])
+            typestr += self.calc_name(union)
+            return "<" + typestr + ">"
+        else:
+            return "lpctype_t with unknown class %d" % (tclass,)
+
+    def to_string(self):
+        (type,val) = unwind_ptr(self.val)
+        return print_ptr(val.address) + " " + self.calc_name(val)
+
 def lookup_printer(val):
     "Returns a pretty printer for val (gdb.Value)."
 
@@ -344,6 +424,7 @@ ptr_printers = {
     'program_s':     lambda val: PtrNamePrinter(val, ["name"]),
     'interactive_s': lambda val: PtrNamePrinter(val, ["ob", "name"]),
     'wiz_list_s':    lambda val: PtrNamePrinter(val, ["name"]),
+    'lpctype_s':     TypePrinter,
     }
 
 direct_printers = {}
