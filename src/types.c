@@ -639,13 +639,13 @@ lpctype_contains (lpctype_t* src, lpctype_t* dest)
             case TCLASS_STRUCT:
                 if(destbase->t_class == TCLASS_STRUCT)
                 {
-                    /* Check if <src> is a base struct of <dest>. */
+                    /* Check if <dest> is a base struct of <src>. */
 
                     if (destbase->t_struct.name == NULL) /* Matches any struct */
                         found = true;
-                    else if (srcbase->t_struct.name && destbase->t_struct.def)
+                    else if (destbase->t_struct.name && srcbase->t_struct.def)
                     {
-                        if(struct_baseof_name(srcbase->t_struct.name, destbase->t_struct.def))
+                        if(struct_baseof_name(destbase->t_struct.name, srcbase->t_struct.def))
                             found = true;
                     }
                 }
