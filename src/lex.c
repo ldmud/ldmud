@@ -757,7 +757,7 @@ init_lexer(void)
     add_permanent_define("__VERSION_MINOR__", -1, string_copy(VERSION_MINOR), MY_FALSE);
     add_permanent_define("__VERSION_MICRO__", -1, string_copy(VERSION_MICRO), MY_FALSE);
     add_permanent_define("__VERSION_PATCH__", -1, string_copy(VERSION_PATCH), MY_FALSE);
-    add_permanent_define("__VERSION_COMMITID__", -1, string_copy(COMMIT_ID), MY_FALSE);
+    add_permanent_define("__VERSION_COMMITID__", -1, string_copy("\"" COMMIT_ID "\""), MY_FALSE);
     add_permanent_define("__VERSION_LOCAL__", -1, string_copy(LOCAL_LEVEL), MY_FALSE);
 
     add_permanent_define("__HOST_NAME__", -1, (void *)get_hostname, MY_TRUE);
