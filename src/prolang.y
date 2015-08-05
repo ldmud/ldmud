@@ -5560,11 +5560,11 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
     }
 
     if (*struct_index == -1)
-        *struct_index = get_struct_index(structure->t_struct.name);
+        *struct_index = get_struct_index(fstruct->name);
     if (*struct_index == -1)
     {
-        yyerrorf("Unknown type in struct dereference: %s\n"
-                , get_lpctype_name(structure));
+        yyerrorf("Unknown type in struct dereference: struct %s\n"
+                , get_txt(fstruct->name->name));
 
         *member_index = -1;
         return NULL;
