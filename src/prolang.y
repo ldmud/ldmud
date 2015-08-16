@@ -5296,137 +5296,40 @@ get_struct_index (struct_name_t * pName)
 } /* get_struct_index() */
 
 /*-------------------------------------------------------------------------*/
-static short
-find_struct_by_member (string_t * name, int * pNum)
-
-/* Among the structs known by this program, find the (smallest) one
- * defining member <name>.
- * Result:
- *   >= 0: Index of the struct in A_STRUCT_DEFS, *<pNum> index of the member
- *   FSM_NO_STRUCT (-1): No struct with such a member
- *   FSM_AMBIGUOUS (-2): Multiple unrelated structs define the member
- * In case of the errors, the function also issues a compiler error.
- */
-
-#define FSM_NO_STRUCT (-1)
-#define FSM_AMBIGUOUS (-2)
-
-{
-    short rc = FSM_NO_STRUCT;
-    struct_def_t * pRC = NULL;
-    int  member = -1;
-    int i;
-
-    for (i = 0; (size_t)i < STRUCT_COUNT; i++)
-    {
-        int num;
-        struct_def_t * pdef = &STRUCT_DEF(i);
-
-        /* If we already found a struct, check if this one is
-         * a relative. If yes, we can immediately continue
-         * to the next.
-         */
-        if (pRC != NULL)
-        {
-            struct_type_t * pTest;
-
-            for ( pTest = pdef->type
-                ; pTest != NULL && pTest != pRC->type
-                ; pTest = pTest->base
-                )
-              NOOP;
-
-            if (pTest != NULL)
-                continue;
-        }
-
-        /* Lookup the member in this struct. If not found,
-         * continue to the next struct.
-         */
-        num = struct_find_member(pdef->type, name);
-        if (num < 0)
-            continue;
-
-        /* If we already found a struct, check if this one is
-         * a relative.
-         */
-        if (pRC != NULL)
-        {
-            struct_type_t * pTest;
-
-            /* Is the newly found struct a child of the
-             * one we already know? If yes, skip it.
-             */
-            for ( pTest = pdef->type
-                ; pTest != NULL && pTest != pRC->type
-                ; pTest = pTest->base
-                )
-              NOOP;
-
-            if (pTest != NULL)
-                continue;
-
-            /* Is the newly found struct a parent of
-             * the one we already know? If yes, keep it
-             * instead of the one we have; if no, the two
-             * structs are completely unrelated and the
-             * lookup is ambiguous.
-             */
-
-            for ( pTest = pRC->type
-                ; pTest != NULL && pTest != pdef->type
-                ; pTest = pTest->base
-                )
-              NOOP;
-
-            if (pTest == NULL)
-            {
-                yyerrorf("Multiple structs found for member '%s': "
-                         "struct %s, struct %s"
-                        , get_txt(name)
-                        , get_txt(struct_t_name(pRC->type))
-                        , get_txt(struct_t_name(pdef->type))
-                        );
-                *pNum = -1;
-                return FSM_AMBIGUOUS;
-            }
-        } /* if (pRC) */
-
-        /* It's a successful lookup */
-        rc = i;
-        pRC = pdef;
-        member = num;
-    } /* for (all structs) */
-
-    if (rc < 0)
-    {
-        yyerrorf("No struct found for member '%s'", get_txt(name));
-    }
-
-    *pNum = member;
-    return rc;
-} /* find_struct_by_member() */
-
-/*-------------------------------------------------------------------------*/
 static lpctype_t*
 get_struct_member_result_type (lpctype_t* structure, string_t* member_name, short* struct_index, int* member_index)
 
 /* Determines the result type of a struct member lookup operation
- * <structure> -> <member>. It checks whether <structure> is a valid
- * struct type for access to <member>.
+ * <structure> -> <member_name>. It checks whether <structure> is a valid
+ * struct type for access to <member_name>.
  *
- * If <member> is non-NULL, then the corresponding struct index will
+ * <member_name> is NULL for runtime lookups, otherwise it contains the
+ * name of the struct member to lookup at compile time.
+ *
+ * If <member_name> is non-NULL, then the corresponding struct index will
  * be written into <struct_index> and the member index into <member_index>.
- * Otherwise both will get -1 as a result.
+ * If the name is ambiguous then the compiler must downgrade to a runtime
+ * lookup and this function will return -1 (FSM_AMBIGUOUS) in <struct_index>
+ * and -1 in <member_index>. If the name is not found -2 (FSM_NO_STRUCT)
+ * will be returned in <struct_index> and -1 in <member_index>.
+ * If <member_name> is NULL, FSM_AMBIGUOUS will be returned in <struct_index>
+ * and -1 in <member_index>.
  *
- * Returns the member type or NULL upon a compile error.
+ * Returns the member type (or a union of all possible member types)
+ * or NULL upon a compile error.
  */
-{
-    lpctype_t* head = structure;    /* Used to walk over the type. */
-    struct_type_t* fstruct = NULL;  /* Found structure definition. */
-    bool is_struct = false;
 
-    *struct_index = -1;
+#define FSM_AMBIGUOUS (-1)
+#define FSM_NO_STRUCT (-2)
+
+{
+    lpctype_t* head = structure;    /* Used to walk over the type.                   */
+    lpctype_t* result = NULL;       /* Result type.                                  */
+    struct_type_t* fstruct = NULL;  /* Found structure definition.                   */
+    bool is_struct = false;         /* There was at least one struct in <structure>. */
+
+    *struct_index = FSM_NO_STRUCT;
+    *member_index = -1;
 
     while (true)
     {
@@ -5445,22 +5348,58 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
 
                 if (member_name != NULL)
                 {
-                    *struct_index = find_struct_by_member(member_name, member_index);
-                    if (*struct_index < 0)
-                    {
-                        *member_index = -1;
-                        return NULL;
-                    }
+                    /* Let's look for all known structs if the have
+                     * a corresponding member.
+                     */
 
-                    fstruct = STRUCT_DEF(*struct_index).type;
+                    for (size_t i = 0; i < STRUCT_COUNT; i++)
+                    {
+                        struct_def_t * pdef = &STRUCT_DEF(i);
+
+                        /* We just look at the direct members, so we automatically
+                         * get the smallest struct that defines the member.
+                         */
+                        int idx = struct_find_direct_member(pdef->type, member_name);
+                        if (idx < 0)
+                            continue;
+
+                        switch (*struct_index)
+                        {
+                            case FSM_NO_STRUCT:
+                                fstruct = pdef->type;
+                                *struct_index = i;
+                                *member_index = idx;
+                                break;
+
+                            case FSM_AMBIGUOUS:
+                                break;
+
+                            default:
+                                /* We did already found a struct.
+                                 * This other struct is different from the current one
+                                 * (because 'mixed' can't be in a union with other types
+                                 * and all we don't have a struct twice in STRUCT_DEF),
+                                 * so we have ambiguity here.
+                                 */
+                                *struct_index = FSM_AMBIGUOUS;
+                                *member_index = -1;
+                                fstruct = NULL;
+                                break;
+                        }
+
+                        lpctype_t *oldresult = result;
+                        result = get_union_type(result, pdef->type->member[idx].type);
+                        free_lpctype(oldresult);
+                    } /* for (all structs) */
                 }
                 else
                 {
-                    *struct_index = -1;
+                    /* Struct not known, member name not known, can be anything... */
+                    *struct_index = FSM_AMBIGUOUS;
                     *member_index = -1;
+                    free_lpctype(result);
                     return lpctype_mixed;
                 }
-
                 break;
 
             default:
@@ -5471,67 +5410,75 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
 
         case TCLASS_STRUCT:
             {
-                if (unionmember->t_struct.def == NULL)
+                struct_type_t *pdef = unionmember->t_struct.def;
+                if (pdef == NULL)
                     break;
 
                 int midx = -1;
+
                 is_struct = true;
 
                 if (member_name != NULL)
                 {
                     /* Let's see, if this one has <member>. */
-                    midx = struct_find_member(unionmember->t_struct.def, member_name);
+                    midx = struct_find_member(pdef, member_name);
                     if (midx < 0)
                         break;
                 }
 
-                if (!fstruct)
+                switch (*struct_index)
                 {
-                    fstruct = unionmember->t_struct.def;
-                    *member_index = midx;
+                    case FSM_NO_STRUCT:
+                        fstruct = pdef;
+                        *struct_index = get_struct_index(fstruct->name);
+                        *member_index = midx;
+                        if (*struct_index == -1)
+                        {
+                            yyerrorf("Unknown type in struct dereference: struct %s\n"
+                                    , get_txt(fstruct->name->name));
+                            *struct_index = FSM_AMBIGUOUS;
+                        }
+                        break;
+
+                    case FSM_AMBIGUOUS:
+                        break;
+
+                    default:
+                        /* Check whether this struct and <fstruct> are related. */
+                        if (struct_baseof(fstruct, pdef))
+                            break;
+                        if (struct_baseof(pdef, fstruct))
+                        {
+                            fstruct = pdef;
+                            *struct_index = get_struct_index(fstruct->name);
+                            *member_index = midx;
+                            break;
+                        }
+
+                        /* Not related, fall back to runtime lookup. */
+                        *struct_index = FSM_AMBIGUOUS;
+                        *member_index = -1;
+                        fstruct = NULL;
+                        break;
+                }
+
+                if (midx < 0)
+                {
+                    /* This is a runtime lookup. It is one of the members,
+                     * so make a union of all the member types.
+                     */
+                    for (int i = pdef->num_members; i--; )
+                    {
+                        lpctype_t *oldresult = result;
+                        result = get_union_type(result, pdef->member[i].type);
+                        free_lpctype(oldresult);
+                    }
                 }
                 else
                 {
-                    struct_type_t* test;
-                    /* Is this a child of <fstruct>? Then skip it.*/
-
-                    for ( test = unionmember->t_struct.def
-                        ; test != NULL && test != fstruct
-                        ; test = test->base
-                        )
-                        NOOP;
-
-                    if (test == NULL)
-                    {
-                        /* It's not a child. Check the other way around. */
-
-                        for ( test = fstruct
-                            ; test != NULL && test != unionmember->t_struct.def
-                            ; test = test->base
-                            )
-                            NOOP;
-
-                        if (test == NULL)
-                        {
-                            /* They are unrelated. But we need a unique index... */
-                            /* TODO: Maybe compile it as a dynamic member lookup. */
-                            yyerrorf("Multiple structs found for member '%s': struct %s, struct %s"
-                                    , get_txt(member_name)
-                                    , get_txt(struct_t_name(fstruct))
-                                    , get_txt(struct_t_name(unionmember->t_struct.def))
-                                    );
-
-                            *struct_index = -1;
-                            *member_index = -1;
-                            return NULL;
-                        }
-                        else
-                        {
-                            /* Remember the base struct. */
-                            fstruct = unionmember->t_struct.def;
-                            *member_index = midx;
-                        }
-                    }
+                    lpctype_t *oldresult = result;
+                    result = get_union_type(result, pdef->member[midx].type);
+                    free_lpctype(oldresult);
                 }
                 break;
             }
@@ -5543,7 +5490,7 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
             break;
     }
 
-    if (!fstruct)
+    if (*struct_index == FSM_NO_STRUCT)
     {
         if (is_struct)
             yyerrorf("No such member '%s' for struct '%s'"
@@ -5554,38 +5501,10 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
             yyerrorf("Bad type for struct lookup: %s"
                     , get_lpctype_name(structure));
 
-        *struct_index = -1;
-        *member_index = -1;
         return NULL;
     }
 
-    if (*struct_index == -1)
-        *struct_index = get_struct_index(fstruct->name);
-    if (*struct_index == -1)
-    {
-        yyerrorf("Unknown type in struct dereference: struct %s\n"
-                , get_txt(fstruct->name->name));
-
-        *member_index = -1;
-        return NULL;
-    }
-
-    if (*member_index < 0)
-    {
-        /* This is a runtime lookup. It is one of the members,
-         * so make a union of all the member types.
-         */
-        lpctype_t *result = NULL;
-        for (int i = fstruct->num_members; i--; )
-        {
-            lpctype_t *oldresult = result;
-            result = get_union_type(result, fstruct->member[i].type);
-            free_lpctype(oldresult);
-        }
-        return result;
-    }
-    else
-        return ref_lpctype(fstruct->member[*member_index].type);
+    return result;
 } /* get_struct_member_result_type() */
 
 /*-------------------------------------------------------------------------*/
@@ -6307,6 +6226,49 @@ store_prog_string (string_t *str)
     last_string_is_new = MY_TRUE;
     return *indexp;
 } /* store_prog_string() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ins_prog_string (string_t *str)
+
+/* Add the tabled string <str> to the strings used by the program
+ * and inserts code to put it on the stack into the current bytecode.
+ * The function adopts the reference of <str>.
+ * Returns the number of bytes written to the bytecode.
+ */
+{
+    PREPARE_INSERT(3);
+    int string_number = store_prog_string(str);
+    if ( string_number <= 0xff )
+    {
+        add_f_code(F_CSTRING0);
+        add_byte(string_number);
+    }
+    else if ( string_number <= 0x1ff )
+    {
+        add_f_code(F_CSTRING1);
+        add_byte(string_number);
+    }
+    else if ( string_number <= 0x2ff )
+    {
+        add_f_code(F_CSTRING2);
+        add_byte(string_number);
+    }
+    else if ( string_number <= 0x3ff )
+    {
+        add_f_code(F_CSTRING3);
+        add_byte(string_number);
+    }
+    else
+    {
+        add_f_code(F_STRING);
+        add_short(string_number);
+        CURRENT_PROGRAM_SIZE += 3;
+        return 3;
+    }
+    CURRENT_PROGRAM_SIZE += 2;
+    return 2;
+} /* ins_prog_string */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -10689,8 +10651,6 @@ expr4:
       {
           /* Push a constant string */
 
-          int string_number;
-          PREPARE_INSERT(3)
           string_t *p;
 %line
           p = last_lex_string;
@@ -10699,34 +10659,7 @@ expr4:
           $$.type = get_fulltype(lpctype_string);
           $$.code = -1;
 
-          string_number = store_prog_string(p);
-          if ( string_number <= 0xff )
-          {
-              add_f_code(F_CSTRING0);
-              add_byte(string_number);
-          }
-          else if ( string_number <= 0x1ff )
-          {
-              add_f_code(F_CSTRING1);
-              add_byte(string_number);
-          }
-          else if ( string_number <= 0x2ff )
-          {
-              add_f_code(F_CSTRING2);
-              add_byte(string_number);
-          }
-          else if ( string_number <= 0x3ff )
-          {
-              add_f_code(F_CSTRING3);
-              add_byte(string_number);
-          }
-          else
-          {
-              add_f_code(F_STRING);
-              add_short(string_number);
-              CURRENT_PROGRAM_SIZE++;
-          }
-          CURRENT_PROGRAM_SIZE += 2;
+          ins_prog_string(p);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11054,7 +10987,12 @@ expr4:
           $$.type = get_fulltype(result);
 
           if ($3 != NULL) /* Compile time lookup. */
-              ins_number(m_index);
+          {
+              if (s_index == FSM_AMBIGUOUS) /* Not anymore. */
+                  ins_prog_string($3);
+              else
+                  ins_number(m_index);
+          }
 
           ins_number(s_index);
           ins_f_code(F_S_INDEX);
@@ -11097,7 +11035,12 @@ expr4:
           }
 
           if ($5 != NULL) /* Compile time lookup. */
-              ins_number(m_index);
+          {
+              if (s_index == FSM_AMBIGUOUS) /* Not anymore. */
+                  ins_prog_string($5);
+              else
+                  ins_number(m_index);
+          }
           ins_number(s_index);
           arrange_protected_lvalue($3.start, $3.code, $3.end, F_PROTECTED_INDEX_S_LVALUE);
 
@@ -11749,10 +11692,12 @@ lvalue:
               bytecode_p p, q;
               p_int start, current;
 
-              if ($3 != NULL)
+              if ($3 != NULL) /* Compile time lookup. */
               {
-                  /* Insert the index code */
-                  ins_number(m_index);
+                  if (s_index == FSM_AMBIGUOUS) /* Not anymore. */
+                      ins_prog_string($3);
+                  else
+                      ins_number(m_index);
               }
 
               /* Insert the struct type index */
@@ -13089,7 +13034,6 @@ function_call:
     | expr4 L_ARROW call_other_name %prec L_ARROW
       {
 %line
-          int string_number;
           string_t *name;
 
           /* Save the (simple) state */
@@ -13193,32 +13137,7 @@ function_call:
           {
               /* Push the function name (the expr4 is already on the stack)
                */
-              string_number = store_prog_string(name);
-              if (string_number <= 0x0ff )
-              {
-                  ins_f_code(F_CSTRING0);
-                  ins_byte(string_number);
-              }
-              else if ( string_number <= 0x1ff )
-              {
-                  ins_f_code(F_CSTRING1);
-                  ins_byte(string_number);
-              }
-              else if ( string_number <= 0x2ff )
-              {
-                  ins_f_code(F_CSTRING2);
-                  ins_byte(string_number);
-              }
-              else if ( string_number <= 0x3ff )
-              {
-                  ins_f_code(F_CSTRING3);
-                  ins_byte(string_number);
-              }
-              else
-              {
-                  ins_f_code(F_STRING);
-                  ins_short(string_number);
-              }
+              ins_prog_string(name);
           } /* if (name) */
           /* otherwise the name was given by an expression for which
            * the code and value have been already generated.
@@ -13974,7 +13893,12 @@ lvalue_list:
           free_lpctype(get_struct_member_result_type($3.type.t_type, $5, &s_index, &m_index));
 
           if ($5 != NULL) /* Compile time lookup. */
-              ins_number(m_index);
+          {
+              if (s_index == FSM_AMBIGUOUS) /* Not anymore. */
+                  ins_prog_string($5);
+              else
+                  ins_number(m_index);
+          }
           ins_number(s_index);
           arrange_protected_lvalue($3.start, $3.code, $3.end, F_PROTECTED_INDEX_S_LVALUE);
 

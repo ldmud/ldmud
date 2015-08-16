@@ -126,6 +126,7 @@ extern void struct_publish_type ( struct_type_t * pSType );
 extern Bool struct_type_equivalent (struct_type_t * pSType1, struct_type_t *pSType2);
 extern struct_type_t * struct_find (string_t *name, program_t * prog);
 extern int struct_find_member ( struct_type_t * ptype, string_t * name );
+extern int struct_find_direct_member ( struct_type_t * ptype, string_t * name );
 extern void struct_check_for_destr ( struct_t * pStruct );
 extern mp_int total_struct_size (strbuf_t *sbuf, Bool verbose);
 extern void   struct_dinfo_status(svalue_t *svp, int value);

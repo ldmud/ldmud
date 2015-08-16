@@ -960,10 +960,12 @@ struct_find ( string_t * name, program_t * prog )
 } /* struct_find() */
 
 /*-------------------------------------------------------------------------*/
-int
-struct_find_member ( struct_type_t * ptype, string_t * name )
+static INLINE int
+inl_struct_find_member ( struct_type_t * ptype, string_t * name, bool only_direct )
 
 /* Find the struct member <name> for struct <ptype> and return its index.
+ * If <only_direct> is true, then only direct members (i.e. members that are
+ * not inherited from a base struct) are considered.
  * Return -1 if not found.
  */
 
@@ -974,7 +976,12 @@ struct_find_member ( struct_type_t * ptype, string_t * name )
     if (struct_t_size(ptype) < 1)
         return -1;
 
-    for (member = 0, pmember = ptype->member
+    if (only_direct && ptype->base != NULL)
+        member = struct_t_size(ptype->base);
+    else
+        member = 0;
+
+    for (pmember = ptype->member + member
         ; member < struct_t_size(ptype)
         ; member++, pmember++
         )
@@ -984,7 +991,31 @@ struct_find_member ( struct_type_t * ptype, string_t * name )
     }
 
     return -1;
+} /* inl_struct_find_member() */
+
+/*-------------------------------------------------------------------------*/
+int
+struct_find_member ( struct_type_t * ptype, string_t * name )
+
+/* Find the struct member <name> for struct <ptype> and return its index.
+ * Return -1 if not found.
+ */
+
+{
+    return inl_struct_find_member(ptype, name, false);
 } /* struct_find_member() */
+
+/*-------------------------------------------------------------------------*/
+int
+struct_find_direct_member ( struct_type_t * ptype, string_t * name )
+
+/* Find the struct member <name>, that is not inherited from a base struct,
+ * for struct <ptype> and return its index. Return -1 if not found.
+ */
+
+{
+    return inl_struct_find_member(ptype, name, true);
+} /* struct_find_direct_member() */
 
 /*-------------------------------------------------------------------------*/
 void

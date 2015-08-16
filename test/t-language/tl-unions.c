@@ -23,6 +23,10 @@ struct sub2(base)
     int m2;
 };
 
+struct indep
+{
+    int member;
+};
 
 string          g_str;
 int             g_int;
@@ -42,7 +46,7 @@ int|string      f_return_int_str          (int|string val)      { return val; }
 int*|string*    f_return_intarr_strarr    (int*|string* val)    { return val; }
 <int*|string*>* f_return_intarr_strarr_arr(<int*|string*>* val) { return val; }
 int|float       f_return_nr               (int|float val)       { return val; }
-int             f_return_member           (struct sub1|struct sub2 val) { return ((struct base)val)->member; }
+int             f_return_member           (struct sub1|struct sub2|struct indep val) { return val->member; }
 
 int|string|mixed* multiply(int|string|mixed* arg, int factor)   {return arg*factor;}
 
