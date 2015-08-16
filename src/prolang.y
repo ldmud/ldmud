@@ -5571,7 +5571,19 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
     }
 
     if (*member_index < 0)
-        return lpctype_mixed;
+    {
+        /* This is a runtime lookup. It is one of the members,
+         * so make a union of all the member types.
+         */
+        lpctype_t *result = NULL;
+        for (int i = fstruct->num_members; i--; )
+        {
+            lpctype_t *oldresult = result;
+            result = get_union_type(result, fstruct->member[i].type);
+            free_lpctype(oldresult);
+        }
+        return result;
+    }
     else
         return ref_lpctype(fstruct->member[*member_index].type);
 } /* get_struct_member_result_type() */
