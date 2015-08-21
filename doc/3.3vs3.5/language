@@ -95,6 +95,8 @@ that you should pay attention to when updating.
   + The efun query_input_pending() was removed in favor of
     interactive_info(ob, II_INPUT_PENDING). There is a sefun replacement
     in /mudlib/deprecated/. (#596)
+  + The efun debug_info() was removed in favor of driver_info()
+    There is a sefun replacement in /mudlib/deprecated/. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an

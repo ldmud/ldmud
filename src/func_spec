@@ -554,7 +554,6 @@ int     write_file(string, string, int default: F_CONST0);
         /* Driver and System functions */
 
 void    configure_driver(int, mixed);
-mixed   debug_info(int, ...);
 void    debug_message(string, int default: F_CONST0);
 int     dump_driver_info(int, null|string default: F_CONST0);
 mixed   driver_info(int);

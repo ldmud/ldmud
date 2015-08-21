@@ -315,7 +315,7 @@ Bool
 dumpstat (string_t *fname)
 
 /* This function dumps statistics about all listed objects into the file
- * $MUDLIB/<fname>. It is called by the command parser or from debug_info.
+ * $MUDLIB/<fname>. It is called from dump_driver_info.
  * Return TRUE on success, FALSE if <fname> can't be written.
  */
 
@@ -395,7 +395,7 @@ Bool
 dumpstat_dest(string_t *fname)
 
 /* this function dumps statistics about all destructed objects into the file
- * $MUDLIB/<fname>. It is called by the commandparser and by debug_info().
+ * $MUDLIB/<fname>. It is called by dump_driver_info().
  * Return TRUE on success, FALSE if <fname> can't be written.
  */
 

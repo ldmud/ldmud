@@ -78,7 +78,6 @@
 #include "svalue.h"
 #include "xalloc.h"
 
-#include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_info.h"
 
 /*-------------------------------------------------------------------------*/
@@ -1823,48 +1822,6 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
     return stringtable_size + distinct_size;
 #   undef STR_OVERHEAD
 } /* add_string_status() */
-
-/*-------------------------------------------------------------------------*/
-void
-string_dinfo_status (svalue_t *svp, int value)
-
-/* Return the string table information for debug_info(DINFO_DATA, DID_STATUS).
- * <svp> points to the svalue block for the result, this function fills in
- * the spots for the object table.
- * If <value> is -1, <svp> points indeed to a value block; other it is
- * the index of the desired value and <svp> points to a single svalue.
- */
-
-{
-#define ST_NUMBER(which,code) \
-    if (value == -1) svp[which].u.number = code; \
-    else if (value == which) svp->u.number = code
-
-    ST_NUMBER(DID_ST_STRINGS, mstr_used);
-    ST_NUMBER(DID_ST_STRING_SIZE, mstr_used_size);
-
-    ST_NUMBER(DID_ST_STR_TABLE_SIZE, HTABLE_SIZE * sizeof(string_t *));
-    ST_NUMBER(DID_ST_STR_OVERHEAD, sizeof(string_t)-1);
-
-    ST_NUMBER(DID_ST_STR_CHAINS,     mstr_chains);
-    ST_NUMBER(DID_ST_STR_ADDED,      mstr_added);
-    ST_NUMBER(DID_ST_STR_DELETED,    mstr_deleted);
-    ST_NUMBER(DID_ST_STR_COLLISIONS, mstr_collisions);
-
-    ST_NUMBER(DID_ST_UNTABLED,      mstr_untabled_count);
-    ST_NUMBER(DID_ST_UNTABLED_SIZE, mstr_untabled_size);
-    ST_NUMBER(DID_ST_TABLED,        mstr_tabled_count);
-    ST_NUMBER(DID_ST_TABLED_SIZE,   mstr_tabled_size);
-
-    ST_NUMBER(DID_ST_STR_SEARCHES,          mstr_searches);
-    ST_NUMBER(DID_ST_STR_SEARCHLEN,         mstr_searchlen);
-    ST_NUMBER(DID_ST_STR_SEARCHES_BYVALUE,  mstr_searches_byvalue);
-    ST_NUMBER(DID_ST_STR_SEARCHLEN_BYVALUE, mstr_searchlen_byvalue);
-    ST_NUMBER(DID_ST_STR_FOUND,             mstr_found);
-    ST_NUMBER(DID_ST_STR_FOUND_BYVALUE,     mstr_found_byvalue);
-
-#undef ST_NUMBER
-} /* string_dinfo_status() */
 
 /*-------------------------------------------------------------------------*/
 void

@@ -112,7 +112,6 @@ extern void mstring_gc_table (void);
 #endif /* GC_SUPPORT */
 
 extern mp_int add_string_status (strbuf_t *sbuf, Bool verbose);
-extern void   string_dinfo_status(svalue_t *svp, int value);
 extern void   string_driver_info (svalue_t *svp, int value) __attribute__((nonnull(1)));
 
 

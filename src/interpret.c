@@ -239,7 +239,7 @@
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/driver_hook.h"
-#include "../mudlib/sys/debug_info.h"
+#include "../mudlib/sys/driver_info.h"
 #include "../mudlib/sys/trace.h"
 
 /*-------------------------------------------------------------------------*/
@@ -19225,7 +19225,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
  *
  * If <rvec> is not NULL, the traceback is returned in a newly created array
  * which pointer is put into *<rvec>. For the format of the array, see
- * efun debug_info().
+ * efun driver_info().
  *
  * If a heart_beat() is involved, return an uncounted pointer to the name of
  * the object that had it, otherwise return NULL.
@@ -19615,7 +19615,7 @@ dump_trace (Bool how, vector_t ** rvec, string_t ** rstr)
  *
  * If <rvec> is not NULL, the traceback is returned in a newly created array
  * which pointer is put into *<rvec>. For the format of the array, see
- * efun debug_info().
+ * efun driver_info().
  * If <rstr> is not NULL, the traceback is put as a string into *<rstr>.
  */
 

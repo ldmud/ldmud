@@ -239,7 +239,6 @@
 #include "backend.h"
 #endif /* MALLOC_EXT_STATISTICS */
 
-#include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_info.h"
 
 /* This is the granularity of memory allocations.
@@ -1175,131 +1174,6 @@ mem_dump_extdata (strbuf_t *sbuf)
     strbuf_add(sbuf, "No detailed blocks statistics available.\n");
 #endif /* MALLOC_EXT_STATISTICS */
 } /* mem_dump_extdata() */
-
-/*-------------------------------------------------------------------------*/
-void
-mem_dinfo_data (svalue_t *svp, int value)
-
-/* Fill in the data for debug_info(DINFO_DATA, DID_MEMORY) into the
- * svalue-block svp.
- */
-
-{
-    unsigned long small_overhead;
-
-#define ST_NUMBER(which,code) \
-    if (value == -1) svp[which].u.number = code; \
-    else if (value == which) svp->u.number = code
-
-    if (value == -1)
-        put_ref_string(svp+DID_MEM_NAME, STR_SLABALLOC);
-    else if (value == DID_MEM_NAME)
-        put_ref_string(svp, STR_SLABALLOC);
-
-    small_overhead = small_slab_stat.counter
-                     * (sizeof(mslab_t) - GRANULARITY + M_OVERHEAD * GRANULARITY);
-
-    ST_NUMBER(DID_MEM_SBRK, sbrk_stat.counter);
-    ST_NUMBER(DID_MEM_SBRK_SIZE, sbrk_stat.size);
-    ST_NUMBER(DID_MEM_LARGE, large_alloc_stat.counter);
-    ST_NUMBER(DID_MEM_LARGE_SIZE, large_alloc_stat.size * GRANULARITY);
-    ST_NUMBER(DID_MEM_LFREE, large_free_stat.counter);
-    ST_NUMBER(DID_MEM_LFREE_SIZE, large_free_stat.size * GRANULARITY);
-    ST_NUMBER(DID_MEM_LWASTED, large_wasted_stat.counter);
-    ST_NUMBER(DID_MEM_LWASTED_SIZE, large_wasted_stat.size);
-    ST_NUMBER(DID_MEM_SLAB, small_slab_stat.counter);
-    ST_NUMBER(DID_MEM_SLAB_SIZE, small_slab_stat.size + small_slab_stat.counter * M_OVERHEAD * GRANULARITY);
-    ST_NUMBER(DID_MEM_SLAB_FREE, small_slab_free_stat.counter);
-    ST_NUMBER(DID_MEM_SLAB_FREE_SIZE, small_slab_free_stat.size);
-    ST_NUMBER(DID_MEM_SMALL, small_alloc_stat.counter);
-    ST_NUMBER(DID_MEM_SMALL_SIZE, small_alloc_stat.size);
-    ST_NUMBER(DID_MEM_SFREE, small_free_stat.counter);
-    ST_NUMBER(DID_MEM_SFREE_SIZE, small_free_stat.size);
-    ST_NUMBER(DID_MEM_SMALL_OVERHEAD_SIZE, small_overhead);
-    ST_NUMBER(DID_MEM_MINC_CALLS, malloc_increment_size_calls);
-    ST_NUMBER(DID_MEM_MINC_SUCCESS, malloc_increment_size_success);
-    ST_NUMBER(DID_MEM_MINC_SIZE, malloc_increment_size_total);
-#if defined(REPLACE_MALLOC)
-    ST_NUMBER(DID_MEM_CLIB, clib_alloc_stat.counter);
-    ST_NUMBER(DID_MEM_CLIB_SIZE, clib_alloc_stat.size);
-#else
-    ST_NUMBER(DID_MEM_CLIB, 0);
-    ST_NUMBER(DID_MEM_CLIB_SIZE, 0);
-#endif
-    ST_NUMBER(DID_MEM_PERM, perm_alloc_stat.counter);
-    ST_NUMBER(DID_MEM_PERM_SIZE, perm_alloc_stat.size);
-    ST_NUMBER(DID_MEM_OVERHEAD, T_OVERHEAD * GRANULARITY);
-    ST_NUMBER(DID_MEM_ALLOCATED, mem_mem_allocated());
-    ST_NUMBER(DID_MEM_USED, mem_mem_used());
-    ST_NUMBER(DID_MEM_TOTAL_UNUSED, large_free_stat.size * GRANULARITY
-                                    + large_wasted_stat.size
-                                    + small_free_stat.size
-             );
-#ifdef USE_AVL_FREELIST
-    ST_NUMBER(DID_MEM_AVL_NODES, num_avl_nodes);
-#else
-    ST_NUMBER(DID_MEM_AVL_NODES, large_free_stat.counter);
-#endif /* USE_AVL_FREELIST */
-#ifdef MALLOC_EXT_STATISTICS
-    do {
-        vector_t * top; /* Array holding the sub vectors */
-        int i;
-        Bool deallocate = MY_FALSE;
-
-        mem_update_stats();
-        top = allocate_array(SIZE_EXTSTATS);
-        
-        if (!top)
-            break;
-
-        for (i = 0; i < SIZE_EXTSTATS; ++i)
-        {
-            vector_t *sub = allocate_array(DID_MEM_ES_MAX);
-
-            if (!sub)
-            {
-                deallocate = MY_TRUE;
-                break;
-            }
-
-            put_number(&sub->item[DID_MEM_ES_MAX_ALLOC], extstats[i].max_alloc);
-            put_number(&sub->item[DID_MEM_ES_CUR_ALLOC], extstats[i].cur_alloc);
-            put_number(&sub->item[DID_MEM_ES_MAX_FREE], extstats[i].max_free);
-            put_number(&sub->item[DID_MEM_ES_CUR_FREE], extstats[i].cur_free);
-            if (num_update_calls)
-            {
-                put_float(&sub->item[DID_MEM_ES_AVG_XALLOC], extstats[i].savg_xalloc / num_update_calls);
-                put_float(&sub->item[DID_MEM_ES_AVG_XFREE], extstats[i].savg_xfree / num_update_calls);
-            }
-            if  (i < SMALL_BLOCK_NUM)
-            {
-                put_number(&sub->item[DID_MEM_ES_FULL_SLABS],  slabtable[i].numFullSlabs);
-                put_number(&sub->item[DID_MEM_ES_FREE_SLABS],  slabtable[i].numFreeSlabs);
-                put_number(&sub->item[DID_MEM_ES_TOTAL_SLABS], slabtable[i].numSlabs);
-            }
-
-            put_array(top->item + i, sub);
-        }
-
-        if (deallocate)
-        {
-            free_array(top);
-            ST_NUMBER(DID_MEM_EXT_STATISTICS, 0);
-        }
-        else
-        {
-            if (value == -1)
-                put_array(svp+DID_MEM_EXT_STATISTICS, top);
-            else if (value == DID_MEM_EXT_STATISTICS)
-                put_array(svp, top);
-        }
-    } while(0);
-#else
-    ST_NUMBER(DID_MEM_EXT_STATISTICS, 0);
-#endif /* MALLOC_EXT_STATISTICS */
-
-#undef ST_NUMBER
-} /* mem_dinfo_data() */
 
 /*-------------------------------------------------------------------------*/
 void

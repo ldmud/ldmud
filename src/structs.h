@@ -129,7 +129,6 @@ extern int struct_find_member ( struct_type_t * ptype, string_t * name );
 extern int struct_find_direct_member ( struct_type_t * ptype, string_t * name );
 extern void struct_check_for_destr ( struct_t * pStruct );
 extern mp_int total_struct_size (strbuf_t *sbuf, Bool verbose);
-extern void   struct_dinfo_status(svalue_t *svp, int value);
 extern void struct_driver_info(svalue_t *svp, int value) __attribute__((nonnull(1)));
 extern string_t * struct_t_unique_name (struct_type_t *pSType);
 #define struct_unique_name(pStruct) struct_t_unique_name(pStruct->type)

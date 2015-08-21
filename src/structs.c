@@ -183,7 +183,6 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
-#include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_info.h"
 #include "../mudlib/sys/struct_info.h"
 
@@ -1064,31 +1063,6 @@ total_struct_size (strbuf_t *sbuf, Bool verbose)
 
     return size_struct + size_struct_type;
 } /* total_struct_size() */
-
-/*-------------------------------------------------------------------------*/
-void
-struct_dinfo_status (svalue_t *svp, int value)
-
-/* Return the struct information for debug_info(DINFO_DATA, DID_STATUS).
- * <svp> points to the svalue block for the result, this function fills in
- * the spots for the object table.
- * If <value> is -1, <svp> points indeed to a value block; other it is
- * the index of the desired value and <svp> points to a single svalue.
- */
-
-{
-#define ST_NUMBER(which,code) \
-    if (value == -1) svp[which].u.number = code; \
-    else if (value == which) svp->u.number = code
-
-    ST_NUMBER(DID_ST_STRUCTS, num_struct);
-    ST_NUMBER(DID_ST_STRUCTS_SIZE, size_struct);
-
-    ST_NUMBER(DID_ST_STRUCT_TYPES, num_struct_type);
-    ST_NUMBER(DID_ST_STRUCT_TYPES_SIZE, size_struct_type);
-
-#undef ST_NUMBER
-} /* string_dinfo_status() */
 
 /*-------------------------------------------------------------------------*/
 void

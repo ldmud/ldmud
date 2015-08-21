@@ -14,7 +14,6 @@
 #include "stdstrings.h"
 #include "svalue.h"
 
-#include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_info.h"
 
 /* Defines required by the xalloc.c wrapper */
@@ -159,21 +158,6 @@ mem_dump_data (strbuf_t *sbuf)
                );
 
 } /* mem_dump_data() */
-
-/*-------------------------------------------------------------------------*/
-void
-mem_dinfo_data (svalue_t *svp, int value)
-
-/* Fill in the data for debug_info(DINFO_DATA, DID_MEMORY) into the
- * svalue-block svp.
- */
-
-{
-    if (value == -1)
-        put_ref_string(svp+DID_MEM_NAME, STR_SYSTEM_MALLOC);
-    else if (value == DID_MEM_NAME)
-        put_ref_string(svp, STR_SYSTEM_MALLOC);
-} /* mem_dinfo_data() */
 
 /*-------------------------------------------------------------------------*/
 void

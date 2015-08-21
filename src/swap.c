@@ -105,7 +105,6 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
-#include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_info.h"
 
 /*-------------------------------------------------------------------------*/
@@ -2490,41 +2489,6 @@ swap_status (strbuf_t *sbuf)
                , (recycle_free_space || !swap_compact_mode) ? "on" : "off"
     );
 } /* swap_status() */
-
-/*-------------------------------------------------------------------------*/
-void
-swap_dinfo_data (svalue_t *svp, int value)
-
-/* Fill in the data for debug_info(DINFO_DATA, DID_SWAP)
- * into the svalue block <svp>.
- * If <value> is -1, <svp> points indeed to a value block; other it is
- * the index of the desired value and <svp> points to a single svalue.
- */
-
-{
-#define ST_NUMBER(which,code) \
-    if (value == -1) svp[which].u.number = code; \
-    else if (value == which) svp->u.number = code
-
-    ST_NUMBER(DID_SW_PROGS, num_swapped - num_unswapped);
-    ST_NUMBER(DID_SW_PROG_SIZE, total_bytes_swapped - total_bytes_unswapped);
-    ST_NUMBER(DID_SW_PROG_UNSWAPPED, num_unswapped);
-    ST_NUMBER(DID_SW_PROG_U_SIZE, total_bytes_unswapped);
-    ST_NUMBER(DID_SW_VARS, num_vb_swapped);
-    ST_NUMBER(DID_SW_VAR_SIZE, total_vb_bytes_swapped);
-    ST_NUMBER(DID_SW_FREE, num_swapfree);
-    ST_NUMBER(DID_SW_FREE_SIZE, total_bytes_swapfree);
-    ST_NUMBER(DID_SW_FILE_SIZE, swapfile_size);
-    ST_NUMBER(DID_SW_REUSED, total_swap_reused);
-    ST_NUMBER(DID_SW_SEARCHES, swap_num_searches);
-    ST_NUMBER(DID_SW_SEARCH_LEN, swap_total_searchlength);
-    ST_NUMBER(DID_SW_F_SEARCHES, swap_free_searches);
-    ST_NUMBER(DID_SW_F_SEARCH_LEN, swap_free_searchlength);
-    ST_NUMBER(DID_SW_COMPACT, swap_compact_mode);
-    ST_NUMBER(DID_SW_RECYCLE_FREE, recycle_free_space);
-
-#undef ST_NUMBER
-} /* swap_dinfo_data() */
 
 /*-------------------------------------------------------------------------*/
 void

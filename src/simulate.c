@@ -72,7 +72,6 @@
 
 #include "i-eval_cost.h"
 
-#include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/driver_info.h"
 #include "../mudlib/sys/files.h"
@@ -269,7 +268,7 @@ vector_t *current_error_trace = NULL;
 string_t *uncaught_error_trace_string = NULL;
 string_t *current_error_trace_string = NULL;
   /* When an error occured, these variables hold the call chain in the
-   * format used by efun debug_info() for evaluation by the mudlib.
+   * format used by efun driver_info() for evaluation by the mudlib.
    * The variables are kept until the next error, or until a GC.
    * 'uncaught_error_trace': the most recent uncaught error
    * 'current_error_trace': the most recent error, caught or uncaught.
@@ -879,7 +878,7 @@ errorf (const char *fmt, ...)
             else
             {
                 /* No dump of the backtrace into the log, but we want it
-                 * available for debug_info().
+                 * available for driver_info().
                  */
                 strbuf_t sbuf;
 
@@ -3195,7 +3194,7 @@ status_parse (strbuf_t * sbuf, char * buff)
  * Return TRUE if the request was recognised, and FALSE otherwise.
  *
  * The function is called from actions:special_parse() to implement
- * the hardcoded commands, and from the efun debug_info().
+ * the hardcoded commands, and from the efun driver_info().
  */
 
 {
@@ -3247,7 +3246,7 @@ status_parse (strbuf_t * sbuf, char * buff)
             strbuf_addf(sbuf, "Memory reserved:\t\t\t %9zu\n", res);
         }
         if (verbose) {
-/* TODO: Add these numbers to the debug_info statistics. */
+/* TODO: Add these numbers to the driver_info statistics. */
             strbuf_add(sbuf, "\nVM Execution:\n");
             strbuf_add(sbuf,   "-------------\n");
             strbuf_addf(sbuf
@@ -3426,92 +3425,6 @@ status_parse (strbuf_t * sbuf, char * buff)
 
     return MY_FALSE;
 } /* status_parse() */
-
-/*-------------------------------------------------------------------------*/
-void
-dinfo_data_status (svalue_t *svp, int value)
-
-/* Fill in the "status" data for debug_info(DINFO_DATA, DID_STATUS)
- * into the svalue-block <svp>.
- * If <value> is -1, <svp> points indeed to a value block; other it is
- * the index of the desired value and <svp> points to a single svalue.
- */
-
-{
-    STORE_DOUBLE_USED;
-
-#define ST_NUMBER(which,code) \
-    if (value == -1) svp[which].u.number = code; \
-    else if (value == which) svp->u.number = code
-
-#define ST_DOUBLE(which,code) \
-    if (value == -1) { \
-        svp[which].type = T_FLOAT; \
-        STORE_DOUBLE(svp+which, code); \
-    } else if (value == which) { \
-        svp->type = T_FLOAT; \
-        STORE_DOUBLE(svp, code); \
-    }
-
-    ST_NUMBER(DID_ST_ACTIONS,           alloc_action_sent);
-    ST_NUMBER(DID_ST_ACTIONS_SIZE,      alloc_action_sent * sizeof (action_t));
-    ST_NUMBER(DID_ST_SHADOWS,           alloc_shadow_sent);
-    ST_NUMBER(DID_ST_SHADOWS_SIZE,      alloc_shadow_sent * sizeof (shadow_t));
-
-    ST_NUMBER(DID_ST_OBJECTS,           tot_alloc_object);
-    ST_NUMBER(DID_ST_OBJECTS_SIZE,      tot_alloc_object_size);
-    ST_NUMBER(DID_ST_OBJECTS_SWAPPED,   num_vb_swapped);
-    ST_NUMBER(DID_ST_OBJECTS_SWAP_SIZE, total_vb_bytes_swapped);
-    ST_NUMBER(DID_ST_OBJECTS_LIST,      num_listed_objs);
-    ST_NUMBER(DID_ST_OBJECTS_NEWLY_DEST, num_newly_destructed);
-    ST_NUMBER(DID_ST_OBJECTS_DESTRUCTED, num_destructed);
-    ST_NUMBER(DID_ST_OBJECTS_PROCESSED, num_last_processed);
-    ST_DOUBLE(DID_ST_OBJECTS_AVG_PROC, relate_statistics(stat_last_processed, stat_in_list));
-    /* TODO: Maybe add number of objects data cleaned here as well. */
-
-    ST_NUMBER(DID_ST_ARRAYS,         num_arrays);
-    ST_NUMBER(DID_ST_ARRAYS_SIZE,    total_array_size());
-
-    ST_NUMBER(DID_ST_MAPPINGS,       num_mappings);
-    ST_NUMBER(DID_ST_MAPPINGS_SIZE,  total_mapping_size());
-    ST_NUMBER(DID_ST_HYBRID_MAPPINGS, num_dirty_mappings);
-    ST_NUMBER(DID_ST_HASH_MAPPINGS,   num_hash_mappings);
-
-    ST_NUMBER(DID_ST_PROGS,          total_num_prog_blocks + num_swapped
-                                                           - num_unswapped);
-    ST_NUMBER(DID_ST_PROGS_SIZE,     total_prog_block_size + total_bytes_swapped
-                                                           - total_bytes_unswapped);
-    ST_NUMBER(DID_ST_PROGS_SWAPPED,   num_swapped - num_unswapped);
-    ST_NUMBER(DID_ST_PROGS_SWAP_SIZE, total_bytes_swapped - total_bytes_unswapped);
-
-    ST_NUMBER(DID_ST_USER_RESERVE,   reserved_user_size);
-    ST_NUMBER(DID_ST_MASTER_RESERVE, reserved_master_size);
-    ST_NUMBER(DID_ST_SYSTEM_RESERVE, reserved_system_size);
-
-#ifdef COMM_STAT
-    ST_NUMBER(DID_ST_ADD_MESSAGE, add_message_calls);
-    ST_NUMBER(DID_ST_PACKETS,     inet_packets);
-    ST_NUMBER(DID_ST_PACKET_SIZE, inet_volume);
-    ST_NUMBER(DID_ST_PACKETS_IN,     inet_packets_in);
-    ST_NUMBER(DID_ST_PACKET_SIZE_IN, inet_volume_in);
-#else
-    ST_NUMBER(DID_ST_ADD_MESSAGE, -1);
-    ST_NUMBER(DID_ST_PACKETS,     -1);
-    ST_NUMBER(DID_ST_PACKET_SIZE, -1);
-    ST_NUMBER(DID_ST_PACKETS_IN,     -1);
-    ST_NUMBER(DID_ST_PACKET_SIZE_IN, -1);
-#endif
-#ifdef APPLY_CACHE_STAT
-    ST_NUMBER(DID_ST_APPLY,      apply_cache_hit+apply_cache_miss);
-    ST_NUMBER(DID_ST_APPLY_HITS, apply_cache_hit);
-#else
-    ST_NUMBER(DID_ST_APPLY,      -1);
-    ST_NUMBER(DID_ST_APPLY_HITS, -1);
-#endif
-
-#undef ST_NUMBER
-#undef ST_DOUBLE
-} /* dinfo_data_status() */
 
 /*-------------------------------------------------------------------------*/
 void

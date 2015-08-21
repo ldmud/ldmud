@@ -281,7 +281,7 @@ mdb_log_sbrk (p_int size)
  *
  *   void mem_dump_data (strbuf_t *sbuf)
  *   void mem_dump_extdata (strbuf_t *sbuf)
- *   void mem_dinfo_data (svalue_t *svp, int value)
+ *   void mem_driver_info (svalue_t *svp, int value)
  *     Return the statistics data.
  *
  *   Bool mem_dump_memory (int fd)

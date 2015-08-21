@@ -278,7 +278,6 @@ extern object_t *lookfor_object(string_t *str, Bool bLoad);
 extern object_t *find_object_str(const char *str);
 extern Bool status_parse(strbuf_t * sbuf, char *buff);
 extern void simulate_driver_info(svalue_t *svp, int value) __attribute__((nonnull(1)));
-extern void dinfo_data_status(svalue_t * svp, int value);
 extern void warnf VARPROT((char *, ...), printf, 1, 2);
 extern void errorf VARPROT((const char *, ...), printf, 1, 2) NORETURN;
 extern void fatal VARPROT((const char *, ...), printf, 1, 2) NORETURN;

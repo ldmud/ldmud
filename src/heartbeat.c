@@ -59,7 +59,6 @@
 
 #include "i-eval_cost.h"
 
-#include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_info.h"
 
 /*-------------------------------------------------------------------------*/
@@ -449,49 +448,6 @@ heart_beat_status (strbuf_t * sbuf, Bool verbose)
     }
     return num_hb_objs * sizeof(struct hb_info);
 } /* heart_beat_status() */
-
-/*-------------------------------------------------------------------------*/
-void
-hbeat_dinfo_status (svalue_t *svp, int value)
-
-/* Return the heartbeat information for debug_info(DINFO_DATA, DID_STATUS).
- * <svp> points to the svalue block for the result, this function fills in
- * the spots for the object table.
- * If <value> is -1, <svp> points indeed to a value block; other it is
- * the index of the desired value and <svp> points to a single svalue.
- */
-
-{
-#define ST_NUMBER(which,code) \
-    if (value == -1) svp[which].u.number = code; \
-    else if (value == which) svp->u.number = code
-
-#define ST_DOUBLE(which,code) \
-    if (value == -1) { \
-        svp[which].type = T_FLOAT; \
-        STORE_DOUBLE(svp+which, code); \
-    } else if (value == which) { \
-        svp->type = T_FLOAT; \
-        STORE_DOUBLE(svp, code); \
-    }
-
-    STORE_DOUBLE_USED;
-
-    ST_NUMBER(DID_ST_HBEAT_OBJS, num_hb_objs);
-    ST_NUMBER(DID_ST_HBEAT_CALLS, num_hb_calls);
-    ST_NUMBER(DID_ST_HBEAT_CALLS_TOTAL, total_hb_calls);
-    ST_NUMBER(DID_ST_HBEAT_SLOTS, num_hb_objs);
-    ST_NUMBER(DID_ST_HBEAT_SIZE, num_hb_objs * sizeof(struct hb_info));
-    ST_NUMBER(DID_ST_HBEAT_PROCESSED, hb_num_done);
-    ST_DOUBLE(DID_ST_HBEAT_AVG_PROC
-             , avg_num_hb_objs
-               ? ((double)avg_num_hb_done / avg_num_hb_objs)
-               : 1.0
-             );
-
-#undef ST_NUMBER
-#undef ST_DOUBLE
-} /* hbeat_dinfo_status() */
 
 /*-------------------------------------------------------------------------*/
 void
