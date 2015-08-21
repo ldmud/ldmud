@@ -298,8 +298,6 @@ extern svalue_t *f_set_driver_hook(svalue_t *sp);
 extern svalue_t *f_shadow(svalue_t *sp);
 extern svalue_t *f_unshadow(svalue_t *sp);
 extern svalue_t *v_limited(svalue_t * sp, int num_arg);
-extern svalue_t *v_set_limits(svalue_t * sp, int num_arg);
-extern svalue_t *f_query_limits(svalue_t * sp);
 
 extern void set_default_limits(vector_t* vec);
 extern void put_limits(svalue_t* svp, bool def);

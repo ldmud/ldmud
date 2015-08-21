@@ -1,0 +1,31 @@
+NAME
+        doc/examples/limits
+
+DESCRIPTION
+        The LPC runtime has limits to prevent rogue objects
+        from allocating all CPU or memory.
+
+EXAMPLES
+        #include <configuration.h>
+        #include <rtlimits.h>
+
+        /* Limits must be given in an array.
+         * initialize it as LIMIT_KEEP for values
+         * we don't want to change.
+         */
+        int * limits = ({ LIMIT_KEEP }) * LIMIT_MAX;
+
+        /* Set the new default eval limit to 200000 */
+        limits[LIMIT_EVAL] = 200000;
+        configure_driver(DC_DEFAULT_RUNTIME_LIMITS, limits);
+
+        /* Set eval limit to unlimited, but reduce the
+         * mapping limit to 5000.
+         */
+        limits[LIMIT_EVAL] = LIMIT_UNLIMITED;
+        limits[LIMIT_MAPPING] = 5000;
+        configure_driver(DC_DEFAULT_RUNTIME_LIMITS, limits);
+
+
+SEE ALSO
+        limited(E), configure_driver(E)

@@ -97,6 +97,9 @@ that you should pay attention to when updating.
     in /mudlib/deprecated/. (#596)
   + The efun debug_info() was removed in favor of driver_info()
     There is a sefun replacement in /mudlib/deprecated/. (#596)
+  + The efuns query_limits() and set_limits() were removed in favor of
+    driver_info() and configure_driver().
+    There are a sefun replacements in /mudlib/deprecated/. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an
