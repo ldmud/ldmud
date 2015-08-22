@@ -108,6 +108,8 @@ that you should pay attention to when updating.
   + The efun query_mud_port() was removed in favor of driver_info()
     and interactive_info().
     There is a sefun replacement in /mudlib/deprecated/. (#596)
+  + The efun query_udp_port() was removed in favor of driver_info().
+    There is a sefun replacement in /mudlib/deprecated/. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an
@@ -129,6 +131,8 @@ that you should pay attention to when updating.
   + The functionality of shadow(ob, 0) was removed in favor of
     object_info(ob, OI_SHADOW_NEXT). There is a sefun implementation with
     the old signature in /mudlib/deprecated/. (#596)
+  + net_connect() had the current udp port as an undocumented default value
+    for its second argument. Now both parameters are mandatory.
 
 - Pragmas
   + The behaviour of the pragma combine_strings is mandatory, that means

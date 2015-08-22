@@ -7911,24 +7911,6 @@ f_users (svalue_t *sp)
 } /* f_users() */
 
 /*-------------------------------------------------------------------------*/
-svalue_t *
-f_query_udp_port (svalue_t *sp)
-
-/* EFUN query_udp_port()
- *
- *   int query_udp_port(void)
- *
- * Returns the port number that is used for the inter mud
- * protocol.
- */
-
-{
-    push_number(sp, udp_port);
-
-    return sp;
-} /* f_query_udp_port() */
-
-/*-------------------------------------------------------------------------*/
 void
 check_for_out_connections (void)
 

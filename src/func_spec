@@ -519,9 +519,8 @@ mixed  *variable_list(object|string, int default: F_CONST1);
 
 int     binary_message(int *|string, int default: F_CONST0);
 
-int     net_connect(string, int default: F_QUERY_UDP_PORT);
+int     net_connect(string, int);
 
-int     query_udp_port();
 int     send_udp(string, int, string|int*);
 
 void    write(mixed);

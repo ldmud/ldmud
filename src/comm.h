@@ -410,8 +410,6 @@ extern void  init_telopts(void);
 extern void  mudlib_telopts(void);
 extern svalue_t *v_input_to (svalue_t *sp, int num_arg);
 
-extern svalue_t *f_query_udp_port(svalue_t *sp);
-
 #ifdef ERQ_DEMON
 extern void  start_erq_demon(const char *suffix, size_t suffixlen);
 extern svalue_t *f_attach_erq_demon(svalue_t *sp);
