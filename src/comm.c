@@ -7695,65 +7695,6 @@ f_input_to_info (svalue_t *sp)
 } /* f_input_to_info() */
 
 /*-------------------------------------------------------------------------*/
-svalue_t *
-f_query_mud_port (svalue_t *sp)
-
-/* EFUN: query_mud_port()
- *
- * Returns the port number the parser uses for user connections.
- *
- *   int query_mud_port(void)
- *
- * If no argument is given, the port for this_player() is
- * returned. If this_player() is not existing or not interactive,
- * the first port number open for connections is returned.
- *
- *   int query_mud_port(object user)
- *   int query_mud_port(int num)
- *
- * If an user object is given, the port used for its connection
- * is returned.
- * If a positive number is given, the <num>th port number the
- * parser uses for connections is returned (given that there are
- * that many ports).
- * If -1 is given, the number of ports open for connections is
- * returned.
- */
-
-{
-    object_t *ob;
-    interactive_t *ip;
-    struct sockaddr_in addr;
-    length_t length;
-
-    length = sizeof(addr);
-
-    if (sp->type == T_NUMBER)
-    {
-        if (sp->u.number < -1 || sp->u.number >= numports)
-        {
-            errorf("Bad arg 1 to query_mud_port(): value %"PRIdPINT" out of range.\n"
-                 , sp->u.number);
-            /* NOTREACHED */
-        }
-        sp->u.number = sp->u.number < 0 ? numports : port_numbers[sp->u.number];
-        return sp;
-    }
-
-    ob = sp->u.ob;
-    deref_object(ob, "query_ip_port");
-
-    if ( !(O_SET_INTERACTIVE(ip, ob))) {
-        put_number(sp, port_numbers[0]);
-        return sp;
-    }
-
-    getsockname(ip->socket, (struct sockaddr *)&addr, &length);
-    put_number(sp, ntohs(addr.sin_port));
-    return sp;
-} /* f_query_mud_port() */
-
-/*-------------------------------------------------------------------------*/
 
 
 static inline void translate_bit(char c, int i, int *length, string_t *rc, unsigned int bitno)
