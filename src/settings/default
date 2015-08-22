@@ -340,10 +340,6 @@ enable_use_parse_command=yes
 
 enable_use_set_light=yes
 
-# Enable this if you want the efun set_is_wizard().
-
-enable_use_set_is_wizard=yes
-
 # Enable this if you want the efun process_string().
 
 enable_use_process_string=yes

@@ -612,91 +612,6 @@ call_modify_command (char *buff)
 } /* call_modify_command() */
 
 /*-------------------------------------------------------------------------*/
-static int
-special_parse (char *buff)
-
-/* Implement a few hardcoded commands. Return TRUE if such a command
- * was given.
- * TODO: Remove this feature.
- */
-
-{
-#ifdef USE_SET_IS_WIZARD
-    if (!is_wizard_used || command_giver->flags & O_IS_WIZARD)
-#endif
-    {
-        Bool no_curobj = MY_FALSE;
-
-        if (strcmp(buff, "malloc") == 0)
-        {
-            strbuf_t sbuf;
-
-            status_parse(&sbuf, "malloc");
-            strbuf_send(&sbuf);
-            return 1;
-        }
-
-        if (strcmp(buff, "malloc extstats") == 0)
-        {
-            strbuf_t sbuf;
-
-            status_parse(&sbuf, "malloc extstats");
-            strbuf_send(&sbuf);
-            return 1;
-        }
-
-        if (strcmp(buff, "dumpallobj") == 0) {
-
-            if (!current_object)
-            {
-                current_object = ref_object(command_giver, "dumpallobj");
-                no_curobj = MY_TRUE;
-            }
-            add_message("Dumping to /OBJ_DUMP ... ");
-            dumpstat(STR_OBJDUMP_FNAME);
-            dumpstat_dest(STR_DESTOBJDUMP_FNAME);
-            add_message("done\n");
-            if (no_curobj)
-            {
-                free_object(current_object, "dumpallobj");
-                current_object = NULL;
-            }
-            return 1;
-        }
-#ifdef OPCPROF /* amylaar */
-        if (strcmp(buff,  "opcdump") == 0) {
-            if (!current_object)
-            {
-                current_object = ref_object(command_giver, "opcdump");
-                no_curobj = MY_TRUE;
-            }
-            opcdump(STR_OPCDUMP_FNAME);
-            if (no_curobj)
-            {
-                free_object(current_object, "opcdump");
-                current_object = NULL;
-            }
-            return 1;
-        }
-#endif
-        if (strncmp(buff, "status", (size_t)6) == 0)
-        {
-            Bool rc;
-            strbuf_t sbuf;
-
-            rc = status_parse(&sbuf, buff+6+(buff[6]==' '));
-            if (rc)
-                strbuf_send(&sbuf);
-            else
-                strbuf_free(&sbuf);
-            return rc;
-        }
-    } /* end of wizard-only special parse commands */
-
-    return 0;
-} /* special_parse() */
-
-/*-------------------------------------------------------------------------*/
 static void
 notify_no_command (char *command, object_t *save_command_giver)
 
@@ -883,11 +798,6 @@ parse_command (char *buff, Bool from_efun)
      * This may clobber command_giver and/or current_object.
      */
     if (!from_efun && call_modify_command(buff))
-        return MY_TRUE;
-
-    /* Parse for special commands
-     */
-    if (!from_efun && special_parse(buff))
         return MY_TRUE;
 
     /* Determine the verb and set last_verb and last_command
@@ -1151,11 +1061,7 @@ parse_command (char *buff, Bool from_efun)
         }
 
         /* Command was found */
-        if (O_IS_INTERACTIVE(command_giver)
-#ifdef USE_SET_IS_WIZARD
-            && !(command_giver->flags & O_IS_WIZARD)
-#endif
-           )
+        if (O_IS_INTERACTIVE(command_giver))
         {
             command_object->user->score++;
         }

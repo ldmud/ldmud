@@ -112,6 +112,9 @@ that you should pay attention to when updating.
     There is a sefun replacement in /mudlib/deprecated/. (#596)
   + The efun query_snoop() was removed in favor of interactive_info().
     There is a sefun replacement in /mudlib/deprecated/. (#596)
+  + The efun set_is_wizard() was removed. It can be implemented with
+    normal actions. Example implementations are provided in
+    /mudlib/deprecated. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an

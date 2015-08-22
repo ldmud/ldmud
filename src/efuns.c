@@ -34,7 +34,6 @@
  *    efun: clones()
  *    efun: object_info()
  *    efun: present_clone()
- *    efun: set_is_wizard() (optional)
  *
  * Values:
  *    efun: abs()
@@ -155,12 +154,6 @@ static void copy_svalue (svalue_t *dest, svalue_t *, struct pointer_table *, int
 /* Macros */
 
 /*-------------------------------------------------------------------------*/
-
-#ifdef USE_SET_IS_WIZARD
-Bool is_wizard_used = MY_FALSE;
-  /* TODO: This flag can go when the special commands are gone. */
-#endif
-
 
 /*=========================================================================*/
 /*                              STRINGS                                    */
@@ -5003,48 +4996,6 @@ v_present_clone (svalue_t *sp, int num_arg)
 
     return sp;
 } /* f_present_clone() */
-
-/*-------------------------------------------------------------------------*/
-#ifdef USE_SET_IS_WIZARD
-
-svalue_t *
-f_set_is_wizard (svalue_t *sp)
-
-/* EFUN set_is_wizard()
- *
- *   int set_is_wizard(object ob, int n)
- *
- * Change object ob's wizardhood flag.  If n is 0, it is cleared, if n is, it
- * is set, if n is -1 the current status is reported. The return value is
- * always the old value of the flag. Using this function sets a flag in the
- * parser, that affects permissions for dumpallobj etc, which are by default
- * free for every user.
- */
-
-{
-    int i;
-    unsigned short *flagp;
-
-    flagp = &sp[-1].u.ob->flags;
-    i = (*flagp & O_IS_WIZARD) != 0;
-
-    switch (sp->u.number)
-    {
-        default:
-            errorf("Bad arg to set_is_wizard(): got %"PRIdPINT
-                   ", expected -1..1\n", sp->u.number);
-            /* NOTREACHED */
-        case  0: *flagp &= ~O_IS_WIZARD; is_wizard_used = MY_TRUE; break;
-        case  1: *flagp |=  O_IS_WIZARD; is_wizard_used = MY_TRUE; break;
-        case -1: break; /* only report status */
-    }
-    sp--;
-    free_object_svalue(sp);
-    put_number(sp, i);
-    return sp;
-} /* f_set_is_wizard() */
-
-#endif /* USE_SET_IS_WIZARD */
 
 /*-------------------------------------------------------------------------*/
 static svalue_t *

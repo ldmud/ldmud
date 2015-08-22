@@ -6,12 +6,6 @@
 #include "pkg-openssl.h"
 #include "pkg-gcrypt.h"
 
-/* --- Variables --- */
-
-#ifdef USE_SET_IS_WIZARD
-extern Bool is_wizard_used;
-#endif
-
 /* --- Prototypes --- */
 
 extern svalue_t *f_capitalize(svalue_t *);
@@ -80,7 +74,6 @@ extern svalue_t *v_clones (svalue_t *sp, int num_args);
 extern svalue_t *v_object_info (svalue_t *sp, int num_args);
 extern svalue_t *v_present_clone (svalue_t *sp, int num_arg);
 extern svalue_t *f_to_object(svalue_t *sp);
-extern svalue_t *f_set_is_wizard(svalue_t *sp);  /* optional */
 extern svalue_t *tell_room(svalue_t *sp);
 
 extern svalue_t *f_ctime(svalue_t *);

@@ -64,9 +64,6 @@ struct object_s
 /* Values of object_t.flags: */
 
 #define O_HEART_BEAT         0x01   /* Does it have an heart beat? */
-#ifdef USE_SET_IS_WIZARD
-#define O_IS_WIZARD          0x02   /* Is it a wizard player.c? */
-#endif
 #define O_ENABLE_COMMANDS    0x04   /* Can it execute commands? */
 #define O_CLONE              0x08   /* Is it cloned from a master copy? */
 #define O_DESTRUCTED         0x10   /* Is it destructed ? */

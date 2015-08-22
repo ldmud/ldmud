@@ -3,3 +3,5 @@ removed efuns.
 Each sefun is in a single file and all are included in simul_efun.c
 Please use them if you need them.
 
+The replacement for set_is_wizard is not meant to be used as a sefun,
+but to be included in the player object.

@@ -311,10 +311,6 @@
  */
 @cdef_use_parse_command@ USE_PARSE_COMMAND
 
-/* Define USE_SET_IS_WIZARD if you want the efun set_is_wizard().
- */
-@cdef_use_set_is_wizard@ USE_SET_IS_WIZARD
-
 /* Define USE_PROCESS_STRING if you want the efun process_string().
  */
 @cdef_use_process_string@ USE_PROCESS_STRING

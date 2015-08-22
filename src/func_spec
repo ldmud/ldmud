@@ -692,13 +692,6 @@ mixed   json_parse(string);
 string  process_string(string);
 #endif
 
-        /* Objects */
-
-#ifdef USE_SET_IS_WIZARD
-int     set_is_wizard(object, int default: F_CONST1);
-#endif
-
-
         /* Obsolete and deprecated functions */
 
 #ifdef USE_DEPRECATED

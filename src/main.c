@@ -1887,9 +1887,6 @@ options (void)
 #ifdef USE_PROCESS_STRING
                               , "process_string() enabled\n"
 #endif
-#ifdef USE_SET_IS_WIZARD
-                              , "set_is_wizard() enabled\n"
-#endif
 #ifdef SHARE_VARIABLES
                               , "clones initialized from blueprint\n"
 #else

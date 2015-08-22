@@ -47,10 +47,6 @@
  *
  * The .flags collect some vital information about the object:
  *     O_HEART_BEAT       : the object has a heartbeat
-#ifdef USE_SET_IS_WIZARD
- *     O_IS_WIZARD        : the object is a 'wizard' - this bit is set with
- *                          the efun set_is_wizard()
-#endif
  *     O_ENABLE_COMMANDS  : can execute commands ("is a living")
  *     O_CLONE            : is a clone, or uses a replaced program
  *     O_DESTRUCTED       : has actually been destructed

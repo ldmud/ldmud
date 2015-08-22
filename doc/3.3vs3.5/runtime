@@ -14,3 +14,6 @@ that you should pay attention to when updating.
   * shutdown() (bug #178)
   * garbage_collection() (bug #178)
 
+- The special driver actions ('status', 'malloc', dumpallobj' and 'opcdump')
+  were removed. They can be implemented as normal actions. Example implementations
+  are provided in /mudlib/deprecated/set_is_wizard.c (#596).
