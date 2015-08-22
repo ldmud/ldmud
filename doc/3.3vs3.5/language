@@ -103,6 +103,8 @@ that you should pay attention to when updating.
   + The efun set_extra_wizinfo_size() was removed in favor of
     configure_driver().
     There is a sefun replacement in /mudlib/deprecated/. (#596)
+  + The efun query_load_average() was removed in favor of driver_info().
+    There is a sefun replacement in /mudlib/deprecated/. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an

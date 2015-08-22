@@ -1593,33 +1593,6 @@ v_garbage_collection (svalue_t *sp, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_query_load_average (svalue_t *sp)
-
-/* EFUN query_load_average()
- *
- * Return a string with the current load_av and compile_av.
- * The string returned points to a local static buffer.
- */
-
-{
-    char buff[100];
-
-#if defined(__MWERKS__) && !defined(WARN_ALL)
-#    pragma warn_largeargs off
-#endif
-    sprintf(buff, "%.2f cmds/s, %.2f comp lines/s"
-                , stat_load.weighted_avg
-                , stat_compile.weighted_avg
-                );
-#if defined(__MWERKS__)
-#    pragma warn_largeargs reset
-#endif
-    push_c_string(sp, buff);
-    return sp;
-} /* f_query_load_average() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
 f_debug_message (svalue_t *sp)
 
 /* EFUN debug_message()

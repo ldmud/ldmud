@@ -563,7 +563,6 @@ int     get_eval_cost();
 #ifdef TRACE_CODE
 string *last_instructions(int, int default: F_CONST1);
 #endif
-string  query_load_average();
 mixed  *rusage();
 mixed   limited(closure, ...);
 void    set_driver_hook(int, closure|int|string|mapping|string*);

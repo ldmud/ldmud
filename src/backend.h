@@ -57,7 +57,6 @@ extern void update_statistic_avg (statistic_t * pStat, long number);
 extern double relate_statistics (statistic_t sStat, statistic_t sRef);
 extern void update_compile_av (int lines);
 extern svalue_t *v_garbage_collection(svalue_t *sp, int num_arg);
-extern svalue_t *f_query_load_average(svalue_t *sp);
 
 /* --- Macros --- */
 
