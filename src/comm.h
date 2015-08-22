@@ -434,7 +434,6 @@ extern input_t *get_input_handler(interactive_t *ip, input_type_t type);
 
 extern char *query_host_name(void);
 extern char *get_host_ip_number(void);
-extern svalue_t *f_query_snoop(svalue_t *sp);
 extern svalue_t *f_remove_interactive(svalue_t *sp);
 
 #ifdef DEBUG

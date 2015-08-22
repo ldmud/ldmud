@@ -6343,60 +6343,6 @@ get_host_ip_number (void)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_query_snoop (svalue_t *sp)
-
-/* EFUN: query_snoop()
- *
- *   object query_snoop(object victim)
- *
- * Return the object which is snooping <victim>, or 0 if there is none.
- * The call must be allowed by master->valid_query_snoop().
- */
-
-{
-    svalue_t *arg1;
-    object_t *ob;
-
-    /* Do some test and set ob to the snooper (if any) */
-    switch (0) /* try {...} */
-    {
-      default:
-        ob = sp->u.ob;
-        if ((ob->flags & (O_DESTRUCTED|O_SHADOW)) != O_SHADOW
-         || O_GET_SHADOW(ob)->ip == NULL)
-        {
-            zero_object_svalue(sp);
-            return sp;
-        }
-        inter_sp = sp;
-        assert_master_ob_loaded();
-        if (current_object != master_ob)
-        {
-            assign_eval_cost();
-            arg1 = apply_master(STR_VALID_QSNOOP, 1);
-            if (arg1 == 0 || arg1->type != T_NUMBER || !arg1->u.number)
-            {
-                ob = NULL;
-                break;
-            }
-        }
-        else
-        {
-            deref_object(ob, "query_snoop");
-        }
-        ob = O_GET_INTERACTIVE(ob)->snoop_by;
-    }
-
-    /* Return the result */
-    if (ob)
-        put_ref_object(sp, ob, "query_snoop");
-    else
-        put_number(sp, 0);
-    return sp;
-} /* f_query_snoop() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
 f_remove_interactive (svalue_t *sp)
 
 /* EFUN: remove_interactive()
