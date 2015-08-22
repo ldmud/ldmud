@@ -364,7 +364,6 @@ mixed  *localtime(int*|int default: F_TIME);
 mixed  *wizlist_info();
 mixed   get_extra_wizinfo(null|object|string);
 void    set_extra_wizinfo(null|object|string, mixed);
-void    set_extra_wizinfo_size(int);
 
 
         /* Strings */

@@ -637,38 +637,6 @@ f_get_extra_wizinfo (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_set_extra_wizinfo_size (svalue_t *sp)
-
-/* EFUN set_extra_wizinfo_size()
- *
- *   void set_extra_wizinfo_size(int size)
- *
- * Indicate that the wizlist should contain an array of this size
- * with extra info foreach wizard. A negative size is used to
- * indicate non-array 'extra' information.
- *
- * Causes the privilege violation
- * ("set_extra_wizinfo_size", this_object(), size).
- *
- * The value is only used to allocate a proper empty 'extra' value
- * for newly created wizlist entries.
- *
- * TODO: The extra_wizinfo idea could be applied to single objects
- * TODO:: and - ta da! - we have driver supported properties.
- * TODO:: Which then could be used to implement uids/euids etc.
- */
-
-{
-    if (!privilege_violation(STR_SET_EXTRA_WIZINFO_SIZE, &const0, sp))
-        wiz_info_extra_size = sp->u.number;
-
-    sp--;
-
-    return sp;
-} /* f_set_extra_wizinfo_size() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
 f_get_error_file (svalue_t *sp)
 
 /* EFUN get_error_file()
