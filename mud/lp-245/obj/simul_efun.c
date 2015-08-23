@@ -1,4 +1,3 @@
-#pragma strong_types
 #pragma save_types
 
 /* obj/simul_efun.c
@@ -19,6 +18,11 @@
 #include "/sys/wizlist.h"
 #include "/sys/erq.h"
 #include "/sys/files.h"
+#include "/sys/configuration.h"
+#include "/sys/interactive_info.h"
+#include "/sys/object_info.h"
+#include "/sys/driver_info.h"
+
 
 mapping living_name_m, name_living_m;
   /* Living -> Name and Name -> Living mappings.
@@ -179,7 +183,7 @@ varargs mixed snoop(mixed snoopee)
 {
     int result;
 
-    if (snoopee && query_snoop(snoopee)) {
+    if (snoopee && interactive(snoopee) && interactive_info(snoopee, II_SNOOP_NEXT)) {
         write("Busy.\n");
         return 0;
     }
@@ -391,9 +395,9 @@ object find_player(string name)
     int i;
 
     if (pointerp(r = name_living_m[name])) {
-	if ( !(r = (a = r)[0]) || !query_once_interactive(r)) {
+	if ( !(r = (a = r)[0]) || !efun::object_info(r, OI_ONCE_INTERACTIVE)) {
 	    for (i = sizeof(a); --i;) {
-		if (a[<i] && query_once_interactive(a[<i])) {
+		if (a[<i] && efun::object_info(a[<i], OI_ONCE_INTERACTIVE)) {
 		    r = a[<i];
 		    a[<i] = a[0];
 		    return a[0] = r;
@@ -403,7 +407,7 @@ object find_player(string name)
 	}
 	return r;
     }
-    return r && query_once_interactive(r) && r;
+    return r && efun::object_info(r, OI_ONCE_INTERACTIVE) && r;
 }
 
 /*===========================================================================
@@ -704,5 +708,147 @@ mixed extract (mixed data, varargs mixed*from_to)
 }
 
 #endif /* !efun_defined(extract) */
+
+#if ! __EFUN_DEFINED__(set_heart_beat)
+//---------------------------------------------------------------------------
+int set_heart_beat(int flag)
+{
+    object ob = previous_object();
+    int hb = object_info(ob, OC_HEART_BEAT);
+
+    if (!flag == !hb)
+        return 0;
+
+    configure_object(ob, OC_HEART_BEAT, flag);
+
+    return 1;
+}
+
+#endif
+
+#if ! __EFUN_DEFINED__(enable_commands)
+//---------------------------------------------------------------------------
+void enable_commands()
+{
+    object ob = previous_object();
+
+    configure_object(ob, OC_COMMANDS_ENABLED, 1);
+    efun::set_this_player(ob);
+}
+
+#endif
+
+#if ! __EFUN_DEFINED__(query_ip_name)
+//---------------------------------------------------------------------------
+varargs string query_ip_name(object player)
+{
+    return interactive_info(player || this_player(), II_IP_NAME);
+}
+
+#endif
+
+#if ! __EFUN_DEFINED__(query_ip_number)
+//---------------------------------------------------------------------------
+varargs string query_ip_number(object player)
+{
+    return interactive_info(player || this_player(), II_IP_NUMBER);
+}
+
+#endif
+
+#if ! __EFUN_DEFINED__(query_idle)
+//---------------------------------------------------------------------------
+int query_idle(object ob)
+{
+    return interactive_info(ob, II_IDLE);
+}
+
+#endif
+
+#if ! __EFUN_DEFINED__(query_load_average)
+//---------------------------------------------------------------------------
+string query_load_average()
+{
+    return sprintf("%.2f cmds/s, %.2f comp lines/s",
+        driver_info(DI_LOAD_AVERAGE_COMMANDS),
+        driver_info(DI_LOAD_AVERAGE_LINES));
+}
+
+#endif
+
+#if ! __EFUN_DEFINED__(query_snoop)
+//---------------------------------------------------------------------------
+object query_snoop(object ob)
+{
+    if(!interactive(ob))
+        return 0;
+
+    object prev = previous_object();
+    set_this_object(prev);
+
+    return interactive_info(ob, II_SNOOP_NEXT);
+}
+#endif
+
+#if ! __EFUN_DEFINED__(cat)
+//---------------------------------------------------------------------------
+#define CAT_MAX_LINES 50
+varargs int cat(string file, int start, int num)
+{
+    set_this_object(previous_object());
+    int more;
+
+    if (num < 0 || !this_player())
+        return 0;
+
+    if (!start)
+        start = 1;
+
+    if (!num || num > CAT_MAX_LINES) {
+        num = CAT_MAX_LINES;
+        more = sizeof(read_file(file, start+num, 1));
+    }
+
+    string txt = read_file(file, start, num);
+    if (!txt)
+        return 0;
+
+    tell_object(this_player(), txt);
+
+    if (more)
+        tell_object(this_player(), "*****TRUNCATED****\n");
+
+    return sizeof(txt & "\n");
+}
+#endif
+
+#if ! __EFUN_DEFINED__(tail)
+//---------------------------------------------------------------------------
+#define TAIL_MAX_BYTES 1000
+varargs int tail(string file)
+{
+    if (extern_call())
+        set_this_object(previous_object());
+
+    if (!stringp(file) || !this_player())
+        return 0;
+    string txt = read_bytes(file, -(TAIL_MAX_BYTES + 80), (TAIL_MAX_BYTES + 80));
+    if (!stringp(txt))
+        return 0;
+
+    // cut off first (incomplete) line
+    int index = strstr(txt, "\n");
+    if (index > -1) {
+        if (index + 1 < sizeof(txt))
+            txt = txt[index+1..];
+        else
+            txt = "";
+    }
+
+    tell_object(this_player(), txt);
+
+    return 1;
+}
+#endif
 
 /*************************************************************************/

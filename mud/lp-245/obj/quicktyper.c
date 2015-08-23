@@ -40,8 +40,8 @@ int	no_history_add;
 int	refreshing;
 int	needs_refresh;
 
-refresh();
-contains();
+int refresh(object obj);
+int contains(string str, object obj);
 
 /*
   return som info for the interested

@@ -22,8 +22,8 @@ or
 
 /* do add_action("debug_toggle", "debug"); */
 
-id();
-short();
+int id(string str);
+string short();
 
 debug_toggle(str) {
 	if(!str || !id(str)) return 0;

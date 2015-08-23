@@ -21,6 +21,7 @@
 #include "/sys/objectinfo.h"
 #include "/sys/functionlist.h"
 #include "/sys/erq.h"
+#include "/sys/object_info.h"
 
 #define INIT_FILE "/room/init_file"
 #define BACKBONE_WIZINFO_SIZE 5
@@ -141,8 +142,9 @@ static void _move_hook_fun (object item, object dest)
 
   if (living(item) && environment(item))
   {
-      name = query_once_interactive(item) ? item->query_real_name()
-                                          : object_name(item);
+      name = object_info(item, OI_ONCE_INTERACTIVE)
+           ? item->query_real_name()
+           : object_name(item);
       /* PLAIN: the call to exit() is needed in compat mode only */
       efun::set_this_player(item);
       object env = environment(item);
@@ -202,6 +204,34 @@ static void _move_hook_fun (object item, object dest)
     item->init();
   }
 }
+
+//---------------------------------------------------------------------------
+static string _auto_include_hook (string base_file, string current_file, int sys_include)
+
+// Optional string to be included when compiling <base_file>.
+//
+// Argument:
+//   base_file: The file to be compiled.
+//   current_file: When handling #include statements, the file to be included
+//   sys_include:  1, when <current_file> is a system include
+//
+
+{
+    // Do nothing for includes.
+    if(current_file)
+        return 0;
+
+    // Add the light mechanism to every object except the light object itself.
+    // And of course ignore master and simul-efun.
+    if(base_file[0] != '/')
+        base_file = "/" + base_file;
+
+    if(member((["/obj/light.c", "/obj/simul_efun.c", "/obj/spare_simul_efun.c", "/obj/master.c" ]), base_file))
+        return 0;
+
+    return "virtual inherit \"/obj/light\";\n";
+}
+
 
 //---------------------------------------------------------------------------
 static mixed _load_uids_fun (mixed object_name, object prev)
@@ -417,6 +447,7 @@ void inaugurate_master (int arg)
   set_driver_hook(H_MODIFY_COMMAND_FNAME, "modify_command");
   set_driver_hook(H_NOTIFY_FAIL, "What?\n");
   set_driver_hook(H_INCLUDE_DIRS, #'_include_dirs_hook);
+  set_driver_hook(H_AUTO_INCLUDE, #'_auto_include_hook);
 }
 
 //---------------------------------------------------------------------------
@@ -916,11 +947,12 @@ mixed prepare_destruct (object ob)
     object sh, next;
 
     /* Remove all pending shadows */
-    if (!query_shadowing(ob)) for (sh = shadow(ob, 0); sh; sh = next) {
-	next = shadow(sh, 0);
-	funcall(bind_lambda(#'unshadow, sh)); /* avoid deep recursion */
-	destruct(sh);
-    }
+    if (!object_info(ob, OI_SHADOW_PREV))
+        for (sh = object_info(ob, OI_SHADOW_NEXT); sh; sh = next) {
+            next = efun::object_info(sh, OI_SHADOW_NEXT);
+            funcall(bind_lambda(#'unshadow, sh)); /* avoid deep recursion */
+            destruct(sh);
+        }
 
     super = environment(ob);
 
@@ -1139,7 +1171,7 @@ mixed heart_beat_error (object culprit, string err,
 // inherited one) whereas <curobj> is just the offending object.
 
 {
-    if ( query_ip_number(culprit) ) {
+    if ( interactive(culprit) ) {
 	tell_object(
 	  culprit,
 	  "Game driver tells you: You have no heart beat !\n"
@@ -1181,7 +1213,7 @@ void runtime_error ( string err, string prg, string curobj, int line
 // program was executed.
 
 {
-  if (this_player() && query_ip_number(this_player()))
+  if (this_player() && interactive(this_player()))
     catch( write(
 	query_player_level("error messages") ?
 	    curobj ?
@@ -1561,7 +1593,7 @@ mixed valid_read  (string path, string euid, string fun, object caller)
         case "print_file":
         case "make_path_absolute": /* internal use, see below */
             set_this_object(caller);
-            if( this_player() && query_ip_number(this_player()) ) {
+            if( this_player() && interactive(this_player()) ) {
                 path = (string)this_player()->valid_read(path);
                 if (!stringp(path)) {
                     write("Bad file name.\n");
@@ -1682,7 +1714,7 @@ mixed valid_write (string path, string euid, string fun, object caller)
     }
 
     set_this_object(caller);
-    if( this_player() && query_ip_number(this_player()) )
+    if( this_player() && interactive(this_player()) )
     {
         path = (string)this_player()->valid_write(path);
         if (!stringp(path)) {
