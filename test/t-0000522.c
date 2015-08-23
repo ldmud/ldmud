@@ -1,25 +1,13 @@
 #include "/inc/base.inc"
+#include "/inc/client.inc"
 
 #include "/sys/input_to.h"
 
-/* These functions are for the clone (the player object). */
-int active;
-void start_client()
+/* This is the MUD object */
+void run_server()
 {
-    net_connect("127.0.0.1", query_mud_port());
-    active = 1;
-}
-
-int logon(int flag)
-{
-    enable_telnet(0);
-    set_prompt("");
-
     add_action("test_action", "test");
-
-    if(active)
-        ed("/dummy","ed_ends");
-    return 1;
+    ed("/dummy","ed_ends");
 }
 
 void ed_ends()
@@ -44,8 +32,7 @@ void test_input_to(string str)
     write("A\n"); // Not a number as 'ed' would show.
 }
 
-/* These functions are for the blueprint (the virtual player that
-   sends us the commands). */
+/* This is the object simulating a player. */
 
 void receive(string str, int nr)
 {
@@ -85,16 +72,11 @@ void receive(string str, int nr)
         input_to("receive", 0, 1);
 }
 
-object connect()
+void run_client()
 {
-    enable_telnet(0);
-    set_prompt("");
-
     write("!test\n=\n=\n");
     call_out(#'shutdown, 1, 1); // If something goes wrong.
     input_to("receive", 0, 0);
-
-    return clone_object(this_object()); // Just a dummy object.
 }
 
 void run_test()
@@ -102,15 +84,7 @@ void run_test()
     msg("\nRunning test for #0000522:\n"
           "--------------------------\n");
 
-    /* Waiting until LDMud is ready for users. */
-    call_out("run_test2", 0);
-}
-
-void run_test2()
-{
-    object dummy;
-    dummy = clone_object(this_object());
-    dummy->start_client();
+    connect_self("run_server", "run_client");
 }
 
 string *epilog(int eflag)

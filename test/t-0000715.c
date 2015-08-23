@@ -2,6 +2,8 @@
 #include "/inc/base.inc"
 #include "/inc/client.inc"
 
+#include "/sys/configuration.h"
+
 void testfun(int arg)
 {
 }
@@ -10,7 +12,7 @@ void heart_beat() {}
 
 void run_client()
 {
-    set_heart_beat(1);
+    configure_object(this_object(), OC_HEART_BEAT, 1);
 
     foreach(int i:  __HEART_BEAT_INTERVAL__)
         call_out(#'testfun, i+1, "abc");

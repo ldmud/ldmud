@@ -1,26 +1,12 @@
 #include "/inc/base.inc"
+#include "/inc/client.inc"
+
+#include "/sys/configuration.h"
 
 /* These functions are for the clone (the player object). */
-void start_client()
+void run_server()
 {
-    net_connect("127.0.0.1", query_mud_port());
-    set_heart_beat(1);
-}
-
-int logon(int flag)
-{
-    enable_telnet(0);
-    set_prompt("");
-
-    return 1;
-}
-
-object connect()
-{
-   enable_telnet(0);
-   set_prompt("");
-
-   return clone_object(this_object());
+    configure_object(this_object(), OC_HEART_BEAT, 1);
 }
 
 void fun(int* oldtime)
@@ -65,15 +51,7 @@ void run_test()
     msg("\nRunning test for #0000375:\n"
         "--------------------------\n");
 
-    call_out("run_test2", 0);
-}
-
-void run_test2()
-{
-    object dummy;
-    dummy = clone_object(this_object());
-    dummy->start_client();
-
+    connect_self("run_server", 0);
     call_out(#'shutdown, (__HEART_BEAT_INTERVAL__+__ALARM_TIME__)*2, 1); // Just to make sure.
 }
 

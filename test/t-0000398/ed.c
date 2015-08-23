@@ -1,7 +1,9 @@
+#include "/sys/configuration.h"
+
 int logon(int flag)
 {
-    enable_telnet(0);
-    set_prompt("");
+    configure_interactive(this_object(), IC_TELNET_ENABLED, 0);
+    configure_interactive(this_object(), IC_PROMPT, "");
     
     ed("/dummy","ed_ends");
     return 1;

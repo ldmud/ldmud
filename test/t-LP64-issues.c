@@ -1,7 +1,6 @@
 #include "/inc/base.inc"
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
-#include "/sys/debug_info.h"
 
 // Name, Flag, Function
 nosave mixed *tests = ({

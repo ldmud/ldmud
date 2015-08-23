@@ -1,8 +1,8 @@
 #include "/inc/base.inc"
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
-#include "/sys/debug_info.h"
 #include "/sys/rtlimits.h"
+#include "/sys/driver_info.h"
 
 private float testfloat = 3.499965555966e-01;
 
@@ -366,10 +366,10 @@ nosave mixed *tests = ({
             // erroneously - reducing the number of tabled strings. This must
             // not happen here.
             closure cl = #'get_master_uid;
-            int num = debug_info(DINFO_DATA, DID_STATUS, DID_ST_TABLED);
+            int num = driver_info(DI_NUM_STRINGS_TABLED);
             foreach(int i: 10000)
                 if(get_type_info(cl, 4) != "get_master_uid" ||
-                   num != debug_info(DINFO_DATA, DID_STATUS, DID_ST_TABLED))
+                   num != efun::driver_info(DI_NUM_STRINGS_TABLED))
                     return 0;
             return 1;
         :)

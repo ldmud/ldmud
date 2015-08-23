@@ -1,14 +1,17 @@
 #include "/inc/gc.inc"
 
+#include "/sys/configuration.h"
+#include "/sys/driver_info.h"
+
 void start_client()
 {
-    net_connect("127.0.0.1", query_mud_port());
+    net_connect("127.0.0.1", efun::driver_info(DI_MUD_PORTS)[0]);
 }
 
 int logon(int flag)
 {
-    enable_telnet(0);
-    set_prompt("");
+    configure_interactive(this_object(), IC_TELNET_ENABLED, 0);
+    configure_interactive(this_object(), IC_PROMPT, "");
 
     call_out(#'start_gc, 1,
     (:

@@ -1,35 +1,19 @@
 #include "/inc/base.inc"
 #include "/inc/gc.inc"
+#include "/inc/client.inc"
 
 #include "/sys/input_to.h"
 #include "/sys/rtlimits.h"
-
-/* These functions are for the clone (the player object). */
-void start_client()
-{
-    net_connect("127.0.0.1", query_mud_port());
-}
-
-int logon(int flag)
-{
-    set_prompt("");
-    return 1;
-}
-
-/* These functions are for the blueprint (the virtual player that
-   sends us the commands). */
 
 /* We make two steps, one without and one with catch().
  * The later might abort the thread, so we have to start
  * a callout to shutdown with an error.
  */
 
-int step = 0;
-
-object connect()
+void run_server(int step)
 {
-    set_prompt("");
-    
+    configure_interactive(this_object(), IC_TELNET_ENABLED, 1);
+
     while(get_eval_cost() > 100000);
     
     call_out(#'shutdown, 0, 1);
@@ -47,13 +31,16 @@ object connect()
     else if(!step)
     {
         step=1;
-        this_object()->run_test2();
+        __MASTER_OBJECT__->connect_self("run_server2", 0);
     }
     else
         start_gc(#'shutdown);
 
     return 0;
 }
+
+void run_server1() { run_server(0); }
+void run_server2() { run_server(1); }
 
 void run_test()
 {
@@ -66,17 +53,9 @@ void run_test()
             if(previous_object())
                 raise_error("Intentional error in H_NOECHO hook.\n");
         });
-    set_limits(LIMIT_EVAL, 200000);
-    
-    /* Waiting until LDMud is ready for users. */
-    call_out("run_test2", 0);
-}
 
-void run_test2()
-{
-    object dummy;
-    dummy = clone_object(this_object());
-    dummy->start_client();
+    configure_driver(DC_DEFAULT_RUNTIME_LIMITS, ({LIMIT_KEEP}) * LIMIT_EVAL + ({200000}));
+    connect_self("run_server1", 0);
 }
 
 string *epilog(int eflag)
