@@ -5462,17 +5462,16 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
                         break;
                 }
 
-                if (midx < 0)
+                if (midx < 0) /* This also means that member_name == NULL */
                 {
-                    /* This is a runtime lookup. It is one of the members,
-                     * so make a union of all the member types.
+                    /* This is a runtime lookup. We can't guess the type,
+                     * because at runtime we might have a derived structs
+                     * with additional members.
                      */
-                    for (int i = pdef->num_members; i--; )
-                    {
-                        lpctype_t *oldresult = result;
-                        result = get_union_type(result, pdef->member[i].type);
-                        free_lpctype(oldresult);
-                    }
+                    free_lpctype(result);
+
+                    /* It doesn't get any better, so return... */
+                    return lpctype_mixed;
                 }
                 else
                 {
