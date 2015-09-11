@@ -21,7 +21,6 @@
 --enable-use-system-crypt \
 --enable-udp-send \
 --enable-use-ipv6 \
---enable-use-alists \
 --disable-use-mccp \
 --disable-use-pthreads \
 --enable-use-pcre \

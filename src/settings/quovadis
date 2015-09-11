@@ -20,7 +20,6 @@ enable_use_pcre=no
 enable_erq=xerq
 
 enable_lpc_nosave=no
-enable_use_alists=yes
 
 with_time_to_clean_up=3600
 with_time_to_swap=900

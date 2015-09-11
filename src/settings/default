@@ -434,10 +434,6 @@ enable_use_gcrypt=yes
 # Enable XML parsing efuns using the iksemel package
 enable_use_iksemel=no
 
-# Enable support for alists.
-
-enable_use_alists=no
-
 # Enable call_other()s on arrays of objects.
 
 enable_lpc_array_calls=yes

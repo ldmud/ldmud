@@ -20,7 +20,6 @@ enable_erq=no
 enable_access_control=no
 enable_strict_euids=yes
 enable_filename_spaces=no
-enable_use_alists=yes
 enable_use_deprecated=no
 enable_use_set_light=no
 enable_use_parse_command=no

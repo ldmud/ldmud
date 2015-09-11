@@ -15,7 +15,6 @@ enable_use_process_string=yes
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
 enable_use_pcre=yes
-enable_use_alists=yes
 enable_use_mysql=/usr/include/mysql
 enable_dynamic_costs=yes
 enable_use_pthreads=yes

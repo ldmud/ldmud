@@ -23,7 +23,6 @@
 --enable-use-deprecated=no \
 --enable-malloc-trace=yes \
 --enable-use-pcre=yes \
---enable-use-alists=yes \
 --enable-use-mysql=yes \
 --enable-use-pgsql=yes \
 --enable-use-mccp=yes \

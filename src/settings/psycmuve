@@ -90,7 +90,6 @@ with_time_to_clean_up=9000
 enable_compat_mode=yes
 enable_strict_euids=no
 enable_share_variables=yes
-enable_use_alists=yes
 enable_use_pcre=no
 
 #-- EXTRAS

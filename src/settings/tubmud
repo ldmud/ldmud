@@ -60,7 +60,6 @@ enable_use_process_string=no
 enable_use_mccp=yes
 enable_use_tls=yes
 with_tls_path=/usr
-enable_use_alists=yes
 enable_lpc_array_calls=yes
 
 # --- Compiler ---

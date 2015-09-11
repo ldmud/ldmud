@@ -26,7 +26,6 @@ enable_dynamic_costs=yes
 
 enable_compat_mode=yes
 enable_strict_euids=no
-enable_use_alists=yes
 enable_use_pcre=no
 with_master_name=secure/master
 

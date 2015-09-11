@@ -18,7 +18,6 @@ with_rxcache_table=4096
 enable_compat_mode=no
 enable_strict_euids=no
 
-enable_use_alists=yes
 enable_use_parse_command=no
 enable_share_variables=no
 enable_use_system_crypt=no

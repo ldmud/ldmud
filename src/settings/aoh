@@ -22,7 +22,6 @@ exec ./configure \
 --enable-strict-euids \
 --enable-erq=xerq \
 --enable-lpc-nosave \
---enable-use-alists \
 --enable-use-deprecated=no \
 --enable-use-pgsql=yes \
 --enable-use-mysql=yes \

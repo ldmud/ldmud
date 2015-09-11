@@ -73,9 +73,6 @@ enable_use_xml=xml2
 # but we do not want old names for efuns
 enable_use_deprecated=no
 
-# we need the alists
-enable_use_alists=yes
-
 # we use this but in a special way
 enable_strict_euids=yes
 

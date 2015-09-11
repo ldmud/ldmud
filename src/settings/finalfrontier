@@ -59,7 +59,6 @@ enable_access_control=yes
 # --- Language ---
 enable_use_parse_command=yes
 enable_use_mysql=yes
-enable_use_alists=yes
 enable_use_pcre=no
 
 # --- Runtime limits ---

@@ -87,7 +87,6 @@ enable_share_variables=no
 enable_use_system_crypt=yes
 enable_lpc_nosave=yes
 enable_use_mysql=no
-enable_use_alists=no
 enable_use_pcre=yes
 enable_use_deprecated=no
 
