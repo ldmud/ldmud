@@ -17444,7 +17444,7 @@ retry_for_shadow:
                 inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs, MY_FALSE);
 
                 // check argument types
-                check_function_args(fx, progp, funstart);
+                check_function_args(fx - function_index_offset, current_prog, funstart);
 
                 previous_ob = current_object;
                 current_object = ob;
