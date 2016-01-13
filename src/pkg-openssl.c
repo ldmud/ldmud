@@ -66,9 +66,6 @@ static Bool tls_is_available = MY_FALSE;
 static SSL_CTX * context = NULL;
   /* The SSL program context. */
 
-static DH *dhe1024 = NULL;
-  /* The Diffie-Hellmann parameters. */
-
 static struct tls_key_s* keys;
   /* Our certificate-key-pairs. */
 
@@ -77,6 +74,54 @@ static int num_keys;
 
 static int current_key;
   /* Index into <keys>. */
+
+/*-------------------------------------------------------------------------*/
+DH *get_dh2048()
+/* Pre-computed Diffie-Hellman parameters. 2048 and avoiding any groups that
+ * are in wide use. (https://www.weakdh.org/)
+ * Returns a pointer to a DH structure from OpenSSL. Caller must free the
+ * memory.
+ */
+{
+  static unsigned char dh2048_p[]={
+    0x9C,0x4F,0xF0,0x77,0x2D,0x8A,0xBE,0xC0,0xED,0xA0,0x67,0x28,
+    0x7A,0xD8,0x76,0x7B,0x50,0x9C,0x79,0x83,0xA8,0x88,0x4A,0x0B,
+    0x4F,0x04,0xEE,0x99,0x80,0xF7,0x2F,0x69,0x26,0x6A,0xF6,0x2D,
+    0x08,0xCE,0x65,0x67,0xD7,0x54,0x1E,0x83,0x99,0x5C,0xA3,0xAF,
+    0x06,0xD1,0xD4,0x87,0x83,0x79,0xCA,0x57,0x75,0x02,0xE1,0x02,
+    0xEA,0xD1,0x37,0x6B,0xE1,0xEB,0xE1,0x32,0x24,0x48,0x26,0x91,
+    0x5D,0x42,0x61,0x36,0x1E,0x64,0xC9,0xE6,0xE4,0xC5,0x63,0x3A,
+    0xCE,0x52,0x71,0x84,0x64,0xF1,0x0D,0xDE,0x96,0x26,0x4D,0x5E,
+    0x79,0x6C,0x0A,0x6B,0xC2,0x85,0x82,0x81,0x21,0xD9,0x61,0xEA,
+    0x37,0x0B,0x81,0x59,0xE4,0x9D,0xA0,0x01,0xE6,0xC3,0x48,0x95,
+    0x4A,0x36,0xE3,0xDA,0x5A,0x5B,0xFD,0x72,0x15,0x24,0x94,0x12,
+    0x5F,0xC1,0xD3,0x99,0x65,0x0F,0x22,0xE4,0x5A,0x29,0x09,0x84,
+    0xC5,0x2E,0x05,0xDB,0x97,0x40,0x2D,0xE1,0x57,0x5D,0x8C,0xF4,
+    0x6D,0x7E,0xF6,0x16,0x73,0xE0,0x69,0xBF,0xDF,0x8C,0x13,0x55,
+    0x05,0xB6,0x64,0xB1,0x5F,0xBE,0x3E,0x5B,0xA2,0xEC,0xD2,0xF3,
+    0x9F,0x9A,0xBE,0x81,0x22,0x5F,0x22,0xA6,0xDD,0x01,0xD4,0x2B,
+    0xEE,0xFD,0xB9,0xAE,0xB1,0x68,0xC3,0x3F,0xC2,0x94,0x43,0x11,
+    0x1F,0x42,0x17,0x33,0x5D,0x21,0xF2,0xC8,0x73,0xAF,0x70,0xB1,
+    0xE1,0xEE,0x79,0xD9,0x9D,0xAC,0x69,0x5F,0x52,0x44,0xF3,0xA0,
+    0xAE,0x57,0x03,0x57,0x1C,0x84,0xC1,0xEA,0x4C,0x21,0x43,0x43,
+    0x08,0xE0,0x8F,0x34,0xFD,0xA7,0xC3,0x00,0x57,0x6A,0xFD,0x74,
+    0x6C,0x69,0x99,0xD3,
+  };
+  static unsigned char dh2048_g[]={
+    0x05,
+  };
+  DH *dh;
+  if ((dh=DH_new()) == NULL)
+    return(NULL);
+  dh->p=BN_bin2bn(dh2048_p,sizeof(dh2048_p),NULL);
+  dh->g=BN_bin2bn(dh2048_g,sizeof(dh2048_g),NULL);
+  if ((dh->p == NULL) || (dh->g == NULL))
+  {
+    DH_free(dh);
+    return(NULL);
+  }
+  return(dh);
+} /* get_dh2048 */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -118,54 +163,6 @@ openssl_realloc (void * ptr, size_t size)
 {
     return prexalloc(ptr, size);
 }
-
-/*-------------------------------------------------------------------------*/
-static Bool
-set_dhe1024 (void)
-
-/* Set the Diffie-Hellmann parameters.
- * Return MY_TRUE on success, and MY_FALSE on error.
- */
-
-{
-    int i;
-    DSA *dsaparams;
-    DH *dhparams;
-    const char *seed[] = { ";-)  :-(  :-)  :-(  ",
-                           ";-)  :-(  :-)  :-(  ",
-                           "Random String no. 12",
-                           ";-)  :-(  :-)  :-(  ",
-                           "hackers have even mo", /* from jargon file */
-                         };
-    unsigned char seedbuf[20];
-
-    if (dhe1024 != NULL)
-        return MY_TRUE;
-
-    RAND_bytes((unsigned char *) &i, sizeof i);
-
-    /* Make sure that i is non-negative - pick one of the provided seeds */
-    if (i < 0)
-        i = -1;
-    if (i < 0) /* happens if i == MININT */
-        i = 0;
-
-    i %= sizeof seed / sizeof seed[0];
-    memcpy(seedbuf, seed[i], 20);
-    dsaparams = DSA_generate_parameters(1024, seedbuf, 20, NULL, NULL, 0, NULL);
-
-    if (dsaparams == NULL)
-        return MY_FALSE;
-
-    dhparams = DSA_dup_DH(dsaparams);
-    DSA_free(dsaparams);
-    if (dhparams == NULL)
-        return MY_FALSE;
-
-    dhe1024 = dhparams;
-
-    return MY_TRUE;
-} /* set_dhe1024() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -717,9 +714,13 @@ tls_global_init (void)
 
     tls_verify_init();
 
-    if (!set_dhe1024()
-     || !SSL_CTX_set_tmp_dh(context, dhe1024)
-       )
+    // Import built-in default parameters.
+    printf("%s TLS: Importing built-in default DH parameters.\n"
+          , time_stamp());
+    debug_message("%s TLS: Importing built-in default DH parameters.\n"
+                 , time_stamp());
+    DH *dh = get_dh2048();
+    if (!dh || !SSL_CTX_set_tmp_dh(context, dh))
     {
         printf("%s TLS: Error setting Diffie-Hellmann parameters:\n"
               , time_stamp());
@@ -761,10 +762,10 @@ ssl_init_err:
                          , time_stamp(), errstring);
         }
 
-        if (dhe1024 != NULL)
+        if (dh != NULL)
         {
-            DH_free(dhe1024);
-            dhe1024 = NULL;
+            DH_free (dh);
+            dh = NULL;
         }
 
         if (context != NULL)
@@ -785,11 +786,6 @@ tls_global_deinit (void)
  */
 
 {
-    if (dhe1024 != NULL)
-    {
-        DH_free(dhe1024);
-        dhe1024 = NULL;
-    }
     if (context != NULL)
     {
         SSL_CTX_free(context);
