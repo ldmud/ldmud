@@ -51,6 +51,20 @@ struct tls_key_s
 };
 
 /*-------------------------------------------------------------------------*/
+/* Constants */
+static const char *dh_pkcs3 =
+  "-----BEGIN DH PARAMETERS-----\n"
+  "MIIBCAKCAQEAnE/wdy2KvsDtoGcoeth2e1CceYOoiEoLTwTumYD3L2kmavYtCM5l\n"
+  "Z9dUHoOZXKOvBtHUh4N5yld1AuEC6tE3a+Hr4TIkSCaRXUJhNh5kyebkxWM6zlJx\n"
+  "hGTxDd6WJk1eeWwKa8KFgoEh2WHqNwuBWeSdoAHmw0iVSjbj2lpb/XIVJJQSX8HT\n"
+  "mWUPIuRaKQmExS4F25dALeFXXYz0bX72FnPgab/fjBNVBbZksV++Plui7NLzn5q+\n"
+  "gSJfIqbdAdQr7v25rrFowz/ClEMRH0IXM10h8shzr3Cx4e552Z2saV9SRPOgrlcD\n"
+  "VxyEwepMIUNDCOCPNP2nwwBXav10bGmZ0wIBBQ==\n"
+  "-----END DH PARAMETERS-----\n";
+/* The statically provided Diffie-Hellmann parameters (2048 bits), used as
+ * default if the administrator does not provide parameters. */
+
+/*-------------------------------------------------------------------------*/
 /* Variables */
 
 static Bool tls_is_available = MY_FALSE;
@@ -60,7 +74,7 @@ static Bool tls_is_available = MY_FALSE;
 static gnutls_certificate_server_credentials x509_cred;
   /* The x509 credentials. */
 
-static gnutls_dh_params dh_params;
+static gnutls_dh_params_t dh_params = 0;
   /* The Diffie-Hellmann parameters */
 
 static struct tls_key_s* keys;
@@ -74,32 +88,32 @@ static int current_key;
 
 /*-------------------------------------------------------------------------*/
 static int
-generate_dh_params (void)
+import_dh_params (void)
 
-/* GnuTLS: Generate Diffie Hellman parameters and store them in the global
- * <dh_params>.  They are for use with DHE kx algorithms. These should be
- * discarded and regenerated once a day, once a week or once a month. Depends
- * on the security requirements.
+/* GnuTLS: Import Diffie Hellman parameters and store them in the global
+ * <dh_params>.  They are for use with DHE kx algorithms. By default, sets the
+ * statically provied parameters in the source.
+ * Depending on security requirements, they may be provided by the
+ * administrator or even re-newed from time to time.
  *
  * tls_is_available must be TRUE.
  */
 
 {
-#if HAS_GNUTLS_VERSION < 8
-    gnutls_datum prime, generator;
-
-    gnutls_dh_params_init( &dh_params);
-    gnutls_dh_params_generate( &prime, &generator, DH_BITS);
-    gnutls_dh_params_set( dh_params, prime, generator, DH_BITS);
-
-    free( prime.data);
-    free( generator.data);
-#else
-    gnutls_dh_params_init( &dh_params);
-    gnutls_dh_params_generate2( dh_params, DH_BITS);
-#endif
-    return 0;
-} /* generate_dh_params() */
+    if (dh_params)
+    {
+        gnutls_dh_params_deinit(dh_params);
+        dh_params = 0;
+    }
+    // Import built-in default parameters.
+    printf("%s TLS: Importing built-in default DH parameters.\n"
+          , time_stamp());
+    debug_message("%s TLS: Importing built-in default DH parameters.\n"
+                 , time_stamp());
+    const gnutls_datum_t p3 = { dh_pkcs3, strlen(dh_pkcs3) };
+    gnutls_dh_params_init(&dh_params);
+    return gnutls_dh_params_import_pkcs3(dh_params, &p3, GNUTLS_X509_FMT_PEM);
+} /* import_dh_params() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -696,9 +710,16 @@ tls_global_init (void)
 
     tls_verify_init();
 
-    generate_dh_params();
-
-    gnutls_certificate_set_dh_params(x509_cred, dh_params);
+    int err = import_dh_params();
+    if (err == GNUTLS_E_SUCCESS)
+        gnutls_certificate_set_dh_params(x509_cred, dh_params);
+    else
+    {
+        printf("%s TLS: Error importing Diffie-Hellman parameters: %s\n"
+              , time_stamp(), gnutls_strerror(err));
+        debug_message("%s Error importing Diffie-Hellman parameters: %s\n"
+                     , time_stamp(), gnutls_strerror(err));
+    }
 
     tls_is_available = MY_TRUE;
 
