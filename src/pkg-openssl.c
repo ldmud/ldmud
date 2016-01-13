@@ -697,7 +697,7 @@ tls_global_init (void)
         return;
     }
 
-    context = SSL_CTX_new (SSLv23_method());
+    context = SSL_CTX_new(SSLv23_method());
     if (!context)
     {
         printf("%s TLS: Can't get SSL context:\n"
@@ -732,8 +732,8 @@ tls_global_init (void)
     /* Avoid small subgroup attacks */
     SSL_CTX_set_options(context, SSL_OP_SINGLE_DH_USE);
 
-    // Disallow SSLv2 connections (only allow SSLv3 and TLSv1 connections.)
-    SSL_CTX_set_options(context, SSL_OP_NO_SSLv2);
+    // Disallow SSLv2 connections (only allow TLS 1.0+ connections.)
+    SSL_CTX_set_options(context, SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3);
 
     // OpenSSL must accept a different buffer address for retries after
     // SSL_write() returned -1 with SSL_WANT_READ/_WRITE, because we transfer
