@@ -744,6 +744,23 @@ tls_global_init (void)
     SSL_CTX_set_mode(context, SSL_MODE_RELEASE_BUFFERS);
 #endif
 
+    // Enable Elliptic Curve support.
+#ifdef SSL_CTX_set_ecdh_auto
+    // this causes openssl to choose the most appropriate parameters, i.e. the
+    // most preferred EC parameters.
+    SSL_CTX_set_ecdh_auto(context, 1);
+#else
+    // otherwise fall back to the standard NIST curve, if available.
+    EC_KEY *key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+    SSL_CTX_set_tmp_ecdh(context, key);
+    EC_KEY_free(key);
+#endif
+#ifdef SSL_OP_SINGLE_ECDH_USE
+    SSL_CTX_set_options(context, SSL_OP_SINGLE_ECDH_USE);
+#endif
+
+
+
     /* OpenSSL successfully initialised */
     tls_is_available = MY_TRUE;
     return;
