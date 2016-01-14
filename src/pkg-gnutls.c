@@ -721,6 +721,25 @@ tls_global_init (void)
                      , time_stamp(), gnutls_strerror(err));
     }
 
+/* Would be nice, but setting this causes sporadic segfaults in
+ * gnutls/nettle/libgmp on my system.
+    // Set some priority default to favour strong ciphers and disable very
+    // weak ones.
+    char* err_pos=NULL;
+    err=gnutls_priority_set_direct(x509_cred,
+        "PFS:+SECURE128:-VERS-SSL3.0:-DHE-DSS:-3DES-CBC:-ARCFOUR-128:-MD5"
+        ":-DES-CBC:%SERVER_PRECEDENCE"
+        , &err_pos);
+    if (err != GNUTLS_E_SUCCESS)
+    {
+        printf("%s TLS: Error setting priorities: %s at %s\n"
+              , time_stamp(), gnutls_strerror(err)
+              , (err_pos ? err_pos : "unknown" ));
+        debug_message("%s Error setting priorities: %s at %s\n"
+                     , time_stamp(), gnutls_strerror(err)
+                     , (err_pos ? err_pos : "unknown" ));
+    }
+*/
     tls_is_available = MY_TRUE;
 
 } /* tls_global_init() */
