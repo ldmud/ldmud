@@ -705,6 +705,30 @@ tls_global_init (void)
     gnutls_global_init();
 #endif
 
+    if (strcmp(gnutls_check_version(NULL), GNUTLS_VERSION) != 0)
+    {
+        printf("%s TLS: The currently used version of GnuTLS (%s) "
+               "differs from the one during compilation (%s). This "
+               "might lead to problems.\n"
+               , time_stamp(), gnutls_check_version(NULL), GNUTLS_VERSION );
+        debug_message("%s TLS: The currently used version of OpenSSL (%s) "
+               "differs from the one during compilation (%s). This "
+               "might lead to problems.\n"
+               , time_stamp(), gnutls_check_version(NULL), GNUTLS_VERSION );
+    }
+    // Check for decently recent version of gnutls (3.3.8 is currently in
+    // Debian stable (2016-01-14)). Issue a warning only, we will still work
+    // with old versions.
+    if (!gnutls_check_version("3.3.8"))
+    {
+        printf("%s TLS: Detected outdated version of GnuTLS (%s). Please "
+               "consider upgrading.\n"
+              , time_stamp(), gnutls_check_version(NULL));
+        debug_message("%s Detected outdated version of GnuTLS (%s). Please "
+                      "consider upgrading."
+                     , time_stamp(), gnutls_check_version(NULL));
+    }
+
     gnutls_certificate_allocate_credentials(&x509_cred);
 
 #if GNUTLS_VERSION_MAJOR >= 3 || (GNUTLS_VERSION_MAJOR == 2 && GNUTLS_VERSION_MINOR >= 11)

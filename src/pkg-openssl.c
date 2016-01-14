@@ -651,7 +651,7 @@ tls_global_init (void)
     // Register pointers to our own allocator functions before calling any
     // other function from OpenSSL.
     CRYPTO_set_mem_functions(openssl_malloc, openssl_realloc, openssl_free);
-    
+
     SSL_load_error_strings();
     ERR_load_BIO_strings();
     if (!SSL_library_init())
@@ -661,6 +661,30 @@ tls_global_init (void)
         debug_message("%s TLS: Initialising the SSL library failed.\n"
                       , time_stamp());
         return;
+    }
+
+    if (SSLeay() != OPENSSL_VERSION_NUMBER)
+    {
+        printf("%s TLS: The currently used version of OpenSSL (0x%lx) "
+               "differs from the one during compilation (0x%lx). This "
+               "might lead to problems.\n"
+               , time_stamp(), SSLeay(), OPENSSL_VERSION_NUMBER );
+        debug_message("%s TLS: The currently used version of OpenSSL (0x%lx) "
+               "differs from the one during compilation (0x%lx). This "
+               "might lead to problems.\n"
+               , time_stamp(), SSLeay(), OPENSSL_VERSION_NUMBER );
+    }
+    // Check for decently recent version of openssl (1.0.1k... is currently in
+    // Debian stable (2016-01-14)). Issue a warning only, we will still work
+    // with old versions.
+    if (SSLeay() < 0x100010bfL)
+    {
+        printf("%s TLS: Detected outdated version of OpenSSL (%s). Please "
+               "consider upgrading.\n"
+              , time_stamp(), SSLeay_version(SSLEAY_VERSION));
+        debug_message("%s Detected outdated version of OpenSSL (%s). Please "
+                      "consider upgrading."
+                     , time_stamp(), SSLeay_version(SSLEAY_VERSION));
     }
 
     /* We deliberately DO NOT seed the pseudo random number generator from
