@@ -10,11 +10,14 @@
 
 #if defined(USE_PYTHON) && defined(HAS_PYTHON3)
 
+#include "exec.h"
+#include "instrs.h"
 #include "interpret.h"
 #include "lex.h"
 #include "mstrings.h"
 #include "object.h"
 #include "pkg-python.h"
+#include "prolang.h"
 #include "simulate.h"
 #include "structs.h"
 #include "typedefs.h"
@@ -675,6 +678,337 @@ static PyTypeObject ldmud_struct_type =
     ldmud_struct_new,                   /* tp_new */
 };
 
+/*=========================================================================*/
+
+/*                                 Module                                  */
+
+/*-------------------------------------------------------------------------*/
+/* The efun namespace */
+
+struct ldmud_efun_s
+{
+    PyObject_HEAD
+
+    int      efun_idx;
+};
+
+typedef struct ldmud_efun_s ldmud_efun_t;
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_efun_repr (ldmud_efun_t *val)
+
+/**
+ * Return a string representation of this efun.
+ */
+
+{
+    return PyUnicode_FromFormat("<efun %s>", instrs[val->efun_idx].name);
+}
+
+/*-------------------------------------------------------------------------*/
+static Py_hash_t
+ldmud_efun_hash (ldmud_efun_t *val)
+
+/**
+ * Return a hash of this efun.
+ */
+
+{
+    return _Py_HashPointer(instrs + val->efun_idx);
+}
+
+/*-------------------------------------------------------------------------*/
+extern svalue_t *inter_fp;
+#ifdef USE_NEW_INLINES
+extern svalue_t *inter_context;
+#endif
+
+static PyObject*
+ldmud_efun_call(ldmud_efun_t *func, PyObject *arg, PyObject *kw)
+{
+    if(!current_object)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "can't call an efun without a current object");
+        return NULL;
+    }
+
+    if (kw != NULL && PyDict_Size(kw) != 0)
+    {
+        PyErr_Format(PyExc_TypeError, "%.200s() takes no keyword arguments",
+                 instrs[func->efun_idx].name);
+        return NULL;
+    }
+    else
+    {
+        /* So we need to construct some LPC bytecode. */
+        bytecode_t code[9];
+        bytecode_p p = code;
+        svalue_t *sp = inter_sp;
+        int efun_idx = func->efun_idx;
+        instr_t *def = instrs + func->efun_idx;
+
+        int min_arg = def->min_arg;
+        int max_arg = def->max_arg;
+        int num_arg = (int)PyTuple_GET_SIZE(arg);
+
+        if (max_arg == -1)
+            max_arg = 0xff;
+
+        if (num_arg < min_arg)
+        {
+            int def_argidx = def->Default;
+            if (num_arg == min_arg - 1 && def_argidx >= 0)
+            {
+                /* We lack one argument for which a default
+                 * is provided.
+                 */
+                if (instrs[def_argidx].prefix)
+                    *p++ = instrs[def_argidx].prefix;
+                *p++ = instrs[def_argidx].opcode;
+            }
+            else
+            {
+                int replacement = proxy_efun(func->efun_idx, num_arg);
+                if (replacement >= 0)
+                {
+                    efun_idx = replacement;
+                    def = instrs + replacement;
+                }
+                else
+                {
+                    PyErr_Format(PyExc_TypeError, "%.200s() takes at least %d arguments (%d given)",
+                        def->name, min_arg, num_arg);
+                    return NULL;
+                }
+            }
+        }
+        else if(num_arg > max_arg)
+        {
+            PyErr_Format(PyExc_TypeError, "%.200s() takes at most %d arguments (%d given)",
+                def->name, max_arg, num_arg);
+            return NULL;
+        }
+
+        /* Store the instruction code */
+        if (def->prefix)
+            *p++ = def->prefix;
+        *p++ = def->opcode;
+
+        /* And finally the return instruction */
+        if ( def->ret_type == lpctype_void )
+            *p++ = F_RETURN0;
+        else
+            *p++ = F_RETURN;
+
+        /* We have a go, put all arguments on the stack. */
+        for (int i = 0; i < num_arg; i++)
+        {
+            const char* err = python_to_svalue(++sp, PyTuple_GetItem(arg, i));
+            if (err != NULL)
+            {
+                PyErr_SetString(PyExc_ValueError, err);
+                pop_n_elems(i, sp);
+                return NULL;
+            }
+        }
+
+        /* Now we have to prepare everything for that return to work. */
+        {
+            struct error_recovery_info error_recovery_info;
+            struct control_stack *save_csp = csp;
+            svalue_t *save_sp = inter_sp;
+            PyObject* result;
+
+            error_recovery_info.rt.last = rt_context;
+            error_recovery_info.rt.type = ERROR_RECOVERY_APPLY;
+            rt_context = (rt_context_t *)&error_recovery_info;
+
+#ifdef USE_NEW_INLINES
+            push_control_stack(sp, inter_pc, inter_fp, inter_context);
+#else
+            push_control_stack(sp, inter_pc, inter_fp);
+#endif /* USE_NEW_INLINES */
+
+            csp->ob = current_object;
+            csp->prev_ob = previous_ob;
+            csp->instruction = efun_idx;
+            csp->funstart = EFUN_FUNSTART;
+            csp->num_local_variables = 0;
+            previous_ob = current_object;
+            inter_fp = sp - num_arg + 1;
+#ifdef USE_NEW_INLINES
+            inter_context = NULL;
+#endif /* USE_NEW_INLINES */
+            tracedepth++;
+
+            if (setjmp(error_recovery_info.con.text))
+            {
+                PyErr_SetString(PyExc_RuntimeError, get_txt(current_error));
+                secure_apply_error(save_sp, save_csp, MY_FALSE);
+                result = NULL;
+            }
+            else
+            {
+                eval_instruction(code, sp);
+
+                /* The result is on the stack (inter_sp) */
+                result = svalue_to_python(inter_sp);
+                pop_stack();
+            }
+            rt_context = error_recovery_info.rt.last;
+            return result;
+        }
+    }
+
+    return NULL;
+}
+
+/*-------------------------------------------------------------------------*/
+static bool ldmud_efun_check(PyObject *ob);
+
+static PyObject*
+ldmud_efun_richcompare (ldmud_efun_t *self, PyObject *other, int op)
+
+/**
+ * Return a hash of this efun.
+ */
+
+{
+    PyObject *result;
+    bool equal;
+
+    if ((op != Py_EQ && op != Py_NE) ||
+        !ldmud_efun_check(other))
+    {
+        Py_INCREF(Py_NotImplemented);
+        return Py_NotImplemented;
+    }
+
+    equal = (self->efun_idx == ((ldmud_efun_t*)other)->efun_idx);
+    result = (equal == (op == Py_EQ)) ? Py_True : Py_False;
+    Py_INCREF(result);
+    return result;
+}
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_efun_get__name__(ldmud_efun_t *efun, void *closure)
+
+/**
+ * Return the value for the __name__ member.
+ */
+
+{
+    return PyUnicode_FromString(instrs[efun->efun_idx].name);
+}
+
+/*-------------------------------------------------------------------------*/
+
+static PyGetSetDef ldmud_efun_getset [] = {
+    {"__name__", (getter)ldmud_efun_get__name__, NULL, NULL},
+    {NULL}
+};
+
+
+static PyTypeObject ldmud_efun_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.Efun",                       /* tp_name */
+    sizeof(ldmud_efun_t),               /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    0,                                  /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    (reprfunc)ldmud_efun_repr,          /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    (hashfunc)ldmud_efun_hash,          /* tp_hash  */
+    (ternaryfunc)ldmud_efun_call,       /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC efun",                         /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    (richcmpfunc)ldmud_efun_richcompare,/* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    0,                                  /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_efun_getset,                  /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,                                  /* tp_init */
+    0,                                  /* tp_alloc */
+    0,                                  /* tp_new */
+};
+
+static bool ldmud_efun_check(PyObject *ob)
+{
+    return Py_TYPE(ob) == &ldmud_efun_type;
+}
+
+
+static PyTypeObject ldmud_efun_namespace =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.efuns",                      /* tp_name */
+};
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+create_efun_namespace()
+
+/* Add all the efuns to the ldmud_efun_namespace and return it.
+ */
+
+{
+    /* The namespace is internal its own type with static functions. */
+    if (PyType_Ready(&ldmud_efun_namespace) < 0)
+        return NULL;
+
+    if (PyType_Ready(&ldmud_efun_type) < 0)
+        return NULL;
+
+    for (int n = EFUN_OFFSET; n <= LAST_INSTRUCTION_CODE; n++)
+    {
+        ldmud_efun_t *efun;
+        PyObject *descr;
+
+        efun = (ldmud_efun_t *)ldmud_efun_type.tp_alloc(&ldmud_efun_type, 0);
+        if (efun == NULL)
+            return NULL;
+
+        efun->efun_idx = n;
+
+        descr = PyStaticMethod_New((PyObject*)efun);
+        Py_DECREF(efun);
+
+        if (descr == NULL)
+            return NULL;
+
+        if (PyDict_SetItemString(ldmud_efun_namespace.tp_dict, instrs[n].name, descr) < 0)
+        {
+            Py_DECREF(descr);
+            return NULL;
+        }
+
+        Py_DECREF(descr);
+    }
+
+    return (PyObject*)&ldmud_efun_namespace;
+}
+
 
 /*-------------------------------------------------------------------------*/
 /* Module definition for the ldmud builtin module */
@@ -700,7 +1034,7 @@ static PyModuleDef ldmud_module =
 
 static PyObject* init_ldmud_module()
 {
-    PyObject *module;
+    PyObject *module, *efuns;
 
     /* Initialize types. */
     if (PyType_Ready(&ldmud_object_type) < 0)
@@ -718,6 +1052,12 @@ static PyObject* init_ldmud_module()
     Py_INCREF(&ldmud_struct_type);
     PyModule_AddObject(module, "Object", (PyObject*) &ldmud_object_type);
     PyModule_AddObject(module, "Struct", (PyObject*) &ldmud_struct_type);
+
+    /* Add the efuns as a sub-namespace. */
+    efuns = create_efun_namespace();
+    if (!efuns)
+        return NULL;
+    PyModule_AddObject(module, "efuns", efuns);
 
     return module;
 }
@@ -1060,7 +1400,6 @@ closure_python_efun_to_string (int type)
 // TODO: Add support for garbage collection.
 // TODO:: We need to keep a root set.
 
-// TODO: Add a submodule 'efuns', where all driver-internal efuns are callable
 // TODO: Add master and simul-efun objects as members to the ldmud module
 
 #endif /* USE_PYTHON && HAS_PYTHON3 */
