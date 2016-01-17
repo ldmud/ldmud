@@ -55,6 +55,16 @@ void run_test()
                 return python_return(s) == s; // Shall preserve identity
             :)
         }),
+#if 0 /* Lvalues are not supported */
+        ({ "passing lvalue", 0,
+            (:
+                int x = 70550;
+                mixed* result = ({ python_return(&x) });
+                result[0] = 66606;
+                return x == 66606;
+            :)
+        }),
+#endif
         ({ "passing too many arguments", TF_ERROR,
             (:
                 return python_return(1,2);

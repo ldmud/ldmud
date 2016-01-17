@@ -1224,10 +1224,6 @@ svalue_to_python (svalue_t *svp)
 {
     switch (svp->type)
     {
-        case T_LVALUE:
-            // TODO
-            return NULL;
-
         case T_NUMBER:
             return PyLong_FromLong(svp->u.number);
 
@@ -1269,11 +1265,20 @@ svalue_to_python (svalue_t *svp)
             return val;
         }
 
+        case T_LVALUE:
         case T_CHAR_LVALUE:
-            // TODO
+        case T_STRING_RANGE_LVALUE:
+        case T_POINTER_RANGE_LVALUE:
+        case T_PROTECTED_CHAR_LVALUE:
+        case T_PROTECTED_STRING_RANGE_LVALUE:
+        case T_PROTECTED_POINTER_RANGE_LVALUE:
+        case T_PROTECTED_LVALUE:
+        case T_PROTECTOR_MAPPING:
+            PyErr_SetString(PyExc_NotImplementedError, "lvalues are not supported");
             return NULL;
 
         default:
+            PyErr_Format(PyExc_TypeError, "unsupported type %d", svp->type);
             return NULL;
     }
 
