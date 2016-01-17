@@ -77,7 +77,22 @@ void run_test()
         if($1)
             shutdown(1);
         else
-            start_gc(#'shutdown);
+        {
+            python_set((<test_struct> 705948522));
+            start_gc(function void(int result)
+            {
+                mixed val = python_get();
+                if(!structp(val) || val->t_int != 705948522)
+                {
+                    msg("Wrong value returned from python_get() after GC.!\n");
+                    shutdown(1);
+                }
+
+                python_set(0);
+
+                start_gc(#'shutdown);
+            });
+        }
         return 0;
     :));
 }

@@ -110,6 +110,7 @@
 #include "otable.h"
 #include "parse.h"
 #include "pkg-pgsql.h"
+#include "pkg-python.h"
 #include "pkg-tls.h"
 #include "prolang.h"
 #include "ptrtable.h"
@@ -2031,6 +2032,9 @@ garbage_collection(void)
 #ifdef USE_TLS
     tls_clear_refs();
 #endif /* USE_TLS */
+#ifdef USE_PYTHON
+    python_clear_refs();
+#endif /* USE_PYTHON */
 
     mb_clear_refs();
       /* As this call also covers the swap buffer, it MUST come after
@@ -2248,6 +2252,9 @@ garbage_collection(void)
 #ifdef USE_TLS
     tls_count_refs();
 #endif /* USE_TLS */
+#ifdef USE_PYTHON
+    python_count_refs();
+#endif /* USE_PYTHON */
 
     mb_note_refs();
 

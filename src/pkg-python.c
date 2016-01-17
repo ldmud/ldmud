@@ -11,6 +11,7 @@
 #if defined(USE_PYTHON) && defined(HAS_PYTHON3)
 
 #include "exec.h"
+#include "gcollect.h"
 #include "instrs.h"
 #include "interpret.h"
 #include "lex.h"
@@ -31,6 +32,9 @@
 #define PY_SSIZE_T_CLEAN
 #include "Python.h"
 
+/* --- Type declarations --- */
+typedef struct ldmud_gc_var_s ldmud_gc_var_t;
+
 /* --- Variables --- */
 char * python_startup_script = NULL;
 
@@ -44,6 +48,8 @@ static ident_t*  python_efun_names[PYTHON_EFUN_TABLE_SIZE];
   /* For each python-defined efun store its identifier
    * here, so we can reverse lookup python efun indices.
    */
+
+static ldmud_gc_var_t *gc_object_list = NULL, *gc_struct_list = NULL;
 
 /* -- Function prototypes --- */
 static const char* python_to_svalue(svalue_t *dest, PyObject* val);
@@ -121,22 +127,76 @@ static PyObject* python_register_efun(PyObject *module, PyObject *args)
 /*-------------------------------------------------------------------------*/
 /* Type structures */
 
+struct ldmud_gc_var_s
+{
+    PyObject_HEAD;
+    ldmud_gc_var_t *gcprev, *gcnext;
+};
+
+#define PyGCObject_HEAD ldmud_gc_var_t gcob_base;
+
 struct ldmud_struct_s
 {
-    PyObject_HEAD
+    PyGCObject_HEAD
 
     struct_t *lpc_struct;
 };
 
 struct ldmud_object_s
 {
-    PyObject_HEAD
+    PyGCObject_HEAD
 
     object_t *lpc_object;
 };
 
 typedef struct ldmud_struct_s ldmud_struct_t;
 typedef struct ldmud_object_s ldmud_object_t;
+
+/*-------------------------------------------------------------------------*/
+/* GC Support */
+
+static void
+add_gc_object (ldmud_gc_var_t** list, ldmud_gc_var_t* var)
+
+/* Add <var> to the <list>.
+ */
+
+{
+    var->gcnext = *list;
+    var->gcprev = NULL;
+    if(*list != NULL)
+    {
+        assert((*list)->gcprev == NULL);
+        (*list)->gcprev = var;
+    }
+    *list = var;
+} /* add_gc_object */
+
+/*-------------------------------------------------------------------------*/
+static void
+remove_gc_object (ldmud_gc_var_t** list, ldmud_gc_var_t* var)
+
+/* Remove <var> from the <list>.
+ */
+
+{
+    if (var->gcprev == NULL)
+    {
+        /* List start */
+        assert(*list == var);
+
+        *list = var->gcnext;
+        if(*list)
+            (*list)->gcprev = NULL;
+    }
+    else
+    {
+        assert(var->gcprev->gcnext == var);
+        var->gcprev->gcnext = var->gcnext;
+        if(var->gcnext)
+            var->gcnext->gcprev = var->gcprev;
+    }
+} /* remove_gc_object */
 
 /*-------------------------------------------------------------------------*/
 /* Objects */
@@ -150,6 +210,8 @@ ldmud_object_dealloc (ldmud_object_t* self)
 {
     if(self->lpc_object)
         free_object(self->lpc_object, "ldmud_object_dealloc");
+
+    remove_gc_object(&gc_object_list, (ldmud_gc_var_t*)self);
 
     Py_TYPE(self)->tp_free((PyObject*)self);
 } /* ldmud_object_dealloc */
@@ -169,6 +231,7 @@ ldmud_object_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (self != NULL)
         self->lpc_object = NULL;
 
+    add_gc_object(&gc_object_list, (ldmud_gc_var_t*)self);
     return (PyObject *)self;
 } /* ldmud_object_new */
 
@@ -256,6 +319,8 @@ ldmud_object_repr (ldmud_object_t *val)
  */
 
 {
+    if(!val->lpc_object)
+        return PyUnicode_FromString("<LPC empty object>");
     return PyUnicode_FromFormat("<LPC object /%s>", get_txt(val->lpc_object->name));
 }
 
@@ -295,18 +360,27 @@ ldmud_object_richcompare (ldmud_object_t *self, PyObject *other, int op)
     self_ob = self->lpc_object;
     other_ob = ((ldmud_object_t*)other)->lpc_object;
 
-    switch (op)
+    if(self_ob == NULL && other_ob == NULL)
+        result = op == Py_LE || op == Py_EQ || op == Py_GE;
+    else if(self_ob == NULL)
+        result = op == Py_LT || op == Py_LE || op == Py_NE;
+    else if(other_ob == NULL)
+        result = op == Py_GT || op == Py_GE || op == Py_NE;
+    else
     {
-        case Py_LT: result = mstring_compare(self_ob->name, other_ob->name) < 0; break;
-        case Py_LE: result = mstring_compare(self_ob->name, other_ob->name) <= 0; break;
-        case Py_EQ: result = self_ob == other_ob; break;
-        case Py_NE: result = self_ob != other_ob; break;
-        case Py_GT: result = mstring_compare(self_ob->name, other_ob->name) > 0; break;
-        case Py_GE: result = mstring_compare(self_ob->name, other_ob->name) >= 0; break;
-        default:
+        switch (op)
         {
-            Py_INCREF(Py_NotImplemented);
-            return Py_NotImplemented;
+            case Py_LT: result = mstring_compare(self_ob->name, other_ob->name) < 0; break;
+            case Py_LE: result = mstring_compare(self_ob->name, other_ob->name) <= 0; break;
+            case Py_EQ: result = self_ob == other_ob; break;
+            case Py_NE: result = self_ob != other_ob; break;
+            case Py_GT: result = mstring_compare(self_ob->name, other_ob->name) > 0; break;
+            case Py_GE: result = mstring_compare(self_ob->name, other_ob->name) >= 0; break;
+            default:
+            {
+                Py_INCREF(Py_NotImplemented);
+                return Py_NotImplemented;
+            }
         }
     }
 
@@ -394,6 +468,8 @@ ldmud_object_create (object_t* ob)
     if (self != NULL)
         self->lpc_object = ref_object(ob, "ldmud_object_create");
 
+    add_gc_object(&gc_object_list, (ldmud_gc_var_t*)self);
+
     return (PyObject *)self;
 } /* ldmud_object_create */
 
@@ -409,6 +485,8 @@ ldmud_struct_dealloc (ldmud_struct_t* self)
 {
     if(self->lpc_struct)
         free_struct(self->lpc_struct);
+
+    remove_gc_object(&gc_struct_list, (ldmud_gc_var_t*)self);
 
     Py_TYPE(self)->tp_free((PyObject*)self);
 } /* ldmud_struct_dealloc */
@@ -427,6 +505,8 @@ ldmud_struct_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
     self = (ldmud_struct_t *)type->tp_alloc(type, 0);
     if (self != NULL)
         self->lpc_struct = NULL;
+
+    add_gc_object(&gc_struct_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
 } /* ldmud_struct_new */
@@ -677,6 +757,12 @@ ldmud_struct_getattr (ldmud_struct_t *obj, char *name)
     int idx;
     PyObject *result;
 
+    if(obj->lpc_struct == NULL)
+    {
+        PyErr_SetString(PyExc_TypeError, "uninitialized struct object");
+        return NULL;
+    }
+
     member_name = new_mstring(name);
     idx = struct_find_member(obj->lpc_struct->type, member_name);
     free_mstring(member_name);
@@ -706,6 +792,12 @@ ldmud_struct_setattr (ldmud_struct_t *obj, char *name, PyObject *value)
     string_t *member_name;
     int idx;
     const char *err;
+
+    if(obj->lpc_struct == NULL)
+    {
+        PyErr_SetString(PyExc_TypeError, "uninitialized struct object");
+        return -1;
+    }
 
     member_name = new_mstring(name);
     idx = struct_find_member(obj->lpc_struct->type, member_name);
@@ -1529,7 +1621,64 @@ closure_python_efun_to_string (int type)
     return get_txt(python_efun_names[type - CLOSURE_PYTHON_EFUN]->name);
 }
 
-// TODO: Add support for garbage collection.
-// TODO:: We need to keep a root set.
+#ifdef GC_SUPPORT
+
+/*-------------------------------------------------------------------------*/
+void
+python_clear_refs ()
+
+/* GC Support: Clear all reference counts.
+ */
+
+{
+    for(ldmud_gc_var_t* var = gc_object_list; var != NULL; var = var->gcnext)
+    {
+        object_t* ob = ((ldmud_object_t*)var)->lpc_object;
+        if(ob != NULL)
+            clear_object_ref(ob);
+    }
+
+    for(ldmud_gc_var_t* var = gc_struct_list; var != NULL; var = var->gcnext)
+    {
+        struct_t* s = ((ldmud_struct_t*)var)->lpc_struct;
+        if(s != NULL)
+            clear_struct_ref(s);
+    }
+} /* python_clear_refs() */
+
+/*-------------------------------------------------------------------------*/
+void
+python_count_refs ()
+
+/* GC Support: Mark all references to xalloc'ed memory.
+ */
+
+{
+    for(ldmud_gc_var_t* var = gc_object_list; var != NULL; var = var->gcnext)
+    {
+        object_t* ob = ((ldmud_object_t*)var)->lpc_object;
+        if(ob != NULL)
+        {
+            if (ob->flags & O_DESTRUCTED)
+            {
+                ((ldmud_object_t*)var)->lpc_object = NULL;
+                reference_destructed_object(ob);
+            }
+            else
+            {
+                ob->ref++;
+            }
+        }
+    }
+
+    for(ldmud_gc_var_t* var = gc_struct_list; var != NULL; var = var->gcnext)
+    {
+        struct_t* s = ((ldmud_struct_t*)var)->lpc_struct;
+        if(s != NULL)
+            count_struct_ref(s);
+    }
+} /* python_count_refs() */
+
+#endif /* GC_SUPPORT */
 
 #endif /* USE_PYTHON && HAS_PYTHON3 */

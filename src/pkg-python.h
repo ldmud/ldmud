@@ -32,6 +32,11 @@ extern bool is_python_efun (ident_t *p);
 extern void call_python_efun (int idx, int num_arg);
 extern const char* closure_python_efun_to_string (int type);
 
+#ifdef GC_SUPPORT
+extern void python_clear_refs();
+extern void python_count_refs();
+#endif /* GC_SUPPORT */
+
 #endif /* USE_PYTHON */
 
 #endif /* PKG_PYTHON_H__ */

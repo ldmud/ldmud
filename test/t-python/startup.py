@@ -87,5 +87,18 @@ def python_return(val):
     type conversion between Python and LPC."""
     return val
 
+# Test of the garbage collection.
+lpc_value = None
+def python_set(val):
+    """Remember the value <val>."""
+    global lpc_value
+    lpc_value = val
+
+def python_get():
+    """Return the remembered value."""
+    return lpc_value
+
 ldmud.register_efun("python_test", python_test)
 ldmud.register_efun("python_return", python_return)
+ldmud.register_efun("python_get", python_get)
+ldmud.register_efun("python_set", python_set)
