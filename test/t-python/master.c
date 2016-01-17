@@ -55,6 +55,15 @@ void run_test()
                 return python_return(s) == s; // Shall preserve identity
             :)
         }),
+        ({ "passing closures", 0,
+            (:
+                closure cl = lambda(0,0);
+                return python_return(#'run_test) == #'run_test &&
+                       python_return(#'this_object) == #'this_object &&
+                       python_return(cl) == cl &&
+                       python_return(#',) == #',;
+            :)
+        }),
 #if 0 /* Lvalues are not supported */
         ({ "passing lvalue", 0,
             (:

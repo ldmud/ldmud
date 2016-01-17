@@ -266,7 +266,7 @@ typedef enum efun_override_e efun_override_t;
 
 extern void init_lexer(void);
 extern int  symbol_operator(const char *symbol, const char **endp);
-extern void symbol_efun_str(const char *str, size_t len, svalue_t *sp, efun_override_t is_efun);
+extern void symbol_efun_str(const char *str, size_t len, svalue_t *sp, efun_override_t is_efun, bool privileged);
 extern void symbol_efun(string_t *name, svalue_t *sp);
 extern void init_global_identifier (ident_t * ident, Bool bVariable);
 extern ident_t *lookfor_shared_identifier(const char *, size_t, int, int, Bool);

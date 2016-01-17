@@ -1411,7 +1411,7 @@ symbol_resword (ident_t *p)
 
 /*-------------------------------------------------------------------------*/
 void
-symbol_efun_str (const char * str, size_t len, svalue_t *sp, efun_override_t is_efun)
+symbol_efun_str (const char * str, size_t len, svalue_t *sp, efun_override_t is_efun, bool privileged)
 
 /* This function implements the efun/operator/sefun part of efun
  * symbol_function().
@@ -1426,6 +1426,8 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, efun_override_t is_
  * if it doesn't contain the 'efun::' prefix, similar with OVERRIDE_SEFUN.
  *
  * inter_sp must be set properly before the call.
+ *
+ * if <privileged> is true, then no check for nomask simul-efuns is done.
  *
  * Accepted symbols are:
  *
@@ -1536,7 +1538,7 @@ undefined_function:
         /* Attempting to override a 'nomask' simul efun?
          * Check it with a privilege violation.
          */
-        if (efun_override == OVERRIDE_EFUN && p->u.global.sim_efun >= 0
+        if (!privileged && efun_override == OVERRIDE_EFUN && p->u.global.sim_efun >= 0
          && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK)
         {
             svalue_t *res;
@@ -1626,7 +1628,7 @@ symbol_efun (string_t *name, svalue_t *sp)
  */
 
 {
-    symbol_efun_str(get_txt(name), mstrsize(name), sp, OVERRIDE_NONE);
+    symbol_efun_str(get_txt(name), mstrsize(name), sp, OVERRIDE_NONE, false);
 } /* symbol_efun() */
 
 /*-------------------------------------------------------------------------*/

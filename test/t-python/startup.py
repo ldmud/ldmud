@@ -64,6 +64,26 @@ class TestStruct(unittest.TestCase):
         self.assertEqual(s.t_float, 5.5)
         self.assertEqual(s.t_string, 'Hello!')
 
+class TestClosure(unittest.TestCase):
+    def setUp(self):
+        self.master = ldmud.get_master()
+
+    def testEfun(self):
+        s = ldmud.Closure(self.master, "this_object")
+        self.assertIsNotNone(s)
+        self.assertEqual(s(), self.master)
+
+    def testOperator(self):
+        s = ldmud.Closure(self.master, ",")
+        self.assertIsNotNone(s)
+        with self.assertRaises(RuntimeError):
+            s()
+
+    def testLfun(self):
+        s = ldmud.Closure(self.master, "master_fun", self.master)
+        self.assertIsNotNone(s)
+        self.assertEqual(s(), 54321)
+
 class TestEfuns(unittest.TestCase):
     def testDir(self):
         self.assertGreater(len(dir(ldmud.efuns)), 200)

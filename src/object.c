@@ -7821,7 +7821,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
     case 'e': /* An efun closure */
     case 's': /* A sefun closure */
       {
-        symbol_efun_str(name, strlen(name), svp, ct == 'e' ? OVERRIDE_EFUN : OVERRIDE_SEFUN);
+        symbol_efun_str(name, strlen(name), svp, ct == 'e' ? OVERRIDE_EFUN : OVERRIDE_SEFUN, false);
         break;
       }
 
