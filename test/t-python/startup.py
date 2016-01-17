@@ -1,6 +1,14 @@
 import sys,unittest
 import ldmud
 
+class TestModule(unittest.TestCase):
+    def testMaster(self):
+        ob = ldmud.Object("/master")
+        self.assertEqual(ob, ldmud.get_master())
+
+    def testSimulEfun(self):
+        self.assertIsNone(ldmud.get_simul_efun())
+
 class TestObject(unittest.TestCase):
     def testInitLoaded(self):
         ob = ldmud.Object("/master")

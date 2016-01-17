@@ -18,6 +18,7 @@
 #include "object.h"
 #include "pkg-python.h"
 #include "prolang.h"
+#include "simul_efun.h"
 #include "simulate.h"
 #include "structs.h"
 #include "typedefs.h"
@@ -246,6 +247,75 @@ ldmud_object_init (ldmud_object_t *self, PyObject *args, PyObject *kwds)
     }
 }
 
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_object_repr (ldmud_object_t *val)
+
+/**
+ * Return a string representation of this object.
+ */
+
+{
+    return PyUnicode_FromFormat("<LPC object /%s>", get_txt(val->lpc_object->name));
+}
+
+/*-------------------------------------------------------------------------*/
+static Py_hash_t
+ldmud_object_hash (ldmud_object_t *val)
+
+/**
+ * Return a hash of this object.
+ */
+
+{
+    return _Py_HashPointer(val->lpc_object);
+}
+
+/*-------------------------------------------------------------------------*/
+static bool ldmud_object_check(PyObject *ob);
+
+static PyObject*
+ldmud_object_richcompare (ldmud_object_t *self, PyObject *other, int op)
+
+/**
+ * Compare <self> to <other> with the compare operation <op>.
+ */
+
+{
+    object_t *self_ob, *other_ob;
+    bool result;
+    PyObject* resultval;
+
+    if (!ldmud_object_check(other))
+    {
+        Py_INCREF(Py_NotImplemented);
+        return Py_NotImplemented;
+    }
+
+    self_ob = self->lpc_object;
+    other_ob = ((ldmud_object_t*)other)->lpc_object;
+
+    switch (op)
+    {
+        case Py_LT: result = mstring_compare(self_ob->name, other_ob->name) < 0; break;
+        case Py_LE: result = mstring_compare(self_ob->name, other_ob->name) <= 0; break;
+        case Py_EQ: result = self_ob == other_ob; break;
+        case Py_NE: result = self_ob != other_ob; break;
+        case Py_GT: result = mstring_compare(self_ob->name, other_ob->name) > 0; break;
+        case Py_GE: result = mstring_compare(self_ob->name, other_ob->name) >= 0; break;
+        default:
+        {
+            Py_INCREF(Py_NotImplemented);
+            return Py_NotImplemented;
+        }
+    }
+
+    resultval = result ? Py_True : Py_False;
+    Py_INCREF(resultval);
+    return resultval;
+}
+
+/*-------------------------------------------------------------------------*/
 static PyMethodDef ldmud_object_methods[] =
 {
     {NULL}
@@ -267,11 +337,11 @@ static PyTypeObject ldmud_object_type =
     0,                                  /* tp_getattr */
     0,                                  /* tp_setattr */
     0,                                  /* tp_reserved */
-    0,                                  /* tp_repr */
+    (reprfunc)ldmud_object_repr,        /* tp_repr */
     0,                                  /* tp_as_number */
     0,                                  /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
-    0,                                  /* tp_hash  */
+    (hashfunc)ldmud_object_hash,        /* tp_hash  */
     0,                                  /* tp_call */
     0,                                  /* tp_str */
     0,                                  /* tp_getattro */
@@ -281,7 +351,7 @@ static PyTypeObject ldmud_object_type =
     "LPC object",                       /* tp_doc */
     0,                                  /* tp_traverse */
     0,                                  /* tp_clear */
-    0,                                  /* tp_richcompare */
+    (richcmpfunc)ldmud_object_richcompare, /* tp_richcompare */
     0,                                  /* tp_weaklistoffset */
     0,                                  /* tp_iter */
     0,                                  /* tp_iternext */
@@ -297,6 +367,35 @@ static PyTypeObject ldmud_object_type =
     0,                                  /* tp_alloc */
     ldmud_object_new,                   /* tp_new */
 };
+
+
+/*-------------------------------------------------------------------------*/
+static bool
+ldmud_object_check (PyObject *ob)
+
+/* Returns true, when <ob> is of the LPC object type.
+ */
+
+{
+    return Py_TYPE(ob) == &ldmud_object_type;
+}
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_object_create (object_t* ob)
+
+/* Creates a new Python object from an LPC object.
+ */
+
+{
+    ldmud_object_t *self;
+
+    self = (ldmud_object_t *)ldmud_object_type.tp_alloc(&ldmud_object_type, 0);
+    if (self != NULL)
+        self->lpc_object = ref_object(ob, "ldmud_object_create");
+
+    return (PyObject *)self;
+} /* ldmud_object_create */
 
 /*-------------------------------------------------------------------------*/
 /* Structs */
@@ -1012,6 +1111,33 @@ create_efun_namespace()
 
 /*-------------------------------------------------------------------------*/
 /* Module definition for the ldmud builtin module */
+
+static PyObject*
+ldmud_get_master (PyObject* self, PyObject* args UNUSED)
+
+/* Return the master object or None.
+ */
+
+{
+    if(master_ob == NULL)
+        Py_RETURN_NONE;
+
+    return ldmud_object_create(master_ob);
+}
+
+static PyObject*
+ldmud_get_simul_efun (PyObject* self, PyObject* args UNUSED)
+
+/* Return the simul_efun object or None.
+ */
+
+{
+    if(simul_efun_object == NULL)
+        Py_RETURN_NONE;
+
+    return ldmud_object_create(simul_efun_object);
+}
+
 static PyMethodDef ldmud_methods[] =
 {
     {
@@ -1019,6 +1145,18 @@ static PyMethodDef ldmud_methods[] =
         "register_efun(name, function) -> None\n\n"
         "Registers a new efun name. This is not allowed during\n"
         "compilation of an LPC object."
+    },
+
+    {
+        "get_master", ldmud_get_master, METH_NOARGS,
+        "get_master() -> Master Object\n\n"
+        "Returns the master object."
+    },
+
+    {
+        "get_simul_efun", ldmud_get_simul_efun, METH_NOARGS,
+        "get_simul_efun() -> Simul-Efun Object\n\n"
+        "Returns the simul_efun object."
     },
 
     {NULL, NULL, 0, NULL}
@@ -1095,13 +1233,7 @@ svalue_to_python (svalue_t *svp)
             return NULL;
 
         case T_OBJECT:
-        {
-            PyObject* val = ldmud_object_new(&ldmud_object_type, NULL, NULL);
-            if (val != NULL)
-                ((ldmud_object_t*)val)->lpc_object = ref_object(svp->u.ob, "svalue_to_python");
-
-            return val;
-        }
+            return ldmud_object_create(svp->u.ob);
 
         case T_MAPPING:
             // TODO
@@ -1399,7 +1531,5 @@ closure_python_efun_to_string (int type)
 
 // TODO: Add support for garbage collection.
 // TODO:: We need to keep a root set.
-
-// TODO: Add master and simul-efun objects as members to the ldmud module
 
 #endif /* USE_PYTHON && HAS_PYTHON3 */
