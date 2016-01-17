@@ -34,6 +34,7 @@
 
 /* --- Type declarations --- */
 typedef struct ldmud_gc_var_s ldmud_gc_var_t;
+typedef void (*CClosureFun)(void*);
 
 /* --- Variables --- */
 char * python_startup_script = NULL;
@@ -54,6 +55,7 @@ static ldmud_gc_var_t *gc_object_list = NULL, *gc_struct_list = NULL;
 /* -- Function prototypes --- */
 static const char* python_to_svalue(svalue_t *dest, PyObject* val);
 static PyObject* svalue_to_python (svalue_t *svp);
+static bool call_lpc_secure(CClosureFun fun, void* data);
 
 /* -- Python definitions and functions --- */
 
@@ -236,6 +238,22 @@ ldmud_object_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
 } /* ldmud_object_new */
 
 /*-------------------------------------------------------------------------*/
+struct ldmud_object_init_closure_s
+{
+    string_t* filename;
+    object_t* ob;
+};
+
+static void
+ldmud_object_init_getobject(struct ldmud_object_init_closure_s* data)
+
+/* Helper function for ldmud_object_init().
+ */
+
+{
+    data->ob = get_object(data->filename);
+} /* ldmud_object_init_getobject */
+
 static int
 ldmud_object_init (ldmud_object_t *self, PyObject *args, PyObject *kwds)
 
@@ -251,14 +269,13 @@ ldmud_object_init (ldmud_object_t *self, PyObject *args, PyObject *kwds)
 
     Py_ssize_t length;
     const char *filename;
-
-    string_t *filename_str;
+    struct ldmud_object_init_closure_s data = { NULL, NULL };
 
     if (! PyArg_ParseTupleAndKeywords(args, kwds, "s#", kwlist, &filename, &length))
         return -1;
 
-    filename_str = new_n_mstring(filename, length);
-    if(!filename_str)
+    data.filename = new_n_mstring(filename, length);
+    if(!data.filename)
     {
         PyErr_SetString(PyExc_MemoryError, "out of memory");
         return -1;
@@ -266,43 +283,14 @@ ldmud_object_init (ldmud_object_t *self, PyObject *args, PyObject *kwds)
     else
     {
         /* get_object() can throw errors, we don't want to jump out of this context. */
+        call_lpc_secure((CClosureFun)ldmud_object_init_getobject, &data);
+        free_mstring(data.filename);
 
-        /* TODO: We need to detect whether this is an external or internal call,
-         * TODO:: so we can set the runtime limits accordingly, also secure_apply_error
-         * TODO:: needs to know for the same reason.
-         */
-        struct error_recovery_info error_recovery_info;
-        struct control_stack *save_csp;
-        svalue_t *save_sp;
-        object_t *ob;
-
-        error_recovery_info.rt.last = rt_context;
-        error_recovery_info.rt.type = ERROR_RECOVERY_APPLY;
-        rt_context = (rt_context_t *)&error_recovery_info;
-
-        save_sp = inter_sp;
-        save_csp = csp;
-
-        if (setjmp(error_recovery_info.con.text))
-        {
-            PyErr_SetString(PyExc_RuntimeError, get_txt(current_error));
-            secure_apply_error(save_sp, save_csp, MY_FALSE);
-
-            ob = NULL;
-        }
-        else
-        {
-            ob = get_object(filename_str);
-        }
-
-        rt_context = error_recovery_info.rt.last;
-        free_mstring(filename_str);
-
-        if(ob)
+        if(data.ob)
         {
             if(self->lpc_object)
                 deref_object(self->lpc_object, "ldmud_object_init");
-            self->lpc_object = ref_object(ob, "ldmud_object_init");
+            self->lpc_object = ref_object(data.ob, "ldmud_object_init");
             return 0;
         }
         else
@@ -910,10 +898,23 @@ ldmud_efun_hash (ldmud_efun_t *val)
 }
 
 /*-------------------------------------------------------------------------*/
-extern svalue_t *inter_fp;
-#ifdef USE_NEW_INLINES
-extern svalue_t *inter_context;
-#endif
+
+struct ldmud_efun_call_closure_s
+{
+    svalue_t efun_closure;
+    int num_arg;
+};
+
+static void
+ldmud_efun_call_efun(struct ldmud_efun_call_closure_s* data)
+
+/* Helper function for ldmud_efun_call().
+ */
+
+{
+    call_lambda(&data->efun_closure, data->num_arg);
+} /* ldmud_efun_call_getobject */
+
 
 static PyObject*
 ldmud_efun_call(ldmud_efun_t *func, PyObject *arg, PyObject *kw)
@@ -932,68 +933,19 @@ ldmud_efun_call(ldmud_efun_t *func, PyObject *arg, PyObject *kw)
     }
     else
     {
-        /* So we need to construct some LPC bytecode. */
-        bytecode_t code[9];
-        bytecode_p p = code;
         svalue_t *sp = inter_sp;
-        int efun_idx = func->efun_idx;
-        instr_t *def = instrs + func->efun_idx;
+        PyObject *result;
 
-        int min_arg = def->min_arg;
-        int max_arg = def->max_arg;
-        int num_arg = (int)PyTuple_GET_SIZE(arg);
+        /* We construct a efun closure, so we don't need to duplicate
+         * code from call_lambda.
+         */
+        struct ldmud_efun_call_closure_s data = { { T_CLOSURE}, (int)PyTuple_GET_SIZE(arg)};
 
-        if (max_arg == -1)
-            max_arg = 0xff;
+        data.efun_closure.x.closure_type = (short)(func->efun_idx + CLOSURE_EFUN);
+        data.efun_closure.u.ob = current_object;
 
-        if (num_arg < min_arg)
-        {
-            int def_argidx = def->Default;
-            if (num_arg == min_arg - 1 && def_argidx >= 0)
-            {
-                /* We lack one argument for which a default
-                 * is provided.
-                 */
-                if (instrs[def_argidx].prefix)
-                    *p++ = instrs[def_argidx].prefix;
-                *p++ = instrs[def_argidx].opcode;
-            }
-            else
-            {
-                int replacement = proxy_efun(func->efun_idx, num_arg);
-                if (replacement >= 0)
-                {
-                    efun_idx = replacement;
-                    def = instrs + replacement;
-                }
-                else
-                {
-                    PyErr_Format(PyExc_TypeError, "%.200s() takes at least %d arguments (%d given)",
-                        def->name, min_arg, num_arg);
-                    return NULL;
-                }
-            }
-        }
-        else if(num_arg > max_arg)
-        {
-            PyErr_Format(PyExc_TypeError, "%.200s() takes at most %d arguments (%d given)",
-                def->name, max_arg, num_arg);
-            return NULL;
-        }
-
-        /* Store the instruction code */
-        if (def->prefix)
-            *p++ = def->prefix;
-        *p++ = def->opcode;
-
-        /* And finally the return instruction */
-        if ( def->ret_type == lpctype_void )
-            *p++ = F_RETURN0;
-        else
-            *p++ = F_RETURN;
-
-        /* We have a go, put all arguments on the stack. */
-        for (int i = 0; i < num_arg; i++)
+        /* Put all arguments on the stack. */
+        for (int i = 0; i < data.num_arg; i++)
         {
             const char* err = python_to_svalue(++sp, PyTuple_GetItem(arg, i));
             if (err != NULL)
@@ -1004,52 +956,17 @@ ldmud_efun_call(ldmud_efun_t *func, PyObject *arg, PyObject *kw)
             }
         }
 
-        /* Now we have to prepare everything for that return to work. */
+        inter_sp = sp;
+
+        if(call_lpc_secure((CClosureFun)ldmud_efun_call_efun, &data))
         {
-            struct error_recovery_info error_recovery_info;
-            struct control_stack *save_csp = csp;
-            svalue_t *save_sp = inter_sp;
-            PyObject* result;
-
-            error_recovery_info.rt.last = rt_context;
-            error_recovery_info.rt.type = ERROR_RECOVERY_APPLY;
-            rt_context = (rt_context_t *)&error_recovery_info;
-
-#ifdef USE_NEW_INLINES
-            push_control_stack(sp, inter_pc, inter_fp, inter_context);
-#else
-            push_control_stack(sp, inter_pc, inter_fp);
-#endif /* USE_NEW_INLINES */
-
-            csp->ob = current_object;
-            csp->prev_ob = previous_ob;
-            csp->instruction = efun_idx;
-            csp->funstart = EFUN_FUNSTART;
-            csp->num_local_variables = 0;
-            previous_ob = current_object;
-            inter_fp = sp - num_arg + 1;
-#ifdef USE_NEW_INLINES
-            inter_context = NULL;
-#endif /* USE_NEW_INLINES */
-            tracedepth++;
-
-            if (setjmp(error_recovery_info.con.text))
-            {
-                PyErr_SetString(PyExc_RuntimeError, get_txt(current_error));
-                secure_apply_error(save_sp, save_csp, MY_FALSE);
-                result = NULL;
-            }
-            else
-            {
-                eval_instruction(code, sp);
-
-                /* The result is on the stack (inter_sp) */
-                result = svalue_to_python(inter_sp);
-                pop_stack();
-            }
-            rt_context = error_recovery_info.rt.last;
-            return result;
+            result = svalue_to_python(inter_sp);
+            pop_stack();
         }
+        else
+            result = NULL;
+
+        return result;
     }
 
     return NULL;
@@ -1452,6 +1369,48 @@ python_to_svalue (svalue_t *dest, PyObject* val)
 
 } /* python_to_svalue */
 
+/*-------------------------------------------------------------------------*/
+static bool
+call_lpc_secure (CClosureFun fun, void* data)
+
+/* Call <fun>(<data>), but guard it against LPC errors.
+ * Returns false if there happened an LPC error, true otherwise.
+ * The error string will be set as a python exception.
+ */
+
+{
+    /* TODO: We need to detect whether this is an external or internal call,
+     * TODO:: so we can set the runtime limits accordingly, also secure_apply_error
+     * TODO:: needs to know for the same reason.
+     */
+    struct error_recovery_info error_recovery_info;
+    struct control_stack *save_csp;
+    svalue_t *save_sp;
+    bool result = false;
+
+    error_recovery_info.rt.last = rt_context;
+    error_recovery_info.rt.type = ERROR_RECOVERY_APPLY;
+    rt_context = (rt_context_t *)&error_recovery_info;
+
+    save_sp = inter_sp;
+    save_csp = csp;
+
+    if (setjmp(error_recovery_info.con.text))
+    {
+        PyErr_SetString(PyExc_RuntimeError, get_txt(current_error));
+        secure_apply_error(save_sp, save_csp, MY_FALSE);
+
+    }
+    else
+    {
+        (*fun)(data);
+        result = true;
+    }
+
+    rt_context = error_recovery_info.rt.last;
+
+    return result;
+} /* call_lpc_secure */
 
 /*=========================================================================*/
 
