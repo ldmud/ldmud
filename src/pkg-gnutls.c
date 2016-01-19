@@ -201,14 +201,15 @@ tls_read_file (const char * fname, const char * desc)
 {
     gnutls_datum_t result = { NULL, 0 };
     FILE * file;
+    long fpos;
 
     file = fopen(fname, "rt");
     if (!file)
         return result;
 
     fseek(file, 0, SEEK_END);
-    result.size = ftell(file);
-    if (result.size < 0)
+    fpos = ftell(file);
+    if (fpos < 0)
     {
         fclose(file);
         if (desc)
@@ -221,6 +222,7 @@ tls_read_file (const char * fname, const char * desc)
         return result;
     }
 
+    result.size = fpos;
     result.data = xalloc(result.size);
     if (result.data == NULL)
     {
