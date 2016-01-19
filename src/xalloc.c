@@ -53,6 +53,7 @@ static inline void count_up(t_stat *a, unsigned long b) {
   ++a->counter;
 }
 
+static inline void count_up_n(t_stat *a, unsigned long b, unsigned long c) UNUSED;
 static inline void count_up_n(t_stat *a, unsigned long b, unsigned long c) {
   count_add(a, b * c);
   a->counter += b;
@@ -63,6 +64,7 @@ static inline void count_back(t_stat *a, unsigned long b) {
   --a->counter;
 }
 
+static inline void count_back_n(t_stat *a, unsigned long b, unsigned long c) UNUSED;
 static inline void count_back_n(t_stat *a, unsigned long b, unsigned long c) {
   count_add(a, -(b * c));
   a->counter -= b;
