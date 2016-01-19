@@ -117,9 +117,9 @@ import_dh_params (void)
 
 /*-------------------------------------------------------------------------*/
 static void
-initialize_tls_session (gnutls_session *session, Bool outgoing) __attribute__((nonnull));
+initialize_tls_session (gnutls_session_t *session, Bool outgoing) __attribute__((nonnull));
 static void
-initialize_tls_session (gnutls_session *session, Bool outgoing)
+initialize_tls_session (gnutls_session_t *session, Bool outgoing)
 
 /* GnuTLS: Initialise a TLS <session>.
  * tls_is_available must be TRUE.

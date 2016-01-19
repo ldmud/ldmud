@@ -10,7 +10,7 @@
 
 /* --- Types --- */
 
-typedef gnutls_session tls_session_t;
+typedef gnutls_session_t tls_session_t;
 
 #endif /* USE_TLS && !HAS_OPENSSL */
 
