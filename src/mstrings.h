@@ -205,21 +205,22 @@ static INLINE unsigned int deref_mstring(string_t *const s)
     return s->info.ref;
 }
 
-static INLINE void free_mstring(string_t *const s) __attribute__((nonnull(1)));
+//static INLINE void free_mstring(string_t *const s) __attribute__((nonnull(1)));
 static INLINE void free_mstring(string_t *const s)
   /* Decrement the refcount for string <s>, and if it reaches 0,
    * deallocate <s> altogether.
    * TODO: check if s can really be NULL or should be allowed to be.
    */
 {
-    if (s != NULL) 
-    { 
-        if (s->info.ref == 1) 
+    //assert(s != NULL);
+    if (s != NULL)
+    {
+        if (s->info.ref == 1)
         {
-            mstring_free(s); 
-        } 
-        else 
-            deref_mstring(s); 
+            mstring_free(s);
+        }
+        else
+            deref_mstring(s);
     }
 }
 
