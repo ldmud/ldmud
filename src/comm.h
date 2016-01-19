@@ -21,23 +21,13 @@
 
 #if !defined (SOCKET_LIB) && !defined(SOCKET_INC)
 #    include <sys/socket.h>
-#    ifdef _AIX
-#        include <sys/socketvar.h>
-#    endif
 #    include <netinet/in.h>
 #    include <arpa/inet.h>
 #    define SOCKET_T int
 #endif /* SOCKET_LIB */
 
 #ifndef MAX_SOCKET_PACKET_SIZE
-#    if defined(sgi) && defined(mips) && defined(unix)
-         /* Work around for an irix kernel bug that can leave the
-          * process unresponsive and unkillable.
-          */
-#        define MAX_SOCKET_PACKET_SIZE   200
-#    else
-#        define MAX_SOCKET_PACKET_SIZE  1024  /* Wild guess. */
-#    endif /* irix */
+#    define MAX_SOCKET_PACKET_SIZE  1024  /* Wild guess. */
 #endif /* MAX_SOCKET_PACKET_SIXE */
 
 
