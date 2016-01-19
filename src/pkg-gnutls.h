@@ -8,6 +8,10 @@
 
 #include "typedefs.h"
 
+/* Number of bits for the Diffie Hellmann parameters in OUTGOING
+ * connections. Deprecated and will be overridden by priority. */
+#define DH_BITS 2048
+
 /* --- Types --- */
 
 typedef gnutls_session_t tls_session_t;

@@ -7821,12 +7821,16 @@ f_configure_driver (svalue_t *sp)
  *        - DC_ENABLE_HEART_BEATS  (1): activate/deactivate heart beats globally
  *        - DC_LONG_EXEC_TIME      (2): execution time considered (too) 'long'
  *        - DC_DATA_CLEAN_TIME     (3): time delay between data cleans
+ *        - DC_TLS_CERTIFICATE     (4): TLS certificate to use (fingerprint)
+ *        - DC_TLS_DHE_PARAMETER   (5): TLS Diffie-Hellman paramter to use
  * 
  * <data> is dependent on <what>:
  *   DC_MEMORY_LIMIT:        ({soft-limit, hard-limit}) both <int>, given in Bytes.
  *   DC_ENABLE_HEART_BEATS:  0/1 (int)
  *   DC_LONG_EXEC_TIME:      0 - __INT_MAX__ (int), given in microseconds.
  *   DC_DATA_CLEAN_TIME:     0 - __INT_MAX__/9 (int), given in seconds
+ *   DC_TLS_CERTIFICATE      (string) SHA1 fingerprint
+ *   DC_TLS_DHE_PARAMETER    (string) TLS Diffie-Hellman paramter (PEM-encoded)
  *
  */
 
@@ -7947,6 +7951,36 @@ f_configure_driver (svalue_t *sp)
             }
 
             break;
+
+        case DC_TLS_DHE_PARAMETER:
+            if (sp->type == T_NUMBER)
+            {
+                if (sp->u.number != 0)
+                    errorf("Unexpected value %d for DC_TLS_DHE_PARAMETER.\n",
+                           sp->u.number);
+                // set built-in defaults
+                if (!tls_import_dh_params(NULL, 0))
+                {
+                    errorf("Built-in default Diffie-Hellman parameters could not be imported. Please "
+                           "refer to debug log for further information.\n");
+                }
+            }
+            else if (sp->type == T_STRING)
+            {
+                int len = mstrsize(sp->u.str);
+                char * text = get_txt(sp->u.str);
+                if (!tls_import_dh_params(text, len))
+                {
+                    errorf("Diffie-Hellman parameters could not be imported. Please "
+                           "refer to debug log for further information.\n");
+                }
+            }
+            else
+            {
+                vefun_exp_arg_error(1, TF_STRING|TF_NUMBER, sp->type, sp);
+            }
+            break;
+
 #endif /* USE_TLS */
     }
 

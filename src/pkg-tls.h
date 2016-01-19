@@ -18,9 +18,6 @@
 
 /* --- Macros --- */
 
-/* Number of bits for the Diffie Hellmann parameters. */
-#define DH_BITS 1024
-
 /* --- Structures --- */
 
 /* Helper function for reading regular files in a directory.
@@ -66,6 +63,7 @@ extern const char * tls_readdir(struct tls_dir_s * info);
 extern void tls_global_init(void);
 extern void tls_verify_init (void);
 extern void tls_global_deinit(void);
+extern int tls_import_dh_params(const char* const buffer, size_t length);
 extern int tls_read(interactive_t *ip, char *buffer, int length);
 extern int tls_write(interactive_t *ip, char *buffer, int length);
 extern int tls_do_handshake (interactive_t *ip);

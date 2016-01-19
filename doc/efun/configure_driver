@@ -56,12 +56,21 @@ DESCRIPTION
            When loading certificates their fingerprints are printed
            on stdout and into the logfile.
 
+        <what> == DC_TLS_DHE_PARAMETER
+           Sets new parameters for the Diffie-Hellman keyexchange for new TLS
+           sessions. The paramters must be given as a PEM encoded string
+           (e.g. the output of 'openssl dhparam -5 2048').
+           If <data> is 0, the built-in defaults will be restored.
+           If importing the new parameters fails (e.g. due to an incorrect
+           format), the driver tries to keep the old parameters 
+
 HISTORY
         Introduced in LDMud 3.3.719.
         DC_ENABLE_HEART_BEATS was added in 3.5.0.
         DC_LONG_EXEC_TIME was added in 3.5.0.
         DC_DATA_CLEAN_TIME was added in 3.5.0.
         DC_TLS_CERTIFICATE was added in 3.5.0.
+        DC_TLS_DHE_PARAMETER was added in 3.5.0.
 
 SEE ALSO
         configure_interactive(E)

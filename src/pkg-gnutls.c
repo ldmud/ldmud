@@ -74,8 +74,8 @@ static Bool tls_is_available = MY_FALSE;
 static gnutls_certificate_server_credentials x509_cred;
   /* The x509 credentials. */
 
-static gnutls_dh_params_t dh_params = 0;
-  /* The Diffie-Hellmann parameters */
+static gnutls_dh_params_t* dh_params = NULL;
+  /* Pointer to the Diffie-Hellmann parameters, permanently allocated */
 
 static struct tls_key_s* keys;
   /* Our certificate-key-pairs. */
@@ -87,33 +87,97 @@ static int current_key;
   /* Index into <keys>. */
 
 /*-------------------------------------------------------------------------*/
-static int
-import_dh_params (void)
+int
+tls_import_dh_params (const char* const buffer, size_t length)
 
-/* GnuTLS: Import Diffie Hellman parameters and store them in the global
- * <dh_params>.  They are for use with DHE kx algorithms. By default, sets the
- * statically provied parameters in the source.
+/* GnuTLS: Import Diffie Hellman parameters. They are for use with DHE kx
+ * algorithms. By default, sets the statically provided parameters in the
+ * source.
  * Depending on security requirements, they may be provided by the
  * administrator or even re-newed from time to time.
+ * If successful, the global <dh_params> points to the new parameters,
+ * otherwise, <dh_params> still points to the old parameters. The memory block
+ * for the parameters is allocated by pxalloc().
+ * Unless the very first import fails, <x509_cred> will always point to valid
+ * parameters.
  *
- * tls_is_available must be TRUE.
+ * returns 1 on success, 0 otherwise.
+ *
+ * The global <x509_cred> must be initialized.
  */
 
 {
-    if (dh_params)
+    gnutls_dh_params_t* newparam = NULL;
+    gnutls_dh_params_t* oldparam = dh_params; // pointer auf alte params sichern
+    unsigned char* pemstr;
+    int err;
+
+    if (buffer == NULL || !length)
     {
-        gnutls_dh_params_deinit(dh_params);
-        dh_params = 0;
+      // use built-in defaults
+      pemstr = (unsigned char*)dh_pkcs3;
+      length = strlen(dh_pkcs3);
+      printf("%s TLS: Importing built-in default DH parameters.\n"
+             , time_stamp());
+      debug_message("%s TLS: Importing built-in default DH parameters.\n"
+                    , time_stamp());
     }
-    // Import built-in default parameters.
-    printf("%s TLS: Importing built-in default DH parameters.\n"
-          , time_stamp());
-    debug_message("%s TLS: Importing built-in default DH parameters.\n"
-                 , time_stamp());
-    const gnutls_datum_t p3 = { dh_pkcs3, strlen(dh_pkcs3) };
-    gnutls_dh_params_init(&dh_params);
-    return gnutls_dh_params_import_pkcs3(dh_params, &p3, GNUTLS_X509_FMT_PEM);
-} /* import_dh_params() */
+    else
+    {
+      pemstr = (unsigned char*)buffer;
+      printf("%s TLS: Importing user-supplied DH parameters.\n"
+             , time_stamp());
+      debug_message("%s TLS: Importing user-supplied DH parameters.\n"
+                    , time_stamp());
+    }
+    const gnutls_datum_t p3 = { pemstr, length };
+
+    // neue struktur initialisieren
+    newparam = pxalloc(sizeof(*newparam));
+    if (!newparam)
+    {
+        printf("%s TLS: Error importing Diffie-Hellman parameters: Out of memory.\n"
+              , time_stamp());
+        debug_message("%s Error importing Diffie-Hellman parameters: Out ofmemory.\n"
+                      , time_stamp());
+        return 0;
+    }
+    err = gnutls_dh_params_init(newparam);
+    if (err != GNUTLS_E_SUCCESS)
+    {
+        printf("%s TLS: Error importing Diffie-Hellman parameters: %s\n"
+              , time_stamp(), gnutls_strerror(err) );
+        debug_message("%s Error importing Diffie-Hellman parameters: %s\n"
+                      , time_stamp(), gnutls_strerror(err));
+        pfree(newparam);
+        return 0;
+    }
+
+    // importieren
+    err = gnutls_dh_params_import_pkcs3(*newparam, &p3, GNUTLS_X509_FMT_PEM);
+    if (err != GNUTLS_E_SUCCESS)
+    {
+        printf("%s TLS: Error importing Diffie-Hellman parameters: %s\n"
+              , time_stamp(), gnutls_strerror(err) );
+        debug_message("%s Error importing Diffie-Hellman parameters: %s\n"
+                      , time_stamp(), gnutls_strerror(err));
+        gnutls_dh_params_deinit(*newparam);
+        return 0;
+    }
+
+    // update pointers (never fails)
+    dh_params = newparam;
+    gnutls_certificate_set_dh_params(x509_cred, *dh_params);
+
+    // alte struktur freigeben
+    if (oldparam)
+    {
+        gnutls_dh_params_deinit(*oldparam);
+        pfree(oldparam);
+    }
+
+    return 1;
+} /* tls_import_dh_params() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -740,16 +804,7 @@ tls_global_init (void)
 
     tls_verify_init();
 
-    int err = import_dh_params();
-    if (err == GNUTLS_E_SUCCESS)
-        gnutls_certificate_set_dh_params(x509_cred, dh_params);
-    else
-    {
-        printf("%s TLS: Error importing Diffie-Hellman parameters: %s\n"
-              , time_stamp(), gnutls_strerror(err));
-        debug_message("%s Error importing Diffie-Hellman parameters: %s\n"
-                     , time_stamp(), gnutls_strerror(err));
-    }
+    tls_import_dh_params(NULL, 0);
 
 /* Would be nice, but setting this causes sporadic segfaults in
  * gnutls/nettle/libgmp on my system.
@@ -785,7 +840,7 @@ tls_global_deinit (void)
     if (tls_is_available)
     {
         gnutls_certificate_free_credentials(x509_cred);
-        gnutls_dh_params_deinit(dh_params);
+        gnutls_dh_params_deinit(*dh_params);
 
         tls_free_keys();
     }

@@ -3,6 +3,7 @@
 #include "/inc/gc.inc"
 #include "/inc/deep_eq.inc"
 #include "/sys/tls.h"
+#include "/sys/configuration.h"
 
 #define TESTFILE "/log/testfile"
 
@@ -14,6 +15,16 @@ mapping json_testdata = ([ "test 1": 42, "test 2": 42.0,
                                       "e": ({10,11,12,13}) ])
                           ]);
 string json_teststring = "{ \"test 5\": { \"d\": { \"z\": 3, \"y\": 2, \"x\": 1 }, \"e\": [ 10, 11, 12, 13 ], \"b\": 27.000000, \"a\": 26, \"c\": \"letter\" }, \"test 1\": 42, \"test 3\": \"hello world\\n\", \"test 4\": [ 1, 2, 3, 4, 5, 42.000000, \"teststring\" ], \"test 2\": 42.000000 }";
+
+string dhe_testdata =
+  "-----BEGIN DH PARAMETERS-----\n"
+  "MIIBCAKCAQEAnE/wdy2KvsDtoGcoeth2e1CceYOoiEoLTwTumYD3L2kmavYtCM5l\n"
+  "Z9dUHoOZXKOvBtHUh4N5yld1AuEC6tE3a+Hr4TIkSCaRXUJhNh5kyebkxWM6zlJx\n"
+  "hGTxDd6WJk1eeWwKa8KFgoEh2WHqNwuBWeSdoAHmw0iVSjbj2lpb/XIVJJQSX8HT\n"
+  "mWUPIuRaKQmExS4F25dALeFXXYz0bX72FnPgab/fjBNVBbZksV++Plui7NLzn5q+\n"
+  "gSJfIqbdAdQr7v25rrFowz/ClEMRH0IXM10h8shzr3Cx4e552Z2saV9SRPOgrlcD\n"
+  "VxyEwepMIUNDCOCPNP2nwwBXav10bGmZ0wIBBQ==\n"
+  "-----END DH PARAMETERS-----\n";
 
 int f(int arg);
 
@@ -269,6 +280,20 @@ mixed *tests = ({
         (: deep_eq(json_parse(json_serialize(json_testdata)), json_testdata) 
          :) }),
 #endif // __JSON__
+#ifdef __TLS__
+    ({ "configure_driver DHE 1 (testdata)", 0,
+        (: configure_driver(DC_TLS_DHE_PARAMETER, dhe_testdata);
+           return 1; :) }),
+    ({ "configure_driver DHE 2 (defaults)", 0,
+        (: configure_driver(DC_TLS_DHE_PARAMETER, 0);
+           return 1; :) }),
+    ({ "configure_driver DHE 3 arg error", TF_ERROR,
+        (: configure_driver(DC_TLS_DHE_PARAMETER, 42) :) }),
+    ({ "configure_driver DHE 4 arg error", TF_ERROR,
+        (: configure_driver(DC_TLS_DHE_PARAMETER, "abcdef42") :) }),
+    ({ "configure_driver DHE 4 arg error", TF_ERROR,
+        (: configure_driver(DC_TLS_DHE_PARAMETER, ({1}) ) :) }),
+#endif // __TLS__
 });
 
 void run_test()

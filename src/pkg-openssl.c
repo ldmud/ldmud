@@ -124,6 +124,81 @@ DH *get_dh2048()
 } /* get_dh2048 */
 
 /*-------------------------------------------------------------------------*/
+int
+tls_import_dh_params (const char* const buffer, size_t length)
+
+/* OpenSSL: Import Diffie Hellman parameters. They are for use with DHE kx
+ * algorithms. By default, sets the statically provided parameters in the
+ * source.
+ * Depending on security requirements, they may be provided by the
+ * administrator or even re-newed from time to time.
+ * If successful, the new parameters will be set in <context>.
+ * If unsuccessful, then <context> either contains the old parameters or none
+ * at all.
+ *
+ * returns 1 on success, 0 otherwise.
+ *
+ * The global <context> must be initialized.
+ */
+{
+    BIO *membio = NULL;
+    DH *dh = NULL;
+    int ret = 1;
+
+    if (buffer == NULL || !length)
+    {
+        // use built-in defaults
+        printf("%s TLS: Importing built-in default DH parameters.\n"
+               , time_stamp());
+        debug_message("%s TLS: Importing built-in default DH parameters.\n"
+                      , time_stamp());
+        dh = get_dh2048();
+    }
+    else
+    {
+      printf("%s TLS: Importing user-supplied DH parameters.\n"
+             , time_stamp());
+      debug_message("%s TLS: Importing user-supplied DH parameters.\n"
+                    , time_stamp());
+      membio = BIO_new_mem_buf((unsigned char*)buffer, length);
+      if (membio)
+      {
+          // So BIO_free() leaves our buffer alone, when freeing
+          BIO_set_close(membio, BIO_NOCLOSE);
+          dh = PEM_read_bio_DHparams(membio, NULL, NULL, NULL);
+      }
+    }
+
+    // Set parameters
+    if (!dh || !SSL_CTX_set_tmp_dh(context, dh))
+    {
+        ret = 0;
+        // Give meaningful error message... the last error in OpenSSL.
+        int err = ERR_get_error();
+        if (err)
+        {
+            char * const errstring = ERR_error_string(err, NULL);
+            printf("%s TLS: Error importing Diffie-Hellmann parameters: %s.\n"
+                  , time_stamp(), errstring);
+            debug_message("%s TLS: Error importing Diffie-Hellmann parameters: %s.\n"
+                         , time_stamp(), errstring);
+        }
+    }
+    // SSL_CTX_set_tmp_dh() duplicates dh itself. So we have to free it even
+    // in case of successesfully setting parameters
+    if (dh)
+    {
+        DH_free(dh);
+        dh = NULL;
+    }
+    // And the BIO if exists as well.
+    if (membio)
+        BIO_free(membio);
+
+  return ret;
+}
+
+/*-------------------------------------------------------------------------*/
 static int
 no_passphrase_callback (char * buf, int num, int w, void *arg)
 
@@ -739,19 +814,7 @@ tls_global_init (void)
     tls_verify_init();
 
     // Import built-in default parameters.
-    printf("%s TLS: Importing built-in default DH parameters.\n"
-          , time_stamp());
-    debug_message("%s TLS: Importing built-in default DH parameters.\n"
-                 , time_stamp());
-    DH *dh = get_dh2048();
-    if (!dh || !SSL_CTX_set_tmp_dh(context, dh))
-    {
-        printf("%s TLS: Error setting Diffie-Hellmann parameters:\n"
-              , time_stamp());
-        debug_message("%s TLS: Error setting Diffie-Hellmann parameters:\n"
-              , time_stamp());
-        goto ssl_init_err;
-    }
+    tls_import_dh_params(NULL, 0);
 
     /* Avoid small subgroup attacks */
     SSL_CTX_set_options(context, SSL_OP_SINGLE_DH_USE);
@@ -769,6 +832,9 @@ tls_global_init (void)
 #endif
 
     // Enable Elliptic Curve support.
+#ifdef SSL_OP_SINGLE_ECDH_USE
+    SSL_CTX_set_options(context, SSL_OP_SINGLE_ECDH_USE);
+#endif
 #ifdef SSL_CTX_set_ecdh_auto
     // this causes openssl to choose the most appropriate parameters, i.e. the
     // most preferred EC parameters.
@@ -778,9 +844,6 @@ tls_global_init (void)
     EC_KEY *key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
     SSL_CTX_set_tmp_ecdh(context, key);
     EC_KEY_free(key);
-#endif
-#ifdef SSL_OP_SINGLE_ECDH_USE
-    SSL_CTX_set_options(context, SSL_OP_SINGLE_ECDH_USE);
 #endif
 
     // Select ciphers to favour strong ciphers and disable very
@@ -817,12 +880,6 @@ ssl_init_err:
                   , time_stamp(), errstring);
             debug_message("%s TLS: SSL %s.\n"
                          , time_stamp(), errstring);
-        }
-
-        if (dh != NULL)
-        {
-            DH_free (dh);
-            dh = NULL;
         }
 
         if (context != NULL)
