@@ -927,7 +927,7 @@ tls_init_connection (interactive_t *ip)
 
 {
     initialize_tls_session(&ip->tls_session, ip->outgoing_conn);
-    gnutls_transport_set_ptr(ip->tls_session, (gnutls_transport_ptr)(ip->socket));
+    gnutls_transport_set_ptr(ip->tls_session, (gnutls_transport_ptr_t)(ip->socket));
 
     return 0;
 } /* tls_init_connection() */
