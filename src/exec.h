@@ -286,17 +286,21 @@ static const bytecode_p EFUN_FUNSTART = (bytecode_p)-2;
   /* Special value used for funstart to mark efuns for dump_trace.
    */
 
-
-static INLINE unsigned short* FUNCTION_HEADER_INDEXP(const bytecode_p const p) 
+/* clang-700.1.81 (and other clang versions) with -Wduplicate-decl-specifier
+ * issue warning about duplicate 'const' declaration specifiers, when
+ * encountering 'const bytecode_p const bla'. The warnings disappear when
+ * using 'const bytecode_t * const bla'.
+ */
+static INLINE unsigned short* FUNCTION_HEADER_INDEXP(const bytecode_t* const p)
                           __attribute__((nonnull(1))) __attribute__((const));
-static INLINE unsigned short* FUNCTION_HEADER_INDEXP(const bytecode_p const p)
+static INLINE unsigned short* FUNCTION_HEADER_INDEXP(const bytecode_t* const p)
 {
     return (unsigned short*)((char *)p - sizeof(unsigned short));
 }
 
-static INLINE unsigned short FUNCTION_HEADER_INDEX(const bytecode_p const p) 
+static INLINE unsigned short FUNCTION_HEADER_INDEX(const bytecode_t* const p)
                           __attribute__((nonnull(1))) __attribute__((const));
-static INLINE unsigned short FUNCTION_HEADER_INDEX(const bytecode_p const p)
+static INLINE unsigned short FUNCTION_HEADER_INDEX(const bytecode_t* const p)
 {
     return *FUNCTION_HEADER_INDEXP(p);
 }
