@@ -8,6 +8,7 @@ struct test_struct
     float  t_float;
     string t_string;
     object t_object;
+    mixed* t_array;
 };
 
 void run_test()
@@ -47,6 +48,13 @@ void run_test()
         ({ "passing objects", 0,
             (:
                 return python_return(this_object()) == this_object();
+            :)
+        }),
+        ({ "passing arrays", 0,
+            (:
+                mixed * arr = ({1,2,3});
+                return python_return(({})) == ({}) &&
+                       python_return(arr) == arr;
             :)
         }),
         ({ "passing structs", 0,
@@ -97,11 +105,16 @@ void run_test()
             shutdown(1);
         else
         {
-            python_set((<test_struct> 705948522));
+            python_set((<test_struct> 705948522, -1000000.0, "Garbage", this_object(), ({ 5, 3, 1})));
             start_gc(function void(int result)
             {
                 mixed val = python_get();
-                if(!structp(val) || val->t_int != 705948522)
+                if(!structp(val) ||
+                    val->t_int != 705948522 ||
+                    val->t_float != -1000000.0 ||
+                    val->t_string != "Garbage" ||
+                    val->t_object != this_object() ||
+                    val->t_array[0] != 5 || val->t_array[1] != 3 || val->t_array[2] != 1)
                 {
                     msg("Wrong value returned from python_get() after GC.!\n");
                     shutdown(1);

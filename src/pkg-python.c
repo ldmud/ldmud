@@ -10,6 +10,7 @@
 
 #if defined(USE_PYTHON) && defined(HAS_PYTHON3)
 
+#include "array.h"
 #include "closure.h"
 #include "exec.h"
 #include "gcollect.h"
@@ -25,6 +26,7 @@
 #include "structs.h"
 #include "swap.h"
 #include "typedefs.h"
+#include "xalloc.h"
 
 /* Python.h defines these again... */
 #undef _GNU_SOURCE
@@ -52,11 +54,15 @@ static ident_t*  python_efun_names[PYTHON_EFUN_TABLE_SIZE];
    * here, so we can reverse lookup python efun indices.
    */
 
-static ldmud_gc_var_t *gc_object_list = NULL, *gc_struct_list = NULL, *gc_closure_list = NULL;
+static ldmud_gc_var_t *gc_object_list = NULL,
+                      *gc_array_list = NULL,
+                      *gc_struct_list = NULL,
+                      *gc_closure_list = NULL;
 
 /* -- Function prototypes --- */
 static const char* python_to_svalue(svalue_t *dest, PyObject* val);
 static PyObject* svalue_to_python (svalue_t *svp);
+static bool python_eq_svalue(PyObject* pval, svalue_t *sval);
 static bool call_lpc_secure(CClosureFun fun, void* data);
 
 /* -- Python definitions and functions --- */
@@ -139,27 +145,35 @@ struct ldmud_gc_var_s
 
 #define PyGCObject_HEAD ldmud_gc_var_t gcob_base;
 
+struct ldmud_array_s
+{
+    PyGCObject_HEAD
+
+    vector_t *lpc_array;        /* Can never be NULL. */
+};
+
 struct ldmud_struct_s
 {
     PyGCObject_HEAD
 
-    struct_t *lpc_struct;
+    struct_t *lpc_struct;       /* Can be NULL. */
 };
 
 struct ldmud_object_s
 {
     PyGCObject_HEAD
 
-    object_t *lpc_object;
+    object_t *lpc_object;       /* Can be NULL. */
 };
 
 struct ldmud_closure_s
 {
     PyGCObject_HEAD
 
-    svalue_t lpc_closure;
+    svalue_t lpc_closure;       /* Can be NULL. */
 };
 
+typedef struct ldmud_array_s ldmud_array_t;
 typedef struct ldmud_struct_s ldmud_struct_t;
 typedef struct ldmud_object_s ldmud_object_t;
 typedef struct ldmud_closure_s ldmud_closure_t;
@@ -467,6 +481,492 @@ ldmud_object_create (object_t* ob)
         self->lpc_object = ref_object(ob, "ldmud_object_create");
 
     add_gc_object(&gc_object_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_object_create */
+
+/*-------------------------------------------------------------------------*/
+/* Arrays */
+
+static bool ldmud_array_check(PyObject *ob);
+static PyObject* ldmud_array_create(vector_t *vec);
+
+static void
+ldmud_array_dealloc (ldmud_array_t* self)
+
+/* Destroy the ldmud_array_t object
+ */
+
+{
+    if(self->lpc_array)
+        free_array(self->lpc_array);
+
+    remove_gc_object(&gc_array_list, (ldmud_gc_var_t*)self);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_array_dealloc */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_array_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
+
+/* Implmenent __new__ for ldmud_array_t, i.e. allocate and initialize
+ * the array with null values.
+ */
+
+{
+    ldmud_array_t *self;
+
+    self = (ldmud_array_t *)type->tp_alloc(type, 0);
+    if (self != NULL)
+        self->lpc_array = ref_array(&null_vector);
+
+    add_gc_object(&gc_array_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_array_new */
+
+/*-------------------------------------------------------------------------*/
+static void
+python_error_handler (const char *fmt, ...)
+
+/* Error handler for allocate_array, so it won't use errorf().
+ */
+
+{
+    char fixed_fmt[ERROR_FMT_LEN];
+    char msg[ERROR_BUF_LEN];
+
+    va_list va;
+
+    va_start(va, fmt);
+    limit_error_format(fixed_fmt, sizeof(fixed_fmt), fmt);
+    vsnprintf(msg, sizeof(msg), fixed_fmt, va);
+    va_end(va);
+
+    PyErr_SetString(PyExc_MemoryError, msg);
+} /* python_error_handler */
+/*-------------------------------------------------------------------------*/
+
+static int
+ldmud_array_init (ldmud_array_t *self, PyObject *args, PyObject *kwds)
+
+/* Implement __init__ for ldmud_stuct_t, i.e. create a new array object
+ * from the given arguments.
+ */
+
+{
+    /* For storing the values, before we know their size. */
+# define VBUFSIZE 256
+    struct value_buffer_s
+    {
+        svalue_t item[VBUFSIZE];
+        struct value_buffer_s* next;
+    };
+
+    /* We expect:
+     *  - either an iterator for the values
+     *  - or a 'size' keyword argument.
+     *  - or nothing, then we're done.
+     */
+
+    static char *kwlist[] = { "values", "size", NULL};
+
+    PyObject *values = NULL;
+    int size = -1;
+
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "|Oi", kwlist, &values, &size))
+        return -1;
+
+    if(values == NULL || size == 0)
+    {
+        if(size <= 0)
+        {
+            free_array(self->lpc_array);
+            self->lpc_array = ref_array(&null_vector);
+        }
+        else
+        {
+            void (*save_handler)(const char *, ...);
+            vector_t *vec;
+
+            save_handler = allocate_array_error_handler;
+            allocate_array_error_handler = python_error_handler;
+            vec = allocate_array_unlimited(size);
+            allocate_array_error_handler = save_handler;
+
+            if(vec == NULL)
+                return -1;
+
+            free_array(self->lpc_array);
+            self->lpc_array = vec;
+        }
+
+        return 0;
+    }
+    else
+    {
+        /* We got some values... */
+        int count = 0;
+        struct value_buffer_s *first = NULL, *current = NULL;
+
+        PyObject *iterator = PyObject_GetIter(values);
+        PyObject *item;
+
+        if (!iterator)
+            return -1;
+
+        while ((item = PyIter_Next(iterator)))
+        {
+            const char *err;
+            int idx = count % VBUFSIZE;
+
+            if(idx == 0)
+            {
+                /* We need to allocate a new buffer. */
+                struct value_buffer_s *next = xalloc(sizeof(struct value_buffer_s));
+                if (next == NULL)
+                {
+                    PyErr_SetString(PyExc_MemoryError, "out of memory");
+                    Py_DECREF(item);
+                    break;
+                }
+
+                if(first == NULL)
+                    first = current = next;
+                else
+                {
+                    current->next = next;
+                    current = next;
+                }
+
+                current->next = NULL;
+            }
+
+            err = python_to_svalue(current->item + idx, item);
+            Py_DECREF(item);
+
+            if (err != NULL)
+            {
+                PyErr_SetString(PyExc_ValueError, err);
+                break;
+            }
+
+            count++;
+            if (size >= 0 && count == size)
+                break;
+        }
+
+        Py_DECREF(iterator);
+
+        /* PyIter_Next may also set an error. */
+        if (!PyErr_Occurred())
+        {
+            /* New create the final vector and copy all the values there. */
+            void (*save_handler)(const char *, ...);
+            vector_t *vec;
+
+            save_handler = allocate_array_error_handler;
+            allocate_array_error_handler = python_error_handler;
+            vec = allocate_array_unlimited(count);
+            allocate_array_error_handler = save_handler;
+
+            if(vec != NULL)
+            {
+                current = NULL;
+                for (int i = 0; i < count; i++)
+                {
+                    int idx = i % VBUFSIZE;
+                    if (idx == 0)
+                    {
+                        if(current == NULL)
+                            current = first;
+                        else
+                            current = current->next;
+                    }
+
+                    vec->item[i] = current->item[idx];
+                }
+
+                free_array(self->lpc_array);
+                self->lpc_array = vec;
+            }
+        }
+
+        for (current = first; current; )
+        {
+            struct value_buffer_s *next = current->next;
+            xfree(current);
+            current = next;
+        }
+
+        return PyErr_Occurred() ? -1 : 0;
+    }
+} /* ldmud_array_init */
+
+/*-------------------------------------------------------------------------*/
+static Py_ssize_t
+ldmud_array_length (ldmud_array_t *val)
+
+/* Implement len() for ldmud_array_t.
+ */
+
+{
+    return VEC_SIZE(val->lpc_array);
+} /* ldmud_array_length */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_array_concat (ldmud_array_t *val, PyObject *second)
+
+/* Implement addition for ldmud_array_t.
+ */
+
+{
+
+    if (!ldmud_array_check(second))
+    {
+        PyErr_Format(PyExc_TypeError, "can only concatenate ldmud.Array (not \"%.200s\") to an ldmud.Array",
+            Py_TYPE(second)->tp_name);
+        return NULL;
+    }
+    else
+    {
+        void (*save_handler)(const char *, ...);
+        ldmud_array_t *val2 = (ldmud_array_t*) second;
+        ldmud_array_t *result;
+        vector_t *vec;
+        svalue_t *items;
+        int size = VEC_SIZE(val->lpc_array) + VEC_SIZE(val2->lpc_array);
+
+        if (size < 0)
+            return PyErr_NoMemory();
+
+        result = (ldmud_array_t *)ldmud_array_create(NULL);
+        if (result == NULL)
+            return NULL;
+
+        save_handler = allocate_array_error_handler;
+        allocate_array_error_handler = python_error_handler;
+        vec = allocate_array_unlimited(size);
+        allocate_array_error_handler = save_handler;
+
+        if (vec == NULL)
+        {
+            ldmud_array_dealloc(result);
+            return NULL;
+        }
+
+        items = vec->item;
+        for (int i = 0; i < VEC_SIZE(val->lpc_array); i++)
+           assign_svalue_no_free(items + i, val->lpc_array->item + i);
+
+        items = vec->item + VEC_SIZE(val->lpc_array);
+        for (int i = 0; i < VEC_SIZE(val2->lpc_array); i++)
+           assign_svalue_no_free(items + i, val2->lpc_array->item + i);
+
+        result->lpc_array = vec;
+        return (PyObject*)result;
+    }
+} /* ldmud_array_concat */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_array_repeat (ldmud_array_t *val, Py_ssize_t num)
+
+/* Implement multiplication for ldmud_array_t.
+ */
+
+{
+    void (*save_handler)(const char *, ...);
+    ldmud_array_t *result;
+    vector_t *vec;
+    svalue_t *items;
+    int size = VEC_SIZE(val->lpc_array) * num;
+
+    if (size < 0)
+        return PyErr_NoMemory();
+
+    result = (ldmud_array_t *)ldmud_array_create(NULL);
+    if (result == NULL)
+        return NULL;
+
+    save_handler = allocate_array_error_handler;
+    allocate_array_error_handler = python_error_handler;
+    vec = allocate_array_unlimited(size);
+    allocate_array_error_handler = save_handler;
+
+    if (vec == NULL)
+    {
+        ldmud_array_dealloc(result);
+        return NULL;
+    }
+
+    items = vec->item;
+    for (int i = 0; i < num; i++)
+    {
+        for (int j = 0; j < VEC_SIZE(val->lpc_array); j++)
+           assign_svalue_no_free(items++, val->lpc_array->item + j);
+    }
+
+    result->lpc_array = vec;
+    return (PyObject*)result;
+} /* ldmud_array_repeat */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_array_item (ldmud_array_t *val, Py_ssize_t idx)
+
+/* Implement item access for ldmud_array_t.
+ */
+
+{
+    PyObject *result;
+    if (idx < 0 || idx >= VEC_SIZE(val->lpc_array))
+    {
+        PyErr_SetString(PyExc_IndexError, "index out of range");
+        return NULL;
+    }
+
+    result = svalue_to_python(val->lpc_array->item + idx);
+    if (result == NULL)
+        PyErr_SetString(PyExc_ValueError, "Unsupported data type.");
+
+    return result;
+} /* ldmud_array_item */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_array_ass_item (ldmud_array_t *val, Py_ssize_t idx, PyObject *v)
+
+/* Implement item access for ldmud_array_t.
+ */
+
+{
+    const char *err;
+    svalue_t sv;
+
+    if (idx < 0 || idx >= VEC_SIZE(val->lpc_array))
+    {
+        PyErr_SetString(PyExc_IndexError, "index out of range");
+        return -1;
+    }
+
+    err = python_to_svalue(&sv, v);
+    if (err != NULL)
+    {
+        PyErr_SetString(PyExc_ValueError, err);
+        return -1;
+    }
+
+    transfer_svalue(val->lpc_array->item + idx, &sv);
+    return 0;
+} /* ldmud_array_ass_item */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_array_contains (ldmud_array_t *val, PyObject *v)
+
+/* Implement __contains__ for ldmud_array_t.
+ */
+
+{
+    for (int i = 0; i < VEC_SIZE(val->lpc_array); i++)
+        if (python_eq_svalue(v, val->lpc_array->item + i))
+            return 1;
+    return 0;
+} /* ldmud_array_contains */
+
+/*-------------------------------------------------------------------------*/
+static PySequenceMethods ldmud_array_as_sequence = {
+    (lenfunc)ldmud_array_length,                /* sq_length */
+    (binaryfunc)ldmud_array_concat,             /* sq_concat */
+    (ssizeargfunc)ldmud_array_repeat,           /* sq_repeat */
+    (ssizeargfunc)ldmud_array_item,             /* sq_item */
+    0,                                          /* sq_slice */
+    (ssizeobjargproc)ldmud_array_ass_item,      /* sq_ass_item */
+    0,                                          /* sq_ass_slice */
+    (objobjproc)ldmud_array_contains,           /* sq_contains */
+    0,                                          /* sq_inplace_concat */
+    0,                                          /* sq_inplace_repeat */
+};
+
+
+static PyMethodDef ldmud_array_methods[] =
+{
+    {NULL}
+};
+
+
+
+static PyTypeObject ldmud_array_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.Array",                      /* tp_name */
+    sizeof(ldmud_array_t),              /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_array_dealloc,    /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    &ldmud_array_as_sequence,           /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC array",                        /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_array_methods,                /* tp_methods */
+    0,                                  /* tp_members */
+    0,                                  /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    (initproc)ldmud_array_init,         /* tp_init */
+    0,                                  /* tp_alloc */
+    ldmud_array_new,                    /* tp_new */
+};
+
+/*-------------------------------------------------------------------------*/
+static bool
+ldmud_array_check (PyObject *ob)
+
+/* Returns true, when <ob> is of the LPC array type.
+ */
+
+{
+    return Py_TYPE(ob) == &ldmud_array_type;
+}
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_array_create (vector_t* vec)
+
+/* Creates a new Python array from an LPC array.
+ */
+
+{
+    ldmud_array_t *self;
+
+    self = (ldmud_array_t *)ldmud_array_type.tp_alloc(&ldmud_array_type, 0);
+    if (self != NULL && vec != NULL)
+        self->lpc_array = ref_array(vec);
+
+    add_gc_object(&gc_array_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
 } /* ldmud_object_create */
@@ -1543,6 +2043,8 @@ static PyObject* init_ldmud_module()
     /* Initialize types. */
     if (PyType_Ready(&ldmud_object_type) < 0)
         return NULL;
+    if (PyType_Ready(&ldmud_array_type) < 0)
+        return NULL;
     if (PyType_Ready(&ldmud_struct_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_closure_type) < 0)
@@ -1555,9 +2057,11 @@ static PyObject* init_ldmud_module()
 
     /* Add types to module. */
     Py_INCREF(&ldmud_object_type);
+    Py_INCREF(&ldmud_array_type);
     Py_INCREF(&ldmud_struct_type);
     Py_INCREF(&ldmud_closure_type);
     PyModule_AddObject(module, "Object", (PyObject*) &ldmud_object_type);
+    PyModule_AddObject(module, "Array", (PyObject*) &ldmud_array_type);
     PyModule_AddObject(module, "Struct", (PyObject*) &ldmud_struct_type);
     PyModule_AddObject(module, "Closure", (PyObject*) &ldmud_closure_type);
 
@@ -1595,8 +2099,7 @@ svalue_to_python (svalue_t *svp)
             return PyUnicode_Decode(get_txt(svp->u.str), mstrsize(svp->u.str), "utf-8", "replace");
 
         case T_POINTER:
-            // TODO
-            return NULL;
+            return ldmud_array_create(svp->u.vec);
 
         case T_OBJECT:
             return ldmud_object_create(svp->u.ob);
@@ -1672,6 +2175,12 @@ python_to_svalue (svalue_t *dest, PyObject* val)
         return NULL;
     }
 
+    if (PyObject_TypeCheck(val, &ldmud_array_type))
+    {
+        put_ref_array(dest, ((ldmud_array_t*)val)->lpc_array);
+        return NULL;
+    }
+
     if (PyObject_TypeCheck(val, &ldmud_struct_type))
     {
         put_ref_struct(dest, ((ldmud_struct_t*)val)->lpc_struct);
@@ -1739,6 +2248,135 @@ python_to_svalue (svalue_t *dest, PyObject* val)
     return "unknown type";
 
 } /* python_to_svalue */
+
+/*-------------------------------------------------------------------------*/
+
+
+static bool
+python_eq_svalue (PyObject* pval, svalue_t *sval)
+
+/* Checks a LPC value with a Python value for equality.
+ */
+
+{
+    if (pval == Py_None)
+        return false;
+
+    /* First we check our own types. */
+    if (PyObject_TypeCheck(pval, &ldmud_object_type))
+    {
+        if (sval->type == T_OBJECT)
+            return sval->u.ob == ((ldmud_object_t*)pval)->lpc_object;
+        else
+            return false;
+    }
+
+    if (PyObject_TypeCheck(pval, &ldmud_array_type))
+    {
+        if (sval->type == T_POINTER)
+            return sval->u.vec == ((ldmud_array_t*)pval)->lpc_array;
+        else
+            return false;
+    }
+
+    if (PyObject_TypeCheck(pval, &ldmud_struct_type))
+    {
+        if (sval->type == T_STRUCT)
+            return sval->u.strct == ((ldmud_struct_t*)pval)->lpc_struct;
+        else
+            return false;
+    }
+
+    if (PyObject_TypeCheck(pval, &ldmud_closure_type))
+    {
+        if (sval->type == T_CLOSURE)
+            return closure_cmp(sval, &((ldmud_closure_t*)pval)->lpc_closure) == 0;
+        else
+            return false;
+    }
+
+    /* And now the python ones. */
+    if (PyLong_Check(pval))
+    {
+        if (sval->type == T_NUMBER)
+        {
+            int overflow;
+            long num = PyLong_AsLongAndOverflow(pval, &overflow);
+
+            if (overflow || num < PINT_MIN || num > PINT_MAX)
+                return false;
+            return sval->u.number == num;
+        }
+        else if (sval->type == T_FLOAT)
+        {
+            return READ_DOUBLE(sval) == PyLong_AsDouble(pval);
+        }
+        else
+            return false;
+    }
+
+    if (PyBool_Check(pval))
+    {
+        if (sval->type == T_NUMBER)
+            return sval->u.number == (pval == Py_True ? 1 : 0);
+        else
+            return false;
+    }
+
+    if (PyFloat_Check(pval))
+    {
+        double num = PyFloat_AsDouble(pval);
+
+        if (sval->type == T_NUMBER)
+            return sval->u.number == num;
+        else if (sval->type == T_FLOAT)
+            return READ_DOUBLE(sval) == num;
+        else
+            return false;
+    }
+
+    if (PyBytes_Check(pval))
+    {
+        if (sval->type == T_STRING)
+        {
+            Py_ssize_t length;
+            char * buf;
+
+            PyBytes_AsStringAndSize(pval, &buf, &length);
+            if (mstrsize(sval->u.str) != length)
+                return false;
+            return memcmp(get_txt(sval->u.str), buf, length) == 0;
+        }
+        else
+            return false;
+    }
+
+    if (PyUnicode_Check(pval))
+    {
+        if (sval->type == T_STRING)
+        {
+            PyObject *utf8;
+            Py_ssize_t length;
+            char * buf;
+            bool result;
+
+            utf8 = PyUnicode_AsEncodedString(pval, "utf-8", "replace");
+            if (utf8 == NULL)
+                return false;
+
+            PyBytes_AsStringAndSize(utf8, &buf, &length);
+
+            result = (mstrsize(sval->u.str) == length && memcmp(get_txt(sval->u.str), buf, length) == 0);
+            Py_DECREF(utf8);
+            return result;
+        }
+        else
+            return false;
+    }
+
+    return false;
+
+} /* python_eq_svalue */
 
 /*-------------------------------------------------------------------------*/
 static bool
@@ -1968,6 +2606,16 @@ python_clear_refs ()
             clear_object_ref(ob);
     }
 
+    for(ldmud_gc_var_t* var = gc_array_list; var != NULL; var = var->gcnext)
+    {
+        vector_t* arr = ((ldmud_array_t*)var)->lpc_array;
+        if (arr->ref)
+        {
+            arr->ref = 0;
+            clear_ref_in_vector(arr->item, VEC_SIZE(arr));
+        }
+    }
+
     for(ldmud_gc_var_t* var = gc_struct_list; var != NULL; var = var->gcnext)
     {
         struct_t* s = ((ldmud_struct_t*)var)->lpc_struct;
@@ -2004,6 +2652,19 @@ python_count_refs ()
                 ob->ref++;
             }
         }
+    }
+
+    for(ldmud_gc_var_t* var = gc_array_list; var != NULL; var = var->gcnext)
+    {
+        vector_t* arr = ((ldmud_array_t*)var)->lpc_array;
+
+        if (arr != &null_vector && x_test_ref(arr))
+        {
+            x_mark_ref(arr);
+            count_array_size(arr);
+            count_ref_in_vector(arr->item, VEC_SIZE(arr));
+        }
+        arr->ref++;
     }
 
     for(ldmud_gc_var_t* var = gc_struct_list; var != NULL; var = var->gcnext)
