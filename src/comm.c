@@ -836,6 +836,24 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
 
 /*-------------------------------------------------------------------------*/
 static void
+set_socket_nosigpipe (SOCKET_T new_socket)
+
+/* Set the <new_socket> to not generate SIGPIPE signals (we anyway ignore them).
+ * Failure is acceptable, the option is only available on some systems.
+ */
+
+{
+#ifdef SO_NOSIGPIPE
+    const int nopipe = 1;
+    if (setsockopt(new_socket, SOL_SOCKET, SO_NOSIGPIPE, &nopipe, sizeof(nopipe)) != 0)
+    {
+        perror("Failure setting SO_NOSIGPIPE");
+    }
+#endif
+}
+
+/*-------------------------------------------------------------------------*/
+static void
 set_socket_nonblocking (SOCKET_T new_socket)
 
 /* Set the <new_socket> into non-blocking mode.
@@ -1265,6 +1283,7 @@ prepare_ipc(void)
         }
         set_socket_nonblocking(sos[i]);
         set_close_on_exec(sos[i]);
+        set_socket_nosigpipe(sos[i]);
 
         if (socket_number(sos[i]) >= min_nfds)
             min_nfds = socket_number(sos[i])+1;
@@ -1273,7 +1292,7 @@ prepare_ipc(void)
     // install some signal handlers
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART; // restart syscalls after handling a signal
-    
+
     /* We ignore SIGPIPE and handle the errors on write/send ourself */
     sa.sa_handler = SIG_IGN;
     if (sigaction(SIGPIPE, &sa, NULL) == -1)
@@ -3514,7 +3533,8 @@ new_player ( object_t *ob, SOCKET_T new_socket
     set_socket_nonblocking(new_socket);
     set_close_on_exec(new_socket);
     set_socket_own(new_socket);
-
+    set_socket_nosigpipe(new_socket);
+    
     /* Check for access restrictions for this connection */
     message = allow_host_access(addr, login_port, &class);
 
@@ -5562,6 +5582,8 @@ start_erq_demon (const char *suffix, size_t suffixlen)
     /* ERQ is up and running */
     erq_demon = sockets[1];
     set_socket_nonblocking(erq_demon);
+    set_socket_nosigpipe(erq_demon);
+    
     if (socket_number(erq_demon) >= min_nfds)
         min_nfds = socket_number(erq_demon)+1;
 } /* start_erq_demon() */
@@ -8929,6 +8951,7 @@ f_net_connect (svalue_t *sp)
             }
             
             set_socket_nonblocking(sfd);
+            set_socket_nosigpipe(sfd);
 
             /* On multihomed machines it is important to bind the socket to
              * the proper IP address.

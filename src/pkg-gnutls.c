@@ -267,7 +267,13 @@ initialize_tls_session (gnutls_session_t *session, Bool outgoing)
  */
 
 {
-    gnutls_init(session, outgoing ? GNUTLS_CLIENT : GNUTLS_SERVER);
+    unsigned int flags;
+    flags = outgoing ? GNUTLS_CLIENT : GNUTLS_SERVER;
+// don't receive signals during send (SIGPIPE)
+#ifdef GNUTLS_NOSIGNAL
+    flags |= GNUTLS_NOSIGNAL;
+#endif
+    gnutls_init(session, flags);
 
     // if we have priorities in the cache, set them.
     if (priority_cache)
