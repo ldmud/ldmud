@@ -271,10 +271,6 @@ mixed   negate(int|float);
 void    raise_error(string);
 void    throw(mixed);
 
-        /* Strings */
-
-int     strlen(null|string);
-
         /* Arrays, Mapings, Structs and Strings*/
 
 int     sizeof(null|string|mixed|mixed *|mapping|struct);

@@ -1,3 +1,4 @@
+ENTFERNTE EFUN
 SYNOPSIS
         int strlen(string str)
 
@@ -6,6 +7,9 @@ BESCHREIBUNG
         Diese efun ist VERALTET und ersetzt durch sizeof().
         Bitte in neuem Code nicht mehr benutzen und in altem
         Code sukzessive ersetzen.
+
+GESCHICHTE
+        Entfernt in LDMud 3.5.0
 
 SIEHE AUCH
         sizeof(E), extract(E)

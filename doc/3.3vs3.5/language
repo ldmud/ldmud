@@ -33,6 +33,8 @@ that you should pay attention to when updating.
     flexible job at managing light in/from objects. (#775)
   + The supporting efuns for alists were removed: insert_alist, order_alist,
     intersect_alist, assoc.
+  + strlen() was removed. sizeof() can be used as a drop-in replacement, which
+    does exactly the same thing.
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an

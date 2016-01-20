@@ -16577,32 +16577,6 @@ again:
         throw_error(sp+1); /* do the longjump, with extra checks... */
         break;
 
-    /* --- Efuns: Strings --- */
-
-    CASE(F_STRLEN);                 /* --- strlen              --- */
-    {
-        /* EFUN strlen()
-         *
-         *   int strlen(string str)
-         *
-         * Returns the length of the string str.
-         */
-
-        size_t i;
-
-        if (sp->type == T_STRING)
-        {
-            i = mstrsize(sp->u.str);
-            free_string_svalue(sp);
-            put_number(sp, i);
-            break;
-        }
-        if (sp->type == T_NUMBER && sp->u.number == 0)
-            break;
-        RAISE_ARG_ERROR(1, TF_NULL|TF_STRING, sp->type);
-        /* NOTREACHED */
-    }
-
     /* --- Efuns: Arrays and Mappings --- */
 
     CASE(F_SIZEOF);                 /* --- sizeof              --- */
