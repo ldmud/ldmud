@@ -16,5 +16,6 @@
 #define DC_DATA_CLEAN_TIME     3
 #define DC_TLS_CERTIFICATE     4
 #define DC_TLS_DHE_PARAMETER   5
+#define DC_TLS_CIPHERLIST      6
 
 #endif /* LPC_CONFIGURATION_H_ */

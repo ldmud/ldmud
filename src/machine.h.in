@@ -4,6 +4,9 @@
 #ifndef MACHINE_H
 #define MACHINE_H
 
+/* Define if building universal (internal helper macro) */
+#undef AC_APPLE_UNIVERSAL_BUILD
+
 /* A mask that allows to extract an unsigned char from a signed */
 #undef CHARBIT_MASK
 
@@ -18,7 +21,7 @@
 /* define the erq include file. */
 #undef ERQ_INCLUDE
 
-/* The following is needed for smalloc without SBRK_OK to use memory
+/* The following is needed for smalloc without MALLOC_REPLACABLE to use memory
    efficiently. smalloc will malloc blocks that are a large power of two,
    minus EXTERN_MALLOC_OVERHEAD. If you have no idea what number to choose,
    compile & run util/overhead.c */
@@ -39,9 +42,6 @@
 /* Does the machine offer GnuTLS? */
 #undef HAS_GNUTLS
 
-/* version of GNUTLS library */
-#undef HAS_GNUTLS_VERSION
-
 /* Does the machine offer iconv? */
 #undef HAS_ICONV
 
@@ -59,6 +59,12 @@
 
 /* Does the machine offer IPv6? */
 #undef HAS_IPV6
+
+/* Does the machine offer JSON-C? */
+#undef HAS_JSON
+
+/* Does the machine offer JSON-C? */
+#undef HAS_JSONC
 
 /* Does the machine offer mySQL? */
 #undef HAS_MYSQL
@@ -90,9 +96,6 @@
 
 /* Define to 1 if you have the <bstring.h> header file. */
 #undef HAVE_BSTRING_H
-
-/* Define to 1 if you have the `bzero' function. */
-#undef HAVE_BZERO
 
 /* Define to 1 if you have the `crypt' function. */
 #undef HAVE_CRYPT
@@ -159,23 +162,14 @@
    than `double'. */
 #undef HAVE_LONG_DOUBLE_WIDER
 
-/* Define to 1 if the system has the type `long long int'. */
+/* Define to 1 if the system has the type 'long long int'. */
 #undef HAVE_LONG_LONG_INT
-
-/* Define to 1 if you have the `memcpy' function. */
-#undef HAVE_MEMCPY
 
 /* Define to 1 if you have the `memmem' function. */
 #undef HAVE_MEMMEM
 
-/* Define to 1 if you have the `memmove' function. */
-#undef HAVE_MEMMOVE
-
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
-
-/* Define to 1 if you have the `memset' function. */
-#undef HAVE_MEMSET
 
 /* Define to 1 if you have the `mmap' function. */
 #undef HAVE_MMAP
@@ -198,15 +192,6 @@
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
 
-/* Define to 1 if you have the `strchr' function. */
-#undef HAVE_STRCHR
-
-/* Define to 1 if you have the `strcspn' function. */
-#undef HAVE_STRCSPN
-
-/* Define to 1 if you have the `strdup' function. */
-#undef HAVE_STRDUP
-
 /* Define to 1 if cpp supports the ANSI # stringizing operator. */
 #undef HAVE_STRINGIZE
 
@@ -215,12 +200,6 @@
 
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
-
-/* Define to 1 if you have the `strrchr' function. */
-#undef HAVE_STRRCHR
-
-/* Define to 1 if you have the `strtoul' function. */
-#undef HAVE_STRTOUL
 
 /* Define to 1 if you have the `sysconf' function. */
 #undef HAVE_SYSCONF
@@ -266,7 +245,7 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
-/* Define to 1 if the system has the type `unsigned long long int'. */
+/* Define to 1 if the system has the type 'unsigned long long int'. */
 #undef HAVE_UNSIGNED_LONG_LONG_INT
 
 /* Define to 1 if you have the `wait3' function. */
@@ -284,8 +263,11 @@
 /* Is the library function inet_ntoa() compatible with the compiler? */
 #undef INET_NTOA_OK
 
-/* Define if you have bcopy, and it handles overlapping ranges correctly. */
-#undef OVERLAPPING_BCOPY
+/* JSON-C supports 64 bit values. */
+#undef JSON_64_SUPPORT
+
+/* Defined if we can replace malloc. */
+#undef MALLOC_REPLACEABLE
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
@@ -298,6 +280,9 @@
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
@@ -319,11 +304,14 @@
    */
 #undef RUSAGE_USEC
 
-/* can we define our own malloc() safely? */
+/* Defined if sbrk() is working */
 #undef SBRK_OK
 
 /* The size of `char *', as computed by sizeof. */
 #undef SIZEOF_CHAR_P
+
+/* The size of `double', as computed by sizeof. */
+#undef SIZEOF_DOUBLE
 
 /* The size of `int', as computed by sizeof. */
 #undef SIZEOF_INT
@@ -357,13 +345,6 @@
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
 
-/* the atari strtol() used to consider characters '9' < c < 'A' to be numeric
-   */
-#undef STRTOL_BROKEN
-
-/* needs the first argument of strtol be declared as const? */
-#undef STRTOL_CONST_CHARP
-
 /* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
 #undef TIME_WITH_SYS_TIME
 
@@ -381,6 +362,18 @@
 
 /* Can SO_OOBINLINE be used on a socket? */
 #undef USE_OOBINLINE
+
+/* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
+   significant byte first (like Motorola and SPARC, unlike Intel). */
+#if defined AC_APPLE_UNIVERSAL_BUILD
+# if defined __BIG_ENDIAN__
+#  define WORDS_BIGENDIAN 1
+# endif
+#else
+# ifndef WORDS_BIGENDIAN
+#  undef WORDS_BIGENDIAN
+# endif
+#endif
 
 /* Define for Solaris 2.5.1 so the uint32_t typedef from <sys/synch.h>,
    <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the

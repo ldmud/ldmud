@@ -199,6 +199,65 @@ tls_import_dh_params (const char* const buffer, size_t length)
 }
 
 /*-------------------------------------------------------------------------*/
+int
+tls_set_ciphers (const char* buffer)
+
+/* OpenSSL: sets ciphers to use.
+ * If the cipher string <buffer> is NULL, the default ciphers will be set.
+ * In case of an error, the state of selected ciphers is undefined.
+ *
+ * returns 1 on success, 0 otherwise.
+ *
+ * requires the global <context> to be initialized.
+ */
+
+{
+    const char* pstr;
+    
+    if (buffer == NULL)
+    {
+        // use built-in defaults. We favor stronger ciphers with PFS and disallow SSLv3, MD5, RC4, DES
+        // (Selection from https://weakdh.org/)
+        pstr = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:"
+        "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:"
+        "DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:"
+        "ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:"
+        "ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:"
+        "ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:"
+        "ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:"
+        "DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:"
+        "DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:"
+        "AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:"
+        "DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:"
+        "!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA";
+        printf("%s TLS: Setting built-in default priorities: %s.\n"
+               , time_stamp(), pstr);
+        debug_message("%s TLS: Setting built-in default priorities: %s.\n"
+                      , time_stamp(), pstr);
+    }
+    else
+    {
+        pstr = buffer;
+        printf("%s TLS: Setting user-supplied priorities: %s.\n"
+               , time_stamp(), pstr);
+        debug_message("%s TLS: Setting user-supplied priorities: %s.\n"
+                      , time_stamp(), pstr);
+    }
+    
+    SSL_CTX_set_options(context, SSL_OP_CIPHER_SERVER_PREFERENCE);
+    if (!SSL_CTX_set_cipher_list(context, pstr))
+    {
+        printf("%s TLS: Error setting cipher list.: None of the supplied ciphers could be selected.\n"
+               , time_stamp());
+        debug_message("%s Error setting cipher list.: None of the supplied ciphers could be selected."
+                      , time_stamp());
+        return 0;
+    }
+    
+    return 1;
+}   // tls_set_ciphers
+
+/*-------------------------------------------------------------------------*/
 static int
 no_passphrase_callback (char * buf, int num, int w, void *arg)
 
@@ -845,23 +904,6 @@ tls_global_init (void)
     SSL_CTX_set_tmp_ecdh(context, key);
     EC_KEY_free(key);
 #endif
-
-    // Select ciphers to favour strong ciphers and disable very
-    // weak ones. (Selection from https://weakdh.org/)
-    SSL_CTX_set_options(context, SSL_OP_CIPHER_SERVER_PREFERENCE);
-    SSL_CTX_set_cipher_list(context,
-        "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:"
-        "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:"
-        "DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:"
-        "ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:"
-        "ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:"
-        "ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:"
-        "ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:"
-        "DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:"
-        "DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:"
-        "AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:"
-        "DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:"
-        "!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA");
 
     /* OpenSSL successfully initialised */
     tls_is_available = MY_TRUE;

@@ -293,6 +293,20 @@ mixed *tests = ({
         (: configure_driver(DC_TLS_DHE_PARAMETER, "abcdef42") :) }),
     ({ "configure_driver DHE 4 arg error", TF_ERROR,
         (: configure_driver(DC_TLS_DHE_PARAMETER, ({1}) ) :) }),
+    ({ "configure_driver DC_TLS_CIPHERLIST 1 default", 0,
+        (: configure_driver(DC_TLS_CIPHERLIST, 0);
+           return 1; :) }),
+    ({ "configure_driver DC_TLS_CIPHERLIST 2", TF_ERROR,
+        (: configure_driver(DC_TLS_CIPHERLIST, "__never_a_cipher_");
+           return 0; :) }),
+    ({ "configure_driver DC_TLS_CIPHERLIST 3", 0,
+#if defined(__GNUTLS__)
+        (: configure_driver(DC_TLS_CIPHERLIST, "NORMAL");
+#elif defined (__OPENSSL__)
+        (: configure_driver(DC_TLS_CIPHERLIST, "DEFAULT");
+#endif
+           return 1; :) }),
+
 #endif // __TLS__
 });
 

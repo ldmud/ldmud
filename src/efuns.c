@@ -7980,7 +7980,34 @@ f_configure_driver (svalue_t *sp)
                 vefun_exp_arg_error(1, TF_STRING|TF_NUMBER, sp->type, sp);
             }
             break;
-
+        
+        case DC_TLS_CIPHERLIST:
+            if (sp->type == T_NUMBER)
+            {
+                if (sp->u.number != 0)
+                    errorf("Unexpected value %d for DC_TLS_CIPHERLIST.\n",
+                           sp->u.number);
+                // set built-in defaults
+                if (!tls_set_ciphers(NULL))
+                {
+                    errorf("Built-in default cipher list could not be set. Please "
+                           "refer to debug log for further information.\n");
+                }
+            }
+            else if (sp->type == T_STRING)
+            {
+                if (!tls_set_ciphers(get_txt(sp->u.str)))
+                {
+                    errorf("Cipher list could not be set. Please "
+                           "refer to debug log for further information.\n");
+                }
+            }
+            else
+            {
+                vefun_exp_arg_error(1, TF_STRING|TF_NUMBER, sp->type, sp);
+            }
+            break;
+            
 #endif /* USE_TLS */
     }
 

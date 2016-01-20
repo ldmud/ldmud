@@ -77,6 +77,9 @@ static gnutls_certificate_server_credentials x509_cred;
 static gnutls_dh_params_t* dh_params = NULL;
   /* Pointer to the Diffie-Hellmann parameters, permanently allocated */
 
+static gnutls_priority_t* priority_cache = NULL;
+  /* Pointer to the priority cache, permanently allocated */
+
 static struct tls_key_s* keys;
   /* Our certificate-key-pairs. */
 
@@ -180,6 +183,80 @@ tls_import_dh_params (const char* const buffer, size_t length)
 } /* tls_import_dh_params() */
 
 /*-------------------------------------------------------------------------*/
+int
+tls_set_ciphers (const char* buffer)
+
+/* GnuTLS: sets priorities to use.
+ * These are stored in the global gnutls_priority_t * <priority_cache>.
+ * If the priority string <buffer> is NULL, the default priorities will be set.
+ * In case of error, the old priorities will be retained (possibly NULL, which
+ * defaults to GnuTLS defaults).
+ *
+ * returns 1 on success, 0 otherwise.
+ *
+ */
+
+{
+    gnutls_priority_t* newp = NULL;
+    gnutls_priority_t* oldp = priority_cache; // pointer auf alte params sichern
+    const char* pstr;
+    const char *errstr;
+    
+    int err;
+    
+    if (buffer == NULL)
+    {
+        // use built-in defaults. We favor stronger ciphers with PFS and disallow SSLv3, MD5, RC4, DES
+        pstr = "PFS:+SECURE128:-VERS-SSL3.0:-DHE-DSS:-ARCFOUR-128:-MD5:-DES-CBC:%SERVER_PRECEDENCE";
+        printf("%s TLS: Setting built-in default priorities: %s.\n"
+               , time_stamp(), pstr);
+        debug_message("%s TLS: Setting built-in default priorities: %s.\n"
+                      , time_stamp(), pstr);
+    }
+    else
+    {
+        pstr = buffer;
+        printf("%s TLS: Setting user-supplied priorities: %s.\n"
+               , time_stamp(), pstr);
+        debug_message("%s TLS: Setting user-supplied priorities: %s.\n"
+                      , time_stamp(), pstr);
+    }
+    
+    // neue struktur initialisieren
+    newp = pxalloc(sizeof(*newp));
+    if (!newp)
+    {
+        printf("%s TLS: Error setting priorities.: Out of memory.\n"
+               , time_stamp());
+        debug_message("%s Error setting priorities.: Out of memory.\n"
+                      , time_stamp());
+        return 0;
+    }
+    err = gnutls_priority_init(newp, pstr, &errstr);
+    if (err != GNUTLS_E_SUCCESS)
+    {
+        printf("%s TLS: Error parsing priority string: %s at %s.\n"
+               , time_stamp(), gnutls_strerror(err), errstr );
+        debug_message("%s Error parsing priority string: %s at %s.\n"
+                      , time_stamp(), gnutls_strerror(err), errstr);
+        pfree(newp);
+        return 0;
+    }
+    
+    // update pointers
+    priority_cache = newp;
+    
+    // alte struktur freigeben
+    if (oldp)
+    {
+        gnutls_priority_deinit(*oldp);
+        pfree(oldp);
+    }
+    
+    return 1;
+}   // tls_set_ciphers
+
+/*-------------------------------------------------------------------------*/
 static void
 initialize_tls_session (gnutls_session_t *session, Bool outgoing) __attribute__((nonnull));
 static void
@@ -192,11 +269,12 @@ initialize_tls_session (gnutls_session_t *session, Bool outgoing)
 {
     gnutls_init(session, outgoing ? GNUTLS_CLIENT : GNUTLS_SERVER);
 
-    /* avoid calling all the priority functions, since the defaults
-     * are adequate.
-     */
-    gnutls_set_default_priority( *session);   
-
+    // if we have priorities in the cache, set them.
+    if (priority_cache)
+        gnutls_priority_set(*session, *priority_cache);
+    else
+        gnutls_priority_set_direct(*session, "NORMAL", NULL);   // last fallback
+    
     gnutls_credentials_set( *session, GNUTLS_CRD_CERTIFICATE, x509_cred);
 
     gnutls_certificate_server_set_request( *session, GNUTLS_CERT_REQUEST);
@@ -806,25 +884,9 @@ tls_global_init (void)
 
     tls_import_dh_params(NULL, 0);
 
-/* Would be nice, but setting this causes sporadic segfaults in
- * gnutls/nettle/libgmp on my system.
-    // Set some priority default to favour strong ciphers and disable very
-    // weak ones.
-    char* err_pos=NULL;
-    err=gnutls_priority_set_direct(x509_cred,
-        "PFS:+SECURE128:-VERS-SSL3.0:-DHE-DSS:-3DES-CBC:-ARCFOUR-128:-MD5"
-        ":-DES-CBC:%SERVER_PRECEDENCE"
-        , &err_pos);
-    if (err != GNUTLS_E_SUCCESS)
-    {
-        printf("%s TLS: Error setting priorities: %s at %s\n"
-              , time_stamp(), gnutls_strerror(err)
-              , (err_pos ? err_pos : "unknown" ));
-        debug_message("%s Error setting priorities: %s at %s\n"
-                     , time_stamp(), gnutls_strerror(err)
-                     , (err_pos ? err_pos : "unknown" ));
-    }
-*/
+    // Set default priorities
+    tls_set_ciphers(NULL);
+
     tls_is_available = MY_TRUE;
 
 } /* tls_global_init() */

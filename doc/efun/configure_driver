@@ -64,6 +64,17 @@ DESCRIPTION
            If importing the new parameters fails (e.g. due to an incorrect
            format), the driver tries to keep the old parameters 
 
+        <what> == DC_TLS_CIPHERLIST
+           Sets a new list of ciphers (OpenSSL) or priorities (GnuTLS) to use.
+           For the correct format, please refer to the help of 'openssl
+           ciphers' or documentation of priority strings in GnuTLS.
+           With GnuTLS a syntax error in the list causes an error.
+           With OpenSSL an error is only raised of none of the given ciphers
+           could be selected.
+           By default, the preferred ciphers of the driver take precedence
+           This can be changed in the priority strings for GnuTLS, but
+           currently not for OpenSSL.
+
 HISTORY
         Introduced in LDMud 3.3.719.
         DC_ENABLE_HEART_BEATS was added in 3.5.0.
@@ -71,6 +82,7 @@ HISTORY
         DC_DATA_CLEAN_TIME was added in 3.5.0.
         DC_TLS_CERTIFICATE was added in 3.5.0.
         DC_TLS_DHE_PARAMETER was added in 3.5.0.
+        DC_TLS_CIPHERLIST was added in 3.5.0.
 
 SEE ALSO
         configure_interactive(E)
