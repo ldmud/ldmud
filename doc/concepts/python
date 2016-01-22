@@ -14,9 +14,63 @@ DESCRIPTION
         This module provides the following functions:
 
           - register_efun(name, function) -> None
-
                 Registers a new efun name. This is not allowed during
                 compilation of an LPC object.
+
+          - get_master() - > Object
+                Returns the current master object.
+                Returns None, if there is no master object (yet).
+
+          - get_simul_efun() - > Object
+                Returns the current simul-efun object
+                (or None if there is none).
+
+
+        This module provides the following types:
+
+          - Object(filename)
+                Corresponds to the LPC object type.
+                On instantiation a filename for an object
+                to search or load is required.
+
+          - Array([values | size])
+                Corresponds to an LPC array.
+                Can either be initialized with a list of values
+                or to a given size.
+
+                Supports element access with [], len() and __contains__.
+
+          - Mapping([values | width])
+                Corresponds to an LPC mapping.
+                Can either be initialized with a dict, a list of tuples
+                or as an empty mapping with a given width.
+
+                Supports element access with [], len(), __contains__
+                and has a width member.
+
+          - Struct(object, name [, values])
+               Corresponds to an LPC struct.
+               On initialization the name of the struct definition and
+               the correspopnding object is required. It can be initialized
+               with a list of values or dict.
+
+               Supports member access as regular python members.
+
+          - Closure(object [,name [, lfun_object]])
+               Corresponds to an LPC closure.
+               On initialization a closure bound to <object> will be created,
+               like a call to symbol_function(<name> [, <lfun_object>]).
+
+               Supports function calls.
+
+
+        This module contains the following sub-namespaces:
+
+          - efuns
+              This namespace contains all original efuns (without any
+              registered python efuns or simul-efuns). These can be called
+              as a regular function.
+
 
 EXAMPLE
         import ldmud
