@@ -80,6 +80,94 @@ class TestArray(unittest.TestCase):
         self.assertEqual(arr[2], 52)
         self.assertEqual(arr[3], "Me")
 
+class TestMapping(unittest.TestCase):
+    def testInitEmpty(self):
+        m = ldmud.Mapping()
+        self.assertIsNotNone(m)
+        self.assertEqual(len(m), 0)
+        self.assertEqual(m.width, 1)
+
+    def testInitWidth(self):
+        m = ldmud.Mapping(width=10)
+        self.assertIsNotNone(m)
+        self.assertEqual(len(m), 0)
+        self.assertEqual(m.width, 10)
+
+    def testInitDict(self):
+        m = ldmud.Mapping({1:1, 2:4, 3:9, 4:16})
+        self.assertIsNotNone(m)
+        self.assertEqual(len(m), 4)
+        self.assertEqual(m.width, 1)
+        self.assertEqual(m[1], 1)
+        self.assertEqual(m[2], 4)
+        self.assertEqual(m[3], 9)
+        self.assertEqual(m[4], 16)
+        self.assertTrue(4 in m)
+        self.assertFalse(5 in m)
+
+    def testInitList(self):
+        m = ldmud.Mapping([(1,2,3),(4,5,6),(7,8,9),(10,11,12),(13,14,15)])
+        self.assertIsNotNone(m)
+        self.assertEqual(len(m), 5)
+        self.assertEqual(m.width, 2)
+        self.assertEqual(m[1], 2)
+        self.assertEqual(m[4,1], 6)
+        self.assertEqual(m[7,0], 8)
+        self.assertTrue(13 in m)
+        self.assertFalse(14 in m)
+
+    def testInitInvalid(self):
+        with self.assertRaises(ValueError):
+            m = ldmud.Mapping([(1,),(2,3)])
+        with self.assertRaises(ValueError):
+            m = ldmud.Mapping([(), ()])
+        with self.assertRaises(ValueError):
+            m = ldmud.Mapping(width=-1)
+
+    def testGetSetSimple(self):
+        m = ldmud.Mapping()
+        self.assertIsNotNone(m)
+
+        m['Hello'] = 1
+        m['World'] = 2
+        self.assertEqual(len(m), 2)
+        self.assertEqual(m.width, 1)
+        self.assertEqual(m['Hello'], 1)
+        self.assertEqual(m['World'], 2)
+        self.assertEqual(m['!'], 0)
+        self.assertFalse('!' in m)
+
+    def testGetSetWide(self):
+        m = ldmud.Mapping(width=2)
+        self.assertIsNotNone(m)
+
+        m['Hello',0] = 1
+        m['Hello',1] = 42
+        m['World'] = 2
+        m['World',1] = 100
+
+        self.assertEqual(len(m), 2)
+        self.assertEqual(m.width, 2)
+        self.assertEqual(m['Hello'], 1)
+        self.assertEqual(m['Hello',0], 1)
+        self.assertEqual(m['Hello',1], 42)
+        self.assertEqual(m['World'], 2)
+        self.assertEqual(m['World',0], 2)
+        self.assertEqual(m['World',1], 100)
+
+    def testGetSetInvalid(self):
+        m = ldmud.Mapping(width=0)
+        with self.assertRaises(Exception):
+            m[10] = 1
+        with self.assertRaises(Exception):
+            val = m[10]
+
+        m = ldmud.Mapping(width=2)
+        with self.assertRaises(IndexError):
+            m['Hi','There'] = 'Me'
+        with self.assertRaises(IndexError):
+            m['Hi',2] = 0
+
 class TestStruct(unittest.TestCase):
     def setUp(self):
         self.master = ldmud.efuns.find_object("/master")

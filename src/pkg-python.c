@@ -17,6 +17,7 @@
 #include "instrs.h"
 #include "interpret.h"
 #include "lex.h"
+#include "mapping.h"
 #include "mstrings.h"
 #include "object.h"
 #include "pkg-python.h"
@@ -26,6 +27,7 @@
 #include "structs.h"
 #include "swap.h"
 #include "typedefs.h"
+#include "wiz_list.h"
 #include "xalloc.h"
 
 /* Python.h defines these again... */
@@ -56,6 +58,7 @@ static ident_t*  python_efun_names[PYTHON_EFUN_TABLE_SIZE];
 
 static ldmud_gc_var_t *gc_object_list = NULL,
                       *gc_array_list = NULL,
+                      *gc_mapping_list = NULL,
                       *gc_struct_list = NULL,
                       *gc_closure_list = NULL;
 
@@ -152,6 +155,13 @@ struct ldmud_array_s
     vector_t *lpc_array;        /* Can never be NULL. */
 };
 
+struct ldmud_mapping_s
+{
+    PyGCObject_HEAD
+
+    mapping_t *lpc_mapping;     /* Can never be NULL. */
+};
+
 struct ldmud_struct_s
 {
     PyGCObject_HEAD
@@ -174,6 +184,7 @@ struct ldmud_closure_s
 };
 
 typedef struct ldmud_array_s ldmud_array_t;
+typedef struct ldmud_mapping_s ldmud_mapping_t;
 typedef struct ldmud_struct_s ldmud_struct_t;
 typedef struct ldmud_object_s ldmud_object_t;
 typedef struct ldmud_closure_s ldmud_closure_t;
@@ -254,9 +265,10 @@ ldmud_object_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
     ldmud_object_t *self;
 
     self = (ldmud_object_t *)type->tp_alloc(type, 0);
-    if (self != NULL)
-        self->lpc_object = NULL;
+    if (self == NULL)
+        return NULL;
 
+    self->lpc_object = NULL;
     add_gc_object(&gc_object_list, (ldmud_gc_var_t*)self);
     return (PyObject *)self;
 } /* ldmud_object_new */
@@ -477,9 +489,10 @@ ldmud_object_create (object_t* ob)
     ldmud_object_t *self;
 
     self = (ldmud_object_t *)ldmud_object_type.tp_alloc(&ldmud_object_type, 0);
-    if (self != NULL)
-        self->lpc_object = ref_object(ob, "ldmud_object_create");
+    if (self == NULL)
+        return NULL;
 
+    self->lpc_object = ref_object(ob, "ldmud_object_create");
     add_gc_object(&gc_object_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
@@ -518,9 +531,10 @@ ldmud_array_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
     ldmud_array_t *self;
 
     self = (ldmud_array_t *)type->tp_alloc(type, 0);
-    if (self != NULL)
-        self->lpc_array = ref_array(&null_vector);
+    if (self == NULL)
+        return NULL;
 
+    self->lpc_array = ref_array(&null_vector);
     add_gc_object(&gc_array_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
@@ -551,7 +565,7 @@ python_error_handler (const char *fmt, ...)
 static int
 ldmud_array_init (ldmud_array_t *self, PyObject *args, PyObject *kwds)
 
-/* Implement __init__ for ldmud_stuct_t, i.e. create a new array object
+/* Implement __init__ for ldmud_array_t, i.e. create a new array object
  * from the given arguments.
  */
 
@@ -963,10 +977,554 @@ ldmud_array_create (vector_t* vec)
     ldmud_array_t *self;
 
     self = (ldmud_array_t *)ldmud_array_type.tp_alloc(&ldmud_array_type, 0);
-    if (self != NULL && vec != NULL)
+    if (self == NULL)
+        return NULL;
+
+    if(vec != NULL)
         self->lpc_array = ref_array(vec);
 
     add_gc_object(&gc_array_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_object_create */
+
+/*-------------------------------------------------------------------------*/
+/* Mappings */
+
+static bool ldmud_mapping_check(PyObject *ob);
+static PyObject* ldmud_mapping_create(mapping_t *vec);
+
+static void
+ldmud_mapping_dealloc (ldmud_mapping_t* self)
+
+/* Destroy the ldmud_mapping_t object
+ */
+
+{
+    if(self->lpc_mapping)
+        free_mapping(self->lpc_mapping);
+
+    remove_gc_object(&gc_mapping_list, (ldmud_gc_var_t*)self);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_mapping_dealloc */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_mapping_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
+
+/* Implmenent __new__ for ldmud_mapping_t, i.e. allocate and initialize
+ * the mapping as an empty one (with width 1).
+ */
+
+{
+    ldmud_mapping_t *self;
+    mapping_t *map;
+
+    map = allocate_cond_mapping(&default_wizlist_entry, 0, 1);
+    if (map == NULL)
+        return PyErr_NoMemory();
+
+    self = (ldmud_mapping_t *)type->tp_alloc(type, 0);
+    if (self == NULL)
+    {
+        free_empty_mapping(map);
+        return NULL;
+    }
+
+    self->lpc_mapping = map;
+    add_gc_object(&gc_mapping_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_mapping_new */
+
+/*-------------------------------------------------------------------------*/
+
+static int
+ldmud_mapping_init (ldmud_mapping_t *self, PyObject *args, PyObject *kwds)
+
+/* Implement __init__ for ldmud_mapping_t, i.e. create a new mapping object
+ * from the given arguments.
+ */
+
+{
+    /* We expect:
+     *  - either an iterator of tuples for the values
+     *  - or a 'width' keyword argument.
+     *  - or nothing, then we're done.
+     */
+
+    static char *kwlist[] = { "values", "width", NULL};
+
+    PyObject *values = NULL;
+    int width = 1;
+
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "|Oi", kwlist, &values, &width))
+        return -1;
+    if (width < 0)
+    {
+        PyErr_Format(PyExc_ValueError, "illegal width '%d'", width);
+        return -1;
+    }
+
+    if(values == NULL)
+    {
+        mapping_t *map;
+
+        if (self->lpc_mapping->ref == 1 && self->lpc_mapping->num_entries == 0 && self->lpc_mapping->num_values == width)
+            return 0; /* Nothing todo. */
+
+        /* Make a new empty mapping... */
+        map = allocate_cond_mapping(&default_wizlist_entry, 0, width);
+        if (map == NULL)
+        {
+            PyErr_NoMemory();
+            return -1;
+        }
+
+        free_mapping(self->lpc_mapping);
+        self->lpc_mapping = map;
+        return 0;
+    }
+    else
+    {
+        /* We got some values... */
+        PyObject *iterator;
+        PyObject *item;
+        mapping_t *map;
+
+        if (PyMapping_Check(values) && !PySequence_Check(values))
+        {
+            PyObject *dictitems = PyMapping_Items(values);
+            if(dictitems != NULL)
+            {
+                iterator = PyObject_GetIter(dictitems);
+                Py_DECREF(dictitems);
+            }
+            else
+                iterator = PyObject_GetIter(values);
+        }
+        else
+            iterator = PyObject_GetIter(values);
+
+        if (!iterator)
+            return -1;
+
+        /* The first tuple determines the width. */
+        item = PyIter_Next(iterator);
+        if (PyErr_Occurred())
+        {
+            Py_DECREF(iterator);
+            return -1;
+        }
+
+        if (!item)
+        {
+            Py_DECREF(iterator);
+
+             /* Empty mapping, same as above. */
+            if (self->lpc_mapping->ref == 1 && self->lpc_mapping->num_entries == 0 && self->lpc_mapping->num_values == width)
+                return 0; /* Nothing todo. */
+
+            /* Make a new empty mapping... */
+            map = allocate_cond_mapping(&default_wizlist_entry, 0, width);
+            if (map == NULL)
+            {
+                PyErr_NoMemory();
+                return -1;
+            }
+
+            free_mapping(self->lpc_mapping);
+            self->lpc_mapping = map;
+            return 0;
+        }
+
+        if (!PyTuple_Check(item) || PyTuple_Size(item) == 0)
+        {
+            PyErr_SetString(PyExc_ValueError, "init iterator must return non-empty tuples");
+            Py_DECREF(item);
+            Py_DECREF(iterator);
+            return -1;
+        }
+
+        width = PyTuple_Size(item) - 1;
+        if (self->lpc_mapping->ref == 1 && self->lpc_mapping->num_entries == 0 && self->lpc_mapping->num_values == width)
+            map = self->lpc_mapping;
+        else
+        {
+            map = allocate_cond_mapping(&default_wizlist_entry, 0, width);
+            if (map == NULL)
+            {
+                PyErr_NoMemory();
+                Py_DECREF(item);
+                Py_DECREF(iterator);
+                return -1;
+            }
+        }
+
+        do
+        {
+            svalue_t sv, *svalues;
+            const char *err;
+            PyObject *key;
+
+            if (PyTuple_Size(item) != width + 1)
+            {
+                PyErr_SetString(PyExc_ValueError, "init iterator must return tuples of the same size");
+                Py_DECREF(item);
+                break;
+            }
+
+            key = PyTuple_GetItem(item, 0);
+            if(key == NULL)
+            {
+                Py_DECREF(item);
+                break;
+            }
+
+            err = python_to_svalue(&sv, key);
+            if (err != NULL)
+            {
+                Py_DECREF(item);
+                PyErr_SetString(PyExc_ValueError, err);
+                break;
+            }
+
+            svalues = get_map_lvalue_unchecked(map, &sv);
+            if (svalues == NULL)
+            {
+                PyErr_NoMemory();
+                Py_DECREF(item);
+                break;
+            }
+
+            for (int i = 0; i < width; i++)
+            {
+                err = python_to_svalue(svalues + i, PyTuple_GetItem(item, i + 1));
+                if (err != NULL)
+                {
+                    Py_DECREF(item);
+                    PyErr_SetString(PyExc_ValueError, err);
+                    break;
+                }
+            }
+
+            if (PyErr_Occurred())
+                break;
+
+        } while ((item = PyIter_Next(iterator)));
+
+        Py_DECREF(iterator);
+
+        if (PyErr_Occurred())
+        {
+            if (map != self->lpc_mapping)
+                free_mapping(map);
+            return -1;
+        }
+
+        if (map != self->lpc_mapping)
+        {
+            free_mapping(self->lpc_mapping);
+            self->lpc_mapping = map;
+        }
+        return 0;
+    }
+} /* ldmud_mapping_init */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_mapping_contains (ldmud_mapping_t *val, PyObject *v)
+
+/* Implement __contains__ for ldmud_mapping_t.
+ */
+
+{
+    svalue_t sv;
+    bool result;
+
+    /* If we can't convert, it's probably not in the mapping. */
+    if (python_to_svalue(&sv, v) != NULL)
+        return 0;
+
+    result = get_map_value(val->lpc_mapping, &sv) != &const0;
+    free_svalue(&sv);
+
+    return result ? 1 : 0;
+} /* ldmud_mapping_contains */
+
+/*-------------------------------------------------------------------------*/
+static Py_ssize_t
+ldmud_mapping_length (ldmud_mapping_t *val)
+
+/* Implement len() for ldmud_mapping_t.
+ */
+
+{
+    return MAP_SIZE(val->lpc_mapping);
+} /* ldmud_mapping_length */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_mapping_subscript (ldmud_mapping_t *val, PyObject *key)
+
+/* Implement item access for ldmud_mapping_t.
+ */
+
+{
+    PyObject *result;
+    svalue_t sv, *values;
+    Py_ssize_t idx = 0;
+
+    if (val->lpc_mapping->num_values == 0)
+    {
+        PyErr_SetString(PyExc_ValueError, "indexing a mapping of width 0");
+        return NULL;
+    }
+
+    /* If it's a tuple, assume it's (key, index) */
+    if (PyTuple_Check(key))
+    {
+        PyObject* second;
+
+        if(PyTuple_Size(key) != 2)
+        {
+            PyErr_SetString(PyExc_IndexError, "index should be a 2-tuple");
+            return NULL;
+        }
+
+        second = PyTuple_GetItem(key, 1);
+        if (second==NULL || !PyIndex_Check(second))
+        {
+            PyErr_Format(PyExc_IndexError, "second index should be an integer, not %.200s", second->ob_type->tp_name);
+            return NULL;
+        }
+
+        idx = PyNumber_AsSsize_t(second, PyExc_IndexError);
+        if (idx == -1 && PyErr_Occurred())
+            return NULL;
+
+        if (idx < 0 || idx >= val->lpc_mapping->num_values)
+        {
+            PyErr_SetString(PyExc_IndexError, "index out of range");
+            return NULL;
+        }
+
+        if(python_to_svalue(&sv, PyTuple_GetItem(key, 0)))
+            return PyLong_FromLong(0);
+    }
+    else if (python_to_svalue(&sv, key) != NULL)
+        /* If we can't convert, it's probably not in the mapping. */
+        return PyLong_FromLong(0);
+
+    values = get_map_value(val->lpc_mapping, &sv);
+    free_svalue(&sv);
+
+    if (values == &const0)
+        return PyLong_FromLong(0);
+
+    result = svalue_to_python(values + idx);
+    if (result == NULL)
+        PyErr_SetString(PyExc_ValueError, "Unsupported data type.");
+
+    return result;
+} /* ldmud_mapping_subscript */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_mapping_ass_sub (ldmud_mapping_t *val, PyObject *key, PyObject *value)
+
+/* Implement item access for ldmud_mapping_t.
+ */
+
+{
+    const char *err;
+    svalue_t skey, sval;
+    svalue_t *dest;
+    Py_ssize_t idx = 0;
+
+    if (val->lpc_mapping->num_values == 0)
+    {
+        PyErr_SetString(PyExc_ValueError, "indexing a mapping of width 0");
+        return -1;
+    }
+
+    /* If it's a tuple, assume it's (key, index) */
+    if (PyTuple_Check(key))
+    {
+        PyObject* second;
+
+        if(PyTuple_Size(key) != 2)
+        {
+            PyErr_SetString(PyExc_IndexError, "index should be a 2-tuple");
+            return -1;
+        }
+
+        second = PyTuple_GetItem(key, 1);
+        if (second==NULL || !PyIndex_Check(second))
+        {
+            PyErr_Format(PyExc_IndexError, "second index should be an integer, not %.200s", second->ob_type->tp_name);
+            return -1;
+        }
+
+        idx = PyNumber_AsSsize_t(second, PyExc_IndexError);
+        if (idx == -1 && PyErr_Occurred())
+            return -1;
+
+        if (idx < 0 || idx >= val->lpc_mapping->num_values)
+        {
+            PyErr_SetString(PyExc_IndexError, "index out of range");
+            return -1;
+        }
+
+        err = python_to_svalue(&skey, PyTuple_GetItem(key, 0));
+    }
+    else
+        err = python_to_svalue(&skey, key);
+    if (err != NULL)
+    {
+        PyErr_SetString(PyExc_ValueError, err);
+        return -1;
+    }
+
+    err = python_to_svalue(&sval, value);
+    if (err != NULL)
+    {
+        PyErr_SetString(PyExc_ValueError, err);
+        free_svalue(&skey);
+        return -1;
+    }
+
+    dest = get_map_lvalue_unchecked(val->lpc_mapping, &skey);
+    free_svalue(&skey);
+
+    if (dest == NULL)
+    {
+        free_svalue(&sval);
+        PyErr_NoMemory();
+        return -1;
+    }
+
+    transfer_svalue(dest + idx, &sval);
+    return 0;
+} /* ldmud_mapping_ass_item */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_mapping_get_width(ldmud_mapping_t *val, void *closure)
+
+/**
+ * Return the value for the width member.
+ */
+
+{
+    return PyLong_FromLong(val->lpc_mapping->num_values);
+} /* ldmud_mapping_get_width */
+/*-------------------------------------------------------------------------*/
+
+static PySequenceMethods ldmud_mapping_as_sequence = {
+    0,                                          /* sq_length */
+    0,                                          /* sq_concat */
+    0,                                          /* sq_repeat */
+    0,                                          /* sq_item */
+    0,                                          /* sq_slice */
+    0,                                          /* sq_ass_item */
+    0,                                          /* sq_ass_slice */
+    (objobjproc)ldmud_mapping_contains,         /* sq_contains */
+    0,                                          /* sq_inplace_concat */
+    0,                                          /* sq_inplace_repeat */
+};
+
+static PyMappingMethods ldmud_mapping_as_mapping = {
+    (lenfunc)ldmud_mapping_length,              /*mp_length*/
+    (binaryfunc)ldmud_mapping_subscript,        /*mp_subscript*/
+    (objobjargproc)ldmud_mapping_ass_sub,       /*mp_ass_subscript*/
+};
+
+
+static PyMethodDef ldmud_mapping_methods[] =
+{
+    {NULL}
+};
+
+
+static PyGetSetDef ldmud_mapping_getset [] = {
+    {"width", (getter)ldmud_mapping_get_width, NULL, NULL},
+    {NULL}
+};
+
+
+static PyTypeObject ldmud_mapping_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.Mapping",                    /* tp_name */
+    sizeof(ldmud_mapping_t),            /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_mapping_dealloc,  /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    &ldmud_mapping_as_sequence,         /* tp_as_sequence */
+    &ldmud_mapping_as_mapping,          /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC mapping",                      /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_mapping_methods,              /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_mapping_getset,              /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    (initproc)ldmud_mapping_init,       /* tp_init */
+    0,                                  /* tp_alloc */
+    ldmud_mapping_new,                  /* tp_new */
+};
+
+/*-------------------------------------------------------------------------*/
+static bool
+ldmud_mapping_check (PyObject *ob)
+
+/* Returns true, when <ob> is of the LPC mapping type.
+ */
+
+{
+    return Py_TYPE(ob) == &ldmud_mapping_type;
+}
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_mapping_create (mapping_t* map)
+
+/* Creates a new Python mapping from an LPC mapping.
+ */
+
+{
+    ldmud_mapping_t *self;
+
+    self = (ldmud_mapping_t *)ldmud_mapping_type.tp_alloc(&ldmud_mapping_type, 0);
+    if (self == NULL)
+        return NULL;
+
+    if (map != NULL)
+        self->lpc_mapping = ref_mapping(map);
+
+    add_gc_object(&gc_mapping_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
 } /* ldmud_object_create */
@@ -1001,9 +1559,10 @@ ldmud_struct_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
     ldmud_struct_t *self;
 
     self = (ldmud_struct_t *)type->tp_alloc(type, 0);
-    if (self != NULL)
-        self->lpc_struct = NULL;
+    if (self == NULL)
+        return NULL;
 
+    self->lpc_struct = NULL;
     add_gc_object(&gc_struct_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
@@ -1013,7 +1572,7 @@ ldmud_struct_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 ldmud_struct_init (ldmud_struct_t *self, PyObject *args, PyObject *kwds)
 
-/* Implement __init__ for ldmud_stuct_t, i.e. create a new struct object
+/* Implement __init__ for ldmud_struct_t, i.e. create a new struct object
  * from the given arguments.
  */
 
@@ -1402,10 +1961,12 @@ ldmud_closure_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
     ldmud_closure_t *self;
 
     self = (ldmud_closure_t *)type->tp_alloc(type, 0);
-    if (self != NULL)
-        self->lpc_closure.type = T_INVALID;
+    if (self == NULL)
+        return NULL;
 
+    self->lpc_closure.type = T_INVALID;
     add_gc_object(&gc_closure_list, (ldmud_gc_var_t*)self);
+
     return (PyObject *)self;
 } /* ldmud_closure_new */
 
@@ -1704,9 +2265,10 @@ ldmud_closure_create (svalue_t* cl)
     ldmud_closure_t *self;
 
     self = (ldmud_closure_t *)ldmud_closure_type.tp_alloc(&ldmud_closure_type, 0);
-    if (self != NULL)
-        assign_svalue_no_free(&self->lpc_closure, cl);
+    if (self == NULL)
+        return NULL;
 
+    assign_svalue_no_free(&self->lpc_closure, cl);
     add_gc_object(&gc_closure_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
@@ -1858,10 +2420,10 @@ ldmud_efun_richcompare (ldmud_efun_t *self, PyObject *other, int op)
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_efun_get__name__(ldmud_efun_t *efun, void *closure)
+ldmud_efun_get_name(ldmud_efun_t *efun, void *closure)
 
 /**
- * Return the value for the __name__ member.
+ * Return the value for the name member.
  */
 
 {
@@ -1871,7 +2433,7 @@ ldmud_efun_get__name__(ldmud_efun_t *efun, void *closure)
 /*-------------------------------------------------------------------------*/
 
 static PyGetSetDef ldmud_efun_getset [] = {
-    {"__name__", (getter)ldmud_efun_get__name__, NULL, NULL},
+    {"name", (getter)ldmud_efun_get_name, NULL, NULL},
     {NULL}
 };
 
@@ -2045,6 +2607,8 @@ static PyObject* init_ldmud_module()
         return NULL;
     if (PyType_Ready(&ldmud_array_type) < 0)
         return NULL;
+    if (PyType_Ready(&ldmud_mapping_type) < 0)
+        return NULL;
     if (PyType_Ready(&ldmud_struct_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_closure_type) < 0)
@@ -2058,10 +2622,12 @@ static PyObject* init_ldmud_module()
     /* Add types to module. */
     Py_INCREF(&ldmud_object_type);
     Py_INCREF(&ldmud_array_type);
+    Py_INCREF(&ldmud_mapping_type);
     Py_INCREF(&ldmud_struct_type);
     Py_INCREF(&ldmud_closure_type);
     PyModule_AddObject(module, "Object", (PyObject*) &ldmud_object_type);
     PyModule_AddObject(module, "Array", (PyObject*) &ldmud_array_type);
+    PyModule_AddObject(module, "Mapping", (PyObject*) &ldmud_mapping_type);
     PyModule_AddObject(module, "Struct", (PyObject*) &ldmud_struct_type);
     PyModule_AddObject(module, "Closure", (PyObject*) &ldmud_closure_type);
 
@@ -2105,8 +2671,7 @@ svalue_to_python (svalue_t *svp)
             return ldmud_object_create(svp->u.ob);
 
         case T_MAPPING:
-            // TODO
-            return NULL;
+            return ldmud_mapping_create(svp->u.map);
 
         case T_CLOSURE:
             return ldmud_closure_create(svp);
@@ -2178,6 +2743,12 @@ python_to_svalue (svalue_t *dest, PyObject* val)
     if (PyObject_TypeCheck(val, &ldmud_array_type))
     {
         put_ref_array(dest, ((ldmud_array_t*)val)->lpc_array);
+        return NULL;
+    }
+
+    if (PyObject_TypeCheck(val, &ldmud_mapping_type))
+    {
+        put_ref_mapping(dest, ((ldmud_mapping_t*)val)->lpc_mapping);
         return NULL;
     }
 
@@ -2275,6 +2846,14 @@ python_eq_svalue (PyObject* pval, svalue_t *sval)
     {
         if (sval->type == T_POINTER)
             return sval->u.vec == ((ldmud_array_t*)pval)->lpc_array;
+        else
+            return false;
+    }
+
+    if (PyObject_TypeCheck(pval, &ldmud_mapping_type))
+    {
+        if (sval->type == T_MAPPING)
+            return sval->u.map == ((ldmud_mapping_t*)pval)->lpc_mapping;
         else
             return false;
     }
@@ -2616,6 +3195,14 @@ python_clear_refs ()
         }
     }
 
+    for(ldmud_gc_var_t* var = gc_mapping_list; var != NULL; var = var->gcnext)
+    {
+        /* Let clear_ref_in_vector do that. */
+        svalue_t mapping = { T_MAPPING };
+        mapping.u.map = ((ldmud_mapping_t*)var)->lpc_mapping;
+        clear_ref_in_vector(&mapping, 1);
+    }
+
     for(ldmud_gc_var_t* var = gc_struct_list; var != NULL; var = var->gcnext)
     {
         struct_t* s = ((ldmud_struct_t*)var)->lpc_struct;
@@ -2665,6 +3252,19 @@ python_count_refs ()
             count_ref_in_vector(arr->item, VEC_SIZE(arr));
         }
         arr->ref++;
+    }
+
+    for(ldmud_gc_var_t* var = gc_mapping_list; var != NULL; var = var->gcnext)
+    {
+        mapping_t* map = ((ldmud_mapping_t*)var)->lpc_mapping;
+
+        if (x_test_ref(map))
+        {
+            x_mark_ref(map);
+            count_ref_in_mapping(map);
+            count_mapping_size(map);
+        }
+        map->ref++;
     }
 
     for(ldmud_gc_var_t* var = gc_struct_list; var != NULL; var = var->gcnext)
