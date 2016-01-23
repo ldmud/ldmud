@@ -148,7 +148,7 @@ mb_alloc (membuffer_e buf, size_t size)
 
 {
 #ifdef DEBUG
-    if (buf < 0 || buf >= mbMax)
+    if (buf >= mbMax)
         fatal("mb_alloc: Illegal buf# %d\n", buf);
 #endif
 
@@ -182,7 +182,7 @@ mb_realloc (membuffer_e buf, size_t size)
     void * mem;
 
 #ifdef DEBUG
-    if (buf < 0 || buf >= mbMax)
+    if (buf >= mbMax)
         fatal("mb_alloc: Illegal buf# %d\n", buf);
 #endif
 
