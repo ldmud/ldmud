@@ -227,6 +227,32 @@ class TestClosure(unittest.TestCase):
         self.assertIsNotNone(s)
         self.assertEqual(s(), 54321)
 
+class TestSymbol(unittest.TestCase):
+    def testSymbolInit(self):
+        s = ldmud.Symbol("sym")
+        self.assertIsNotNone(s)
+        self.assertEqual(s.name, "sym")
+        self.assertEqual(s.quotes, 1)
+
+    def testSymbolInitQuotes(self):
+        s = ldmud.Symbol("sym", 5)
+        self.assertIsNotNone(s)
+        self.assertEqual(s.name, "sym")
+        self.assertEqual(s.quotes, 5)
+
+    def testSymbolEq(self):
+        s1 = ldmud.Symbol("sym", 2)
+        s2 = ldmud.Symbol("sym", 2)
+        s3 = ldmud.Symbol("sym", 5)
+        s4 = ldmud.Symbol("sym2", 2)
+        self.assertIsNotNone(s1)
+        self.assertIsNotNone(s2)
+        self.assertIsNotNone(s3)
+        self.assertIsNotNone(s4)
+        self.assertEqual(s1, s2)
+        self.assertNotEqual(s1, s3)
+        self.assertNotEqual(s1, s4)
+
 class TestEfuns(unittest.TestCase):
     def testDir(self):
         self.assertGreater(len(dir(ldmud.efuns)), 200)

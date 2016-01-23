@@ -63,6 +63,13 @@ DESCRIPTION
 
                Supports function calls.
 
+          - Symbol(name [, quotes])
+              Corresponds to an LPC symbol.
+              On initialization the name of the symbol is required.
+              Optionally the number of quotes (at least 1) can be specified.
+
+              Has two members: name and quotes.
+
 
         This module contains the following sub-namespaces:
 

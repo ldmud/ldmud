@@ -60,7 +60,8 @@ static ldmud_gc_var_t *gc_object_list = NULL,
                       *gc_array_list = NULL,
                       *gc_mapping_list = NULL,
                       *gc_struct_list = NULL,
-                      *gc_closure_list = NULL;
+                      *gc_closure_list = NULL,
+                      *gc_symbol_list = NULL;
 
 /* -- Function prototypes --- */
 static const char* python_to_svalue(svalue_t *dest, PyObject* val);
@@ -180,7 +181,14 @@ struct ldmud_closure_s
 {
     PyGCObject_HEAD
 
-    svalue_t lpc_closure;       /* Can be NULL. */
+    svalue_t lpc_closure;       /* Can be T_INVALID. */
+};
+
+struct ldmud_symbol_s
+{
+    PyGCObject_HEAD
+
+    svalue_t lpc_symbol;        /* Can be T_INVALID. */
 };
 
 typedef struct ldmud_array_s ldmud_array_t;
@@ -188,6 +196,7 @@ typedef struct ldmud_mapping_s ldmud_mapping_t;
 typedef struct ldmud_struct_s ldmud_struct_t;
 typedef struct ldmud_object_s ldmud_object_t;
 typedef struct ldmud_closure_s ldmud_closure_t;
+typedef struct ldmud_symbol_s ldmud_symbol_t;
 
 /*-------------------------------------------------------------------------*/
 /* GC Support */
@@ -2275,6 +2284,278 @@ ldmud_closure_create (svalue_t* cl)
 } /* ldmud_closure_create */
 
 /*-------------------------------------------------------------------------*/
+/* Symbols */
+static bool ldmud_symbol_check(PyObject *ob);
+
+static void
+ldmud_symbol_dealloc (ldmud_symbol_t* self)
+
+/* Destroy the ldmud_symbol_t object
+ */
+
+{
+    free_svalue(&self->lpc_symbol);
+
+    remove_gc_object(&gc_symbol_list, (ldmud_gc_var_t*)self);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_symbol_dealloc */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_symbol_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
+
+/* Implmenent __new__ for ldmud_symbol_t, i.e. allocate and initialize
+ * the symbol with null values.
+ */
+
+{
+    ldmud_symbol_t *self;
+
+    self = (ldmud_symbol_t *)type->tp_alloc(type, 0);
+    if (self == NULL)
+        return NULL;
+
+    self->lpc_symbol.type = T_INVALID;
+    add_gc_object(&gc_symbol_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_symbol_new */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_symbol_init (ldmud_symbol_t *self, PyObject *args, PyObject *kwds)
+
+/* Implement __init__ for ldmud_symbol_t, i.e. create a new symbol object
+ * from the given arguments.
+ */
+
+{
+    /* We expect:
+     *  - the name of this symbol,
+     *  - and optionally the number of quotes (at least 1)
+     */
+
+    static char *kwlist[] = { "name", "quotes", NULL};
+
+    Py_ssize_t length;
+    const char *name;
+    int quotes = 1;
+    string_t * str;
+
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "s#|i", kwlist,
+                                      &name, &length, &quotes))
+        return -1;
+
+    if(quotes < 1)
+    {
+        PyErr_SetString(PyExc_ValueError, "need at least one quote");
+        return -1;
+    }
+
+    str = new_n_tabled(name, length);
+    if (str == NULL)
+    {
+        PyErr_NoMemory();
+        return -1;
+    }
+
+    put_symbol(&self->lpc_symbol, str, quotes);
+    return 0;
+}
+
+/*-------------------------------------------------------------------------*/
+static Py_hash_t
+ldmud_symbol_hash (ldmud_symbol_t *val)
+
+/**
+ * Return a hash of this symbol.
+ */
+
+{
+    return _Py_HashPointer(val->lpc_symbol.u.str) ^ val->lpc_symbol.x.quotes;
+}
+
+/*-------------------------------------------------------------------------*/
+
+static PyObject*
+ldmud_symbol_richcompare (ldmud_symbol_t *self, PyObject *other, int op)
+
+/**
+ * Compare <self> to <other> with the compare operation <op>.
+ */
+
+{
+    svalue_t *self_sym, *other_sym;
+    bool result;
+    PyObject* resultval;
+
+    if (!ldmud_symbol_check(other))
+    {
+        Py_INCREF(Py_NotImplemented);
+        return Py_NotImplemented;
+    }
+
+    self_sym = &self->lpc_symbol;
+    other_sym = &((ldmud_symbol_t*)other)->lpc_symbol;
+
+    if(self_sym->type != T_SYMBOL && other_sym->type != T_SYMBOL)
+        result = op == Py_LE || op == Py_EQ || op == Py_GE;
+    else if(self_sym->type != T_SYMBOL)
+        result = op == Py_LT || op == Py_LE || op == Py_NE;
+    else if(other_sym->type != T_SYMBOL)
+        result = op == Py_GT || op == Py_GE || op == Py_NE;
+    else
+    {
+        int cmp = mstrcmp(self_sym->u.str, other_sym->u.str);
+        if (cmp == 0)
+            cmp = self_sym->x.quotes == other_sym->x.quotes ? 0
+                : self_sym->x.quotes < other_sym->x.quotes ? -1 : 1;
+
+        switch (op)
+        {
+            case Py_LT: result = cmp < 0; break;
+            case Py_LE: result = cmp <= 0; break;
+            case Py_EQ: result = cmp == 0; break;
+            case Py_NE: result = cmp != 0; break;
+            case Py_GT: result = cmp > 0; break;
+            case Py_GE: result = cmp >= 0; break;
+            default:
+            {
+                Py_INCREF(Py_NotImplemented);
+                return Py_NotImplemented;
+            }
+        }
+    }
+
+    resultval = result ? Py_True : Py_False;
+    Py_INCREF(resultval);
+    return resultval;
+}
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_symbol_get_name(ldmud_symbol_t *val, void *closure)
+
+/**
+ * Return the value for the name member.
+ */
+
+{
+    if (val->lpc_symbol.type != T_SYMBOL)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    return PyUnicode_Decode(get_txt(val->lpc_symbol.u.str), mstrsize(val->lpc_symbol.u.str), "utf-8", "replace");
+}
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_symbol_get_quotes(ldmud_symbol_t *val, void *closure)
+
+/**
+ * Return the value for the quotes member.
+ */
+
+{
+    if (val->lpc_symbol.type != T_SYMBOL)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+    return PyLong_FromLong(val->lpc_symbol.x.quotes);
+}
+
+/*-------------------------------------------------------------------------*/
+static PyMethodDef ldmud_symbol_methods[] =
+{
+    {NULL}
+};
+
+static PyGetSetDef ldmud_symbol_getset[] =
+{
+    {"name",   (getter)ldmud_symbol_get_name,   NULL, NULL},
+    {"quotes", (getter)ldmud_symbol_get_quotes, NULL, NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_symbol_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.Symbol",                     /* tp_name */
+    sizeof(ldmud_symbol_t),             /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_symbol_dealloc,   /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    (hashfunc)ldmud_symbol_hash,        /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC symbol",                       /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    (richcmpfunc)ldmud_symbol_richcompare, /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_symbol_methods,               /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_symbol_getset,                /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    (initproc)ldmud_symbol_init,        /* tp_init */
+    0,                                  /* tp_alloc */
+    ldmud_symbol_new,                   /* tp_new */
+};
+
+
+/*-------------------------------------------------------------------------*/
+static bool
+ldmud_symbol_check (PyObject *ob)
+
+/* Returns true, when <ob> is of the LPC symbol type.
+ */
+
+{
+    return Py_TYPE(ob) == &ldmud_symbol_type;
+}
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_symbol_create (svalue_t* sym)
+
+/* Creates a new Python symbol from an LPC symbol.
+ */
+
+{
+    ldmud_symbol_t *self;
+
+    self = (ldmud_symbol_t *)ldmud_symbol_type.tp_alloc(&ldmud_symbol_type, 0);
+    if (self == NULL)
+        return NULL;
+
+    assign_svalue_no_free(&self->lpc_symbol, sym);
+    add_gc_object(&gc_symbol_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_symbol_create */
+
+/*-------------------------------------------------------------------------*/
 
 /*=========================================================================*/
 
@@ -2613,6 +2894,8 @@ static PyObject* init_ldmud_module()
         return NULL;
     if (PyType_Ready(&ldmud_closure_type) < 0)
         return NULL;
+    if (PyType_Ready(&ldmud_symbol_type) < 0)
+        return NULL;
 
     /* Initialize module. */
     module = PyModule_Create(&ldmud_module);
@@ -2625,11 +2908,13 @@ static PyObject* init_ldmud_module()
     Py_INCREF(&ldmud_mapping_type);
     Py_INCREF(&ldmud_struct_type);
     Py_INCREF(&ldmud_closure_type);
+    Py_INCREF(&ldmud_symbol_type);
     PyModule_AddObject(module, "Object", (PyObject*) &ldmud_object_type);
     PyModule_AddObject(module, "Array", (PyObject*) &ldmud_array_type);
     PyModule_AddObject(module, "Mapping", (PyObject*) &ldmud_mapping_type);
     PyModule_AddObject(module, "Struct", (PyObject*) &ldmud_struct_type);
     PyModule_AddObject(module, "Closure", (PyObject*) &ldmud_closure_type);
+    PyModule_AddObject(module, "Symbol", (PyObject*) &ldmud_symbol_type);
 
     /* Add the efuns as a sub-namespace. */
     efuns = create_efun_namespace();
@@ -2677,8 +2962,7 @@ svalue_to_python (svalue_t *svp)
             return ldmud_closure_create(svp);
 
         case T_SYMBOL:
-            // TODO
-            return NULL;
+            return ldmud_symbol_create(svp);
 
         case T_QUOTED_ARRAY:
             // TODO
@@ -2761,6 +3045,12 @@ python_to_svalue (svalue_t *dest, PyObject* val)
     if (PyObject_TypeCheck(val, &ldmud_closure_type))
     {
         assign_svalue_no_free(dest, &((ldmud_closure_t*)val)->lpc_closure);
+        return NULL;
+    }
+
+    if (PyObject_TypeCheck(val, &ldmud_symbol_type))
+    {
+        assign_svalue_no_free(dest, &((ldmud_symbol_t*)val)->lpc_symbol);
         return NULL;
     }
 
@@ -2870,6 +3160,18 @@ python_eq_svalue (PyObject* pval, svalue_t *sval)
     {
         if (sval->type == T_CLOSURE)
             return closure_cmp(sval, &((ldmud_closure_t*)pval)->lpc_closure) == 0;
+        else
+            return false;
+    }
+
+    if (PyObject_TypeCheck(pval, &ldmud_symbol_type))
+    {
+        if (sval->type == T_SYMBOL)
+        {
+            svalue_t *psval = &((ldmud_symbol_t*)pval)->lpc_symbol;
+            return psval->u.str == sval->u.str &&
+                   psval->x.quotes == sval->x.quotes;
+        }
         else
             return false;
     }
@@ -3214,6 +3516,11 @@ python_clear_refs ()
     {
         clear_ref_in_vector(&((ldmud_closure_t*)var)->lpc_closure, 1);
     }
+
+    for(ldmud_gc_var_t* var = gc_symbol_list; var != NULL; var = var->gcnext)
+    {
+        clear_ref_in_vector(&((ldmud_symbol_t*)var)->lpc_symbol, 1);
+    }
 } /* python_clear_refs() */
 
 /*-------------------------------------------------------------------------*/
@@ -3277,6 +3584,11 @@ python_count_refs ()
     for(ldmud_gc_var_t* var = gc_closure_list; var != NULL; var = var->gcnext)
     {
         count_ref_in_vector(&((ldmud_closure_t*)var)->lpc_closure, 1);
+    }
+
+    for(ldmud_gc_var_t* var = gc_symbol_list; var != NULL; var = var->gcnext)
+    {
+        count_ref_in_vector(&((ldmud_symbol_t*)var)->lpc_symbol, 1);
     }
 } /* python_count_refs() */
 
