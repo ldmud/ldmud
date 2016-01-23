@@ -61,7 +61,8 @@ static ldmud_gc_var_t *gc_object_list = NULL,
                       *gc_mapping_list = NULL,
                       *gc_struct_list = NULL,
                       *gc_closure_list = NULL,
-                      *gc_symbol_list = NULL;
+                      *gc_symbol_list = NULL,
+                      *gc_quoted_array_list = NULL;
 
 /* -- Function prototypes --- */
 static const char* python_to_svalue(svalue_t *dest, PyObject* val);
@@ -191,12 +192,20 @@ struct ldmud_symbol_s
     svalue_t lpc_symbol;        /* Can be T_INVALID. */
 };
 
+struct ldmud_quoted_array_s
+{
+    PyGCObject_HEAD
+
+    svalue_t lpc_quoted_array;  /* Can be T_INVALID. */
+};
+
 typedef struct ldmud_array_s ldmud_array_t;
 typedef struct ldmud_mapping_s ldmud_mapping_t;
 typedef struct ldmud_struct_s ldmud_struct_t;
 typedef struct ldmud_object_s ldmud_object_t;
 typedef struct ldmud_closure_s ldmud_closure_t;
 typedef struct ldmud_symbol_s ldmud_symbol_t;
+typedef struct ldmud_quoted_array_s ldmud_quoted_array_t;
 
 /*-------------------------------------------------------------------------*/
 /* GC Support */
@@ -2556,6 +2565,225 @@ ldmud_symbol_create (svalue_t* sym)
 } /* ldmud_symbol_create */
 
 /*-------------------------------------------------------------------------*/
+/* Quoted Arrays */
+static bool ldmud_quoted_array_check(PyObject *ob);
+
+static void
+ldmud_quoted_array_dealloc (ldmud_quoted_array_t* self)
+
+/* Destroy the ldmud_quoted_array_t object
+ */
+
+{
+    free_svalue(&self->lpc_quoted_array);
+
+    remove_gc_object(&gc_quoted_array_list, (ldmud_gc_var_t*)self);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_quoted_array_dealloc */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_quoted_array_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
+
+/* Implmenent __new__ for ldmud_quoted_array_t, i.e. allocate and initialize
+ * the quoted_array with null values.
+ */
+
+{
+    ldmud_quoted_array_t *self;
+
+    self = (ldmud_quoted_array_t *)type->tp_alloc(type, 0);
+    if (self == NULL)
+        return NULL;
+
+    self->lpc_quoted_array.type = T_INVALID;
+    add_gc_object(&gc_quoted_array_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_quoted_array_new */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_quoted_array_init (ldmud_quoted_array_t *self, PyObject *args, PyObject *kwds)
+
+/* Implement __init__ for ldmud_quoted_array_t, i.e. create a new quoted_array object
+ * from the given arguments.
+ */
+
+{
+    /* We expect:
+     *  - the base array (can also be an already quoted array),
+     *  - and optionally the number of quotes (at least 1)
+     */
+
+    static char *kwlist[] = { "array", "quotes", NULL};
+
+    PyObject *arr;
+    int quotes = 1;
+    vector_t *vec;
+
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "O|i", kwlist,
+                                      &arr, &quotes))
+        return -1;
+
+    if(quotes < 1)
+    {
+        PyErr_SetString(PyExc_ValueError, "need at least one quote");
+        return -1;
+    }
+
+    if (ldmud_array_check(arr))
+        vec = ((ldmud_array_t*)arr)->lpc_array;
+    else if(ldmud_quoted_array_check(arr))
+    {
+        svalue_t *sval = &((ldmud_quoted_array_t*)arr)->lpc_quoted_array;
+        if (sval->type != T_QUOTED_ARRAY)
+        {
+            PyErr_SetString(PyExc_ValueError, "uninitialized quoted array");
+            return -1;
+        }
+
+        vec = sval->u.vec;
+        quotes += sval->x.quotes;
+    }
+    else
+    {
+        PyErr_Format(PyExc_TypeError, "can only quote ldmud.Array or ldmud.QuotedArray (not \"%.200s\")",
+                     Py_TYPE(arr)->tp_name);
+        return -1;
+    }
+
+    put_ref_array(&self->lpc_quoted_array, vec);
+    self->lpc_quoted_array.type = T_QUOTED_ARRAY;
+    self->lpc_quoted_array.x.quotes = quotes;
+
+    return 0;
+}
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_quoted_array_get_array(ldmud_quoted_array_t *val, void *closure)
+
+/**
+ * Return the value for the array member.
+ */
+
+{
+    if (val->lpc_quoted_array.type != T_QUOTED_ARRAY)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    return ldmud_array_create(val->lpc_quoted_array.u.vec);
+}
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_quoted_array_get_quotes(ldmud_quoted_array_t *val, void *closure)
+
+/**
+ * Return the value for the quotes member.
+ */
+
+{
+    if (val->lpc_quoted_array.type != T_QUOTED_ARRAY)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+    return PyLong_FromLong(val->lpc_quoted_array.x.quotes);
+}
+
+/*-------------------------------------------------------------------------*/
+static PyMethodDef ldmud_quoted_array_methods[] =
+{
+    {NULL}
+};
+
+static PyGetSetDef ldmud_quoted_array_getset[] =
+{
+    {"array",  (getter)ldmud_quoted_array_get_array,  NULL, NULL},
+    {"quotes", (getter)ldmud_quoted_array_get_quotes, NULL, NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_quoted_array_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.QuotedArray",                /* tp_name */
+    sizeof(ldmud_quoted_array_t),       /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_quoted_array_dealloc, /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC quoted array",                 /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_quoted_array_methods,         /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_quoted_array_getset,          /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    (initproc)ldmud_quoted_array_init,  /* tp_init */
+    0,                                  /* tp_alloc */
+    ldmud_quoted_array_new,             /* tp_new */
+};
+
+
+/*-------------------------------------------------------------------------*/
+static bool
+ldmud_quoted_array_check (PyObject *ob)
+
+/* Returns true, when <ob> is of the LPC quoted_array type.
+ */
+
+{
+    return Py_TYPE(ob) == &ldmud_quoted_array_type;
+}
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_quoted_array_create (svalue_t* sym)
+
+/* Creates a new Python quoted_array from an LPC quoted_array.
+ */
+
+{
+    ldmud_quoted_array_t *self;
+
+    self = (ldmud_quoted_array_t *)ldmud_quoted_array_type.tp_alloc(&ldmud_quoted_array_type, 0);
+    if (self == NULL)
+        return NULL;
+
+    assign_svalue_no_free(&self->lpc_quoted_array, sym);
+    add_gc_object(&gc_quoted_array_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_quoted_array_create */
+
+/*-------------------------------------------------------------------------*/
 
 /*=========================================================================*/
 
@@ -2896,6 +3124,8 @@ static PyObject* init_ldmud_module()
         return NULL;
     if (PyType_Ready(&ldmud_symbol_type) < 0)
         return NULL;
+    if (PyType_Ready(&ldmud_quoted_array_type) < 0)
+        return NULL;
 
     /* Initialize module. */
     module = PyModule_Create(&ldmud_module);
@@ -2909,12 +3139,14 @@ static PyObject* init_ldmud_module()
     Py_INCREF(&ldmud_struct_type);
     Py_INCREF(&ldmud_closure_type);
     Py_INCREF(&ldmud_symbol_type);
+    Py_INCREF(&ldmud_quoted_array_type);
     PyModule_AddObject(module, "Object", (PyObject*) &ldmud_object_type);
     PyModule_AddObject(module, "Array", (PyObject*) &ldmud_array_type);
     PyModule_AddObject(module, "Mapping", (PyObject*) &ldmud_mapping_type);
     PyModule_AddObject(module, "Struct", (PyObject*) &ldmud_struct_type);
     PyModule_AddObject(module, "Closure", (PyObject*) &ldmud_closure_type);
     PyModule_AddObject(module, "Symbol", (PyObject*) &ldmud_symbol_type);
+    PyModule_AddObject(module, "QuotedArray", (PyObject*) &ldmud_quoted_array_type);
 
     /* Add the efuns as a sub-namespace. */
     efuns = create_efun_namespace();
@@ -2965,8 +3197,7 @@ svalue_to_python (svalue_t *svp)
             return ldmud_symbol_create(svp);
 
         case T_QUOTED_ARRAY:
-            // TODO
-            return NULL;
+            return ldmud_quoted_array_create(svp);
 
         case T_STRUCT:
         {
@@ -3051,6 +3282,12 @@ python_to_svalue (svalue_t *dest, PyObject* val)
     if (PyObject_TypeCheck(val, &ldmud_symbol_type))
     {
         assign_svalue_no_free(dest, &((ldmud_symbol_t*)val)->lpc_symbol);
+        return NULL;
+    }
+
+    if (PyObject_TypeCheck(val, &ldmud_quoted_array_type))
+    {
+        assign_svalue_no_free(dest, &((ldmud_quoted_array_t*)val)->lpc_quoted_array);
         return NULL;
     }
 
@@ -3170,6 +3407,18 @@ python_eq_svalue (PyObject* pval, svalue_t *sval)
         {
             svalue_t *psval = &((ldmud_symbol_t*)pval)->lpc_symbol;
             return psval->u.str == sval->u.str &&
+                   psval->x.quotes == sval->x.quotes;
+        }
+        else
+            return false;
+    }
+
+    if (PyObject_TypeCheck(pval, &ldmud_quoted_array_type))
+    {
+        if (sval->type == T_QUOTED_ARRAY)
+        {
+            svalue_t *psval = &((ldmud_quoted_array_t*)pval)->lpc_quoted_array;
+            return psval->u.vec == sval->u.vec &&
                    psval->x.quotes == sval->x.quotes;
         }
         else
@@ -3521,6 +3770,11 @@ python_clear_refs ()
     {
         clear_ref_in_vector(&((ldmud_symbol_t*)var)->lpc_symbol, 1);
     }
+
+    for(ldmud_gc_var_t* var = gc_quoted_array_list; var != NULL; var = var->gcnext)
+    {
+        clear_ref_in_vector(&((ldmud_quoted_array_t*)var)->lpc_quoted_array, 1);
+    }
 } /* python_clear_refs() */
 
 /*-------------------------------------------------------------------------*/
@@ -3589,6 +3843,11 @@ python_count_refs ()
     for(ldmud_gc_var_t* var = gc_symbol_list; var != NULL; var = var->gcnext)
     {
         count_ref_in_vector(&((ldmud_symbol_t*)var)->lpc_symbol, 1);
+    }
+
+    for(ldmud_gc_var_t* var = gc_quoted_array_list; var != NULL; var = var->gcnext)
+    {
+        count_ref_in_vector(&((ldmud_quoted_array_t*)var)->lpc_quoted_array, 1);
     }
 } /* python_count_refs() */
 

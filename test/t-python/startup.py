@@ -253,6 +253,36 @@ class TestSymbol(unittest.TestCase):
         self.assertNotEqual(s1, s3)
         self.assertNotEqual(s1, s4)
 
+class TestQuotedArray(unittest.TestCase):
+    def testQuotedArrayInit(self):
+        qa = ldmud.QuotedArray(ldmud.Array([2, 1]))
+        self.assertIsNotNone(qa)
+        self.assertEqual(len(qa.array), 2)
+        self.assertEqual(qa.array[0], 2)
+        self.assertEqual(qa.array[1], 1)
+        self.assertEqual(qa.quotes, 1)
+
+    def testQuotedArrayInitQuotes(self):
+        qa = ldmud.QuotedArray(ldmud.Array([2, 1]), quotes=5)
+        self.assertIsNotNone(qa)
+        self.assertEqual(len(qa.array), 2)
+        self.assertEqual(qa.array[0], 2)
+        self.assertEqual(qa.array[1], 1)
+        self.assertEqual(qa.quotes, 5)
+
+    def testQuotedArrayInitQuotedArray(self):
+        qa1 = ldmud.QuotedArray(ldmud.Array([4, 3]), quotes=2)
+        qa2 = ldmud.QuotedArray(qa1, quotes=3)
+        self.assertIsNotNone(qa2)
+        self.assertEqual(len(qa2.array), 2)
+        self.assertEqual(qa2.array[0], 4)
+        self.assertEqual(qa2.array[1], 3)
+        self.assertEqual(qa2.quotes, 5)
+
+    def testQuotedArrayInitInvalid(self):
+        with self.assertRaises(TypeError):
+            ldmud.QuotedArray(1.5, 1)
+
 class TestEfuns(unittest.TestCase):
     def testDir(self):
         self.assertGreater(len(dir(ldmud.efuns)), 200)

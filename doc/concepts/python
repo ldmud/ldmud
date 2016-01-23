@@ -70,6 +70,13 @@ DESCRIPTION
 
               Has two members: name and quotes.
 
+          - QuotedArray(array [, quotes])
+              Corresponds to an LPC quoted array.
+              On initialization an array is required.
+              Optionally the number of quotes (at least 1) can be specified.
+
+              Has two members: array and quotes.
+
 
         This module contains the following sub-namespaces:
 

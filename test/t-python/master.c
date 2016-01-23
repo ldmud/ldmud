@@ -11,6 +11,7 @@ struct test_struct
     mixed*  t_array;
     mapping t_mapping;
     symbol  t_symbol;
+    mixed   t_quoted_array;
 };
 
 void run_test()
@@ -86,6 +87,14 @@ void run_test()
                        python_return('''abc) == '''abc;
             :)
         }),
+        ({ "passing quoted arrays", 0,
+            (:
+                mixed arr = '''({5,15,20});
+                return python_return(arr) == arr &&
+                       python_return('({})) == '({}) &&
+                       python_return(''({})) != '({});
+            :)
+        }),
 #if 0 /* Lvalues are not supported */
         ({ "passing lvalue", 0,
             (:
@@ -119,7 +128,17 @@ void run_test()
             shutdown(1);
         else
         {
-            python_set((<test_struct> 705948522, -1000000.0, "Garbage", this_object(), ({ 5, 3, 1}), ([2,3,5]), quote("abc"+"gc")));
+            python_set((<test_struct> 
+                705948522,
+                -1000000.0,
+                "Garbage",
+                this_object(),
+                ({ 5, 3, 1}),
+                ([2,3,5]),
+                quote("abc"+"gc"),
+                quote(({11, 13, 17}))
+            ));
+
             start_gc(function void(int result)
             {
                 mixed val = python_get();
@@ -131,7 +150,8 @@ void run_test()
                     val->t_array[0] != 5 || val->t_array[1] != 3 || val->t_array[2] != 1 ||
                     sizeof(val->t_mapping) != 3 || widthof(val->t_mapping) != 0 ||
                     !member(val->t_mapping, 2) || !member(val->t_mapping, 3) || !member(val->t_mapping, 5) ||
-                    unquote(val->t_symbol) != "ab" + "cgc"
+                    unquote(val->t_symbol) != "ab" + "cgc" ||
+                    sizeof(unquote(val->t_quoted_array)) != 3
                   )
                 {
                     msg("Wrong value returned from python_get() after GC.!\n");
