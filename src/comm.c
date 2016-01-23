@@ -5068,7 +5068,7 @@ telnet_neg (interactive_t *ip)
     char *from;   /* Next char to process */
     char *to;     /* Where to store the extracted command text */
     int   state;
-    int   ch;     /* Current character */
+    unsigned char ch;     /* Current character */
     char *first;  /* Begin of the last pure command text */
     char *end;    /* End of data in text[] */
 
@@ -5152,8 +5152,7 @@ telnet_neg (interactive_t *ip)
                 return;
             }
             ch = (*from++ & 0xff);
-            DTN(("t_n: (ts_data) processing %02hhx '%c'\n"
-                , (unsigned char)ch, ch));
+            DTN(("t_n: (ts_data) processing %02hhx '%c'\n", ch, ch));
             /* FALLTHROUGH */
 
         case TS_DATA: /* --- Copy/interpret plain data --- */
@@ -5344,7 +5343,8 @@ telnet_neg (interactive_t *ip)
             } /* switch(ch) */
             state = ip->ts_data;
             goto change_state;
-
+DIAGWARN_PUSH
+DIAG_IGNORE_TAUTOLOGICAL_CONST_OOR_CMP
         case TS_WILL:
             command_giver = ip->ob;
             if (ch < NTELOPTS) {
@@ -5406,7 +5406,7 @@ telnet_neg (interactive_t *ip)
             }
             state = ip->ts_data;
             goto change_state;
-
+DIAGWARN_POP
         case TS_SB:
             DTN(("t_n: state TS_SB got %02hhx\n", ch));
             if (ch == IAC) {

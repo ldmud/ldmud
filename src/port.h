@@ -157,6 +157,19 @@ extern int errno;
 #    define MALLOC
 #    define FORMATDEBUG(f,a,b)
 #endif
+#ifdef __clang__
+# define DIAGWARN_PUSH _Pragma("clang diagnostic push")
+# define DIAGWARN_POP  _Pragma("clang diagnostic pop")
+# define DIAG_IGNORE_TAUTOLOGICAL_CONST_OOR_CMP _Pragma("clang diagnostic ignored \"-Wtautological-constant-out-of-range-compare\"")
+#elif __GNUC__ * 100 + __GNUC_MINOR__ >= 406
+# define DIAGWARN_PUSH _Pragma("GCC diagnostic push")
+# define DIAGWARN_POP  _Pragma("GCC diagnostic pop")
+# define DIAG_IGNORE_TAUTOLOGICAL_CONST_OOR_CMP _Pragma("GCC diagnostic ignored \"-Wtype-limits\"")
+#else
+# define DIAGWARN_PUSH
+# define DIAGWARN_POP
+# define DIAG_IGNORE_TAUTOLOGICAL_CONST_OOR_CMP
+#endif
 
 #define VARPROT(proto,like,form,var) proto FORMATDEBUG(like,form,var)
 
