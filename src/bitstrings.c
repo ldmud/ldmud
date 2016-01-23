@@ -539,7 +539,7 @@ f_next_bit (svalue_t *sp)
     }
 
     invert = 0;
-    if (!sp->type == T_NUMBER || sp->u.number)
+    if (sp->type != T_NUMBER || sp->u.number)
         invert = 0x3f;
 
     /* Now search for the next bit */
