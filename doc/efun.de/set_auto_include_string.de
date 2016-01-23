@@ -5,7 +5,7 @@ SYNOPSIS
 BESCHREIBUNG
         <arg> wird automatisch in jedes neu kompilierte LPC-Objekt
         eingebunden. Das ist nuetzlich, um globale Definitionen, z.B.
-        #pragma combine_string oder #pragma_strict_types durchzusetzen.
+        #pragma combine_string oder #pragma strict_types durchzusetzen.
         Das aufrufende Objekt muss durch das Masterobjekt privilegiert
         sein.
 

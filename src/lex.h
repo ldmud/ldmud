@@ -213,12 +213,21 @@ struct ident_s
 
 #define lookup_predef(p) (p->type == I_TYPE_GLOBAL ? p->u.global.efun : -1)
 
+
+/* Values of pragma_strict_types */
+typedef enum pragma_cttype_checks
+{
+    PRAGMA_WEAK_TYPES    = 0,
+    PRAGMA_STRONG_TYPES  = 1,
+    PRAGMA_STRICT_TYPES  = 2,
+} pragma_cttype_checks_e;
+
 /* --- Variables --- */
 
 extern struct lpc_predef_s * lpc_predefs;
 extern int total_lines;
 extern source_loc_t current_loc;
-extern Bool pragma_strict_types;
+extern pragma_cttype_checks_e pragma_strict_types;
 extern Bool pragma_save_types;
 extern Bool pragma_no_clone;
 extern Bool pragma_no_inherit;
@@ -234,11 +243,6 @@ extern Bool pragma_rtt_checks;
 extern string_t *last_lex_string;
 extern ident_t *all_efuns;
 
-/* Values of pragma_strict_types */
-
-#define PRAGMA_WEAK_TYPES    0
-#define PRAGMA_STRONG_TYPES  1
-#define PRAGMA_STRICT_TYPES  2
 
 /* Function name overrides. */
 enum efun_override_e

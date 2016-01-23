@@ -153,7 +153,7 @@ Bool pragma_check_overloads;
    * mudlibs.
    */
 
-Bool pragma_strict_types;
+pragma_cttype_checks_e pragma_strict_types;
   /* Type enforcing mode: PRAGMA_WEAK_TYPES, PRAGMA_STRONG_TYPES
    * and PRAGMA_STRICT_TYPES.
    */
