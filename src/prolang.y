@@ -16576,23 +16576,10 @@ epilog (void)
          * sorted list of function names.
          */
 
-        /* If the program is too large, make sure that the
-         * name strings are freed again.
-         */
+        /* Raise error if program got too large. */
         if (CURRENT_PROGRAM_SIZE > FUNSTART_MASK)
         {
-            function_t *functions;
-
             yyerror("Program too large");
-            functions = FUNCTION(0);
-            for (i = num_functions; --i >= 0; functions++)
-            {
-                if ( !(functions->flags & (NAME_UNDEFINED|NAME_INHERITED)) ==
-                      NAME_UNDEFINED)
-                {
-                    free_mstring(functions->name);
-                }
-            }
         }
 
         /* Done: functions are sorted, resolved, etc etc */
