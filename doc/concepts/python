@@ -17,6 +17,13 @@ DESCRIPTION
                 Registers a new efun name. This is not allowed during
                 compilation of an LPC object.
 
+          - unregister_efun(name) -> None
+                Removes a python efun from registration. This is not
+                allowed during compilation of an LPC object. The
+                removal will only affect newly compiled code,
+                already compiled code will produce errors when
+                calling this efun.
+
           - register_socket(fd, function [,eventmask]) -> None
                 Registers a socket <fd> to watch for events (like
                 poll/select). The socket must be either given as

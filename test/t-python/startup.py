@@ -335,3 +335,6 @@ ldmud.register_efun("python_test", python_test)
 ldmud.register_efun("python_return", python_return)
 ldmud.register_efun("python_get", python_get)
 ldmud.register_efun("python_set", python_set)
+
+ldmud.register_efun("abs", lambda x: x*2)
+ldmud.register_efun("unregister_abs", lambda: ldmud.unregister_efun("abs"))

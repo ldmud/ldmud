@@ -115,6 +115,19 @@ void run_test()
                 return python_return();
             :)
         }),
+        ({
+            "Overriding efuns", 0,
+            (:
+                return funcall(symbol_function("abs"),-10) == -20;
+            :)
+        }),
+        ({
+            "Unregistering efuns", 0,
+            (:
+                unregister_abs();
+                return funcall(symbol_function("abs"),-10) == 10;
+            :)
+        }),
         ({ "Python test suite", 0,
             (:
                 msg("\n");

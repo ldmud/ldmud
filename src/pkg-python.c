@@ -169,6 +169,58 @@ python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
+python_unregister_efun (PyObject *module, PyObject *args, PyObject *kwds)
+
+/* Python function to remove a efun registration.
+ * We just set the entry in the python_efun_table to NULL.
+ * The identifier stays, because we want to reuse its index,
+ * when this efun will be re-registered.
+ *
+ * Already compiled code will still reference the python efun
+ * and will produce errors.
+ */
+
+{
+    static char *kwlist[] = { "name", NULL};
+
+    char *name;
+    ident_t *ident;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s:unregister_efun", kwlist, &name))
+        return NULL;
+
+    ident = find_shared_identifier(name, I_TYPE_GLOBAL, 0);
+    if (!ident || ident->type == I_TYPE_UNKNOWN)
+    {
+        /* No identifier there, we're done. */
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    /* There is higher level identifier?
+     * Should only happen during compile time, and that we forbid.
+     */
+    if (ident->type != I_TYPE_GLOBAL)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "couldn't remove efun entry");
+        return NULL;
+    }
+
+    /* This is a python efun? */
+    if (ident->u.global.python_efun != I_GLOBAL_PYTHON_EFUN_OTHER)
+    {
+        int idx = ident->u.global.python_efun;
+
+        Py_XDECREF(python_efun_table[idx]);
+        python_efun_table[idx] = NULL;
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
+} /* python_register_efun */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
 python_register_socket (PyObject *module, PyObject *args, PyObject *kwds)
 
 /* Python function to register a callable with a socket.
@@ -3240,6 +3292,14 @@ static PyMethodDef ldmud_methods[] =
         "register_efun(name, function) -> None\n\n"
         "Registers a new efun name. This is not allowed during\n"
         "compilation of an LPC object."
+    },
+
+    {
+        "unregister_efun",
+        (PyCFunction) python_unregister_efun, METH_VARARGS | METH_KEYWORDS,
+        "unregister_efun(name) -> None\n\n"
+        "Removes a python efun from registration. This is not allowed\n"
+        "during compilation of an LPC object."
     },
 
     {
