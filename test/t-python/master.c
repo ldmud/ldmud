@@ -142,6 +142,13 @@ void run_test()
             start_gc(function void(int result)
             {
                 mixed val = python_get();
+
+                if (result)
+                {
+                    shutdown(result);
+                    return;
+                }
+
                 if(!structp(val) ||
                     val->t_int != 705948522 ||
                     val->t_float != -1000000.0 ||

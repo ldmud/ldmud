@@ -184,6 +184,7 @@ extern svalue_t *_get_map_lvalue(mapping_t *m, svalue_t *map_index, Bool need_lv
 #define get_map_value(m,x) _get_map_lvalue(m,x,MY_FALSE, MY_TRUE)
 #define get_map_lvalue(m,x) _get_map_lvalue(m,x,MY_TRUE, MY_TRUE)
 #define get_map_lvalue_unchecked(m,x) _get_map_lvalue(m,x,MY_TRUE, MY_FALSE)
+extern void remove_mapping(mapping_t *m, svalue_t *map_index);
 extern Bool mapping_references_objects (mapping_t *m);
 extern void check_map_for_destr_keys(mapping_t *m);
 extern void check_map_for_destr_values(mapping_t *m);

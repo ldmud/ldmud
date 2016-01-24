@@ -10,6 +10,8 @@
 
 #if defined(USE_PYTHON) && defined(HAS_PYTHON3)
 
+#include <poll.h>
+
 #include "array.h"
 #include "closure.h"
 #include "exec.h"
@@ -36,11 +38,27 @@
 #undef _XOPEN_SOURCE
 
 #define PY_SSIZE_T_CLEAN
-#include "Python.h"
+#include <Python.h>
 
 /* --- Type declarations --- */
 typedef struct ldmud_gc_var_s ldmud_gc_var_t;
 typedef void (*CClosureFun)(void*);
+typedef struct python_poll_fds_s python_poll_fds_t;
+
+
+/* --- Type definitions --- */
+struct python_poll_fds_s
+{
+    int fd;                   /* file descriptor */
+    short events;             /* combination of POLLIN, POLLOUT and POLLPRI
+                               * (only valid when eventsfun == NULL)
+                               */
+    PyObject* eventsfun;      /* refcounted python callable to determine <events>. */
+    PyObject* fun;            /* refcounted python callable */
+
+    python_poll_fds_t *next;  /* singly linked list */
+};
+
 
 /* --- Variables --- */
 char * python_startup_script = NULL;
@@ -54,6 +72,10 @@ static PyObject* python_efun_table[PYTHON_EFUN_TABLE_SIZE];
 static ident_t*  python_efun_names[PYTHON_EFUN_TABLE_SIZE];
   /* For each python-defined efun store its identifier
    * here, so we can reverse lookup python efun indices.
+   */
+
+static python_poll_fds_t *poll_fds = NULL;
+  /* List of all via register_socket() registered file descriptors.
    */
 
 static ldmud_gc_var_t *gc_object_list = NULL,
@@ -72,13 +94,23 @@ static bool call_lpc_secure(CClosureFun fun, void* data);
 
 /* -- Python definitions and functions --- */
 
-static PyObject* python_register_efun(PyObject *module, PyObject *args)
+static PyObject*
+python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
+
+/* Python function to register a python callable as an efun.
+ * The callable is entered into the python_efun_table
+ * and its table index is saved as an identifier in the lexer
+ * (perhaps overriding an internal efun)
+ */
+
 {
+    static char *kwlist[] = { "name", "function", NULL};
+
     char *name;
     PyObject *fun;
     ident_t *ident;
 
-    if (!PyArg_ParseTuple(args, "sO:register_efun", &name, &fun))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "sO:register_efun", kwlist, &name, &fun))
         return NULL;
 
     if (!PyCallable_Check(fun))
@@ -133,7 +165,120 @@ static PyObject* python_register_efun(PyObject *module, PyObject *args)
     Py_XINCREF(fun);
     Py_INCREF(Py_None);
     return Py_None;
-}
+} /* python_register_efun */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+python_register_socket (PyObject *module, PyObject *args, PyObject *kwds)
+
+/* Python function to register a callable with a socket.
+ * The callable is called whenever an event on the socket occurs.
+ * The socket is watched by the backend loop.
+ */
+
+{
+    static char *kwlist[] = { "fd", "function", "eventmask", NULL};
+
+    PyObject *fun, *fdob, *eventsfun = NULL;
+    python_poll_fds_t *fds = poll_fds;
+    int events = POLLIN | POLLPRI | POLLOUT;
+    int fd;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO|O:register_socket", kwlist, &fdob, &fun, &eventsfun))
+        return NULL;
+
+    if (!PyCallable_Check(fun))
+    {
+        PyErr_SetString(PyExc_TypeError, "function parameter must be callable");
+        return NULL;
+    }
+
+    if (eventsfun != NULL && !PyCallable_Check(eventsfun))
+    {
+        events = PyLong_AsLong(eventsfun);
+        if (events == -1 && PyErr_Occurred())
+            return NULL;
+
+        eventsfun = NULL;
+    }
+
+    fd = PyObject_AsFileDescriptor(fdob);
+    if (fd == -1)
+        return NULL;
+
+    if (eventsfun == NULL && !(events & (POLLIN|POLLPRI|POLLOUT)))
+    {
+        PyErr_SetString(PyExc_ValueError, "eventmask must be at least one of POLLIN, POLLPRI or POLLOUT");
+        return NULL;
+    }
+
+    /* Let's go through our list, replace already registered functions
+     * with this one or add a new entry.
+     */
+
+    for (; fds != NULL; fds = fds->next)
+        if(fds->fd == fd)
+            break;
+
+    if (fds == NULL)
+    {
+        fds = xalloc(sizeof(python_poll_fds_t));
+        if (fds == NULL)
+            return PyErr_NoMemory();
+
+        fds->next = poll_fds;
+        fds->fun = NULL;
+        fds->fd = fd;
+        poll_fds = fds;
+    }
+
+    Py_XDECREF(fds->fun);
+    Py_XINCREF(fun);
+    Py_XINCREF(eventsfun);
+
+    fds->fun = fun;
+    fds->events = events;
+    fds->eventsfun = eventsfun;
+
+    Py_INCREF(Py_None);
+    return Py_None;
+} /* python_register_socket */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+python_unregister_socket (PyObject *module, PyObject *args, PyObject *kwds)
+
+/* Python function to remove a socket from being watched.
+ */
+
+{
+    static char *kwlist[] = { "fd", NULL};
+
+    PyObject *fdob;
+    int fd;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O:unregister_socket", kwlist, &fdob))
+        return NULL;
+
+    fd = PyObject_AsFileDescriptor(fdob);
+    if (fd == -1)
+        return NULL;
+
+    for (python_poll_fds_t **fds = &poll_fds; *fds != NULL; fds = &((*fds)->next))
+        if ((*fds)->fd == fd)
+        {
+            python_poll_fds_t *oldpoll = *fds;
+            *fds = oldpoll->next;
+
+            Py_XDECREF(oldpoll->fun);
+            Py_XDECREF(oldpoll->eventsfun);
+            xfree(oldpoll);
+            break;
+        }
+
+    Py_INCREF(Py_None);
+    return Py_None;
+} /* python_unregister_socket */
 
 /*=========================================================================*/
 
@@ -1215,6 +1360,7 @@ ldmud_mapping_init (ldmud_mapping_t *self, PyObject *args, PyObject *kwds)
                 Py_DECREF(item);
                 break;
             }
+            free_svalue(&sv);
 
             for (int i = 0; i < width; i++)
             {
@@ -1357,8 +1503,7 @@ ldmud_mapping_ass_sub (ldmud_mapping_t *val, PyObject *key, PyObject *value)
 
 {
     const char *err;
-    svalue_t skey, sval;
-    svalue_t *dest;
+    svalue_t skey;
     Py_ssize_t idx = 0;
 
     if (val->lpc_mapping->num_values == 0)
@@ -1405,25 +1550,37 @@ ldmud_mapping_ass_sub (ldmud_mapping_t *val, PyObject *key, PyObject *value)
         return -1;
     }
 
-    err = python_to_svalue(&sval, value);
-    if (err != NULL)
+    if (value == NULL)
     {
-        PyErr_SetString(PyExc_ValueError, err);
+        /* Deletion */
+        remove_mapping(val->lpc_mapping, &skey);
         free_svalue(&skey);
-        return -1;
     }
-
-    dest = get_map_lvalue_unchecked(val->lpc_mapping, &skey);
-    free_svalue(&skey);
-
-    if (dest == NULL)
+    else
     {
-        free_svalue(&sval);
-        PyErr_NoMemory();
-        return -1;
-    }
+        svalue_t sval;
+        svalue_t *dest;
 
-    transfer_svalue(dest + idx, &sval);
+        err = python_to_svalue(&sval, value);
+        if (err != NULL)
+        {
+            PyErr_SetString(PyExc_ValueError, err);
+            free_svalue(&skey);
+            return -1;
+        }
+
+        dest = get_map_lvalue_unchecked(val->lpc_mapping, &skey);
+        free_svalue(&skey);
+
+        if (dest == NULL)
+        {
+            free_svalue(&sval);
+            PyErr_NoMemory();
+            return -1;
+        }
+
+        transfer_svalue(dest + idx, &sval);
+    }
     return 0;
 } /* ldmud_mapping_ass_item */
 
@@ -3078,10 +3235,26 @@ ldmud_get_simul_efun (PyObject* self, PyObject* args UNUSED)
 static PyMethodDef ldmud_methods[] =
 {
     {
-        "register_efun", python_register_efun, METH_VARARGS,
+        "register_efun",
+        (PyCFunction) python_register_efun, METH_VARARGS | METH_KEYWORDS,
         "register_efun(name, function) -> None\n\n"
         "Registers a new efun name. This is not allowed during\n"
         "compilation of an LPC object."
+    },
+
+    {
+        "register_socket",
+        (PyCFunction) python_register_socket, METH_VARARGS | METH_KEYWORDS,
+        "register_socket(fd, function [, eventmask]) -> None\n\n"
+        "Register a file descriptor (an integer or an object with\n"
+        "a fileno() method returning an int) for monitoring."
+    },
+
+    {
+        "unregister_socket",
+        (PyCFunction) python_unregister_socket, METH_VARARGS | METH_KEYWORDS,
+        "unregister_socket(fd) -> None\n\n"
+        "Remove a file descriptor from being monitored."
     },
 
     {
@@ -3568,7 +3741,6 @@ pkg_python_init (char* prog_name)
 
 {
     FILE *script_file;
-    PyCompilerFlags flags;
 
     /** Python3 requires now wchar_t?!
      * Py_SetProgramName(prog_name);
@@ -3578,8 +3750,12 @@ pkg_python_init (char* prog_name)
     Py_Initialize();
 
     script_file = fopen(python_startup_script, "rt");
-    flags.cf_flags = 0;
-    PyRun_SimpleFileExFlags(script_file, python_startup_script, 1, &flags);
+    if(script_file != NULL)
+    {
+        PyCompilerFlags flags;
+        flags.cf_flags = 0;
+        PyRun_SimpleFileExFlags(script_file, python_startup_script, 1, &flags);
+    }
 } /* pkg_python_init */
 
 
@@ -3706,6 +3882,106 @@ call_python_efun (int idx, int num_arg)
 
 
 /*-------------------------------------------------------------------------*/
+void
+python_set_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int *nfds)
+
+/* Set all file descriptors that some python routines are waiting for.
+ */
+
+{
+    for (python_poll_fds_t *fds = poll_fds; fds != NULL; fds = fds->next)
+    {
+        short events = fds->events;
+
+        if (fds->eventsfun)
+        {
+            PyObject *result;
+
+            result = PyObject_CallObject(fds->eventsfun, NULL);
+            if (result == NULL)
+            {
+                /* Exception occurred. */
+                if (PyErr_Occurred())
+                    PyErr_Print();
+                continue;
+            }
+
+            events = PyLong_AsLong(result);
+            if (events == -1 && PyErr_Occurred())
+            {
+                PyErr_Print();
+                Py_DECREF(result);
+                continue;
+            }
+            Py_DECREF(result);
+        }
+
+        if(events & POLLIN)
+            FD_SET(fds->fd, readfds);
+
+        if(events & POLLOUT)
+            FD_SET(fds->fd, writefds);
+
+        if(events & POLLPRI)
+            FD_SET(fds->fd, exceptfds);
+
+        if(events & (POLLIN|POLLOUT|POLLPRI))
+            (*nfds)++;
+    }
+} /* python_set_fds */
+
+/*-------------------------------------------------------------------------*/
+void
+python_handle_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfds)
+
+/* File descriptors in the given sets have events.
+ * Check whether a callable is waiting for it, then call it.
+ */
+
+{
+    for (python_poll_fds_t *fds = poll_fds; fds != NULL; fds = fds->next)
+    {
+        int events = 0;
+
+        if (FD_ISSET(fds->fd, readfds))
+            events |= POLLIN;
+
+        if (FD_ISSET(fds->fd, writefds))
+            events |= POLLOUT;
+
+        if (FD_ISSET(fds->fd, exceptfds))
+            events |= POLLPRI;
+
+        if (events != 0)
+        {
+            PyObject *result, *args, *arg;
+
+            args = PyTuple_New(1);
+            if (args == NULL)
+                continue; /* Out of memory, what shall we do... */
+
+            arg = PyLong_FromLong(events);
+            if (arg == NULL)
+                continue;
+
+            PyTuple_SET_ITEM(args, 0, arg);
+
+            result = PyObject_CallObject(fds->fun, args);
+            Py_XDECREF(args);
+
+            if (result == NULL)
+            {
+                /* Exception occurred. */
+                if (PyErr_Occurred())
+                    PyErr_Print();
+            }
+            else
+                Py_DECREF(result);
+        }
+    }
+} /* python_handle_fds */
+
+/*-------------------------------------------------------------------------*/
 
 
 const char*
@@ -3785,6 +4061,11 @@ python_count_refs ()
  */
 
 {
+    /* Our polling list */
+    for (python_poll_fds_t *fds = poll_fds; fds != NULL; fds = fds->next)
+        note_malloced_block_ref(fds);
+
+    /* All Python objects that reference LPC data */
     for(ldmud_gc_var_t* var = gc_object_list; var != NULL; var = var->gcnext)
     {
         object_t* ob = ((ldmud_object_t*)var)->lpc_object;

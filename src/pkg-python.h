@@ -9,6 +9,7 @@
 #error "pkg-python configured even though the machine doesn't support Python3."
 #endif
 
+#include <unistd.h>
 #include "typedefs.h"
 
 /* --- Defines --- */
@@ -27,10 +28,14 @@ extern int num_python_efun;
   /* Next available ID for python efuns. */
 
 /* --- Prototypes --- */
-extern void pkg_python_init (char* prog_name);
-extern bool is_python_efun (ident_t *p);
-extern void call_python_efun (int idx, int num_arg);
-extern const char* closure_python_efun_to_string (int type);
+extern void pkg_python_init(char* prog_name);
+
+extern bool is_python_efun(ident_t *p);
+extern void call_python_efun(int idx, int num_arg);
+extern const char* closure_python_efun_to_string(int type);
+
+extern void python_set_fds(fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int *nfds);
+extern void python_handle_fds(fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfds);
 
 #ifdef GC_SUPPORT
 extern void python_clear_refs();

@@ -137,6 +137,20 @@ class TestMapping(unittest.TestCase):
         self.assertEqual(m['!'], 0)
         self.assertFalse('!' in m)
 
+    def testDeletion(self):
+        m = ldmud.Mapping( { "One": 1, "Two": 2, "Three": 3 } )
+        self.assertIsNotNone(m)
+
+        self.assertEqual(len(m), 3)
+        self.assertEqual(m.width, 1)
+        del m["Two"]
+
+        self.assertEqual(len(m), 2)
+        self.assertEqual(m.width, 1)
+        self.assertFalse('Two' in m)
+        self.assertEqual(m['One'], 1)
+        self.assertEqual(m['Three'], 3)
+
     def testGetSetWide(self):
         m = ldmud.Mapping(width=2)
         self.assertIsNotNone(m)

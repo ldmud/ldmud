@@ -131,6 +131,7 @@
 #include "object.h"
 #include "pkg-mccp.h"
 #include "pkg-pgsql.h"
+#include "pkg-python.h"
 #ifdef USE_TLS
 #include "pkg-tls.h"
 #endif
@@ -2252,7 +2253,7 @@ get_message (char *buff)
 
 {
     /* State information: */
-    static fd_set readfds, writefds;
+    static fd_set readfds, writefds, pexceptfds;
       /* List of sockets with pending data.
        * You can ignore a 'could be used uninitialized' warning.
        */
@@ -2300,6 +2301,7 @@ get_message (char *buff)
 
             FD_ZERO(&readfds);
             FD_ZERO(&writefds);
+            FD_ZERO(&pexceptfds);
             for (i = 0; i < numports; i++) {
                 FD_SET(sos[i], &readfds);
             } /* for */
@@ -2350,6 +2352,9 @@ get_message (char *buff)
 #ifdef USE_PGSQL
             pg_setfds(&readfds, &writefds, &nfds);
 #endif
+#ifdef USE_PYTHON
+           python_set_fds(&readfds, &writefds, &pexceptfds, &nfds);
+#endif
 
             /* select() until time is up or there is data */
 
@@ -2358,7 +2363,7 @@ get_message (char *buff)
                 check_alarm();
                 timeout.tv_sec = twait;
                 timeout.tv_usec = 0;
-                res = socket_select(nfds, &readfds, &writefds, 0, &timeout);
+                res = socket_select(nfds, &readfds, &writefds, &pexceptfds, &timeout);
                 if (res == -1)
                 {
                     if (errno == EINTR)
@@ -2429,6 +2434,9 @@ get_message (char *buff)
 
 #ifdef USE_PGSQL
             pg_process_all();
+#endif
+#ifdef USE_PYTHON
+            python_handle_fds(&readfds, &writefds, &exceptfds, nfds);
 #endif
 
             /* Initialise the user scan */

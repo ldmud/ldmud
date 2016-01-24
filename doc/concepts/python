@@ -17,6 +17,20 @@ DESCRIPTION
                 Registers a new efun name. This is not allowed during
                 compilation of an LPC object.
 
+          - register_socket(fd, function [,eventmask]) -> None
+                Registers a socket <fd> to watch for events (like
+                poll/select). The socket must be either given as
+                an integer or an object with a fileno() method
+                returning an integer. The function must be a callable
+                accepting one argument, the actual event mask.
+                <eventmask> may be an combination of select.POLLIN,
+                select.POLLOUT and select.POLLPRI or a callable
+                returning such a combination.
+
+          - unregister_socket(fd) -> None
+                Removes a previously registered socket from the
+                watch list.
+
           - get_master() - > Object
                 Returns the current master object.
                 Returns None, if there is no master object (yet).

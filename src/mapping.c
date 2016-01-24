@@ -1428,7 +1428,7 @@ check_map_for_destr (mapping_t *m)
 } /* check_map_for_destr() */
 
 /*-------------------------------------------------------------------------*/
-static void
+void
 remove_mapping (mapping_t *m, svalue_t *map_index)
 
 /* Remove from mapping <m> that entry which is index by key value
