@@ -2,6 +2,7 @@ src/bytecode_gen.h
 src/config.h
 src/config.log
 src/config.status
+src/configure
 src/efun_defs.c
 src/instrs.h
 src/lang.c
@@ -9,6 +10,7 @@ src/lang.h
 src/lang.y
 src/ldmud
 src/machine.h
+src/machine.h.in
 src/make_func.c
 src/mkfunc
 src/Makefile
