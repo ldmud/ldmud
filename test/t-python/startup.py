@@ -227,6 +227,12 @@ class TestMapping(unittest.TestCase):
         with self.assertRaises(IndexError):
             m['Hi',2] = 0
 
+    def testIterator(self):
+        m = ldmud.Mapping( { "One": 1, "Two": 2, "Three": 3 } );
+        self.assertEqual(dict(m), { "One": 1, "Two": 2, "Three": 3})
+        self.assertEqual(set(m.keys()), set(("One", "Two", "Three",)))
+        self.assertEqual(set(m.values()), set((1,2,3,)))
+
 class TestStruct(unittest.TestCase):
     def setUp(self):
         self.master = ldmud.efuns.find_object("/master")

@@ -100,6 +100,7 @@ static const char* python_hook_names[] = {
 static ldmud_gc_var_t *gc_object_list = NULL,
                       *gc_array_list = NULL,
                       *gc_mapping_list = NULL,
+                      *gc_mapping_list_list = NULL,
                       *gc_struct_list = NULL,
                       *gc_closure_list = NULL,
                       *gc_symbol_list = NULL,
@@ -1565,6 +1566,390 @@ ldmud_array_create (vector_t* vec)
 static bool ldmud_mapping_check(PyObject *ob);
 static PyObject* ldmud_mapping_create(mapping_t *vec);
 
+/* This is used by the list itself and the iterator class. */
+enum ldmud_mapping_iterator_mode
+{
+    MappingIterator_Items,
+    MappingIterator_Keys,
+    MappingIterator_Values,
+};
+
+typedef struct ldmud_mapping_list_s ldmud_mapping_list_t;
+struct ldmud_mapping_list_s
+{
+    PyGCObject_HEAD
+
+    mapping_t*                       map;
+    vector_t*                        indices;
+    int                              pos;    /* Only used for the iterator. */
+    enum ldmud_mapping_iterator_mode mode;
+};
+
+/*-------------------------------------------------------------------------*/
+static void
+ldmud_mapping_list_dealloc (ldmud_mapping_list_t* self)
+
+/* Destroy the ldmud_mapping_list_t object
+ */
+
+{
+    free_mapping(self->map);
+    free_array(self->indices);
+
+    remove_gc_object(&gc_mapping_list_list, (ldmud_gc_var_t*)self);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_mapping_dealloc */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_mapping_iter_next (ldmud_mapping_list_t* self)
+{
+    PyObject *result = NULL;
+
+    if (self->pos >= VEC_SIZE(self->indices))
+        return NULL;
+
+    switch (self->mode)
+    {
+        case MappingIterator_Keys:
+            result = svalue_to_python(self->indices->item + self->pos);
+            break;
+
+        case MappingIterator_Items:
+        case MappingIterator_Values:
+            while (true)
+            {
+                svalue_t *values = get_map_value(self->map, self->indices->item + self->pos);
+
+                if (values == &const0)
+                {
+                    /* Key removed? Try next. */
+                    self->pos++;
+                    if (self->pos >= VEC_SIZE(self->indices))
+                        return NULL;
+
+                    continue;
+                }
+
+                if (self->mode == MappingIterator_Values)
+                    result = svalue_to_python(values);
+                else
+                {
+                    PyObject *val;
+
+                    result = PyTuple_New(self->map->num_values + 1);
+                    if (result == NULL)
+                        return NULL;
+
+                    val = svalue_to_python(self->indices->item + self->pos);
+                    if (val == NULL)
+                    {
+                        Py_DECREF(result);
+                        return NULL;
+                    }
+
+                    PyTuple_SET_ITEM(result, 0, val);
+                    for (int i = 0; i < self->map->num_values; i++)
+                    {
+                        val = svalue_to_python(values + i);
+                        if (val == NULL)
+                        {
+                            Py_DECREF(result);
+                            return NULL;
+                        }
+
+                        PyTuple_SET_ITEM(result, i+1, val);
+                    }
+                }
+
+                break;
+            }
+            break;
+    }
+
+    self->pos++;
+    return result;
+} /* ldmud_mapping_iter_next */
+
+/*-------------------------------------------------------------------------*/
+static PyTypeObject ldmud_mapping_iter_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.MappingIter",                /* tp_name */
+    sizeof(ldmud_mapping_list_t),       /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_mapping_list_dealloc, /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC mapping iterator",             /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    PyObject_SelfIter,                  /* tp_iter */
+    (iternextfunc)ldmud_mapping_iter_next, /* tp_iternext */
+    0,                                  /* tp_methods */
+    0,                                  /* tp_members */
+    0,                                  /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,                                  /* tp_init */
+    0,                                  /* tp_alloc */
+    0,                                  /* tp_new */
+};
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_mapping_iter_create (mapping_t *map, vector_t *indices, enum ldmud_mapping_iterator_mode mode)
+
+/* Creates a mapping iterator.
+ */
+
+{
+    ldmud_mapping_list_t *self;
+
+    self = (ldmud_mapping_list_t *)ldmud_mapping_iter_type.tp_alloc(&ldmud_mapping_iter_type, 0);
+    if (self == NULL)
+        return NULL;
+
+    self->map = ref_mapping(map);
+    self->indices = ref_array(indices);
+    self->pos = 0;
+    self->mode = mode;
+
+    add_gc_object(&gc_mapping_list_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_object_create */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_mapping_list_iter (ldmud_mapping_list_t* self)
+
+/* Creates an iterator for ourselves.
+ */
+{
+    return ldmud_mapping_iter_create(self->map, self->indices, self->mode);
+}
+
+/*-------------------------------------------------------------------------*/
+static Py_ssize_t
+ldmud_mapping_list_length (ldmud_mapping_list_t *val)
+
+/* Implement len() for ldmud_mapping_list_t.
+ */
+
+{
+    return MAP_SIZE(val->map);
+} /* ldmud_mapping_list_length */
+
+/*-------------------------------------------------------------------------*/
+struct ldmud_mapping_list_contains_info_s
+{
+    PyObject *v;
+    bool result;
+};
+
+static void
+ldmud_mapping_list_contains_walker (svalue_t *key, svalue_t *val, void *extra)
+
+/* Called from ldmud_mapping_list_contains for each element to compare it's
+ * value against extra->v.
+ */
+
+{
+    struct ldmud_mapping_list_contains_info_s *info = (struct ldmud_mapping_list_contains_info_s*)extra;
+    if (info->result)
+        return;
+
+    if (python_eq_svalue(info->v, val))
+        info->result = true;
+} /* ldmud_mapping_list_contains_walker */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_mapping_list_contains (ldmud_mapping_list_t *val, PyObject *v)
+
+/* Implement __contains__ for ldmud_mapping_list_t.
+ */
+
+{
+
+    switch (val->mode)
+    {
+        case MappingIterator_Items:
+        {
+            svalue_t sv, *values;
+
+            /* We can only compare against tuples with the correct size. */
+            if (!PyTuple_Check(v) || PyTuple_Size(v) != val->map->num_values + 1)
+                return 0;
+
+            /* If we can't convert, it's probably not in the mapping. */
+            if (python_to_svalue(&sv, PyTuple_GetItem(v,0)) != NULL)
+                return 0;
+
+            values = get_map_value(val->map, &sv);
+            free_svalue(&sv);
+
+            if(values == &const0)
+                return 0;
+
+            /* Now compare the values... */
+            for (int i = 0; i < val->map->num_values; i++)
+                if (!python_eq_svalue(PyTuple_GetItem(v,i+1), values + i))
+                    return 0;
+
+            return 1;
+        }
+
+        case MappingIterator_Keys:
+        {
+            svalue_t sv;
+            bool result;
+
+            /* If we can't convert, it's probably not in the mapping. */
+            if (python_to_svalue(&sv, v) != NULL)
+                return 0;
+
+            result = get_map_value(val->map, &sv) != &const0;
+            free_svalue(&sv);
+
+            return result ? 1 : 0;
+        }
+
+        case MappingIterator_Values:
+        {
+            /* We need to walk through the mapping... */
+            struct ldmud_mapping_list_contains_info_s info;
+            info.v = v;
+            info.result = false;
+
+            walk_mapping(val->map, ldmud_mapping_list_contains_walker, &info);
+            return info.result ? 1 : 0;
+        }
+    }
+
+    PyErr_SetString(PyExc_SystemError, "invalid state");
+    return -1;
+
+} /* ldmud_mapping_list_contains */
+
+
+/*-------------------------------------------------------------------------*/
+static PySequenceMethods ldmud_mapping_list_as_sequence = {
+    (lenfunc)ldmud_mapping_list_length,         /* sq_length */
+    0,                                          /* sq_concat */
+    0,                                          /* sq_repeat */
+    0,                                          /* sq_item */
+    0,                                          /* sq_slice */
+    0,                                          /* sq_ass_item */
+    0,                                          /* sq_ass_slice */
+    (objobjproc)ldmud_mapping_list_contains,    /* sq_contains */
+    0,                                          /* sq_inplace_concat */
+    0,                                          /* sq_inplace_repeat */
+};
+
+static PyTypeObject ldmud_mapping_list_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.MappingList",                /* tp_name */
+    sizeof(ldmud_mapping_list_t),       /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_mapping_list_dealloc, /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    &ldmud_mapping_list_as_sequence,    /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC mapping list",                 /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    (getiterfunc)ldmud_mapping_list_iter, /* tp_iter */
+    0,                                  /* tp_iternext */
+    0,                                  /* tp_methods */
+    0,                                  /* tp_members */
+    0,                                  /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,                                  /* tp_init */
+    0,                                  /* tp_alloc */
+    0,                                  /* tp_new */
+};
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_mapping_list_create (mapping_t *map, enum ldmud_mapping_iterator_mode mode)
+
+/* Creates a mapping view.
+ */
+
+{
+    ldmud_mapping_list_t *self;
+    void (*save_handler)(const char *, ...);
+    vector_t *vec;
+    svalue_t *items;
+
+    save_handler = allocate_array_error_handler;
+    allocate_array_error_handler = python_error_handler;
+    vec = allocate_array_unlimited(MAP_SIZE(map));
+    allocate_array_error_handler = save_handler;
+
+    if(vec == NULL)
+        return PyErr_NoMemory();
+
+    self = (ldmud_mapping_list_t *)ldmud_mapping_iter_type.tp_alloc(&ldmud_mapping_iter_type, 0);
+    if (self == NULL)
+    {
+        free_array(vec);
+        return NULL;
+    }
+
+    items = vec->item;
+    walk_mapping(map, m_indices_filter, &items);
+
+    self->map = ref_mapping(map);
+    self->indices = vec;
+    self->pos = 0;
+    self->mode = mode;
+
+    add_gc_object(&gc_mapping_list_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_object_create */
+
+/*-------------------------------------------------------------------------*/
 static void
 ldmud_mapping_dealloc (ldmud_mapping_t* self)
 
@@ -1805,6 +2190,25 @@ ldmud_mapping_init (ldmud_mapping_t *self, PyObject *args, PyObject *kwds)
 } /* ldmud_mapping_init */
 
 /*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_mapping_iter (ldmud_mapping_t *self)
+
+/* Returns an iterator over the keys.
+ */
+
+{
+    PyObject* list = ldmud_mapping_list_create(self->lpc_mapping, MappingIterator_Keys);
+    PyObject* iter;
+
+    if (list == NULL)
+        return NULL;
+
+    iter = PyObject_GetIter(list);
+    Py_DECREF(list);
+    return iter;
+} /* ldmud_mapping_iter */
+
+/*-------------------------------------------------------------------------*/
 static int
 ldmud_mapping_contains (ldmud_mapping_t *val, PyObject *v)
 
@@ -1994,7 +2398,40 @@ ldmud_mapping_ass_sub (ldmud_mapping_t *val, PyObject *key, PyObject *value)
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_mapping_get_width(ldmud_mapping_t *val, void *closure)
+ldmud_mapping_keys (ldmud_mapping_t *self)
+
+/* Returns a list of the keys.
+ */
+
+{
+    return ldmud_mapping_list_create(self->lpc_mapping, MappingIterator_Keys);
+} /* ldmud_mapping_keys */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_mapping_items (ldmud_mapping_t *self)
+
+/* Returns a list of items.
+ */
+
+{
+    return ldmud_mapping_list_create(self->lpc_mapping, MappingIterator_Items);
+} /* ldmud_mapping_items */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_mapping_values (ldmud_mapping_t *self)
+
+/* Returns a list of values.
+ */
+
+{
+    return ldmud_mapping_list_create(self->lpc_mapping, MappingIterator_Values);
+} /* ldmud_mapping_values */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_mapping_get_width (ldmud_mapping_t *val, void *closure)
 
 /**
  * Return the value for the width member.
@@ -2028,6 +2465,27 @@ static PyMappingMethods ldmud_mapping_as_mapping = {
 
 static PyMethodDef ldmud_mapping_methods[] =
 {
+    {
+        "keys",
+        (PyCFunction)ldmud_mapping_keys, METH_NOARGS,
+        "keys() -> Iterable sequence\n\n"
+        "Returns an iterable sequence over all the keys of this mapping."
+    },
+
+    {
+        "items",
+        (PyCFunction)ldmud_mapping_items, METH_NOARGS,
+        "items() -> Iterable sequence\n\n"
+        "Returns an iterable sequence over all the items\n"
+        "(key-value-pairs) of this mapping."
+    },
+    {
+        "values",
+        (PyCFunction)ldmud_mapping_values, METH_NOARGS,
+        "values() -> Iterable sequence\n\n"
+        "Returns an iterable sequence over all the values of this mapping"
+    },
+
     {NULL}
 };
 
@@ -2065,11 +2523,11 @@ static PyTypeObject ldmud_mapping_type =
     0,                                  /* tp_clear */
     0,                                  /* tp_richcompare */
     0,                                  /* tp_weaklistoffset */
-    0,                                  /* tp_iter */
+    (getiterfunc)ldmud_mapping_iter,    /* tp_iter */
     0,                                  /* tp_iternext */
     ldmud_mapping_methods,              /* tp_methods */
     0,                                  /* tp_members */
-    ldmud_mapping_getset,              /* tp_getset */
+    ldmud_mapping_getset,               /* tp_getset */
     0,                                  /* tp_base */
     0,                                  /* tp_dict */
     0,                                  /* tp_descr_get */
@@ -3732,6 +4190,10 @@ static PyObject* init_ldmud_module()
         return NULL;
     if (PyType_Ready(&ldmud_mapping_type) < 0)
         return NULL;
+    if (PyType_Ready(&ldmud_mapping_list_type) < 0)
+        return NULL;
+    if (PyType_Ready(&ldmud_mapping_iter_type) < 0)
+        return NULL;
     if (PyType_Ready(&ldmud_struct_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_closure_type) < 0)
@@ -4579,6 +5041,15 @@ python_clear_refs ()
         clear_ref_in_vector(&mapping, 1);
     }
 
+    for(ldmud_gc_var_t* var = gc_mapping_list_list; var != NULL; var = var->gcnext)
+    {
+        /* Let clear_ref_in_vector do that. */
+        svalue_t values[2] = { { T_MAPPING }, { T_POINTER } };
+        values[0].u.map = ((ldmud_mapping_list_t*)var)->map;
+        values[1].u.vec = ((ldmud_mapping_list_t*)var)->indices;
+        clear_ref_in_vector(values, 2);
+    }
+
     for(ldmud_gc_var_t* var = gc_struct_list; var != NULL; var = var->gcnext)
     {
         struct_t* s = ((ldmud_struct_t*)var)->lpc_struct;
@@ -4661,6 +5132,15 @@ python_count_refs ()
             count_mapping_size(map);
         }
         map->ref++;
+    }
+
+    for(ldmud_gc_var_t* var = gc_mapping_list_list; var != NULL; var = var->gcnext)
+    {
+        /* Let count_ref_in_vector do that. */
+        svalue_t values[2] = { { T_MAPPING }, { T_POINTER } };
+        values[0].u.map = ((ldmud_mapping_list_t*)var)->map;
+        values[1].u.vec = ((ldmud_mapping_list_t*)var)->indices;
+        count_ref_in_vector(values, 2);
     }
 
     for(ldmud_gc_var_t* var = gc_struct_list; var != NULL; var = var->gcnext)
