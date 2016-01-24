@@ -38,6 +38,26 @@ DESCRIPTION
                 Removes a previously registered socket from the
                 watch list.
 
+          - register_hook(hook, function) -> None
+                Register a hook. The python function will be called
+                whenever <hook> happens. <hook> can be one of the
+                following:
+
+                  ON_HEARTBEAT
+                    Called without arguments for every backend loop
+
+                  ON_OBJECT_CREATED
+                    Called whenever an object was created, with the
+                    object as its first and only argument. This call
+                    happens before any LPC code of the object ran.
+
+                  ON_OBJECT_DESTRUCTED
+                    Called just before an object will be destructed,
+                    with the object as its first and only argument.
+
+          - unregister_hook(hook, function) -> None
+                Removes a hook function.
+
           - get_master() - > Object
                 Returns the current master object.
                 Returns None, if there is no master object (yet).

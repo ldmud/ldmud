@@ -128,10 +128,24 @@ void run_test()
                 return funcall(symbol_function("abs"),-10) == 10;
             :)
         }),
+        ({
+            "Python object hook 1", 0,
+            (:
+                object* oblist = python_get_hook_info()[1];
+                return sizeof(oblist) == 1 && oblist[0] == this_object();
+            :)
+        }),
         ({ "Python test suite", 0,
             (:
                 msg("\n");
                 return python_test();
+            :)
+        }),
+        ({
+            "Python object hook 2", 0,
+            (:
+                object* oblist = python_get_hook_info()[1];
+                return sizeof(oblist) == 2 && oblist[0] == this_object();
             :)
         }),
 
@@ -176,9 +190,17 @@ void run_test()
                 {
                     msg("Wrong value returned from python_get() after GC.!\n");
                     shutdown(1);
+                    return;
                 }
 
                 python_set(0);
+
+                if(python_get_hook_info()[0] == 0)
+                {
+                    msg("Heartbeat hook didn't count any heartbeats!\n");
+                    shutdown(1);
+                    return;
+                }
 
                 start_gc(#'shutdown);
             });

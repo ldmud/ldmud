@@ -44,7 +44,7 @@
 typedef struct ldmud_gc_var_s ldmud_gc_var_t;
 typedef void (*CClosureFun)(void*);
 typedef struct python_poll_fds_s python_poll_fds_t;
-
+typedef struct python_hook_s python_hook_t;
 
 /* --- Type definitions --- */
 struct python_poll_fds_s
@@ -59,9 +59,21 @@ struct python_poll_fds_s
     python_poll_fds_t *next;  /* singly linked list */
 };
 
+/* Just a linked list of python callables. */
+struct python_hook_s
+{
+    PyObject* fun;
+    python_hook_t *next;
+};
 
 /* --- Variables --- */
 char * python_startup_script = NULL;
+
+static bool python_is_external = true;
+ /* Remember how python code was called,
+  * false, when called from a running LPC program,
+  * true otherwise (upon external events)
+  */
 
 int num_python_efun = 0;
 
@@ -77,6 +89,13 @@ static ident_t*  python_efun_names[PYTHON_EFUN_TABLE_SIZE];
 static python_poll_fds_t *poll_fds = NULL;
   /* List of all via register_socket() registered file descriptors.
    */
+
+static python_hook_t *python_hooks[PYTHON_HOOK_COUNT];
+static const char* python_hook_names[] = {
+    "ON_HEARTBEAT",
+    "ON_OBJECT_CREATED",
+    "ON_OBJECT_DESTRUCTED",
+};
 
 static ldmud_gc_var_t *gc_object_list = NULL,
                       *gc_array_list = NULL,
@@ -331,6 +350,93 @@ python_unregister_socket (PyObject *module, PyObject *args, PyObject *kwds)
     Py_INCREF(Py_None);
     return Py_None;
 } /* python_unregister_socket */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+python_register_hook (PyObject *module, PyObject *args, PyObject *kwds)
+
+/* Python function to register a callable as a hook.
+ * The callable is called whenever the hook event occurs.
+ */
+
+{
+    static char *kwlist[] = { "hook", "function", NULL};
+
+    int hook;
+    PyObject *fun;
+    python_hook_t **hooklist;
+    python_hook_t *entry;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "iO:register_hook", kwlist, &hook, &fun))
+        return NULL;
+
+    if (!PyCallable_Check(fun))
+    {
+        PyErr_SetString(PyExc_TypeError, "function parameter must be callable");
+        return NULL;
+    }
+
+    if (hook < 0 || hook >= PYTHON_HOOK_COUNT)
+    {
+        PyErr_Format(PyExc_TypeError, "illegal hook '%d'", hook);
+        return NULL;
+    }
+
+    entry = xalloc(sizeof(python_hook_t));
+    if (entry == NULL)
+        return PyErr_NoMemory();
+    entry->fun = fun;
+    entry->next = NULL;
+
+    /* Append it at the end. */
+    for(hooklist = &(python_hooks[hook]); *hooklist; hooklist = &(*hooklist)->next);
+
+    *hooklist = entry;
+
+    Py_XINCREF(fun);
+    Py_INCREF(Py_None);
+    return Py_None;
+} /* python_register_hook */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+python_unregister_hook (PyObject *module, PyObject *args, PyObject *kwds)
+
+/* Python function to unregister a hook.
+ */
+
+{
+    static char *kwlist[] = { "hook", "function", NULL};
+
+    int hook;
+    PyObject *fun;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "iO:unregister_hook", kwlist, &hook, &fun))
+        return NULL;
+
+    if (hook < 0 || hook >= PYTHON_HOOK_COUNT)
+    {
+        PyErr_Format(PyExc_TypeError, "illegal hook '%d'", hook);
+        return NULL;
+    }
+
+    for(python_hook_t **hooklist = &(python_hooks[hook]); *hooklist; )
+    {
+        python_hook_t *entry = *hooklist;
+        if (PyObject_RichCompareBool(entry->fun, fun, Py_EQ) == 1)
+        {
+            *hooklist = entry->next;
+
+            Py_XDECREF(entry->fun);
+            xfree(entry);
+        }
+        else
+            hooklist = &(*hooklist)->next;
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
+} /* python_unregister_hook */
 
 /*=========================================================================*/
 
@@ -3318,6 +3424,30 @@ static PyMethodDef ldmud_methods[] =
     },
 
     {
+        "register_hook",
+        (PyCFunction) python_register_hook, METH_VARARGS | METH_KEYWORDS,
+        "register_hook(hook, function) -> None\n\n"
+        "Register a hook. The python function will be called whenever\n"
+        "<hook> happens. <hook> can be one of the following:\n\n"
+        "  ON_HEARTBEAT\n"
+        "    Called without arguments for every backend loop\n\n"
+        "  ON_OBJECT_CREATED\n"
+        "    Called whenever an object was created, with the object\n"
+        "    as its first and only argument. This call happens before\n"
+        "    any LPC code of the object ran.\n\n"
+        "  ON_OBJECT_DESTRUCTED\n"
+        "    Called just before an object will be destructed,\n"
+        "    with the object as its first and only argument."
+    },
+
+    {
+        "unregister_hook",
+        (PyCFunction) python_unregister_hook, METH_VARARGS | METH_KEYWORDS,
+        "unregister_hook(hook, function) -> None\n\n"
+        "Removes a hook function."
+    },
+
+    {
         "get_master", ldmud_get_master, METH_NOARGS,
         "get_master() -> Master Object\n\n"
         "Returns the master object."
@@ -3380,6 +3510,10 @@ static PyObject* init_ldmud_module()
     PyModule_AddObject(module, "Closure", (PyObject*) &ldmud_closure_type);
     PyModule_AddObject(module, "Symbol", (PyObject*) &ldmud_symbol_type);
     PyModule_AddObject(module, "QuotedArray", (PyObject*) &ldmud_quoted_array_type);
+
+    assert(PYTHON_HOOK_COUNT == sizeof(python_hook_names) / sizeof(python_hook_names[0]));
+    for (int i = 0; i < PYTHON_HOOK_COUNT; i++)
+        PyModule_AddIntConstant(module, python_hook_names[i], i);
 
     /* Add the efuns as a sub-namespace. */
     efuns = create_efun_namespace();
@@ -3751,10 +3885,6 @@ call_lpc_secure (CClosureFun fun, void* data)
  */
 
 {
-    /* TODO: We need to detect whether this is an external or internal call,
-     * TODO:: so we can set the runtime limits accordingly, also secure_apply_error
-     * TODO:: needs to know for the same reason.
-     */
     struct error_recovery_info error_recovery_info;
     struct control_stack *save_csp;
     svalue_t *save_sp;
@@ -3770,13 +3900,29 @@ call_lpc_secure (CClosureFun fun, void* data)
     if (setjmp(error_recovery_info.con.text))
     {
         PyErr_SetString(PyExc_RuntimeError, get_txt(current_error));
-        secure_apply_error(save_sp, save_csp, MY_FALSE);
-
+        secure_apply_error(save_sp, save_csp, python_is_external);
     }
     else
     {
+        object_t *save_ob = current_object;
+
+        if(python_is_external)
+        {
+            /* We do externally called python code
+             * in the context of the master ob.
+             */
+            current_object = master_ob;
+            mark_start_evaluation();
+        }
+
         (*fun)(data);
         result = true;
+
+        if(python_is_external)
+        {
+            mark_end_evaluation();
+            current_object = save_ob;
+        }
     }
 
     rt_context = error_recovery_info.rt.last;
@@ -3851,6 +3997,7 @@ call_python_efun (int idx, int num_arg)
     PyObject *result, *args;
     int pos;
     svalue_t *argp;
+    bool was_external = python_is_external;
 
     /* Efun still registered?
      * (F_PYTHON_EFUN opcodes may still be floating around.)
@@ -3876,7 +4023,9 @@ call_python_efun (int idx, int num_arg)
     }
     inter_sp = pop_n_elems(num_arg, inter_sp);
 
+    python_is_external = false;
     result = PyObject_CallObject(python_efun_table[idx], args);
+    python_is_external = was_external;
     Py_XDECREF(args);
 
     if (result == NULL)
@@ -3949,6 +4098,7 @@ python_set_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int *nfds)
  */
 
 {
+    python_is_external = true;
     for (python_poll_fds_t *fds = poll_fds; fds != NULL; fds = fds->next)
     {
         short events = fds->events;
@@ -3999,6 +4149,7 @@ python_handle_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfd
  */
 
 {
+    python_is_external = true;
     for (python_poll_fds_t *fds = poll_fds; fds != NULL; fds = fds->next)
     {
         int events = 0;
@@ -4018,11 +4169,18 @@ python_handle_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfd
 
             args = PyTuple_New(1);
             if (args == NULL)
+            {
+                PyErr_Clear();
                 continue; /* Out of memory, what shall we do... */
+            }
 
             arg = PyLong_FromLong(events);
             if (arg == NULL)
+            {
+                PyErr_Clear();
+                Py_DECREF(args);
                 continue;
+            }
 
             PyTuple_SET_ITEM(args, 0, arg);
 
@@ -4042,8 +4200,88 @@ python_handle_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfd
 } /* python_handle_fds */
 
 /*-------------------------------------------------------------------------*/
+void
+python_call_hook (int hook, bool is_external)
 
+/* Call the python <hook> without any arguments.
+ */
 
+{
+    bool was_external = python_is_external;
+    python_is_external = is_external;
+
+    for(python_hook_t *entry = python_hooks[hook]; entry; entry = entry->next)
+    {
+        PyObject *result;
+
+        result = PyObject_CallObject(entry->fun, NULL);
+        if (result == NULL)
+        {
+            /* Exception occurred. */
+            if (PyErr_Occurred())
+                PyErr_Print();
+            continue;
+        }
+        Py_DECREF(result);
+    }
+
+    python_is_external = was_external;
+} /* python_call_hook */
+
+/*-------------------------------------------------------------------------*/
+void
+python_call_hook_object (int hook, bool is_external, object_t *ob)
+
+/* Call the python <hook> with an object as its only argument.
+ */
+
+{
+    bool was_external = python_is_external;
+
+    PyObject *args, *arg;
+    if (python_hooks[hook] == NULL)
+        return;
+
+    args = PyTuple_New(1);
+    if (args == NULL)
+    {
+        PyErr_Clear();
+        return;
+    }
+
+    arg = ldmud_object_create(ob);
+    if (arg == NULL)
+    {
+        PyErr_Clear();
+        Py_DECREF(args);
+        return;
+    }
+
+    PyTuple_SET_ITEM(args, 0, arg);
+
+    python_is_external = is_external;
+
+    for(python_hook_t *entry = python_hooks[hook]; entry; entry = entry->next)
+    {
+        PyObject *result;
+
+        result = PyObject_CallObject(entry->fun, args);
+        if (result == NULL)
+        {
+            /* Exception occurred. */
+            if (PyErr_Occurred())
+                PyErr_Print();
+            continue;
+        }
+        Py_DECREF(result);
+    }
+
+    Py_DECREF(args);
+
+    python_is_external = was_external;
+} /* python_call_hook_object */
+
+/*-------------------------------------------------------------------------*/
 const char*
 closure_python_efun_to_string (int type)
 
@@ -4124,6 +4362,11 @@ python_count_refs ()
     /* Our polling list */
     for (python_poll_fds_t *fds = poll_fds; fds != NULL; fds = fds->next)
         note_malloced_block_ref(fds);
+
+    /* The python hooks */
+    for (int i = 0; i < PYTHON_HOOK_COUNT; i++)
+        for(python_hook_t *entry = python_hooks[i]; entry; entry = entry->next)
+            note_malloced_block_ref(entry);
 
     /* All Python objects that reference LPC data */
     for(ldmud_gc_var_t* var = gc_object_list; var != NULL; var = var->gcnext)

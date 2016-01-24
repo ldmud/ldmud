@@ -16,6 +16,7 @@ DRIVER_DEFAULTS="-u-1 -E 0 --no-compat -e -N --cleanup-time -1 --reset-time -1
     -sv-1 --hard-malloc-limit unlimited --min-malloc 0 -ru0 -rm0 -rs0
     --no-strict-euids
     --no-wizlist-file --check-refcounts --check-state 2 --access-file none
+    --python-script startup.py
     --access-log none -f test 65432"
 
 export DRIVER DRIVER_DEFAULTS

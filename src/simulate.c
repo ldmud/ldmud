@@ -59,6 +59,7 @@
 #ifdef USE_SQLITE
 #include "pkg-sqlite.h"
 #endif
+#include "pkg-python.h"
 #include "prolang.h"
 #include "sent.h"
 #include "simul_efun.h"
@@ -2648,6 +2649,9 @@ destruct (object_t *ob)
     if (ob->open_sqlite_db)
         sl_close(ob);
 #endif
+#ifdef USE_PYTHON
+    python_call_hook_object(PYTHON_HOOK_ON_OBJECT_DESTRUCTED, false, ob);
+#endif /* USE_PYTHON */
     ob->time_reset = 0;
 
     /* We need the object in memory */

@@ -477,6 +477,10 @@ init_object_variables (object_t *ob, object_t *templ)
         }
     }
 
+#ifdef USE_PYTHON
+    python_call_hook_object(PYTHON_HOOK_ON_OBJECT_CREATED, false, ob);
+#endif /* USE_PYTHON */
+
     /* Initialized all other variables programmatically */
     sapply_ign_prot(STR_VARINIT, ob, 0);
 } /* init_object_variables() */

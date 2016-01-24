@@ -20,6 +20,16 @@
    * .x.closure_type entry in svalue_s, which gives us 11 bits.
    */
 
+/* --- Enums --- */
+enum python_hooks
+{
+    PYTHON_HOOK_ON_HEARTBEAT,
+    PYTHON_HOOK_ON_OBJECT_CREATED,
+    PYTHON_HOOK_ON_OBJECT_DESTRUCTED,
+
+    PYTHON_HOOK_COUNT,
+};
+
 /* --- Variables --- */
 extern char * python_startup_script;
   /* Filename to call at LDMud startup. */
@@ -36,6 +46,9 @@ extern const char* closure_python_efun_to_string(int type);
 
 extern void python_set_fds(fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int *nfds);
 extern void python_handle_fds(fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfds);
+
+extern void python_call_hook(int hook, bool is_external);
+extern void python_call_hook_object(int hook, bool is_external, object_t *ob);
 
 #ifdef GC_SUPPORT
 extern void python_clear_refs();

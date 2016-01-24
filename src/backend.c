@@ -64,6 +64,7 @@
 #include "mstrings.h"
 #include "object.h"
 #include "otable.h"
+#include "pkg-python.h"
 #include "random.h"
 #include "simulate.h"
 #include "stdstrings.h"
@@ -885,6 +886,10 @@ backend (void)
             command_giver = NULL;
             trace_level = 0;
             wiz_decay();
+
+#ifdef USE_PYTHON
+            python_call_hook(PYTHON_HOOK_ON_HEARTBEAT, true);
+#endif /* USE_PYTHON */
 
             mem_consolidate(MY_FALSE);
         }

@@ -338,3 +338,21 @@ ldmud.register_efun("python_set", python_set)
 
 ldmud.register_efun("abs", lambda x: x*2)
 ldmud.register_efun("unregister_abs", lambda: ldmud.unregister_efun("abs"))
+
+# Test of the hooks
+num_hb = 0
+def hb_hook():
+    global num_hb
+    num_hb += 1
+
+ob_list = []
+def ob_created(ob):
+    ob_list.append(ob)
+
+def get_hook_info():
+    return ldmud.Array((num_hb, ldmud.Array(ob_list),))
+
+ldmud.register_hook(ldmud.ON_HEARTBEAT, hb_hook)
+ldmud.register_hook(ldmud.ON_OBJECT_CREATED, ob_created)
+
+ldmud.register_efun("python_get_hook_info", get_hook_info)
