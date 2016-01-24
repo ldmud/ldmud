@@ -735,6 +735,24 @@ ldmud_object_richcompare (ldmud_object_t *self, PyObject *other, int op)
 }
 
 /*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_object_get_name(ldmud_object_t *val, void *closure)
+
+/**
+ * Return the value for the name member.
+ */
+
+{
+    if(!val->lpc_object)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    return PyUnicode_FromFormat("/%s", get_txt(val->lpc_object->name));
+}
+
+/*-------------------------------------------------------------------------*/
 static PyMethodDef ldmud_object_methods[] =
 {
     {NULL}
@@ -742,6 +760,7 @@ static PyMethodDef ldmud_object_methods[] =
 
 static PyGetSetDef ldmud_object_getset[] =
 {
+    {"name", (getter)ldmud_object_get_name,   NULL, NULL},
     {NULL}
 };
 
@@ -931,7 +950,10 @@ ldmud_array_init (ldmud_array_t *self, PyObject *args, PyObject *kwds)
             allocate_array_error_handler = save_handler;
 
             if(vec == NULL)
+            {
+                PyErr_NoMemory();
                 return -1;
+            }
 
             free_array(self->lpc_array);
             self->lpc_array = vec;
@@ -1026,6 +1048,8 @@ ldmud_array_init (ldmud_array_t *self, PyObject *args, PyObject *kwds)
                 free_array(self->lpc_array);
                 self->lpc_array = vec;
             }
+            else
+                PyErr_NoMemory();
         }
 
         for (current = first; current; )
@@ -1089,7 +1113,7 @@ ldmud_array_concat (ldmud_array_t *val, PyObject *second)
         if (vec == NULL)
         {
             ldmud_array_dealloc(result);
-            return NULL;
+            return PyErr_NoMemory();
         }
 
         items = vec->item;
@@ -1134,7 +1158,7 @@ ldmud_array_repeat (ldmud_array_t *val, Py_ssize_t num)
     if (vec == NULL)
     {
         ldmud_array_dealloc(result);
-        return NULL;
+        return PyErr_NoMemory();
     }
 
     items = vec->item;
@@ -1187,14 +1211,26 @@ ldmud_array_ass_item (ldmud_array_t *val, Py_ssize_t idx, PyObject *v)
         return -1;
     }
 
-    err = python_to_svalue(&sv, v);
-    if (err != NULL)
+    if (v == NULL)
     {
-        PyErr_SetString(PyExc_ValueError, err);
-        return -1;
-    }
+        /* Removal of this element. */
+        free_svalue(val->lpc_array->item + idx);
 
-    transfer_svalue(val->lpc_array->item + idx, &sv);
+        val->lpc_array->size--;
+        for(; idx < VEC_SIZE(val->lpc_array); idx++)
+            transfer_svalue_no_free(val->lpc_array->item + idx, val->lpc_array->item + idx + 1);
+    }
+    else
+    {
+        err = python_to_svalue(&sv, v);
+        if (err != NULL)
+        {
+            PyErr_SetString(PyExc_ValueError, err);
+            return -1;
+        }
+
+        transfer_svalue(val->lpc_array->item + idx, &sv);
+    }
     return 0;
 } /* ldmud_array_ass_item */
 
@@ -1213,6 +1249,212 @@ ldmud_array_contains (ldmud_array_t *val, PyObject *v)
 } /* ldmud_array_contains */
 
 /*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_array_subscript (ldmud_array_t *val, PyObject *key)
+
+/* Implement item access for ldmud_array_t.
+ */
+
+{
+    if (PyIndex_Check(key))
+    {
+        Py_ssize_t idx = PyNumber_AsSsize_t(key, PyExc_IndexError);
+        if (idx == -1 && PyErr_Occurred())
+            return NULL;
+        if (idx < 0)
+            idx += VEC_SIZE(val->lpc_array);
+
+        return ldmud_array_item(val, idx);
+    }
+    else if (PySlice_Check(key))
+    {
+        Py_ssize_t start, stop, step, slicelength;
+
+        if (PySlice_GetIndicesEx(key, VEC_SIZE(val->lpc_array),
+                         &start, &stop, &step, &slicelength) < 0)
+            return NULL;
+
+        if (slicelength <= 0)
+            return ldmud_array_create(&null_vector);
+        else
+        {
+            void (*save_handler)(const char *, ...);
+            PyObject *result;
+            vector_t *vec;
+
+            save_handler = allocate_array_error_handler;
+            allocate_array_error_handler = python_error_handler;
+            vec = allocate_array_unlimited(slicelength);
+            allocate_array_error_handler = save_handler;
+
+            if (vec == NULL)
+                return PyErr_NoMemory();
+
+            result = ldmud_array_create(vec);
+            free_array(vec);
+
+            if (result == NULL)
+                return NULL;
+
+            for (Py_ssize_t cur = start, i = 0; i < slicelength; cur += step, i++)
+                assign_svalue(vec->item + i, val->lpc_array->item + cur);
+
+            return result;
+        }
+    }
+    else
+    {
+        PyErr_Format(PyExc_TypeError, "indices must be integers, not %.200s",
+                    key->ob_type->tp_name);
+        return NULL;
+    }
+
+} /* ldmud_array_subscript */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_array_ass_sub (ldmud_array_t *val, PyObject *key, PyObject *value)
+
+/* Implement item access for ldmud_array_t.
+ */
+
+{
+    if (PyIndex_Check(key))
+    {
+        Py_ssize_t idx = PyNumber_AsSsize_t(key, PyExc_IndexError);
+        if (idx == -1 && PyErr_Occurred())
+            return -1;
+        if (idx < 0)
+            idx += VEC_SIZE(val->lpc_array);
+
+        return ldmud_array_ass_item(val, idx, value);
+    }
+    else if (PySlice_Check(key))
+    {
+        Py_ssize_t start, stop, step, slicelength;
+        vector_t *replacement;
+
+        if (PySlice_GetIndicesEx(key, VEC_SIZE(val->lpc_array),
+                         &start, &stop, &step, &slicelength) < 0)
+            return -1;
+
+        if (value == NULL)
+        {
+            Py_ssize_t src, dest, length, next;
+
+            if (step < 0)
+            {
+                /* The order is not relevant. */
+                Py_ssize_t temp = start;
+                start = stop + 1;
+                stop = temp + 1;
+                step = -step;
+            }
+
+            length = VEC_SIZE(val->lpc_array);
+            for (src = start, dest = start, next = start; src < length; src++)
+            {
+                if(src == next && src < stop)
+                {
+                    free_svalue(val->lpc_array->item + src);
+                    next += step;
+                }
+                else
+                {
+                    transfer_svalue_no_free(val->lpc_array->item + dest, val->lpc_array->item + src);
+                    dest++;
+                }
+            }
+            val->lpc_array->size -= slicelength;
+            assert(VEC_SIZE(val->lpc_array) == dest);
+
+            return 0;
+        }
+
+        if (!ldmud_array_check(value))
+        {
+            PyErr_Format(PyExc_TypeError, "can assign ldmud.Array (not \"%.200s\") to an ldmud.Array slice",
+                Py_TYPE(value)->tp_name);
+            return -1;
+        }
+
+        replacement = ((ldmud_array_t*)value)->lpc_array;
+        if (VEC_SIZE(replacement) == slicelength && replacement != val->lpc_array)
+        {
+            /* We can replace the items in-place. */
+            for (Py_ssize_t cur = start, i = 0; i < slicelength; cur += step, i++)
+                assign_svalue(val->lpc_array->item + cur, replacement->item + i);
+
+            return 0;
+        }
+        else if (step != 1 && step != -1)
+        {
+            PyErr_Format(PyExc_ValueError, "attempt to assign array of size %d to extended slice of size %d",
+                VEC_SIZE(replacement), slicelength);
+            return -1;
+        }
+        else
+        {
+            /* We create a new array, consisting of val[0..start-1], replacement, val[stop..<1].
+             * If step == -1, then the replacement will be inserted in reverse order.
+             */
+            Py_ssize_t cur;
+            void (*save_handler)(const char *, ...);
+            vector_t *vec;
+
+            if (step == -1)
+            {
+                Py_ssize_t temp = start;
+                start = stop + 1;
+                stop = temp + 1;
+            }
+
+            save_handler = allocate_array_error_handler;
+            allocate_array_error_handler = python_error_handler;
+            vec = allocate_array_unlimited(start + VEC_SIZE(replacement) + VEC_SIZE(val->lpc_array) - stop);
+            allocate_array_error_handler = save_handler;
+
+            if (vec == NULL)
+            {
+                PyErr_NoMemory();
+                return -1;
+            }
+
+            cur = 0;
+            for (Py_ssize_t i = 0; i < start; i++, cur++)
+                assign_svalue_no_free(vec->item + cur, val->lpc_array->item + i);
+
+            if (step == -1)
+            {
+                for (Py_ssize_t i = VEC_SIZE(replacement); i--; cur++)
+                    assign_svalue_no_free(vec->item + cur, replacement->item + i);
+            }
+            else
+            {
+                for (Py_ssize_t i = 0; i < VEC_SIZE(replacement); i++, cur++)
+                    assign_svalue_no_free(vec->item + cur, replacement->item + i);
+            }
+
+            for (Py_ssize_t i = stop; i < VEC_SIZE(val->lpc_array); i++, cur++)
+                assign_svalue_no_free(vec->item + cur, val->lpc_array->item + i);
+
+            assert(cur == VEC_SIZE(vec));
+
+            free_array(val->lpc_array);
+            val->lpc_array = vec;
+
+            return 0;
+        }
+    }
+    else
+    {
+        PyErr_Format(PyExc_TypeError, "indices must be integers, not %.200s",
+                    key->ob_type->tp_name);
+        return -1;
+    }
+} /* ldmud_array_ass_item */
+
+/*-------------------------------------------------------------------------*/
 static PySequenceMethods ldmud_array_as_sequence = {
     (lenfunc)ldmud_array_length,                /* sq_length */
     (binaryfunc)ldmud_array_concat,             /* sq_concat */
@@ -1224,6 +1466,14 @@ static PySequenceMethods ldmud_array_as_sequence = {
     (objobjproc)ldmud_array_contains,           /* sq_contains */
     0,                                          /* sq_inplace_concat */
     0,                                          /* sq_inplace_repeat */
+};
+
+
+/* This is needed for slicing. */
+static PyMappingMethods ldmud_array_as_mapping = {
+    (lenfunc)ldmud_array_length,                /*mp_length*/
+    (binaryfunc)ldmud_array_subscript,          /*mp_subscript*/
+    (objobjargproc)ldmud_array_ass_sub,         /*mp_ass_subscript*/
 };
 
 
@@ -1248,7 +1498,7 @@ static PyTypeObject ldmud_array_type =
     0,                                  /* tp_repr */
     0,                                  /* tp_as_number */
     &ldmud_array_as_sequence,           /* tp_as_sequence */
-    0,                                  /* tp_as_mapping */
+    &ldmud_array_as_mapping,            /* tp_as_mapping */
     0,                                  /* tp_hash  */
     0,                                  /* tp_call */
     0,                                  /* tp_str */
@@ -1755,6 +2005,7 @@ ldmud_mapping_get_width(ldmud_mapping_t *val, void *closure)
 } /* ldmud_mapping_get_width */
 /*-------------------------------------------------------------------------*/
 
+/* This is needed for 'in' functionality. */
 static PySequenceMethods ldmud_mapping_as_sequence = {
     0,                                          /* sq_length */
     0,                                          /* sq_concat */

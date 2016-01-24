@@ -20,6 +20,7 @@ class TestObject(unittest.TestCase):
             ldmud.efuns.destruct(oldob)
         ob = ldmud.Object("/testob")
         self.assertIsNotNone(ob)
+        self.assertEqual(ob.name, "/testob")
 
     def testInitNonExisting(self):
         with self.assertRaises(RuntimeError):
@@ -79,6 +80,50 @@ class TestArray(unittest.TestCase):
         self.assertEqual(arr[1], 21)
         self.assertEqual(arr[2], 52)
         self.assertEqual(arr[3], "Me")
+
+    def testSlice(self):
+        arr = ldmud.Array(range(8))
+        self.assertEqual(list(arr[3:5]), [3,4])
+        self.assertEqual(list(arr[5:3:-1]), [5,4])
+        self.assertEqual(list(arr[::-2]), list(range(7,0,-2)))
+
+        arr[::-1] = arr
+        self.assertEqual(list(arr), list(range(7,-1,-1)))
+
+        arr[5:10] = ldmud.Array([10])
+        self.assertEqual(list(arr), [7, 6, 5, 4, 3, 10])
+
+        arr[4:2:-1] = ldmud.Array([100,101,102,103,104])
+        self.assertEqual(list(arr), [7, 6, 5, 104, 103, 102, 101, 100, 10])
+
+    def testDeletion(self):
+        parr = list(range(20))
+        arr = ldmud.Array(range(20))
+
+        del arr[5]
+        del parr[5]
+        self.assertEqual(list(arr), parr)
+
+        del arr[1:3]
+        del parr[1:3]
+        self.assertEqual(list(arr), parr)
+
+        del arr[3:1]
+        del parr[3:1]
+        self.assertEqual(list(arr), parr)
+
+        del arr[4:2:-1]
+        del parr[4:2:-1]
+        self.assertEqual(list(arr), parr)
+
+        del arr[0:10:3]
+        del parr[0:10:3]
+        self.assertEqual(list(arr), parr)
+
+        del arr[10:0:-3]
+        del parr[10:0:-3]
+        self.assertEqual(list(arr), parr)
+
 
 class TestMapping(unittest.TestCase):
     def testInitEmpty(self):
