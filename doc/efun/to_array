@@ -13,7 +13,7 @@ DESCRIPTION
         converted to the array ({ 33, 34 }), and not ({ 33, 34, 0 }) (the
         LDMud versions prior to 3.3 returned the latter array).
 
-        Quoted arrays are ``dequoted'', and arrays are left as they
+        Quoted arrays are "dequoted", and arrays are left as they
         are.
 
         Structs are converted into a normal array.

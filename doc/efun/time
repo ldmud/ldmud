@@ -2,10 +2,10 @@ SYNOPSIS
         int time()
 
 DESCRIPTION
-        Return number of seconds ellapsed since 1. Jan 1970, 0.0:0 GMT
+        Return number of seconds elapsed since 1. Jan 1970, 0.0:0 GMT.
 
-        The time is based on the time provided by the host system, however,
-        the driver makes sure that the result of time() is monotonically
+        The time is based on the time provided by the host system, but
+        the driver does make sure the result of time() is monotonically
         increasing (ie. changes only to bigger numbers).
 
         The result of time() does not change during the course of a command

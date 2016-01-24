@@ -2,10 +2,10 @@ SYNOPSIS
         object this_player(void)
 
 DESCRIPTION
-        Return the current command giver.  This can be an interactive
-        user or a living object like a npc.
+        Return the current command giver. This can be an interactive
+        user or another living object (like an npc).
 
-        If called from inside the heart_beat() of a not living object
+        If called from inside the heart_beat() of a non-living object,
         0 will be returned.
 
 EXAMPLES

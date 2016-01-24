@@ -2,12 +2,12 @@ SYNOPSIS
         int * utime()
 
 DESCRIPTION
-         Return the time since 1. Jan 1970, 00:00:00 GMT in microsecond
-         precision.
+        Return the time since 1. Jan 1970, 00:00:00 GMT in microsecond
+        precision.
 
-         Return is an array:
-           int[0]: number of seconds elapsed
-           int[1]: number of microseconds within the current second.
+        Return is an array:
+          int[0]: number of seconds elapsed
+          int[1]: number of microseconds within the current second.
 
 EXAMPLES
         write(ctime(utime())+"\n");

@@ -2,7 +2,7 @@ SYNOPSIS
         int test_bit(string str, int n)
 
 DESCRIPTION
-        Return 0 or 1 of bit n was set in string str.
+        Return 0 or 1 if bit <n> was set in string <str>.
 
         Each character contains 6 bits. So you can store a value
         between 0 and 63 in one character (2^6=64). Starting character

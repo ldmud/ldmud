@@ -11,7 +11,7 @@ DESCRIPTION
         result:
 
         0: Success.
-        1: To heavy for destination.
+        1: Too heavy for destination.
         2: Can't be dropped.
         3: Can't take it out of it's container.
         4: The object can't be inserted into bags etc.
@@ -19,7 +19,7 @@ DESCRIPTION
         6: The object can't be picked up.
 
         If an object is transfered to a newly created object, make
-        sure that the new object first is transfered to it's
+        sure that the new object first is transfered to its
         destination.
 
         The efun calls add_weight(), drop(), get(), prevent_insert(),
@@ -112,5 +112,5 @@ HISTORY
           USE_DEPRECATED.
 
 SEE ALSO
-         move_object(E), drop(A), get(A), prevent_insert(A),
-         can_put_and_get(A), add_weight(A)
+        move_object(E), drop(A), get(A), prevent_insert(A),
+        can_put_and_get(A), add_weight(A)

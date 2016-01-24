@@ -6,8 +6,9 @@ SYNOPSIS
         (float)<value>
 
 DESCRIPTION
-        Ints are expanded to floats, strings are converted up to the
+        Ints are expanded to floats; strings are converted up to the
         first character that doesnt belong into a float.
+
         Floats are just returned.
 
 BUGS
