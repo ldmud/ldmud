@@ -2897,6 +2897,16 @@ eval_arg (int eOption, const char * pValue)
             tls_crldirectory = strdup(pValue);
         break;
 #endif
+#ifdef USE_PYTHON
+    case cPythonScript:
+        if (python_startup_script != NULL)
+            free(python_startup_script);
+        if (!strcmp(pValue, "none"))
+            python_startup_script = NULL;
+        else
+            python_startup_script = strdup(pValue);
+        break;
+#endif
 
 #ifdef GC_SUPPORT
     case cGcollectFD:
