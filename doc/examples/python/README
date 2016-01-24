@@ -1,0 +1,38 @@
+NAME
+        doc/examples/python/README
+
+
+DESCRIPTION
+        These are examples for the Python interface of LDMud:
+
+
+        startup.py
+
+            This module loads all the other modules and offers
+            a python_reload() efun to reload all the other
+            modules.
+
+
+        console.py
+        console.c
+
+            A python console for LPC. Via input_to entered commands
+            are sent to the Python module to interpret them and
+            return its result. (Without any security guards in-place
+            that module is a VERY BIG security hole.)
+
+
+        asyncore_patch.py
+        echo.py
+
+            Demonstrates how to patch the asyncore module to work
+            with the LDMud select loop to watch for sockets.
+            The echo module is the same as in the asyncore documentation.
+
+
+HISTORY
+        LDMud 3.5 implemented the python functionality.
+
+
+SEE ALSO
+        python(C)
