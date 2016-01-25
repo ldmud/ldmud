@@ -524,7 +524,6 @@ int     net_connect(string, int default: F_QUERY_UDP_PORT);
 int     query_udp_port();
 int     send_udp(string, int, string|int*);
 
-object  query_input_pending(object);
 int     query_mud_port(int|object default: F_THIS_PLAYER);
 
 void    write(mixed);

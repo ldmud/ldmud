@@ -718,7 +718,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
                      , ts, current_object->name
                            ? get_txt(current_object->name) : "<null>");
     debug_message("%s Dump of the call chain:\n", ts);
-    (void)dump_trace(MY_TRUE, NULL); fflush(stdout);
+    (void)dump_trace(MY_TRUE, NULL, NULL); fflush(stdout);
 
     va_end(va);
 
@@ -7268,52 +7268,6 @@ get_input_handler (interactive_t *ip, input_type_t type)
 
     return NULL;
 } /* get_input_handler */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_query_input_pending (svalue_t *sp)
-
-/* EFUN query_input_pending()
- *
- *   object query_input_pending(object ob)
- *
- * If ob is interactive and currently has an input_to() pending,
- * the object that has called the input_to() is returned,
- * else 0.
- */
-
-{
-    object_t *ob, *cb;
-    interactive_t *ip;
-
-    ob = sp->u.ob;
-    if (O_SET_INTERACTIVE(ip, ob) && ip->input_handler)
-    {
-        input_t *ih = ip->input_handler;
-
-        while (ih && ih->type != INPUT_TO)
-            ih = ih->next;
-
-        if (ih)
-        {
-            cb = callback_object(&(((input_to_t*)ih)->fun));
-            if (cb)
-                sp->u.ob = ref_object(cb, "query_input_pending");
-            else
-                put_number(sp, 0);
-        }
-        else
-            put_number(sp, 0);
-    }
-    else
-    {
-        put_number(sp, 0);
-    }
-
-    deref_object(ob, "query_input_pending");
-
-    return sp;
-} /* f_query_input_pending() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
