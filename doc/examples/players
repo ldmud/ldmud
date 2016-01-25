@@ -8,11 +8,20 @@ DESCRIPTION
 EXAMPLES
         #include <configuration.h>
 
-        /* This function should be called, after the network connection
-         * was given to this object via exec().
+        /* To setup an interactive player
+         * write master::connect() like this:
          */
-        void setup_player()
+        object connect()
         {
+            object obj;
+            ...
+
+
+            /* Establish a mud-wide default for a maximum command rate */
+            configure_interactive(this_object(),
+                IC_MAX_COMMANDS, 100);
+
+
             /* In a screen-oriented editor, most of the printable
              * characters (excluding answers to editor prompts
              * 'j', 'n' and 'q') can be combined into strings.
@@ -25,6 +34,13 @@ EXAMPLES
             /* To disable any previous setting, just call: */
             configure_interactive(this_object(),
                 IC_COMBINE_CHARSET_AS_STRING, "");
+
+
+            /* Upon return from the the function, the connection
+             * with its modified max_commands will be rebound
+             * from the master object to the returned object.
+             */
+            return obj;
         }
 
 

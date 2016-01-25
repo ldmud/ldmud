@@ -75,6 +75,9 @@ that you should pay attention to when updating.
   + The efun set_prompt() was removed in favor of
     configure_interactive(ob, IC_PROMPT, prompt).
     There is a sefun replacement in /mudlib/deprecated/. (#596)
+  + The efuns set_max_commands() and get_max_commands() were removed in
+    favor of configure_interactive(ob, IC_MAX_COMMANDS, num).
+    There are a sefun replacements in /mudlib/deprecated/. (#596)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an
