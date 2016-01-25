@@ -35,83 +35,55 @@ that you should pay attention to when updating.
     intersect_alist, assoc.
   + strlen() was removed. sizeof() can be used as a drop-in replacement, which
     does exactly the same thing.
-  + The efun set_heart_beat() was removed in favor of
-    configure_object(ob, OC_HEART_BEAT, flag). There is a sefun
-    replacement in /mudlib/deprecated/. (#596)
-  + The efuns enable_commands() and disable_commands() were removed in
-    favor of configure_obect(ob, OC_COMMANDS_ENABLED, 1 resp. 0).
-    There is a sefun replacement in /mudlib/deprecated/. (#596)
-  + The efun query_once_interactive() was removed in favor of
-    object_info(ob, OI_ONCE_INTERACTIVE). There is a sefun
-    replacement in /mudlib/deprecated/. (#596)
-  + The efun query_shadowing() was removed in favor of
-    object_info(ob, OI_SHADOW_PREV). There is a sefun replacement
-    in /mudlib/deprecated/. (#596)
-  + The efuns set_connection_charset(), get_connection_charset(),
-    set_combine_charset(), and get_combine_charset() were removed in
-    favor of
-     * configure_object(ob, IC_CONNECTION_CHARSET_AS_STRING, val),
-       configure_object(ob, IC_CONNECTION_CHARSET_AS_ARRAY, val) and
-       configure_object(ob, IC_QUOTE_IAC, 1 resp. 0),
-     * object_info(ob, IC_CONNECTION_CHARSET_AS_STRING),
-       object_info(ob, IC_CONNECTION_CHARSET_AS_STRING) and
-       object_info(ob, IC_QUOTE_IAC),
-     * configure_object(ob, IC_COMBINE_CHARSET_AS_STRING, val) and
-       configure_object(ob, IC_COMBINE_CHARSET_AS_ARRAY, val),
-     * object_info(ob, IC_COMBINE_CHARSET_AS_STRING) and
-       object_info(ob, IC_COMBINE_CHARSET_AS_STRING),
-    There are a sefun replacements in /mudlib/deprecated/. (#596)
-  + The efun set_buffer_size() was removed in favor of
-    configure_interactive(ob, IC_SOCKET_BUFFER_SIZE, size).
-    There is a sefun replacement in /mudlib/deprecated/. (#596)
-  + The efun enable_telnet() was removed in favor of
-    configure_interactive(ob, IC_TELNET_ENABLED, state).
-    There is a sefun replacement in /mudlib/deprecated/. (#596)
-  + The efuns start_mccp_compress(), end_mccp_compress(),
-    query_mccp(), and query_mccp_stats() were removed in favor of
-     * configure_interactive(ob, IC_MCCP, state) and
-     * interactive_info(ob, II_MCCP_STATS).
-    There are a sefun replacements in /mudlib/deprecated/. (#596)
-  + The efun set_prompt() was removed in favor of
-    configure_interactive(ob, IC_PROMPT, prompt).
-    There is a sefun replacement in /mudlib/deprecated/. (#596)
-  + The efuns set_max_commands() and get_max_commands() were removed in
-    favor of configure_interactive(ob, IC_MAX_COMMANDS, num).
-    There are a sefun replacements in /mudlib/deprecated/. (#596)
-  + The efun set_modify_command() was removed in favor of
-    configure_interactive(ob, IC_MODIFY_COMMAND, ob).
-    There is a sefun replacement in /mudlib/deprecated/. (#596)
-  + The efuns query_ip_name() and query_ip_number() were removed in favor of
-     * interactive_info(ob, II_IP_NAME),
-     * interactive_info(ob, II_IP_NUMBER), and
-     * interactive_info(ob, II_IP_ADDRESS).
-    There are a sefun replacements in /mudlib/deprecated/. (#596)
-  + The efun query_editing() was removed in favor of
-    interactive_info(ob, II_EDITING). There is a sefun replacement
-    in /mudlib/deprecated/. (#596)
-  + The efun query_idle() was removed in favor of
-    interactive_info(ob, II_IDLE). There is a sefun replacement
-    in /mudlib/deprecated/. (#596)
-  + The efun query_input_pending() was removed in favor of
-    interactive_info(ob, II_INPUT_PENDING). There is a sefun replacement
-    in /mudlib/deprecated/. (#596)
-  + The efun debug_info() was removed in favor of driver_info()
-    There is a sefun replacement in /mudlib/deprecated/. (#596)
-  + The efuns query_limits() and set_limits() were removed in favor of
-    driver_info() and configure_driver().
-    There are a sefun replacements in /mudlib/deprecated/. (#596)
-  + The efun set_extra_wizinfo_size() was removed in favor of
-    configure_driver().
-    There is a sefun replacement in /mudlib/deprecated/. (#596)
-  + The efun query_load_average() was removed in favor of driver_info().
-    There is a sefun replacement in /mudlib/deprecated/. (#596)
-  + The efun query_mud_port() was removed in favor of driver_info()
-    and interactive_info().
-    There is a sefun replacement in /mudlib/deprecated/. (#596)
-  + The efun query_udp_port() was removed in favor of driver_info().
-    There is a sefun replacement in /mudlib/deprecated/. (#596)
-  + The efun query_snoop() was removed in favor of interactive_info().
-    There is a sefun replacement in /mudlib/deprecated/. (#596)
+  + The following efuns were removed in favor of new efuns.
+    There are sefun replacements in /mudlib/deprecated/. (#596)
+
+        set_heart_beat()         -> configure_object(ob, OC_HEART_BEAT, flag)
+        enable_commands()        -> configure_object(ob, OC_COMMANDS_ENABLED, 1)
+        disable_commands()       -> configure_object(ob, OC_COMMANDS_ENABLED, 0)
+        query_once_interactive() -> object_info(ob, OI_ONCE_INTERACTIVE)
+        query_shadowing()        -> object_info(ob, OI_SHADOW_PREV)
+        set_connection_charset() -> configure_object(ob, IC_CONNECTION_CHARSET_AS_STRING, val)
+                                    configure_object(ob, IC_CONNECTION_CHARSET_AS_ARRAY, val)
+                                    configure_object(ob, IC_QUOTE_IAC, 1 resp. 0)
+        get_connection_charset() -> object_info(ob, IC_CONNECTION_CHARSET_AS_STRING)
+                                    object_info(ob, IC_CONNECTION_CHARSET_AS_STRING)
+                                    object_info(ob, IC_QUOTE_IAC)
+        set_combine_charset()    -> configure_object(ob, IC_COMBINE_CHARSET_AS_STRING, val)
+                                    configure_object(ob, IC_COMBINE_CHARSET_AS_ARRAY, val)
+        get_combine_charset()    -> object_info(ob, IC_COMBINE_CHARSET_AS_STRING)
+                                    object_info(ob, IC_COMBINE_CHARSET_AS_STRING)
+        set_buffer_size()        -> configure_interactive(ob, IC_SOCKET_BUFFER_SIZE, size)
+        enable_telnet()          -> configure_interactive(ob, IC_TELNET_ENABLED, state)
+        start_mccp_compress()    -> configure_interactive(ob, IC_MCCP, state)
+        end_mccp_compress()      -> configure_interactive(ob, IC_MCCP, 0)
+        query_mccp()             -> interactive_info(ob, IC_MCCP)
+        query_mccp_stats()       -> interactive_info(ob, II_MCCP_STATS)
+        set_prompt()             -> configure_interactive(ob, IC_PROMPT, prompt)
+        set_max_commands()       -> configure_interactive(ob, IC_MAX_COMMANDS, num)
+        get_max_commands()       -> interactive_info(ob, IC_MAX_COMMANDS)
+        set_modify_command()     -> configure_interactive(ob, IC_MODIFY_COMMAND, ob)
+        query_ip_name()          -> interactive_info(ob, II_IP_NAME)
+                                    interactive_info(ob, II_IP_ADDRESS)
+        query_ip_number()        -> interactive_info(ob, II_IP_NUMBER)
+                                    interactive_info(ob, II_IP_ADDRESS)
+        query_editing()          -> interactive_info(ob, II_EDITING)
+        query_idle()             -> interactive_info(ob, II_IDLE)
+        query_input_pending()    -> interactive_info(ob, II_INPUT_PENDING)
+        debug_info()             -> driver_info(...)
+                                    dump_driver_info(...)
+                                    objects(...)
+        query_limits()           -> driver_info(DC_DEFAULT_RUNTIME_LIMITS)
+                                    driver_info(DI_CURRENT_RUNTIME_LIMITS)
+        set_limits()             -> configure_driver(DC_DEFAULT_RUNTIME_LIMITS)
+        set_extra_wizinfo_size() -> configure_driver(DC_EXTRA_WIZINFO_SIZE)
+        query_load_average()     -> driver_info(DI_LOAD_AVERAGE_COMMANDS)
+                                    driver_info(DI_LOAD_AVERAGE_LINES)
+        query_mud_port()         -> driver_info(DI_MUD_PORTS)
+                                    interactive_info(ob, II_MUD_PORT)
+        query_udp_port()         -> driver_info(DI_UDP_PORT)
+        query_snoop()            -> interactive_info(ob, II_SNOOP_NEXT)
+
   + The efun set_is_wizard() was removed. It can be implemented with
     normal actions. Example implementations are provided in
     /mudlib/deprecated. (#596)
