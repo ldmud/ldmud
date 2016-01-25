@@ -26,8 +26,9 @@ DESCRIPTION
           If the heart beat is not needed for the moment, then do disable
           it. This will reduce system overhead.
 
-          Note that heart_beat()s are called only if there are interactive
-          players in the game.
+          Note that heart_beat()s are called only if there are enabled
+          via configuer_driver(DC_ENABLE_HEART_BEATS), which is the
+          default.
 
 
         The current values for these options can be queried using
