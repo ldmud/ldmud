@@ -1860,10 +1860,20 @@ garbage_collection(void)
         free_array(current_error_trace);
         current_error_trace = NULL;
     }
+    if (current_error_trace_string)
+    {
+        free_mstring(current_error_trace_string);
+        current_error_trace_string = NULL;
+    }
     if (uncaught_error_trace)
     {
         free_array(uncaught_error_trace);
         uncaught_error_trace = NULL;
+    }
+    if (uncaught_error_trace_string)
+    {
+        free_mstring(uncaught_error_trace_string);
+        uncaught_error_trace_string = NULL;
     }
 
     remove_destructed_objects(MY_TRUE); /* After reducing all object references! */
@@ -2887,10 +2897,20 @@ garbage_collection (void)
         free_array(current_error_trace);
         current_error_trace = NULL;
     }
+    if (current_error_trace_string)
+    {
+        free_mstring(current_error_trace_string);
+        current_error_trace_string = NULL;
+    }
     if (uncaught_error_trace)
     {
         free_array(uncaught_error_trace);
         uncaught_error_trace = NULL;
+    }
+    if (uncaught_error_trace_string)
+    {
+        free_mstring(uncaught_error_trace_string);
+        uncaught_error_trace_string = NULL;
     }
     remove_destructed_objects(MY_TRUE);
 

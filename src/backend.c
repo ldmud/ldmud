@@ -289,7 +289,7 @@ do_state_check (int minlvl, const char *where)
     {
         debug_message("%s Inconsistency %s\n", time_stamp(), where);
         printf("%s Inconsistency %s\n", time_stamp(), where);
-        (void)dump_trace(MY_TRUE, NULL);
+        (void)dump_trace(MY_TRUE, NULL, NULL);
 #ifdef TRACE_CODE
         last_instructions(TOTAL_TRACE_LENGTH, 1, 0);
 #endif

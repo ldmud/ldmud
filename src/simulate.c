@@ -74,6 +74,7 @@
 
 #include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_hook.h"
+#include "../mudlib/sys/driver_info.h"
 #include "../mudlib/sys/files.h"
 #include "../mudlib/sys/regexp.h"
 #include "../mudlib/sys/rtlimits.h"
@@ -265,6 +266,8 @@ mp_int    current_error_line_number;
 
 vector_t *uncaught_error_trace = NULL;
 vector_t *current_error_trace = NULL;
+string_t *uncaught_error_trace_string = NULL;
+string_t *current_error_trace_string = NULL;
   /* When an error occured, these variables hold the call chain in the
    * format used by efun debug_info() for evaluation by the mudlib.
    * The variables are kept until the next error, or until a GC.
@@ -650,7 +653,7 @@ fatal (const char *fmt, ...)
                      , ts, current_object->name
                            ? get_txt(current_object->name) : "<null>");
     debug_message("%s Dump of the call chain:\n", ts);
-    (void)dump_trace(MY_TRUE, NULL);
+    (void)dump_trace(MY_TRUE, NULL, NULL);
     printf("%s LDMud aborting on fatal error.\n", time_stamp());
     fflush(stdout);
 
@@ -864,7 +867,12 @@ errorf (const char *fmt, ...)
                     free_array(current_error_trace);
                     current_error_trace = NULL;
                 }
-                object_name = dump_trace(MY_FALSE, &current_error_trace);
+                if (current_error_trace_string)
+                {
+                    free_mstring(current_error_trace_string);
+                    current_error_trace_string = NULL;
+                }
+                object_name = dump_trace(MY_FALSE, &current_error_trace, &current_error_trace_string);
                 debug_message("%s ... execution continues.\n", ts);
                 printf("%s ... execution continues.\n", ts);
             }
@@ -873,12 +881,22 @@ errorf (const char *fmt, ...)
                 /* No dump of the backtrace into the log, but we want it
                  * available for debug_info().
                  */
+                strbuf_t sbuf;
+
                 if (current_error_trace)
                 {
                     free_array(current_error_trace);
                     current_error_trace = NULL;
                 }
-                object_name = collect_trace(NULL, &current_error_trace);
+                if (current_error_trace_string)
+                {
+                    free_mstring(current_error_trace_string);
+                    current_error_trace_string = NULL;
+                }
+                strbuf_zero(&sbuf);
+                object_name = collect_trace(&sbuf, &current_error_trace);
+                current_error_trace_string = new_mstring(sbuf.buf);
+                strbuf_free(&sbuf);
             }
         }
         else /* We're running low on memory. */
@@ -887,6 +905,11 @@ errorf (const char *fmt, ...)
             {
                 free_array(current_error_trace);
                 current_error_trace = NULL;
+            }
+            if (current_error_trace_string)
+            {
+                free_mstring(current_error_trace_string);
+                current_error_trace_string = NULL;
             }
             object_name = STR_UNKNOWN_OBJECT;
         }
@@ -957,15 +980,28 @@ errorf (const char *fmt, ...)
             free_array(uncaught_error_trace);
             uncaught_error_trace = NULL;
         }
+        if (uncaught_error_trace_string)
+        {
+            free_mstring(uncaught_error_trace_string);
+            uncaught_error_trace_string = NULL;
+        }
         if (current_error_trace)
         {
             free_array(current_error_trace);
             current_error_trace = NULL;
         }
+        if (current_error_trace_string)
+        {
+            free_mstring(current_error_trace_string);
+            current_error_trace_string = NULL;
+        }
 
-        object_name = dump_trace(num_error == 3, &current_error_trace);
+        object_name = dump_trace(num_error == 3, &current_error_trace, &current_error_trace_string);
         if (!published_catch)
+        {
             uncaught_error_trace = ref_array(current_error_trace);
+            uncaught_error_trace_string = ref_mstring(current_error_trace_string);
+        }
         fflush(stdout);
     }
 
@@ -1000,10 +1036,20 @@ errorf (const char *fmt, ...)
                 free_array(current_error_trace);
                 current_error_trace = NULL;
             }
+            if (current_error_trace_string)
+            {
+                free_mstring(current_error_trace_string);
+                current_error_trace_string = NULL;
+            }
             if (uncaught_error_trace)
             {
                 free_array(uncaught_error_trace);
                 uncaught_error_trace = NULL;
+            }
+            if (uncaught_error_trace_string)
+            {
+                free_mstring(uncaught_error_trace_string);
+                uncaught_error_trace_string = NULL;
             }
         }
         unroll_context_stack();
@@ -3468,6 +3514,48 @@ dinfo_data_status (svalue_t *svp, int value)
 } /* dinfo_data_status() */
 
 /*-------------------------------------------------------------------------*/
+void
+simulate_driver_info (svalue_t *svp, int value)
+
+/* Returns the vm information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+    switch (value)
+    {
+        case DI_NUM_ACTIONS:
+            put_number(svp, alloc_action_sent);
+            break;
+
+        case DI_NUM_SHADOWS:
+            put_number(svp, alloc_shadow_sent);
+            break;
+
+        case DI_SIZE_ACTIONS:
+            put_number(svp, alloc_action_sent * sizeof(action_t));
+            break;
+
+        case DI_SIZE_SHADOWS:
+            put_number(svp, alloc_shadow_sent * sizeof (shadow_t));
+            break;
+
+        case DI_NUM_OBJECTS_DESTRUCTED:
+            put_number(svp, num_destructed);
+            break;
+
+        case DI_NUM_OBJECTS_NEWLY_DESTRUCTED:
+            put_number(svp, num_newly_destructed);
+            break;
+
+        default:
+            fatal("Unknown option for simulate_driver_info(): %d\n", value);
+            break;
+    }
+
+} /* simulate_driver_info() */
+
+/*-------------------------------------------------------------------------*/
 string_t *
 check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool writeflg)
 
@@ -5046,12 +5134,14 @@ extract_limits ( struct limits_context_s * result
                , svalue_t *svp
                , int  num
                , Bool tagged
+               , Bool defaults
                )
 
 /* Extract the user-given runtime limits from <svp>...
  * and store them into <result>. If <tagged> is FALSE, <svp> points to an array
  * with the <num> values stored at the proper indices, otherwise <svp> points
- * to a series of <num>/2 (tag, value) pairs.
+ * to a series of <num>/2 (tag, value) pairs. If <defaults> is FALSE, the current
+ * runtime limits are used as the base, otherwise the default values.
  *
  * If the function encounters illegal limit tags or values, it throws
  * an error.
@@ -5059,15 +5149,30 @@ extract_limits ( struct limits_context_s * result
 
 {
     /* Set the defaults (unchanged) limits */
-    result->max_eval = max_eval_cost;
-    result->max_array = max_array_size;
-    result->max_mapping = max_mapping_size;
-    result->max_map_keys = max_mapping_keys;
-    result->max_callouts = max_callouts;
-    result->max_byte = max_byte_xfer;
-    result->max_file = max_file_xfer;
-    result->max_memory = max_memory;
-    result->use_cost = 0;
+    if (defaults)
+    {
+        result->max_eval = def_eval_cost;
+        result->max_array = def_array_size;
+        result->max_mapping = def_mapping_size;
+        result->max_map_keys = def_mapping_keys;
+        result->max_callouts = def_callouts;
+        result->max_byte = def_byte_xfer;
+        result->max_file = def_file_xfer;
+        result->max_memory = def_memory;
+        result->use_cost = DEF_USE_EVAL_COST;
+    }
+    else
+    {
+        result->max_eval = max_eval_cost;
+        result->max_array = max_array_size;
+        result->max_mapping = max_mapping_size;
+        result->max_map_keys = max_mapping_keys;
+        result->max_callouts = max_callouts;
+        result->max_byte = max_byte_xfer;
+        result->max_file = max_file_xfer;
+        result->max_memory = max_memory;
+        result->use_cost = 0;
+    }
 
     if (!tagged)
     {
@@ -5182,12 +5287,12 @@ v_limited (svalue_t * sp, int num_arg)
     {
         extract_limits(&limits, argp[1].u.vec->item
                       , (int)VEC_SIZE(argp[1].u.vec)
-                      , MY_FALSE);
+                      , MY_FALSE, MY_FALSE);
         cl_args = num_arg - 2;
     }
     else if (num_arg % 2 == 1)
     {
-        extract_limits(&limits, argp+1, num_arg-1, MY_TRUE);
+        extract_limits(&limits, argp+1, num_arg-1, MY_TRUE, MY_FALSE);
         cl_args = 0;
     }
     else
@@ -5314,9 +5419,9 @@ v_set_limits (svalue_t * sp, int num_arg)
 
     if (num_arg == 1 && argp->type == T_POINTER && VEC_SIZE(argp->u.vec) < INT_MAX)
         extract_limits(&limits, argp->u.vec->item, (int)VEC_SIZE(argp->u.vec)
-                      , MY_FALSE);
+                      , MY_FALSE, MY_TRUE);
     else if (num_arg % 2 == 0)
-        extract_limits(&limits, argp, num_arg, MY_TRUE);
+        extract_limits(&limits, argp, num_arg, MY_TRUE, MY_TRUE);
     else
     {
         errorf("set_limits(): Invalid limit specification.\n");
@@ -5412,6 +5517,82 @@ f_query_limits (svalue_t * sp)
     put_array(sp, vec);
     return sp;
 } /* f_query_limits() */
+
+/*-------------------------------------------------------------------------*/
+void
+set_default_limits (vector_t* vec)
+
+/* Extract the default limits from an integer array <vec> with an
+ * entry for each limit. The entry can be a positive number
+ * or one of three special values:
+ *     LIMIT_UNLIMITED: the limit is deactivated
+ *     LIMIT_DEFAULT:   the global setting is used.
+ *     LIMIT_KEEP:      the former setting is kept
+ */
+
+{
+    struct limits_context_s limits;
+
+    extract_limits(&limits, vec->item, (int)VEC_SIZE(vec), MY_FALSE, MY_TRUE);
+
+    /* Now store the parsed limits into the variables */
+    def_eval_cost = limits.max_eval;
+    def_array_size = limits.max_array;
+    def_mapping_size = limits.max_mapping;
+    def_mapping_keys = limits.max_map_keys;
+    def_byte_xfer = limits.max_byte;
+    def_file_xfer = limits.max_file;
+    def_callouts = limits.max_callouts;
+    def_memory = limits.max_memory;
+
+} /* set_default_limits() */
+
+/*-------------------------------------------------------------------------*/
+void
+put_limits (svalue_t* svp, bool def)
+
+/* Write an array with the current runtime limits, resp. if <def>
+ * is true, the default runtime limits into <svp>. *<svp> shall be
+ * empty when called. The entries in the array are:
+ *
+ *   int[LIMIT_EVAL]:    the max number of eval costs
+ *   int[LIMIT_ARRAY]:   the max number of array entries
+ *   int[LIMIT_MAPPING_SIZE]: the max number of mapping values
+ *   int[LIMIT_MAPPING_KEYS]: the max number of mapping entries
+ *      (LIMIT_MAPPING is an alias for LIMIT_MAPPING_KEYS)
+ *   int[LIMIT_BYTE]:    the max number of bytes for one read/write_bytes()
+ *   int[LIMIT_FILE]:    the max number of bytes for one read/write_file()
+ *   int[LIMIT_COST]:    how to account for the evaluation cost
+ *
+ * A limit of '0' means 'no limit', except for LIMIT_COST.
+ */
+
+{
+    vector_t *vec;
+
+    vec = allocate_uninit_array(LIMIT_MAX);
+    if (!vec)
+    {
+        errorf("(query_limits) Out of memory: array[%d] for result.\n"
+             , LIMIT_MAX);
+        /* NOTREACHED */
+    }
+
+    put_number(vec->item+LIMIT_EVAL,     def ? def_eval_cost : max_eval_cost);
+    put_number(vec->item+LIMIT_ARRAY,    def ? def_array_size : max_array_size);
+    put_number(vec->item+LIMIT_MAPPING_KEYS
+              , def ? def_mapping_keys : max_mapping_keys);
+    put_number(vec->item+LIMIT_MAPPING_SIZE
+              , def ? def_mapping_size : max_mapping_size);
+    put_number(vec->item+LIMIT_BYTE,     def ? def_byte_xfer : max_byte_xfer);
+    put_number(vec->item+LIMIT_FILE,     def ? def_file_xfer : max_file_xfer);
+    put_number(vec->item+LIMIT_CALLOUTS, def ? def_callouts : max_callouts);
+    put_number(vec->item+LIMIT_COST,     def ? DEF_USE_EVAL_COST : use_eval_cost);
+    put_number(vec->item+LIMIT_MEMORY,   def ? def_memory : max_memory);
+
+    /* No free_svalue: sp is empty */
+    put_array(svp, vec);
+} /* query_limits() */
 
 /***************************************************************************/
 

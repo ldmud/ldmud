@@ -198,7 +198,7 @@ extern svalue_t *apply(string_t *fun, object_t *ob, int num_arg);
 extern void call_function(program_t *progp, int fx);
 extern int get_line_number(bytecode_p p, program_t *progp, string_t **namep);
 extern string_t *collect_trace(strbuf_t * sbuf, vector_t ** rvec);
-extern string_t *dump_trace(Bool how, vector_t **rvec);
+extern string_t *dump_trace(Bool how, vector_t **rvec, string_t ** rstr);
 extern int get_line_number_if_any(string_t **name);
 extern void reset_machine(Bool first);
 extern void secure_apply_error(svalue_t *save_sp, struct control_stack *save_csp, Bool clear_costs);

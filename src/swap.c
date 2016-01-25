@@ -106,6 +106,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/debug_info.h"
+#include "../mudlib/sys/driver_info.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -2524,6 +2525,64 @@ swap_dinfo_data (svalue_t *svp, int value)
 
 #undef ST_NUMBER
 } /* swap_dinfo_data() */
+
+/*-------------------------------------------------------------------------*/
+void
+swap_driver_info (svalue_t *svp, int value)
+
+/* Returns the swap information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+    switch (value)
+    {
+        case DI_NUM_SWAP_BLOCKS:
+            put_number(svp, num_swapped + num_swap_structs + num_swapfree + num_vb_swapped);
+            break;
+
+        case DI_NUM_SWAP_BLOCKS_FREE:
+            put_number(svp, num_swapfree);
+            break;
+
+        case DI_NUM_SWAP_BLOCKS_REUSE_LOOKUPS:
+            put_number(svp, swap_num_searches);
+            break;
+
+        case DI_NUM_SWAP_BLOCKS_REUSE_LOOKUP_STEPS:
+            put_number(svp, swap_total_searchlength);
+            break;
+
+        case DI_NUM_SWAP_BLOCKS_FREE_LOOKUPS:
+            put_number(svp, swap_free_searches);
+            break;
+
+        case DI_NUM_SWAP_BLOCKS_FREE_LOOKUP_STEPS:
+            put_number(svp, swap_free_searchlength);
+            break;
+
+        case DI_SIZE_SWAP_BLOCKS:
+            put_number(svp, swapfile_size);
+            break;
+
+        case DI_SIZE_SWAP_BLOCKS_FREE:
+            put_number(svp, total_bytes_swapfree);
+            break;
+
+        case DI_SIZE_SWAP_BLOCKS_REUSED:
+            put_number(svp, total_swap_reused);
+            break;
+
+        case DI_SWAP_RECYCLE_PHASE:
+            put_number(svp, recycle_free_space);
+            break;
+
+        default:
+            fatal("Unknown option for swap_driver_info(): %d\n", value);
+            break;
+    }
+
+} /* swap_driver_info() */
 
 /***************************************************************************/
 

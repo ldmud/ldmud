@@ -17102,7 +17102,7 @@ again:
         printf("%s Received profiling signal, evaluation time > %ld.%06lds\n",
                       ts, (long)profiling_timevalue.tv_sec, (long)profiling_timevalue.tv_usec);
         // dump stack trace and continue execution
-        object_name = dump_trace(MY_FALSE, NULL);
+        object_name = dump_trace(MY_FALSE, NULL, NULL);
         debug_message("%s ... execution continues.\n", ts);
         printf("%s ... execution continues.\n", ts);
     }
@@ -17761,10 +17761,20 @@ secure_apply_error ( svalue_t *save_sp, struct control_stack *save_csp
                 free_array(current_error_trace);
                 current_error_trace = NULL;
             }
+            if (current_error_trace_string)
+            {
+                free_mstring(current_error_trace_string);
+                current_error_trace_string = NULL;
+            }
             if (uncaught_error_trace)
             {
                 free_array(uncaught_error_trace);
                 uncaught_error_trace = NULL;
+            }
+            if (uncaught_error_trace_string)
+            {
+                free_mstring(uncaught_error_trace_string);
+                uncaught_error_trace_string = NULL;
             }
         }
     }
@@ -19591,7 +19601,7 @@ name_computed: /* Jump target from the catch detection */
 
 /*-------------------------------------------------------------------------*/
 string_t *
-dump_trace (Bool how, vector_t ** rvec)
+dump_trace (Bool how, vector_t ** rvec, string_t ** rstr)
 
 /* Write out a traceback, starting from the first frame. If a heart_beat()
  * is involved, return (uncounted) the name of the object that had it.
@@ -19606,6 +19616,7 @@ dump_trace (Bool how, vector_t ** rvec)
  * If <rvec> is not NULL, the traceback is returned in a newly created array
  * which pointer is put into *<rvec>. For the format of the array, see
  * efun debug_info().
+ * If <rstr> is not NULL, the traceback is put as a string into *<rstr>.
  */
 
 {
@@ -19638,6 +19649,8 @@ dump_trace (Bool how, vector_t ** rvec)
     if (how)
         fputs(sbuf.buf, stdout);
     debug_message("%s", sbuf.buf);
+    if (rstr)
+        *rstr = new_mstring(sbuf.buf);
 
     /* Cleanup and return */
     strbuf_free(&sbuf);

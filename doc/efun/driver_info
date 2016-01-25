@@ -1,0 +1,685 @@
+SYNOPSIS
+        #include <driver_info.h>
+
+        mixed driver_info(int what)
+
+DESCRIPTION
+        Returns some internal information about the driver.
+        The argument <what> determines which information is returned.
+
+        It can be either a configuration option as given to
+        configure_driver() or one of the following options:
+
+
+
+        Driver Environment:
+
+        <what> == DI_BOOT_TIME:
+          The time() when the driver was started.
+
+
+
+        LPC Runtime status:
+
+        <what> == DI_CURRENT_RUNTIME_LIMITS:
+          Return an array with the current runtime limits.
+          The entries in the returned array are:
+
+            int[LIMIT_EVAL]:         the max number of eval costs
+            int[LIMIT_ARRAY]:        the max number of array entries
+            int[LIMIT_MAPPING_SIZE]: the max number of mapping values
+            int[LIMIT_MAPPING_KEYS]: the max number of mapping entries
+               (LIMIT_MAPPING is an alias for LIMIT_MAPPING_KEYS)
+            int[LIMIT_BYTE]:         the max number of bytes handled with
+                                     one read_bytes()/write_bytes() call.
+            int[LIMIT_FILE]:         the max number of bytes handled with
+                                     one read_file()/write_file() call.
+            int[LIMIT_CALLOUTS]:     the number of callouts at one time.
+            int[LIMIT_COST]:         how to account the current cost.
+            int[LIMIT_MEMROY]:       the max. number of bytes which can be 
+                                     _additionally_ allocated/used 
+                                     _per top-level execution thread_
+
+          For all limits except LIMIT_COST a limit of '0' aka LIMIT_UNLIMITED
+          means 'no limit'.
+
+          The value for LIMIT_COST has these meanings:
+
+            value > 0: the execution will cost minimum(<value>, actual cost) .
+            value = 0: if the current LIMIT_EVAL is larger than the calling
+                       LIMIT_EVAL, the evaluation will cost only 10; otherwise
+                       the full cost will be accounted.
+            value < 0: (-value)% of the current evaluation cost will be
+                       accounted; -100 obviously means 'full cost'.
+
+        <what> == DI_EVAL_NUMBER:
+          Return the current evaluation number.
+          The number is incremented for each top-level call. Top-level
+          calls are initiated by the driver, usually in reaction to an
+          external event:
+              - commands (added by add_action)
+              - heart_beat, reset, clean_up
+              - calls from call_out or input_to
+              - master applies triggered by external events
+              - calls of driver hooks in reaction to external events
+              - send_erq callbacks
+              - logon in interactives
+
+          The number can be used to detect cases where the same code is
+          executed twice in the same top level evaluation (say, heart_beat),
+          and also for time stamps for ordering some events.
+
+          Please note that the counter may overflow, especially on 32 bit
+          systems. As a result, it can also be negative.
+
+
+
+        Network configuration:
+
+        <what> == DI_MUD_PORTS:
+          Returns an array with all open ports, which the driver
+          listens for player connections on.
+
+        <what> == DI_UDP_PORT:
+          Returns the port number of the UDP socket.
+
+
+
+        Memory management:
+
+        <what> == DI_MEMORY_RESERVE_USER:
+          Current size of the user memory reserve.
+          The user memory reserve is allocated at startup and is used
+          when the driver runs out of memory.
+
+        <what> == DI_MEMORY_RESERVE_MASTER:
+          Current size of the master memory reserve.
+          The master memory reserve is allocated at startup and is used
+          when the driver runs out of memory while executing master
+          code.
+
+        <what> == DI_MEMORY_RESERVE_SYSTEM:
+          Current size of the system memory reserve.
+          The system memory reserve is allocated at startup and is used
+          when the driver runs out of memory while executing internal
+          operations.
+
+
+
+        Traces:
+
+        <what> == DI_TRACE_CURRENT:
+          Returns the current stack trace in array form.
+
+          If the array has more than one entries, the first entry is 0 or
+          the name of the object with the heartbeat which started the
+          current thread; all following entries describe the call stack
+          starting with the topmost function called.
+
+          All call entries are arrays themselves with the following elements:
+
+               int[TRACE_TYPE]: The type of the call frame:
+                   TRACE_TYPE_SYMBOL (0): a function symbol (shouldn't happen).
+                   TRACE_TYPE_SEFUN  (1): a simul-efun.
+                   TRACE_TYPE_EFUN   (2): an efun closure.
+                   TRACE_TYPE_LAMBDA (3): a lambda closure.
+                   TRACE_TYPE_LFUN   (4): a normal lfun.
+
+               mixed[TRACE_NAME]: The 'name' of the called frame:
+                   _TYPE_EFUN:   either the name of the efun, or the code of
+                                 the instruction for operator closures
+                   _TYPE_LAMBDA: the numeric lambda identifier.
+                   _TYPE_LFUN:   the name of the lfun.
+
+               string[TRACE_PROGRAM]: The (file)name of the program holding
+                                      the code.
+
+               string[TRACE_OBJECT]:  The name of the object for which the code
+                                      was executed.
+               int[TRACE_LOC]:
+                   _TYPE_LAMBDA: current program offset from the start of the
+                                 closure code.
+                   _TYPE_LFUN:   the line number.
+
+        <what> == DI_TRACE_CURRENT_DEPTH:
+          Return the current number of frames on the control stack
+          (recursion depth).
+
+        <what> == DI_TRACE_CURRENT_AS_STRING:
+          Returns the current stack trace as a string.
+
+        <what> == DI_TRACE_LAST_ERROR:
+          Returns the stack trace of the last error in array form
+          (same format as DI_TRACE_CURRENT). Stack traces of errors
+          before the last GC might not be available anymore.
+
+        <what> == DI_TRACE_LAST_ERROR_AS_STRING:
+          Returns the stack trace of the last error as a string.
+
+        <what> == DI_TRACE_LAST_UNCAUGHT_ERROR:
+          Returns the stack trace of the last uncaught error in array form
+          (same format as DI_TRACE_CURRENT). Stack traces of errors
+          before the last GC might not be available anymore.
+
+        <what> == DI_TRACE_LAST_UNCAUGHT_ERROR_AS_STRING:
+          Returns the stack trace of the last uncaught error as a string.
+
+
+
+        LPC Runtime statistics:
+
+        <what> == DI_NUM_FUNCTION_NAME_CALLS:
+          Number of function calls by name (like call_other).
+
+        <what> == DI_NUM_FUNCTION_NAME_CALL_HITS:
+          Function calls by name are cached (to accelerate
+          lookup of the corresponding program code).
+          This returns the number of cache hits.
+
+        <what> == DI_NUM_FUNCTION_NAME_CALL_MISSES:
+          The number of function call cache misses.
+
+        <what> == DI_NUM_OBJECTS_LAST_PROCESSED:
+          Number of listed objects processed in the last backend cycle.
+
+        <what> == DI_NUM_HEARTBEAT_TOTAL_CYCLES:
+          Total number of heart_beats cycles so far.
+
+        <what> == DI_NUM_HEARTBEAT_ACTIVE_CYCLES:
+          Number of active heart_beat cycles executed so far
+          (ie. cycles in which at least one heart_beat() function
+          was called).
+
+        <what> == DI_NUM_HEARTBEATS_LAST_PROCESSED:
+          Number of heart_beats calls in the last backend cycle
+
+        <what> == DI_NUM_STRING_TABLE_STRINGS_ADDED:
+          Number of distinct strings added to the string table so far.
+
+        <what> == DI_NUM_STRING_TABLE_STRINGS_REMOVED:
+          Number of distinct strings removed from the string table so far.
+
+        <what> == DI_NUM_STRING_TABLE_LOOKUPS_BY_VALUE:
+          Number of string searches by value.
+
+        <what> == DI_NUM_STRING_TABLE_LOOKUPS_BY_INDEX:
+          Number of string searches by address.
+
+        <what> == DI_NUM_STRING_TABLE_LOOKUP_STEPS_BY_VALUE:
+          Number of lookup steps needed for string searches by value.
+
+        <what> == DI_NUM_STRING_TABLE_LOOKUP_STEPS_BY_INDEX:
+          Number of lookup steps needed for string searches by address.
+
+        <what> == DI_NUM_STRING_TABLE_HITS_BY_VALUE:
+          Number of successful lookups of strings by value.
+
+        <what> == DI_NUM_STRING_TABLE_HITS_BY_INDEX:
+          Number of successful lookups of strings by address.
+
+        <what> == DI_NUM_STRING_TABLE_COLLISIONS:
+          Number of distinct strings added to an existing hash chain so far.
+
+        <what> == DI_NUM_REGEX_LOOKUPS:
+          Number of requests for new regexps.
+
+        <what> == DI_NUM_REGEX_LOOKUP_HITS:
+          Number of requested regexps found in the table.
+
+        <what> == DI_NUM_REGEX_LOOKUP_MISSES:
+          Number of requested regexps not found in the table.
+
+        <what> == DI_NUM_REGEX_LOOKUP_COLLISIONS:
+          Number of requested new regexps which collided with a cached one.
+
+
+
+        Network statistics:
+
+        <what> == DI_NUM_MESSAGES_OUT:
+          Number of messages sent to a player.
+
+        <what> == DI_NUM_PACKETS_OUT:
+          Number of packets sent to a player.
+
+        <what> == DI_NUM_PACKETS_IN:
+          Number of packets received from a player.
+
+        <what> == DI_SIZE_PACKETS_OUT:
+          Number of bytes sent to a player.
+
+        <what> == DI_SIZE_PACKETS_IN:
+          Number of bytes received from a player.
+
+
+
+        Load:
+
+        <what> == DI_LOAD_AVERAGE_COMMANDS:
+          A float value that shows the number of executed player commands
+          per second.
+
+        <what> == DI_LOAD_AVERAGE_LINES:
+          A float value that shows the number of compiled code lines
+          per second.
+
+        <what> == DI_LOAD_AVERAGE_PROCESSED_OBJECTS:
+          A float value that shows the average number of objects processed
+          each backend cycle.
+
+        <what> == DI_LOAD_AVERAGE_PROCESSED_OBJECTS_RELATIVE:
+          Average number of objects processed each cycle, expressed
+          as percentage (0..1.0) of the number of present objects.
+
+        <what> == DI_LOAD_AVERAGE_PROCESSED_HEARTBEATS_RELATIVE:
+          Average number of heart_beats called each cycle, expressed
+          as fraction (0..1.0) of the number of active heartbeats.
+
+
+
+        Memory use statistics:
+
+        <what> == DI_NUM_ACTIONS:
+          Number of allocated actions.
+
+        <what> == DI_NUM_CALLOUTS:
+          Number of pending call_outs.
+
+        <what> == DI_NUM_HEARTBEATS:
+          Number of objects with a heartbeat.
+
+        <what> == DI_NUM_SHADOWS:
+          Number of allocated shadows.
+
+        <what> == DI_NUM_OBJECTS:
+          Number of objects.
+
+        <what> == DI_NUM_OBJECTS_SWAPPED:
+          Number of objects that are swapped-out.
+
+        <what> == DI_NUM_OBJECTS_IN_LIST:
+          Number of objects in the object list
+          (i.e. not destructed objects).
+
+        <what> == DI_NUM_OBJECTS_IN_TABLE:
+          Number of objects in the object table.
+
+        <what> == DI_NUM_OBJECTS_DESTRUCTED:
+          Number of destructed, but still referenced objects.
+          (Not counting DI_NUM_OBJECTS_NEWLY_DESTRUCTED).
+
+        <what> == DI_NUM_OBJECTS_NEWLY_DESTRUCTED:
+          Number of newly destructed objects (ie. objects destructed
+          in this execution thread, that will really be destroyed in
+          the next backend cycle).
+
+        <what> == DI_NUM_OBJECT_TABLE_SLOTS:
+          Number of hash slots provided by the object table.
+
+        <what> == DI_NUM_PROGS:
+          Size occupied by the object table.
+
+        <what> == DI_NUM_PROGS_SWAPPED:
+          Number of swapped-out program blocks
+
+        <what> == DI_NUM_PROGS_UNSWAPPED:
+          Number of programs that were swapped-out, are now swapped-in,
+          but still have allocated space in the swap file.
+
+        <what> == DI_NUM_ARRAYS:
+          Number of currently existing arrays.
+
+        <what> == DI_NUM_MAPPINGS:
+          Number of currently existing mappings.
+
+        <what> == DI_NUM_MAPPINGS_CLEAN:
+          Number of clean mappings (mappings without a hash part).
+
+        <what> == DI_NUM_MAPPINGS_HASH:
+          Number of hash mappings.
+
+        <what> == DI_NUM_MAPPINGS_HYBRID:
+          Number of hybrid mappings (mappings that have a
+          condensed and hash part).
+
+        <what> == DI_NUM_STRUCTS:
+          Number of currently existing structs.
+
+        <what> == DI_NUM_STRUCT_TYPES:
+          Number of currently existing struct types.
+
+        <what> == DI_NUM_VIRTUAL_STRINGS:
+          Number of currently existing virtual strings
+          (identical strings are counted separately).
+
+        <what> == DI_NUM_STRINGS:
+          Number of real strings (identical strings
+          are counted once).
+
+        <what> == DI_NUM_STRINGS_TABLED:
+          Number of directly tabled strings.
+
+        <what> == DI_NUM_STRINGS_UNTABLED:
+          Number of untabled strings.
+
+        <what> == DI_NUM_STRING_TABLE_SLOTS:
+          Number of hash slots in the string table.
+
+        <what> == DI_NUM_STRING_TABLE_SLOTS_USED:
+          Number of hash chains in the string table.
+
+        <what> == DI_NUM_REGEX:
+          Number of cached regular expressions.
+
+        <what> == DI_NUM_REGEX_TABLE_SLOTS:
+          Number of slots in the regexp cache table.
+
+        <what> == DI_SIZE_ACTIONS:
+          Total size of allocated actions.
+
+        <what> == DI_SIZE_CALLOUTS:
+          Total size of pending call_outs.
+
+        <what> == DI_SIZE_HEARTBEATS:
+          Total size of the heart_beat list.
+
+        <what> == DI_SIZE_SHADOWS:
+          Total size of allocated shadows.
+
+        <what> == DI_SIZE_OBJECTS:
+          Total size of objects (not counting the size of the values
+          of their variables).
+
+        <what> == DI_SIZE_OBJECTS_SWAPPED:
+          Total size of swapped-out variable blocks.
+
+        <what> == DI_SIZE_OBJECT_TABLE:
+          Size occupied by the object table.
+
+        <what> == DI_SIZE_PROGS:
+          Total size of all programs.
+
+        <what> == DI_SIZE_PROGS_SWAPPED:
+          Total size of swapped-out program blocks
+
+        <what> == DI_SIZE_PROGS_UNSWAPPED:
+          Total size of unswapped program blocks
+
+        <what> == DI_SIZE_ARRAYS:
+          Total size of all arrays (not counting additional sizes
+          of array element values).
+
+        <what> == DI_SIZE_MAPPINGS:
+          Total size of all mapping (not counting additional sizes
+          of contained values).
+
+        <what> == DI_SIZE_STRUCTS:
+          Total size of all structs (not counting additional sizes
+          of contained values).
+
+        <what> == DI_SIZE_STRUCT_TYPES:
+          Total size of all struct type definitions.
+
+        <what> == DI_SIZE_STRINGS:
+          Total size of all strings.
+
+        <what> == DI_SIZE_STRINGS_TABLED:
+          Total size of all tabled strings.
+
+        <what> == DI_SIZE_STRINGS_UNTABLED:
+          Total size of all untabled strings.
+
+        <what> == DI_SIZE_STRING_TABLE:
+          Size of the string table structure itself.
+
+        <what> == DI_SIZE_STRING_OVERHEAD:
+          Size of the overhead per string (compared to a raw string).
+
+        <what> == DI_SIZE_REGEX:
+          Total size of all cached regular expressions.
+
+        <what> == DI_SIZE_BUFFER_FILE:
+          The size of the memory buffer for file operations.
+
+        <what> == DI_SIZE_BUFFER_SWAP:
+          The size of the memory buffer for the swap file.
+
+
+
+        Memory swapper statistics:
+
+        <what> == DI_NUM_SWAP_BLOCKS:
+          Number of blocks in the swap file.
+
+        <what> == DI_NUM_SWAP_BLOCKS_FREE:
+          Number of free blocks in the swap file.
+
+        <what> == DI_NUM_SWAP_BLOCKS_REUSE_LOOKUPS:
+          Number of searches for blocks to reuse in the swap file.
+
+        <what> == DI_NUM_SWAP_BLOCKS_REUSE_LOOKUP_STEPS:
+          Total number of lookup steps in searches for blocks
+          to reuse in the swap file.
+
+        <what> == DI_NUM_SWAP_BLOCKS_FREE_LOOKUPS:
+          Number of searches for blocks to free in the swap file.
+
+        <what> == DI_NUM_SWAP_BLOCKS_FREE_LOOKUP_STEPS:
+          Total number of lookup steps in searches for blocks
+          to free in the swap file.
+
+        <what> == DI_SIZE_SWAP_BLOCKS:
+          Size of the swap file.
+
+        <what> == DI_SIZE_SWAP_BLOCKS_FREE:
+          Size of free blocks in the swap file.
+
+        <what> == DI_SIZE_SWAP_BLOCKS_REUSED:
+          Total reused space in the swap file.
+
+        <what> == DI_SWAP_RECYCLE_PHASE:
+          True if the swapper is currently recycling free block.
+
+
+
+        Memory allocator statistics:
+
+        <what> == DI_MEMORY_ALLOCATOR_NAME:
+          The name of the allocator: "sysmalloc", "smalloc", "slaballoc
+
+        <what> == DI_NUM_SYS_ALLOCATED_BLOCKS:
+          Number of memory blocks requested from the operating system.
+
+        <what> == DI_NUM_LARGE_BLOCKS_ALLOCATED:
+          Number of large allocated blocks.
+          (With smalloc: The large allocated blocks include
+          the small chunk blocks.)
+
+        <what> == DI_NUM_LARGE_BLOCKS_FREE:
+          Number of large free blocks.
+
+        <what> == DI_NUM_LARGE_BLOCKS_WASTE:
+          Number of unusable large memory fragments.
+
+        <what> == DI_NUM_SMALL_BLOCKS_ALLOCATED:
+          Number of small allocated blocks.
+
+        <what> == DI_NUM_SMALL_BLOCKS_FREE:
+          Number of small free blocks.
+
+        <what> == DI_NUM_SMALL_BLOCKS_WASTE:
+          Number of unusably small memory fragments.
+
+        <what> == DI_NUM_SMALL_BLOCK_CHUNKS:
+          Number of small chunk/slab blocks.
+          (That are large blocks that are used as a
+          base for small blocks.)
+
+        <what> == DI_NUM_UNMANAGED_BLOCKS:
+          Number of unmanaged (non-GC-able) allocations.
+
+        <what> == DI_NUM_FREE_BLOCKS_AVL_NODES:
+          Number of AVL nodes used to manage the large free
+          blocks. This value might go away again.
+
+        <what> == DI_SIZE_SYS_ALLOCATED_BLOCKS:
+          Total size of memory requested from the operating system.
+
+        <what> == DI_SIZE_LARGE_BLOCKS_ALLOCATED:
+          Total size of large allocated blocks.
+
+        <what> == DI_SIZE_LARGE_BLOCKS_FREE:
+          Total size of large free blocks.
+
+        <what> == DI_SIZE_LARGE_BLOCKS_WASTE:
+          Total size of unusable large memory fragments.
+
+        <what> == DI_SIZE_LARGE_BLOCK_OVERHEAD:
+          The overhead of every large block allocation.
+
+        <what> == DI_SIZE_SMALL_BLOCKS_ALLOCATED:
+          Total size of small allocated blocks.
+
+        <what> == DI_SIZE_SMALL_BLOCKS_FREE:
+          Total size of small free blocks.
+
+        <what> == DI_SIZE_SMALL_BLOCKS_WASTE:
+          Total size of unusably small memory fragments.
+
+        <what> == DI_SIZE_SMALL_BLOCK_OVERHEAD:
+          The overhead of every small block allocation.
+
+        <what> == DI_SIZE_SMALL_BLOCK_CHUNKS:
+          Total size of small chunk/slab blocks.
+
+        <what> == DI_SIZE_UNMANAGED_BLOCKS:
+          Total size of unmanaged (non-GC-able) allocations.
+
+        <what> == DI_SIZE_MEMORY_USED:
+          The amount of memory currently allocated from the allocator.
+
+        <what> == DI_SIZE_MEMORY_UNUSED:
+          The amount of memory allocated from the system, but
+          not used by the driver.
+
+        <what> == DI_SIZE_MEMORY_OVERHEAD:
+          Amount of memory used for the management of the memory.
+
+        <what> == DI_NUM_INCREMENT_SIZE_CALLS:
+          Number of requests to increase the size of a memory block.
+
+        <what> == DI_NUM_INCREMENT_SIZE_CALL_SUCCESSES:
+          Number of successful requests to increase the
+          size of a memory block.
+
+        <what> == DI_SIZE_INCREMENT_SIZE_CALL_DIFFS:
+          Total size of additionally allocated memory by
+          increasing already allocated memory blocks.
+
+        <what> == DI_NUM_REPLACEMENT_MALLOC_CALLS:
+          Number of allocations done through the
+          clib functions (if supported by the allocator).
+
+        <what> == DI_SIZE_REPLACEMENT_MALLOC_CALLS:
+          Total size of allocations done through the
+          clib functions (if supported by the allocator).
+
+        <what> == DI_NUM_MEMORY_DEFRAGMENTATION_CALLS_FULL:
+          Total number of requests to defragment all small memory chunks.
+
+        <what> == DI_NUM_MEMORY_DEFRAGMENTATION_CALLS_TARGETED:
+          Total number of requests to defragment small memory chunks
+          for a desired size.
+
+        <what> == DI_NUM_MEMORY_DEFRAGMENTATION_CALL_TARGET_HITS:
+          Total number of successful requests to defragment small
+          memory chunks for a desired size.
+
+        <what> == DI_NUM_MEMORY_DEFRAGMENTATION_BLOCKS_INSPECTED:
+          Number of blocks inspected during defragmentations.
+
+        <what> == DI_NUM_MEMORY_DEFRAGMENTATION_BLOCKS_MERGED:
+          Number of blocks merged during defragmentations.
+
+        <what> == DI_NUM_MEMORY_DEFRAGMENTATION_BLOCKS_RESULTING:
+          Number of defragmented blocks (ie. merge results).
+
+        <what> == DI_MEMORY_EXTENDED_STATISTICS:
+          If the driver was compiled with extended memory statistics,
+          they are returned in this entry; if the driver was compiled
+          without the statistics, 0 is returned.
+
+          The array contains NUM+2 entries, where NUM is the number
+          of distinct small block sizes. Entry [NUM] describes the
+          statistics of oversized small blocks (smalloc) resp. for
+          all slabs (slaballoc), entry [NUM+1] summarizes all large
+          blocks. Each entry is an array of these fields:
+
+               int DIM_ES_MAX_ALLOC:
+                       Max number of allocated blocks of this size.
+
+               int DIM_ES_CUR_ALLOC:
+                       Current number of allocated blocks of this size.
+
+               int DIM_ES_MAX_FREE:
+                       Max number of allocated blocks of this size.
+
+               int DIM_ES_CUR_FREE:
+                       Current number of allocated blocks of this size.
+
+               float DIM_ES_AVG_XALLOC:
+                       Number of explicit allocation requests per
+                       second.
+
+               float DIM_ES_AVG_XFREE:
+                       Number of explicit deallocation requests per
+                       second.
+
+               int DIM_ES_FULL_SLABS:
+                       Number of fully used slabs (slaballoc only).
+
+               int DIM_ES_FREE_SLABS:
+                       Number of fully free slabs (slaballoc only).
+
+               int DIM_ES_TOTAL_SLABS:
+                       Total number of slabs: partially used, fully used
+                       and fully free (slaballoc only).
+
+           The allocation/deallocation-per-second statistics do
+           not cover internal shuffling of the freelists.
+
+           The slab statistics (entry [NUM], slaballoc only) shows
+           in the AVG statistics the frequence with which slabs were
+           allocated from resp. returned to the large memory pool.
+
+
+
+        Status texts:
+
+        <what> == DI_STATUS_TEXT_MEMORY:
+          A printable string containing information about
+          the memory usage.
+
+        <what> == DI_STATUS_TEXT_TABLES:
+          A printable string containing information about
+          the LPC runtime.
+
+        <what> == DI_STATUS_TEXT_SWAP:
+          A printable string containing information about
+          the swap system.
+
+        <what> == DI_STATUS_TEXT_MALLOC:
+          A printable string containing information about
+          memory allocations.
+
+        <what> == DI_STATUS_TEXT_MALLOC_EXTENDED:
+          A printable strings with extended memory statistics
+          (if the driver was compiled with them).
+
+
+HISTORY
+        Introduced in LDMud 3.5.0.
+
+SEE ALSO
+        configure_driver(E), object_info(E), interactive_info(E),
+        dump_driver_info(E)

@@ -104,6 +104,8 @@ that you should pay attention to when updating.
   + configure_object() sets options for given objects. (#596)
   + interactive_info() and driver_info() return information about
     interactive objects resp. the driver and the LPC runtime. (#596)
+  + dump_driver_info() dumps information to a file. (#596)
+  + objects() returns an excerpt from the object list. (#596)
 
 - Changed efuns:
   + call_other() and call_direct() now always accept an array of objects or

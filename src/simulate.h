@@ -232,6 +232,8 @@ extern string_t *current_error_object_name;
 extern mp_int current_error_line_number;
 extern vector_t *uncaught_error_trace;
 extern vector_t *current_error_trace;
+extern string_t *uncaught_error_trace_string;
+extern string_t *current_error_trace_string;
 
 extern Bool game_is_being_shut_down;
 extern Bool master_will_be_updated;
@@ -275,6 +277,7 @@ extern object_t *lookfor_object(string_t *str, Bool bLoad);
 #define get_object(str) lookfor_object((str), MY_TRUE)
 extern object_t *find_object_str(const char *str);
 extern Bool status_parse(strbuf_t * sbuf, char *buff);
+extern void simulate_driver_info(svalue_t *svp, int value) __attribute__((nonnull(1)));
 extern void dinfo_data_status(svalue_t * svp, int value);
 extern void warnf VARPROT((char *, ...), printf, 1, 2);
 extern void errorf VARPROT((const char *, ...), printf, 1, 2) NORETURN;
@@ -298,5 +301,8 @@ extern svalue_t *f_unshadow(svalue_t *sp);
 extern svalue_t *v_limited(svalue_t * sp, int num_arg);
 extern svalue_t *v_set_limits(svalue_t * sp, int num_arg);
 extern svalue_t *f_query_limits(svalue_t * sp);
+
+extern void set_default_limits(vector_t* vec);
+extern void put_limits(svalue_t* svp, bool def);
 
 #endif  /* SIMULATE_H__ */

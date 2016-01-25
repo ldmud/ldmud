@@ -141,7 +141,7 @@ wiz_list_t *all_wiz = NULL;
    * an average O(1) complexity.
    */
 
-static int wiz_info_extra_size = -1;
+int wiz_info_extra_size = -1;
   /* Default size of the .extra field, -1 if unspecified.
    */
 

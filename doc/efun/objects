@@ -1,0 +1,26 @@
+SYNOPSIS
+        object* objects()
+        object* objects(int pos)
+        object* objects(int pos, int num)
+        object* objects(object prev_ob)
+        object* objects(object prev_ob, int num)
+
+DESCRIPTION
+        Returns an array of objects from the global object list.
+
+        The first three forms will return objects starting
+        with position <pos> (or the first object, if <pos> was
+        not given).
+
+        The fourth and fifth form will start with the object
+        following <prev_ob> in the object list.
+
+        The efun will return at most <num> objects if <num> was
+        given, otherwise all remaining objects. If the number of
+        objects exceeds the maximum array size, an error is thrown.
+
+HISTORY
+        Introduced in LDMud 3.5.0.
+
+SEE ALSO
+        dump_driver_info(E), driver_info(E), object_info(E)

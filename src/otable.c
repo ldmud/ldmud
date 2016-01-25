@@ -44,6 +44,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/debug_info.h"
+#include "../mudlib/sys/driver_info.h"
 
 /*=========================================================================*/
 /*                           OBJECT TABLE                                  */
@@ -323,6 +324,37 @@ otable_dinfo_status (svalue_t *svp, int value)
 
 #undef ST_NUMBER
 } /* otable_dinfo_status() */
+
+/*-------------------------------------------------------------------------*/
+void
+otable_driver_info (svalue_t *svp, int value)
+
+/* Returns the object table information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+    switch (value)
+    {
+        case DI_NUM_OBJECTS_IN_TABLE:
+            put_number(svp, objs_in_table);
+            break;
+
+        case DI_NUM_OBJECT_TABLE_SLOTS:
+            put_number(svp, OTABLE_SIZE);
+            break;
+
+        case DI_SIZE_OBJECT_TABLE:
+            put_number(svp, OTABLE_SIZE * sizeof(object_t *));
+            break;
+
+
+        default:
+            fatal("Unknown option for otable_driver_info(): %d\n", value);
+            break;
+    }
+
+} /* otable_driver_info() */
 
 /*=========================================================================*/
 /*                           GENERAL ROUTINES                              */

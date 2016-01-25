@@ -79,6 +79,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/debug_info.h"
+#include "../mudlib/sys/driver_info.h"
 
 /*-------------------------------------------------------------------------*/
 #if HTABLE_SIZE > MAX_HASH32
@@ -173,7 +174,7 @@ static statcounter_t mstr_searches = 0;
    */
 
 static statcounter_t mstr_found = 0;
-  /* Number of successful searches in the string table with content comparison.
+  /* Number of successful searches in the string table without content comparison.
    */
 
 #ifdef EXT_STRING_STATS
@@ -1864,5 +1865,106 @@ string_dinfo_status (svalue_t *svp, int value)
 
 #undef ST_NUMBER
 } /* string_dinfo_status() */
+
+/*-------------------------------------------------------------------------*/
+void
+string_driver_info (svalue_t *svp, int value)
+
+/* Returns the string table information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+    switch (value)
+    {
+        case DI_NUM_STRING_TABLE_STRINGS_ADDED:
+            put_number(svp, mstr_added);
+            break;
+
+        case DI_NUM_STRING_TABLE_STRINGS_REMOVED:
+            put_number(svp, mstr_deleted);
+            break;
+
+        case DI_NUM_STRING_TABLE_LOOKUPS_BY_VALUE:
+            put_number(svp, mstr_searches_byvalue);
+            break;
+
+        case DI_NUM_STRING_TABLE_LOOKUPS_BY_INDEX:
+            put_number(svp, mstr_searches);
+            break;
+
+        case DI_NUM_STRING_TABLE_LOOKUP_STEPS_BY_VALUE:
+            put_number(svp, mstr_searchlen_byvalue);
+            break;
+
+        case DI_NUM_STRING_TABLE_LOOKUP_STEPS_BY_INDEX:
+            put_number(svp, mstr_searchlen);
+            break;
+
+        case DI_NUM_STRING_TABLE_HITS_BY_VALUE:
+            put_number(svp, mstr_found_byvalue);
+            break;
+
+        case DI_NUM_STRING_TABLE_HITS_BY_INDEX:
+            put_number(svp, mstr_found);
+            break;
+
+        case DI_NUM_STRING_TABLE_COLLISIONS:
+            put_number(svp, mstr_collisions);
+            break;
+
+
+        case DI_NUM_VIRTUAL_STRINGS:
+            put_number(svp, mstr_used);
+            break;
+
+        case DI_NUM_STRINGS:
+            put_number(svp, mstr_tabled_count + mstr_untabled_count);
+            break;
+
+        case DI_NUM_STRINGS_TABLED:
+            put_number(svp, mstr_tabled_count);
+            break;
+
+        case DI_NUM_STRINGS_UNTABLED:
+            put_number(svp, mstr_untabled_count);
+            break;
+
+        case DI_NUM_STRING_TABLE_SLOTS:
+            put_number(svp, HTABLE_SIZE);
+            break;
+
+        case DI_NUM_STRING_TABLE_SLOTS_USED:
+            put_number(svp, mstr_chains);
+            break;
+
+
+        case DI_SIZE_STRINGS:
+            put_number(svp, mstr_used_size);
+            break;
+
+        case DI_SIZE_STRINGS_TABLED:
+            put_number(svp, mstr_tabled_size);
+            break;
+
+        case DI_SIZE_STRINGS_UNTABLED:
+            put_number(svp, mstr_untabled_size);
+            break;
+
+        case DI_SIZE_STRING_TABLE:
+            put_number(svp, HTABLE_SIZE * sizeof(string_t *));
+            break;
+
+        case DI_SIZE_STRING_OVERHEAD:
+            put_number(svp, sizeof(string_t)-1);
+            break;
+
+
+        default:
+            fatal("Unknown option for string_driver_info(): %d\n", value);
+            break;
+    }
+
+} /* string_driver_info() */
 
 /***************************************************************************/

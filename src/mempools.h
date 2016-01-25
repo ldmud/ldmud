@@ -44,6 +44,7 @@ extern void * mb_alloc(membuffer_e buf, size_t size);
 extern void * mb_realloc(membuffer_e buf, size_t size);
 extern size_t mb_status (strbuf_t * sbuf, Bool verbose);
 extern void   mb_dinfo_status (svalue_t *svp, int value);
+extern void   mempools_driver_info(svalue_t *svp, int value) __attribute__((nonnull(1)));
 
 #define mb_free(buf) NOOP
   /* Use the above macro to 'free' the memory.

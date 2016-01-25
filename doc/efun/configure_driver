@@ -75,14 +75,59 @@ DESCRIPTION
            This can be changed in the priority strings for GnuTLS, but
            currently not for OpenSSL.
 
+        <what> == DC_EXTRA_WIZINFO_SIZE
+           Indicate that the wizlist should contain an array of the given size
+           with extra info for each wizard. A negative value indicates
+           a non-array value.
+
+           The value is only used to allocate a proper empty 'extra' value
+           for newly created wizlist entries.
+
+        <what> == DC_DEFAULT_RUNTIME_LIMITS
+           Sets the default runtime limits, that will be used for each thread.
+           They will be in effect as the initial limits with the next thread.
+           The limits must be given as an array with the following entries:
+
+             int[LIMIT_EVAL]:         the max number of eval costs
+             int[LIMIT_ARRAY]:        the max number of array entries
+             int[LIMIT_MAPPING_SIZE]: the max number of mapping values
+             int[LIMIT_MAPPING_KEYS]: the max number of mapping entries
+             int[LIMIT_BYTE]:         the max number of bytes handled with
+                                      one read_bytes()/write_bytes() call.
+             int[LIMIT_FILE]:         the max number of bytes handled with
+                                      one read_file()/write_file() call.
+             int[LIMIT_CALLOUTS]:     the number of callouts at one time.
+             int[LIMIT_COST]:         how to account the current cost.
+             int[LIMIT_MEMROY]:       the max. number of bytes which can be 
+                                        _additionally_ allocated/used
+                                        _per top-level execution thread_.
+
+          The limit settings recognize three special values:
+
+            LIMIT_UNLIMITED:  the limit is deactivated
+            LIMIT_KEEP:       the former setting is kept
+            LIMIT_DEFAULT:    the 'global' default setting is used.
+
+          For LIMIT_COST, the special values have these meaning:
+            LIMIT_UNLIMITED:  at maximum 1 tick is accounted
+            LIMIT_KEEP:        LIMIT_COST is set to 0
+            LIMIT_DEFAULT:     LIMIT_COST is set to -100
+
+        <what> == DC_SWAP_COMPACT_MODE
+           Sets free swap space shall be reused immediately to keep
+           the swap file as small as possible.
+           (Same as the --swap-compact command line switch.)
+
 HISTORY
         Introduced in LDMud 3.3.719.
         DC_ENABLE_HEART_BEATS was added in 3.5.0.
         DC_LONG_EXEC_TIME was added in 3.5.0.
         DC_DATA_CLEAN_TIME was added in 3.5.0.
+        DC_EXTRA_WIZINFO_SIZE was added in 3.5.0.
         DC_TLS_CERTIFICATE was added in 3.5.0.
         DC_TLS_DHE_PARAMETER was added in 3.5.0.
         DC_TLS_CIPHERLIST was added in 3.5.0.
+        DC_SWAP_COMPACT_MODE was added in 3.5.0.
 
 SEE ALSO
         configure_interactive(E)

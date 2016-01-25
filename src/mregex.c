@@ -59,6 +59,7 @@
 
 #include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_hook.h"
+#include "../mudlib/sys/driver_info.h"
 #include "../mudlib/sys/regexp.h"
 
 /*--------------------------------------------------------------------*/
@@ -1276,6 +1277,53 @@ rxcache_dinfo_status (svalue_t *svp, int value)
 #undef ST_NUMBER
 #endif
 } /* rxcache_dinfo_status() */
+
+/*-------------------------------------------------------------------------*/
+void
+rxcache_driver_info (svalue_t *svp, int value)
+
+/* Returns the regex cache information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+#ifdef RXCACHE_TABLE
+    switch (value)
+    {
+        case DI_NUM_REGEX_LOOKUPS:
+            put_number(svp, iNumXRequests);
+            break;
+
+        case DI_NUM_REGEX_LOOKUP_HITS:
+            put_number(svp, iNumXFound);
+            break;
+
+        case DI_NUM_REGEX_LOOKUP_MISSES:
+            put_number(svp, iNumXRequests - iNumXFound);
+            break;
+
+        case DI_NUM_REGEX_LOOKUP_COLLISIONS:
+            put_number(svp, iNumXCollisions);
+            break;
+
+        case DI_NUM_REGEX:
+            put_number(svp, iNumXEntries);
+            break;
+
+        case DI_NUM_REGEX_TABLE_SLOTS:
+            put_number(svp, RXCACHE_TABLE);
+            break;
+
+        case DI_SIZE_REGEX:
+            put_number(svp, iXSizeAlloc);
+            break;
+
+        default:
+            fatal("Unknown option for rxcache_driver_info(): %d\n", value);
+            break;
+    }
+#endif
+} /* rxcache_driver_info() */
 
 /*--------------------------------------------------------------------*/
 #if defined(GC_SUPPORT)

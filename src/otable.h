@@ -7,6 +7,7 @@
 
 extern void init_otable(void);
 extern size_t show_otable_status(strbuf_t *sbuf, Bool verbose);
+extern void otable_driver_info(svalue_t *svp, int value) __attribute__((nonnull(1)));
 extern void otable_dinfo_status(svalue_t *svp, int value);
 
 extern void enter_object_hash(object_t *ob);

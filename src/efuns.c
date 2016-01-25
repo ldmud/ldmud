@@ -138,6 +138,7 @@
 
 #include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_hook.h"
+#include "../mudlib/sys/driver_info.h"
 #include "../mudlib/sys/configuration.h"
 #include "../mudlib/sys/object_info.h"
 #include "../mudlib/sys/regexp.h"
@@ -7969,16 +7970,16 @@ f_configure_driver (svalue_t *sp)
             return sp; /* NOTREACHED */
         case DC_MEMORY_LIMIT:
             if (sp->type != T_POINTER)
-                efun_arg_error(1, T_POINTER, sp->type, sp);
+                efun_arg_error(2, T_POINTER, sp->type, sp);
             if (VEC_SIZE(sp->u.vec) != 2)
-                errorf("Bad arg 1 to configure_driver(): Invalid array size %"PRIdPINT
+                errorf("Bad arg 2 to configure_driver(): Invalid array size %"PRIdPINT
                        ", expected 2.\n"
                        , VEC_SIZE(sp->u.vec));
             if (sp->u.vec->item[0].type != T_NUMBER)
-                errorf("Bad arg 1 to configure_driver(): Element 0 is '%s', expected 'int'.\n"
+                errorf("Bad arg 2 to configure_driver(): Element 0 is '%s', expected 'int'.\n"
                        , typename(sp->u.vec->item[0].type));
             if (sp->u.vec->item[1].type != T_NUMBER)
-                errorf("Bad arg 1 to configure_driver(): Element 1 is '%s', expected 'int'.\n"
+                errorf("Bad arg 2 to configure_driver(): Element 1 is '%s', expected 'int'.\n"
                        , typename(sp->u.vec->item[1].type));
             if (!set_memory_limit(MALLOC_SOFT_LIMIT, sp->u.vec->item[0].u.number))
                 errorf("Could not set the soft memory limit (%"PRIdPINT") in configure_driver()\n",
@@ -7990,13 +7991,13 @@ f_configure_driver (svalue_t *sp)
 
         case DC_ENABLE_HEART_BEATS:
             if (sp->type != T_NUMBER)
-                efun_arg_error(1, T_NUMBER, sp->type, sp);
+                efun_arg_error(2, T_NUMBER, sp->type, sp);
             heart_beats_enabled = sp->u.number != 0 ? MY_TRUE : MY_FALSE;
             break;
 
         case DC_LONG_EXEC_TIME:
             if (sp->type != T_NUMBER)
-                efun_arg_error(1, T_NUMBER, sp->type, sp);
+                efun_arg_error(2, T_NUMBER, sp->type, sp);
             if (!set_profiling_time_limit(sp->u.number))
                 errorf("Could not set the profiling time limit for long executions "
                        "(%"PRIdPINT") in configure_driver()\n",
@@ -8005,7 +8006,7 @@ f_configure_driver (svalue_t *sp)
 
         case DC_DATA_CLEAN_TIME:
             if (sp->type != T_NUMBER)
-                efun_arg_error(1, T_NUMBER, sp->type, sp);
+                efun_arg_error(2, T_NUMBER, sp->type, sp);
             if (sp->u.number > 0 && sp->u.number < PINT_MAX/9)
                 time_to_data_cleanup = sp->u.number;
             else
@@ -8017,7 +8018,7 @@ f_configure_driver (svalue_t *sp)
 #ifdef USE_TLS
         case DC_TLS_CERTIFICATE:
             if (sp->type != T_STRING)
-                efun_arg_error(1, T_STRING, sp->type, sp);
+                efun_arg_error(2, T_STRING, sp->type, sp);
             else
             {
                 int len = mstrsize(sp->u.str);
@@ -8129,6 +8130,25 @@ f_configure_driver (svalue_t *sp)
             break;
             
 #endif /* USE_TLS */
+
+        case DC_EXTRA_WIZINFO_SIZE:
+            if (sp->type != T_NUMBER)
+                efun_arg_error(2, T_NUMBER, sp->type, sp);
+            wiz_info_extra_size = sp->u.number;
+            break;
+
+        case DC_DEFAULT_RUNTIME_LIMITS:
+            if (sp->type != T_POINTER)
+                efun_arg_error(2, T_POINTER, sp->type, sp);
+            set_default_limits(sp->u.vec);
+            break;
+
+        case DC_SWAP_COMPACT_MODE:
+            if (sp->type != T_NUMBER)
+                efun_arg_error(2, T_NUMBER, sp->type, sp);
+            swap_compact_mode = (sp->u.number != 0);
+            break;
+
     }
 
     // free arguments
@@ -8137,7 +8157,7 @@ f_configure_driver (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-v_driver_info (svalue_t *sp, int num_arg)
+f_driver_info (svalue_t *sp)
 
 /* EFUN driver_info()
  *
@@ -8150,15 +8170,18 @@ v_driver_info (svalue_t *sp, int num_arg)
  * <what> == DI_...
  */
 {
-    svalue_t *arg;
     svalue_t result;
+    p_int what = sp->u.number;
 
-    arg = sp - num_arg + 1;
+    /* We'll init with 0, because the availability of several
+     * options depends on the compile time configuration.
+     */
+    put_number(&result, 0);
 
-    switch (arg[0].u.number)
+    switch (what)
     {
         default:
-            errorf("Illegal value %"PRIdPINT" for driver_info().\n", arg[0].u.number);
+            errorf("Illegal value %"PRIdPINT" for driver_info().\n", what);
             return sp; /* NOTREACHED */
 
         case DC_MEMORY_LIMIT:
@@ -8218,16 +8241,714 @@ v_driver_info (svalue_t *sp, int num_arg)
             break;
         }
 #endif /* USE_TLS */
+
+        case DC_EXTRA_WIZINFO_SIZE:
+            put_number(&result, wiz_info_extra_size);
+            break;
+
+        case DC_DEFAULT_RUNTIME_LIMITS:
+            put_limits(&result, true);
+            break;
+
+        case DC_SWAP_COMPACT_MODE:
+            put_number(&result, swap_compact_mode);
+            break;
+
+        /* Driver Environment */
+        case DI_BOOT_TIME:
+            put_number(&result, boot_time);
+            break;
+
+        /* LPC Runtime status */
+        case DI_CURRENT_RUNTIME_LIMITS:
+            put_limits(&result, false);
+            break;
+
+        case DI_EVAL_NUMBER:
+            put_number(&result, eval_number);
+            break;
+
+        /* Network configuration */
+        case DI_MUD_PORTS:
+        {
+            vector_t *v;
+            int i;
+
+            memsafe(v = allocate_array(numports), sizeof(*v), "result array");
+
+            for (i = 0; i < numports; i++)
+                put_number(v->item + i, port_numbers[i]);
+            put_array(&result, v);
+            break;
+        }
+
+        case DI_UDP_PORT:
+            put_number(&result, udp_port);
+            break;
+
+        /* Memory management */
+        case DI_MEMORY_RESERVE_USER:
+            put_number(&result, reserved_user_size);
+            break;
+
+        case DI_MEMORY_RESERVE_MASTER:
+            put_number(&result, reserved_master_size);
+            break;
+
+        case DI_MEMORY_RESERVE_SYSTEM:
+            put_number(&result, reserved_system_size);
+            break;
+
+        /* Traces */
+        case DI_TRACE_CURRENT:
+        {
+            vector_t * vec;
+
+            collect_trace(NULL, &vec);
+            put_array(&result, vec);
+            break;
+        }
+
+        case DI_TRACE_CURRENT_DEPTH:
+            put_number(&result, control_stack_depth());
+            break;
+
+        case DI_TRACE_CURRENT_AS_STRING:
+        {
+            strbuf_t sbuf;
+
+            strbuf_zero(&sbuf);
+            collect_trace(&sbuf, NULL);
+            put_string(&result, new_mstring(sbuf.buf));
+            strbuf_free(&sbuf);
+            break;
+        }
+
+        case DI_TRACE_LAST_ERROR:
+            if (current_error_trace)
+                put_ref_array(&result, current_error_trace);
+            else
+                put_number(&result, 0);
+            break;
+
+        case DI_TRACE_LAST_ERROR_AS_STRING:
+            put_ref_string(&result, current_error_trace_string);
+            break;
+
+        case DI_TRACE_LAST_UNCAUGHT_ERROR:
+            if (uncaught_error_trace)
+                put_ref_array(&result, uncaught_error_trace);
+            else
+                put_number(&result, 0);
+            break;
+
+        case DI_TRACE_LAST_UNCAUGHT_ERROR_AS_STRING:
+            put_ref_string(&result, uncaught_error_trace_string);
+            break;
+
+        /* LPC Runtime statistics */
+#ifdef APPLY_CACHE_STAT
+        case DI_NUM_FUNCTION_NAME_CALLS:
+            put_number(&result, apply_cache_hit+apply_cache_miss);
+            break;
+
+        case DI_NUM_FUNCTION_NAME_CALL_HITS:
+            put_number(&result, apply_cache_hit);
+            break;
+
+        case DI_NUM_FUNCTION_NAME_CALL_MISSES:
+            put_number(&result, apply_cache_miss);
+            break;
+#else
+#endif
+
+        case DI_NUM_HEARTBEAT_TOTAL_CYCLES:
+            /* FALLTHROUGH */
+        case DI_NUM_HEARTBEAT_ACTIVE_CYCLES:
+            /* FALLTHROUGH */
+        case DI_NUM_HEARTBEATS_LAST_PROCESSED:
+            hbeat_driver_info(&result, what);
+            break;
+
+        case DI_NUM_STRING_TABLE_STRINGS_ADDED:
+            /* FALLTHROUGH */
+        case DI_NUM_STRING_TABLE_STRINGS_REMOVED:
+            /* FALLTHROUGH */
+        case DI_NUM_STRING_TABLE_LOOKUPS_BY_VALUE:
+            /* FALLTHROUGH */
+        case DI_NUM_STRING_TABLE_LOOKUPS_BY_INDEX:
+            /* FALLTHROUGH */
+        case DI_NUM_STRING_TABLE_LOOKUP_STEPS_BY_VALUE:
+            /* FALLTHROUGH */
+        case DI_NUM_STRING_TABLE_LOOKUP_STEPS_BY_INDEX:
+            /* FALLTHROUGH */
+        case DI_NUM_STRING_TABLE_HITS_BY_VALUE:
+            /* FALLTHROUGH */
+        case DI_NUM_STRING_TABLE_HITS_BY_INDEX:
+            /* FALLTHROUGH */
+        case DI_NUM_STRING_TABLE_COLLISIONS:
+            string_driver_info(&result, what);
+            break;
+
+        case DI_NUM_REGEX_LOOKUPS:
+            /* FALLTHROUGH */
+        case DI_NUM_REGEX_LOOKUP_HITS:
+            /* FALLTHROUGH */
+        case DI_NUM_REGEX_LOOKUP_MISSES:
+            /* FALLTHROUGH */
+        case DI_NUM_REGEX_LOOKUP_COLLISIONS:
+            rxcache_driver_info(&result, what);
+            break;
+
+        /* Network statistics */
+#ifdef COMM_STAT
+        case DI_NUM_MESSAGES_OUT:
+            put_number(&result, add_message_calls);
+            break;
+
+        case DI_NUM_PACKETS_OUT:
+            put_number(&result, inet_packets);
+            break;
+
+        case DI_NUM_PACKETS_IN:
+            put_number(&result, inet_packets_in);
+            break;
+
+        case DI_SIZE_PACKETS_OUT:
+            put_number(&result, inet_volume);
+            break;
+
+        case DI_SIZE_PACKETS_IN:
+            put_number(&result, inet_volume_in);
+            break;
+#endif
+
+        /* Load */
+        case DI_LOAD_AVERAGE_COMMANDS:
+            put_float(&result, stat_load.weighted_avg);
+            break;
+
+        case DI_LOAD_AVERAGE_LINES:
+            put_float(&result, stat_compile.weighted_avg);
+            break;
+
+        case DI_LOAD_AVERAGE_PROCESSED_OBJECTS:
+            put_float(&result, stat_last_processed.weighted_avg);
+            break;
+
+        case DI_LOAD_AVERAGE_PROCESSED_OBJECTS_RELATIVE:
+            put_float(&result, relate_statistics(stat_last_processed, stat_in_list));
+            break;
+
+        case DI_LOAD_AVERAGE_PROCESSED_HEARTBEATS_RELATIVE:
+            hbeat_driver_info(&result, what);
+            break;
+
+        /* Memory use statistics */
+        case DI_NUM_ACTIONS:
+            simulate_driver_info(&result, what);
+            break;
+
+        case DI_NUM_CALLOUTS:
+            callout_driver_info(&result, what);
+            break;
+
+        case DI_NUM_HEARTBEATS:
+            hbeat_driver_info(&result, what);
+            break;
+
+        case DI_NUM_SHADOWS:
+            simulate_driver_info(&result, what);
+            break;
+
+        case DI_NUM_OBJECTS:
+            put_number(&result, tot_alloc_object);
+            break;
+
+        case DI_NUM_OBJECTS_SWAPPED:
+            put_number(&result, num_vb_swapped);
+            break;
+
+        case DI_NUM_OBJECTS_IN_LIST:
+            put_number(&result, num_listed_objs);
+            break;
+
+        case DI_NUM_OBJECTS_IN_TABLE:
+            otable_driver_info(&result, what);
+            break;
+
+        case DI_NUM_OBJECTS_DESTRUCTED:
+            /* FALLTHROUGH */
+        case DI_NUM_OBJECTS_NEWLY_DESTRUCTED:
+            simulate_driver_info(&result, what);
+            break;
+
+        case DI_NUM_OBJECTS_LAST_PROCESSED:
+            put_number(&result, num_last_processed);
+            break;
+
+        case DI_NUM_OBJECT_TABLE_SLOTS:
+            otable_driver_info(&result, what);
+            break;
+
+        case DI_NUM_PROGS:
+            put_number(&result, total_num_prog_blocks + num_swapped - num_unswapped);
+            break;
+
+        case DI_NUM_PROGS_SWAPPED:
+            put_number(&result, num_swapped - num_unswapped);
+            break;
+
+        case DI_NUM_PROGS_UNSWAPPED:
+            put_number(&result, num_unswapped);
+            break;
+
+        case DI_NUM_ARRAYS:
+            put_number(&result, num_arrays);
+            break;
+
+        case DI_NUM_MAPPINGS:
+            put_number(&result, num_mappings);
+            break;
+
+        case DI_NUM_MAPPINGS_CLEAN:
+            put_number(&result, num_mappings - num_hash_mappings - num_dirty_mappings);
+            break;
+
+        case DI_NUM_MAPPINGS_HASH:
+            put_number(&result, num_hash_mappings);
+            break;
+
+        case DI_NUM_MAPPINGS_HYBRID:
+            put_number(&result, num_dirty_mappings);
+            break;
+
+        case DI_NUM_STRUCTS:
+            /* FALLTHROUGH */
+        case DI_NUM_STRUCT_TYPES:
+            struct_driver_info(&result, what);
+            break;
+
+        case DI_NUM_VIRTUAL_STRINGS:
+            /* FALLTHROUGH */
+        case DI_NUM_STRINGS:
+            /* FALLTHROUGH */
+        case DI_NUM_STRINGS_TABLED:
+            /* FALLTHROUGH */
+        case DI_NUM_STRINGS_UNTABLED:
+            /* FALLTHROUGH */
+        case DI_NUM_STRING_TABLE_SLOTS:
+            /* FALLTHROUGH */
+        case DI_NUM_STRING_TABLE_SLOTS_USED:
+            string_driver_info(&result, what);
+            break;
+
+        case DI_NUM_REGEX:
+            /* FALLTHROUGH */
+        case DI_NUM_REGEX_TABLE_SLOTS:
+            rxcache_driver_info(&result, what);
+            break;
+
+
+        case DI_SIZE_ACTIONS:
+            simulate_driver_info(&result, what);
+            break;
+
+        case DI_SIZE_CALLOUTS:
+            callout_driver_info(&result, what);
+            break;
+
+        case DI_SIZE_HEARTBEATS:
+            hbeat_driver_info(&result, what);
+            break;
+
+        case DI_SIZE_SHADOWS:
+            simulate_driver_info(&result, what);
+            break;
+
+        case DI_SIZE_OBJECTS:
+            put_number(&result, tot_alloc_object_size);
+            break;
+
+        case DI_SIZE_OBJECTS_SWAPPED:
+            put_number(&result, total_vb_bytes_swapped);
+            break;
+
+        case DI_SIZE_OBJECT_TABLE:
+            otable_driver_info(&result, what);
+            break;
+
+        case DI_SIZE_PROGS:
+            put_number(&result, total_prog_block_size + total_bytes_swapped - total_bytes_unswapped);
+            break;
+
+        case DI_SIZE_PROGS_SWAPPED:
+            put_number(&result, total_bytes_swapped - total_bytes_unswapped);
+            break;
+
+        case DI_SIZE_PROGS_UNSWAPPED:
+            put_number(&result, total_bytes_unswapped);
+            break;
+
+        case DI_SIZE_ARRAYS:
+            put_number(&result, total_array_size());
+            break;
+
+        case DI_SIZE_MAPPINGS:
+            put_number(&result, total_mapping_size());
+            break;
+
+        case DI_SIZE_STRUCTS:
+            /* FALLTHROUGH */
+        case DI_SIZE_STRUCT_TYPES:
+            struct_driver_info(&result, what);
+            break;
+
+        case DI_SIZE_STRINGS:
+            /* FALLTHROUGH */
+        case DI_SIZE_STRINGS_TABLED:
+            /* FALLTHROUGH */
+        case DI_SIZE_STRINGS_UNTABLED:
+            /* FALLTHROUGH */
+        case DI_SIZE_STRING_TABLE:
+            /* FALLTHROUGH */
+        case DI_SIZE_STRING_OVERHEAD:
+            string_driver_info(&result, what);
+            break;
+
+        case DI_SIZE_REGEX:
+            rxcache_driver_info(&result, what);
+            break;
+
+        case DI_SIZE_BUFFER_FILE:
+            /* FALLTHROUGH */
+        case DI_SIZE_BUFFER_SWAP:
+            mempools_driver_info(&result, what);
+            break;
+
+
+        /* Memory swapper statistics */
+        case DI_NUM_SWAP_BLOCKS:
+            /* FALLTHROUGH */
+        case DI_NUM_SWAP_BLOCKS_FREE:
+            /* FALLTHROUGH */
+        case DI_NUM_SWAP_BLOCKS_REUSE_LOOKUPS:
+            /* FALLTHROUGH */
+        case DI_NUM_SWAP_BLOCKS_REUSE_LOOKUP_STEPS:
+            /* FALLTHROUGH */
+        case DI_NUM_SWAP_BLOCKS_FREE_LOOKUPS:
+            /* FALLTHROUGH */
+        case DI_NUM_SWAP_BLOCKS_FREE_LOOKUP_STEPS:
+            /* FALLTHROUGH */
+        case DI_SIZE_SWAP_BLOCKS:
+            /* FALLTHROUGH */
+        case DI_SIZE_SWAP_BLOCKS_FREE:
+            /* FALLTHROUGH */
+        case DI_SIZE_SWAP_BLOCKS_REUSED:
+            /* FALLTHROUGH */
+        case DI_SWAP_RECYCLE_PHASE:
+            swap_driver_info(&result, what);
+            break;
+
+
+        /* Memory allocator statistics */
+        case DI_MEMORY_ALLOCATOR_NAME:
+            /* FALLTHROUGH */
+
+        case DI_NUM_SYS_ALLOCATED_BLOCKS:
+        case DI_NUM_LARGE_BLOCKS_ALLOCATED:
+        case DI_NUM_LARGE_BLOCKS_FREE:
+        case DI_NUM_LARGE_BLOCKS_WASTE:
+        case DI_NUM_SMALL_BLOCKS_ALLOCATED:
+        case DI_NUM_SMALL_BLOCKS_FREE:
+        case DI_NUM_SMALL_BLOCKS_WASTE:
+        case DI_NUM_SMALL_BLOCK_CHUNKS:
+        case DI_NUM_UNMANAGED_BLOCKS:
+        case DI_NUM_FREE_BLOCKS_AVL_NODES:
+            /* FALLTHROUGH */
+
+        case DI_SIZE_SYS_ALLOCATED_BLOCKS:
+        case DI_SIZE_LARGE_BLOCKS_ALLOCATED:
+        case DI_SIZE_LARGE_BLOCKS_FREE:
+        case DI_SIZE_LARGE_BLOCKS_WASTE:
+        case DI_SIZE_LARGE_BLOCK_OVERHEAD:
+        case DI_SIZE_SMALL_BLOCKS_ALLOCATED:
+        case DI_SIZE_SMALL_BLOCKS_FREE:
+        case DI_SIZE_SMALL_BLOCKS_WASTE:
+        case DI_SIZE_SMALL_BLOCK_OVERHEAD:
+        case DI_SIZE_SMALL_BLOCK_CHUNKS:
+        case DI_SIZE_UNMANAGED_BLOCKS:
+        case DI_SIZE_MEMORY_USED:
+        case DI_SIZE_MEMORY_UNUSED:
+        case DI_SIZE_MEMORY_OVERHEAD:
+            /* FALLTHROUGH */
+
+        case DI_NUM_INCREMENT_SIZE_CALLS:
+        case DI_NUM_INCREMENT_SIZE_CALL_SUCCESSES:
+        case DI_SIZE_INCREMENT_SIZE_CALL_DIFFS:
+        case DI_NUM_REPLACEMENT_MALLOC_CALLS:
+        case DI_SIZE_REPLACEMENT_MALLOC_CALLS:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_CALLS_FULL:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_CALLS_TARGETED:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_CALL_TARGET_HITS:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_BLOCKS_INSPECTED:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_BLOCKS_MERGED:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_BLOCKS_RESULTING:
+            /* FALLTHROUGH */
+
+        case DI_MEMORY_EXTENDED_STATISTICS:
+            mem_driver_info(&result, what);
+            break;
+
+        /* Status texts */
+        case DI_STATUS_TEXT_MEMORY:
+        {
+            strbuf_t sbuf;
+            if (status_parse(&sbuf, ""))
+                strbuf_store(&sbuf, &result);
+            else
+            {
+                strbuf_free(&sbuf);
+                put_number(&result, 0);
+            }
+            break;
+        }
+
+        case DI_STATUS_TEXT_TABLES:
+        {
+            strbuf_t sbuf;
+            if (status_parse(&sbuf, "tables"))
+                strbuf_store(&sbuf, &result);
+            else
+            {
+                strbuf_free(&sbuf);
+                put_number(&result, 0);
+            }
+            break;
+        }
+
+        case DI_STATUS_TEXT_SWAP:
+        {
+            strbuf_t sbuf;
+            if (status_parse(&sbuf, "swap"))
+                strbuf_store(&sbuf, &result);
+            else
+            {
+                strbuf_free(&sbuf);
+                put_number(&result, 0);
+            }
+            break;
+        }
+
+        case DI_STATUS_TEXT_MALLOC:
+        {
+            strbuf_t sbuf;
+            if (status_parse(&sbuf, "malloc"))
+                strbuf_store(&sbuf, &result);
+            else
+            {
+                strbuf_free(&sbuf);
+                put_number(&result, 0);
+            }
+            break;
+        }
+
+        case DI_STATUS_TEXT_MALLOC_EXTENDED:
+        {
+            strbuf_t sbuf;
+            if (status_parse(&sbuf, "malloc extstats"))
+                strbuf_store(&sbuf, &result);
+            else
+            {
+                strbuf_free(&sbuf);
+                put_number(&result, 0);
+            }
+            break;
+        }
     }
 
     /* Clean up the stack and return the result */
+    free_svalue(sp);
 
-    sp = pop_n_elems(num_arg, sp);
-
-    sp++;
     *sp = result;
     return sp;
-} /* v_driver_info */
+} /* f_driver_info */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_dump_driver_info (svalue_t *sp)
+
+/* EFUN dump_driver_info()
+ *
+ *   int dump_driver_info(int what [, string filename])
+ *
+ * Dumps runtime information in <file>. Returns 1 on success, 0 otherwise.
+ */
+{
+    bool success;
+    string_t * fname;
+
+    if (sp[0].type == T_STRING)
+        fname = sp[0].u.str;
+    else
+        fname = NULL;
+
+    switch (sp[-1].u.number)
+    {
+        default:
+            errorf("Illegal value %"PRIdPINT" for dump_driver_info().\n", sp[-1].u.number);
+            return sp; /* NOTREACHED */
+
+        case DDI_OBJECTS:
+            success = dumpstat(fname ? fname : STR_OBJDUMP_FNAME);
+            break;
+
+        case DDI_OBJECTS_DESTRUCTED:
+            success = dumpstat_dest(fname ? fname : STR_DESTOBJDUMP_FNAME);
+            break;
+
+        case DDI_OPCODES:
+#ifdef OPCPROF
+            success = opcdump(fname ? fname : STR_OPCDUMP);
+#else
+            success = false;
+#endif
+            break;
+
+        case DDI_MEMORY:
+            success = false;
+            if (mem_dump_memory(-1))
+            {
+                int fd;
+
+                if (!fname)
+                    fname = STR_MEMDUMP_FNAME;
+                fname = check_valid_path(fname, current_object, STR_MEMDUMP, MY_TRUE);
+                if (fname)
+                {
+                    fd = open(get_txt(fname), O_CREAT|O_APPEND|O_WRONLY, 0664);
+                    if (fd < 0)
+                    {
+                        perror("open memdump file");
+                    }
+                    else
+                    {
+                        writes(fd, "------------------------------------"
+                                   "--------------\n");
+                        dprintf1(fd, "Date: %s\n", (p_int)time_stamp());
+                        success = mem_dump_memory(fd);
+                        writes(fd, "\n");
+                        close(fd);
+                    }
+
+                    free_mstring(fname);
+                }
+            }
+            break;
+    }
+
+    sp = pop_n_elems(2, sp);
+    push_number(sp, success ? 1 : 0);
+    return sp;
+
+} /* f_dump_driver_info */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_objects (svalue_t *sp, int num_arg)
+
+/* EFUN objects()
+ *
+ *   object* objects(int pos = 0, int num = __INT_MAX__)
+ *   object* objects(object prev_ob, int num = __INT_MAX__)
+ *
+ * Returns an array of objects from the global object list.
+ * The first form will return the objects starting with position <pos>
+ * in the object list. The second form will start with the object
+ * following <prev_ob>. Both will return at most <num> objects
+ * (given a suitable maximum array size).
+ *
+ */
+
+{
+    svalue_t *arg;
+    object_t *ob, *firstob;
+    vector_t *vec;
+    svalue_t *svp;
+    mp_int num, count;
+
+    arg = sp-num_arg+1;
+    inter_sp = sp;
+
+    if (num_arg > 2)
+        errorf("Too many arguments to objects()\n");
+
+    /* Get the starting object (that is to be included in the result). */
+    if (num_arg == 0)
+        ob = obj_list;
+    else if (arg[0].type == T_OBJECT)
+        ob = arg[0].u.ob->next_all;
+    else if (arg[0].type == T_NUMBER)
+    {
+        p_int i;
+
+        ob = obj_list;
+        i = arg[0].u.number;
+
+        if (i < 0)
+            errorf("Bad arg 1 to objects(): %"PRIdPINT", expected a number >= 0.\n"
+                 , i);
+
+        while (ob && --i >= 0) ob = ob->next_all;
+    }
+    else
+        vefun_exp_arg_error(1, TF_NUMBER | TF_OBJECT, arg[0].type, sp);
+
+    /* Get the number of objects in the result array. */
+    if (num_arg != 2)
+        num = PINT_MAX;
+    else if (arg[1].type == T_NUMBER)
+    {
+        num = arg[1].u.number;
+
+        if (num <= 0)
+            errorf("Bad arg 2 to objects(): %"PRIdMPINT", expected a number > 0.\n"
+                 , num);
+    }
+    else
+        vefun_exp_arg_error(2, TF_NUMBER, arg[1].type, sp);
+
+    /* First count how many objects that will be. */
+    count = 0;
+    firstob = ob;
+
+    while (ob && count < num)
+    {
+        ob = ob->next_all;
+        count++;
+    }
+
+    /* Now let's get to it. */
+    memsafe(vec = allocate_uninit_array(count), sizeof(*vec) + (count-1) * sizeof(*vec->item), "objects");
+
+    count = 0;
+    ob = firstob;
+    svp = vec->item;
+
+    while (ob && count < num)
+    {
+        put_ref_object(svp, ob, "objects");
+
+        ob = ob->next_all;
+        count++;
+        svp++;
+    }
+
+    sp = pop_n_elems(num_arg, sp);
+    push_array(sp, vec);
+    return sp;
+
+} /* v_objects */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

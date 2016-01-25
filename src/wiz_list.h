@@ -36,6 +36,7 @@ struct wiz_list_s
 
 /* --- Variables --- */
 
+extern int wiz_info_extra_size;
 extern wiz_list_t *all_wiz;
 extern wiz_list_t default_wizlist_entry;
 extern char wizlist_name[];

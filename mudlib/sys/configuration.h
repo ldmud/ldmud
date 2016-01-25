@@ -26,12 +26,15 @@
 
 /* Possible options for configure_driver().
  */
-#define DC_MEMORY_LIMIT        0
-#define DC_ENABLE_HEART_BEATS  1
-#define DC_LONG_EXEC_TIME      2
-#define DC_DATA_CLEAN_TIME     3
-#define DC_TLS_CERTIFICATE     4
-#define DC_TLS_DHE_PARAMETER   5
-#define DC_TLS_CIPHERLIST      6
+#define DC_MEMORY_LIMIT                  0
+#define DC_ENABLE_HEART_BEATS            1
+#define DC_LONG_EXEC_TIME                2
+#define DC_DATA_CLEAN_TIME               3
+#define DC_TLS_CERTIFICATE               4
+#define DC_TLS_DHE_PARAMETER             5
+#define DC_TLS_CIPHERLIST                6
+#define DC_EXTRA_WIZINFO_SIZE            7
+#define DC_DEFAULT_RUNTIME_LIMITS        8
+#define DC_SWAP_COMPACT_MODE             9
 
 #endif /* LPC_CONFIGURATION_H_ */

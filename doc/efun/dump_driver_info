@@ -1,0 +1,75 @@
+SYNOPSIS
+        #include <driver_info.h>
+
+        int dump_driver_info(int what)
+        int dump_driver_info(int what, string filename)
+
+DESCRIPTION
+        Dumps information specificied by <what> into a file
+        specified by <filename>. If <filename> is omitted,
+        a default file name is used. The function calls
+        master->valid_write() to check that it can write
+        the files. The file in question is always written anew
+
+        On success the efun returns 1, or 0 if an error occured.
+
+        <what> == DDI_OBJECTS:
+          Dumps information about all live objects.
+          Default filename is '/OBJ_DUMP',
+          valid_write() will read 'objdump' for the function.
+
+          For every object, a line is written into the file with the
+          following information in the given order:
+            - object name
+            - size in memory, shared data counted only once
+            - size in memory if data wouldn't be shared
+            - number of references
+            - 'HB' if the object has a heartbeat, nothing if not.
+            - the name of the environment, or '--' if the object
+              has no environment
+            - in parentheses the number of execution ticks spent
+              in this object
+            - the swap status:
+               nothing if not swapped,
+               'PROG SWAPPED' if only the program is swapped
+               'VAR SWAPPED' if only the variabes are swapped
+               'SWAPPED' if both program and variables are swapped
+            - the time the object was created
+
+        <what> == DDI_OBJECTS_DESTRUCTED:
+          Dumps information about all destructed objects. 
+          Default filename is '/DEST_OBJ_DUMP',
+          valid_write() will read 'objdump' for the function.
+
+          For every object, a line is written into the file with the
+          following information in the given order:
+            - object name
+            - number of references
+            - 'NEW' if the object was destructed in this execution
+              thread, nothing if it is older already.
+
+        <what> == DDI_OPCODES:
+          Dumps usage information about the opcodes.
+          Default filename is '/OPC_DUMP',
+          valid_write() will read 'opcdump' for the function.
+
+        <what> == DDI_MEMORY:
+          Dumps a list of all allocated memory blocks (if the allocator
+          supports this).
+          Default filename is '/MEMORY_DUMP',
+          valid_write() will read 'memdump' for the function,
+          and the new data will be appended to the end of the file.
+
+          If the allocator doesn't support memory dumps, this call will
+          always return 0, and nothing will be written.
+
+          This works best if the allocator is compiled with
+          MALLOC_TRACE and/or MALLOC_LPC_TRACE.
+
+          NOTE: Make sure that this option can't be abused!
+
+HISTORY
+        Introduced in LDMud 3.5.0.
+
+SEE ALSO
+        driver_info(E), object_info(E), interactive_info(E)

@@ -184,6 +184,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/debug_info.h"
+#include "../mudlib/sys/driver_info.h"
 #include "../mudlib/sys/struct_info.h"
 
 /*-------------------------------------------------------------------------*/
@@ -1088,6 +1089,40 @@ struct_dinfo_status (svalue_t *svp, int value)
 
 #undef ST_NUMBER
 } /* string_dinfo_status() */
+
+/*-------------------------------------------------------------------------*/
+void
+struct_driver_info (svalue_t *svp, int value)
+
+/* Returns the struct information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+    switch (value)
+    {
+        case DI_NUM_STRUCTS:
+            put_number(svp, num_struct);
+            break;
+
+        case DI_NUM_STRUCT_TYPES:
+            put_number(svp, num_struct_type);
+            break;
+
+        case DI_SIZE_STRUCTS:
+            put_number(svp, size_struct);
+            break;
+
+        case DI_SIZE_STRUCT_TYPES:
+            put_number(svp, size_struct_type);
+            break;
+
+        default:
+            fatal("Unknown option for struct_driver_info(): %d\n", value);
+            break;
+    }
+
+} /* struct_driver_info() */
 
 /*-------------------------------------------------------------------------*/
 string_t *

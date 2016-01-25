@@ -240,6 +240,7 @@
 #endif /* MALLOC_EXT_STATISTICS */
 
 #include "../mudlib/sys/debug_info.h"
+#include "../mudlib/sys/driver_info.h"
 
 /* This is the granularity of memory allocations.
  * WARNING: This MUST be sizeof(word_t) at the moment. If you want to change
@@ -1299,6 +1300,229 @@ mem_dinfo_data (svalue_t *svp, int value)
 
 #undef ST_NUMBER
 } /* mem_dinfo_data() */
+
+/*-------------------------------------------------------------------------*/
+void
+mem_driver_info (svalue_t *svp, int value)
+
+/* Returns the memory information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+    switch (value)
+    {
+        case DI_MEMORY_ALLOCATOR_NAME:
+            put_ref_string(svp, STR_SLABALLOC);
+            break;
+
+
+        case DI_NUM_SYS_ALLOCATED_BLOCKS:
+            put_number(svp, sbrk_stat.counter);
+            break;
+
+        case DI_NUM_LARGE_BLOCKS_ALLOCATED:
+            put_number(svp, large_alloc_stat.counter);
+            break;
+
+        case DI_NUM_LARGE_BLOCKS_FREE:
+            put_number(svp, large_free_stat.counter);
+            break;
+
+        case DI_NUM_LARGE_BLOCKS_WASTE:
+            put_number(svp, large_wasted_stat.counter);
+            break;
+
+        case DI_NUM_SMALL_BLOCKS_ALLOCATED:
+            put_number(svp, small_alloc_stat.counter);
+            break;
+
+        case DI_NUM_SMALL_BLOCKS_FREE:
+            put_number(svp, small_free_stat.counter);
+            break;
+
+        case DI_NUM_SMALL_BLOCKS_WASTE:
+            put_number(svp, 0);
+            break;
+
+        case DI_NUM_SMALL_BLOCK_CHUNKS:
+            put_number(svp, small_slab_stat.counter);
+            break;
+
+        case DI_NUM_UNMANAGED_BLOCKS:
+            put_number(svp, perm_alloc_stat.counter);
+            break;
+
+        case DI_NUM_FREE_BLOCKS_AVL_NODES:
+#ifdef USE_AVL_FREELIST
+            put_number(svp, num_avl_nodes);
+#else
+            put_number(svp, large_free_stat.counter);
+#endif
+            break;
+
+
+        case DI_SIZE_SYS_ALLOCATED_BLOCKS:
+            put_number(svp, sbrk_stat.size);
+            break;
+
+        case DI_SIZE_LARGE_BLOCKS_ALLOCATED:
+            put_number(svp, large_alloc_stat.size * GRANULARITY);
+            break;
+
+        case DI_SIZE_LARGE_BLOCKS_FREE:
+            put_number(svp, large_free_stat.size * GRANULARITY);
+            break;
+
+        case DI_SIZE_LARGE_BLOCKS_WASTE:
+            put_number(svp, large_wasted_stat.size);
+            break;
+
+        case DI_SIZE_LARGE_BLOCK_OVERHEAD:
+            put_number(svp, TL_OVERHEAD * GRANULARITY);
+            break;
+
+        case DI_SIZE_SMALL_BLOCKS_ALLOCATED:
+            put_number(svp, small_alloc_stat.size);
+            break;
+
+        case DI_SIZE_SMALL_BLOCKS_FREE:
+            put_number(svp, small_free_stat.size);
+            break;
+
+        case DI_SIZE_SMALL_BLOCKS_WASTE:
+            put_number(svp, small_slab_stat.counter * (sizeof(mslab_t) - GRANULARITY + M_OVERHEAD * GRANULARITY));
+            break;
+
+        case DI_SIZE_SMALL_BLOCK_OVERHEAD:
+            put_number(svp, T_OVERHEAD * GRANULARITY);
+            break;
+
+        case DI_SIZE_SMALL_BLOCK_CHUNKS:
+            put_number(svp, small_slab_stat.size + small_slab_stat.counter * M_OVERHEAD * GRANULARITY);
+            break;
+
+        case DI_SIZE_UNMANAGED_BLOCKS:
+            put_number(svp, perm_alloc_stat.size);
+            break;
+
+        case DI_SIZE_MEMORY_USED:
+            put_number(svp, mem_mem_used());
+            break;
+
+        case DI_SIZE_MEMORY_UNUSED:
+            put_number(svp, large_free_stat.size * GRANULARITY
+                            + large_wasted_stat.size
+                            + small_free_stat.size);
+            break;
+
+        case DI_SIZE_MEMORY_OVERHEAD:
+            put_number(svp, mem_mem_allocated() - mem_mem_used());
+            break;
+
+
+        case DI_NUM_INCREMENT_SIZE_CALLS:
+            put_number(svp, malloc_increment_size_calls);
+            break;
+
+        case DI_NUM_INCREMENT_SIZE_CALL_SUCCESSES:
+            put_number(svp, malloc_increment_size_success);
+            break;
+
+        case DI_SIZE_INCREMENT_SIZE_CALL_DIFFS:
+            put_number(svp, malloc_increment_size_total);
+            break;
+
+        case DI_NUM_REPLACEMENT_MALLOC_CALLS:
+#if defined(REPLACE_MALLOC)
+            put_number(svp, clib_alloc_stat.counter);
+#else
+            put_number(svp, 0);
+#endif
+            break;
+
+        case DI_SIZE_REPLACEMENT_MALLOC_CALLS:
+#if defined(REPLACE_MALLOC)
+            put_number(svp, clib_alloc_stat.size);
+#else
+            put_number(svp, 0);
+#endif
+            break;
+
+        case DI_NUM_MEMORY_DEFRAGMENTATION_CALLS_FULL:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_CALLS_TARGETED:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_CALL_TARGET_HITS:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_BLOCKS_INSPECTED:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_BLOCKS_MERGED:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_BLOCKS_RESULTING:
+            put_number(svp, 0);
+            break;
+
+
+        case DI_MEMORY_EXTENDED_STATISTICS:
+#ifdef MALLOC_EXT_STATISTICS
+            do {
+                vector_t * top; /* Array holding the sub vectors */
+                int i;
+                Bool deallocate = MY_FALSE;
+
+                mem_update_stats();
+                top = allocate_array(SIZE_EXTSTATS);
+
+                if (!top)
+                    break;
+
+                for (i = 0; i < SIZE_EXTSTATS; ++i)
+                {
+                    vector_t *sub = allocate_array(DIM_ES_MAX);
+
+                    if (!sub)
+                    {
+                        deallocate = MY_TRUE;
+                        break;
+                    }
+
+                    put_number(&sub->item[DIM_ES_MAX_ALLOC], extstats[i].max_alloc);
+                    put_number(&sub->item[DIM_ES_CUR_ALLOC], extstats[i].cur_alloc);
+                    put_number(&sub->item[DIM_ES_MAX_FREE], extstats[i].max_free);
+                    put_number(&sub->item[DIM_ES_CUR_FREE], extstats[i].cur_free);
+                    if (num_update_calls)
+                    {
+                        put_float(&sub->item[DIM_ES_AVG_XALLOC], extstats[i].savg_xalloc / num_update_calls);
+                        put_float(&sub->item[DIM_ES_AVG_XFREE], extstats[i].savg_xfree / num_update_calls);
+                    }
+                    if  (i < SMALL_BLOCK_NUM)
+                    {
+                        put_number(&sub->item[DIM_ES_FULL_SLABS],  slabtable[i].numFullSlabs);
+                        put_number(&sub->item[DIM_ES_FREE_SLABS],  slabtable[i].numFreeSlabs);
+                        put_number(&sub->item[DIM_ES_TOTAL_SLABS], slabtable[i].numSlabs);
+                    }
+
+                    put_array(top->item + i, sub);
+                }
+
+                if (deallocate)
+                {
+                    free_array(top);
+                    put_number(svp, 0);
+                }
+                else
+                {
+                    put_array(svp, top);
+                }
+            } while(0);
+#else
+            put_number(svp, 0);
+#endif /* MALLOC_EXT_STATISTICS */
+            break;
+
+
+        default:
+            fatal("Unknown option for mem_driver_info(): %d\n", value);
+            break;
+    }
+
+} /* mem_driver_info() */
 
 
 /*=========================================================================*/

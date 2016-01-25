@@ -15,6 +15,7 @@
 #include "svalue.h"
 
 #include "../mudlib/sys/debug_info.h"
+#include "../mudlib/sys/driver_info.h"
 
 /* Defines required by the xalloc.c wrapper */
 /* #undef REPLACE_MALLOC */
@@ -173,6 +174,68 @@ mem_dinfo_data (svalue_t *svp, int value)
     else if (value == DID_MEM_NAME)
         put_ref_string(svp, STR_SYSTEM_MALLOC);
 } /* mem_dinfo_data() */
+
+/*-------------------------------------------------------------------------*/
+void
+mem_driver_info (svalue_t *svp, int value)
+
+/* Returns the memory information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+    switch (value)
+    {
+        case DI_MEMORY_ALLOCATOR_NAME:
+            put_ref_string(svp, STR_SYSTEM_MALLOC);
+            break;
+
+        case DI_NUM_SYS_ALLOCATED_BLOCKS:
+        case DI_NUM_LARGE_BLOCKS_ALLOCATED:
+        case DI_NUM_LARGE_BLOCKS_FREE:
+        case DI_NUM_LARGE_BLOCKS_WASTE:
+        case DI_NUM_SMALL_BLOCKS_ALLOCATED:
+        case DI_NUM_SMALL_BLOCKS_FREE:
+        case DI_NUM_SMALL_BLOCKS_WASTE:
+        case DI_NUM_SMALL_BLOCK_CHUNKS:
+        case DI_NUM_UNMANAGED_BLOCKS:
+        case DI_NUM_FREE_BLOCKS_AVL_NODES:
+        case DI_SIZE_SYS_ALLOCATED_BLOCKS:
+        case DI_SIZE_LARGE_BLOCKS_ALLOCATED:
+        case DI_SIZE_LARGE_BLOCKS_FREE:
+        case DI_SIZE_LARGE_BLOCKS_WASTE:
+        case DI_SIZE_LARGE_BLOCK_OVERHEAD:
+        case DI_SIZE_SMALL_BLOCKS_ALLOCATED:
+        case DI_SIZE_SMALL_BLOCKS_FREE:
+        case DI_SIZE_SMALL_BLOCKS_WASTE:
+        case DI_SIZE_SMALL_BLOCK_OVERHEAD:
+        case DI_SIZE_SMALL_BLOCK_CHUNKS:
+        case DI_SIZE_UNMANAGED_BLOCKS:
+        case DI_SIZE_MEMORY_USED:
+        case DI_SIZE_MEMORY_UNUSED:
+        case DI_SIZE_MEMORY_OVERHEAD:
+        case DI_NUM_INCREMENT_SIZE_CALLS:
+        case DI_NUM_INCREMENT_SIZE_CALL_SUCCESSES:
+        case DI_SIZE_INCREMENT_SIZE_CALL_DIFFS:
+        case DI_NUM_REPLACEMENT_MALLOC_CALLS:
+        case DI_SIZE_REPLACEMENT_MALLOC_CALLS:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_CALLS_FULL:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_CALLS_TARGETED:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_CALL_TARGET_HITS:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_BLOCKS_INSPECTED:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_BLOCKS_MERGED:
+        case DI_NUM_MEMORY_DEFRAGMENTATION_BLOCKS_RESULTING:
+        case DI_MEMORY_EXTENDED_STATISTICS:
+            put_number(svp, 0);
+            break;
+
+        default:
+            fatal("Unknown option for mem_driver_info(): %d\n", value);
+            break;
+    }
+
+} /* mem_driver_info() */
+
 
 /*-------------------------------------------------------------------------*/
 void

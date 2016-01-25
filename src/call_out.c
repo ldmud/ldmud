@@ -47,6 +47,7 @@
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/debug_info.h"
+#include "../mudlib/sys/driver_info.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -594,6 +595,32 @@ callout_dinfo_status (svalue_t *svp, int value)
 
 #undef ST_NUMBER
 } /* callout_dinfo_status() */
+
+/*-------------------------------------------------------------------------*/
+void
+callout_driver_info (svalue_t *svp, int value)
+
+/* Returns the call-out information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+    switch (value)
+    {
+        case DI_NUM_CALLOUTS:
+            put_number(svp, num_callouts);
+            break;
+
+        case DI_SIZE_CALLOUTS:
+            put_number(svp, num_callouts * sizeof(struct call));
+            break;
+
+        default:
+            fatal("Unknown option for callout_driver_info(): %d\n", value);
+            break;
+    }
+
+} /* callout_driver_info() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef DEBUG

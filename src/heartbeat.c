@@ -60,6 +60,7 @@
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/debug_info.h"
+#include "../mudlib/sys/driver_info.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -491,6 +492,51 @@ hbeat_dinfo_status (svalue_t *svp, int value)
 #undef ST_NUMBER
 #undef ST_DOUBLE
 } /* hbeat_dinfo_status() */
+
+/*-------------------------------------------------------------------------*/
+void
+hbeat_driver_info (svalue_t *svp, int value)
+
+/* Returns the heartbeat information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+    switch (value)
+    {
+        case DI_NUM_HEARTBEAT_TOTAL_CYCLES:
+            put_number(svp, total_hb_calls);
+            break;
+
+        case DI_NUM_HEARTBEAT_ACTIVE_CYCLES:
+            put_number(svp, num_hb_calls);
+            break;
+
+        case DI_NUM_HEARTBEATS_LAST_PROCESSED:
+            put_number(svp, hb_num_done);
+            break;
+
+        case DI_NUM_HEARTBEATS:
+            put_number(svp, num_hb_objs);
+            break;
+
+        case DI_SIZE_HEARTBEATS:
+            put_number(svp, num_hb_objs * sizeof(struct hb_info));
+            break;
+
+        case DI_LOAD_AVERAGE_PROCESSED_HEARTBEATS_RELATIVE:
+            put_float(svp, avg_num_hb_objs
+               ? ((double)avg_num_hb_done / avg_num_hb_objs)
+               : 1.0
+             );
+            break;
+
+        default:
+            fatal("Unknown option for hbeat_driver_info(): %d\n", value);
+            break;
+    }
+
+} /* hbeat_driver_info() */
 
 /*=========================================================================*/
 

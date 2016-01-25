@@ -85,6 +85,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/debug_info.h"
+#include "../mudlib/sys/driver_info.h"
 
 /*=========================================================================*/
 /*                         M E M B U F F E R S                             */
@@ -303,6 +304,32 @@ mb_dinfo_status (svalue_t *svp, int value)
 
 #undef ST_NUMBER
 } /* mb_dinfo_status() */
+
+/*-------------------------------------------------------------------------*/
+void
+mempools_driver_info (svalue_t *svp, int value)
+
+/* Returns the mempool information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+    switch (value)
+    {
+        case DI_SIZE_BUFFER_FILE:
+            put_number(svp, membuffers[mbFile].size);
+            break;
+
+        case DI_SIZE_BUFFER_SWAP:
+            put_number(svp, membuffers[mbSwap].size);
+            break;
+
+        default:
+            fatal("Unknown option for mempools_driver_info(): %d\n", value);
+            break;
+    }
+
+} /* mempools_driver_info() */
 
 /*=========================================================================*/
 /*                           M E M P O O L S                               */
