@@ -4627,7 +4627,7 @@ f_object_info (svalue_t *sp)
         break;
 
     case OI_OBJECT_PREV:
-        if (ob->next_all)
+        if (ob->prev_all)
             put_ref_object(&result, ob->prev_all, "object_info(OI_OBJECT_PREV)");
         else
             put_number(&result, 0);
