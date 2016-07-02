@@ -1,3 +1,4 @@
+%define lr.type ielr
 %{
 %line
 /*---------------------------------------------------------------------------
@@ -53,14 +54,10 @@
  * structures (explained where declared).
  *
  * The most tricky part is that of lvalue (and with it reference) generation
- * in contexts where rvalues are sensible as well. This is so especially
- * because the order of arguments on the stack differs between the
- * instructions :-(. The approach is to generate rvalues, but keep the
- * position, and size and alternatives of the instruction(s) in a struct
- * lrvalue, so that a later change into lvalues is possible. Additionally
- * these instructions can be modified to generated protected lvalues as well.
- * TODO: This whole thing is quite complex and not very well documented.
- * TODO:: It's propably easier to rewrite interpreter and compiler...
+ * in contexts where rvalues are sensible as well. The approach is to
+ * generate rvalues, but keep the position, and size and alternatives of the
+ * instruction(s) in a struct lrvalue, so that a later change into lvalues is
+ * possible.
  *
  * Another challenge is the compilation of inline closures, as they
  * are implemented as separate lfuns (with synthetic names), but encountered
@@ -972,7 +969,6 @@ static void define_local_variable (ident_t* name, lpctype_t* actual_type, struct
 static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2);
 static Bool add_lvalue_code ( struct lvalue_s * lv, int instruction);
 static void insert_pop_value(void);
-static void arrange_protected_lvalue(p_int, int, p_int, int);
 static int insert_inherited(char *, string_t *, program_t **, function_t *, int, bytecode_p);
   /* Returnvalues from insert_inherited(): */
 #  define INHERITED_NOT_FOUND            (-1)
@@ -2505,9 +2501,6 @@ get_aggregate_type (int n)
         argp++;
     }
 
-    if (mask & TYPE_MOD_REFERENCE)
-        yyerror("Can't trace reference assignments.");
-
     if (result)
     {
         lpctype_t *arrtype = get_array_type(result);
@@ -2633,6 +2626,24 @@ ins_f_code (unsigned int b)
         ins_byte(instrs[b].prefix);
     ins_byte(instrs[b].opcode);
 } /* ins_f_code() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ins_f_code_buf (unsigned int b, bytecode_p buf)
+
+/* Add the instruction <b> to the <buf>, taking care of encoding
+ * multi-byte instructions properly. Returns the number of
+ * bytes written. The buffer must have space for at least 2 bytes.
+ */
+
+{
+    int pos = 0;
+    if (instrs[b].prefix)
+        buf[pos++] = instrs[b].prefix;
+    buf[pos++] = instrs[b].opcode;
+
+    return pos;
+} /* ins_f_code_buf() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -6363,6 +6374,7 @@ delete_prog_string (void)
 %token L_DEC
 %token L_DEFAULT
 %token L_DO
+%token L_DUMMY
 %token L_ELLIPSIS
 %token L_ELSE
 %token L_EQ
@@ -6502,36 +6514,68 @@ delete_prog_string (void)
        * while the body is compiled.
        */
 
-    struct s_lrvalue
+    struct rvalue_s
     {
         fulltype_t type;   /* Type of the expression */
-        uint32     start;  /* Startaddress of the instruction */
-        short      code;   /* Alternative instruction */
-        uint32     end;    /* Endaddress+1 of the instruction */
+        uint32     start;  /* Startaddress of the expression */
+    } rvalue;
+      /* Just a simple expression. */
+
+    struct lrvalue_s
+    {
+        fulltype_t type;     /* Type of the expression */
+        uint32     start;    /* Startaddress of the instruction */
+        short      code;     /* Alternative instruction */
+        uint32     argbytes; /* Number of bytes after the opcode */
     }
     lrvalue;
       /* Used for expressions which may return a rvalue or lvalues.
-       * It is also used by the index range generation to move around
-       * the index expressions.
+       * This happens when this expression is followed by an
+       * index or range expression to yield an lvalue.
+       * Then the indexed expression should be converted to an lvalue, too.
+       * (Because for strings, the string itself must be replaced,
+       * when a single character changes. For arrays and strings
+       * an assignment to a range expression might replace the whole
+       * array/string.)
+       *
        * Lvalue generation in places where either a r- or an lvalue
        * is acceptible first generates the rvalue code, but stores
        * the necessary information to patch the code to produce
        * lvalues in this structure.
-       * For more information, see arrange_protected_lvalue().
+       *
+       * If .code < 0, then the expression cannot be an lvalue.
+       *
+       * The opcode is usually the last byte (you'll get that position with
+       * the .start of the following expression or CURRENT_PROGRAM_SIZE).
+       * The opcode might be followed by additional arguments (like
+       * F_IDENTIFIER / F_PUSH_IDENTIFIER_LVALUE), then the number of
+       * following bytes is in .arg (which is 0 normally).
+       */
+
+    struct incdec_s
+    {
+        uint32     start;  /* Current programm pointer */
+        short      code;   /* The opcode (F_PRE_INC or F_PRE_DEC) */
+    }
+    incdec;
+      /* For pre-increment or -decrement remembers which opcode to use,
+       * because it must be issued after the following expression has
+       * been compiled.
        */
 
     struct s_index
     {
-        int        inst;   /* Type of the index */
-        uint32     start;  /* Startaddress of the index */
-        uint32     end;    /* Endaddress+1 of the index */
-        fulltype_t type1;  /* Type of index, resp. lower bound */
-        fulltype_t type2;  /* Type of other index, resp. upper bound */
+        short      rvalue_inst;  /* Index opcode for rvalues */
+        short      lvalue_inst;  /* Index opcode for lvalues */
+        uint32     start;        /* Startaddress of the index */
+        uint32     end;          /* Endaddress+1 of the index */
+        fulltype_t type1;        /* Type of index, resp. lower bound */
+        fulltype_t type2;        /* Type of other index, resp. upper bound */
     }
     index;
       /* This is used to parse and return the indexing operation
        * of an array or mapping.
-       * .inst gives the type of the operation:
+       * .rvalue_inst gives the type of the operation:
        *   F_INDEX:     [x]
        *   F_RINDEX:    [<x]
        *   F_AINDEX:    [>x]
@@ -6547,6 +6591,8 @@ delete_prog_string (void)
        *   F_NX_RANGE:  [ x..  ]
        *   F_RX_RANGE:  [<x..  ]
        *   F_AX_RANGE:  [>x..  ]
+       * .lvalue_inst contains the corresponding opcode for
+       * lvalue generation.
        * .start and .end are the bytecode limits of the whole
        * operation.
        * .type1 and optionally .type2 are the types of the
@@ -6565,6 +6611,16 @@ delete_prog_string (void)
        * (by passing on the bytecode to create) and what type it is.
        * .length = 0: u.simple contains the bytecode to create
        * .length != 0: u.p points to the bytecode of .length bytes.
+       *
+       * An lvalue expression is not put directly in the program code,
+       * because it will be evaluated after the right hand side of the
+       * assignment (eg. a = b = c; will be evaluated from right to
+       * left). The compiled bytecodes for the lvalue are in .u.p
+       * (when .length > 0) or .u.simple instead.
+       *
+       * The allocated buffer (.u.p) needs to be allocatd with yalloc(),
+       * so it will be freed automatically at the end of the compilation
+       * in case of an error.
        */
 
     struct {
@@ -6621,7 +6677,7 @@ delete_prog_string (void)
 %destructor { free_lpctype($$);       } <lpctype>
 %destructor { free_fulltype($$);      } <fulltype>
 %destructor { free_lpctype($$.type);  } <lvalue>
-%destructor { free_fulltype($$.type); } <lrvalue> <struct_init_member>
+%destructor { free_fulltype($$.type); } <rvalue> <lrvalue> <struct_init_member>
 %destructor { free_fulltype($$.type1);
               free_fulltype($$.type2); } <index>
 
@@ -6646,14 +6702,14 @@ delete_prog_string (void)
 %type <lpctype>      inline_opt_type
 %type <lpctype>      decl_cast cast
 %type <address>      note_start
-%type <lrvalue>      comma_expr expr0 expr4
-%type <lrvalue>      function_call
-%type <lrvalue>      inline_func
-%type <lrvalue>      catch sscanf
+%type <rvalue>       comma_expr expr0
+%type <lrvalue>      expr4
+%type <rvalue>       function_call inline_func
+%type <rvalue>       catch sscanf
 %ifdef USE_PARSE_COMMAND
-%type <lrvalue>      parse_command
+%type <rvalue>       parse_command
 %endif
-%type <lvalue>       lvalue name_lvalue local_name_lvalue foreach_var_lvalue
+%type <lvalue>       lvalue name_lvalue name_var_lvalue local_name_lvalue foreach_var_lvalue
 %type <index>        index_range index_expr
 %type <case_label>   case_label
 %type <address>      optional_else
@@ -6712,7 +6768,7 @@ delete_prog_string (void)
 
 /* Special uses of <lrvalue> */
 
-%type <lrvalue> pre_inc_dec
+%type <incdec> pre_inc_dec
   /* .code: The instruction F_PRE_INC or F_PRE_DEC.
    * .start: The CURRENT_PROGRAM_SIZE where this inst was encountered.
    */
@@ -6943,7 +6999,6 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
 printf("DEBUG: After inline block: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
          $$.start = current_inline->end;
-         $$.code = -1;
          $$.type = get_fulltype(lpctype_closure);
 
          complete_inline_closure();
@@ -7007,7 +7062,6 @@ printf("DEBUG: After L_END_INLINE: program size %"PRIuMPINT"\n", CURRENT_PROGRAM
          leave_block_scope(MY_FALSE);
 
          $$.start = current_inline->end;
-         $$.code = -1;
          $$.type = get_fulltype(lpctype_closure);
 
          complete_inline_closure();
@@ -8121,11 +8175,6 @@ return:
               }
           }
 
-          if (type2.t_flags & TYPE_MOD_REFERENCE)
-          {
-              yyerror("May not return a reference");
-          }
-
           if (last_expression == CURRENT_PROGRAM_SIZE - 1
            && mem_block[A_PROGRAM].block[last_expression] ==
                   F_CONST0 )
@@ -8680,9 +8729,6 @@ expr_decl:
               yyerror("Only plain assignments allowed here");
           }
 
-          if (type2.t_flags & TYPE_MOD_REFERENCE)
-              yyerror("Can't trace reference assignments");
-
           /* Add the bytecode to create the lvalue and do the
            * assignment.
            */
@@ -8938,7 +8984,7 @@ foreach_var_decl:  /* Generate the code for one lvalue */
 foreach_var_lvalue:  /* Gather the code for one lvalue */
 
       local_name_lvalue
-    | name_lvalue
+    | name_var_lvalue
 
 ; /* foreach_var_lvalue */
 
@@ -8975,6 +9021,7 @@ foreach_expr:
            * ints (but not &int), mixed and unknown (when !exact_types).
            */
           if (!has_common_type(lpctype_any_array, dtype)
+           && !has_common_type(lpctype_any_struct, dtype)
            && !lpctype_contains(lpctype_string, dtype)
            && !lpctype_contains(lpctype_mapping, dtype)
            && (gen_refs || !lpctype_contains(lpctype_int, dtype))
@@ -9475,7 +9522,7 @@ string_constant:
 /* Expressions
  *
  * expr0 (with the help of the precedence and assoc specifications) handles
- * most of the expressions, and returns normal rvalues (as lrvalues).
+ * most of the expressions, and returns normal rvalues.
  *
  * expr4 contains the expressions atoms (literal values), function calls
  * and expressions returning values which might be used as rvalues
@@ -9483,8 +9530,11 @@ string_constant:
  *
  * lvalue contains expressions for unprotected lvalues and returns lvalues.
  *
- * name_lvalue is a subrule of lvalue and can be used where lvalues of
- * variables are needed (foreach() is one example).
+ * name_var_lvalue is a special lvalue that ignores any lvalues in the variable
+ * and is used the modify the direct content of the variable (normally
+ * if a variable already contents an lvalue, then an lvalue of that variable
+ * would use that lvalue; with name_var_lvalue this doesn't happen).
+ * It currently is used by foreach().
  *
  * local_name_lvalue is to be used in contexts where new local variables
  * may be defined on the fly (for example "for(int i...").
@@ -9503,6 +9553,7 @@ comma_expr:
       ',' expr0
 
       {
+          $$.start = $1.start;
           $$.type = $4.type;
 
           free_fulltype($1.type);
@@ -9515,7 +9566,7 @@ expr0:
 
       /* Normal assign:               ||= (&&= analog):
        *
-       *  <expr0>               <lvalue>         <lvalue>
+       *  <expr0>               <prot-lvalue>    <protected-lvalue>
        *  <lvalue>              LDUP             LDUP
        *  ASSIGN-operator       LOR l            DUP
        *                        <expr0>          LBRANCH_WHEN_NON_ZERO l
@@ -9530,7 +9581,7 @@ expr0:
       {
           if ($2 == F_LAND_EQ || $2 == F_LOR_EQ)
           {
-              if (!add_lvalue_code(&$1, 0))
+              if (!add_lvalue_code(&$1, F_MAKE_PROTECTED))
               {
                   free_lpctype($1.type);
                   YYACCEPT;
@@ -9630,9 +9681,6 @@ expr0:
               restype = ref_fulltype(type1);
           }
 
-          if (type2.t_flags & TYPE_MOD_REFERENCE)
-              yyerror("Can't trace reference assignments.");
-
           /* Special checks for struct assignments */
           if (is_type_struct(type1.t_type) || is_type_struct(type2.t_type)
              )
@@ -9671,7 +9719,6 @@ expr0:
                   YYACCEPT;
               }
           }
-          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = restype;
 
           free_lpctype($1.type);
@@ -9789,7 +9836,6 @@ expr0:
           type2 = $7.type;
 
           $$ = $1;
-          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = get_fulltype(get_union_type(type1.t_type, type2.t_type));
 
           free_fulltype($1.type);
@@ -9815,7 +9861,6 @@ expr0:
           update_lop_branch($<address>3, F_LBRANCH_WHEN_NON_ZERO);
 
           $$ = $1;
-          $$.end = CURRENT_PROGRAM_SIZE;
 
           /* Determine the result type */
           $$.type.t_type = get_union_type($1.type.t_type, $4.type.t_type);
@@ -9842,7 +9887,6 @@ expr0:
           update_lop_branch($<address>3, F_LBRANCH_WHEN_ZERO);
 
           $$ = $1;
-          $$.end = CURRENT_PROGRAM_SIZE;
 
           /* Determine the result type */
           $$.type = $4.type; /* It's the second value or zero. */
@@ -9862,8 +9906,6 @@ expr0:
           free_fulltype($3.type);
 
           ins_f_code(F_OR);
-
-          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9878,8 +9920,6 @@ expr0:
           free_fulltype($3.type);
 
           ins_f_code(F_XOR);
-
-          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9894,7 +9934,6 @@ expr0:
           free_fulltype($3.type);
 
           ins_f_code(F_AND);
-          $$.end = CURRENT_PROGRAM_SIZE;
       } /* end of '&' code */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9916,7 +9955,6 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
-          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9938,7 +9976,6 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
-          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9951,7 +9988,6 @@ expr0:
           free_fulltype($3.type);
 
           ins_f_code(F_GT);
-          $$.end = CURRENT_PROGRAM_SIZE;
       }
     | expr0 L_GE  expr0
       {
@@ -9962,7 +9998,6 @@ expr0:
           free_fulltype($3.type);
 
           ins_f_code(F_GE);
-          $$.end = CURRENT_PROGRAM_SIZE;
       }
     | expr0 '<'  expr0
       {
@@ -9973,7 +10008,6 @@ expr0:
           free_fulltype($3.type);
 
           ins_f_code(F_LT);
-          $$.end = CURRENT_PROGRAM_SIZE;
       }
     | expr0 L_LE  expr0
       {
@@ -9984,7 +10018,6 @@ expr0:
           free_fulltype($3.type);
 
           ins_f_code(F_LE);
-          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10000,7 +10033,6 @@ expr0:
           free_fulltype($3.type);
 
           ins_f_code(F_LSH);
-          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10015,7 +10047,6 @@ expr0:
           free_fulltype($3.type);
 
           ins_f_code(F_RSH);
-          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10030,7 +10061,6 @@ expr0:
           free_fulltype($3.type);
 
           ins_byte(F_RSHL);
-          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10124,7 +10154,6 @@ expr0:
 
           free_fulltype($1.type);
           free_fulltype($4.type);
-          $$.end = CURRENT_PROGRAM_SIZE;
       } /* '+' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10138,7 +10167,6 @@ expr0:
           ins_f_code(F_SUBTRACT);
           free_fulltype($1.type);
           free_fulltype($3.type);
-          $$.end = CURRENT_PROGRAM_SIZE;
       } /* '-' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10151,7 +10179,6 @@ expr0:
           ins_f_code(F_MULTIPLY);
           free_fulltype($1.type);
           free_fulltype($3.type);
-          $$.end = CURRENT_PROGRAM_SIZE;
       } /* '*' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10164,7 +10191,6 @@ expr0:
           ins_f_code(F_MOD);
           free_fulltype($1.type);
           free_fulltype($3.type);
-          $$.end = CURRENT_PROGRAM_SIZE;
       }
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '/' expr0
@@ -10176,7 +10202,6 @@ expr0:
           ins_f_code(F_DIVIDE);
           free_fulltype($1.type);
           free_fulltype($3.type);
-          $$.end = CURRENT_PROGRAM_SIZE;
       } /* '/' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10272,294 +10297,37 @@ expr0:
           }
 
           free_fulltype($2.type);
-          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | pre_inc_dec  L_IDENTIFIER %prec L_INC
+    | pre_inc_dec lvalue %prec L_INC
       {
-          /* ++/-- of a global variable.
-           * We have to distinguish virtual and non-virtual
-           * variables here.
-           */
-          variable_t *varp;
-          fulltype_t lvtype;
-          int i;
-          PREPARE_INSERT(4)
-%line
+          lpctype_t *result;
           $$.start = $1.start;
-          i = verify_declared($2);
-          if (i == -1)
-              /* Variable not declared. */
+
+          if (!add_lvalue_code(&$2, $1.code))
+          {
+              free_lpctype($2.type);
               YYACCEPT;
-
-          if (i & VIRTUAL_VAR_TAG)
-          {
-              add_f_code(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
-              add_byte(i);
-              varp = V_VARIABLE(i);
-              lvtype = varp->type;
-          }
-          else
-          {
-              if ((i + num_virtual_variables) & ~0xff)
-              {
-                  add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
-                  add_short(i + num_virtual_variables);
-                  CURRENT_PROGRAM_SIZE += 1;
-              }
-              else
-              {
-                  add_f_code(F_PUSH_IDENTIFIER_LVALUE);
-                  add_byte(i + num_virtual_variables);
-              }
-              varp = NV_VARIABLE(i);
-              lvtype = varp->type;
           }
 
-          // warn about deprecated variables.
-          if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
-              yywarnf("Using deprecated global variable %s.\n",
-                      get_txt(varp->name));
-
-          // Remove visibility flags
-          lvtype.t_flags &= TYPE_MOD_MASK;
-
-          lpctype_t *result = get_common_type(lvtype.t_type, lpctype_int_float);
+          result = get_common_type($2.type, lpctype_int_float);
           if(result == NULL)
           {
-              argument_type_error($1.code, lvtype.t_type);
-              ref_fulltype(lvtype);
-          }
-          else
-          {
-              lvtype.t_type = result;
+              argument_type_error($1.code, $2.type);
+              result = lpctype_int_float;
           }
 
-          last_expression = CURRENT_PROGRAM_SIZE + 2;
-
-          CURRENT_PROGRAM_SIZE += 3;
-
-          add_f_code($1.code);
-          $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = lvtype;
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | pre_inc_dec L_LOCAL %prec L_INC
-      {
-          lpctype_t *lvtype, *result;
-          PREPARE_INSERT(3)
-%line
-          $$.start = $1.start;
-
-          $2 = check_for_context_local($2, &lvtype);
-
-          if ($2->u.local.context >= 0)
-          {
-              add_f_code(F_PUSH_CONTEXT_LVALUE);
-              add_byte($2->u.local.context);
-          }
-          else
-          {
-              add_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
-              add_byte($2->u.local.num);
-          }
-          CURRENT_PROGRAM_SIZE =
-            (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
-          add_f_code($1.code);
-
-          result = get_common_type(lvtype, lpctype_int_float);
-          if(result == NULL)
-          {
-              argument_type_error($1.code, lvtype);
-              $$.type = get_fulltype(ref_lpctype(lvtype));
-          }
-          else
-          {
-              $$.type = get_fulltype(result);
-          }
-
-          $$.end = CURRENT_PROGRAM_SIZE;
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | pre_inc_dec expr4 index_expr %prec '['
-      {
-          mp_uint current;
-          bytecode_p p;
-          int start;
-          lpctype_t* result;
-%line
-          $$.start = $1.start;
-
-          /* Check the types */
-          result = lpctype_int_float;
-          if (exact_types)
-          {
-              lpctype_t* element = get_index_result_type($2.type.t_type, $3.type1, $3.inst, NULL);
-              if (element)
-              {
-                  result = get_common_type(element, lpctype_int_float);
-                  if (!result)
-                  {
-                      argument_type_error($1.code, element);
-                      result = lpctype_int_float;
-                  }
-                  free_lpctype(element);
-              }
-          } /* if (exact_types) */
-
-          free_fulltype($2.type);
-          free_fulltype($3.type1);
-          free_fulltype($3.type2);
-
-          /* Create the code to index the lvalue */
-
-          /* TODO: How does this lvalue-indexing work? */
-          current = CURRENT_PROGRAM_SIZE;
-          start = $2.start;
-          if ($2.code >= 0)
-          {
-              if ($2.end)
-              {
-                  int length;
-                  bytecode_p q;
-
-                  length = $2.end - start + 1;
-                  if (!realloc_a_program(length))
-                  {
-                      yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
-                              , current+length);
-                      free_lpctype(result);
-                      YYACCEPT;
-                  }
-                  p = PROGRAM_BLOCK;
-                  memcpy(p + current, p + start, length);
-                  p += start;
-                  q = p + length;
-                  length = current - start;
-                  for( ; --length >= 0; )
-                      *p++ = *q++;
-                  if ($2.code == F_PUSH_IDENTIFIER16_LVALUE)
-                      p[-3] = $2.code;
-                  else
-                      p[-1] = $2.code;
-                  if ($3.inst == F_INDEX)
-                      *p++ = F_INDEX_LVALUE;
-                  else if ($3.inst == F_RINDEX)
-                      *p++ = F_RINDEX_LVALUE;
-                  else
-                      *p++ = F_AINDEX_LVALUE;
-              }
-              else
-              {
-                  int i;
-                  int length;
-
-                  if (!realloc_a_program(3))
-                  {
-                      yyerrorf("Out of memory: program size %"PRIuMPINT"\n",
-                               current+3);
-                      free_lpctype(result);
-                      YYACCEPT;
-                  }
-                  p = PROGRAM_BLOCK + start;
-                  i = p[1];
-                  length = current - start - 2;
-                  for( ; --length >= 0; p++)
-                      *p = p[2];
-                  *p++ = $2.code;
-                  *p++ = i;
-                  if ($3.inst == F_INDEX)
-                      *p++ = F_INDEX_LVALUE;
-                  else if ($3.inst == F_RINDEX)
-                      *p++ = F_RINDEX_LVALUE;
-                  else
-                      *p++ = F_AINDEX_LVALUE;
-              }
-          }
-          else
-          {
-              if (!realloc_a_program(2))
-              {
-                  yyerrorf("Out of memory: program size %"PRIuMPINT"\n", 
-                           current+2);
-                  free_lpctype(result);
-                  YYACCEPT;
-              }
-              p = PROGRAM_BLOCK + start;
-              if ($3.inst == F_INDEX)
-                  *p++ = F_PUSH_INDEXED_LVALUE;
-              else if ($3.inst == F_RINDEX)
-                  *p++ = F_PUSH_RINDEXED_LVALUE;
-              else
-                  *p++ = F_PUSH_AINDEXED_LVALUE;
-          }
-
-          /* Finally store the actual instruction */
-          *p = $1.code;
-          last_expression = current + 1;
-          CURRENT_PROGRAM_SIZE = current + 2;
-          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = get_fulltype(result);
 
-      } /* pre_inc_dec expr4 [index_expr] */
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | pre_inc_dec expr4 '[' expr0 ',' expr0 ']' %prec '['
-      {
-          mp_uint current;
-          bytecode_p p;
-%line
-          $$.start = $1.start;
-
-          if ($4.type.t_flags & TYPE_MOD_REFERENCE
-           || $6.type.t_flags & TYPE_MOD_REFERENCE)
-              yyerror("Reference used as index");
-
-          /* Check the types */
-          if (exact_types && !lpctype_contains(lpctype_mapping, $2.type.t_type))
-              fulltype_error("Bad type to indexed lvalue", $2.type);
-
-          if (exact_types && !lpctype_contains(lpctype_int, $6.type.t_type))
-              fulltype_error("Bad type of index", $6.type);
-
-          /* We don't have to do much: we can take the rvalue
-           * produced by <expr4> and add our PUSH_INDEXED_MAP_LVALUE
-           */
-          current = CURRENT_PROGRAM_SIZE;
-          if (!realloc_a_program(2))
-          {
-              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", 
-                       current+2);
-              free_fulltype($2.type);
-              free_fulltype($4.type);
-              free_fulltype($6.type);
-              YYACCEPT;
-          }
-          p = PROGRAM_BLOCK + current;
-          *p++ = F_PUSH_INDEXED_MAP_LVALUE;
-
-          /* Finally store the actual instruction */
-          *p = $1.code;
-          last_expression = current + 1;
-          CURRENT_PROGRAM_SIZE = current + 2;
-          $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = get_fulltype(lpctype_mixed);
-
-          free_fulltype($2.type);
-          free_fulltype($4.type);
-          free_fulltype($6.type);
-      } /* pre_inc_dec expr4 [expr0 ',' expr0] */
-
+          free_lpctype($2.type);
+      }
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | L_NOT expr0
       {
           $$ = $2;
           last_expression = CURRENT_PROGRAM_SIZE;
           ins_f_code(F_NOT);        /* Any type is valid here. */
-          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = get_fulltype(lpctype_int);
 
           free_fulltype($2.type);
@@ -10574,7 +10342,6 @@ expr0:
               fulltype_error("Bad argument to ~", $2.type);
 
           ins_f_code(F_COMPL);
-          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = get_fulltype(lpctype_int);
 
           free_fulltype($2.type);
@@ -10613,7 +10380,6 @@ expr0:
           }
 
           $$ = $2;
-          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = get_fulltype(check_unary_op_type($2.type.t_type, "unary '-'", types_unary_math, lpctype_mixed));
 
           free_fulltype($2.type);
@@ -10633,7 +10399,6 @@ expr0:
 
           /* Check the types */
           $$.type = get_fulltype(check_unary_op_type($1.type, "++", types_unary_math, lpctype_mixed));
-          $$.end = CURRENT_PROGRAM_SIZE;
 
           free_lpctype($1.type);
       } /* post-inc */
@@ -10653,7 +10418,6 @@ expr0:
 
           /* Check the types */
           $$.type = get_fulltype(check_unary_op_type($1.type, "--", types_unary_math, NULL));
-          $$.end = CURRENT_PROGRAM_SIZE;
 
           free_lpctype($1.type);
       } /* post-dec */
@@ -10661,7 +10425,8 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr4
       {
-          $$ = $1;
+          $$.start = $1.start;
+          $$.type = $1.type;
       }
 
 ; /* expr0 */
@@ -10675,11 +10440,36 @@ pre_inc_dec:
 
 expr4:
       function_call  %prec '~'
+      {
+          $$.code =  -1;
+          $$.start = $1.start;
+          $$.type =  $1.type;
+      }
     | inline_func    %prec '~'
+      {
+          $$.code =  -1;
+          $$.start = $1.start;
+          $$.type =  $1.type;
+      }
     | catch          %prec '~'
+      {
+          $$.code =  -1;
+          $$.start = $1.start;
+          $$.type =  $1.type;
+      }
     | sscanf         %prec '~'
+      {
+          $$.code =  -1;
+          $$.start = $1.start;
+          $$.type =  $1.type;
+      }
 %ifdef USE_PARSE_COMMAND
     | parse_command  %prec '~'
+      {
+          $$.code =  -1;
+          $$.start = $1.start;
+          $$.type =  $1.type;
+      }
 %endif /* USE_PARSE_COMMAND */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11012,312 +10802,38 @@ expr4:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 L_ARROW struct_member_name
+    | '&' '(' lvalue ')'
+
       {
-          /* Lookup a struct member */
-          short s_index = -1;
-          int m_index = -1;
+          uint32 current = CURRENT_PROGRAM_SIZE;
 
-          lpctype_t* result = get_struct_member_result_type($1.type.t_type, $3, &s_index, &m_index);
-          if (!result)
-              result = lpctype_mixed;
-
-          $$.start = $1.start;
-          $$.code = -1;
-          $$.type = get_fulltype(result);
-
-          if ($3 != NULL) /* Compile time lookup. */
+          if (!add_lvalue_code(&$3, F_MAKE_PROTECTED))
           {
-              if (s_index == FSM_AMBIGUOUS) /* Not anymore. */
-                  ins_prog_string($3);
-              else
-                  ins_number(m_index);
+              free_lpctype($3.type);
+              YYACCEPT;
           }
 
-          ins_number(s_index);
-          ins_f_code(F_S_INDEX);
-
-          $$.end = CURRENT_PROGRAM_SIZE-1;
-          if ($3 != NULL)
-              free_mstring($3);
-          free_fulltype($1.type);
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | '&' '(' expr4 L_ARROW struct_member_name ')'
-
-      {
-          /* Create a reference to a struct member */
-          short s_index = -1;
-          int m_index = -1;
-
-          lpctype_t* result = get_struct_member_result_type($3.type.t_type, $5, &s_index, &m_index);
-          if (!result)
-              result = lpctype_mixed;
-
-          $$.start = $3.start;
+          $$.start = current;
           $$.code = -1;
-          $$.type = get_fulltype(result);
+          $$.type = get_fulltype($3.type); /* Adapt the reference. */
           $$.type.t_flags |= TYPE_MOD_REFERENCE;
-
-          /* '&(struct->member->member)' generates a simple
-           * F_S_INDEX for the first lookup instead of a suitable
-           * lvalue lookup. I don't understand the lvalue generation
-           * well enough to correct the generated code, so for now
-           * I restrict the lookup to one level.
-           */
-          if ($3.end != 0
-           && F_S_INDEX == mem_block[A_PROGRAM].block[$3.end]
-             )
-          {
-              yyerror("Implementation restriction: Only a single struct "
-                      "member lookup allowed inside a &()");
-          }
-
-          if ($5 != NULL) /* Compile time lookup. */
-          {
-              if (s_index == FSM_AMBIGUOUS) /* Not anymore. */
-                  ins_prog_string($5);
-              else
-                  ins_number(m_index);
-          }
-          ins_number(s_index);
-          arrange_protected_lvalue($3.start, $3.code, $3.end, F_PROTECTED_INDEX_S_LVALUE);
-
-          $$.end = CURRENT_PROGRAM_SIZE-1;
-          if ($5 != NULL)
-              free_mstring($5);
-          free_fulltype($3.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 index_range %prec '['
+    | '&' name_lvalue                        %prec '~'
       {
-%line
-          /* Generate a range expression */
-          $$.start = $1.start;
-          $$.code = -1;
+          uint32 current = CURRENT_PROGRAM_SIZE;
 
-          ins_f_code($2.inst);
-
-          /* Check the types */
-          $$.type = get_fulltype(check_unary_op_type($1.type.t_type, "range index", types_range_index, lpctype_mixed));
-
-          if (!lpctype_contains(lpctype_int, $2.type1.t_type))
-              fulltype_error("Bad type of index", $2.type1);
-          if (!lpctype_contains(lpctype_int, $2.type2.t_type))
-              fulltype_error("Bad type of index", $2.type2);
-
-          free_fulltype($1.type);
-          free_fulltype($2.type1);
-          free_fulltype($2.type2);
-      } /* expr4 index_range */
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | '&' L_IDENTIFIER                        %prec '~'
-      {
-          /* Reference to a global variable, virtual or non-virtual.
-           * We generate PUSH_LVALUE code and mark the type
-           * as TYPE_MOD_REFERENCE.
-           */
-
-          int i;
-          mp_uint current;
-          bytecode_p p;
-          variable_t *varp;
-%line
-          i = verify_declared($2);
-          if (i == -1)
-              /* variable not declared */
-              YYACCEPT;
-
-          $$.start = current = CURRENT_PROGRAM_SIZE;
-          $$.code = -1;
-
-          if (!realloc_a_program(3))
+          if (!add_lvalue_code(&$2, F_MAKE_PROTECTED))
           {
-              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+3);
+              free_lpctype($2.type);
               YYACCEPT;
           }
-          p = PROGRAM_BLOCK + current;
 
-          if (i & VIRTUAL_VAR_TAG)
-          {
-              *p++ = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
-              *p = i;
-              varp = V_VARIABLE(i);
-          }
-          else
-          {
-              if ((i + num_virtual_variables) & ~0xff)
-              {
-                  *p = F_PUSH_IDENTIFIER16_LVALUE;
-                  upd_short(++current, i + num_virtual_variables);
-              }
-              else
-              {
-                  *p++ = F_PUSH_IDENTIFIER_LVALUE;
-                  *p = i + num_virtual_variables;
-              }
-              varp = NV_VARIABLE(i);
-          }
-
-          CURRENT_PROGRAM_SIZE = current + 2;
-          if (i == -1)
-              $$.type = get_fulltype(lpctype_mixed);
-          else
-          {
-              if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
-                  yywarnf("Referencing deprecated global variable %s.\n",
-                          get_txt(varp->name));
-
-              $$.type = ref_fulltype(varp->type);
-          }
-          $$.type.t_flags = TYPE_MOD_REFERENCE; /* Clear all other flags. */
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | '&' L_LOCAL                        %prec '~'
-      {
-          /* Reference to a local variable.
-           * We generate PUSH_LVALUE code and mark the type
-           * as TYPE_MOD_REFERENCE.
-           */
-
-          mp_uint current;
-          bytecode_p p;
-          lpctype_t *type;
-%line
-          $2 = check_for_context_local($2, &type);
-
-          $$.start = current = CURRENT_PROGRAM_SIZE;
+          $$.start = current;
           $$.code = -1;
-          if (!realloc_a_program(2))
-          {
-              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", 
-                       current+2);
-              YYACCEPT;
-          }
-          p = PROGRAM_BLOCK + current;
-
-          if ($2->u.local.context >= 0)
-          {
-              *p++ = F_PUSH_CONTEXT_LVALUE;
-              *p = $2->u.local.context;
-          }
-          else
-          {
-              *p++ = F_PUSH_LOCAL_VARIABLE_LVALUE;
-              *p = $2->u.local.num;
-          }
-          $$.type.t_type = ref_lpctype(type);
-          $$.type.t_flags = TYPE_MOD_REFERENCE;
-          CURRENT_PROGRAM_SIZE = current + 2;
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | '&' '(' expr4 index_expr ')'        %prec '~'
-      {
-%line
-          /* Generate the proper indexing operator */
-
-          if ($4.inst == F_INDEX)
-              arrange_protected_lvalue($3.start, $3.code, $3.end,
-                 F_PROTECTED_INDEX_LVALUE
-              );
-          else if ($4.inst == F_RINDEX)
-              arrange_protected_lvalue($3.start, $3.code, $3.end,
-                 F_PROTECTED_RINDEX_LVALUE
-              );
-          else
-              arrange_protected_lvalue($3.start, $3.code, $3.end,
-                 F_PROTECTED_AINDEX_LVALUE
-              );
-
-          $$.start = $3.start;
-          $$.code = -1;
-
-          /* Compute the result type */
-          $$.type.t_type = get_index_result_type($3.type.t_type, $4.type1, $4.inst, lpctype_mixed);
-          $$.type.t_flags = TYPE_MOD_REFERENCE;
-
-          free_fulltype($3.type);
-          free_fulltype($4.type1);
-          free_fulltype($4.type2);
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | '&' '(' expr4 '[' expr0 ',' expr0 ']' ')'
-      {
-%line
-          /* Generate the proper indexing operator */
-
-          $$.start = $3.start;
-          $$.code = -1;
-          $$.type.t_type = lpctype_mixed;
-          $$.type.t_flags = TYPE_MOD_REFERENCE;
-
-          ins_f_code(F_PUSH_PROTECTED_INDEXED_MAP_LVALUE);
-
-          if ($5.type.t_flags & TYPE_MOD_REFERENCE
-           || $7.type.t_flags & TYPE_MOD_REFERENCE)
-              yyerror("Reference used as index");
-
-          if (exact_types && !lpctype_contains(lpctype_mapping, $3.type.t_type))
-              fulltype_error("Bad type to indexed lvalue", $3.type);
-
-          if (exact_types && !lpctype_contains(lpctype_int, $7.type.t_type))
-              fulltype_error("Bad type of index", $7.type);
-
-          free_fulltype($3.type);
-          free_fulltype($5.type);
-          free_fulltype($7.type);
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | '&' '(' expr4 index_range ')'        %prec '~'
-        {
-%line
-          /* Generate the proper indexing operator */
-          int prot_op;
-
-          switch($4.inst)
-          {
-          case F_RANGE:    prot_op = F_PROTECTED_RANGE_LVALUE;    break;
-          case F_NR_RANGE: prot_op = F_PROTECTED_NR_RANGE_LVALUE; break;
-          case F_RN_RANGE: prot_op = F_PROTECTED_RN_RANGE_LVALUE; break;
-          case F_RR_RANGE: prot_op = F_PROTECTED_RR_RANGE_LVALUE; break;
-          case F_NA_RANGE: prot_op = F_PROTECTED_NA_RANGE_LVALUE; break;
-          case F_AN_RANGE: prot_op = F_PROTECTED_AN_RANGE_LVALUE; break;
-          case F_RA_RANGE: prot_op = F_PROTECTED_RA_RANGE_LVALUE; break;
-          case F_AR_RANGE: prot_op = F_PROTECTED_AR_RANGE_LVALUE; break;
-          case F_AA_RANGE: prot_op = F_PROTECTED_AA_RANGE_LVALUE; break;
-          case F_NX_RANGE: prot_op = F_PROTECTED_NX_RANGE_LVALUE; break;
-          case F_RX_RANGE: prot_op = F_PROTECTED_RX_RANGE_LVALUE; break;
-          case F_AX_RANGE: prot_op = F_PROTECTED_AX_RANGE_LVALUE; break;
-          default:
-              fatal("Unsupported range type %d %s\n"
-                   , $4.inst, get_f_name($4.inst));
-          }
-
-          arrange_protected_lvalue($3.start, $3.code, $3.end
-                                  , prot_op
-                                  );
-
-          $$.start = $3.start;
-          $$.code = -1;
-
-          /* Compute the result type */
-          $$.type = get_fulltype(check_unary_op_type($3.type.t_type, "range index", types_range_index, lpctype_mixed));
-
-          if (exact_types && !lpctype_contains(lpctype_int, $4.type1.t_type))
-              fulltype_error("Bad type of index", $4.type1);
-          if (exact_types && !lpctype_contains(lpctype_int, $4.type2.t_type))
-              fulltype_error("Bad type of index", $4.type2);
-
-          free_fulltype($3.type);
-          free_fulltype($4.type1);
-          free_fulltype($4.type2);
+          $$.type = get_fulltype($2.type); /* Adapt the reference. */
+          $$.type.t_flags |= TYPE_MOD_REFERENCE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11336,7 +10852,6 @@ expr4:
               YYACCEPT;
 
           $$.start = current = CURRENT_PROGRAM_SIZE;
-          $$.end = 0;
 
           if (!realloc_a_program(3))
           {
@@ -11345,13 +10860,12 @@ expr4:
           }
           p = PROGRAM_BLOCK + current;
 
-          if (i == -1)
-              $$.type = get_fulltype(lpctype_mixed);
-          else if (i & VIRTUAL_VAR_TAG)
+          if (i & VIRTUAL_VAR_TAG)
           {
               /* Access a virtual variable */
 
               $$.code = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
+              $$.argbytes = 1;
               *p++ = F_VIRTUAL_VARIABLE;
               *p = i;
               varp = V_VARIABLE(i);
@@ -11364,13 +10878,14 @@ expr4:
               if ((i + num_virtual_variables) & ~0xff)
               {
                   $$.code = F_PUSH_IDENTIFIER16_LVALUE;
+                  $$.argbytes = 2;
                   *p = F_IDENTIFIER16;
                   upd_short(++current, i + num_virtual_variables);
-                  $$.end = current+1;
               }
               else
               {
                   $$.code = F_PUSH_IDENTIFIER_LVALUE;
+                  $$.argbytes = 1;
                   *p++ = F_IDENTIFIER;
                   *p = i + num_virtual_variables;
               }
@@ -11400,7 +10915,6 @@ expr4:
 
           $$.type = get_fulltype(ref_lpctype(type));
           $$.start = current = CURRENT_PROGRAM_SIZE;
-          $$.end = 0;
           if (!realloc_a_program(2))
           {
               yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+2);
@@ -11411,16 +10925,51 @@ expr4:
           if ($1->u.local.context >= 0)
           {
               $$.code = F_PUSH_CONTEXT_LVALUE;
+              $$.argbytes = 1;
               *p++ = F_CONTEXT_IDENTIFIER;
               *p = $1->u.local.context;
           }
           else
           {
               $$.code = F_PUSH_LOCAL_VARIABLE_LVALUE;
+              $$.argbytes = 1;
               *p++ = F_LOCAL;
               *p = $1->u.local.num;
           }
           CURRENT_PROGRAM_SIZE = current + 2;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr4 L_ARROW struct_member_name
+      {
+          /* Lookup a struct member */
+          short s_index = -1;
+          int m_index = -1;
+
+          lpctype_t* result = get_struct_member_result_type($1.type.t_type, $3, &s_index, &m_index);
+          if (!result)
+              result = lpctype_mixed;
+
+          $$.start = $1.start;
+          $$.type = get_fulltype(result);
+
+          if ($3 != NULL) /* Compile time lookup. */
+          {
+              if (s_index == FSM_AMBIGUOUS) /* Not anymore. */
+                  ins_prog_string($3);
+              else
+                  ins_number(m_index);
+          }
+
+          ins_number(s_index);
+          ins_f_code(F_S_INDEX);
+
+          $$.code = F_S_INDEX_LVALUE;
+          $$.argbytes = 0;
+
+          if ($3 != NULL)
+              free_mstring($3);
+          free_fulltype($1.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11430,30 +10979,41 @@ expr4:
           /* Generate (R)INDEX/PUSH_(R)INDEXED_LVALUE */
 
           $$.start = $1.start;
-          $$.end = CURRENT_PROGRAM_SIZE;
-          if ($2.inst == F_INDEX)
-          {
-              $$.code = F_PUSH_INDEXED_LVALUE;
-              ins_f_code(F_INDEX);
-          }
-          else if ($2.inst == F_RINDEX)
-          {
-              $$.code = F_PUSH_RINDEXED_LVALUE;
-              ins_f_code(F_RINDEX);
-          }
-          else
-          {
-              $$.code = F_PUSH_AINDEXED_LVALUE;
-              ins_f_code(F_AINDEX);
-          }
+          $$.argbytes = 0;
+          $$.code = $2.lvalue_inst;
+          ins_f_code($2.rvalue_inst);
 
           /* Check and compute the types */
-          $$.type = get_fulltype(get_index_result_type($1.type.t_type, $2.type1, $2.inst, lpctype_mixed));
+          $$.type = get_fulltype(get_index_result_type($1.type.t_type, $2.type1, $2.rvalue_inst, lpctype_mixed));
 
           free_fulltype($1.type);
           free_fulltype($2.type1);
           free_fulltype($2.type2);
       }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr4 index_range %prec '['
+      {
+%line
+          /* Generate a range expression */
+          $$.start = $1.start;
+          $$.argbytes = 0;
+          $$.code = $2.lvalue_inst;
+
+          ins_f_code($2.rvalue_inst);
+
+          /* Check the types */
+          $$.type = get_fulltype(check_unary_op_type($1.type.t_type, "range index", types_range_index, lpctype_mixed));
+
+          if (!lpctype_contains(lpctype_int, $2.type1.t_type))
+              fulltype_error("Bad type of index", $2.type1);
+          if (!lpctype_contains(lpctype_int, $2.type2.t_type))
+              fulltype_error("Bad type of index", $2.type2);
+
+          free_fulltype($1.type);
+          free_fulltype($2.type1);
+          free_fulltype($2.type2);
+      } /* expr4 index_range */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr4 '[' expr0 ',' expr0 ']' %prec '['
@@ -11462,8 +11022,8 @@ expr4:
           /* Generate MAP_INDEX/PUSH_INDEXED_MAP_LVALUE */
 
           $$.start = $1.start;
-          $$.end = CURRENT_PROGRAM_SIZE;
-          $$.code = F_PUSH_INDEXED_MAP_LVALUE;
+          $$.argbytes = 0;
+          $$.code = F_MAP_INDEX_LVALUE;
           $$.type = get_fulltype(lpctype_mixed);
           ins_f_code(F_MAP_INDEX);
 
@@ -11483,331 +11043,6 @@ expr4:
           free_fulltype($5.type);
       }
 ; /* expr4 */
-
-
-lvalue:
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-      name_lvalue
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 index_expr %prec '['
-      {
-          /* Generate/add an (R)INDEX_LVALUE */
-
-          bytecode_p p, q;
-          p_int start, current;
-%line
-          start = $1.start;
-          current = CURRENT_PROGRAM_SIZE;
-
-          p = PROGRAM_BLOCK;
-          q = yalloc(current-start+2); /* assign uses an extra byte */
-
-          /* First change the rvalue 'expr4' into an lvalue.
-           */
-          if ($1.code >= 0)
-          {
-              p_int end, start2;
-
-              if ( 0 != (end = $1.end) )
-              {
-                  /* Multibyte instruction */
-                  start2 = end+1;
-                  if ($1.code == F_PUSH_IDENTIFIER16_LVALUE)
-                      p[start] = $1.code;
-                  else
-                      p[end] = $1.code;
-                  memcpy(q, p + start2, current - start2);
-                  memcpy(q + current - start2, p + start, start2 - start);
-                  if ($2.inst == F_INDEX)
-                      q[current - start] = F_INDEX_LVALUE;
-                  else if ($2.inst == F_RINDEX)
-                      q[current - start] = F_RINDEX_LVALUE;
-                  else
-                      q[current - start] = F_AINDEX_LVALUE;
-              }
-              else
-              {
-                  /* Simple relocation/insertion */
-                  bytecode_t c;
-
-                  start2 = start + 2;
-                  c = p[start+1];
-                  memcpy(q, p + start2, current - start2);
-                  p = q + current - start2;
-                  *p++ = $1.code;
-                  *p++ = c;
-                  if ($2.inst == F_INDEX)
-                      *p = F_INDEX_LVALUE;
-                  else if ($2.inst == F_RINDEX)
-                      *p = F_RINDEX_LVALUE;
-                  else
-                      *p = F_AINDEX_LVALUE;
-              }
-          }
-          else
-          {
-              /* We can just copy the instruction block
-               * and add a PUSH_(R)INDEXED_LVALUE
-               */
-              memcpy(q, p + start, current - start);
-              if ($2.inst == F_INDEX)
-                  q[current - start] = F_PUSH_INDEXED_LVALUE;
-              else if ($2.inst == F_RINDEX)
-                  q[current - start] = F_PUSH_RINDEXED_LVALUE;
-              else
-                  q[current - start] = F_PUSH_AINDEXED_LVALUE;
-          }
-
-          /* This is what we return */
-          $$.length = current + 1 - start;
-          $$.u.p = q;
-
-          CURRENT_PROGRAM_SIZE = start;
-          last_expression = -1;
-
-          /* Check and compute the types */
-          $$.type = get_index_result_type($1.type.t_type, $2.type1, $2.inst, lpctype_mixed);
-
-          free_fulltype($1.type);
-          free_fulltype($2.type1);
-          free_fulltype($2.type2);
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 '[' expr0 ',' expr0 ']' %prec '['
-      {
-          /* Generate/add an PUSH_INDEXED_MAP_LVALUE */
-
-          bytecode_p p, q;
-          p_int start, current;
-%line
-
-          /* Well, just generate the code: expr4 must be
-           * a mapping, or a runtime error will occur.
-           */
-          start = $1.start;
-          current = CURRENT_PROGRAM_SIZE;
-          p = PROGRAM_BLOCK;
-          q = yalloc(current-start+2); /* assign uses an extra byte */
-          memcpy(q, p + start, current - start);
-          q[current - start] = F_PUSH_INDEXED_MAP_LVALUE;
-
-          $$.length = current + 1 - start;
-          $$.u.p = q;
-          $$.type = lpctype_mixed;
-          CURRENT_PROGRAM_SIZE = start;
-          last_expression = -1;
-
-          /* Check and compute types */
-          if ($3.type.t_flags & TYPE_MOD_REFERENCE
-           || $5.type.t_flags & TYPE_MOD_REFERENCE)
-              yyerror("Reference used as index");
-
-          if (exact_types && !lpctype_contains(lpctype_mapping, $1.type.t_type))
-              fulltype_error("Bad type to indexed lvalue", $1.type);
-
-          if (exact_types && !lpctype_contains(lpctype_int, $5.type.t_type))
-              fulltype_error("Bad type of index", $5.type);
-
-          free_fulltype($1.type);
-          free_fulltype($3.type);
-          free_fulltype($5.type);
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 index_range %prec '['
-      {
-          /* RANGE_LVALUE generation */
-
-          bytecode_p p, q;
-          p_int start, current;
-          int indexing_code;
-
-%line
-          switch ($2.inst)
-          {
-          case F_RANGE:    indexing_code = F_RANGE_LVALUE; break;
-          case F_NR_RANGE: indexing_code = F_NR_RANGE_LVALUE; break;
-          case F_RN_RANGE: indexing_code = F_RN_RANGE_LVALUE; break;
-          case F_RR_RANGE: indexing_code = F_RR_RANGE_LVALUE; break;
-          case F_NA_RANGE: indexing_code = F_NA_RANGE_LVALUE; break;
-          case F_AN_RANGE: indexing_code = F_AN_RANGE_LVALUE; break;
-          case F_RA_RANGE: indexing_code = F_RA_RANGE_LVALUE; break;
-          case F_AR_RANGE: indexing_code = F_AR_RANGE_LVALUE; break;
-          case F_AA_RANGE: indexing_code = F_AA_RANGE_LVALUE; break;
-          case F_NX_RANGE: indexing_code = F_NX_RANGE_LVALUE; break;
-          case F_RX_RANGE: indexing_code = F_RX_RANGE_LVALUE; break;
-          case F_AX_RANGE: indexing_code = F_AX_RANGE_LVALUE; break;
-          default:
-              errorf("Unsupported range type %d %s\n"
-                   , $2.inst, get_f_name($2.inst));
-          }
-
-          start = $1.start;
-          current = CURRENT_PROGRAM_SIZE;
-          p = PROGRAM_BLOCK;
-          q = yalloc(current-start+3);
-
-          /* Change the expr4 into an lvalue
-           */
-          if ($1.code < 0)
-          {
-                yyerror("Need lvalue for range lvalue.");
-          }
-          else
-          {
-              p_int end, start2;
-
-              if ( 0 != (end = $1.end) )
-              {
-                  /* Multibyte instruction */
-                  start2 = end+1;
-                  if ($1.code == F_PUSH_IDENTIFIER16_LVALUE)
-                  {
-                      p[start] = $1.code;
-                  }
-                  else
-                  {
-                      p[end] = $1.code;
-                  }
-              }
-              else
-              {
-                  /* Simple relocation/replacement */
-                  start2 = start+2;
-                  p[start] = $1.code;
-              }
-
-              /* Do the actual relocation */
-              memcpy(q, p + start2, current - start2);
-              memcpy(q + current - start2, p + start, start2 - start);
-              current -= start;
-
-              /* Insert the indexing code */
-              if (instrs[indexing_code].prefix)
-              {
-                  q[current++] = instrs[indexing_code].prefix;
-              }
-              q[current] = instrs[indexing_code].opcode;
-          }
-
-          /* This is what we return */
-          $$.length = current + 1;
-          $$.u.p = q;
-
-          CURRENT_PROGRAM_SIZE = start;
-          last_expression = -1;
-
-          /* Compute and check the types */
-          $$.type = check_unary_op_type($1.type.t_type, "range index", types_range_index, lpctype_mixed);
-
-          if (exact_types && !lpctype_contains(lpctype_int, $2.type1.t_type))
-              fulltype_error("Bad type of index", $2.type1);
-          if (exact_types && !lpctype_contains(lpctype_int, $2.type2.t_type))
-              fulltype_error("Bad type of index", $2.type2);
-
-          free_fulltype($1.type);
-          free_fulltype($2.type1);
-          free_fulltype($2.type2);
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 L_ARROW struct_member_name
-      {
-          /* Create a struct member lvalue */
-          short s_index = -1;
-          int m_index = -1;
-
-          lpctype_t* result = get_struct_member_result_type($1.type.t_type, $3, &s_index, &m_index);
-          if (!result)
-              result = lpctype_mixed;
-
-          /* We have to generate some code, so if the struct lookup is
-           * invalid, we just play along and generate code to look up
-           * member #-1 in whatever we got.
-           */
-
-          {
-              bytecode_p p, q;
-              p_int start, current;
-
-              if ($3 != NULL) /* Compile time lookup. */
-              {
-                  if (s_index == FSM_AMBIGUOUS) /* Not anymore. */
-                      ins_prog_string($3);
-                  else
-                      ins_number(m_index);
-              }
-
-              /* Insert the struct type index */
-              ins_number(s_index);
-
-              /* Generate/add an INDEX_S_LVALUE */
-
-              start = $1.start;
-              current = CURRENT_PROGRAM_SIZE;
-
-              p = PROGRAM_BLOCK;
-              q = yalloc(current-start+2); /* assign uses an extra byte */
-
-              /* First change the rvalue 'expr4' into an lvalue.
-               */
-              if ($1.code >= 0)
-              {
-                  p_int end, start2;
-
-                  if ( 0 != (end = $1.end) )
-                  {
-                      /* Multibyte instruction */
-                      start2 = end+1;
-                      if ($1.code == F_PUSH_IDENTIFIER16_LVALUE)
-                          p[start] = $1.code;
-                      else
-                          p[end] = $1.code;
-                      memcpy(q, p + start2, current - start2);
-                      memcpy(q + current - start2, p + start, start2 - start);
-                      q[current - start] = F_INDEX_S_LVALUE;
-                  }
-                  else
-                  {
-                      /* Simple relocation/insertion */
-                      bytecode_t c;
-
-                      start2 = start + 2;
-                      c = p[start+1];
-                      memcpy(q, p + start2, current - start2);
-                      p = q + current - start2;
-                      *p++ = $1.code;
-                      *p++ = c;
-                      *p = F_INDEX_S_LVALUE;
-                  }
-              }
-              else
-              {
-                  /* We can just copy the instruction block
-                   * and add a PUSH_(R)INDEXED_LVALUE
-                   */
-                  memcpy(q, p + start, current - start);
-                  q[current - start] = F_PUSH_INDEXED_S_LVALUE;
-              }
-
-              /* This is what we return */
-              $$.length = current + 1 - start;
-              $$.u.p = q;
-
-              CURRENT_PROGRAM_SIZE = start;
-              last_expression = -1;
-
-              $$.type = result;
-          }
-
-          if ($3 != NULL)
-              free_mstring($3);
-          free_fulltype($1.type);
-      }
-
-; /* lvalue */
 
 
 name_lvalue:
@@ -11882,6 +11117,326 @@ name_lvalue:
       }
 ; /* name_lvalue */
 
+lvalue:
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    name_lvalue
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr4 index_expr %prec '['
+      {
+          /* Generate/add an (R)INDEX_LVALUE */
+
+          bytecode_p p, q;
+          p_int start, current;
+%line
+          start = $1.start;
+          current = CURRENT_PROGRAM_SIZE;
+
+          p = PROGRAM_BLOCK;
+          q = yalloc(current-start+4);
+          /* Two byte of the F_MAKE_PROTECTED,
+           * another two for the index operation
+           */
+
+          /* First change the rvalue 'expr4' into an lvalue.
+           */
+          if ($1.code >= 0)
+          {
+              p_int expr4len = $2.start - $1.start;
+              p_int indexexprlen = current - $2.start;
+              p_int oplen = 0;
+
+              /* First patch expr4 to be an lvalue */
+              p[$2.start - $1.argbytes - 1] = $1.code;
+
+              /* Copy expr4 into q. */
+              memcpy(q, p + $1.start, expr4len);
+
+              /* Make that a protected lvalue, because we have to
+               * evaluate the index expression first, before using it.
+               */
+              oplen += ins_f_code_buf(F_MAKE_PROTECTED, q + expr4len);
+
+              /* Now add index_expr */
+              memcpy(q + expr4len + oplen, p + $2.start, indexexprlen);
+
+              /* And finally the index expression */
+              oplen += ins_f_code_buf($2.lvalue_inst, q + expr4len + oplen + indexexprlen);
+              $$.length = current + oplen - start;
+          }
+          else
+          {
+              /* We can just copy the instruction block
+               * and add a the index operation.
+               */
+              memcpy(q, p + start, current - start);
+              $$.length = current - start + ins_f_code_buf($2.lvalue_inst, q + current - start);
+          }
+
+          /* This is what we return */
+          $$.u.p = q;
+
+          CURRENT_PROGRAM_SIZE = start;
+          last_expression = -1;
+
+          /* Check and compute the types */
+          $$.type = get_index_result_type($1.type.t_type, $2.type1, $2.rvalue_inst, lpctype_mixed);
+
+          free_fulltype($1.type);
+          free_fulltype($2.type1);
+          free_fulltype($2.type2);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr4 '[' expr0 ',' expr0 ']' %prec '['
+      {
+          /* Generate/add an PUSH_INDEXED_MAP_LVALUE */
+
+          bytecode_p p, q;
+          p_int start, current;
+%line
+
+          /* Well, just generate the code: expr4 must be
+           * a mapping, or a runtime error will occur.
+           */
+          start = $1.start;
+          current = CURRENT_PROGRAM_SIZE;
+          p = PROGRAM_BLOCK;
+          q = yalloc(current-start+2);
+          memcpy(q, p + start, current - start);
+
+          $$.length = current - start + ins_f_code_buf(F_MAP_INDEX_LVALUE, q + current - start);
+          $$.u.p = q;
+          $$.type = lpctype_mixed;
+          CURRENT_PROGRAM_SIZE = start;
+          last_expression = -1;
+
+          /* Check and compute types */
+          if ($3.type.t_flags & TYPE_MOD_REFERENCE
+           || $5.type.t_flags & TYPE_MOD_REFERENCE)
+              yyerror("Reference used as index");
+
+          if (exact_types && !lpctype_contains(lpctype_mapping, $1.type.t_type))
+              fulltype_error("Bad type to indexed lvalue", $1.type);
+
+          if (exact_types && !lpctype_contains(lpctype_int, $5.type.t_type))
+              fulltype_error("Bad type of index", $5.type);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+          free_fulltype($5.type);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr4 index_range %prec '['
+      {
+          /* RANGE_LVALUE generation */
+
+          bytecode_p p, q;
+          p_int start, current;
+
+%line
+          start = $1.start;
+          current = CURRENT_PROGRAM_SIZE;
+          p = PROGRAM_BLOCK;
+          q = yalloc(current-start+4);
+
+          /* Change the expr4 into an lvalue
+           */
+          if ($1.code < 0)
+          {
+                yyerror("Need lvalue for range lvalue.");
+          }
+          else
+          {
+              p_int expr4len = $2.start - $1.start;
+              p_int indexexprlen = current - $2.start;
+              p_int oplen = 0;
+
+              /* First patch expr4 to be an lvalue */
+              p[$2.start - $1.argbytes - 1] = $1.code;
+
+              /* Copy expr4 into q. */
+              memcpy(q, p + $1.start, expr4len);
+
+              /* Make that a protected lvalue, because we have to
+               * evaluate the index expression first, before using it.
+               */
+              oplen += ins_f_code_buf(F_MAKE_PROTECTED, q + expr4len);
+
+              /* Now add index_range */
+              memcpy(q + expr4len + oplen, p + $2.start, indexexprlen);
+
+              /* And finally the index expression */
+              oplen += ins_f_code_buf($2.lvalue_inst, q + expr4len + oplen + indexexprlen);
+              $$.length = current + oplen - start;
+          }
+
+          /* This is what we return */
+          $$.u.p = q;
+
+          CURRENT_PROGRAM_SIZE = start;
+          last_expression = -1;
+
+          /* Compute and check the types */
+          $$.type = check_unary_op_type($1.type.t_type, "range index", types_range_index, lpctype_mixed);
+
+          if (exact_types && !lpctype_contains(lpctype_int, $2.type1.t_type))
+              fulltype_error("Bad type of index", $2.type1);
+          if (exact_types && !lpctype_contains(lpctype_int, $2.type2.t_type))
+              fulltype_error("Bad type of index", $2.type2);
+
+          free_fulltype($1.type);
+          free_fulltype($2.type1);
+          free_fulltype($2.type2);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr4 L_ARROW struct_member_name
+      {
+          /* Create a struct member lvalue */
+          short s_index = -1;
+          int m_index = -1;
+
+%line
+          lpctype_t* result = get_struct_member_result_type($1.type.t_type, $3, &s_index, &m_index);
+          if (!result)
+              result = lpctype_mixed;
+
+          /* We have to generate some code, so if the struct lookup is
+           * invalid, we just play along and generate code to look up
+           * member #-1 in whatever we got.
+           */
+
+          {
+              bytecode_p p, q;
+              p_int start, current;
+
+              if ($3 != NULL) /* Compile time lookup. */
+              {
+                  if (s_index == FSM_AMBIGUOUS) /* Not anymore. */
+                      ins_prog_string($3);
+                  else
+                      ins_number(m_index);
+              }
+
+              /* Insert the struct type index and the index opcode */
+              ins_number(s_index);
+              ins_f_code(F_S_INDEX_LVALUE);
+
+              /* Now move that into an lvalue buffer. */
+              start = $1.start;
+              current = CURRENT_PROGRAM_SIZE;
+
+              p = PROGRAM_BLOCK;
+              q = yalloc(current-start);
+
+              memcpy(q, p + start, current - start);
+
+              /* This is what we return */
+              $$.length = current - start;
+              $$.u.p = q;
+
+              CURRENT_PROGRAM_SIZE = start;
+              last_expression = -1;
+
+              $$.type = result;
+          }
+
+          if ($3 != NULL)
+              free_mstring($3);
+          free_fulltype($1.type);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | L_DUMMY
+      {
+          /* This rule is there to distinguish the 'lvalue' rules
+           * from the expr4 rules and thus to prevent conflicts
+           * because of the LALR simplication process.
+           * (Alternatively the canonical-lr parser could be used.)
+           */
+           fatal("There should be no reduction with this rule.");
+
+           $$.type = lpctype_mixed;
+           $$.length = 0;
+      }
+
+; /* lvalue */
+
+
+name_var_lvalue:
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    L_IDENTIFIER
+      {
+          /* Generate the lvalue for a global variable */
+
+          int i;
+          variable_t *varp;
+%line
+          $$.length = 0;
+          i = verify_declared($1);
+          if (i == -1)
+              /* variable not declared */
+              YYACCEPT;
+
+          if (i & VIRTUAL_VAR_TAG)
+          {
+              $$.u.simple[0] = F_PUSH_VIRTUAL_VARIABLE_VLVALUE;
+              $$.u.simple[1] = i;
+              varp = V_VARIABLE(i);
+              $$.type = ref_lpctype(varp->type.t_type);
+          }
+          else
+          {
+              if ((i + num_virtual_variables) & ~0xff)
+              {
+                  bytecode_p q;
+
+                  q = yalloc(4); /* assign uses an extra byte */
+                  $$.length = 3;
+                  $$.u.p = q;
+                  q[0] = F_PUSH_IDENTIFIER16_VLVALUE;
+                  PUT_SHORT(q+1, i + num_virtual_variables);
+              }
+              else
+              {
+                  $$.u.simple[0] = F_PUSH_IDENTIFIER_VLVALUE;
+                  $$.u.simple[1] = i + num_virtual_variables;
+              }
+              varp = NV_VARIABLE(i);
+              $$.type = ref_lpctype(varp->type.t_type);
+          }
+          if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
+              yywarnf("Using deprecated global variable %s.\n",
+                      get_txt(varp->name));
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | L_LOCAL
+      {
+          lpctype_t *type;
+%line
+          /* Generate the lvalue for a local */
+
+          $1 = check_for_context_local($1, &type);
+
+          $$.type = ref_lpctype(type);
+
+          if ($1->u.local.context >= 0)
+          {
+              $$.u.simple[0] = F_PUSH_CONTEXT_VLVALUE;
+              $$.u.simple[1] = $1->u.local.context;
+          }
+          else
+          {
+              $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_VLVALUE;
+              $$.u.simple[1] = $1->u.local.num;
+          }
+          $$.length = 0;
+      }
+; /* name_lvalue */
+
 
 local_name_lvalue:
       basic_type L_IDENTIFIER
@@ -11907,10 +11462,11 @@ local_name_lvalue:
 index_expr :
       '[' expr0 ']'
         {
-            $$.inst = F_INDEX;
-            $$.start = $2.start;
-            $$.end = $2.end;
-            $$.type1 = $2.type;
+            $$.rvalue_inst  = F_INDEX;
+            $$.lvalue_inst  = F_INDEX_LVALUE;
+            $$.start        = $2.start;
+            $$.end          = CURRENT_PROGRAM_SIZE;
+            $$.type1        = $2.type;
             $$.type2.t_type = NULL;
             if (!pragma_warn_deprecated)
             {
@@ -11922,10 +11478,11 @@ index_expr :
 
     | '[' '<' expr0 ']'
         {
-            $$.inst = F_RINDEX;
-            $$.start = $3.start;
-            $$.end = $3.end;
-            $$.type1 = $3.type;
+            $$.rvalue_inst  = F_RINDEX;
+            $$.lvalue_inst  = F_RINDEX_LVALUE;
+            $$.start        = $3.start;
+            $$.end          = CURRENT_PROGRAM_SIZE;
+            $$.type1        = $3.type;
             $$.type2.t_type = NULL;
             if (!pragma_warn_deprecated)
             {
@@ -11936,10 +11493,11 @@ index_expr :
 
     | '[' '>' expr0 ']'
         {
-            $$.inst = F_AINDEX;
-            $$.start = $3.start;
-            $$.end = $3.end;
-            $$.type1 = $3.type;
+            $$.rvalue_inst  = F_AINDEX;
+            $$.lvalue_inst  = F_AINDEX_LVALUE;
+            $$.start        = $3.start;
+            $$.end          = CURRENT_PROGRAM_SIZE;
+            $$.type1        = $3.type;
             $$.type2.t_type = NULL;
             if (!pragma_warn_deprecated)
             {
@@ -11978,21 +11536,18 @@ index_range :
           for( ; --length >= 0; p--) PUT_CODE(p, GET_CODE(p-1));
           STORE_CODE(mark, F_CONST0);
           CURRENT_PROGRAM_SIZE++;
-          $3.end++;
 
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $3.end++;
-          }
 
           /* Return the data */
 
-          $$.inst  = F_RANGE;
-          $$.start = $3.start;
-          $$.end   = $3.end;
-          $$.type1 = get_fulltype(lpctype_int);
-          $$.type2 = $3.type;
+          $$.rvalue_inst  = F_RANGE;
+          $$.lvalue_inst  = F_RANGE_LVALUE;
+          $$.start        = $3.start;
+          $$.end          = CURRENT_PROGRAM_SIZE;
+          $$.type1        = get_fulltype(lpctype_int);
+          $$.type2        = $3.type;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12022,21 +11577,18 @@ index_range :
           for( ; --length >= 0; p--) PUT_CODE(p, GET_CODE(p-1));
           STORE_CODE(mark, F_CONST0);
           CURRENT_PROGRAM_SIZE++;
-          $4.end++;
 
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $4.end++;
-          }
 
           /* Return the data */
 
-          $$.inst  = F_NR_RANGE;
-          $$.start = $4.start;
-          $$.end   = $4.end;
-          $$.type1 = get_fulltype(lpctype_int);
-          $$.type2 = $4.type;
+          $$.rvalue_inst = F_NR_RANGE;
+          $$.lvalue_inst = F_NR_RANGE_LVALUE;
+          $$.start       = $4.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = get_fulltype(lpctype_int);
+          $$.type2       = $4.type;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12066,181 +11618,158 @@ index_range :
           for( ; --length >= 0; p--) PUT_CODE(p, GET_CODE(p-1));
           STORE_CODE(mark, F_CONST0);
           CURRENT_PROGRAM_SIZE++;
-          $4.end++;
 
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $4.end++;
-          }
 
           /* Return the data */
 
-          $$.inst  = F_NA_RANGE;
-          $$.start = $4.start;
-          $$.end   = $4.end;
-          $$.type1 = get_fulltype(lpctype_int);
-          $$.type2 = $4.type;
+          $$.rvalue_inst = F_NA_RANGE;
+          $$.lvalue_inst = F_NA_RANGE_LVALUE;
+          $$.start       = $4.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = get_fulltype(lpctype_int);
+          $$.type2       = $4.type;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE     expr0 ']'
       {
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $4.end++;
-          }
 
-          $$.inst  = F_RANGE;
-          $$.start = $2.start;
-          $$.end   = $4.end;
-          $$.type1 = $2.type;
-          $$.type2 = $4.type;
+          $$.rvalue_inst = F_RANGE;
+          $$.lvalue_inst = F_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $2.type;
+          $$.type2       = $4.type;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE '<' expr0 ']'
       {
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $5.end++;
-          }
 
-          $$.inst  = F_NR_RANGE;
-          $$.start = $2.start;
-          $$.end   = $5.end;
-          $$.type1 = $2.type;
-          $$.type2 = $5.type;
+          $$.rvalue_inst = F_NR_RANGE;
+          $$.lvalue_inst = F_NR_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $2.type;
+          $$.type2       = $5.type;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '<' expr0 L_RANGE     expr0 ']'
       {
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $5.end++;
-          }
 
-          $$.inst  = F_RN_RANGE;
-          $$.start = $3.start;
-          $$.end   = $5.end;
-          $$.type1 = $3.type;
-          $$.type2 = $5.type;
+          $$.rvalue_inst = F_RN_RANGE;
+          $$.lvalue_inst = F_RN_RANGE_LVALUE;
+          $$.start       = $3.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $3.type;
+          $$.type2       = $5.type;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '<' expr0 L_RANGE '<' expr0 ']'
       {
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $6.end++;
-          }
 
-          $$.inst  = F_RR_RANGE;
-          $$.start = $3.start;
-          $$.end   = $6.end;
-          $$.type1 = $3.type;
-          $$.type2 = $6.type;
+          $$.rvalue_inst = F_RR_RANGE;
+          $$.lvalue_inst = F_RR_RANGE_LVALUE;
+          $$.start       = $3.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $3.type;
+          $$.type2       = $6.type;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE '>' expr0 ']'
       {
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $5.end++;
-          }
 
-          $$.inst  = F_NA_RANGE;
-          $$.start = $2.start;
-          $$.end   = $5.end;
-          $$.type1 = $2.type;
-          $$.type2 = $5.type;
+          $$.rvalue_inst = F_NA_RANGE;
+          $$.lvalue_inst = F_NA_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $2.type;
+          $$.type2       = $5.type;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '>' expr0 L_RANGE     expr0 ']'
       {
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $5.end++;
-          }
 
-          $$.inst  = F_AN_RANGE;
-          $$.start = $3.start;
-          $$.end   = $5.end;
-          $$.type1 = $3.type;
-          $$.type2 = $5.type;
+          $$.rvalue_inst = F_AN_RANGE;
+          $$.lvalue_inst = F_AN_RANGE_LVALUE;
+          $$.start       = $3.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $3.type;
+          $$.type2       = $5.type;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '<' expr0 L_RANGE '>' expr0 ']'
       {
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $6.end++;
-          }
 
-          $$.inst  = F_RA_RANGE;
-          $$.start = $3.start;
-          $$.end   = $6.end;
-          $$.type1 = $3.type;
-          $$.type2 = $6.type;
+          $$.rvalue_inst = F_RA_RANGE;
+          $$.lvalue_inst = F_RA_RANGE_LVALUE;
+          $$.start       = $3.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $3.type;
+          $$.type2       = $6.type;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '>' expr0 L_RANGE '<' expr0 ']'
       {
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $6.end++;
-          }
 
-          $$.inst  = F_AR_RANGE;
-          $$.start = $3.start;
-          $$.end   = $6.end;
-          $$.type1 = $3.type;
-          $$.type2 = $6.type;
+          $$.rvalue_inst = F_AR_RANGE;
+          $$.lvalue_inst = F_AR_RANGE_LVALUE;
+          $$.start       = $3.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $3.type;
+          $$.type2       = $6.type;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '>' expr0 L_RANGE '>' expr0 ']'
       {
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $6.end++;
-          }
 
-          $$.inst  = F_AA_RANGE;
-          $$.start = $3.start;
-          $$.end   = $6.end;
-          $$.type1 = $3.type;
-          $$.type2 = $6.type;
+          $$.rvalue_inst = F_AA_RANGE;
+          $$.lvalue_inst = F_AA_RANGE_LVALUE;
+          $$.start       = $3.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $3.type;
+          $$.type2       = $6.type;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE           ']'
       {
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $2.end++;
-          }
 
-          $$.inst  = F_NX_RANGE;
-          $$.start = $2.start;
-          $$.end   = $2.end;
-          $$.type1 = $2.type;
-          $$.type2 = get_fulltype(lpctype_int);
+          $$.rvalue_inst = F_NX_RANGE;
+          $$.lvalue_inst = F_NX_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $2.type;
+          $$.type2       = get_fulltype(lpctype_int);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12251,16 +11780,14 @@ index_range :
            */
 
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $3.end++;
-          }
 
-          $$.inst  = F_RX_RANGE;
-          $$.start = $3.start;
-          $$.end   = $3.end;
-          $$.type1 = $3.type;
-          $$.type2 = get_fulltype(lpctype_int);
+          $$.rvalue_inst = F_RX_RANGE;
+          $$.lvalue_inst = F_RX_RANGE_LVALUE;
+          $$.start       = $3.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $3.type;
+          $$.type2       = get_fulltype(lpctype_int);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12271,16 +11798,14 @@ index_range :
            */
 
           if (pragma_range_check)
-          {
               ins_byte(F_ARRAY_RANGE_CHECK);
-              $3.end++;
-          }
 
-          $$.inst  = F_AX_RANGE;
-          $$.start = $3.start;
-          $$.end   = $3.end;
-          $$.type1 = $3.type;
-          $$.type2 = get_fulltype(lpctype_int);
+          $$.rvalue_inst = F_AX_RANGE;
+          $$.lvalue_inst = F_AX_RANGE_LVALUE;
+          $$.start       = $3.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $3.type;
+          $$.type2       = get_fulltype(lpctype_int);
       }
 ; /* index_range */
 
@@ -12604,7 +12129,6 @@ function_call:
           ap_needed = MY_FALSE;
 
           $$.start = $<function_call_head>2.start;
-          $$.code = -1;
 
           if ( $4 >= 0xff )
               /* since num_arg is encoded in just one byte, and 0xff
@@ -13294,7 +12818,6 @@ function_call:
               CURRENT_PROGRAM_SIZE++;
               $$.type = get_fulltype(instrs[F_CALL_OTHER].ret_type);
           }
-          $$.code = -1;
           $$.start = $1.start;
           pop_arg_stack($6);
             /* No good need of these arguments because we don't
@@ -13643,7 +13166,6 @@ catch:
 
           $$.start = origstart;
           $$.type  = get_fulltype(lpctype_string);
-          $$.code = -1;
       }
 ; /* catch */
 
@@ -13749,7 +13271,6 @@ sscanf:
           ins_byte($7 + 2);
           $$.start = $2;
           $$.type = get_fulltype(lpctype_int);
-          $$.code = -1;
 
           free_fulltype($4.type);
           free_fulltype($6.type);
@@ -13765,7 +13286,6 @@ parse_command:
           ins_byte($9 + 3);
           $$.start = $2;
           $$.type = get_fulltype(lpctype_int);
-          $$.code = -1;
 
           free_fulltype($4.type);
           free_fulltype($6.type);
@@ -13779,190 +13299,16 @@ lvalue_list:
       /* empty */ { $$ = 0; }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | lvalue_list ',' L_IDENTIFIER
+    | lvalue_list ',' lvalue
       {
-          /* Push the lvalue for a global variable */
-
-          int i;
-          variable_t *varp;
 %line
-          $$ = 1 + $1;
+          Bool res = add_lvalue_code(&$3, F_MAKE_PROTECTED);
 
-          i = verify_declared($3);
-          if (i == -1)
-              /* variable not declared */
+          $$ = $1 + 1;
+          free_lpctype($3.type);
+
+          if (!res)
               YYACCEPT;
-
-          if (i & VIRTUAL_VAR_TAG)
-          {
-              ins_f_code(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
-              ins_byte(i);
-              varp = V_VARIABLE(i);
-          }
-          else
-          {
-              if ((i + num_virtual_variables) & ~0xff)
-              {
-                  ins_f_code(F_PUSH_IDENTIFIER16_LVALUE);
-                  ins_short(i + num_virtual_variables);
-              }
-              else
-              {
-                  ins_f_code(F_PUSH_IDENTIFIER_LVALUE);
-                  ins_byte(i + num_virtual_variables);
-              }
-              varp = NV_VARIABLE(i);
-          }
-          if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
-          {
-              yywarnf("Using deprecated global variable %s.\n",
-                      get_txt(varp->name));
-          }          
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | lvalue_list ',' L_LOCAL
-      {
-%line
-          /* Push the lvalue for a local variable */
-
-          lpctype_t *dummy;
-          $3 = check_for_context_local($3, &dummy);
-
-          if ($3->u.local.context >= 0)
-          {
-              ins_f_code(F_PUSH_CONTEXT_LVALUE);
-              ins_byte($3->u.local.context);
-          }
-          else
-          {
-              ins_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
-              ins_byte($3->u.local.num);
-          }
-          $$ = 1 + $1;
-      }
-
-    | lvalue_list ',' expr4 index_expr
-      {
-          /* Generate a PROTECTED_(R)INDEX_LVALUE */
-
-%line
-          $$ = 1 + $1;
-
-          if ($4.inst == F_INDEX)
-              arrange_protected_lvalue($3.start, $3.code, $3.end,
-                F_PROTECTED_INDEX_LVALUE
-              );
-          else if ($4.inst == F_RINDEX)
-              arrange_protected_lvalue($3.start, $3.code, $3.end,
-                F_PROTECTED_RINDEX_LVALUE
-              );
-          else
-              arrange_protected_lvalue($3.start, $3.code, $3.end,
-                F_PROTECTED_AINDEX_LVALUE
-              );
-
-          /* Check the types. */
-          free_lpctype(get_index_result_type($3.type.t_type, $4.type1, $4.inst, NULL));
-
-          free_fulltype($3.type);
-          free_fulltype($4.type1);
-          free_fulltype($4.type2);
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | lvalue_list ',' expr4 '[' expr0 ',' expr0 ']'
-      {
-%line
-          /* Generate a PUSH_PROTECTED_INDEXED_MAP_LVALUE */
-
-          $$ = 1 + $1;
-          ins_f_code(F_PUSH_PROTECTED_INDEXED_MAP_LVALUE);
-          if ($5.type.t_flags & TYPE_MOD_REFERENCE)
-                yyerror("Reference used as index");
-
-          /* Compute and check types */
-          if (exact_types && !lpctype_contains(lpctype_mapping, $3.type.t_type))
-              fulltype_error("Bad type to indexed lvalue", $3.type);
-
-          if (exact_types && !lpctype_contains(lpctype_int, $7.type.t_type))
-              fulltype_error("Bad type of index", $7.type);
-
-          free_fulltype($3.type);
-          free_fulltype($5.type);
-          free_fulltype($7.type);
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | lvalue_list ',' expr4 index_range
-      {
-%line
-          /* Generate/add the PROTECTED range LVALUE */
-
-          int prot_op;
-
-          switch ($4.inst)
-          {
-          case F_RANGE:    prot_op = F_PROTECTED_RANGE_LVALUE; break;
-          case F_NR_RANGE: prot_op = F_PROTECTED_NR_RANGE_LVALUE; break;
-          case F_RN_RANGE: prot_op = F_PROTECTED_RN_RANGE_LVALUE; break;
-          case F_RR_RANGE: prot_op = F_PROTECTED_RR_RANGE_LVALUE; break;
-          case F_NA_RANGE: prot_op = F_PROTECTED_NA_RANGE_LVALUE; break;
-          case F_AN_RANGE: prot_op = F_PROTECTED_AN_RANGE_LVALUE; break;
-          case F_RA_RANGE: prot_op = F_PROTECTED_RA_RANGE_LVALUE; break;
-          case F_AR_RANGE: prot_op = F_PROTECTED_AR_RANGE_LVALUE; break;
-          case F_AA_RANGE: prot_op = F_PROTECTED_AA_RANGE_LVALUE; break;
-          case F_NX_RANGE: prot_op = F_PROTECTED_NX_RANGE_LVALUE; break;
-          case F_RX_RANGE: prot_op = F_PROTECTED_RX_RANGE_LVALUE; break;
-          case F_AX_RANGE: prot_op = F_PROTECTED_AX_RANGE_LVALUE; break;
-          default:
-              errorf("Unsupported range type %d %s\n"
-                   , $4.inst, get_f_name($4.inst));
-          }
-
-          $$ = 1 + $1;
-          arrange_protected_lvalue($3.start, $3.code, $3.end
-                                  , prot_op
-          );
-
-          /* Compute and check types */
-          free_lpctype(check_unary_op_type($3.type.t_type, "range index", types_range_index, NULL));
-
-          if (exact_types && !lpctype_contains(lpctype_int, $4.type1.t_type))
-              fulltype_error("Bad type of index", $4.type1);
-          if (exact_types && !lpctype_contains(lpctype_int, $4.type2.t_type))
-              fulltype_error("Bad type of index", $4.type2);
-
-          free_fulltype($3.type);
-          free_fulltype($4.type1);
-          free_fulltype($4.type2);
-
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | lvalue_list ',' expr4 L_ARROW struct_member_name
-      {
-          /* Create a reference to a struct member */
-          short s_index = -1;
-          int m_index = -1;
-
-          $$ = 1 + $1;
-
-          free_lpctype(get_struct_member_result_type($3.type.t_type, $5, &s_index, &m_index));
-
-          if ($5 != NULL) /* Compile time lookup. */
-          {
-              if (s_index == FSM_AMBIGUOUS) /* Not anymore. */
-                  ins_prog_string($5);
-              else
-                  ins_number(m_index);
-          }
-          ins_number(s_index);
-          arrange_protected_lvalue($3.start, $3.code, $3.end, F_PROTECTED_INDEX_S_LVALUE);
-
-          if ($5 != NULL)
-              free_mstring($5);
-          free_fulltype($3.type);
       }
 
 ; /* lvalue_list */
@@ -14103,9 +13449,6 @@ if (current_inline && current_inline->parse_context)
     {
         yyerror("Only plain assignments allowed here");
     }
-
-    if (exprtype.t_flags & TYPE_MOD_REFERENCE)
-        yyerror("Can't trace reference assignments");
 
     if (!add_lvalue_code(lv, F_VOID_ASSIGN))
         return;
@@ -14253,223 +13596,6 @@ insert_pop_value (void)
     
     last_expression = -1;
 } /* insert_pop_value() */
-
-/*-------------------------------------------------------------------------*/
-static void
-arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
-
-/* Arrange the creation of a (protected) lvalue instead of a normal lvalue
- * or even rvalue (mostly used when passing arguments by reference).
- * The arguments mean in general:
- *   start: start address of the instruction
- *   end:   end address+1 of the instruction
- *   code:  lvalue-generating instruction alternative to the one now
- *          stored at <start>
- *   newcode: additional instruction to insert.
- *
- * The following scenarios exist:
- *
- * code >= 0 && end != 0:
- *     The multi-byte instruction in [<start>..<end>[ (which might
- *     be a complete indexing operation, but always excludes the
- *     actual instruction bytes to change) is moved to the end of
- *     the current program, then its alternative <code> and <newcode>
- *     are appended.
- *
- *     Cases are:
- *         global
- *             IDENTIFIER16 -> PUSH_IDENTIFIER16_LVALUE
- *         expr4->x
- *             S_INDEX      -> PUSH_PROTECTED_INDEXED_S_LVALUE
- *         expr4[x]
- *             INDEX        -> PUSH_PROTECTED_INDEXED_LVALUE
- *         expr4[<x]
- *             RINDEX       -> PUSH_PROTECTED_RINDEXED_LVALUE
- *         expr4[>x]
- *             AINDEX       -> PUSH_PROTECTED_AINDEXED_LVALUE
- *         expr4[x,y]
- *             MAP_INDEX    -> PUSH_PROTECTED_INDEXED_MAP_LVALUE
- *
- *     The 'global' case is special in that the code block only
- *     consists of the instruction and its 2-byte argument - all
- *     other cases are much bigger and the instruction to change
- *     is right at the end without argument.
- *
- * code >= 0 && end == 0:
- *     The instruction at <start> (1 byte code, 1 byte argument)
- *     removed (the argument byte is preserved), instead the instructions
- *     <code> plus the preserved argument byte and <newcode> are appended
- *     to the end of the current code.
- *
- *     Cases are:
- *         global:
- *             VIRTUAL_VARIABLE -> PUSH_VIRTUAL_VARIABLE_LVALUE
- *             IDENTIFIER       -> PUSH_IDENTIFIER_LVALUE
- *         local
- *             LOCAL            -> PUSH_LOCAL_LVALUE
- *
- * code < 0:
- *     The original instruction doesn't need or have an alternative,
- *     and <newcode> is a protected-index-lvalue code, for which
- *     the appropriate push-protected-index-lvalue code has
- *     to be appended to the program.
- *
- *     Cases where this code is generated:
- *         F_STRING, F_NUMBER, F_CLOSURE, F_FLOAT, F_SYMBOL,
- *         (expr0), ({ expr,... }), '({ expr,... }), ([...]),
- *         x[a..b], x[<a..b], x[a..<b], x[<a..<b], x[a..], x[<a..],
- *         &global, &local, &(expr4[x]), &(expr4[<x]), &(expr4[x,y]),
- *         &(expr4[x..y]), &(expr4[<x..y]), &(expr4[x..<y]),
- *         &(expr4[<x..<y]).
- *
- *     Cases accepted by the function:
- *         &(expr4[x]):  F_PROTECTED_INDEX_LVALUE
- *                       -> F_PUSH_PROTECTED_INDEXED_LVALUE;
- *         &(expr4[<x]): F_PROTECTED_RINDEX_LVALUE
- *                       -> F_PUSH_PROTECTED_RINDEXED_LVALUE;
- *         &(expr4->x):  F_PROTECTED_INDEX_S_LVALUE
- *                       -> F_PUSH_PROTECTED_INDEXED_S_LVALUE;
- *
- * TODO: I am surprised this works at all.
- */
-
-{
-    mp_uint current;
-    bytecode_p p;
-
-    current = CURRENT_PROGRAM_SIZE;
-    if (code >= 0)
-    {
-        if (end)
-        {
-            /* Variant 1: cycle a codeblock and modify instructions */
-
-            p_int length;
-            bytecode_p q;
-
-            length = end - start + 1;
-
-            /* Get enough memory */
-            if (!realloc_a_program(length))
-            {
-                yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
-                        , CURRENT_PROGRAM_SIZE + length);
-                return;
-            }
-
-            /* Cycle the indexing code to the end, where it belongs:
-             *
-             *   <indexing-code> <instrs>
-             * is changed via
-             *   <...>           <instrs> <indexing-code>
-             * to
-             *   <instrs> <indexing-code>
-             */
-            p = PROGRAM_BLOCK;
-            memcpy(p + current, p + start, length);
-            p += start;
-            q = p + length;
-            length = current - start;
-            do *p++ = *q++; while (--length);
-
-            /* Adjust the code... */
-            switch(code)
-            {
-            case F_PUSH_INDEXED_S_LVALUE:
-                code = F_PUSH_PROTECTED_INDEXED_S_LVALUE;
-                break;
-            case F_PUSH_INDEXED_LVALUE:
-                code = F_PUSH_PROTECTED_INDEXED_LVALUE;
-                break;
-            case F_PUSH_RINDEXED_LVALUE:
-                code = F_PUSH_PROTECTED_RINDEXED_LVALUE;
-                break;
-            case F_PUSH_AINDEXED_LVALUE:
-                code = F_PUSH_PROTECTED_AINDEXED_LVALUE;
-                break;
-            case F_PUSH_INDEXED_MAP_LVALUE:
-                code = F_PUSH_PROTECTED_INDEXED_MAP_LVALUE;
-                break;
-            case F_PUSH_IDENTIFIER16_LVALUE:
-                PUT_CODE(p-3, code);
-                goto code_stored;
-            default:
-                fatal("Unexpected lvalue code\n");
-            }
-
-            /* ...and store it in place of the indexing instruction
-             * right before p == current
-             */
-            PUT_CODE(p-1, instrs[code].opcode);
-        code_stored:
-            /* Append the newcode instruction (current will be adjusted
-             * at the end of the function).
-             */
-            PUT_CODE(p, instrs[newcode].opcode);
-        }
-        else
-        {
-            /* Variant 2: Change
-             *   <old-code> <arg> <instrs...>
-             * to
-             *   <instrs...> <code> <arg> <newcode>
-             */
-
-            int instr_arg;
-            p_int length;
-
-            if (!realloc_a_program(2))
-            {
-                yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
-                        , CURRENT_PROGRAM_SIZE + 2);
-                return;
-            }
-
-            p = PROGRAM_BLOCK + start;
-            instr_arg = p[1];
-            length = current - start - 2;
-            for( ; --length >= 0; p++) PUT_CODE(p, GET_CODE(p+2));
-            STORE_CODE(p, code);
-            STORE_CODE(p, instr_arg);
-            PUT_CODE(p, instrs[newcode].opcode);
-        }
-    }
-    else
-    {
-        /* Variant 3: Just add a modified <newcode> */
-
-        switch(newcode)
-        {
-        case F_PROTECTED_INDEX_S_LVALUE:
-            newcode = F_PUSH_PROTECTED_INDEXED_S_LVALUE;
-            break;
-        case F_PROTECTED_INDEX_LVALUE:
-            newcode = F_PUSH_PROTECTED_INDEXED_LVALUE;
-            break;
-        case F_PROTECTED_RINDEX_LVALUE:
-            newcode = F_PUSH_PROTECTED_RINDEXED_LVALUE;
-            break;
-        case F_PROTECTED_AINDEX_LVALUE:
-            newcode = F_PUSH_PROTECTED_AINDEXED_LVALUE;
-            break;
-        default:
-            yyerror("Need lvalue for range lvalue.");
-        }
-
-        if (!realloc_a_program(2))
-        {
-            yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
-                    , CURRENT_PROGRAM_SIZE + 2);
-            return;
-        }
-
-        p = PROGRAM_BLOCK + current;
-        PUT_CODE(p, instrs[newcode].opcode);
-    }
-
-    /* Correct the program size */
-    CURRENT_PROGRAM_SIZE = current + 1;
-} /* arrange_protected_lvalue() */
 
 /*-------------------------------------------------------------------------*/
 int

@@ -464,6 +464,40 @@ cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
         case T_CLOSURE:
             cleanup_closure(p, context);
             break;
+
+        case T_LVALUE:
+            switch (p->x.lvalue_type)
+            {
+                default:
+                    fatal("(cleanup_vector) Illegal lvalue %p type %d\n", p, p->x.lvalue_type);
+                    /* NOTREACHED */
+                    break;
+
+                case LVALUE_UNPROTECTED:
+                case LVALUE_UNPROTECTED_CHAR:
+                case LVALUE_UNPROTECTED_RANGE:
+                    NOOP;
+                    break;
+
+                case LVALUE_PROTECTED:
+                    cleanup_vector(&p->u.protected_lvalue->val, 1, context);
+                    break;
+
+                case LVALUE_PROTECTED_CHAR:
+                    NOOP;
+                    break;
+
+                case LVALUE_PROTECTED_RANGE:
+                    /* Only clean, if it's a vector.
+                     * We don't want to make that string tabled.
+                     */
+                    if (p->u.protected_range_lvalue->vec.type == T_POINTER)
+                    {
+                        cleanup_vector(&p->u.protected_range_lvalue->vec, 1, context);
+                        cleanup_vector(&p->u.protected_range_lvalue->var->val, 1, context);
+                    }
+                    break;
+            } /* switch (p->x.lvalue_type) */
         }
     } /* for */
 } /* cleanup_vector() */
@@ -1404,6 +1438,61 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
             else
                 clear_object_ref(p->u.ob);
             continue;
+
+        case T_LVALUE:
+            switch (p->x.lvalue_type)
+            {
+                default:
+                    fatal("(clear_ref_in_vector) Illegal lvalue %p type %d\n", p, p->x.lvalue_type);
+                    /* NOTREACHED */
+                    break;
+
+                case LVALUE_UNPROTECTED:
+                case LVALUE_UNPROTECTED_CHAR:
+                case LVALUE_UNPROTECTED_RANGE:
+                    NOOP;
+                    break;
+
+                case LVALUE_PROTECTED:
+                {
+                    struct protected_lvalue* lv = p->u.protected_lvalue;
+                    if (lv->ref)
+                    {
+                        lv->ref = 0;
+                        clear_ref_in_vector(&lv->val, 1);
+                    }
+                    break;
+                }
+
+                case LVALUE_PROTECTED_CHAR:
+                {
+                    struct protected_char_lvalue* lv = p->u.protected_char_lvalue;
+                    if (lv->ref)
+                    {
+                        lv->ref = 0;
+                        clear_string_ref(lv->str);
+                    }
+                    break;
+                }
+
+                case LVALUE_PROTECTED_RANGE:
+                {
+                    struct protected_range_lvalue* lv = p->u.protected_range_lvalue;
+                    if (lv->ref)
+                    {
+                        lv->ref = 0;
+                        clear_ref_in_vector(&lv->vec, 1);
+
+                        struct protected_lvalue* var = lv->var;
+                        if (var->ref)
+                        {
+                            var->ref = 0;
+                            clear_ref_in_vector(&var->val, 1);
+                        }
+                    }
+                    break;
+                }
+            } /* switch (p->x.lvalue_type) */
         }
     }
 } /* clear_ref_in_vector() */
@@ -1508,6 +1597,72 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
         case T_SYMBOL:
             MARK_MSTRING_REF(p->u.str);
             continue;
+
+        case T_LVALUE:
+            switch (p->x.lvalue_type)
+            {
+                default:
+                    fatal("(count_ref_in_vector) Illegal lvalue %p type %d\n", p, p->x.lvalue_type);
+                    /* NOTREACHED */
+                    break;
+
+                case LVALUE_UNPROTECTED:
+                case LVALUE_UNPROTECTED_CHAR:
+                case LVALUE_UNPROTECTED_RANGE:
+                    NOOP;
+                    break;
+
+                case LVALUE_PROTECTED:
+                {
+                    struct protected_lvalue* lv = p->u.protected_lvalue;
+
+                    if (CHECK_REF(lv))
+                    {
+#ifdef CHECK_OBJECT_GC_REF
+                        gc_count_ref_in_vector(&lv->val, 1, file, line);
+#else
+                        count_ref_in_vector(&lv->val, 1);
+#endif
+                    }
+                    lv->ref++;
+                    break;
+                }
+
+                case LVALUE_PROTECTED_CHAR:
+                {
+                    struct protected_char_lvalue* lv = p->u.protected_char_lvalue;
+                    if (CHECK_REF(lv))
+                        MARK_MSTRING_REF(lv->str);
+                    lv->ref++;
+                    break;
+                }
+
+                case LVALUE_PROTECTED_RANGE:
+                {
+                    struct protected_range_lvalue* lv = p->u.protected_range_lvalue;
+                    if (CHECK_REF(lv))
+                    {
+#ifdef CHECK_OBJECT_GC_REF
+                        gc_count_ref_in_vector(&lv->vec, 1, file, line);
+#else
+                        count_ref_in_vector(&lv->vec, 1);
+#endif
+
+                        struct protected_lvalue* var = lv->var;
+                        if (CHECK_REF(var))
+                        {
+#ifdef CHECK_OBJECT_GC_REF
+                            gc_count_ref_in_vector(&var->val, 1, file, line);
+#else
+                            count_ref_in_vector(&var->val, 1);
+#endif
+                        }
+                        var->ref++;
+                    }
+                    lv->ref++;
+                    break;
+                }
+            } /* switch (p->x.lvalue_type) */
         }
     } /* for */
 } /* gc_count_ref_in_vector() */

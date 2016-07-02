@@ -4289,16 +4289,15 @@ svalue_to_python (svalue_t *svp)
         }
 
         case T_LVALUE:
-        case T_CHAR_LVALUE:
-        case T_STRING_RANGE_LVALUE:
-        case T_POINTER_RANGE_LVALUE:
-        case T_PROTECTED_CHAR_LVALUE:
-        case T_PROTECTED_STRING_RANGE_LVALUE:
-        case T_PROTECTED_POINTER_RANGE_LVALUE:
-        case T_PROTECTED_LVALUE:
-        case T_PROTECTOR_MAPPING:
-            PyErr_SetString(PyExc_NotImplementedError, "lvalues are not supported");
+        {
+            svalue_t* rval = get_rvalue(svp, NULL);
+
+            if (rval != NULL)
+                return svalue_to_python(svp);
+
+            PyErr_SetString(PyExc_NotImplementedError, "lvalue ranges are not supported");
             return NULL;
+        }
 
         default:
             PyErr_Format(PyExc_TypeError, "unsupported type %d", svp->type);

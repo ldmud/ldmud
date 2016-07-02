@@ -85,6 +85,7 @@
 
 #include "my-alloca.h"
 #include "my-rusage.h"
+#include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
 #include <stddef.h>
@@ -3338,7 +3339,7 @@ sscanf_decimal (char *str, struct sscanf_info *info)
             return;
 
         tmp_svalue.u.number = (p_int)((num ^ info->sign) - info->sign);
-        transfer_svalue((info->arg_current++)->u.lvalue, &tmp_svalue);
+        transfer_svalue(info->arg_current++, &tmp_svalue);
     }
 
     info->number_of_matches += info->flags.count_match;
@@ -3400,13 +3401,25 @@ sscanf_match_percent (char *str, char *fmt, struct sscanf_info *info)
             continue;
 
         case '*':
-            if (info->arg_current >= info->arg_end
-             || info->arg_current->u.lvalue->type != T_NUMBER)
+            if (info->arg_current >= info->arg_end)
             {
                 info->match_end = NULL;
                 return NULL;
             }
-            *nump = (mp_uint)((info->arg_current++)->u.lvalue->u.number);
+            else
+            {
+                svalue_t *val = get_rvalue(info->arg_current, NULL);
+                if (!val || val->type != T_NUMBER)
+                {
+                    info->match_end = NULL;
+                    return NULL;
+                }
+                else
+                {
+                    info->arg_current++;
+                    *nump = (mp_uint)(val->u.number);
+                }
+            }
             continue;
 
         case '.':
@@ -4103,7 +4116,7 @@ match_skipped:
                     memsafe(matchstr = new_n_mstring(in_string, (size_t)num)
                            , num, "matchstring");
                     put_string(&sv_tmp, matchstr);
-                    transfer_svalue(arg->u.lvalue, &sv_tmp);
+                    transfer_svalue(arg, &sv_tmp);
                 }
 
                 in_string = info.match_end;
@@ -7643,42 +7656,74 @@ f_reverse(svalue_t *sp)
  */
 
 {
-    Bool changeInPlace = MY_FALSE;
+    bool changeInPlace = false;
+    mp_int index1, index2;
+    svalue_t *data, *var = NULL;
 
     /* If the argument is passed in by reference, make sure that it is
      * an array, note the fact, and place it directly into the stack.
-     * TODO: Allow protected ranges here.
      */
-    if (sp->type == T_LVALUE || sp->type == T_PROTECTED_LVALUE)
+    if (sp->type == T_LVALUE)
     {
-        svalue_t * svp = sp;
-        vector_t * vec = NULL;
+        bool last_reference = false;
+        data = get_rvalue(sp, &last_reference);
 
-        while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
+        if (data == NULL)
         {
-            svp = svp->u.lvalue;
-        }
+            /* This is a range. */
+            struct protected_range_lvalue *r;
 
-        if (svp->type != T_POINTER)
+            assert(sp->x.lvalue_type == LVALUE_PROTECTED_RANGE);
+            r = sp->u.protected_range_lvalue;
+
+            index1 = r->index1;
+            index2 = r->index2;
+            data = &(r->vec);
+            var = &(r->var->val);
+        }
+        else if (data->type == T_POINTER)
+        {
+            vector_t *vec = ref_array(data->u.vec);
+            free_svalue(sp);
+            put_array(sp, vec);
+
+            index1 = 0;
+            index2 = (mp_int)VEC_SIZE(vec);
+            data = sp;
+        }
+        else if (data->type == T_STRING)
+        {
+            string_t *str = ref_mstring(data->u.str);
+            free_svalue(sp);
+            put_string(sp, str);
+
+            if(!last_reference)
+                var = data;
+
+            index1 = 0;
+            index2 = (mp_int)mstrsize(str);
+            data = sp;
+        }
+        else
         {
             inter_sp = sp;
             errorf("Bad arg 1 to reverse(): got '%s &', "
-                  "expected 'string/mixed */mixed * &'.\n"
-                 , typename(svp->type));
+                  "expected 'string/string &/mixed */mixed * &'.\n"
+                 , typename(data->type));
             /* NOTREACHED */
             return sp;
         }
 
-        changeInPlace = MY_TRUE;
-
-        vec = ref_array(svp->u.vec);
-        free_svalue(sp);
-        put_array(sp, vec);
+        changeInPlace = true;
     }
+    else
+        data = sp;
 
-    if (sp->type == T_NUMBER)
+    if (data->type == T_NUMBER)
     {
         p_int res;
+
+        assert(data == sp);
 
         /* Try to use a fast bit swapping algorithm.
          * The slow fallback default is a loop swapping bit-by-bit.
@@ -7686,7 +7731,7 @@ f_reverse(svalue_t *sp)
 
 #if SIZEOF_PINT == 8
 
-        res = sp->u.number;
+        res = data->u.number;
 
         res =   ((res & 0xaaaaaaaaaaaaaaaa) >> 1)
               | ((res & 0x5555555555555555) << 1);
@@ -7702,7 +7747,7 @@ f_reverse(svalue_t *sp)
 
 #elif SIZEOF_PINT == 4
 
-        res = sp->u.number;
+        res = data->u.number;
 
         res = ((res & 0xaaaaaaaa) >> 1) | ((res & 0x55555555) << 1);
 	res = ((res & 0xcccccccc) >> 2) | ((res & 0x33333333) << 2);
@@ -7715,7 +7760,7 @@ f_reverse(svalue_t *sp)
         unsigned char * from, * to;
         int num;
 
-        from = (unsigned char *)&sp->u.number;
+        from = (unsigned char *)&data->u.number;
         to = (unsigned char *)&res + sizeof(res) - 1;
 
         for (num = sizeof(res); num > 0; num--, from++, to--)
@@ -7748,48 +7793,91 @@ f_reverse(svalue_t *sp)
 
         put_number(sp, res);
     }
-    else if (sp->type == T_STRING)
+    else if (data->type == T_STRING)
     {
-        size_t len = mstrsize(sp->u.str);
+        size_t len = mstrsize(data->u.str);
 
         /* If the length of the string is less than 2, there nothing to do */
         if (len > 1)
         {
-            char *h, *str;
-            string_t *res;
+            char *p1, *p2;
 
-            memsafe(res = alloc_mstring(len), len, "reversed string");
-            h = get_txt(res);
-            h += len - 1;
-            str = get_txt(sp->u.str);
+            if (changeInPlace)
+            {
+                if (!mstr_singular(data->u.str))
+                {
+                    string_t * str;
+                    memsafe(str = unshare_mstring(data->u.str), mstrsize(data->u.str)
+                           , "modifiable string");
 
-            while (len--)
-                *h-- = *str++;
-            free_string_svalue(sp);
-            put_string(sp, res);
+                    if (var != NULL && var->type == T_STRING && var->u.str == data->u.str)
+                    {
+                        free_mstring(var->u.str);
+                        var->u.str = ref_mstring(str);
+                    }
+                    data->u.str = str;
+                }
+
+                p1 = get_txt(data->u.str);
+            }
+            else
+            {
+                string_t *res = NULL;
+
+                memsafe(res = alloc_mstring(len), len, "reversed string");
+                p1 = get_txt(res);
+
+                memcpy(p1, get_txt(data->u.str), len);
+                free_string_svalue(data);
+                put_string(sp, res);
+            }
+
+            if(!changeInPlace)
+            {
+                index1 = 0;
+                index2 = (mp_int)len;
+            }
+
+            p2 = p1 + index2 - 1;
+            p1 += index1;
+
+            while (p1 < p2)
+            {
+                char c = *p1;
+                *p1 = *p2;
+                *p2 = c;
+
+                p1++;
+                p2--;
+            }
         }
     }
-    else if (sp->type == T_POINTER)
+    else if (data->type == T_POINTER)
     {
-        mp_int v_size;
+        mp_int r_size;
         vector_t *vec = NULL;
 
         /* If we change in place, the 'new' vector is the old one
-         * with just one reference added. Same if the vector has only
-         * one reference to begin with, or is the null vector.
+         * that lies already on the stack.
          */
         if (changeInPlace
-         || sp->u.vec->ref == 1
-         || sp->u.vec == &null_vector)
+         || data->u.vec->ref == 1
+         || data->u.vec == &null_vector)
         {
-            vec = ref_array(sp->u.vec);
+            vec = data->u.vec;
+            if (!changeInPlace)
+            {
+                changeInPlace = true;
+                index1 = 0;
+                index2 = (mp_int)VEC_SIZE(vec);
+            }
         }
         else
         {
             vector_t *old;
             size_t size, i;
 
-            old = sp->u.vec;
+            old = data->u.vec;
             size = VEC_SIZE(old);
             vec = allocate_uninit_array((int)size);
             if (!vec)
@@ -7797,30 +7885,39 @@ f_reverse(svalue_t *sp)
                      , (unsigned long) size);
             for (i = 0; i < size; i++)
                 assign_svalue_no_free(&vec->item[i], &old->item[i]);
+
+            index1 = 0;
+            index2 = size;
         }
 
-        /* If the length of the array is less than 2, there nothing to do */
-        if ((v_size = (mp_int)VEC_SIZE(vec)) > 1)
+        r_size = index2 - index1;
+
+        /* If the length of the range is less than 2, there nothing to do */
+        if (r_size > 1)
         {
-            mp_int half, i;
+            mp_int i1, i2;
 
-            DYN_ARRAY_COST(v_size);
+            DYN_ARRAY_COST(r_size);
 
-            i = 0;
-            half = v_size / 2;
-            while (i < half)
+            i1 = index1;
+            i2 = index2 - 1;
+            while (i1 < i2)
             {
                 svalue_t tmp;
-                tmp   = *(vec->item + i);
-                *(vec->item + i) = *(vec->item + (v_size - 1) - i);
-                *(vec->item + (v_size - 1) - i) = tmp;
-                i++;
+                tmp   = *(vec->item + i1);
+                *(vec->item + i1) = *(vec->item + i2);
+                *(vec->item + i2) = tmp;
+                i1++;
+                i2--;
             }
         }
 
-        /* Replace the old array by the new one. */
-        free_svalue(sp);
-        put_array(sp, vec);
+        if (!changeInPlace)
+        {
+            /* Replace the old array by the new one. */
+            free_svalue(sp);
+            put_array(sp, vec);
+        }
     }
     else
     {
