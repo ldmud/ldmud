@@ -5,6 +5,9 @@
 mixed globalvar;
 object unpriv;
 
+// Used later in a test:
+mixed array = ({42, function void() : int destroy_that = 43 {} });
+
 // Name, Flag, Function
 mixed *tests = ({
     ({ "b-980420", 0,
@@ -105,6 +108,11 @@ mixed *tests = ({
     }),
     ({ "Lambda error message", 0,
        (: closure c = lambda(0, ({#'/, 0, 0})); call_out(c, 0); return 1; :)
+   }),
+   ({ "Stack corruption due to a context variable in global context", 0,
+      (:
+          return array[0] == 42;
+      :)
    }),
 });
 

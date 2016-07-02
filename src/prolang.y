@@ -16332,7 +16332,11 @@ epilog (void)
         ip = make_global_identifier(get_txt(STR_VARINIT), I_TYPE_UNKNOWN);
         if (ip)
         {
-            define_new_function(MY_FALSE, ip, 0, 0, first_initializer_start
+            /* Update the function header for __INIT. Look at the __INIT
+             * block_scope (#0), whether we need some space for local variables.
+             */
+            define_new_function(MY_FALSE, ip, 0, block_scope[0].num_locals
+                                , first_initializer_start
                                 , TYPE_MOD_PROTECTED, get_fulltype(lpctype_unknown));
         }
         /* ref count for ip->name was incremented by transfer_init_control() */
