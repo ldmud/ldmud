@@ -180,9 +180,6 @@
  * TODO: The virtual machine should be reconsidered, using the DGD and MudOS
  * TODO:: machines for inspiration. This applies to implementation as well
  * TODO:: as to the instruction set.
- * TODO: Let all assign_ and transfer_ functions check for destruct objects.
- * TODO:: The speed difference to assign_checked_ and transfer_checked_ is
- * TODO:: not big enough to justify the extra set of functions.
  */
 
 /*-------------------------------------------------------------------------*/
@@ -461,20 +458,12 @@ static const char * svalue_typename[]
    , /* T_FLOAT   */  "float"
    , /* T_CLOSURE */  "closure"
    , /* T_SYMBOL  */  "symbol"
-   , /* T_QUOTED_ARRAY */  "quoted-array"
-   , /* T_STRUCT */  "struct"
-   , /* T_CHAR_LVALUE */           "char-lvalue"
-   , /* T_STRING_RANGE_LVALUE */   "string-range-lvalue"
-   , /* T_POINTER_RANGE_LVALUE */  "array-range-lvalue"
-   , /* T_PROTECTED_CHAR_LVALUE */           "prot-char-lvalue"
-   , /* T_PROTECTED_STRING_RANGE_LVALUE */   "prot-string-range-lvalue"
-   , /* T_PROTECTED_POINTER_RANGE_LVALUE */  "prot-array-range-lvalue"
-   , /* T_PROTECTED_LVALUE  */               "prot-lvalue"
-   , /* T_PROTECTOR_MAPPING  */              "protector-mapping"
-   , /* T_CALLBACK */       "callback-mapping"
+   , /* T_QUOTED_ARRAY */   "quoted-array"
+   , /* T_STRUCT */         "struct"
+   , /* T_CALLBACK */       "callback"
    , /* T_ERROR_HANDLER */  "error-handler"
    , /* T_BREAK_ADDR */     "break-address"
-   , /* T_NULL */  "null"
+   , /* T_NULL */           "null"
    };
 
 /*-------------------------------------------------------------------------*/
@@ -644,26 +633,30 @@ static struct cache cache[CACHE_SIZE];
   /* The apply cache.
    */
 
-static struct
-  {
-    svalue_t v;
-      /* The target value:
-       *   .v.type: T_CHAR_LVALUE
-       *   .v.u.charp: the char to modify
-       * or
-       *   .v.type: T_{POINTER,STRING}_RANGE_LVALUE
-       *   .v.u.{vec,string}: the target value holding the range
-       *   .index1, .index2, .size: see below
-       */
-    mp_int index1;  /* First index of the range */
-    mp_int index2;  /* Last index of the range plus 1 */
-    mp_int size;    /* Current(?) size of the value */
-  }
-special_lvalue;
+  /* --- struct unprotected_char: a single character in a string */
+struct unprotected_char
+{
+    char     *charp;              /* The indexed character. */
+    string_t *str;                /* The string that is indexed
+                                   * (not refcounted). */
+} current_unprotected_char =      /* Static buffer, because there is only */
+  { NULL, NULL };                 /* one unprotected lvalue at a time. */
+
+  /* --- struct unprotected_range: a range in a string or vector */
+struct unprotected_range
+{
+    svalue_t *vec;                /* The string or vector containing
+                                   * the range. */
+    mp_int    index1, index2;     /* first and last (exc.) index of the range */
+    struct protected_lvalue *var; /* A (uncounted) protected_lvalue
+                                   * referencing that string or vector.
+                                   * Can be NULL. */
+} current_unprotected_range =     /* Static buffer, because there is only */
+  { NULL, 0, 0 };                 /* one unprotected lvalue at a time. */
   /* When assigning to vector and string ranges or elements, the
    * target information is stored in this structure.
-   * TODO: Having one global structure counts as 'ugly'.
-   * Used knowingly by: (r)index_lvalue(), transfer_pointer_range(),
+   *
+   * Used knowingly by: push_index_lvalue(), transfer_pointer_range(),
    *                    assign_string_range().
    * Used unknowingly by: assign_svalue(), transfer_svalue(),
    *                    add_number_to_lvalue(), F_VOID_ASSIGN.
@@ -682,15 +675,6 @@ static svalue_t indexing_quickfix = { T_NUMBER };
    * TODO: Is it made sure that this var will be vacated before the
    * TODO:: next use? Otoh, if not it's no problem as the value is
    * TODO:: by definition volatile.
-   */
-
-svalue_t last_indexing_protector = { T_NUMBER };
-  /* When indexing a protected non-string-lvalue, this variable receives
-   * the protecting svalue for the duration of the operation (actually
-   * until the next indexing operation (TODO: not nice)).
-   * This is necessary because the indexing operation necessarily destroys
-   * the protector structure, even though the protection is still needed.
-   * Used by: protected_index_lvalue().
    */
 
 #ifdef OPCPROF
@@ -949,105 +933,63 @@ is_sto_context (void)
  *
  * destructed_object_ref(v): test if <v> references a destructed object.
  * object_ref(v,o):          test if <v> references object <o>
+ *
  * free_string_svalue(v): free string svalue <v>.
  * free_object_svalue(v): free object svalue <v>.
  * zero_object_svalue(v): replace the object in svalue <v> by number 0.
  * free_svalue(v):        free the svalue <v>.
+ *
+ * normalize_svalue(svp, collapse): Replace references to destructed
+ *                        objects with the number 0, reduce lvalue lists to
+ *                        a single entry. And if <collapse> is true,
+ *                        replace a singular lvalue with its rvalue.
+ *
+ * internal_assign_svalue_no_free(to, from): put a copy of <from> into <to>;
+ *                        <to> is considered empty.
+ *
+ * internal_assign_rvalue_no_free(to, from): put a copy of <from> into <to>;
+ *                        <to> is considered empty. If <from> is an lvalue,
+ *                        copy its rvalue instead.
+ *
  * assign_svalue_no_free(to,from): put a copy of <from> into <to>; <to>
- *                        is considered empty.
+ *                        is considered empty, but normalize <from> first.
+ *
+ * assign_rvalue_no_free(to,from): put a copy of <from> into <to>; <to>
+ *                        is considered empty, but normalize <from> first.
+ *                        If <from> is an lvalue, copy its rvalue instead.
+ *
  * copy_svalue_no_free(to,from): put a shallow value copy of <from> into <to>;
  *                        <to> is considered empty.
- * assign_checked_svalue_no_free(to,from): put a copy of <from> into <to>;
- *                        <to> is considered empty, <from> may be destructed
- *                        object.
- * assign_local_svalue_no_free(to,from): put a copy of local var <from>
- *                        into <to>; <to> is considered empty, <from> may
- *                        be destructed object.
- * static assign_lrvalue_no_free(to,from): like assign_svalue_no_free(),
- *                        but lvalues and strings are handled differently.
+ *
+ * get_rvalue(v, &last_ref): If <v> is a range lvalue, return NULL.
+ *                        If <v> is any other lvalue, return a pointer to its
+ *                        rvalue, otherwise return <v>. If the result will
+ *                        go away, if <v> is overwritten, set <last_ref> to true.
+ *
+ * get_rvalue_no_collapse(v, &last_ref): Same as get_rvalue(), but don't
+ *                        collapse any singular lvalues.
+ *
+ * link_protected_lvalue(dest, lv): Assign the lvalue <lv> to the lvalue <dest>.
+ *
  * assign_svalue(dest,v): assign <v> to <dest>, freeing <dest> first.
  *                        Also handles assigns to lvalues.
+ *
  * transfer_svalue_no_free(dest,v): move <v> into <dest>; <dest> is
  *                        considered empty.
+ *
+ * transfer_rvalue_no_free(dest,v): move <v> into <dest>; <dest> is
+ *                        considered empty. If <from> is an lvalue,
+ *                        copy its rvalue and remove the lvalue.
+ *
  * transfer_svalue(dest,v): move <v> into <dest>; freeing <dest> first.
  *                        Also handles transfers to lvalues.
+ *
  * static add_number_to_lvalue(dest,i,pre,post): add <i> to lvalue <dest>.
  *
  * In addition there are some helper functions.
  *
  * TODO: All these functions and vars should go into a separate module.
  */
-
-/*-------------------------------------------------------------------------*/
-
-/* --- Protector structures ---
- *
- * Whenever an assignment is made to a single value, or to a range in
- * a string, vector or mapping, the interpreter generates protector
- * structures in place of the usual LVALUE-svalues, which hold:
- *  - a svalue structure referring to the svalue into which the assignment
- *    is done (this structure is always first so that the protector
- *    structures can be used instead of normal svalues),
- *  - the necessary information to store the assigned svalue into its
- *    place in the target holding the value,
- *  - a protective reference to the holding value.
- *
- * All this just to keep LPC statements like 'a = ({ 1 }); a[0] = (a = 0);'
- * from crashing.
- *
- * TODO: A simpler way would be to compute the lhs of an assignment
- * TODO:: after evaluating the rhs - not vice versa as it is now.
- * TODO:: However, passing lvalues and ranges as ref-parameters to functions
- * TODO:: would still be a potential problem.
- */
-
-/* --- struct protected_lvalue: protect a single value
- */
-struct protected_lvalue
-{
-    svalue_t v;
-      /* .v.type: T_PROTECTED_LVALUE
-       * .v.u.lvalue: the protected value
-       */
-    svalue_t protector;
-      /* additional reference .v.u.lvalue (or its holder) as means of
-       * protection
-       */
-};
-
-/* --- struct protected_char_lvalue: protect a char in a string
- */
-struct protected_char_lvalue
-{
-    svalue_t v;
-      /* .v.type: T_PROTECTED_CHAR_LVALUE
-       * .v.u.charp: points to the char to access
-       */
-    svalue_t protector; /* protects .lvalue */
-    svalue_t *lvalue;   /* the string containing the char */
-    char *start;
-      /* must be == get_txt(lvalue->u.str), otherwise the string has been
-       * changed and this lvalue is invalid
-       */
-};
-
-/* --- struct protected_range_lvalue: protect a range in a string or vector
- */
-struct protected_range_lvalue {
-    svalue_t v;
-      /* .v.type: T_PROTECTED_{POINTER,STRING}_RANGE_LVALUE
-       * .v.u.{str,vec}: the target value holding the range
-       */
-    svalue_t protector;  /* protects .lvalue */
-    svalue_t *lvalue;    /* the original svalue holding the range */
-    int index1, index2;  /* first and last index of the range in .lvalue */
-    int size;            /* original size of .lvalue */
-
-    /* On creation, .v.u.{vec,str} == .lvalue->u.{vec,str}.
-     * If that condition no longer holds, the target in .v has been changed
-     * and the range information (index, size) is no longer valid.
-     */
-};
 
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
@@ -1117,32 +1059,6 @@ zero_object_svalue (svalue_t *v)
 
     free_object(ob, "zero_object_svalue");
     put_number(v, 0);
-}
-
-/*-------------------------------------------------------------------------*/
-static void
-free_protector_svalue (svalue_t *v)
-
-/* Free the svalue <v> which contains a protective reference to a vector
- * or to a mapping.
- */
-
-{
-    switch (v->type)
-    {
-      case T_STRUCT:
-        free_struct(v->u.strct);
-        break;
-      case T_POINTER:
-        free_array(v->u.vec);
-        break;
-      case T_MAPPING:
-        free_mapping(v->u.map);
-        break;
-      case T_PROTECTOR_MAPPING:
-        free_protector_mapping(v->u.map);
-        break;
-    }
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1226,55 +1142,55 @@ int_free_svalue (svalue_t *v)
         break;
 
     case T_LVALUE:
-        switch (v->u.lvalue->type)
+        switch (v->x.lvalue_type)
         {
-        case T_PROTECTED_LVALUE:
-          {
-              struct protected_lvalue *p;
+        default:
+            fatal("(free_svalue) Illegal lvalue %p type %d\n", v, v->x.lvalue_type);
+            /* NOTREACHED */
+            break;
 
-              p = v->u.protected_lvalue;
-              free_protector_svalue(&p->protector);
-              xfree(p);
-              break;
-          }
+        case LVALUE_UNPROTECTED:
+        case LVALUE_UNPROTECTED_CHAR:
+        case LVALUE_UNPROTECTED_RANGE:
+            NOOP;
+            break;
 
-        case T_PROTECTED_CHAR_LVALUE:
-          {
-              struct protected_char_lvalue *p;
+        case LVALUE_PROTECTED:
+            if (--(v->u.protected_lvalue->ref) <= 0)
+            {
+                free_svalue(&(v->u.protected_lvalue->val));
+                xfree(v->u.protected_lvalue);
+            }
+            break;
 
-              p = v->u.protected_char_lvalue;
-              if (p->v.type == T_STRING)
-              {
-                  free_mstring(p->v.u.str);
-              }
-              free_protector_svalue(&p->protector);
-              xfree(p);
-              break;
-          }
+        case LVALUE_PROTECTED_CHAR:
+            if (--(v->u.protected_char_lvalue->ref) <= 0)
+            {
+                struct protected_char_lvalue *p;
+                p = v->u.protected_char_lvalue;
 
-        case T_PROTECTED_STRING_RANGE_LVALUE:
-          {
-              struct protected_range_lvalue *p;
+                free_mstring(p->str);
+                xfree(p);
+            }
+            break;
 
-              p = v->u.protected_range_lvalue;
-              free_mstring(p->v.u.str);
-              free_protector_svalue(&p->protector);
-              xfree(p);
-              break;
-          }
+        case LVALUE_PROTECTED_RANGE:
+            if (--(v->u.protected_range_lvalue->ref) <= 0)
+            {
+                struct protected_range_lvalue *r;
+                r = v->u.protected_range_lvalue;
 
-        case T_PROTECTED_POINTER_RANGE_LVALUE:
-          {
-              struct protected_range_lvalue *p;
+                free_svalue(&(r->vec));
+                if (r->var && --(r->var->ref) <= 0)
+                {
+                    free_svalue(&(r->var->val));
+                    xfree(r->var);
+                }
 
-              p = v->u.protected_range_lvalue;
-              free_array(p->v.u.vec);
-              free_protector_svalue(&p->protector);
-              xfree(p);
-              break;
-          }
-
-        } /* switch (v->u.lvalue->type) */
+                xfree(r);
+            }
+            break;
+        } /* switch (v->x.lvalue_type) */
         break; /* case T_LVALUE */
 
     }
@@ -1323,6 +1239,19 @@ free_svalue (svalue_t *v)
 
     case T_MAPPING:
         needs_deserializing = (v->u.map->ref == 1);
+        break;
+
+    case T_LVALUE:
+        switch (v->x.lvalue_type)
+        {
+        case LVALUE_PROTECTED:
+            needs_deserializing = (v->u.protected_lvalue->ref == 1);
+            break;
+
+        case LVALUE_PROTECTED_RANGE:
+            needs_deserializing = (v->u.protected_range_lvalue->ref == 1);
+            break;
+        }
         break;
     }
 
@@ -1466,52 +1395,7 @@ inl_object_ref (svalue_t *svp, object_t *obj)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-check_for_ref_loop (svalue_t * dest)
-
-/* <dest> has just been assigned to - check if this created a reference loop.
- * If yes, free <dest> and throw an error.
- */
-
-{
-    if (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
-    {
-        /* rover1 will scan the lvalue chain in two-steps, rover2 will
-         * scan it step by step. If there is a loop, the two will eventually
-         * meet again.
-         */
-        svalue_t * rover1, * rover2;
-
-        rover1 = rover2 = dest;
-        do {
-            if (rover1->type == T_LVALUE || rover1->type == T_PROTECTED_LVALUE)
-                rover1 = rover1->u.lvalue;
-            else
-                break;
-            if (rover1->type == T_LVALUE || rover1->type == T_PROTECTED_LVALUE)
-                rover1 = rover1->u.lvalue;
-            else
-                break;
-            if (rover2->type == T_LVALUE || rover2->type == T_PROTECTED_LVALUE)
-                rover2 = rover2->u.lvalue;
-            else
-                break;
-            if (rover1 == rover2)
-            {
-                free_svalue(dest);
-                errorf("Assignment would create reference loop.\n");
-            }
-        } while (rover1
-             && (rover1->type == T_LVALUE || rover1->type == T_PROTECTED_LVALUE)
-             && rover2
-             && (rover2->type == T_LVALUE || rover2->type == T_PROTECTED_LVALUE)
-                );
-    }
-
-} /* check_for_ref_loop() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE void
-inl_assign_svalue_no_free (svalue_t *to, svalue_t *from)
+internal_assign_svalue_no_free (svalue_t *to, svalue_t *from)
 
 /* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
  * value is either copied when appropriate, or its refcount is increased.
@@ -1519,6 +1403,8 @@ inl_assign_svalue_no_free (svalue_t *to, svalue_t *from)
  *
  * If <from> is a destructed object, <to> is set to the number 0 but
  * <from> is left unchanged.
+ *
+ * <from> may never be an unprotected lvalue.
  */
 
 {
@@ -1570,19 +1456,32 @@ inl_assign_svalue_no_free (svalue_t *to, svalue_t *from)
     case T_MAPPING:
         (void)ref_mapping(to->u.map);
         break;
+
+    case T_LVALUE:
+        switch(to->x.lvalue_type)
+        {
+        default:
+            fatal("(assign_svalue_no_free) Illegal lvalue %p type %d\n", to, to->x.lvalue_type);
+            /* NOTREACHED */
+            break;
+
+        case LVALUE_PROTECTED:
+            to->u.protected_lvalue->ref++;
+            break;
+
+        case LVALUE_PROTECTED_CHAR:
+            to->u.protected_char_lvalue->ref++;
+            break;
+
+        case LVALUE_PROTECTED_RANGE:
+            to->u.protected_range_lvalue->ref++;
+            break;
+
+        } /* switch */
+        break;
     }
 
-    /* Protection against endless reference loops */
-    if (to->type == T_LVALUE || to->type == T_PROTECTED_LVALUE)
-    {
-        check_for_ref_loop(to);
-    }
-} /* inl_assign_svalue_no_free() */
-
-void assign_svalue_no_free (svalue_t *to, svalue_t *from)
-{ inl_assign_svalue_no_free(to,from); }
-
-#define assign_svalue_no_free(to,from) inl_assign_svalue_no_free(to,from)
+} /* internal_assign_svalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -1596,6 +1495,8 @@ inl_copy_svalue_no_free (svalue_t *to, svalue_t *from)
  *
  * If <from> is a destructed object, <to> is set to the number 0 but
  * <from> is left unchanged.
+ *
+ * <from> may never be an unprotected lvalue.
  */
 
 {
@@ -1637,7 +1538,7 @@ inl_copy_svalue_no_free (svalue_t *to, svalue_t *from)
             put_ref_array(to, &null_vector);
     }
     else
-        assign_svalue_no_free(to, from);
+        internal_assign_svalue_no_free(to, from);
 } /* inl_copy_svalue_no_free() */
 
 void copy_svalue_no_free (svalue_t *to, svalue_t *from)
@@ -1647,7 +1548,185 @@ void copy_svalue_no_free (svalue_t *to, svalue_t *from)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-assign_checked_svalue_no_free (svalue_t *to, svalue_t *from)
+internal_assign_rvalue_no_free ( svalue_t *to, svalue_t *from )
+
+/* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
+ * value is either copied when appropriate, or its refcount is increased.
+ * <to> is considered empty at the time of call.
+ *
+ * If <from> is a protected lvalue, it will be dereferenced to get
+ * the real value. (It is not allowed to be an unprotected lvalue.)
+ * So afterwards <to> is guaranteed not to be an lvalue.
+ * If that value is a destructed object, 0 is assigned.
+ */
+
+{
+    if (from->type == T_LVALUE)
+    {
+        switch (from->x.lvalue_type)
+        {
+        default:
+            fatal("(assign_rvalue_no_free) Illegal lvalue %p type %d\n", from, from->x.lvalue_type);
+            /* NOTREACHED */
+            break;
+
+        case LVALUE_PROTECTED:
+            internal_assign_svalue_no_free(to, &(from->u.protected_lvalue->val));
+            break;
+
+        case LVALUE_PROTECTED_CHAR:
+            put_number(to, (unsigned char) *from->u.protected_char_lvalue->charp);
+            break;
+
+        case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = from->u.protected_range_lvalue;
+                svalue_t *vec = &(r->vec);
+
+                switch (vec->type)
+                {
+                case T_POINTER:
+                    {
+                        vector_t *slice = slice_array(vec->u.vec, r->index1, r->index2 - 1);
+                        if (slice == NULL)
+                            errorf("Out of memory: array[%"PRIdMPINT"..%"PRIdMPINT"].\n", r->index1, r->index2 - 1);
+                        else
+                            put_array(to, slice);
+                        break;
+                    }
+
+                case T_STRING:
+                    {
+                        string_t *slice;
+                        if (r->index2 <= r->index1)
+                            slice = ref_mstring(STR_EMPTY);
+                        else
+                            slice = mstr_extract(vec->u.str, r->index1, r->index2 - 1);
+                        if (slice == NULL)
+                            errorf("Out of memory: string[%"PRIdMPINT"..%"PRIdMPINT"].\n", r->index1, r->index2 - 1);
+                        else
+                            put_string(to, slice);
+                        break;
+                    }
+
+                default:
+                    fatal("(assign_rvalue_no_free) Illegal range %p type %d\n", r, vec->type);
+                    /* NOTREACHED */
+                    break;
+                }
+            }
+            break;
+
+        } /* switch (from->x.lvalue_type) */
+    }
+    else
+        internal_assign_svalue_no_free(to, from);
+} /* internal_assign_rvalue_no_free() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+normalize_svalue (svalue_t *svp, bool collapse_lvalues)
+
+/* Checks whether <svp> is a protected lvalue (unprotected lvalues are not
+ * allowed here). If so, the normalizing steps are applied:
+ *
+ * 1. If it is a simple protected lvalue pointing to a protected range
+ *    lvalue it is replaced by that range lvalue.
+ * 2. If this lvalue holds the only reference to the underlying svalue
+ *    it is replaced by the svalue (or a range/char of it).
+ *    This is done only if <collapse_lvalues> is true.
+ * 3. If this is a protected range lvalue, check whether the referenced
+ *    variable is still valid. Otherwise replace it with NULL.
+ *
+ * If <svp> is a reference to a destructed object, it will be replaced
+ * by 0. In all other cases this is a no-op.
+ */
+
+{
+    while (svp->type == T_LVALUE)
+    {
+        switch(svp->x.lvalue_type)
+        {
+            default:
+                fatal("(normalize_lvalue) Illegal lvalue %p type %d\n", svp, svp->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_PROTECTED:
+            {
+                svalue_t *dest = &(svp->u.protected_lvalue->val);
+
+                if (dest->type == T_LVALUE
+                 || (collapse_lvalues && svp->u.protected_lvalue->ref == 1))
+                {
+                    svalue_t temp = *svp;
+                    internal_assign_svalue_no_free(svp, dest);
+                    free_svalue(&temp);
+                    continue;
+                }
+
+                if (destructed_object_ref(dest))
+                {
+                    free_svalue(dest);
+                    internal_assign_svalue_no_free(dest, &const0);
+                    break;
+                }
+                break;
+            }
+
+            case LVALUE_PROTECTED_CHAR:
+                if (collapse_lvalues && svp->u.protected_char_lvalue->ref == 1 && svp->u.protected_char_lvalue->str->info.ref == 1)
+                {
+                    svalue_t temp = *svp;
+                    internal_assign_rvalue_no_free(svp, &temp);
+                    free_svalue(&temp);
+                    continue;
+                }
+                break;
+
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
+
+                if (collapse_lvalues
+                 && r->ref == 1
+                 && (r->var == NULL || r->var->ref == 1))
+                {
+                    svalue_t temp = *svp;
+                    internal_assign_rvalue_no_free(svp, &temp);
+                    free_svalue(&temp);
+                    continue;
+                }
+
+                if (r->var != NULL
+                 && (r->vec.type != r->var->val.type
+                  || (r->vec.type == T_POINTER && r->vec.u.vec != r->var->val.u.vec)
+                  || (r->vec.type == T_STRING  && r->vec.u.str != r->var->val.u.str)))
+                {
+                    if(--(r->var->ref) <= 0)
+                    {
+                        free_svalue(&(r->var->val));
+                        xfree(r->var);
+                    }
+
+                    r->var = NULL;
+                }
+                break;
+            }
+        }
+        break;
+    } /* switch */
+
+    if (destructed_object_ref(svp))
+    {
+        free_svalue(svp);
+        internal_assign_svalue_no_free(svp, &const0);
+    }
+} /* normalize_lvalue() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+inl_assign_svalue_no_free (svalue_t *to, svalue_t *from)
 
 /* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
  * value is either copied when appropriate, or its refcount is increased.
@@ -1655,197 +1734,263 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from)
  * <from> may point to a variable or vector element, so it might contain
  * a destructed object. In that case, <from> and <to> are set to
  * svalue-number 0.
+ *
+ * <from> may never be an unprotected lvalue.
  */
 
 {
-    switch (from->type)
-    {
-    case T_STRING:
-        (void)ref_mstring(from->u.str);
-        break;
+    normalize_svalue(from, false);
+    internal_assign_svalue_no_free(to, from);
+} /* inl_assign_svalue_no_free() */
 
-    case T_OBJECT:
-      {
-        object_t *ob = from->u.ob;
-        if ( !(ob->flags & O_DESTRUCTED) ) {
-            ref_object(ob, "ass to var");
-            break;
-        }
-        zero_object_svalue(from);
-        break;
-      }
+void assign_svalue_no_free (svalue_t *to, svalue_t *from)
+{ inl_assign_svalue_no_free(to,from); }
 
-    case T_QUOTED_ARRAY:
-    case T_POINTER:
-        (void)ref_array(from->u.vec);
-        break;
-
-    case T_STRUCT:
-        (void)ref_struct(from->u.strct);
-        break;
-
-    case T_SYMBOL:
-        (void)ref_mstring(from->u.str);
-        break;
-
-    case T_CLOSURE:
-        if (!destructed_object_ref(from))
-            addref_closure(from, "ass to var");
-        else
-            assign_svalue(from, &const0);
-        break;
-
-    case T_MAPPING:
-        (void)ref_mapping(from->u.map);
-        break;
-    }
-    *to = *from;
-
-    /* Protection against endless reference loops */
-    if (to->type == T_LVALUE || to->type == T_PROTECTED_LVALUE)
-    {
-        check_for_ref_loop(to);
-    }
-} /* assign_checked_svalue_no_free() */
+#define assign_svalue_no_free(to,from) inl_assign_svalue_no_free(to,from)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-assign_local_svalue_no_free ( svalue_t *to, svalue_t *from )
+inl_assign_rvalue_no_free (svalue_t *to, svalue_t *from)
 
 /* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
  * value is either copied when appropriate, or its refcount is increased.
  * <to> is considered empty at the time of call.
  *
- * <from> is meant to point to a local variable, which might be an arg
- * to the current lfun.
- * If <from> is a lvalue, the chain is unraveled and the final non-lvalue
- * is assigned. If that value is a destructed object, 0 is assigned.
+ * If <from> is a protected lvalue, it will be dereferenced to get
+ * the real value. (It is not allowed to be an unprotected lvalue.)
+ * So afterwards <to> is guaranteed not to be an lvalue.
+ * If that value is a destructed object, 0 is assigned.
+ * In that case also <from> is set to svalue-number 0.
  */
 
 {
-assign_from_lvalue:
-    switch (from->type)
-    {
-      case T_STRING:
-        (void)ref_mstring(from->u.str);
-        break;
-      case T_OBJECT:
-        (void)ref_object(from->u.ob, "assign_local_lvalue_no_free");
-        break;
-      case T_QUOTED_ARRAY:
-      case T_POINTER:
-        (void)ref_array(from->u.vec);
-        break;
-      case T_STRUCT:
-        (void)ref_struct(from->u.strct);
-        break;
-      case T_SYMBOL:
-        (void)ref_mstring(from->u.str);
-        break;
-      case T_CLOSURE:
-        addref_closure(from, "ass to var");
-        break;
-      case T_MAPPING:
-        (void)ref_mapping(from->u.map);
-        break;
-      case T_LVALUE:
-      case T_PROTECTED_LVALUE:
-        from = from->u.lvalue;
-        if (destructed_object_ref(from)) {
-            assign_svalue(from, &const0);
-            break;
-        }
-        goto assign_from_lvalue;
-      case T_PROTECTED_CHAR_LVALUE:
-        put_number(to, *from->u.charp);
-        return;
-    }
-    *to = *from;
+    normalize_svalue(from, true);
+    internal_assign_rvalue_no_free(to, from);
+} /* inl_assign_rvalue_no_free() */
 
-    /* Protection against endless reference loops */
-    if (to->type == T_LVALUE || to->type == T_PROTECTED_LVALUE)
-    {
-        check_for_ref_loop(to);
-    }
-} /* assign_local_svalue_no_free() */
+void assign_rvalue_no_free (svalue_t *to, svalue_t *from)
+{ inl_assign_rvalue_no_free(to,from); }
+
+#define assign_rvalue_no_free(to,from) inl_assign_rvalue_no_free(to,from)
 
 /*-------------------------------------------------------------------------*/
-static INLINE
-void assign_lrvalue_no_free (svalue_t *to, svalue_t *from)
+static INLINE svalue_t *
+inl_get_rvalue (svalue_t *v, bool *last_reference, bool collapse_lvalues)
 
-/* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
- * value is either copied when appropriate, or its refcount is increased.
- * <to> is considered empty at the time of call.
+/* This function handles unravelling of protected lvalues.
+ * (<v> may not be an unprotected lvalue.)
  *
- * This function differs from assign_svalue_no_free() in the handling of
- * two types:
- *  - if <from> is an unshared string, the string is made shared and
- *    both <to> and <from> are changed to use the shared string.
- *  - if <from> is a lvalue, <to>.u.lvalue is set to point to <from>.
- *    This is necessary when pushing references onto the stack - if
- *    assign_svalue_no_free() were used, the first free_svalue() would undo
- *    the whole lvalue indirection, even though there were still other lvalue
- *    entries in the stack for the same svalue.
- *    TODO: An alternative would be use a special struct lvalue {} with a
- *    refcount.
+ * If <v> is a normal lvalue, get the base rvalue its pointing at.
+ * If <v> is a range lvalue, then NULL is returned.
+ * (In that case use assign_rvalue_no_free to store a copy of the range.)
+ * If <v> is a char lvalue, the value of that character is stored in a
+ * local svalue and a reference to this svalue is returned.
+ * (May be overwritten with a subsequent call to this function.)
+ * If <v> is not an lvalue at all, it is returned.
+ *
+ * If <last_reference> is not NULL, it will be set to true
+ * if <v> is a protected lvalue with just one reference
+ * or not an lvalue at all. (Otherwise it will stay unchanged.)
+ *
+ * This function normalizes the lvalue first. <collapse_lvalues>
+ * is passed to normalize_svalue.
  */
 
 {
-#ifdef DEBUG
-    if (from == 0)
-        fatal("Null pointer to assign_lrvalue_no_free().\n");
-#endif
+    normalize_svalue(v, collapse_lvalues);
 
-    /* Copy the data */
-    *to = *from;
-
-    /* Now adapt the refcounts or similar */
-
-    switch(from->type)
+    if (v->type == T_LVALUE)
     {
-    case T_STRING:
-        (void)ref_mstring(to->u.str);
-        break;
+        switch (v->x.lvalue_type)
+        {
+            default:
+                fatal("(get_rvalue) Illegal lvalue %p type %d\n", v, v->x.lvalue_type);
+                /* NOTREACHED */
+                break;
 
-    case T_OBJECT:
-        (void)ref_object(to->u.ob, "ass to var");
-        break;
+            case LVALUE_PROTECTED:
+                if (last_reference != NULL && v->u.protected_lvalue->ref == 1)
+                    *last_reference = true;
 
-    case T_QUOTED_ARRAY:
-    case T_POINTER:
-        (void)ref_array(to->u.vec);
-        break;
+                return &(v->u.protected_lvalue->val);
 
-    case T_STRUCT:
-        (void)ref_struct(to->u.strct);
-        break;
+            case LVALUE_PROTECTED_CHAR:
+            {
+                if (last_reference != NULL && v->u.protected_char_lvalue->ref == 1)
+                    *last_reference = true;
 
-    case T_SYMBOL:
-        (void)ref_mstring(to->u.str);
-        break;
+                static svalue_t charval = { T_NUMBER };
+                charval.u.number = (unsigned char) *v->u.protected_char_lvalue->charp;
 
-    case T_CLOSURE:
-        if (!destructed_object_ref(to))
-            addref_closure(to, "ass to var");
-        else
-            put_number(to, 0);
-        break;
+                return &charval;
+            }
 
-    case T_MAPPING:
-        (void)ref_mapping(to->u.map);
-        break;
+            case LVALUE_PROTECTED_RANGE:
+                if (last_reference != NULL && v->u.protected_range_lvalue->ref == 1)
+                    *last_reference = true;
 
-    case T_LVALUE:
-        to->u.lvalue = from;
-        break;
+                return NULL;
+
+        } /* switch (v->x.lvalue_type) */
     }
-
-    /* Protection against endless reference loops */
-    if (to->type == T_LVALUE || to->type == T_PROTECTED_LVALUE)
+    else
     {
-        check_for_ref_loop(to);
+        if(last_reference != NULL)
+            *last_reference = true;
+        return v;
     }
-} /* assign_lrvalue_no_free() */
+} /* inl_get_rvalue() */
+
+svalue_t * get_rvalue (svalue_t *v, bool *last_reference)
+{ return inl_get_rvalue(v, last_reference, true); }
+
+#define get_rvalue(v, last_reference) inl_get_rvalue(v, last_reference, true)
+#define get_rvalue_no_collapse(v, last_reference) inl_get_rvalue(v, last_reference, false)
+
+/*-------------------------------------------------------------------------*/
+static bool
+link_protected_lvalue (svalue_t *dest, svalue_t *lv)
+
+/* Link both lvalues together, so that they represent a single value
+ * later on. Both, <dest> and <lv>, must be protected lvalues.
+ * It is assumed, that both are normalized. The resulting value
+ * (where both point to at the end) is the content of <lv>.
+ *
+ * The function returns true on success, false otherwise
+ * (when both lvalues are incompatible).
+ */
+
+{
+    assert(dest->type == T_LVALUE);
+    assert(lv->type == T_LVALUE);
+
+    switch (dest->x.lvalue_type)
+    {
+        default:
+            fatal("(link_protected_lvalue) Illegal lvalue %p type %d\n", dest, dest->x.lvalue_type);
+            /* NOTREACHED */
+            break;
+
+        case LVALUE_PROTECTED:
+            /* Are they the same? */
+            if (lv->x.lvalue_type == LVALUE_PROTECTED
+             && lv->u.protected_lvalue == dest->u.protected_lvalue)
+                 return true;
+
+            /* This is pretty easy, replace <dest> with <lv>.
+             * For all other svalues that reference <dest->u.protected_lvalue>
+             * we need to put a reference to <lv> also there.
+             */
+            if (dest->u.protected_lvalue->ref != 1)
+            {
+                /* Should be normalized. */
+                assert(dest->u.protected_lvalue->val.type != T_LVALUE);
+
+                free_svalue(&(dest->u.protected_lvalue->val));
+                internal_assign_svalue_no_free(&(dest->u.protected_lvalue->val), lv);
+            }
+
+            free_svalue(dest);
+            internal_assign_svalue_no_free(dest, lv);
+            return true;
+
+        case LVALUE_PROTECTED_CHAR:
+            switch (lv->x.lvalue_type)
+            {
+                default:
+                    fatal("(link_protected_lvalue) Illegal lvalue %p type %d\n", lv, lv->x.lvalue_type);
+                    /* NOTREACHED */
+                    break;
+
+                case LVALUE_PROTECTED:
+                    /* We do this the other way around,
+                     * make <lv> into a protected_char_lvalue,
+                     * but do the assignment first.
+                     */
+                    if (lv->u.protected_lvalue->val.type != T_NUMBER)
+                        return false;
+
+                    *dest->u.protected_char_lvalue->charp = (char)lv->u.protected_lvalue->val.u.number;
+                    return link_protected_lvalue(lv, dest);
+
+                case LVALUE_PROTECTED_CHAR:
+                    /* Are they the same? */
+                    if (lv->u.protected_char_lvalue == dest->u.protected_char_lvalue)
+                         return true;
+
+                    /* TODO: We would need to link them together, there is no other way,
+                     * because we would need to update both chars every time there
+                     * is an assignment.
+                     */
+                    return false; /* For now. */
+
+                case LVALUE_PROTECTED_RANGE:
+                    /* char and range are incompatible. */
+                    return false;
+            } /* switch (lv->x.lvalue_type) */
+            break;
+
+        case LVALUE_PROTECTED_RANGE:
+            switch (lv->x.lvalue_type)
+            {
+                default:
+                    fatal("(link_protected_lvalue) Illegal lvalue %p type %d\n", lv, lv->x.lvalue_type);
+                    /* NOTREACHED */
+                    break;
+
+                case LVALUE_PROTECTED:
+                {
+                    /* So hopefully this points to an array/string.
+                     * Then we do the assignment and link them the other
+                     * way around (making <lv> a protected_range_lvalue).
+                     */
+                    struct protected_range_lvalue *prot_range = dest->u.protected_range_lvalue;
+                    struct protected_lvalue *prot_lval = lv->u.protected_lvalue;
+
+                    if (prot_lval->val.type != prot_range->vec.type)
+                        return false;
+
+                    switch(prot_range->vec.type)
+                    {
+                        case T_POINTER:
+                            ref_array(prot_lval->val.u.vec); /* transfer_...() will free it once */
+                            transfer_protected_pointer_range(prot_range, &(prot_lval->val));
+                            break;
+
+                        case T_STRING:
+                            assign_protected_string_range(prot_range, &(prot_lval->val), MY_FALSE);
+                            break;
+
+                        default:
+                            fatal("(link_protected_lvalue) Illegal range %p type %d\n", prot_range, prot_range->vec.type);
+                            /* NOTREACHED */
+                            break;
+                    }
+                    return link_protected_lvalue(lv, dest);
+                }
+
+                case LVALUE_PROTECTED_CHAR:
+                    /* char and range are incompatible. */
+                    return false;
+
+                case LVALUE_PROTECTED_RANGE:
+                    /* Are they the same? */
+                    if (lv->u.protected_range_lvalue == dest->u.protected_range_lvalue)
+                         return true;
+
+                    /* TODO: We need to link them together, there is no other way,
+                     * because we would need to update both ranges every time there
+                     * is an assignment.
+                     */
+                    return false; /* For now. */
+            } /* switch (lv->x.lvalue_type) */
+            break;
+
+    } /* switch (dest->x.lvalue_type) */
+
+    return false; /* NOTREACHED */
+
+} /* link_protected_lvalue */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1866,130 +2011,125 @@ assign_svalue (svalue_t *dest, svalue_t *v)
  *
  * If <dest> is a lvalue, <v> will be assigned to the svalue referenced
  * to by <dest>.
+ *
+ * <v> may never be an unprotected lvalue.
  */
 
 {
-    /* Free the <dest> svalue.
-     * If <dest> is a (protected) lvalue, the loop will traverse the lvalue
-     * chain until the actual svalue is found.
-     * If a T_xxx_LVALUE is found, the assignment will be done here
-     * immediately.
-     */
+    normalize_svalue(v, false);
 
-    for (;;) {
-        switch(dest->type)
-        {
-        case T_LVALUE:
-        case T_PROTECTED_LVALUE:
-            dest = dest->u.lvalue;
-            continue;
-
-        case T_STRING:
-            free_mstring(dest->u.str);
-            break;
-
-        case T_OBJECT:
-          {
-            object_t *ob = dest->u.ob;
-            free_object(ob, "assign_svalue");
-            break;
-          }
-
-        case T_QUOTED_ARRAY:
-        case T_POINTER:
-          {
-            vector_t *vec = dest->u.vec;
-            assign_svalue_no_free(dest, v);
-              /* TODO: leaks vec if out of memory */
-            free_array(vec);
-            return;
-          }
-
-        case T_STRUCT:
-          {
-            struct_t *strct = dest->u.strct;
-            assign_svalue_no_free(dest, v);
-              /* TODO: leaks strct if out of memory */
-            free_struct(strct);
-            return;
-          }
-
-        case T_MAPPING:
-          {
-            mapping_t *map = dest->u.map;
-            assign_svalue_no_free(dest, v); /* leaks map if out of memory */
-            free_mapping(map);
-            return;
-          }
-
-        case T_SYMBOL:
-            free_mstring(dest->u.str);
-            break;
-
-        case T_CLOSURE:
-            free_closure(dest);
-            break;
-
+    /* First check whether we assign to an lvalue. */
+    if (dest->type == T_LVALUE)
+    {
         /* If the final svalue in dest is one of these lvalues,
          * the assignment is done right here and now.
-         * Note that 'dest' in some cases points to a protector structure.
          */
+        switch(dest->x.lvalue_type)
+        {
+        default:
+            fatal("(assign_svalue) Illegal lvalue %p type %d\n", dest, dest->x.lvalue_type);
+            /* NOTREACHED */
+            break;
 
-        case T_CHAR_LVALUE:
+        case LVALUE_UNPROTECTED:
+            dest = dest->u.lvalue;
+            break;
+
+        case LVALUE_UNPROTECTED_CHAR:
             if (v->type == T_NUMBER)
-                *dest->u.charp = (char)v->u.number;
+                *current_unprotected_char.charp = (char)v->u.number;
             return;
 
-        case T_PROTECTED_CHAR_LVALUE:
-          {
-            struct protected_char_lvalue *p;
-
-            p = (struct protected_char_lvalue *)dest;
-            if (p->lvalue->type == T_STRING
-             && get_txt(p->lvalue->u.str) == p->start)
+        case LVALUE_UNPROTECTED_RANGE:
+            switch (current_unprotected_range.vec->type)
             {
-                if (v->type == T_NUMBER)
-                    *p->v.u.charp = (char)v->u.number;
-            }
-            return;
-          }
+            case T_POINTER:
+                if (v->type == T_POINTER)
+                {
+                    (void)ref_array(v->u.vec); /* transfer_...() will free it once */
+                    transfer_pointer_range(v);
+                }
+                return;
 
-        case T_POINTER_RANGE_LVALUE:
-            if (v->type == T_POINTER)
+            case T_STRING:
+                assign_string_range(v, MY_FALSE);
+                return;
+
+            default:
+                fatal("(assign_svalue) Illegal type in protected range lvalue: %s, expected array or string.\n",
+                   typename(current_unprotected_range.vec->type));
+                /* NOTREACHED */
+                return;
+            } /* switch() */
+            /* NOTREACHED */
+            return;
+
+        case LVALUE_PROTECTED:
+            if (v->type == T_LVALUE)
             {
-                (void)ref_array(v->u.vec); /* transfer_...() will free it once */
-                transfer_pointer_range(v);
+                normalize_svalue(dest, false);
+                link_protected_lvalue(dest, v);
+                return;
             }
-            return;
+            else
+                dest = &(dest->u.protected_lvalue->val);
+            break;
 
-        case T_PROTECTED_POINTER_RANGE_LVALUE:
-            if (v->type == T_POINTER)
+        case LVALUE_PROTECTED_CHAR:
+            if (v->type == T_LVALUE)
             {
-                (void)ref_array(v->u.vec); /* transfer_...() will free it once */
-                transfer_protected_pointer_range(
-                  (struct protected_range_lvalue *)dest, v
-                );
+                normalize_svalue(dest, false);
+                link_protected_lvalue(dest, v);
             }
+            else if (v->type == T_NUMBER)
+                *dest->u.protected_char_lvalue->charp = (char)v->u.number;
             return;
 
-        case T_STRING_RANGE_LVALUE:
-            assign_string_range(v, MY_FALSE);
-            return;
+        case LVALUE_PROTECTED_RANGE:
+            if (v->type == T_LVALUE)
+            {
+                normalize_svalue(dest, false);
+                link_protected_lvalue(dest, v);
+                return;
+            }
+            else
+            {
+                struct protected_range_lvalue *r;
 
-        case T_PROTECTED_STRING_RANGE_LVALUE:
-            assign_protected_string_range(
-                  (struct protected_range_lvalue *)dest, v, MY_FALSE
-            );
-            return;
+                r = dest->u.protected_range_lvalue;
 
+                switch(r->vec.type)
+                {
+                    case T_POINTER:
+                        if (v->type == T_POINTER)
+                        {
+                            (void)ref_array(v->u.vec); /* transfer_...() will free it once */
+                            transfer_protected_pointer_range(r, v);
+                        }
+                        /* TODO: Else throw an error? */
+                        return;
+
+                    case T_STRING:
+                        assign_protected_string_range(r, v, MY_FALSE);
+                        return;
+
+                    default:
+                        fatal("(assign_svalue) Illegal range %p type %d\n", r, r->vec.type);
+                        /* NOTREACHED */
+                        break;
+                }
+                /* NOTREACHED */
+                return;
+            }
         } /* switch() */
+    }
 
-        /* No more lvalues to follow, old value freed: do the assign next */
-        break;
-    } /* end for */
+    /* Now free the <dest> svalue, and assign the new value.
+     */
 
-    /* Now assign the value to the now-invalid <dest> */
-    assign_svalue_no_free(dest, v);
+    free_svalue(dest);
+    internal_assign_svalue_no_free(dest, v);
+
 } /* assign_svalue() */
 
 /*-------------------------------------------------------------------------*/
@@ -2004,13 +2144,6 @@ inl_transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
 {
     /* Copy the data */
     *dest = *v;
-
-    /* Protection against endless reference loops */
-    if (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
-    {
-        v->type = T_INVALID;
-        check_for_ref_loop(dest);
-    }
 } /* inl_transfer_svalue_no_free() */
 
 void transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
@@ -2035,117 +2168,123 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
  */
 
 {
-    /* Unravel the T_LVALUE chain, if any. */
-    while (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
-        dest = dest->u.lvalue;
+    normalize_svalue(v, false);
 
-    /* Free the <dest> svalue.
-     * If a T_xxx_LVALUE is found, the transfer will be done here
-     * immediately.
-     */
-
-    for(;;)
+    /* First check whether we assign to an lvalue. */
+    if (dest->type == T_LVALUE)
     {
-        switch (dest->type)
-        {
-        case T_STRING:
-            free_mstring(dest->u.str);
-            break;
-
-        case T_OBJECT:
-          {
-            object_t *ob = dest->u.ob;
-            free_object(ob, "transfer_svalue");
-            break;
-          }
-
-        case T_QUOTED_ARRAY:
-        case T_POINTER:
-            free_array(dest->u.vec);
-            break;
-
-        case T_STRUCT:
-            free_struct(dest->u.strct);
-            break;
-
-        case T_SYMBOL:
-            free_mstring(dest->u.str);
-            break;
-
-        case T_CLOSURE:
-            free_closure(dest);
-            break;
-
-        case T_MAPPING:
-            free_mapping(dest->u.map);
-            break;
-
         /* If the final svalue in dest is one of these lvalues,
          * the assignment is done right here and now.
-         * Note that 'dest' in some cases points to a protector structure.
          */
+        switch(dest->x.lvalue_type)
+        {
+        default:
+            fatal("(transfer_svalue) Illegal lvalue %p type %d\n", dest, dest->x.lvalue_type);
+            /* NOTREACHED */
+            break;
 
-        case T_CHAR_LVALUE:
+        case LVALUE_UNPROTECTED:
+            dest = dest->u.lvalue;
+            break;
+
+        case LVALUE_UNPROTECTED_CHAR:
             if (v->type == T_NUMBER)
-            {
-                *dest->u.charp = (char)v->u.number;
-            }
+                *current_unprotected_char.charp = (char)v->u.number;
             else
                 free_svalue(v);
             return;
 
-        case T_PROTECTED_CHAR_LVALUE:
-          {
-            struct protected_char_lvalue *p;
-
-            p = (struct protected_char_lvalue *)dest;
-            if (p->lvalue->type == T_STRING
-             && get_txt(p->lvalue->u.str) == p->start)
+        case LVALUE_UNPROTECTED_RANGE:
+            switch (current_unprotected_range.vec->type)
             {
-                if (v->type == T_NUMBER)
-                {
-                    *p->v.u.charp = (char)v->u.number;
-                    return;
-                }
+            case T_POINTER:
+                if (v->type == T_POINTER)
+                    transfer_pointer_range(v);
+                else
+                    free_svalue(v);
+                return;
+
+            case T_STRING:
+                assign_string_range(v, MY_TRUE);
+                return;
+
+            default:
+                fatal("(transfer_svalue) Illegal type in protected range lvalue: %s, expected array or string.\n",
+                   typename(current_unprotected_range.vec->type));
+                /* NOTREACHED */
+                return;
+            } /* switch() */
+            /* NOTREACHED */
+            return;
+
+        case LVALUE_PROTECTED:
+            if (v->type == T_LVALUE)
+            {
+                normalize_svalue(dest, false);
+                link_protected_lvalue(dest, v);
+                free_svalue(v);
+                return;
             }
-            free_svalue(v);
+            else
+                dest = &(dest->u.protected_lvalue->val);
+            break;
+
+        case LVALUE_PROTECTED_CHAR:
+            if (v->type == T_LVALUE)
+            {
+                normalize_svalue(dest, false);
+                link_protected_lvalue(dest, v);
+                free_svalue(v);
+                return;
+            }
+            else if (v->type == T_NUMBER)
+                *dest->u.protected_char_lvalue->charp = (char)v->u.number;
+            else
+                free_svalue(v);
             return;
-          }
 
-        case T_POINTER_RANGE_LVALUE:
-            transfer_pointer_range(v);
-            return;
+        case LVALUE_PROTECTED_RANGE:
+            if (v->type == T_LVALUE)
+            {
+                normalize_svalue(dest, false);
+                link_protected_lvalue(dest, v);
+                free_svalue(v);
+                return;
+            }
+            else
+            {
+                struct protected_range_lvalue *r;
 
-        case T_PROTECTED_POINTER_RANGE_LVALUE:
-            transfer_protected_pointer_range(
-              (struct protected_range_lvalue *)dest, v
-            );
-            return;
+                r = dest->u.protected_range_lvalue;
 
-        case T_STRING_RANGE_LVALUE:
-            assign_string_range(v, MY_TRUE);
-            return;
+                switch(r->vec.type)
+                {
+                    case T_POINTER:
+                        if (v->type == T_POINTER)
+                            transfer_protected_pointer_range(r, v);
+                       else
+                            free_svalue(v);
+                            /* TODO: Else throw an error? */
+                        return;
 
-        case T_PROTECTED_STRING_RANGE_LVALUE:
-            assign_protected_string_range(
-              (struct protected_range_lvalue *)dest, v, MY_TRUE
-            );
-            return;
-        } /* end switch */
+                    case T_STRING:
+                        assign_protected_string_range(r, v, MY_TRUE);
+                        return;
 
-        /* No more lvalues to follow, old value freed: do the assign next */
-        break;
-    } /* end for */
-
-    /* Transfer the value */
-    *dest = *v;
-
-    /* Protection against endless reference loops */
-    if (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
-    {
-        v->type = T_INVALID;
-        check_for_ref_loop(dest);
+                    default:
+                        fatal("(transfer_svalue) Illegal range %p type %d\n", r, r->vec.type);
+                        /* NOTREACHED */
+                        break;
+                }
+                /* NOTREACHED */
+                return;
+            }
+        } /* switch() */
     }
+
+    /* Free the <dest> svalue and transfer <v>. */
+    free_svalue(dest);
+    transfer_svalue_no_free(dest, v);
 
 } /* inl_transfer_svalue() */
 
@@ -2159,7 +2298,7 @@ static void
 transfer_pointer_range (svalue_t *source)
 
 /* Transfer the vector <source> to the vector range defined by
- * <special_lvalue>, modifying the target vector in special_lvalue
+ * <current_unprotected_range>, modifying the target vector therein
  * accordingly. <source> is freed once in the call.
  *
  * If <source> is not a vector, it is just freed.
@@ -2169,19 +2308,21 @@ transfer_pointer_range (svalue_t *source)
     if (source->type == T_POINTER)
     {
         vector_t *sv;      /* Source vector (from source) */
-        vector_t *dv;      /* Destination vector (from special_lvalue) */
+        vector_t *dv;      /* Destination vector (from current_unprotected_range) */
         vector_t *rv;      /* Result vector */
         mp_int dsize;           /* Size of destination vector */
         mp_int ssize;           /* Size of source vector */
         mp_int index1, index2;  /* First and last index of destination range */
         mp_int i;
 
+        assert(current_unprotected_range.vec->type == T_POINTER);
+
         /* Setup the variables */
-        dsize = special_lvalue.size;
-        index1 = special_lvalue.index1;
-        index2 = special_lvalue.index2;
-        dv = special_lvalue.v.u.lvalue->u.vec;
+        index1 = current_unprotected_range.index1;
+        index2 = current_unprotected_range.index2;
+        dv = current_unprotected_range.vec->u.vec;
         sv = source->u.vec;
+        dsize = (mp_int)VEC_SIZE(dv);
         ssize = (mp_int)VEC_SIZE(sv);
 
 #ifdef NO_NEGATIVE_RANGES
@@ -2238,7 +2379,7 @@ transfer_pointer_range (svalue_t *source)
             svalue_t *s, *d; /* Copy source and destination */
 
             rv = allocate_array(dsize + ssize + index1 - index2);
-            special_lvalue.v.u.lvalue->u.vec = rv;
+            current_unprotected_range.vec->u.vec = rv;
             s = dv->item;
             d = rv->item;
 
@@ -2258,6 +2399,15 @@ transfer_pointer_range (svalue_t *source)
             for (i = dsize - index2; --i >= 0; )
             {
                 assign_svalue_no_free(d++, s++);
+            }
+
+            /* Update any variable holding that vector. */
+            if (current_unprotected_range.var != NULL
+             && current_unprotected_range.var->val.type == T_POINTER
+             && current_unprotected_range.var->val.u.vec == dv)
+            {
+               current_unprotected_range.var->val.u.vec = ref_array(rv);
+               free_array(dv);
             }
 
             free_array(dv); /* this can make the lvalue invalid to use */
@@ -2282,7 +2432,7 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
  */
 
 {
-    if (source->type == T_POINTER && dest->v.u.vec == dest->lvalue->u.vec)
+    if (source->type == T_POINTER)
     {
         vector_t *sv;      /* Source vector (from source) */
         vector_t *dv;      /* Dest vector (from dest) */
@@ -2292,12 +2442,14 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
         mp_int index1, index2;  /* Target range indices */
         mp_int i;
 
+        assert(dest->vec.type == T_POINTER);
+
         /* Setup the variables */
-        dsize = dest->size;
         index1 = dest->index1;
         index2 = dest->index2;
-        dv = dest->v.u.vec;
+        dv = dest->vec.u.vec;
         sv = source->u.vec;
+        dsize = (mp_int)VEC_SIZE(dv);
         ssize = (mp_int)VEC_SIZE(sv);
 
 #ifdef NO_NEGATIVE_RANGES
@@ -2345,7 +2497,6 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
             svalue_t *s, *d;  /* Copy source and destination */
 
             rv = allocate_array(dsize + ssize + index1 - index2);
-            dest->lvalue->u.vec = rv;
 
             s = dv->item;
             d = rv->item;
@@ -2367,14 +2518,26 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
                 assign_svalue_no_free(d++, s++);
             }
 
+            dest->index2 = (int)(index1 + ssize);
+            dest->vec.u.vec = rv;
+
+            if (dest->var != NULL
+             && dest->var->val.type == T_POINTER
+             && dest->var->val.u.vec == dv)
+            {
+                /* The variable still points to
+                 * the vector, so update it.
+                 */
+               dest->var->val.u.vec = ref_array(rv);
+               free_array(dv);
+            }
+
             free_array(dv); /* this can make the lvalue invalid to use */
         }
     }
     else
     {
-        /* Not a pointer, or the protected range has changed in size before:
-         * just free it
-         */
+        /* Not a pointer */
         free_svalue(source);
     }
 
@@ -2385,7 +2548,7 @@ static void
 assign_string_range (svalue_t *source, Bool do_free)
 
 /* Transfer the string <source> to the string range defined by
- * <special_lvalue>, modifying the target string in special_lvalue
+ * <current_unprotected_range>, modifying the target string therein
  * accordingly. If <do_free> is TRUE, <source> is freed once in the call.
  *
  * If <source> is not a string, it is just freed resp. ignored.
@@ -2394,7 +2557,7 @@ assign_string_range (svalue_t *source, Bool do_free)
 {
     if (source->type == T_STRING)
     {
-        svalue_t *dsvp;     /* destination svalue (from special_lvalue) */
+        svalue_t *dsvp;          /* destination svalue (from current_unprotected_range) */
         string_t *ds;            /* destination string (from dsvp) */
         string_t *ss;            /* source string (from source) */
         string_t *rs;            /* result string */
@@ -2403,12 +2566,12 @@ assign_string_range (svalue_t *source, Bool do_free)
         mp_int index1, index2;   /* range indices */
 
         /* Set variables */
-        dsize = special_lvalue.size;
-        index1 = special_lvalue.index1;
-        index2 = special_lvalue.index2;
-        dsvp = special_lvalue.v.u.lvalue;
+        index1 = current_unprotected_range.index1;
+        index2 = current_unprotected_range.index2;
+        dsvp = current_unprotected_range.vec;
         ds = dsvp->u.str;
         ss = source->u.str;
+        dsize = (mp_int)mstrsize(ds);
         ssize = (mp_int)mstrsize(ss);
 
 #ifdef NO_NEGATIVE_RANGES
@@ -2437,6 +2600,15 @@ assign_string_range (svalue_t *source, Bool do_free)
         /* Assign the new string in place of the old */
         free_string_svalue(dsvp);
         dsvp->u.str = rs;
+
+        /* Update the original variable. */
+        if (current_unprotected_range.var != NULL
+         && current_unprotected_range.var->val.type == T_STRING
+         && current_unprotected_range.var->val.u.str == ds)
+        {
+            free_mstring(ds);
+            current_unprotected_range.var->val.u.str = ref_mstring(rs);
+        }
 
         if (do_free)
             free_string_svalue(source);
@@ -2469,7 +2641,6 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
 {
     if (source->type == T_STRING)
     {
-        svalue_t *dsvp;     /* destination value (from dest) */
         string_t *ds;            /* destination string (from dsvp) */
         string_t *ss;            /* source string (from source) */
         string_t *rs;            /* result string */
@@ -2478,12 +2649,15 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         mp_int rsize;            /* size of result string */
         mp_int index1, index2;   /* range indices */
 
+        assert(dest->vec.type == T_STRING);
+
         /* Set variables */
-        dsize = dest->size;
         index1 = dest->index1;
         index2 = dest->index2;
-        dsvp = dest->lvalue;
-        ds = dest->v.u.str;
+        ds = dest->vec.u.str;
+        ss = source->u.str;
+        dsize = (mp_int)mstrsize(ds);
+        ssize = (mp_int)mstrsize(ss);
 
 #ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
@@ -2492,17 +2666,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
                  );
 #endif /* NO_NEGATIVE_RANGES */
 
-        /* If the lvalue is no longer valid, free it */
-        if (dsvp->u.str != ds)
-        {
-            if (do_free)
-                free_svalue(source);
-            return;
-        }
-
         /* Create a new string */
-        ss = source->u.str;
-        ssize = (mp_int)mstrsize(ss);
         rsize = dsize + ssize + index1 - index2;
         rs = alloc_mstring((size_t)rsize);
         if (!rs)
@@ -2510,20 +2674,27 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
             outofmem((dsize + ssize + index1 - index2), "new string");
         }
 
+        dest->index2 = (int)(index1 + ssize);
+        dest->vec.u.str = rs;
+
         if (index1)
             memcpy(get_txt(rs), get_txt(ds), (size_t)index1);
         if (ssize)
             memcpy(get_txt(rs) + index1, get_txt(ss), (size_t)ssize);
-        dest->index2 = (int)(index1 + ssize);
         if (dsize > index2)
             memcpy( get_txt(rs) + dest->index2, get_txt(ds) + index2
                   , (size_t)(dsize - index2));
-        dest->size = rsize;
+
+        /* Update the original variable. */
+        if (dest->var != NULL
+         && dest->var->val.type == T_STRING
+         && dest->var->val.u.str == ds)
+        {
+            free_mstring(ds);
+            dest->var->val.u.str = ref_mstring(rs);
+        }
+
         free_mstring(ds);
-        free_mstring(ds);
-        /* we will have two references to rs */
-        ref_mstring(rs);
-        dest->v.u.str = dsvp->u.str = rs;
 
         if (do_free)
             free_string_svalue(source);
@@ -2538,7 +2709,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
 
 /*-------------------------------------------------------------------------*/
 static void
-add_number_to_lvalue (svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
+add_number_to_lvalue (char* op, svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
 
 /* Add the number <i> to the (PROTECTED_)LVALUE <dest>.
  * If <pre> is not null, the <dest> value before the addition is copied
@@ -2548,22 +2719,69 @@ add_number_to_lvalue (svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
  * Both <pre> and <post> are supposed to be empty svalues when given.
  *
  * If <dest> is of the wrong type, an error is generated.
+ *
+ * <op> is the name of the operation for the error messages.
  */
 
 {
-    /* Deref the T_(PROTECTED_)LVALUES */
-    do
-        dest = dest->u.lvalue;
-    while (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE);
+    /* Handle the lvalue. */
+    if (dest->type != T_LVALUE)
+    {
+        fatal("(add_number_to_lvalue) Illegal svalue %p type %d\n", dest, dest->type);
+        /* NOTREACHED */
+        return;
+    }
+
+    switch (dest->x.lvalue_type)
+    {
+        default:
+            errorf("Bad arg to %s: got '%s', expected numeric type.\n", op, typename(dest->type));
+            break;
+
+        case LVALUE_UNPROTECTED:
+            dest = dest->u.lvalue;
+            break;
+
+        case LVALUE_UNPROTECTED_CHAR:
+            if (pre) put_number(pre, (unsigned char)*current_unprotected_char.charp);
+            *(current_unprotected_char.charp) += i;
+            if (post) put_number(post, (unsigned char)*current_unprotected_char.charp);
+            return;
+
+        case LVALUE_PROTECTED:
+            dest = &(dest->u.protected_lvalue->val);
+            break;
+
+        case LVALUE_PROTECTED_CHAR:
+            {
+                unsigned char* charp = (unsigned char*)dest->u.protected_char_lvalue->charp;
+
+                if (pre) put_number(pre, *charp);
+                *charp += i;
+                if (post) put_number(post, *charp);
+
+                return;
+            }
+    } /* switch() */
 
     /* Now increment the non-LVALUE */
     switch (dest->type)
     {
     default:
-        errorf("Reference to bad type %s to ++/--\n", typename(dest->type));
+        errorf("Bad arg to %s: got '%s', expected numeric type.\n", op, typename(dest->type));
         break;
 
     case T_NUMBER:
+        if ((i>0)
+           ?(dest->u.number > PINT_MAX-i)
+           :(dest->u.number < PINT_MIN-i))
+        {
+            errorf("Numeric overflow: (%"PRIdPINT")%s\n",
+                   dest->u.number, op);
+            /* NOTREACHED */
+            break;
+        }
+
         if (pre) put_number(pre, dest->u.number);
         dest->u.number += i;
         if (post) put_number(post, dest->u.number);
@@ -2583,37 +2801,15 @@ add_number_to_lvalue (svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
         }
 
         d += (double)i;
+        if (d < (-DBL_MAX) || d > DBL_MAX)
+            errorf("Numeric overflow: (%g)%s\n", READ_DOUBLE(dest), op);
+
         STORE_DOUBLE(dest, d);
 
         if (post)
         {
             post->type = T_FLOAT;
             STORE_DOUBLE(post, d);
-        }
-        break;
-      }
-
-    case T_PROTECTED_LVALUE:
-        add_number_to_lvalue(dest, i, pre, post);
-        break;
-
-    case T_CHAR_LVALUE:
-        if (pre) put_number(pre, (unsigned char)*dest->u.charp);
-        *(dest->u.charp) += i;
-        if (post) put_number(post, (unsigned char)*dest->u.charp);
-        break;
-
-    case T_PROTECTED_CHAR_LVALUE:
-      {
-        struct protected_char_lvalue *p;
-
-        p = (struct protected_char_lvalue *)dest;
-        if (p->lvalue->type == T_STRING
-         && get_txt(p->lvalue->u.str) == p->start)
-        {
-            if (pre) put_number(pre, (unsigned char)*(p->v.u.charp));
-            i = (unsigned char)(*(p->v.u.charp) += i);
-            if (post) put_number(post, i);
         }
         break;
       }
@@ -2712,7 +2908,7 @@ inter_add_array (vector_t *q, vector_t **vpp)
         deref_array(p);
         d = r->item;
         for (cnt = (mp_int)p_size; --cnt >= 0; ) {
-            assign_checked_svalue_no_free (d++, s++);
+            assign_svalue_no_free (d++, s++);
         }
     }
 
@@ -2736,7 +2932,7 @@ inter_add_array (vector_t *q, vector_t **vpp)
     else /* q->ref > 1 */
     {
         for (cnt = (mp_int)q_size; --cnt >= 0; ) {
-            assign_checked_svalue_no_free (d++, s++);
+            assign_svalue_no_free (d++, s++);
         }
         *vpp = r;
 
@@ -2842,7 +3038,7 @@ push_svalue_block (int num, svalue_t *v)
     for (w = inter_sp; --num >= 0; v++)
     {
         w++;
-        assign_lrvalue_no_free(w, v);
+        assign_svalue_no_free(w, v);
     }
     inter_sp = w;
 }
@@ -2930,8 +3126,8 @@ push_error_handler(void (*errorhandler)(error_handler_t *), error_handler_t *arg
 
 /* Push the <errorhandler>() with the argument <arg> as error handler
  * onto the stack.
- * This means that a new T_LVALUE is created on the stack, pointing
- * to <arg>. <arg> itself is setup to be a T_ERROR_HANDLER value.
+ * This means that a new T_ERROR_HANDLER is created on the stack, pointing
+ * to <arg>. <arg> is used to store a pointer to <errorhandler>.
  * Returns new inter_sp.
  */
 
@@ -2969,109 +3165,37 @@ push_error_handler(void (*errorhandler)(error_handler_t *), error_handler_t *arg
  * update <inter_pc> in case of errors. Result of the call is the new
  * stackpointer pointing to the result on the machine stack.
  *
- * Some typical layouts:
- *
- *     (LVALUE) -> indexed svalue from vector/mapping
- *                 (might be copied into indexing_quickfix)
- *
- *       by: push_(r)indexed_lvalue()
- *           (r)index_lvalue()
- *
- *
- *     (LVALUE) -> (CHAR_LVALUE)
- *                 special_lvalue.u.charp -> character in untabled string
- *
- *       by: (r)index_lvalue() on string lvalues
- *
- *
- *     (LVALUE) -> (PROTECTED_LVALUE) -> indexed svalue in vector/mapping
- *                 protector          -> vector/mapping
- *       by: push_protected_(r)indexed_lvalue()
- *           push_protected_indexed_map_lvalue()
- *           protected_(r)index_lvalue()
- *
- *
- *     (LVALUE) -> (PROTECTED_CHAR_LVALUE)
- *                    .lvalue -> untabled string svalue
- *                    .charp -> indexed character in untabled string
- *                    .start  -> first character of actual string text
- *                    .protector: T_INVALID or the string's .protector value
- *                                if the string itself is result of a protected
- *                                lvalue index.
- *
- *       by: protected_(r)index_lvalue() on string lvalue
- *
- *
- *     (LVALUE) -> (T_{STRING,POINTER}_RANGE_LVALUE)
- *                   special_lvalue.v   -> indexed-on string/vector
- *                   special_lvalue.size:  size of the string/vector
- *                                 .ind1:  lower index
- *                                 .ind2:  upper index
- *
- *       by: range_lvalue()
- *
- *
- *     (LVALUE) -> (T_PROTECTED_{STRING,POINTER}_RANGE_LVALUE)
- *                   .v   :   indexed-on string/vector
- *                   .lvalue -> svalue of indexed-on string/vector
- *                   .size:  size of the string/vector
- *                   .ind1:  lower index
- *                   .ind2:  upper index
- *                   .protector: the protector of the initial lvalue, if any.
- *
- *       by: protected_range_lvalue()
- *
- *
- * TODO: A lot of the functions differ only in minute details - test how
- * TODO:: much time merging the functions (and adding if()s for the
- * TODO:: differences) really costs.
+ * The layout is the same for all function. The topmost element on the
+ * stack are the indices. Below that is the indexed value. The later
+ * can be a protected lvalue. The function differ in the type of index
+ * (normal, range, map) and whether they shall return an lvalue or
+ * rvalue.
  *-------------------------------------------------------------------------
  * The functions (in a LPCish notation) are:
  *
- *   push_indexed_lvalue(vector|mapping v, int|mixed i)
- *     Return &(v[i]), unprotected.
- *   push_rindexed_lvalue(vector v, int i)
- *     Return &(v[<i]), unprotected.
- *   push_aindexed_lvalue(vector v, int i)
- *     Return &(v[>i]), unprotected.
- *   push_protected_indexed_lvalue(vector|mapping v, int|mixed i)
- *     Return &(v[i]), protected.
- *   push_protected_rindexed_lvalue(vector v, int i)
- *     Return &(v[<i]), protected.
- *   push_protected_aindexed_lvalue(vector v, int i)
- *     Return &(v[>i]), protected.
- *   push_protected_indexed_map_lvalue(mapping m, mixed i, int j)
- *     Return &(m[i:j]), protected.
- *   index_lvalue(vector|mapping|string & v, int|mixed i)
- *     Return &(*v[i]), unprotected, using special_lvalue.
- *   rindex_lvalue(vector|string & v, int i)
- *     Return &(*v[<i]), unprotected, using special_lvalue.
- *   aindex_lvalue(vector|string & v, int i)
- *     Return &(*v[>i]), unprotected, using special_lvalue.
- *   protected_index_lvalue(vector|mapping|string & v, int|mixed i)
- *     Return &(*v[i]), protected.
- *   protected_rindex_lvalue(vector|string & v, int i)
- *     Return &(*v[<i]), protected.
- *   protected_aindex_lvalue(vector|string & v, int i)
- *     Return &(*v[>i]), protected.
- *   range_lvalue(vector|string & v, int i2, int i1)
- *     Return &(*v[i1..i2]), unprotected, using special_lvalue.
- *   protected_range_lvalue(vector|string & v, int i2, int i1)
- *     Return &(*v[i1..i2]), protected.
- *   push_indexed_value(string|vector|mapping|struct v, int|mixed i)
- *     Return v[i].
- *   push_rindexed_value(string|vector v, int i)
- *     Return v[<i].
- *   push_aindexed_value(string|vector v, int i)
- *     Return v[>i].
+ *   push_index_lvalue(vector|string|mapping|struct v, int|mixed i)
+ *     Return &(v[i]), unprotected. (Supports all single-index
+ *     types: &(v[<i]), &(v[>i]), &(s->i).)
+ *
+ *   push_range_lvalue(vector|string v, int i1, int i2)
+ *     Return &(v[i1..i2]), unprotected, using current_unprotected_range.
+ *     Supports all range-index types.
+ *
+ *   push_index_value(vector|string|mapping|struct v, int|mixed i)
+ *     Return v[i]
+ *
+ *   push_range_value(vector|string v, int i1, int i2)
+ *     Return v[i1..i2]
  */
+
+enum index_type { REGULAR_INDEX, REVERSE_INDEX, ARITHMETIC_INDEX };
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-get_vector_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
+get_vector_item_extended (vector_t * vec, mp_int size, mp_int offset, svalue_t * i, svalue_t *sp, bytecode_p pc, enum index_type itype)
 
-/* Index vector <vec> with index <i> and return the pointer to the
- * indexed item.
+/* Index vector <vec> starting at <offset> and having size <size>
+ * with index <i> and return the pointer to the indexed item.
  * If the index is invalid, throw an error.
  */
 
@@ -3086,27 +3210,60 @@ get_vector_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
                ));
         return NULL;
     }
-    else
+
+    ind = i->u.number;
+    switch (itype)
     {
-        ind = i->u.number;
-        if (ind < 0)
-        {
-            ERROR("Illegal index for []: not a positive number.\n");
-            /* NOTREACHED */
-            return NULL;
-        }
-        if (ind >= VEC_SIZE(vec))
-        {
-            ERRORF(("Index for [] out of bounds: %"PRIdPINT
-                    ", vector size: %"PRIdPINT"\n"
-                   , ind, VEC_SIZE(vec)));
-            /* NOTREACHED */
-            return NULL;
-        }
+        case REGULAR_INDEX:
+            if (ind < 0)
+            {
+                ERROR("Illegal index for []: not a positive number.\n");
+                /* NOTREACHED */
+                return NULL;
+            }
+            if (ind >= size)
+            {
+                ERRORF(("Index for [] out of bounds: %"PRIdPINT
+                        ", vector size: %"PRIdPINT"\n"
+                       , ind, size));
+                /* NOTREACHED */
+                return NULL;
+            }
+            break;
+
+        case REVERSE_INDEX:
+            if (ind < 0)
+            {
+                ERROR("Illegal index for [<]: not a positive number.\n");
+                return NULL;
+            }
+
+            if (ind > size || ind <= 0)
+            {
+                ERRORF(("Index out of bounds for [<]: %"PRIdPINT", vector size: %"
+                        PRIdPINT".\n", i->u.number, size));
+                return NULL;
+            }
+
+            ind = size - ind;
+            break;
+
+        case ARITHMETIC_INDEX:
+            if (ind < 0)
+                ind = size + ind;
+
+            if (ind < 0 || ind >= size)
+            {
+                ERRORF(("Index out of bounds for [>]: %"PRIdPINT", vector size: %"
+                        PRIdPINT".\n"
+                       , i->u.number, size));
+                return NULL;
+            }
+            break;
     }
 
     /* Compute the indexed element */
-    item = &vec->item[ind];
+    item = &vec->item[ind + offset];
     if (destructed_object_ref(item))
     {
         free_svalue(item);
@@ -3114,99 +3271,204 @@ get_vector_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
     }
 
     return item;
+} /* get_vector_item_extended() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+get_vector_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc, enum index_type itype)
+
+/* Index vector <vec> with index <i> and return the pointer
+ * to the indexed item.
+ * If the index is invalid, throw an error.
+ */
+{
+    return get_vector_item_extended(vec, VEC_SIZE(vec), 0, i, sp, pc, itype);
 } /* get_vector_item() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-get_vector_r_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
+get_vector_range_item (vector_t * vec, mp_int index1, mp_int index2, svalue_t * i, svalue_t *sp, bytecode_p pc, enum index_type itype)
 
-/* Reverse-index vector <vec> with index <i> and return the pointer to the
- * indexed item.
+/* Index the vector range <vec>[<index1>..<index2>] with index <i> and
+ * return the pointer to the indexed item.
  * If the index is invalid, throw an error.
  */
 
 {
-    p_int ind;
-    svalue_t * item;
-
-    if (i->type != T_NUMBER)
-    {
-        ERRORF(("Illegal index for [<]: got %s, expected number.\n"
-               , typename(i->type)
-               ));
-        return NULL;
-    }
-    if ((ind = i->u.number) < 0)
-    {
-        ERROR("Illegal index for [<]: not a positive number.\n");
-        return NULL;
-    }
-    if ( (ind = VEC_SIZE(vec) - ind) < 0
-     ||  ind >= VEC_SIZE(vec)
-       )
-    {
-        ERRORF(("Index out of bounds for [<]: %"PRIdPINT", vector size: %"
-                PRIdPINT".\n", i->u.number, VEC_SIZE(vec)));
-        return NULL;
-    }
-
-    /* Compute the indexed element */
-    item = &vec->item[ind];
-    if (destructed_object_ref(item))
-    {
-        free_svalue(item);
-        put_number(item, 0);
-    }
-
-    return item;
-} /* get_vector_r_item() */
+    return get_vector_item_extended(vec, index2 - index1, index1, i, sp, pc, itype);
+} /* get_vector_range_item() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-get_vector_a_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
+static INLINE char *
+get_string_item_extended ( svalue_t * svp, mp_int size, mp_int offset
+                         , svalue_t * i, Bool make_singular
+                         , Bool allow_one_past
+                         , svalue_t *sp, bytecode_p pc
+                         , enum index_type itype)
 
-/* Arithmetic-index vector <vec> with index <i> and return the pointer to the
- * indexed item.
+/* Index string <svp> starting at <offset> and having size <size>
+ * with index <i> and return the pointer to the indexed item.
+ * If <make_singular> is TRUE, <svp> is made an untabled string
+ * with just one reference.
+ * If <allow_one_past> is TRUE, indexing one past the official end
+ * of the string for retrieval purposes is ok. TODO: Remove this.
  * If the index is invalid, throw an error.
  */
 
 {
-    p_int ind;
-    svalue_t * item;
+    static char nullchar = 0; /* We use that for allowed index at the end. */
+    mp_int ind;
 
     if (i->type != T_NUMBER)
     {
-        ERRORF(("Illegal index for [>]: got %s, expected number.\n"
+        ERRORF(("Illegal index for []: got %s, expected number.\n"
                , typename(i->type)
                ));
         return NULL;
     }
-    if (0 > (ind = i->u.number))
-        ind = VEC_SIZE(vec) + ind;
-    if (ind < 0 || ind >= VEC_SIZE(vec))
+    else
+
+    ind = i->u.number;
+    switch (itype)
     {
-        ERRORF(("Index out of bounds for [>]: %"PRIdPINT", vector size: %"
-                PRIdPINT".\n"
-               , i->u.number, VEC_SIZE(vec)));
-        return NULL;
+        case REGULAR_INDEX:
+            if (ind < 0)
+            {
+                ERROR("Illegal index for []: not a positive number.\n");
+                /* NOTREACHED */
+                return NULL;
+            }
+            if (ind > size )
+            {
+                ERRORF(("Index out of bounds for []: %"PRIdMPINT
+                        ", string length: %zu.\n"
+                       , ind, mstrsize(svp->u.str)));
+                /* NOTREACHED */
+                return NULL;
+            }
+            if (ind == size)
+            {
+                if (!allow_one_past)
+                {
+                    ERRORF(("Index out of bounds for []: %"PRIdMPINT
+                            ", string length: %zu.\n"
+                           , ind, mstrsize(svp->u.str)));
+                    return NULL;
+                }
+                else if (!runtime_no_warn_deprecated)
+                {
+                    warnf( "Warning: Indexing past string end is deprecated: "
+                           "index %"PRIdMPINT", string length: %zu.\n"
+                         , ind, mstrsize(svp->u.str)
+                         );
+                    return &nullchar;
+                }
+            }
+            break;
+
+        case REVERSE_INDEX:
+            if (ind < 0)
+            {
+                ERROR("Illegal index for [<]: not a positive number.\n");
+                return NULL;
+            }
+
+            /* Compute the real index. Allow ""[<1]. */
+            ind = size - ind;
+            if (!mstrsize(svp->u.str) && ind == -1)
+                ind = 0;
+
+            if ( ind < 0
+             ||  ind > size
+               )
+            {
+                ERRORF(("Index out of bounds for [<]: %"PRIdPINT
+                        ", string length: %zu\n"
+                       , i->u.number, mstrsize(svp->u.str)));
+                return NULL;
+            }
+
+            if (ind == size)
+            {
+                if (!allow_one_past)
+                {
+                    ERRORF(("Index out of bounds for [<]: %"PRIdMPINT
+                            ", string length: %zu.\n"
+                           , ind, mstrsize(svp->u.str)));
+                    return NULL;
+                }
+                else if (!runtime_no_warn_deprecated)
+                {
+                    warnf( "Warning: Indexing past string end is deprecated: "
+                           "index %"PRIdMPINT", string length: %zu.\n"
+                         , ind, mstrsize(svp->u.str)
+                         );
+                    return &nullchar;
+                }
+            }
+            break;
+
+        case ARITHMETIC_INDEX:
+            if (0 > ind)
+            {
+                /* Compute the real index. Allow ""[<1]. */
+                ind = size + ind;
+                if (!mstrsize(svp->u.str) && ind == -1)
+                    ind = 0;
+            }
+            if (ind < 0 || ind > size)
+            {
+                ERRORF(("Index out of bounds for [>]: %"PRIdPINT
+                        ", string length: %zu\n"
+                       , i->u.number, mstrsize(svp->u.str)));
+                return NULL;
+            }
+
+            if (ind == size)
+            {
+                if (!allow_one_past)
+                {
+                    ERRORF(("Index out of bounds for [>]: %"PRIdMPINT
+                            ", string length: %zu.\n"
+                           , ind, mstrsize(svp->u.str)));
+                    return NULL;
+                }
+                else if (!runtime_no_warn_deprecated)
+                {
+                    warnf( "Warning: Indexing past string end is deprecated: "
+                           "index %"PRIdMPINT", string length: %zu.\n"
+                         , ind, mstrsize(svp->u.str)
+                         );
+                    return &nullchar;
+                }
+            }
+            break;
     }
 
-    /* Compute the indexed element */
-    item = &vec->item[ind];
-    if (destructed_object_ref(item))
+    /* The basic idea here was to to create a new copy of the string only
+     * if the string is not singular (aka !mstr_singular(svp->u.str)).
+     * Unfortunately local variable lvalues are pushed without counting
+     * the additional reference, so we now have to play it safe and
+     * duplicate the string whenever requested.
+     */
+    if (make_singular)
     {
-        free_svalue(item);
-        put_number(item, 0);
+        string_t *p;
+
+        memsafe(p = unshare_mstring(svp->u.str), mstrsize(svp->u.str)
+               , "modifiable string");
+        svp->u.str = p;
     }
 
-    return item;
-} /* get_vector_a_item() */
+    return &(get_txt(svp->u.str)[ind + offset]);
+} /* get_string_item_extended() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
 get_string_item ( svalue_t * svp, svalue_t * i, Bool make_singular
                 , Bool allow_one_past
-                , svalue_t *sp, bytecode_p pc)
+                , svalue_t *sp, bytecode_p pc
+                , enum index_type itype)
 
 /* Index string <svp> with index <i> and return the pointer to the
  * indexed item.
@@ -3218,239 +3480,40 @@ get_string_item ( svalue_t * svp, svalue_t * i, Bool make_singular
  */
 
 {
-    mp_int ind;
-
-    if (i->type != T_NUMBER)
-    {
-        ERRORF(("Illegal index for []: got %s, expected number.\n"
-               , typename(i->type)
-               ));
-        return NULL;
-    }
-    else
-    {
-        ind = i->u.number;
-        if (ind < 0)
-        {
-            ERROR("Illegal index for []: not a positive number.\n");
-            return NULL;
-        }
-
-        if (ind > (mp_int)mstrsize(svp->u.str) )
-        {
-            ERRORF(("Index out of bounds for []: %"PRIdMPINT
-                    ", string length: %zu.\n"
-                   , ind, mstrsize(svp->u.str)));
-            return NULL;
-        }
-
-        if (ind == (mp_int)mstrsize(svp->u.str))
-        {
-            if (!allow_one_past)
-            {
-                ERRORF(("Index out of bounds for []: %"PRIdMPINT
-                        ", string length: %zu.\n"
-                       , ind, mstrsize(svp->u.str)));
-                return NULL;
-            }
-            else if (!runtime_no_warn_deprecated)
-                warnf( "Warning: Indexing past string end is deprecated: "
-                       "index %"PRIdMPINT", string length: %zu.\n"
-                     , ind, mstrsize(svp->u.str)
-                     );
-        }
-    }
-
-    /* The basic idea here was to to create a new copy of the string only
-     * if the string is not singular (aka !mstr_singular(svp->u.str)).
-     * Unfortunately local variable lvalues are pushed without counting
-     * the additional reference, so we now have to play it safe and
-     * duplicate the string whenever requested.
-     */
-    if (make_singular)
-    {
-        string_t *p;
-        
-        memsafe(p = unshare_mstring(svp->u.str), mstrsize(svp->u.str)
-               , "modifiable string");
-        svp->u.str = p;
-    }
-
-    return &(get_txt(svp->u.str)[ind]);
+    return get_string_item_extended(svp, (mp_int)mstrsize(svp->u.str), 0,
+        i, make_singular, allow_one_past, sp, pc, itype);
 } /* get_string_item() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
-get_string_r_item (svalue_t * svp, svalue_t * i, Bool make_singular
-                  , Bool allow_one_past
-                  , svalue_t *sp, bytecode_p pc)
+get_string_range_item ( svalue_t * svp, mp_int index1, mp_int index2
+                      , svalue_t * i, Bool make_singular
+                      , Bool allow_one_past
+                      , svalue_t *sp, bytecode_p pc
+                      , enum index_type itype)
 
-/* Reverse-Index string <svp> with index <i> and return the pointer to the
- * indexed item.
- * If <allow_one_past> is TRUE, indexing one past the official end
- * of the string for retrieval purposes is ok. TODO: Remove this.
+/* Index string range <svp>[<index1>..<index2>] and
+ * return the pointer to the indexed item.
  * If <make_singular> is TRUE, <svp> is made an untabled string
  * with just one reference.
+ * If <allow_one_past> is TRUE, indexing one past the official end
+ * of the string for retrieval purposes is ok. TODO: Remove this.
  * If the index is invalid, throw an error.
  */
 
 {
-    mp_int ind;
-
-    if (i->type != T_NUMBER)
-    {
-        ERRORF(("Illegal index for [<]: got %s, expected number.\n"
-               , typename(i->type)
-               ));
-        return NULL;
-    }
-    else
-    {
-        ind = i->u.number;
-        if ((ind = i->u.number) < 0)
-        {
-            ERROR("Illegal index for [<]: not a positive number.\n");
-            return NULL;
-        }
-
-        /* Compute the real index. Allow ""[<1]. */
-        ind = (mp_int)mstrsize(svp->u.str) - ind;
-        if (!mstrsize(svp->u.str) && ind == -1)
-            ind = 0;
-
-        if ( ind < 0
-         ||  ind > (mp_int)mstrsize(svp->u.str)
-           )
-        {
-            ERRORF(("Index out of bounds for [<]: %"PRIdPINT
-                    ", string length: %zu\n"
-                   , i->u.number, mstrsize(svp->u.str)));
-            return NULL;
-        }
-
-        if (ind == (mp_int)mstrsize(svp->u.str))
-        {
-            if (!allow_one_past)
-            {
-                ERRORF(("Index out of bounds for [<]: %"PRIdMPINT
-                        ", string length: %zu.\n"
-                       , ind, mstrsize(svp->u.str)));
-                return NULL;
-            }
-            else if (!runtime_no_warn_deprecated)
-                warnf( "Warning: Indexing past string end is deprecated: "
-                       "index %"PRIdMPINT", string length: %zu.\n"
-                     , ind, mstrsize(svp->u.str)
-                     );
-        }
-    }
-
-    /* The basic idea here was to to create a new copy of the string only
-     * if the string is not singular (aka !mstr_singular(svp->u.str)).
-     * Unfortunately local variable lvalues are pushed without counting
-     * the additional reference, so we now have to play it safe and
-     * duplicate the string whenever requested.
-     */
-    if (make_singular)
-    {
-        string_t *p;
-        
-        memsafe(p = unshare_mstring(svp->u.str), mstrsize(svp->u.str)
-               , "modifiable string");
-        svp->u.str = p;
-    }
-
-    return &(get_txt(svp->u.str)[ind]);
-} /* get_string_r_item() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE char *
-get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
-                  , Bool allow_one_past
-                  , svalue_t *sp, bytecode_p pc)
-
-/* Arithmetic-Index string <svp> with index <i> and return the pointer to the
- * indexed item.
- * If <allow_one_past> is TRUE, indexing one past the official end
- * of the string for retrieval purposes is ok. TODO: Remove this.
- * If <make_singular> is TRUE, <svp> is made an untabled string
- * with just one reference.
- * If the index is invalid, throw an error.
- */
-
-{
-    mp_int ind;
-
-    if (i->type != T_NUMBER)
-    {
-        ERRORF(("Illegal index for [>]: got %s, expected number.\n"
-               , typename(i->type)
-               ));
-        return NULL;
-    }
-    else
-    {
-        ind = i->u.number;
-
-        if (0 > ind)
-        {
-            /* Compute the real index. Allow ""[<1]. */
-            ind = (mp_int)mstrsize(svp->u.str) + ind;
-            if (!mstrsize(svp->u.str) && ind == -1)
-                ind = 0;
-        }
-        if (ind < 0 || ind > (mp_int)mstrsize(svp->u.str))
-        {
-            ERRORF(("Index out of bounds for [>]: %"PRIdPINT
-                    ", string length: %zu\n"
-                   , i->u.number, mstrsize(svp->u.str)));
-            return NULL;
-        }
-
-        if (ind == (mp_int)mstrsize(svp->u.str))
-        {
-            if (!allow_one_past)
-            {
-                ERRORF(("Index out of bounds for [>]: %"PRIdMPINT
-                        ", string length: %zu.\n"
-                       , ind, mstrsize(svp->u.str)));
-                return NULL;
-            }
-            else if (!runtime_no_warn_deprecated)
-                warnf( "Warning: Indexing past string end is deprecated: "
-                       "index %"PRIdMPINT", string length: %zu.\n"
-                     , ind, mstrsize(svp->u.str)
-                     );
-        }
-    }
-
-    /* The basic idea here was to to create a new copy of the string only
-     * if the string is not singular (aka !mstr_singular(svp->u.str)).
-     * Unfortunately local variable lvalues are pushed without counting
-     * the additional reference, so we now have to play it safe and
-     * duplicate the string whenever requested.
-     */
-    if (make_singular)
-    {
-        string_t *p;
-        
-        memsafe(p = unshare_mstring(svp->u.str), mstrsize(svp->u.str)
-               , "modifiable string");
-        svp->u.str = p;
-    }
-
-    return &(get_txt(svp->u.str)[ind]);
-} /* get_string_a_item() */
+    return get_string_item_extended(svp, index2 - index1, index1,
+        i, make_singular, allow_one_past, sp, pc, itype);
+} /* get_string_range_item() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-check_struct_op (svalue_t * sp, int off_type, int off_value, int off_index, bytecode_p pc, bool * ignore_error)
+check_struct_op (svalue_t * sp, bytecode_p pc, bool * ignore_error)
 
 /* On the stack are the arguments for a struct indexing operation.
- * In particular: sp[<off_type>]:  the struct type index <idx>
- *               sp[<off_value>]:    <off_value> <= 0: the struct value to idx.
- *               sp[-<off_value>+1]: <off_value> >  0: the struct Lvalue to idx.
- *               sp[off_index]:    the member index
+ * In particular: sp[0]:  the struct type index <idx>
+ *                sp[-2]: the struct value to idx.
+ *                sp[-1]: the member index
  *
  * Check the validity of the indexing operation and thrown an error
  * if invalid.
@@ -3468,68 +3531,38 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, int off_index, byte
 
 {
     short s_index;
-    svalue_t * svp;
+    svalue_t * svp, * isvp;
 
     if (ignore_error)
         *ignore_error = false;
 
+    isvp = get_rvalue(sp, NULL);
+
     /* These two errors can happen with careless funcall(#'->)s */
-    if (sp[off_type].type != T_NUMBER)
-        ERRORF(("Illegal struct type value: %s, expected a number.\n"
-               , typename(sp[off_type].type)
+    if (!isvp || isvp->type != T_NUMBER)
+        ERRORF(("Illegal struct index value: %s, expected a number.\n"
+               , typename((isvp ? isvp : sp)->type)
               ));
-    if (sp[off_type].u.number >= 0
-     && sp[off_type].u.number >= current_prog->num_structs)
+    if (isvp->u.number >= 0
+     && isvp->u.number >= current_prog->num_structs)
     {
         ERRORF(("Too big struct index: %"PRIdPINT", max %hu\n"
-               , sp[off_type].u.number, current_prog->num_structs
+               , isvp->u.number, current_prog->num_structs
               ));
     }
 
     /* Get the struct type index */
-    s_index = (short)sp[off_type].u.number;
+    s_index = (short)isvp->u.number;
 
-    if (off_value <= 0 && sp[off_value].type != T_STRUCT)
+    /* Get the struct value itself */
+    svp = get_rvalue(sp-2, NULL);
+    if (!svp || svp->type != T_STRUCT)
     {
         ERRORF(("Illegal type to struct->(): %s, expected struct.\n"
-               , typename(sp[off_type].type)
+               , typename(svp ? svp->type : (sp-2)->type)
               ));
         /* NOTREACHED */
     }
-
-    /* Get the reference to struct svalue to index */
-
-    if (off_value > 0)
-    {
-        svp = &sp[-off_value+1];
-
-        if (svp->type != T_LVALUE && svp->type != T_PROTECTED_LVALUE)
-        {
-            ERRORF(("Illegal type to lvalue struct->(): %s value, "
-                    "expected struct lvalue.\n"
-                   , typename(svp->type)
-                  ));
-            /* NOTREACHED */
-        }
-
-        while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
-            svp = svp->u.lvalue;
-        if (svp->type != T_STRUCT)
-        {
-            if (svp->type == T_NUMBER && !svp->u.number)
-                ERRORF(("Illegal type to lvalue struct->(): number 0, "
-                        "expected struct.\n"
-                      ));
-            else
-                ERRORF(("Illegal type to lvalue struct->(): %s, "
-                        "expected struct.\n"
-                       , typename(svp->type)
-                      ));
-            /* NOTREACHED */
-        }
-    }
-    else
-        svp = &sp[off_value];
 
     /* Check if the struct on the stack is of the correct type */
     if (s_index >= 0)
@@ -3547,11 +3580,14 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, int off_index, byte
              * We have to change the index to lookup by name.
              */
 
-            svalue_t * member_idx = &sp[off_index];
-            if (member_idx->type == T_NUMBER)
+            svalue_t * member_idx = get_rvalue(sp-1, NULL);
+            if (member_idx && member_idx->type == T_NUMBER)
             {
                 /* Put the name of the member instead of the index. */
-                put_ref_symbol(member_idx, pExpected->member[member_idx->u.number].name, 1);
+                p_int m_index = member_idx->u.number;
+
+                free_svalue(sp-1);
+                put_ref_symbol(sp-1, pExpected->member[m_index].name, 1);
             }
             /* else it is already a lookup by name. */
 
@@ -3574,9 +3610,8 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, int off_index, byte
             if (!exp_name)
                 exp_name = struct_t_name(pExpected);
 
-            ERRORF(("Illegal type to%s struct->(): struct %s, "
+            ERRORF(("Illegal type to struct->(): struct %s, "
                     "expected struct %s.\n"
-                   , off_value > 0 ? " lvalue" : ""
                    , get_txt(got_name)
                    , get_txt(exp_name)
                   ));
@@ -3584,12 +3619,7 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, int off_index, byte
     }
 
     /* Remove the type index entry from the stack */
-    if (off_type != 0)
-    {
-        for ( ; off_type < 0; off_type++)
-            sp[off_type] = sp[off_type+1];
-    }
-
+    free_svalue(sp);
     return sp-1;
 } /* check_struct_op() */
 
@@ -3669,1470 +3699,487 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc, bool 
 } /* get_struct_item() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
+static INLINE void
+assign_var_lvalue_no_free (svalue_t *dest, svalue_t *src)
 
-/* Operator F_PUSH_INDEXED_LVALUE(vector  v=sp[-1], int   i=sp[0])
- * Operator F_PUSH_INDEXED_LVALUE(mapping v=sp[-1], mixed i=sp[0])
- * Operator F_PUSH_INDEXED_S_LVALUE(struct v=sp[-1], mixed i=sp[0])
- *
- * Compute the lvalue &(v[i]) and push it into the stack. If v has just
- * one ref left, the indexed item is stored in indexing_quickfix and the
- * lvalue refers to that variable.
- * TODO: indexing_quickfix could be implemented using protected lvalues.
+/* Put an unprotected lvalue to <sp> into <dest>.
+ * <dest> is considered empty at the time of call.
+ * If <src> is already a (protected) lvalue, ignore that.
  */
-
 {
-    svalue_t *i;     /* the index value */
-    svalue_t *vec;   /* the indexed vector or mapping */
+    dest->type = T_LVALUE;
+    dest->x.lvalue_type = LVALUE_UNPROTECTED;
+    dest->u.lvalue = src;
+} /* assign_var_lvalue_no_free() */
 
-    /* Get the arguments */
-    i = sp;
-    vec = sp - 1;
+/*-------------------------------------------------------------------------*/
+static INLINE void
+assign_lvalue_no_free (svalue_t *dest, svalue_t *src)
 
-    /* Index a vector.
-     */
-    if (vec->type == T_POINTER)
+/* Put an unprotected lvalue to <sp> into <dest>.
+ * <dest> is considered empty at the time of call.
+ * If <src> is already a (protected) lvalue, use that.
+ */
+{
+    if (src->type == T_LVALUE)
     {
-        svalue_t *item;
+        assign_svalue_no_free(dest, src);
+    }
+    else
+    {
+        assign_var_lvalue_no_free(dest, src);
+    }
+} /* assign_lvalue_no_free() */
 
-        item = get_vector_item(vec->u.vec, i, sp, pc);
+/*-------------------------------------------------------------------------*/
+static INLINE void
+assign_char_lvalue_no_free (svalue_t *dest, string_t* src, char *cp)
 
-        if (vec->u.vec->ref == 1)
-        {
-            /* Rescue the indexed item as vec will go away */
-            assign_svalue (&indexing_quickfix, item);
-            item = &indexing_quickfix;
-        }
+/* Put an unprotected char lvalue to <cp> into <dest>.
+ * <dest> is considered empty at the time of call.
+ */
+{
+    dest->type = T_LVALUE;
+    dest->x.lvalue_type = LVALUE_UNPROTECTED_CHAR;
 
-        /* Remove the arguments from the stack */
-        sp = vec;
-        free_array(vec->u.vec);
+    current_unprotected_char.str = src;
+    current_unprotected_char.charp = cp;
+} /* assign_char_lvalue_no_free() */
 
-        /* Return the result */
-        vec->type = T_LVALUE;
-        vec->u.lvalue = item;
+/*-------------------------------------------------------------------------*/
+INLINE void
+assign_protected_lvalue_no_free (svalue_t *dest, svalue_t *src)
+
+/* Put a protected lvalue to <src> into <dest>.
+ * <dest> is considered empty at the time of call.
+ * <src> is not allowed to be an unprotected lvalue.
+ */
+{
+    if (src->type == T_LVALUE)
+    {
+        assign_svalue_no_free(dest, src);
+    }
+    else
+    {
+        struct protected_lvalue *lval;
+
+        memsafe(lval = xalloc(sizeof(*lval)), sizeof(*lval)
+               , "protected lvalue");
+
+        lval->ref = 2;
+        lval->val = *src;
+
+        dest->type = src->type = T_LVALUE;
+        dest->x.lvalue_type = src->x.lvalue_type = LVALUE_PROTECTED;
+        dest->u.protected_lvalue = src->u.protected_lvalue = lval;
+    }
+} /* assign_protected_lvalue_no_free() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+assign_protected_char_lvalue_no_free (svalue_t *dest, string_t *src, char *charp)
+
+/* Put a protected char lvalue to <cp> into <dest>.
+ * <dest> is considered empty at the time of call.
+ */
+{
+    struct protected_char_lvalue *lval;
+
+    memsafe(lval = xalloc(sizeof(*lval)), sizeof(*lval)
+           , "protected char lvalue");
+
+    lval->ref = 1;
+    lval->str = ref_mstring(src);
+    lval->charp = charp;
+
+    dest->type = T_LVALUE;
+    dest->x.lvalue_type = LVALUE_PROTECTED_CHAR;
+    dest->u.protected_char_lvalue = lval;
+} /* assign_char_lvalue_no_free() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+assign_protected_range_lvalue_no_free (svalue_t *dest, struct protected_lvalue *var, svalue_t *vec, mp_int index1, mp_int index2)
+
+/* Put a protected range lvalue to <src>[index1..index2-1] into <dest>.
+ * <dest> is considered empty at the time of call.
+ */
+{
+    struct protected_range_lvalue *lval;
+
+    memsafe(lval = xalloc(sizeof(*lval)), sizeof(*lval)
+           , "protected range lvalue");
+
+    lval->ref = 1;
+    lval->index1 = index1;
+    lval->index2 = index2;
+    /* Save the vector first. */
+    assign_svalue_no_free(&(lval->vec), vec);
+
+    lval->var = var;
+    if (var)
+        var->ref++;
+
+    dest->type = T_LVALUE;
+    dest->x.lvalue_type = LVALUE_PROTECTED_RANGE;
+    dest->u.protected_range_lvalue = lval;
+} /* assign_char_lvalue_no_free() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+push_protected_lvalue (svalue_t *sp)
+
+/* Convert the value sp[0] into a protected lvalue.
+ * It must be an lvalue (protected or unprotected).
+ * If its already protected, then this function is a no-op.
+ */
+{
+    if (sp->type != T_LVALUE)
+    {
+        fatal("(push_protected_lvalue) Expected lvalue, "
+              "received svalue type (%"PRIdPHINT":%"PRIdPHINT")\n"
+            , sp->type, sp->x.generic);
+        /* NOTREACHED */
         return sp;
     }
 
-    /* Index a struct.
+    /* If there is an unprotected lvalue on <sp>,
+     * then we can just overwrite it, because
+     * it doesn't hold any counted references.
      */
-    if (vec->type == T_STRUCT)
+    switch (sp->x.lvalue_type)
     {
-        struct_t * st = vec->u.strct;
-        svalue_t * item;
-
-        item = get_struct_item(st, i, sp, pc, false);
-
-        if (st->ref == 1)
-        {
-            /* Rescue the indexed item as st will go away */
-            assign_svalue (&indexing_quickfix, item);
-            item = &indexing_quickfix;
-        }
-
-        /* Remove the arguments from the stack */
-        free_svalue(sp); sp--;
-        free_struct(st);
-
-        /* Return the result */
-        sp->type = T_LVALUE;
-        sp->u.lvalue = item;
-        return sp;
-    }
-
-    /* Index a mapping
-     */
-    if (vec->type == T_MAPPING)
-    {
-        mapping_t *m;
-        svalue_t *item;
-
-        m = vec->u.map;
-
-        if (!m->num_values)
-        {
-            ERROR("Indexing a mapping of width 0.\n");
-            return NULL;
-        }
-
-        /* Compute the indexed element */
-
-        item = get_map_lvalue(m, i);
-        if (!item)
-        {
-            outofmemory("indexed lvalue");
+        default:
+            fatal("(push_protected_lvalue) Illegal lvalue %p type %d\n", sp, sp->x.lvalue_type);
             /* NOTREACHED */
-            return NULL;
-        }
+            break;
 
-        if (m->ref == 1)
-        {
-            /* Rescue the indexed item as vec will go away */
-            assign_svalue (&indexing_quickfix, item);
-            item = &indexing_quickfix;
-        }
+        case LVALUE_UNPROTECTED:
+            assign_protected_lvalue_no_free(sp, sp->u.lvalue);
+            break;
 
-        /* Remove the arguments from the stack */
-        free_svalue(sp--);
-        free_mapping(m);
+        case LVALUE_UNPROTECTED_CHAR:
+            assign_protected_char_lvalue_no_free(sp,
+                current_unprotected_char.str, current_unprotected_char.charp);
+            break;
 
-        /* Return the result */
-        vec->type = T_LVALUE;
-        vec->u.lvalue = item;
-        return sp;
+        case LVALUE_UNPROTECTED_RANGE:
+            assign_protected_range_lvalue_no_free(sp,
+                current_unprotected_range.var, current_unprotected_range.vec,
+                current_unprotected_range.index1, current_unprotected_range.index2);
+            break;
+
+        case LVALUE_PROTECTED:
+        case LVALUE_PROTECTED_CHAR:
+        case LVALUE_PROTECTED_RANGE:
+            NOOP;
+            break;
     }
 
-    /* Illegal type to index */
-    inter_sp = sp;
-    inter_pc = pc;
-    errorf("(lvalue1)Indexing on illegal type '%s'.\n", typename(vec->type));
     return sp;
-} /* push_indexed_lvalue() */
+} /* push_protected_lvalue() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-push_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
+get_unprotected_lvalue (svalue_t *lval)
 
-/* Operator F_PUSH_RINDEXED_LVALUE(vector v=sp[-1], int i=sp[0])
+/* Generate an unprotected lvalue from *lval.
+ * It must be an lvalue (protected or unprotected).
+ * If its already unprotected, then this function is a no-op.
+ * The svalue *lval is not modified.
  *
- * Compute the lvalue &(v[<i]) and push it into the stack. If v has just
- * one ref left, the indexed item is stored in indexing_quickfix and the
- * lvalue refers to that variable.
+ * The resulting unprotected lvalue shouldn't be used
+ * to make a protected one from it (again), because it
+ * would lead to lvalue chains (which we don't expect anymore).
  */
-
 {
-    svalue_t *i;     /* the index value */
-    svalue_t *vec;   /* the vector */
-
-    /* Get the arguments */
-    i = sp;
-    vec = sp - 1;
-
-    /* Index a vector.
+    /* If we must convert, then use that static variable.
+     * It's safe, because it carries no counted references
+     * and there is only one unprotected lvalue at a time.
      */
-    if (vec->type == T_POINTER)
+    static svalue_t unprotected_lvalue;
+
+    if (lval->type != T_LVALUE)
     {
-        svalue_t *item;
-
-        item = get_vector_r_item(vec->u.vec, i, sp, pc);
-
-        if (vec->u.vec->ref == 1)
-        {
-            /* Rescue the indexed item as vec will go away */
-            assign_svalue (&indexing_quickfix, item);
-            item = &indexing_quickfix;
-        }
-
-        /* Remove the arguments from the stack */
-        sp = vec;
-        free_array(vec->u.vec);
-
-        /* Return the result */
-        vec->type = T_LVALUE;
-        vec->u.lvalue = item;
-        return sp;
+        fatal("(get_unprotected_lvalue) Expected lvalue, "
+              "received svalue type (%"PRIdPHINT":%"PRIdPHINT")\n"
+            , lval->type, lval->x.generic);
+        /* NOTREACHED */
+        return lval;
     }
 
-    /* Indexing on illegal type */
-    inter_sp = sp;
-    inter_pc = pc;
-    errorf("(lvalue2)Indexing on illegal type '%s'.\n", typename(vec->type));
-    return NULL;
-} /* push_rindexed_lvalue() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-push_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
-
-/* Operator F_PUSH_AINDEXED_LVALUE(vector v=sp[-1], int i=sp[0])
- *
- * Compute the lvalue &(v[>i]) and push it into the stack. If v has just
- * one ref left, the indexed item is stored in indexing_quickfix and the
- * lvalue refers to that variable.
- */
-
-{
-    svalue_t *i;     /* the index value */
-    svalue_t *vec;   /* the vector */
-
-    /* Get the arguments */
-    i = sp;
-    vec = sp - 1;
-
-    /* Index a vector.
+    /* If there is an unprotected lvalue on <lval>,
+     * then we can just overwrite it, because
+     * it doesn't hold any counted references.
      */
-    if (vec->type == T_POINTER)
+    switch (lval->x.lvalue_type)
     {
-        svalue_t *item;
-
-        item = get_vector_a_item(vec->u.vec, i, sp, pc);
-
-        if (vec->u.vec->ref == 1)
-        {
-            /* Rescue the indexed item as vec will go away */
-            assign_svalue (&indexing_quickfix, item);
-            item = &indexing_quickfix;
-        }
-
-        /* Remove the arguments from the stack */
-        sp = vec;
-        free_array(vec->u.vec);
-
-        /* Return the result */
-        vec->type = T_LVALUE;
-        vec->u.lvalue = item;
-        return sp;
-    }
-
-    /* Indexing on illegal type */
-    inter_sp = sp;
-    inter_pc = pc;
-    errorf("(lvalue3)Indexing on illegal type '%s'.\n", typename(vec->type));
-    return NULL;
-} /* push_aindexed_lvalue() */
-
-/*-------------------------------------------------------------------------*/
-/* void BUILD_MAP_PROTECTOR(svalue_t *dest, mapping_t *m)
- *
- * Init svalue <dest> to protectively hold mapping <m> in which one entry
- * is about to be used as target for a lvalue.
- *
- * If mapping <m> is dirty, protect its hash_mapping part by incrementing
- * its refcount (and if this is the first call, also initialize the .deleted
- * entry), and by making the svalue a T_PROTECTOR_MAPPING.
- *
- * If <m> is not dirty, not protection is necessary.
- */
-#define BUILD_MAP_PROTECTOR(dest, m)     \
-{                                        \
-    mapping_hash_t *hm;                  \
-                                         \
-    if ( NULL != (hm = (m)->hash) ) {    \
-        if (!hm->ref++)                  \
-            hm->deleted = NULL;          \
-        dest.type = T_PROTECTOR_MAPPING; \
-    } else {                             \
-        dest.type = T_MAPPING;           \
-    }                                    \
-    dest.u.map = m;                      \
-}
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
-
-/* Op. F_PUSH_PROTECTED_INDEXED_LVALUE(vector  v=sp[-1], int   i=sp[0])
- * Op. F_PUSH_PROTECTED_INDEXED_LVALUE(mapping v=sp[-1], mixed i=sp[0])
- * Op. F_PUSH_PROTECTED_INDEXED_S_LVALUE(struct  v=sp[-1], mixed i=sp[0])
- *
- * Compute the lvalue &(v[i]), store it in a struct protected_lvalue, and
- * push the protector as PROTECTED_LVALUE into the stack.
- */
-
-{
-    svalue_t           * i;       /* the index */
-    svalue_t           * vec;     /* the vector */
-
-    /* Get the arguments */
-    i = sp;
-    vec = sp - 1;
-
-    /* Index a vector.
-     */
-    if (vec->type == T_POINTER)
-    {
-        svalue_t *item;
-        struct protected_lvalue * lvalue;
-
-        item = get_vector_item(vec->u.vec, i, sp, pc);
-
-        /* Compute the indexed item and set up the protector */
-
-        lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
-        lvalue->v.type = T_PROTECTED_LVALUE;
-        lvalue->v.u.lvalue = item;
-        put_array(&(lvalue->protector), vec->u.vec);
-          /* The one ref to vec is transferred from *vec */
-
-        /* Remove the arguments and return the result */
-        sp = vec;
-        vec->type = T_LVALUE;
-        vec->u.lvalue = &lvalue->v;
-        return sp;
-    }
-
-    /* Index a struct.
-     */
-    if (vec->type == T_STRUCT)
-    {
-        struct_t * st = vec->u.strct;
-        svalue_t * item;
-        struct protected_lvalue * lvalue;
-
-        item = get_struct_item(st, i, sp, pc, false);
-
-        /* Item and set up the protector */
-
-        lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
-        lvalue->v.type = T_PROTECTED_LVALUE;
-        lvalue->v.u.lvalue = item;
-        put_struct(&(lvalue->protector), st);
-          /* The one ref to st is transferred from *vec */
-
-        /* Remove the arguments and return the result */
-        free_svalue(i);
-        sp = vec;
-        sp->type = T_LVALUE;
-        sp->u.lvalue = &lvalue->v;
-        return sp;
-    }
-
-    /* Index a mapping
-     */
-    if (vec->type == T_MAPPING)
-    {
-        mapping_t *m;
-        svalue_t *item;
-        struct protected_lvalue * lvalue;
-
-        m = vec->u.map;
-
-        if (!m->num_values)
-        {
-            ERROR("Indexing a mapping of width 0.\n");
-            return NULL;
-        }
-
-        /* Compute the indexed item and set up the protector */
-
-        item = get_map_lvalue(m, i);
-        if (!item)
-        {
-            outofmemory("indexed lvalue");
+        default:
+            fatal("(push_protected_lvalue) Illegal lvalue %p type %d\n", lval, lval->x.lvalue_type);
             /* NOTREACHED */
             return NULL;
-        }
 
-        lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
-        lvalue->v.type = T_PROTECTED_LVALUE;
-        lvalue->v.u.lvalue = item;
-        BUILD_MAP_PROTECTOR(lvalue->protector, m)
-          /* The one ref is transferred from the stack */
+        case LVALUE_UNPROTECTED:
+        case LVALUE_UNPROTECTED_CHAR:
+        case LVALUE_UNPROTECTED_RANGE:
+            return lval;
 
-        /* Remove the arguments and return the result */
-        pop_stack();
-        vec->type = T_LVALUE;
-        vec->u.lvalue = &lvalue->v;
-        return sp;
+        case LVALUE_PROTECTED:
+            assign_lvalue_no_free(&unprotected_lvalue, &(lval->u.protected_lvalue->val));
+            return &unprotected_lvalue;
+
+        case LVALUE_PROTECTED_CHAR:
+            assign_char_lvalue_no_free(&unprotected_lvalue, lval->u.protected_char_lvalue->str, lval->u.protected_char_lvalue->charp);
+            return &unprotected_lvalue;
+
+        case LVALUE_PROTECTED_RANGE:
+            unprotected_lvalue.type = T_LVALUE;
+            unprotected_lvalue.x.lvalue_type = LVALUE_UNPROTECTED_RANGE;
+            current_unprotected_range.var = lval->u.protected_range_lvalue->var;
+            current_unprotected_range.vec = &(lval->u.protected_range_lvalue->vec);
+            current_unprotected_range.index1 = lval->u.protected_range_lvalue->index1;
+            current_unprotected_range.index2 = lval->u.protected_range_lvalue->index2;
+            return &unprotected_lvalue;
     }
-
-    /* Indexing on illegal type. */
-
-    inter_sp = sp;
-    inter_pc = pc;
-    errorf("(lvalue4)Indexing on illegal type '%s'.\n", typename(vec->type));
-    return NULL;
-} /* push_protected_indexed_lvalue() */
+} /* get_unprotected_lvalue() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-push_protected_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
+push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype)
 
-/* Op. F_PUSH_PROTECTED_RINDEXED_LVALUE(vector v=sp[-1], int i=sp[0])
+/* Operator F_INDEX_LVALUE   (string|vector v=sp[-1], int   i=sp[0])
+ *          F_RINDEX_LVALUE  (string|vector v=sp[-1], int   i=sp[0])
+ *          F_AINDEX_LVALUE  (string|vector v=sp[-1], int   i=sp[0])
+ *          F_INDEX_LVALUE   (mapping       v=sp[-1], mixed i=sp[0])
+ *          F_S_INDEX_LVALUE (struct        v=sp[-1], mixed i=sp[0])
  *
- * Compute the lvalue &(v[<i]), store it in a struct protected_lvalue, and
- * push the protector as PROTECTED_LVALUE into the stack.
- */
-
-{
-    svalue_t           * i;       /* the index */
-    svalue_t           * vec;     /* the vector */
-    struct protected_lvalue * lvalue;  /* the protector */
-
-    /* Get the arguments */
-
-    i = sp;
-    vec = sp - 1;
-
-    /* Index a vector
-     */
-    if (vec->type == T_POINTER)
-    {
-        svalue_t *item;
-
-        item = get_vector_r_item(vec->u.vec, i, sp, pc);
-
-        /* Set up the protector */
-
-        lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
-        lvalue->v.type = T_PROTECTED_LVALUE;
-        lvalue->v.u.lvalue = item;
-        put_array(&(lvalue->protector), vec->u.vec);
-          /* The one ref is transferred from the stack */
-
-        /* Remove arguments and return result */
-        sp = vec;
-        vec->type = T_LVALUE;
-        vec->u.lvalue = &lvalue->v;
-        return sp;
-    }
-
-    /* Indexing in illegal type */
-
-    inter_sp = sp;
-    inter_pc = pc;
-    errorf("(lvalue5)Indexing on illegal type '%s'.\n", typename(vec->type));
-    return NULL;
-} /* push_protected_rindexed_lvalue() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-push_protected_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
-
-/* Op. F_PUSH_PROTECTED_AINDEXED_LVALUE(vector v=sp[-1], int i=sp[0])
- *
- * Compute the lvalue &(v[>i]), store it in a struct protected_lvalue, and
- * push the protector as PROTECTED_LVALUE into the stack.
- */
-
-{
-    svalue_t           * i;       /* the index */
-    svalue_t           * vec;     /* the vector */
-    struct protected_lvalue * lvalue;  /* the protector */
-
-    /* Get the arguments */
-
-    i = sp;
-    vec = sp - 1;
-
-    /* Index a vector
-     */
-    if (vec->type == T_POINTER)
-    {
-        svalue_t *item;
-
-        item = get_vector_a_item(vec->u.vec, i, sp, pc);
-
-        /* Setup the protector */
-
-        lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
-        lvalue->v.type = T_PROTECTED_LVALUE;
-        lvalue->v.u.lvalue = item;
-        put_array(&(lvalue->protector), vec->u.vec);
-          /* The one ref is transferred from the stack */
-
-        /* Remove arguments and return result */
-        sp = vec;
-        vec->type = T_LVALUE;
-        vec->u.lvalue = &lvalue->v;
-        return sp;
-    }
-
-    /* Indexing in illegal type */
-
-    inter_sp = sp;
-    inter_pc = pc;
-    errorf("(lvalue6)Indexing on illegal type '%s'.\n", typename(vec->type));
-    return NULL;
-} /* push_protected_aindexed_lvalue() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-push_protected_indexed_map_lvalue (svalue_t *sp, bytecode_p pc)
-
-/* Op. F_PUSH_PROTECTED_INDEXED_MAP_LVALUE(mapping m=sp[-2], mixed i=sp[-1]
- *                                                         , int   j=sp[0])
- *
- * Compute the lvalue &(m[i:j]), store it in a struct protected_lvalue, and
- * push the protector as PROTECTED_LVALUE into the stack.
- */
-
-{
-    svalue_t           * i;       /* the index */
-    svalue_t           * vec;     /* the vector */
-    svalue_t           * item;    /* the indexed element */
-    struct protected_lvalue * lvalue;  /* the protector */
-
-    /* Get the arguments */
-    i = sp - 1;
-    vec = sp - 2;
-
-    /* Index a mapping.
-     */
-    if (vec->type == T_MAPPING)
-    {
-        mapping_t *m;
-
-        m = vec->u.map;
-        if (sp->type != T_NUMBER)
-        {
-            ERRORF(("Illegal subindex for []: got %s, expected number.\n"
-                   , typename(sp->type)
-                   ));
-            return NULL;
-        }
-        if ((p_uint)sp->u.number >= (p_uint)m->num_values
-            /* using uints automagically checks for negative indices */
-           )
-        {
-            ERRORF(("Too big subindex for []: value %"PRIdPINT", width %"
-                    PRIdPINT".\n", sp->u.number, m->num_values));
-            return NULL;
-        }
-
-        /* Compute the indexed element and setup the protector */
-
-        item = get_map_lvalue(m, i);
-        if (!item)
-        {
-            outofmemory("indexed lvalue");
-            /* NOTREACHED */
-            return NULL;
-        }
-        item += sp->u.number;
-
-        lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
-        lvalue->v.type = T_PROTECTED_LVALUE;
-        lvalue->v.u.lvalue = item;
-        BUILD_MAP_PROTECTOR(lvalue->protector, m)
-          /* The one ref is transferred from the stack */
-
-        /* Remove the arguments and return the result */
-        sp--;
-        pop_stack();
-        vec->type = T_LVALUE;
-        vec->u.lvalue = &lvalue->v;
-        return sp;
-    }
-
-    /* Indexing on illegal type */
-
-    inter_sp = sp;
-    inter_pc = pc;
-    errorf("(lvalue7)Indexing on illegal type '%s'.\n", typename(vec->type));
-    return NULL;
-} /* push_protected_indexed_map_lvalue() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-index_lvalue (svalue_t *sp, bytecode_p pc)
-
-/* Operator F_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
- *          F_INDEX_LVALUE (mapping       &v=sp[0], mixed i=sp[-1])
- *          F_INDEX_S_LVALUE (struct      &v=sp[0], mixed i=sp[-1])
- *
- * Compute the index &(v[i]) of lvalue <v> and push it into the stack. The
- * computed index is a lvalue itself.
+ * Compute the index &(v[i]) of lrvalue <v> and push it onto the stack
+ * as an lvalue.
  * If <v> is a string-lvalue, it is made a malloced string if necessary,
  * and the pushed result will be a lvalue pointing to a CHAR_LVALUE stored
- * in <special_lvalue>.
+ * in <current_unprotected_char>.
  */
 
 {
     svalue_t *vec;   /* the vector/mapping */
-    svalue_t *i;     /* the index */
-    short     type;  /* type of <vec> */
+    svalue_t *idx;   /* the index */
+    svalue_t *item;  /* the resulting item (for non-string values) */
+    bool      last_reference = false; /* Whether the value has
+                                       * only one reference left.
+                                       */
 
     /* get the arguments */
-    vec = sp;
-    i = sp -1;
+    vec = get_rvalue_no_collapse(sp - 1, &last_reference);
+    idx = sp;
 
-    /* Dereference the initial (and possibly more) lvalue-indirection
-     */
-    do {
-        vec = vec->u.lvalue;
-        type = vec->type;
-    } while (type == T_LVALUE || type == T_PROTECTED_LVALUE);
-
-    /* Index a vector.
-     */
-    if (type == T_POINTER)
+    if (vec == NULL) /* It's a protected range lvalue */
     {
-        vector_t *v = vec->u.vec;
-        svalue_t *item;
+        struct protected_range_lvalue *r;
 
-        item = get_vector_item(v, i, sp, pc);
+        vec = sp - 1;
+        assert(vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_RANGE);
+        r = vec->u.protected_range_lvalue;
 
-        /* Remove the arguments and push the result */
-
-        sp = i;
-
-        sp->type = T_LVALUE;
-        sp->u.lvalue = item;
-        return sp;
-    }
-
-    /* Index a string.
-     */
-    if (type == T_STRING)
-    {
-        char * cp;
-
-        cp = get_string_item(vec, i, /* make_singular: */ MY_TRUE
-                            , /* allow_one_past: */ MY_FALSE
-                            , sp, pc);
-
-        /* Remove the arguments and create and push the result. */
-
-        sp = i;
-
-        sp->type = T_LVALUE;
-        sp->u.lvalue = &special_lvalue.v;
-        special_lvalue.v.type = T_CHAR_LVALUE;
-        special_lvalue.v.u.charp = cp;
-        return sp;
-    }
-
-    /* Index a struct.
-     */
-    if (type == T_STRUCT)
-    {
-        struct_t * st = vec->u.strct;
-        svalue_t * item;
-
-        item = get_struct_item(st, i, sp, pc, false);
-        
-        /* Remove the arguments and push the result */
-
-        sp--; /* *sp is a T_LVALUE and can be dropped silently  */
-        free_svalue(sp); /* This was 'i' */
-
-        sp->type = T_LVALUE;
-        sp->u.lvalue = item;
-        return sp;
-    }
-
-    /* Index a mapping.
-     */
-    if (type == T_MAPPING)
-    {
-        svalue_t *item;
-        mapping_t *m;
-
-        m = vec->u.map;
-        if (!m->num_values)
+        switch (r->vec.type)
         {
-            ERROR("Indexing a mapping of width 0.\n");
-            return NULL;
-        }
-
-        /* Compute the element */
-        item = get_map_lvalue(m, i);
-        if (!item)
-        {
-            outofmemory("indexed lvalue");
-            /* NOTREACHED */
-            return NULL;
-        }
-
-        /* Remove the arguments and push the result. */
-
-        sp = i;
-        free_svalue(i);
-        sp->type = T_LVALUE;
-        sp->u.lvalue = item;
-        return sp;
-    }
-
-    /* Illegal type to index. */
-
-    inter_sp = sp;
-    inter_pc = pc;
-    errorf("(lvalue8)Indexing on illegal type '%s'.\n", typename(type));
-    return NULL;
-} /* index_lvalue() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-rindex_lvalue (svalue_t *sp, bytecode_p pc)
-
-/* Operator F_RINDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
- *
- * Compute the index &(v[<i]) of lvalue <v> and push it into the stack. The
- * computed index is a lvalue itself.
- * If <v> is a string-lvalue, it is made a malloced string if necessary,
- * and the pushed result will be a lvalue pointing to a CHAR_LVALUE stored
- * in <special_lvalue>.
- */
-
-{
-    svalue_t *vec;   /* the vector/string */
-    svalue_t *i;     /* the index */
-    short     type;  /* type of <vec> */
-
-    /* get the arguments */
-    vec = sp;
-    i = sp -1;
-
-    /* Dereference the initial (and possibly more) lvalue-indirection
-     */
-    do {
-        vec = vec->u.lvalue;
-        type = vec->type;
-    } while (type == T_LVALUE || type == T_PROTECTED_LVALUE);
-
-    /* Index a vector
-     */
-    if (type == T_POINTER)
-    {
-        vector_t *v = vec->u.vec;
-        svalue_t *item;
-
-        item = get_vector_r_item(v, i, sp, pc);
-
-        /* Remove the arguments and return the result */
-
-        sp = i;
-        sp->type = T_LVALUE;
-        sp->u.lvalue = item;
-        return sp;
-    }
-
-    /* Index a string
-     */
-    if (type == T_STRING)
-    {
-        char * cp;
-
-        cp = get_string_r_item(vec, i, /* make_singular: */ MY_TRUE
-                              , /* allow_one_past: */ MY_FALSE
-                              , sp, pc);
-
-        /* Remove the argument and return the result */
-
-        sp = i;
-        sp->type = T_LVALUE;
-        sp->u.lvalue = &special_lvalue.v;
-        special_lvalue.v.type = T_CHAR_LVALUE;
-        special_lvalue.v.u.charp = cp;
-        return sp;
-    }
-
-    /* Indexing on illegal type */
-
-    inter_sp = sp;
-    inter_pc = pc;
-    errorf("(lvalue9)Indexing on illegal type '%s'.\n", typename(type));
-    return NULL;
-} /* rindex_lvalue() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-aindex_lvalue (svalue_t *sp, bytecode_p pc)
-
-/* Operator F_AINDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
- *
- * Compute the index &(v[>i]) of lvalue <v> and push it into the stack. The
- * computed index is a lvalue itself.
- * If <v> is a string-lvalue, it is made a malloced string if necessary,
- * and the pushed result will be a lvalue pointing to a CHAR_LVALUE stored
- * in <special_lvalue>.
- */
-
-{
-    svalue_t *vec;   /* the vector/string */
-    svalue_t *i;     /* the index */
-    short     type;  /* type of <vec> */
-
-    /* get the arguments */
-    vec = sp;
-    i = sp -1;
-
-    /* Dereference the initial (and possibly more) lvalue-indirection
-     */
-    do {
-        vec = vec->u.lvalue;
-        type = vec->type;
-    } while (type == T_LVALUE || type == T_PROTECTED_LVALUE);
-
-    /* Index a vector
-     */
-    if (type == T_POINTER)
-    {
-        vector_t *v = vec->u.vec;
-        svalue_t *item;
-
-        item = get_vector_a_item(v, i, sp, pc);
-
-        /* Remove the arguments and return the result */
-
-        sp = i;
-        sp->type = T_LVALUE;
-        sp->u.lvalue = item;
-        return sp;
-    }
-
-    /* Index a string
-     */
-    if (type == T_STRING)
-    {
-        char * cp;
-
-        cp = get_string_a_item(vec, i, /* make_singular: */ MY_TRUE
-                              , /* allow_one_past: */ MY_FALSE
-                              , sp, pc);
-
-        /* Remove the argument and return the result */
-
-        sp = i;
-        sp->type = T_LVALUE;
-        sp->u.lvalue = &special_lvalue.v;
-        special_lvalue.v.type = T_CHAR_LVALUE;
-        special_lvalue.v.u.charp = cp;
-        return sp;
-    }
-
-    /* Indexing on illegal type */
-
-    inter_sp = sp;
-    inter_pc = pc;
-    errorf("(lvalue10)Indexing on illegal type '%s'.\n", typename(type));
-    return NULL;
-} /* aindex_lvalue() */
-
-/*-------------------------------------------------------------------------*/
-static svalue_t *
-protected_index_lvalue (svalue_t *sp, bytecode_p pc)
-
-/* Operator F_PROTECTED_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
- *          F_PROTECTED_INDEX_LVALUE (mapping       &v=sp[0], mixed i=sp[-1])
- *          F_PROTECTED_INDEX_S_LVALUE (struct      &v=sp[0], mixed i=sp[-1])
- *
- * Compute the index &(*v[i]) of lvalue <v>, wrap it into a protector, and push
- * the reference to the protector as PROTECTED_LVALUE onto the stack.
- *
- * If <v> is a protected non-string-lvalue, the protected_lvalue referenced
- * by <v>.u.lvalue will be deallocated, and the protector itself will be
- * stored in <last_indexing_protector> for the time being.
- *
- * If <v> is a string-lvalue, it is made a malloced string if necessary.
- */
-
-{
-    svalue_t *vec;   /* the indexed value */
-    svalue_t *i;     /* the index */
-    short     type;  /* type of <vec> */
-
-    /* Get arguments */
-    vec = sp->u.lvalue;
-    i = sp -1;
-
-    /* The loop unravels the (possible) lvalue chain starting at vec.
-     * When a non-lvalue is encountered, the indexing takes place
-     * the function returns.
-     */
-    for (;;)
-    {
-        type = vec->type;
-
-        /* Index a vector.
-         */
-        if (type == T_POINTER)
-        {
-            vector_t *v = vec->u.vec;
-            struct protected_lvalue *lvalue;
-            svalue_t *item;
-
-            item = get_vector_item(v, i, sp, pc);
-
-            /* Drop the arguments */
-            sp = i;
-
-            /* Compute and return the result */
-
-            lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
-            lvalue->v.type = T_PROTECTED_LVALUE;
-            lvalue->v.u.lvalue = item;
-            put_ref_array(&(lvalue->protector), v);
-
-            sp->type = T_LVALUE;
-            sp->u.lvalue = &lvalue->v;
-
-            return sp;
-        }
-
-        /* Index a struct.
-         */
-        if (type == T_STRUCT)
-        {
-            struct_t * st = vec->u.strct;
-            svalue_t * item;
-            struct protected_lvalue *lvalue;
-
-            item = get_struct_item(st, i, sp, pc, false);
-
-            /* Drop the arguments */
-            free_svalue(i);
-            sp = i;
-
-            /* Compute and return the result */
-
-            lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
-            lvalue->v.type = T_PROTECTED_LVALUE;
-            lvalue->v.u.lvalue = item;
-            put_ref_struct(&(lvalue->protector), st);
-
-            sp->type = T_LVALUE;
-            sp->u.lvalue = &lvalue->v;
-
-            return sp;
-        }
-
-        /* Index a string.
-         */
-        if (type == T_STRING)
-        {
-            struct protected_char_lvalue *val;
-            char * cp;
-
-            cp = get_string_item(vec, i, /* make_singular: */ MY_TRUE
-                                , /* allow_one_past: */ MY_FALSE
-                                , sp, pc);
-
-            /* Add another reference to the string to keep it alive while
-             * we use it.
-             */
-            (void)ref_mstring(vec->u.str);
-
-            /* Drop the arguments */
-            sp = i;
-
-            /* Compute and return the result */
-
-            val = (struct protected_char_lvalue *)xalloc(sizeof *val);
-            val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.charp = cp;
-            val->lvalue = vec;
-            val->start = get_txt(vec->u.str);
-            val->protector.type = T_INVALID;
-
-            sp->type = T_LVALUE;
-            sp->u.protected_char_lvalue = val;
-
-            return sp;
-        }
-
-        /* Index a mapping.
-         */
-        if (type == T_MAPPING)
-        {
-            svalue_t *item;
-            struct protected_lvalue *lvalue;
-            mapping_t *m;
-
-            m = vec->u.map;
-            if (!m->num_values)
+            case T_POINTER:
             {
-                ERROR("Indexing a mapping of width 0.\n");
+                item = get_vector_range_item(r->vec.u.vec, r->index1, r->index2, idx, sp, pc, itype);
+
+                if (last_reference)
+                    last_reference = (r->vec.u.vec->ref == 1);
+                break;
+            }
+
+            case T_STRING:
+            {
+                svalue_t temp;
+                string_t * orig = r->vec.u.str;
+                char * cp = get_string_range_item(&(r->vec), r->index1, r->index2, idx, MY_TRUE, MY_FALSE, sp, pc, itype);
+
+                /* Update the original variable. */
+                if (r->vec.u.str != orig
+                 && r->var != NULL
+                 && r->var->val.type == T_STRING
+                 && r->var->val.u.str == orig)
+                {
+                    free_mstring(orig);
+                    r->var->val.u.str = ref_mstring(r->vec.u.str);
+                }
+
+                if (last_reference && vec->u.str->info.ref == 1)
+                {
+                    /* The string will go away, store the number. */
+                    free_svalue(&indexing_quickfix);
+                    put_number(&indexing_quickfix, *(unsigned char*)cp);
+
+                    free_svalue(sp--);
+                    free_svalue(sp);
+
+                    assign_lvalue_no_free(sp, &indexing_quickfix);
+                    return sp;
+                }
+
+                assign_char_lvalue_no_free(&temp, r->vec.u.str, cp);
+                free_svalue(sp--);
+                free_svalue(sp);
+                *sp = temp;
+
+                return sp;
+            }
+
+            default:
+                fatal("(index_lvalue)Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+        }
+    }
+    else
+    {
+        switch (vec->type)
+        {
+            /* Index an array.
+             */
+            case T_POINTER:
+                item = get_vector_item(vec->u.vec, idx, sp, pc, itype);
+
+                if (last_reference)
+                    last_reference = (vec->u.vec->ref == 1);
+                break;
+
+            /* Index a string.
+             */
+            case T_STRING:
+            {
+                char * cp;
+
+                cp = get_string_item(vec, idx, /* make_singular: */ MY_TRUE
+                                    , /* allow_one_past: */ MY_FALSE
+                                    , sp, pc, itype);
+
+                if (last_reference && vec->u.str->info.ref == 1)
+                {
+                    /* The string will go away, store the number. */
+                    free_svalue(&indexing_quickfix);
+                    put_number(&indexing_quickfix, *(unsigned char*)cp);
+
+                    free_svalue(sp--);
+                    free_svalue(sp);
+
+                    assign_lvalue_no_free(sp, &indexing_quickfix);
+                    return sp;
+                }
+
+                /* Remove the arguments and create and push the result. */
+                free_svalue(sp--);
+                free_svalue(sp);
+
+                assign_char_lvalue_no_free(sp, vec->u.str, cp);
+                return sp;
+            }
+
+            /* Index a struct.
+             */
+            case T_STRUCT:
+                if (itype != REGULAR_INDEX)
+                {
+                    inter_sp = sp;
+                    inter_pc = pc;
+                    errorf("(index_lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
+                    return NULL;
+                }
+
+                item = get_struct_item(vec->u.strct, idx, sp, pc, false);
+
+                if (last_reference)
+                    last_reference = (vec->u.strct->ref == 1);
+                break;
+
+            /* Index a mapping.
+             */
+            case T_MAPPING:
+            {
+                mapping_t *m;
+
+                if (itype != REGULAR_INDEX)
+                {
+                    inter_sp = sp;
+                    inter_pc = pc;
+                    errorf("(index_lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
+                    return NULL;
+                }
+
+                m = vec->u.map;
+                if (!m->num_values)
+                {
+                    ERROR("Indexing a mapping of width 0.\n");
+                    return NULL;
+                }
+
+                /* Compute the element */
+                item = get_map_lvalue(m, idx);
+                if (!item)
+                {
+                    outofmemory("indexed lvalue");
+                    /* NOTREACHED */
+                    return NULL;
+                }
+
+                if (last_reference)
+                    last_reference = (m->ref == 1);
+
+                break;
+            }
+
+            default:
+                /* Illegal type to index. */
+                inter_sp = sp;
+                inter_pc = pc;
+                errorf("(index_lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
                 return NULL;
-            }
-
-            /* Compute the indexed element */
-            item = get_map_lvalue(m, i);
-            if (!item)
-            {
-                outofmemory("indexed lvalue");
-                /* NOTREACHED */
-                return NULL;
-            }
-
-            /* Build the protector */
-            ref_mapping(m);
-            lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
-            lvalue->v.type = T_PROTECTED_LVALUE;
-            lvalue->v.u.lvalue = item;
-            BUILD_MAP_PROTECTOR(lvalue->protector, m)
-
-            /* Drop the arguments and return the result */
-            sp = i;
-            free_svalue(i);
-
-            sp->type = T_LVALUE;
-            sp->u.lvalue = &lvalue->v;
-
-            return sp;
         }
+    }
 
-        /* lvalues are just dereferenced.
-         */
-        if (type == T_LVALUE)
-        {
-            vec = vec->u.lvalue;
-            continue;
-        }
-
-        /* Non-string protected lvalues are dereferenced, a protected
-         * string lvalue is indexed immediately.
-         */
-        if (type == T_PROTECTED_LVALUE)
-        {
-            struct protected_lvalue *lvalue;
-            struct protected_char_lvalue *val;
-            char * cp;
-
-            lvalue = (struct protected_lvalue *)vec;
-
-            if (lvalue->v.u.lvalue->type != T_STRING)
-            {
-                /* Deref a non-string protected lvalue.
-                 * If this is the lvalue passed to the operator, also free
-                 * the protector structure (since its stack space will be
-                 * used for the result), but keep the protector itself
-                 * in a global variable.
-                 */
-                if (vec == sp->u.lvalue)
-                {
-                    free_protector_svalue(&last_indexing_protector);
-                    last_indexing_protector = lvalue->protector;
-                    vec = lvalue->v.u.lvalue;
-                    xfree(lvalue);
-                    continue;
-                }
-
-                vec = lvalue->v.u.lvalue;
-                continue;
-            }
-
-            vec = lvalue->v.u.lvalue; /* it's a string... */
-
-            cp = get_string_item(vec, i, /* make_singular: */ MY_TRUE
-                                , /* allow_one_past: */ MY_FALSE
-                                , sp, pc);
-
-            /* Add another reference to the string to keep it alive while
-             * we use it.
-             */
-            (void)ref_mstring(vec->u.str);
-
-            /* Build the protector */
-            val = (struct protected_char_lvalue *)xalloc(sizeof *val);
-            val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.charp = cp;
-            val->lvalue = vec;
-            val->start = get_txt(vec->u.str);
-
-            /* Drop the arguments and return the result.
-             * If this was the lvalue passed to the operator in the
-             * first place, adopt the protecting value and free the old
-             * operator structure. If not, just don't assign a protecting
-             * value.
-             */
-            if (lvalue == sp->u.protected_lvalue)
-            {
-                val->protector = lvalue->protector;
-                xfree(lvalue);
-            }
-            else
-            {
-                val->protector.type = T_INVALID;
-            }
-
-            sp = i;
-            sp->type = T_LVALUE;
-            sp->u.protected_char_lvalue = val;
-
-            return sp;
-        }
-
-        /* Indexing on illegal type */
-        inter_sp = sp;
-        inter_pc = pc;
-        errorf("(lvalue11)Indexing on illegal type '%s'.\n", typename(type));
-        return NULL;
-    } /* for(ever) */
-
-    /* NOTREACHED */
-    return NULL;
-} /* protected_index_lvalue() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
-
-/* Operator F_PROTECTED_RINDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
- *
- * Compute the index &(*v[<i]) of lvalue <v>, wrap it into a protector, and
- * push the reference to the protector as PROTECTED_LVALUE onto the stack.
- *
- * If <v> is a protected non-string-lvalue, the protected_lvalue referenced
- * by <v>.u.lvalue will be deallocated, and the protector itself will be
- * stored in <last_indexing_protector> for the time being.
- *
- * If <v> is a string-lvalue, it is made a malloced string if necessary.
- */
-
-{
-    svalue_t *vec;   /* the indexed value */
-    svalue_t *i;     /* the index */
-    short     type;  /* type of <vec> */
-
-    /* Get arguments */
-    vec = sp->u.lvalue;
-    i = sp -1;
-
-    /* The loop unravels the (possible) lvalue chain starting at vec.
-     * When a non-lvalue is encountered, the indexing takes place
-     * the function returns.
-     */
-    for (;;)
+    /* We should now have our result in <item>. */
+    if (last_reference)
     {
-        type = vec->type;
+        /* Rescue the indexed item as st will go away */
+        free_svalue(&indexing_quickfix);
+        assign_svalue_no_free(&indexing_quickfix, item);
+        item = &indexing_quickfix;
+    }
 
-        /* Index a vector.
-         */
-        if (type == T_POINTER)
-        {
-            vector_t *v = vec->u.vec;
-            struct protected_lvalue *lvalue;
-            svalue_t *item;
+    /* Remove the arguments and push the result */
+    free_svalue(sp--);
+    free_svalue(sp);
 
-            item = get_vector_r_item(v, i, sp, pc);
-
-            /* Create the protector for the result */
-
-            lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
-            lvalue->v.type = T_PROTECTED_LVALUE;
-            lvalue->v.u.lvalue = item;
-            put_ref_array(&(lvalue->protector), v);
-
-            /* Drop the arguments and return the result */
-
-            sp = i;
-
-            sp->type = T_LVALUE;
-            sp->u.lvalue = &lvalue->v;
-            return sp;
-        }
-
-        /* Index a string.
-         */
-        if (type == T_STRING)
-        {
-            struct protected_char_lvalue *val;
-            char * cp;
-
-            cp = get_string_r_item(vec, i, /* make_singular: */ MY_TRUE
-                                  , /* allow_one_past: */ MY_FALSE
-                                  , sp, pc);
-
-            /* Add another reference to the string to keep it alive while
-             * we use it.
-             */
-            (void)ref_mstring(vec->u.str);
-
-            /* Build the protector */
-            val = (struct protected_char_lvalue *)xalloc(sizeof *val);
-            val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.charp = cp;
-            val->lvalue = vec;
-            val->start = get_txt(vec->u.str);
-            val->protector.type = T_INVALID;
-
-            /* Drop the arguments and return the result */
-            sp = i;
-
-            sp->type = T_LVALUE;
-            sp->u.protected_char_lvalue = val;
-
-            return sp;
-        }
-
-        /* lvalues are just dereferenced.
-         */
-        if (type == T_LVALUE)
-        {
-            vec = vec->u.lvalue;
-            continue;
-        }
-
-        /* Non-string protected lvalues are dereferenced, a protected
-         * string lvalue is indexed immediately.
-         */
-        if (type == T_PROTECTED_LVALUE)
-        {
-            struct protected_lvalue *lvalue;
-            struct protected_char_lvalue *val;
-            char * cp;
-
-            lvalue = (struct protected_lvalue *)vec;
-
-            if (lvalue->v.u.lvalue->type != T_STRING)
-            {
-                /* Deref a non-string protected lvalue.
-                 * If this is the lvalue passed to the operator, also free
-                 * the protector structure (since its stack space will be
-                 * used for the result), but keep the protector itself
-                 * in a global variable.
-                 */
-                if (vec == sp->u.lvalue)
-                {
-                    free_protector_svalue(&last_indexing_protector);
-                    last_indexing_protector = lvalue->protector;
-                    vec = lvalue->v.u.lvalue;
-                    xfree(lvalue);
-                    continue;
-                }
-                vec = lvalue->v.u.lvalue;
-                continue;
-            }
-
-            vec = lvalue->v.u.lvalue; /* it's a string... */
-            cp = get_string_r_item(vec, i, /* make_singular: */ MY_TRUE
-                                  , /* allow_one_past: */ MY_FALSE
-                                  , sp, pc);
-
-            /* Add another reference to the string to keep it alive while
-             * we use it.
-             */
-            (void)ref_mstring(vec->u.str);
-
-            /* Build the protector */
-            val = (struct protected_char_lvalue *)xalloc(sizeof *val);
-            val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.charp = cp;
-            val->lvalue = vec;
-            val->start = get_txt(vec->u.str);
-
-            /* Drop the arguments and return the result.
-             * If this was the lvalue passed to the operator in the
-             * first place, adopt the protecting value and free the old
-             * operator structure. If not, just don't assign a protecting
-             * value.
-             */
-            if (lvalue == sp->u.protected_lvalue)
-            {
-                val->protector = lvalue->protector;
-                xfree(lvalue);
-            }
-            else
-            {
-                val->protector.type = T_INVALID;
-            }
-
-            sp = i;
-            sp->type = T_LVALUE;
-            sp->u.protected_char_lvalue = val;
-
-            return sp;
-        }
-
-        /* Indexing on illegal type */
-        inter_sp = sp;
-        inter_pc = pc;
-        errorf("(lvalue12)Indexing on illegal type '%s'.\n", typename(type));
-        return NULL;
-    } /* for(ever) */
-
-    /* NOTREACHED */
-    return NULL;
-} /* protected_rindex_lvalue() */
+    assign_lvalue_no_free(sp, item);
+    return sp;
+} /* push_index_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
-
-/* Operator F_PROTECTED_AINDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
- *
- * Compute the index &(*v[>i]) of lvalue <v>, wrap it into a protector, and
- * push the reference to the protector as PROTECTED_LVALUE onto the stack.
- *
- * If <v> is a protected non-string-lvalue, the protected_lvalue referenced
- * by <v>.u.lvalue will be deallocated, and the protector itself will be
- * stored in <last_indexing_protector> for the time being.
- *
- * If <v> is a string-lvalue, it is made a malloced string if necessary.
+/* Code values used by push_range_lvalue() and push_range_value()
  */
 
+enum range_type
 {
-    svalue_t *vec;   /* the indexed value */
-    svalue_t *i;     /* the index */
-    short     type;  /* type of <vec> */
+    NN_RANGE = 0,
+    RN_RANGE = 1 << 0,
+    AN_RANGE = 2 << 0,
+    NR_RANGE = 1 << 2,
+    NA_RANGE = 2 << 2,
 
-    /* Get arguments */
-    vec = sp->u.lvalue;
-    i = sp -1;
+    RR_RANGE = (RN_RANGE|NR_RANGE),
+    RA_RANGE = (RN_RANGE|NA_RANGE),
+    AR_RANGE = (AN_RANGE|NR_RANGE),
+    AA_RANGE = (AN_RANGE|NA_RANGE),
 
-    /* The loop unravels the (possible) lvalue chain starting at vec.
-     * When a non-lvalue is encountered, the indexing takes place
-     * the function returns.
-     */
-    for (;;)
-    {
-        type = vec->type;
-
-        /* Index a vector.
-         */
-        if (type == T_POINTER)
-        {
-            vector_t *v = vec->u.vec;
-            struct protected_lvalue *lvalue;
-            svalue_t *item;
-
-            item = get_vector_a_item(v, i, sp, pc);
-
-            /* Create the protector for the result */
-
-            lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
-            lvalue->v.type = T_PROTECTED_LVALUE;
-            lvalue->v.u.lvalue = item;
-            put_ref_array(&(lvalue->protector), v);
-
-            /* Drop the arguments and return the result */
-
-            sp = i;
-
-            sp->type = T_LVALUE;
-            sp->u.lvalue = &lvalue->v;
-            return sp;
-        }
-
-        /* Index a string.
-         */
-        if (type == T_STRING)
-        {
-            struct protected_char_lvalue *val;
-            char * cp;
-
-            cp = get_string_a_item(vec, i, /* make_singular: */ MY_TRUE
-                                  , /* allow_one_past: */ MY_FALSE
-                                  , sp, pc);
-
-            /* Add another reference to the string to keep it alive while
-             * we use it.
-             */
-            (void)ref_mstring(vec->u.str);
-
-            /* Build the protector */
-            val = (struct protected_char_lvalue *)xalloc(sizeof *val);
-            val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.charp = cp;
-            val->lvalue = vec;
-            val->start = get_txt(vec->u.str);
-            val->protector.type = T_INVALID;
-
-            /* Drop the arguments and return the result */
-            sp = i;
-
-            sp->type = T_LVALUE;
-            sp->u.protected_char_lvalue = val;
-
-            return sp;
-        }
-
-        /* lvalues are just dereferenced.
-         */
-        if (type == T_LVALUE)
-        {
-            vec = vec->u.lvalue;
-            continue;
-        }
-
-        /* Non-string protected lvalues are dereferenced, a protected
-         * string lvalue is indexed immediately.
-         */
-        if (type == T_PROTECTED_LVALUE)
-        {
-            struct protected_lvalue *lvalue;
-            struct protected_char_lvalue *val;
-            char * cp;
-
-            lvalue = (struct protected_lvalue *)vec;
-
-            if (lvalue->v.u.lvalue->type != T_STRING)
-            {
-                /* Deref a non-string protected lvalue.
-                 * If this is the lvalue passed to the operator, also free
-                 * the protector structure (since its stack space will be
-                 * used for the result), but keep the protector itself
-                 * in a global variable.
-                 */
-                if (vec == sp->u.lvalue)
-                {
-                    free_protector_svalue(&last_indexing_protector);
-                    last_indexing_protector = lvalue->protector;
-                    vec = lvalue->v.u.lvalue;
-                    xfree(lvalue);
-                    continue;
-                }
-                vec = lvalue->v.u.lvalue;
-                continue;
-            }
-
-            vec = lvalue->v.u.lvalue; /* it's a string... */
-            cp = get_string_a_item(vec, i, /* make_singular: */ MY_TRUE
-                                  , /* allow_one_past: */ MY_FALSE
-                                  , sp, pc);
-
-            /* Add another reference to the string to keep it alive while
-             * we use it.
-             */
-            (void)ref_mstring(vec->u.str);
-
-            /* Build the protector */
-            val = (struct protected_char_lvalue *)xalloc(sizeof *val);
-            val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.charp = cp;
-            val->lvalue = vec;
-            val->start = get_txt(vec->u.str);
-
-            /* Drop the arguments and return the result.
-             * If this was the lvalue passed to the operator in the
-             * first place, adopt the protecting value and free the old
-             * operator structure. If not, just don't assign a protecting
-             * value.
-             */
-            if (lvalue == sp->u.protected_lvalue)
-            {
-                val->protector = lvalue->protector;
-                xfree(lvalue);
-            }
-            else
-            {
-                val->protector.type = T_INVALID;
-            }
-
-            sp = i;
-            sp->type = T_LVALUE;
-            sp->u.protected_char_lvalue = val;
-
-            return sp;
-        }
-
-        /* Indexing on illegal type */
-        inter_sp = sp;
-        inter_pc = pc;
-        errorf("(lvalue13)Indexing on illegal type '%s'.\n", typename(type));
-        return NULL;
-    } /* for(ever) */
-
-    /* NOTREACHED */
-    return NULL;
-} /* protected_aindex_lvalue() */
-
-/*-------------------------------------------------------------------------*/
-
-/* Code values used by range_lvalue() and protected_range_lvalue()
- */
-
-#define NN_RANGE (0)
-#define RN_RANGE (1 << 0)
-#define AN_RANGE (2 << 0)
-#define NR_RANGE (1 << 2)
-#define NA_RANGE (2 << 2)
-
-#define RR_RANGE (RN_RANGE|NR_RANGE)
-#define RA_RANGE (RN_RANGE|NA_RANGE)
-#define AR_RANGE (AN_RANGE|NR_RANGE)
-#define AA_RANGE (AN_RANGE|NA_RANGE)
-
-#define NX_MASK (3)
-#define XN_MASK (3 << 2)
+    NX_MASK  = 3 << 0,
+    XN_MASK  = 3 << 2,
+};
 
 static svalue_t *
-range_lvalue (int code, svalue_t *sp)
+push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
 
-/* Operator F_RANGE_LVALUE (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
+/* Operator F_RANGE_LVALUE (string|vector &v=sp[-2], int i1=sp[-1], i2=sp[0])
  * and the operators F_*_RANGE_LVALUE.
  *
  * Compute the range &(v[i1..i2]) of lvalue <v> and push it into the stack.
@@ -5149,177 +4196,339 @@ range_lvalue (int code, svalue_t *sp)
  */
 
 {
-    svalue_t *vec;         /* the indexed vector or string */
-    svalue_t *i;           /* the index */
-    int            ind1, ind2;  /* Lower and upper range index */
-    short          type;        /* type of <vec> */
-    mp_int         size;        /* size of <vec> in elements */
+    svalue_t       *vec;          /* the indexed vector or string */
+    mp_int         ind1, ind2;    /* Lower and upper range index */
+    mp_int         size;          /* size of <vec> in elements */
+    mp_int         offset;        /* offset into <vec> */
+    bool last_reference = false;  /* Whether the value has
+                                   * only one reference left.
+                                   */
+    struct protected_lvalue *var; /* The variable holding the vector */
 
-    /* Get the arguments */
-    vec = sp;
-    i = sp-1;
+    /* Get the vector */
+    vec = get_rvalue_no_collapse(sp - 2, &last_reference);
 
-#ifdef DEBUG
-    if (sp->type != T_LVALUE) {
-        inter_sp = sp;
-        errorf("wrong type to range_lvalue: got %s, expected lvalue\n"
-             , typename(sp->type));
-        return NULL;
-    }
-#endif
+    /* Get the indices first. */
+    if (sp[-1].type != T_NUMBER)
+        ERRORF(("Bad type '%s' of start interval to [..] range.\n"
+               , typename(sp[-1].type)
+               ));
+    if (sp[0].type != T_NUMBER)
+        ERRORF(("Bad type '%s' of end interval to [..] range.\n"
+               , typename(sp[0].type)
+               ));
+    ind1 = sp[-1].u.number;
+    ind2 = sp[0].u.number;
 
-    /* Deref the initial, and possibly more, lvalues.
-     */
-    do {
-        vec = vec->u.lvalue;
-        type = vec->type;
-    } while (type == T_LVALUE || type == T_PROTECTED_LVALUE);
-
-    /* Determine the type of the result, and the input's size.
-     */
-    switch(type)
+    /* Now get to the vector */
+    if (vec == NULL)
     {
-    case T_POINTER:
-        special_lvalue.v.type = T_POINTER_RANGE_LVALUE;
-        size = (mp_int)VEC_SIZE(vec->u.vec);
-        break;
-    case T_STRING:
-        special_lvalue.v.type = T_STRING_RANGE_LVALUE;
-        size = (mp_int)mstrsize(vec->u.str);
-        break;
-    default:
-        inter_sp = sp;
-        errorf("(lvalue)Range index on illegal type '%s'.\n", typename(type));
-        return NULL;
-    }
+        /* It must be a protected range. */
+        struct protected_range_lvalue *r;
 
-    /* Get and check the upper bound i2 */
+        vec = sp - 2;
+        assert(vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_RANGE);
+        r = vec->u.protected_range_lvalue;
 
-    if (i->type != T_NUMBER)
-    {
-        inter_sp = sp;
-        errorf("Illegal upper range index: got '%s', expected 'number'.\n"
-             , typename(i->type));
-        return NULL;
-    }
+        vec = &(r->vec);
+        offset = r->index1;
+        size = r->index2 - r->index1;
+        var = r->var;
 
-    if ((code & XN_MASK) == NR_RANGE)
-    {
-        ind2 = size - i->u.number;
-    }
-    else if ((code & XN_MASK) == NA_RANGE)
-    {
-        if (i->u.number < 0)
-            ind2 = size + i->u.number;
-        else
-            ind2 = i->u.number;
+        if (vec->type != T_POINTER && vec->type != T_STRING)
+            fatal("(range_lvalue)Illegal type for range lvalue '%s'.\n", typename(vec->type));
     }
     else
     {
-        ind2 = i->u.number;
-    }
+        switch (vec->type)
+        {
+            case T_POINTER:
+                size = VEC_SIZE(vec->u.vec);
+                offset = 0;
+                break;
 
+            case T_STRING:
+                size = mstrsize(vec->u.str);
+                offset = 0;
+                break;
 
-    if (++ind2 < 0 || ind2 > size+1)
-    {
-        inter_sp = sp;
-        errorf("Upper range index out of bounds: %"PRIdPINT
-               ", size: %"PRIdMPINT".\n"
-             , i->u.number, size);
-        return NULL;
-    }
+            default:
+                ERRORF(("Bad argument to [..] operand: got %s, "
+                        "expected string/array.\n", typename(vec->type))
+                        );
+        }
 
-    /* Get and check the lower bound i1 */
-
-    if ((--i)->type != T_NUMBER)
-    {
-        inter_sp = sp;
-        errorf("Illegal lower range index: got %s, expected number.\n"
-             , typename(i->type));
-        return NULL;
-    }
-
-    if ((code & NX_MASK) == RN_RANGE)
-    {
-        ind1 = size - i->u.number;
-    }
-    else if ((code & NX_MASK) == AN_RANGE)
-    {
-        if (i->u.number < 0)
-            ind1 = size + i->u.number;
+        if (sp[-2].type == T_LVALUE)
+        {
+            assert(sp[-2].x.lvalue_type == LVALUE_PROTECTED);
+            var = sp[-2].u.protected_lvalue;
+        }
         else
-            ind1 = i->u.number;
+        {
+            var = NULL;
+            // We're referencing an svalue_t on the stack...
+            last_reference = true;
+        }
     }
-    else
+
+    if (var && var->ref == 1)
+        var = NULL;
+
+    if (last_reference)
     {
-        ind1 = i->u.number;
+        /* Rescue the vector as it will go away */
+        svalue_t temp = indexing_quickfix;
+        assign_svalue_no_free(&indexing_quickfix, vec);
+        free_svalue(&temp);
+
+        vec = &indexing_quickfix;
+    }
+
+    switch (code & NX_MASK)
+    {
+        case NN_RANGE:
+            // Nothing to do.
+            break;
+
+        case RN_RANGE:
+            ind1 = size - ind1;
+            break;
+
+        case AN_RANGE:
+            if (ind1 < 0)
+                ind1 = size + ind1;
+            break;
+
+        default:
+            fatal("(range_value)Illegal index type %d.\n", code);
+            break;
+    }
+
+    switch (code & XN_MASK)
+    {
+        case NN_RANGE:
+            // Nothing to do.
+            break;
+
+        case NR_RANGE:
+            ind2 = size - ind2;
+            break;
+
+        case NA_RANGE:
+            if (ind2 < 0)
+                ind2 = size + ind2;
+            break;
+
+        default:
+            fatal("(range_value)Illegal index type %d.\n", code);
+            break;
     }
 
     if (ind1 < 0 || ind1 > size)
-    {   /* Appending (ind1 == size) is allowed */
-        inter_sp = sp;
-        errorf("Lower range index out of bounds: %"PRIdPINT
-               ", size: %"PRIdMPINT".\n"
-             , i->u.number, size);
-        return NULL;
-    }
-
-
-    /* Check the range for consistency */
-
-    if (ind2 < ind1)
     {
+        /* Appending (ind1 == size) is allowed */
+        inter_pc = pc;
         inter_sp = sp;
-        errorf("Range of negative size given: %"PRIdPINT
-               "..%"PRIdPINT" .\n"
-             , i->u.number, (i+1)->u.number);
-        return NULL;
+        if (ind2 < -1 || ind2 >= size)
+            errorf( "Warning: Out-of-bounds range limits: [%"
+                    PRIdMPINT"..%"PRIdMPINT"], size %"PRIdMPINT".\n"
+                  , ind1, ind2, size);
+        else
+            errorf( "Warning: Out-of-bounds lower range limits: %"
+                    PRIdMPINT", size %"PRIdMPINT".\n"
+                  , ind1, size);
     }
-
-    if (ind1 == size) /* again allow appending */
-        ind2 = ind1;
-    else if (ind2 > size)
+    else if (ind2 < -1 || ind2 >= size)
     {
+        inter_pc = pc;
         inter_sp = sp;
-        errorf("Upper range index out of bounds: %"PRIdPINT
-               ", size: %"PRIdMPINT".\n"
-             , (i+1)->u.number, size);
-        return NULL;
+        errorf( "Warning: Out-of-bounds upper range limits: %"
+                PRIdMPINT", size %"PRIdMPINT".\n"
+              , ind2, size);
+    }
+    else if (ind1 > ind2 + 1)
+    {
+        inter_pc = pc;
+        inter_sp = sp;
+        errorf( "Warning: Ranges of negative size: %"PRIdMPINT
+                "..%"PRIdMPINT".\n"
+              , ind1, ind2);
     }
 
-    /* Finish the special_lvalue structure
+    /* Save information to the current_unprotected_range structure.
      */
-    special_lvalue.v.u.lvalue = vec;
-    special_lvalue.size = size;
-    special_lvalue.index1 = ind1;
-    special_lvalue.index2 = ind2;
+    current_unprotected_range.var = var;
+    current_unprotected_range.vec = vec;
+    current_unprotected_range.index1 = offset+ind1;
+    current_unprotected_range.index2 = offset+ind2+1;
 
     /* Drop the arguments and return the result. */
-
-    sp = i;
+    pop_n_elems(3);
+    sp++;
 
     sp->type = T_LVALUE;
-    sp->u.lvalue = &special_lvalue.v;
+    sp->x.lvalue_type = LVALUE_UNPROTECTED_RANGE;
 
     return sp;
-} /* range_lvalue() */
+} /* push_range_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-static svalue_t *
-protected_range_lvalue (int code, svalue_t *sp)
+static INLINE svalue_t *
+push_index_value (svalue_t *sp, bytecode_p pc, bool ignore_error, enum index_type itype)
 
-/* Operator F_PROTECTED_RANGE_LVALUE
- *                       (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
- * and the x-operators F_PROTECTED_*_RANGE_LVALUE and
- * F_PROTECTED_LVALUE.
+/* Operator F_INDEX   (string|vector v=sp[-1], int        i=sp[0])
+ *          F_RINDEX  (string|vector v=sp[-1], int        i=sp[0])
+ *          F_AINDEX  (string|vector v=sp[-1], int        i=sp[0])
+ *          F_INDEX   (mapping       v=sp[-1], mixed      i=sp[0])
+ *          F_S_INDEX (struct        v=sp[-1], string|int i=sp[0])
  *
- * Compute the range &(v[i1..i2]) of lvalue <v>, wrap it into a protector,
- * and push the reference to the protector onto the stack.
+ * Compute the value (v[i]) and push it onto the stack.
+ * If the value would be a destructed object, 0 is pushed onto the stack
+ * and the ref to the object is removed from the vector/mapping.
+ * <ignore_error> will just be passed to get_struct_item() and
+ * results in returning 0, when a struct member is not found.
+ */
+
+{
+    svalue_t *vec;    /* the indexed value */
+    svalue_t *idx;    /* the index */
+    svalue_t *item;   /* the item in the structure */
+    svalue_t  result; /* a copy of that item */
+
+    /* get the arguments */
+    vec = get_rvalue(sp - 1, NULL);
+    idx = sp;
+
+    if (vec == NULL) /* It's a protected range lvalue */
+    {
+        struct protected_range_lvalue *r;
+
+        vec = sp - 1;
+        assert(vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_RANGE);
+        r = vec->u.protected_range_lvalue;
+
+        switch (r->vec.type)
+        {
+            case T_POINTER:
+            {
+                item = get_vector_range_item(r->vec.u.vec, r->index1, r->index2, idx, sp, pc, itype);
+                break;
+            }
+
+            case T_STRING:
+            {
+                int c = (unsigned char) *get_string_range_item(&(r->vec), r->index1, r->index2, idx, MY_FALSE, MY_TRUE, sp, pc, itype);
+
+                free_svalue(sp--);
+                free_svalue(sp);
+
+                put_number(sp, c);
+                return sp;
+            }
+
+            default:
+                fatal("(index_value)Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+        }
+    }
+    else
+    {
+        switch (vec->type)
+        {
+            /* Index an array.
+             */
+            case T_POINTER:
+                item = get_vector_item(vec->u.vec, idx, sp, pc, itype);
+                break;
+
+            /* Index a string.
+             */
+            case T_STRING:
+            {
+                int c;
+
+                c = (unsigned char)
+                    *get_string_item(vec, idx, /* make_singular: */ MY_FALSE
+                                    , /* allow_one_past: */ MY_TRUE
+                                    , sp, pc, itype);
+
+                /* Remove the arguments and create and push the result. */
+                free_svalue(sp--);
+                free_svalue(sp);
+
+                put_number(sp, c);
+                return sp;
+            }
+
+            /* Index a struct.
+             */
+            case T_STRUCT:
+                if (itype != REGULAR_INDEX)
+                {
+                    inter_sp = sp;
+                    inter_pc = pc;
+                    errorf("(index_value)Indexing on illegal type '%s'.\n", typename(vec->type));
+                    return NULL;
+                }
+
+                item = get_struct_item(vec->u.strct, idx, sp, pc, ignore_error);
+                break;
+
+            /* Index a mapping.
+             */
+            case T_MAPPING:
+            {
+                mapping_t *m;
+
+                if (itype != REGULAR_INDEX)
+                {
+                    inter_sp = sp;
+                    inter_pc = pc;
+                    errorf("(index_value)Indexing on illegal type '%s'.\n", typename(vec->type));
+                    return NULL;
+                }
+
+                m = vec->u.map;
+                if (!m->num_values)
+                {
+                    ERROR("Indexing a mapping of width 0.\n");
+                    return NULL;
+                }
+
+                /* Compute the element */
+                item = get_map_value(m, idx);
+                break;
+            }
+
+            default:
+                /* Illegal type to index. */
+                inter_sp = sp;
+                inter_pc = pc;
+                errorf("(index_value)Indexing on illegal type '%s'.\n", typename(vec->type));
+                return NULL;
+        }
+    }
+
+    /* Copy item first into result, because it can vanish
+     * when we're freeing the values on the stack.
+     */
+    assign_rvalue_no_free(&result, item);
+
+    /* Remove the arguments and push the result */
+    free_svalue(sp--);
+    free_svalue(sp);
+
+    transfer_svalue_no_free(sp, &result);
+    return sp;
+} /* push_index_value() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
+
+/* Operator F_RANGE (string|vector &v=sp[-2], int i1=sp[-1], i2=sp[0])
+ * and the operators F_*_RANGE.
  *
- * If <v> is a protected lvalue itself, its protecting svalue will be used
- * in the result protector.
- *
- * If <v> is a string-lvalue, it is made a malloced string if necessary.
+ * Compute the value v[i1..i2] and push it into the stack.
  *
  * <code> is a four-bit flag determining whether the indexes are counted
  * from the beginning ('[i1..' and '..i2]'), the end of the vector
@@ -5331,503 +4540,173 @@ protected_range_lvalue (int code, svalue_t *sp)
  */
 
 {
-    svalue_t *vec;         /* the indexed vector or string */
-    svalue_t *i;           /* the index */
-    int            ind1, ind2;  /* Lower and upper range index */
-    short          type;        /* type of <vec> */
+    svalue_t      *vec;         /* the indexed vector or string */
+    mp_int         ind1, ind2;  /* Lower and upper range index */
     mp_int         size;        /* size of <vec> in elements */
-    short          lvalue_type; /* Result type */
-    svalue_t  protector;   /* Protecting svalue saved from v */
-    struct protected_range_lvalue *new_lvalue;
-                                /* Result protector structure */
+    mp_int         offset;      /* offset into <vec> */
 
-#ifdef DEBUG
-    if (sp->type != T_LVALUE)
+    /* get the arguments */
+    vec = get_rvalue(sp - 2, NULL);
+
+    if (sp[-1].type != T_NUMBER)
+        ERRORF(("Bad type '%s' of start interval to [..] range.\n"
+               , typename(sp[-1].type)
+               ));
+    if (sp[0].type != T_NUMBER)
+        ERRORF(("Bad type '%s' of end interval to [..] range.\n"
+               , typename(sp[0].type)
+               ));
+    ind1 = sp[-1].u.number;
+    ind2 = sp[0].u.number;
+
+    if (vec == NULL)
     {
-        inter_sp = sp;
-        errorf("wrong type to protected_range_lvalue: got %s, expected lvalue\n"
-             , typename(sp->type));
-        return NULL;
-    }
-#endif
-    /* Get the arguments, and also remember the protector in case v
-     * is a protected lvalue.
-     */
-    vec = sp->u.lvalue; /* deref initial lvalue */
-    i = sp - 1;
+        /* It must be a protected range. */
+        struct protected_range_lvalue *r;
 
-    type = vec->type;
+        vec = sp - 2;
+        assert(vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_RANGE);
+        r = vec->u.protected_range_lvalue;
 
-    if (type != T_PROTECTED_LVALUE)
-        protector.type = T_INVALID;
-    else
-        protector = ((struct protected_lvalue*)vec)->protector;
+        vec = &(r->vec);
+        offset = r->index1;
+        size = r->index2 - r->index1;
 
-    /* Deref any possibly following lvalues
-     */
-    while (type == T_LVALUE || type == T_PROTECTED_LVALUE)
-    {
-        vec = vec->u.lvalue;
-        type = vec->type;
-    }
-
-    /* Determine the type of the result, and the input's size.
-     * Also massage the input value a bit.
-     */
-    switch(type)
-    {
-    case T_POINTER:
-        (void)ref_array(vec->u.vec); /* Count the coming protector */
-        lvalue_type = T_PROTECTED_POINTER_RANGE_LVALUE;
-        size = (mp_int)VEC_SIZE(vec->u.vec);
-        break;
-
-    case T_STRING:
-        /* If the string is tabled, i.e. not changeable, or has more than
-         * one reference, allocate a new copy which can be changed safely.
-         */
-        if (!mstr_singular(vec->u.str))
-        {
-            string_t *p;
-
-            memsafe(p = unshare_mstring(vec->u.str), mstrsize(vec->u.str)
-                   , "modifiable string");
-            vec->u.str = p;
-        }
-
-        /* Add another reference to the string to keep it alive while
-         * we use it.
-         */
-        (void)ref_mstring(vec->u.str);
-
-        lvalue_type = T_PROTECTED_STRING_RANGE_LVALUE;
-        size = (mp_int)mstrsize(vec->u.str);
-        break;
-
-    default:
-        inter_sp = sp;
-        errorf("(lvalue)Range index on illegal type '%s'.\n", typename(type));
-        return NULL;
-    }
-
-    /* Get and check the upper index i2 */
-
-    if (i->type != T_NUMBER)
-    {
-        inter_sp = sp;
-        errorf("Illegal upper range index: got '%s', expected 'number'.\n"
-             , typename(i->type));
-        return NULL;
-    }
-
-    if ((code & XN_MASK) == NR_RANGE)
-    {
-        ind2 = size - i->u.number;
-    }
-    else if ((code & XN_MASK) == NA_RANGE)
-    {
-        if (i->u.number < 0)
-            ind2 = size + i->u.number;
-        else
-            ind2 = i->u.number;
+        if (vec->type != T_POINTER && vec->type != T_STRING)
+            fatal("(range_value)Illegal type for range lvalue '%s'.\n", typename(vec->type));
     }
     else
     {
-        ind2 = i->u.number;
+        switch (vec->type)
+        {
+            case T_POINTER:
+                size = VEC_SIZE(vec->u.vec);
+                offset = 0;
+                break;
+
+            case T_STRING:
+                size = mstrsize(vec->u.str);
+                offset = 0;
+                break;
+
+            default:
+                ERRORF(("Bad argument to [..] operand: got %s, "
+                        "expected string/array.\n", typename(vec->type))
+                        );
+        }
     }
 
-    if (++ind2 < 0 || ind2 > size) {
-        inter_sp = sp;
-        errorf("Upper range index out of bounds: %"PRIdPINT
-               ", size: %"PRIdMPINT".\n"
-             , i->u.number, size);
-        return NULL;
-    }
-
-    /* Get and check the lower index i1 */
-
-    if ((--i)->type != T_NUMBER)
+    switch (code & NX_MASK)
     {
-        inter_sp = sp;
-        errorf("Illegal lower range index: got %s, expected number.\n"
-             , typename(i->type));
-        return NULL;
+        case NN_RANGE:
+            // Nothing to do.
+            break;
+
+        case RN_RANGE:
+            ind1 = size - ind1;
+            break;
+
+        case AN_RANGE:
+            if (ind1 < 0)
+                ind1 = size + ind1;
+            break;
+
+        default:
+            fatal("(range_value)Illegal index type %d.\n", code);
+            break;
     }
 
-    if ((code & NX_MASK) == RN_RANGE)
+    switch (code & XN_MASK)
     {
-        ind1 = size - i->u.number;
+        case NN_RANGE:
+            // Nothing to do.
+            break;
+
+        case NR_RANGE:
+            ind2 = size - ind2;
+            break;
+
+        case NA_RANGE:
+            if (ind2 < 0)
+                ind2 = size + ind2;
+            break;
+
+        default:
+            fatal("(range_value)Illegal index type %d.\n", code);
+            break;
     }
-    else if ((code & NX_MASK) == AN_RANGE)
+
+    if (runtime_array_range_check && vec->type == T_POINTER)
     {
-        if (i->u.number < 0)
-            ind1 = size + i->u.number;
-        else
-            ind1 = i->u.number;
+        if (ind1 < 0 || ind1 >= size)
+        {
+            if (ind2 < 0 || ind2 >= size)
+                WARNF(("Warning: Out-of-bounds range limits: [%"
+                       PRIdMPINT"..%"PRIdMPINT"], size %"PRIdMPINT".\n"
+                      , ind1, ind2, size));
+            else
+                WARNF(("Warning: Out-of-bounds lower range limits: %"
+                       PRIdMPINT", size %"PRIdMPINT".\n"
+                      , ind1, size));
+        }
+        else if (ind2 < 0 || ind2 >= size)
+        {
+            WARNF(("Warning: Out-of-bounds upper range limits: %"
+                   PRIdMPINT", size %"PRIdMPINT".\n"
+                  , ind2, size));
+        }
+        else if (ind1 > ind2 + 1)
+        {
+            WARNF(("Warning: Ranges of negative size: %"PRIdMPINT
+                   "..%"PRIdMPINT".\n"
+                  , ind1, ind2));
+        }
     }
-    else
-    {
-        ind1 = i->u.number;
-    }
 
-    if (ind1 < 0 || ind1 > size)
-    {
-        /* Appending (ind1 == size) is allowed */
-        inter_sp = sp;
-        errorf("Lower range index out of bounds: %"PRIdPINT
-               ", size: %"PRIdMPINT".\n"
-             , i->u.number, size);
-        return NULL;
-    }
+    /* Make sure, ind1 is greater then zero. */
+    if (ind1 < 0)
+        ind1 = 0;
 
-    /* Build the protector */
-    new_lvalue = (struct protected_range_lvalue *)xalloc(sizeof *new_lvalue);
-    new_lvalue->v.type = lvalue_type;
-    new_lvalue->v.u = vec->u;
-    new_lvalue->protector = protector;
-    new_lvalue->lvalue = vec;
-    new_lvalue->index2 = ind2;
-    new_lvalue->index1 = ind1;
-    new_lvalue->size = size;
-
-    /* Drop the arguments and return the result */
-
-    sp = i;
-
-    sp->type = T_LVALUE;
-    sp->u.protected_range_lvalue = new_lvalue;
-
-    return sp;
-} /* protected_range_lvalue() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-push_indexed_value (svalue_t *sp, bytecode_p pc, bool ignore_error)
-
-/* Operator F_INDEX (string|vector v=sp[-1], int   i=sp[0])
- *          F_INDEX (mapping       v=sp[-1], mixed i=sp[0])
- *          F_S_INDEX (struct      v=sp[-1], string|int i=sp[0])
- *
- * Compute the value (v[i]) and push it onto the stack.
- * If the value would be a destructed object, 0 is pushed onto the stack
- * and the ref to the object is removed from the vector/mapping.
- * <ignore_error> will just be passed to get_struct_item() and
- * results in returning 0, when a struct member is not found.
- */
-
-{
-    svalue_t *vec;  /* the indexed value */
-    svalue_t *i;    /* the index */
-
-    /* Get arguments */
-    i = sp;
-    vec = sp - 1;
+    /* Make sure, ind2 is lower then size. */
+    if (ind2 >= size)
+        ind2 = size-1;
 
     switch (vec->type)
     {
-    case T_STRING:
-      {
-        int c;
-
-        c = (unsigned char)
-            *get_string_item(vec, i, /* make_singular: */ MY_FALSE
-                            , /* allow_one_past: */ MY_TRUE
-                            , sp, pc);
-
-        /* Drop the args and return the result */
-
-        free_string_svalue(vec);
-
-        sp = vec; /* == sp-1 */
-        put_number(sp, c);
-
-        return sp;
-      }
-
-    case T_POINTER:
-      {
-        svalue_t *item;
-
-        item = get_vector_item(vec->u.vec, i, sp, pc);
-
-        /* Drop the arguments */
-        sp = vec; /* == sp-1 */
-
-        /* Assign the indexed element to the sp entry holding vec.
-         * Decrement the vector ref manually to optimize the case that
-         * this is the last ref to the vector.
-         */
-        if (vec->u.vec->ref == 1)
+        case T_POINTER:
         {
-            svalue_t tmp;
+            vector_t* v = slice_array(vec->u.vec, offset + ind1, offset + ind2);
 
-            /* Copy the indexed element into <tmp>
-             */
-            tmp = *item;
+            pop_n_elems(3);
 
-            /* Invalidate the old space of the result value and free
-             * the vector.
-             */
-            item->type = T_INVALID;
-            free_array(vec->u.vec);
-
-            /* Return the result */
-            *sp = tmp;
+            if (v)
+                push_array(sp, v);
+            else
+                push_number(sp, 0);
             return sp;
         }
 
-        deref_array(vec->u.vec);
-
-        /* The vector continues to live: keep the refcount as it is
-         * and just assign the indexed element for the result.
-         */
-        assign_checked_svalue_no_free(sp, item);
-        return sp;
-      }
-
-    case T_MAPPING:
-      {
-        svalue_t item;
-        mapping_t *m;
-
-        m = vec->u.map;
-
-        if (!m->num_values)
+        case T_STRING:
         {
-            inter_sp = sp;
-            inter_pc = pc;
-            errorf("(value)Indexing a mapping of width 0.\n");
-            return NULL;
-        }
+            string_t *str;
+            if (ind2 < ind1)
+                str = ref_mstring(STR_EMPTY);
+            else
+                str = mstr_extract(vec->u.str, offset + ind1, offset + ind2);
 
-        /* Get the item.
-         * We are getting a copy in case the subsequent free() actions
-         * free the mapping and all it's data.
-         */
-        assign_checked_svalue_no_free(&item, get_map_value(m, i));
+            pop_n_elems(3);
 
-        /* Drop the arguments */
-
-        free_svalue(i);
-        free_mapping(m);
-
-        /* Return the result */
-        sp = vec; /* == sp-1 */
-        transfer_svalue_no_free(sp, &item);
-        return sp;
-      }
-
-    case T_STRUCT:
-      {
-        struct_t * st = vec->u.strct;
-        svalue_t * item;
-
-        item = get_struct_item(st, i, sp, pc, ignore_error);
-
-        /* Drop the 'i' argument */
-        free_svalue(sp);
-        sp--;
-
-        /* Assign the value */
-        assign_svalue_no_free(sp, item);
-
-        /* Drop the struct reference */
-        free_struct(st);
-        return sp;
-      }
-
-    default:
-        inter_sp = sp;
-        inter_pc = pc;
-        errorf("(value)Indexing on illegal type '%s'.\n", typename(vec->type));
-        return NULL;
-    }
-
-    /* NOTREACHED */
-    return NULL;
-} /* push_indexed_value() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-push_rindexed_value (svalue_t *sp, bytecode_p pc)
-
-/* Operator F_RINDEX (string|vector v=sp[0], int   i=sp[-1])
- *
- * Compute the value (v[<i]) and push it onto the stack.
- * If the value would be a destructed object, 0 is pushed onto the stack
- * and the ref to the object is removed from the vector/mapping.
- */
-
-{
-    svalue_t *vec;  /* the indexed value */
-    svalue_t *i;    /* the index */
-
-    /* Get arguments */
-    i = sp;
-    vec = sp - 1;
-
-    switch (vec->type)
-    {
-    case T_STRING:
-      {
-        int c;
-
-        c = (unsigned char)
-            *get_string_r_item(vec, i, /* make_singular: */ MY_FALSE
-                              , /* allow_one_past: */ MY_TRUE
-                              , sp, pc);
-
-        /* Drop the args and return the result */
-
-        free_string_svalue(vec);
-
-        sp = vec; /* == sp-1 */
-        put_number(sp, c);
-        return sp;
-      }
-
-    case T_POINTER:
-      {
-        svalue_t *item;
-
-        item = get_vector_r_item(vec->u.vec, i, sp, pc);
-
-        /* Drop the arguments */
-        sp = vec;
-
-        /* Assign the indexed element to the sp entry holding vec.
-         * Decrement the vector ref manually to optimize the case that
-         * this is the last ref to the vector.
-         */
-        if (vec->u.vec->ref == 1)
-        {
-            svalue_t tmp;
-
-            /* Copy the indexed element into <tmp>
-             */
-            tmp = *item;
-
-            /* Invalidate the old space of the result value and free
-             * the vector.
-             */
-            item->type = T_INVALID;
-            free_array(vec->u.vec);
-
-            /* Return the result */
-            *sp = tmp;
+            if (str)
+                push_string(sp, str);
+            else
+                push_number(sp, 0);
             return sp;
         }
 
-        deref_array(vec->u.vec);
-
-        /* The vector continues to live: keep the refcount as it is
-         * and just assign the indexed element for the result.
-         */
-        assign_checked_svalue_no_free(sp, item);
-        return sp;
-      }
-
-    default:
-        inter_sp = sp;
-        inter_pc = pc;
-        errorf("(lvalue)Range index on illegal type '%s'.\n", typename(vec->type));
-        return NULL;
+        default:
+            fatal("(range_value)Illegal type for range lvalue '%s'.\n", typename(vec->type));
     }
-
-    /* NOTREACHED */
-    return NULL;
-} /* push_rindexed_value() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-push_aindexed_value (svalue_t *sp, bytecode_p pc)
-
-/* Operator F_AINDEX (string|vector v=sp[0], int   i=sp[-1])
- *
- * Compute the value (v[>i]) and push it onto the stack.
- * If the value would be a destructed object, 0 is pushed onto the stack
- * and the ref to the object is removed from the vector/mapping.
- */
-
-{
-    svalue_t *vec;  /* the indexed value */
-    svalue_t *i;    /* the index */
-
-    /* Get arguments */
-    i = sp;
-    vec = sp - 1;
-
-    switch (vec->type)
-    {
-    case T_STRING:
-      {
-        int c;
-
-        c = (unsigned char)
-            *get_string_a_item(vec, i, /* make_singular: */ MY_FALSE
-                              , /* allow_one_past: */ MY_TRUE
-                              , sp, pc);
-
-        /* Drop the args and return the result */
-
-        free_string_svalue(vec);
-
-        sp = vec; /* == sp-1 */
-        put_number(sp, c);
-        return sp;
-      }
-
-    case T_POINTER:
-      {
-        svalue_t *item;
-
-        item = get_vector_a_item(vec->u.vec, i, sp, pc);
-
-        /* Drop the arguments */
-        sp = vec;
-
-        /* Assign the indexed element to the sp entry holding vec.
-         * Decrement the vector ref manually to optimize the case that
-         * this is the last ref to the vector.
-         */
-        if (vec->u.vec->ref == 1)
-        {
-            svalue_t tmp;
-
-            /* Copy the indexed element into <tmp>
-             */
-            tmp = *item;
-
-            /* Invalidate the old space of the result value and free
-             * the vector.
-             */
-            item->type = T_INVALID;
-            free_array(vec->u.vec);
-
-            /* Return the result */
-            *sp = tmp;
-            return sp;
-        }
-
-        deref_array(vec->u.vec);
-
-        /* The vector continues to live: keep the refcount as it is
-         * and just assign the indexed element for the result.
-         */
-        assign_checked_svalue_no_free(sp, item);
-        return sp;
-      }
-
-    default:
-        inter_sp = sp;
-        inter_pc = pc;
-        errorf("(lvalue)Range index on illegal type '%s'.\n", typename(vec->type));
-        return NULL;
-    }
-
-    /* NOTREACHED */
-    return NULL;
-} /* push_aindexed_value() */
+}
 
 /*=========================================================================*/
 /*-------------------------------------------------------------------------*/
@@ -6503,35 +5382,6 @@ test_efun_args (int instr, int args, svalue_t *argp)
 } /* test_efun_args() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-unravel_lvalue_indirection(svalue_t *svp)
-// unravels any lvalue indirection if there is one
-{
-    switch(svp->type)
-    {
-        // handle lvalues/references.
-        case T_LVALUE:
-        case T_PROTECTED_LVALUE:
-            // trace LVALUE chain to the real svalue.
-            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
-                svp = svp->u.lvalue;
-            return svp;
-            
-        // these point directly to the referenced svalue.
-        case T_PROTECTED_STRING_RANGE_LVALUE:
-        case T_STRING_RANGE_LVALUE:
-        case T_PROTECTED_CHAR_LVALUE:
-        case T_POINTER_RANGE_LVALUE:
-        case T_PROTECTED_POINTER_RANGE_LVALUE:
-        case T_PROTECTOR_MAPPING:
-            return svp->u.lvalue;
-            
-    }
-    // Fall-through, no lvalue
-    return svp;
-} // unravel_lvalue_indirection
-
-/*-------------------------------------------------------------------------*/
 static INLINE Bool
 check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **svptype)
 // This function checks if <formal_type> and the svalue pointed to by <svp>
@@ -6543,8 +5393,13 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
 // which is useful for error messages. (The caller must free it afterwards.)
 {
     lpctype_t *valuetype = NULL;
+    svalue_t *bsvp = get_rvalue_no_collapse(svp, NULL);
 
-    svp = unravel_lvalue_indirection(svp);
+    if (bsvp == NULL)
+    {
+        assert(svp->type == T_LVALUE && svp->x.lvalue_type == LVALUE_PROTECTED_RANGE);
+        bsvp = &(svp->u.protected_range_lvalue->vec);
+    }
 
     // No type saved? Anything is possible...
     if (!formaltype)
@@ -6563,13 +5418,14 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
     }
 
     // Now, let's determine the compiler type corresponding to svp.
-    switch(svp->type)
+    switch(bsvp->type)
     {
         // These should anyway not happen...
         case T_INVALID:
         case T_CALLBACK:
         case T_ERROR_HANDLER:
         case T_BREAK_ADDR:
+        case T_LVALUE:
             if (svptype)
                 *svptype = lpctype_unknown;
             return MY_FALSE;
@@ -6593,7 +5449,7 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
                 if (member->t_class == TCLASS_ARRAY)
                 {
                     lpctype_t *element = member->t_array.element;
-                    vector_t *vec = svp->u.vec;
+                    vector_t *vec = bsvp->u.vec;
                     size_t i, size = VEC_SIZE(vec);
                     Bool correct = MY_TRUE;
 
@@ -6666,7 +5522,7 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
 
         case T_NUMBER:
             // Zero (0) is considered to be an element of any type.
-            if (svp->u.number == 0)
+            if (bsvp->u.number == 0)
             {
                 if (svptype)
                     *svptype = lpctype_mixed;
@@ -6685,7 +5541,7 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
             break;
 
         case T_STRUCT:
-            valuetype = get_struct_type(svp->u.strct->type);
+            valuetype = get_struct_type(bsvp->u.strct->type);
             break;
     }
 
@@ -7676,19 +6532,12 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
 setup_new_frame2 (bytecode_p funstart, svalue_t *sp
-                 , Bool allowRefs, Bool is_lambda)
+                 , Bool is_lambda)
 
 /* Before calling the function at <funstart>, massage the data on the
  * stack ending at <sp> to match the formal argumentlist of the function
  * (excessive args are removed, missing args are provided as 0),
  * and allocate the local variables on the stack.
- *
- * If <allowRefs> is TRUE, references may be passed as extended varargs
- * ('(varargs mixed *)'). Currently this is used only for simul efuns
- * and driver hooks.
- * TODO: Investigate if holding references in arrays is really such a
- * TODO:: a bad thing. Maybe it's just an implementation issue.
- * TODO:: This also affects apply_low() and call_lambda().
  *
  * <is_lambda> has to be TRUE if the function is a lambda closure.
  * This information is needed for proper tracing.
@@ -7767,21 +6616,10 @@ setup_new_frame2 (bytecode_p funstart, svalue_t *sp
              */
             v = allocate_uninit_array(i);
             while (--i >= 0)
-            {
-                if (!allowRefs && sp->type == T_LVALUE)
-                    num_arg = -1; /* mark error condition */
                 v->item[i] = *sp--;
-            }
 
             ++sp;
             put_array(sp, v);
-
-            if (num_arg < 0)
-            {
-                bytecode_p pc = funstart; /* for the ERROR() macro */
-
-                ERROR("Varargs argument passed by reference.\n");
-            }
 
             i = 0; /* All arguments are there now. */
         }
@@ -7844,13 +6682,11 @@ setup_new_frame2 (bytecode_p funstart, svalue_t *sp
 
 /*-------------------------------------------------------------------------*/
 static void
-setup_new_frame (int fx, program_t *inhProg, Bool allowRefs)
+setup_new_frame (int fx, program_t *inhProg)
 
 /* Setup a call for function <fx> in the current program.
  * If <inhProg> is not NULL, it is the program of the inherited function
  * to call.
- * If <allowRefs> is TRUE, references may be passed as extended varargs
- * ('(varargs mixed *)').
  * Result are the flags for the function. Global csp->funstart is set
  * to the start of the function bytecode.
  */
@@ -7934,7 +6770,7 @@ setup_new_frame (int fx, program_t *inhProg, Bool allowRefs)
      */
     csp->funstart = current_prog->program + (flags & FUNSTART_MASK);
 
-    inter_sp = setup_new_frame2(csp->funstart, inter_sp, allowRefs, MY_FALSE);
+    inter_sp = setup_new_frame2(csp->funstart, inter_sp, MY_FALSE);
 #ifdef DEBUG
     if (!current_object->variables && variable_index_offset)
         fatal("%s Fatal: new frame for object %p '%s' w/o variables, "
@@ -8041,8 +6877,6 @@ free_interpreter_temporaries (void)
  */
 
 {
-    free_protector_svalue(&last_indexing_protector);
-    last_indexing_protector.type = T_NUMBER;
     free_svalue(&indexing_quickfix);
     indexing_quickfix.type = T_NUMBER;
     free_svalue(&apply_return_value);
@@ -8817,7 +7651,7 @@ again:
          * <var_ix> is a uint8.
          */
         sp++;
-        assign_checked_svalue_no_free(sp, find_value((int)(LOAD_UINT8(pc))) );
+        assign_rvalue_no_free(sp, find_value((int)(LOAD_UINT8(pc))) );
         break;
 
     CASE(F_STRING);                /* --- string <ix>          --- */
@@ -9956,7 +8790,7 @@ again:
          * onto the stack.
          */
         sp++;
-        assign_local_svalue_no_free(sp, fp + LOAD_UINT8(pc));
+        assign_rvalue_no_free(sp, fp + LOAD_UINT8(pc));
         break;
 
     CASE(F_CATCH);       /* --- catch <flags> <offset> <guarded code> --- */
@@ -10068,61 +8902,13 @@ again:
         /* void inc (mixed & sp[0])
          *
          * Increment the (numeric) value designed by the lvalue on top
-         * of the stack, then remove the lvalue from the
-         * stack (not free()!, this lvalue is just a copy).
+         * of the stack, then remove the lvalue from the stack.
          */
-
-        svalue_t *svp;
-
-        /* Get the designated value */
         TYPE_TEST1(sp, T_LVALUE);
-        svp = sp->u.lvalue;
 
-        /* Now increment where we can */
-        if (svp->type == T_NUMBER)
-        {
-            if (svp->u.number == PINT_MAX)
-            {
-                ERRORF(("Numeric overflow: (%"PRIdPINT")++\n", 
-                        svp->u.number));
-                /* NOTREACHED */
-                break;
-            }
-            svp->u.number++;
-            sp--;
-            break;
-        }
-        else if (svp->type == T_FLOAT)
-        {
-            STORE_DOUBLE_USED
-            double d;
-
-            d = READ_DOUBLE(svp) + 1.0;
-            if (d < (-DBL_MAX) || d > DBL_MAX)
-                ERRORF(("Numeric overflow: (%g)++\n", READ_DOUBLE(svp)));
-            sp->type = T_FLOAT;
-            STORE_DOUBLE(svp, d);
-            sp--;
-            break;
-        }
-        else if (svp->type == T_CHAR_LVALUE)
-        {
-            (*svp->u.charp)++;
-            sp--;
-            break;
-        }
-        else if (svp->type == T_LVALUE
-              || svp->type == T_PROTECTED_LVALUE)
-        {
-            inter_sp = sp;
-            add_number_to_lvalue(svp, 1, NULL, NULL);
-            sp--;
-            break;
-        }
-
-        ERRORF(("Bad arg to ++: got '%s', expected numeric type.\n"
-               , typename(svp->type)
-               ));
+        inter_sp = sp;
+        add_number_to_lvalue("++", sp, 1, NULL, NULL);
+        pop_stack();
         break;
     }
 
@@ -10131,61 +8917,14 @@ again:
         /* void dec (mixed & sp[0])
          *
          * Decrement the (numeric) value designed by the lvalue on top
-         * of the stack, then remove the lvalue from the
-         * stack (not free()!, this lvalue is just a copy).
+         * of the stack, then remove the lvalue from the stack.
          */
 
-        svalue_t *svp;
-
-        /* Get the designated value */
         TYPE_TEST1(sp, T_LVALUE);
-        svp = sp->u.lvalue;
 
-        /* Now decrement where we can */
-        if (svp->type == T_NUMBER)
-        {
-            if (svp->u.number == PINT_MIN)
-            {
-                ERRORF(("Numeric overflow: (%"PRIdPINT")--\n", 
-                        svp->u.number));
-                /* NOTREACHED */
-                break;
-            }
-            svp->u.number--;
-            sp--;
-            break;
-        }
-        else if (svp->type == T_FLOAT)
-        {
-            STORE_DOUBLE_USED
-            double d;
-
-            d = READ_DOUBLE(svp) - 1.0;
-            if (d < (-DBL_MAX) || d > DBL_MAX)
-                ERRORF(("Numeric overflow: (%g)--\n", READ_DOUBLE(svp)));
-            sp->type = T_FLOAT;
-            STORE_DOUBLE(svp, d);
-            sp--;
-            break;
-        }
-        else if (svp->type == T_CHAR_LVALUE)
-        {
-            (*svp->u.charp)--;
-            sp--;
-            break;
-        }
-        else if (svp->type == T_LVALUE
-              || svp->type == T_PROTECTED_LVALUE)
-        {
-            inter_sp = sp;
-            add_number_to_lvalue(svp, -1,  NULL, NULL);
-            sp--;
-            break;
-        }
-
-        ERRORF(("Bad arg to --: got '%s', expected numeric type.\n"
-               , typename(svp->type)
-               ));
+        inter_sp = sp;
+        add_number_to_lvalue("--", sp, -1, NULL, NULL);
+        pop_stack();
         break;
     }
 
@@ -10195,60 +8934,17 @@ again:
          *
          * Increment the numeric value designated by the lvalue on top
          * of the stack, and replace the stack entry with the value
-         * before the increment. The lvalue itself is simply removed, not
-         * free()d.
+         * before the increment.
          */
 
-        svalue_t *svp;
+        svalue_t result;
 
-        /* Get the designated value */
         TYPE_TEST1(sp, T_LVALUE);
-        svp = sp->u.lvalue;
 
-        /* Do the push and increment */
-        if (svp->type == T_NUMBER)
-        {
-            if (svp->u.number == PINT_MAX)
-            {
-                ERRORF(("Numeric overflow: (%"PRIdPINT")++\n", 
-                        svp->u.number));
-                /* NOTREACHED */
-                break;
-            }
-            put_number(sp,  svp->u.number++ );
-            break;
-        }
-        else if (svp->type == T_FLOAT)
-        {
-            STORE_DOUBLE_USED
-            double d;
-
-            d = READ_DOUBLE(svp);
-            sp->type = T_FLOAT;
-            STORE_DOUBLE(sp, d);
-            d += 1.0;
-            if (d < (-DBL_MAX) || d > DBL_MAX)
-                ERRORF(("Numeric overflow: (%g)++\n", READ_DOUBLE(svp)));
-            STORE_DOUBLE(svp, d);
-            break;
-        }
-        else if (svp->type == T_CHAR_LVALUE)
-        {
-            put_number(sp,  (unsigned char)(*svp->u.charp) );
-            (*svp->u.charp)++;
-            break;
-        }
-        else if (svp->type == T_LVALUE
-              || svp->type == T_PROTECTED_LVALUE)
-        {
-            inter_sp = sp;
-            add_number_to_lvalue(svp, 1, sp, NULL);
-            break;
-        }
-
-        ERRORF(("Bad arg to ++: got '%s', expected numeric type.\n"
-               , typename(svp->type)
-               ));
+        inter_sp = sp;
+        add_number_to_lvalue("++", sp, 1, &result, NULL);
+        free_svalue(sp);
+        transfer_svalue_no_free(sp, &result);
         break;
     }
 
@@ -10258,60 +8954,17 @@ again:
          *
          * Decrement the numeric value designated by the lvalue on top
          * of the stack, and replace the stack entry with the value
-         * before the decrement. The lvalue itself is simply removed, not
-         * free()d.
+         * before the decrement.
          */
 
-        svalue_t *svp;
+        svalue_t result;
 
-        /* Get the designated value */
         TYPE_TEST1(sp, T_LVALUE);
-        svp = sp->u.lvalue;
 
-        /* Do the push and decrement */
-        if (svp->type == T_NUMBER)
-        {
-            if (svp->u.number == PINT_MIN)
-            {
-                ERRORF(("Numeric overflow: (%"PRIdPINT")--\n", 
-                        svp->u.number));
-                /* NOTREACHED */
-                break;
-            }
-            put_number(sp,  svp->u.number-- );
-            break;
-        }
-        else if (svp->type == T_FLOAT)
-        {
-            STORE_DOUBLE_USED
-            double d;
-
-            d = READ_DOUBLE(svp);
-            sp->type = T_FLOAT;
-            STORE_DOUBLE(sp, d);
-            d -= 1.0;
-            if (d < (-DBL_MAX) || d > DBL_MAX)
-                ERRORF(("Numeric overflow: (%g)--\n", READ_DOUBLE(svp)));
-            STORE_DOUBLE(svp, d);
-            break;
-        }
-        else if (svp->type == T_CHAR_LVALUE)
-        {
-            put_number(sp, (unsigned char)(*svp->u.charp) );
-            (*svp->u.charp)--;
-            break;
-        }
-        else if (svp->type == T_LVALUE
-              || svp->type == T_PROTECTED_LVALUE)
-        {
-            inter_sp = sp;
-            add_number_to_lvalue(svp, -1, sp, NULL);
-            break;
-        }
-
-        ERRORF(("Bad arg to --: got '%s', expected numeric type.\n"
-               , typename(svp->type)
-               ));
+        inter_sp = sp;
+        add_number_to_lvalue("--", sp, -1, &result, NULL);
+        free_svalue(sp);
+        transfer_svalue_no_free(sp, &result);
         break;
     }
 
@@ -10321,58 +8974,17 @@ again:
          *
          * Increment the numeric value designated by the lvalue on top
          * of the stack, and replace the stack entry with the incremented
-         * value. The lvalue itself is simply removed, not free()d.
+         * value.
          */
 
-        svalue_t *svp;
+        svalue_t result;
 
-        /* Get the designated value */
         TYPE_TEST1(sp, T_LVALUE);
-        svp = sp->u.lvalue;
 
-        /* Do the increment and push */
-        if (svp->type == T_NUMBER)
-        {
-            if (svp->u.number == PINT_MAX)
-            {
-                ERRORF(("Numeric overflow: ++(%"PRIdPINT")\n", 
-                        svp->u.number));
-                /* NOTREACHED */
-                break;
-            }
-            put_number(sp,  ++(svp->u.number) );
-            break;
-        }
-        else if (svp->type == T_FLOAT)
-        {
-            STORE_DOUBLE_USED
-            double d;
-
-            d = READ_DOUBLE(svp) + 1.0;
-            if (d < (-DBL_MAX) || d > DBL_MAX)
-                ERRORF(("Numeric overflow: ++(%g)\n", READ_DOUBLE(svp)));
-            sp->type = T_FLOAT;
-            STORE_DOUBLE(sp, d);
-            STORE_DOUBLE(svp, d);
-            break;
-        }
-        else if (svp->type == T_CHAR_LVALUE)
-        {
-            ++(*svp->u.charp);
-            put_number(sp,  (unsigned char)(*svp->u.charp) );
-            break;
-        }
-        else if (svp->type == T_LVALUE
-              || svp->type == T_PROTECTED_LVALUE)
-        {
-            inter_sp = sp;
-            add_number_to_lvalue(svp, 1, NULL, sp);
-            break;
-        }
-
-        ERRORF(("Bad arg to ++: got '%s', expected numeric type.\n"
-               , typename(svp->type)
-               ));
+        inter_sp = sp;
+        add_number_to_lvalue("++", sp, 1, NULL, &result);
+        free_svalue(sp);
+        transfer_svalue_no_free(sp, &result);
         break;
     }
 
@@ -10382,58 +8994,17 @@ again:
          *
          * Decrement the numeric value designated by the lvalue on top
          * of the stack, and replace the stack entry with the decremented
-         * value. The lvalue itself is simply removed, not free()d.
+         * value.
          */
 
-        svalue_t *svp;
+        svalue_t result;
 
-        /* Get the designated value */
         TYPE_TEST1(sp, T_LVALUE);
-        svp = sp->u.lvalue;
 
-        /* Do the decrement and push */
-        if (svp->type == T_NUMBER)
-        {
-            if (svp->u.number == PINT_MIN)
-            {
-                ERRORF(("Numeric overflow: --(%"PRIdPINT")\n", 
-                        svp->u.number));
-                /* NOTREACHED */
-                break;
-            }
-            put_number(sp,  --(svp->u.number) );
-            break;
-        }
-        else if (svp->type == T_FLOAT)
-        {
-            STORE_DOUBLE_USED
-            double d;
-
-            d = READ_DOUBLE(svp) - 1.0;
-            if (d < (-DBL_MAX) || d > DBL_MAX)
-                ERRORF(("Numeric overflow: --(%g)\n", READ_DOUBLE(svp)));
-            sp->type = T_FLOAT;
-            STORE_DOUBLE(sp, d);
-            STORE_DOUBLE(svp, d);
-            break;
-        }
-        else if (svp->type == T_CHAR_LVALUE)
-        {
-            --(*svp->u.charp);
-            put_number(sp,  (unsigned char)(*svp->u.charp) );
-            break;
-        }
-        else if (svp->type == T_LVALUE
-              || svp->type == T_PROTECTED_LVALUE)
-        {
-            inter_sp = sp;
-            add_number_to_lvalue(svp, -1, NULL, sp);
-            break;
-        }
-
-        ERRORF(("Bad arg to --: got '%s', expected numeric type.\n"
-               , typename(svp->type)
-               ));
+        inter_sp = sp;
+        add_number_to_lvalue("--", sp, -1, NULL, &result);
+        free_svalue(sp);
+        transfer_svalue_no_free(sp, &result);
         break;
     }
 
@@ -10489,18 +9060,14 @@ again:
          * assign_svalue().
          */
 
-        svalue_t *dest;
-
-        /* Get the designated lvalue */
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
             FATALF(("Bad left arg to F_ASSIGN: got '%s', expected 'lvalue'.\n"
                    , typename(sp->type)
                    ));
 #endif
-        dest = sp->u.lvalue;
-        assign_svalue(dest, sp-1);
-        sp--;
+        assign_svalue(sp, sp-1);
+        pop_stack();
         break;
     }
 
@@ -10520,8 +9087,9 @@ again:
                    , typename(sp->type)
                    ));
 #endif
-        transfer_svalue(sp->u.lvalue, sp-1);
-        sp -= 2;
+        transfer_svalue(sp, sp-1);
+        pop_stack();
+        sp--;
         break;
     }
 
@@ -11947,8 +10515,6 @@ again:
         break;
 
     CASE(F_NX_RANGE);               /* --- nx_range            --- */
-    CASE(F_RX_RANGE);               /* --- rx_range            --- */
-    CASE(F_AX_RANGE);               /* --- ax_range            --- */
         /* Push '1' onto the stack to make up for the missing
          * upper range bound, then fall through to the normal
          * range handling.
@@ -11956,205 +10522,49 @@ again:
         sp++;
         put_number(sp, 1);
         /* FALLTHROUGH */
+    CASE(F_NR_RANGE);               /* --- nr_range            --- */
+        sp = push_range_value(NR_RANGE, sp, pc);
+        break;
+
+    CASE(F_RX_RANGE);               /* --- rx_range            --- */
+        sp++;
+        put_number(sp, 1);
+        /* FALLTHROUGH */
+    CASE(F_RR_RANGE);               /* --- rr_range            --- */
+        sp = push_range_value(RR_RANGE, sp, pc);
+        break;
+
+    CASE(F_AX_RANGE);               /* --- ax_range            --- */
+        sp++;
+        put_number(sp, 1);
+        /* FALLTHROUGH */
+    CASE(F_AR_RANGE);               /* --- ar_range            --- */
+        sp = push_range_value(AR_RANGE, sp, pc);
+        break;
 
     CASE(F_RANGE);                  /* --- range               --- */
-    CASE(F_NR_RANGE);               /* --- nr_range            --- */
-    CASE(F_RN_RANGE);               /* --- rn_range            --- */
-    CASE(F_RR_RANGE);               /* --- rr_range            --- */
-    CASE(F_NA_RANGE);               /* --- na_range            --- */
-    CASE(F_AN_RANGE);               /* --- an_range            --- */
-    CASE(F_RA_RANGE);               /* --- ra_range            --- */
-    CASE(F_AR_RANGE);               /* --- ar_range            --- */
-    CASE(F_AA_RANGE);               /* --- aa_range            --- */
-      {
-        /* Compute the range sp[-1]..sp[0] from string/array sp[-2]
-         * and leave it on the stack.
-         * This code also handles the NX/RX/AX_RANGE, pretending that
-         * they are NR/RR/AR_RANGEs.
-         */
-
-        if (sp[-1].type != T_NUMBER)
-            ERRORF(("Bad type '%s' of start interval to [..] range.\n"
-                   , typename(sp[-1].type)
-                   ));
-        if (sp[0].type != T_NUMBER)
-            ERRORF(("Bad type '%s' of end interval to [..] range.\n"
-                   , typename(sp[0].type)
-                   ));
-
-        if (sp[-2].type == T_POINTER)
-        {
-            /* Slice a range from an array */
-
-            vector_t *v;
-            p_int size, i1, i2;
-
-            size = VEC_SIZE(sp[-2].u.vec);
-
-            if (instruction == F_RANGE
-             || instruction == F_NR_RANGE
-             || instruction == F_NA_RANGE
-             || instruction == F_NX_RANGE)
-                i1 = sp[-1].u.number;
-            else
-            if (instruction == F_AN_RANGE
-             || instruction == F_AR_RANGE
-             || instruction == F_AA_RANGE
-             || instruction == F_AX_RANGE)
-            {
-                if (sp[-1].u.number < 0)
-                    i1 = size + sp[-1].u.number;
-                else
-                    i1 = sp[-1].u.number;
-            }
-            else
-                i1 = size - sp[-1].u.number;
-
-            if (instruction == F_RANGE
-             || instruction == F_RN_RANGE
-             || instruction == F_AN_RANGE)
-                i2 = sp[0].u.number;
-            else
-            if (instruction == F_NA_RANGE
-             || instruction == F_RA_RANGE
-             || instruction == F_AA_RANGE)
-            {
-                if (sp[0].u.number < 0)
-                    i2 = size + sp[0].u.number;
-                else
-                    i2 = sp[0].u.number;
-            }
-            else
-                i2 = size - sp[0].u.number;
-
-            if (runtime_array_range_check)
-            {
-                if (i1 < 0 || i1 >= size)
-                {
-                    if (i2 < 0 || i2 >= size)
-                        WARNF(("Warning: Out-of-bounds range limits: [%"
-                               PRIdPINT"..%"PRIdPINT"], size %"PRIdPINT".\n"
-                              , i1, i2, size));
-                    else
-                        WARNF(("Warning: Out-of-bounds lower range limits: %"
-                               PRIdPINT", size %"PRIdPINT".\n"
-                              , i1, size));
-                }
-                else if (i2 < 0 || i2 >= size)
-                {
-                    WARNF(("Warning: Out-of-bounds upper range limits: %"
-                           PRIdPINT", size %"PRIdPINT".\n"
-                          , i2, size));
-                }
-                else if (i1 > i2)
-                {
-                    WARNF(("Warning: Ranges of negative size: %"PRIdPINT
-                           "..%"PRIdPINT".\n"
-                          , i1, i2));
-                }
-            }
-
-            if (i2 >= size)
-            {
-                i2 = size - 1;
-            }
-
-            pop_stack();
-            pop_stack();
-
-            v = slice_array(sp->u.vec, i1, i2);
-
-            free_array(sp->u.vec);
-            if (v)
-            {
-                sp->u.vec = v;
-            }
-            else
-            {
-                put_number(sp, 0);
-            }
-        }
-        else if (sp[-2].type == T_STRING)
-        {
-            /* Slice a range from string */
-
-            p_int len, from, to;
-            string_t *res;
-
-            len = mstrsize(sp[-2].u.str);
-            if (instruction == F_RANGE
-             || instruction == F_NR_RANGE
-             || instruction == F_NX_RANGE
-             || instruction == F_NA_RANGE)
-                from = sp[-1].u.number;
-            else
-            if (instruction == F_AN_RANGE
-             || instruction == F_AR_RANGE
-             || instruction == F_AX_RANGE
-             || instruction == F_AA_RANGE)
-            {
-                if (sp[-1].u.number < 0)
-                    from = len + sp[-1].u.number;
-                else
-                    from = sp[-1].u.number;
-            }
-            else
-                from = len - sp[-1].u.number;
-            if (from < 0)
-            {
-                from = 0;
-            }
-
-            if (instruction == F_RANGE
-             || instruction == F_RN_RANGE
-             || instruction == F_AN_RANGE)
-                to = sp[0].u.number;
-            else
-            if (instruction == F_NA_RANGE
-             || instruction == F_RA_RANGE
-             || instruction == F_AA_RANGE)
-            {
-                if (sp[0].u.number < 0)
-                    to = len + sp[0].u.number;
-                else
-                    to = sp[0].u.number;
-            }
-            else
-                to = len - sp[0].u.number;
-            if (to >= len)
-                to = len-1;
-
-            if (to < from)
-            {
-                pop_n_elems(3);
-                push_ref_string(sp, STR_EMPTY);
-                break;
-            }
-
-            if (to == len-1)
-            {
-                res = mstr_extract(sp[-2].u.str, from, -1);
-            }
-            else
-            {
-                res = mstr_extract(sp[-2].u.str, from, to);
-            }
-
-            if (res == NULL)
-            {
-                ERRORF(("Out of memory (%"PRIdPINT" bytes).\n", to-from+1));
-            }
-            pop_n_elems(3);
-            push_string(sp, res);
-        }
-        else
-        {
-            ERRORF(("Bad argument to [..] operand: got %s, "
-                    "expected string/array.\n", typename(sp[-2].type)
-                    ));
-        }
+        sp = push_range_value(NN_RANGE, sp, pc);
         break;
-      }
+
+    CASE(F_RN_RANGE);               /* --- rn_range            --- */
+        sp = push_range_value(RN_RANGE, sp, pc);
+        break;
+
+    CASE(F_NA_RANGE);               /* --- na_range            --- */
+        sp = push_range_value(NA_RANGE, sp, pc);
+        break;
+
+    CASE(F_AN_RANGE);               /* --- an_range            --- */
+        sp = push_range_value(AN_RANGE, sp, pc);
+        break;
+
+    CASE(F_RA_RANGE);               /* --- ra_range            --- */
+        sp = push_range_value(RA_RANGE, sp, pc);
+        break;
+
+    CASE(F_AA_RANGE);               /* --- aa_range            --- */
+        sp = push_range_value(AA_RANGE, sp, pc);
+        break;
 
     CASE(F_ADD_EQ);                 /* --- add_eq              --- */
     CASE(F_VOID_ADD_EQ);            /* --- void_add_eq         --- */
@@ -12179,6 +10589,7 @@ again:
         short type2;         /* type and value of sp[-1] */
         union u u2;
         svalue_t *argp; /* the actual value of sp[0] */
+        svalue_t *lval;
 
         type2 = sp[-1].type;
         u2 = sp[-1].u;
@@ -12187,11 +10598,61 @@ again:
         TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
-        /* Set argp to the actual value designated by sp[0] */
-        for ( argp = sp->u.lvalue
-            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
-            ; argp = argp->u.lvalue)
-            NOOP;
+        /* Set argp to the actual value designated by sp[0].
+         * We handle special lvalues right away.
+         */
+        argp = NULL;
+        lval = get_unprotected_lvalue(sp);
+
+        switch (lval->x.lvalue_type)
+        {
+            default:
+                fatal("(F_ADD_EQ) Illegal lvalue %p type %d\n", lval, lval->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_UNPROTECTED:
+                argp = lval->u.lvalue;
+                break;
+
+            case LVALUE_UNPROTECTED_CHAR:
+                if (type2 == T_NUMBER)
+                {
+                    p_int left = (unsigned char)*current_unprotected_char.charp;
+                    p_int right = u2.number;
+
+                    if ((left >= 0 && right >= 0 && PINT_MAX - left < right)
+                     || (left < 0 && right < 0 && PINT_MIN - left > right)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %"PRIdPINT" += %"PRIdPINT"\n"
+                               , left, right));
+                        /* NOTREACHED */
+                        break;
+                    }
+
+                    *current_unprotected_char.charp = (left += right);
+                    pop_stack();
+
+                    if (instruction == F_VOID_ADD_EQ)
+                        pop_stack();
+                    else
+                        sp->u.number = left; /* It is already a T_NUMBER. */
+                }
+                else
+                {
+                    OP_ARG_ERROR(2, TF_NUMBER, type2);
+                    /* NOTREACHED */
+                }
+                break;
+
+            case LVALUE_UNPROTECTED_RANGE:
+                ERRORF(("Bad argument to +=: Addition to a range is not implemented.\n"));
+                break; /* NOTREACHED */
+        }
+
+        if(argp == NULL) /* Already handled. */
+            break;
 
         /* Now do it */
         switch(argp->type)
@@ -12215,8 +10676,6 @@ again:
                 new_string = mstr_add(left, right);
                 if (!new_string)
                     ERRORF(("Out of memory (%zu bytes)\n", len));
-                free_string_svalue(sp-1);
-                sp -= 2;
             }
             else if (type2 == T_NUMBER)
             {
@@ -12234,7 +10693,6 @@ again:
                     ERRORF(("Out of memory (%lu bytes)\n"
                            , (unsigned long) len
                            ));
-                sp -= 2;
             }
             else if (type2 == T_FLOAT)
             {
@@ -12250,7 +10708,6 @@ again:
                 new_string = mstr_add_txt(argp->u.str, buff, strlen(buff));
                 if (!new_string)
                     ERRORF(("Out of memory (%zu bytes).\n", len));
-                sp -= 2;
             }
             else
             {
@@ -12280,14 +10737,7 @@ again:
                     break;
                 }
 
-                if (instruction == F_VOID_ADD_EQ)
-                {
-                    argp->u.number += u2.number;
-                    sp -= 2;
-                    goto again;
-                }
-                (--sp)->u.number = argp->u.number += u2.number;
-                goto again;
+                argp->u.number += u2.number;
             }
             else if (type2 == T_FLOAT)
             {
@@ -12300,16 +10750,6 @@ again:
                            , argp->u.number, READ_DOUBLE(sp-1)));
                 argp->type = T_FLOAT;
                 STORE_DOUBLE(argp, sum);
-                if (instruction == F_VOID_ADD_EQ)
-                {
-                    sp -= 2;
-                    goto again;
-                }
-
-                --sp;
-                sp->type = T_FLOAT;
-                STORE_DOUBLE(sp, sum);
-                goto again;
             }
             else if (type2 == T_STRING)
             {
@@ -12327,53 +10767,9 @@ again:
                 res = mstr_add_to_txt(buff, strlen(buff), right);
                 if (!res)
                     ERRORF(("Out of memory (%zu bytes)\n", len));
-                free_string_svalue(sp-1);
 
                 /* Overwrite the number in argp */
                 put_string(argp, res);
-
-                if (instruction == F_VOID_ADD_EQ)
-                {
-                    sp -= 2;
-                    goto again;
-                }
-
-                --sp;
-                put_ref_string(sp, res);
-
-                goto again;
-            }
-            else
-            {
-                OP_ARG_ERROR(2, TF_NUMBER, type2);
-                /* NOTREACHED */
-            }
-            break;
-
-        case T_CHAR_LVALUE:  /* Add to a character in a string */
-            if (type2 == T_NUMBER)
-            {
-                p_int left = (unsigned char)*argp->u.charp;
-                p_int right = u2.number;
-
-                if ((left >= 0 && right >= 0 && PINT_MAX - left < right)
-                 || (left < 0 && right < 0 && PINT_MIN - left > right)
-                   )
-                {
-                    ERRORF(("Numeric overflow: %"PRIdPINT" += %"PRIdPINT"\n"
-                           , left, right));
-                    /* NOTREACHED */
-                    break;
-                }
-
-                if (instruction == F_VOID_ADD_EQ)
-                {
-                    *argp->u.charp += u2.number;
-                    sp -= 2;
-                    goto again;
-                }
-                (--sp)->u.number = (unsigned char)(*argp->u.charp += u2.number);
-                goto again;
             }
             else
             {
@@ -12391,8 +10787,6 @@ again:
             else
             {
                 add_to_mapping(argp->u.map, u2.map);
-                sp -= 2;
-                free_mapping(u2.map);
                 if ((max_mapping_size && MAP_TOTAL_SIZE(argp->u.map) > (p_int)max_mapping_size)
                  || (max_mapping_keys && MAP_SIZE(argp->u.map) > (p_int)max_mapping_keys)
                   )
@@ -12420,21 +10814,14 @@ again:
             }
             else
             {
-                vector_t *v;
-
                 inter_sp = sp;
                 inter_pc = pc;
                 DYN_ARRAY_COST(VEC_SIZE(u2.vec)+VEC_SIZE(argp->u.vec));
-                v = inter_add_array(u2.vec, &argp->u.vec);
-                if (instruction == F_VOID_ADD_EQ)
-                {
-                    sp -= 2;
-                    goto again;
-                }
-                sp--;
-                sp->u.vec = ref_array(v);
-                goto again;
-                }
+                inter_add_array(u2.vec, &argp->u.vec);
+
+                /* The reference of sp[-1] is gone. */
+                sp[-1].type = T_INVALID;
+            }
             break;
 
         case T_FLOAT:  /* Add to a float */
@@ -12451,7 +10838,6 @@ again:
                     ERRORF(("Numeric overflow: %g + %g\n"
                            , READ_DOUBLE(argp), READ_DOUBLE(sp-1)));
                 STORE_DOUBLE(argp, d);
-                sp -= 2;
             }
             else if (type2 == T_NUMBER)
             {
@@ -12463,7 +10849,6 @@ again:
                     ERRORF(("Numeric overflow: %g + %"PRIdPINT"\n"
                            , READ_DOUBLE(argp), (sp-1)->u.number));
                 STORE_DOUBLE(argp, d);
-                sp -= 2;
             }
             else
             {
@@ -12477,6 +10862,9 @@ again:
                         , argp->type);
             /* NOTREACHED */
         } /* end of switch */
+
+        /* Remove the arguments from the stack. */
+        pop_n_elems(2);
 
         /* If the instruction is F_ADD_EQ, leave the result on the stack */
         if (instruction != F_VOID_ADD_EQ)
@@ -12506,6 +10894,7 @@ again:
         short type2;         /* type and value of sp[-1] */
         union u u2;
         svalue_t *argp; /* the actual value of sp[0] */
+        svalue_t *lval;
 
         type2 = sp[-1].type;
         u2 = sp[-1].u;
@@ -12514,11 +10903,57 @@ again:
         TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
-        /* Set argp to the actual value designated by sp[0] */
-        for ( argp = sp->u.lvalue
-            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
-            ; argp = argp->u.lvalue)
-            NOOP;
+        /* Set argp to the actual value designated by sp[0].
+         * We handle special lvalues right away.
+         */
+        argp = NULL;
+        lval = get_unprotected_lvalue(sp);
+
+        switch (lval->x.lvalue_type)
+        {
+            default:
+                fatal("(F_SUB_EQ) Illegal lvalue %p type %d\n", lval, lval->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_UNPROTECTED:
+                argp = lval->u.lvalue;
+                break;
+
+            case LVALUE_UNPROTECTED_CHAR:
+                if (type2 == T_NUMBER)
+                {
+                    p_int left = (unsigned char)*current_unprotected_char.charp;
+                    p_int right = u2.number;
+
+                    if ((left >= 0 && right < 0 && PINT_MAX + right < left)
+                     || (left < 0 && right >= 0 && PINT_MIN + right > left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %"PRIdPINT" -= %"PRIdPINT"\n"
+                               , left, right));
+                        /* NOTREACHED */
+                        break;
+                    }
+
+                    *current_unprotected_char.charp = (left -= right);
+                    pop_stack();
+                    sp->u.number = left; /* It is already a T_NUMBER. */
+                }
+                else
+                {
+                    OP_ARG_ERROR(2, TF_NUMBER, type2);
+                    /* NOTREACHED */
+                }
+                break;
+
+            case LVALUE_UNPROTECTED_RANGE:
+                ERRORF(("Bad argument to -=: Subtraction from a range is not implemented.\n"));
+                break; /* NOTREACHED */
+        }
+
+        if(argp == NULL) /* Already handled. */
+            break;
 
         /* Now do it */
         switch (argp->type)
@@ -12538,106 +10973,67 @@ again:
                     /* NOTREACHED */
                     break;
                 }
-                sp--;
-                sp->u.number = argp->u.number -= u2.number;
-                break;
+                argp->u.number -= u2.number;
             }
-
-            if (type2 == T_FLOAT)
+            else if (type2 == T_FLOAT)
             {
                 STORE_DOUBLE_USED
                 double diff;
 
-                sp--;
-                diff = (double)(argp->u.number) - READ_DOUBLE(sp);
+                diff = (double)(argp->u.number) - READ_DOUBLE(sp-1);
                 if (diff < (-DBL_MAX) || diff > DBL_MAX)
                     ERRORF(("Numeric overflow: %"PRIdPINT" - %g\n"
-                           , argp->u.number, READ_DOUBLE(sp)));
-                STORE_DOUBLE(sp, diff);
-                sp->type = T_FLOAT;
-                assign_svalue_no_free(argp, sp);
-                break;
+                           , argp->u.number, READ_DOUBLE(sp-1)));
+                argp->type = T_FLOAT;
+                STORE_DOUBLE(argp, diff);
             }
-
-            /* type2 of the wrong type */
-            OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, type2);
-            /* NOTREACHED */
-            break;
-
-        case T_CHAR_LVALUE:  /* Subtract from a char in a string */
-            if (type2 != T_NUMBER)
+            else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, type2);
+                /* type2 of the wrong type */
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, type2);
                 /* NOTREACHED */
             }
-
-            {
-                p_int left = (unsigned char)*argp->u.charp;
-                p_int right = u2.number;
-
-                if ((left >= 0 && right < 0 && PINT_MAX + right < left)
-                 || (left < 0 && right >= 0 && PINT_MIN + right > left)
-                   )
-                {
-                    ERRORF(("Numeric overflow: %"PRIdPINT" -= %"PRIdPINT"\n"
-                           , left, right));
-                    /* NOTREACHED */
-                    break;
-                }
-            }
-
-            sp--;
-            sp->u.number = (unsigned char)(*argp->u.charp -= u2.number);
             break;
 
         case T_STRING:   /* Subtract from a string */
-        {
-            string_t * result;
-
-            if (type2 != T_STRING)
+            if (type2 == T_STRING)
+            {
+                string_t * result;
+                inter_sp = sp;
+                result = intersect_strings(argp->u.str, (sp-1)->u.str, MY_TRUE);
+                free_string_svalue(argp);
+                put_string(argp, result);
+            }
+            else
             {
                 OP_ARG_ERROR(2, TF_STRING, type2);
                 /* NOTREACHED */
             }
-
-            inter_sp = sp;
-            result = intersect_strings(argp->u.str, (sp-1)->u.str, MY_TRUE);
-            free_string_svalue(argp);
-            put_string(argp, result);
-            free_svalue(sp);
-            sp--;
-            free_string_svalue(sp);
-            put_ref_string(sp, result);
             break;
-        }
 
         case T_POINTER:  /* Subtract from an array */
-          {
-            vector_t *v, *v_old;
+            if (type2 == T_POINTER)
+            {
+                vector_t *v;
+                v = u2.vec;
 
-            if (type2 != T_POINTER)
+                /* Duplicate the minuend array if necessary, as
+                 * the subtraction will change and free it
+                 */
+                if (v->ref > 1)
+                {
+                    deref_array(v);
+                    v = slice_array(v, 0, (mp_int)VEC_SIZE(v)-1 );
+                }
+                argp->u.vec = subtract_array(argp->u.vec, v);
+                sp[-1].type = T_INVALID; /* subtract_array used that reference. */
+            }
+            else
             {
                 OP_ARG_ERROR(2, TF_POINTER, type2);
                 /* NOTREACHED */
             }
-
-            v = u2.vec;
-
-            /* Duplicate the minuend array if necessary, as
-             * the subtraction will change and free it
-             */
-            if (v->ref > 1)
-            {
-                deref_array(v);
-                v = slice_array(v, 0, (mp_int)VEC_SIZE(v)-1 );
-            }
-            sp--;
-            v_old = argp->u.vec;
-            v = subtract_array(v_old, v);
-            argp->u.vec = v;
-            put_ref_array(sp, v);
             break;
-          }
 
         case T_FLOAT:  /* Subtract from a float */
             if (type2 == T_FLOAT)
@@ -12648,26 +11044,22 @@ again:
                 /* don't use the address of u2, this would prevent putting it
                  * in a register
                  */
-                sp--;
-                d = READ_DOUBLE(argp) - READ_DOUBLE(sp);
+                d = READ_DOUBLE(argp) - READ_DOUBLE(sp-1);
                 if (d < (-DBL_MAX) || d > DBL_MAX)
                     ERRORF(("Numeric overflow: %g + %g\n"
-                           , READ_DOUBLE(argp), READ_DOUBLE(sp)));
+                           , READ_DOUBLE(argp), READ_DOUBLE(sp-1)));
                 STORE_DOUBLE(argp, d);
-                *sp = *argp;
             }
             else if (type2 == T_NUMBER)
             {
                 STORE_DOUBLE_USED
                 double d;
 
-                sp--;
-                d = READ_DOUBLE(argp) - (double)sp->u.number;
+                d = READ_DOUBLE(argp) - (double)sp[-1].u.number;
                 if (d < (-DBL_MAX) || d > DBL_MAX)
                     ERRORF(("Numeric overflow: %g + %"PRIdPINT"\n"
-                           , READ_DOUBLE(argp), sp->u.number));
+                           , READ_DOUBLE(argp), sp[-1].u.number));
                 STORE_DOUBLE(argp, d);
-                *sp = *argp;
             }
             else
             {
@@ -12681,8 +11073,7 @@ again:
             {
                 mapping_t *m;
 
-                sp--;
-                m = sp->u.map;
+                m = sp[-1].u.map;
 
                 /* Test for the special case 'm - m'
                  * Note: do not return a new empty mapping, argp->u.map must be changed.
@@ -12698,12 +11089,7 @@ again:
 
                 walk_mapping(m, sub_from_mapping_filter, argp->u.map);
                 free_mapping(m);
-                sp->u.map = ref_mapping(argp->u.map);
-            }
-            else if (type2 == T_MAPPING && sp[-1].u.map->num_values)
-            {
-                ERROR("Bad right arg to -=: mapping has values.\n");
-                /* NOTREACHED */
+                sp[-1].type = T_INVALID;
             }
             else
             {
@@ -12717,6 +11103,9 @@ again:
                         , argp->type);
             /* NOTREACHED */
         } /* end of switch */
+
+        pop_n_elems(2);
+        assign_svalue_no_free(++sp, argp);
         break;
     }
 
@@ -12736,25 +11125,99 @@ again:
          */
 
         svalue_t *argp;
+        svalue_t *lval;
 
 #ifdef DEBUG
         TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
-        /* Set argp to the actual value designated by sp[0] */
-        for ( argp = sp->u.lvalue
-            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
-            ; argp = argp->u.lvalue)
-            NOOP;
+        /* Set argp to the actual value designated by sp[0].
+         * We handle special lvalues right away.
+         */
+        argp = NULL;
+        lval = get_unprotected_lvalue(sp);
+
+        switch (lval->x.lvalue_type)
+        {
+            default:
+                fatal("(F_MULT_EQ) Illegal lvalue %p type %d\n", lval, lval->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_UNPROTECTED:
+                argp = lval->u.lvalue;
+                break;
+
+            case LVALUE_UNPROTECTED_CHAR:
+                if (sp[-1].type == T_NUMBER)
+                {
+                    p_int left = (unsigned char)*current_unprotected_char.charp;
+                    p_int right = sp[-1].u.number;
+
+                    if (left > 0 && right > 0)
+                    {
+                        if ((left != 0 && PINT_MAX / left < right)
+                         || (right != 0 && PINT_MAX / right < left)
+                           )
+                        {
+                            ERRORF(("Numeric overflow: %"PRIdPINT" *= %"
+                                    PRIdPINT"\n", left, right));
+                            /* NOTREACHED */
+                            break;
+                        }
+                    }
+                    else if (left < 0 && right < 0)
+                    {
+                        if ((left != 0 && PINT_MAX / left > right)
+                         || (right != 0 && PINT_MAX / right > left)
+                           )
+                        {
+                            ERRORF(("Numeric overflow: %"PRIdPINT" *= %"
+                                    PRIdPINT"\n", left, right));
+                            /* NOTREACHED */
+                            break;
+                        }
+                    }
+                    else if (left != 0 && right != 0)
+                    {
+                        if ((left > 0 && PINT_MIN / left > right)
+                         || (right > 0 && PINT_MIN / right > left)
+                           )
+                        {
+                            ERRORF(("Numeric overflow: %"PRIdPINT" *= %"
+                                    PRIdPINT"\n", left, right));
+                            /* NOTREACHED */
+                            break;
+                        }
+                    }
+
+                    *current_unprotected_char.charp = (left *= right);
+                    pop_stack();
+                    sp->u.number = left; /* It is already a T_NUMBER. */
+                }
+                else
+                {
+                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    /* NOTREACHED */
+                }
+                break;
+
+            case LVALUE_UNPROTECTED_RANGE:
+                ERRORF(("Bad argument to *=: Multiplicating a range is not implemented.\n"));
+                break; /* NOTREACHED */
+        }
+
+        if(argp == NULL) /* Already handled. */
+            break;
 
         /* Now do it */
-        if (argp->type == T_NUMBER)
+        switch (argp->type)
         {
-            sp--;
-            if (sp->type == T_NUMBER)
+        case T_NUMBER:
+            if (sp[-1].type == T_NUMBER)
             {
                 p_int left = argp->u.number;
-                p_int right = sp->u.number;
+                p_int right = sp[-1].u.number;
 
                 if (left > 0 && right > 0)
                 {
@@ -12795,11 +11258,9 @@ again:
                         break;
                     }
                 }
-                sp->u.number = argp->u.number *= sp->u.number;
-                break;
+                argp->u.number *= sp[-1].u.number;
             } /* type2 == T_NUMBER */
-
-            if (sp->type == T_FLOAT)
+            else if (sp[-1].type == T_FLOAT)
             {
                 STORE_DOUBLE_USED
                 double product;
@@ -12808,203 +11269,152 @@ again:
                 if (product < (-DBL_MAX) || product > DBL_MAX)
                     ERRORF(("Numeric overflow: %"PRIdPINT" * %g\n"
                            , argp->u.number, READ_DOUBLE(sp)));
-                STORE_DOUBLE(sp, product);
-                sp->type = T_FLOAT;
-                assign_svalue_no_free(argp, sp);
-                break;
-            }
-
-            /* Unsupported type2 */
-            OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp->type);
-            /* NOTREACHED */
-        }
-
-        if (argp->type == T_CHAR_LVALUE)
-        {
-            sp--;
-            if (sp->type != T_NUMBER)
-            {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
-                /* NOTREACHED */
-            }
-            {
-                p_int left = (unsigned char)*argp->u.charp;
-                p_int right = sp->u.number;
-
-                if (left > 0 && right > 0)
-                {
-                    if ((left != 0 && PINT_MAX / left < right)
-                     || (right != 0 && PINT_MAX / right < left)
-                       )
-                    {
-                        ERRORF(("Numeric overflow: %"PRIdPINT" *= %"
-                                PRIdPINT"\n", left, right));
-                        /* NOTREACHED */
-                        break;
-                    }
-                }
-                else if (left < 0 && right < 0)
-                {
-                    if ((left != 0 && PINT_MAX / left > right)
-                     || (right != 0 && PINT_MAX / right > left)
-                       )
-                    {
-                        ERRORF(("Numeric overflow: %"PRIdPINT" *= %"
-                                PRIdPINT"\n", left, right));
-                        /* NOTREACHED */
-                        break;
-                    }
-                }
-                else if (left != 0 && right != 0)
-                {
-                    if ((left > 0 && PINT_MIN / left > right)
-                     || (right > 0 && PINT_MIN / right > left)
-                       )
-                    {
-                        ERRORF(("Numeric overflow: %"PRIdPINT" *= %"
-                                PRIdPINT"\n", left, right));
-                        /* NOTREACHED */
-                        break;
-                    }
-                }
-            }
-            sp->u.number = (unsigned char)(*argp->u.charp *= sp->u.number);
-            break;
-        }
-
-        if (argp->type == T_FLOAT)
-        {
-            STORE_DOUBLE_USED
-            double d;
-
-            sp--;
-            if (sp->type == T_FLOAT)
-            {
-                d = READ_DOUBLE(argp) * READ_DOUBLE(sp);
-                if (d < (-DBL_MAX) || d > DBL_MAX)
-                    ERRORF(("Numeric overflow: %g * %g\n"
-                           , READ_DOUBLE(argp), READ_DOUBLE(sp)));
-                STORE_DOUBLE(argp, d);
-                *sp = *argp;
-            }
-            else if (sp->type == T_NUMBER)
-            {
-                d = READ_DOUBLE(argp) * (double)sp->u.number;
-                if (d < (-DBL_MAX) || d > DBL_MAX)
-                    ERRORF(("Numeric overflow: %g * %"PRIdPINT"\n"
-                           , READ_DOUBLE(argp), sp->u.number));
-                STORE_DOUBLE(argp, d);
-                *sp = *argp;
+                argp->type = T_FLOAT;
+                STORE_DOUBLE(argp, product);
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp->type);
+                /* Unsupported type2 */
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp[-1].type);
                 /* NOTREACHED */
             }
             break;
-        }
 
-        if (argp->type == T_STRING)
-        {
-            string_t * result;
-            size_t reslen;
-            size_t len;
-
-            sp--;
-            if (sp->type != T_NUMBER)
+        case T_FLOAT:
+            if (sp[-1].type == T_FLOAT)
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                STORE_DOUBLE_USED
+                double d;
+
+                d = READ_DOUBLE(argp) * READ_DOUBLE(sp-1);
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g * %g\n"
+                           , READ_DOUBLE(argp), READ_DOUBLE(sp-1)));
+                STORE_DOUBLE(argp, d);
+            }
+            else if (sp[-1].type == T_NUMBER)
+            {
+                STORE_DOUBLE_USED
+                double d;
+
+                d = READ_DOUBLE(argp) * (double)sp[-1].u.number;
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g * %"PRIdPINT"\n"
+                           , READ_DOUBLE(argp), sp[-1].u.number));
+                STORE_DOUBLE(argp, d);
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp[-1].type);
                 /* NOTREACHED */
             }
-            if (sp->u.number < 0)
-            {
-                ERROR("Bad right arg to *=: negative number\n");
-                /* NOTREACHED */
-            }
-
-            len = mstrsize(argp->u.str);
-
-            if (len > (size_t)PINT_MAX
-             || (   len != 0
-                 && PINT_MAX / (p_int)len < sp->u.number)
-             || (   sp->u.number != 0
-                 && PINT_MAX / sp->u.number < (p_int)len)
-               )
-                ERRORF(("Result string too long (%"PRIdPINT" * %zu).\n"
-                       , sp->u.number, len
-                       ));
-
-            reslen = (size_t)sp->u.number * len;
-            result = mstr_repeat(argp->u.str, (size_t)sp->u.number);
-            if (!result)
-                ERRORF(("Out of memory (%zu bytes).\n", reslen));
-
-            DYN_STRING_COST(reslen)
-
-            free_string_svalue(argp);
-            put_string(argp, result);
-            assign_svalue_no_free(sp, argp);
             break;
-        }
 
-        if (argp->type == T_POINTER)
-        {
-            vector_t *result;
-            mp_int reslen;
-            p_uint len;
-
-            sp--;
-            if (sp->type != T_NUMBER)
+        case T_STRING:
+            if (sp[-1].type == T_NUMBER)
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
-                /* NOTREACHED */
-            }
-            if (sp->u.number < 0)
-            {
-                ERROR("Bad right arg to *=: negative number\n");
-                /* NOTREACHED */
-            }
+                string_t * result;
+                size_t reslen;
+                size_t len;
 
-            inter_sp = sp;
-            inter_pc = pc;
-            len = VEC_SIZE(argp->u.vec);
-            reslen = sp->u.number * (mp_int)len;
-            result = allocate_uninit_array(reslen);
-            DYN_ARRAY_COST(reslen);
-
-            if (sp->u.number > 0 && len)
-            {
-                p_uint left;
-                svalue_t *from, *to;
-
-                /* Seed result[] with one copy of the array.
-                 */
-                for ( from = argp->u.vec->item, to = result->item, left = len
-                    ; left
-                    ; from++, to++, left--)
+                if (sp[-1].u.number < 0)
                 {
-                    assign_svalue_no_free(to, from);
-                } /* for() seed */
+                    ERROR("Bad right arg to *=: negative number\n");
+                    /* NOTREACHED */
+                }
 
-                /* Now fill the remainder of the vector with
-                 * the values already copied in there.
-                 */
-                for (from = result->item, left = reslen - len
-                    ; left
-                    ; to++, from++, left--
-                    )
-                    assign_svalue_no_free(to, from);
-            } /* if (len) */
+                len = mstrsize(argp->u.str);
 
-            free_svalue(argp);
-            put_array(argp, result);
-            assign_svalue_no_free(sp, argp);
+                if (len > (size_t)PINT_MAX
+                 || (   len != 0
+                     && PINT_MAX / (p_int)len < sp[-1].u.number)
+                 || (   sp[-1].u.number != 0
+                     && PINT_MAX / sp[-1].u.number < (p_int)len)
+                   )
+                    ERRORF(("Result string too long (%"PRIdPINT" * %zu).\n"
+                           , sp[-1].u.number, len
+                           ));
+
+                reslen = (size_t)sp[-1].u.number * len;
+                result = mstr_repeat(argp->u.str, (size_t)sp[-1].u.number);
+                if (!result)
+                    ERRORF(("Out of memory (%zu bytes).\n", reslen));
+
+                DYN_STRING_COST(reslen)
+
+                free_string_svalue(argp);
+                put_string(argp, result);
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                /* NOTREACHED */
+            }
+            break;
+
+        case T_POINTER:
+            if (sp[-1].type == T_NUMBER)
+            {
+                vector_t *result;
+                mp_int reslen;
+                p_uint len;
+
+                if (sp[-1].u.number < 0)
+                {
+                    ERROR("Bad right arg to *=: negative number\n");
+                    /* NOTREACHED */
+                }
+
+                inter_sp = sp;
+                inter_pc = pc;
+                len = VEC_SIZE(argp->u.vec);
+                reslen = sp[-1].u.number * (mp_int)len;
+                result = allocate_uninit_array(reslen);
+                DYN_ARRAY_COST(reslen);
+
+                if (sp[-1].u.number > 0 && len)
+                {
+                    p_uint left;
+                    svalue_t *from, *to;
+
+                    /* Seed result[] with one copy of the array.
+                     */
+                    for ( from = argp->u.vec->item, to = result->item, left = len
+                        ; left
+                        ; from++, to++, left--)
+                    {
+                        assign_svalue_no_free(to, from);
+                    } /* for() seed */
+
+                    /* Now fill the remainder of the vector with
+                     * the values already copied in there.
+                     */
+                    for (from = result->item, left = reslen - len
+                        ; left
+                        ; to++, from++, left--
+                        )
+                        assign_svalue_no_free(to, from);
+                } /* if (len) */
+
+                free_svalue(argp);
+                put_array(argp, result);
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                /* NOTREACHED */
+            }
+            break;
+
+        default:
+            OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_POINTER|TF_NUMBER
+                        , argp->type);
+            /* NOTREACHED */
             break;
         }
 
-        OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_POINTER|TF_NUMBER
-                    , argp->type);
-        /* NOTREACHED */
+        pop_n_elems(2);
+        assign_svalue_no_free(++sp, argp);
         break;
     }
 
@@ -13022,110 +11432,134 @@ again:
          */
 
         svalue_t *argp;
+        svalue_t *lval;
 
 #ifdef DEBUG
         TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
-        /* Set argp to the actual value designated by sp[0] */
-        for ( argp = sp->u.lvalue
-            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
-            ; argp = argp->u.lvalue)
-            NOOP;
+        /* Set argp to the actual value designated by sp[0].
+         * We handle special lvalues right away.
+         */
+        argp = NULL;
+        lval = get_unprotected_lvalue(sp);
+
+        switch (lval->x.lvalue_type)
+        {
+            default:
+                fatal("(F_DIV_EQ) Illegal lvalue %p type %d\n", lval, lval->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_UNPROTECTED:
+                argp = lval->u.lvalue;
+                break;
+
+            case LVALUE_UNPROTECTED_CHAR:
+                if (sp[-1].type == T_NUMBER)
+                {
+                    if (sp[-1].u.number == 0)
+                        ERROR("Division by zero\n");
+                    sp[-1].u.number = (unsigned char)(*current_unprotected_char.charp /= sp[-1].u.number);
+                    pop_stack();
+                }
+                else
+                {
+                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    /* NOTREACHED */
+                }
+                break;
+
+            case LVALUE_UNPROTECTED_RANGE:
+                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, T_POINTER);
+                break; /* NOTREACHED */
+        }
+
+        if(argp == NULL) /* Already handled. */
+            break;
 
         /* Now do it */
-        if (argp->type == T_NUMBER)
+        switch (argp->type)
         {
-            sp--;
-            if (sp->type == T_NUMBER)
+        case T_NUMBER:
+            if (sp[-1].type == T_NUMBER)
             {
-                if (sp->u.number == 0)
+                if (sp[-1].u.number == 0)
                     ERROR("Division by zero\n");
-                if (argp->u.number == PINT_MIN && sp->u.number == -1)
+                if (argp->u.number == PINT_MIN && sp[-1].u.number == -1)
                     ERRORF(("Numeric overflow: %"PRIdPINT" / -1\n"
                            , argp->u.number
                            ));
-                sp->u.number = argp->u.number /= sp->u.number;
-                break;
+                argp->u.number /= sp[-1].u.number;
             }
-
-            if (sp->type == T_FLOAT)
+            else if (sp[-1].type == T_FLOAT)
             {
                 double dtmp;
                 STORE_DOUBLE_USED
 
-                dtmp = READ_DOUBLE( sp );
+                dtmp = READ_DOUBLE( sp-1 );
                 if (dtmp == 0.)
                     ERROR("Division by zero\n");
                 dtmp = (double)argp->u.number / dtmp;
                 if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
                     ERRORF(("Numeric overflow: %"PRIdPINT" / %g\n"
-                           , argp->u.number, READ_DOUBLE(sp)));
-                STORE_DOUBLE(sp, dtmp);
-                sp->type = T_FLOAT;
-                assign_svalue_no_free(argp, sp);
-                break;
+                           , argp->u.number, READ_DOUBLE(sp-1)));
+                argp->type = T_FLOAT;
+                STORE_DOUBLE(argp, dtmp);
             }
-
-            /* Unsupported type2 */
-            OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp->type);
-            /* NOTREACHED */
-        }
-
-        if (argp->type == T_CHAR_LVALUE)
-        {
-            sp--;
-            if (sp->type != T_NUMBER)
+            else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* Unsupported type2 */
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp[-1].type);
                 /* NOTREACHED */
             }
-            if (sp->u.number == 0)
-                ERROR("Division by zero\n");
-            sp->u.number = (unsigned char)(*argp->u.charp /= sp->u.number);
             break;
-        }
 
-        if (argp->type == T_FLOAT)
-        {
-            STORE_DOUBLE_USED
-            double d;
-
-            sp--;
-            if (sp->type == T_FLOAT)
+        case T_FLOAT:
+            if (sp[-1].type == T_FLOAT)
             {
-                d = READ_DOUBLE(sp);
+                STORE_DOUBLE_USED
+                double d;
+
+                d = READ_DOUBLE(sp-1);
                 if (d == 0.0)
                     ERROR("Division by zero\n");
                 d = READ_DOUBLE(argp) / d;
                 if (d < (-DBL_MAX) || d > DBL_MAX)
                     ERRORF(("Numeric overflow: %g / %g\n"
-                           , READ_DOUBLE(argp), READ_DOUBLE(sp)));
+                           , READ_DOUBLE(argp), READ_DOUBLE(sp-1)));
                 STORE_DOUBLE(argp, d);
-                *sp = *argp;
             }
-            else if (sp->type == T_NUMBER)
+            else if (sp[-1].type == T_NUMBER)
             {
+                STORE_DOUBLE_USED
+                double d;
                 p_int i;
-                i = sp->u.number;
+
+                i = sp[-1].u.number;
                 if (i == 0)
                     ERROR("Division by zero\n");
                 d = READ_DOUBLE(argp) / (double)i;
                 if (d < (-DBL_MAX) || d > DBL_MAX)
                     ERRORF(("Numeric overflow: %g / %"PRIdPINT"\n"
-                           , READ_DOUBLE(argp), sp->u.number));
+                           , READ_DOUBLE(argp), sp[-1].u.number));
                 STORE_DOUBLE(argp, d);
-                *sp = *argp;
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp->type);
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp[-1].type);
                 /* NOTREACHED */
             }
             break;
+
+        default:
+            OP_ARG_ERROR(1, TF_FLOAT|TF_NUMBER, argp->type);
+            /* NOTREACHED */
         }
-        OP_ARG_ERROR(1, TF_FLOAT|TF_NUMBER, argp->type);
-        /* NOTREACHED */
+
+        pop_n_elems(2);
+        assign_svalue_no_free(++sp, argp);
+        break;
     }
 
     CASE(F_MOD_EQ);                 /* --- mod_eq              --- */
@@ -13142,48 +11576,77 @@ again:
          */
 
         svalue_t *argp;
+        svalue_t *lval;
 
 #ifdef DEBUG
         TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
-        /* Set argp to the actual value designated by sp[0] */
-        for ( argp = sp->u.lvalue
-            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
-            ; argp = argp->u.lvalue)
-            NOOP;
+        /* Set argp to the actual value designated by sp[0].
+         * We handle special lvalues right away.
+         */
+        argp = NULL;
+        lval = get_unprotected_lvalue(sp);
+
+        switch (lval->x.lvalue_type)
+        {
+            default:
+                fatal("(F_MOD_EQ) Illegal lvalue %p type %d\n", lval, lval->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_UNPROTECTED:
+                argp = lval->u.lvalue;
+                break;
+
+            case LVALUE_UNPROTECTED_CHAR:
+                if (sp[-1].type == T_NUMBER)
+                {
+                    if (sp[-1].u.number == 0)
+                        ERROR("Division by zero\n");
+                    sp[-1].u.number = (unsigned char)(*current_unprotected_char.charp %= sp[-1].u.number);
+                    pop_stack();
+                }
+                else
+                {
+                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    /* NOTREACHED */
+                }
+                break;
+
+            case LVALUE_UNPROTECTED_RANGE:
+                OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
+                break; /* NOTREACHED */
+        }
+
+        if(argp == NULL) /* Already handled. */
+            break;
 
         /* Now do it */
-        if (argp->type == T_NUMBER)
+        switch (argp->type)
         {
-            sp--;
-            if (sp->type != T_NUMBER)
+        case T_NUMBER:
+            if (sp[-1].type == T_NUMBER)
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                if (sp[-1].u.number == 0)
+                    ERROR("Division by zero\n");
+                argp->u.number %= sp[-1].u.number;
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
                 /* NOTREACHED */
             }
-            if (sp->u.number == 0)
-                ERROR("Division by zero\n");
-            sp->u.number = argp->u.number %= sp->u.number;
             break;
+
+        default:
+            OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+            /* NOTREACHED */
         }
 
-        if (argp->type == T_CHAR_LVALUE)
-        {
-            sp--;
-            if (sp->type != T_NUMBER)
-            {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
-                /* NOTREACHED */
-            }
-            if (sp->u.number == 0)
-                ERROR("Division by zero\n");
-            sp->u.number = (unsigned char)(*argp->u.charp %= sp->u.number);
-            break;
-        }
-
-        OP_ARG_ERROR(1, TF_NUMBER, argp->type);
-        /* NOTREACHED */
+        pop_n_elems(2);
+        assign_svalue_no_free(++sp, argp);
+        break;
     }
 
     CASE(F_AND_EQ);                 /* --- and_eq              --- */
@@ -13201,74 +11664,102 @@ again:
          */
 
         svalue_t *argp;
+        svalue_t *lval;
 
 #ifdef DEBUG
         TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
-        /* Set argp to the actual value designated by sp[0] */
-        for ( argp = sp->u.lvalue
-            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
-            ; argp = argp->u.lvalue)
-            NOOP;
+        /* Set argp to the actual value designated by sp[0].
+         * We handle special lvalues right away.
+         */
+        argp = NULL;
+        lval = get_unprotected_lvalue(sp);
+
+        switch (lval->x.lvalue_type)
+        {
+            default:
+                fatal("(F_AND_EQ) Illegal lvalue %p type %d\n", lval, lval->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_UNPROTECTED:
+                argp = lval->u.lvalue;
+                break;
+
+            case LVALUE_UNPROTECTED_CHAR:
+                if (sp[-1].type == T_NUMBER)
+                {
+                    sp[-1].u.number = (unsigned char)(*current_unprotected_char.charp &= sp[-1].u.number);
+                    pop_stack();
+                }
+                else
+                {
+                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    /* NOTREACHED */
+                }
+                break;
+
+            case LVALUE_UNPROTECTED_RANGE:
+                ERRORF(("Bad argument to &=: Intersecting a range is not implemented.\n"));
+                break; /* NOTREACHED */
+        }
+
+        if(argp == NULL) /* Already handled. */
+            break;
 
         /* Now do it */
-        if (argp->type == T_NUMBER)  /* Intersect a number */
+        switch (argp->type)
         {
-            if (sp[-1].type != T_NUMBER)
+        case T_NUMBER:  /* Intersect a number */
+            if (sp[-1].type == T_NUMBER)
+            {
+                argp->u.number &= sp[-1].u.number;
+            }
+            else
             {
                 OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
                 /* NOTREACHED */
             }
-            sp--;
-            sp->u.number = argp->u.number &= sp->u.number;
             break;
-        }
 
-        if (argp->type == T_CHAR_LVALUE)
-        {
-            sp--;
-            if (sp->type != T_NUMBER)
-            {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
-                /* NOTREACHED */
-            }
-            sp->u.number = (unsigned char)(*argp->u.charp &= sp->u.number);
-            break;
-        }
-
-        if (argp->type == T_POINTER)
-        {
+        case T_POINTER:
             /* Intersect an array */
-
             if (sp[-1].type == T_POINTER)
             {
                 vector_t *vec1, *vec2;
 
-                inter_sp = sp - 2;
                 vec1 = argp->u.vec;
                 vec2 = sp[-1].u.vec;
-                argp->type = T_NUMBER;
-                vec1 = intersect_array(vec1, vec2);
-                put_ref_array(argp, vec1);
-                sp--;
-                sp->u.vec = argp->u.vec;
-                free_svalue(sp+1);
+
+                /* intersect_array will free both arguments (also on errors).
+                 * With sp[-1] we can live without, the other we need.
+                 */
+                ref_array(vec1);
+                sp[-1].type = T_NUMBER;
+
+                inter_sp = sp;
+                argp->u.vec = intersect_array(vec1, vec2);
+
+                free_array(vec1);
             }
             else if (sp[-1].type == T_MAPPING)
             {
                 vector_t *vec;
                 mapping_t * map;
 
-                inter_sp = sp - 2;
                 vec = argp->u.vec;
                 map = sp[-1].u.map;
-                argp->type = T_NUMBER;
-                vec = map_intersect_array(vec, map);
-                put_ref_array(argp, vec);
-                sp--;
-                put_array(sp, argp->u.vec);
-                free_svalue(sp+1);
+
+                /* map_intersect_array frees both,
+                 * so taking an extra ref of the lvalue.
+                 */
+                ref_array(vec);
+                sp[-1].type = T_NUMBER;
+
+                inter_sp = sp;
+                argp->u.vec = map_intersect_array(vec, map);
+                free_array(vec);
             }
             else
             {
@@ -13276,55 +11767,46 @@ again:
                 /* NOTREACHED */
             }
             break;
-        }
 
-        if (argp->type == T_MAPPING)
-        {
+        case T_MAPPING:
             /* Intersect a mapping */
-
-            mapping_t *result;
-
-            if (sp[-1].type != T_POINTER && sp[-1].type != T_MAPPING)
+            if (sp[-1].type == T_POINTER || sp[-1].type == T_MAPPING)
+            {
+                 inter_sp = sp;
+                 argp->u.map = map_intersect(argp->u.map, sp-1);
+                 sp[-1].type = T_NUMBER; /* freed by map_intersect */
+            }
+            else
             {
                 OP_ARG_ERROR(2, TF_MAPPING|TF_POINTER, sp[-1].type);
                 /* NOTREACHED */
             }
-
-            inter_sp = sp;
-
-            result = map_intersect(argp->u.map, sp-1);
-
-            put_mapping(argp, result);
-
-            free_svalue(sp);
-            sp--;
-
-            put_ref_mapping(sp, result);
             break;
-        }
 
-        if (argp->type == T_STRING)
-        {
-            string_t * result;
+        case T_STRING:
+            if (sp[-1].type == T_STRING)
+            {
+                string_t * result;
 
-            if (sp[-1].type != T_STRING)
+                inter_sp = sp;
+                result = intersect_strings(argp->u.str, (sp-1)->u.str, MY_FALSE);
+
+                free_string_svalue(argp);
+                put_string(argp, result);
+            }
+            else
             {
                 OP_ARG_ERROR(2, TF_STRING, sp[-1].type);
                 /* NOTREACHED */
             }
-            inter_sp = sp;
-            result = intersect_strings(argp->u.str, (sp-1)->u.str, MY_FALSE);
-            free_string_svalue(argp);
-            put_string(argp, result);
-            free_svalue(sp);
-            sp--;
-            free_string_svalue(sp);
-            put_ref_string(sp, result);
             break;
+        default:
+            OP_ARG_ERROR(1, TF_NUMBER|TF_STRING|TF_POINTER, argp->type);
+            /* NOTREACHED */
         }
 
-        OP_ARG_ERROR(1, TF_NUMBER|TF_STRING|TF_POINTER, argp->type);
-        /* NOTREACHED */
+        pop_n_elems(2);
+        assign_svalue_no_free(++sp, argp);
         break;
     }
 
@@ -13339,68 +11821,95 @@ again:
          */
 
         svalue_t *argp;
+        svalue_t *lval;
 
 #ifdef DEBUG
         TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
-        /* Set argp to the actual value designated by sp[0] */
-        for ( argp = sp->u.lvalue
-            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
-            ; argp = argp->u.lvalue)
-            NOOP;
+        /* Set argp to the actual value designated by sp[0].
+         * We handle special lvalues right away.
+         */
+        argp = NULL;
+        lval = get_unprotected_lvalue(sp);
+
+        switch (lval->x.lvalue_type)
+        {
+            default:
+                fatal("(F_OR_EQ) Illegal lvalue %p type %d\n", lval, lval->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_UNPROTECTED:
+                argp = lval->u.lvalue;
+                break;
+
+            case LVALUE_UNPROTECTED_CHAR:
+                if (sp[-1].type == T_NUMBER)
+                {
+                    sp[-1].u.number = (unsigned char)(*current_unprotected_char.charp |= sp[-1].u.number);
+                    pop_stack();
+                }
+                else
+                {
+                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    /* NOTREACHED */
+                }
+                break;
+
+            case LVALUE_UNPROTECTED_RANGE:
+                ERRORF(("Bad argument to |=: Joining a range is not implemented.\n"));
+                break; /* NOTREACHED */
+        }
+
+        if(argp == NULL) /* Already handled. */
+            break;
 
         /* Now do it */
-        if (argp->type == T_NUMBER)
+        switch (argp->type)
         {
-            sp--;
-            if (sp->type != T_NUMBER)
+        case T_NUMBER:
+            if (sp[-1].type == T_NUMBER)
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                argp->u.number |= sp[-1].u.number;
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
                 /* NOTREACHED */
             }
-            sp->u.number = argp->u.number |= sp->u.number;
             break;
-        }
 
-        if (argp->type == T_CHAR_LVALUE)
-        {
-            sp--;
-            if (sp->type != T_NUMBER)
-            {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
-                /* NOTREACHED */
-            }
-            sp->u.number = (unsigned char)(*argp->u.charp |= sp->u.number);
-            break;
-        }
-
-        if (argp->type == T_POINTER)
-        {
+        case T_POINTER:
             /* Join an array */
+            if (sp[-1].type == T_POINTER)
+            {
+                vector_t *vec1, *vec2;
 
-            vector_t *vec1, *vec2;
+                inter_sp = sp;
+                inter_pc = pc;
 
-            if (sp[-1].type != T_POINTER)
+                vec1 = argp->u.vec;
+                vec2 = sp[-1].u.vec;
+
+                /* The new vec may be one of the original vec1 or vec2 */
+                argp->u.vec = join_array(vec1, vec2);
+                sp[-1].type = T_NUMBER; /* freed by join_array. */
+            }
+            else
             {
                 OP_ARG_ERROR(2, TF_POINTER, sp[-1].type);
                 /* NOTREACHED */
             }
-            inter_sp = sp;
-            inter_pc = pc;
-            vec1 = argp->u.vec;
-            vec2 = sp[-1].u.vec;
-            vec1 = join_array(vec1, vec2);
-              /* The new vec1 may be one of the original vec1 or vec2 */
-            put_ref_array(argp, vec1);
-            sp--;
-            sp->u.vec = argp->u.vec;
-            free_svalue(sp+1);
             break;
+
+        default:
+            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp->type);
+            /* NOTREACHED */
         }
 
-        OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp->type);
-        /* NOTREACHED */
+        pop_n_elems(2);
+        assign_svalue_no_free(++sp, argp);
         break;
     }
 
@@ -13417,67 +11926,93 @@ again:
          */
 
         svalue_t *argp;
+        svalue_t *lval;
 
 #ifdef DEBUG
         TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
-        /* Set argp to the actual value designated by sp[0] */
-        for ( argp = sp->u.lvalue
-            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
-            ; argp = argp->u.lvalue)
-            NOOP;
+        /* Set argp to the actual value designated by sp[0].
+         * We handle special lvalues right away.
+         */
+        argp = NULL;
+        lval = get_unprotected_lvalue(sp);
+
+        switch (lval->x.lvalue_type)
+        {
+            default:
+                fatal("(F_XOR_EQ) Illegal lvalue %p type %d\n", lval, lval->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_UNPROTECTED:
+                argp = lval->u.lvalue;
+                break;
+
+            case LVALUE_UNPROTECTED_CHAR:
+                if (sp[-1].type == T_NUMBER)
+                {
+                    sp[-1].u.number = (unsigned char)(*current_unprotected_char.charp ^= sp[-1].u.number);
+                    pop_stack();
+                }
+                else
+                {
+                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    /* NOTREACHED */
+                }
+                break;
+
+            case LVALUE_UNPROTECTED_RANGE:
+                ERRORF(("Bad argument to ^=: Symmetric difference with a range is not implemented.\n"));
+                break; /* NOTREACHED */
+        }
+
+        if(argp == NULL) /* Already handled. */
+            break;
 
         /* Now do it */
-        if (argp->type == T_NUMBER)
+        switch (argp->type)
         {
-            sp--;
-            if (sp->type != T_NUMBER)
+        case T_NUMBER:
+            if (sp[-1].type == T_NUMBER)
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                argp->u.number ^= sp[-1].u.number;
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
                 /* NOTREACHED */
             }
-            sp->u.number = argp->u.number ^= sp->u.number;
             break;
-        }
 
-        if (argp->type == T_CHAR_LVALUE)
-        {
-            sp--;
-            if (sp->type != T_NUMBER)
-            {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
-                /* NOTREACHED */
-            }
-            sp->u.number = (unsigned char)(*argp->u.charp ^= sp->u.number);
-            break;
-        }
-
-        if (argp->type == T_POINTER)
-        {
+        case T_POINTER:
             /* Symm-diff an array */
+            if (sp[-1].type == T_POINTER)
+            {
+                vector_t *vec1, *vec2;
 
-            vector_t *vec1, *vec2;
+                inter_sp = sp;
 
-            if (sp[-1].type != T_POINTER)
+                vec1 = argp->u.vec;
+                vec2 = sp[-1].u.vec;
+
+                argp->u.vec = symmetric_diff_array(vec1, vec2);
+                sp[-1].type = T_NUMBER; /* freed by symmetric_diff_array */
+            }
+            else
             {
                 OP_ARG_ERROR(2, TF_POINTER, sp[-1].type);
                 /* NOTREACHED */
             }
-            inter_sp = sp - 2;
-            vec1 = argp->u.vec;
-            vec2 = sp[-1].u.vec;
-            argp->type = T_NUMBER;
-            vec1 = symmetric_diff_array(vec1, vec2);
-            put_ref_array(argp, vec1);
-            sp--;
-            sp->u.vec = argp->u.vec;
-            free_svalue(sp+1);
             break;
+
+        default:
+            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp->type);
+            /* NOTREACHED */
         }
 
-        OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp->type);
-        /* NOTREACHED */
+        pop_n_elems(2);
+        assign_svalue_no_free(++sp, argp);
         break;
     }
 
@@ -13492,50 +12027,79 @@ again:
          * TODO: Implement an arithmetic shift.
          */
 
-        p_uint shift;
+        p_uint shift = sp[-1].u.number;
         svalue_t *argp;
+        svalue_t *lval;
 
 #ifdef DEBUG
         TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
-        /* Set argp to the actual value designated by sp[0] */
-        for ( argp = sp->u.lvalue
-            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
-            ; argp = argp->u.lvalue)
-            NOOP;
+        if (shift > MAX_SHIFT)
+            shift = MAX_SHIFT;
+
+        /* Set argp to the actual value designated by sp[0].
+         * We handle special lvalues right away.
+         */
+        argp = NULL;
+        lval = get_unprotected_lvalue(sp);
+
+        switch (lval->x.lvalue_type)
+        {
+            default:
+                fatal("(F_LSH_EQ) Illegal lvalue %p type %d\n", lval, lval->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_UNPROTECTED:
+                argp = lval->u.lvalue;
+                break;
+
+            case LVALUE_UNPROTECTED_CHAR:
+                if (sp[-1].type == T_NUMBER)
+                {
+                    if (shift > 8)
+                        shift = 8;
+                    sp[-1].u.number = (*(unsigned char*)current_unprotected_char.charp <<= shift);
+                    pop_stack();
+                }
+                else
+                {
+                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    /* NOTREACHED */
+                }
+                break;
+
+            case LVALUE_UNPROTECTED_RANGE:
+                OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
+                break; /* NOTREACHED */
+        }
+
+        if(argp == NULL) /* Already handled. */
+            break;
 
         /* Now do it */
-        if (argp->type == T_NUMBER)
+        switch (argp->type)
         {
-            sp--;
-            if (sp->type != T_NUMBER)
+        case T_NUMBER:
+            if (sp[-1].type == T_NUMBER)
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                argp->u.number <<= shift;
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
                 /* NOTREACHED */
             }
-            shift = sp->u.number;
-            argp->u.number <<= shift > MAX_SHIFT ? MAX_SHIFT : shift;
-            sp->u.number = argp->u.number;
             break;
+
+        default:
+            OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+            /* NOTREACHED */
         }
 
-        if (argp->type == T_CHAR_LVALUE)
-        {
-            sp--;
-            if (sp->type != T_NUMBER)
-            {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
-                /* NOTREACHED */
-            }
-            shift = sp->u.number;
-            *argp->u.charp <<= shift > MAX_SHIFT ? MAX_SHIFT : shift;
-            sp->u.number = (unsigned char)(*argp->u.charp);
-            break;
-        }
-
-        OP_ARG_ERROR(1, TF_NUMBER, argp->type);
-        /* NOTREACHED */
+        pop_n_elems(2);
+        assign_svalue_no_free(++sp, argp);
         break;
     }
 
@@ -13548,50 +12112,80 @@ again:
          *   int        >> int                -> int
          */
 
-        p_uint shift;
+        p_uint shift = sp[-1].u.number;
         svalue_t *argp;
+        svalue_t *lval;
 
 #ifdef DEBUG
         TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
-        /* Set argp to the actual value designated by sp[0] */
-        for ( argp = sp->u.lvalue
-            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
-            ; argp = argp->u.lvalue)
-            NOOP;
+        if (shift > MAX_SHIFT)
+            shift = MAX_SHIFT + 1;
+
+        /* Set argp to the actual value designated by sp[0].
+         * We handle special lvalues right away.
+         */
+        argp = NULL;
+        lval = get_unprotected_lvalue(sp);
+
+        switch (lval->x.lvalue_type)
+        {
+            default:
+                fatal("(F_RSH_EQ) Illegal lvalue %p type %d\n", lval, lval->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_UNPROTECTED:
+                argp = lval->u.lvalue;
+                break;
+
+            case LVALUE_UNPROTECTED_CHAR:
+                if (sp[-1].type == T_NUMBER)
+                {
+                    if (shift > 8)
+                        shift = 8;
+                    sp[-1].u.number = (*(unsigned char*)current_unprotected_char.charp >>= shift);
+                    pop_stack();
+                }
+                else
+                {
+                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    /* NOTREACHED */
+                }
+                break;
+
+            case LVALUE_UNPROTECTED_RANGE:
+                OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
+                break; /* NOTREACHED */
+        }
+
+        if(argp == NULL) /* Already handled. */
+            break;
 
         /* Now do it */
-        if (argp->type == T_NUMBER)
+        switch (argp->type)
         {
-            sp--;
-            if (sp->type != T_NUMBER)
+        case T_NUMBER:
+            if (sp[-1].type == T_NUMBER)
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                argp->u.number >>= shift;
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
                 /* NOTREACHED */
             }
-            shift = sp->u.number;
-            argp->u.number >>= shift > MAX_SHIFT ? (MAX_SHIFT+1) : shift;
-            sp->u.number = argp->u.number;
             break;
+
+        default:
+            OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+            /* NOTREACHED */
         }
 
-        if (argp->type == T_CHAR_LVALUE)
-        {
-            sp--;
-            if (sp->type != T_NUMBER)
-            {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
-                /* NOTREACHED */
-            }
-            shift = sp->u.number;
-            *argp->u.charp >>= shift > MAX_SHIFT ? MAX_SHIFT : shift;
-            sp->u.number = (unsigned char)(*argp->u.charp);
-            break;
-        }
-
-        OP_ARG_ERROR(1, TF_NUMBER, argp->type);
-        /* NOTREACHED */ break;
+        pop_n_elems(2);
+        assign_svalue_no_free(++sp, argp);
+        break;
     }
 
     CASE(F_RSHL_EQ);               /* --- rshl_eq              --- */
@@ -13603,55 +12197,82 @@ again:
          *   int        >>> int                -> int
          */
 
-        p_uint shift;
+        p_uint shift = sp[-1].u.number;
         svalue_t *argp;
+        svalue_t *lval;
+
 #ifdef DEBUG
         TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
-        /* Set argp to the actual value designated by sp[0] */
-        for ( argp = sp->u.lvalue
-            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
-            ; argp = argp->u.lvalue)
-            NOOP;
+        /* Set argp to the actual value designated by sp[0].
+         * We handle special lvalues right away.
+         */
+        argp = NULL;
+        lval = get_unprotected_lvalue(sp);
+
+        switch (lval->x.lvalue_type)
+        {
+            default:
+                fatal("(F_RSHL_EQ) Illegal lvalue %p type %d\n", lval, lval->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_UNPROTECTED:
+                argp = lval->u.lvalue;
+                break;
+
+            case LVALUE_UNPROTECTED_CHAR:
+                if (sp[-1].type == T_NUMBER)
+                {
+                    /* We treat the chars as unsigned, so
+                     * no difference here to F_RSH_EQ.
+                     */
+                    if (shift > 8)
+                        shift = 8;
+                    sp[-1].u.number = (*(unsigned char*)current_unprotected_char.charp >>= shift);
+                    pop_stack();
+                }
+                else
+                {
+                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    /* NOTREACHED */
+                }
+                break;
+
+            case LVALUE_UNPROTECTED_RANGE:
+                OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
+                break; /* NOTREACHED */
+        }
+
+        if(argp == NULL) /* Already handled. */
+            break;
 
         /* Now do it */
-        if (argp->type == T_NUMBER)
+        switch (argp->type)
         {
-            sp--;
-            if (sp->type != T_NUMBER)
+        case T_NUMBER:
+            if (sp[-1].type == T_NUMBER)
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                if (shift > MAX_SHIFT)
+                    argp->u.number = 0;
+                else
+                    argp->u.number = (p_uint)argp->u.number >> shift;
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
                 /* NOTREACHED */
             }
-            shift = sp->u.number;
-            if (shift > MAX_SHIFT)
-                argp->u.number = 0;
-            else
-                argp->u.number = (p_uint)argp->u.number >> shift;
-            sp->u.number = argp->u.number;
             break;
+
+        default:
+            OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+            /* NOTREACHED */
         }
 
-        if (argp->type == T_CHAR_LVALUE)
-        {
-            sp--;
-            if (sp->type != T_NUMBER)
-            {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
-                /* NOTREACHED */
-            }
-            shift = sp->u.number;
-            if (shift > MAX_SHIFT)
-                *argp->u.charp = 0;
-            else
-                *argp->u.charp = (p_uint)*argp->u.charp >> shift;
-            sp->u.number = (unsigned char)*argp->u.charp;
-            break;
-        }
-
-        OP_ARG_ERROR(1, TF_NUMBER, argp->type);
-        /* NOTREACHED */
+        pop_n_elems(2);
+        assign_svalue_no_free(++sp, argp);
         break;
     }
 
@@ -13684,11 +12305,9 @@ again:
         /* Push a duplicate of sp[0] onto the stack.
          * If sp[0] is an lvalue, it is derefenced first.
          */
-        svalue_t * svp = sp;
         sp++;
-        while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
-            svp = svp->u.lvalue;
-        assign_svalue_no_free(sp, svp);
+        normalize_svalue(sp-1, false);
+        internal_assign_rvalue_no_free(sp, sp-1);
         break;
       }
 
@@ -14068,7 +12687,7 @@ again:
         csp->funstart = funstart;
 
         /* Setup the stack, arguments and local vars */
-        sp = setup_new_frame2(funstart, sp, MY_FALSE, MY_FALSE);
+        sp = setup_new_frame2(funstart, sp, MY_FALSE);
         inter_sp = sp;
 
         // check the argument types
@@ -14178,7 +12797,7 @@ again:
         csp->funstart = funstart;
 
         /* Setup the stack, arguments and local vars */
-        sp = setup_new_frame2(funstart, sp, MY_FALSE, MY_FALSE);
+        sp = setup_new_frame2(funstart, sp, MY_FALSE);
         inter_sp = sp;
 
         // check the arguments
@@ -14226,7 +12845,7 @@ again:
              */
             inter_pc = pc;
 
-            int_call_lambda(ap, num_arg, MY_FALSE, MY_FALSE);
+            int_call_lambda(ap, num_arg, MY_FALSE);
 
             pc = inter_pc;
             sp = inter_sp;
@@ -14261,7 +12880,7 @@ again:
              */
 
         sp++;
-        assign_checked_svalue_no_free(sp, inter_context+LOAD_UINT8(pc));
+        assign_rvalue_no_free(sp, inter_context+LOAD_UINT8(pc));
         break;
 
                                /* --- context_identifier16 <var_ix> --- */
@@ -14285,7 +12904,7 @@ again:
 
         LOAD_SHORT(var_index, pc);
         sp++;
-        assign_checked_svalue_no_free(sp, inter_context+var_index);
+        assign_rvalue_no_free(sp, inter_context+var_index);
         break;
      }
 
@@ -14303,8 +12922,7 @@ again:
              */
 
         sp++;
-        sp->type = T_LVALUE;
-        sp->u.lvalue = inter_context + LOAD_UINT8(pc);
+        assign_lvalue_no_free(sp, inter_context + LOAD_UINT8(pc));
         break;
 
                                  /* --- push_context16_lvalue <num> --- */
@@ -14326,8 +12944,7 @@ again:
 
         LOAD_SHORT(var_index, pc);
         sp++;
-        sp->type = T_LVALUE;
-        sp->u.lvalue = inter_context + var_index;
+        assign_lvalue_no_free(sp, inter_context + var_index);
         break;
       }
 
@@ -14339,8 +12956,7 @@ again:
          * variable table.
          */
         sp++;
-        sp->type = T_LVALUE;
-        sp->u.lvalue = find_value((int)(LOAD_UINT8(pc) ));
+        assign_lvalue_no_free(sp, find_value((int)(LOAD_UINT8(pc) )));
         break;
 
     CASE(F_VIRTUAL_VARIABLE);         /* --- virtual_variable <num> --- */
@@ -14352,9 +12968,7 @@ again:
          * variable table.
          */
         sp++;
-        assign_checked_svalue_no_free(sp
-                                     , find_virtual_value((int)(LOAD_UINT8(pc)))
-        );
+        assign_rvalue_no_free(sp, find_virtual_value((int)(LOAD_UINT8(pc))));
         break;
 
                           /* --- push_virtual_variable_lvalue <num> --- */
@@ -14366,8 +12980,7 @@ again:
          * variable table.
          */
         sp++;
-        sp->type = T_LVALUE;
-        sp->u.lvalue = find_virtual_value((int)(LOAD_UINT8(pc) ));
+        assign_lvalue_no_free(sp, find_virtual_value((int)(LOAD_UINT8(pc) )));
         break;
 
     CASE(F_IDENTIFIER16);         /* --- identifier16 <var_ix> --- */
@@ -14382,7 +12995,7 @@ again:
 
         LOAD_SHORT(var_index, pc);
         sp++;
-        assign_checked_svalue_no_free(sp, find_value((int)var_index));
+        assign_rvalue_no_free(sp, find_value((int)var_index));
         break;
     }
 
@@ -14399,8 +13012,7 @@ again:
 
         LOAD_SHORT(var_index, pc);
         sp++;
-        sp->type = T_LVALUE;
-        sp->u.lvalue = find_value((int)var_index);
+        assign_lvalue_no_free(sp, find_value((int)var_index));
         break;
     }
                          /* --- push_local_variable_lvalue <num> --- */
@@ -14410,92 +13022,85 @@ again:
          * <num> is an uint8 and used as index onto the framepointer.
          */
         sp++;
-        sp->type = T_LVALUE;
-        sp->u.lvalue = fp + LOAD_UINT8(pc);
+        assign_lvalue_no_free(sp, fp + LOAD_UINT8(pc));
         break;
 
-    CASE(F_PUSH_INDEXED_S_LVALUE); /* --- push_indexed_s_lvalue --- */
+    CASE(F_S_INDEX_LVALUE);         /* --- s_index_lvalue     --- */
         /* Op. (struct v=sp[-2], mixed i=sp[-1], short idx=sp[0])
          *
-         * Compute the lvalue &(v[i]) and push it into the stack. If v has
-         * just one ref left, the indexed item is stored in indexing_quickfix
-         * and the lvalue refers to that variable.
+         * Compute the index &(v[i]) of rvalue <v> and push it into the
+         * stack as an lvalue.
          *
          * <idx> gives the index of the expected struct type - the
          * operator accepts a struct of this type, or any of its children.
          * An negative <idx> accepts any struct.
          */
 
-        sp = check_struct_op(sp, 0, -2, -1, pc, NULL);
-        sp = push_indexed_lvalue(sp, pc);
+        sp = check_struct_op(sp, pc, NULL);
+        sp = push_index_lvalue(sp, pc, REGULAR_INDEX);
         break;
 
-    CASE(F_PUSH_INDEXED_LVALUE);    /* --- push_indexed_lvalue --- */
-        /* Operator F_PUSH_INDEXED_LVALUE(vector  v=sp[-1], int   i=sp[0])
-         * Operator F_PUSH_INDEXED_LVALUE(mapping v=sp[-1], mixed i=sp[0])
+    CASE(F_MAP_INDEX_LVALUE);       /* --- map_index_lvalue   --- */
+    {
+        /* Operator F_MAP_INDEX_LVALUE( mapping m=sp[-2]
+         *                            , mixed i=sp[-1], int j=sp[0])
          *
-         * Compute the lvalue &(v[i]) and push it into the stack. If v has
+         * Compute the lvalue &(m[i,j]) and push it into the stack. If v has
          * just one ref left, the indexed item is stored in indexing_quickfix
          * and the lvalue refers to that variable.
          */
+        svalue_t *data;
+        mapping_t *m;
+        mp_int n;
 
+        if (sp[-2].type != T_MAPPING)
         {
-            svalue_t * svp = sp-1;
-
-            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
-                svp = svp->u.lvalue;
-            if (svp->type == T_STRUCT)
-            {
-                ERRORF(("Illegal type to []: %s lvalue, "
-                        "expected string/mapping/vector lvalue.\n"
-                       , typename(svp->type)
-                      ));
-                /* NOTREACHED */
-            }
+            ERRORF(("(lvalue) Indexing on illegal type: %s, expected mapping.\n"
+                   , typename(sp[-2].type)
+                  ));
         }
-        sp = push_indexed_lvalue(sp, pc);
+        if (sp[0].type != T_NUMBER)
+        {
+            ERRORF(("Illegal sub-index type: %s, expected number.\n"
+                   , typename(sp[0].type)
+                  ));
+        }
+
+        m = sp[-2].u.map;
+        n = sp->u.number;
+        if (n < 0 || n >= m->num_values)
+        {
+            ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
+                    PRIdPINT".\n", n, m->num_values));
+        }
+
+        sp--; /* the key */
+        data = get_map_lvalue(m, sp);
+        if (!data)
+        {
+            outofmemory("indexed lvalue");
+            /* NOTREACHED */
+            return MY_FALSE;
+        }
+        pop_stack();
+
+        if (m->ref == 1)
+        {
+            free_svalue(&indexing_quickfix);
+            assign_svalue_no_free(&indexing_quickfix, data + n);
+            assign_lvalue_no_free(sp, &indexing_quickfix);
+        }
+        else
+        {
+            assign_lvalue_no_free(sp, data + n);
+        }
+        free_mapping(m);
         break;
-
-    CASE(F_PUSH_RINDEXED_LVALUE);   /* --- push_rindexed_lvalue --- */
-        /* Operator F_PUSH_RINDEXED_LVALUE(vector v=sp[-1], int i=sp[0])
-         *
-         * Compute the lvalue &(v[<i]) and push it into the stack. If v has
-         * just one ref left, the indexed item is stored in indexing_quickfix
-         * and the lvalue refers to that variable.
-         */
-
-        sp = push_rindexed_lvalue(sp, pc);
-        break;
-
-    CASE(F_PUSH_AINDEXED_LVALUE);   /* --- push_aindexed_lvalue --- */
-        /* Operator F_PUSH_AINDEXED_LVALUE(vector v=sp[-1], int i=sp[0])
-         *
-         * Compute the lvalue &(v[>i]) and push it into the stack. If v has
-         * just one ref left, the indexed item is stored in indexing_quickfix
-         * and the lvalue refers to that variable.
-         */
-
-        sp = push_aindexed_lvalue(sp, pc);
-        break;
-
-    CASE(F_INDEX_S_LVALUE);         /* --- index_s_lvalue     --- */
-        /* Op. (struct &v=sp[0], int i=sp[-2], short * idx=sp[-1])
-         *
-         * Compute the index &(v[i]) of lvalue <v> and push it into the stack.
-         * The computed index is a lvalue itself. 
-         *
-         * <idx> gives the index of the expected struct type - the
-         * operator accepts a struct of this type, or any of its children.
-         * An negative <idx> accepts any struct.
-         */
-
-        sp = check_struct_op(sp, -1, 1, -2, pc, NULL);
-        sp = index_lvalue(sp, pc);
-        break;
+    }
 
     CASE(F_INDEX_LVALUE);           /* --- index_lvalue       --- */
-        /* Operator F_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
-         *          F_INDEX_LVALUE (mapping       &v=sp[0], mixed i=sp[-1])
+        /* Operator F_INDEX_LVALUE (string|vector &v=sp[-1], int   i=sp[0])
+         *          F_INDEX_LVALUE (mapping       &v=sp[-1], mixed i=sp[0])
          *
          * Compute the index &(v[i]) of lvalue <v> and push it into the stack.
          * The computed index is a lvalue itself.  If <v> is a string-lvalue,
@@ -14505,11 +13110,8 @@ again:
          */
 
         {
-            svalue_t * svp = sp;
-
-            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
-                svp = svp->u.lvalue;
-            if (svp->type == T_STRUCT)
+            svalue_t * svp = get_rvalue_no_collapse(sp-1, NULL);
+            if (svp && svp->type == T_STRUCT)
             {
                 ERRORF(("Illegal type to []: %s lvalue, "
                         "expected string/mapping/vector lvalue.\n"
@@ -14518,11 +13120,11 @@ again:
                 /* NOTREACHED */
             }
         }
-        sp = index_lvalue(sp, pc);
+        sp = push_index_lvalue(sp, pc, REGULAR_INDEX);
         break;
 
     CASE(F_RINDEX_LVALUE);          /* --- rindex_lvalue      --- */
-        /* Operator F_RINDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
+        /* Operator F_RINDEX_LVALUE (string|vector &v=sp[-1], int   i=sp[0])
          *
          * Compute the index &(v[<i]) of lvalue <v> and push it into the
          * stack. The computed index is a lvalue itself.
@@ -14531,11 +13133,11 @@ again:
          * CHAR_LVALUE stored in <special_lvalue>.
          */
 
-        sp = rindex_lvalue(sp, pc);
+        sp = push_index_lvalue(sp, pc, REVERSE_INDEX);
         break;
 
     CASE(F_AINDEX_LVALUE);          /* --- aindex_lvalue      --- */
-        /* Operator F_AINDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
+        /* Operator F_AINDEX_LVALUE (string|vector &v=sp[-1], int   i=sp[0])
          *
          * Compute the index &(v[>i]) of lvalue <v> and push it into the
          * stack. The computed index is a lvalue itself.
@@ -14544,7 +13146,7 @@ again:
          * CHAR_LVALUE stored in <special_lvalue>.
          */
 
-        sp = aindex_lvalue(sp, pc);
+        sp = push_index_lvalue(sp, pc, ARITHMETIC_INDEX);
         break;
 
     CASE(F_S_INDEX);                /* --- s_index            --- */
@@ -14561,8 +13163,8 @@ again:
          */
 
         bool ignore_error = false;
-        sp = check_struct_op(sp, 0, -2, -1, pc, &ignore_error);
-        sp = push_indexed_value(sp, pc, ignore_error);
+        sp = check_struct_op(sp, pc, &ignore_error);
+        sp = push_index_value(sp, pc, ignore_error, REGULAR_INDEX);
         break;
     }
 
@@ -14584,34 +13186,34 @@ again:
                   ));
             /* NOTREACHED */
         }
-        sp = push_indexed_value(sp, pc, false);
+        sp = push_index_value(sp, pc, false, REGULAR_INDEX);
         break;
 
     CASE(F_RINDEX);                 /* --- rindex              --- */
-        /* Operator F_RINDEX (string|vector v=sp[0], int   i=sp[-1])
+        /* Operator F_RINDEX (string|vector v=sp[-1], int   i=sp[0])
          *
          * Compute the value (v[<i]) and push it onto the stack.  If the value
          * would be a destructed object, 0 is pushed onto the stack and the
          * ref to the object is removed from the vector/mapping.
          */
 
-        sp = push_rindexed_value(sp, pc);
+        sp = push_index_value(sp, pc, false, REVERSE_INDEX);
         break;
 
     CASE(F_AINDEX);                 /* --- aindex              --- */
-        /* Operator F_AINDEX (string|vector v=sp[0], int   i=sp[-1])
+        /* Operator F_AINDEX (string|vector v=sp[-1], int   i=sp[0])
          *
          * Compute the value (v[<i]) and push it onto the stack.  If the value
          * would be a destructed object, 0 is pushed onto the stack and the
          * ref to the object is removed from the vector/mapping.
          */
 
-        sp = push_aindexed_value(sp, pc);
+        sp = push_index_value(sp, pc, false, ARITHMETIC_INDEX);
         break;
 
     CASE(F_RANGE_LVALUE);           /* --- range_lvalue        --- */
-        /* Operator F_RANGE_LVALUE (string|vector &v=sp[0]
-         *                         , int i2=sp[-1], i1=sp[-2])
+        /* Operator F_RANGE_LVALUE (string|vector &v=sp[-2]
+         *                         , int i1=sp[-1], i2=sp[0])
          *
          * Compute the range &(v[i1..i2]) of lvalue <v> and push it into the
          * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
@@ -14622,13 +13224,12 @@ again:
          * TODO:: argument would be as well.
          */
 
-        inter_pc = pc;
-        sp = range_lvalue(NN_RANGE, sp);
+        sp = push_range_lvalue(NN_RANGE, sp, pc);
         break;
 
     CASE(F_NR_RANGE_LVALUE);           /* --- nr_range_lvalue     --- */
-        /* Operator F_NR_RANGE_LVALUE (string|vector &v=sp[0]
-         *                         , int i2=sp[-1], i1=sp[-2])
+        /* Operator F_NR_RANGE_LVALUE (string|vector &v=sp[-2]
+         *                         , int i1=sp[-1], i2=sp[0])
          *
          * Compute the range &(v[i1..<i2]) of lvalue <v> and push it into the
          * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
@@ -14636,13 +13237,12 @@ again:
          * STRING_RANGE_LVALUE.
          */
 
-        inter_pc = pc;
-        sp = range_lvalue(NR_RANGE, sp);
+        sp = push_range_lvalue(NR_RANGE, sp, pc);
         break;
 
     CASE(F_RN_RANGE_LVALUE);           /* --- rn_range_lvalue     --- */
-        /* Operator F_RN_RANGE_LVALUE (string|vector &v=sp[0]
-         *                         , int i2=sp[-1], i1=sp[-2])
+        /* Operator F_RN_RANGE_LVALUE (string|vector &v=sp[-2]
+         *                         , int i1=sp[-1], i2=sp[0])
          *
          * Compute the range &(v[<i1..i2]) of lvalue <v> and push it into the
          * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
@@ -14650,13 +13250,12 @@ again:
          * STRING_RANGE_LVALUE.
          */
 
-        inter_pc = pc;
-        sp = range_lvalue(RN_RANGE, sp);
+        sp = push_range_lvalue(RN_RANGE, sp, pc);
         break;
 
     CASE(F_RR_RANGE_LVALUE);           /* --- rr_range_lvalue     --- */
-        /* Operator F_RR_RANGE_LVALUE (string|vector &v=sp[0]
-         *                         , int i2=sp[-1], i1=sp[-2])
+        /* Operator F_RR_RANGE_LVALUE (string|vector &v=sp[-2]
+         *                         , int i1=sp[-1], i2=sp[0])
          *
          * Compute the range &(v[<i1..<i2]) of lvalue <v> and push it into the
          * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
@@ -14664,13 +13263,12 @@ again:
          * STRING_RANGE_LVALUE.
          */
 
-        inter_pc = pc;
-        sp = range_lvalue(RR_RANGE, sp);
+        sp = push_range_lvalue(RR_RANGE, sp, pc);
         break;
 
     CASE(F_NA_RANGE_LVALUE);           /* --- na_range_lvalue     --- */
-        /* Operator F_NA_RANGE_LVALUE (string|vector &v=sp[0]
-         *                         , int i2=sp[-1], i1=sp[-2])
+        /* Operator F_NA_RANGE_LVALUE (string|vector &v=sp[-2]
+         *                         , int i1=sp[-1], i2=sp[0])
          *
          * Compute the range &(v[i1..>i2]) of lvalue <v> and push it into the
          * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
@@ -14678,13 +13276,12 @@ again:
          * STRING_RANGE_LVALUE.
          */
 
-        inter_pc = pc;
-        sp = range_lvalue(NA_RANGE, sp);
+        sp = push_range_lvalue(NA_RANGE, sp, pc);
         break;
 
     CASE(F_AN_RANGE_LVALUE);           /* --- an_range_lvalue     --- */
-        /* Operator F_AN_RANGE_LVALUE (string|vector &v=sp[0]
-         *                         , int i2=sp[-1], i1=sp[-2])
+        /* Operator F_AN_RANGE_LVALUE (string|vector &v=sp[-2]
+         *                         , int i1=sp[-1], i2=sp[0])
          *
          * Compute the range &(v[>i1..i2]) of lvalue <v> and push it into the
          * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
@@ -14692,13 +13289,12 @@ again:
          * STRING_RANGE_LVALUE.
          */
 
-        inter_pc = pc;
-        sp = range_lvalue(AN_RANGE, sp);
+        sp = push_range_lvalue(AN_RANGE, sp, pc);
         break;
 
     CASE(F_RA_RANGE_LVALUE);           /* --- ra_range_lvalue     --- */
-        /* Operator F_RA_RANGE_LVALUE (string|vector &v=sp[0]
-         *                         , int i2=sp[-1], i1=sp[-2])
+        /* Operator F_RA_RANGE_LVALUE (string|vector &v=sp[-2]
+         *                         , int i1=sp[-1], i2=sp[0])
          *
          * Compute the range &(v[<i1..>i2]) of lvalue <v> and push it into the
          * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
@@ -14706,13 +13302,12 @@ again:
          * STRING_RANGE_LVALUE.
          */
 
-        inter_pc = pc;
-        sp = range_lvalue(RA_RANGE, sp);
+        sp = push_range_lvalue(RA_RANGE, sp, pc);
         break;
 
     CASE(F_AR_RANGE_LVALUE);           /* --- ar_range_lvalue     --- */
-        /* Operator F_AR_RANGE_LVALUE (string|vector &v=sp[0]
-         *                         , int i2=sp[-1], i1=sp[-2])
+        /* Operator F_AR_RANGE_LVALUE (string|vector &v=sp[-2]
+         *                         , int i1=sp[-1], i2=sp[0])
          *
          * Compute the range &(v[>i1..<i2]) of lvalue <v> and push it into the
          * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
@@ -14720,13 +13315,12 @@ again:
          * STRING_RANGE_LVALUE.
          */
 
-        inter_pc = pc;
-        sp = range_lvalue(AR_RANGE, sp);
+        sp = push_range_lvalue(AR_RANGE, sp, pc);
         break;
 
     CASE(F_AA_RANGE_LVALUE);           /* --- aa_range_lvalue     --- */
-        /* Operator F_AA_RANGE_LVALUE (string|vector &v=sp[0]
-         *                         , int i2=sp[-1], i1=sp[-2])
+        /* Operator F_AA_RANGE_LVALUE (string|vector &v=sp[-2]
+         *                         , int i1=sp[-1], i2=sp[0])
          *
          * Compute the range &(v[>i1..>i2]) of lvalue <v> and push it into the
          * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
@@ -14734,13 +13328,12 @@ again:
          * STRING_RANGE_LVALUE.
          */
 
-        inter_pc = pc;
-        sp = range_lvalue(AA_RANGE, sp);
+        sp = push_range_lvalue(AA_RANGE, sp, pc);
         break;
 
     CASE(F_NX_RANGE_LVALUE);           /* --- nx_range_lvalue     --- */
-        /* Operator F_NX_RANGE_LVALUE (string|vector &v=sp[0]
-         *                            , int i1=sp[-1])
+        /* Operator F_NX_RANGE_LVALUE (string|vector &v=sp[-1]
+         *                            , int i1=sp[0])
          *
          * Compute the range &(v[i1..]) of lvalue <v> and push it into the
          * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
@@ -14751,16 +13344,13 @@ again:
          * call F_NR_RANGE_LVALUE, effectively computing &(v[i1..<1]).
          */
 
-        inter_pc = pc;
-        sp++;
-        sp[0] = sp[-1];       /* Pull up the 'v' */
-        put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = range_lvalue(NR_RANGE, sp);
+        push_number(sp, 1);  /* 'Push' the 1 for the upper bound */
+        sp = push_range_lvalue(NR_RANGE, sp, pc);
         break;
 
     CASE(F_RX_RANGE_LVALUE);           /* --- rx_range_lvalue     --- */
-        /* Operator F_RX_RANGE_LVALUE (string|vector &v=sp[0]
-         *                            , int i1=sp[-1])
+        /* Operator F_RX_RANGE_LVALUE (string|vector &v=sp[-1]
+         *                            , int i1=sp[0])
          *
          * Compute the range &(v[<i1..]) of lvalue <v> and push it into the
          * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
@@ -14771,16 +13361,13 @@ again:
          * call F_RR_RANGE_LVALUE, effectively computing &(v[<i1..<1]).
          */
 
-        inter_pc = pc;
-        sp++;
-        sp[0] = sp[-1];       /* Pull up the 'v' */
-        put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = range_lvalue(RR_RANGE, sp);
+        push_number(sp, 1);  /* 'Push' the 1 for the upper bound */
+        sp = push_range_lvalue(RR_RANGE, sp, pc);
         break;
 
     CASE(F_AX_RANGE_LVALUE);           /* --- ax_range_lvalue     --- */
-        /* Operator F_AX_RANGE_LVALUE (string|vector &v=sp[0]
-         *                            , int i1=sp[-1])
+        /* Operator F_AX_RANGE_LVALUE (string|vector &v=sp[-1]
+         *                            , int i1=sp[0])
          *
          * Compute the range &(v[>i1..]) of lvalue <v> and push it into the
          * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
@@ -14791,418 +13378,90 @@ again:
          * call F_AR_RANGE_LVALUE, effectively computing &(v[>i1..<1]).
          */
 
+        push_number(sp, 1);  /* 'Push' the 1 for the upper bound */
+        sp = push_range_lvalue(AR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAKE_PROTECTED);
+        /* Operator &(ref=sp[0])
+         *
+         * Convert the lvalue on the stack into a protected lvalue.
+         * If <v> happens the be a protected lvalue already, then
+         * do nothing. (Can happen when creating a reference to
+         * a variable that already is a protected lvalue.)
+         */
+
         inter_pc = pc;
+        sp = push_protected_lvalue(sp);
+        break;
+
+                          /* --- push_virtual_variable_vlvalue <num> --- */
+    CASE(F_PUSH_VIRTUAL_VARIABLE_VLVALUE);
+        /* Push a var-lvalue onto the stack pointing to virtual object-global
+         * variable <num> (ignoring any existing lvalues in the variable).
+         *
+         * <num> is an uint8 and used as index in the current objects
+         * variable table.
+         */
         sp++;
-        sp[0] = sp[-1];       /* Pull up the 'v' */
-        put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = range_lvalue(AR_RANGE, sp);
+        assign_var_lvalue_no_free(sp, find_virtual_value((int)(LOAD_UINT8(pc) )));
         break;
 
-                        /* --- push_protected_indexed_s_lvalue --- */
-    CASE(F_PUSH_PROTECTED_INDEXED_S_LVALUE);
-        /* Op. (struct  v=sp[-2], mixed i=sp[-1], short idx=sp[0])
+    CASE(F_PUSH_IDENTIFIER_VLVALUE);  /* --- push_identifier_vlvalue <num> --- */
+        /* Push a variable-lvalue onto the stack pointing to object-global
+         * variable <num> (ignoring any existing lvalues in the variable).
          *
-         * Compute the lvalue &(v[i]), store it in a struct
-         * protected_lvalue, and push the protector as PROTECTED_LVALUE
-         * into the stack.
-         *
-         * short <idx> gives the index of the expected struct type - the
-         * operator accepts a struct of this type, or any of its children.
-         * An negative <idx> accepts any struct.
+         * <num> is an uint8 and used as index in the current objects
+         * variable table.
          */
-
-        sp = check_struct_op(sp, 0, 3, -1, pc, NULL);
-        sp = push_protected_indexed_lvalue(sp, pc);
-        break;
-
-                          /* --- push_protected_indexed_lvalue --- */
-    CASE(F_PUSH_PROTECTED_INDEXED_LVALUE);
-        /* Op. (vector  v=sp[-1], int   i=sp[0])
-         * Op. (mapping v=sp[-1], mixed i=sp[0])
-         *
-         * Compute the lvalue &(v[i]), store it in a struct
-         * protected_lvalue, and push the protector as PROTECTED_LVALUE
-         * into the stack.
-         */
-
-        if ((sp-1)->type == T_STRUCT)
-        {
-            ERRORF(("Illegal type to []: %s, expected vector/mapping.\n"
-                   , typename((sp-1)->type)
-                  ));
-            /* NOTREACHED */
-        }
-        sp = push_protected_indexed_lvalue(sp, pc);
-        break;
-
-                         /* --- push_protected_rindexed_lvalue --- */
-    CASE(F_PUSH_PROTECTED_RINDEXED_LVALUE);
-        /* Op. (vector v=sp[-1], int i=sp[0])
-         *
-         * Compute the lvalue &(v[<i]), store it in a struct
-         * protected_lvalue, and push the protector as PROTECTED_LVALUE
-         * into the stack.
-         */
-
-        sp = push_protected_rindexed_lvalue(sp, pc);
-        break;
-
-                         /* --- push_protected_aindexed_lvalue --- */
-    CASE(F_PUSH_PROTECTED_AINDEXED_LVALUE);
-        /* Op. (vector v=sp[-1], int i=sp[0])
-         *
-         * Compute the lvalue &(v[>i]), store it in a struct
-         * protected_lvalue, and push the protector as PROTECTED_LVALUE
-         * into the stack.
-         */
-
-        sp = push_protected_aindexed_lvalue(sp, pc);
-        break;
-
-                      /* --- push_protected_indexed_map_lvalue --- */
-    CASE(F_PUSH_PROTECTED_INDEXED_MAP_LVALUE);
-        /* Op. (mapping m=sp[-2], mixed i=sp[-1], int   j=sp[0])
-         *
-         * Compute the lvalue &(m[i:j]), store it in a struct
-         * protected_lvalue, and push the protector as PROTECTED_LVALUE
-         * into the stack.
-         */
-
-        push_protected_indexed_map_lvalue(sp, pc);
-        break;
-
-                               /* --- protected_index_s_lvalue --- */
-    CASE(F_PROTECTED_INDEX_S_LVALUE);
-        /* Operator (struct &v=sp[0], mixed i=sp[-2], short idx=sp[-1])
-         *
-         * Compute the index &(*v[i]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector as
-         * PROTECTED_LVALUE onto the stack.
-         *
-         * short <idx> gives the index of the expected struct type - the
-         * operator accepts a struct of this type, or any of its children.
-         * An negative <idx> accepts any struct.
-         */
-
-        sp = check_struct_op(sp, -1, 1, -2, pc, NULL);
-        sp = protected_index_lvalue(sp, pc);
-        break;
-
-                                 /* --- protected_index_lvalue --- */
-    CASE(F_PROTECTED_INDEX_LVALUE);
-        /* Operator (string|vector &v=sp[0], int   i=sp[-1])
-         *          (mapping       &v=sp[0], mixed i=sp[-1])
-         *
-         * Compute the index &(*v[i]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector as
-         * PROTECTED_LVALUE onto the stack.
-         *
-         * If <v> is a protected non-string-lvalue, the protected_lvalue
-         * referenced by <v>.u.lvalue will be deallocated, and the
-         * protector itself will be stored in <last_indexing_protector>
-         * for the time being.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         */
-
-        if ((sp-1)->type == T_STRUCT)
-        {
-            ERRORF(("Illegal type to []: %s, expected string/vector/mapping.\n"
-                   , typename((sp-1)->type)
-                  ));
-            /* NOTREACHED */
-        }
-        sp = protected_index_lvalue(sp, pc);
-        break;
-
-                                /* --- protected_rindex_lvalue --- */
-    CASE(F_PROTECTED_RINDEX_LVALUE);
-        /* Operator (string|vector &v=sp[0], int   i=sp[-1])
-         *
-         * Compute the index &(*v[<i]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector as
-         * PROTECTED_LVALUE onto the stack.
-         *
-         * If <v> is a protected non-string-lvalue, the protected_lvalue
-         * referenced by <v>.u.lvalue will be deallocated, and the
-         * protector itself will be stored in <last_indexing_protector>
-         * for the time being.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         */
-
-        sp = protected_rindex_lvalue(sp, pc);
-        break;
-
-                                /* --- protected_aindex_lvalue --- */
-    CASE(F_PROTECTED_AINDEX_LVALUE);
-        /* Operator (string|vector &v=sp[0], int   i=sp[-1])
-         *
-         * Compute the index &(*v[>i]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector as
-         * PROTECTED_LVALUE onto the stack.
-         *
-         * If <v> is a protected non-string-lvalue, the protected_lvalue
-         * referenced by <v>.u.lvalue will be deallocated, and the
-         * protector itself will be stored in <last_indexing_protector>
-         * for the time being.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         */
-
-        sp = protected_aindex_lvalue(sp, pc);
-        break;
-
-                              /* --- protected_range_lvalue --- */
-    CASE(F_PROTECTED_RANGE_LVALUE);
-        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
-         *
-         * Compute the range &(v[i1..i2]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector onto the
-         * stack.
-         *
-         * If <v> is a protected lvalue itself, its protecting svalue will
-         * be used in the result protector.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         */
-
-        inter_pc = pc;
-        sp = protected_range_lvalue(NN_RANGE, sp);
-        break;
-
-                           /* --- protected_nr_range_lvalue --- */
-    CASE(F_PROTECTED_NR_RANGE_LVALUE);
-        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
-         *
-         * Compute the range &(v[i1..<i2]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector onto the
-         * stack.
-         *
-         * If <v> is a protected lvalue itself, its protecting svalue will
-         * be used in the result protector.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         */
-
-        inter_pc = pc;
-        sp = protected_range_lvalue(NR_RANGE, sp);
-        break;
-
-                             /* --- protected_rn_range_lvalue --- */
-    CASE(F_PROTECTED_RN_RANGE_LVALUE);
-        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
-         *
-         * Compute the range &(v[<i1..i2]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector onto the
-         * stack.
-         *
-         * If <v> is a protected lvalue itself, its protecting svalue will
-         * be used in the result protector.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         */
-
-        inter_pc = pc;
-        sp = protected_range_lvalue(RN_RANGE, sp);
-        break;
-
-                             /* --- protected_rr_range_lvalue --- */
-    CASE(F_PROTECTED_RR_RANGE_LVALUE);
-        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
-         *
-         * Compute the range &(v[<i1..<i2]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector onto the
-         * stack.
-         *
-         * If <v> is a protected lvalue itself, its protecting svalue will
-         * be used in the result protector.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         */
-
-        inter_pc = pc;
-        sp = protected_range_lvalue(RR_RANGE, sp);
-        break;
-
-                           /* --- protected_na_range_lvalue --- */
-    CASE(F_PROTECTED_NA_RANGE_LVALUE);
-        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
-         *
-         * Compute the range &(v[i1..>i2]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector onto the
-         * stack.
-         *
-         * If <v> is a protected lvalue itself, its protecting svalue will
-         * be used in the result protector.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         */
-
-        inter_pc = pc;
-        sp = protected_range_lvalue(NA_RANGE, sp);
-        break;
-
-                             /* --- protected_an_range_lvalue --- */
-    CASE(F_PROTECTED_AN_RANGE_LVALUE);
-        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
-         *
-         * Compute the range &(v[>i1..i2]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector onto the
-         * stack.
-         *
-         * If <v> is a protected lvalue itself, its protecting svalue will
-         * be used in the result protector.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         */
-
-        inter_pc = pc;
-        sp = protected_range_lvalue(AN_RANGE, sp);
-        break;
-
-                           /* --- protected_ra_range_lvalue --- */
-    CASE(F_PROTECTED_RA_RANGE_LVALUE);
-        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
-         *
-         * Compute the range &(v[<i1..>i2]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector onto the
-         * stack.
-         *
-         * If <v> is a protected lvalue itself, its protecting svalue will
-         * be used in the result protector.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         */
-
-        inter_pc = pc;
-        sp = protected_range_lvalue(RA_RANGE, sp);
-        break;
-
-                             /* --- protected_ar_range_lvalue --- */
-    CASE(F_PROTECTED_AR_RANGE_LVALUE);
-        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
-         *
-         * Compute the range &(v[>i1..<i2]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector onto the
-         * stack.
-         *
-         * If <v> is a protected lvalue itself, its protecting svalue will
-         * be used in the result protector.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         */
-
-        inter_pc = pc;
-        sp = protected_range_lvalue(AR_RANGE, sp);
-        break;
-
-                             /* --- protected_aa_range_lvalue --- */
-    CASE(F_PROTECTED_AA_RANGE_LVALUE);
-        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
-         *
-         * Compute the range &(v[>i1..>i2]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector onto the
-         * stack.
-         *
-         * If <v> is a protected lvalue itself, its protecting svalue will
-         * be used in the result protector.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         */
-
-        inter_pc = pc;
-        sp = protected_range_lvalue(AA_RANGE, sp);
-        break;
-
-                              /* --- protected_nx_range_lvalue --- */
-    CASE(F_PROTECTED_NX_RANGE_LVALUE);
-        /* Operator (string|vector &v=sp[0], i1=sp[-1])
-         *
-         * Compute the range &(v[i1..]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector onto the
-         * stack.
-         *
-         * If <v> is a protected lvalue itself, its protecting svalue will
-         * be used in the result protector.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         *
-         * We implement it by pushing '1' onto the stack and then
-         * calling protected_nr_range_lvalue, effectively computing
-         * &(v[i1..<1]).
-         */
-
-        inter_pc = pc;
         sp++;
-        sp[0] = sp[-1];       /* Pull up the 'v' */
-        put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = protected_range_lvalue(NR_RANGE, sp);
+        assign_var_lvalue_no_free(sp, find_value((int)(LOAD_UINT8(pc) )));
         break;
 
-                          /* --- protected_rx_range_lvalue --- */
-    CASE(F_PROTECTED_RX_RANGE_LVALUE);
-        /* Operator (string|vector &v=sp[0], int i1=sp[-1])
+                       /* --- push_identifier16_vlvalue <var_ix> --- */
+    CASE(F_PUSH_IDENTIFIER16_VLVALUE);
+    {
+        /* Push a variable-lvalue onto the stack pointing to object-global
+         * variable <num> (ignoring any existing lvalues in the variable).
          *
-         * Compute the range &(v[<i1..]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector onto the
-         * stack.
+         * <num> is an uint8 and used as index in the current objects
+         * variable table.
+         */
+        unsigned short var_index;
+
+        LOAD_SHORT(var_index, pc);
+        sp++;
+        assign_var_lvalue_no_free(sp, find_value((int)var_index));
+        break;
+    }
+
+    CASE(F_PUSH_CONTEXT_VLVALUE);   /* --- push_context_vlvalue <num> --- */
+        /* Push a variable-lvalue onto the stack pointing to context
+         * variable <num> (ignoring any existing lvalues in the variable).
          *
-         * If <v> is a protected lvalue itself, its protecting svalue will
-         * be used in the result protector.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         *
-         * We implement it by pushing '1' onto the stack and then
-         * calling protected_nr_range_lvalue, effectively computing
-         * &(v[<i1..<1]).
+         * <num> is an uint8.
          */
 
-        inter_pc = pc;
+        if (inter_context == NULL)
+            errorf("(eval_instruction) context_identifier: "
+                  "inter_context is NULL\n");
+            /* May happen if somebody does a funcall(symbol_function())
+             * on the lfun of an context closure.
+             */
+
         sp++;
-        sp[0] = sp[-1];       /* Pull up the 'v' */
-        put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = protected_range_lvalue(RR_RANGE, sp);
+        assign_var_lvalue_no_free(sp, inter_context + LOAD_UINT8(pc));
         break;
 
-                          /* --- protected_ax_range_lvalue --- */
-    CASE(F_PROTECTED_AX_RANGE_LVALUE);
-        /* Operator (string|vector &v=sp[0], int i1=sp[-1])
+                         /* --- push_local_variable_vlvalue <num> --- */
+    CASE(F_PUSH_LOCAL_VARIABLE_VLVALUE);
+        /* Push a variable-lvalue onto the stack pointing to local
+         * variable <num> (ignoring any existing lvalues in the variable).
          *
-         * Compute the range &(v[>i1..]) of lvalue <v>, wrap it into a
-         * protector, and push the reference to the protector onto the
-         * stack.
-         *
-         * If <v> is a protected lvalue itself, its protecting svalue will
-         * be used in the result protector.
-         *
-         * If <v> is a string-lvalue, it is made a malloced string if
-         * necessary.
-         *
-         * We implement it by pushing '1' onto the stack and then
-         * calling protected_ar_range_lvalue, effectively computing
-         * &(v[>i1..<1]).
+         * <num> is an uint8 and used as index onto the framepointer.
          */
-
-        inter_pc = pc;
         sp++;
-        sp[0] = sp[-1];       /* Pull up the 'v' */
-        put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = protected_range_lvalue(AR_RANGE, sp);
+        assign_var_lvalue_no_free(sp, fp + LOAD_UINT8(pc));
         break;
 
     CASE(F_SIMUL_EFUN);             /* --- simul_efun <code>   --- */
@@ -15322,7 +13581,7 @@ again:
             current_variables = ob->variables;
             if (current_variables)
                 current_variables += entry->variable_index_offset;
-            new_sp = setup_new_frame2(funstart, sp, MY_TRUE, MY_FALSE);
+            new_sp = setup_new_frame2(funstart, sp, MY_FALSE);
             inter_sp = new_sp;
             check_function_args(prog->function_headers[FUNCTION_HEADER_INDEX(funstart)].offset.fx, current_prog, funstart);
 
@@ -15634,7 +13893,7 @@ again:
         cstart = (svalue_t *)((char *)(csp->funstart)
                                    - LAMBDA_VALUE_OFFSET);
         sp++;
-        assign_checked_svalue_no_free(sp, cstart - ix);
+        assign_svalue_no_free(sp, cstart - ix);
         break;
     }
 
@@ -15657,7 +13916,7 @@ again:
         cstart = (svalue_t *)((char *)(csp->funstart)
                                    - LAMBDA_VALUE_OFFSET);
         sp++;
-        assign_checked_svalue_no_free(sp, cstart - ix);
+        assign_svalue_no_free(sp, cstart - ix);
         break;
     }
 
@@ -15705,67 +13964,7 @@ again:
         }
         else
         {
-            assign_checked_svalue_no_free(sp, data + n);
-        }
-        free_mapping(m);
-        break;
-    }
-
-    CASE(F_PUSH_INDEXED_MAP_LVALUE); /* --- push_indexed_map_lvalue --- */
-    {
-        /* Operator F_PUSH_INDEXED_MAP_LVALUE( mapping m=sp[-2]
-         *                                   , mixed i=sp[-1], int j=sp[0])
-         *
-         * Compute the lvalue &(m[i,j]) and push it into the stack. If v has
-         * just one ref left, the indexed item is stored in indexing_quickfix
-         * and the lvalue refers to that variable.
-         */
-        svalue_t *data;
-        mapping_t *m;
-        mp_int n;
-
-        if (sp[-2].type != T_MAPPING)
-        {
-            ERRORF(("(lvalue) Indexing on illegal type: %s, expected mapping.\n"
-                   , typename(sp[-2].type)
-                  ));
-        }
-        if (sp[0].type != T_NUMBER)
-        {
-            ERRORF(("Illegal sub-index type: %s, expected number.\n"
-                   , typename(sp[0].type)
-                  ));
-        }
-
-        m = sp[-2].u.map;
-        n = sp->u.number;
-        if (n < 0 || n >= m->num_values)
-        {
-            ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
-                    PRIdPINT".\n", n, m->num_values));
-        }
-
-        sp--; /* the key */
-        data = get_map_lvalue(m, sp);
-        if (!data)
-        {
-            outofmemory("indexed lvalue");
-            /* NOTREACHED */
-            return MY_FALSE;
-        }
-        pop_stack();
-
-        if (!m->ref)
-        {
-            assign_svalue (&indexing_quickfix, data + n);
-            sp->type = T_LVALUE;
-            sp->u.lvalue = &indexing_quickfix;
-            break;
-        }
-        else
-        {
-            sp->type = T_LVALUE;
-            sp->u.lvalue = data + n;
+            assign_rvalue_no_free(sp, data + n);
         }
         free_mapping(m);
         break;
@@ -15776,9 +13975,12 @@ again:
     CASE(F_FOREACH_RANGE); /* --- foreach_range <nargs> <offset> --- */
     {
         /* Initialize a foreach() loop. On the stack are <nargs>-1
-         * lvalues where the (l)value(s) are to be stored. The last
-         * value on the stack is the (l)value to loop over. (Do not
-         * confuse <nargs> with the normal NUM_ARG!).
+         * lvalues where the (l)value(s) are to be stored.
+         * These lvalues are always unprotected lvalues (it's safe
+         * here, because they point only to local or global variables).
+         *
+         * The last value on the stack is the (l)value to loop over.
+         * (Do not confuse <nargs> with the normal NUM_ARG!).
          *
          * ushort <offset> is the distance to the FOREACH_NEXT
          * instruction follwing the codeblock after the instruction,
@@ -15809,12 +14011,14 @@ again:
         p_int count, start;
         unsigned short offset;
         Bool gen_refs, use_range, do_extra_loop;
+        bool last_reference = false;
         svalue_t * arg;
 
         gen_refs = (instruction == F_FOREACH_REF);
         use_range = (instruction == F_FOREACH_RANGE);
         do_extra_loop = MY_FALSE;
         start = 0;
+        count = -1; /* -1 meaning uninitialized. */
 
         nargs = load_uint8(&pc);
         LOAD_SHORT(offset, pc);
@@ -15822,22 +14026,86 @@ again:
         /* Unravel the lvalue chain (if any) to get to the actual value
          * to loop over.
          */
-        if (gen_refs && sp->type != T_LVALUE)
+        if (gen_refs)
         {
-            ERRORF(("foreach() got a %s, expected a &(string/array/mapping).\n"
-                   , typename(sp->type)
-                   ));
+            svalue_t argval;
+            svalue_t *argvar = NULL;
+
+            if (sp->type != T_LVALUE)
+                ERRORF(("foreach() got a %s, expected a &(string/array/mapping).\n"
+                       , typename(sp->type)
+                       ));
+
+            arg = get_rvalue_no_collapse(sp, &last_reference);
+            if (arg && arg->type == T_NUMBER)
+                ERROR("foreach() got a &number, expected a (&)string/array/mapping/struct or number.\n");
+
+            if (arg == NULL)
+            {
+                /* This is a range lvalue, take that string/vector
+                 * But set start and count accordingly.
+                 */
+                struct protected_range_lvalue *r;
+
+                assert(sp->type == T_LVALUE && sp->x.lvalue_type == LVALUE_PROTECTED_RANGE);
+                r = sp->u.protected_range_lvalue;
+
+                arg = &(r->vec);
+
+                start = r->index1;
+                count = r->index2 - r->index1;
+                if (count < 0)
+                    count = 0;
+
+                /* Remember the variable, if it is a string,
+                 * because we might need to update it.
+                 */
+                if (arg->type == T_STRING
+                 && r->var != NULL
+                 && r->var->val.type == T_STRING
+                 && r->var->val.u.str == arg->u.str )
+                    argvar = &(r->var->val);
+            }
+
+            if (arg->type == T_STRING)
+            {
+                /* If the string is tabled, i.e. not changeable, or has more
+                 * than one reference, allocate a new copy which can be
+                 * changed safely.
+                 */
+                if (!mstr_singular(arg->u.str))
+                {
+                    string_t *str;
+                    memsafe(str = unshare_mstring(arg->u.str), mstrsize(arg->u.str)
+                           , "modifiable string");
+                    arg->u.str = str;
+                    if (argvar != NULL)
+                    {
+                        free_mstring(argvar->u.str);
+                        argvar->u.str = ref_mstring(str);
+                    }
+                }
+            }
+
+            /* Replace the lvalue on the stack by the value
+             * itself, we don't need the lvalue anymore.
+             *
+             * If this was the last reference,
+             * we need to copy it before overwriting <sp>.
+             */
+            assign_svalue_no_free(&argval, arg);
+            free_svalue(sp);
+            transfer_svalue_no_free(sp, &argval);
+        }
+        else if (use_range)
+        {
+            if (sp->type != T_NUMBER)
+                ERRORF(("foreach() got a %s, requires a number for upper range bound.\n"
+                       , typename(arg->type)
+                       ));
         }
 
-        for (arg = sp
-            ; gen_refs && arg && arg->type == T_LVALUE
-            ; arg = arg->u.lvalue)
-            NOOP;
-
-        if (use_range && arg->type != T_NUMBER)
-            ERRORF(("foreach() got a %s, requires a number for upper range bound.\n"
-                   , typename(arg->type)
-                   ));
+        arg = sp;
 
         if (arg->type != T_STRING
          && arg->type != T_POINTER
@@ -15847,10 +14115,6 @@ again:
             ERRORF(("foreach() got a %s, expected a (&)string/array/mapping/struct or number.\n"
                    , typename(sp->type)
                    ));
-
-        if (gen_refs && arg->type == T_NUMBER)
-            ERROR("foreach() got a &number, expected a (&)string/array/mapping/struct or number.\n"
-                   );
 
         /* Find out how many variables we require */
 
@@ -15864,67 +14128,22 @@ again:
         }
         else if (arg->type == T_STRING)
         {
-            count = mstrsize(arg->u.str);
+            if (count < 0)
+                count = mstrsize(arg->u.str);
             vars_required = 1;
-
-            if (gen_refs)
-            {
-                string_t *str;
-
-                /* If the string is tabled, i.e. not changeable, or has more
-                 * than one reference, allocate a new copy which can be
-                 * changed safely.
-                 */
-                if (!mstr_singular(arg->u.str))
-                {
-                    memsafe(str = unshare_mstring(arg->u.str), mstrsize(arg->u.str)
-                           , "modifiable string");
-                    arg->u.str = str;
-                }
-
-                /* Replace the string-lvalue on the stack by the string
-                 * itself - we don't need the lvalue any more.
-                 */
-                str = ref_mstring(arg->u.str);
-                free_svalue(sp);
-                put_string(sp, str);
-            }
         }
         else if (arg->type == T_POINTER)
         {
             check_for_destr(arg->u.vec);
-            count = VEC_SIZE(arg->u.vec);
+            if (count < 0)
+                count = VEC_SIZE(arg->u.vec);
             vars_required = 1;
-
-            if (gen_refs)
-            {
-                /* Replace the array-lvalue on the stack by the array
-                 * itself - we don't need the lvalue any more.
-                 */
-                vector_t * vec = arg->u.vec;
-
-                (void)ref_array(vec);
-                free_svalue(sp);
-                put_array(sp, vec);
-            }
         }
         else if (arg->type == T_STRUCT)
         {
             struct_check_for_destr(arg->u.strct);
             count = struct_size(arg->u.strct);
             vars_required = 1;
-
-            if (gen_refs)
-            {
-                /* Replace the struct-lvalue on the stack by the struct
-                 * itself - we don't need the lvalue any more.
-                 */
-                struct_t * st = arg->u.strct;
-
-                (void)ref_struct(st);
-                free_svalue(sp);
-                put_struct(sp, st);
-            }
         }
         else
         {
@@ -15935,18 +14154,8 @@ again:
             vars_required = 1 + m->num_values;
             indices = m_indices(m);
 
+            /* after m_indices(), else we'd count destructed entries */
             count = MAP_SIZE(m);
-              /* after m_indices(), else we'd count destructed entries */
-
-            if (gen_refs)
-            {
-                /* Replace the mapping-lvalue on the stack by the mapping
-                 * itself - we don't need the lvalue any more.
-                 */
-                (void)ref_mapping(m);
-                free_svalue(sp);
-                put_mapping(sp, m);
-            }
 
             /* Push the indices array and remember the fact in nargs.
              */
@@ -16027,8 +14236,9 @@ again:
         if (sp->x.generic == 2)
         {
             sp->x.generic = 0;
-            /* FOREACH_RANGE with extra loop: don't increment the
-             * 'next' number on this one.
+            /* FOREACH_RANGE with extra loop: count is 0,
+             * but we must not end the loop here, instead
+             * make a round through the full number range.
              */
         }
         else
@@ -16037,8 +14247,8 @@ again:
             if (0 == sp[-1].u.number)
                 break; /* Nope */
 
-            sp->u.number++; /* next number */
         }
+        sp->u.number++;    /* next number */
         sp[-1].u.number--; /* decrement loop count */
 
         gen_refs = sp->x.generic;
@@ -16070,15 +14280,12 @@ again:
 
             /* Assign the index we used */
             {
-                svalue_t *dest;
-
 #ifdef DEBUG
-                if (lvalue->type != T_LVALUE)
+                if (lvalue->type != T_LVALUE || lvalue->x.lvalue_type != LVALUE_UNPROTECTED)
                     fatal("Bad argument to foreach(): not a lvalue\n");
                     /* TODO: Give type and value */
 #endif
-                dest = lvalue->u.lvalue;
-                assign_svalue(dest, indices->item+ix);
+                assign_svalue(lvalue, indices->item+ix);
 
                 lvalue++;
             }
@@ -16090,32 +14297,21 @@ again:
 
             for ( ; left > 0; left--, lvalue++, values++)
             {
-                svalue_t *dest;
-
 #ifdef DEBUG
-                if (lvalue->type != T_LVALUE)
+                if (lvalue->type != T_LVALUE || lvalue->x.lvalue_type != LVALUE_UNPROTECTED)
                     fatal("Bad argument to foreach(): not a lvalue\n");
                     /* TODO: Give type and value */
 #endif
-                dest = lvalue->u.lvalue;
                 if (!gen_refs)
                 {
-                    assign_svalue(dest, values);
+                    assign_svalue(lvalue, values);
                 }
                 else
                 {
-                    struct protected_lvalue * prot;
+                    svalue_t * dest = lvalue->u.lvalue;
 
                     free_svalue(dest);
-
-                    prot = (struct protected_lvalue *)xalloc(sizeof *prot);
-                    prot->v.type = T_PROTECTED_LVALUE;
-                    prot->v.u.lvalue = values;
-                    (void)ref_mapping(m);
-                    BUILD_MAP_PROTECTOR(prot->protector, m)
-
-                    dest->type = T_LVALUE;
-                    dest->u.lvalue = &prot->v;
+                    assign_protected_lvalue_no_free(dest, values);
                 }
             }
 
@@ -16125,7 +14321,7 @@ again:
         {
             lvalue = sp - sp[-1].x.generic - 1;
 #ifdef DEBUG
-            if (lvalue->type != T_LVALUE)
+            if (lvalue->type != T_LVALUE || lvalue->x.lvalue_type != LVALUE_UNPROTECTED)
                 fatal("Bad argument to foreach(): not a lvalue\n");
                 /* TODO: Give type and value */
 #endif
@@ -16145,21 +14341,8 @@ again:
                 }
                 else
                 {
-                    svalue_t * str = sp-2;
-                    struct protected_char_lvalue *val;
-
-                    /* Compute and return the result */
-
-                    (void)ref_mstring(str->u.str);
-                    val = (struct protected_char_lvalue *)xalloc(sizeof *val);
-                    val->v.type = T_PROTECTED_CHAR_LVALUE;
-                    val->v.u.charp = &(get_txt(str->u.str)[ix]);
-                    val->lvalue = str;
-                    val->start = get_txt(str->u.str);
-                    val->protector.type = T_INVALID;
-
-                    lvalue->type = T_LVALUE;
-                    lvalue->u.protected_char_lvalue = val;
+                    string_t * str = sp[-2].u.str;
+                    assign_protected_char_lvalue_no_free(lvalue, str, &(get_txt(str)[ix]));
                 }
             }
             else if (sp[-2].type == T_POINTER)
@@ -16171,28 +14354,14 @@ again:
                      * FOREACH_END instruction.
                      */
 
+                free_svalue(lvalue);
                 if (!gen_refs)
                 {
-                    assign_svalue(lvalue, sp[-2].u.vec->item+ix);
+                    assign_svalue_no_free(lvalue, sp[-2].u.vec->item+ix);
                 }
                 else
                 {
-                    svalue_t * vec = sp-2;
-                    svalue_t * item;
-                    struct protected_lvalue * prot;
-
-                    free_svalue(lvalue);
-
-                    /* Compute the indexed item and set up the protector */
-
-                    item = &vec->u.vec->item[ix];
-                    prot = (struct protected_lvalue *)xalloc(sizeof *prot);
-                    prot->v.type = T_PROTECTED_LVALUE;
-                    prot->v.u.lvalue = item;
-                    put_ref_array(&(prot->protector), vec->u.vec);
-
-                    lvalue->type = T_LVALUE;
-                    lvalue->u.lvalue = &prot->v;
+                    assign_protected_lvalue_no_free(lvalue, sp[-2].u.vec->item+ix);
                 }
             }
             else if (sp[-2].type == T_STRUCT)
@@ -16204,29 +14373,15 @@ again:
                      * We stop processing and continue with the following
                      * FOREACH_END instruction.
                      */
-                     
+
+                free_svalue(lvalue);
                 if (!gen_refs)
                 {
-                    assign_svalue(lvalue, sp[-2].u.strct->member+ix);
+                    assign_svalue_no_free(lvalue, sp[-2].u.strct->member+ix);
                 }
                 else
                 {
-                    svalue_t * st = sp-2;
-                    svalue_t * item;
-                    struct protected_lvalue * prot;
-
-                    free_svalue(lvalue);
-
-                    /* Compute the indexed item and set up the protector */
-
-                    item = &st->u.strct->member[ix];
-                    prot = (struct protected_lvalue *)xalloc(sizeof *prot);
-                    prot->v.type = T_PROTECTED_LVALUE;
-                    prot->v.u.lvalue = item;
-                    put_ref_struct(&(prot->protector), st->u.strct);
-
-                    lvalue->type = T_LVALUE;
-                    lvalue->u.lvalue = &prot->v;
+                    assign_protected_lvalue_no_free(lvalue, sp[-2].u.strct->member+ix);
                 }
             }
             else
@@ -16578,9 +14733,35 @@ again:
          * function, instead of the usual call-by-value.
          */
 
-        int i;
+        int i = 0;
+        if (sp->type == T_LVALUE)
+        {
+            /* It must be an protected lvalue with at least 3 references:
+             *  - one on the stack,
+             *  - one on the local variable of the caller to this efun,
+             *  - one on whatever variable of the caller of the caller
+             *    (whatever the local variable references).
+             */
+            switch (sp->x.lvalue_type)
+            {
+                default:
+                    fatal("Illegal lvalue %p type %d as arg 1 to referencep().\n", sp, sp->x.lvalue_type);
+                    /* NOTREACHED */
+                    break;
 
-        i = (sp->type == T_LVALUE && sp->u.lvalue->type == T_LVALUE);
+                case LVALUE_PROTECTED:
+                    i = (sp->u.protected_lvalue->ref > 2);
+                    break;
+
+                case LVALUE_PROTECTED_CHAR:
+                    i = (sp->u.protected_char_lvalue->ref > 2);
+                    break;
+
+                case LVALUE_PROTECTED_RANGE:
+                    i = (sp->u.protected_range_lvalue->ref > 2);
+                    break;
+            } /* switch (sp->x.lvalue_type) */
+        }
         free_svalue(sp);
         put_number(sp, i);
         break;
@@ -16881,7 +15062,10 @@ again:
             {
                 /* Function not found */
                 if (b_use_default) /* int_apply() removed the args */
+                {
                     sp -= num_arg-2;
+                    assert(inter_sp == sp);
+                }
                 else
                     pop_n_elems(num_arg-2);
                 pop_n_elems(2);
@@ -16936,25 +15120,29 @@ again:
             for ( ; size != 0; size--, svp++)
             {
                 int i;
+                svalue_t * item = get_rvalue(svp, NULL);
+                if(!item)
+                    item = svp;
 
                 assign_eval_cost_inl();
                 inter_sp = sp; /* Might be clobbered from previous loop */
 
-                if (svp->type == T_OBJECT)
-                    ob = svp->u.ob;
-                else if (svp->type == T_STRING)
+                if (item->type == T_OBJECT)
+                    ob = item->u.ob;
+                else if (item->type == T_STRING)
                 {
-                    ob = get_object(svp->u.str);
+                    ob = get_object(item->u.str);
                     if (ob == NULL)
                     {
                         ERRORF(("call_other() failed: can't get object '%s'\n"
-                               , get_txt(svp->u.str)));
+                               , get_txt(item->u.str)));
                         /* NOTREACHED */
                         continue;
                     }
                 }
-                else if (svp->type == T_NUMBER && svp->u.number == 0)
+                else if (item->type == T_NUMBER && item->u.number == 0)
                 {
+                    /* Write 0 as a result. */
                     free_svalue(svp);
                     put_number(svp, 0);
                     continue;
@@ -16963,14 +15151,14 @@ again:
                     ERRORF(("Bad arg for call_other() at index %"PRIdMPINT": "
                             "got %s, expected string/object\n"
                            , (mp_int)(svp - arg->u.vec->item)
-                           , typename(svp->type)
+                           , typename(item->type)
                            ));
 
                 /* Destructed objects yield 0 */
                 if (ob->flags & O_DESTRUCTED)
                 {
-                    free_svalue(svp);
-                    put_number(svp, 0);
+                    free_svalue(item);
+                    put_number(item, 0);
                     continue;
                 }
 
@@ -17288,7 +15476,7 @@ again:
 /*-------------------------------------------------------------------------*/
 static Bool
 apply_low ( string_t *fun, object_t *ob, int num_arg
-          , Bool b_ign_prot, Bool allowRefs)
+          , Bool b_ign_prot)
 
 /* The low-level implementation of function calls.
  *
@@ -17296,10 +15484,6 @@ apply_low ( string_t *fun, object_t *ob, int num_arg
  * onto the stack (<inter_sp> points to the last one). static and protected
  * functions can't be called from the outside unless <b_ign_prot> is true.
  * apply_low() takes care of calling shadows where necessary.
- *
- * If <allowRefs> is TRUE, references may be passed as extended varargs
- * ('(varargs mixed *)'). Currently this is used only for simul efuns
- * and driver hooks.
  *
  * When apply_low() returns true, the call was successful, the arguments
  * one the stack have been popped and replaced with the result. But note
@@ -17440,7 +15624,7 @@ retry_for_shadow:
             current_variables = ob->variables;
             if (current_variables)
                 current_variables += variable_index_offset;
-            inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs, MY_FALSE);
+            inter_sp = setup_new_frame2(funstart, inter_sp, MY_FALSE);
                         
             // check argument types
             check_function_args(cache[ix].progp->function_headers[FUNCTION_HEADER_INDEX(funstart)].offset.fx, cache[ix].progp, funstart);
@@ -17561,7 +15745,7 @@ retry_for_shadow:
                         goto failure;
                 }
                 csp->funstart = funstart;
-                inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs, MY_FALSE);
+                inter_sp = setup_new_frame2(funstart, inter_sp, MY_FALSE);
 
                 // check argument types
                 check_function_args(fx - function_index_offset, current_prog, funstart);
@@ -17647,7 +15831,7 @@ int_apply (string_t *fun, object_t *ob, int num_arg
  */
 
 {
-    if (apply_low(fun, ob, num_arg, b_ign_prot, MY_FALSE))
+    if (apply_low(fun, ob, num_arg, b_ign_prot))
         return APPLY_FOUND;
 
     if (b_use_default)
@@ -17676,8 +15860,9 @@ int_apply (string_t *fun, object_t *ob, int num_arg
             /* Add the three new arguments: &result, ob, fun
              * to the arguments on the stack.
              */
-            argp[0].type = T_LVALUE;
-            argp[0].u.lvalue = &result;
+            /* This changes result into a protected lvalue. */
+            assign_protected_lvalue_no_free(argp, &result);
+
             if (hook->type == T_CLOSURE)
             {
                 put_ref_object(argp+1, ob, "int_apply");
@@ -17689,11 +15874,11 @@ int_apply (string_t *fun, object_t *ob, int num_arg
             /* Call the function */
             if (hook->type == T_STRING)
             {
-                rc = apply_low(hook->u.str, ob, num_arg+num_extra, b_ign_prot, MY_TRUE);
+                rc = apply_low(hook->u.str, ob, num_arg+num_extra, b_ign_prot);
             }
             else /* hook->type == T_CLOSURE */
             {
-                int_call_lambda(hook, num_arg+num_extra, MY_TRUE, MY_TRUE);
+                int_call_lambda(hook, num_arg+num_extra, MY_TRUE);
                 rc = 1; /* This call obviously succeeds */
             }
 
@@ -18422,15 +16607,11 @@ assert_master_ob_loaded (void)
 
 /*-------------------------------------------------------------------------*/
 void
-int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
+int_call_lambda (svalue_t *lsvp, int num_arg, Bool external)
 
 /* Call the closure <lsvp> with <num_arg> arguments on the stack. On
  * success, the arguments are replaced with the result, else an errorf()
  * is generated.
- *
- * If <allowRefs> is TRUE, references may be passed as extended varargs
- * ('(varargs mixed *)'). Currently this is used only for simul efuns
- * and driver hooks.
  *
  * If <external> is TRUE, the eval_instruction is called to execute the
  * closure. Otherwise inter_pc is just set and int_call_lambda returns
@@ -18473,7 +16654,9 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            push_number(inter_sp, 0);
+            pop_n_elems(num_arg);
+            push_number(sp, 0);
+            inter_sp = sp;
             return;
         }
 
@@ -18489,7 +16672,9 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            push_number(inter_sp, 0);
+            pop_n_elems(num_arg);
+            push_number(sp, 0);
+            inter_sp = sp;
             return;
         }
 
@@ -18545,7 +16730,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         current_object = l->function.lfun.ob;
         current_prog = current_object->prog;
         /* inter_sp == sp */
-        setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg, allowRefs);
+        setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg);
           
         // check arguments
         check_function_args(current_prog->function_headers[FUNCTION_HEADER_INDEX(csp->funstart)].offset.fx, current_prog, csp->funstart);
@@ -18584,7 +16769,8 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         /* Don't use variables in a destructed object */
         if (l->ob->flags & O_DESTRUCTED)
         {
-            push_number(inter_sp, 0);
+            push_number(sp, 0);
+            inter_sp = sp;
             return;
         }
 
@@ -18660,7 +16846,9 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            push_number(inter_sp, 0);
+            pop_n_elems(num_arg);
+            push_number(sp, 0);
+            inter_sp = sp;
             return;
         }
 
@@ -18690,7 +16878,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         funstart = l->function.code.program;
         csp->funstart = funstart;
         csp->extern_call = external;
-        sp = setup_new_frame2(funstart, sp, allowRefs, MY_TRUE);
+        sp = setup_new_frame2(funstart, sp, MY_TRUE);
 
         current_variables = current_object->variables;
         current_strings = current_prog->strings;
@@ -18715,7 +16903,9 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            push_number(inter_sp, 0);
+            pop_n_elems(num_arg);
+            push_number(sp, 0);
+            inter_sp = sp;
             return;
         }
 
@@ -18746,7 +16936,9 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external)
                  * the closure should be zeroed out.
                  */
                 CLEAN_CSP
-                push_number(inter_sp, 0);
+                pop_n_elems(num_arg);
+                push_number(sp, 0);
+                inter_sp = sp;
                 return;
             }
 
@@ -19017,7 +17209,7 @@ call_function (program_t *progp, int fx)
 #endif
     csp->num_local_variables = 0;
     current_prog = progp;
-    setup_new_frame(fx, NULL, MY_FALSE);
+    setup_new_frame(fx, NULL);
     previous_ob = current_object;
     tracedepth = 0;
     eval_instruction(csp->funstart, inter_sp);
@@ -20867,7 +19059,6 @@ check_a_lot_ref_counts (program_t *search_prog)
 #endif
 
     count_extra_ref_in_vector(&indexing_quickfix, 1);
-    count_extra_ref_in_vector(&last_indexing_protector, 1);
     null_vector.extra_ref++;
     count_extra_ref_in_vector(driver_hook, NUM_DRIVER_HOOKS);
 

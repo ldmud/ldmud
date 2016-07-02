@@ -145,6 +145,7 @@
 #include "typedefs.h"
 
 #include "my-alloca.h"
+#include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -206,9 +207,9 @@
 
 /* Flags passed to compile_lvalue()
  */
-#define USE_INDEX_LVALUE  0x1  /* Use INDEX_LVALUE instead of PUSH_INDEX_LVALUE */
-#define PROTECT_LVALUE    0x2  /* Protect the generated lvalue */
-
+#define PROTECT_LVALUE    0x1  /* Protect the generated lvalue */
+#define MAKE_VAR_LVALUE   0x2  /* Make an variable lvalue */
+                               /* (ignore any lvalues in the variable) */
 
 #define UNIMPLEMENTED \
             lambda_error("Unimplemented - contact the maintainer\n");
@@ -342,7 +343,7 @@ static void lambda_cerror(const char *s) FORMATDEBUG(printf,1,0) NORETURN;
 static void lambda_cerrorl(const char *s1, const char *s2 UNUSED, int line1 UNUSED, 
                            int line2 UNUSED) NORETURN FORMATDEBUG(printf,1,0);
 static void free_symbols(void);
-static Bool is_lvalue (svalue_t *argp, int index_lvalue);
+static Bool is_lvalue (svalue_t *argp, int flags);
 static void compile_lvalue(svalue_t *, int);
 static lambda_t * lambda (vector_t *args, svalue_t *block, object_t *origin);
 
@@ -2521,8 +2522,8 @@ compile_value (svalue_t *value, int opt_flags)
                     argp++;
                     for (; (i -= 2) >= 0; argp+=2)
                     {
-                        compile_value(argp+1, REF_REJECTED);
-                        compile_lvalue(argp, USE_INDEX_LVALUE);
+                        compile_value(argp+1, 0);
+                        compile_lvalue(argp, 0);
                         if (!i)
                         {
                             /* Last assignment: we might need to keep this value */
@@ -2569,7 +2570,7 @@ compile_value (svalue_t *value, int opt_flags)
 
                     if (argp[2].type == T_NUMBER && argp[2].u.number == 1)
                     {
-                        compile_lvalue(argp+1, USE_INDEX_LVALUE);
+                        compile_lvalue(argp+1, 0);
                         if (opt_flags & VOID_ACCEPTED)
                         {
                             opt_flags = VOID_GIVEN;
@@ -2584,7 +2585,7 @@ compile_value (svalue_t *value, int opt_flags)
                     else
                     {
                         compile_value(argp+2, REF_REJECTED);
-                        compile_lvalue(argp+1, USE_INDEX_LVALUE);
+                        compile_lvalue(argp+1, 0);
                         if (opt_flags & VOID_ACCEPTED)
                         {
                             opt_flags = VOID_GIVEN;
@@ -2619,7 +2620,7 @@ compile_value (svalue_t *value, int opt_flags)
 
                     if (argp[2].type == T_NUMBER && argp[2].u.number == 1)
                     {
-                        compile_lvalue(argp+1, USE_INDEX_LVALUE);
+                        compile_lvalue(argp+1, 0);
                         if (opt_flags & VOID_ACCEPTED)
                         {
                             opt_flags = VOID_GIVEN;
@@ -2634,7 +2635,7 @@ compile_value (svalue_t *value, int opt_flags)
                     else
                     {
                         compile_value(argp+2, REF_REJECTED);
-                        compile_lvalue(argp+1, USE_INDEX_LVALUE);
+                        compile_lvalue(argp+1, 0);
                         STORE_CODE(current.codep, F_SUB_EQ);
                         current.code_left--;
                     }
@@ -2667,7 +2668,7 @@ compile_value (svalue_t *value, int opt_flags)
                         );
                     }
                     compile_value(argp+2, REF_REJECTED);
-                    compile_lvalue(argp+1, USE_INDEX_LVALUE);
+                    compile_lvalue(argp+1, 0);
                     STORE_CODE(current.codep, (bytecode_t)(type - CLOSURE_OPERATOR));
                     current.code_left--;
                     break;
@@ -2726,7 +2727,7 @@ compile_value (svalue_t *value, int opt_flags)
                         );
                     }
 
-                    compile_lvalue(argp+1, USE_INDEX_LVALUE);
+                    compile_lvalue(argp+1, 0);
 
                     if (current.code_left < 3)
                         realloc_code();
@@ -2739,7 +2740,7 @@ compile_value (svalue_t *value, int opt_flags)
                     STORE_CODE(current.codep, (bytecode_t)code);
                     STORE_CODE(current.codep, (bytecode_t)0);
 
-                    compile_value(argp+2, REF_REJECTED);
+                    compile_value(argp+2, 0);
 
                     /* Store the correct offsets for the operator/branch
                      * instruction. If necessary, the short branch is
@@ -2808,7 +2809,7 @@ compile_value (svalue_t *value, int opt_flags)
                         );
                     }
 
-                    compile_lvalue(argp+1, USE_INDEX_LVALUE);
+                    compile_lvalue(argp+1, 0);
 
                     if (opt_flags & VOID_ACCEPTED)
                     {
@@ -3110,9 +3111,9 @@ compile_value (svalue_t *value, int opt_flags)
                     if ((++argp)->type != T_POINTER)
                     {
                         vars_given = 1;
-                        if (!is_lvalue(argp, 0))
+                        if (!is_lvalue(argp, MAKE_VAR_LVALUE))
                             lambda_error("Missing variable lvalue to #'foreach\n");
-                        compile_lvalue(argp, 0);
+                        compile_lvalue(argp, MAKE_VAR_LVALUE);
                     }
                     else
                     {
@@ -3127,9 +3128,9 @@ compile_value (svalue_t *value, int opt_flags)
                             lambda_error("Too many lvalues to #'foreach: %d\n", vars_given);
                         for ( ; i > 0; i--, svp++)
                         {
-                            if (!is_lvalue(svp, 0))
+                            if (!is_lvalue(svp, MAKE_VAR_LVALUE))
                                 lambda_error("Missing variable lvalue to #'foreach\n");
-                            compile_lvalue(svp, 0);
+                            compile_lvalue(svp, MAKE_VAR_LVALUE);
                         }
                     }
 
@@ -3289,7 +3290,7 @@ compile_value (svalue_t *value, int opt_flags)
 
                     while (--lvalues >= 0)
                     {
-                        compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
+                        compile_lvalue(++argp, PROTECT_LVALUE);
                     }
 
                     if (current.code_left < 2)
@@ -3331,7 +3332,7 @@ compile_value (svalue_t *value, int opt_flags)
 
                     while (--lvalues >= 0)
                     {
-                        compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
+                        compile_lvalue(++argp, PROTECT_LVALUE);
                     }
 
                     if (current.code_left < 2)
@@ -3360,7 +3361,7 @@ compile_value (svalue_t *value, int opt_flags)
                     size = i = block_size - 1;
                     while (--i >= 0)
                     {
-                        compile_value(++argp, REF_REJECTED);
+                        compile_value(++argp, 0);
                     }
                     if (current.code_left < 3)
                         realloc_code();
@@ -3416,7 +3417,7 @@ compile_value (svalue_t *value, int opt_flags)
 
                         while (--j >= 0)
                         {
-                            compile_value(element++, REF_REJECTED);
+                            compile_value(element++, 0);
                         }
                     }
 
@@ -3475,7 +3476,7 @@ compile_value (svalue_t *value, int opt_flags)
                     i = size+1;
                     while (--i >= 0)
                     {
-                        compile_value(++argp, REF_REJECTED);
+                        compile_value(++argp, 0);
                     }
                     if (current.code_left < 4)
                         realloc_code();
@@ -3506,7 +3507,7 @@ compile_value (svalue_t *value, int opt_flags)
                     else
                     {
                         opt_flags =
-                          compile_value(++argp, ZERO_ACCEPTED|REF_REJECTED);
+                          compile_value(++argp, ZERO_ACCEPTED);
                     }
 
                     if (current.code_left < 1)
@@ -3973,7 +3974,7 @@ compile_value (svalue_t *value, int opt_flags)
                     	 */
                         if (opt_flags & REF_REJECTED)
                             lambda_error("Reference value in bad position\n");
-                        compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
+                        compile_lvalue(++argp, PROTECT_LVALUE);
                     }
                     else
                     {
@@ -4021,7 +4022,7 @@ compile_value (svalue_t *value, int opt_flags)
                     	 */
                         if (opt_flags & REF_REJECTED)
                             lambda_error("Reference value in bad position\n");
-                        compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
+                        compile_lvalue(++argp, PROTECT_LVALUE);
                     }
                     else
                     {
@@ -4069,7 +4070,7 @@ compile_value (svalue_t *value, int opt_flags)
                     	 */
                         if (opt_flags & REF_REJECTED)
                             lambda_error("Reference value in bad position\n");
-                        compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
+                        compile_lvalue(++argp, PROTECT_LVALUE);
                     }
                     else
                     {
@@ -4663,11 +4664,12 @@ compile_value (svalue_t *value, int opt_flags)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-is_lvalue (svalue_t *argp, int index_lvalue)
+is_lvalue (svalue_t *argp, int flags)
 
 /* Test if the value <argp> can be compiled into a lvalue.
- * If <index_lvalue> is not zero, arrays compiling into an indexing
- * instruction are accepted, too.
+ * <flags> denote the same flags as compile_lvalue:
+ *   MAKE_VAR_LVALUE: If set, then compiling indexed arrays/strings
+ *                    are not allowed (only plain variables).
  */
 
 {
@@ -4677,7 +4679,7 @@ is_lvalue (svalue_t *argp, int index_lvalue)
         return argp->x.quotes == 1;
 
     case T_POINTER:
-        if (index_lvalue)
+        if (!(flags & MAKE_VAR_LVALUE))
         {
             vector_t *block;
 
@@ -4723,6 +4725,9 @@ compile_lvalue (svalue_t *argp, int flags)
  */
 
 {
+    /* Both flags are exclusive. */
+    assert(!(flags & PROTECT_LVALUE) || !(flags & MAKE_VAR_LVALUE));
+
     switch(argp->type) {
 
     /* 'a: Symbol of a local variable.
@@ -4748,11 +4753,17 @@ compile_lvalue (svalue_t *argp, int flags)
               lambda_error("Too many symbols.\n");
         }
 
-        if (current.code_left < 3)
+        if (current.code_left < 4)
             realloc_code();
         current.code_left -= 2;
-        STORE_CODE(current.codep, F_PUSH_LOCAL_VARIABLE_LVALUE);
+        STORE_CODE(current.codep, (flags & MAKE_VAR_LVALUE) ? F_PUSH_LOCAL_VARIABLE_VLVALUE : F_PUSH_LOCAL_VARIABLE_LVALUE);
         STORE_UINT8(current.codep, (bytecode_t)sym->index);
+
+        if (flags & PROTECT_LVALUE)
+        {
+            current.code_left--;
+            STORE_CODE(current.codep, F_MAKE_PROTECTED);
+        }
         return;
       }
 
@@ -4765,6 +4776,8 @@ compile_lvalue (svalue_t *argp, int flags)
         block = argp->u.vec;
         if (block != &null_vector && (argp = block->item)->type == T_CLOSURE)
         {
+            bool is_struct = false;
+
             switch (argp->x.closure_type)
             {
 
@@ -4772,126 +4785,67 @@ compile_lvalue (svalue_t *argp, int flags)
              * ({ #'[<, map|array, index })
              * ({ #'->, struct, index })
              */
+            case F_S_INDEX +CLOSURE_EFUN:
+                is_struct = true;
+                /* FALLTHROUGH */
             case F_INDEX +CLOSURE_EFUN:
             case F_RINDEX+CLOSURE_EFUN:
             case F_AINDEX+CLOSURE_EFUN:
-            case F_S_INDEX +CLOSURE_EFUN:
+                if (flags & MAKE_VAR_LVALUE)
+                    break;
+
                 if (VEC_SIZE(block) == 3)
                 {
                     /* Indexing of an array or normal mapping.
                      */
-                    if (is_lvalue(argp+1, flags & USE_INDEX_LVALUE))
+
+                    /* If it is a string, we need an lvalue,
+                     * but we can't really differentiate here.
+                     */
+                    if (!is_struct && is_lvalue(argp+1, 0))
+                        compile_lvalue(argp+1, PROTECT_LVALUE);
+                    else
+                        compile_value(argp+1, 0);
+
+                    compile_value(argp+2, 0);
+
+                    if (current.code_left < 3)
+                        realloc_code();
+
+                    current.code_left--;
+                    switch (argp->x.closure_type)
                     {
-                        compile_value(argp+2, 0);
+                        case F_INDEX + CLOSURE_EFUN:
+                            STORE_CODE(current.codep
+                                      , (bytecode_t)
+                                        (F_INDEX_LVALUE));
+                            break;
 
-                        if (!(flags & PROTECT_LVALUE)
-                         && argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN
-                           )
-                        {
-                            if (current.code_left < 1)
-                                realloc_code();
-                            current.code_left--;
+                        case F_RINDEX + CLOSURE_EFUN:
+                            STORE_CODE(current.codep
+                                      , (bytecode_t)
+                                        (F_RINDEX_LVALUE));
+                            break;
+
+                        case F_AINDEX + CLOSURE_EFUN:
+                            STORE_CODE(current.codep
+                                      , (bytecode_t)
+                                        (F_AINDEX_LVALUE));
+                            break;
+
+                        case F_S_INDEX + CLOSURE_EFUN:
+                            current.code_left --;
                             STORE_CODE(current.codep, (bytecode_t) F_NCONST1);
-                        }
-
-                        compile_lvalue(argp+1, flags & PROTECT_LVALUE);
-                        if (current.code_left < 3)
-                            realloc_code();
-                        if (flags & PROTECT_LVALUE)
-                        {
-                            current.code_left -= 1;
-                            if (argp->x.closure_type == F_INDEX + CLOSURE_EFUN)
-                                STORE_CODE(current.codep
-                                          , (bytecode_t)
-                                            (F_PROTECTED_INDEX_LVALUE));
-                            else if (argp->x.closure_type == F_RINDEX + CLOSURE_EFUN)
-                                STORE_CODE(current.codep
-                                          , (bytecode_t)
-                                            (F_PROTECTED_RINDEX_LVALUE));
-                            else if (argp->x.closure_type == F_AINDEX + CLOSURE_EFUN)
-                                STORE_CODE(current.codep
-                                          , (bytecode_t)
-                                            (F_PROTECTED_AINDEX_LVALUE));
-                            else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
-                            {
-                                current.code_left -= 1;
-                                STORE_CODE(current.codep, (bytecode_t) F_NCONST1);
-                                STORE_CODE(current.codep
-                                          , (bytecode_t)
-                                            (F_PROTECTED_INDEX_S_LVALUE));
-                            }
-                        } else {
-                            current.code_left -= 1;
-                            if (argp->x.closure_type == F_INDEX + CLOSURE_EFUN)
-                                STORE_CODE(current.codep
-                                          , (bytecode_t)
-                                            (F_INDEX_LVALUE));
-                            else if (argp->x.closure_type == F_RINDEX + CLOSURE_EFUN)
-                                STORE_CODE(current.codep
-                                          , (bytecode_t)
-                                            (F_RINDEX_LVALUE));
-                            else if (argp->x.closure_type == F_AINDEX + CLOSURE_EFUN)
-                                STORE_CODE(current.codep
-                                          , (bytecode_t)
-                                            (F_AINDEX_LVALUE));
-                            else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
-                            {
-                                STORE_CODE(current.codep
-                                          , (bytecode_t)
-                                            (F_INDEX_S_LVALUE));
-                            }
-                        }
-                        return;
+                            STORE_CODE(current.codep
+                                      , (bytecode_t)
+                                        (F_S_INDEX_LVALUE));
+                            break;
                     }
 
-                    compile_value(argp+1, 0);
-                    compile_value(argp+2, 0);
-                    if (current.code_left < 2)
-                        realloc_code();
-                    if (flags & PROTECT_LVALUE) {
-                        current.code_left -= 1;
-                        if (argp->x.closure_type == F_INDEX + CLOSURE_EFUN)
-                            STORE_CODE(current.codep
-                                      , (bytecode_t)
-                                        (F_PUSH_PROTECTED_INDEXED_LVALUE));
-                        else if (argp->x.closure_type == F_RINDEX + CLOSURE_EFUN)
-                            STORE_CODE(current.codep
-                                      , (bytecode_t)
-                                        (F_PUSH_PROTECTED_RINDEXED_LVALUE));
-                        else if (argp->x.closure_type == F_AINDEX + CLOSURE_EFUN)
-                            STORE_CODE(current.codep
-                                      , (bytecode_t)
-                                        (F_PUSH_PROTECTED_AINDEXED_LVALUE));
-                        else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
-                        {
-                            current.code_left -= 1;
-                            STORE_CODE(current.codep, (bytecode_t) F_NCONST1);
-                            STORE_CODE(current.codep
-                                      , (bytecode_t)
-                                        (F_PUSH_PROTECTED_INDEXED_S_LVALUE));
-                        }
-                    } else {
-                        current.code_left -= 1;
-                        if (argp->x.closure_type == F_INDEX + CLOSURE_EFUN)
-                            STORE_CODE(current.codep
-                                      , (bytecode_t)
-                                        (F_PUSH_INDEXED_LVALUE));
-                        else if (argp->x.closure_type == F_RINDEX + CLOSURE_EFUN)
-                            STORE_CODE(current.codep
-                                      , (bytecode_t)
-                                        (F_PUSH_RINDEXED_LVALUE));
-                        else if (argp->x.closure_type == F_AINDEX + CLOSURE_EFUN)
-                            STORE_CODE(current.codep
-                                      , (bytecode_t)
-                                        (F_PUSH_AINDEXED_LVALUE));
-                        else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
-                        {
-                            current.code_left -= 1;
-                            STORE_CODE(current.codep, (bytecode_t) F_NCONST1);
-                            STORE_CODE(current.codep
-                                      , (bytecode_t)
-                                        (F_PUSH_INDEXED_S_LVALUE));
-                        }
+                    if (flags & PROTECT_LVALUE)
+                    {
+                        current.code_left--;
+                        STORE_CODE(current.codep, F_MAKE_PROTECTED);
                     }
                     return;
                 } /* if (VEC_SIZE(block) == 3) */
@@ -4908,17 +4862,11 @@ compile_lvalue (svalue_t *argp, int flags)
                     if (current.code_left < 2)
                         realloc_code();
 
+                    STORE_CODE(current.codep, F_MAP_INDEX_LVALUE);
                     if (flags & PROTECT_LVALUE)
                     {
-                        current.code_left -= 1;
-                        STORE_CODE(current.codep,
-                          F_PUSH_PROTECTED_INDEXED_MAP_LVALUE);
-                    }
-                    else
-                    {
-                        current.code_left -= 1;
-                        STORE_CODE(current.codep,
-                                     F_PUSH_INDEXED_MAP_LVALUE);
+                        current.code_left--;
+                        STORE_CODE(current.codep, F_MAKE_PROTECTED);
                     }
                     return;
                 } /* if (VEC_SIZE(block) == 4...) */
@@ -4927,29 +4875,7 @@ compile_lvalue (svalue_t *argp, int flags)
                 break;
 
             /* ({#'[..], map/array, index, index })
-             */
-            case F_RANGE +CLOSURE_EFUN:
-                if (VEC_SIZE(block) != 4)
-                    break;
-                compile_value(argp += 2, 0);
-                compile_value(++argp, 0);
-                compile_lvalue(argp - 2, flags & PROTECT_LVALUE);
-
-                if (current.code_left < 2)
-                    realloc_code();
-                if (flags & PROTECT_LVALUE)
-                {
-                    current.code_left -= 1;
-                    STORE_CODE(current.codep, F_PROTECTED_RANGE_LVALUE);
-                }
-                else
-                {
-                    current.code_left -= 1;
-                    STORE_CODE(current.codep, F_RANGE_LVALUE);
-                }
-                return;
-
-            /* ({#'[..<], map/array, index, index })
+             * ({#'[..<], map/array, index, index })
              * ({#'[<..], map/array, index, index })
              * ({#'[<..<], map/array, index, index })
              * ({#'[..>], map/array, index, index })
@@ -4958,6 +4884,7 @@ compile_lvalue (svalue_t *argp, int flags)
              * ({#'[>..<], map/array, index, index })
              * ({#'[>..>], map/array, index, index })
              */
+            case F_RANGE    +CLOSURE_EFUN:
             case F_NR_RANGE +CLOSURE_EFUN:
             case F_RN_RANGE +CLOSURE_EFUN:
             case F_RR_RANGE +CLOSURE_EFUN:
@@ -4967,61 +4894,69 @@ compile_lvalue (svalue_t *argp, int flags)
             case F_AR_RANGE +CLOSURE_EFUN:
             case F_AA_RANGE +CLOSURE_EFUN:
               {
-              	int code;
-              	
+                int code;
+
+                if (flags & MAKE_VAR_LVALUE)
+                    break;
+
                 if (VEC_SIZE(block) != 4)
                     break;
 
                 code = F_ILLEGAL;
                 switch(argp->x.closure_type)
                 {
+                case F_RANGE+CLOSURE_EFUN:
+                    code = F_RANGE_LVALUE;
+                    break;
                 case F_NR_RANGE+CLOSURE_EFUN:
-                    code = (flags & PROTECT_LVALUE) ? F_PROTECTED_NR_RANGE_LVALUE
-                                                    : F_NR_RANGE_LVALUE;
+                    code = F_NR_RANGE_LVALUE;
                     break;
                 case F_RN_RANGE+CLOSURE_EFUN:
-                    code = (flags & PROTECT_LVALUE) ? F_PROTECTED_RN_RANGE_LVALUE
-                                                    : F_RN_RANGE_LVALUE;
+                    code = F_RN_RANGE_LVALUE;
                     break;
                 case F_RR_RANGE+CLOSURE_EFUN:
-                    code = (flags & PROTECT_LVALUE) ? F_PROTECTED_RR_RANGE_LVALUE
-                                                    : F_RR_RANGE_LVALUE;
+                    code = F_RR_RANGE_LVALUE;
+                    break;
                 case F_NA_RANGE+CLOSURE_EFUN:
-                    code = (flags & PROTECT_LVALUE) ? F_PROTECTED_NA_RANGE_LVALUE
-                                                    : F_NA_RANGE_LVALUE;
+                    code = F_NA_RANGE_LVALUE;
                     break;
                 case F_AN_RANGE+CLOSURE_EFUN:
-                    code = (flags & PROTECT_LVALUE) ? F_PROTECTED_AN_RANGE_LVALUE
-                                                    : F_AN_RANGE_LVALUE;
+                    code = F_AN_RANGE_LVALUE;
                     break;
                 case F_RA_RANGE+CLOSURE_EFUN:
-                    code = (flags & PROTECT_LVALUE) ? F_PROTECTED_RA_RANGE_LVALUE
-                                                    : F_RA_RANGE_LVALUE;
+                    code = F_RA_RANGE_LVALUE;
                     break;
                 case F_AR_RANGE+CLOSURE_EFUN:
-                    code = (flags & PROTECT_LVALUE) ? F_PROTECTED_AR_RANGE_LVALUE
-                                                    : F_AR_RANGE_LVALUE;
+                    code = F_AR_RANGE_LVALUE;
                     break;
                 case F_AA_RANGE+CLOSURE_EFUN:
-                    code = (flags & PROTECT_LVALUE) ? F_PROTECTED_AA_RANGE_LVALUE
-                                                    : F_AA_RANGE_LVALUE;
+                    code = F_AA_RANGE_LVALUE;
                     break;
                 }
 
-                compile_value(argp += 2, 0);
+                compile_lvalue(++argp, PROTECT_LVALUE);
                 compile_value(++argp, 0);
-                compile_lvalue(argp - 2, flags & PROTECT_LVALUE);
+                compile_value(++argp, 0);
 
                 if (current.code_left < 2)
                     realloc_code();
-                current.code_left -= 1;
+                current.code_left--;
                 STORE_CODE(current.codep, (bytecode_t)code);
+
+                if (flags & PROTECT_LVALUE)
+                {
+                    current.code_left--;
+                    STORE_CODE(current.codep, F_MAKE_PROTECTED);
+                }
                 return;
               }
 
             /* ({ #'[, mapping, index [,index] })
              */
             case F_MAP_INDEX +CLOSURE_EFUN:
+                if (flags & MAKE_VAR_LVALUE)
+                    break;
+
                 if (VEC_SIZE(block) != 4)
                     break;
 
@@ -5031,16 +4966,14 @@ compile_lvalue (svalue_t *argp, int flags)
 
                 if (current.code_left < 2)
                     realloc_code();
+
+                current.code_left--;
+                STORE_CODE(current.codep, F_MAP_INDEX_LVALUE);
+
                 if (flags & PROTECT_LVALUE)
                 {
-                    current.code_left -= 1;
-                    STORE_CODE(current.codep,
-                      F_PUSH_PROTECTED_INDEXED_MAP_LVALUE);
-                }
-                else
-                {
-                    current.code_left -= 1;
-                    STORE_CODE(current.codep, F_PUSH_INDEXED_MAP_LVALUE);
+                    current.code_left--;
+                    STORE_CODE(current.codep, F_MAKE_PROTECTED);
                 }
                 return;
 
@@ -5048,20 +4981,10 @@ compile_lvalue (svalue_t *argp, int flags)
              */
             case CLOSURE_IDENTIFIER:
               {
-                lambda_t *l;
-
                 if (VEC_SIZE(block) != 1)
                     break;
-                l = argp->u.lambda;
-                if (l->ob != current.lambda_origin)
-                    break;
-                if (current.code_left < 3)
-                    realloc_code();
-                current.code_left -= 2;
-                if ((short)l->function.var_index < 0)
-                    lambda_error("Variable not inherited\n");
-                STORE_CODE(current.codep, F_PUSH_IDENTIFIER_LVALUE);
-                STORE_UINT8(current.codep, (bytecode_t)l->function.var_index);
+
+                compile_lvalue(argp, flags);
                 return;
               }
             } /* switch(closure_type) */
@@ -5082,13 +5005,19 @@ compile_lvalue (svalue_t *argp, int flags)
             l = argp->u.lambda;
             if (l->ob != current.lambda_origin)
                 break;
-            if (current.code_left < 3)
+            if (current.code_left < 4)
                 realloc_code();
             current.code_left -= 2;
             if ((short)l->function.var_index < 0)
                 lambda_error("Variable not inherited\n");
-            STORE_CODE(current.codep, F_PUSH_IDENTIFIER_LVALUE);
+            STORE_CODE(current.codep, (flags & MAKE_VAR_LVALUE) ? F_PUSH_IDENTIFIER_VLVALUE : F_PUSH_IDENTIFIER_LVALUE);
             STORE_CODE(current.codep, (bytecode_t)(l->function.var_index));
+
+            if (flags & PROTECT_LVALUE)
+            {
+                current.code_left--;
+                STORE_CODE(current.codep, F_MAKE_PROTECTED);
+            }
             return;
           }
         }

@@ -193,17 +193,17 @@ class SValuePrinter:
     T_SYMBOL                         = 0x9
     T_QUOTED_ARRAY                   = 0xa
     T_STRUCT                         = 0xb
-    T_CHAR_LVALUE                    = 0xc
-    T_STRING_RANGE_LVALUE            = 0x0d
-    T_POINTER_RANGE_LVALUE           = 0x0e
-    T_PROTECTED_CHAR_LVALUE          = 0x0f
-    T_PROTECTED_STRING_RANGE_LVALUE  = 0x10
-    T_PROTECTED_POINTER_RANGE_LVALUE = 0x11
-    T_PROTECTED_LVALUE               = 0x12
-    T_PROTECTOR_MAPPING              = 0x13
-    T_CALLBACK                       = 0x14
-    T_ERROR_HANDLER                  = 0x15
-    T_NULL                           = 0x16
+    T_CALLBACK                       = 0xc
+    T_ERROR_HANDLER                  = 0xd
+    T_BREAK_ADDR                     = 0xe
+    T_NULL                           = 0xf
+
+    LVALUE_UNPROTECTED               = 0x00
+    LVALUE_UNPROTECTED_CHAR          = 0x01
+    LVALUE_UNPROTECTED_RANGE         = 0x02
+    LVALUE_PROTECTED                 = 0x10
+    LVALUE_PROTECTED_CHAR            = 0x11
+    LVALUE_PROTECTED_RANGE           = 0x12
 
     names = {
         T_INVALID:                        "T_INVALID",
@@ -218,16 +218,9 @@ class SValuePrinter:
         T_SYMBOL:                         "T_SYMBOL",
         T_QUOTED_ARRAY:                   "T_QUOTED_ARRAY",
         T_STRUCT:                         "T_STRUCT",
-        T_CHAR_LVALUE:                    "T_CHAR_LVALUE",
-        T_STRING_RANGE_LVALUE:            "T_STRING_RANGE_LVALUE",
-        T_POINTER_RANGE_LVALUE:           "T_POINTER_RANGE_LVALUE",
-        T_PROTECTED_CHAR_LVALUE:          "T_PROTECTED_CHAR_LVALUE",
-        T_PROTECTED_STRING_RANGE_LVALUE:  "T_PROTECTED_STRING_RANGE_LVALUE",
-        T_PROTECTED_POINTER_RANGE_LVALUE: "T_PROTECTED_POINTER_RANGE_LVALUE",
-        T_PROTECTED_LVALUE:               "T_PROTECTED_LVALUE",
-        T_PROTECTOR_MAPPING:              "T_PROTECTOR_MAPPING",
         T_CALLBACK:                       "T_CALLBACK",
         T_ERROR_HANDLER:                  "T_ERROR_HANDLER",
+        T_BREAK_ADDR:                     "T_BREAK_ADDR",
         T_NULL:                           "T_NULL",
     }
 
@@ -252,7 +245,30 @@ class SValuePrinter:
 
         stype = val["type"]
         if stype == self.T_LVALUE:
-            return [(".u.lvalue", val["u"]["lvalue"])]
+            ltype = val["x"]["lvalue_type"]
+
+            if ltype == self.LVALUE_UNPROTECTED:
+                return [("x.lvalue_type", "LVALUE_UNPROTECTED"),
+                        ("u.lvalue", val["u"]["lvalue"])]
+            elif ltype == self.LVALUE_UNPROTECTED_CHAR:
+                lvalue = gdb.lookup_global_symbol("current_unprotected_char").value()
+                return [("x.lvalue_type", "LVALUE_UNPROTECTED_CHAR"),
+                        ("current_unprotected_char", lvalue)]
+            elif ltype == self.LVALUE_UNPROTECTED_RANGE:
+                lvalue = gdb.lookup_global_symbol("current_unprotected_range").value()
+                return [("x.lvalue_type", "LVALUE_UNPROTECTED_RANGE"),
+                        ("current_unprotected_range", lvalue)]
+            elif ltype == self.LVALUE_PROTECTED:
+                return [("x.lvalue_type", "LVALUE_PROTECTED"),
+                        ("u.protected_lvalue", val["u"]["protected_lvalue"])]
+            elif ltype == self.LVALUE_PROTECTED_CHAR:
+                return [("x.lvalue_type", "LVALUE_PROTECTED_CHAR"),
+                        ("u.protected_char_lvalue", val["u"]["protected_char_lvalue"])]
+            elif ltype == self.LVALUE_PROTECTED_RANGE:
+                return [("x.lvalue_type", "LVALUE_PROTECTED_RANGE"),
+                        ("u.protected_range_lvalue", val["u"]["protected_range_lvalue"])]
+            else:
+                return [(".x.lvalue_type", ltype)]
         elif stype == self.T_NUMBER:
             return [(".u.number", val["u"]["number"])]
         elif stype == self.T_STRING:
@@ -264,6 +280,8 @@ class SValuePrinter:
         elif stype == self.T_MAPPING:
             return [(".u.map", val["u"]["map"])]
         elif stype == self.T_FLOAT:
+            if any([field.name == "float_number" for field in val["u"].type.fields()]):
+                return [("u.float_number", val["u"]["float_number"])]
             return [(".u.mantissa", val["u"]["mantissa"]),
                     (".x.exponent", val["x"]["exponent"])]
         elif stype == self.T_CLOSURE:
@@ -277,29 +295,76 @@ class SValuePrinter:
                     (".x.quotes", val["x"]["quotes"])]
         elif stype == self.T_STRUCT:
             return [(".u.strct", val["u"]["strct"])]
-        elif stype == self.T_CHAR_LVALUE:
-            return [(".u.charp", val["u"]["charp"])]
-        elif stype == self.T_STRING_RANGE_LVALUE:
-            return [(".u.str", val["u"]["str"])]
-        elif stype == self.T_POINTER_RANGE_LVALUE:
-            return [(".u.vec", val["u"]["vec"])]
-        elif stype == self.T_PROTECTED_CHAR_LVALUE:
-            return [(".u.protected_char_lvalue", val["u"]["protected_char_lvalue"])]
-        elif stype == self.T_PROTECTED_STRING_RANGE_LVALUE:
-            return [(".u.protected_range_lvalue", val["u"]["protected_range_lvalue"])]
-        elif stype == self.T_PROTECTED_POINTER_RANGE_LVALUE:
-            return [(".u.protected_range_lvalue", val["u"]["protected_range_lvalue"])]
-        elif stype == self.T_PROTECTED_LVALUE:
-            return [(".u.protected_lvalue", val["u"]["protected_lvalue"])]
-        elif stype == self.T_PROTECTOR_MAPPING:
-            return [(".u.map", val["u"]["map"])]
         elif stype == self.T_CALLBACK:
             return [(".u.cb", val["u"]["cb"]),
                     (".x.extern_args", val["x"]["extern_args"])]
         elif stype == self.T_ERROR_HANDLER:
             return [(".u.error_handler", val["u"]["error_handler"])]
+        elif stype == self.T_BREAK_ADDR:
+            return [(".u.break_addr", val["u"]["break_addr"])]
         else:
             return []
+
+class ProtLvalPrinter:
+    "Prints a protected lvalue"
+
+    def __init__(self, val):
+         self.val = val
+
+    def to_string(self):
+        (type,val) = unwind_ptr(self.val)
+
+        return print_ptr(val.address)
+
+    def children(self):
+        (type,val) = unwind_ptr(self.val)
+        if val.address == 0:
+            return []
+
+        return [(".ref", val["ref"]),
+                (".val", val["val"].address)]
+
+class ProtCharPrinter:
+    "Prints a protected char lvalue"
+
+    def __init__(self, val):
+         self.val = val
+
+    def to_string(self):
+        (type,val) = unwind_ptr(self.val)
+
+        return print_ptr(val.address)
+
+    def children(self):
+        (type,val) = unwind_ptr(self.val)
+        if val.address == 0:
+            return []
+
+        return [(".ref", val["ref"]),
+                (".str", val["str"]),
+                (".charp", val["charp"])]
+
+class ProtRangePrinter:
+    "Prints a protected range lvalue"
+
+    def __init__(self, val):
+         self.val = val
+
+    def to_string(self):
+        (type,val) = unwind_ptr(self.val)
+
+        return print_ptr(val.address)
+
+    def children(self):
+        (type,val) = unwind_ptr(self.val)
+        if val.address == 0:
+            return []
+
+        return [(".ref", val["ref"]),
+                (".index1", val["index1"]),
+                (".index2", val["index2"]),
+                (".vec", val["vec"].address),
+                (".var", val["var"])]
 
 class TypePrinter:
     "Prints a LPC type"
@@ -425,6 +490,9 @@ ptr_printers = {
     'interactive_s': lambda val: PtrNamePrinter(val, ["ob", "name"]),
     'wiz_list_s':    lambda val: PtrNamePrinter(val, ["name"]),
     'lpctype_s':     TypePrinter,
-    }
+    'protected_lvalue':       ProtLvalPrinter,
+    'protected_char_lvalue':  ProtCharPrinter,
+    'protected_range_lvalue': ProtRangePrinter,
+}
 
 direct_printers = {}

@@ -685,67 +685,6 @@ _free_mapping (mapping_t *m, Bool no_data)
 } /* _free_mapping() */
 
 /*-------------------------------------------------------------------------*/
-void
-free_protector_mapping (mapping_t *m)
-
-/* Free the mapping <m> which is part of a T_PROTECTOR_MAPPING svalue.
- * Such svalues are created only for mappings with a hashed part, and
- * have the ref of the hashed part incremented at creation.
- *
- * This function is a wrapper around free_mapping() and takes care
- * to free m->hash->deleted if m->hash->ref reaches zero due to this
- * call.
- */
-
-{
-    mapping_hash_t *hm;
-
-#ifdef DEBUG
-    /* This type of mapping must have a hash part */
-
-    if (!m->hash || m->hash->ref <= 0)
-    {
-        /* This shouldn't happen */
-        printf("%s free_protector_mapping() : no hash %s\n"
-              , time_stamp(), m->hash ? "reference" : "part");
-#ifdef TRACE_CODE
-        {
-            last_instructions(TOTAL_TRACE_LENGTH, MY_TRUE, NULL);
-        }
-#endif
-        dump_trace(MY_FALSE, NULL, NULL);
-/*        printf("%s free_protector_mapping() : no hash %s\n"
-              , time_stamp(), m->hash ? "reference" : "part");
- */
-        free_mapping(m);
-    }
-#endif /* DEBUG */
-
-
-    /* If this was the last protective reference, execute
-     * the pending deletions.
-     */
-
-    if (!--(hm = m->hash)->ref)
-    {
-        map_chain_t *mc, *next;
-
-        for (mc = hm->deleted; mc; mc = next)
-        {
-            next = mc->next;
-            free_map_chain(m, mc, MY_FALSE);
-        }
-
-        hm->deleted = NULL;
-    }
-
-    /* Call free_mapping() if appropriate */
-
-    free_mapping(m);
-
-} /* free_protector_mapping() */
-
-/*-------------------------------------------------------------------------*/
 static INLINE mp_int
 mhash (svalue_t * svp)
 
@@ -2174,15 +2113,6 @@ compact_mapping (mapping_t *m, Bool force)
        * Neat sideeffect: all allocations are guaranteed to work (or
        * the driver terminates).
        */
-
-    if (last_indexing_protector.type == T_PROTECTOR_MAPPING)
-    {
-        /* There is a slight chance that free_protector_mapping causes
-         * remove_empty_mappings().
-         */
-        free_protector_mapping(last_indexing_protector.u.map);
-        last_indexing_protector.type = T_NUMBER;
-    }
 
 #ifdef DEBUG
     if (!m->user)
@@ -3995,8 +3925,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
         /* Push the values as lvalues */
         for (j = num_values, data = (read_pointer++)->u.lvalue; --j >= 0; )
         {
-             (++sp2)->type = T_LVALUE;
-             sp2->u.lvalue = data++;
+             assign_protected_lvalue_no_free(++sp2, data++);
         }
 
         /* Call the function */
@@ -4508,12 +4437,12 @@ v_m_contains (svalue_t *sp, int num_arg)
         /* TODO: May this cause problems elsewhere, too? */
         if (destructed_object_ref(item))
         {
-            assign_svalue(sp[i].u.lvalue, &const0);
+            assign_svalue(sp+i, &const0);
             item++;
         }
         else
             /* mapping must not have been freed yet */
-            assign_svalue(sp[i].u.lvalue, item++);
+            assign_svalue(sp+i, item++);
         free_svalue(&sp[i]);
     }
 

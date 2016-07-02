@@ -76,6 +76,13 @@ int deep_eq(mixed arg1, mixed arg2)
             arg2 = unquote(arg2);
             break;
 
+        case T_STRUCT:
+            if(get_type_info(arg1, 2) != get_type_info(arg2, 2))
+                return 0;
+            arg1 = to_array(arg1);
+            arg2 = to_array(arg2);
+            break;
+
         default:
             raise_error("Unknown type " + typeof(arg1) + ".\n");
         }

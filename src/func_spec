@@ -174,14 +174,10 @@
         identifier16
         push_identifier16_lvalue
         push_local_variable_lvalue
-        push_indexed_lvalue
-        push_rindexed_lvalue
-        push_aindexed_lvalue
-        push_indexed_s_lvalue
         index_lvalue
         rindex_lvalue
         aindex_lvalue
-        index_s_lvalue
+        s_index_lvalue
         range_lvalue
         nr_range_lvalue
         rn_range_lvalue
@@ -194,27 +190,13 @@
         nx_range_lvalue
         rx_range_lvalue
         ax_range_lvalue
-        push_protected_indexed_lvalue
-        push_protected_rindexed_lvalue
-        push_protected_aindexed_lvalue
-        push_protected_indexed_map_lvalue
-        push_protected_indexed_s_lvalue
-        protected_index_lvalue
-        protected_rindex_lvalue
-        protected_aindex_lvalue
-        protected_index_s_lvalue
-        protected_range_lvalue
-        protected_nr_range_lvalue
-        protected_rn_range_lvalue
-        protected_rr_range_lvalue
-        protected_na_range_lvalue
-        protected_ra_range_lvalue
-        protected_an_range_lvalue
-        protected_ar_range_lvalue
-        protected_aa_range_lvalue
-        protected_nx_range_lvalue
-        protected_rx_range_lvalue
-        protected_ax_range_lvalue
+        map_index_lvalue
+        make_protected
+        push_virtual_variable_vlvalue
+        push_identifier_vlvalue
+        push_identifier16_vlvalue
+        push_context_vlvalue
+        push_local_variable_vlvalue
         simul_efun
         aggregate
         m_aggregate
@@ -224,7 +206,6 @@
         previous_object0
         lambda_cconstant
         lambda_constant
-        push_indexed_map_lvalue
         foreach
         foreach_ref
         foreach_range
@@ -329,7 +310,7 @@ float   sqrt(int|float);
 float   ceil(int|float);
 float   floor(int|float);
 float   pow(int|float,int|float);
-mixed   reverse(int|string|mixed *|mixed *&);
+mixed   reverse(int|string|string &|mixed *|mixed *&);
 
 mixed   max(mixed|mixed*, ...);
 mixed   min(mixed|mixed*, ...);

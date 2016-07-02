@@ -101,6 +101,48 @@ typedef struct mem_error_handler_s {
   char          * buff;      /* The allocated buffer to free. */
 } mem_error_handler_t;
 
+/* --- struct protected_lvalue: protect a single value
+ * On creation the original svalue is taken out of its place
+ * (a variable, array or whatever) and put in this structure.
+ * A T_LVALUE/LVALUE_PROTECTED pointing to this structure will
+ * then be stored into the original place. This is done to have the
+ * lifetime of the lvalue not be bound by the lifetime of the variable,
+ * array or whatever.
+ */
+struct protected_lvalue
+{
+    p_int    ref; /* Number of references */
+    svalue_t val; /* The svalue. */
+};
+
+/* --- struct protected_char_lvalue: protect an lvalue to a single
+ * character in a string. We'll save a counted reference to the string.
+ */
+struct protected_char_lvalue
+{
+    p_int     ref;   /* Number of references to this structure. */
+    string_t *str;   /* The string that is indexed. */
+    char     *charp; /* The indexed character. */
+};
+
+/* -- struct protected_range_lvalue: protected an lvalue to a
+ * string or vector range. The reference to the vector is counted.
+ * We also make the variable holding the vector a protected lvalue,
+ * so we are able to update variable when changing the size of
+ * a vector or changing the (not-mutable) string.
+ */
+struct protected_range_lvalue
+{
+    p_int    ref;                    /* Number of references, */
+    svalue_t vec;                    /* The string or vector containing the range. */
+    mp_int   index1, index2;         /* first and last index of the range.
+                                        index2 is the index after the last
+                                        element of the range. */
+    struct protected_lvalue *var;    /* A (counted) protected_lvalue
+                                        referencing that string or vector. */
+};
+
+
 
 /* --- Constants --- */
 
@@ -121,7 +163,6 @@ extern svalue_t *current_variables;
 extern int32  eval_cost;
 extern int32  assigned_eval_cost;
 extern svalue_t apply_return_value;
-extern svalue_t last_indexing_protector;
 
 #ifdef APPLY_CACHE_STAT
 extern statcounter_t apply_cache_hit;
@@ -156,10 +197,14 @@ extern void free_object_svalue(svalue_t *v);
 extern void zero_object_svalue(svalue_t *v);
 extern void free_svalue(svalue_t *v);
 extern void assign_svalue_no_free(svalue_t *to, svalue_t *from);
+extern void assign_rvalue_no_free(svalue_t *to, svalue_t *from);
 extern void assign_svalue(svalue_t *dest, svalue_t *v);
 extern void copy_svalue_no_free (svalue_t *to, svalue_t *from);
 extern void transfer_svalue_no_free(svalue_t *dest, svalue_t *v);
 extern void transfer_svalue(svalue_t *dest, svalue_t *v);
+extern void assign_protected_lvalue_no_free (svalue_t *dest, svalue_t *src);
+
+extern svalue_t *get_rvalue(svalue_t *v, bool *last_reference);
 
 extern void put_c_string (svalue_t *sp, const char *p);
 extern void put_c_n_string (svalue_t *sp, const char *p, size_t len);
@@ -218,8 +263,8 @@ extern svalue_t *secure_call_lambda(svalue_t *closure, int num_arg, Bool externa
 #define secure_callback_lambda(fun, num_arg) secure_call_lambda(fun, num_arg, MY_TRUE)
 
 extern void remove_object_from_stack(object_t *ob);
-extern void int_call_lambda(svalue_t *lsvp, int num_arg, Bool allowRefs, Bool external);
-#define call_lambda(lsvp, num_arg) int_call_lambda(lsvp, num_arg, MY_FALSE, MY_TRUE)
+extern void int_call_lambda(svalue_t *lsvp, int num_arg, Bool external);
+#define call_lambda(lsvp, num_arg) int_call_lambda(lsvp, num_arg, MY_TRUE)
 extern inherit_t *adjust_variable_offsets(const inherit_t *inheritp, const program_t *prog, const object_t *obj);
 extern void free_interpreter_temporaries(void);
 extern void invalidate_apply_low_cache(void);

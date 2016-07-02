@@ -58,6 +58,7 @@
 #include "typedefs.h"
 
 #include "my-alloca.h"
+#include <assert.h>
 #include <stddef.h>
 
 #include "array.h"
@@ -2359,7 +2360,7 @@ v_sort_array (svalue_t * sp, int num_arg)
     svalue_t   *arg;
     callback_t  cb;
     int         error_index;
-    mp_int      step, halfstep, size;
+    mp_int      step, halfstep, offset, size;
     int         i, j, index1, index2, end1, end2;
     svalue_t   *source, *dest, *temp;
     Bool        inplace = MY_FALSE;
@@ -2383,14 +2384,40 @@ v_sort_array (svalue_t * sp, int num_arg)
      */
     if (arg->type == T_LVALUE)
     {
-        svalue_t * svp = arg;
-        vector_t * vec = NULL;
-        
-        do {
-            svp = svp->u.lvalue;
-        } while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE);
-        
-        if (svp->type != T_POINTER)
+        svalue_t * svp = get_rvalue(arg, NULL);
+
+        if (svp == NULL)
+        {
+            /* This is a range. */
+            struct protected_range_lvalue *r;
+
+            assert(arg->x.lvalue_type == LVALUE_PROTECTED_RANGE);
+            r = arg->u.protected_range_lvalue;
+
+            if (r->vec.type != T_POINTER)
+            {
+                inter_sp = sp;
+                errorf("Bad arg 1 to sort_array(): got '%s[..] &', "
+                       "expected 'mixed * / mixed *&'.\n"
+                       , typename(r->vec.type));
+                // NOTREACHED
+                return sp;
+            }
+
+            offset = r->index1;
+            size = r->index2 - r->index1;
+            data = r->vec.u.vec;
+        }
+        else if (svp->type == T_POINTER)
+        {
+            data = ref_array(svp->u.vec);
+            free_svalue(arg);
+            put_array(arg, data);
+
+            offset = 0;
+            size = (mp_int)VEC_SIZE(data);
+        }
+        else
         {
             inter_sp = sp;
             errorf("Bad arg 1 to sort_array(): got '%s &', "
@@ -2401,19 +2428,20 @@ v_sort_array (svalue_t * sp, int num_arg)
         }
 
         inplace = MY_TRUE;
-        
-        vec = ref_array(svp->u.vec);
-        free_svalue(arg);
-        put_array(arg, vec);
+
     }
-        
-    
+    else
+    {
+        offset = 0;
+        size = (mp_int)VEC_SIZE(arg->u.vec);
+        data = arg->u.vec;
+    }
+
     /* Get the array. Since the sort sorts in-place, we have
      * to make a shallow copy of arrays with more than one
      * ref. Exception is, if the array is given as reference/lvalue, then we
      * always sort in-place.
      */
-    data = arg->u.vec;
     check_for_destr(data);
 
     if (!inplace && data->ref != 1)
@@ -2426,7 +2454,6 @@ v_sort_array (svalue_t * sp, int num_arg)
         arg->u.vec = data;
     }
 
-    size = (mp_int)VEC_SIZE(data);
 
     /* Easiest case: nothing to sort */
     if (size <= 1)
@@ -2453,7 +2480,7 @@ v_sort_array (svalue_t * sp, int num_arg)
     }
 
     for (i = 0; i < size; i++)
-        source[i] = temp[i];
+        source[i] = temp[offset+i];
 
     step = 2;
     halfstep = 1;
@@ -2507,7 +2534,7 @@ v_sort_array (svalue_t * sp, int num_arg)
 
     temp = data->item;
     for (i = size; --i >= 0; )
-      temp[i] = source[i];
+      temp[offset+i] = source[i];
 
     free_callback(&cb);
     return arg;

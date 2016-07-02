@@ -3770,7 +3770,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
         }
 
         xallocate(cb, sizeof(*cb), "logon tls-callback structure");
-        setup_function_callback(cb, current_interactive, STR_LOGON, 0, NULL, MY_TRUE);
+        setup_function_callback(cb, current_interactive, STR_LOGON, 0, NULL);
         new_interactive->tls_cb = cb;
 
     }
@@ -7036,14 +7036,12 @@ v_input_to (svalue_t *sp, int num_arg)
         error_index = setup_function_callback(&(it->fun), current_object
                                              , arg[0].u.str
                                              , extra, extra_arg
-                                             , MY_TRUE
                                              );
         free_string_svalue(arg);
     }
     else if (arg[0].type == T_CLOSURE)
         error_index = setup_closure_callback(&(it->fun), arg
                                             , extra, extra_arg
-                                            , MY_TRUE
                                             );
     else
         error_index = 1;
