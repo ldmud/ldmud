@@ -8,6 +8,18 @@
 #pragma strong_types, save_types
 inherit "ti-types";
 
+#pragma weak_types
+untyped_fun(string*|symbol str)
+{
+    if(0)
+        untyped_fun(({"C"}));
+    else
+        ::untyped_fun("C");
+
+    return 2;
+}
+
+#pragma strong_types, save_types
 int|symbol typed_fun(string*|symbol str)
 {
     /* Check, whether we can already call
@@ -18,16 +30,6 @@ int|symbol typed_fun(string*|symbol str)
     else
         ::typed_fun("C");
     return 1;
-}
-
-int|symbol untyped_fun(string*|symbol str)
-{
-    if(0)
-        untyped_fun(({"C"}));
-    else
-        ::untyped_fun("C");
-
-    return 2;
 }
 
 int run_test()
