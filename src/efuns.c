@@ -8023,6 +8023,10 @@ f_configure_driver (svalue_t *sp)
             break;
 
         case DC_TLS_DHE_PARAMETER:
+            if (!tls_available())
+                errorf("Diffie-Hellmann parameters could not be imported: "
+                       "TLS layer hasn't been initialized.\n");
+
             if (sp->type == T_NUMBER)
             {
                 if (sp->u.number != 0)
@@ -8052,6 +8056,10 @@ f_configure_driver (svalue_t *sp)
             break;
         
         case DC_TLS_CIPHERLIST:
+            if (!tls_available())
+                errorf("Cipher list could not be set: "
+                       "TLS layer hasn't been initialized.\n");
+
             if (sp->type == T_NUMBER)
             {
                 if (sp->u.number != 0)

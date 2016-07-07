@@ -281,6 +281,7 @@ mixed *tests = ({
          :) }),
 #endif // __JSON__
 #ifdef __TLS__
+}) + (tls_available() ? ({
     ({ "configure_driver DHE 1 (testdata)", 0,
         (: configure_driver(DC_TLS_DHE_PARAMETER, dhe_testdata);
            return 1; :) }),
@@ -306,7 +307,18 @@ mixed *tests = ({
         (: configure_driver(DC_TLS_CIPHERLIST, "DEFAULT");
 #endif
            return 1; :) }),
-
+}) : ({
+    // TLS is not available, check that is doesn't crash.
+    ({ "configure_driver DHE 1 (testdata) - not available", TF_ERROR,
+        (: configure_driver(DC_TLS_DHE_PARAMETER, dhe_testdata);
+           return 1; :) }),
+    ({ "configure_driver DHE (default) - not available", TF_ERROR,
+        (: configure_driver(DC_TLS_DHE_PARAMETER, 0);
+           return 1; :) }),
+    ({ "configure_driver DC_TLS_CIPHERLIST - not available", TF_ERROR,
+        (: configure_driver(DC_TLS_CIPHERLIST, 0);
+           return 1; :) }),
+})) + ({
 #endif // __TLS__
 });
 
