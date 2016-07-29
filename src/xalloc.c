@@ -1161,11 +1161,15 @@ dump_malloc_trace (int d
 #if defined(REPLACE_MALLOC)
 
 /*-------------------------------------------------------------------------*/
-void *
-malloc (size_t size)
+static void *
+xmalloc (size_t size)
 
 /* Allocate an empty memory block of size <sizel>.
  * The memory is aligned and not subject to GC.
+ *
+ * We first define the function with a different name to work around
+ * a gcc optimization: p = malloc(x); memset(p, 0, x); may be replaced
+ * by a call to calloc(), which would fatal inside calloc itself!
  */
 
 {
@@ -1177,14 +1181,24 @@ malloc (size_t size)
         result = pxalloc(size);
         malloc_privilege = save_privilege;
     }
-    
+
     if (result)
     {
         count_up(&clib_alloc_stat, xalloced_size(result) + mem_overhead());
     }
 
     return result;
-} /* malloc() */
+} /* xmalloc() */
+
+void *
+malloc (size_t size)
+
+/* Actually replace malloc.
+ */
+
+{
+    return xmalloc(size);
+}
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1215,7 +1229,7 @@ calloc (size_t nelem, size_t sizel)
 
     if (nelem == 0 || sizel == 0)
         return NULL;
-    p = malloc(nelem * sizel);
+    p = xmalloc(nelem * sizel);
     if (p == NULL)
         return NULL;
     memset(p, '\0', nelem * sizel);
@@ -1235,14 +1249,14 @@ realloc (void * p, size_t size)
    void * t;
 
    if (!p)
-        return malloc(size);
+        return xmalloc(size);
 
    old_size = xalloced_size(p) - XM_OVERHEAD_SIZE; // usable size
 
    if (old_size >= size)
       return p;
 
-   t = malloc(size);
+   t = xmalloc(size);
    if (t == NULL)
        return NULL;
 
