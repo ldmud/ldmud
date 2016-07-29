@@ -7170,12 +7170,13 @@ restore_map_size (struct rms_parameters *parameters)
                 pt2 = strpbrk(pt, "=:;,");
                 if (!pt2)
                     return -1;
-                if (*pt2 != '=')
-                    break;
-                pt = strchr(pt2, ':');
-                if (!pt)
-                    return -1;
-                pt++;
+                if (*pt2 == '=')
+                {
+                    pt = strchr(pt2, ':');
+                    if (!pt)
+                        return -1;
+                    pt++;
+                }
             }
             /* FALL THROUGH */
 
