@@ -60,6 +60,12 @@
 /* Does the machine offer IPv6? */
 #undef HAS_IPV6
 
+/* Does the machine offer JSON-C? */
+#undef HAS_JSON
+
+/* Does the machine offer JSON-C? */
+#undef HAS_JSONC
+
 /* Does the machine offer mySQL? */
 #undef HAS_MYSQL
 
@@ -283,6 +289,9 @@
 
 /* Is the library function inet_ntoa() compatible with the compiler? */
 #undef INET_NTOA_OK
+
+/* JSON-C supports 64 bit values. */
+#undef JSON_64_SUPPORT
 
 /* Define if you have bcopy, and it handles overlapping ranges correctly. */
 #undef OVERLAPPING_BCOPY

@@ -378,6 +378,11 @@
  */
 @cdef_use_builtin_pcre@ USE_BUILTIN_PCRE
 
+/* Define this if you want JSON support (assuming that your host
+ * actually offers this.
+ */
+@cdef_use_json@ USE_JSON
+
 /* Define this if you want iksemel library support.
  */
 @cdef_use_xml@ USE_XML

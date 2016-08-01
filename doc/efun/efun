@@ -34,6 +34,8 @@ DESCRIPTION
              tls_query_connection_info()
              tls_query_connection_state()
              tls_refresh_certs()
+             json_serialize()
+             json_parse()
              xml_generate()
              xml_parse()
 
