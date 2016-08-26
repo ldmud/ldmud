@@ -234,6 +234,8 @@ mixed *tests = ({
         (: restore_value(save_value(__FLOAT_MAX__)) == __FLOAT_MAX__ :) }),
     ({ "save_/restore_value 2", 0, 
         (: restore_value(save_value(__FLOAT_MIN__)) == __FLOAT_MIN__ :) }),
+    ({ "save_/restore_value 3", 0,
+        (: restore_value("([2.0:2.0,])\n")[2.0] == 2.0 :) }),
     ({ "sort_array 1", 0, (: deep_eq(sort_array(({4,5,2,6,1,3,0}),#'>),
                                      ({0,1,2,3,4,5,6})) :) }),
     ({ "sort_array 2", 0, // sort in-place
