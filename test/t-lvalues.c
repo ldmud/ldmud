@@ -140,9 +140,12 @@ mixed *tests = ({
     ({ "Unprotected string range 1", 0, (: string a = "0123456789"; a[2..6]   = "xxxxx"; return a == "01xxxxx789"; :) }),
     ({ "Unprotected string range 2", 0, (: string a = "0123456789"; a[2..6] &&= "xxxxx"; return a == "01xxxxx789"; :) }),
     /* TODO: What should the proper results be? */
-    ({ "Vanishing destinations 1", TF_ERROR, (: mixed a = ({1}); a[0] = (a=0); :) }),
-    ({ "Vanishing destinations 2", TF_ERROR, (: mixed a = ([]); a["abc"] = (a=0); :) }),
-    ({ "Vanishing destinations 3", TF_ERROR, (: string str = "abcd"; str[0] = (str=0); :) }),
+    ({ "Vanishing destinations 1a", TF_ERROR, (: mixed a = ({1}); a[0] = (a=0); :) }),
+    ({ "Vanishing destinations 1b", TF_ERROR, (: mixed a = ({1}); a[a=0] = 0; :) }),
+    ({ "Vanishing destinations 2a", TF_ERROR, (: mixed a = ([]); a["abc"] = (a=0); :) }),
+    ({ "Vanishing destinations 2b", TF_ERROR, (: mixed a = ([]); a[a="abc"] = 0; :) }),
+    ({ "Vanishing destinations 3a", TF_ERROR, (: string str = "abcd"; str[0] = (str=0); :) }),
+    ({ "Vanishing destinations 3b", TF_ERROR, (: string str = "abcd"; str[str=0] = 0; :) }),
     ({ "Vanishing destinations 4", TF_DONTCHECKERROR, (: mixed a = ({1}); a[0] &&= (a=0); :) }),
     /* If the previous one didn't crash, let's try to detect its wrongdoing */
     ({ "Vanishing destinations 4b", 0,
