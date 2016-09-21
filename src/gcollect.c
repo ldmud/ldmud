@@ -2614,7 +2614,7 @@ show_mstring (int d, void *block, int depth)
         string_t *str;
 
         str = (string_t *)block;
-        if (str->info.tabled)
+        if (mstr_tabled(str))
         {
             WRITES(d, "Tabled string: ");
             show_mstring_data(d, str, depth);

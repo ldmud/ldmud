@@ -14,10 +14,18 @@
  * internal string structure. It is used for both tabled (shared) and
  * untabled (free) strings, and allocated to size.
  *
- * Untabled strings are marked by .tabled == MY_FALSE.
+ * Untabled strings can be constant (.type == STRING_UNTABLED) or
+ * mutable (.type == STRING_MUTABLE). The later have char or string
+ * range lvalues on them and thus can be modified anytime (and
+ * therefore may not be tabled). But also for mutable strings their
+ * length stays constant.
  *
- * Tabled strings are the ones managed in the string table and have .tabled
- * = TRUE. The table uses the .next pointer for the table handling.
+ * A mutable string has one (or zero) rvalue reference to it and at
+ * least one lvalue reference. (If the lvalue reference vanishes,
+ * the string can be made constant again.)
+ *
+ * Tabled strings are the ones managed in the string table and have .type
+ * == STRING_TABLED. The table uses the .next pointer for the table handling.
  * The table reference is not counted.
  *
  * (While the .next pointer is 'ballast' in untabled strings, in practice the
@@ -39,11 +47,18 @@
  * string plus an extra terminating '\0' (which is not counted in the size).
  */
 
+enum string_type
+{
+    STRING_UNTABLED,    /* Constant string, not in the string table */
+    STRING_TABLED,      /* Constant string, entered in the string table */
+    STRING_MUTABLE,     /* Mutable string (therefore not in the string table) */
+};
+
 struct string_s
 {
     struct {
-        Bool tabled      :  1;
-        unsigned int ref : 31;
+        enum string_type  type :  2;
+        unsigned int ref       : 30;
     } info;
     string_t * next;    /* Linkpointer in string table. */
     size_t     size;    /* Length of the string */
@@ -74,6 +89,8 @@ extern string_t * mstring_new_n_string (const char * const pTxt, size_t len MTRA
 extern string_t * mstring_new_tabled (const char * const pTxt MTRACE_DECL);
 extern string_t * mstring_new_n_tabled (const char * const pTxt, size_t size MTRACE_DECL);
 extern string_t * mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL);
+extern string_t * mstring_make_constant (string_t * pStr, bool in_place_only MTRACE_DECL);
+extern string_t * mstring_make_mutable (string_t * pStr MTRACE_DECL);
 extern string_t * mstring_dup (string_t * pStr MTRACE_DECL);
 extern string_t * mstring_unshare (string_t * pStr MTRACE_DECL);
 extern string_t * mstring_resize (string_t * pStr, size_t n MTRACE_DECL);
@@ -138,17 +155,6 @@ static INLINE hash32_t mstr_hash(const string_t * const s)
     return s->hash;
 }
 
-static INLINE Bool mstr_singular(const string_t * const s)
-                                   __attribute__((nonnull(1)))
-                                   __attribute__((pure));
-static INLINE Bool mstr_singular(const string_t * const s)
-  /* Return FALSE if string<s> has multiple users, ie. is tabled
-   * or has more than one reference.
-   */
-{
-    return ! (s->info.tabled || s->info.ref != 1);
-}
-
 static INLINE Bool mstr_untabled(const string_t * const s)
                                    __attribute__((nonnull(1)))
                                    __attribute__((pure));
@@ -156,7 +162,7 @@ static INLINE Bool mstr_untabled(const string_t * const s)
   /* Return TRUE if string <s> is not tabled.
    */
 {
-    return !(s->info.tabled);
+    return s->info.type != STRING_TABLED;
 }
 
 static INLINE Bool mstr_tabled(const string_t * const s)
@@ -166,7 +172,7 @@ static INLINE Bool mstr_tabled(const string_t * const s)
   /* Return TRUE if string <s> is tabled - directly or indirectly.
    */
 {
-    return s->info.tabled;
+    return s->info.type == STRING_TABLED;
 }
 
 static INLINE size_t mstrsize(const string_t * const s)
@@ -261,6 +267,9 @@ static INLINE void extract_cstr(char *d, const string_t *const s, size_t l)
 #define new_n_tabled(pTxt,len)   mstring_new_n_tabled(pTxt,len MTRACE_ARG)
 #define make_tabled(pStr)        mstring_make_tabled(pStr, MY_TRUE MTRACE_ARG)
 #define make_tabled_from(pStr)   mstring_make_tabled(pStr, MY_FALSE MTRACE_ARG)
+#define make_constant(pStr)      mstring_make_constant(pStr, false MTRACE_ARG)
+#define try_make_constant(pStr)  mstring_make_constant(pStr, true MTRACE_ARG)
+#define make_mutable(pStr)       mstring_make_mutable(pStr MTRACE_ARG)
 #define dup_mstring(pStr)        mstring_dup(pStr MTRACE_ARG)
 #define unshare_mstring(pStr)    mstring_unshare(pStr MTRACE_ARG)
 #define resize_mstring(pStr,n)   mstring_resize(pStr,n MTRACE_ARG)

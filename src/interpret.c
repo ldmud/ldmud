@@ -1620,7 +1620,24 @@ internal_assign_rvalue_no_free ( svalue_t *to, svalue_t *from )
         } /* switch (from->x.lvalue_type) */
     }
     else
+    {
+        /* <from> is not an lvalue, so we can try to make
+         * it constant again...
+         */
+        if(from->type == T_STRING)
+            try_make_constant(from->u.str);
+
         internal_assign_svalue_no_free(to, from);
+    }
+
+    /* If this was a mutable string, isolate it. */
+    if(to->type == T_STRING)
+    {
+        string_t *str = make_constant(to->u.str);
+        if (str)
+            to->u.str = str;
+    }
+
 } /* internal_assign_rvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
@@ -3301,14 +3318,14 @@ get_vector_range_item (vector_t * vec, mp_int index1, mp_int index2, svalue_t * 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
 get_string_item_extended ( svalue_t * svp, mp_int size, mp_int offset
-                         , svalue_t * i, Bool make_singular
+                         , svalue_t * i, Bool make_mutable
                          , Bool allow_one_past
                          , svalue_t *sp, bytecode_p pc
                          , enum index_type itype)
 
 /* Index string <svp> starting at <offset> and having size <size>
  * with index <i> and return the pointer to the indexed item.
- * If <make_singular> is TRUE, <svp> is made an untabled string
+ * If <make_mutable> is TRUE, <svp> is made a mutable string
  * with just one reference.
  * If <allow_one_past> is TRUE, indexing one past the official end
  * of the string for retrieval purposes is ok. TODO: Remove this.
@@ -3451,11 +3468,11 @@ get_string_item_extended ( svalue_t * svp, mp_int size, mp_int offset
      * the additional reference, so we now have to play it safe and
      * duplicate the string whenever requested.
      */
-    if (make_singular)
+    if (make_mutable)
     {
         string_t *p;
 
-        memsafe(p = unshare_mstring(svp->u.str), mstrsize(svp->u.str)
+        memsafe(p = make_mutable(svp->u.str), mstrsize(svp->u.str)
                , "modifiable string");
         svp->u.str = p;
     }
@@ -3465,14 +3482,14 @@ get_string_item_extended ( svalue_t * svp, mp_int size, mp_int offset
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
-get_string_item ( svalue_t * svp, svalue_t * i, Bool make_singular
+get_string_item ( svalue_t * svp, svalue_t * i, Bool make_mutable
                 , Bool allow_one_past
                 , svalue_t *sp, bytecode_p pc
                 , enum index_type itype)
 
 /* Index string <svp> with index <i> and return the pointer to the
  * indexed item.
- * If <make_singular> is TRUE, <svp> is made an untabled string
+ * If <make_mutable> is TRUE, <svp> is made an untabled string
  * with just one reference.
  * If <allow_one_past> is TRUE, indexing one past the official end
  * of the string for retrieval purposes is ok. TODO: Remove this.
@@ -3481,20 +3498,20 @@ get_string_item ( svalue_t * svp, svalue_t * i, Bool make_singular
 
 {
     return get_string_item_extended(svp, (mp_int)mstrsize(svp->u.str), 0,
-        i, make_singular, allow_one_past, sp, pc, itype);
+        i, make_mutable, allow_one_past, sp, pc, itype);
 } /* get_string_item() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
 get_string_range_item ( svalue_t * svp, mp_int index1, mp_int index2
-                      , svalue_t * i, Bool make_singular
+                      , svalue_t * i, Bool make_mutable
                       , Bool allow_one_past
                       , svalue_t *sp, bytecode_p pc
                       , enum index_type itype)
 
 /* Index string range <svp>[<index1>..<index2>] and
  * return the pointer to the indexed item.
- * If <make_singular> is TRUE, <svp> is made an untabled string
+ * If <make_mutable> is TRUE, <svp> is made an untabled string
  * with just one reference.
  * If <allow_one_past> is TRUE, indexing one past the official end
  * of the string for retrieval purposes is ok. TODO: Remove this.
@@ -3503,7 +3520,7 @@ get_string_range_item ( svalue_t * svp, mp_int index1, mp_int index2
 
 {
     return get_string_item_extended(svp, index2 - index1, index1,
-        i, make_singular, allow_one_past, sp, pc, itype);
+        i, make_mutable, allow_one_past, sp, pc, itype);
 } /* get_string_range_item() */
 
 /*-------------------------------------------------------------------------*/
@@ -4051,7 +4068,7 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype)
             {
                 char * cp;
 
-                cp = get_string_item(vec, idx, /* make_singular: */ MY_TRUE
+                cp = get_string_item(vec, idx, /* make_mutable: */ MY_TRUE
                                     , /* allow_one_past: */ MY_FALSE
                                     , sp, pc, itype);
 
@@ -4447,7 +4464,7 @@ push_index_value (svalue_t *sp, bytecode_p pc, bool ignore_error, enum index_typ
                 int c;
 
                 c = (unsigned char)
-                    *get_string_item(vec, idx, /* make_singular: */ MY_FALSE
+                    *get_string_item(vec, idx, /* make_mutable: */ MY_FALSE
                                     , /* allow_one_past: */ MY_TRUE
                                     , sp, pc, itype);
 
@@ -14073,11 +14090,12 @@ again:
                  * than one reference, allocate a new copy which can be
                  * changed safely.
                  */
-                if (!mstr_singular(arg->u.str))
+                string_t *str;
+                memsafe(str = make_mutable(arg->u.str), mstrsize(arg->u.str)
+                       , "modifiable string");
+
+                if (arg->u.str != str)
                 {
-                    string_t *str;
-                    memsafe(str = unshare_mstring(arg->u.str), mstrsize(arg->u.str)
-                           , "modifiable string");
                     arg->u.str = str;
                     if (argvar != NULL)
                     {

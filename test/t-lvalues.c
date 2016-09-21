@@ -169,7 +169,6 @@ mixed *tests = ({
     ({ "Protected elements 1", 0, (: mixed a = ({1,2,3,4,5}); funcall((: $1 = $2; $2 = $3; :), &(a[1]), &(a[2]), &(a[<2])); return deep_eq(a, ({1,3,4,4,5})); :) }),
     ({ "Protected elements 2", 0, (: mixed a = ({1,2,3,4,5}); funcall((: $1 = $2; $2 = $3; :), &(a[1]), &(a[2]), &(a[1])); return deep_eq(a, ({1,3,3,4,5})); :) }),
     ({ "Protected char 1", 0, (: string str = "xyz"; mixed c = 0 || &(str[1]); c = 'a'; return str == "xaz"; :) }),
-#if 0 /* These need mutable strings */
     ({ "Protected char 2", 0, (: string str = "xyz"; mixed c1 = 0 || &(str[0]), c2 = 0 || &(str[1]); c1 = 'a'; c2 = 'b';return str == "abz"; :) }),
     ({ "Protected char 3", 0,
         (:
@@ -203,7 +202,6 @@ mixed *tests = ({
             return sizeof(m)==2 && "X"+ind[0] != "X"+ind[1];
         :)
     }),
-#endif
     ({ "Protected array range 1", 0, (: mixed a = ({1,2,3,4,5}); funcall((: $1 = $2; :), &(a[1..2]), &(a[3..3])); return deep_eq(a, ({1,4,4,5})); :) }),
     ({ "Protected array range 2", 0, (: mixed a = ({1,2,3,4,5}); funcall((: $1[1] = "a"; :), &(a[1..2])); return deep_eq(a, ({1,2,"a",4,5})); :) }),
     ({ "Protected array range 3", 0, (: mixed a = ({0,1,2,3,4}); funcall((: $1 = ({}); :), &(a[0..1])); return deep_eq(a, ({2,3,4})); :) }),

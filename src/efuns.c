@@ -7820,21 +7820,18 @@ f_reverse(svalue_t *sp)
 
             if (changeInPlace)
             {
-                if (!mstr_singular(data->u.str))
+                string_t *str;
+                memsafe(str = make_mutable(data->u.str), mstrsize(data->u.str)
+                       , "modifiable string");
+
+                if (var != NULL && var->type == T_STRING && var->u.str == data->u.str)
                 {
-                    string_t * str;
-                    memsafe(str = unshare_mstring(data->u.str), mstrsize(data->u.str)
-                           , "modifiable string");
-
-                    if (var != NULL && var->type == T_STRING && var->u.str == data->u.str)
-                    {
-                        free_mstring(var->u.str);
-                        var->u.str = ref_mstring(str);
-                    }
-                    data->u.str = str;
+                    free_mstring(var->u.str);
+                    var->u.str = ref_mstring(str);
                 }
+                data->u.str = str;
 
-                p1 = get_txt(data->u.str);
+                p1 = get_txt(str);
             }
             else
             {
