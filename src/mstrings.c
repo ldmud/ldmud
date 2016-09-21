@@ -45,11 +45,14 @@
  * This string_t value is the one referenced by svalues and the like.
  * It allows the following string types:
  *
- * Untabled, freely allocated strings:
- *   .tabled is FALSE
+ * Untabled, freely allocated, constant strings:
+ *   .type is STRING_UNTABLED
+ *
+ * Untabled, freely allocated, mutable (constant-length) strings:
+ *   .type is STRING_MUTABLE
  *
  * Tabled (shared) strings:
- *   .tabled is TRUE
+ *   .type is STRING_TABLED
  *   .next is the hash chain pointer, the reference from the
  *   table is not counted.
  *
@@ -371,7 +374,7 @@ make_new_tabled (const char * const pTxt, size_t size, hash32_t hash MTRACE_DECL
     string->hash = hash;
     memcpy(string->txt, pTxt, size);
     string->txt[size] = '\0';
-    string->info.tabled = MY_TRUE;
+    string->info.type = STRING_TABLED;
     string->info.ref = 1;
       /* An uninitialized memory read at this point is ok: it's because
        * the bitfield is initialized in parts.
@@ -426,7 +429,7 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
     string->next = NULL;
     string->hash = 0;
     string->txt[iSize] = '\0';
-    string->info.tabled = MY_FALSE;
+    string->info.type = STRING_UNTABLED;
     string->info.ref = 1;
       /* An uninitialized memory read at this point is ok: it's because
        * the bitfield is initialized in parts.
@@ -581,7 +584,7 @@ table_string (string_t * pStr MTRACE_DECL)
     size_t     msize;
 
     /* If the string is already tabled, our work is done */
-    if (pStr->info.tabled)
+    if (pStr->info.type == STRING_TABLED)
         return pStr;
 
     msize = mstr_mem_size(pStr);
@@ -599,7 +602,11 @@ table_string (string_t * pStr MTRACE_DECL)
     {
         /* No: add the string into the table.
          */
-        pStr->info.tabled = MY_TRUE;
+        string = mstring_make_constant(pStr, false MTRACE_PASS);
+        if (!string)
+            return string;
+
+        string->info.type = STRING_TABLED;
 
         mstr_added++;
         if (NULL == stringtable[idx])
@@ -607,7 +614,7 @@ table_string (string_t * pStr MTRACE_DECL)
         else
             mstr_collisions++;
 
-        pStr->next = stringtable[idx];
+        string->next = stringtable[idx];
         stringtable[idx] = pStr;
 
         mstr_tabled_count++;
@@ -615,8 +622,6 @@ table_string (string_t * pStr MTRACE_DECL)
 
         mstr_untabled_count--;
         mstr_untabled_size -= msize;
-
-        string = pStr;
     }
 
     /* That's all */
@@ -653,6 +658,108 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
 
     return string;
 } /* mstring_make_tabled() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_make_constant (string_t * pStr, bool in_place_only MTRACE_DECL)
+
+/* Aliased to: make_constant(pStr)     : in_place_only = false
+/*             try_make_constant(pStr) : in_place_only = true
+ *
+ * Take the string <pStr> and convert it into a constant string if it is
+ * a mutable string. This is done in-place if there is only one reference
+ * left. Therefore the caller must make sure, that this reference comes
+ * from an rvalue, not an lvalue.
+ *
+ * If the conversion can't be done in-place, do it by copying. Then the
+ * new string is returned and <pStr> is dereference once.
+ * If <in_place_only> is true, then no copying is done. Instead NULL is
+ * returned.
+ *
+ * Return NULL when out of memory.
+ */
+
+{
+    string_t *string;
+
+    switch (pStr->info.type)
+    {
+        case STRING_UNTABLED:
+        case STRING_TABLED:
+            return pStr;
+
+        case STRING_MUTABLE:
+            /* If there is only one reference, we can convert it in-place. */
+            if (pStr->info.ref == 1)
+            {
+                pStr->info.type = STRING_UNTABLED;
+                return pStr;
+            }
+            break;
+    }
+
+    if (in_place_only)
+        return NULL;
+
+    /* Table the string one way or the other (always succeeds) */
+    string = mstring_dup(pStr MTRACE_PASS);
+    if (!string)
+        return NULL;
+
+    free_mstring(pStr);
+
+    return string;
+} /* mstring_make_constant() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_make_mutable (string_t * pStr MTRACE_DECL)
+
+/* Aliased to: make_mutable(pStr)
+ *
+ * Take the string <pStr> and convert it into a mutable string if it is
+ * not already one of the type. The conversion is usually done by copying
+ * if there is more than one reference to the string (or if it is tabled).
+ *
+ * Return the counted reference to the tabled instance, and dereference
+ * the <pStr> once.
+ *
+ * Return NULL when out of memory.
+ */
+
+{
+    string_t *string;
+
+    switch (pStr->info.type)
+    {
+        case STRING_UNTABLED:
+            /* If there is only one reference, we can convert it in-place. */
+            if (pStr->info.ref == 1)
+            {
+                pStr->info.type = STRING_MUTABLE;
+                pStr->hash = 0;
+                return pStr;
+            }
+            break;
+
+        case STRING_TABLED:
+            /* For tabled strings we always have to make a copy. */
+            break;
+
+        case STRING_MUTABLE:
+            return pStr;
+    }
+
+    /* Table the string one way or the other (always succeeds) */
+    string = mstring_dup(pStr MTRACE_PASS);
+    if (!string)
+        return NULL;
+
+    string->info.type = STRING_MUTABLE;
+    free_mstring(pStr);
+
+    return string;
+} /* mstring_make_mutable() */
 
 /*-------------------------------------------------------------------------*/
 string_t *
@@ -706,9 +813,11 @@ mstring_unshare (string_t * pStr MTRACE_DECL)
     /* Check for the easy cases where the argument string can be
      * the result: untabled and just one reference.
      */
-    if (!pStr->info.tabled && pStr->info.ref == 1)
+    if (pStr->info.type != STRING_TABLED && pStr->info.ref == 1)
     {
         pStr->hash = 0;
+        pStr->info.type = STRING_UNTABLED;
+
         return pStr;
     }
 
@@ -741,10 +850,12 @@ mstring_resize (string_t * pStr, size_t newlen MTRACE_DECL)
     string_t *string;
 
     /* Check for the easy case */
-    if (!pStr->info.tabled && pStr->info.ref == 1
+    if (pStr->info.type != STRING_TABLED && pStr->info.ref == 1
      && pStr->size == newlen)
     {
         pStr->hash = 0;
+        pStr->info.type = STRING_UNTABLED;
+
         return pStr;
     }
 
@@ -786,7 +897,7 @@ mstring_find_tabled (string_t * pStr)
 #endif /* EXT_STRING_STATS */
 
     /* If pStr is tabled, our work is done */
-    if (pStr->info.tabled)
+    if (pStr->info.type == STRING_TABLED)
     {
 #ifdef EXT_STRING_STATS
         stNumTabledCheckedTable++;
@@ -854,7 +965,7 @@ mstring_free (string_t *s)
 
     /* String has no refs left - deallocate it */
 
-    if (s->info.tabled)
+    if (s->info.type == STRING_TABLED)
     {
         /* A tabled string */
 
@@ -1683,7 +1794,7 @@ mstring_gc_table (void)
                 mstr_deleted++;
 
                 this->info.ref = 1;
-                this->info.tabled = MY_FALSE;
+                this->info.type = STRING_UNTABLED;
                 free_mstring(this);
             }
             else
