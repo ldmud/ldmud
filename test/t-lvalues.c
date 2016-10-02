@@ -585,6 +585,119 @@ mixed *tests = ({
            return !funcall((: referencep(&$1) :), ref);
        :)
     }),
+    ({
+        "Flattening lvalue parameters with apply", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            int* arr = ({0, 1, 2, 3, 4, 5});
+            apply(cl, &arr);
+            return deep_eq(arr, ({2,4,7,10,4,5}));
+        :),
+    }),
+    ({
+        "Flattening vanishing lvalue parameters with apply", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            int* arr = ({0, 1, 2, 3, 4, 5});
+            int* arr2 = ({&(arr[0]),&(arr[1]),&(arr[2]),&(arr[3]),&(arr[4]),&(arr[5])});
+            apply(cl, &(arr2[0..<1][(arr2=0)..<1]));
+            return deep_eq(arr, ({2,4,7,10,4,5}));
+        :),
+    }),
+    ({
+        "Flattening range lvalue parameters with apply", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            int* arr = ({0, 1, 2, 3, 4, 5});
+            apply(cl, &(arr[2..4]));
+            return deep_eq(arr, ({0,1,4,6,9,5}));
+        :),
+    }),
+    ({
+        "Flattening lvalue parameters '...'", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            int* arr = ({0, 1, 2, 3, 4, 5});
+            funcall(cl, &arr...);
+            return deep_eq(arr, ({2,4,7,10,4,5}));
+        :),
+    }),
+    ({
+        "Flattening vanishing lvalue parameters with '...'", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            int* arr = ({0, 1, 2, 3, 4, 5});
+            int* arr2 = ({&(arr[0]),&(arr[1]),&(arr[2]),&(arr[3]),&(arr[4]),&(arr[5])});
+            funcall(cl, &(arr2[0..<1][(arr2=0)..<1])...);
+            return deep_eq(arr, ({2,4,7,10,4,5}));
+        :),
+    }),
+    ({
+        "Flattening range lvalue parameters '...'", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            int* arr = ({0, 1, 2, 3, 4, 5});
+            funcall(cl, &(arr[2..4])...);
+            return deep_eq(arr, ({0,1,4,6,9,5}));
+        :),
+    }),
+    /* The same tests without any '&' should leave them alone. */
+    ({
+        "Flattening rvalue parameters with apply", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            int* arr = ({0, 1, 2, 3, 4, 5});
+            apply(cl, arr);
+            return deep_eq(arr, ({0,1,2,3,4,5}));
+        :),
+    }),
+    ({
+        "Flattening vanishing rvalue parameters with apply", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            int* arr = ({0, 1, 2, 3, 4, 5});
+            int* arr2 = ({&(arr[0]),&(arr[1]),&(arr[2]),&(arr[3]),&(arr[4]),&(arr[5])});
+            apply(cl, arr2[0..<1][(arr2=0)..<1]);
+            return deep_eq(arr, ({0,1,2,3,4,5}));
+        :),
+    }),
+    ({
+        "Flattening range rvalue parameters with apply", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            int* arr = ({0, 1, 2, 3, 4, 5});
+            apply(cl, arr[2..4]);
+            return deep_eq(arr, ({0,1,2,3,4,5}));
+        :),
+    }),
+    ({
+        "Flattening rvalue parameters '...'", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            int* arr = ({0, 1, 2, 3, 4, 5});
+            funcall(cl, arr...);
+            return deep_eq(arr, ({0,1,2,3,4,5}));
+        :),
+    }),
+    ({
+        "Flattening vanishing rvalue parameters with '...'", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            int* arr = ({0, 1, 2, 3, 4, 5});
+            int* arr2 = ({&(arr[0]),&(arr[1]),&(arr[2]),&(arr[3]),&(arr[4]),&(arr[5])});
+            funcall(cl, (arr2[0..<1][(arr2=0)..<1])...);
+            return deep_eq(arr, ({0,1,2,3,4,5}));
+        :),
+    }),
+    ({
+        "Flattening range rvalue parameters '...'", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            int* arr = ({0, 1, 2, 3, 4, 5});
+            funcall(cl, (arr[2..4])...);
+            return deep_eq(arr, ({0,1,2,3,4,5}));
+        :),
+    }),
 });
 
 void run_test()
