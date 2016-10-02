@@ -175,6 +175,16 @@ static INLINE Bool mstr_tabled(const string_t * const s)
     return s->info.type == STRING_TABLED;
 }
 
+static INLINE Bool mstr_mutable(const string_t * const s)
+                                   __attribute__((nonnull(1)))
+                                   __attribute__((pure));
+static INLINE Bool mstr_mutable(const string_t * const s)
+  /* Return TRUE if string <s> is mutable.
+   */
+{
+    return s->info.type == STRING_MUTABLE;
+}
+
 static INLINE size_t mstrsize(const string_t * const s)
                                    __attribute__((nonnull(1)))
                                    __attribute__((pure));

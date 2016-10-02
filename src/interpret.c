@@ -740,6 +740,7 @@ p_int used_memory_at_eval_start = 0;
 
 enum { APPLY_NOT_FOUND = 0, APPLY_FOUND, APPLY_DEFAULT_FOUND };
 static int int_apply(string_t *, object_t *, int, Bool, Bool);
+static int expand_argument(svalue_t *sp);
 static void call_simul_efun(unsigned int code, object_t *ob, int num_arg);
 #ifdef DEBUG
 static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
@@ -2167,6 +2168,36 @@ void transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
 {  inl_transfer_svalue_no_free(dest,v); }
 
 #define transfer_svalue_no_free(dest,v) inl_transfer_svalue_no_free(dest,v)
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+inl_transfer_rvalue_no_free (svalue_t *dest, svalue_t *v)
+
+/* Move the value <v> into <dest>.
+ *
+ * <dest> is assumed to be invalid before the call, <v> is invalid after.
+ *
+ * If <v> is a protected lvalue, it will be dereferenced to get
+ * the real value. (It is not allowed to be an unprotected lvalue.)
+ * So afterwards <dest> is guaranteed not to be an lvalue.
+ */
+
+{
+    if (v->type == T_LVALUE
+     || (v->type == T_STRING && mstr_mutable(v->u.str)))
+    {
+        assign_rvalue_no_free(dest, v);
+        free_svalue(v);
+    }
+    else
+        transfer_svalue_no_free(dest, v);
+
+} /* inl_transfer_rvalue_no_free() */
+
+void transfer_rvalue_no_free (svalue_t *dest, svalue_t *v)
+{  inl_transfer_rvalue_no_free(dest,v); }
+
+#define transfer_rvalue_no_free(dest,v) inl_transfer_rvalue_no_free(dest,v)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -12409,63 +12440,7 @@ again:
          * This code is used in conjunction with save/restore/use_arg_frame
          * to implement flexible varargs.
          */
-
-        if (sp->type == T_POINTER)
-        {
-            /* The argument is an array: flatten it */
-
-            vector_t *vec;  /* the array */
-            svalue_t *svp;  /* pointer into the array */
-            p_int i;         /* (remaining) vector size */
-
-            vec = sp->u.vec;
-            i = VEC_SIZE(vec);
-
-            /* Check if there is enough space on the stack.
-             */
-            if (i + (sp - VALUE_STACK) >= EVALUATOR_STACK_SIZE)
-            {
-                errorf("VM Stack overflow: %"PRIdMPINT" too high.\n"
-                     , ((mp_int)i + (sp - VALUE_STACK) - EVALUATOR_STACK_SIZE) );
-                /* NOTREACHED */
-                break;
-            }
-
-            /* Push the array elements onto the stack, overwriting the
-             * array value itself.
-             */
-            if (deref_array(vec))
-            {
-                for (svp = vec->item; --i >= 0; )
-                {
-                    if (destructed_object_ref(svp))
-                    {
-                        put_number(sp, 0);
-                        sp++;
-                        svp++;
-                    }
-                    else
-                        assign_svalue_no_free(sp++, svp++);
-                }
-            }
-            else
-            {
-                /* The array will be freed, so use a faster function */
-                for (svp = vec->item; --i >= 0; ) {
-                    if (destructed_object_ref(svp))
-                    {
-                        put_number(sp, 0);
-                        sp++;
-                        svp++;
-                    }
-                    else
-                        transfer_svalue_no_free(sp++, svp++);
-                }
-                free_empty_vector(vec);
-            }
-
-            sp--; /* undo the last extraneous sp++ */
-        }
+        sp += expand_argument(sp) - 1;
         break;
       }
 
@@ -13410,6 +13385,9 @@ again:
 
         inter_pc = pc;
         sp = push_protected_lvalue(sp);
+
+        /* Now we don't need the quickfix anymore. */
+        free_svalue(&indexing_quickfix);
         break;
 
                           /* --- push_virtual_variable_vlvalue <num> --- */
@@ -19160,6 +19138,130 @@ check_a_lot_ref_counts (program_t *search_prog)
 #define ERROR(s) {inter_sp = sp; errorf(s);}
 
 /*-------------------------------------------------------------------------*/
+static int
+expand_argument (svalue_t *sp)
+
+/* Expands the argument <sp> on the stack.
+ * If <sp> is an array or array range, remove it from the stack
+ * and push its elements on the stack. Return the number of
+ * elements pushed (return 1, if <sp> stayed unchanged).
+ *
+ * If it's an array lvalue or array range lvalue, pass its
+ * elements also as lvalues.
+ */
+
+{
+    vector_t *vec = NULL;
+    p_int start = 0, size = 0;
+    bool make_ref = false;
+
+    if (sp->type == T_POINTER)
+    {
+        vec = sp->u.vec;
+        start = 0;
+        size = VEC_SIZE(vec);
+        make_ref = false;
+    }
+    else if (sp->type == T_LVALUE)
+    {
+        switch(sp->x.lvalue_type)
+        {
+            default:
+                fatal("(expand_argument) Illegal lvalue %p type %d\n", sp, sp->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_PROTECTED:
+            {
+                struct protected_lvalue *l = sp->u.protected_lvalue;
+
+                if (l->val.type != T_POINTER) /* Nothing to do for non-arrays, pass it as-is. */
+                    break;
+
+                vec = l->val.u.vec;
+                start = 0;
+                size = VEC_SIZE(vec);
+                make_ref = true;
+                break;
+            }
+
+            case LVALUE_PROTECTED_CHAR:
+                /* Nothing to do... */
+                break;
+
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = sp->u.protected_range_lvalue;
+
+                if (r->vec.type == T_STRING)
+                    break;
+                else if (r->vec.type != T_POINTER)
+                {
+                    fatal("(expand_argument) Illegal range %p type %d\n", r, r->vec.type);
+                    break;
+                }
+
+                vec = r->vec.u.vec;
+                start = r->index1;
+                size = r->index2 - r->index1;
+                make_ref = true;
+                break;
+            }
+        } /* switch */
+    }
+
+    if (vec != NULL)
+    {
+        /* The last argument is an array: flatten it */
+        svalue_t *svp;  /* pointer into the array */
+        int i = size;
+
+        /* Check if we would overflowing the stack. */
+        if (size + (sp - VALUE_STACK) >= EVALUATOR_STACK_SIZE)
+            errorf("VM Stack overflow: %zu too high.\n",
+                 (size_t)(size + (sp - VALUE_STACK) - EVALUATOR_STACK_SIZE) );
+
+        /* Push the array elements onto the stack, overwriting the
+         * array value itself.
+         */
+        ref_array(vec);
+        free_svalue(sp--);
+
+        if (deref_array(vec))
+        {
+            /* The array continues to live, copy the values. */
+            for (svp = vec->item + start; --i >= 0; svp++)
+            {
+                if (make_ref)
+                    assign_protected_lvalue_no_free(++sp, svp);
+                else
+                    assign_svalue_no_free(++sp, svp);
+            }
+        }
+        else
+        {
+            /* The array will be freed, so use a faster function */
+            for (svp = vec->item + start; --i >= 0; svp++)
+            {
+                /* For references, we keep them, but we don't
+                 * create one here, because the array will go...
+                 */
+                if (make_ref)
+                    transfer_svalue_no_free(++sp, svp);
+                else
+                    transfer_rvalue_no_free(++sp, svp);
+            }
+            free_empty_vector(vec);
+        }
+
+        return size;
+    }
+    else
+        return 1;
+
+} /* expand_argument() */
+
+/*-------------------------------------------------------------------------*/
 svalue_t *
 v_apply (svalue_t *sp, int num_arg)
 
@@ -19170,6 +19272,10 @@ v_apply (svalue_t *sp, int num_arg)
  * Call the closure <cl> and pass it all the extra arguments
  * given in the call. If the last argument is an array, it
  * is flattened, ie. passed as a bunch of single arguments.
+ *
+ * If it's an array lvalue or array range lvalue, pass its
+ * elements also as lvalues.
+ *
  * TODO: Use the MudOS-Notation '(*f)(...)' as alternative.
  */
 
@@ -19189,76 +19295,17 @@ v_apply (svalue_t *sp, int num_arg)
         return sp;
     }
 
-    if (sp->type == T_POINTER)
-    {
-        /* The last argument is an array: flatten it */
+    /* Check the target closure type */
+    if (args->x.closure_type >= 0 &&
+        args->x.closure_type != CLOSURE_LFUN &&
+        args->x.closure_type != CLOSURE_LAMBDA &&
+        args->x.closure_type != CLOSURE_BOUND_LAMBDA)
+            errorf("Uncallable closure in apply().\n");
 
-        vector_t *vec;  /* the array */
-        svalue_t *svp;  /* pointer into the array */
-        long i;              /* (remaining) vector size */
 
-        vec = sp->u.vec;
-        i = (long)VEC_SIZE(vec);
-        num_arg += i - 1;
-
-        /* Check if the target closure can handle
-         * all the arguments without overflowing the stack.
-         */
-        switch( (sp - num_arg + i)->x.closure_type )
-        {
-        default:
-            if ((sp - num_arg + i)->x.closure_type >= 0)
-                errorf("Uncallable closure in apply().\n");
-            /* else: operator/sefun/efun closure: FALLTHROUGH */
-        case CLOSURE_LFUN:
-        case CLOSURE_LAMBDA:
-        case CLOSURE_BOUND_LAMBDA:
-            if (num_arg + (sp - VALUE_STACK) < EVALUATOR_STACK_SIZE)
-                break;
-            errorf("VM Stack overflow: %zu too high.\n",
-                 (size_t)(num_arg + (sp - VALUE_STACK) - EVALUATOR_STACK_SIZE) );
-            break;
-        }
-
-        /* Push the array elements onto the stack, overwriting the
-         * array value itself.
-         */
-        if (deref_array(vec))
-        {
-            for (svp = vec->item; --i >= 0; )
-            {
-                if (destructed_object_ref(svp))
-                {
-                    put_number(sp, 0);
-                    sp++;
-                    svp++;
-                }
-                else
-                    assign_svalue_no_free(sp++, svp++);
-            }
-        }
-        else
-        {
-            /* The array will be freed, so use a faster function */
-            for (svp = vec->item; --i >= 0; ) {
-                if (destructed_object_ref(svp))
-                {
-                    put_number(sp, 0);
-                    sp++;
-                    svp++;
-                }
-                else
-                    transfer_svalue_no_free(sp++, svp++);
-            }
-            free_empty_vector(vec);
-        }
-
-        sp--; /* undo the last extraneous sp++ */
-    }
-
-    /* Prepare to call the closure */
-
-    args = sp -num_arg +1;
+    /* Expand the last argument. */
+    num_arg += expand_argument(sp) - 1;
+    sp = args + num_arg - 1;
 
     /* No external calls may be done when this object is
      * destructed.
