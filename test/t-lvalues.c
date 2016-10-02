@@ -139,6 +139,12 @@ mixed *tests = ({
     ({ "Unprotected array range 4", 0, (: mixed a = ({0,1,2,3,4}); a[2..3]= ({10,11,12,13}); return deep_eq(a, ({0,1,10,11,12,13,4})); :) }),
     ({ "Unprotected string range 1", 0, (: string a = "0123456789"; a[2..6]   = "xxxxx"; return a == "01xxxxx789"; :) }),
     ({ "Unprotected string range 2", 0, (: string a = "0123456789"; a[2..6] &&= "xxxxx"; return a == "01xxxxx789"; :) }),
+
+    ({ "Indexing array range 1", 0, (: int* a = ({1,2,3,4,5,6}); a[1..3][1] = 7; return deep_eq(a, ({1,2,7,4,5,6})); :) }),
+    ({ "Indexing array range 2", 0, (: int* a = ({1,2,3,4,5,6}); a[1..3][1..1] = ({}); return deep_eq(a, ({1,2,4,5,6})); :) }),
+    ({ "Indexing string range 1", 0, (: string str = "abcdef"; str[0..3][2] = 'x'; return str == "abxdef"; :) }),
+    ({ "Indexing string range 2", 0, (: string str = "abcdef"; str[0..3][2..2] = "xyz"; return str == "abxyzdef"; :) }),
+
     /* TODO: What should the proper results be? */
     ({ "Vanishing destinations 1a", TF_ERROR, (: mixed a = ({1}); a[0] = (a=0); :) }),
     ({ "Vanishing destinations 1b", TF_ERROR, (: mixed a = ({1}); a[a=0] = 0; :) }),
