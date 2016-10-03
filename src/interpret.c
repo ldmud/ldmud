@@ -3225,6 +3225,9 @@ push_error_handler(void (*errorhandler)(error_handler_t *), error_handler_t *arg
  *     Return &(v[i]), unprotected. (Supports all single-index
  *     types: &(v[<i]), &(v[>i]), &(s->i).)
  *
+ *   push_map_index_lvalue(mapping m, mixed key, int i)
+ *     Return &(m[key,i]), unprotected.
+ *
  *   push_range_lvalue(vector|string v, int i1, int i2)
  *     Return &(v[i1..i2]), unprotected, using current_unprotected_range.
  *     Supports all range-index types.
@@ -3993,13 +3996,18 @@ get_unprotected_lvalue (svalue_t *lval)
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype)
+push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool reseating)
 
-/* Operator F_INDEX_LVALUE   (string|vector v=sp[-1], int   i=sp[0])
- *          F_RINDEX_LVALUE  (string|vector v=sp[-1], int   i=sp[0])
- *          F_AINDEX_LVALUE  (string|vector v=sp[-1], int   i=sp[0])
- *          F_INDEX_LVALUE   (mapping       v=sp[-1], mixed i=sp[0])
- *          F_S_INDEX_LVALUE (struct        v=sp[-1], mixed i=sp[0])
+/* Operator F_INDEX_LVALUE    (string|vector v=sp[-1], int   i=sp[0])
+ *          F_RINDEX_LVALUE   (string|vector v=sp[-1], int   i=sp[0])
+ *          F_AINDEX_LVALUE   (string|vector v=sp[-1], int   i=sp[0])
+ *          F_INDEX_LVALUE    (mapping       v=sp[-1], mixed i=sp[0])
+ *          F_S_INDEX_LVALUE  (struct        v=sp[-1], mixed i=sp[0])
+ *          F_INDEX_VLVALUE   (string|vector v=sp[-1], int   i=sp[0])
+ *          F_RINDEX_VLVALUE  (string|vector v=sp[-1], int   i=sp[0])
+ *          F_AINDEX_VLVALUE  (string|vector v=sp[-1], int   i=sp[0])
+ *          F_INDEX_VLVALUE   (mapping       v=sp[-1], mixed i=sp[0])
+ *          F_S_INDEX_VLVALUE (struct        v=sp[-1], mixed i=sp[0])
  *
  * Compute the index &(v[i]) of lrvalue <v> and push it onto the stack
  * as an lvalue.
@@ -4098,6 +4106,9 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype)
             case T_STRING:
             {
                 char * cp;
+
+                if (reseating)
+                    errorf("(index_vlvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
 
                 cp = get_string_item(vec, idx, /* make_mutable: */ MY_TRUE
                                     , /* allow_one_past: */ MY_FALSE
@@ -4199,9 +4210,85 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype)
     free_svalue(sp--);
     free_svalue(sp);
 
-    assign_lvalue_no_free(sp, item);
+    if (reseating)
+        assign_var_lvalue_no_free(sp, item);
+    else
+        assign_lvalue_no_free(sp, item);
     return sp;
 } /* push_index_lvalue() */
+
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+push_map_index_lvalue (svalue_t *sp, bytecode_p pc, bool reseating)
+
+/* Operator F_MAP_INDEX_LVALUE(  mapping m=sp[-2]
+ *                             , mixed i=sp[-1], int j=sp[0])
+ *          F_MAP_INDEX_VLVALUE( mapping m=sp[-2]
+ *                             , mixed i=sp[-1], int j=sp[0])
+ *
+ * Compute the lvalue &(m[i,j]) and push it into the stack. If v has
+ * just one ref left, the indexed item is stored in indexing_quickfix
+ * and the lvalue refers to that variable.
+ */
+
+{
+    svalue_t *data;
+    mapping_t *m;
+    mp_int n;
+
+    if (sp[-2].type != T_MAPPING)
+    {
+        ERRORF(("(lvalue) Indexing on illegal type: %s, expected mapping.\n"
+               , typename(sp[-2].type)
+              ));
+    }
+    if (sp[0].type != T_NUMBER)
+    {
+        ERRORF(("Illegal sub-index type: %s, expected number.\n"
+               , typename(sp[0].type)
+              ));
+    }
+
+    m = sp[-2].u.map;
+    n = sp->u.number;
+    if (n < 0 || n >= m->num_values)
+    {
+        ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
+                PRIdPINT".\n", n, m->num_values));
+    }
+
+    sp--; /* the key */
+    data = get_map_lvalue(m, sp);
+    if (!data)
+    {
+        outofmemory("indexed lvalue");
+        /* NOTREACHED */
+        return sp;
+    }
+    pop_stack();
+
+    if (m->ref == 1)
+    {
+        free_svalue(&indexing_quickfix);
+        assign_svalue_no_free(&indexing_quickfix, data + n);
+        if (reseating)
+            assign_var_lvalue_no_free(sp, &indexing_quickfix);
+        else
+            assign_lvalue_no_free(sp, &indexing_quickfix);
+    }
+    else
+    {
+        if (reseating)
+            assign_var_lvalue_no_free(sp, data + n);
+        else
+            assign_lvalue_no_free(sp, data + n);
+    }
+    free_mapping(m);
+
+    return sp;
+} /* push_map_index_lvalue() */
+
 
 /*-------------------------------------------------------------------------*/
 /* Code values used by push_range_lvalue() and push_range_value()
@@ -13029,11 +13116,10 @@ again:
          */
 
         sp = check_struct_op(sp, pc, NULL);
-        sp = push_index_lvalue(sp, pc, REGULAR_INDEX);
+        sp = push_index_lvalue(sp, pc, REGULAR_INDEX, false);
         break;
 
     CASE(F_MAP_INDEX_LVALUE);       /* --- map_index_lvalue   --- */
-    {
         /* Operator F_MAP_INDEX_LVALUE( mapping m=sp[-2]
          *                            , mixed i=sp[-1], int j=sp[0])
          *
@@ -13041,54 +13127,8 @@ again:
          * just one ref left, the indexed item is stored in indexing_quickfix
          * and the lvalue refers to that variable.
          */
-        svalue_t *data;
-        mapping_t *m;
-        mp_int n;
-
-        if (sp[-2].type != T_MAPPING)
-        {
-            ERRORF(("(lvalue) Indexing on illegal type: %s, expected mapping.\n"
-                   , typename(sp[-2].type)
-                  ));
-        }
-        if (sp[0].type != T_NUMBER)
-        {
-            ERRORF(("Illegal sub-index type: %s, expected number.\n"
-                   , typename(sp[0].type)
-                  ));
-        }
-
-        m = sp[-2].u.map;
-        n = sp->u.number;
-        if (n < 0 || n >= m->num_values)
-        {
-            ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
-                    PRIdPINT".\n", n, m->num_values));
-        }
-
-        sp--; /* the key */
-        data = get_map_lvalue(m, sp);
-        if (!data)
-        {
-            outofmemory("indexed lvalue");
-            /* NOTREACHED */
-            return MY_FALSE;
-        }
-        pop_stack();
-
-        if (m->ref == 1)
-        {
-            free_svalue(&indexing_quickfix);
-            assign_svalue_no_free(&indexing_quickfix, data + n);
-            assign_lvalue_no_free(sp, &indexing_quickfix);
-        }
-        else
-        {
-            assign_lvalue_no_free(sp, data + n);
-        }
-        free_mapping(m);
+        sp = push_map_index_lvalue(sp, pc, false);
         break;
-    }
 
     CASE(F_INDEX_LVALUE);           /* --- index_lvalue       --- */
         /* Operator F_INDEX_LVALUE (string|vector &v=sp[-1], int   i=sp[0])
@@ -13112,7 +13152,7 @@ again:
                 /* NOTREACHED */
             }
         }
-        sp = push_index_lvalue(sp, pc, REGULAR_INDEX);
+        sp = push_index_lvalue(sp, pc, REGULAR_INDEX, false);
         break;
 
     CASE(F_RINDEX_LVALUE);          /* --- rindex_lvalue      --- */
@@ -13125,7 +13165,7 @@ again:
          * CHAR_LVALUE stored in <special_lvalue>.
          */
 
-        sp = push_index_lvalue(sp, pc, REVERSE_INDEX);
+        sp = push_index_lvalue(sp, pc, REVERSE_INDEX, false);
         break;
 
     CASE(F_AINDEX_LVALUE);          /* --- aindex_lvalue      --- */
@@ -13138,7 +13178,7 @@ again:
          * CHAR_LVALUE stored in <special_lvalue>.
          */
 
-        sp = push_index_lvalue(sp, pc, ARITHMETIC_INDEX);
+        sp = push_index_lvalue(sp, pc, ARITHMETIC_INDEX, false);
         break;
 
     CASE(F_S_INDEX);                /* --- s_index            --- */
@@ -13458,6 +13498,85 @@ again:
         sp++;
         assign_var_lvalue_no_free(sp, fp + LOAD_UINT8(pc));
         break;
+
+    CASE(F_INDEX_VLVALUE);          /* --- index_vlvalue       --- */
+        /* Operator F_INDEX (vector  v=sp[-1], int   i=sp[0])
+         *          F_INDEX (mapping v=sp[-1], mixed i=sp[0])
+         *
+         * Compute the value (v[i]) and push it onto the stack.
+         * This'll create an unprotected lvalue directly to the entry,
+         * so the entry can be changed without respecting any existing
+         * lvalue references in that entry.
+         */
+
+        if ((sp-1)->type == T_STRUCT)
+        {
+            ERRORF(("Illegal type to []: %s, expected string/vector/mapping.\n"
+                   , typename((sp-1)->type)
+                  ));
+            /* NOTREACHED */
+        }
+        sp = push_index_lvalue(sp, pc, REGULAR_INDEX, true);
+        break;
+
+    CASE(F_RINDEX_VLVALUE);         /* --- rindex_vlvalue      --- */
+        /* Operator F_RINDEX_VLVALUE (string|vector &v=sp[-1], int   i=sp[0])
+         *
+         * Compute the index &(v[<i]) of lvalue <v> and push it onto the stack.
+         * This'll create an unprotected lvalue directly to the entry,
+         * so the entry can be changed without respecting any existing
+         * lvalue references in that entry.
+         */
+
+        sp = push_index_lvalue(sp, pc, REVERSE_INDEX, true);
+        break;
+
+    CASE(F_AINDEX_VLVALUE);         /* --- aindex_vlvalue      --- */
+        /* Operator F_AINDEX_VLVALUE (string|vector &v=sp[-1], int   i=sp[0])
+         *
+         * Compute the index &(v[>i]) of lvalue <v> and push it onto the stack.
+         * This'll create an unprotected lvalue directly to the entry,
+         * so the entry can be changed without respecting any existing
+         * stack. The computed index is a lvalue itself.
+         */
+
+        sp = push_index_lvalue(sp, pc, ARITHMETIC_INDEX, true);
+        break;
+
+    CASE(F_S_INDEX_VLVALUE);        /* --- s_index_vlvalue     --- */
+        /* Op. (struct v=sp[-2], mixed i=sp[-1], short idx=sp[0])
+         *
+         * Compute the index &(v[i]) of rvalue <v> and push it into the
+         * stack as an lvalue.
+         *
+         * <idx> gives the index of the expected struct type - the
+         * operator accepts a struct of this type, or any of its children.
+         * An negative <idx> accepts any struct.
+         *
+         * This'll create an unprotected lvalue directly to the entry,
+         * so the entry can be changed without respecting any existing
+         * stack. The computed index is a lvalue itself.
+         */
+
+        sp = check_struct_op(sp, pc, NULL);
+        sp = push_index_lvalue(sp, pc, REGULAR_INDEX, true);
+        break;
+
+    CASE(F_MAP_INDEX_VLVALUE);      /* --- map_index_vlvalue   --- */
+        /* Operator F_MAP_INDEX_VLVALUE( mapping m=sp[-2]
+         *                             , mixed i=sp[-1], int j=sp[0])
+         *
+         * Compute the lvalue &(m[i,j]) and push it into the stack. If v has
+         * just one ref left, the indexed item is stored in indexing_quickfix
+         * and the lvalue refers to that variable.
+         *
+         * This'll create an unprotected lvalue directly to the entry,
+         * so the entry can be changed without respecting any existing
+         * stack. The computed index is a lvalue itself.
+         */
+        sp = push_map_index_lvalue(sp, pc, true);
+        break;
+
 
     CASE(F_SIMUL_EFUN);             /* --- simul_efun <code>   --- */
     {

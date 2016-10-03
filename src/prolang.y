@@ -6797,6 +6797,8 @@ delete_prog_string (void)
     {
         short      rvalue_inst;  /* Index opcode for rvalues */
         short      lvalue_inst;  /* Index opcode for lvalues */
+        short      vlvalue_inst; /* Index opcode for reseating lvalues
+                                    This is not used for ranges. */
         uint32     start;        /* Startaddress of the index */
         uint32     end;          /* Endaddress+1 of the index */
         fulltype_t type1;        /* Type of index, resp. lower bound */
@@ -6832,6 +6834,8 @@ delete_prog_string (void)
     struct lvalue_s {
         lpctype_t *    type;
         lvalue_block_t lvalue;
+        short          vlvalue_inst;
+        short          num_arg;
     } lvalue;
       /* Used in assigns to communicate how an lvalue has to be accessed
        * (by passing on the bytecode to create) and what type it is.
@@ -6841,6 +6845,11 @@ delete_prog_string (void)
        * assignment (eg. a = b = c; will be evaluated from right to
        * left). The compiled bytecodes for the lvalue are stored in the
        * LVALUE_BLOCK and should be freed using free_lvalue_block().
+       *
+       * If this lvalue expression can be used for reseating assignments,
+       * then vlvalue_inst (if != 0) will contain the instruction that
+       * must replace the last instruction in the lvalue block.
+       * (The last instruction will have .num_arg bytes following it.)
        */
 
     struct {
@@ -6929,7 +6938,7 @@ delete_prog_string (void)
 %ifdef USE_PARSE_COMMAND
 %type <rvalue>       parse_command
 %endif
-%type <lvalue>       lvalue name_lvalue name_var_lvalue local_name_lvalue foreach_var_lvalue
+%type <lvalue>       lvalue name_lvalue name_var_lvalue local_name_lvalue foreach_var_lvalue lvalue_reference
 %type <index>        index_range index_expr
 %type <case_label>   case_label
 %type <address>      optional_else
@@ -10598,6 +10607,76 @@ expr0:
       } /* post-dec */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | lvalue_reference %prec '~'
+
+      {
+          uint32 current = CURRENT_PROGRAM_SIZE;
+
+          if (!add_lvalue_code(&$1, F_MAKE_PROTECTED))
+          {
+              free_lpctype($1.type);
+              YYACCEPT;
+          }
+
+          $$.start = current;
+          $$.type = get_fulltype($1.type); /* Adapt the reference. */
+          $$.type.t_flags |= TYPE_MOD_REFERENCE;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | lvalue_reference L_ASSIGN expr0 %prec L_ASSIGN
+      {
+          fulltype_t type1, type2, restype;
+%line
+          $$ = $3;
+
+          if ($2 != F_ASSIGN)
+              yyerror("Only plain assignments allowed with references");
+
+          /* Change the instruction into a reseating instruction. */
+          if ($1.vlvalue_inst)
+              LVALUE_BLOCK[$1.lvalue.start + $1.lvalue.size - $1.num_arg - 1] = $1.vlvalue_inst;
+          else
+              yyerror("Illegal rhs for assignment");
+
+          type1.t_type = $1.type;
+          type1.t_flags = 0;
+          type2 = $3.type;
+
+          if(type2.t_type == lpctype_mixed && !type2.t_flags)
+              restype.t_type = lpctype_mixed;
+          else
+              restype.t_type = get_common_type(type1.t_type, type2.t_type);
+          restype.t_flags = type2.t_flags;
+
+          if (exact_types && !restype.t_type)
+          {
+              yyerrorf("Bad assignment %s", get_two_fulltypes(type1, type2));
+              restype = ref_fulltype(type1);
+          }
+
+          /* Special checks for struct assignments */
+          if (is_type_struct(type1.t_type) || is_type_struct(type2.t_type))
+          {
+              free_fulltype(restype);
+              restype = ref_fulltype(type1);
+          }
+
+          if (!add_lvalue_code(&$1, $2))
+          {
+              free_lpctype($1.type);
+              free_fulltype($3.type);
+              free_fulltype(restype);
+              YYACCEPT;
+          }
+
+          $$.type = restype;
+
+          free_lpctype($1.type);
+          free_fulltype($3.type);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr4
       {
 %line
@@ -10608,6 +10687,22 @@ expr0:
       }
 
 ; /* expr0 */
+
+
+lvalue_reference:
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+      '&' name_lvalue
+      {
+          $$ = $2;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '&' '(' lvalue ')'
+      {
+          $$ = $3;
+      }
+; /* lvalue_reference */
+
 
 
 pre_inc_dec:
@@ -10980,41 +11075,6 @@ expr4:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | '&' '(' lvalue ')'
-
-      {
-          uint32 current = CURRENT_PROGRAM_SIZE;
-
-          if (!add_lvalue_code(&$3, F_MAKE_PROTECTED))
-          {
-              free_lpctype($3.type);
-              YYACCEPT;
-          }
-
-          $$.start = current;
-          $$.lvalue = (lvalue_block_t) {0, 0};
-          $$.type = get_fulltype($3.type); /* Adapt the reference. */
-          $$.type.t_flags |= TYPE_MOD_REFERENCE;
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | '&' name_lvalue                        %prec '~'
-      {
-          uint32 current = CURRENT_PROGRAM_SIZE;
-
-          if (!add_lvalue_code(&$2, F_MAKE_PROTECTED))
-          {
-              free_lpctype($2.type);
-              YYACCEPT;
-          }
-
-          $$.start = current;
-          $$.lvalue = (lvalue_block_t) {0, 0};
-          $$.type = get_fulltype($2.type); /* Adapt the reference. */
-          $$.type.t_flags |= TYPE_MOD_REFERENCE;
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 %// The following expressions can be patched to lvalues for use in index_lvalue.
     | L_IDENTIFIER
       {
@@ -11310,6 +11370,9 @@ name_lvalue:
 
               q[0] = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
               q[1] = i;
+              $$.vlvalue_inst = F_PUSH_VIRTUAL_VARIABLE_VLVALUE;
+              $$.num_arg = 1;
+
               varp = V_VARIABLE(i);
               $$.type = ref_lpctype(varp->type.t_type);
           }
@@ -11324,6 +11387,9 @@ name_lvalue:
 
                   q[0] = F_PUSH_IDENTIFIER16_LVALUE;
                   PUT_SHORT(q+1, i);
+
+                  $$.vlvalue_inst = F_PUSH_IDENTIFIER16_VLVALUE;
+                  $$.num_arg = 2;
               }
               else
               {
@@ -11334,6 +11400,9 @@ name_lvalue:
 
                   q[0] = F_PUSH_IDENTIFIER_LVALUE;
                   q[1] = i;
+
+                  $$.vlvalue_inst = F_PUSH_IDENTIFIER_VLVALUE;
+                  $$.num_arg = 1;
               }
               varp = NV_VARIABLE(i);
               $$.type = ref_lpctype(varp->type.t_type);
@@ -11361,11 +11430,17 @@ name_lvalue:
           {
               q[0] = F_PUSH_CONTEXT_LVALUE;
               q[1] = $1->u.local.context;
+
+              $$.vlvalue_inst = F_PUSH_CONTEXT_VLVALUE;
+              $$.num_arg = 1;
           }
           else
           {
               q[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
               q[1] = $1->u.local.num;
+
+              $$.vlvalue_inst = F_PUSH_LOCAL_VARIABLE_VLVALUE;
+              $$.num_arg = 1;
           }
       }
 ; /* name_lvalue */
@@ -11397,6 +11472,9 @@ lvalue:
               $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, $2.lvalue_inst);
           }
 
+          $$.vlvalue_inst = $2.vlvalue_inst;
+          $$.num_arg = 0;
+
           /* Remove the code from the program block. */
           CURRENT_PROGRAM_SIZE = $1.start;
           last_expression = -1;
@@ -11423,6 +11501,9 @@ lvalue:
           free_lvalue_block($1.lvalue);
           $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, F_MAP_INDEX_LVALUE);
           $$.type = lpctype_mixed;
+
+          $$.vlvalue_inst = F_MAP_INDEX_VLVALUE;
+          $$.num_arg = 0;
 
           /* Remove the code from the program block. */
           CURRENT_PROGRAM_SIZE = $1.start;
@@ -11469,6 +11550,9 @@ lvalue:
                */
               $$.lvalue = compose_lvalue_block($1.lvalue, F_MAKE_PROTECTED, $2.start, $2.lvalue_inst);
           }
+
+          $$.vlvalue_inst = 0;
+          $$.num_arg = 0;
 
           /* Remove the code from the program block. */
           CURRENT_PROGRAM_SIZE = $1.start;
@@ -11526,6 +11610,9 @@ lvalue:
               /* Now move that into an lvalue buffer. */
               $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, 0);
 
+              $$.vlvalue_inst = F_S_INDEX_VLVALUE;
+              $$.num_arg = 0;
+
               /* And remove it from the program block. */
               CURRENT_PROGRAM_SIZE = $1.start;
               last_expression = -1;
@@ -11548,6 +11635,8 @@ lvalue:
 
            $$.type = lpctype_mixed;
            $$.lvalue = (lvalue_block_t) {0, 0};
+           $$.vlvalue_inst = 0;
+           $$.num_arg = 0;
       }
 
 ; /* lvalue */
@@ -11555,84 +11644,13 @@ lvalue:
 
 name_var_lvalue:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    L_IDENTIFIER
+    name_lvalue
       {
-          /* Generate the lvalue for a global variable */
+          bytecode_p q = LVALUE_BLOCK + $1.lvalue.start;
 
-          int i;
-          variable_t *varp;
-%line
-          i = verify_declared($1);
-          if (i == -1)
-              /* variable not declared */
-              YYACCEPT;
+          $$ = $1;
 
-          if (i & VIRTUAL_VAR_TAG)
-          {
-              bytecode_p q;
-
-              $$.lvalue = alloc_lvalue_block(2);
-              q = LVALUE_BLOCK + $$.lvalue.start;
-
-              q[0] = F_PUSH_VIRTUAL_VARIABLE_VLVALUE;
-              q[1] = i;
-              varp = V_VARIABLE(i);
-              $$.type = ref_lpctype(varp->type.t_type);
-          }
-          else
-          {
-              if (i & ~0xff)
-              {
-                  bytecode_p q;
-
-                  $$.lvalue = alloc_lvalue_block(3);
-                  q = LVALUE_BLOCK + $$.lvalue.start;
-
-                  q[0] = F_PUSH_IDENTIFIER16_VLVALUE;
-                  PUT_SHORT(q+1, i);
-              }
-              else
-              {
-                  bytecode_p q;
-
-                  $$.lvalue = alloc_lvalue_block(2);
-                  q = LVALUE_BLOCK + $$.lvalue.start;
-
-                  q[0] = F_PUSH_IDENTIFIER_VLVALUE;
-                  q[1] = i;
-              }
-              varp = NV_VARIABLE(i);
-              $$.type = ref_lpctype(varp->type.t_type);
-          }
-          if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
-              yywarnf("Using deprecated global variable %s.\n",
-                      get_txt(varp->name));
-      }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | L_LOCAL
-      {
-          lpctype_t *type;
-          bytecode_p q;
-%line
-          /* Generate the lvalue for a local */
-
-          $1 = check_for_context_local($1, &type);
-
-          $$.type = ref_lpctype(type);
-          $$.lvalue = alloc_lvalue_block(2);
-          q = LVALUE_BLOCK + $$.lvalue.start;
-
-          if ($1->u.local.context >= 0)
-          {
-              q[0] = F_PUSH_CONTEXT_VLVALUE;
-              q[1] = $1->u.local.context;
-          }
-          else
-          {
-              q[0] = F_PUSH_LOCAL_VARIABLE_VLVALUE;
-              q[1] = $1->u.local.num;
-          }
+          q[$1.lvalue.size - $1.num_arg - 1] = $1.vlvalue_inst;
       }
 ; /* name_var_lvalue */
 
@@ -11663,6 +11681,7 @@ index_expr :
         {
             $$.rvalue_inst  = F_INDEX;
             $$.lvalue_inst  = F_INDEX_LVALUE;
+            $$.vlvalue_inst = F_INDEX_VLVALUE;
             $$.start        = $2.start;
             $$.end          = CURRENT_PROGRAM_SIZE;
             $$.type1        = $2.type;
@@ -11679,6 +11698,7 @@ index_expr :
         {
             $$.rvalue_inst  = F_RINDEX;
             $$.lvalue_inst  = F_RINDEX_LVALUE;
+            $$.vlvalue_inst = F_RINDEX_VLVALUE;
             $$.start        = $3.start;
             $$.end          = CURRENT_PROGRAM_SIZE;
             $$.type1        = $3.type;
@@ -11694,6 +11714,7 @@ index_expr :
         {
             $$.rvalue_inst  = F_AINDEX;
             $$.lvalue_inst  = F_AINDEX_LVALUE;
+            $$.vlvalue_inst = F_AINDEX_VLVALUE;
             $$.start        = $3.start;
             $$.end          = CURRENT_PROGRAM_SIZE;
             $$.type1        = $3.type;
@@ -13609,6 +13630,9 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
 
         lvalue_code[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
         lvalue_code[1] = q->u.local.num;
+
+        lv->vlvalue_inst = F_PUSH_LOCAL_VARIABLE_VLVALUE;
+        lv->num_arg = 1;
 
         lv->type = actual_type;
     }
