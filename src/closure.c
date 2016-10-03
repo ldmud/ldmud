@@ -193,12 +193,20 @@
 /* Flags passed to resp. returned by compile_value().
  * They must fit into one bytecode_t (the #'? needs that)
  */
-#define ZERO_ACCEPTED     0x01  /* in:  a return value of zero need not be coded */
-#define VOID_ACCEPTED     0x02  /* in:  any return value can be left out */
-#define VOID_GIVEN        0x04  /* out: no return value given */
-#define NEGATE_ACCEPTED   0x08  /* in:  Caller accepts a reversed logic result */
-#define NEGATE_GIVEN      0x10  /* out: Result is in reversed logic */
-#define REF_REJECTED      0x20  /* in:  lvalues not accepted */
+enum compile_value_input_flags
+{
+    ZERO_ACCEPTED      = 0x01, /* a return value of zero need not be coded */
+    VOID_ACCEPTED      = 0x02, /* any return value can be left out */
+    NEGATE_ACCEPTED    = 0x04, /* Caller accepts a reversed logic result */
+    REF_ACCEPTED       = 0x08, /* lvalue references may be produced */
+};
+
+enum compile_value_output_flags
+{
+    VOID_GIVEN         = 0x01, /* no return value given */
+    NEGATE_GIVEN       = 0x02, /* Result is in reversed logic */
+    REF_GIVEN          = 0x04, /* Result will be an lvalue reference */
+};
 
 #define VOID_WANTED (ZERO_ACCEPTED | VOID_ACCEPTED | NEGATE_ACCEPTED)
   /* all "don't care for the result" flags.
@@ -207,9 +215,13 @@
 
 /* Flags passed to compile_lvalue()
  */
-#define PROTECT_LVALUE    0x1  /* Protect the generated lvalue */
-#define MAKE_VAR_LVALUE   0x2  /* Make an variable lvalue */
+enum compile_lvalue_input_flags
+{
+    PROTECT_LVALUE     = 0x01, /* Protect the generated lvalue */
+    MAKE_VAR_LVALUE    = 0x02, /* Make an variable lvalue */
                                /* (ignore any lvalues in the variable) */
+    RESEATING_ACCEPTED = 0x04, /* Allow reseating references (&var). */
+};
 
 #define UNIMPLEMENTED \
             lambda_error("Unimplemented - contact the maintainer\n");
@@ -1615,7 +1627,7 @@ insert_value_push (svalue_t *value)
 
 /*-------------------------------------------------------------------------*/
 static int
-compile_value (svalue_t *value, int opt_flags)
+compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 
 /* Compile the <value> into a closure in the context of the current
  * work_area. <opt_flags> gives additional instructions about what
@@ -1631,9 +1643,31 @@ compile_value (svalue_t *value, int opt_flags)
  *    symbol, 1 quote:   resolved as local variable/argument
  *    symbol, > 1 quote: inserted as symbol with one quote less
  *    other: inserted as is
+ *
+ * The return value may contain the following flags:
+ *    VOID_GIVEN:
+ *        The generated code will not leave any result on the stack.
+ *        This will be only the case when VOID_ACCEPTED was in
+ *        <opt_flags> (otherwise there will be code emittet to
+ *        put something on the stack).
+ *
+ *    NEGATE_GIVEN:
+ *        The value on the stack must be negated. The needed F_NOT
+ *        was not emitted. This will be only the case when
+ *        NEGATE_ACCEPTED or VOID_ACCEPTED was set in <opt_flags>.
+ *        In the former case it is expected, the caller will negate
+ *        the value (used to optimize to bytecodes into one), in
+ *        the later case the value on the stack will be discarded
+ *        anyway.
+ *
+ *    REF_GIVEN:
+ *       The result on the stack will be a freshly created
+ *       lvalue reference (&var).
  */
 
 {
+    enum compile_value_output_flags result_flags = 0;
+
     if (!--current.levels_left)
         lambda_error("Too deep recursion inside lambda()\n");
 
@@ -1716,7 +1750,7 @@ compile_value (svalue_t *value, int opt_flags)
                     mp_int end;      /* first free code byte */
                     Bool is_and;     /* TRUE if the operator is F_LAND */
                     int code;        /* Compiled instruction */
-                    int void_given;
+                    enum compile_value_output_flags void_given;
 
                     code = type - CLOSURE_OPERATOR;
                     is_and = code == (F_LAND);
@@ -1728,7 +1762,7 @@ compile_value (svalue_t *value, int opt_flags)
                     {
                         code = is_and ? F_BRANCH_WHEN_ZERO
                                       : F_BRANCH_WHEN_NON_ZERO;
-                        opt_flags |= VOID_GIVEN;
+                        result_flags |= VOID_GIVEN;
                     }
 
                     /* Generate the code for the arguments but the last one.
@@ -1739,7 +1773,7 @@ compile_value (svalue_t *value, int opt_flags)
                     i = block_size - 1;
                     branchp = alloca(i * sizeof *branchp);
                     while (--i > 0) {
-                        compile_value(++argp, REF_REJECTED);
+                        compile_value(++argp, opt_flags & REF_ACCEPTED);
                         if (current.code_left < 2)
                             realloc_code();
                         *branchp++ = current.code_max - current.code_left;
@@ -1754,11 +1788,11 @@ compile_value (svalue_t *value, int opt_flags)
                      */
                     if (i)
                         void_given = compile_value(is_and ? &const1 : &const0
-                                         , opt_flags & (VOID_ACCEPTED|REF_REJECTED)
+                                         , opt_flags & (VOID_ACCEPTED|REF_ACCEPTED)
                                      );
                     else
                         void_given = compile_value(++argp
-                                         , opt_flags & (VOID_ACCEPTED|REF_REJECTED)
+                                         , opt_flags & (VOID_ACCEPTED|REF_ACCEPTED)
                                      );
 
                     /* If the caller accepts void, but we compiled a result,
@@ -1935,8 +1969,10 @@ compile_value (svalue_t *value, int opt_flags)
                     mp_int non_void_dest; /* branch dest with a result */
                     Bool is_notif;        /* TRUE if this is #'?! */
                     int code;             /* The instruction to compile to */
-                    int opt_used;         /* Current compile() result */
-                    int all_void;         /* !0 if  cond-parts returns a value */
+                    enum compile_value_output_flags opt_used;
+                                          /* Current compile() result */
+                    enum compile_value_output_flags all_void;
+                                          /* !0 if  cond-parts returns a value */
                     mp_int last_branch;   /* Position of branch after cond */
 
                     non_void_dest = 0;
@@ -1994,11 +2030,11 @@ compile_value (svalue_t *value, int opt_flags)
                         ++argp;
                         opt_used = compile_value(argp,
                             (i == 1 && !all_void) ?
-                                opt_flags & REF_REJECTED :
+                                opt_flags & REF_ACCEPTED :
                                 opt_flags &
-                                  (VOID_ACCEPTED|ZERO_ACCEPTED|REF_REJECTED)
+                                  (VOID_ACCEPTED|ZERO_ACCEPTED|REF_ACCEPTED)
                           );
-                        all_void &= opt_used;
+                        all_void &= (opt_used&VOID_GIVEN);
                         if (current.code_left < 4)
                             realloc_code();
 
@@ -2078,7 +2114,7 @@ compile_value (svalue_t *value, int opt_flags)
                                          * the last cond
                                          */
 
-                        opt_flags |= VOID_GIVEN;
+                        result_flags |= VOID_GIVEN;
                         if (all_void)
                         {
                             /* No cond-part returned a result, just remove
@@ -2183,8 +2219,8 @@ compile_value (svalue_t *value, int opt_flags)
                           i ? &const0 : ++argp,
                           opt_flags &
                             ( all_void ?
-                              (VOID_ACCEPTED|ZERO_ACCEPTED|REF_REJECTED) :
-                              REF_REJECTED
+                              (VOID_ACCEPTED|ZERO_ACCEPTED|REF_ACCEPTED) :
+                              REF_ACCEPTED
                             )
                         );
 
@@ -2200,7 +2236,7 @@ compile_value (svalue_t *value, int opt_flags)
                              * void-<cond>s branch here, too.
                              */
                             void_dest = non_void_dest;
-                            opt_flags |= VOID_GIVEN;
+                            result_flags |= VOID_GIVEN;
                         }
                         else if (opt_flags & VOID_ACCEPTED)
                         {
@@ -2210,7 +2246,7 @@ compile_value (svalue_t *value, int opt_flags)
                              *   nvd: POP
                              *   vd:
                              */
-                            opt_flags |= VOID_GIVEN;
+                            result_flags |= VOID_GIVEN;
                             if (current.code_left < 1)
                                 realloc_code();
                             current.code_left--;
@@ -2438,7 +2474,7 @@ compile_value (svalue_t *value, int opt_flags)
                     break;
                   }
 
-                /* ({#', <expr1>, <expr2>, ..., <exprn> })
+                /* ({#',, <expr1>, <expr2>, ..., <exprn> })
                  */
                 case F_POP_VALUE:
                   {
@@ -2459,12 +2495,12 @@ compile_value (svalue_t *value, int opt_flags)
                      */
 
                     mp_int i;
-                    int void_given;
+                    enum compile_value_output_flags void_given;
 
                     /* Compile the first n-1 expressions */
                     for (i = block_size - 1; --i > 0; )
                     {
-                        void_given = compile_value(++argp, VOID_WANTED);
+                        void_given = compile_value(++argp, VOID_WANTED|REF_ACCEPTED);
 
                         /* If we got a result, pop it */
                         if ( !(void_given & VOID_GIVEN) )
@@ -2479,7 +2515,7 @@ compile_value (svalue_t *value, int opt_flags)
                     /* Compile the last expression.
                      * If there is none (i != 0), use CONST0 instead.
                      */
-                    opt_flags = compile_value(i ? &const0 : ++argp, opt_flags);
+                    result_flags = compile_value(i ? &const0 : ++argp, opt_flags);
                     break;
                   }
 
@@ -2514,14 +2550,14 @@ compile_value (svalue_t *value, int opt_flags)
                     argp++;
                     for (; (i -= 2) >= 0; argp+=2)
                     {
-                        compile_value(argp+1, 0);
-                        compile_lvalue(argp, 0);
+                        compile_value(argp+1, REF_ACCEPTED);
+                        compile_lvalue(argp, RESEATING_ACCEPTED);
                         if (!i)
                         {
                             /* Last assignment: we might need to keep this value */
                             if (opt_flags & VOID_ACCEPTED)
                             {
-                                opt_flags = VOID_GIVEN;
+                                result_flags = VOID_GIVEN;
                                 STORE_CODE(current.codep, F_VOID_ASSIGN);
                             }
                             else
@@ -2565,7 +2601,7 @@ compile_value (svalue_t *value, int opt_flags)
                         compile_lvalue(argp+1, 0);
                         if (opt_flags & VOID_ACCEPTED)
                         {
-                            opt_flags = VOID_GIVEN;
+                            result_flags = VOID_GIVEN;
                             STORE_CODE(current.codep, F_INC);
                         }
                         else
@@ -2576,11 +2612,11 @@ compile_value (svalue_t *value, int opt_flags)
                     }
                     else
                     {
-                        compile_value(argp+2, REF_REJECTED);
+                        compile_value(argp+2, 0);
                         compile_lvalue(argp+1, 0);
                         if (opt_flags & VOID_ACCEPTED)
                         {
-                            opt_flags = VOID_GIVEN;
+                            result_flags = VOID_GIVEN;
                             STORE_CODE(current.codep, F_VOID_ADD_EQ);
                         }
                         else
@@ -2615,7 +2651,7 @@ compile_value (svalue_t *value, int opt_flags)
                         compile_lvalue(argp+1, 0);
                         if (opt_flags & VOID_ACCEPTED)
                         {
-                            opt_flags = VOID_GIVEN;
+                            result_flags = VOID_GIVEN;
                             STORE_CODE(current.codep, F_DEC);
                         }
                         else
@@ -2626,7 +2662,7 @@ compile_value (svalue_t *value, int opt_flags)
                     }
                     else
                     {
-                        compile_value(argp+2, REF_REJECTED);
+                        compile_value(argp+2, 0);
                         compile_lvalue(argp+1, 0);
                         STORE_CODE(current.codep, F_SUB_EQ);
                         current.code_left--;
@@ -2659,7 +2695,7 @@ compile_value (svalue_t *value, int opt_flags)
                           instrs[type - CLOSURE_OPERATOR].name
                         );
                     }
-                    compile_value(argp+2, REF_REJECTED);
+                    compile_value(argp+2, 0);
                     compile_lvalue(argp+1, 0);
                     STORE_CODE(current.codep, (bytecode_t)(type - CLOSURE_OPERATOR));
                     current.code_left--;
@@ -2673,7 +2709,7 @@ compile_value (svalue_t *value, int opt_flags)
                   {
                     /* This is compiled as:
                      *
-                     *      <lvalue>
+                     *      <prot-lvalue>
                      *      LDUP
                      *      <op> l
                      *      <expr>
@@ -2682,7 +2718,7 @@ compile_value (svalue_t *value, int opt_flags)
                      *
                      * respectively for long branches:
                      *
-                     *      <lvalue>
+                     *      <prot-lvalue>
                      *      LDUP
                      *      DUP
                      *      LBRANCH l
@@ -2719,7 +2755,7 @@ compile_value (svalue_t *value, int opt_flags)
                         );
                     }
 
-                    compile_lvalue(argp+1, 0);
+                    compile_lvalue(argp+1, PROTECT_LVALUE);
 
                     if (current.code_left < 3)
                         realloc_code();
@@ -2732,7 +2768,7 @@ compile_value (svalue_t *value, int opt_flags)
                     STORE_CODE(current.codep, (bytecode_t)code);
                     STORE_CODE(current.codep, (bytecode_t)0);
 
-                    compile_value(argp+2, 0);
+                    compile_value(argp+2, REF_ACCEPTED);
 
                     /* Store the correct offsets for the operator/branch
                      * instruction. If necessary, the short branch is
@@ -2805,7 +2841,7 @@ compile_value (svalue_t *value, int opt_flags)
 
                     if (opt_flags & VOID_ACCEPTED)
                     {
-                        opt_flags = VOID_GIVEN;
+                        result_flags = VOID_GIVEN;
                         if (type-CLOSURE_OPERATOR == F_POST_INC)
                             STORE_CODE(current.codep, F_INC);
                         else
@@ -2843,7 +2879,7 @@ compile_value (svalue_t *value, int opt_flags)
                      */
 
                     mp_int i;
-                    int    void_given;
+                    enum compile_value_output_flags void_given;
                     mp_int offset;      /* Position of first <body> */
 
                     i = block_size - 3;
@@ -2855,7 +2891,7 @@ compile_value (svalue_t *value, int opt_flags)
                     /* Compile all the bodys */
                     if (i) do
                     {
-                        void_given = compile_value(++argp, VOID_WANTED);
+                        void_given = compile_value(++argp, VOID_WANTED|REF_ACCEPTED);
                         if ( !(void_given & VOID_GIVEN) )
                         {
                             /* POP the unwanted result */
@@ -2895,7 +2931,7 @@ compile_value (svalue_t *value, int opt_flags)
                     }
 
                     /* Compile the result */
-                    opt_flags = compile_value(++argp, opt_flags);
+                    result_flags = compile_value(++argp, opt_flags);
                     break;
                   }
 
@@ -2926,7 +2962,7 @@ compile_value (svalue_t *value, int opt_flags)
                      */
 
                     mp_int i;
-                    int    void_given;
+                    enum compile_value_output_flags void_given;
                     mp_int start_branch;
                     mp_int offset;
 
@@ -2949,7 +2985,7 @@ compile_value (svalue_t *value, int opt_flags)
                     argp += 2;
                     if (i) do
                     {
-                        void_given = compile_value(++argp, VOID_WANTED);
+                        void_given = compile_value(++argp, VOID_WANTED|REF_ACCEPTED);
                         if ( !(void_given & VOID_GIVEN) )
                         {
                             /* The body returned a result: POP it */
@@ -3026,7 +3062,7 @@ compile_value (svalue_t *value, int opt_flags)
                     }
 
                     /* Compile the result */
-                    opt_flags = compile_value(++argp, opt_flags);
+                    result_flags = compile_value(++argp, opt_flags);
                     break;
                   }
 
@@ -3065,11 +3101,12 @@ compile_value (svalue_t *value, int opt_flags)
                      */
 
                     mp_int i;
-                    int    void_given;
+                    enum compile_value_output_flags void_given;
                     mp_int start;
                     mp_int offset;
                     int    vars_given;
                     int    body_count;
+                    bool   foreach_ref = false;
 
                     body_count = block_size - 3;
                     if (body_count < 0)
@@ -3080,7 +3117,7 @@ compile_value (svalue_t *value, int opt_flags)
                         /* Just create the code for the expression
                          * and pop the value
                          */
-                        compile_value(argp+2, 0);
+                        compile_value(argp+2, REF_ACCEPTED);
                         if (current.code_left < 2)
                             realloc_code();
                         current.code_left--;
@@ -3088,7 +3125,7 @@ compile_value (svalue_t *value, int opt_flags)
 
                         /* If a result is required, compile a 0 */
                         if (opt_flags & VOID_ACCEPTED)
-                            opt_flags = VOID_GIVEN;
+                            result_flags = VOID_GIVEN;
                         else
                         {
                             current.code_left--;
@@ -3127,14 +3164,14 @@ compile_value (svalue_t *value, int opt_flags)
                     }
 
                     /* Create the code for the expression */
-                    compile_value(++argp, 0);
+                    foreach_ref = (compile_value(++argp, REF_ACCEPTED) & REF_GIVEN) != 0;
 
                     /* Create the FOREACH instruction and remember the position
                      */
                     if (current.code_left < 4)
                         realloc_code();
                     current.code_left -= 4;
-                    STORE_CODE(current.codep, F_FOREACH);
+                    STORE_CODE(current.codep, foreach_ref ? F_FOREACH_REF : F_FOREACH);
                     STORE_UINT8(current.codep, vars_given+1);
                     STORE_SHORT(current.codep, 0);
                     start = current.code_max - current.code_left;
@@ -3143,7 +3180,7 @@ compile_value (svalue_t *value, int opt_flags)
                      */
                     for (i = body_count; i > 0; i--)
                     {
-                        void_given = compile_value(++argp, VOID_WANTED);
+                        void_given = compile_value(++argp, VOID_WANTED|REF_ACCEPTED);
                         if ( !(void_given & VOID_GIVEN) )
                         {
                             /* The body returned a result: POP it */
@@ -3170,7 +3207,7 @@ compile_value (svalue_t *value, int opt_flags)
 
                     /* If a result is required, compile a 0 */
                     if (opt_flags & VOID_ACCEPTED)
-                        opt_flags = VOID_GIVEN;
+                        result_flags = VOID_GIVEN;
                     else
                     {
                         current.code_left--;
@@ -3196,7 +3233,6 @@ compile_value (svalue_t *value, int opt_flags)
 
                     mp_int start, offset;
                     int flags, i;
-                    int void_given;
 
                     if (block_size < 2 && block_size > 6)
                         lambda_error("Wrong number of arguments to #'catch\n");
@@ -3239,7 +3275,7 @@ compile_value (svalue_t *value, int opt_flags)
                     STORE_UINT8(current.codep, 0);
                     start = current.code_max - current.code_left;
 
-                    void_given = compile_value(++argp, 0);
+                    compile_value(++argp, REF_ACCEPTED);
                     if (current.code_left < 1)
                         realloc_code();
 
@@ -3353,7 +3389,7 @@ compile_value (svalue_t *value, int opt_flags)
                     size = i = block_size - 1;
                     while (--i >= 0)
                     {
-                        compile_value(++argp, 0);
+                        compile_value(++argp, REF_ACCEPTED);
                     }
                     if (current.code_left < 3)
                         realloc_code();
@@ -3409,7 +3445,7 @@ compile_value (svalue_t *value, int opt_flags)
 
                         while (--j >= 0)
                         {
-                            compile_value(element++, 0);
+                            compile_value(element++, REF_ACCEPTED);
                         }
                     }
 
@@ -3468,7 +3504,7 @@ compile_value (svalue_t *value, int opt_flags)
                     i = size+1;
                     while (--i >= 0)
                     {
-                        compile_value(++argp, 0);
+                        compile_value(++argp, REF_ACCEPTED);
                     }
                     if (current.code_left < 4)
                         realloc_code();
@@ -3494,21 +3530,21 @@ compile_value (svalue_t *value, int opt_flags)
                     {
                         if (block_size > 1)
                             lambda_error("Too many arguments to #'return\n");
-                        opt_flags = VOID_GIVEN;
+                        result_flags = VOID_GIVEN;
                     }
                     else
                     {
-                        opt_flags =
-                          compile_value(++argp, ZERO_ACCEPTED);
+                        result_flags =
+                          compile_value(++argp, ZERO_ACCEPTED|REF_ACCEPTED);
                     }
 
                     if (current.code_left < 1)
                         realloc_code();
                     current.code_left--;
-                    if (opt_flags & VOID_GIVEN)
+                    if (result_flags & VOID_GIVEN)
                     {
                         STORE_CODE(current.codep, F_RETURN0);
-                        opt_flags ^= VOID_GIVEN;
+                        result_flags ^= VOID_GIVEN;
                     }
                     else
                         STORE_CODE(current.codep, F_RETURN);
@@ -3556,15 +3592,8 @@ compile_value (svalue_t *value, int opt_flags)
                         lambda_error("Bad number of arguments to %s\n"
                                     , opname);
 
-                    compile_value(++argp, REF_REJECTED);
-
-                    /* A numeric index can be compiled directly */
-                    if ((++argp)->type == T_NUMBER)
-                        compile_value(argp, 0);
-                    else
-                    {
-                        compile_value(argp, REF_REJECTED);
-                    }
+                    compile_value(++argp, 0);
+                    compile_value(argp, 0);
 
                     if (current.code_left < 2)
                         realloc_code();
@@ -3653,7 +3682,7 @@ compile_value (svalue_t *value, int opt_flags)
                     if (block_size != 2 + num_blocks * 3)
                         lambda_error("Bad number of arguments to #'switch\n");
 
-                    compile_value(++argp, REF_REJECTED);
+                    compile_value(++argp, 0);
 
                     if (current.code_left < 3)
                         realloc_code();
@@ -3681,7 +3710,7 @@ compile_value (svalue_t *value, int opt_flags)
                         svalue_t *labels;     /* Label value(s) */
                         mp_int j;             /* Number of (remaining) labels */
                         case_list_entry_t *l;
-                        int opt_used;
+                        enum compile_value_output_flags opt_used;
 
                         /* Compile the case labels */
 
@@ -3818,8 +3847,7 @@ compile_value (svalue_t *value, int opt_flags)
                           argp,
                           argp[1].x.closure_type ==
                           F_POP_VALUE+CLOSURE_OPERATOR ?
-                            REF_REJECTED | VOID_ACCEPTED :
-                            REF_REJECTED
+                            VOID_ACCEPTED|REF_ACCEPTED : REF_ACCEPTED
                         );
 
                         /* Check and compile the delimiter #', or #'break */
@@ -3961,12 +3989,14 @@ compile_value (svalue_t *value, int opt_flags)
                     	/* This is compiled as:
                     	 *
                     	 *   <lvalue>
+                    	 *   F_MAKE_PROTECTED
                     	 *
                     	 * (easy, isn't it?)
                     	 */
-                        if (opt_flags & REF_REJECTED)
+                        if (!(opt_flags & REF_ACCEPTED))
                             lambda_error("Reference value in bad position\n");
                         compile_lvalue(++argp, PROTECT_LVALUE);
+                        result_flags |= REF_GIVEN;
                     }
                     else
                     {
@@ -3976,7 +4006,6 @@ compile_value (svalue_t *value, int opt_flags)
                   }
 
                 /* ({#'|, <expr1>, ..., <exprn> })
-                 * ({#'|, <lvalue> })
                  */
                 case F_OR:
                   {
@@ -4004,27 +4033,14 @@ compile_value (svalue_t *value, int opt_flags)
                             STORE_CODE(current.codep, F_OR);
                         } while (--i);
                     }
-                    else if (!i)
-                    {
-                    	/* This is compiled as:
-                    	 *
-                    	 *   <lvalue>
-                    	 *
-                    	 * (easy, isn't it?)
-                    	 */
-                        if (opt_flags & REF_REJECTED)
-                            lambda_error("Reference value in bad position\n");
-                        compile_lvalue(++argp, PROTECT_LVALUE);
-                    }
                     else
                     {
-                        lambda_error("Missing argument(s) to #'&\n");
+                        lambda_error("Missing argument(s) to #'|\n");
                     }
                     break;
                   }
 
                 /* ({#'^, <expr1>, ..., <exprn> })
-                 * ({#'^, <lvalue> })
                  */
                 case F_XOR:
                   {
@@ -4052,21 +4068,9 @@ compile_value (svalue_t *value, int opt_flags)
                             STORE_CODE(current.codep, F_XOR);
                         } while (--i);
                     }
-                    else if (!i)
-                    {
-                    	/* This is compiled as:
-                    	 *
-                    	 *   <lvalue>
-                    	 *
-                    	 * (easy, isn't it?)
-                    	 */
-                        if (opt_flags & REF_REJECTED)
-                            lambda_error("Reference value in bad position\n");
-                        compile_lvalue(++argp, PROTECT_LVALUE);
-                    }
                     else
                     {
-                        lambda_error("Missing argument(s) to #'&\n");
+                        lambda_error("Missing argument(s) to #'^\n");
                     }
                     break;
                   }
@@ -4081,16 +4085,16 @@ compile_value (svalue_t *value, int opt_flags)
                      *   NOT
                      *
                      * If the caller accepts reversed logic, the NOT is
-                     * omitted and the fact is stored in opt_flags:NEGATE_GIVEN.
+                     * omitted and the fact is stored in result_flags:NEGATE_GIVEN.
                      */
 
                     if (block_size != 2)
                         lambda_error("Wrong number of arguments to #'!\n");
 
-                    opt_flags |= compile_value(++argp, opt_flags & ~ZERO_ACCEPTED);
-                    if (opt_flags & (NEGATE_ACCEPTED|VOID_GIVEN) )
+                    result_flags = compile_value(++argp, opt_flags & ~(ZERO_ACCEPTED|REF_ACCEPTED));
+                    if (opt_flags & NEGATE_ACCEPTED)
                     {
-                        opt_flags ^= NEGATE_GIVEN;
+                        result_flags ^= NEGATE_GIVEN;
                     }
                     else
                     {
@@ -4144,7 +4148,7 @@ compile_value (svalue_t *value, int opt_flags)
                     num_arg = (mp_int)VEC_SIZE(block) - 1;
                     for (i = num_arg; --i >= 0; )
                     {
-                        compile_value(++argp, 0);
+                        compile_value(++argp, REF_ACCEPTED);
                     }
 
                     /* Get the instruction and check if it received the
@@ -4227,7 +4231,7 @@ compile_value (svalue_t *value, int opt_flags)
                         if (f < EFUNV_OFFSET
                          && (opt_flags & (ZERO_ACCEPTED|VOID_ACCEPTED)))
                         {
-                            opt_flags = VOID_GIVEN;
+                            result_flags = VOID_GIVEN;
                         }
                         else
                         {
@@ -4326,7 +4330,7 @@ compile_value (svalue_t *value, int opt_flags)
 
             for (i = num_arg; --i >= 0; )
             {
-                compile_value(++argp, 0);
+                compile_value(++argp, REF_ACCEPTED);
             }
 
             /* and the simul-efun instruction */
@@ -4430,7 +4434,7 @@ compile_value (svalue_t *value, int opt_flags)
                 insert_value_push(argp); /* Push the closure */
                 for (i = block_size; --i; )
                 {
-                    compile_value(++argp, 0);
+                    compile_value(++argp, REF_ACCEPTED);
                 }
                 if (current.code_left < 3)
                     realloc_code();
@@ -4454,7 +4458,7 @@ compile_value (svalue_t *value, int opt_flags)
                 insert_value_push(argp); /* Push the closure */
                 for (i = block_size; --i; )
                 {
-                    compile_value(++argp, 0);
+                    compile_value(++argp, REF_ACCEPTED);
                 }
                 if (current.code_left < 3)
                     realloc_code();
@@ -4474,7 +4478,7 @@ compile_value (svalue_t *value, int opt_flags)
 
                 for (i = block_size; --i; )
                 {
-                    compile_value(++argp, 0);
+                    compile_value(++argp, REF_ACCEPTED);
                 }
 
                 if (current.code_left < 6)
@@ -4612,7 +4616,7 @@ compile_value (svalue_t *value, int opt_flags)
                 if (opt_flags & (VOID_ACCEPTED|ZERO_ACCEPTED))
                 {
                     /* The caller doesn't really need a value */
-                    opt_flags = VOID_GIVEN;
+                    result_flags = VOID_GIVEN;
                     break;
                 }
                 STORE_CODE(current.codep, F_CONST0);
@@ -4650,7 +4654,7 @@ compile_value (svalue_t *value, int opt_flags)
 
     /* Finish up */
     current.levels_left++;
-    return opt_flags;
+    return result_flags;
 
 } /* compile_value() */
 
@@ -4671,31 +4675,53 @@ is_lvalue (svalue_t *argp, int flags)
         return argp->x.quotes == 1;
 
     case T_POINTER:
-        if (!(flags & MAKE_VAR_LVALUE))
-        {
-            vector_t *block;
+      {
+        vector_t *block;
 
-            block = argp->u.vec;
+        block = argp->u.vec;
+        if (VEC_SIZE(block) < 1)
+            break;
+
+        argp = block->item;
+        if (argp->type != T_CLOSURE)
+            break;
+
+        switch (argp->x.closure_type)
+        {
+          case F_NX_RANGE +CLOSURE_EFUN:
+          case F_RX_RANGE +CLOSURE_EFUN:
+          case F_AX_RANGE +CLOSURE_EFUN:
+            if (flags & MAKE_VAR_LVALUE)
+               break;
+            /* Fallthrough */
+          case F_INDEX +CLOSURE_EFUN:
+          case F_RINDEX+CLOSURE_EFUN:
+          case F_AINDEX+CLOSURE_EFUN:
+          case F_S_INDEX +CLOSURE_EFUN:
+          case CLOSURE_IDENTIFIER:
             if (VEC_SIZE(block) != 3)
                 break;
+            return MY_TRUE;
 
-            argp = block->item;
-            if (argp->type != T_CLOSURE)
-            {
+          case F_RANGE    +CLOSURE_EFUN:
+          case F_NR_RANGE +CLOSURE_EFUN:
+          case F_RN_RANGE +CLOSURE_EFUN:
+          case F_RR_RANGE +CLOSURE_EFUN:
+          case F_NA_RANGE +CLOSURE_EFUN:
+          case F_AN_RANGE +CLOSURE_EFUN:
+          case F_RA_RANGE +CLOSURE_EFUN:
+          case F_AR_RANGE +CLOSURE_EFUN:
+          case F_AA_RANGE +CLOSURE_EFUN:
+            if (flags & MAKE_VAR_LVALUE)
+               break;
+            /* Fallthrough */
+          case F_MAP_INDEX +CLOSURE_EFUN:
+            if (VEC_SIZE(block) != 4)
                 break;
-            }
-
-            switch (argp->x.closure_type)
-            {
-              case F_INDEX +CLOSURE_EFUN:
-              case F_RINDEX+CLOSURE_EFUN:
-              case F_AINDEX+CLOSURE_EFUN:
-              case F_S_INDEX +CLOSURE_EFUN:
-              case CLOSURE_IDENTIFIER:
-                return MY_TRUE;
-            }
+            return MY_TRUE;
         }
         break;
+      }
 
     case T_CLOSURE:
         if (argp->x.closure_type == CLOSURE_IDENTIFIER)
@@ -4717,8 +4743,8 @@ compile_lvalue (svalue_t *argp, int flags)
  */
 
 {
-    /* Both flags are exclusive. */
-    assert(!(flags & PROTECT_LVALUE) || !(flags & MAKE_VAR_LVALUE));
+    /* These 3 flags are exclusive. */
+    assert(((flags & PROTECT_LVALUE)?1:0) + ((flags & MAKE_VAR_LVALUE)?1:0) + ((flags & RESEATING_ACCEPTED)?1:0) <= 1);
 
     switch(argp->type) {
 
@@ -4783,8 +4809,6 @@ compile_lvalue (svalue_t *argp, int flags)
             case F_INDEX +CLOSURE_EFUN:
             case F_RINDEX+CLOSURE_EFUN:
             case F_AINDEX+CLOSURE_EFUN:
-                if (flags & MAKE_VAR_LVALUE)
-                    break;
 
                 if (VEC_SIZE(block) == 3)
                 {
@@ -4810,19 +4834,19 @@ compile_lvalue (svalue_t *argp, int flags)
                         case F_INDEX + CLOSURE_EFUN:
                             STORE_CODE(current.codep
                                       , (bytecode_t)
-                                        (F_INDEX_LVALUE));
+                                        ((flags & MAKE_VAR_LVALUE) ? F_INDEX_VLVALUE : F_INDEX_LVALUE));
                             break;
 
                         case F_RINDEX + CLOSURE_EFUN:
                             STORE_CODE(current.codep
                                       , (bytecode_t)
-                                        (F_RINDEX_LVALUE));
+                                        ((flags & MAKE_VAR_LVALUE) ? F_RINDEX_VLVALUE : F_RINDEX_LVALUE));
                             break;
 
                         case F_AINDEX + CLOSURE_EFUN:
                             STORE_CODE(current.codep
                                       , (bytecode_t)
-                                        (F_AINDEX_LVALUE));
+                                        ((flags & MAKE_VAR_LVALUE) ? F_AINDEX_VLVALUE : F_AINDEX_LVALUE));
                             break;
 
                         case F_S_INDEX + CLOSURE_EFUN:
@@ -4830,7 +4854,7 @@ compile_lvalue (svalue_t *argp, int flags)
                             STORE_CODE(current.codep, (bytecode_t) F_NCONST1);
                             STORE_CODE(current.codep
                                       , (bytecode_t)
-                                        (F_S_INDEX_LVALUE));
+                                        ((flags & MAKE_VAR_LVALUE) ? F_S_INDEX_VLVALUE : F_S_INDEX_LVALUE));
                             break;
                     }
 
@@ -4854,7 +4878,7 @@ compile_lvalue (svalue_t *argp, int flags)
                     if (current.code_left < 2)
                         realloc_code();
 
-                    STORE_CODE(current.codep, F_MAP_INDEX_LVALUE);
+                    STORE_CODE(current.codep, (flags & MAKE_VAR_LVALUE) ? F_MAP_INDEX_VLVALUE : F_MAP_INDEX_LVALUE);
                     if (flags & PROTECT_LVALUE)
                     {
                         current.code_left--;
@@ -4943,12 +4967,55 @@ compile_lvalue (svalue_t *argp, int flags)
                 return;
               }
 
-            /* ({ #'[, mapping, index [,index] })
+            /* ({#'[.., array, index })
+             * ({#'[<.., array, index })
+             * ({#'[>.., array, index })
              */
-            case F_MAP_INDEX +CLOSURE_EFUN:
+            case F_NX_RANGE +CLOSURE_EFUN:
+            case F_RX_RANGE +CLOSURE_EFUN:
+            case F_AX_RANGE +CLOSURE_EFUN:
+              {
+                int code;
+
                 if (flags & MAKE_VAR_LVALUE)
                     break;
 
+                if (VEC_SIZE(block) != 3)
+                    break;
+
+                code = F_ILLEGAL;
+                switch(argp->x.closure_type)
+                {
+                case F_NX_RANGE+CLOSURE_EFUN:
+                    code = F_NX_RANGE_LVALUE;
+                    break;
+                case F_RX_RANGE+CLOSURE_EFUN:
+                    code = F_RX_RANGE_LVALUE;
+                    break;
+                case F_AX_RANGE+CLOSURE_EFUN:
+                    code = F_AX_RANGE_LVALUE;
+                    break;
+                }
+
+                compile_lvalue(++argp, PROTECT_LVALUE);
+                compile_value(++argp, 0);
+
+                if (current.code_left < 2)
+                    realloc_code();
+                current.code_left--;
+                STORE_CODE(current.codep, (bytecode_t)code);
+
+                if (flags & PROTECT_LVALUE)
+                {
+                    current.code_left--;
+                    STORE_CODE(current.codep, F_MAKE_PROTECTED);
+                }
+                return;
+              }
+
+            /* ({ #'[, mapping, index [,index] })
+             */
+            case F_MAP_INDEX +CLOSURE_EFUN:
                 if (VEC_SIZE(block) != 4)
                     break;
 
@@ -4960,13 +5027,25 @@ compile_lvalue (svalue_t *argp, int flags)
                     realloc_code();
 
                 current.code_left--;
-                STORE_CODE(current.codep, F_MAP_INDEX_LVALUE);
+                STORE_CODE(current.codep, (flags & MAKE_VAR_LVALUE) ? F_MAP_INDEX_VLVALUE : F_MAP_INDEX_LVALUE);
 
                 if (flags & PROTECT_LVALUE)
                 {
                     current.code_left--;
                     STORE_CODE(current.codep, F_MAKE_PROTECTED);
                 }
+                return;
+
+            /* ({ #'&, lvalue })
+             */
+            case F_AND +CLOSURE_EFUN:
+                if (!(flags & RESEATING_ACCEPTED))
+                    break;
+
+                if (VEC_SIZE(block) != 2)
+                    break;
+
+                compile_lvalue(++argp, MAKE_VAR_LVALUE);
                 return;
 
             /* ({ #'global_var })
@@ -5108,7 +5187,7 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
 
     /* Now compile */
 
-    void_given = compile_value(block, ZERO_ACCEPTED|REF_REJECTED);
+    void_given = compile_value(block, ZERO_ACCEPTED|REF_ACCEPTED);
 
     /* Add the final F_RETURN instruction */
     if (current.code_left < 1)
