@@ -170,6 +170,7 @@ mixed *tests = ({
     ({ "Vanishing destinations 10", 0, (: mixed a = ({1,2,3,4,5,6}); mixed range = &(a[1..4]); a = 0; range = ({7,8,9}); return deep_eq(range, ({7,8,9})); :) }),
     ({ "Vanishing destinations 11", 0, (: mixed a = "Vanishing"; mixed element = &(a[1]); a = 0; return element == 'a'; :) }),
     ({ "Vanishing destinations 12", 0, (: mixed a = "Vanishing"; mixed range = &(a[5..6]); a = 0; return range == "hi"; :) }),
+
     ({ "Protected locals 1", 0, (: mixed a = ({1,2,3,4,5}); int summe; map(a, (: $2+=$1 :), &summe); return summe == 15; :) }),
     ({ "Protected locals 2", 0, (: int x = 1; return &x; :) }),
     ({ "Protected elements 1", 0, (: mixed a = ({1,2,3,4,5}); funcall((: $1 = $2; $2 = $3; :), &(a[1]), &(a[2]), &(a[<2])); return deep_eq(a, ({1,3,4,4,5})); :) }),
@@ -271,6 +272,7 @@ mixed *tests = ({
             return val == 10; /* Shouldn't have changed. */
         :)
     }),
+
     ({ "Reference loops 1", 0,
        (:
            mixed a = 10;
@@ -295,6 +297,7 @@ mixed *tests = ({
            return a == 30 && b == 30 && c == 30 && d == 30;
        :)
     }),
+
     ({ "foreach over integer", 0,
        (:
            int a, sum;
@@ -460,6 +463,7 @@ mixed *tests = ({
            return a == 0 && b == 0;
        :)
     }),
+
     ({ "Special Efuns 1", 0,
        (:
            mixed a = ({ 1 });
@@ -585,6 +589,7 @@ mixed *tests = ({
            return !funcall((: referencep(&$1) :), ref);
        :)
     }),
+
     ({
         "Flattening lvalue parameters with apply", 0,
         (:
@@ -696,6 +701,83 @@ mixed *tests = ({
             int* arr = ({0, 1, 2, 3, 4, 5});
             funcall(cl, (arr[2..4])...);
             return deep_eq(arr, ({0,1,2,3,4,5}));
+        :),
+    }),
+
+    ({
+        "Reseating of variables", 0,
+        (:
+            int a = 10;
+            int b = 12;
+            int l = &a;
+            &l = &b;
+
+            return a==10 && b = 12 && l = 12;
+        :),
+    }),
+
+    ({
+        "Reseating of array entry [1]", 0,
+        (:
+            int b = 11;
+            int* arr = ({0, &b, 2, 3});
+
+            arr[1] = 10;
+            &(arr[1]) = 12;
+
+            return deep_eq(arr, ({0, 12, 2, 3})) && b == 10;
+        :),
+    }),
+
+    ({
+        "Reseating of array entry [<1]", 0,
+        (:
+            int b = 11;
+            int* arr = ({0, 1, 2, &b});
+
+            arr[<1] = 10;
+            &(arr[<1]) = 12;
+
+            return deep_eq(arr, ({0, 1, 2, 12})) && b == 10;
+        :),
+    }),
+
+    ({
+        "Reseating of array entry [>1]", 0,
+        (:
+            int b = 11;
+            int* arr = ({0, &b, 2, 3});
+
+            arr[>1] = 10;
+            &(arr[>1]) = 12;
+
+            return deep_eq(arr, ({0, 12, 2, 3})) && b == 10;
+        :),
+    }),
+
+    ({
+        "Reseating of mapping entry", 0,
+        (:
+            int b = 11;
+            mapping m = ([ "Hi": &b ]);
+
+            m["Hi",0] = 33;
+            &(m["Hi",0]) = 22;
+
+            return deep_eq(m, (["Hi": 22])) && b == 33;
+        :),
+    }),
+
+    ({
+        "Reseating of struct entry", 0,
+        (:
+            int b = 100;
+            struct teststruct s = (<teststruct> &b, 300, 500);
+
+            s->a = 101;
+            &(s->a) = 200;
+
+            return deep_eq(s, (<teststruct> 200, 300, 500)) && b == 101;
         :),
     }),
 });

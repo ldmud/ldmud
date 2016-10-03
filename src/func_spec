@@ -197,6 +197,11 @@
         push_identifier16_vlvalue
         push_context_vlvalue
         push_local_variable_vlvalue
+        index_vlvalue
+        rindex_vlvalue
+        aindex_vlvalue
+        s_index_vlvalue
+        map_index_vlvalue
         simul_efun
         aggregate
         m_aggregate
