@@ -5387,10 +5387,18 @@ f_transfer (svalue_t *sp)
  *    The difference lies in the handling of float numbers (see svalue.h).
  */
 
-#define SAVE_OBJECT_VERSION '2'
-#define CURRENT_VERSION 2
   /* Current version of new save files, expressed as char and as int.
    */
+#define SAVE_OBJECT_VERSION '2'
+
+enum save_format_version
+{
+    SAVE_FORMAT_ORIGINAL = 0, /* Original format from Amylaar's LPMud */
+    SAVE_FORMAT_CLOSURES = 1, /* LDMud 3.2.9 added Closures           */
+    SAVE_FORMAT_FLOATS   = 2, /* LDMud 3.5.0 changed float format     */
+
+    CURRENT_VERSION      = 2
+};
 
 #ifdef FLOAT_FORMAT_0
 #    define SAVE_OBJECT_HOST '0'
@@ -5829,7 +5837,7 @@ save_struct (struct_t *st)
     }
 
     /* The unique name (struct_name prog_name #id) as fake member */
-    if (save_version < 1 || !recall_pointer(struct_unique_name(st)))
+    if (save_version < SAVE_FORMAT_CLOSURES || !recall_pointer(struct_unique_name(st)))
     {
         save_string(struct_unique_name(st));
     }
@@ -6237,7 +6245,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
 
         source = number_buffer;
         
-        if (save_version >= 2)
+        if (save_version >= SAVE_FORMAT_FLOATS)
         {
             (void)snprintf(source, sizeof(number_buffer),
                           "%la", dtmpval);
@@ -6285,7 +6293,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
       }
 
     case T_CLOSURE:
-        if (save_version > 0)
+        if (save_version >= SAVE_FORMAT_CLOSURES)
         {
             rc = save_closure(v, writable);
             break;
@@ -8302,8 +8310,8 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         // if strtoimax stopped at a 'x' or '.', this seems to be a floating
         // number (then start again below), otherwise this is regarded as
         // integer number and put into svp and we return.
-        if ( (restore_ctx->restored_version >= 2  && *cp != 'x')
-            || (restore_ctx->restored_version < 2 && *cp != '.' ) )
+        if ( (restore_ctx->restored_version >= SAVE_FORMAT_FLOATS  && *cp != 'x')
+            || (restore_ctx->restored_version < SAVE_FORMAT_FLOATS && *cp != '.' ) )
         {
             put_number(svp, (p_int)ival);
             *pt = cp+1;   // cp points to the delimeter, pt to one char after that...
@@ -8311,7 +8319,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         }
 
         svp->type = T_FLOAT;
-        if (restore_ctx->restored_version >= 2 )
+        if (restore_ctx->restored_version >= SAVE_FORMAT_FLOATS )
         {
             // In version 2 (and above) restore the string written by sprintf("%a")
             cp = numstart;
