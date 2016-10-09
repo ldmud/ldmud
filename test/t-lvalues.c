@@ -3,6 +3,8 @@
 #include "/inc/gc.inc"
 #include "/inc/deep_eq.inc"
 
+#include "/sys/driver_info.h"
+
 #pragma no_warn_missing_return
 
 struct teststruct
@@ -830,6 +832,16 @@ mixed *tests = ({
     ({ "restore_value of array range with wrong indices 3", TF_ERROR,
        (:
            restore_value("#3:2\n({<1>=&(<2>=({10,11,12,}),-1..0),<1>,<2>,})\n");
+       :)
+    }),
+    ({ "dump_driver_info(DDI_OBJECTS) with lvalues", 0,
+       (:
+            mixed val = -1;
+            global_var = ({ &val, &val });
+
+            // And this shouldn't crash.
+            dump_driver_info(DDI_OBJECTS);
+            return 1;
        :)
     }),
 
