@@ -101,6 +101,7 @@
 #define DI_NUM_STRING_TABLE_SLOTS_USED                      -426
 #define DI_NUM_REGEX                                        -427
 #define DI_NUM_REGEX_TABLE_SLOTS                            -428
+#define DI_NUM_LVALUES                                      -429
 
 #define DI_SIZE_ACTIONS                                     -450
 #define DI_SIZE_CALLOUTS                                    -451
