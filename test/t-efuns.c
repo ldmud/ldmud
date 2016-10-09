@@ -4,6 +4,7 @@
 #include "/inc/deep_eq.inc"
 #include "/sys/tls.h"
 #include "/sys/configuration.h"
+#include "/sys/lpctypes.h"
 
 #define TESTFILE "/log/testfile"
 
@@ -230,10 +231,68 @@ mixed *tests = ({
     ({ "implode 1", 0, (: implode(({ "foo", "bar", "" }), "*") == "foo*bar*":) }),
     ({ "implode 2", 0, (: implode(({ "a", 2, this_object(), "c" }), "b") == "abc" :) }),
     ({ "implode 3", 0, (: implode(({ "", "" }), "") == "":) }),
-    ({ "save_/restore_value 1", 0, 
-        (: restore_value(save_value(__FLOAT_MAX__)) == __FLOAT_MAX__ :) }),
-    ({ "save_/restore_value 2", 0, 
-        (: restore_value(save_value(__FLOAT_MIN__)) == __FLOAT_MIN__ :) }),
+    ({ "save_/restore_value", 0,
+        (:
+            foreach(mixed val:
+            ({
+                __FLOAT_MIN__,
+                __FLOAT_MAX__,
+                0.1,
+                10.2,
+                -0.5,
+                -100.1,
+
+                __INT_MIN__,
+                __INT_MAX__,
+                0,
+                1,
+                -10,
+
+                "ABC",
+                save_value(({""})),
+                "\"",
+                "\0\0",
+
+                quote("Hello"),
+                quote(","),
+
+                #'copy,
+                #',,
+                #'f,
+                #'tests,
+
+                ({}),
+                ({-1})*100,
+
+                '({}),
+                ''({1,2,3}),
+
+                ([:0]),
+                ([:1]),
+                ([:2]),
+                (["a":1;2;3, "b":4;5;6]),
+            }))
+            {
+                if(!deep_eq(val, restore_value(save_value(val))))
+                    return 0;
+
+                if(!deep_eq(({val}), restore_value(save_value(({val})))))
+                    return 0;
+
+                if(member(([T_POINTER, T_MAPPING, T_QUOTED_ARRAY, T_STRUCT]), get_type_info(val)[0]))
+                {
+                    /* We just check, that it works without throwing an error. */
+                    restore_value(save_value(([val])));
+                    restore_value(save_value(([val:1;2])));
+                    restore_value(save_value((["a":val;2])));
+                }
+                else if(!deep_eq(([val]), restore_value(save_value(([val])))))
+                    return 0;
+            }
+
+            return 1;
+        :)
+    }),
     ({ "sort_array 1", 0, (: deep_eq(sort_array(({4,5,2,6,1,3,0}),#'>),
                                      ({0,1,2,3,4,5,6})) :) }),
     ({ "sort_array 2", 0, // sort in-place
