@@ -22,6 +22,7 @@
 #include "exec.h"
 #include "filestat.h"
 #include "instrs.h"  /* F_RETURN, F_RETURN0 for overhead computation */
+#include "interpret.h"
 #include "mapping.h"
 #include "mstrings.h"
 #include "object.h"
@@ -293,6 +294,133 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         else
             return 0;
     }
+
+    case T_LVALUE:
+        switch(v->x.lvalue_type)
+        {
+            default:
+                fatal("Illegal lvalue %p type %d\n", v, v->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_PROTECTED:
+            {
+                struct protected_lvalue *lv = v->u.protected_lvalue;
+
+                if (lv->ref)
+                {
+                    struct pointer_record* record = find_add_pointer(ptable, lv, MY_TRUE);
+                    if (record->ref_count < 0)
+                    {
+                        /* New entry, determine the size. */
+                        record->ref_count = 1;
+                        record->id_number = 0;
+
+                        overhead = sizeof *lv;
+                        composite = svalue_size(&lv->val, pTotal);
+                        *pTotal += overhead;
+
+                        /* Record it for later occurrences. */
+                        record->id_number = overhead + composite;
+                        return record->id_number * record->ref_count / lv->ref;
+                    }
+                    else
+                    {
+                        /* We have seen it. Don't need to add to the total,
+                         * but the the shared result.
+                         */
+                        record->ref_count++;
+                        return record->id_number / lv->ref;
+                    }
+                }
+                else
+                    return 0;
+            }
+
+            case LVALUE_PROTECTED_CHAR:
+            {
+                struct protected_char_lvalue *lv = v->u.protected_char_lvalue;
+
+                if (lv->ref)
+                {
+                    struct pointer_record* record = find_add_pointer(ptable, lv, MY_TRUE);
+                    if (record->ref_count < 0)
+                    {
+                        /* New entry, determine the size. */
+                        record->ref_count = 1;
+                        record->id_number = 0;
+
+                        overhead = sizeof *lv;
+
+                        if (lv->str->info.ref)
+                        {
+                            *pTotal = mstr_mem_size(lv->str);
+                            composite = *pTotal / lv->str->info.ref;
+                        }
+                        *pTotal += overhead;
+
+                        /* Record it for later occurrences. */
+                        record->id_number = overhead + composite;
+                        return record->id_number * record->ref_count / lv->ref;
+                    }
+                    else
+                    {
+                        /* We have seen it. Don't need to add to the total,
+                         * but the the shared result.
+                         */
+                        record->ref_count++;
+                        return record->id_number / lv->ref;
+                    }
+                }
+                else
+                    return 0;
+            }
+
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *lv = v->u.protected_range_lvalue;
+
+                if (lv->ref)
+                {
+                    struct pointer_record* record = find_add_pointer(ptable, lv, MY_TRUE);
+                    if (record->ref_count < 0)
+                    {
+                        /* New entry, determine the size. */
+                        record->ref_count = 1;
+                        record->id_number = 0;
+
+                        overhead = sizeof *lv;
+                        composite = svalue_size(&lv->vec, &total);
+                        *pTotal = total + overhead;
+
+                        if (lv->var != NULL)
+                        {
+                            svalue_t dummy = { T_LVALUE };
+                            dummy.x.lvalue_type = LVALUE_PROTECTED;
+                            dummy.u.protected_lvalue = lv->var;
+
+                            composite += svalue_size(&dummy, &total);
+                            *pTotal += total;
+                        }
+
+                        /* Record it for later occurrences. */
+                        record->id_number = overhead + composite;
+                        return record->id_number * record->ref_count / lv->ref;
+                    }
+                    else
+                    {
+                        /* We have seen it. Don't need to add to the total,
+                         * but the the shared result.
+                         */
+                        record->ref_count++;
+                        return record->id_number / lv->ref;
+                    }
+                }
+                else
+                    return 0;
+            }
+
+        } /* switch */
 
     default:
         fatal("Illegal type: %d\n", v->type);
