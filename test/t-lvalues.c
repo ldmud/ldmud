@@ -638,6 +638,200 @@ mixed *tests = ({
            return !funcall((: referencep(&$1) :), ref);
        :)
     }),
+    ({ "save_value with lvalue references", 0,
+       (:
+           int var = 99;
+
+           return explode(save_value(({&var, &var})),"\n")[1] == "({<1>=&(99,),<1>,})";
+       :)
+    }),
+    ({ "save_value with temporary lvalue references", 0,
+       (:
+           int var = 98;
+           int* arr = ({&var});
+           &var = 97;
+
+           /* We shouldn't see a trace of the lvalue reference. */
+           return explode(save_value(arr),"\n")[1] == "({98,})";
+       :)
+    }),
+    ({ "save_value with single lvalue references", 0,
+       (:
+           int var = 98;
+           int* arr = ({&var});
+
+           /* We shouldn't see a trace of the lvalue reference, either. */
+           return explode(save_value(arr),"\n")[1] == "({98,})";
+       :)
+    }),
+    ({ "save_value with lvalue references in old format", 0,
+       (:
+           int var = 99;
+           return explode(save_value(({&var, &var}), 2),"\n")[1] == "({99,99,})";
+       :)
+    }),
+    ({ "save_value with char lvalue references", 0,
+       (:
+           string str = "Hello";
+           mixed c = &(str[1]);
+
+           return explode(save_value(({&c, &c})),"\n")[1] == "({<1>=&(101,),<1>,})";
+       :)
+    }),
+    ({ "save_value with temporary char lvalue references", 0,
+       (:
+           string str = "Hello";
+           mixed c = &(str[2]);
+           int* arr = ({&c});
+           &c = 109;
+
+           /* We shouldn't see a trace of the lvalue reference. */
+           return explode(save_value(arr),"\n")[1] == "({108,})";
+       :)
+    }),
+    ({ "save_value with single char lvalue references", 0,
+       (:
+           string str = "Hello";
+           mixed c = &(str[2]);
+           int* arr = ({&c});
+
+           /* We shouldn't see a trace of the lvalue reference, either. */
+           return explode(save_value(arr),"\n")[1] == "({108,})";
+       :)
+    }),
+    ({ "save_value with char lvalue references in old format", 0,
+       (:
+           string str = "Hello";
+           mixed c = &(str[1]);
+
+           return explode(save_value(({&c, &c}), 2),"\n")[1] == "({101,101,})";
+       :)
+    }),
+    ({ "save_value with array range lvalue references 1", 0,
+       (:
+           int* arr = ({0,1,2,3,4,5});
+           mixed var = &(arr[1..3]);
+
+           return explode(save_value(({arr, &arr, &var, &var})),"\n")[1]
+               == "({<1>=({0,1,2,3,4,5,}),<2>=&(<1>,),<3>=&(<2>,1..3),<3>,})";
+       :)
+    }),
+    ({ "save_value with array range lvalue references 2", 0,
+       (:
+           int* arr = ({0,1,2,3,4,5});
+           mixed var = &(arr[1..3]);
+
+           return explode(save_value(({&arr, &var, &var})),"\n")[1]
+               == "({<1>=&(({0,1,2,3,4,5,}),),<2>=&(<1>,1..3),<2>,})";
+       :)
+    }),
+    ({ "save_value with array range lvalue references 3", 0,
+       (:
+           int* arr = ({0,1,2,3,4,5});
+           mixed var = &(arr[1..3]);
+
+           return explode(save_value(({arr, &var, &var})),"\n")[1]
+               == "({<1>=({0,1,2,3,4,5,}),<2>=&(<1>,1..3),<2>,})";
+       :)
+    }),
+    ({ "save_value with array range lvalue references 4", 0,
+       (:
+           int* arr = ({0,1,2,3,4,5});
+           mixed var = &(arr[1..3]);
+
+           return explode(save_value(({&var, &var})),"\n")[1]
+               == "({<1>=&(({1,2,3,}),),<1>,})";
+       :)
+    }),
+    ({ "save_value with array range lvalue references 5", 0,
+       (:
+           int* arr = ({0,1,2,3,4,5});
+           mixed var = &(arr[1..3]);
+
+           return explode(save_value(({&var})),"\n")[1]
+               == "({({1,2,3,}),})";
+       :)
+    }),
+    ({ "save_value with array range lvalue references in old format 1", 0,
+       (:
+           int* arr = ({0,1,2,3,4,5});
+           mixed var = &(arr[1..3]);
+
+           return explode(save_value(({arr, &arr, &var, &var}),2),"\n")[1]
+               == "({<1>=({0,1,2,3,4,5,}),<1>,<2>=({1,2,3,}),<2>,})";
+       :)
+    }),
+    ({ "restore_value of lvalue references", 0,
+       (:
+           mixed* arr = restore_value("#3:2\n({<1>=&(10,),<1>,})\n");
+
+           if(sizeof(arr) != 2 || arr[0] != 10 || arr[1] != 10)
+               return 0;
+
+           arr[0] = 12;
+           return arr[1] == 12;
+       :)
+    }),
+    ({ "restore_value of recursive lvalue references", 0,
+       (:
+           mixed arr = restore_value("#3:2\n<1>=&(({<1>,2,}),)\n");
+
+           if(sizeof(arr) != 2 || sizeof(arr[0]) != 2)
+               return 0;
+
+           arr += ({3});
+           if(sizeof(arr) != 3 || sizeof(arr[0]) != 3)
+               return 0;
+
+           // Break the circular reference.
+           &(arr[0]) = 1;
+
+           return 1;
+       :)
+    }),
+    ({ "restore_value of array range", 0,
+       (:
+           mixed* arr = restore_value("#3:2\n({<1>=&(<2>=({10,11,12,}),1..1),<1>,<2>,})\n");
+
+           if(sizeof(arr) != 3 || !deep_eq(arr[0],({11})) || !deep_eq(arr[1],({11})) || !deep_eq(arr[2], ({10,11,12})))
+               return 0;
+
+           arr[2][1] = 101;
+           return arr[0][0] == 101 && arr[1][0] == 101;
+       :)
+    }),
+    ({ "restore_value of a recursive array range", 0,
+       (:
+           mixed* arr = restore_value("#3:2\n({<1>=&(<2>=({<1>,11,12,}),1..1),<1>,<2>,})\n");
+
+           if(sizeof(arr) != 3 || !deep_eq(arr[0],({11})) || !deep_eq(arr[1],({11})) || sizeof(arr[2]) != 3)
+               return 0;
+
+           arr[2][1] = 101;
+
+           if(arr[0][0] != 101 || arr[1][0] != 101)
+               return 0;
+
+           // Break the circular reference.
+           &(arr[2][0]) = 10;
+           return deep_eq(arr[2], ({10,101,12}));;
+       :)
+    }),
+    ({ "restore_value of array range with wrong indices 1", TF_ERROR,
+       (:
+           restore_value("#3:2\n({<1>=&(<2>=({10,11,12,}),1..10),<1>,<2>,})\n");
+       :)
+    }),
+    ({ "restore_value of array range with wrong indices 2", TF_ERROR,
+       (:
+           restore_value("#3:2\n({<1>=&(<2>=({10,11,12,}),2..0),<1>,<2>,})\n");
+       :)
+    }),
+    ({ "restore_value of array range with wrong indices 3", TF_ERROR,
+       (:
+           restore_value("#3:2\n({<1>=&(<2>=({10,11,12,}),-1..0),<1>,<2>,})\n");
+       :)
+    }),
 
     ({
         "Flattening lvalue parameters with apply", 0,
