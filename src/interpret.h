@@ -178,6 +178,8 @@ extern statistic_t stat_eval_duration;
 extern struct timeval profiling_timevalue;
 extern p_int used_memory_at_eval_start;
 
+extern int num_protected_lvalues;
+
 /* --- Prototypes --- */
 
 extern void assign_eval_cost(void);

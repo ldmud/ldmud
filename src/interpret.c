@@ -735,6 +735,10 @@ p_int used_memory_at_eval_start = 0;
    * set by mark_start_evaluation() (and v_limited()).
    */
 
+int num_protected_lvalues = 0;
+  /* Number of protected_(char_|range_)lvalue objects in play.
+   */
+
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
@@ -1161,6 +1165,8 @@ int_free_svalue (svalue_t *v)
             {
                 free_svalue(&(v->u.protected_lvalue->val));
                 xfree(v->u.protected_lvalue);
+
+                num_protected_lvalues--;
             }
             break;
 
@@ -1172,6 +1178,8 @@ int_free_svalue (svalue_t *v)
 
                 free_mstring(p->str);
                 xfree(p);
+
+                num_protected_lvalues--;
             }
             break;
 
@@ -1186,9 +1194,13 @@ int_free_svalue (svalue_t *v)
                 {
                     free_svalue(&(r->var->val));
                     xfree(r->var);
+
+                    num_protected_lvalues--;
                 }
 
                 xfree(r);
+
+                num_protected_lvalues--;
             }
             break;
         } /* switch (v->x.lvalue_type) */
@@ -1725,6 +1737,8 @@ normalize_svalue (svalue_t *svp, bool collapse_lvalues)
                     {
                         free_svalue(&(r->var->val));
                         xfree(r->var);
+
+                        num_protected_lvalues--;
                     }
 
                     r->var = NULL;
@@ -3823,6 +3837,8 @@ assign_protected_lvalue_no_free (svalue_t *dest, svalue_t *src)
         dest->type = src->type = T_LVALUE;
         dest->x.lvalue_type = src->x.lvalue_type = LVALUE_PROTECTED;
         dest->u.protected_lvalue = src->u.protected_lvalue = lval;
+
+        num_protected_lvalues++;
     }
 } /* assign_protected_lvalue_no_free() */
 
@@ -3846,6 +3862,8 @@ assign_protected_char_lvalue_no_free (svalue_t *dest, string_t *src, char *charp
     dest->type = T_LVALUE;
     dest->x.lvalue_type = LVALUE_PROTECTED_CHAR;
     dest->u.protected_char_lvalue = lval;
+
+    num_protected_lvalues++;
 } /* assign_char_lvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
@@ -3874,6 +3892,8 @@ assign_protected_range_lvalue_no_free (svalue_t *dest, struct protected_lvalue *
     dest->type = T_LVALUE;
     dest->x.lvalue_type = LVALUE_PROTECTED_RANGE;
     dest->u.protected_range_lvalue = lval;
+
+    num_protected_lvalues++;
 } /* assign_char_lvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/

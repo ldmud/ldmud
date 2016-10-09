@@ -844,6 +844,34 @@ mixed *tests = ({
             return 1;
        :)
     }),
+    ({ "driver_info(DI_NUM_LVALUS)", 0,
+       (:
+            int old = driver_info(DI_NUM_LVALUES);
+            int lv = &old;
+
+            int new = driver_info(DI_NUM_LVALUES);
+            if (new <= old)
+                return 0;
+
+            old = new;
+            int* arr = ({});
+            int* range = &(arr[0..-1]);
+
+            new = driver_info(DI_NUM_LVALUES);
+            if (new <= old)
+                return 0;
+
+            old = new;
+            string str = "driver";
+            int ch = &(str[2]);
+
+            new = driver_info(DI_NUM_LVALUES);
+            if (new <= old)
+                return 0;
+
+            return 1;
+       :)
+    }),
 
     ({
         "Flattening lvalue parameters with apply", 0,
@@ -1988,10 +2016,16 @@ void run_test()
 
     run_array(tests,
         (:
+            msg("At the end %d lvalues in memory.\n", driver_info(DI_NUM_LVALUES));
+
             if($1)
                 shutdown(1);
             else
-                start_gc(#'shutdown);
+                start_gc(function void(int result)
+                {
+                    msg("After GC %d lvalues in memory.\n", driver_info(DI_NUM_LVALUES));
+                    shutdown(result);
+                });
 
             return 0;
         :));

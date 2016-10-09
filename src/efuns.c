@@ -8622,6 +8622,9 @@ f_driver_info (svalue_t *sp)
             rxcache_driver_info(&result, what);
             break;
 
+        case DI_NUM_LVALUES:
+            put_number(&result, num_protected_lvalues);
+            break;
 
         case DI_SIZE_ACTIONS:
             simulate_driver_info(&result, what);

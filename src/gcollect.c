@@ -1625,6 +1625,7 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
 #else
                         count_ref_in_vector(&lv->val, 1);
 #endif
+                        num_protected_lvalues++;
                     }
                     lv->ref++;
                     break;
@@ -1634,7 +1635,10 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
                 {
                     struct protected_char_lvalue* lv = p->u.protected_char_lvalue;
                     if (CHECK_REF(lv))
+                    {
                         MARK_MSTRING_REF(lv->str);
+                        num_protected_lvalues++;
+                    }
                     lv->ref++;
                     break;
                 }
@@ -1658,8 +1662,11 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
 #else
                             count_ref_in_vector(&var->val, 1);
 #endif
+                            num_protected_lvalues++;
                         }
                         var->ref++;
+
+                        num_protected_lvalues++;
                     }
                     lv->ref++;
                     break;
@@ -2073,6 +2080,7 @@ garbage_collection(void)
 
     clear_array_size();
     clear_mapping_size();
+    num_protected_lvalues = 0;
 
     /* Process the list of all objects */
 
