@@ -110,6 +110,9 @@ that you should pay attention to when updating.
     the old signature in /mudlib/deprecated/. (#596)
   + net_connect() had the current udp port as an undocumented default value
     for its second argument. Now both parameters are mandatory.
+  + sort_array() and reverse() also work with array range references.
+  + apply() now expands an lvalue reference to an array or an array range
+    as lvalue references to the array elements.
 
 - Pragmas
   + The behaviour of the pragma combine_strings is mandatory, that means
