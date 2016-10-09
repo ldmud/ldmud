@@ -55,7 +55,9 @@ svalue_cmp (svalue_t *left, svalue_t *right)
 
     switch (left->type)
     {
+#ifndef FLOAT_FORMAT_2
     case T_FLOAT:
+#endif
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
         if ( 0 != (d = left->x.generic - right->x.generic) ) return d;
@@ -95,7 +97,9 @@ svalue_eq (svalue_t *left, svalue_t *right)
 
     switch (left->type)
     {
+#ifndef FLOAT_FORMAT_2
     case T_FLOAT:
+#endif
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
         return left->x.generic != right->x.generic ? -1 : 0;
