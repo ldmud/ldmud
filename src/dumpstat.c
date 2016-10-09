@@ -116,20 +116,38 @@ svalue_size (svalue_t *v, mp_int * pTotal)
 
     case T_MAPPING:
     {
-        struct svalue_size_locals locals;
-
-        if (NULL == register_pointer(ptable, v->u.map) ) return 0;
-
         if (v->u.map->ref)
         {
-            overhead = (mp_uint)mapping_overhead(v->u.map);
-            locals.total = 0;
-            locals.composite = 0;
-            locals.num_values = v->u.map->num_values;
-            walk_mapping(v->u.map, svalue_size_map_filter, &locals);
+            struct pointer_record* record = find_add_pointer(ptable, v->u.map, MY_TRUE);
+            if (record->ref_count < 0)
+            {
+                /* New entry, determine the size. */
+                struct svalue_size_locals locals;
 
-            *pTotal = locals.total + overhead;
-            return (overhead + locals.composite) / v->u.map->ref;
+                record->ref_count = 1;
+                record->id_number = 0;
+
+                overhead = (mp_uint)mapping_overhead(v->u.map);
+
+                locals.total = 0;
+                locals.composite = 0;
+                locals.num_values = v->u.map->num_values;
+                walk_mapping(v->u.map, svalue_size_map_filter, &locals);
+
+                *pTotal = locals.total + overhead;
+
+                /* Record it for later occurrences. */
+                record->id_number = overhead + locals.composite;
+                return record->id_number * record->ref_count / v->u.map->ref;
+            }
+            else
+            {
+                /* We have seen it. Don't need to add to the total,
+                 * but the the shared result.
+                 */
+                record->ref_count++;
+                return record->id_number / v->u.vec->ref;
+            }
         }
         else
             return 0;
@@ -139,18 +157,38 @@ svalue_size (svalue_t *v, mp_int * pTotal)
     case T_QUOTED_ARRAY:
     {
         if (v->u.vec == &null_vector) return 0;
-        if (NULL == register_pointer(ptable, v->u.vec) ) return 0;
+
         if (v->u.vec->ref)
         {
-            overhead = sizeof *v->u.vec - sizeof v->u.vec->item +
-              sizeof(svalue_t) * v->u.vec->size + sizeof(char *);
-            for (i=0; i < (mp_int)VEC_SIZE(v->u.vec); i++) {
-                composite += svalue_size(&v->u.vec->item[i], &total);
-                *pTotal += total;
-            }
-            *pTotal += overhead;
+            struct pointer_record* record = find_add_pointer(ptable, v->u.vec, MY_TRUE);
+            if (record->ref_count < 0)
+            {
+                /* New entry, determine the size. */
+                record->ref_count = 1;
+                record->id_number = 0;
 
-            return (overhead + composite) / v->u.vec->ref;
+                overhead = sizeof *v->u.vec - sizeof v->u.vec->item
+                         + sizeof(svalue_t) * v->u.vec->size + sizeof(char *);
+                for (i=0; i < (mp_int)VEC_SIZE(v->u.vec); i++)
+                {
+                    composite += svalue_size(&v->u.vec->item[i], &total);
+                    *pTotal += total;
+                }
+
+                *pTotal += overhead;
+
+                /* Record it for later occurrences. */
+                record->id_number = overhead + composite;
+                return record->id_number * record->ref_count / v->u.vec->ref;
+            }
+            else
+            {
+                /* We have seen it. Don't need to add to the total,
+                 * but the the shared result.
+                 */
+                record->ref_count++;
+                return record->id_number / v->u.vec->ref;
+            }
         }
         else
             return 0;
@@ -158,18 +196,38 @@ svalue_size (svalue_t *v, mp_int * pTotal)
     case T_STRUCT:
     {
         struct_t *st = v->u.strct;
-        if (NULL == register_pointer(ptable, st) ) return 0;
+
         if (st->ref)
         {
-            overhead = sizeof *st - sizeof st->member
-                      + sizeof(svalue_t) * struct_size(st);
-            for (i=0; i < (mp_int)struct_size(st); i++) {
-                composite += svalue_size(&st->member[i], &total);
-                *pTotal += total;
-            }
-            *pTotal += overhead;
+            struct pointer_record* record = find_add_pointer(ptable, st, MY_TRUE);
+            if (record->ref_count < 0)
+            {
+                /* New entry, determine the size. */
+                record->ref_count = 1;
+                record->id_number = 0;
 
-            return (overhead + composite) / st->ref;
+                overhead = sizeof *st - sizeof st->member
+                         + sizeof(svalue_t) * struct_size(st);
+                for (i=0; i < (mp_int)struct_size(st); i++)
+                {
+                    composite += svalue_size(&st->member[i], &total);
+                    *pTotal += total;
+                }
+
+                *pTotal += overhead;
+
+                /* Record it for later occurrences. */
+                record->id_number = overhead + composite;
+                return record->id_number * record->ref_count / st->ref;
+            }
+            else
+            {
+                /* We have seen it. Don't need to add to the total,
+                 * but the the shared result.
+                 */
+                record->ref_count++;
+                return record->id_number / st->ref;
+            }
         }
         else
             return 0;
@@ -261,7 +319,7 @@ data_size (object_t *ob, mp_int * pTotal)
     svalue_t *svp;
 
     if (pTotal != NULL)
-        *pTotal = 0;
+        *pTotal = total;
 
     if (ob->flags & O_SWAPPED || !(i = ob->prog->num_variables) )
         return 0;
