@@ -612,8 +612,7 @@ svalue_to_string ( fmt_state_t *st
                 break;
 
             case LVALUE_PROTECTED:
-                stradd(st, &str, compact ? "p l:" : "prot lvalue: ");
-                str = svalue_to_string(st, &(obj->u.protected_lvalue->val), str, indent+2, trailing, quoteStrings, compact, MY_FALSE);
+                str = svalue_to_string(st, &(obj->u.protected_lvalue->val), str, indent+2, MY_FALSE, quoteStrings, compact, MY_TRUE);
                 break;
 
             case LVALUE_PROTECTED_CHAR:
@@ -623,7 +622,6 @@ svalue_to_string ( fmt_state_t *st
                 buf[0] = *obj->u.protected_char_lvalue->charp;
                 buf[1] = '\0';
 
-                stradd(st, &str, compact ? "p c:" : "prot char: ");
                 stradd(st, &str, "'");
                 stradd(st, &str, buf);
                 stradd(st, &str, "'");
@@ -646,8 +644,6 @@ svalue_to_string ( fmt_state_t *st
                     case T_POINTER:
                     {
                         size_t size;
-
-                        stradd(st, &str, compact ? "p r:" : "prot range: ");
 
                         size = r->index2 - r->index1;
                         if (!size)
@@ -701,7 +697,6 @@ svalue_to_string ( fmt_state_t *st
 
                     case T_STRING:
                     {
-                        stradd(st, &str, compact ? "p r:" : "prot range: ");
                         stradd(st, &str, "\"");
                         straddn(st, &str, get_txt(vec->u.str) + r->index1, r->index2 - r->index1);
                         stradd(st, &str, "\"");
