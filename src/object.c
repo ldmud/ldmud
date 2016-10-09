@@ -156,6 +156,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <ctype.h>
 #include <assert.h>
 
 #include "object.h"
@@ -5383,21 +5384,24 @@ f_transfer (svalue_t *sp)
  *    or quoted arrays.
  *    Version 2 uses only one representation for storing LPC floats:
  *     the one used by sprintf("%la").
+ *    Version 3 can also save lvalues references (without it,
+ *     the plain rvalue will be saved).
  * <host> is 2 for drivers using the FLOAT_FORMAT_2, and 0 for everything else.
  *    The difference lies in the handling of float numbers (see svalue.h).
  */
 
   /* Current version of new save files, expressed as char and as int.
    */
-#define SAVE_OBJECT_VERSION '2'
+#define SAVE_OBJECT_VERSION '3'
 
 enum save_format_version
 {
     SAVE_FORMAT_ORIGINAL = 0, /* Original format from Amylaar's LPMud */
     SAVE_FORMAT_CLOSURES = 1, /* LDMud 3.2.9 added Closures           */
     SAVE_FORMAT_FLOATS   = 2, /* LDMud 3.5.0 changed float format     */
+    SAVE_FORMAT_LVALUES  = 3, /* LDMud 3.5.0 added lvalue references  */
 
-    CURRENT_VERSION      = 2
+    CURRENT_VERSION      = 3
 };
 
 #ifdef FLOAT_FORMAT_0
@@ -5414,7 +5418,6 @@ enum save_format_version
 /* Forward Declarations */
 
 static Bool save_svalue(svalue_t *, char, Bool);
-static int restore_size(char **str);
 static Bool restore_svalue(svalue_t *, char **, char);
 static void register_svalue(svalue_t *);
 
@@ -5667,10 +5670,29 @@ recall_pointer (void *pointer)
 
 /*-------------------------------------------------------------------------*/
 static void
-save_string (string_t *src)
+save_number (p_int num)
+
+/* Write the number <num>to the write buffer.
+ */
+
+{
+    L_PUTC_PROLOG
+    char *source, c;
+
+    source = number_buffer;
+    (void)snprintf(source, sizeof(number_buffer), "%"PRIdPINT, num);
+    c = *source++;
+    do L_PUTC(c) while ( '\0' != (c = *source++) );
+    L_PUTC_EPILOG
+} /* save_number() */
+
+/*-------------------------------------------------------------------------*/
+static void
+save_string (string_t *src, p_int start, p_int count)
 
 /* Write string <src> to the write buffer, but escape all funny
  * characters.
+ * If <start> is >= 0, then only write src[start..start+count-1].
  */
 
 {
@@ -5680,8 +5702,18 @@ save_string (string_t *src)
     L_PUTC_PROLOG
 
     L_PUTC('\"')
-    len = mstrsize(src);
+
     cp = get_txt(src);
+
+    if (start < 0)
+    {
+        len = mstrsize(src);
+    }
+    else
+    {
+        cp += start;
+        len = count;
+    }
     while ( len-- )
     {
         c = *cp++;
@@ -5773,9 +5805,10 @@ save_mapping (mapping_t *m)
 
 /*-------------------------------------------------------------------------*/
 static void
-save_array (vector_t *v)
+save_array (vector_t *v, p_int start, p_int count)
 
 /* Encode the array <v> and write it to the write buffer.
+ * If <start> is >= 0, then only write v[start..start+count-1].
  */
 
 {
@@ -5785,7 +5818,7 @@ save_array (vector_t *v)
     /* Recall the array from the pointer table.
      * If it is a shared one, there's nothing else to do.
      */
-    if (recall_pointer(v))
+    if (start < 0 && recall_pointer(v))
         return;
 
     /* Write the '(<'... */
@@ -5796,8 +5829,14 @@ save_array (vector_t *v)
         L_PUTC_EPILOG
     }
 
+    if (start < 0)
+    {
+        start = 0;
+        count = VEC_SIZE(v);
+    }
+
     /* ... the values ... */
-    for (i = VEC_SIZE(v), val = v->item; --i >= 0; )
+    for (i = count, val = v->item + start; --i >= 0; )
     {
         save_svalue(val++, ',', MY_FALSE);
     }
@@ -5839,7 +5878,7 @@ save_struct (struct_t *st)
     /* The unique name (struct_name prog_name #id) as fake member */
     if (save_version < SAVE_FORMAT_CLOSURES || !recall_pointer(struct_unique_name(st)))
     {
-        save_string(struct_unique_name(st));
+        save_string(struct_unique_name(st), -1, -1);
     }
     {
         L_PUTC_PROLOG
@@ -6172,6 +6211,259 @@ save_closure (svalue_t *cl, Bool writable)
 
 /*-------------------------------------------------------------------------*/
 static Bool
+save_lvalue (svalue_t *v, char delimiter, Bool writable)
+
+/* Encode the lvalue <v> and write it to the write buffer.
+ * <delimiter>, <writable> and the return value are as
+ * in save_svalue().
+ */
+
+{
+    /* Shall the fallback for plain rvalues come into play? */
+    bool done = false;
+
+    if (save_version >= SAVE_FORMAT_LVALUES)
+    {
+        /* The new format... */
+        done = true;
+
+        switch (v->x.lvalue_type)
+        {
+            default:
+                fatal("(save_lvalue) Illegal lvalue %p type %d\n", v, v->x.lvalue_type);
+                break;
+
+            case LVALUE_PROTECTED:
+            {
+                /* Format: <1>=&(value) */
+                struct protected_lvalue *l = v->u.protected_lvalue;
+
+                if(recall_pointer(l))
+                    break;
+
+                /* Only one reference? No need for an lvalue reference here. */
+                if(!lookup_pointer(ptable,l)->ref_count)
+                {
+                    /* Go to the fallback. */
+                    done = false;
+                    break;
+                }
+
+                {
+                    L_PUTC_PROLOG
+                    L_PUTC('&')
+                    L_PUTC('(')
+                    L_PUTC_EPILOG
+                }
+
+                save_svalue(&(l->val), ',', MY_FALSE);
+                MY_PUTC(')')
+                break;
+            }
+
+            case LVALUE_PROTECTED_CHAR:
+            {
+                /* We can't save the string links, so saving as a reference to a number.
+                 *
+                 * Format: <1>=&(123)
+                 */
+
+                struct protected_char_lvalue *l = v->u.protected_char_lvalue;
+
+                if(recall_pointer(l))
+                    break;
+
+                /* Only one reference? No need for an lvalue reference here. */
+                if(!lookup_pointer(ptable,l)->ref_count)
+                {
+                    /* Go to the fallback. */
+                    done = false;
+                    break;
+                }
+
+                {
+                    L_PUTC_PROLOG
+                    L_PUTC('&')
+                    L_PUTC('(')
+                    L_PUTC_EPILOG
+                }
+
+                save_number(*((unsigned char*)v->u.protected_char_lvalue->charp));
+
+                {
+                    L_PUTC_PROLOG
+                    L_PUTC(',')
+                    L_PUTC(')')
+                    L_PUTC_EPILOG
+                }
+
+                break;
+            }
+
+            case LVALUE_PROTECTED_RANGE:
+            {
+                /* Format: <1>=&(<2>=&(vector)[index1..index2-1])
+                 *
+                 * The <2>=&() only happens, when the lvalue still has a valid
+                 * variable reference.
+                 */
+                struct protected_range_lvalue *r = v->u.protected_range_lvalue;
+                bool var_valid, vec_referenced;
+
+                if(recall_pointer(r))
+                    break;
+
+                /* Only one reference? No need for an lvalue reference here. */
+                if(!lookup_pointer(ptable,r)->ref_count)
+                {
+                    /* Go to the fallback. */
+                    done = false;
+                    break;
+                }
+
+                /* Check whether the variable reference is still valid. */
+                var_valid = (r->var != NULL
+                 && ((r->vec.type == T_POINTER && r->var->val.type == T_POINTER && r->vec.u.vec == r->var->val.u.vec)
+                  || (r->vec.type == T_STRING  && r->var->val.type == T_STRING  && r->vec.u.str == r->var->val.u.str)));
+
+                /* Let's have alook whether we have to disclose to full
+                 * array (although we only see a part of it here).
+                 */
+                if (r->vec.type == T_POINTER)
+                    vec_referenced = lookup_pointer(ptable, r->vec.u.vec)->ref_count != 0;
+                else
+                    vec_referenced = false;
+
+                if (!vec_referenced && var_valid)
+                    vec_referenced = lookup_pointer(ptable, r->var)->ref_count;
+
+                {
+                    L_PUTC_PROLOG
+                    L_PUTC('&')
+                    L_PUTC('(')
+                    L_PUTC_EPILOG
+                }
+
+                if (!vec_referenced)
+                {
+                    switch (r->vec.type)
+                    {
+                        case T_POINTER:
+                            save_array(r->vec.u.vec, r->index1, r->index2 - r->index1);
+                            break;
+
+                        case T_STRING:
+                            save_string(r->vec.u.str, r->index1, r->index2 - r->index1);
+                            break;
+
+                        default:
+                             fatal("(save_lvalue) Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                             break;
+                    }
+
+                    {
+                        L_PUTC_PROLOG
+                        L_PUTC(',')
+                        L_PUTC(')')
+                        L_PUTC_EPILOG
+                    }
+                    break;
+                }
+
+                if (var_valid)
+                {
+                    /* Variable reference is still valid */
+                    if (!recall_pointer(r->var))
+                    {
+                        if(!lookup_pointer(ptable,r->var)->ref_count)
+                        {
+                            save_svalue(&(r->vec), ',', MY_FALSE);
+                        }
+                        else
+                        {
+                            {
+                                L_PUTC_PROLOG
+                                L_PUTC('&')
+                                L_PUTC('(')
+                                L_PUTC_EPILOG
+                            }
+
+                            save_svalue(&(r->var->val), ')', MY_FALSE);
+
+                            MY_PUTC(',')
+                        }
+                    }
+                    else
+                        MY_PUTC(',')
+                }
+                else
+                    save_svalue(&(r->vec), ',', MY_FALSE);
+
+                save_number(r->index1);
+
+                MY_PUTC('.')
+                MY_PUTC('.')
+
+                save_number(r->index2 - 1);
+
+                MY_PUTC(')')
+                break;
+            }
+        } /* switch() */
+    }
+
+
+    if (!done)
+    {
+        /* In the old format, we save the plain value. */
+
+        switch (v->x.lvalue_type)
+        {
+            default:
+                fatal("(save_lvalue) Illegal lvalue %p type %d\n", v, v->x.lvalue_type);
+                break;
+
+            case LVALUE_PROTECTED:
+                return save_svalue(&(v->u.protected_lvalue->val), delimiter, writable);
+
+            case LVALUE_PROTECTED_CHAR:
+                save_number(*((unsigned char*)v->u.protected_char_lvalue->charp));
+                break;
+
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = v->u.protected_range_lvalue;
+
+                switch (r->vec.type)
+                {
+                    case T_POINTER:
+                        if(recall_pointer(r))
+                            break;
+
+                        save_array(r->vec.u.vec, r->index1, r->index2 - r->index1);
+                        break;
+
+                    case T_STRING:
+                        save_string(r->vec.u.str, r->index1, r->index2 - r->index1);
+                        break;
+
+                    default:
+                         fatal("(save_lvalue) Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                         break;
+                }
+
+                break;
+            }
+        } /* switch() */
+    }
+
+    MY_PUTC(delimiter)
+    return MY_TRUE;
+
+} /* save_lvalue() */
+
+/*-------------------------------------------------------------------------*/
+static Bool
 save_svalue (svalue_t *v, char delimiter, Bool writable)
 
 /* Encode the value <v> and write it to the write buffer, terminate
@@ -6190,7 +6482,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
     switch(v->type)
     {
     case T_STRING:
-        save_string(v->u.str);
+        save_string(v->u.str, -1, -1);
         break;
 
     case T_QUOTED_ARRAY:
@@ -6207,7 +6499,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
       }
 
     case T_POINTER:
-        save_array(v->u.vec);
+        save_array(v->u.vec, -1, -1);
         break;
 
     case T_STRUCT:
@@ -6215,18 +6507,8 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         break;
 
     case T_NUMBER:
-      {
-        L_PUTC_PROLOG
-        char *source, c;
-
-        source = number_buffer;
-        (void)snprintf(source, sizeof(number_buffer), "%"PRIdPINT, v->u.number);
-        c = *source++;
-        do L_PUTC(c) while ( '\0' != (c = *source++) );
-        L_PUTC(delimiter);
-        L_PUTC_EPILOG
-        return rc;
-    }
+        save_number(v->u.number);
+        break;
 
     case T_FLOAT:
       {
@@ -6278,6 +6560,9 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         save_mapping(v->u.map);
         break;
 
+    case T_LVALUE:
+        return save_lvalue(v, delimiter, writable);
+
     case T_SYMBOL:
       {
         L_PUTC_PROLOG
@@ -6288,7 +6573,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         c = *source++;
         do L_PUTC(c) while ( '\0' != (c = *source++) );
         L_PUTC_EPILOG
-        save_string(v->u.str);
+        save_string(v->u.str, -1, -1);
         break;
       }
 
@@ -6475,6 +6760,55 @@ register_svalue (svalue_t *svp)
       case T_CLOSURE:
         register_closure(svp);
         break;
+
+      case T_LVALUE:
+        if (save_version < SAVE_FORMAT_LVALUES)
+        {
+            /* For older format, just do the recursion.
+             * And treat ranges as normal arrays. */
+            if (svp->x.lvalue_type == LVALUE_PROTECTED)
+                register_svalue(&(svp->u.protected_lvalue->val));
+            else if (svp->x.lvalue_type == LVALUE_PROTECTED_RANGE)
+                register_pointer(ptable, svp->u.protected_range_lvalue);
+            break;
+        }
+
+        switch (svp->x.lvalue_type)
+        {
+            default:
+                fatal("(register_svalue) Illegal lvalue %p type %d\n", svp, svp->x.lvalue_type);
+                /* NOTREACHED */
+                break;
+
+            case LVALUE_PROTECTED:
+                if(register_pointer(ptable, svp->u.protected_lvalue) != NULL)
+                    register_svalue(&(svp->u.protected_lvalue->val));
+                break;
+
+            case LVALUE_PROTECTED_CHAR:
+                register_pointer(ptable, svp->u.protected_char_lvalue);
+                break;
+
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
+
+                if(register_pointer(ptable, r) != NULL)
+                {
+
+                    if (r->var != NULL
+                     && ((r->vec.type == T_POINTER && r->var->val.type == T_POINTER && r->vec.u.vec == r->var->val.u.vec)
+                      || (r->vec.type == T_STRING  && r->var->val.type == T_STRING  && r->vec.u.str == r->var->val.u.str)))
+                    {
+                        if (register_pointer(ptable, r->var) != NULL)
+                            register_svalue(&(r->var->val));
+                    }
+                    else
+                        register_svalue(&(r->vec));
+                }
+                break;
+            }
+        } /* switch (v->x.lvalue_type) */
     } /* switch() */
 } /* register_svalue() */
 
@@ -7042,6 +7376,195 @@ struct rms_parameters
     int num_values;  /* Recognized number of values per key */
 };
 
+static int restore_map_size(struct rms_parameters *parameters);
+static int restore_size(char **str);
+
+/*-------------------------------------------------------------------------*/
+static bool
+skip_element (char **str)
+
+/* In the string starting at *str search for the end of
+ * the svalue. Return true on success, false otherwise.
+ */
+
+{
+    char *pt = *str;
+
+    if (*pt == '<')
+    {
+        /* A shared array/mapping/lvalue */
+        pt = strchr(pt, '>');
+        if (!pt)
+            return false;
+
+        if (pt[1] == '=')
+            pt += 2;
+        else
+        {
+            *str = pt + 1;
+            return true;
+        }
+    }
+
+    if (pt[0] == '#' && pt[1] >= '0' && pt[1] <= '9')
+    {
+        /* Symbol or quoted array.
+         * Just skip to header and parse it
+         * as a normal string or array.
+         */
+        pt = strchr(pt+2,':');
+        if (!pt)
+            return false;
+        pt++;
+    }
+
+    switch(*pt)
+    {
+        case '\"':  /* string */
+        {
+            int backslashes;
+
+            do
+            {
+                pt = strchr(&pt[1],'\"');
+                if (!pt)
+                    return false;
+               /* the quote is escaped if and only
+                * if the number of slashes is odd.
+                */
+               for (backslashes = -1; pt[backslashes] == '\\'; backslashes--)
+                   NOOP;
+            } while ( !(backslashes & 1) ) ;
+
+            *str = pt+1;
+            return true;
+        }
+
+        case '(':  /* array, struct or mapping */
+        {
+            /* Lazy way of doing it, a bit inefficient */
+            struct rms_parameters tmp_par;
+            int tsiz;
+
+            tmp_par.str = pt + 2;
+            if (pt[1] == '{'
+             || pt[1] == '<'
+               )
+                tsiz = restore_size(&tmp_par.str);
+            else if (pt[1] == '[')
+                tsiz = restore_map_size(&tmp_par);
+            else
+                return false;
+
+            if (tsiz < 0)
+                return false;
+
+            *str = tmp_par.str;
+            return true;
+        }
+
+        case '#': /* A closure: skip the header and restart this check
+                   * again from the data part.
+                   */
+        {
+            if (pt[2] != ':')
+                return false;
+
+            switch (pt[1])
+            {
+                case 'e':
+                {
+                    /* efun or operator closure. */
+
+                    /* Try parsing the closure as operator closure.
+                     * If it is, restart the scanning from the end
+                     * of the string (which is likely to contain magic
+                     * characters like '<' or '-').
+                     */
+                    const char* end;
+                    if (symbol_operator(pt+3, &end) >= 0)
+                    {
+                        *str = (char *)end;
+                        return true;
+                    }
+                    /* else fallthrough */
+                }
+
+                case 's':    /* simul-efun */
+                case 'l':    /* lfun       */
+                case 'v':    /* variable   */
+                    /* Skip name. */
+                    pt += 3;
+                    while (isalunum(*pt) || *pt == '#')
+                        pt++;
+
+                    *str = pt;
+                    return true;
+
+                case 'c':    /* context closure */
+                    /* Skip the name */
+                    pt = strchr(pt, ':');
+                    /* Skip the number of variables */
+                    pt = strchr(pt+1, ':');
+                    if (pt[1] != '(' || pt[2] != '{')
+                        return false;
+
+                    /* And skip the array */
+                    *str = pt+3;
+                    return restore_size(str) >= 0;
+
+                default:
+                    return false;
+            }
+        }
+
+        case '&': /* An lvalue reference. */
+            if (pt[1] != '(')
+                return false;
+
+            pt += 2;
+            if (!skip_element(&pt))
+                return false;
+
+            /* Skip the indices. */
+            pt = strchr(pt, ')');
+            if (!pt)
+                return false;
+
+            *str = pt+1;
+            return true;
+
+        case '-':  /* A number */
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+        {
+            /* Skip any hexadecimal digits and one of the following chars:
+             * "+-.:=epx", but the ':' we allow only after a '='.
+             */
+            const char* addchars = "+-.=";
+
+            pt++;
+            while (isalnum(*pt) || strchr(addchars, *pt))
+            {
+                if(*pt == '=')
+                    /* old-style, after that only hexadecimal digits and ':' */
+                    addchars = ":";
+                else if(*pt == ':')
+                    /* only one ':' allowed. */
+                    addchars = "";
+
+                pt++;
+            }
+
+            *str = pt;
+            return true;
+        }
+
+        default:
+            return false;
+    }
+} /* skip_element() */
+
 /*-------------------------------------------------------------------------*/
 static int
 restore_map_size (struct rms_parameters *parameters)
@@ -7106,119 +7629,10 @@ restore_map_size (struct rms_parameters *parameters)
             return siz;
           }
 
-        case '\"':  /* A string */
-          {
-            int backslashes;
-
-            do {
-                pt = strchr(&pt[1],'\"');
-                if (!pt)
-                    return -1;
-                /* the quote is escaped if and only
-                 * if the number of slashes is odd. */
-                for (backslashes = -1; pt[backslashes] == '\\'; backslashes--) ;
-            } while ( !(backslashes & 1) ) ;
-            pt++;
-            break;
-          }
-
-        case '(':  /* An embedded mapping/array/struct */
-          {
-            int tsiz;
-
-            parameters->str = pt + 2;
-            if (pt[1] == '{'
-             || pt[1] == '<'
-               )
-                tsiz = restore_size(&parameters->str);
-            else if (pt[1] == '[')
-                tsiz = restore_map_size(parameters);
-            else return -1;
-            pt = parameters->str;
-            if (tsiz < 0)
-                return -1;
-            break;
-          }
-
-        case '<':  /* A shared mapping/array/struct */
-          {
-            pt = strchr(pt, '>');
-            if (!pt)
-                return -1;
-            pt++;
-            if (pt[0] == '=')
-            {
-                pt++;
-                continue;
-            }
-            break;
-          }
-
-        case '#': /* A closure: skip the header and restart this check
-                   * again from the data part.
-                   */
-          { 
-            const char * end;
-
-            if (pt[1] == 'c')
-            {
-                pt = strchr(pt, ':');
-                if (!pt)
-                    return -1;
-                pt++;
-            }
-            pt = strchr(pt, ':');
-            if (!pt)
-                return -1;
-            pt++;
-
-            /* Try parsing the closure as operator closure.
-             * If it is, restart the scanning from the end
-             * of the string (which is likely to contain magic
-             * characters like '<' or '-').
-             */
-            if (symbol_operator(pt, &end) >= 0)
-            {
-                pt = (char *)end;
-            }
-
-            continue;
-          }
-
-        case '-':  /* A negative number */
-            pt++;
-            if (!*pt)
-                return -1;
-            /* FALL THROUGH */
-
-        case '0': case '1': case '2': case '3': case '4':  /* A number */
-        case '5': case '6': case '7': case '8': case '9':
-            if (pt[1] == '.')
-            {
-                /* A float: test for the <float>=<exp>:<mantissa> syntax */
-
-                char *pt2;
-
-                pt2 = strpbrk(pt, "=:;,");
-                if (!pt2)
-                    return -1;
-                if (*pt2 != '=')
-                    break;
-                pt = strchr(pt2, ':');
-                if (!pt)
-                    return -1;
-                pt++;
-            }
-            /* FALL THROUGH */
-
-        /* Numbers and default: advance pt to the next terminal */
         default:
-          {
-            pt = strpbrk(pt, ":;,");
-            if (!pt)
+            if (!skip_element(&pt))
                 return -1;
             break;
-          }
         } /* switch() */
 
         /* At this point, pt points just after the preceeding
@@ -7385,7 +7799,7 @@ restore_size (char **str)
  */
 
 {
-    char *pt, *pt2;
+    char *pt;
     int siz;
 
     pt = *str;
@@ -7404,111 +7818,16 @@ restore_size (char **str)
             return siz;
           }
 
-        case '\"':  /* String */
-          {
-            int backslashes;
-
-            do {
-                pt = strchr(&pt[1],'\"');
-                if (!pt)
-                    return -1;
-               /* the quote is escaped if and only
-                * if the number of slashes is odd.
-                */
-               for (backslashes = -1; pt[backslashes] == '\\'; backslashes--)
-                   NOOP;
-            } while ( !(backslashes & 1) ) ;
-
-            if (pt[1] != ',')
-                return -1;
-            siz++;
-            pt += 2;
-            break;
-          }
-
-        case '(':  /* Embedded array, struct or mapping */
-          {
-            /* Lazy way of doing it, a bit inefficient */
-            struct rms_parameters tmp_par;
-            int tsiz;
-
-            tmp_par.str = pt + 2;
-            if (pt[1] == '{'
-             || pt[1] == '<'
-               )
-                tsiz = restore_size(&tmp_par.str);
-            else if (pt[1] == '[')
-                tsiz = restore_map_size(&tmp_par);
-            else
-                return -1;
-
-            pt = tmp_par.str;
-            if (tsiz < 0)
-                return -1;
-
-            pt++;
-            siz++;
-
-            break;
-          }
-
-        case '<': /* A shared array or mapping */
-          {
-            pt = strchr(pt, '>');
-            if (!pt)
-                return -1;
-            if (pt[1] == ',')
-            {
-                siz++;
-                pt += 2;
-            }
-            else if (pt[1] == '=')
-            {
-                pt += 2;
-            }
-            else
-                return -1;
-            break;
-          }
-
-        case '#': /* A closure: skip the header and restart this check
-                   * again from the data part.
-                   */
-          {
-            const char * end;
-
-            if (pt[1] == 'c')
-            {
-                pt2 = strchr(pt, ':');
-                if (!pt2)
-                    return -1;
-                pt = &pt2[1];
-            }
-            pt2 = strchr(pt, ':');
-            if (!pt2)
-                return -1;
-            pt = &pt2[1];
-
-            /* Try parsing the closure as operator closure.
-             * If it is, restart the scanning from the end
-             * of the string (which is likely to contain magic
-             * characters like '<' or '-').
-             */
-            if (symbol_operator(pt, &end) >= 0)
-            {
-                pt = (char *)end;
-            }
-            break;
-          }
-
         default:
-            pt2 = strchr(pt, ',');
-            if (!pt2)
+            if (!skip_element(&pt))
                 return -1;
-            siz++;
-            pt = &pt2[1];
-            break;
 
+            if (*pt != ',')
+                return -1;
+
+            siz++;
+            pt++;
+            break;
         } /* switch() */
     } /* while() */
 
@@ -8125,6 +8444,127 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
 } /* restore_closure() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE bool
+restore_lvalue (svalue_t *svp, char **str)
+
+/* Restore an lvalue reference from the text starting at *<str>
+ * (which points just after the leading '&') and store it into *<svp>.
+ * Return TRUE if the restore was successful, FALSE else (*<svp> is
+ * set to const0 in that case).
+ * On a successful return, *<str> is set to point after the lvalue text
+ * restored.
+ */
+
+{
+    svalue_t dummy = const0;
+    svalue_t *val;
+    p_int idx1, idx2, size;
+    char *cp;
+    struct protected_lvalue *lval = NULL;
+
+    if (restore_ctx->restored_version < SAVE_FORMAT_LVALUES)
+    {
+        /* Not supported in this version... */
+        *svp = const0;
+        return false;
+    }
+
+    if (**str != '(')
+    {
+        *svp = const0;
+        return false;
+    }
+
+    ++*str;
+
+    /* We first try to restore it into a protected lvalue.
+     * If it's a range lvalue, we convert it later.
+     */
+    assign_protected_lvalue_no_free(svp, &dummy);
+    free_svalue(&dummy);
+
+    val = &(svp->u.protected_lvalue->val);
+    if (!restore_svalue(val, str, ','))
+    {
+        free_svalue(svp);
+        *svp = const0;
+        return false;
+    }
+
+    if (**str == ')')
+    {
+        ++*str;
+        return true;
+    }
+
+    /* So, it's either a range lvalue. */
+    cp = *str;
+    idx1 = strtol(*str, str, 10);
+    if (cp == *str || *((*str)++) != '.' || *((*str)++) != '.')
+    {
+        free_svalue(svp);
+        *svp = const0;
+        return false;
+    }
+
+    cp = *str;
+    idx2 = strtol(*str, str, 10);
+    if (cp == *str || *((*str)++) != ')')
+    {
+        free_svalue(svp);
+        *svp = const0;
+        return false;
+    }
+
+    if (val->type == T_LVALUE && val->x.lvalue_type == LVALUE_PROTECTED)
+    {
+        lval = val->u.protected_lvalue;
+        val = &(lval->val);
+    }
+
+    switch (val->type)
+    {
+        case T_POINTER:
+            size = VEC_SIZE(val->u.vec);
+            break;
+
+        case T_STRING:
+            size = mstrsize(val->u.str);
+            break;
+
+        default:
+            free_svalue(svp);
+            *svp = const0;
+            return false;
+    }
+
+    if (idx1 < 0 || idx1 > size || idx2 <= -1 || idx2 >= size || idx1 > idx2 + 1)
+    {
+        free_svalue(svp);
+        *svp = const0;
+        return false;
+    }
+
+    /* Create our range lvalue and replace the normal
+     * lvalue reference in <svp>.
+     */
+    assign_protected_range_lvalue_no_free(&dummy, lval, val, idx1, idx2+1);
+    if (svp->u.protected_lvalue->ref != 1)
+    {
+        /* There is already a second reference to it.
+         * Updating that one also.
+         */
+        free_svalue(val);
+        assign_svalue_no_free(val, &dummy);
+    }
+
+    free_svalue(svp);
+    transfer_svalue_no_free(svp, &dummy);
+
+    return true;
+} /* restore_lvalue() */
+
+/*-------------------------------------------------------------------------*/
 static Bool
 restore_svalue (svalue_t *svp, char **pt, char delimiter)
 
@@ -8362,6 +8802,16 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         cp = strchr(cp, delimiter);
         *pt = cp+1;
         return cp != NULL;
+      }
+
+    case '&': /* An lvalue reference */
+      {
+        *pt = ++cp;
+        if ( !restore_lvalue(svp, pt) )
+        {
+            return MY_FALSE;
+        }
+        break;
       }
 
     case '<': /* A shared value */

@@ -271,6 +271,7 @@ mixed *tests = ({
                 ([:1]),
                 ([:2]),
                 (["a":1;2;3, "b":4;5;6]),
+                ([1:"a";"b", 2:"c";"d"]),
             }))
             {
                 if(!deep_eq(val, restore_value(save_value(val))))
@@ -286,8 +287,22 @@ mixed *tests = ({
                     restore_value(save_value(([val:1;2])));
                     restore_value(save_value((["a":val;2])));
                 }
-                else if(!deep_eq(([val]), restore_value(save_value(([val])))))
-                    return 0;
+                else
+                {
+                    if(!deep_eq(([val]), restore_value(save_value(([val])))))
+                        return 0;
+
+                    if (floatp(val))
+                    {
+                        /* Check support for the old format.
+                         * We just check the absence of errors,
+                         * because it's imprecise.
+                         */
+                        restore_value(save_value(val, 0));
+                        restore_value(save_value(({val}), 0));
+                        restore_value(save_value(([val]), 0));
+                    }
+                }
             }
 
             return 1;

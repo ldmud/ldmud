@@ -3825,7 +3825,7 @@ assign_protected_lvalue_no_free (svalue_t *dest, svalue_t *src)
 } /* assign_protected_lvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE void
+INLINE void
 assign_protected_char_lvalue_no_free (svalue_t *dest, string_t *src, char *charp)
 
 /* Put a protected char lvalue to <cp> into <dest>.
@@ -3847,7 +3847,7 @@ assign_protected_char_lvalue_no_free (svalue_t *dest, string_t *src, char *charp
 } /* assign_char_lvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE void
+INLINE void
 assign_protected_range_lvalue_no_free (svalue_t *dest, struct protected_lvalue *var, svalue_t *vec, mp_int index1, mp_int index2)
 
 /* Put a protected range lvalue to <src>[index1..index2-1] into <dest>.
