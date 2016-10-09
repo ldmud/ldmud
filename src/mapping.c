@@ -778,6 +778,13 @@ mhash (svalue_t * svp)
         }
         break;
 
+#ifdef FLOAT_FORMAT_2
+    case T_FLOAT:
+        /* We have no additional type information. */
+        i = svp->u.number;
+        break;
+#endif
+
     default:
         i = svp->u.number ^ *SVALUE_FULLTYPE(svp);
         break;
