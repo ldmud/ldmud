@@ -195,6 +195,7 @@ extern Bool destructed_object_ref (svalue_t *svp);
 extern void free_object_svalue(svalue_t *v);
 extern void zero_object_svalue(svalue_t *v);
 extern void free_svalue(svalue_t *v);
+extern void normalize_svalue(svalue_t *svp, bool collapse_lvalues);
 extern void assign_svalue_no_free(svalue_t *to, svalue_t *from);
 extern void assign_rvalue_no_free(svalue_t *to, svalue_t *from);
 extern void assign_svalue(svalue_t *dest, svalue_t *v);

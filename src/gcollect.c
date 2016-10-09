@@ -406,6 +406,8 @@ cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
     for (p = svp; p < svp+num; p++)
     {
         context->numValues++;
+
+        normalize_svalue(p, true);
         switch(p->type)
         {
         case T_OBJECT:
