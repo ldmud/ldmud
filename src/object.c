@@ -8165,6 +8165,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
     case '\"':  /* A string */
       {
         char *source, *start, c;
+        p_int len = 0;
 
         start = cp;
         source = cp+1;
@@ -8200,10 +8201,11 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                 }
             } else if (c == '\"') break;
             *cp++ = c;
+            len++;
         }
         *cp = '\0';
         *pt = source;
-        put_string(svp, new_tabled(start));
+        put_string(svp, new_n_tabled(start, len));
         if (!svp->u.str)
         {
             *svp = const0;
