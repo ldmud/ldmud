@@ -844,6 +844,9 @@ init_lexer(void)
 #ifdef USE_GCRYPT
     add_permanent_define("__GCRYPT__", -1, string_copy("1"), MY_FALSE);
 #endif
+#ifdef USE_PYTHON
+    add_permanent_define("__PYTHON__", -1, string_copy("1"), MY_FALSE);
+#endif
     if (wizlist_name[0] != '\0')
     {
         if (compat_mode)

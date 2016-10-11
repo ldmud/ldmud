@@ -62,6 +62,10 @@ int deep_eq(mixed arg1, mixed arg2)
                 return 1;
             if (CLOSURE_IS_EFUN(t))
                 return 1;
+#ifdef CLOSURE_IS_PYTHON_EFUN
+            if (CLOSURE_IS_PYTHON_EFUN(t))
+                return 1;
+#endif
             if (CLOSURE_IS_OPERATOR(t))
                 return 1;
             raise_error("Unknown closure type " + t + ".\n");

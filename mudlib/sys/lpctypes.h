@@ -46,7 +46,12 @@
 #define CLOSURE_LAMBDA          5  /* normal lambda closure */
 #define CLOSURE_UNBOUND_LAMBDA  6  /* unbound lambda closure. */
 
-#define CLOSURE_OPERATOR        (0xe800)
+#ifdef __PYTHON__
+#  define CLOSURE_OPERATOR      (0xe000)
+#  define CLOSURE_PYTHON_EFUN   (0xe800)
+#else
+#  define CLOSURE_OPERATOR      (0xe800)
+#endif
 #define CLOSURE_EFUN            (0xf000)
 #define CLOSURE_SIMUL_EFUN      (0xf800)
 
@@ -58,6 +63,9 @@
 #define CLOSURE_IS_SIMUL_EFUN(x) (((x) & 0xf800) == CLOSURE_SIMUL_EFUN)
 #define CLOSURE_IS_EFUN(x)	 (((x) & 0xf800) == CLOSURE_EFUN)
 #define CLOSURE_IS_OPERATOR(x)	 (((x) & 0xf800) == CLOSURE_OPERATOR)
+#ifdef __PYTHON__
+#  define CLOSURE_IS_PYTHON_EFUN(x)	(((x) & 0xf800) == CLOSURE_PYTHON_EFUN)
+#endif
 
 #endif /* __DRIVER_SOURCE__ */
 
