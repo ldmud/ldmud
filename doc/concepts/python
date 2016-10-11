@@ -135,6 +135,48 @@ EXAMPLE
 
         ldmud.register_efun("hello", hello_world)
 
+NOTES
+        Just like simul-efuns python efuns can shadow real efuns. The
+        original efun is then inaccessible for LPC code (except for code
+        that was compiled before the efun was registered). Python efuns are
+        nearly indistinguishable from real efuns, they also use the efun::
+        prefix. However they can be detected with
+            CLOSURE_IS_PYTHON_EFUN(get_type_info(#'efun,1))
+
+        Without the prefix the order of name resolution for function calls is:
+         1. lfuns
+         2. simul-efuns
+         3. python efuns
+         4. real efuns
+
+        Also just like simul-efuns python-registered efuns are called
+        from LPC code that was compiled after the registration. LPC code
+        that was compiled before the registration will still call the
+        original efuns (or throw a compile error if that efun doesn't exist).
+        Therefore such efuns should be registered in the python startup
+        script.
+
+        When a python efun is unregistered, code that was compiled while the
+        registration was in effect will throw a runtime error. (Regardless
+        of whether a driver efun with the same name exists or not.)
+
+        There is a limit of 2048 python efuns. Not only registered, but also
+        formerly registered - but now unregistered - efuns count toward that
+        limit. Re-registering the same efun name again won't count a second
+        time. (LPC code that was compiled during the previous registration
+        will also call the new efun after the re-registration.)
+
+        As LDMud is single-threaded, the python code will run in the same
+        thread as the LPC machine. So any long-running python function will
+        halt the MUD for all players. Hence python functions should return
+        promptly and source out any lengthy tasks to another process. If
+        other threads are spawned from python, then these threads are not
+        allowed to access any LDMud functions or objects.
+
+        Finally a note of caution: Don't change the meaning of base efuns
+        fundamentally as it furthers confusion and hinders exchange of LPC
+        code and knowledge between mudlibs.
+
 HISTORY
         LDMud 3.5 implemented the python functionality.
 

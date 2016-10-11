@@ -74,3 +74,9 @@ Language
   a T_CLOSURE svalue are reserved for simul-efuns.
   F_SIMUL_EFUN however takes a short int, so there 65536
   simul-efuns would be possible.
+
+* maximum number of python efuns: 2048
+  Only values 0xe800-0xefff in .x.closure_type of
+  a T_CLOSURE svalue are reserved for python efuns.
+  F_PYTHON_EFUN however takes a short int, so there 65536
+  python efuns would be possible.
