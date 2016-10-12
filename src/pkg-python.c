@@ -5168,4 +5168,71 @@ python_count_refs ()
 
 #endif /* GC_SUPPORT */
 
+#ifdef DEBUG
+void
+count_python_extra_refs ()
+
+/* Refcount Debugging: Count the refcounts in objects and arrays.
+ */
+
+{
+    /* All Python objects that reference LPC data. */
+    for(ldmud_gc_var_t* var = gc_object_list; var != NULL; var = var->gcnext)
+    {
+        object_t* ob = ((ldmud_object_t*)var)->lpc_object;
+        if(ob != NULL)
+            count_extra_ref_in_object(ob);
+    }
+
+    for(ldmud_gc_var_t* var = gc_array_list; var != NULL; var = var->gcnext)
+    {
+        svalue_t vec = { T_POINTER };
+        vec.u.vec = ((ldmud_array_t*)var)->lpc_array;
+
+        count_extra_ref_in_vector(&vec, 1);
+    }
+
+    for(ldmud_gc_var_t* var = gc_mapping_list; var != NULL; var = var->gcnext)
+    {
+        svalue_t map = { T_MAPPING };
+        map.u.map = ((ldmud_mapping_t*)var)->lpc_mapping;
+
+        count_extra_ref_in_vector(&map, 1);
+    }
+
+    for(ldmud_gc_var_t* var = gc_mapping_list_list; var != NULL; var = var->gcnext)
+    {
+        /* Let count_ref_in_vector do that. */
+        svalue_t values[2] = { { T_MAPPING }, { T_POINTER } };
+        values[0].u.map = ((ldmud_mapping_list_t*)var)->map;
+        values[1].u.vec = ((ldmud_mapping_list_t*)var)->indices;
+        count_extra_ref_in_vector(values, 2);
+    }
+
+    for(ldmud_gc_var_t* var = gc_struct_list; var != NULL; var = var->gcnext)
+    {
+        svalue_t str = { T_STRUCT };
+        str.u.strct = ((ldmud_struct_t*)var)->lpc_struct;
+
+        count_extra_ref_in_vector(&str, 1);
+    }
+
+    for(ldmud_gc_var_t* var = gc_closure_list; var != NULL; var = var->gcnext)
+    {
+        count_extra_ref_in_vector(&((ldmud_closure_t*)var)->lpc_closure, 1);
+    }
+
+    for(ldmud_gc_var_t* var = gc_symbol_list; var != NULL; var = var->gcnext)
+    {
+        count_extra_ref_in_vector(&((ldmud_symbol_t*)var)->lpc_symbol, 1);
+    }
+
+    for(ldmud_gc_var_t* var = gc_quoted_array_list; var != NULL; var = var->gcnext)
+    {
+        count_extra_ref_in_vector(&((ldmud_quoted_array_t*)var)->lpc_quoted_array, 1);
+    }
+} /* count_python_extra_refs() */
+
+#endif /* DEBUG */
+
 #endif /* USE_PYTHON && HAS_PYTHON3 */

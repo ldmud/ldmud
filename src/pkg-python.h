@@ -55,6 +55,10 @@ extern void python_clear_refs();
 extern void python_count_refs();
 #endif /* GC_SUPPORT */
 
+#ifdef DEBUG
+extern void count_python_extra_refs();
+#endif /* DEBUG */
+
 #endif /* USE_PYTHON */
 
 #endif /* PKG_PYTHON_H__ */

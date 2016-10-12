@@ -20746,6 +20746,9 @@ check_a_lot_ref_counts (program_t *search_prog)
     count_extra_ref_from_wiz_list();
     count_simul_efun_extra_refs(ptable);
     count_comm_extra_refs();
+#ifdef USE_PYTHON
+    count_python_extra_refs();
+#endif
 
 #ifdef TRACE_CODE
     {
