@@ -365,9 +365,10 @@ struct memblock_s {
     } u;
 };
 
-#define MEMBLOCK_LIMIT (128)
+#define MEMBLOCK_SMALL_LIMIT (16 * sizeof(p_uint))
   /* Maximum size for the userspace of a memory block.
-   * Using blocks larger than this is likely to run into fragmentation
+   * We try to stay within the smallblocks, because using
+   * blocks larger than this is likely to run into fragmentation
    * of the large block heap.
    */
 
@@ -432,9 +433,15 @@ size_pool (size_t elemsize, size_t o_size)
     size_t esize = (ROUND(elemsize) + o_size);
     unsigned int num;
 
-    num = MEMBLOCK_LIMIT / esize;
-    if (num < 1)
-        num = 1;
+    /* Let's look how many elements could fit into a small block. */
+    num = (MEMBLOCK_SMALL_LIMIT - sizeof(struct memblock_s) + sizeof(((struct memblock_s*)NULL)->u)) / esize;
+
+    /* If not at least 8 elements could fit there, we go for a large block.
+     * with at least 32 elements.
+     */
+    if (num < 8)
+        num = 32;
+
     return num * esize;
 } /* size_pool() */
 
