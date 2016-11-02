@@ -1851,7 +1851,7 @@ lookfor_shared_identifier (const char *s, size_t len, int n, int depth, Bool bCr
     {
         /* Identifier is not in table, so create a new entry */
 
-        str = new_n_tabled(s, len);
+        str = new_n_unicode_tabled(s, len);
         if (!str)
             return NULL;
         curr = xalloc(sizeof *curr);
@@ -3950,6 +3950,8 @@ add_lex_string (char *str, size_t slen)
                   len1+slen);
     }
     free_mstring(last_lex_string);
+    if (new->info.unicode == STRING_ASCII && !is_ascii(str, slen))
+        new->info.unicode = STRING_UTF8;
     last_lex_string = make_tabled(new);
 } /* add_lex_string() */
 
@@ -3971,7 +3973,7 @@ string (char *str, size_t slen)
     }
     else
     {
-        last_lex_string = new_n_tabled(str, slen);
+        last_lex_string = new_n_unicode_tabled(str, slen);
         if (!last_lex_string)
         {
             lexerrorf("Out of memory for string literal (%zu bytes)",
@@ -7626,7 +7628,7 @@ f_expand_define (svalue_t *sp)
         if (d && _expand_define(&d->u.define, d) )
         {
             *end = '\0';
-            res = new_mstring(outp);
+            res = new_unicode_mstring(outp);
             *end = '\n';  /* Restore the newline character */
         }
         outp = &end[1];

@@ -1,0 +1,23 @@
+SYNOPSIS
+        string to_text(string bytesequence, string encoding)
+        string to_text(int* bytes, string encoding)
+        string to_text(string unicode)
+        string to_text(int* characters)
+
+DESCRIPTION
+        The first argument is converted to a unicode string.
+
+        The first two variants convert an encoded text, given as
+        a sequence of bytes, to string. The second argument denotes
+        the name of the encoding used to produce the byte sequence.
+
+        The third variant just returns the argument.
+
+        The fourth variant converts a sequence of unicode characters
+        to string.
+
+HISTORY
+        Introduced in LDMud 3.6.0.
+
+SEE ALSO
+        to_bytes(E), to_string(E), to_array(E)

@@ -831,7 +831,7 @@ f_get_dir (svalue_t *sp)
                 }
                 else
                 {
-                    memsafe(result = new_n_mstring(de->d_name, namelen), namelen
+                    memsafe(result = new_n_mstring(de->d_name, namelen, STRING_BYTES), namelen
                            , "getdir() names");
                 }
                 put_string(w->item+j, result);
@@ -1019,7 +1019,7 @@ v_read_bytes (svalue_t *sp, int num_arg)
         /* We return a copy of the life parts of the buffer, and get rid
          * of the largish buffer itself.
          */
-        rc = new_n_mstring(str, size);
+        rc = new_n_mstring(str, size, STRING_BYTES);
         mb_free(mbFile);
 
     }while(0);
@@ -1238,7 +1238,7 @@ v_read_file (svalue_t *sp, int num_arg)
         /* Make a copy of the valid parts of the str buffer, then
          * get rid of the largish buffer itself.
          */
-        rc = new_n_mstring(str, p2-str);
+        rc = new_n_unicode_mstring(str, p2-str);
         mb_free(mbFile);
         if (!rc)
         {

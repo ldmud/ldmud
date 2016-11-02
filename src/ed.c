@@ -1672,7 +1672,7 @@ optpat (void)
     if(P_OLDPAT)
         free_regexp(P_OLDPAT);
 
-    memsafe(buf = new_mstring(str), strlen(str), "regexp pattern string");
+    memsafe(buf = new_unicode_mstring(str), strlen(str), "regexp pattern string");
     P_OLDPAT = rx_compile(buf, P_EXCOMPAT ? RE_EXCOMPATIBLE : 0, MY_TRUE);
     free_mstring(buf);
     return P_OLDPAT;
@@ -3523,7 +3523,7 @@ save_ed_buffer (input_t *ih)
         if (*get_txt(fname) == '/')
         {
             string_t *tmp;
-            tmp = new_n_mstring(get_txt(fname)+1, mstrsize(fname)-1);
+            tmp = new_n_unicode_mstring(get_txt(fname)+1, mstrsize(fname)-1);
             if (!tmp)
             {
                 add_message("(ed) Out of memory (%lu bytes) for filename.\n"

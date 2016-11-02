@@ -467,7 +467,7 @@ explode_string (string_t *str, string_t *del)
     if (mstrsize(str) == 0)
     {
         ret = allocate_array(1);
-        buff = new_n_mstring("", 0);
+        buff = new_n_mstring("", 0, str->info.unicode);
         put_string(ret->item, buff);
         return ret;
     }
@@ -488,7 +488,7 @@ explode_string (string_t *str, string_t *del)
             for ( svp = ret->item, p = get_txt(str)
                 ; --len >= 0
                 ; svp++, p++ ) {
-                buff = new_n_mstring(p, 1);
+                buff = new_n_mstring(p, 1, str->info.unicode);
                 if (!buff) {
                     free_array(ret);
                     outofmem(1, "explode() on a string");
@@ -523,7 +523,7 @@ explode_string (string_t *str, string_t *del)
                 ; left -= (p + 1 - txt), txt = p + 1, svp++)
             {
                 len = p - txt;
-                buff = new_n_mstring(txt, (size_t)len);
+                buff = new_n_mstring(txt, (size_t)len, str->info.unicode);
                 if (!buff) {
                     free_array(ret);
                     outofmem(len, "explode() on a string");
@@ -535,7 +535,7 @@ explode_string (string_t *str, string_t *del)
              * the last delimiter.
              */
             len = get_txt(str) + mstrsize(str) - txt;
-            buff = new_n_mstring(txt, (size_t)len);
+            buff = new_n_mstring(txt, (size_t)len, str->info.unicode);
             if (!buff) {
                 free_array(ret);
                 outofmem(len, "explode() on a string");
@@ -585,7 +585,7 @@ explode_string (string_t *str, string_t *del)
             ptrdiff_t bufflen;
 
             bufflen = p - beg;
-            buff = new_n_mstring(beg, (size_t)bufflen);
+            buff = new_n_mstring(beg, (size_t)bufflen, str->info.unicode);
             if (!buff) {
                 free_array(ret);
                 outofmem(bufflen, "buffer for explode()");
@@ -606,7 +606,7 @@ explode_string (string_t *str, string_t *del)
 
     /* Copy the last occurence (may be empty). */
     len = get_txt(str) + mstrsize(str) - beg;
-    buff = new_n_mstring(beg, (size_t)len);
+    buff = new_n_mstring(beg, (size_t)len, str->info.unicode);
     if (!buff) {
         free_array(ret);
         outofmem(len, "last fragment in explode()");

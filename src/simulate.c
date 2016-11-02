@@ -826,7 +826,7 @@ errorf (const char *fmt, ...)
          * If we run out of memory here, we won't execute the catch.
          */
         {
-            string_t * str = new_mstring(emsg_buf);
+            string_t * str = new_unicode_mstring(emsg_buf);
 
             if (NULL != str)
             {
@@ -898,7 +898,7 @@ errorf (const char *fmt, ...)
                 }
                 strbuf_zero(&sbuf);
                 object_name = collect_trace(&sbuf, &current_error_trace);
-                current_error_trace_string = new_mstring(sbuf.buf);
+                current_error_trace_string = new_unicode_mstring(sbuf.buf);
                 strbuf_free(&sbuf);
             }
         }
@@ -939,7 +939,7 @@ errorf (const char *fmt, ...)
     do_save_error = MY_FALSE;
 
     /* Get a copy of the error message */
-    malloced_error = new_mstring(emsg_buf+1);
+    malloced_error = new_unicode_mstring(emsg_buf+1);
 
     /* If we have a current_object, determine the program location
      * of the fault.
@@ -1946,7 +1946,7 @@ load_object (const char *lname, Bool create_super, int depth
                 ob = svp->u.ob;
                 remove_object_hash(ob);
                 free_mstring(ob->name);
-                ob->name = new_mstring(name);
+                ob->name = new_unicode_mstring(name);
                 enter_object_hash(ob);
 
                 /* If this object is a clone, clear the clone flag
@@ -2117,7 +2117,7 @@ load_object (const char *lname, Bool create_super, int depth
     if (!ob)
         errorf("Out of memory for new object '%s'\n", name);
 
-    ob->name = new_mstring(name);
+    ob->name = new_unicode_mstring(name);
 #ifdef CHECK_OBJECT_STAT
     if (check_object_stat)
     {
@@ -2139,7 +2139,7 @@ load_object (const char *lname, Bool create_super, int depth
 
     if (!compat_mode)
         name--;  /* Make the leading '/' visible again */
-    ob->load_name = new_tabled(name);  /* but here it is */
+    ob->load_name = new_unicode_tabled(name);  /* but here it is */
     ob->prog = prog;
     ob->ticks = ob->gigaticks = 0;
     ob->next_all = obj_list;

@@ -556,7 +556,7 @@ main (int argc, char **argv)
             const char *pName = make_name_sane(master_name, MY_FALSE);
             if (pName)
                 strcpy(master_name, pName);
-            master_name_str = new_tabled(master_name);
+            master_name_str = new_unicode_tabled(master_name);
             if (!master_name_str)
             {
                 printf("%s Out of memory for master object name (%lu bytes).\n"

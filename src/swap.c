@@ -1864,11 +1864,11 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
                 if (svp->type == T_STRING
                  && svp->x.generic != 0)
                 {
-                    s = new_n_mstring((char *)p, len);
+                    s = new_n_unicode_mstring((char *)p, len);
                 }
                 else
                 {
-                    s = new_n_tabled((char *)p, len);
+                    s = new_n_unicode_tabled((char *)p, len);
                 }
 
                 if (!s)

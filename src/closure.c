@@ -5936,6 +5936,7 @@ closure_to_string (svalue_t * sp, Bool compact)
     string_t *rc;
     lambda_t *l;
     object_t *ob;
+    size_t len;
 
     rc = NULL;
     buf[sizeof(buf)-1] = '\0';
@@ -6129,7 +6130,8 @@ closure_to_string (svalue_t * sp, Bool compact)
       } /* case default */
     } /* switch(closure_type) */
 
-    memsafe(rc = new_mstring(buf), strlen(buf), "converted lambda");
+    len = strlen(buf);
+    memsafe(rc = new_n_unicode_mstring(buf, len), len, "converted lambda");
 
     /* If it's a closure with a lambda structure, we can determine
      * where it was created.

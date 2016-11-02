@@ -578,7 +578,7 @@ call_modify_command (char *buff)
             svalue_t sv;
             string_t * str;
 
-            if ( NULL != (str = find_tabled_str(buff)) )
+            if ( NULL != (str = find_tabled_str(buff, STRING_UTF8)) )
             {
                 put_string(&sv, str);
                 svp =
@@ -811,12 +811,12 @@ parse_command (char *buff, Bool from_efun)
     if (p == NULL)
     {
         length += 1;
-        last_verb = new_tabled(buff);
+        last_verb = new_tabled(buff, STRING_UTF8);
     }
     else
     {
         *p = '\0';
-        last_verb = new_tabled(buff);
+        last_verb = new_tabled(buff, STRING_UTF8);
         *p = ' ';
         length = p - buff;
     }
@@ -987,7 +987,7 @@ parse_command (char *buff, Bool from_efun)
                 push_string(inter_sp, last_verb);
                 ch = buff[len];
                 buff[len] = '\0';
-                last_verb = new_tabled(buff);
+                last_verb = new_tabled(buff, STRING_UTF8);
                 buff[len] = ch;
                 push_c_string(inter_sp, &buff[len]);
                 ret = execute_callback(&(sa->cb), 1, MY_TRUE, save_current_object == NULL);
@@ -1621,7 +1621,7 @@ f_match_command(svalue_t * sp)
     else
         verb_length = (size_t)(p - cmdbuf);
 
-    verb = new_n_tabled(cmdbuf, verb_length);
+    verb = new_n_tabled(cmdbuf, verb_length, STRING_UTF8);
 
     /* Scan the list of sentences for the saved command giver
      * and collect the found matches in a list.

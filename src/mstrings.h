@@ -45,6 +45,11 @@
  * The string text itself is held at the end of the structure starting
  * at .txt. The structure is allocated large enough to hold the whole
  * string plus an extra terminating '\0' (which is not counted in the size).
+ *
+ * Regarding unicode we differentiate between 7-bit ASCII strings,
+ * UTF8 encoded strings and byte sequences. 7-bit ASCII strings are also
+ * considered to be UTF8 encoded strings, but we keep them distinct to optimize
+ * string operations (because this would be the majority of strings).
  */
 
 enum string_type
@@ -54,11 +59,19 @@ enum string_type
     STRING_MUTABLE,     /* Mutable string (therefore not in the string table) */
 };
 
+enum unicode_type
+{
+    STRING_ASCII,       /* A string that does only contain chars <= 0x7f. */
+    STRING_UTF8,        /* A unicode string encoded in UTF8. */
+    STRING_BYTES,       /* Sequence of 8-bit characters. */
+};
+
 struct string_s
 {
     struct {
-        enum string_type  type :  2;
-        unsigned int ref       : 30;
+        enum string_type  type    :  2;
+        enum unicode_type unicode :  2;
+        unsigned int ref          : 28;
     } info;
     string_t * next;    /* Linkpointer in string table. */
     size_t     size;    /* Length of the string */
@@ -84,10 +97,14 @@ extern hash32_t   mstring_get_hash (string_t * pStr);
 extern hash32_t   hash_string (const char * const s, size_t size);
 extern hash32_t   hash_string_chained (const char * const s, size_t size, hash32_t chainhash);
 extern string_t * mstring_alloc_string (size_t iSize MTRACE_DECL);
-extern string_t * mstring_new_string (const char * const pTxt MTRACE_DECL);
-extern string_t * mstring_new_n_string (const char * const pTxt, size_t len MTRACE_DECL);
-extern string_t * mstring_new_tabled (const char * const pTxt MTRACE_DECL);
-extern string_t * mstring_new_n_tabled (const char * const pTxt, size_t size MTRACE_DECL);
+extern string_t * mstring_new_string (const char * const pTxt, enum unicode_type unicode MTRACE_DECL);
+extern string_t * mstring_new_n_string (const char * const pTxt, size_t len, enum unicode_type unicode MTRACE_DECL);
+extern string_t * mstring_new_tabled (const char * const pTxt, enum unicode_type unicode MTRACE_DECL);
+extern string_t * mstring_new_n_tabled (const char * const pTxt, size_t size, enum unicode_type unicode MTRACE_DECL);
+extern string_t * mstring_new_unicode_string (const char * const pTxt MTRACE_DECL);
+extern string_t * mstring_new_n_unicode_string (const char * const pTxt, size_t len MTRACE_DECL);
+extern string_t * mstring_new_unicode_tabled (const char * const pTxt MTRACE_DECL);
+extern string_t * mstring_new_n_unicode_tabled (const char * const pTxt, size_t len MTRACE_DECL);
 extern string_t * mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL);
 extern string_t * mstring_make_constant (string_t * pStr, bool in_place_only MTRACE_DECL);
 extern string_t * mstring_make_mutable (string_t * pStr MTRACE_DECL);
@@ -95,7 +112,7 @@ extern string_t * mstring_dup (string_t * pStr MTRACE_DECL);
 extern string_t * mstring_unshare (string_t * pStr MTRACE_DECL);
 extern string_t * mstring_resize (string_t * pStr, size_t n MTRACE_DECL);
 extern string_t * mstring_find_tabled (string_t * pStr);
-extern string_t * mstring_find_tabled_str (const char * const pTxt, size_t size);
+extern string_t * mstring_find_tabled_str (const char * const pTxt, size_t size, enum unicode_type unicode);
 extern int        mstring_order( string_t * const pStr1
                                , string_t * const pStr2);
 extern int        mstring_compare( string_t * const pStr1
@@ -270,40 +287,44 @@ static INLINE void extract_cstr(char *d, const string_t *const s, size_t l)
 
 /* A handful of shorthands for commonly used functions */
 
-#define alloc_mstring(iSize)     mstring_alloc_string(iSize MTRACE_ARG)
-#define new_mstring(pTxt)        mstring_new_string(pTxt MTRACE_ARG)
-#define new_n_mstring(pTxt,len)  mstring_new_n_string(pTxt,len MTRACE_ARG)
-#define new_tabled(pTxt)         mstring_new_tabled(pTxt MTRACE_ARG)
-#define new_n_tabled(pTxt,len)   mstring_new_n_tabled(pTxt,len MTRACE_ARG)
-#define make_tabled(pStr)        mstring_make_tabled(pStr, MY_TRUE MTRACE_ARG)
-#define make_tabled_from(pStr)   mstring_make_tabled(pStr, MY_FALSE MTRACE_ARG)
-#define make_constant(pStr)      mstring_make_constant(pStr, false MTRACE_ARG)
-#define try_make_constant(pStr)  mstring_make_constant(pStr, true MTRACE_ARG)
-#define make_mutable(pStr)       mstring_make_mutable(pStr MTRACE_ARG)
-#define dup_mstring(pStr)        mstring_dup(pStr MTRACE_ARG)
-#define unshare_mstring(pStr)    mstring_unshare(pStr MTRACE_ARG)
-#define resize_mstring(pStr,n)   mstring_resize(pStr,n MTRACE_ARG)
-#define find_tabled(pStr)          mstring_find_tabled(pStr)
-#define find_tabled_str(pTxt)      mstring_find_tabled_str(pTxt, strlen(pTxt))
-#define find_tabled_str_n(pTxt,n)  mstring_find_tabled_str(pTxt,n)
-#define mstr_get_hash(s)         ((s)->hash ? (s)->hash : mstring_get_hash(s))
-#define mstrcmp(pStr1,pStr2)     mstring_compare(pStr1, pStr2)
-#define mstr_order(pStr1,pStr2)  mstring_order(pStr1, pStr2)
-#define mstreq(pStr1,pStr2)      mstring_equal(pStr1, pStr2)
-#define mstrstr(pStr,pTxt)       mstring_mstr_n_str(pStr, 0, pTxt, strlen(pTxt))
-#define mstrrstr(pStr,pTxt)      mstring_mstr_rn_str(pStr, mstrsize(pStr)-1, pTxt, strlen(pTxt))
-#define mstr_add(pStr1,pStr2)     mstring_add(pStr1,pStr2 MTRACE_ARG)
-#define mstr_add_txt(pStr1,pTxt2,len) mstring_add_txt(pStr1,pTxt2,len MTRACE_ARG)
-#define mstr_add_to_txt(pTxt1,len,pStr2) mstring_add_to_txt(pTxt1, len, pStr2 MTRACE_ARG)
-#define mstr_append(pStr1,pStr2)  mstring_append(pStr1,pStr2 MTRACE_ARG)
-#define mstr_append_txt(pStr1,pTxt2,len) mstring_append_txt(pStr1,pTxt2,len MTRACE_ARG)
-#define mstr_repeat(pStr,num)    mstring_repeat(pStr,num MTRACE_ARG)
-#define mstr_extract(pStr,start,end) mstring_extract (pStr,start,end MTRACE_ARG)
-#define add_slash(pStr)          mstring_add_slash(pStr MTRACE_ARG)
-#define del_slash(pStr)          mstring_del_slash(pStr MTRACE_ARG)
-#define del_dotc(pStr)           mstring_del_dotc(pStr MTRACE_ARG)
-#define cvt_progname(pStr)       mstring_cvt_progname(pStr MTRACE_ARG)
-#define mstrchr(pStr,c)          mstring_chr(pStr, c)
-#define mstrprefixed(pStr1, pStr2) mstring_prefixed(pStr1, pStr2)
+#define alloc_mstring(iSize)               mstring_alloc_string(iSize MTRACE_ARG)
+#define new_mstring(pTxt,unicode)          mstring_new_string(pTxt,unicode MTRACE_ARG)
+#define new_n_mstring(pTxt,len,unicode)    mstring_new_n_string(pTxt,len,unicode MTRACE_ARG)
+#define new_tabled(pTxt,unicode)           mstring_new_tabled(pTxt,unicode MTRACE_ARG)
+#define new_n_tabled(pTxt,len,unicode)     mstring_new_n_tabled(pTxt,len,unicode MTRACE_ARG)
+#define new_unicode_mstring(pTxt)          mstring_new_unicode_string(pTxt MTRACE_ARG)
+#define new_n_unicode_mstring(pTxt,len)    mstring_new_n_unicode_string(pTxt,len MTRACE_ARG)
+#define new_unicode_tabled(pTxt)           mstring_new_unicode_tabled(pTxt MTRACE_ARG)
+#define new_n_unicode_tabled(pTxt,len)     mstring_new_n_unicode_tabled(pTxt,len MTRACE_ARG)
+#define make_tabled(pStr)                  mstring_make_tabled(pStr, MY_TRUE MTRACE_ARG)
+#define make_tabled_from(pStr)             mstring_make_tabled(pStr, MY_FALSE MTRACE_ARG)
+#define make_constant(pStr)                mstring_make_constant(pStr, false MTRACE_ARG)
+#define try_make_constant(pStr)            mstring_make_constant(pStr, true MTRACE_ARG)
+#define make_mutable(pStr)                 mstring_make_mutable(pStr MTRACE_ARG)
+#define dup_mstring(pStr)                  mstring_dup(pStr MTRACE_ARG)
+#define unshare_mstring(pStr)              mstring_unshare(pStr MTRACE_ARG)
+#define resize_mstring(pStr,n)             mstring_resize(pStr,n MTRACE_ARG)
+#define find_tabled(pStr)                  mstring_find_tabled(pStr)
+#define find_tabled_str(pTxt,unicode)      mstring_find_tabled_str(pTxt, strlen(pTxt), unicode)
+#define find_tabled_str_n(pTxt,n,unicode)  mstring_find_tabled_str(pTxt,n,unicode)
+#define mstr_get_hash(s)                   ((s)->hash ? (s)->hash : mstring_get_hash(s))
+#define mstrcmp(pStr1,pStr2)               mstring_compare(pStr1, pStr2)
+#define mstr_order(pStr1,pStr2)            mstring_order(pStr1, pStr2)
+#define mstreq(pStr1,pStr2)                mstring_equal(pStr1, pStr2)
+#define mstrstr(pStr,pTxt)                 mstring_mstr_n_str(pStr, 0, pTxt, strlen(pTxt))
+#define mstrrstr(pStr,pTxt)                mstring_mstr_rn_str(pStr, mstrsize(pStr)-1, pTxt, strlen(pTxt))
+#define mstr_add(pStr1,pStr2)              mstring_add(pStr1,pStr2 MTRACE_ARG)
+#define mstr_add_txt(pStr1,pTxt2,len)      mstring_add_txt(pStr1,pTxt2,len MTRACE_ARG)
+#define mstr_add_to_txt(pTxt1,len,pStr2)   mstring_add_to_txt(pTxt1, len, pStr2 MTRACE_ARG)
+#define mstr_append(pStr1,pStr2)           mstring_append(pStr1,pStr2 MTRACE_ARG)
+#define mstr_append_txt(pStr1,pTxt2,len)   mstring_append_txt(pStr1,pTxt2,len MTRACE_ARG)
+#define mstr_repeat(pStr,num)              mstring_repeat(pStr,num MTRACE_ARG)
+#define mstr_extract(pStr,start,end)       mstring_extract (pStr,start,end MTRACE_ARG)
+#define add_slash(pStr)                    mstring_add_slash(pStr MTRACE_ARG)
+#define del_slash(pStr)                    mstring_del_slash(pStr MTRACE_ARG)
+#define del_dotc(pStr)                     mstring_del_dotc(pStr MTRACE_ARG)
+#define cvt_progname(pStr)                 mstring_cvt_progname(pStr MTRACE_ARG)
+#define mstrchr(pStr,c)                    mstring_chr(pStr, c)
+#define mstrprefixed(pStr1, pStr2)         mstring_prefixed(pStr1, pStr2)
 
 #endif /* MSTRINGS_H_ */

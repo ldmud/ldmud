@@ -1990,7 +1990,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
                     /* Store the created result in .clean and pass it
                      * to case INFO_T_STRING is 'the' carg.
                      */
-                    put_string(&st->clean, new_n_mstring(st->tmp, b->size + b->offset - (p_int)sizeof(sprintf_buffer_t) ));
+                    put_string(&st->clean, new_n_unicode_mstring(st->tmp, b->size + b->offset - (p_int)sizeof(sprintf_buffer_t) ));
                     carg = &st->clean;
 
                     free_pointer_table(st->ptable);
@@ -2430,7 +2430,7 @@ add_table_now:
 
     /* Copy over the result */
     if  (st->bpos > 1)
-        result = new_n_mstring(st->buff, st->bpos-1);
+        result = new_n_unicode_mstring(st->buff, st->bpos-1);
     else
         result = ref_mstring(STR_EMPTY);
     if (!result)

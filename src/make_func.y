@@ -3404,7 +3404,7 @@ create_stdstrings (void)
 " */\n"
 "\n"
 "{\n"
-"#   define INIT(x,s) shstring[x] = mstring_new_tabled(s MTRACE_ARG);\n"
+"#   define INIT(x,s) shstring[x] = mstring_new_tabled(s, STRING_ASCII MTRACE_ARG);\n"
 "\n"
          , fpw);
 

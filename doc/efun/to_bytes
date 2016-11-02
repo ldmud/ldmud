@@ -1,0 +1,23 @@
+SYNOPSIS
+        string to_bytes(string unicode, string encoding)
+        string to_bytes(int* characters, string encoding)
+        string to_bytes(string bytesequence)
+        string to_bytes(int* bytes)
+
+DESCRIPTION
+        The first argument is converted to an encoded string.
+
+        The first two variants convert a unicode string resp. a sequence
+        of unicode characters to a byte sequence that represents
+        the encoded string. The second argument denotes the name of
+        the encoding to use.
+
+        The third variant just returns the argument.
+
+        The fourth variant converts an array of bytes to a byte string.
+
+HISTORY
+        Introduced in LDMud 3.6.0.
+
+SEE ALSO
+        to_text(E), to_string(E), to_array(E)

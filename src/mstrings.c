@@ -68,6 +68,7 @@
 
 #include "driver.h"
 
+#include <assert.h>
 #include <stdio.h>
 
 #include "mstrings.h"
@@ -258,7 +259,7 @@ mstring_get_hash (string_t * pStr)
 
 /*-------------------------------------------------------------------------*/
 static INLINE string_t *
-find_and_move (const char * const s, size_t size, hash32_t hash)
+find_and_move (const char * const s, size_t size, bool is_byte, hash32_t hash)
 /* If <s> is a tabled string of length <size> and <hash> in the related
  * stringtable chain: find it, move it to the head of the chain and return its
  * string_t*.
@@ -281,6 +282,7 @@ find_and_move (const char * const s, size_t size, hash32_t hash)
           && get_txt(rover) != s
           && !(   size == mstrsize(rover)
                && hash == get_hash(rover)
+               && is_byte == (rover->info.unicode == STRING_BYTES)
                && 0 == memcmp(get_txt(rover), s, size)
               )
         ; prev = rover, rover = rover->next
@@ -347,7 +349,7 @@ move_to_head (string_t *s, int idx)
 
 /*-------------------------------------------------------------------------*/
 static INLINE string_t *
-make_new_tabled (const char * const pTxt, size_t size, hash32_t hash MTRACE_DECL)
+make_new_tabled (const char * const pTxt, size_t size, enum unicode_type unicode, hash32_t hash MTRACE_DECL)
 /* Helper function for mstring_new_tabled() and mstring_new_n_tabled().
  *
  * Create a new tabled string by copying the data string <pTxt> of length
@@ -375,6 +377,7 @@ make_new_tabled (const char * const pTxt, size_t size, hash32_t hash MTRACE_DECL
     memcpy(string->txt, pTxt, size);
     string->txt[size] = '\0';
     string->info.type = STRING_TABLED;
+    string->info.unicode = unicode;
     string->info.ref = 1;
       /* An uninitialized memory read at this point is ok: it's because
        * the bitfield is initialized in parts.
@@ -430,6 +433,7 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
     string->hash = 0;
     string->txt[iSize] = '\0';
     string->info.type = STRING_UNTABLED;
+    string->info.unicode = STRING_ASCII;
     string->info.ref = 1;
       /* An uninitialized memory read at this point is ok: it's because
        * the bitfield is initialized in parts.
@@ -450,9 +454,9 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_new_string (const char * const pTxt MTRACE_DECL)
+mstring_new_string (const char * const pTxt, enum unicode_type unicode MTRACE_DECL)
 
-/* Aliased to: new_mstring(pTxt)
+/* Aliased to: new_mstring(pTxt, unicode)
  *
  * Create a new untabled string by copying the C string <pTxt> and
  * return it, counting the result as one reference.
@@ -467,9 +471,12 @@ mstring_new_string (const char * const pTxt MTRACE_DECL)
     size = strlen(pTxt);
 
     string = mstring_alloc_string(size MTRACE_PASS);
-    if (string && size)
+    if (string)
     {
-        memcpy(string->txt, pTxt, size);
+        string->info.unicode = unicode;
+
+        if (size)
+            memcpy(string->txt, pTxt, size);
     }
 
     return string;
@@ -477,9 +484,9 @@ mstring_new_string (const char * const pTxt MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_new_n_string (const char * const pTxt, size_t len MTRACE_DECL)
+mstring_new_n_string (const char * const pTxt, size_t len, enum unicode_type unicode MTRACE_DECL)
 
-/* Aliased to: new_n_mstring(pTxt, len)
+/* Aliased to: new_n_mstring(pTxt, len, unicode)
  *
  * Create a new untabled string by copying the <len> characters at <pTxt>
  * and return it, counting the result as one reference.
@@ -491,9 +498,12 @@ mstring_new_n_string (const char * const pTxt, size_t len MTRACE_DECL)
     string_t *string;
 
     string = mstring_alloc_string(len MTRACE_PASS);
-    if (string && len)
+    if (string)
     {
-        memcpy(string->txt, pTxt, len);
+        string->info.unicode = unicode;
+
+        if (len)
+            memcpy(string->txt, pTxt, len);
     }
 
     return string;
@@ -501,9 +511,9 @@ mstring_new_n_string (const char * const pTxt, size_t len MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_new_tabled (const char * const pTxt MTRACE_DECL)
+mstring_new_tabled (const char * const pTxt, enum unicode_type unicode MTRACE_DECL)
 
-/* Aliased to: new_tabled(pTxt)
+/* Aliased to: new_tabled(pTxt, unicode)
  *
  * Create a new tabled string by copying the C string <pTxt> and
  * return it counting the result as one reference. If a tabled string
@@ -521,21 +531,21 @@ mstring_new_tabled (const char * const pTxt MTRACE_DECL)
     hash = hash_string_inl(pTxt, size);
 
     /* Check if the string has already been tabled */
-    string = find_and_move(pTxt, size, hash);
+    string = find_and_move(pTxt, size, unicode == STRING_BYTES, hash);
     if (string)
     {
         return ref_mstring(string);
     }
 
     /* No: create a new one */
-    return make_new_tabled(pTxt, size, hash MTRACE_PASS);
+    return make_new_tabled(pTxt, size, unicode, hash MTRACE_PASS);
 } /* mstring_new_tabled() */
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_new_n_tabled (const char * const pTxt, size_t size MTRACE_DECL)
+mstring_new_n_tabled (const char * const pTxt, size_t size, enum unicode_type unicode MTRACE_DECL)
 
-/* Aliased to: new_n_tabled(pTxt, len)
+/* Aliased to: new_n_tabled(pTxt, len, unicode)
  *
  * Create a new tabled string by copying the C string <pTxt> of length <size>
  * and return it counting the result as one reference. If a tabled string
@@ -551,15 +561,84 @@ mstring_new_n_tabled (const char * const pTxt, size_t size MTRACE_DECL)
     hash = hash_string_inl(pTxt, size);
 
     /* Check if the string has already been tabled */
-    string = find_and_move(pTxt, size, hash);
+    string = find_and_move(pTxt, size, unicode == STRING_BYTES, hash);
     if (string)
     {
         return ref_mstring(string);
     }
 
     /* No: create a new one */
-    return make_new_tabled(pTxt, size, hash MTRACE_PASS);
+    return make_new_tabled(pTxt, size, unicode, hash MTRACE_PASS);
 } /* mstring_new_n_tabled() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_new_unicode_string (const char * const pTxt MTRACE_DECL)
+
+/* Aliased to: new_unicode_mstring(pTxt)
+ *
+ * Create a new untabled unicode string by copying the C string <pTxt>
+ * and return it, counting the result as one reference.
+ *
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    size_t len = strlen(pTxt);
+    return mstring_new_n_string(pTxt, len, is_ascii(pTxt, len) ? STRING_ASCII : STRING_UTF8 MTRACE_PASS);
+} /* mstring_new_unicode_string() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_new_n_unicode_string (const char * const pTxt, size_t len MTRACE_DECL)
+
+/* Aliased to: new_n_unicode_mstring(pTxt, len)
+ *
+ * Create a new untabled unicode string by copying the <len> characters
+ * at <pTxt> and return it, counting the result as one reference.
+ *
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    return mstring_new_n_string(pTxt, len, is_ascii(pTxt, len) ? STRING_ASCII : STRING_UTF8 MTRACE_PASS);
+} /* mstring_new_n_unicode_string() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_new_unicode_tabled (const char * const pTxt MTRACE_DECL)
+
+/* Aliased to: new_unicode_mstring(pTxt)
+ *
+ * Create a new tabled unicode string by copying the C string <pTxt> and
+ * return it counting the result as one reference. If a tabled string
+ * for the same <pTxt> already exists, a reference to that one is returned.
+ *
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    size_t len = strlen(pTxt);
+    return mstring_new_n_tabled(pTxt, len, is_ascii(pTxt, len) ? STRING_ASCII : STRING_UTF8 MTRACE_PASS);
+} /* mstring_new_unicode_tabled() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_new_n_unicode_tabled (const char * const pTxt, size_t len MTRACE_DECL)
+
+/* Aliased to: new_unicode_mstring(pTxt)
+ *
+ * Create a new tabled unicode string by copying the C string <pTxt> of
+ * length <size> and return it counting the result as one reference.
+ * If a tabled string for the same <pTxt> already exists, a reference
+ * to that one is returned.
+ *
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    return mstring_new_n_tabled(pTxt, len, is_ascii(pTxt, len) ? STRING_ASCII : STRING_UTF8 MTRACE_PASS);
+} /* mstring_new_n_unicode_tabled() */
 
 /*-------------------------------------------------------------------------*/
 static string_t *
@@ -596,7 +675,7 @@ table_string (string_t * pStr MTRACE_DECL)
     idx = HashToIndex(hash);
 
     /* Check if the string has already been tabled */
-    string = find_and_move(pStr->txt, size, hash);
+    string = find_and_move(pStr->txt, size, pStr->info.unicode == STRING_BYTES, hash);
 
     if (!string)
     {
@@ -664,7 +743,7 @@ string_t *
 mstring_make_constant (string_t * pStr, bool in_place_only MTRACE_DECL)
 
 /* Aliased to: make_constant(pStr)     : in_place_only = false
-/*             try_make_constant(pStr) : in_place_only = true
+ *             try_make_constant(pStr) : in_place_only = true
  *
  * Take the string <pStr> and convert it into a constant string if it is
  * a mutable string. This is done in-place if there is only one reference
@@ -786,6 +865,7 @@ mstring_dup (string_t * pStr MTRACE_DECL)
     if (string)
     {
         memcpy(string->txt,  pStr->txt, pStr->size);
+        string->info.unicode = pStr->info.unicode;
     }
 
     return string;
@@ -827,6 +907,7 @@ mstring_unshare (string_t * pStr MTRACE_DECL)
     if (string)
     {
         memcpy(string->txt,  pStr->txt, pStr->size);
+        string->info.unicode = pStr->info.unicode;
         free_mstring(pStr);
     }
 
@@ -868,6 +949,7 @@ mstring_resize (string_t * pStr, size_t newlen MTRACE_DECL)
             memcpy(string->txt,  pStr->txt, pStr->size);
         else
             memcpy(string->txt,  pStr->txt, newlen);
+        string->info.unicode = pStr->info.unicode;
     }
 
     free_mstring(pStr);
@@ -913,14 +995,14 @@ mstring_find_tabled (string_t * pStr)
     size = mstrsize(pStr);
     hash = get_hash(pStr);
 
-    return find_and_move(pStr->txt, size, hash);
+    return find_and_move(pStr->txt, size, pStr->info.unicode == STRING_BYTES, hash);
 } /* mstring_find_tabled() */
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_find_tabled_str (const char * const pTxt, size_t size)
+mstring_find_tabled_str (const char * const pTxt, size_t size, enum unicode_type unicode)
 
-/* Aliased to: find_tabled_str(pTxt), find_tabled_str_n(pTxt)
+/* Aliased to: find_tabled_str(pTxt, unicode), find_tabled_str_n(pTxt, size, unicode)
  *
  * Find the tabled string with the same content as the C string <pTxt> and
  * return it.
@@ -934,7 +1016,7 @@ mstring_find_tabled_str (const char * const pTxt, size_t size)
 
     hash = hash_string_inl(pTxt, size);
 
-    return find_and_move(pTxt, size, hash);
+    return find_and_move(pTxt, size, unicode == STRING_BYTES, hash);
 } /* mstring_find_tabled_str() */
 
 /*-------------------------------------------------------------------------*/
@@ -1027,6 +1109,9 @@ mstring_equal(string_t * const pStr1, string_t * const pStr2)
     if (mstrsize(pStr1) != mstrsize(pStr2))
         return MY_FALSE;
 
+    if ((pStr1->info.unicode == STRING_BYTES) != (pStr2->info.unicode == STRING_BYTES))
+        return MY_FALSE;
+
     if (get_hash(pStr1) != get_hash(pStr2))
     {
 #ifdef EXT_STRING_STATS
@@ -1065,6 +1150,14 @@ mstring_compare (string_t * const pStr1, string_t * const pStr2)
             stNumTabledComp++;
 #endif /* EXT_STRING_STATS */
         return 0;
+    }
+
+    /* Text strings are 'less' than byte strings */
+    {
+        bool isbyte1 = (pStr1->info.unicode == STRING_BYTES);
+        bool isbyte2 = (pStr2->info.unicode == STRING_BYTES);
+        if (isbyte1 != isbyte2)
+            return isbyte2 ? -1 : 1;
     }
 
     /* We have to compare two strings by byte.
@@ -1117,6 +1210,14 @@ mstring_order (string_t * const pStr1, string_t * const pStr2)
             stNumTabledComp++;
 #endif /* EXT_STRING_STATS */
         return 0;
+    }
+
+    /* Text strings are 'less' than byte strings */
+    {
+        bool isbyte1 = (pStr1->info.unicode == STRING_BYTES);
+        bool isbyte2 = (pStr2->info.unicode == STRING_BYTES);
+        if (isbyte1 != isbyte2)
+            return isbyte2 ? -1 : 1;
     }
 
     /* Shorter strings are 'less' than longer strings */
@@ -1207,14 +1308,12 @@ mstring_mstr_rn_str ( const string_t * const pStr, size_t start
 
 {
     const char * cp;
-    size_t left;
     char   first;
 
     if (start > mstrsize(pStr))
         return NULL;
 
     /* Initialize 'characters remaining' and 'current position' */
-    left = mstrsize(pStr) - start;
     cp = get_txt((string_t *const)pStr)+start;
 
     /* Special case: strrstr("text", "") */
@@ -1252,12 +1351,15 @@ mstring_add_slash (const string_t *str MTRACE_DECL)
     string_t *tmp;
     char * txt;
 
+    assert(str->info.unicode != STRING_BYTES);
+
     tmp = mstring_alloc_string(mstrsize(str)+1 MTRACE_PASS);
     if (tmp)
     {
         txt = get_txt(tmp);
         *txt = '/';
         memcpy(txt+1, get_txt((string_t *const)str), mstrsize(str));
+        tmp->info.unicode = str->info.unicode;
     }
     return tmp;
 } /* mstring_add_slash() */
@@ -1278,13 +1380,15 @@ mstring_del_slash (string_t *str MTRACE_DECL)
 {
     char * txt;
 
+    assert(str->info.unicode != STRING_BYTES);
+
     txt = get_txt(str);
     while (*txt == '/')
         txt++;
     if (txt == get_txt(str))
         return ref_mstring(str);
 
-    return mstring_new_string(txt MTRACE_PASS);
+    return mstring_new_string(txt, str->info.unicode MTRACE_PASS);
 } /* mstring_del_slash() */
 
 /*-------------------------------------------------------------------------*/
@@ -1304,6 +1408,8 @@ mstring_del_dotc (string_t *str MTRACE_DECL)
     size_t len;
     char * txt, *p;
 
+    assert(str->info.unicode != STRING_BYTES);
+
     txt = get_txt(str);
     len = mstrsize(str);
 
@@ -1318,6 +1424,7 @@ mstring_del_dotc (string_t *str MTRACE_DECL)
     if (tmp)
     {
         memcpy(get_txt(tmp), txt, len);
+        tmp->info.unicode = str->info.unicode;
     }
 
     return tmp;
@@ -1345,6 +1452,8 @@ mstring_cvt_progname (const string_t *str MTRACE_DECL)
     const char * txt, *p;
     char *txt2;
 
+    assert(str->info.unicode != STRING_BYTES);
+
     txt = get_txt((string_t *const)str);
     len = mstrsize(str);
 
@@ -1367,6 +1476,7 @@ mstring_cvt_progname (const string_t *str MTRACE_DECL)
             len--;
         }
         memcpy(txt2, txt, len);
+        tmp->info.unicode = str->info.unicode;
     }
 
     return tmp;
@@ -1390,6 +1500,8 @@ mstring_add (const string_t *left, const string_t *right MTRACE_DECL)
     size_t lleft, lright;
     string_t *tmp;
 
+    assert((left->info.unicode == STRING_BYTES) == (right->info.unicode == STRING_BYTES));
+
     lleft = mstrsize(left);
     lright = mstrsize(right);
     tmp = mstring_alloc_string(lleft+lright MTRACE_PASS);
@@ -1400,6 +1512,10 @@ mstring_add (const string_t *left, const string_t *right MTRACE_DECL)
         txt = get_txt(tmp);
         memcpy(txt, get_txt((string_t *const)left), lleft);
         memcpy(txt+lleft, get_txt((string_t *const)right), lright);
+        if (left->info.unicode == STRING_UTF8)
+            tmp->info.unicode = STRING_UTF8;
+        else
+            tmp->info.unicode = right->info.unicode;
     }
     return tmp;
 } /* mstring_add() */
@@ -1430,6 +1546,7 @@ mstring_add_txt (const string_t *left, const char *right, size_t len MTRACE_DECL
         txt = get_txt(tmp);
         memcpy(txt, get_txt((string_t *const)left), lleft);
         memcpy(txt+lleft, right, len);
+        tmp->info.unicode = left->info.unicode;
     }
     return tmp;
 } /* mstring_add_txt() */
@@ -1460,6 +1577,7 @@ mstring_add_to_txt (const char *left, size_t len, const string_t *right MTRACE_D
         txt = get_txt(tmp);
         memcpy(txt, left, len);
         memcpy(txt+len, get_txt((string_t *const)right), lright);
+        tmp->info.unicode = right->info.unicode;
     }
     return tmp;
 } /* mstring_add_to_txt() */
@@ -1557,6 +1675,10 @@ mstring_repeat (const string_t *base, size_t num MTRACE_DECL)
         if (reslen > curlen)
             memcpy(txt+curlen, txt, reslen-curlen);
     }
+
+    if (result)
+        result->info.unicode = base->info.unicode;
+
     return result;
 } /* mstring_repeat() */
 
@@ -1619,6 +1741,14 @@ mstring_extract (const string_t *str, size_t start, long end MTRACE_DECL)
     {
         memcpy(get_txt(result), get_txt((string_t *const)str)+start, reslen);
     }
+    if (result)
+    {
+        if (str->info.unicode == STRING_UTF8)
+            result->info.unicode = is_ascii(get_txt(result), reslen) ? STRING_ASCII : STRING_UTF8;
+        else
+            result->info.unicode = str->info.unicode;
+    }
+
     return result;
 } /* mstring_extract() */
 
@@ -1634,6 +1764,8 @@ mstring_prefixed (const string_t *p, const string_t *s)
 {
     const char *pp, *ps;
     size_t lp, ls;
+
+    assert((p->info.unicode == STRING_BYTES) == (s->info.unicode == STRING_BYTES));
 
     lp = mstrsize(p); pp = get_txt((string_t *const)p);
     ls = mstrsize(s); ps = get_txt((string_t *const)s);

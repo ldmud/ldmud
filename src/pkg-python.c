@@ -658,7 +658,7 @@ ldmud_object_init (ldmud_object_t *self, PyObject *args, PyObject *kwds)
     if (! PyArg_ParseTupleAndKeywords(args, kwds, "s#", kwlist, &filename, &length))
         return -1;
 
-    data.filename = new_n_mstring(filename, length);
+    data.filename = new_n_unicode_mstring(filename, length);
     if(!data.filename)
     {
         PyErr_SetString(PyExc_MemoryError, "out of memory");
@@ -2684,9 +2684,8 @@ ldmud_struct_init (ldmud_struct_t *self, PyObject *args, PyObject *kwds)
 
     /* Lookup the struct type. */
     /* TODO: This lookup also includes NAME_HIDDEN entries, maybe only consider visible structs. */
-    lpc_struct_name = new_n_mstring(name, length);
-    lpc_struct_type = struct_find(lpc_struct_name, lpc_ob->prog);
-    free_mstring(lpc_struct_name);
+    lpc_struct_name = find_tabled_str_n(name, length, STRING_UTF8);
+    lpc_struct_type = lpc_struct_name ? struct_find(lpc_struct_name, lpc_ob->prog) : NULL;
 
     if(!lpc_struct_type)
     {
@@ -2789,9 +2788,8 @@ ldmud_struct_init (ldmud_struct_t *self, PyObject *args, PyObject *kwds)
                     }
 
                     PyBytes_AsStringAndSize(utf8, &buf, &member_length);
-                    member_name = new_n_mstring(buf, member_length);
-                    idx = struct_find_member(lpc_struct_type, member_name);
-                    free_mstring(member_name);
+                    member_name = find_tabled_str_n(buf, member_length, STRING_UTF8);
+                    idx = member_name ? struct_find_member(lpc_struct_type, member_name) : -1;
 
                     if (idx < 0)
                     {
@@ -2894,9 +2892,8 @@ ldmud_struct_getattr (ldmud_struct_t *obj, char *name)
         return NULL;
     }
 
-    member_name = new_mstring(name);
-    idx = struct_find_member(obj->lpc_struct->type, member_name);
-    free_mstring(member_name);
+    member_name = find_tabled_str(name, STRING_UTF8);
+    idx = member_name ? struct_find_member(obj->lpc_struct->type, member_name) : -1;
 
     if (idx < 0)
     {
@@ -2930,9 +2927,8 @@ ldmud_struct_setattr (ldmud_struct_t *obj, char *name, PyObject *value)
         return -1;
     }
 
-    member_name = new_mstring(name);
+    member_name = find_tabled_str(name, STRING_UTF8);
     idx = struct_find_member(obj->lpc_struct->type, member_name);
-    free_mstring(member_name);
 
     if (idx < 0)
     {
@@ -3097,7 +3093,7 @@ ldmud_closure_init (ldmud_closure_t *self, PyObject *args, PyObject *kwds)
             return -1;
         }
 
-        funname = find_tabled_str_n(name, length);
+        funname = find_tabled_str_n(name, length, STRING_UTF8);
         if(funname)
             idx = find_function(funname, prog_ob->prog);
         else
@@ -3412,7 +3408,7 @@ ldmud_symbol_init (ldmud_symbol_t *self, PyObject *args, PyObject *kwds)
         return -1;
     }
 
-    str = new_n_tabled(name, length);
+    str = new_n_tabled(name, length, STRING_UTF8);
     if (str == NULL)
     {
         PyErr_NoMemory();

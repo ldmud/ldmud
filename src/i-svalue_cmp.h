@@ -102,6 +102,9 @@ rvalue_cmp (svalue_t *left, svalue_t *right)
         if (lr->vec.type == T_STRING)
         {
             /* String ranges */
+            if ((d = (lr->vec.u.str->info.unicode == STRING_BYTES) - (rr->vec.u.str->info.unicode == STRING_BYTES)) != 0)
+                return d;
+
             if ((d = (lr->index2 - lr->index1) - (rr->index2 - rr->index1)) != 0)
                 return d;
 
@@ -125,6 +128,9 @@ rvalue_cmp (svalue_t *left, svalue_t *right)
 
         if (sv->type != T_STRING)
             return ((sv->type < T_STRING) == (left_rv == NULL)) ? 1 : -1;
+
+        if ((d = (sv->u.str->info.unicode == STRING_BYTES) - (r->vec.u.str->info.unicode == STRING_BYTES)) != 0)
+            return ((d < 0) == (left_rv == NULL)) ? 1 : -1;
 
         len = mstrsize(sv->u.str);
         if ((d = (len - (r->index2 - r->index1))) != 0)
@@ -217,6 +223,9 @@ rvalue_eq (svalue_t *left, svalue_t *right)
             if ((lr->index2 - lr->index1) != (rr->index2 - rr->index1))
                 return -1;
 
+            if ((lr->vec.u.str->info.unicode == STRING_BYTES) != (rr->vec.u.str->info.unicode == STRING_BYTES))
+                return -1;
+
             return (memcmp(get_txt(lr->vec.u.str) + lr->index1, get_txt(rr->vec.u.str) + rr->index1, lr->index2 - lr->index1) == 0) ? 0 : -1;
         }
         else
@@ -236,6 +245,9 @@ rvalue_eq (svalue_t *left, svalue_t *right)
 
         len = mstrsize(sv->u.str);
         if (len != r->index2 - r->index1)
+            return -1;
+
+        if ((r->vec.u.str->info.unicode == STRING_BYTES) != (sv->u.str->info.unicode == STRING_BYTES))
             return -1;
 
         return (memcmp(get_txt(sv->u.str), get_txt(r->vec.u.str) + r->index1, len) == 0) ? 0 : -1;

@@ -1111,13 +1111,13 @@ rx_sub_str (regexp_t *pRegexp, char *source, char *subst)
     string_t *m_subst;
     string_t *rc;
 
-    m_source = new_mstring(source);
+    m_source = new_unicode_mstring(source);
     if (!m_source)
     {
         return NULL;
     }
 
-    m_subst = new_mstring(subst);
+    m_subst = new_unicode_mstring(subst);
     if (!m_subst)
     {
         free_mstring(m_source);

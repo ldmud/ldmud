@@ -2625,7 +2625,7 @@ get_message (char *buff)
                             {
                                 string_t * str;
 
-                                str = new_n_mstring(rp + 8, rest);
+                                str = new_n_mstring(rp + 8, rest, STRING_BYTES);
                                 push_string(inter_sp, str);
 
                                 num_arg = 1;
@@ -2760,7 +2760,7 @@ get_message (char *buff)
             {
                 string_t *udp_data;
 
-                udp_data = new_n_mstring(udp_buf, cnt);
+                udp_data = new_n_mstring(udp_buf, cnt, STRING_BYTES);
                 if (!udp_data)
                 {
                     debug_message("%s Out of memory (%d bytes) for UDP message.\n"
@@ -3325,7 +3325,7 @@ remove_interactive (object_t *ob, Bool force)
         if (numRemaining > 0)
         {
             string_t * remaining = NULL;
-            memsafe( remaining = new_n_mstring(interactive->text+interactive->command_start, numRemaining)
+            memsafe( remaining = new_n_mstring(interactive->text+interactive->command_start, numRemaining, STRING_BYTES)
                    , numRemaining, "buffer for remaining data from socket");
             push_string(inter_sp, remaining);
         }
@@ -6000,7 +6000,7 @@ add_ip_entry (struct in_addr addr, const char *name)
     iptable[ix].addr = addr;
     if (iptable[ix].name)
         free_mstring(iptable[ix].name);
-    iptable[ix].name = new_tabled(name);
+    iptable[ix].name = new_tabled(name, STRING_ASCII);
 
     if (new_entry)
         ipcur = (ipcur+1) % IPSIZE;
@@ -6029,7 +6029,7 @@ update_ip_entry (const char *oldname, const char *newname)
            )
         {
             free_mstring(iptable[i].name);
-            iptable[i].name = new_tabled(newname);
+            iptable[i].name = new_tabled(newname, STRING_ASCII);
         }
     }
 } /* update_ip_entry() */
@@ -6081,9 +6081,9 @@ lookup_ip_entry (struct in_addr addr, Bool useErq)
 
     memcpy(&tmp, &addr, sizeof(tmp));
 #ifndef USE_IPV6
-    ipname = new_tabled(inet_ntoa(tmp));
+    ipname = new_tabled(inet_ntoa(tmp), STRING_ASCII);
 #else
-    ipname = new_tabled(inet6_ntoa(tmp));
+    ipname = new_tabled(inet6_ntoa(tmp), STRING_ASCII);
 #endif
 
     iptable[ipcur].name = ipname;
@@ -8725,9 +8725,9 @@ f_interactive_info (svalue_t *sp)
             string_t *haddr;
 
 #ifndef USE_IPV6
-            haddr = new_mstring(inet_ntoa(ip->addr.sin_addr));
+            haddr = new_mstring(inet_ntoa(ip->addr.sin_addr), STRING_ASCII);
 #else
-            haddr = new_mstring(inet6_ntoa(ip->addr.sin_addr));
+            haddr = new_mstring(inet6_ntoa(ip->addr.sin_addr), STRING_ASCII);
 #endif
 
             if (!haddr)

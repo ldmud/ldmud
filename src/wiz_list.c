@@ -374,7 +374,7 @@ load_wiz_file (void)
         {
             string_t * tmp;
 
-            tmp = new_mstring(buff);
+            tmp = new_unicode_mstring(buff);
             add_name(tmp)->score += score;
             free_mstring(tmp);
         }
@@ -448,12 +448,12 @@ save_error (const char *msg, const char *file, int line)
         p[1] = 'c';
         p[2] = '\0';
     }
-    wl->file_name = new_mstring(copy);
+    wl->file_name = new_unicode_mstring(copy);
 
     /* Set the error_message */
     if (wl->error_message)
         free_mstring(wl->error_message);
-    wl->error_message = new_mstring(msg);
+    wl->error_message = new_unicode_mstring(msg);
 
     /* Set the line_number */
     wl->line_number = line;

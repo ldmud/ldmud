@@ -5197,7 +5197,7 @@ define_new_struct ( Bool proto, ident_t *p, const char * prog_name, funflag_t fl
 
     /* Fill in the struct_def_t */
     sdef.type  = struct_new_prototype(ref_mstring(p->name)
-                                    , new_tabled(prog_name));
+                                    , new_unicode_tabled(prog_name));
     sdef.flags = proto ? (flags | NAME_PROTOTYPE)
                        : (flags & ~NAME_PROTOTYPE);
     sdef.inh = -1;
@@ -7613,7 +7613,7 @@ inheritance:
                    * we just got.
                    */
                   free_mstring(last_string_constant);
-                  last_string_constant = new_tabled(cp);
+                  last_string_constant = new_tabled(cp, res->u.str->info.unicode);
               }
               /* else: no result - use the string as it is */
           }
@@ -14205,7 +14205,7 @@ find_inherited_function ( const char * super_name
     string_t *rname;
     short     ix;
 
-    rname = find_tabled_str(real_name);
+    rname = find_tabled_str(real_name, STRING_UTF8);
 
     ix =  rname ? lookup_inherited(super_name, rname, &ip, flags) : -1;
     if (ix >= 0) /* Also return the inherit index. */
@@ -16492,7 +16492,7 @@ store_include_info (char *name, char * filename, char delim, int depth)
             }
         }
 
-        inc.filename = new_tabled(filename);
+        inc.filename = new_unicode_tabled(filename);
         if (inc.filename == NULL)
         {
             inc.filename = ref_mstring(STR_DEFAULT);
@@ -16516,7 +16516,7 @@ store_include_info (char *name, char * filename, char delim, int depth)
             tmp[len+1] = delim;
             tmp[len+2] = '\0';
 
-            inc.name = new_tabled(tmp);
+            inc.name = new_unicode_tabled(tmp);
             if (inc.name == NULL)
             {
                 inc.name = ref_mstring(STR_DEFAULT);
@@ -17250,7 +17250,7 @@ epilog (void)
         *prog = NULL_program;
 
         /* Set up the program structure */
-        if ( !(prog->name = new_mstring(current_loc.file->name)) )
+        if ( !(prog->name = new_unicode_mstring(current_loc.file->name)) )
         {
             xfree(prog);
             yyerrorf("Out of memory: filename '%s'", current_loc.file->name);

@@ -332,6 +332,9 @@ mixed  *to_array(string|mixed*|symbol|quoted_array|struct);
 mixed   to_struct(mapping|mixed*|struct, void|struct);
 object  to_object(null|object|string|closure);
 
+string  to_bytes(string|int*, void|string);
+string  to_text(string|int*, void|string);
+
 mixed  *struct_info(struct, int);
 int     baseof(struct, struct);
 

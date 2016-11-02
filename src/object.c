@@ -3362,7 +3362,7 @@ f_rename_object (svalue_t *sp)
         }
     }
 
-    m_name = new_mstring(name);
+    m_name = new_mstring(name, sp[0].u.str->info.unicode);
     if (!m_name)
     {
         if (freenamebuffer)
@@ -3535,9 +3535,9 @@ v_replace_program (svalue_t *sp, int num_arg)
             if (name[name_len-2] != '.' || name[name_len-1] != 'c')
                 strcat(name,".c");
             if (*name == '/')
-                sname = new_mstring(name+1);
+                sname = new_mstring(name+1, sp->u.str->info.unicode);
             else
-                sname = new_mstring(name);
+                sname = new_mstring(name, sp->u.str->info.unicode);
             /* name is not needed anymore, free it first, before throwing any
              * runtime errors. */
             xfree(name);
@@ -4524,7 +4524,7 @@ v_present (svalue_t *sp, int num_arg)
         if (hasNumber)
         {
             string_t * sitem;
-            memsafe(sitem = new_n_mstring(item, length), length, "id string");
+            memsafe(sitem = new_n_mstring(item, length, arg->u.str->info.unicode), length, "id string");
             free_mstring(arg->u.str);
             arg->u.str = sitem;
         }
@@ -8127,7 +8127,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         /* If the variable exists, it must exist as shared
          * string.
          */
-        s = find_tabled_str(name);
+        s = find_tabled_str(name, STRING_UTF8);
         if (!s)
         {
             *svp = const0;
@@ -8323,7 +8323,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         if (fun_ix_offs < 0) /* No need to lookup in case of an error. */
             s = NULL;
         else
-            s = find_tabled_str(name);
+            s = find_tabled_str(name, STRING_UTF8);
         /* Although s is NULL, we parse to the end. */
 
         if (s)
@@ -8638,7 +8638,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         }
         *cp = '\0';
         *pt = source;
-        put_string(svp, new_n_tabled(start, len));
+        put_string(svp, new_n_unicode_tabled(start, len));
         if (!svp->u.str)
         {
             *svp = const0;
@@ -8895,7 +8895,7 @@ old_restore_string (svalue_t *v, char *str)
         if (cp[-2] == '\n' && cp[-3] == '\"')
         {
             cp[-3] = '\0';
-            put_string(v, new_tabled(str));
+            put_string(v, new_unicode_tabled(str));
             if (!v->u.str)
             {
                 *v = const0;
@@ -9286,7 +9286,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
         do { /* A simple try.. environment */
 
-            if ( NULL != (var = find_tabled_str(cur)) )
+            if ( NULL != (var = find_tabled_str(cur, STRING_UTF8)) )
             {
                 /* The name exists in an object somewhere, now check if it
                  * is one of our variables

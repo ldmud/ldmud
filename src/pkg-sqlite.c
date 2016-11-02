@@ -743,7 +743,7 @@ sl_vfs_full_pathname (sqlite3_vfs* vfs, const char* name, int len, char* buf)
  */
 
 {
-    string_t *orig_file = new_mstring(name);
+    string_t *orig_file = new_unicode_mstring(name);
     string_t *new_file = check_valid_path(orig_file, current_object, STR_SQLITE_OPEN , MY_TRUE);
     int rc;
 

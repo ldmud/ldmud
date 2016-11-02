@@ -786,7 +786,7 @@ struct_new_anonymous (int num_members)
     for (i = 0; i < num_members; i++)
     {
         sprintf(buf, "m-%d", i);
-        pType->member[i].name = new_tabled(buf);
+        pType->member[i].name = new_tabled(buf, STRING_ASCII);
         if (!pType->member[i].name)
         {
             debug_message("(%s:%d) Out of memory (%zu bytes) for member name\n"
@@ -1121,7 +1121,7 @@ struct_t_unique_name (struct_type_t *pSType)
                 , get_txt(struct_t_pname(pSType))
                 , struct_t_pid(pSType)
            );
-    pSType->unique_name = new_mstring(name);
+    pSType->unique_name = new_unicode_mstring(name);
 
     return pSType->unique_name;
 } /* struct_t_unique_name() */

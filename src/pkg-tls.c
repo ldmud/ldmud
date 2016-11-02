@@ -495,7 +495,7 @@ f_tls_error(svalue_t *sp)
 
     if (text)
     {
-        memsafe(s = new_mstring(text), strlen(text), "tls_error()");
+        memsafe(s = new_unicode_mstring(text), strlen(text), "tls_error()");
         free_svalue(sp);
         put_string(sp, s);
     }

@@ -3062,7 +3062,7 @@ put_c_string (svalue_t *sp, const char *p)
 {
     string_t * str;
 
-    memsafe(str = new_mstring(p), strlen(p), "string");
+    memsafe(str = new_unicode_mstring(p), strlen(p), "string");
     put_string(sp, str);
 } /* put_c_string() */
 
@@ -3076,7 +3076,7 @@ put_c_n_string (svalue_t *sp, const char *p, size_t len)
 {
     string_t * str;
 
-    memsafe(str = new_n_mstring(p, len), len, "string");
+    memsafe(str = new_n_unicode_mstring(p, len), len, "string");
     put_string(sp, str);
 } /* put_c_n_string() */
 
@@ -17745,7 +17745,7 @@ get_line_number_if_any (string_t **name)
             if (buf[sizeof buf - 1] != '\0')
                 fatal("interpret:get_line_number_if_any(): "
                       "buffer overflow.\n");
-            memsafe(*name = new_mstring(buf), strlen(buf), "instruction name");
+            memsafe(*name = new_unicode_mstring(buf), strlen(buf), "instruction name");
         }
         else
             *name = ref_mstring(STR_EFUN_CLOSURE);
@@ -17761,7 +17761,7 @@ get_line_number_if_any (string_t **name)
 
         strncpy(buf + 2, iname, sizeof(buf) - 2);
         buf[sizeof(buf - 1)] = 0;
-        memsafe(*name = new_mstring(buf), strlen(buf), "python efun name");
+        memsafe(*name = new_unicode_mstring(buf), strlen(buf), "python efun name");
 
         return 0;
     }
@@ -17777,7 +17777,7 @@ get_line_number_if_any (string_t **name)
             lambda_t * l;
 
             sprintf(name_buffer, "<lambda 0x%6p>", csp->funstart);
-            memsafe(*name = new_mstring(name_buffer), strlen(name_buffer)
+            memsafe(*name = new_mstring(name_buffer, STRING_ASCII), strlen(name_buffer)
                    , "lambda name");
             /* Find the beginning of the lambda structure.*/
             l = (lambda_t *)( (PTRTYPE)(csp->funstart)
@@ -18062,7 +18062,7 @@ not_catch:  /* The frame does not point at a catch here */
                     string_t *tmp;
 
                     NEW_ENTRY(entry, TRACE_TYPE_EFUN, ob->prog->name, dump_eval_cost);
-                    memsafe(tmp = new_mstring(iname), strlen(iname)
+                    memsafe(tmp = new_mstring(iname, STRING_ASCII), strlen(iname)
                            , "instruction name");
                     put_string(entry->vec->item+TRACE_NAME, tmp);
                 }
@@ -18238,7 +18238,7 @@ dump_trace (Bool how, vector_t ** rvec, string_t ** rstr)
         fputs(sbuf.buf, stdout);
     debug_message("%s", sbuf.buf);
     if (rstr)
-        *rstr = new_mstring(sbuf.buf);
+        *rstr = new_unicode_mstring(sbuf.buf);
 
     /* Cleanup and return */
     strbuf_free(&sbuf);
@@ -18467,7 +18467,7 @@ last_instr_output (char *str, svalue_t **svpp)
     if (svpp)
     {
         string_t *s;
-        memsafe(s = new_mstring(str), strlen(str), "copy of instruction name");
+        memsafe(s = new_unicode_mstring(str), strlen(str), "copy of instruction name");
         put_string((*svpp), s);
         (*svpp)++;
     }

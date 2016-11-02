@@ -1946,7 +1946,7 @@ v_trim (svalue_t *sp, int num_arg)
         size_t newlen;
 
         newlen = (size_t)(right - left);
-        memsafe(trimmed = new_n_mstring(left, newlen), newlen, "trimmed result");
+        memsafe(trimmed = new_n_unicode_mstring(left, newlen), newlen, "trimmed result");
         free_string_svalue(argp);
         put_string(argp, trimmed);
     }
@@ -2354,7 +2354,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 str = NULL;
             else
             {
-                str = find_tabled_str_n(parts[i], lens[i]);
+                str = find_tabled_str_n(parts[i], lens[i], STRING_UTF8);
             }
             if (str != NULL && map != NULL)
             {
@@ -3067,7 +3067,7 @@ process_value (const char *str, Bool original)
     /* Check if the function exists at all. apply() will be delighted
      * over the shared string anyway.
      */
-    if ( NULL == (func2 = find_tabled_str(func)) )
+    if ( NULL == (func2 = find_tabled_str(func, STRING_UTF8)) )
     {
         /* free the error handler if necessary. */
         if (original)
@@ -3083,7 +3083,7 @@ process_value (const char *str, Bool original)
     {
         string_t *objstr;
 
-        memsafe(objstr = new_mstring(obj), strlen(obj), "object name");
+        memsafe(objstr = new_unicode_mstring(obj), strlen(obj), "object name");
         ob = find_object(objstr);
         free_mstring(objstr);
     }
@@ -4155,7 +4155,7 @@ match_skipped:
                 if (flags.do_assign)
                 {
                     string_t *matchstr;
-                    memsafe(matchstr = new_n_mstring(in_string, (size_t)num)
+                    memsafe(matchstr = new_n_unicode_mstring(in_string, (size_t)num)
                            , num, "matchstring");
                     put_string(&sv_tmp, matchstr);
                     transfer_svalue(arg, &sv_tmp);
@@ -5036,9 +5036,9 @@ v_present_clone (svalue_t *sp, int num_arg)
         sane_name = (char *)make_name_sane(name0, !compat_mode);
 
         if (sane_name)
-            name = find_tabled_str(sane_name);
+            name = find_tabled_str(sane_name, STRING_UTF8);
         else
-            name = find_tabled_str(name0);
+            name = find_tabled_str(name0, STRING_UTF8);
         
         /* tmpbuf (and name0 which might point to the same memory) is unneeded
          * from now on. Setting both to NULL, just in case somebody uses 
@@ -5905,7 +5905,7 @@ f_to_string (svalue_t *sp)
         if (buf[sizeof(buf)-1] != '\0')
             fatal("Buffer overflow in to_string(): "
                   "int number too big.\n");
-        memsafe(s = new_mstring(buf), strlen(buf), "converted number");
+        memsafe(s = new_mstring(buf, STRING_ASCII), strlen(buf), "converted number");
         break;
 
     case T_FLOAT:
@@ -5913,7 +5913,7 @@ f_to_string (svalue_t *sp)
         if (buf[sizeof(buf)-1] != '\0')
             fatal("Buffer overflow in to_string: "
                   "int number too big.\n");
-        memsafe(s = new_mstring(buf), strlen(buf), "converted number");
+        memsafe(s = new_mstring(buf, STRING_ASCII), strlen(buf), "converted number");
         break;
 
     case T_OBJECT:
@@ -5927,40 +5927,8 @@ f_to_string (svalue_t *sp)
         break;
 
     case T_POINTER:
-      {
-        /* Arrays of ints are considered exploded strings and
-         * converted back accordingly, ie. up to the first non-int.
-         */
-
-        long size;
-        svalue_t *svp;
-        char *d;
-
-        size = (long)VEC_SIZE(sp->u.vec);
-        svp = sp->u.vec->item;
-        memsafe(s = alloc_mstring(size), size, "converted array");
-        d = get_txt(s);
-        while (size--)
-        {
-            svalue_t *item = get_rvalue(svp, NULL);
-            if (item == NULL || item->type != T_NUMBER)
-            {
-                if (d == get_txt(s))
-                {
-                    free_mstring(s);
-                    s = ref_mstring(STR_EMPTY);
-                }
-                else
-                    memsafe(s = resize_mstring(s, d-get_txt(s))
-                           , d-get_txt(s), "converted array");
-                break;
-            }
-            *d++ = (char)item->u.number;
-            svp++;
-        }
-        free_array(sp->u.vec);
-        break;
-      }
+        /* Alias for to_text(array). */
+        return v_to_text(sp, 1);
 
     case T_STRUCT:
       {
@@ -5970,10 +5938,12 @@ f_to_string (svalue_t *sp)
         const char * fmt = "<struct %s>";
 
         name = struct_name(sp->u.strct);
-        size = strlen(fmt)+mstrsize(name);
+        size = strlen(fmt)+mstrsize(name)-2;
 
         memsafe(rc = alloc_mstring(size), size, "converted struct");
         sprintf(get_txt(rc), fmt, get_txt(name));
+        if (!is_ascii(get_txt(name), size))
+            rc->info.unicode = STRING_UTF8;
         free_struct(sp->u.strct);
         put_string(sp, rc);
         break;
@@ -6040,14 +6010,53 @@ f_to_array (svalue_t *sp)
         /* Split the string into an array of ints */
 
         len = (p_int)mstrsize(sp->u.str);
-        v = allocate_uninit_array((mp_int)len);
         s = get_txt(sp->u.str);
-        svp = v->item;
-        while (len-- > 0) {
-            ch = (unsigned char)*s++;
-            put_number(svp, ch);
-            svp++;
+
+        if (sp->type == T_STRING && sp->u.str->info.unicode == STRING_UTF8)
+        {
+            bool error;
+            size_t chars = byte_to_char_index(s, len, &error);
+            if (error)
+                errorf("to_array(): Invalid character in string at index %zd.\n", chars);
+
+            v = allocate_uninit_array((mp_int)chars);
+            svp = v->item;
+
+            /* This is a UTF8 string, let's decode it. */
+            while (len)
+            {
+                p_int code;
+                size_t codelen = utf8_to_unicode(s, len, &code);
+
+                if (!codelen)
+                    errorf("to_array(): Invalid character in string at index %zd.\n",
+                        byte_to_char_index(get_txt(sp->u.str), mstrsize(sp->u.str) - len, NULL));
+
+                len -= codelen;
+                s += codelen;
+
+                put_number(svp, code);
+                svp++;
+            }
+
+            /* We should be at the end, otherwise utf8_to_unicode()
+             * or byte_to_char_index() did something wrong.
+             */
+            assert(svp == v->item + chars);
         }
+        else
+        {
+            v = allocate_uninit_array((mp_int)len);
+            svp = v->item;
+
+            while (len-- > 0)
+            {
+                ch = (unsigned char)*s++;
+                put_number(svp, ch);
+                svp++;
+            }
+        }
+
         free_svalue(sp);
         put_array(sp, v);
         break;
@@ -8804,7 +8813,7 @@ f_driver_info (svalue_t *sp)
 
             strbuf_zero(&sbuf);
             collect_trace(&sbuf, NULL);
-            put_string(&result, new_mstring(sbuf.buf));
+            put_string(&result, new_unicode_mstring(sbuf.buf));
             strbuf_free(&sbuf);
             break;
         }
@@ -9751,11 +9760,11 @@ f_ctime(svalue_t *sp)
         if (cp)
         {
             int len = cp - ts;
-            memsafe(rc = new_n_mstring(ts, len), len, "ctime() result");
+            memsafe(rc = new_n_unicode_mstring(ts, len), len, "ctime() result");
         }
         else
         {
-            memsafe(rc = new_mstring(ts), strlen(ts), "ctime() result");
+            memsafe(rc = new_unicode_mstring(ts), strlen(ts), "ctime() result");
         }
     }
     else
@@ -9780,12 +9789,12 @@ f_ctime(svalue_t *sp)
             if (cp)
             {
                 int len = cp - ts;
-                memsafe(rc = new_n_tabled(ts, len), len,
+                memsafe(rc = new_n_unicode_tabled(ts, len), len,
                         "ctime() result");
             }
             else
             {
-                memsafe(rc = new_tabled(ts), strlen(ts),
+                memsafe(rc = new_unicode_tabled(ts), strlen(ts),
                         "ctime() result");
             }
             /* fill cache, free last (invalid) string first and don't forget 
@@ -10005,7 +10014,7 @@ v_strftime(svalue_t *sp, int num_arg)
         errorf("Bad time in strftime(): %"PRIdMPINT" can't be "
             "represented by the host system. Maybe too large?\n", clk);
 
-    memsafe(rc = new_tabled(ts), strlen(ts)+sizeof(string_t), "strftime() result");
+    memsafe(rc = new_unicode_tabled(ts), strlen(ts)+sizeof(string_t), "strftime() result");
     
     sp = pop_n_elems(num_arg, sp);
     push_string(sp, rc);
