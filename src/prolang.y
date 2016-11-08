@@ -15644,6 +15644,8 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
             }
 
             newvx++;
+            if (newvx == newprogp->num_variables)
+                newvx = num_new_virtual_variables;
         }
         else
         {
