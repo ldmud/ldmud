@@ -30,14 +30,14 @@ void run_test()
 
     for(testnum = 0; testnum < 16; testnum++)
     {
-        foreach(string ob: ({"a","b","c"}))
+        foreach(string ob: ({"a","b","c","d"}))
             destruct(find_object(ob));
 
         counter = ([:1]);
         load_object("b");
         destruct(find_object("a"));
 
-        for(int i=1; i <= 10; i++)
+        for(int i=1; i <= 11; i++)
         {
             string testname = sprintf("%d%c", testnum + 1, 'a' + i - 1);
             object d;
