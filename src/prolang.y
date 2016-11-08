@@ -15230,6 +15230,8 @@ get_virtual_function_id (program_t *progp, int fx)
 {
     funflag_t flags;
 
+    assert(fx < progp->num_functions);
+
     flags = progp->functions[fx];
 
     /* Handle a cross-define */
@@ -15722,7 +15724,7 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
 
     {
         function_t *newfunp;
-        function_t *oldfunp, *lastoldfunp, *origfunp;
+        function_t *oldfunp, *lastoldfunp;
         unsigned short *oldix = oldprogp->function_names;
         unsigned short *newix = newprogp->function_names;
         int oldleft = oldprogp->num_function_names;
@@ -15865,21 +15867,25 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
                 oldfunp[*oldix].flags = NAME_UNDEFINED|NAME_HIDDEN;
         }
 
-        /* And all visible functions in the updated program
-         * will be cross-defined to the previous instance.
+        /* Now we have to take care of the remaining functions with names
+         * (the ones still have NAME_HIDDEN, but not being NAME_CROSS_DEFINED).
+         * They must either be a registered identifier, being cross-defined,
+         * or hidden as TYPE_MOD_PRIVATE. The first and second options
+         * one would require to implement the function inherit logic for
+         * a function that was inherited and the old inherit's place
+         * with the old inherit's modifier. Therefore we use the simple
+         * approach and keep all surfacing functions hidden (because they
+         * were not part of the inherited program).
          */
-        origfunp = FUNCTION(newinheritp->function_index_offset);
-        newix = newprogp->function_names;
-        for (newleft = newprogp->num_function_names; --newleft >= 0; newix++)
-        {
-            if ( !(newfunp[*newix].flags & NAME_CROSS_DEFINED))
-            {
-                cross_define(origfunp + *newix, newfunp + *newix,
-                    newinheritp->function_index_offset - updateinherit.function_index_offset);
 
-                update_function_identifier(origfunp + *newix, newinheritp->function_index_offset + *newix,
-                                           newfunp + *newix, updateinherit.function_index_offset + *newix);
-            }
+        /* Reset newix and newleft. */
+        newix = newprogp->function_names;
+        newleft = newprogp->num_function_names;
+
+        for (; --newleft >= 0; newix++)
+        {
+            if ( (newfunp[*newix].flags & (NAME_HIDDEN|NAME_CROSS_DEFINED)) == NAME_HIDDEN )
+                newfunp[*newix].flags |= TYPE_MOD_PRIVATE;
         }
     }
 
@@ -15978,6 +15984,18 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
 
                         update_function_identifier(oldfunp + oldix, dupinheritp->function_index_offset + oldix,
                                                    newfunp + newix, dupupdate.function_index_offset + newix);
+                    }
+                }
+
+                /* And hide any surfaced functions. */
+                {
+                    unsigned short *newix = newprogp->function_names;
+                    int newleft = newprogp->num_function_names;
+
+                    for (; --newleft >= 0; newix++)
+                    {
+                        if ( (newfunp[*newix].flags & (NAME_HIDDEN|NAME_CROSS_DEFINED)) == NAME_HIDDEN )
+                            newfunp[*newix].flags |= TYPE_MOD_PRIVATE;
                     }
                 }
 
@@ -16439,9 +16457,36 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
      * be removed.
      */
     fun_p = FUNCTION(first_func_index);
-    for (int i = 0, current_func_index = first_func_index; i < from->num_functions; i++, current_func_index++)
+    for (int newix = 0; newix < from->num_functions; newix++)
     {
+        int i = newix;                                 /* Index relative to the inherit
+                                                        * Same as index into fun_p.
+                                                        */
+        int current_func_index = first_func_index + i; /* Index into the current prog. */
+
+        program_t *funprogp = from;
+        int funprogidx = i;                            /* Index into <funprog>. */
+
         function_t fun = fun_p[i];
+        if (fun.flags & NAME_CROSS_DEFINED)
+        {
+            /* We'll check whether this is a cross-definition to an
+             * updated virtual program. Then we need to handle the
+             * name there.
+             */
+            int32 offset = GET_CROSSDEF_OFFSET(fun.offset.func);
+            if (i + offset >= from->num_functions)
+            {
+                i += offset;
+                current_func_index += offset;
+                fun = fun_p[i];
+
+                /* This should be a virtual inherited function. */
+                assert(fun.flags & TYPE_MOD_VIRTUAL);
+                funprogp = INHERIT(fun.offset.inherit).prog;
+                funprogidx = i + first_func_index - INHERIT(fun.offset.inherit).function_index_offset;
+            }
+        }
 
         /* Apply nomask now, visibility later when we know
          * that this the dominant definition.
@@ -16536,7 +16581,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
                         }
                         else if ((fun.flags | funmodifier) & TYPE_MOD_VIRTUAL
                               && OldFunction->flags & TYPE_MOD_VIRTUAL
-                          &&    get_virtual_function_id(from, i)
+                          &&    get_virtual_function_id(funprogp, funprogidx)
   == get_virtual_function_id(INHERIT(OldFunction->offset.inherit).prog
                 , n - INHERIT(OldFunction->offset.inherit).function_index_offset
                      )
@@ -16711,7 +16756,8 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
             }
 
             /* Recognize the initializer function */
-            if (mstreq(fun.name, STR_VARINIT))
+            if (mstreq(fun.name, STR_VARINIT)
+             && (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) != (TYPE_MOD_PRIVATE|NAME_HIDDEN))
             {
                 initializer = i;
                 fun.flags |= NAME_UNDEFINED;
