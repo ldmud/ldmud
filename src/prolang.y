@@ -15218,6 +15218,31 @@ cross_define (function_t *from, function_t *to, int32 offset)
 } /* cross_define() */
 
 /*-------------------------------------------------------------------------*/
+static void
+update_function_identifier (function_t *from, short fromidx, function_t *to, short toidx)
+
+/* The function <to> (function index <toidx> was cross-defined to the real
+ * function <from> (with function index <fromidx>).
+ * If there is any identifier with their name update it accordingly.
+ */
+
+{
+    ident_t *ident = find_shared_identifier_mstr(from->name, I_TYPE_GLOBAL, 0);
+    if (ident && ident->u.global.function == toidx)
+    {
+        /* We first have to check, whether <from> is also a cross-defintion. */
+        while (from->flags & NAME_CROSS_DEFINED)
+        {
+            int32 offset = GET_CROSSDEF_OFFSET(from->offset.func);
+            from += offset;
+            fromidx += offset;
+        }
+
+        ident->u.global.function = fromidx;
+    }
+} /* update_function_identifier() */
+
+/*-------------------------------------------------------------------------*/
 static funflag_t *
 get_virtual_function_id (program_t *progp, int fx)
 
@@ -15765,11 +15790,6 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
                 function_t *curoldfunp = oldfunp + *oldix;
                 function_t *curnewfunp = newfunp + *newix;
                 function_t *realoldfunp = curoldfunp;
-                ident_t *fun_ident = find_shared_identifier_mstr(oldname, I_TYPE_GLOBAL, 0);
-
-                /* Ignore non-function identifier. */
-                if (fun_ident && (fun_ident->type != I_TYPE_GLOBAL || fun_ident->u.global.function < 0))
-                    fun_ident = NULL;
 
                 while (realoldfunp->flags & NAME_CROSS_DEFINED)
                     realoldfunp = realoldfunp + GET_CROSSDEF_OFFSET(realoldfunp->offset.func);
@@ -15788,8 +15808,13 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
                     cross_define(curnewfunp, curoldfunp,
                         updateinherit.function_index_offset + *newix - oldinheritp->function_index_offset - *oldix);
 
-                    if (fun_ident && fun_ident->u.global.function == oldinheritp->function_index_offset + *oldix)
-                        fun_ident->u.global.function = updateinherit.function_index_offset + *newix;
+                    update_function_identifier(curnewfunp, updateinherit.function_index_offset + *newix,
+                                               curoldfunp, oldinheritp->function_index_offset + *oldix);
+
+                    /* Also take over the visibility. */
+                    curnewfunp->flags = (curnewfunp->flags & ~(NAME_HIDDEN))
+                                      | (curoldfunp->flags & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED))
+                                      | TYPE_MOD_VIRTUAL;
                 }
                 else
                 {
@@ -15799,8 +15824,8 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
                     cross_define(curoldfunp, curnewfunp,
                         oldinheritp->function_index_offset + *oldix - updateinherit.function_index_offset - *newix);
 
-                    if (fun_ident && fun_ident->u.global.function == updateinherit.function_index_offset + *newix)
-                        fun_ident->u.global.function = oldinheritp->function_index_offset + *oldix;
+                    update_function_identifier(curoldfunp, oldinheritp->function_index_offset + *oldix,
+                                               curnewfunp, updateinherit.function_index_offset + *newix);
                 }
 
                 fun_map[*oldix] = *newix;
@@ -15877,9 +15902,8 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
                 cross_define(origfunp + *newix, newfunp + *newix,
                     newinheritp->function_index_offset - updateinherit.function_index_offset);
 
-                ident_t *fun_ident = find_shared_identifier_mstr(origfunp[*newix].name, I_TYPE_GLOBAL, 0);
-                if (fun_ident && fun_ident->type == I_TYPE_GLOBAL && fun_ident->u.global.function == updateinherit.function_index_offset + *newix)
-                    fun_ident->u.global.function = newinheritp->function_index_offset + *newix;
+                update_function_identifier(origfunp + *newix, newinheritp->function_index_offset + *newix,
+                                           newfunp + *newix, updateinherit.function_index_offset + *newix);
             }
         }
     }
@@ -15962,8 +15986,12 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
                         cross_define(newfunp + newix, oldfunp + oldix,
                             dupupdate.function_index_offset + newix - dupinheritp->function_index_offset - oldix);
 
-                        if (fun_ident && fun_ident->u.global.function == dupinheritp->function_index_offset + oldix)
-                            fun_ident->u.global.function = dupupdate.function_index_offset + newix;
+                        update_function_identifier(newfunp + newix, dupupdate.function_index_offset + newix,
+                                                   oldfunp + oldix, dupinheritp->function_index_offset + oldix);
+
+                        newfunp[newix].flags = (newfunp[newix].flags & ~(NAME_HIDDEN))
+                                             | (oldfunp[oldix].flags & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED))
+                                             | TYPE_MOD_VIRTUAL;
                     }
                     else
                     {
@@ -15973,8 +16001,8 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
                         cross_define(oldfunp + oldix, newfunp + newix,
                             dupinheritp->function_index_offset + oldix - dupupdate.function_index_offset - newix);
 
-                        if (fun_ident && fun_ident->u.global.function == dupupdate.function_index_offset + newix)
-                            fun_ident->u.global.function = dupinheritp->function_index_offset + oldix;
+                        update_function_identifier(oldfunp + oldix, dupinheritp->function_index_offset + oldix,
+                                                   newfunp + newix, dupupdate.function_index_offset + newix);
                     }
                 }
 
