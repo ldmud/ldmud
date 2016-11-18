@@ -5725,6 +5725,14 @@ printf("DEBUG:   move code forward: from %"PRIuMPINT", length %"PRIuMPINT
     CURRENT_PROGRAM_SIZE -= length + (start - end);
     stored_bytes -= length + (start - end);
 
+    /* Update last_expression, so it doesn't point into
+     * the inline closure code block that we just removed.
+     */
+    if (bAbort)
+        last_expression = -1;
+    else
+        last_expression = PROGRAM_BLOCK + end; /* There is the F_CONTEXT_CLOSURE. */
+
 #ifdef DEBUG_INLINES
 printf("DEBUG:   program size: %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
