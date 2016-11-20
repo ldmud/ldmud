@@ -621,6 +621,40 @@ mixed *tests = ({
            return arr == 6 && result == "ulav";
        :)
     }),
+    ({
+       "implode with references in the array 1", 0,
+       (:
+           string b = "B";
+           int val = 67;
+           string d = "LDMud";
+           
+           return implode(({"A", &b, &val, &(d[1..1])}),":") == "A:B:D";
+       :)
+    }),
+    ({
+       "implode with references in the array 2", 0,
+       (:
+           string s = "xyz";
+
+           return implode(({&s, "123"}), ", ") == "xyz, 123";
+       :)
+    }),
+    ({
+       "implode with references in the array 3", 0,
+       (:
+           string s = "abc";
+
+           return implode(({&(s[1..1]), "2"}), ", ") == "b, 2";
+       :)
+    }),
+    ({
+       "implode with references in the array 4", 0,
+       (:
+           string s = "abc";
+
+           return implode(({&s, &(s[1..1])}), ", ") == "abc, b";
+       :)
+    }),
     ({ "referencep with a lvalue parameter", 0,
        (:
            int var;
