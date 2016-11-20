@@ -640,6 +640,7 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
     char *p;
     string_t *result;
     svalue_t *svp;
+    bool first = true;
 
     del_len = mstrsize(del);
     deltxt = get_txt(del);
@@ -649,14 +650,16 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
     size = -(mp_int)del_len;
     for (i = (arr_size = (mp_int)VEC_SIZE(arr)), svp = arr->item; --i >= 0; svp++)
     {
-        if (svp->type == T_STRING) {
-            size += (mp_int)del_len + mstrsize(svp->u.str);
-        }
-        else if (destructed_object_ref(svp))
+        svalue_t *elem = get_rvalue(svp, NULL);
+        if (elem == NULL)
         {
-            /* While we're here anyway... */
-            assign_svalue(svp, &const0);
+            /* This is a range. */
+            struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
+            if (r->vec.type == T_STRING)
+                size += (mp_int)del_len + r->index2 - r->index1;
         }
+        else if (elem->type == T_STRING)
+            size += (mp_int)del_len + mstrsize(elem->u.str);
     }
 
     /* Allocate the string; cop out if there's nothing to implode.
@@ -680,30 +683,46 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
      */
 
     svp = arr->item;
+    i = arr_size;
 
-    /* Look for the first element to add (there is at least one!) */
-    for (i = arr_size; svp->type != T_STRING; )
+    while (i-- > 0)
     {
-        --i;
-        svp++;
-    }
-
-    memcpy(p, get_txt(svp->u.str), mstrsize(svp->u.str));
-    p += mstrsize(svp->u.str);
-
-    /* Copy the others if any */
-    while (--i > 0)
-    {
-        svp++;
-        if (svp->type == T_STRING)
+        svalue_t *elem = get_rvalue(svp, NULL);
+        if (elem == NULL)
         {
-            memcpy(p, deltxt, del_len);
-            p += del_len;
-            memcpy(p, get_txt(svp->u.str), mstrsize(svp->u.str));
-            p += mstrsize(svp->u.str);
+            /* This is a range. */
+            struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
+            if (r->vec.type == T_STRING)
+            {
+                if (first)
+                    first = false;
+                else
+                {
+                    memcpy(p, deltxt, del_len);
+                    p += del_len;
+                }
+
+                memcpy(p, get_txt(r->vec.u.str) + r->index1, r->index2 - r->index1);
+                p += r->index2 - r->index1;
+            }
         }
+        else if (elem->type == T_STRING)
+        {
+            if (first)
+                first = false;
+            else
+            {
+                memcpy(p, deltxt, del_len);
+                p += del_len;
+            }
+            memcpy(p, get_txt(elem->u.str), mstrsize(elem->u.str));
+            p += mstrsize(elem->u.str);
+        }
+
+        svp++;
     }
 
+    assert(p - get_txt(result) == size);
     return result;
 } /* implode_array() */
 
