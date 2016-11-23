@@ -87,7 +87,12 @@ f_json_parse (svalue_t *sp)
 
     // parse text into json object
     parsed = json_tokener_parse(get_txt(sp->u.str));
+
+#ifdef HAS_JSONC
+    if (!parsed || parsed == NULL)
+#else
     if (!parsed || is_error(parsed))
+#endif
     {
         errorf("json_parse(): could not parse string - probably illegal JSON format.\n");
     }
