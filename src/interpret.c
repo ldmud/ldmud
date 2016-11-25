@@ -13353,6 +13353,22 @@ again:
         free_svalue(&indexing_quickfix);
         break;
 
+    CASE(F_MAKE_RVALUE);
+    {
+        /* Operator val=sp[0]
+         *
+         * If there is a protected lvalue on the stack,
+         * put its value on the stack instead. If it is not
+         * a protected lvalue, leave it. (Unprotected
+         * lvalues are forbidden here.)
+         */
+        svalue_t val = sp[0];
+
+        inter_pc = pc;
+        transfer_rvalue_no_free(sp, &val);
+        break;
+    }
+
                           /* --- push_virtual_variable_vlvalue <num> --- */
     CASE(F_PUSH_VIRTUAL_VARIABLE_VLVALUE);
         /* Push a var-lvalue onto the stack pointing to virtual object-global

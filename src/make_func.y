@@ -112,6 +112,9 @@
  *        The types are given in the usual LPC syntax, with the additional
  *        type of 'unknown' for return types.
  *
+ *        The return type can contain a  '&' to indicate, that it might
+ *        put an lvalue reference on the stack.
+ *
  *        Argument types can be the combination of several types in
  *        the form 'type|type|...', e.g. 'string|object'. If one of the
  *        types is 'void', the argument is optional (but then only optional
@@ -736,12 +739,12 @@ code:     optional_name ID optional_optype
         num_instr[current_code_class]++;
 
         if ($3 == 0)
-            sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, NULL , -1, -1, \"%s\", NULL },\n"
+            sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, NULL , -1, -1, false, \"%s\", NULL },\n"
                         , classprefix[instr[num_buff].code_class]
                         , f_name, classtag[instr[num_buff].code_class]
                         , $1);
         else
-            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, 0, &_lpctype_mixed, -1, -1, \"%s\", NULL },\n"
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, 0, &_lpctype_mixed, -1, -1, false, \"%s\", NULL },\n"
                         , classprefix[instr[num_buff].code_class]
                         , f_name, classtag[instr[num_buff].code_class]
                         , $3, $3
@@ -919,18 +922,24 @@ func: type ID optional_ID '(' arg_list optional_default ')' optional_name ';'
 
             tag = (code_class == C_EFUN) ? classtag[C_CODE] : classtag[code_class];
 
-            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, %s, %d, %d, \"%s\""
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, %s, %d, %d, %s, \"%s\""
                         , f_prefix, f_name, tag
                         , unlimit_max ? -1 : max_arg, min_arg
-                        , $6, lpctypestr($1), arg_index, lpc_index, $2
+                        , $6, lpctypestr($1 & ~MF_TYPE_MOD_REFERENCE)
+                        , arg_index, lpc_index
+                        , ($1 & MF_TYPE_MOD_REFERENCE) ? "true" : "false"
+                        , $2
                    );
 
         }
         else
         {
-            sprintf(buff, "{ 0, 0, %d, %d, %s, %s, %d, %d, \"%s\""
+            sprintf(buff, "{ 0, 0, %d, %d, %s, %s, %d, %d, %s, \"%s\""
                         , unlimit_max ? -1 : max_arg, min_arg
-                        , $6, lpctypestr($1), arg_index, lpc_index, $2
+                        , $6, lpctypestr($1 & ~MF_TYPE_MOD_REFERENCE)
+                        , arg_index, lpc_index
+                        , ($1 & MF_TYPE_MOD_REFERENCE) ? "true" : "false"
+                        , $2
                    );
         }
 

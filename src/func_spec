@@ -12,6 +12,9 @@
  * An argument is marked as optional if it also takes the type 'void'.
  * The type alternative 'null' denotes arguments which may take the
  * number 0 instead of values of the other types.
+ * The return type might be annotated with a '&' to indicate, that the
+ * efun might return an lvalue reference that must be converted to an
+ * rvalue at the end.
  *
  * Look at the end for the list of functions that are optionally available.
  * If you don't want them, simply comment out them. All other functions must
@@ -192,6 +195,7 @@
         ax_range_lvalue
         map_index_lvalue
         make_protected
+        make_rvalue
         push_virtual_variable_vlvalue
         push_identifier_vlvalue
         push_identifier16_vlvalue
@@ -266,8 +270,8 @@ int     sizeof(null|string|mixed|mixed *|mapping|struct);
 
         /* Functions and Closures */
 
-unknown call_other(object|string|object *|string *, string, ...);
-unknown call_direct(object|string|object *|string *, string, ...);
+unknown& call_other(object|string|object *|string *, string, ...);
+unknown& call_direct(object|string|object *|string *, string, ...);
           /* The lexer switches the return type between 'unknown'
            * and 'any' depending on the _types pragmas.
            */
@@ -435,8 +439,8 @@ int     widthof(null|mapping);
 
         /* Functions and Closures */
 
-mixed   apply(mixed|closure, ...);
-mixed   funcall(mixed|closure, ...);
+mixed&  apply(mixed|closure, ...);
+mixed&  funcall(mixed|closure, ...);
 
 closure bind_lambda(closure, object|void);
 closure lambda(null|mixed *, mixed);
@@ -549,7 +553,7 @@ int     get_eval_cost();
 string *last_instructions(int, int default: F_CONST1);
 #endif
 mixed  *rusage();
-mixed   limited(closure, ...);
+mixed&  limited(closure, ...);
 void    set_driver_hook(int, closure|int|string|mapping|string*);
 void    shutdown(int default: F_CONST0);
 int     trace(int);
