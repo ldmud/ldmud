@@ -5731,7 +5731,7 @@ printf("DEBUG:   move code forward: from %"PRIuMPINT", length %"PRIuMPINT
     if (bAbort)
         last_expression = -1;
     else
-        last_expression = PROGRAM_BLOCK + end; /* There is the F_CONTEXT_CLOSURE. */
+        last_expression = end; /* There is the F_CONTEXT_CLOSURE. */
 
 #ifdef DEBUG_INLINES
 printf("DEBUG:   program size: %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
