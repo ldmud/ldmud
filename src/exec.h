@@ -237,6 +237,10 @@ struct instr_s
                          /* A '-1' index means that no type information
                           * is available.
                           */
+    bool might_return_lvalue;
+                         /* The efun might return an lvalue reference,
+                          * which must be unravalled at the end.
+                          */
     char *name;          /* The printable name of the instruction. */
     char *deprecated;    /* Usually NULL, for deprecated efuns this is
                           * the warning message to print.

@@ -199,6 +199,7 @@ enum compile_value_input_flags
     VOID_ACCEPTED      = 0x02, /* any return value can be left out */
     NEGATE_ACCEPTED    = 0x04, /* Caller accepts a reversed logic result */
     REF_ACCEPTED       = 0x08, /* lvalue references may be produced */
+    LEAVE_LVALUE       = 0x10, /* For function calls, leave lvalue references. */
 };
 
 enum compile_value_output_flags
@@ -221,6 +222,7 @@ enum compile_lvalue_input_flags
     MAKE_VAR_LVALUE    = 0x02, /* Make an variable lvalue */
                                /* (ignore any lvalues in the variable) */
     RESEATING_ACCEPTED = 0x04, /* Allow reseating references (&var). */
+    ALLOW_FUNCTION_CALL= 0x08, /* Allow function calls (maybe-lvalues). */
 };
 
 #define UNIMPLEMENTED \
@@ -355,6 +357,12 @@ static void lambda_cerror(const char *s) FORMATDEBUG(printf,1,0) NORETURN;
 static void lambda_cerrorl(const char *s1, const char *s2 UNUSED, int line1 UNUSED, 
                            int line2 UNUSED) NORETURN FORMATDEBUG(printf,1,0);
 static void free_symbols(void);
+static int compile_efun_call(ph_int type, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags);
+static int compile_sefun_call(ph_int type, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags);
+#ifdef USE_PYTHON
+static int compile_python_efun_call(ph_int type, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags);
+#endif
+static int compile_lambda_call(ph_int type, svalue_t* closure, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags);
 static Bool is_lvalue (svalue_t *argp, int flags);
 static void compile_lvalue(svalue_t *, int);
 static lambda_t * lambda (vector_t *args, svalue_t *block, object_t *origin);
@@ -3921,38 +3929,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
             {
                 /* Closure is an python-defined efun */
 
-                mp_int block_size;  /* Number of entries */
-
-                block_size = (mp_int)VEC_SIZE(block);
-                /* This is compiled as:
-                 *
-                 * <save_arg_frame>
-                 * <arg1>
-                 * <arg2>
-                 * ...
-                 * <argN>
-                 * <python_efun>
-                 * <restore_arg_frame>
-                 */
-
-                int f = type - CLOSURE_PYTHON_EFUN;
-
-                if (current.code_left < 1)
-                    realloc_code();
-                STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
-                current.code_left--;
-
-                /* Compile the arguments */
-                mp_int num_arg = (mp_int)VEC_SIZE(block) - 1;
-                for (mp_int i = block_size; --i > 0; )
-                    compile_value(++argp, 0);
-
-                if (current.code_left < 4)
-                    realloc_code();
-                STORE_CODE(current.codep, F_PYTHON_EFUN);
-                STORE_SHORT(current.codep, (short)f);
-                STORE_CODE(current.codep, F_RESTORE_ARG_FRAME);
-                current.code_left -= 4;
+                result_flags = compile_python_efun_call(type, (mp_int)VEC_SIZE(block) - 1, argp+1, opt_flags);
             }
 #endif
             else /* it's an EFUN closure */
@@ -4003,7 +3980,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     	 */
                         if (!(opt_flags & REF_ACCEPTED))
                             lambda_error("Reference value in bad position\n");
-                        compile_lvalue(++argp, PROTECT_LVALUE);
+                        compile_lvalue(++argp, PROTECT_LVALUE|ALLOW_FUNCTION_CALL);
                         result_flags |= REF_GIVEN;
                     }
                     else
@@ -4115,148 +4092,9 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                   }
 
                 default:
-                  {
-                    /* This is compiled as:
-                     *
-                     *   optional <save_arg_frame>
-                     *   <arg1>
-                     *   <arg2>
-                     *   ...
-                     *   <argN>
-                     *   <efun>
-                     *   optional <restore_arg_frame>
-                     */
-                    
-                    mp_int i;
-                    bytecode_p p;
-                    int f;
-                    Bool needs_ap;
-                    mp_int num_arg;
-                    mp_int min;
-                    mp_int max;
-                    mp_int def;
+                    result_flags = compile_efun_call(type, (mp_int)VEC_SIZE(block) - 1, argp+1, opt_flags);
+                    break;
 
-                    /* Get the instruction code */
-                    f = type - CLOSURE_EFUN;
-                    min = instrs[f].min_arg;
-                    max = instrs[f].max_arg;
-
-                    /* Handle the arg frame for varargs efuns */
-                    needs_ap = MY_FALSE;
-                    if (f >= EFUNV_OFFSET || f == F_CALL_OTHER)
-                    {
-                        needs_ap = MY_TRUE;
-                        if (current.code_left < 1)
-                            realloc_code();
-                        current.code_left--;
-                        STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
-                    }
-
-                    /* Compile the arguments */
-                    num_arg = (mp_int)VEC_SIZE(block) - 1;
-                    for (i = num_arg; --i >= 0; )
-                    {
-                        compile_value(++argp, REF_ACCEPTED);
-                    }
-
-                    /* Get the instruction and check if it received the
-                     * correct number of arguments.
-                     */
-                    argp = block->item;
-                    if (current.code_left < 8)
-                        realloc_code();
-
-                    /* The 'efun' #'-> needs a hidden argument
-                     * for the struct type index.
-                     */
-                    if (f == F_S_INDEX)
-                    {
-                        current.code_left--;
-                        STORE_CODE(current.codep, (bytecode_t)F_NCONST1);
-                    }
-
-                    p = current.codep;
-                    if (num_arg < min)
-                    {
-                        /* Not enough arguments... probably */
-
-                        int g;
-
-                        if (num_arg == min-1 && 0 != (def = instrs[f].Default))
-                        {
-                            /* We have a default argument */
-                            if (instrs[def].prefix)
-                            {
-                                STORE_CODE(p, instrs[def].prefix);
-                                current.code_left--;
-                                max--;
-                                min--;
-                            }
-                            STORE_CODE(p, instrs[def].opcode);
-                            current.code_left--;
-                            max--;
-                            min--;
-                        }
-                        else
-                            /* Maybe there is a replacement efun */
-                             if ( (g = proxy_efun(f, num_arg)) < 0
-                         ||  (f = g, MY_FALSE) )
-                            /* No, there isn't */
-                            lambda_error("Too few arguments to %s\n", instrs[f].name);
-                    }
-                    else if (num_arg > max && max != -1)
-                    {
-                        /* More arguments than the efun can handle */
-                        if (f == F_INDEX && num_arg == 3)
-                        {
-                            /* Exception: indexing of wide mappings */
-                            f = F_MAP_INDEX;
-                        }
-                        else
-                        {
-                            lambda_error(
-                              "Too many arguments to %s\n",
-                              instrs[f].name
-                            );
-                        }
-                    }
-
-                    /* Store function bytecode. */
-                    if (instrs[f].prefix)
-                    {
-                        STORE_CODE(p, instrs[f].prefix);
-                        current.code_left--;
-                    }
-                    STORE_CODE(p, instrs[f].opcode);
-                    current.code_left--;
-
-                    /* Note the type of the result, and add a CONST0 if
-                     * the caller expects one from a void efun. Always
-                     * add the CONST0 for void varargs efuns.
-                     */
-                    if ( instrs[f].ret_type == lpctype_void )
-                    {
-                        if (f < EFUNV_OFFSET
-                         && (opt_flags & (ZERO_ACCEPTED|VOID_ACCEPTED)))
-                        {
-                            result_flags = VOID_GIVEN;
-                        }
-                        else
-                        {
-                            STORE_CODE(p, F_CONST0);
-                            current.code_left--;
-                        }
-                    }
-
-                    /* Handle the arg frame for varargs efuns */
-                    if (needs_ap)
-                    {
-                        current.code_left--;
-                        STORE_CODE(p, F_RESTORE_ARG_FRAME);
-                    }
-
-                    current.codep = p;
-                  } /* case default: */
                 } /* switch */
                 break;
             }
@@ -4264,139 +4102,8 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
         else switch (type) /* type >= CLOSURE_SIMUL_EFUN */
         {
         default: /* SIMUL_EFUN closure */
-          {
-            /* This is compiled as:
-             *    sefun <= 0xffff           sefun > 0xffff
-             *
-             *    opt. SAVE_ARG_FRAME       SAVE_ARG_FRAME
-             *                              <sefun_object_name>
-             *                              <sefun_name>
-             *    <arg1>                    <arg1>
-             *    ...                       ...
-             *    <argN>                    <argN>
-             *    SIMUL_EFUN <sefun>        CALL_DIRECT
-             *    opt. RESTORE_ARG_FRAME    RESTORE_ARG_FRAME
-             */
-
-            int simul_efun;
-            mp_int num_arg;
-            int i;
-            Bool needs_ap;
-            Bool needs_call_direct;
-
-            simul_efun = type - CLOSURE_SIMUL_EFUN;
-
-            needs_ap = MY_FALSE;
-            needs_call_direct = (simul_efun >= SEFUN_TABLE_SIZE);
-
-            if (needs_call_direct)
-            {
-            	/* We have to call the sefun by name */
-                static svalue_t string_sv = { T_STRING };
-
-                if (current.code_left < 1)
-                    realloc_code();
-                current.code_left -= 1;
-                STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
-                needs_ap = MY_TRUE;
-
-                string_sv.u.str = query_simul_efun_file_name();
-                compile_value(&string_sv, 0);
-                string_sv.u.str = simul_efunp[simul_efun].name;
-                compile_value(&string_sv, 0);
-            }
-            else if (simul_efunp[simul_efun].num_arg == SIMUL_EFUN_VARARGS
-                  || 0 != (simul_efunp[simul_efun].flags & TYPE_MOD_XVARARGS)
-                    )
-            {
-                /* varargs efuns need the arg frame */
-
-                if (current.code_left < 1)
-                    realloc_code();
-                current.code_left -= 1;
-                STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
-                needs_ap = MY_TRUE;
-            }
-
-            /* Compile the arguments */
-
-            num_arg = (mp_int)VEC_SIZE(block) - 1;
-            if (!needs_call_direct)
-            {
-                function_t *funp = &simul_efunp[simul_efun];
-                if (num_arg > funp->num_arg
-                  && !(funp->flags & TYPE_MOD_XVARARGS)
-                   )
-                {
-                    lambda_error(
-                      "Too many arguments to simul_efun %s\n"
-                     , get_txt(funp->name)
-                    );
-                    num_arg = funp->num_arg;
-                }
-            }
-
-            for (i = num_arg; --i >= 0; )
-            {
-                compile_value(++argp, REF_ACCEPTED);
-            }
-
-            /* and the simul-efun instruction */
-
-            if (current.code_left < 3)
-                realloc_code();
-
-            if (needs_call_direct)
-            {
-            	/* We need the call_other */
-                current.code_left -= 1;
-                STORE_CODE(current.codep, F_CALL_DIRECT);
-                if (num_arg + 1 > 0xff)
-                    lambda_error("Argument number overflow\n");
-            }
-            else
-            {
-            	/* We can call by index */
-            	
-                function_t *funp = &simul_efunp[simul_efun];
-
-                if (!needs_ap)
-                {
-                    /* The function takes fixed number of args:
-                     * push 0s onto the stack for missing args
-                     */
-
-                    if (num_arg < funp->num_arg
-                      && funp->num_arg != SIMUL_EFUN_VARARGS
-                       )
-                    {
-                        lambda_error(
-                          "Missing arguments to simul_efun %s\n"
-                         , get_txt(funp->name)
-                        );
-                    }
-
-                    i = funp->num_arg - num_arg;
-                    if (i > 1 && current.code_left < i + 4)
-                        realloc_code();
-                    current.code_left -= i;
-                    while ( --i >= 0 ) {
-                        STORE_CODE(current.codep, F_CONST0);
-                    }
-                }
-
-                STORE_CODE(current.codep, F_SIMUL_EFUN);
-                STORE_SHORT(current.codep, (short)simul_efun);
-                current.code_left -= 3;
-
-                if (needs_ap)
-                {
-                    STORE_UINT8(current.codep, F_RESTORE_ARG_FRAME);
-                    current.code_left--;
-                }
-            }
+            result_flags = compile_sefun_call(type, (mp_int)VEC_SIZE(block) - 1, argp+1, opt_flags);
             break;
-          } /* CLOSURE_SIMUL_EFUN */
 
         case CLOSURE_PRELIMINARY:
             lambda_error("Unimplemented closure type for lambda()\n");
@@ -4405,103 +4112,8 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
         case CLOSURE_BOUND_LAMBDA:
         case CLOSURE_LAMBDA:
         case CLOSURE_LFUN:
-          {
-            /* This is compiled as
-             *   alien-lfun:             local lfun:
-             *
-             *   <lfun_closure>
-             *   <arg1>                   <arg1>
-             *   ...                      ...
-             *   <argN>                   <argN>
-             *   FUNCALL N+1              CALL_FUNCTION <lfun-index> N
-             *
-             * alien-lfun: lambda->ob != lambda->function.lfun.ob
-             *
-             * Inherited lfun closures, context lfun closures and lambda
-             * closures are compiled similar to alien lfuns using
-             * F_CALL_CLOSURE.
-             */
-
-            mp_int i;
-            lambda_t *l;
-            mp_int block_size;
-
-            block_size = (mp_int)VEC_SIZE(block);
-            l = argp->u.lambda;
-            if ((type != CLOSURE_UNBOUND_LAMBDA && l->ob != current.lambda_origin)
-             || (type == CLOSURE_LFUN && l->ob != l->function.lfun.ob)
-               )
-            {
-                /* Compile it like an alien lfun */
-
-                if (current.code_left < 1)
-                    realloc_code();
-                current.code_left -= 1;
-                STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
-
-                insert_value_push(argp); /* Push the closure */
-                for (i = block_size; --i; )
-                {
-                    compile_value(++argp, REF_ACCEPTED);
-                }
-                if (current.code_left < 3)
-                    realloc_code();
-                current.code_left -= 3;
-                STORE_CODE(current.codep, instrs[F_FUNCALL].prefix);
-                STORE_CODE(current.codep, instrs[F_FUNCALL].opcode);
-                STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
-            }
-            else if (type != CLOSURE_LFUN
-             || l->function.lfun.inhProg
-             || l->function.lfun.context_size
-               )
-            {
-                /* Compile it using F_CALL_CLOSURE. */
-
-                if (current.code_left < 1)
-                    realloc_code();
-                current.code_left -= 1;
-                STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
-
-                insert_value_push(argp); /* Push the closure */
-                for (i = block_size; --i; )
-                {
-                    compile_value(++argp, REF_ACCEPTED);
-                }
-                if (current.code_left < 3)
-                    realloc_code();
-                current.code_left -= 3;
-                STORE_CODE(current.codep, instrs[F_CALL_CLOSURE].opcode);
-                STORE_CODE(current.codep, instrs[F_POP_SECOND].opcode);
-                STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
-            }
-            else
-            {
-                /* Intra-object call: we can call by address */
-
-                if (current.code_left < 1)
-                    realloc_code();
-                current.code_left -= 1;
-                STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
-
-                for (i = block_size; --i; )
-                {
-                    compile_value(++argp, REF_ACCEPTED);
-                }
-
-                if (current.code_left < 6)
-                    realloc_code();
-
-                STORE_CODE(current.codep, F_CALL_FUNCTION);
-                STORE_SHORT(current.codep, l->function.lfun.index);
-                STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
-                
-                current.code_left -= 4;
-                if (block_size > 0x100)
-                    lambda_error("Too many arguments to lfun closure\n");
-            }
+            result_flags = compile_lambda_call(type, argp, (mp_int)VEC_SIZE(block) - 1, argp+1, opt_flags);
             break;
-          } /* CLOSURE_LFUN */
 
         case CLOSURE_IDENTIFIER:
           {
@@ -4667,6 +4279,478 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 } /* compile_value() */
 
 /*-------------------------------------------------------------------------*/
+static int
+compile_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags)
+
+/* Compile a generic efun call.
+ */
+
+{
+    /* This is compiled as:
+     *
+     *   optional <save_arg_frame>
+     *   <arg1>
+     *   <arg2>
+     *   ...
+     *   <argN>
+     *   <efun>
+     *   optional <restore_arg_frame>
+     *   optional <make_rvalue>
+     */
+
+    enum compile_value_output_flags result_flags = 0;
+
+    mp_int i;
+    bytecode_p p;
+    int f;
+    Bool needs_ap;
+    mp_int min;
+    mp_int max;
+    mp_int def;
+
+    /* Get the instruction code */
+    f = type - CLOSURE_EFUN;
+    min = instrs[f].min_arg;
+    max = instrs[f].max_arg;
+
+    /* Handle the arg frame for varargs efuns */
+    needs_ap = MY_FALSE;
+    if (f >= EFUNV_OFFSET || f == F_CALL_OTHER)
+    {
+        needs_ap = MY_TRUE;
+        if (current.code_left < 1)
+            realloc_code();
+        current.code_left--;
+        STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
+    }
+
+    /* Compile the arguments */
+    for (i = num_arg; --i >= 0; )
+    {
+        compile_value(argp++, REF_ACCEPTED);
+    }
+
+    /* Get the instruction and check if it received the
+     * correct number of arguments.
+     */
+    if (current.code_left < 9)
+        realloc_code();
+
+    /* The 'efun' #'-> needs a hidden argument
+     * for the struct type index.
+     */
+    if (f == F_S_INDEX)
+    {
+        current.code_left--;
+        STORE_CODE(current.codep, (bytecode_t)F_NCONST1);
+    }
+
+    p = current.codep;
+    if (num_arg < min)
+    {
+        /* Not enough arguments... probably */
+
+        int g;
+
+        if (num_arg == min-1 && 0 != (def = instrs[f].Default))
+        {
+            /* We have a default argument */
+            if (instrs[def].prefix)
+            {
+                STORE_CODE(p, instrs[def].prefix);
+                current.code_left--;
+                max--;
+                min--;
+            }
+            STORE_CODE(p, instrs[def].opcode);
+            current.code_left--;
+            max--;
+            min--;
+        }
+        else
+            /* Maybe there is a replacement efun */
+             if ( (g = proxy_efun(f, num_arg)) < 0
+         ||  (f = g, MY_FALSE) )
+            /* No, there isn't */
+            lambda_error("Too few arguments to %s\n", instrs[f].name);
+    }
+    else if (num_arg > max && max != -1)
+    {
+        /* More arguments than the efun can handle */
+        if (f == F_INDEX && num_arg == 3)
+        {
+            /* Exception: indexing of wide mappings */
+            f = F_MAP_INDEX;
+        }
+        else
+        {
+            lambda_error(
+              "Too many arguments to %s\n",
+              instrs[f].name
+            );
+        }
+    }
+
+    /* Store function bytecode. */
+    if (instrs[f].prefix)
+    {
+        STORE_CODE(p, instrs[f].prefix);
+        current.code_left--;
+    }
+    STORE_CODE(p, instrs[f].opcode);
+    current.code_left--;
+
+    /* Note the type of the result, and add a CONST0 if
+     * the caller expects one from a void efun. Always
+     * add the CONST0 for void varargs efuns.
+     */
+    if ( instrs[f].ret_type == lpctype_void )
+    {
+        if (f < EFUNV_OFFSET
+         && (opt_flags & (ZERO_ACCEPTED|VOID_ACCEPTED)))
+        {
+            result_flags = VOID_GIVEN;
+        }
+        else
+        {
+            STORE_CODE(p, F_CONST0);
+            current.code_left--;
+        }
+    }
+
+    /* Handle the arg frame for varargs efuns */
+    if (needs_ap)
+    {
+        current.code_left--;
+        STORE_CODE(p, F_RESTORE_ARG_FRAME);
+    }
+
+    if (instrs[f].might_return_lvalue && !(opt_flags & LEAVE_LVALUE))
+    {
+        STORE_CODE(p, F_MAKE_RVALUE);
+        current.code_left--;
+    }
+
+    current.codep = p;
+
+    return result_flags;
+} /* compile_efun_call */
+
+
+#ifdef USE_PYTHON
+/*-------------------------------------------------------------------------*/
+static int
+compile_python_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags)
+
+/* Compile a python efun call.
+ */
+
+{
+    /* This is compiled as:
+     *
+     * <save_arg_frame>
+     * <arg1>
+     * <arg2>
+     * ...
+     * <argN>
+     * <python_efun>
+     * <restore_arg_frame>
+     * optional <make_rvalue>
+     */
+
+    int f = type - CLOSURE_PYTHON_EFUN;
+
+    if (current.code_left < 1)
+        realloc_code();
+    STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
+    current.code_left--;
+
+    /* Compile the arguments */
+    for (int i = num_arg; --i >= 0; )
+        compile_value(argp++, REF_ACCEPTED);
+
+    if (current.code_left < 5)
+        realloc_code();
+    STORE_CODE(current.codep, F_PYTHON_EFUN);
+    STORE_SHORT(current.codep, (short)f);
+    STORE_CODE(current.codep, F_RESTORE_ARG_FRAME);
+    current.code_left -= 4;
+
+    if (!(opt_flags & LEAVE_LVALUE))
+    {
+        STORE_CODE(current.codep, F_MAKE_RVALUE);
+        current.code_left--;
+    }
+
+    return 0;
+} /* compile_python_efun_call */
+#endif
+
+/*-------------------------------------------------------------------------*/
+static int
+compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags)
+
+/* Compile a simul-efun call.
+ */
+
+{
+    /* This is compiled as:
+     *    sefun <= 0xffff           sefun > 0xffff
+     *
+     *    opt. SAVE_ARG_FRAME       SAVE_ARG_FRAME
+     *                              <sefun_object_name>
+     *                              <sefun_name>
+     *    <arg1>                    <arg1>
+     *    ...                       ...
+     *    <argN>                    <argN>
+     *    SIMUL_EFUN <sefun>        CALL_DIRECT
+     *    opt. RESTORE_ARG_FRAME    RESTORE_ARG_FRAME
+     */
+
+    int simul_efun;
+    int i;
+    Bool needs_ap;
+    Bool needs_call_direct;
+
+    simul_efun = type - CLOSURE_SIMUL_EFUN;
+
+    needs_ap = MY_FALSE;
+    needs_call_direct = (simul_efun >= SEFUN_TABLE_SIZE);
+
+    if (needs_call_direct)
+    {
+    	/* We have to call the sefun by name */
+        static svalue_t string_sv = { T_STRING };
+
+        if (current.code_left < 1)
+            realloc_code();
+        current.code_left -= 1;
+        STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
+        needs_ap = MY_TRUE;
+
+        string_sv.u.str = query_simul_efun_file_name();
+        compile_value(&string_sv, 0);
+        string_sv.u.str = simul_efunp[simul_efun].name;
+        compile_value(&string_sv, 0);
+    }
+    else if (simul_efunp[simul_efun].num_arg == SIMUL_EFUN_VARARGS
+          || 0 != (simul_efunp[simul_efun].flags & TYPE_MOD_XVARARGS)
+            )
+    {
+        /* varargs efuns need the arg frame */
+
+        if (current.code_left < 1)
+            realloc_code();
+        current.code_left -= 1;
+        STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
+        needs_ap = MY_TRUE;
+    }
+
+    /* Compile the arguments */
+
+    if (!needs_call_direct)
+    {
+        function_t *funp = &simul_efunp[simul_efun];
+        if (num_arg > funp->num_arg
+          && !(funp->flags & TYPE_MOD_XVARARGS)
+           )
+        {
+            lambda_error(
+              "Too many arguments to simul_efun %s\n"
+             , get_txt(funp->name)
+            );
+            num_arg = funp->num_arg;
+        }
+    }
+
+    for (i = num_arg; --i >= 0; )
+    {
+        compile_value(argp++, REF_ACCEPTED);
+    }
+
+    /* and the simul-efun instruction */
+
+    if (current.code_left < 4)
+        realloc_code();
+
+    if (needs_call_direct)
+    {
+    	/* We need the call_other */
+        current.code_left -= 1;
+        STORE_CODE(current.codep, F_CALL_DIRECT);
+        if (num_arg + 1 > 0xff)
+            lambda_error("Argument number overflow\n");
+    }
+    else
+    {
+    	/* We can call by index */
+    	
+        function_t *funp = &simul_efunp[simul_efun];
+
+        if (!needs_ap)
+        {
+            /* The function takes fixed number of args:
+             * push 0s onto the stack for missing args
+             */
+
+            if (num_arg < funp->num_arg
+              && funp->num_arg != SIMUL_EFUN_VARARGS
+               )
+            {
+                lambda_error(
+                  "Missing arguments to simul_efun %s\n"
+                 , get_txt(funp->name)
+                );
+            }
+
+            i = funp->num_arg - num_arg;
+            if (i > 1 && current.code_left < i + 4)
+                realloc_code();
+            current.code_left -= i;
+            while ( --i >= 0 ) {
+                STORE_CODE(current.codep, F_CONST0);
+            }
+        }
+
+        STORE_CODE(current.codep, F_SIMUL_EFUN);
+        STORE_SHORT(current.codep, (short)simul_efun);
+        current.code_left -= 3;
+
+        if (needs_ap)
+        {
+            STORE_UINT8(current.codep, F_RESTORE_ARG_FRAME);
+            current.code_left--;
+        }
+    }
+
+    if(!(opt_flags & LEAVE_LVALUE))
+    {
+        STORE_CODE(current.codep, F_MAKE_RVALUE);
+        current.code_left--;
+    }
+
+    return 0;
+} /* compile_sefun_call */
+
+/*-------------------------------------------------------------------------*/
+static int
+compile_lambda_call (ph_int type, svalue_t* closure, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags)
+{
+    /* This is compiled as
+     *   alien-lfun:             local lfun:
+     *
+     *   <lfun_closure>
+     *   <arg1>                   <arg1>
+     *   ...                      ...
+     *   <argN>                   <argN>
+     *   FUNCALL N+1              CALL_FUNCTION <lfun-index> N
+     *   MAKE_RVALUE              MAKE_RVALUE
+     *
+     * alien-lfun: lambda->ob != lambda->function.lfun.ob
+     *
+     * Inherited lfun closures, context lfun closures and lambda
+     * closures are compiled similar to alien lfuns using
+     * F_CALL_CLOSURE.
+     */
+
+    lambda_t *l;
+
+    l = closure->u.lambda;
+    if ((type != CLOSURE_UNBOUND_LAMBDA && l->ob != current.lambda_origin)
+     || (type == CLOSURE_LFUN && l->ob != l->function.lfun.ob)
+       )
+    {
+        /* Compile it like an alien lfun */
+
+        if (current.code_left < 1)
+            realloc_code();
+        current.code_left -= 1;
+        STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
+
+        insert_value_push(closure); /* Push the closure */
+        for (mp_int i = num_arg; i--; )
+        {
+            compile_value(argp++, REF_ACCEPTED);
+        }
+        if (current.code_left < 3)
+            realloc_code();
+        current.code_left -= 3;
+        STORE_CODE(current.codep, instrs[F_FUNCALL].prefix);
+        STORE_CODE(current.codep, instrs[F_FUNCALL].opcode);
+        STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
+
+        if (!(opt_flags & LEAVE_LVALUE))
+        {
+            current.code_left--;
+            STORE_CODE(current.codep, F_MAKE_RVALUE);
+        }
+    }
+    else if (type != CLOSURE_LFUN
+     || l->function.lfun.inhProg
+     || l->function.lfun.context_size
+       )
+    {
+        /* Compile it using F_CALL_CLOSURE. */
+
+        if (current.code_left < 1)
+            realloc_code();
+        current.code_left -= 1;
+        STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
+
+        insert_value_push(closure); /* Push the closure */
+        for (mp_int i = num_arg; i--; )
+        {
+            compile_value(argp++, REF_ACCEPTED);
+        }
+        if (current.code_left < 4)
+            realloc_code();
+        current.code_left -= 3;
+        STORE_CODE(current.codep, instrs[F_CALL_CLOSURE].opcode);
+        STORE_CODE(current.codep, instrs[F_POP_SECOND].opcode);
+        STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
+        if (!(opt_flags & LEAVE_LVALUE))
+        {
+            current.code_left--;
+            STORE_CODE(current.codep, F_MAKE_RVALUE);
+        }
+    }
+    else
+    {
+        /* Intra-object call: we can call by address */
+
+        if (current.code_left < 1)
+            realloc_code();
+        current.code_left -= 1;
+        STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
+
+        for (mp_int i = num_arg; i--; )
+        {
+            compile_value(argp++, REF_ACCEPTED);
+        }
+
+        if (current.code_left < 7)
+            realloc_code();
+
+        STORE_CODE(current.codep, F_CALL_FUNCTION);
+        STORE_SHORT(current.codep, l->function.lfun.index);
+        STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
+
+        current.code_left -= 4;
+
+        if (!(opt_flags & LEAVE_LVALUE))
+        {
+            STORE_CODE(current.codep, F_MAKE_RVALUE);
+            current.code_left--;
+        }
+
+        if (num_arg >= 0x100)
+            lambda_error("Too many arguments to lfun closure\n");
+    }
+
+    return 0;
+} /* compile_lambda_call */
+
+/*-------------------------------------------------------------------------*/
 static Bool
 is_lvalue (svalue_t *argp, int flags)
 
@@ -4753,6 +4837,9 @@ compile_lvalue (svalue_t *argp, int flags)
 {
     /* These 3 flags are exclusive. */
     assert(((flags & PROTECT_LVALUE)?1:0) + ((flags & MAKE_VAR_LVALUE)?1:0) + ((flags & RESEATING_ACCEPTED)?1:0) <= 1);
+
+    /* Function calls only allowed with PROTECT_LVALUE. */
+    assert(!(flags & ALLOW_FUNCTION_CALL) || (flags & PROTECT_LVALUE));
 
     switch(argp->type) {
 
@@ -5066,6 +5153,51 @@ compile_lvalue (svalue_t *argp, int flags)
                 compile_lvalue(argp, flags);
                 return;
               }
+
+            case CLOSURE_UNBOUND_LAMBDA:
+            case CLOSURE_BOUND_LAMBDA:
+            case CLOSURE_LAMBDA:
+            case CLOSURE_LFUN:
+                if (flags & ALLOW_FUNCTION_CALL)
+                {
+                    compile_lambda_call(argp->x.closure_type, argp, (mp_int)VEC_SIZE(block) - 1, argp+1, LEAVE_LVALUE);
+                    return;
+                }
+                break;
+
+            default:
+                if (flags & ALLOW_FUNCTION_CALL)
+                {
+                    ph_int type = argp->x.closure_type;
+#ifdef USE_PYTHON
+                    if (type < (ph_int)CLOSURE_PYTHON_EFUN)     /* Operator closure. */
+#else
+                    if (type < (ph_int)CLOSURE_EFUN)            /* Operator closure. */
+#endif
+                        break;
+#ifdef USE_PYTHON
+                    else if (type < (ph_int)CLOSURE_EFUN)       /* Python Efun closure. */
+                    {
+                        compile_python_efun_call(type, (mp_int)VEC_SIZE(block) - 1, argp+1, LEAVE_LVALUE);
+                        return;
+                    }
+#endif
+                    else if (type < (ph_int)CLOSURE_SIMUL_EFUN) /* Efun closure. */
+                    {
+                        /* Only allow the function call efuns. */
+                        if (!instrs[type - CLOSURE_EFUN].might_return_lvalue)
+                            break;
+
+                        compile_efun_call(type, (mp_int)VEC_SIZE(block) - 1, argp+1, LEAVE_LVALUE);
+                        return;
+                    }
+                    else if (type < (ph_int)CLOSURE_LFUN)       /* Simul-Efun closure. */
+                    {
+                        compile_sefun_call(type, (mp_int)VEC_SIZE(block) - 1, argp+1, LEAVE_LVALUE);
+                        return;
+                    }
+                }
+                break;
             } /* switch(closure_type) */
         }
         break;

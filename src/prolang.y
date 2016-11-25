@@ -6782,6 +6782,14 @@ delete_prog_string (void)
        * If .lvalue.size == 0, then the expression cannot be an lvalue.
        */
 
+    struct
+    {
+        fulltype_t type;         /* Type of the expression         */
+        uint32     start;        /* Startaddress of the expression */
+        bool       might_lvalue; /* Might be an lvalue reference.  */
+    } function_call_result;
+      /* A function call expression. */
+
     struct incdec_s
     {
         uint32     start;  /* Current programm pointer */
@@ -6933,7 +6941,7 @@ delete_prog_string (void)
 %type <address>      note_start
 %type <rvalue>       comma_expr expr0
 %type <lrvalue>      expr4
-%type <rvalue>       function_call inline_func
+%type <rvalue>       inline_func
 %type <rvalue>       catch sscanf
 %ifdef USE_PARSE_COMMAND
 %type <rvalue>       parse_command
@@ -6949,6 +6957,7 @@ delete_prog_string (void)
 %type <struct_init_list>   opt_struct_init opt_struct_init2
 %type <sh_string>    struct_member_name
 %type <function_name> function_name
+%type <function_call_result> function_call
 
 
 /* Special uses of <number> */
@@ -10612,7 +10621,11 @@ expr0:
       {
           uint32 current = CURRENT_PROGRAM_SIZE;
 
-          if (!add_lvalue_code(&$1, F_MAKE_PROTECTED))
+          if (!$1.lvalue.size)
+          {
+              current = $1.lvalue.start;
+          }
+          else if(!add_lvalue_code(&$1, F_MAKE_PROTECTED))
           {
               free_lpctype($1.type);
               YYACCEPT;
@@ -10701,6 +10714,17 @@ lvalue_reference:
       {
           $$ = $3;
       }
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '&' '(' function_call ')'
+      {
+          /* We abuse the .lvalue.start to save the start
+           * of the expression in the program code.
+           */
+          $$.lvalue = (lvalue_block_t) {$3.start, 0};
+          $$.type = $3.type.t_type;
+          $$.vlvalue_inst = 0;
+          $$.num_arg = 0;
+      }
 ; /* lvalue_reference */
 
 
@@ -10714,6 +10738,12 @@ pre_inc_dec:
 expr4:
       function_call  %prec '~'
       {
+          /* And add an opcode to make it into an rvalue,
+           * just to be on the safe side.
+           */
+          if ($1.might_lvalue)
+              ins_f_code(F_MAKE_RVALUE);
+
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.start =  $1.start;
           $$.type =   $1.type;
@@ -12349,6 +12379,7 @@ function_call:
           ap_needed = MY_FALSE;
 
           $$.start = $<function_call_head>2.start;
+          $$.might_lvalue = true;
 
           if ( $4 >= 0xff )
               /* since num_arg is encoded in just one byte, and 0xff
@@ -12753,6 +12784,7 @@ function_call:
                       add_f_code(F_CONST0);
                       CURRENT_PROGRAM_SIZE++;
                   }
+                  $$.might_lvalue = instrs[f].might_return_lvalue;
               } /* efun */
 
               else if ($<function_call_head>2.efun_override)
@@ -12961,6 +12993,8 @@ function_call:
 
           has_ellipsis = got_ellipsis[argument_level];
           ap_needed = MY_TRUE;
+
+          $$.might_lvalue = true;
 
           if (!disable_sefuns && call_other_sefun >= 0)
           {

@@ -323,6 +323,47 @@ mixed *tests = ({
             return val == 10; /* Shouldn't have changed. */
         :)
     }),
+    ({ "Volatile return lvalues 1", 0,
+        (:
+            mixed val = 10;
+            mixed result = return_first_lvalue(&val, 0);
+
+            /* result should not be a reference to val. */
+            result = 12;
+            return val == 10;
+        :)
+    }),
+    ({ "Volatile return lvalues 2", 0,
+        (:
+            mixed val = 10;
+            mixed result = funcall(function mixed() : mixed ref = &val { return &ref; });
+
+            /* result should not be a reference to val. */
+            result = 12;
+            return val == 10;
+        :)
+    }),
+
+    ({ "Protected return lvalues 1", 0,
+        (:
+            mixed val = 20;
+            mixed result = &(return_first_lvalue(&val, 0));
+
+            /* result should not be a reference to val. */
+            result = 22;
+            return val == 22;
+        :)
+    }),
+    ({ "Protected return lvalues 2", 0,
+        (:
+            mixed val = 20;
+            mixed result = &(funcall(function mixed() : mixed ref = &val { return &ref; }));
+
+            /* result should not be a reference to val. */
+            result = 22;
+            return val == 22;
+        :)
+    }),
 
     ({ "Reference loops 1", 0,
        (:
@@ -1416,7 +1457,54 @@ mixed *tests = ({
             ({#'==, 'val, 10 })
         }))
     }),
+    ({ "Lambda: Volatile return lvalues 1", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'val, 10 }),
+            ({#'=, 'result, ({#'return_first_lvalue, ({#'&, 'val}), 0 }) }),
+            ({#'=, 'result, 12 }),
+            ({#'==, 'val, 10 })
+        }))
+    }),
+    ({ "Lambda: Volatile return lvalues 2", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'val, 10 }),
+            ({#'=, 'result,
+                ({#'funcall,
+                    ({ #'lambda, 0, ({#'({, #'return, ({#'&, 'val}) }) })
+                })
+            }),
+            ({#'=, 'result, 12 }),
+            ({#'==, 'val, 10 })
+        }))
+    }),
 
+
+    ({ "Lambda: Protected return lvalues 1", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'val, 20 }),
+            ({#'=, 'result, ({#'&, ({#'return_first_lvalue, ({#'&, 'val}), 0 }) }) }),
+            ({#'=, 'result, 22 }),
+            ({#'==, 'val, 22 })
+        }))
+    }),
+    ({ "Lambda: Protected return lvalues 2", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'val, 20 }),
+            ({#'=, 'result,
+                ({#'&,
+                    ({#'funcall,
+                        ({ #'lambda, 0, ({#'({, #'return, ({#'&, 'val}) }) })
+                    })
+                })
+            }),
+            ({#'=, 'result, 22 }),
+            ({#'==, 'val, 22 })
+        }))
+    }),
 
 
     ({ "Lambda: Reference loops 1", 0,
