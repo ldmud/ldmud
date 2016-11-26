@@ -6420,7 +6420,7 @@ f_copy (svalue_t *sp)
                 errorf("(copy) Out of memory: array[%lu] for copy.\n"
                      , (unsigned long) size);
             for (i = 0; i < size; i++)
-                assign_svalue_no_free(&new->item[i], &old->item[i]);
+                assign_rvalue_no_free(&new->item[i], &old->item[i]);
             free_array(old);
             sp->u.vec = new;
         }
@@ -6442,7 +6442,7 @@ f_copy (svalue_t *sp)
                 errorf("(copy) Out of memory: struct '%s' for copy.\n"
                      , get_txt(struct_name(old)));
             for (i = 0; i < size; i++)
-                assign_svalue_no_free(&new->member[i], &old->member[i]);
+                assign_rvalue_no_free(&new->member[i], &old->member[i]);
             free_struct(old);
             sp->u.strct = new;
         }

@@ -749,7 +749,7 @@ slice_array (vector_t *p, mp_int from, mp_int to)
 
     d = allocate_array(to-from+1);
     for (cnt = from; cnt <= to; cnt++)
-        assign_svalue_no_free(&d->item[cnt-from], &p->item[cnt]);
+        assign_rvalue_no_free(&d->item[cnt-from], &p->item[cnt]);
 
     return d;
 }
@@ -1408,7 +1408,7 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
     {
         if (!flags[i])
         {
-            assign_svalue_no_free(dest, minuend->item+i);
+            assign_rvalue_no_free(dest, minuend->item+i);
             dest++;
             result_size--;
         }
