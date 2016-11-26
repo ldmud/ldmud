@@ -10,6 +10,7 @@
 #include "driver.h"
 
 #include "closure.h" /* closure_eq(), closure_cmp() */
+#include "interpret.h" /* get_rvalue() */
 #include "svalue.h"
 
 /*-------------------------------------------------------------------------*/
@@ -60,6 +61,7 @@ svalue_cmp (svalue_t *left, svalue_t *right)
 #endif
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
+    case T_LVALUE:
         if ( 0 != (d = left->x.generic - right->x.generic) ) return d;
         break;
     }
@@ -68,10 +70,82 @@ svalue_cmp (svalue_t *left, svalue_t *right)
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
+rvalue_cmp (svalue_t *left, svalue_t *right)
+
+/* Order function for sorts.
+ *
+ * Compares just like svalue_cmp, but dereferences lvalues before.
+ * So the comparison is done on the plain rvalue with the exception
+ * of array ranges, which are compared as their own reference type.
+ *
+ * This function will normalize any given svalue (ie. shorten
+ * lvalue chains, replace destructed object refs with 0).
+ */
+
+{
+    svalue_t *left_rv = get_rvalue(left, NULL);
+    svalue_t *right_rv = get_rvalue(right, NULL);
+
+    if (left_rv == NULL && right_rv == NULL)
+    {
+        /* Both are ranges. */
+        struct protected_range_lvalue *lr = left->u.protected_range_lvalue, *rr = right->u.protected_range_lvalue;
+        register p_int d;
+        if (lr->vec.type != rr->vec.type)
+        {
+            if (lr->vec.type == T_STRING)
+                return T_STRING - right->type;
+            else
+                return left->type - T_STRING;
+        }
+
+        if (lr->vec.type == T_STRING)
+        {
+            /* String ranges */
+            if ((d = (lr->index2 - lr->index1) - (rr->index2 - rr->index1)) != 0)
+                return d;
+
+            return memcmp(get_txt(lr->vec.u.str) + lr->index1, get_txt(rr->vec.u.str) + rr->index1, lr->index2 - lr->index1);
+        }
+        else
+        {
+            /* Array ranges */
+            return lr - rr;
+        }
+    }
+    else if (left_rv == NULL || right_rv == NULL)
+    {
+        struct protected_range_lvalue *r = ((left_rv == NULL) ? left : right)->u.protected_range_lvalue;
+        svalue_t *sv = (left_rv == NULL) ? right_rv : left_rv;
+        size_t len;
+        register p_int d;
+
+        if (r->vec.type != T_STRING)
+            return left->type - right->type;
+
+        if (sv->type != T_STRING)
+            return ((sv->type < T_STRING) == (left_rv == NULL)) ? 1 : -1;
+
+        len = mstrsize(sv->u.str);
+        if ((d = (len - (r->index2 - r->index1))) != 0)
+            return ((d < 0) == (left_rv == NULL)) ? 1 : -1;
+
+        d = memcmp(get_txt(sv->u.str), get_txt(r->vec.u.str) + r->index1, len);
+        if (left_rv == NULL)
+            return -d;
+        else
+            return d;
+    }
+
+    return svalue_cmp(left_rv, right_rv);
+} /* rvalue_cmp() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE int
 svalue_eq (svalue_t *left, svalue_t *right)
 
-/* Compare *left and *right, return 0 if equal, and -1 if not (this
- * is to keep in line with the svalue_cmp() return values).
+/* Compare *left and *right, return 0 if equal, and -1 if not
+ * (this is to keep in line with the svalue_cmp() return values).
  *
  * See also svalue_cmp() for the general version.
  */
@@ -102,6 +176,7 @@ svalue_eq (svalue_t *left, svalue_t *right)
 #endif
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
+    case T_LVALUE:
         return left->x.generic != right->x.generic ? -1 : 0;
     default:
         return 0;
@@ -110,6 +185,64 @@ svalue_eq (svalue_t *left, svalue_t *right)
     /* NOTREACHED */
     return 0;
 } /* svalue_eq() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE int
+rvalue_eq (svalue_t *left, svalue_t *right)
+
+/* Compare both values.
+ *
+ * Compares just like svalue_eq, but dereferences lvalues before.
+ * So the comparison is done on the plain rvalue with the exception
+ * of array ranges, which are compared as their own reference type.
+ *
+ * This function will normalize any given svalue (ie. shorten
+ * lvalue chains, replace destructed object refs with 0).
+ */
+
+{
+    svalue_t *left_rv = get_rvalue(left, NULL);
+    svalue_t *right_rv = get_rvalue(right, NULL);
+
+    if (left_rv == NULL && right_rv == NULL)
+    {
+        /* Both are ranges. */
+        struct protected_range_lvalue *lr = left->u.protected_range_lvalue, *rr = right->u.protected_range_lvalue;
+        if (lr->vec.type != rr->vec.type)
+            return -1;
+
+        if (lr->vec.type == T_STRING)
+        {
+            /* String ranges */
+            if ((lr->index2 - lr->index1) != (rr->index2 - rr->index1))
+                return -1;
+
+            return (memcmp(get_txt(lr->vec.u.str) + lr->index1, get_txt(rr->vec.u.str) + rr->index1, lr->index2 - lr->index1) == 0) ? 0 : -1;
+        }
+        else
+        {
+            /* Array ranges */
+            return (lr == rr) ? 0 : -1;
+        }
+    }
+    else if (left_rv == NULL || right_rv == NULL)
+    {
+        struct protected_range_lvalue *r = ((left_rv == NULL) ? left : right)->u.protected_range_lvalue;
+        svalue_t *sv = (left_rv == NULL) ? right_rv : left_rv;
+        size_t len;
+
+        if (r->vec.type != T_STRING || sv->type != T_STRING)
+            return -1;
+
+        len = mstrsize(sv->u.str);
+        if (len != r->index2 - r->index1)
+            return -1;
+
+        return (memcmp(get_txt(sv->u.str), get_txt(r->vec.u.str) + r->index1, len) == 0) ? 0 : -1;
+    }
+
+    return svalue_eq(left_rv, right_rv);
+} /* rvalue_eq() */
 
 /***************************************************************************/
 

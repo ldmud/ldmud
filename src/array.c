@@ -817,7 +817,7 @@ get_array_order (vector_t * vec )
 
 /* Determine the order of the elements in vector <vec> and return the
  * sorted indices (actually svalue_t* pointer diffs). The order is
- * determined by svalue_cmp() (which happens to be high-to-low).
+ * determined by rvalue_cmp() (which happens to be high-to-low).
  *
  * As a side effect, strings in the vector are made shared, and
  * destructed objects in the vector are replaced by svalue 0s.
@@ -874,7 +874,7 @@ get_array_order (vector_t * vec )
             break;
 
         case 2:
-            if (svalue_cmp(vec->item, vec->item + 1) > 0)
+            if (rvalue_cmp(vec->item, vec->item + 1) > 0)
             {
                 sorted[0] = 0;
                 sorted[1] = 1;
@@ -893,20 +893,20 @@ get_array_order (vector_t * vec )
             sorted[0] = 0;
             sorted[1] = 1;
             sorted[2] = 2;
-            d = svalue_cmp(vec->item, vec->item + 1);
+            d = rvalue_cmp(vec->item, vec->item + 1);
             if (d < 0)
             {
                 sorted[1] = 0;
                 sorted[0] = 1;
             }
-            d = svalue_cmp(vec->item + sorted[0], vec->item + 2);
+            d = rvalue_cmp(vec->item + sorted[0], vec->item + 2);
             if (d < 0)
             {
                 ptrdiff_t tmp = sorted[2];
                 sorted[2] = sorted[0];
                 sorted[0] = tmp;
             }
-            d = svalue_cmp(vec->item + sorted[1], vec->item + sorted[2]);
+            d = rvalue_cmp(vec->item + sorted[1], vec->item + sorted[2]);
             if (d < 0)
             {
                 ptrdiff_t tmp = sorted[2];
@@ -941,7 +941,7 @@ get_array_order (vector_t * vec )
                 {
                     svalue_t *test = vec->item + sorted[test_idx];
 
-                    if (svalue_cmp(max, test) < 0)
+                    if (rvalue_cmp(max, test) < 0)
                     {
                         max_idx = test_idx;
                         max = test;
@@ -986,7 +986,7 @@ get_array_order (vector_t * vec )
 
         /* propagate the new element up in the heap as much as necessary */
         for (curix = j; 0 != (parix = curix>>1); ) {
-            if ( svalue_cmp(root[parix], inpnt) > 0 ) {
+            if ( rvalue_cmp(root[parix], inpnt) > 0 ) {
                 root[curix] = root[parix];
                 curix = parix;
             } else {
@@ -1017,7 +1017,7 @@ get_array_order (vector_t * vec )
                 break;
             }
             if (root[child2]) {
-                if (!root[child] || svalue_cmp(root[child], root[child2]) > 0)
+                if (!root[child] || rvalue_cmp(root[child], root[child2]) > 0)
                 {
                     root[curix] = root[child2];
                     curix = child2;
@@ -1046,7 +1046,7 @@ vector_t *
 order_array (vector_t *vec)
 
 /* Order the array <vec> and return a new vector with the sorted data.
- * The sorting order is the internal order defined by svalue_cmp() (which
+ * The sorting order is the internal order defined by rvalue_cmp() (which
  * happens to be high-to-low).
  *
  * This function and lookup_key() are used in several places for internal
@@ -1092,7 +1092,7 @@ lookup_key (svalue_t *key, vector_t *vec)
  *   -2          -> key should be at position 1,
  *   -len(vec)-1 -> key should be appended to the vector.
  *
- * <vec> must be sorted according to svalue_cmp(), else the result will be
+ * <vec> must be sorted according to rvalue_cmp(), else the result will be
  * interesting, but useless.
  *
  * The function is used by object.c and pkg-alists.c .
@@ -1125,7 +1125,7 @@ lookup_key (svalue_t *key, vector_t *vec)
     i = keynum >> 1;
     o = (i+2) >> 1;
     for (;;) {
-        d = svalue_cmp(key, &vec->item[i]);
+        d = rvalue_cmp(key, &vec->item[i]);
         if (d < 0)
         {
             i -= o;
@@ -1151,7 +1151,7 @@ lookup_key (svalue_t *key, vector_t *vec)
         if (o <= 1)
         {
             /* Last element to try */
-            d = svalue_cmp(key, &vec->item[i]);
+            d = rvalue_cmp(key, &vec->item[i]);
             if (d == 0) return i;
             if (d > 0) return -(i+1)-1;
             return -i-1;
@@ -1217,7 +1217,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
             /* Even more special case: both vectors have just one elem */
             if (len2 == 1)
             {
-                if (!svalue_eq(vec1->item, vec2->item))
+                if (!rvalue_eq(vec1->item, vec2->item))
                 {
                     flags[0] = flags[1] = MY_TRUE;
                 }
@@ -1246,7 +1246,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
          */
         for ( ; rlen != 0; rlen--, rover++, rflag++)
         {
-            if (!svalue_eq(rover, elem))
+            if (!rvalue_eq(rover, elem))
                 *rflag = *eflag = MY_TRUE;
         }
 
@@ -1278,7 +1278,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
         {
             int d;
 
-            d = svalue_cmp(vec1->item + *index1, vec2->item + *index2);
+            d = rvalue_cmp(vec1->item + *index1, vec2->item + *index2);
             if (d == 0)
             {
                 /* Elements match */
@@ -1297,7 +1297,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
                     index1++;
                     len1--;
                     if (len1 != 0)
-                        d = svalue_eq(test_val, vec1->item + *index1);
+                        d = rvalue_eq(test_val, vec1->item + *index1);
                 }
                 while (len1 != 0 && d == 0);
 
@@ -1306,7 +1306,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
                     index2++;
                     len2--;
                     if (len2 != 0)
-                        d = svalue_eq(test_val, vec2->item + *index2);
+                        d = rvalue_eq(test_val, vec2->item + *index2);
                 }
                 while (len2 != 0 && d == 0);
 
@@ -1722,7 +1722,7 @@ is_ordered (vector_t *v)
  *
  * The conditions are:
  *   - every string is shared
- *   - all elements are sorted according to svalue_cmp().
+ *   - all elements are sorted according to rvalue_cmp().
  *
  * This predicate is currently used just by the swapper, historically
  * to avoid swapping out alist values. This is because the internal order
@@ -1736,7 +1736,7 @@ is_ordered (vector_t *v)
     for (svp = v->item, i = (mp_int)VEC_SIZE(v); --i > 0; svp++) {
         if (svp->type == T_STRING && !mstr_tabled(svp->u.str))
             return MY_FALSE;
-        if (svalue_cmp(svp, svp+1) > 0)
+        if (rvalue_cmp(svp, svp+1) > 0)
             return MY_FALSE;
     }
     if (svp->type == T_STRING && !mstr_tabled(svp->u.str))

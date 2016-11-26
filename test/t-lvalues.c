@@ -1015,6 +1015,28 @@ mixed *tests = ({
             return 1;
        :)
     }),
+    ({
+       "Array matching with lvalue references 1", 0,
+       (:
+           int* arr = ({1,2,3});
+           string str = "Hallihallo!";
+           int* arrref = &(arr[1..2]);
+
+           return sizeof(({ &arrref, &(str[5..9]), &str, arr }) - ({ &arrref, "hallo", str, &arr })) == 0 &&
+                  sizeof(({ &arrref }) - ({ arr[1..2] })) == 1;
+       :)
+    }),
+    ({
+       "Array matching with lvalue references 2", 0,
+       (:
+           int* arr = ({1,2,3});
+           string str = "Hallihallo!";
+           int* arrref = &(arr[1..2]);
+
+           return sizeof(({ &arrref, &(str[5..9]), &str, &arr }) & ({ &arrref, "hallo", str, arr })) == 4 &&
+                  sizeof(({ &arrref }) & ({ arr[1..2] })) == 0;
+       :)
+    }),
 
     ({
         "Flattening lvalue parameters with apply", 0,
