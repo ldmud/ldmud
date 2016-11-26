@@ -2970,7 +2970,7 @@ inter_add_array (vector_t *q, vector_t **vpp)
         deref_array(p);
         d = r->item;
         for (cnt = (mp_int)p_size; --cnt >= 0; ) {
-            assign_svalue_no_free (d++, s++);
+            assign_rvalue_no_free (d++, s++);
         }
     }
 
@@ -2994,7 +2994,7 @@ inter_add_array (vector_t *q, vector_t **vpp)
     else /* q->ref > 1 */
     {
         for (cnt = (mp_int)q_size; --cnt >= 0; ) {
-            assign_svalue_no_free (d++, s++);
+            assign_rvalue_no_free (d++, s++);
         }
         *vpp = r;
 

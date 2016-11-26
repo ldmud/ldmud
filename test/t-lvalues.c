@@ -343,6 +343,74 @@ mixed *tests = ({
             return val == 10;
         :)
     }),
+    ({ "Volatile array elements 1", 0,
+        (:
+            int  a = 1;
+            int* b = ({&a});
+            int* c = copy(b);
+            a = 2;
+
+            return c[0] == 1;
+        :)
+    }),
+    ({ "Volatile array elements 2", 0,
+        (:
+            int  a = 1;
+            int* b = ({&a});
+            int* c = b + ({});
+            a = 2;
+
+            return c[0] == 1;
+        :)
+    }),
+    ({ "Volatile array elements 3", 0,
+        (:
+            int  a = 1;
+            int* b = ({&a});
+            int* c = ({}) + b;
+            a = 2;
+
+            return c[0] == 1;
+        :)
+    }),
+    ({ "Volatile array elements 4", 0,
+        (:
+            int  a = 1;
+            int* b = ({&a});
+            int* c = b[0..<1];
+            a = 2;
+
+            return c[0] == 1;
+        :)
+    }),
+    ({ "Volatile array elements 5", 0,
+        (:
+            int  a = 1;
+            int* b = ({0, &a, 2});
+            int* c = b - ({ 1 });
+
+            return deep_eq(c, ({0, 2}));
+        :)
+    }),
+    ({ "Volatile array elements 6", 0,
+        (:
+            int  a = 1;
+            int* b = ({0, 1, 2});
+            int* c = b - ({ &a });
+
+            return deep_eq(c, ({0, 2}));
+        :)
+    }),
+    ({ "Volatile array elements 7", 0,
+        (:
+            int  a = 1;
+            int* b = ({0, &a, 2});
+            int* c = b - ({ 0, 2 });
+
+            b[0] = 10;
+            return a == 1;
+        :)
+    }),
 
     ({ "Protected return lvalues 1", 0,
         (:
