@@ -411,6 +411,28 @@ mixed *tests = ({
             return a == 1;
         :)
     }),
+    ({ "Dereferenced mapping keys 1", 0,
+        (:
+            int a = 1;
+            mapping m = ([:1]);
+
+            m_add(m, &a, 2);
+            a = 10;
+
+            return member(m, 1) && !member(m, 10);
+        :)
+    }),
+    ({ "Dereferenced mapping keys 2", 0,
+        (:
+            int a = 1;
+            mapping m = mkmapping(({&a, 2}));
+
+            a = 10;
+
+            return member(m, 1) && !member(m, 10);
+        :)
+    }),
+
 
     ({ "Protected return lvalues 1", 0,
         (:

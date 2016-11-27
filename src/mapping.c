@@ -781,6 +781,7 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
      && map_index->type != T_FLOAT
      && map_index->type != T_SYMBOL
      && map_index->type != T_QUOTED_ARRAY
+     && map_index->type != T_LVALUE
        )
         map_index->x.generic = (short)(map_index->u.number << 1);
 
@@ -910,17 +911,22 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
     mapping_hash_t * hm;
     svalue_t       * entry;
     mp_int           idx;
+    svalue_t         real_index;
 
 static svalue_t local_const0;
   /* Local svalue-0 instance to be returned if a lvalue
    * for a 0-width was requested.
    */
 
-    entry = find_map_entry(m, map_index, (p_int *)&idx, &mc, need_lvalue);
+    assign_rvalue_no_free(&real_index, map_index);
+
+    entry = find_map_entry(m, &real_index, (p_int *)&idx, &mc, need_lvalue);
 
     /* If we found the entry, return the values */
     if (entry != NULL)
     {
+        free_svalue(&real_index);
+
         if (!m->num_values)
             return &const1;
 
@@ -931,7 +937,10 @@ static svalue_t local_const0;
     }
 
     if (!need_lvalue)
+    {
+        free_svalue(&real_index);
         return &const0;
+    }
 
     /* We didn't find key and the caller wants the data.
      * So create a new entry and enter it into the hash index (also
@@ -953,6 +962,7 @@ static svalue_t local_const0;
         }
         if (max_mapping_size && msize > (mp_int)max_mapping_size)
         {
+            free_svalue(&real_index);
             errorf("Illegal mapping size: %"PRIdMPINT" elements (%"
                 PRIdPINT" x %"PRIdPINT")\n"
                  , msize, MAP_SIZE(m)+1, m->num_values);
@@ -960,6 +970,7 @@ static svalue_t local_const0;
         }
         if (max_mapping_keys && MAP_SIZE(m) > (mp_int)max_mapping_keys)
         {
+            free_svalue(&real_index);
             errorf("Illegal mapping size: %"PRIdMPINT" entries\n", msize+1);
             return NULL;
         }
@@ -970,7 +981,10 @@ static svalue_t local_const0;
      */
     mc = new_map_chain(m);
     if (NULL == mc)
+    {
+        free_svalue(&real_index);
         return NULL;
+    }
 
     /* If the mapping has no hashed index, create one with just one
      * chain and put the new entry in there.
@@ -985,6 +999,7 @@ static svalue_t local_const0;
         hm = get_new_hash(m, 1);
         if (!hm)
         {
+            free_svalue(&real_index);
             free_map_chain(m, mc, MY_TRUE);
             return NULL; /* Oops */
         }
@@ -1023,6 +1038,7 @@ static svalue_t local_const0;
             hm = xalloc(sizeof *hm - sizeof *mcp + sizeof *mcp * size);
             if (!hm)
             {
+                free_svalue(&real_index);
                 free_map_chain(m, mc, MY_TRUE);
                 return NULL;
             }
@@ -1064,7 +1080,7 @@ static svalue_t local_const0;
 
         /* Finally, insert the new entry into its chain */
 
-        idx = mhash(map_index) & hm->mask;
+        idx = mhash(&real_index) & hm->mask;
         mc->next = hm->chains[idx];
         hm->chains[idx] = mc;
     }
@@ -1073,7 +1089,7 @@ static svalue_t local_const0;
      * the statistics and copy the key value into the structure.
      */
 
-    assign_svalue_no_free(&(mc->data[0]), map_index);
+    transfer_svalue_no_free(&(mc->data[0]), &real_index);
     for (idx = m->num_values, entry = &(mc->data[1]); idx > 0
         ; idx--, entry++)
         put_number(entry, 0);
@@ -1384,10 +1400,13 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
     map_chain_t    * mc;
     mapping_hash_t * hm;
     p_int            num_values;
+    svalue_t         real_index;
 
     num_values = m->num_values;
 
-    entry = find_map_entry(m, map_index, &key_ix, &mc, MY_FALSE);
+    assign_rvalue_no_free(&real_index, map_index);
+    entry = find_map_entry(m, &real_index, &key_ix, &mc, MY_FALSE);
+    free_svalue(&real_index);
 
     if (NULL != entry)
     {
