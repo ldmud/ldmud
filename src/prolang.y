@@ -1210,47 +1210,67 @@ realloc_mem_block (mem_block_t *mbp, mp_int size)
 } /* realloc_mem_block() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE void
+static INLINE bool
+reserve_mem_block (int n, size_t size)
+
+/* Reserve <size> bytes at the current position in memory area <n>.
+ * This does not increase the .current_size. Returns true, when successful,
+ * false otherwise (usually an out-of-memory condition).
+ * (If false, then an error message was already emitted.)
+ */
+
+{
+    mem_block_t *mbp = &mem_block[n];
+
+    if (size && mbp->current_size + size > mbp->max_size)
+        return realloc_mem_block(mbp, mbp->current_size + size);
+
+    return true;
+} /* reserve_mem_block() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE bool
 extend_mem_block (int n, size_t size)
 
 /* Reserve <size> bytes at the current position in memory area <n>.
- * This does increase the .current_size .
+ * This does increase the .current_size. Returns true, when successful,
+ * false otherwise (usually an out-of-memory condition).
+ * (If false, then an error message was already emitted.)
  */
 
 {
-    mem_block_t *mbp = &mem_block[n];
-
-    if (size)
+    if (reserve_mem_block(n, size))
     {
-        if (mbp->current_size + size > mbp->max_size)
-        {
-            if (!realloc_mem_block(mbp, mbp->current_size + size))
-                return;
-        }
-        mbp->current_size += size;
+        mem_block[n].current_size += size;
+        return true;
     }
+
+    return false;
 } /* extend_mem_block() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE void
+static INLINE bool
 add_to_mem_block (int n, void *data, size_t size)
 
 /* Add the <data> block of <size> bytes to the memory area <n>.
+ * Returns true, when successful, false otherwise
+ * (usually an out-of-memory condition).
+ * (If false, then an error message was already emitted.)
  */
 
 {
     mem_block_t *mbp = &mem_block[n];
 
-    if (size)
-    {
-        if (mbp->current_size + size > mbp->max_size)
-        {
-            if (!realloc_mem_block(mbp, mbp->current_size + size))
-                return;
-        }
-        memcpy(mbp->block + mbp->current_size, data, size);
-        mbp->current_size += size;
-    }
+    if (!size)
+        return true;
+
+    if (!reserve_mem_block(n, size))
+        return false;
+
+    memcpy(mbp->block + mbp->current_size, data, size);
+    mbp->current_size += size;
+
+    return true;
 } /* add_to_mem_block() */
 
 /*-------------------------------------------------------------------------*/
