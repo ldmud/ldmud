@@ -20654,7 +20654,6 @@ check_extra_ref_in_vector (svalue_t *svp, size_t num)
             if (NULL == register_pointer(ptable, p->u.strct) )
                 continue;
             check_extra_ref_in_vector(&p->u.strct->member[0], struct_size(p->u.strct));
-            p->u.vec->extra_ref = 0;
             continue;
 
         case T_MAPPING:
