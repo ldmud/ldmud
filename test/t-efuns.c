@@ -268,6 +268,16 @@ mixed *tests = ({
     ({ "regmatch 9", 0, (: deep_eq(regmatch("", "^$", RE_MATCH_SUBS), ({"", 1})) :) }),
     ({ "regmatch 10", 0, (: deep_eq(regmatch("", "(a|)", RE_MATCH_SUBS), ({ "", "", 1})) :) }),
 
+    ({ "transpose_array 1", 0, (: deep_eq(transpose_array(({})), ({})) :) }),
+    ({ "transpose_array 2", 0, (: deep_eq(transpose_array(({ ({}), ({}), ({}) })), ({})) :) }),
+    ({ "transpose_array 3", 0, (: deep_eq(transpose_array(({ ({1,2,3}), ({"A","B","C"}) })), ({ ({1, "A"}), ({2, "B"}), ({3, "C"}) })) :) }),
+    ({ "transpose_array 4", 0, (: deep_eq(transpose_array(({ ({1}),     ({"A","B","C"}) })), ({ ({1, "A"}), ({0, "B"}), ({0, "C"}) })) :) }),
+    ({ "transpose_array 5", 0, (: deep_eq(transpose_array(({ ({}),      ({"A","B","C"}) })), ({ ({0, "A"}), ({0, "B"}), ({0, "C"}) })) :) }),
+    ({ "transpose_array 6", 0, (: deep_eq(transpose_array(({ ({1,2,3}), ({"A"})         })), ({ ({1, "A"}), ({2, 0}),   ({3, 0})   })) :) }),
+    ({ "transpose_array 7", 0, (: deep_eq(transpose_array(({ ({1,2,3}), ({})            })), ({ ({1, 0}),   ({2, 0}),   ({3, 0})   })) :) }),
+    ({ "transpose_array 8", 0, (: deep_eq(transpose_array(({ ({1,}), ({"A","B"}), ({'x,'y,'z}), ({-0.1, -0.2, -0.3, -0.4}) })), ({ ({1,"A",'x,-0.1}), ({0,"B",'y,-0.2}), ({0,0,'z,-0.3}), ({0,0,0,-0.4}) })) :) }),
+    ({ "transpose_array 9", 0, (: deep_eq(transpose_array(({ ({1,2,3,4}), ({"A","B","C"}), ({'x,'y}), ({-0.1}) })), ({ ({1,"A",'x,-0.1}), ({2,"B",'y,0}), ({3,"C",0,0}), ({4,0,0,0}) })) :) }),
+
     ({ "explode 1", 0, (: deep_eq(explode("",""), ({""})) :) }),
     ({ "explode 2", 0, (: deep_eq(explode("","anything"), ({""})) :) }),
     ({ "explode 3", 0, (: deep_eq(explode("abc",""), ({"a","b","c"})) :) }),

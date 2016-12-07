@@ -2838,111 +2838,136 @@ f_transpose_array (svalue_t *sp)
  */
 
 {
-    vector_t *v;  /* Input vector */
-    vector_t *w;  /* Result vector */
-    mp_int a;     /* size of <v> */
-    mp_int b;     /* size of <v>[ix] for all ix */
-    mp_int i, j;
-    int no_copy;
-      /* 1 if <v> has only one ref, else 0. Not just a boolean, it
-       * is compared with the ref counts of the subvectors of v.
-       */
-    svalue_t *x, *y, *z;
-    int o;
+    vector_t *src;      /* Input vector */
+    vector_t *dest;     /* Result vector */
+    mp_int srclen;      /* size of <src> */
+    mp_int srcwidth;    /* size of <src>[ix] for all ix */
+    bool no_copy;       /* true if <src> has only one ref, else false.  */
+
+    svalue_t *srcitem;  /* item within input vector. */
+    svalue_t *destitem; /* item within result vector. */
+    mp_int srccount;    /* remaining items in input vector. */
+    mp_int srcindex;    /* index within input vector. */
+    mp_int destindex;   /* index within result vector. */
 
     /* Get and test the arguments */
-    v = sp->u.vec;
+    src = sp->u.vec;
 
-    if ( !(a = (mp_int)VEC_SIZE(v)) )
+    if ( !(srclen = (mp_int)VEC_SIZE(src)) )
         return sp;
 
     /* Find the widest subarray in the main array */
-    b = 0;
-    for (x = v->item, i = a; i > 0; i--, x++)
+    srcwidth = 0;
+    for (srcitem = src->item, srccount = srclen; srccount > 0; srccount--, srcitem++)
     {
-        mp_int c;
+        svalue_t *entry = get_rvalue(srcitem, NULL);
+        mp_int entrylen = -1;
 
-        if (x->type != T_POINTER)
+        if (entry == NULL)
         {
-              errorf("Bad arg 1 to transpose_array(): not an array of arrays.\n");
-              /* NOTREACHED */
-              return sp;
+            /* This is a range lvalue. */
+            struct protected_range_lvalue *r = srcitem->u.protected_range_lvalue;
+            if (r->vec.type == T_POINTER)
+                entrylen = (mp_int) r->index2 - r->index1;
+
         }
-        c = (mp_int)VEC_SIZE(x->u.vec);
-        if (c > b)
-            b = c;
+        else
+        {
+            if (entry->type == T_POINTER)
+                entrylen = (mp_int)VEC_SIZE(entry->u.vec);
+        }
+
+        if (entrylen == -1)
+        {
+            errorf("Bad arg 1 to transpose_array(): not an array of arrays.\n");
+            /* NOTREACHED */
+            return sp;
+        }
+
+        if (entrylen > srcwidth)
+            srcwidth = entrylen;
     }
 
     /* If all subarrays are empty, just return an empty array */
-    if (!b)
+    if (!srcwidth)
     {
-        sp->u.vec = ref_array(v->item->u.vec);
-        free_array(v);
+        sp->u.vec = ref_array(&null_vector);
+        free_array(src);
         return sp;
     }
 
-    no_copy = (v->ref == 1) ? 1 : 0;
+    no_copy = (src->ref == 1);
 
     /* Allocate and initialize the result vector */
-    w = allocate_uninit_array(b);
-    for (j = b, x = w->item; --j >= 0; x++)
+    dest = allocate_uninit_array(srcwidth);
+    for (destindex = srcwidth, destitem = dest->item; --destindex >= 0; destitem++)
     {
-        put_array(x, allocate_array(a));
+        put_array(destitem, allocate_array(srclen));
     }
 
-    o = offsetof(vector_t, item);
-
-    for (i = a, y = v->item; --i >= 0; o += sizeof(svalue_t), y++)
+    srcindex = 0;
+    for (srccount = srclen, srcitem = src->item; --srccount >= 0; srcindex++, srcitem++)
     {
-        mp_int c;
+        bool last_reference = false;
+        svalue_t *srcentry = get_rvalue(srcitem, &last_reference);
+        mp_int srcentrylen;
+        svalue_t *srcentryitem;
 
-        x = w->item;
-        if (y->type != T_POINTER)
-            break;
+        destitem = dest->item;
 
-        z = y->u.vec->item;
+        if (srcentry == NULL)
+        {
+            /* This is a range lvalue. */
+            struct protected_range_lvalue *r = srcitem->u.protected_range_lvalue;
+            if (r->vec.type != T_POINTER)
+                break;
+            srcentryitem = r->vec.u.vec->item + r->index1;
+            srcentrylen = (mp_int) r->index2 - r->index1;
+            if (r->vec.u.vec->ref != 1)
+                last_reference = false;
+        }
+        else
+        {
+            if (srcentry->type != T_POINTER)
+                break;
+            srcentryitem = srcentry->u.vec->item;
+            srcentrylen = (mp_int)VEC_SIZE(srcentry->u.vec);
+            if (srcentry->u.vec->ref != 1)
+                last_reference = false;
+        }
 
-        c = b;
-        if (VEC_SIZE(y->u.vec) < b
-         && !(c = (mp_int)VEC_SIZE(y->u.vec)) )
-                continue;
-
-        if (y->u.vec->ref == no_copy)
+        if (no_copy && last_reference)
         {
             /* Move the values to the result vector */
 
-            j = c;
-            do {
-                transfer_svalue_no_free(
-                  (svalue_t *)((char*)x->u.vec+o),
-                  z
-                );
-                x++;
-                z++;
-            } while (--j > 0);
-            free_empty_vector(y->u.vec);
-            y->type = T_INVALID;
+            for (mp_int srcentrypos = srcentrylen; srcentrypos; srcentrypos--)
+            {
+                transfer_rvalue_no_free(destitem->u.vec->item + srcindex, srcentryitem);
+
+                srcentryitem->type = T_INVALID;
+                destitem++;
+                srcentryitem++;
+            }
+            free_svalue(srcitem);
+            srcitem->type = T_INVALID;
         }
         else
         {
             /* Assign the values to the result vector */
 
-            j = c;
-            do {
-                assign_svalue_no_free(
-                  (svalue_t *)((char*)x->u.vec+o),
-                  z
-                );
-                x++;
-                z++;
-            } while (--j > 0);
+            for (mp_int srcentrypos = srcentrylen; srcentrypos; srcentrypos--)
+            {
+                assign_rvalue_no_free(destitem->u.vec->item + srcindex, srcentryitem);
+                destitem++;
+                srcentryitem++;
+            }
         }
     }
 
     /* Clean up and return the result */
 
     free_array(sp->u.vec);
-    sp->u.vec = w;
+    sp->u.vec = dest;
     return sp;
 } /* f_transpose_array() */
 

@@ -786,6 +786,51 @@ mixed *tests = ({
            return implode(({&s, &(s[1..1])}), ", ") == "abc, b";
        :)
     }),
+    ({
+       "transpose_array with references in the array 1", 0,
+       (:
+           int* a1 = ({1,2,3});
+           int* a2 = ({'a','b','c'});
+           int** both = ({ &a1, &a2 });
+
+           return deep_eq(transpose_array(both), ({ ({1,'a'}), ({2,'b'}), ({3,'c'}) }));
+       :)
+    }),
+    ({
+       "transpose_array with references in the array 2", 0,
+       (:
+           string k = "abc", v = "def";
+
+           return deep_eq(transpose_array(({ ({ &k, "xyz" }), ({ &v, "123" }) })), ({ ({ "abc", "def" }), ({ "xyz", "123" }) }));
+       :)
+    }),
+    ({
+       "transpose_array with references in the array 3", 0,
+       (:
+           string *k = ({ "abc", "xyz" }), *v = ({ "def", "123" });
+
+           return deep_eq(transpose_array(({ &k, &v })), ({ ({ "abc", "def" }), ({ "xyz", "123" }) }));
+       :)
+    }),
+    ({
+       "transpose_array with ranges in the array", 0,
+       (:
+           int* a = ({1,2,3,'a','b','c'});
+           int** both = ({ &(a[0..2]), &(a[3..5]) });
+
+           return deep_eq(transpose_array(both), ({ ({1,'a'}), ({2,'b'}), ({3,'c'}) }));
+       :)
+    }),
+    ({
+       "transpose_array unraveling references", 0,
+       (:
+           int i = 11;
+           mixed * result = transpose_array(({({ &i })}));
+
+           i = 12;
+           return deep_eq(result, ({({11})}));
+       :)
+    }),
     ({ "referencep with a lvalue parameter", 0,
        (:
            int var;

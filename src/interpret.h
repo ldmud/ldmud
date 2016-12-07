@@ -204,6 +204,7 @@ extern void assign_rvalue_no_free(svalue_t *to, svalue_t *from);
 extern void assign_svalue(svalue_t *dest, svalue_t *v);
 extern void copy_svalue_no_free (svalue_t *to, svalue_t *from);
 extern void transfer_svalue_no_free(svalue_t *dest, svalue_t *v);
+extern void transfer_rvalue_no_free(svalue_t *dest, svalue_t *v);
 extern void transfer_svalue(svalue_t *dest, svalue_t *v);
 extern void assign_protected_lvalue_no_free(svalue_t *dest, svalue_t *src);
 extern void assign_protected_char_lvalue_no_free(svalue_t *dest, string_t *src, char *charp);
