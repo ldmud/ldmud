@@ -89,7 +89,7 @@ f_json_parse (svalue_t *sp)
     parsed = json_tokener_parse(get_txt(sp->u.str));
 
 #ifdef HAS_JSONC
-    if (!parsed || parsed == NULL)
+    if (!parsed)
 #else
     if (!parsed || is_error(parsed))
 #endif
