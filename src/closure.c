@@ -1205,11 +1205,19 @@ closure_literal ( svalue_t *dest
     if (ix >= CLOSURE_IDENTIFIER_OFFS)
     {
         ix += - CLOSURE_IDENTIFIER_OFFS
-              + (current_variables - current_object->variables);
-              /* the added difference takes into account that the
+              /* The added difference takes into account that the
                * index is specified relative to the program which might
                * have been inherited.
                */
+              + (current_variables - current_object->variables)
+              /* But current_variables points to the non-virtual
+               * variables, so adjusting for that...
+               * (The lexer forbids closures to virtual variables,
+               * so we don't have to look for them here. But
+               * the variable index takes them into account.)
+               */
+              - current_prog->num_virtual_variables;
+
         closure_identifier(dest, current_object, ix, MY_TRUE);
     }
     else /* lfun closure */
@@ -6272,10 +6280,27 @@ f_symbol_variable (svalue_t *sp)
         warnf("Creating closure to deprecated global variable %s.\n",
               get_txt(current_prog->variables[n].name));
     }
-    
+
+    /* Check for virtual variables */
+    if (n < current_prog->num_virtual_variables)
+    {
+        /* Search for the virtual variable in the current_object's
+         * variable block.
+         */
+        n = translate_virtual_variable_index(n);
+    }
+    else
+    {
+        /* Ordinary variables, translate the index into current_object's
+         * variable block.
+         */
+        n = n - current_prog->num_virtual_variables
+              + (current_variables - current_object->variables);
+    }
+
     /* Create the result closure and put it onto the stack */
     closure_identifier( sp, current_object
-                      , (unsigned short)(n + (current_variables - current_object->variables))
+                      , (unsigned short)(n)
                       , /* raise_error: */ MY_FALSE);
     if (sp->type != T_CLOSURE)
     {

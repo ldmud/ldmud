@@ -1,0 +1,28 @@
+These files test some inherit scenarios.
+----------------------------------------
+
+Inherits na.c to nf.c are simple programs having one variable (x_var) and
+function (x_fun) that return "x" ("x" is between "a" and"f").
+Also there are getters and setters (set_x_var and get_x_var for the variable
+and get_x_fun for the function ) to check whether they access the correct
+variable or function.
+
+Then there are programs which inherit the basic programs: i_xy, where x and
+y are the programs they inherit. The name can be followed by a number
+to create distinct programs inheriting the same basic programs. If there
+is a 'v' before the letter, then it is inherited virtually.
+
+Last but not least there are programs with a variable and function with
+different visibilities: 'prog_visible' as visible, 'prog_protected'
+as protected, 'prog_private' as private and 'prog_public' as public.
+All of them inherit 'prog_visible' virtually with the corresponding
+modifier.
+
+Special scenarios:
+ * Trampoline function:
+   trampoline.c has the public function f() that calls the prototype g().
+   trampoline-user1.c and trampoline-user2.c inherit trampoline virtually
+   and override g() and make it private to prevent cross-definition.
+   Later trampoline-user1::f() must call it's h() and similary for
+   trampoline-user2, even if trampoline is virtual and so it's the same
+   f() with the same variables (but not the same function table).

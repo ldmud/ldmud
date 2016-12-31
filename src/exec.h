@@ -75,6 +75,17 @@
  *       the first argument type. If this index is INDEX_START_NONE,
  *       the function has no type information.
  *
+ *   unsigned short *update_index_map[]:
+ *      Lookup table:
+ *          old function index -> new function index
+ *      and
+ *          old variable index -> new variable index
+ *      for obsoleted virtually inherited programs. When an older
+ *      and newer program of the same name are inherited virtually,
+ *      the compiler builds such a table to map the function and
+ *      variable indices of the older program to the indices
+ *      in the newer program.
+ *
  *   include_t includes[]: an array listing all include files used
  *       to compile the program, in the order they were encountered.
  *       When a program is swapped, the reference counts to these strings
@@ -116,11 +127,11 @@
  *     A-fblock: A-funs  (B similar)
  *     A-vblock: A-vars  (B similar)
  *
- *     C-fblock: C-funs A-desc
- *     C-vblock: C-vars A-vars
+ *     C-fblock: A-desc C-funs
+ *     C-vblock: A-vars C-vars
  *
- *     D-fblock: D-funs (C-desc A-desc) B-desc
- *     D-vblock: D-vars  C-vars A-vars  B-vars
+ *     D-fblock: (A-desc C-desc) B-desc D-funs
+ *     D-vblock:  A-vars C-vars  B-vars D-vars
  *       and fblock has the twist that (C-desc A-desc) together are
  *       considered being 'the' C-desc block.
  *
@@ -139,6 +150,19 @@
  *
  * The compiler places virtual variables always at the begin of the variable
  * block and limits the number to 256.
+ *
+ * When different versions of the same program (different program_t objects
+ * that have the same name) are inherited only variables for the newest version
+ * are used. For the old program there will actually be created two inherit
+ * entrys, one describing the new program (with the corresponding function
+ * and variable index offsets) and one describing the old program. The later
+ * gets the INHERIT_TYPE_MAPPED flag and a table mapping old variable indices
+ * to indices in the new program. The function index offset in the old inherit
+ * entry will still point to the function table for the old inherit, since
+ * it can't be replaced, because intermediate programs might reference,
+ * cross-define or overload these functions. Therefore the function table for
+ * the newer program is added and the same functions between both programs
+ * are cross-defined.
  *
  * TODO: Find a way to avoid the virtual var searching - either by encoding the
  * TODO:: inherit index in the code, or by adding a ref to the 'first
@@ -162,10 +186,15 @@
 /* Other type related defines */
 enum {
      STRUCT_MAX_MEMBERS = 255,
-  /* We allow up to this number of members per struct, so that
-   * we can encode the number of actual members, where needed,
-   * in a single bytecode.
-   */
+      /* We allow up to this number of members per struct, so that
+       * we can encode the number of actual members, where needed,
+       * in a single bytecode.
+       */
+
+     MAX_VIRTUAL_VARIABLES = 256,
+      /* Restricted to 256 variables, so it can be encoded in
+       * in a single bytecode.
+       */
 };
 
 
@@ -230,8 +259,19 @@ struct instr_s
 typedef uint32 funflag_t;  /* Function flags */
 typedef int32 sfunflag_t;  /* signed version of Function flags */
 
+/* The visiblity is a 4-bit value within the function flags
+ * masked by TYPE_MOD_VISIBILITY.
+ */
+enum visibility_modifier {
+    VIS_PRIVATE        = 0x100000000,
+    VIS_PROTECTED      = 0x010000000,
+    VIS_STATIC         = 0x400000000,
+    VIS_VISIBLE        = 0x000000000,
+    VIS_PUBLIC         = 0x080000000,
+};
+
 enum function_flags {
-    NAME_INHERITED     = 0x80000000,  /* defined by inheritance */
+    NAME_INHERITED     = 0x80000000,  /* defined by inheritance         */
     TYPE_MOD_STATIC    = 0x40000000,  /* Static function or variable    */
     TYPE_MOD_NO_MASK   = 0x20000000,  /* The nomask => not redefineable */
     TYPE_MOD_PRIVATE   = 0x10000000,  /* Can't be inherited             */
@@ -271,6 +311,12 @@ enum function_flags {
     NAME_PROTOTYPE     = 0x00010000, /* Defined by a prototype only    */
     NAME_UNDEFINED     = 0x00008000, /* Not defined yet                */
     NAME_TYPES_LOST    = 0x00004000, /* inherited, no save_types       */
+
+    TYPE_MOD_VISIBLE   = 0x00000001,
+   /* This flag is only used during parsing of visibility flags,
+    * to indicate that a visibility flag was given (and thus
+    * no default value is to be used).
+    */
 };
 
 
@@ -343,28 +389,83 @@ struct variable_s
 struct inherit_s
 {
     program_t *prog;  /* Pointer to the inherited program */
+
     unsigned short function_index_offset;
       /* Offset of the inherited program's function block within the
        * inheriting program's function block.
        */
+
     unsigned short variable_index_offset;
       /* Offset of the inherited program's variables block within the
-       * inheriting program's variable block.
+       * inheriting program's variable block. This offset points
+       * to the first non-virtual variable of <prog>.
+       *
        * The NON_VIRTUAL_OFFSET_TAG marks the variables of non-virtual
        * inherits temporarily during compiles.
        */
+
     unsigned short inherit_type;            /* Type of inherit */
 
     unsigned short inherit_depth;           /* Depth of inherit */
+
+    unsigned short updated_inherit;
+      /* When INHERIT_TYPE_MAPPED this it the index of a newer, also
+       * virtually inherited program that has the same name as <progp>.
+       */
+
+    unsigned short num_additional_variables;
+      /* When INHERIT_TYPE_MAPPED contains the number of additional
+       * variables used (variables that <updated_inherit> doesn't
+       * contain anymore). .variable_index_offsets points to the
+       * first variable.
+       */
+
+    unsigned short variable_map_offset;
+      /* When INHERIT_TYPE_MAPPED, then it is the offset into the current
+       * program's (the inheritee's) index mapping table for variables.
+       * E.g. for access to a variable <ix> into the old program use
+       * current_prog->update_index_map[ix + old_inherit->variable_map_offset]
+       * as the variable index into <updated_inherit>'s variable block
+       * instead (the indices are the offsets in the non-virtual variable
+       * block).
+       *
+       * But if the new index is larger then the number of non-virtual
+       * variables (.num_variables - .num_virtual_variables) of
+       * <updated_inherit>, then it is an additional variable
+       * (see .num_additional_variables) in the old program and the
+       * difference is the variable index.
+       */
+
+    unsigned short function_map_offset;
+      /* When INHERIT_TYPE_MAPPED, then it is the offset into the current
+       * program's (the inheritee's) index mapping table for functions.
+       * E.g. when calling the function <fx> in the old program use
+       * current_prog->update_index_map[fx + old_inherit->function_map_offset]
+       * as the function index into <updated_inherit>'s program instead.
+       * A value of USHRT_MAX designates a vanished (and therefore now
+       * undefined) function.
+       *
+       * This is only needed for the implementation of F_CALL_INHERITED
+       * as these functions are cross-defined in the function table, too.
+       *
+       * We could save one member variable, because
+       *   function_map_offset = variable_map_offset + prog->num_variables,
+       * but we have the space now, so we'll make it explicit.
+       */
 };
+
 /* Constants for inherit_type in inherit_s */
 enum inherit_types {
     INHERIT_TYPE_NORMAL    = 0x0000,  /* Type: Normal inherit */
     INHERIT_TYPE_VIRTUAL   = 0x0001,  /* Type: Virtual inherit */
     INHERIT_TYPE_EXTRA     = 0x0002,  /* Type: Extra inherit added by
-                                              * copy_variables()
-                                              */
+                                       * copy_variables()
+                                       */
+
+    INHERIT_TYPE_MASK      = 0x0003,  /* Bitmask for the pure inherit type */
+
     INHERIT_TYPE_DUPLICATE = 0x0004,  /* Flag: Duplicate virt inherit */
+    INHERIT_TYPE_MAPPED    = 0x0008,  /* Flag: Obsoleted virt inherit */
 };
 
 /* --- struct struct_def: description of one struct
@@ -514,6 +615,12 @@ struct program_s
     unsigned short *type_start;
       /* TODO: Some code relies on this being unsigned short */
 
+    unsigned short *update_index_map;
+     /* This contains the tables for INHERIT_TYPE_MAPPED inherits
+      * that map variable and function indices from an obsoleted
+      * program to its newer counterpart.
+      */
+
     p_int swap_num;
       /* The swap number (swap file offset) for an unswapped program
        * It is set to -1 if it hasn't been swapped yet.
@@ -540,7 +647,11 @@ struct program_s
     unsigned short num_includes;
       /* Number of stored include filenames */
     unsigned short num_variables;
-      /* Number of variables (inherited and own) of this program */
+      /* Number of variables (inherited and own, virtual and non-virtual)
+       * of this program
+       */
+    unsigned short num_virtual_variables;
+      /* Number of virtual variables (naturally inherited) of this program. */
     unsigned short num_inherited;
       /* Number of (directly) inherited programs */
     unsigned short num_structs;
@@ -799,7 +910,7 @@ static INLINE inherit_t * search_function_inherit(const program_t *const progp,
 }
 
 static INLINE function_t *get_function_header_extended(const program_t *const progp, const int fx, const program_t **inh_progp, int *inh_fx)
-                          __attribute__((pure)) __attribute__((nonnull(1))) /*__attribute__((returns_nonnull))*/;
+                          __attribute__((nonnull(1))) /*__attribute__((returns_nonnull))*/;
 static INLINE function_t *get_function_header_extended(const program_t *const progp, const int fx, const program_t **inhprogp, int *inhfx)
   /* Gets the function header for the function with the index <fx>.
    * This function resolves cross-definitions and looks up inherits.

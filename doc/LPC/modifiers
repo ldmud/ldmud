@@ -37,13 +37,13 @@ DESCRIPTION
                      at the force so better use the security system).
                      Also efuns like call_out() or input_to() can call
                      these functions if given as a string.
-        public    -- this is the default type. Such functions can be called
+        visible   -- this is the default type. Such functions can be called
                      from within the file as well as from inheriting objects
                      and other objects via call_other().
-                     To declare a function public only results in the
-                     impossibility to change the accessibility at the
-                     inherit statement (see below). No error will occur,
-                     only the type will not be modified by the inherit
+        public    -- similar to "visible", but the declaration as "public"
+                     results in the impossibility to change the accessibility
+                     at the inherit statement (see below). No error will
+                     occur, only the type will not be modified by the inherit
                      statement.
         nomask    -- such functions cannot be overridden by inheriting
                      objects. If you have the fun foo() defined in your
@@ -86,10 +86,17 @@ DESCRIPTION
                      Note that nosave and private do not overlap in any
                      way. They are absolutely independant.
         static    -- the old name for 'nosave'. Its use is deprecated.
+        protected -- such variables can be accessed by inheriting
+                     programs. There is little difference to the default
+                     visibility ("visible"). Protected variables are
+                     not seen by variable_exists() from other objects,
+                     and this modifier can be detected with variable_list().
+        visible   -- this is the default visibility. The variable can
+                     accessed by inheriting programs.
         public    -- declares the variable public. It cannot be declared
-                     private or static by inheriting. No error will occur,
-                     only the type will not be modified by the inherit
-                     statement.
+                     protected, private or static by inheriting. No error
+                     will occur, only the type will not be modified by the
+                     inherit statement.
         deprecated - Whenever this variable is used, a warning is issue.
                      Usually this is done at compile-time, but
                      symbol_variable() warns at run-time.
@@ -98,6 +105,8 @@ DESCRIPTION
         internal variables so declare them as private and offer functions
         to query and change the variables if possible.
 
+        Inheritance:
+        ~~~~~~~~~~~~
         It is also possible to redeclare all variables and/or functions
         of an inherited object for the own object at the inheriting
         statement:
@@ -108,6 +117,19 @@ DESCRIPTION
 
         To redeclare a function or a variable declared public in the
         inherited object to be private or protected is not possible.
+
+        The following table shows the result of the combination of
+        visibility modifiers at the function declaration and inherit
+        statement:
+
+        Function  |                  Inheritance modifiers
+        modifier  | public    | visible   | static    | protected | private
+       -----------+-----------+-----------+-----------+-----------+---------
+        public    | public    | public    | public    | public    | public
+        visible   | public    | visible   | static    | protected | private
+        static    | static    | static    | static    | protected | private
+        protected | protected | protected | protected | protected | private
+        private   | private   | private   | private   | private   | private
 
         There also exists a modifier explicitly for the inherit statement:
 
@@ -146,8 +168,8 @@ DESCRIPTION
 
             All variables are by default private, but functions are public.
 
-        Only the modifiers 'private', 'public' and 'protected' (and 'static'
-        for functions only) are allowed here.
+        Only the modifiers 'private', 'protected', 'visible' and 'public'
+        (and 'static' for functions only) are allowed here.
 
         The default visibility thus set affects only variables/functions with
         no explicite visibility:
@@ -177,6 +199,9 @@ HISTORY
 
         The default visibility was added in LDMud 3.2.9 as experimental
         feature.
+
+        LDMud 3.5 introduced 'visible' as a name for the default
+        visibility.
 
 SEE ALSO
             closures(LPC), inheritance(LPC), functions(LPC), types(LPC)

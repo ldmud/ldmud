@@ -118,6 +118,7 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          precision as 'double' in C (the driver uses internally 'double'
          instead of the traditional self-built format).
        + Implemented union types. (#721)
+       + Private prototypes are now invisible in the inheriting program.
 
     - Networking
        + UDP datagrams with lengths up to 65507 (including UDP and IPv4

@@ -47,6 +47,7 @@ struct control_stack {
       /* Index of current program's function block within the functions of the
        * current objects program (needed for inheritance).
        */
+    int variable_index_offset;          /* Same for variables. */
     svalue_t *current_variables;        /* Same */
     int   extern_call;
       /* TRUE if the call came from outside the object (call_others to
@@ -190,6 +191,7 @@ extern Bool privilege_violation_n(string_t *what, object_t *whom, svalue_t *sp, 
 
 extern Bool check_rtt_compatibility(lpctype_t *formaltype, svalue_t *svp) __attribute__((nonnull(2)));
 extern lpctype_t* get_rtt_type(lpctype_t *formaltype, svalue_t *svp) __attribute__((nonnull(2)));
+extern int translate_virtual_variable_index(int num);
 
 extern svalue_t *sapply_int(string_t *fun, object_t *ob, int num_arg, Bool b_ign_prot, Bool b_use_default);
 #define sapply(f,o,n) sapply_int(f,o,n, MY_FALSE, MY_TRUE)

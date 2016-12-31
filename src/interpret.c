@@ -191,6 +191,7 @@
 #include "typedefs.h"
 
 #include "my-alloca.h"
+#include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -535,8 +536,8 @@ int function_index_offset;
    */
 
 static int variable_index_offset;
-  /* Index of current program's variable block within the variables
-   * of the current object (needed for inheritance).
+  /* Index of current program's non-virtual variable block within
+   * the variables of the current object (needed for inheritance).
    */
 
 svalue_t *current_variables;
@@ -5920,12 +5921,13 @@ find_value (int num)
     }
 
 #ifdef DEBUG
-    if (num >= current_object->prog->num_variables)
+    if (num >= current_prog->num_variables - (variable_index_offset ? current_prog->num_virtual_variables : 0))
     {
         fatal("Illegal variable access %d(%d).\n",
-            num, current_object->prog->num_variables);
+            num, current_prog->num_variables);
     }
 #endif
+
     return &current_variables[num];
 } /* find_value() */
 
@@ -5934,7 +5936,7 @@ static INLINE svalue_t *
 find_virtual_value (int num)
 
 /* For the virtually inherited variable <num> (given as index within
- * the current object's variable block) return the address of the actual
+ * the current program's variable block) return the address of the actual
  * variable.
  *
  * If the program for this variable was inherited more than one time,
@@ -5949,16 +5951,35 @@ find_virtual_value (int num)
  */
 
 {
+    return &current_object->variables[translate_virtual_variable_index(num)];
+} /* find_virtual_value() */
+
+/*-------------------------------------------------------------------------*/
+int
+translate_virtual_variable_index (int num)
+
+/* For the virtually inherited variable <num> (given as index within
+ * the current program's variable block) return its index in the
+ * current_object's variable block.
+ *
+ * Because virtually inherited programs might have another offset
+ * in the current_object then in current_prog (because all virtually
+ * inherited variable blocks are put at the beginn of the final
+ * variable block before any regular variables), we have to look
+ * up the inherit of <num> in the current_object and translate
+ * the variable index accordingly.
+ */
+
+{
     inherit_t *inheritp;
     program_t *progp;
-    char *progpp; /* actually a program_t **, but some compilers... */
 
     /* Make sure that we are not calling from a set_this_object()
      * context.
      */
     if (is_sto_context())
     {
-        errorf("find_virtual_value: Can't execute with "
+        errorf("translate_virtual_variable_index: Can't execute with "
               "set_this_object() in effect.\n"
              );
     }
@@ -5967,7 +5988,8 @@ find_virtual_value (int num)
      */
     inheritp = current_prog->inherit;
     while
-      (   inheritp->variable_index_offset + inheritp->prog->num_variables <= num
+      (   inheritp->inherit_type == INHERIT_TYPE_NORMAL
+       || inheritp->variable_index_offset + inheritp->prog->num_variables - inheritp->prog->num_virtual_variables <= num
        || inheritp->variable_index_offset > num)
     {
         inheritp++;
@@ -5975,24 +5997,38 @@ find_virtual_value (int num)
 
     /* Get the index of the variable within the inherited program.
      */
-    num -= inheritp->variable_index_offset;
+    num = num - inheritp->variable_index_offset;
 
     /* Set inheritp to the first instance of this inherited program.
-     * A cleaner, but slighly slower way to write the following segment
-     * is: for (inheritp = current_object->prog_inherit
-     *         ; inheritp->prog != progp
-     *         ; inheritp++) NOOP;
+     * We need a virtual inherited instance, so either
+     * INHERIT_TYPE_EXTRA or INHERIT_TYPE_VIRTUAL,
+     * but not INHERIT_TYPE_NORMAL.
      */
     progp = inheritp->prog;
-    progpp = (char *)&current_object->prog->inherit->prog;
-    while (*(program_t **)progpp != progp)
-        progpp += sizeof(inherit_t);
-    inheritp = (inherit_t *)
-                 (((PTRTYPE)(progpp)) - offsetof(inherit_t, prog));
+
+    for (inheritp = current_object->prog->inherit
+       ; inheritp->prog != progp || inheritp->inherit_type == INHERIT_TYPE_NORMAL
+       ; inheritp++) NOOP;
+
+    /* Handle obsoleted inherited programs */
+    while (inheritp->inherit_type & INHERIT_TYPE_MAPPED)
+    {
+        inherit_t *new_inheritp = current_object->prog->inherit + inheritp->updated_inherit;
+        num = current_object->prog->update_index_map[num + inheritp->variable_map_offset];
+
+        if (num >= new_inheritp->prog->num_variables - new_inheritp->prog->num_virtual_variables)
+        {
+            /* Dangling variable. We'll stay in that variable block. */
+            num -= new_inheritp->prog->num_variables - new_inheritp->prog->num_virtual_variables;
+            break;
+        }
+
+        inheritp = new_inheritp;
+    }
 
     /* Compute the actual variable address */
 
-    num += inheritp->variable_index_offset;
+    num = num + inheritp->variable_index_offset;
 
 #ifdef DEBUG
     if (!current_object->variables
@@ -6000,22 +6036,20 @@ find_virtual_value (int num)
        )
     {
         if (num)
-            fatal("%s Fatal: find_virtual_value() on object %p '%s' "
+            fatal("%s Fatal: translate_virtual_variable_index() on object %p '%s' "
                   "w/o variables, num %d\n"
                  , time_stamp(), current_object, get_txt(current_object->name)
                  , num);
         else
-            errorf("%s Error: find_virtual_value() on object %p '%s' "
+            errorf("%s Error: translate_virtual_variable_index() on object %p '%s' "
                   "w/o variables, num %d\n"
                  , time_stamp(), current_object, get_txt(current_object->name)
                  , num);
     }
 #endif
 
-    return &current_object->variables[num];
-      /* TODO: Why not '&current_variables[num]'? */
-} /* find_virtual_value() */
-
+    return num;
+} /* translate_virtual_variable_index() */
 
 /*=========================================================================*/
 
@@ -7367,6 +7401,7 @@ push_control_stack ( svalue_t   *sp
     csp->catch_call = MY_FALSE;
     csp->pc = pc;
     csp->function_index_offset = function_index_offset;
+    csp->variable_index_offset = variable_index_offset;
     csp->current_variables = current_variables;
     csp->break_sp = break_sp;
 #ifdef EVAL_COST_TRACE
@@ -7400,6 +7435,7 @@ pop_control_stack (void)
     inter_fp = csp->fp;
     inter_context = csp->context;
     function_index_offset = csp->function_index_offset;
+    variable_index_offset = csp->variable_index_offset;
     current_variables     = csp->current_variables;
     break_sp = csp->break_sp;
     csp--;
@@ -7432,12 +7468,7 @@ adjust_variable_offsets ( const inherit_t * inheritp
     inherit_t * inh = NULL;
 
     if (prog != obj->prog
-     && inheritp->prog->num_variables
-     && (prog->variables[inheritp->variable_index_offset
-                         +inheritp->prog->num_variables-1
-                        ].type.t_flags & TYPE_MOD_VIRTUAL)
-     && !(inheritp->prog->variables[inheritp->prog->num_variables-1
-                                   ].type.t_flags & TYPE_MOD_VIRTUAL)
+     && inheritp->inherit_type != INHERIT_TYPE_NORMAL
        )
     {
         /* Now search for the first virtual inheritance of the program
@@ -7451,9 +7482,7 @@ adjust_variable_offsets ( const inherit_t * inheritp
         while (i)
         {
             if (inh->prog == inheritp->prog
-             && obj->prog->variables[inh->variable_index_offset
-                                     +inh->prog->num_variables-1
-                                    ].type.t_flags&TYPE_MOD_VIRTUAL
+             && inh->inherit_type != INHERIT_TYPE_NORMAL
                )
                 break;
             inh++;
@@ -7489,7 +7518,7 @@ adjust_variable_offsets ( const inherit_t * inheritp
 
 /*-------------------------------------------------------------------------*/
 static inherit_t *
-setup_inherited_call (unsigned short inhIndex)
+setup_inherited_call (unsigned short inhIndex, unsigned short *fx)
 
 /* Setup the global variables for a call to an explicitly inherited
  * function, inherited from <inhIndex>. Result is the pointer to the
@@ -7524,7 +7553,40 @@ setup_inherited_call (unsigned short inhIndex)
             /* Found a virtual base class, so un-adjust the offsets. */
             inheritp = inh;
             current_variables = current_object->variables;
+            variable_index_offset = 0;
             function_index_offset = 0;
+
+            /* Check for obsoleted inherited programs. */
+            while (inheritp->inherit_type & INHERIT_TYPE_MAPPED)
+            {
+                unsigned short prevfx = *fx;
+
+                *fx = current_object->prog->update_index_map[prevfx + inheritp->function_map_offset];
+                if (*fx == USHRT_MAX)
+                {
+                    /* There was no corresponding function in the new program.
+                     * If this was the __INIT function we'll ignore it.
+                     * Otherwise throw an error.
+                     */
+                    function_t* fun = get_function_header(inheritp->prog, prevfx);
+                    if (mstreq(fun->name, STR_VARINIT))
+                        return NULL;
+                    else
+                        errorf("Dangling function call to '%s' in program '%s'.\n", get_txt(fun->name), get_txt(inheritp->prog->name));
+                }
+                inheritp = current_object->prog->inherit + inheritp->updated_inherit;
+            }
+        }
+        else if(inheritp->inherit_type != INHERIT_TYPE_NORMAL)
+        {
+            /* Virtual inherit, but we're at the top level.
+             * So nothing to correct, just reset the variable offsets,
+             * because they point to the non-virtual variables.
+             */
+
+            current_variables = current_object->variables;
+            variable_index_offset = 0;
+            assert(function_index_offset == 0); /* We should be at the topmost program. */
         }
     }
 
@@ -7581,6 +7643,16 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
         inherit_t *inheritp;
 
         inheritp = &progp->inherit[flags & INHERIT_MASK];
+        assert(!(inheritp->inherit_type & INHERIT_TYPE_MAPPED));
+
+        if(inheritp->inherit_type != INHERIT_TYPE_NORMAL)
+        {
+            /* We must be at the top-level for virtual inherits. */
+            assert(var_ix_offs == progp->num_virtual_variables);
+
+            var_ix_offs = 0;
+        }
+
         progp = inheritp->prog;
         fx -= inheritp->function_index_offset;
         var_ix_offs += inheritp->variable_index_offset;
@@ -7784,16 +7856,19 @@ setup_new_frame (int fx, program_t *inhProg, Bool allowRefs)
 {
     funflag_t flags;
 
+    /* We must be at the topmost level in the inherit hierarchy. */
+    assert(current_prog == current_object->prog);
+
     if (inhProg)
     {
         program_t *progp;
         int       fun_ix_offs;
         int       var_ix_offs;
-        
+
         progp = current_prog;
         fun_ix_offs = 0;
-        var_ix_offs = 0;
-        
+        var_ix_offs = progp->num_virtual_variables;
+
         while (progp != inhProg)
         {
             inherit_t      *inheritp, *inh;
@@ -7819,6 +7894,15 @@ setup_new_frame (int fx, program_t *inhProg, Bool allowRefs)
                 inheritp = inh;
                 fun_ix_offs = 0;
                 var_ix_offs = 0;
+
+                /* Check for obsoleted inherited programs. */
+                while (inheritp->inherit_type & INHERIT_TYPE_MAPPED)
+                {
+                    fx = current_object->prog->update_index_map[fx + inheritp->function_map_offset];
+                    if (fx == USHRT_MAX)
+                        errorf("Dangling function call in program '%s'.\n", get_txt(inheritp->prog->name));
+                    inheritp = current_object->prog->inherit + inheritp->updated_inherit;
+                }
             }
 
             fun_ix_offs += inheritp->function_index_offset;
@@ -7841,7 +7925,7 @@ setup_new_frame (int fx, program_t *inhProg, Bool allowRefs)
         flags = setup_new_frame1(fx, fun_ix_offs, var_ix_offs);
     }
     else
-        flags = setup_new_frame1(fx, 0, 0);
+        flags = setup_new_frame1(fx, 0, current_prog->num_virtual_variables);
 
     /* Setting csp->funstart is not just convenient, but also
      * required for proper error handling in setup_new_frame2()
@@ -9135,6 +9219,7 @@ again:
         }
 
         function_index_offset = csp->function_index_offset;
+        variable_index_offset = csp->variable_index_offset;
         current_variables     = csp->current_variables;
         break_sp = csp->break_sp;
         inter_context = csp->context;
@@ -13976,7 +14061,7 @@ again:
         /* Search for the function definition and determine the offsets.
          */
         csp->num_local_variables = sp - ap + 1;
-        flags = setup_new_frame1(obj_func_index, 0, 0);
+        flags = setup_new_frame1(obj_func_index, 0, current_prog->num_virtual_variables);
         funstart = current_prog->program + (flags & FUNSTART_MASK);
         csp->funstart = funstart;
 
@@ -14065,7 +14150,16 @@ again:
         /* Save all important global stack machine registers */
         push_control_stack(sp, pc, fp, inter_context);
 
-        inheritp = setup_inherited_call(prog_index);
+        inheritp = setup_inherited_call(prog_index, &func_index);
+        if (!inheritp)
+        {
+            /* Not found anymore and no error thrown.
+             * This can happen for vanished __INIT functions.
+             */
+            pop_control_stack();
+            push_number(sp, 0);
+            break;
+        }
 
         /* Search for the function definition and determine the offsets.
          */
@@ -14076,7 +14170,7 @@ again:
         flags = setup_new_frame1(
           func_index,
           function_index_offset + inheritp->function_index_offset,
-          inheritp->variable_index_offset
+          variable_index_offset + inheritp->variable_index_offset
         );
         funstart = current_prog->program + (flags & FUNSTART_MASK);
         csp->funstart = funstart;
@@ -14091,7 +14185,9 @@ again:
         /* Finish the setup */
         fp = inter_fp;
         pc = funstart;
-        current_variables += variable_index_offset;
+        current_variables = current_object->variables;
+        if (current_variables)
+            current_variables += variable_index_offset;
         current_strings = current_prog->strings;
         csp->extern_call = MY_FALSE;
         break;
@@ -17303,12 +17399,13 @@ retry_for_shadow:
         if (cache[ix].progp
           /* Static functions may not be called from outside.
            * Protected functions not even from the inside
+           * And undefined functions are never found by name.
            */
-          && (   !(cache[ix].flags & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED)) /* -> neither static nor protected */
-              || b_ign_prot
-              || (   !(cache[ix].flags & TYPE_MOD_PROTECTED)
-                  && current_object == ob
-                 ) /* --> static but not protected, and caller is owner */
+          && !(cache[ix].flags &
+                 ((!b_ign_prot && current_object != ob ? TYPE_MOD_STATIC    : 0)
+                 |(!b_ign_prot                         ? TYPE_MOD_PROTECTED : 0)
+                 | NAME_UNDEFINED
+                 )
              )
            )
         {
@@ -17330,6 +17427,7 @@ retry_for_shadow:
             current_prog = cache[ix].progp;
             current_strings = current_prog->strings;
             function_index_offset = cache[ix].function_index_offset;
+            variable_index_offset = cache[ix].variable_index_offset;
 #ifdef DEBUG
             if (!ob->variables && cache[ix].variable_index_offset)
                 fatal("%s Fatal: apply (cached) for object %p '%s' "
@@ -17339,7 +17437,7 @@ retry_for_shadow:
 #endif
             current_variables = ob->variables;
             if (current_variables)
-                current_variables += cache[ix].variable_index_offset;
+                current_variables += variable_index_offset;
             inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs, MY_FALSE);
                         
             // check argument types
@@ -17407,7 +17505,7 @@ retry_for_shadow:
 
                 csp->num_local_variables = num_arg;
                 current_prog = progp;
-                flags = setup_new_frame1(fx, 0, 0);
+                flags = setup_new_frame1(fx, 0, current_prog->num_virtual_variables);
                 
                 current_strings = current_prog->strings;
 
@@ -17428,17 +17526,20 @@ retry_for_shadow:
                 funstart = current_prog->program + (flags & FUNSTART_MASK);
 
                 cache[ix].funstart = funstart;
-                cache[ix].flags = progp->functions[fx]
-                                  & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|TYPE_MOD_DEPRECATED);
+                cache[ix].flags = (progp->functions[fx]
+                                   & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|TYPE_MOD_DEPRECATED))
+                                | (GET_CODE(funstart) == F_UNDEF ? NAME_UNDEFINED : 0);
 
                 /* Static functions may not be called from outside,
                  * Protected functions not even from the inside.
+                 * And undefined functions are never found by name.
                  */
-                if (0 != (cache[ix].flags & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED))
-                  && (   (cache[ix].flags & TYPE_MOD_PROTECTED)
-                      || current_object != ob)
-                  && !b_ign_prot
-                    )
+                if (cache[ix].flags &
+                     ((!b_ign_prot && current_object != ob ? TYPE_MOD_STATIC    : 0)
+                     |(!b_ign_prot                         ? TYPE_MOD_PROTECTED : 0)
+                     | NAME_UNDEFINED
+                     )
+                   )
                 {
                     /* Not found */
 

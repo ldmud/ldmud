@@ -307,7 +307,7 @@ assert_simul_efun_object (void)
          * necessary.
          */
         fun_ix_offs = ix;
-        var_ix_offs = 0;
+        var_ix_offs = progp->num_virtual_variables;
         inherit_progp = progp;
         while (flags2 & NAME_INHERITED)
         {
@@ -315,7 +315,11 @@ assert_simul_efun_object (void)
 
             inheritp = &inherit_progp->inherit[flags2 & INHERIT_MASK];
             ix -= inheritp->function_index_offset;
+
+            if (inheritp->inherit_type != INHERIT_TYPE_NORMAL)
+                var_ix_offs = 0;
             var_ix_offs += inheritp->variable_index_offset;
+
             inherit_progp = inheritp->prog;
             flags2 = inherit_progp->functions[ix];
         }
