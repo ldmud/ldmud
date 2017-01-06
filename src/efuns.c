@@ -8297,7 +8297,10 @@ f_driver_info (svalue_t *sp)
             break;
 
         case DI_TRACE_LAST_ERROR_AS_STRING:
-            put_ref_string(&result, current_error_trace_string);
+            if (current_error_trace_string)
+                put_ref_string(&result, current_error_trace_string);
+            else
+                put_number(&result, 0);
             break;
 
         case DI_TRACE_LAST_UNCAUGHT_ERROR:
@@ -8308,7 +8311,10 @@ f_driver_info (svalue_t *sp)
             break;
 
         case DI_TRACE_LAST_UNCAUGHT_ERROR_AS_STRING:
-            put_ref_string(&result, uncaught_error_trace_string);
+            if (uncaught_error_trace_string)
+                put_ref_string(&result, uncaught_error_trace_string);
+            else
+                put_number(&result, 0);
             break;
 
         /* LPC Runtime statistics */

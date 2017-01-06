@@ -999,8 +999,10 @@ errorf (const char *fmt, ...)
         object_name = dump_trace(num_error == 3, &current_error_trace, &current_error_trace_string);
         if (!published_catch)
         {
-            uncaught_error_trace = ref_array(current_error_trace);
-            uncaught_error_trace_string = ref_mstring(current_error_trace_string);
+            if (current_error_trace)
+                uncaught_error_trace = ref_array(current_error_trace);
+            if (current_error_trace_string)
+                uncaught_error_trace_string = ref_mstring(current_error_trace_string);
         }
         fflush(stdout);
     }
