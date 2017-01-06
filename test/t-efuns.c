@@ -111,6 +111,33 @@ mixed *tests = ({
 	    return sizeof(all_inventory(this_object())) == 0;
 	:)
     }),
+    ({ "allocate 1", 0,    (: deep_eq(allocate(0, 10), ({})) :) }),
+    ({ "allocate 2", 0,    (: deep_eq(allocate(5, 2), ({2, 2, 2, 2, 2})) :) }),
+    ({ "allocate 3", 0,    (: deep_eq(allocate(({1,2,3}), 4), ({ ({ ({4, 4, 4}), ({4, 4, 4}) }) })) :) }),
+    ({ "allocate 4", 0,
+        (:
+            mixed* a = allocate(2, ({1}) );
+            a[0][0] = -1;
+
+            return deep_eq(a, ({ ({-1}), ({1}) }));
+        :)
+    }),
+    ({ "allocate 5", 0,
+        (:
+            mixed* a = allocate(({3,2}), ({1}) );
+            a[0][0][0] = -1;
+
+            return deep_eq(a, ({ ({ ({ -1 }), ({ 1 }) }), ({ ({ 1 }), ({ 1 }) }), ({ ({ 1 }), ({ 1 }) }) }));
+        :)
+    }),
+#if 0
+    /* Out of memory errors can't be caught, therefore these
+     * can't be a part of the regular test array. But they
+     * should not crash and should not leak any memory.
+     */
+    ({ "allocate 6a", TF_ERROR, (: allocate(0x1000000, ({ 1 })) :) }),
+    ({ "allocate 6b", TF_ERROR, (: allocate( ({0x100, 0x100, 0x100}), ({ 1 })); :) }),
+#endif
     ({ "asin 1", 0,        (: asin(0.0) == 0 :) }),
     ({ "asin 2", TF_ERROR, (: funcall(#'asin,"1.0") :) }),
     ({ "asin 3", TF_ERROR, (: asin(1.1) :) }),
@@ -399,6 +426,8 @@ void run_test()
 
 string *epilog(int eflag)
 {
+    configure_driver(DC_MEMORY_LIMIT, ({ 0x10000000, 0x20000000 }));
+
     run_test();
     return 0;
 }

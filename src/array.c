@@ -1730,6 +1730,76 @@ is_ordered (vector_t *v)
 /*                            EFUNS                                        */
 
 /*-------------------------------------------------------------------------*/
+/* This structure has all information for the cleanup handler.
+ * So it contains the full state of the allocate() algorithm.
+ * (Except the current dimension, which we can deduct easily.)
+ */
+struct allocate_cleanup_s
+{
+    error_handler_t head; /* For push_error_handler.                 */
+
+    int num_dim;          /* Number of dimensions.                   */
+    bool hasInitValue;    /* True, if there are special init values. */
+
+    size_t * curpos;      /* For each dimension the number of initialized array elements. */
+    size_t * sizes;       /* For each dimension the final array size.                     */
+    vector_t ** curvec;   /* For each dimension the array that's being worked on.         */
+};
+
+/*-------------------------------------------------------------------------*/
+static void
+allocate_cleanup (error_handler_t *arg)
+
+/* Cleanup handler for the allocate() efun.
+ *
+ * This is called when an error happens during the allocation
+ * of an array and cleans up the partly created array.
+ */
+
+{
+    struct allocate_cleanup_s* info = (struct allocate_cleanup_s*)arg;
+
+    int dim = info->num_dim - 1;
+    while (dim >= 0)
+    {
+        if (info->curvec[dim])
+            break;
+
+        dim--;
+    }
+
+    while (dim >= 0)
+    {
+        if (!info->curpos[dim])
+        {
+            /* Finished this array. */
+            xfree(info->curvec[dim]);
+            dim--;
+        }
+        else if (dim != info->num_dim - 1)
+        {
+            /* Go to the next dimension. */
+            size_t pos = --info->curpos[dim];
+
+            info->curvec[dim+1] = info->curvec[dim]->item[pos].u.vec;
+            info->curpos[dim+1] = info->sizes[dim+1];
+            dim++;
+        }
+        else if (info->hasInitValue)
+        {
+            size_t pos = --info->curpos[dim];
+
+            free_svalue(info->curvec[dim]->item + pos);
+        }
+        else
+        {
+            /* All elements are zero, don't need to free them. */
+            info->curpos[dim] = 0;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------*/
 svalue_t *
 v_allocate (svalue_t *sp, int num_arg)
 
@@ -1745,6 +1815,7 @@ v_allocate (svalue_t *sp, int num_arg)
  */
 
 {
+    static struct allocate_cleanup_s info;
     vector_t *v;
     svalue_t *argp;
     size_t new_size;
@@ -1763,8 +1834,21 @@ v_allocate (svalue_t *sp, int num_arg)
             svalue_t *svp;
 
             v = allocate_uninit_array(new_size);
+
+            info.num_dim = 1;
+            info.hasInitValue = true;
+            info.curpos = &i;
+            info.sizes = &new_size;
+            info.curvec = &v;
+
+            /* In case of an (out of memory) error... */
+            push_error_handler(allocate_cleanup, &(info.head));
+
             for (svp = v->item, i = 0; i < new_size; i++, svp++)
                 copy_svalue_no_free(svp, sp);
+
+            /* Remove the cleanup routine without starting it. */
+            inter_sp = sp;
         }
     }
     else if (argp->type == T_POINTER
@@ -1784,16 +1868,17 @@ v_allocate (svalue_t *sp, int num_arg)
     else if (argp->type == T_POINTER)
     {
         svalue_t *svp;
-        size_t dim, num_dim;
+        size_t dim;
         size_t count;
-        Bool hasInitValue = MY_FALSE;
-        size_t * curpos = alloca(VEC_SIZE(argp->u.vec) * sizeof(*curpos));
-        size_t * sizes = alloca(VEC_SIZE(argp->u.vec) * sizeof(*sizes));
-        vector_t ** curvec = alloca(VEC_SIZE(argp->u.vec) * sizeof(*curvec));
 
-        num_dim = VEC_SIZE(argp->u.vec);
+        info.num_dim = VEC_SIZE(argp->u.vec);
+        info.hasInitValue = MY_FALSE;
 
-        if (!curpos || !curvec || !sizes)
+        info.curpos = alloca(VEC_SIZE(argp->u.vec) * sizeof(*info.curpos));
+        info.sizes = alloca(VEC_SIZE(argp->u.vec) * sizeof(*info.sizes));
+        info.curvec = alloca(VEC_SIZE(argp->u.vec) * sizeof(*info.curvec));
+
+        if (!info.curpos || !info.curvec || !info.sizes)
         {
             errorf("Out of stack memory.\n");
             /* NOTREACHED */
@@ -1801,14 +1886,14 @@ v_allocate (svalue_t *sp, int num_arg)
 
         if (num_arg == 2 && (sp->type != T_NUMBER || sp->u.number != 0))
         {
-            hasInitValue = MY_TRUE;
+            info.hasInitValue = MY_TRUE;
         }
 
         /* Check the size array for consistency, and also count how many
          * elements we're going to allocate.
          */
         for ( dim = 0, count = 0, svp = argp->u.vec->item
-            ; dim < num_dim
+            ; dim < info.num_dim
             ; dim++, svp++
             )
         {
@@ -1827,55 +1912,58 @@ v_allocate (svalue_t *sp, int num_arg)
             if (size < 0 || (max_array_size && (size_t)size > max_array_size))
                 errorf("Illegal array size: %"PRIdPINT"\n", size);
 
-            if (size == 0 && dim < num_dim-1)
+            if (size == 0 && dim < info.num_dim-1)
                 errorf("Only the last dimension can have empty arrays.\n");
 
             count *= (size_t)size;
             if (max_array_size && count > max_array_size)
                 errorf("Illegal total array size: %lu\n", (unsigned long)count);
 
-            sizes[dim] = (size_t)size;
-            curvec[dim] = NULL;
+            info.sizes[dim] = (size_t)size;
+            info.curvec[dim] = NULL;
         }
 
         /* Now loop over the dimensions, creating the array structure */
         dim = 0;
-        curpos[0] = 0;
-        while (dim > 0 || curpos[0] < sizes[0])
+        info.curpos[0] = 0;
+
+        push_error_handler(allocate_cleanup, &(info.head));
+
+        while (dim > 0 || info.curpos[0] < info.sizes[0])
         {
-            if (!curvec[dim])
+            if (!info.curvec[dim])
             {
                 /* We just entered this dimension.
                  * Create a new array and initialise the loop.
                  */
-                if (hasInitValue || dim+1 < num_dim)
+                if (info.hasInitValue || dim+1 < info.num_dim)
                 {
-                    curvec[dim] = allocate_uninit_array(sizes[dim]);
+                    info.curvec[dim] = allocate_uninit_array(info.sizes[dim]);
                 }
                 else
                 {
-                    curvec[dim] = allocate_array(sizes[dim]);
+                    info.curvec[dim] = allocate_array(info.sizes[dim]);
                     /* This is the last dimension, and there is nothing
                      * to initialize: return immediately to the higher level
                      */
-                    curpos[dim] = sizes[dim]; /* In case dim == 0 */
+                    info.curpos[dim] = info.sizes[dim]; /* In case dim == 0 */
                     if (dim > 0)
                         dim--;
                     continue;
                 }
-                curpos[dim] = 0;
+                info.curpos[dim] = 0;
             }
 
             /* curvec[dim] is valid, and we have to put the next
              * element in at index curpos[dim].
              */
-            if (dim == num_dim-1)
+            if (dim == info.num_dim-1)
             {
                 /* Last dimension: assign the init value */
-                if (hasInitValue && curpos[dim] < sizes[dim])
-                    copy_svalue_no_free(curvec[dim]->item+curpos[dim], sp);
+                if (info.hasInitValue && info.curpos[dim] < info.sizes[dim])
+                    copy_svalue_no_free(info.curvec[dim]->item+info.curpos[dim], sp);
             }
-            else if (!curvec[dim+1])
+            else if (!info.curvec[dim+1])
             {
                 /* We need a vector from a lower dimension, but it doesn't
                  * exist yet: setup the loop parameters to go into
@@ -1884,25 +1972,28 @@ v_allocate (svalue_t *sp, int num_arg)
                 dim++;
                 continue;
             }
-            else if (curpos[dim] < sizes[dim])
+            else if (info.curpos[dim] < info.sizes[dim])
             {
                 /* We got a vector from a lower lever */
-                put_array(curvec[dim]->item+curpos[dim], curvec[dim+1]);
-                curvec[dim+1] = NULL;
+                put_array(info.curvec[dim]->item+info.curpos[dim], info.curvec[dim+1]);
+                info.curvec[dim+1] = NULL;
             }
 
             /* Continue to the next element. If we are at the end
              * of this dimension, return to the next higher one.
              */
-            curpos[dim]++;
-            if (curpos[dim] >= sizes[dim] && dim > 0)
+            info.curpos[dim]++;
+            if (info.curpos[dim] >= info.sizes[dim] && dim > 0)
             {
                 dim--;
             }
         } /* while() */
 
         /* The final vector is now in curvec[0] */
-        v = curvec[0];
+        v = info.curvec[0];
+
+        /* Remove the cleanup routine without starting it. */
+        inter_sp = sp;
     }
     else
     {

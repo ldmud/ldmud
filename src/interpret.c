@@ -1340,7 +1340,11 @@ free_svalue (svalue_t *v)
      */
     if (fs_queue_head != NULL)
     {
+        int save_privilege = malloc_privilege;
+
+        malloc_privilege = MALLOC_SYSTEM;
         fs_queue_t * tmp = xalloc(sizeof(*tmp));
+        malloc_privilege = save_privilege;
 
         if (NULL == tmp)
         {
@@ -1594,24 +1598,18 @@ inl_copy_svalue_no_free (svalue_t *to, svalue_t *from)
  */
 
 {
-    assign_svalue_no_free(to, from);
-
     /* For arrays and mappings, create a shallow copy */
     if (from->type == T_MAPPING)
     {
         mapping_t *old, *new;
+        old = from->u.map;
 
-        old = to->u.map;
-        if (old->ref != 1)
-        {
-            DYN_MAPPING_COST(MAP_SIZE(old));
-            new = copy_mapping(old);
-            if (!new)
-                errorf("Out of memory: mapping[%"PRIdPINT"] for copy.\n"
-                     , MAP_SIZE(old));
-            free_mapping(old);
-            to->u.map = new;
-        }
+        DYN_MAPPING_COST(MAP_SIZE(old));
+        new = copy_mapping(old);
+        if (!new)
+            errorf("Out of memory: mapping[%"PRIdPINT"] for copy.\n"
+                 , MAP_SIZE(old));
+        put_mapping(to, new);
     }
     else if (from->type == T_POINTER
           || from->type == T_QUOTED_ARRAY)
@@ -1619,9 +1617,9 @@ inl_copy_svalue_no_free (svalue_t *to, svalue_t *from)
         vector_t *old, *new;
         size_t size, i;
 
-        old = to->u.vec;
+        old = from->u.vec;
         size = VEC_SIZE(old);
-        if (old->ref != 1 && old != &null_vector)
+        if (old != &null_vector)
         {
             DYN_ARRAY_COST(size);
             new = allocate_uninit_array((int)size);
@@ -1631,10 +1629,14 @@ inl_copy_svalue_no_free (svalue_t *to, svalue_t *from)
             for (i = 0; i < size; i++)
                 assign_svalue_no_free( &new->item[i]
                                      , &old->item[i]);
-            free_array(old);
+            *to = *from;
             to->u.vec = new;
         }
+        else
+            put_ref_array(to, &null_vector);
     }
+    else
+        assign_svalue_no_free(to, from);
 } /* inl_copy_svalue_no_free() */
 
 void copy_svalue_no_free (svalue_t *to, svalue_t *from)
