@@ -219,6 +219,14 @@ f_crypt(svalue_t *sp)
         errorf("Bad argument 2 to crypt(): string too short.\n");
 
     res = crypt(get_txt((sp-1)->u.str), salt);
+    if (!res)
+    {
+        if (errno == EINVAL && sp->type == T_STRING)
+            errorf("Bad argument 2 to crypt(): Invalid salt.\n");
+        else
+            errorf("crypt() is not available.\n");
+    }
+
     sp = pop_n_elems(2, sp);
     push_c_string(sp, res);
 
