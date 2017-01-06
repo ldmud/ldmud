@@ -9223,7 +9223,7 @@ f_ctime(svalue_t *sp)
     {
       /* second-precision case */
         // test if string for this time is cached
-        if (last_time != sp->u.number)
+        if (last_time != sp->u.number || last_ctime_result == NULL)
         {
           /* cache is outdated */
             ts = time_fstring(sp->u.number, "%a %b %d %H:%M:%S %Y", 0);
