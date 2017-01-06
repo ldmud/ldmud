@@ -3805,6 +3805,9 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
         error_index = 0;
         free_svalue(&(cb->function.lambda));
         cb->function.lambda.type = T_INVALID;
+
+        for (int i = 0; i < nargs; i++)
+            free_svalue(args+i);
     }
     else
     {
