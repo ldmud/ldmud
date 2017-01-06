@@ -11634,6 +11634,12 @@ lvalue:
           if ($1.code < 0)
           {
                 yyerror("Need lvalue for range lvalue.");
+
+                /* We can't continue without an lvalue on our hand. */
+                free_fulltype($1.type);
+                free_fulltype($2.type1);
+                free_fulltype($2.type2);
+                YYACCEPT;
           }
           else
           {
