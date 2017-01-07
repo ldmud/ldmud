@@ -782,6 +782,11 @@ static int max_number_of_locals = 0;
   /* Total number of local variables used in this function so far.
    */
 
+static int max_number_of_init_locals = 0;
+  /* Total number of local variables used in the __INIT function so far.
+   * (These are context variables of inline closures used for initialization.)
+   */
+
 static ident_t *all_locals = NULL;
   /* List of defined local variables, listed in reverse order of definition.
    * This also means that the variables are listed in reverse order of
@@ -14520,6 +14525,9 @@ transfer_init_control (void)
          */
         upd_jump_offset(last_initializer_end, mem_block[A_PROGRAM].current_size);
     }
+    block_depth = 1;
+    init_scope(block_depth);
+    max_number_of_locals = max_number_of_init_locals;
 } /* transfer_init_control() */
 
 /*-------------------------------------------------------------------------*/
@@ -14533,6 +14541,9 @@ add_new_init_jump (void)
 {
     ins_f_code(F_JUMP);
     last_initializer_end = (bc_offset_t)CURRENT_PROGRAM_SIZE;
+
+    max_number_of_init_locals = max_number_of_locals;
+    block_depth = 0;
     
     if (realloc_a_program(sizeof(bc_offset_t)))
     {
@@ -16277,6 +16288,8 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
     argument_level = 0;
     got_ellipsis[0] = MY_FALSE;
 
+    max_number_of_init_locals = 0;
+
     /* Check if call_other() has been replaced by a sefun.
      */
     call_other_sefun = -1;
@@ -16388,7 +16401,7 @@ epilog (void)
             /* Update the function header for __INIT. Look at the __INIT
              * block_scope (#0), whether we need some space for local variables.
              */
-            define_new_function(MY_FALSE, ip, 0, block_scope[0].num_locals
+            define_new_function(MY_FALSE, ip, 0, max_number_of_init_locals
                                 , first_initializer_start
                                 , TYPE_MOD_PROTECTED, get_fulltype(lpctype_unknown));
         }
