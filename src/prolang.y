@@ -11067,14 +11067,15 @@ expr4:
               if (s_index == FSM_AMBIGUOUS) /* Not anymore. */
                   ins_prog_string($5);
               else
+              {
                   ins_number(m_index);
+                  free_mstring($5);
+              }
           }
           ins_number(s_index);
           arrange_protected_lvalue($3.start, $3.code, $3.end, F_PROTECTED_INDEX_S_LVALUE);
 
           $$.end = CURRENT_PROGRAM_SIZE-1;
-          if ($5 != NULL)
-              free_mstring($5);
           free_fulltype($3.type);
       }
 
@@ -11731,7 +11732,10 @@ lvalue:
                   if (s_index == FSM_AMBIGUOUS) /* Not anymore. */
                       ins_prog_string($3);
                   else
+                  {
                       ins_number(m_index);
+                      free_mstring($3);
+                  }
               }
 
               /* Insert the struct type index */
@@ -11796,8 +11800,6 @@ lvalue:
               $$.type = result;
           }
 
-          if ($3 != NULL)
-              free_mstring($3);
           free_fulltype($1.type);
       }
 
