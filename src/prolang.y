@@ -4791,7 +4791,10 @@ def_function_complete ( p_int body_start, Bool is_inline)
             /* Check if the previous instruction is a RETURN, or
              * at least a non-continuing instruction.
              */
-            bytecode_t last = PROGRAM_BLOCK[CURRENT_PROGRAM_SIZE-1];
+            bytecode_t last = F_ILLEGAL;
+
+            if (CURRENT_PROGRAM_SIZE > body_start + FUNCTION_HDR_SIZE)
+                last = PROGRAM_BLOCK[CURRENT_PROGRAM_SIZE-1];
 
             if (F_RETURN == last || F_RETURN0 == last
              || F_RAISE_ERROR == last || F_THROW == last
@@ -14163,7 +14166,12 @@ insert_pop_value (void)
      * the value from being generated if the last expression is not too long
      * ago.
      */
-    if (last_expression == CURRENT_PROGRAM_SIZE - sizeof(bytecode_t))
+    if (last_expression > CURRENT_PROGRAM_SIZE)
+    {
+        /* No last expression but a value to pop, interesting... */
+        ins_f_code(F_POP_VALUE);
+    }
+    else if (last_expression == CURRENT_PROGRAM_SIZE - sizeof(bytecode_t))
     {
          /* The following ops have no data in the bytecode. */
         switch ( mem_block[A_PROGRAM].block[last_expression])
