@@ -8144,13 +8144,12 @@ f_net_connect (svalue_t *sp)
             }
             socket_close(sfd);
         }
-        // no longer need the results from getaddrinfo()
-        freeaddrinfo(result);
-        
+
         if (rp == NULL)
         {
             // No address succeeded, rc contains the last 'error', we just
             // exit here.
+            freeaddrinfo(result);
             break;
         }
         // at this point we a connected socket
@@ -8163,6 +8162,9 @@ f_net_connect (svalue_t *sp)
         outconn[n].socket = sfd;
         outconn[n].target = *((struct sockaddr_in *)rp->ai_addr);
         outconn[n].curr_obj = ref_object(current_object, "net_conect");
+
+        // no longer need the results from getaddrinfo()
+        freeaddrinfo(result);
 
         if (errno == EINPROGRESS)
         {
