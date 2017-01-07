@@ -3973,6 +3973,11 @@ mem_clear_slab_memory_flags ( const char * tag
 
 {
     word_t * p;
+#ifdef MALLOC_CHECK
+    /* The magic bytes we expect: */
+    p_uint amagic = samagic[SIZE_MOD_INDEX(slab->size, samagic)];
+    p_uint fmagic = sfmagic[SIZE_MOD_INDEX(slab->size, sfmagic)];
+#endif
 
     if (NULL != startp)
         p = startp;
@@ -3990,7 +3995,19 @@ mem_clear_slab_memory_flags ( const char * tag
     while (p < slab->blocks + slabtable[ix].numBlocks * slab->size / GRANULARITY)
     {
         /* ulog1f("slaballoc:   clear block %x\n", p); */
-        *p &= ~M_REF;
+        p[M_SIZE] &= ~M_REF;
+
+#ifdef MALLOC_CHECK
+        if (p[M_MAGIC] != ((p[M_SIZE] & THIS_BLOCK) ? fmagic : amagic))
+        {
+            fatal("mem_clear_slab_memory_flags: block %p, "
+                  "magic match failed: expected %"PRIxPINT", "
+                  "found %"PRIxPINT"\n"
+                , p, (p_uint)((p[M_SIZE] & THIS_BLOCK) ? fmagic : amagic), p[M_MAGIC]
+            );
+        }
+#endif
+
         p += slab->size / GRANULARITY;
     }
 
@@ -4017,7 +4034,17 @@ mem_clear_ref_flags (void)
     last = heap_end - TL_OVERHEAD;
     for (p = heap_start; p < last; )
     {
-        p[1] &= ~M_REF;
+        p[1 + M_SIZE] &= ~M_REF;
+#ifdef MALLOC_CHECK
+        if (p[1 + M_MAGIC] != ((p[1 + M_SIZE] & THIS_BLOCK) ? LAMAGIC : LFMAGIC))
+        {
+            fatal("mem_clear_ref_flags: block %p, "
+                  "magic match failed: expected %"PRIxPINT", "
+                  "found %"PRIxPINT"\n"
+                , p, (p_uint)((p[1 + M_SIZE] & THIS_BLOCK) ? LAMAGIC : LFMAGIC), p[1 + M_MAGIC]
+            );
+        }
+#endif
         if (p + *p > heap_end)
         {
             in_malloc = 0;
