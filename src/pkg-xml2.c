@@ -210,6 +210,8 @@ parse_node (svalue_t *result, xmlTextReaderPtr reader)
                 /* FALLTHROUGH */
             case XML_READER_TYPE_TEXT:
             case XML_READER_TYPE_CDATA:
+            case XML_READER_TYPE_WHITESPACE:
+            case XML_READER_TYPE_SIGNIFICANT_WHITESPACE:
                 if (children == NULL)
                 {
                     children = &(element->item[XML_TAG_CONTENTS]);
