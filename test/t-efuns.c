@@ -5,6 +5,7 @@
 #include "/sys/tls.h"
 #include "/sys/configuration.h"
 #include "/sys/lpctypes.h"
+#include "/sys/regexp.h"
 
 #define TESTFILE "/log/testfile"
 
@@ -255,6 +256,18 @@ mixed *tests = ({
     ({ "map mapping 4", 0, (: deep_eq(map(([1,2,3]), (: $1 + $3 :), 1), ([1:2,2:3,3:4])) :) }),
     ({ "map mapping 5", 0, (: deep_eq(map(([1,2,3]), "f"), ([1:2,2:3,3:4])) :) }),
     ({ "map mapping 6", TF_ERROR, (: map(([]), unbound_lambda(0,0), ([1,2,3])) :) }),
+
+    ({ "regmatch 1", 0, (: regmatch("abcd", "abc") == "abc" :) }),
+    ({ "regmatch 2", 0, (: regmatch("abcd", "abcdef") == 0 :) }),
+    ({ "regmatch 3", 0, (: regmatch("abcd", "^$") == 0 :) }),
+    ({ "regmatch 4", 0, (: regmatch("", "^$") == "" :) }),
+    ({ "regmatch 5", 0, (: regmatch("", "(a|)") == "" :) }),
+    ({ "regmatch 6", 0, (: deep_eq(regmatch("abcd", "abc", RE_MATCH_SUBS), ({"abc", 3})) :) }),
+    ({ "regmatch 7", 0, (: regmatch("abcd", "abcdef", RE_MATCH_SUBS) == 0 :) }),
+    ({ "regmatch 8", 0, (: regmatch("abcd", "^$", RE_MATCH_SUBS) == 0 :) }),
+    ({ "regmatch 9", 0, (: deep_eq(regmatch("", "^$", RE_MATCH_SUBS), ({"", 1})) :) }),
+    ({ "regmatch 10", 0, (: deep_eq(regmatch("", "(a|)", RE_MATCH_SUBS), ({ "", "", 1})) :) }),
+
     ({ "explode 1", 0, (: deep_eq(explode("",""), ({""})) :) }),
     ({ "explode 2", 0, (: deep_eq(explode("","anything"), ({""})) :) }),
     ({ "explode 3", 0, (: deep_eq(explode("abc",""), ({"a","b","c"})) :) }),

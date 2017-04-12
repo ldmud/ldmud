@@ -1642,10 +1642,14 @@ v_regmatch (svalue_t *sp, int num_arg)
                 size_t start, end;
 
                 if (!rx_get_match_n(reg, text, i, &start, &end)
-                 || start >= end
+                 || start > end
                    )
                 {
                     put_number(&(result->item[i]), 0);
+                }
+                else if (start == end)
+                {
+                    put_ref_string(result->item + i, STR_EMPTY);
                 }
                 else
                 {
@@ -1683,9 +1687,13 @@ v_regmatch (svalue_t *sp, int num_arg)
             size_t start, end;
 
             rx_get_match(reg, text, &start, &end);
-            if (start >= end)
+            if (start > end)
             {
                 resstr = NULL;
+            }
+            else if (start == end)
+            {
+                resstr = ref_mstring(STR_EMPTY);
             }
             else
             {
