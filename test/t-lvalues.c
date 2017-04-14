@@ -850,6 +850,20 @@ mixed *tests = ({
            return !funcall((: referencep(&$1) :), ref);
        :)
     }),
+    ({ "regexp with lvalue references", 0,
+       (:
+           string str1 = "abcdef", str2 = "uwvxyz";
+
+           return deep_eq(regexp(({ &str1, &str2 }), "def"), ({"abcdef"}));
+       :)
+    }),
+    ({ "regexp with string ranges", 0,
+       (:
+           string str = "abcdef";
+
+           return deep_eq(regexp(({ &(str[2..3]), &(str[1..4]) }), "^cd$"), ({"cd"}));
+       :)
+    }),
     ({ "save_value with lvalue references", 0,
        (:
            int var = 99;

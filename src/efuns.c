@@ -925,12 +925,24 @@ f_regexp (svalue_t *sp)
         }
         sp = inter_sp;
 
-        for (num_match = i = 0; i < v_size; i++) {
+        for (num_match = i = 0; i < v_size; i++)
+        {
+            svalue_t *item = get_rvalue(v->item + i, NULL);
+            svalue_t tmp_line = { T_NUMBER };
             string_t *line;
 
             res[i] = MY_FALSE;
 
-            if (v->item[i].type != T_STRING)
+            if (item == NULL)
+            {
+                struct protected_range_lvalue *r = v->item[i].u.protected_range_lvalue;
+                if (r->vec.type != T_STRING)
+                    continue;
+
+                item = &tmp_line;
+                assign_rvalue_no_free(item, v->item + i);
+            }
+            else if (item->type != T_STRING)
                 continue;
 
             if (add_eval_cost(1))
@@ -938,11 +950,13 @@ f_regexp (svalue_t *sp)
                 /* Evalution cost exceeded: we abort matching at this point
                  * and let the interpreter detect the exception.
                  */
+                free_svalue(&tmp_line);
                 break;
             }
 
-            line = v->item[i].u.str;
+            line = item->u.str;
             rc = rx_exec(reg, line, 0);
+            free_svalue(&tmp_line);
             if (rc == 0)
                 continue;
             if (rc < 0)
@@ -963,7 +977,7 @@ f_regexp (svalue_t *sp)
         for (j=i=0; i < v_size && j < num_match; i++) {
             if (!res[i])
                 continue;
-            assign_svalue_no_free(&ret->item[j++], &v->item[i]);
+            assign_rvalue_no_free(&ret->item[j++], &v->item[i]);
         }
         /* Free regexp and the intermediate buffer res by freeing the error
          * handler. */
