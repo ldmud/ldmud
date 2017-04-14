@@ -5052,9 +5052,11 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
     char * fname = bMax ? "max" : "min";
     svalue_t *argp = sp-num_arg+1;
     svalue_t *valuep = argp;
+    svalue_t *rvaluep;
     int left = num_arg;
     Bool gotArray = MY_FALSE;
     svalue_t *result = NULL;
+    svalue_t tmp_str = { T_NUMBER };
 
 
     if (argp->type == T_POINTER)
@@ -5074,63 +5076,111 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
         }
     }
 
-    if (valuep->type == T_STRING)
+    rvaluep = get_rvalue(valuep, NULL);
+    if (rvaluep == NULL)
     {
-        result = valuep;
+        struct protected_range_lvalue *r = valuep->u.protected_range_lvalue;
+        if (r->vec.type != T_STRING)
+        {
+            /* We only need this for error messages. */
+            rvaluep = &(r->vec);
+        }
+        else
+        {
+            rvaluep = &tmp_str;
+            assign_rvalue_no_free(rvaluep, valuep);
+        }
+    }
+
+    if (rvaluep->type == T_STRING)
+    {
+        result = rvaluep;
 
         for (valuep++, left--; left > 0; valuep++, left--)
         {
             int cmp;
-
-            if (valuep->type != T_STRING)
+            svalue_t *item = get_rvalue(valuep, NULL);
+            svalue_t item_str = { T_NUMBER };
+            if (item == NULL)
             {
+                struct protected_range_lvalue *r = valuep->u.protected_range_lvalue;
+                if (r->vec.type != T_STRING)
+                {
+                    /* We only need this for error messages. */
+                    item = &(r->vec);
+                }
+                else
+                {
+                    item = &item_str;
+                    assign_rvalue_no_free(item, valuep);
+                }
+            }
+
+            if (item->type != T_STRING)
+            {
+                free_svalue(&tmp_str);
                 if (gotArray)
                     errorf("Bad argument to %s(): array[%d] is a '%s', "
                           "expected 'string'.\n"
                          , fname, (int)VEC_SIZE(argp->u.vec) - left + 1
-                         , typename(valuep->type));
+                         , typename(item->type));
                 else
-                    vefun_arg_error(num_arg - left + 1, T_STRING, valuep->type, sp);
+                    vefun_arg_error(num_arg - left + 1, T_STRING, item->type, sp);
                 /* NOTREACHED */
             }
 
-            cmp = mstrcmp(valuep->u.str, result->u.str);
+            cmp = mstrcmp(item->u.str, result->u.str);
             if (bMax ? (cmp > 0) : (cmp < 0))
-                result = valuep;
+            {
+                if (item == &item_str)
+                {
+                    free_svalue(&tmp_str);
+                    transfer_svalue_no_free(&tmp_str, &item_str);
+                    result = &(tmp_str);
+                }
+                else
+                    result = item;
+            }
+            else
+                free_svalue(&item_str);
         }
     }
-    else if (valuep->type == T_NUMBER || valuep->type == T_FLOAT)
+    else if (rvaluep->type == T_NUMBER || rvaluep->type == T_FLOAT)
     {
-        result = valuep;
+        result = rvaluep;
 
         for (valuep++, left--; left > 0; valuep++, left--)
         {
-            if (valuep->type != T_FLOAT && valuep->type != T_NUMBER)
+            svalue_t *item = get_rvalue(valuep, NULL);
+            if (item == NULL)
+                item = &(valuep->u.protected_range_lvalue->vec);
+
+            if (item->type != T_FLOAT && item->type != T_NUMBER)
             {
                 if (gotArray)
                     errorf("Bad argument to %s(): array[%d] is a '%s', "
                           "expected 'int' or 'float'.\n"
                          , fname, (int)VEC_SIZE(argp->u.vec) - left + 1
-                         , typename(valuep->type));
+                         , typename(item->type));
                 else
-                    vefun_exp_arg_error(num_arg - left + 1, TF_NUMBER|TF_FLOAT, valuep->type, sp);
+                    vefun_exp_arg_error(num_arg - left + 1, TF_NUMBER|TF_FLOAT, item->type, sp);
                 /* NOTREACHED */
             }
 
-            if (valuep->type == T_NUMBER && result->type == T_NUMBER)
+            if (item->type == T_NUMBER && result->type == T_NUMBER)
             {
-                if (bMax ? (valuep->u.number > result->u.number)
-                         : (valuep->u.number < result->u.number))
-                    result = valuep;
+                if (bMax ? (item->u.number > result->u.number)
+                         : (item->u.number < result->u.number))
+                    result = item;
             }
             else
             {
                 double v, r;
 
-                if (valuep->type == T_FLOAT)
-                    v = READ_DOUBLE(valuep);
+                if (item->type == T_FLOAT)
+                    v = READ_DOUBLE(item);
                 else
-                    v = (double)(valuep->u.number);
+                    v = (double)(item->u.number);
 
                 if (result->type == T_FLOAT)
                     r = READ_DOUBLE(result);
@@ -5139,7 +5189,7 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
 
                 if (bMax ? (v > r)
                          : (v < r))
-                    result = valuep;
+                    result = item;
             }
         } /* for (values) */
     }
@@ -5148,9 +5198,9 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
         if (gotArray)
             errorf("Bad argument to %s(): array[0] is a '%s', "
                   "expected 'string', 'int' or 'float'.\n"
-                 , fname, typename(valuep->type));
+                 , fname, typename(rvaluep->type));
         else
-            vefun_exp_arg_error(1, TF_STRING|TF_NUMBER|TF_FLOAT, valuep->type, sp);
+            vefun_exp_arg_error(1, TF_STRING|TF_NUMBER|TF_FLOAT, rvaluep->type, sp);
         /* NOTREACHED */
     }
 
@@ -5164,6 +5214,8 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
         sp = pop_n_elems(num_arg, sp) + 1;
         transfer_svalue_no_free(sp, &resvalue);
     }
+
+    free_svalue(&tmp_str);
 
     return sp;
 } /* x_min_max() */
