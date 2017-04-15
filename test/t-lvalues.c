@@ -960,6 +960,13 @@ mixed *tests = ({
         :)
     }),
     ({
+        "to_string with references in the array", 0,
+        (:
+            int a = 'L';
+            return to_string(({&a, 'D', 'M', 'u', 'd'})) == "LDMud";
+        :)
+    }),
+    ({
        "transpose_array with references in the array 1", 0,
        (:
            int* a1 = ({1,2,3});

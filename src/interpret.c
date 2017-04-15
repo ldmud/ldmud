@@ -3036,6 +3036,8 @@ inter_add_array (vector_t *q, vector_t **vpp)
  *     Convert the C-String <p> into a mstring and put it into <sp>.
  * push_svalue(v), push_svalue_block(num,v):
  *     Push one or more svalues onto the stack.
+ * push_rvalue(v):
+ *     Push one rvalue onto the stack.
  * pop_stack(), _drop_n_elems(n,sp):
  *     Pop (free) elements from the stack.
  * stack_overflow(sp,fp,pc):
@@ -3084,6 +3086,18 @@ push_svalue (svalue_t *v)
 
 {
     assign_svalue_no_free(++inter_sp, v);
+}
+
+/*-------------------------------------------------------------------------*/
+void
+push_rvalue (svalue_t *v)
+
+/* Push the svalue <v> as an rvalue onto the stack as defined by <inter_sp>.
+ * Same semantic as assign_rvalue_no_free().
+ */
+
+{
+    assign_rvalue_no_free(++inter_sp, v);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -4907,7 +4921,7 @@ void m_values_filter ( svalue_t *key UNUSED
 #endif
     struct mvf_info * vip = (struct mvf_info *)extra;
 
-    assign_svalue_no_free( vip->svp++, data + vip->num);
+    assign_rvalue_no_free( vip->svp++, data + vip->num);
 } /* m_values_filter() */
 
 /*-------------------------------------------------------------------------*/
@@ -4930,7 +4944,7 @@ m_unmake_filter ( svalue_t *key
 
     assign_svalue_no_free(vip->svp->u.vec->item + vip->num, key);
     for (i = 0; i < vip->width; i++)
-        assign_svalue_no_free(vip->svp[i+1].u.vec->item + vip->num, data+i);
+        assign_rvalue_no_free(vip->svp[i+1].u.vec->item + vip->num, data+i);
     vip->num++;
 } /* m_unmake_filter() */
 

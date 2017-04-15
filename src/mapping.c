@@ -4104,7 +4104,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
             }
             else if (1 == num_values)
             {
-                push_svalue(read_pointer[1].u.lvalue);
+                push_rvalue(read_pointer[1].u.lvalue);
             }
             else
             {
@@ -4114,7 +4114,10 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
                 for (j = 0, svp = dvec->item
                     ; j < num_values
                     ; j++, svp++, v++)
-                    assign_svalue(svp, v);
+                {
+                    free_svalue(svp);
+                    assign_rvalue_no_free(svp, v);
+                }
                 push_svalue(dvec_sp);
             }
         }
@@ -4142,7 +4145,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
         }
         for (j = num_values, data = read_pointer[1].u.lvalue; --j >= 0; )
         {
-            assign_svalue_no_free(v++, data++);
+            assign_rvalue_no_free(v++, data++);
         }
     }
 
@@ -4333,7 +4336,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
             else if (1 == num_values)
             {
                 v = get_map_value(arg_m, key);
-                push_svalue(v);
+                push_rvalue(v);
             }
             else
             {
@@ -4342,7 +4345,10 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
                 v = get_map_value(arg_m, key);
                 for (j = 0, svp = dvec->item; j < num_values; j++, svp++, v++)
-                    assign_svalue(svp, v);
+                {
+                    free_svalue(svp);
+                    assign_rvalue_no_free(svp, v);
+                }
                 push_svalue(dvec_sp);
             }
         }
@@ -4363,7 +4369,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
         data = apply_callback(&cb, 1 + bFull);
         if (data)
         {
-            transfer_svalue_no_free(v, data);
+            transfer_rvalue_no_free(v, data);
             data->type = T_INVALID;
         }
     }
@@ -4500,7 +4506,7 @@ f_m_entry (svalue_t *sp)
 
         for (i = 0; i < num_values; i++)
         {
-            assign_svalue(rc->item+i, data+i);
+            assign_rvalue_no_free(rc->item+i, data+i);
         }
     }
     else
@@ -4620,7 +4626,8 @@ v_mkmapping (svalue_t *sp, int num_arg)
 
             put_string(&key, st->type->member[i].name);
             data = get_map_lvalue_unchecked(m, &key);
-            assign_svalue(data, &st->member[i]);
+            free_svalue(data);
+            assign_rvalue_no_free(data, &st->member[i]);
         }
     }
 
@@ -4675,7 +4682,8 @@ v_mkmapping (svalue_t *sp, int num_arg)
                 /* If a key value appears multiple times, we have to free
                  * a previous assigned value to avoid a memory leak
                  */
-                assign_svalue(dest++, &sp[i].u.vec->item[length]);
+                free_svalue(dest);
+                assign_rvalue_no_free(dest++, &sp[i].u.vec->item[length]);
             }
         }
     }

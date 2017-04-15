@@ -429,28 +429,29 @@ ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
  */
 {
     struct json_object *jobj;
+    svalue_t *val = get_rvalue(sp, NULL);
 
-    switch(sp->type) {
+    switch((val != NULL ? val : sp)->type) {
     case T_NUMBER:
 #ifdef JSON_64_SUPPORT
-        jobj = json_object_new_int64(sp->u.number);
+        jobj = json_object_new_int64(val->u.number);
 #else
-        if (sp->u.number > INT32_MAX || sp->u.number < INT32_MIN)
+        if (val->u.number > INT32_MAX || val->u.number < INT32_MIN)
             warnf("json_serialize(): truncated 64 bit long number %ld to 32 bit due missing support in JSON-C.\n",
-                  sp->u.number);
-        jobj = json_object_new_int(sp->u.number);
+                  val->u.number);
+        jobj = json_object_new_int(val->u.number);
 #endif   // JSON_64_SUPPORT
 
         if (parent) ldmud_json_attach(parent, key, jobj);
         break;
     
     case T_FLOAT:
-        jobj = json_object_new_double(READ_DOUBLE(sp));
+        jobj = json_object_new_double(READ_DOUBLE(val));
         if (parent) ldmud_json_attach(parent, key, jobj);
         break;
     
     case T_STRING:
-        jobj = json_object_new_string(get_txt(sp->u.str));
+        jobj = json_object_new_string(get_txt(val->u.str));
         if (parent) ldmud_json_attach(parent, key, jobj);
         break;
     
@@ -460,26 +461,26 @@ ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
         // prevent any memory leaks in case there is a call to errorf() later.
         ldmud_json_attach(parent, key, jobj);
 
-        for (int i = 0; i < VEC_SIZE(sp->u.vec); ++i)
-            ldmud_json_serialize(&sp->u.vec->item[i], jobj, NULL);
+        for (int i = 0; i < VEC_SIZE(val->u.vec); ++i)
+            ldmud_json_serialize(&val->u.vec->item[i], jobj, NULL);
         
         break;
     
     case T_MAPPING:
-        if (sp->u.map->num_values != 1)
+        if (val->u.map->num_values != 1)
           errorf("json_serialize(): can only serialize mappings with width 1, "
-                 "but got mapping with width %ld.\n",sp->u.map->num_values);
+                 "but got mapping with width %ld.\n",val->u.map->num_values);
         
         jobj = json_object_new_object();
         // the created object has to be attached to the parent immediately to
         // prevent any memory leaks in case there is a call to errorf() later.
         ldmud_json_attach(parent, key, jobj);
 
-        walk_mapping(sp->u.map, &ldmud_json_walker, jobj);
+        walk_mapping(val->u.map, &ldmud_json_walker, jobj);
         break;
     case T_STRUCT:
     {
-        struct_t  * st = sp->u.strct;
+        struct_t  * st = val->u.strct;
         jobj = json_object_new_object();
         // the created object has to be attached to the parent immediately to
         // prevent any memory leaks in case there is a call to errorf() later.
@@ -489,6 +490,26 @@ ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
         for (int i  = 0; i < struct_size(st); ++i)
         {
             ldmud_json_serialize(&(st->member[i]),jobj,get_txt(st->type->member[i].name));
+        }
+        break;
+    }
+
+    case T_LVALUE:
+    {
+        /* Must be a range, all other would have been handled by get_rvalue(). */
+        struct protected_range_lvalue* r = sp->u.protected_range_lvalue;
+        if (r->vec.type == T_STRING)
+        {
+            jobj = json_object_new_string_len(get_txt(r->vec.u.str) + r->index1, r->index2 - r->index1);
+            if (parent) ldmud_json_attach(parent, key, jobj);
+        }
+        else
+        {
+            jobj = json_object_new_array();
+            if (parent) ldmud_json_attach(parent, key, jobj);
+
+            for (mp_int i = r->index1; i < r->index2; ++i)
+                ldmud_json_serialize(r->vec.u.vec->item + i, jobj, NULL);
         }
         break;
     }

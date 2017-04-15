@@ -286,33 +286,34 @@ xml_cleanup (error_handler_t * arg)
 } /* xml_cleanup() */
 
 static void
-write_xml_node(vector_t * vnode, xmlTextWriterPtr writer)
+write_xml_node(svalue_t * vnode, mp_int vsize, xmlTextWriterPtr writer)
 
 /* Writes a new xml node from the given array structure with the three
  * elements (name, contents, attributes) using <writer>.
  * The contents element may contain other tags, so recursion may occur.
  */
 {
+    struct protected_range_lvalue *range = NULL;
     svalue_t *element;
     char *name;
     int rc;
 
-    if ((mp_int) VEC_SIZE(vnode) != 3)
+    if (vsize != 3)
     {
-        errorf("Bad arg 1 to xml_generate(): tag is not an array with 3 \
-                elements.\n");
+        errorf("Bad arg 1 to xml_generate(): tag is not an array with 3 "
+               "elements.\n");
 
         /* NOTREACHED */
         return;
     }
 
     /* get the name, as this is essential */
-    element = &vnode->item[XML_TAG_NAME];
+    element = get_rvalue(vnode + XML_TAG_NAME, NULL);
 
-    if (element->type != T_STRING)
+    if (element == NULL || element->type != T_STRING)
     {
-        errorf("Bad arg 1 to xml_generate(): first element of tag array \
-                not a string.\n");
+        errorf("Bad arg 1 to xml_generate(): first element of tag array "
+               "not a string.\n");
 
         /* NOTREACHED */
         return;
@@ -324,10 +325,10 @@ write_xml_node(vector_t * vnode, xmlTextWriterPtr writer)
         errorf("(xml_generate) Error writing XML element.\n");
 
     /* now handle the attributes of this one */
-    element = &vnode->item[XML_TAG_ATTRIBUTES];
+    element = get_rvalue(vnode + XML_TAG_ATTRIBUTES, NULL);
 
     /* this might be absent */
-    if (element->type == T_MAPPING)
+    if (element != NULL && element->type == T_MAPPING)
     {
         attribute_walk_extra_t extra;
 
@@ -337,7 +338,7 @@ write_xml_node(vector_t * vnode, xmlTextWriterPtr writer)
         /* walk the mapping and add all attributes */
         walk_mapping(element->u.map, &walk_attribute_mapping, &extra);
     }
-    else if (element->type != T_NUMBER || element->u.number != 0)
+    else if (element == NULL || element->type != T_NUMBER || element->u.number != 0)
     {
         errorf("Bad arg 1 to xml_generate(): second element of tag array not "
                "NULL/mapping.\n");
@@ -347,26 +348,57 @@ write_xml_node(vector_t * vnode, xmlTextWriterPtr writer)
     }
 
     /* now check, if the node has a contents */
-    element = &vnode->item[XML_TAG_CONTENTS];
+    element = get_rvalue(vnode + XML_TAG_CONTENTS, NULL);
+    if (element == NULL)
+    {
+        range = vnode[XML_TAG_CONTENTS].u.protected_range_lvalue;
+        element = &(range->vec);
+    }
 
     /* this might even be absent */
     if (element->type == T_POINTER)
     {
         int size;
         int i;
-        vector_t *contents;
+        svalue_t *contents;
 
         /* get the vector */
-        contents = element->u.vec;
+        contents = element->u.vec->item;
 
         /* get its size */
-        size = (mp_int)VEC_SIZE(contents);
+        if (range == NULL)
+        {
+            size = (mp_int)VEC_SIZE(element->u.vec);
+        }
+        else
+        {
+            size = range->index2 - range->index1;
+            contents += range->index1;
+        }
 
         for (i = 0; i < size; i++)
         {
-            element = &contents->item[i];
+            element = get_rvalue(contents + i, NULL);
+            if (element == NULL)
+            {
+                struct protected_range_lvalue *cr = contents[i].u.protected_range_lvalue;
+                if (cr->vec.type == T_STRING)
+                {
+                    svalue_t tmp_content;
+                    assign_rvalue_no_free(&tmp_content, contents + i);
 
-            if (element->type == T_STRING)
+                    rc = xmlTextWriterWriteString(writer, (xmlChar *) get_txt(element->u.str));
+
+                    free_svalue(&tmp_content);
+                    if (rc < 0)
+                        errorf("(xml_generate) Error writing plain text.\n");
+                }
+                else
+                {
+                    write_xml_node(cr->vec.u.vec->item + cr->index1, cr->index2 - cr->index1, writer);
+                }
+            }
+            else if (element->type == T_STRING)
             {
                 /* found content */
                 rc = xmlTextWriterWriteString(writer, (xmlChar *) get_txt(element->u.str));
@@ -376,7 +408,7 @@ write_xml_node(vector_t * vnode, xmlTextWriterPtr writer)
             else if (element->type == T_POINTER)
             {
                 /* found a sub tag */
-                write_xml_node(element->u.vec, writer);
+                write_xml_node(element->u.vec->item, (mp_int) VEC_SIZE(element->u.vec), writer);
             }
         }
     }
@@ -447,7 +479,7 @@ f_xml_generate (svalue_t *sp)
     if (rc < 0)
         errorf("(xml_generate) Error starting XML document.\n");
 
-    write_xml_node(sp->u.vec, rec_data->writer);
+    write_xml_node(sp->u.vec->item, VEC_SIZE(sp->u.vec), rec_data->writer);
 
     rc = xmlTextWriterEndDocument(rec_data->writer);
     if (rc < 0)

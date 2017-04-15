@@ -5857,7 +5857,18 @@ f_send_erq (svalue_t *sp)
         }
         svp = &v->item[0];
         for (j = (p_int)arglen; --j >= 0; )
-            *cp++ = (char)(*svp++).u.number;
+        {
+            svalue_t* item = get_rvalue(svp++, NULL);
+            if (item == NULL || item->type != T_NUMBER)
+            {
+                xfree(arg);
+                errorf("Bad arg 2 to send_erq(): got %s*, "
+                      "expected string/int*.\n", typename(svp[-1].type));
+                /* NOTREACHED */
+                return sp;
+            }
+            *cp++ = (char)item->u.number;
+        }
     }
 
     erq_request = sp[-2].u.number;
@@ -6505,7 +6516,18 @@ f_send_udp (svalue_t *sp)
             
             svp = &v->item[0];
             for (j = (p_int)msglen; --j >= 0; )
-                *cp++ = (char)(*svp++).u.number;
+            {
+                svalue_t* item = get_rvalue(svp++, NULL);
+                if (item == NULL || item->type != T_NUMBER)
+                {
+                    errorf("Bad arg 3 to send_udp(): got %s*, "
+                          "expected string/int*.\n", typename(svp[-1].type));
+                    /* NOTREACHED */
+                    return sp;
+                }
+
+                *cp++ = (char)item->u.number;
+            }
         }
 
         /* Is this call valid? */
@@ -6643,7 +6665,8 @@ f_binary_message (svalue_t *sp)
         for (i = (mp_int)size, svp = sp[-1].u.vec->item, p = get_txt(msg)
             ; --i >= 0; svp++)
         {
-            if (svp->type != T_NUMBER)
+            svalue_t* item = get_rvalue(svp, NULL);
+            if (item == NULL || item->type != T_NUMBER)
             {
                 free_mstring(msg);
                 errorf("Bad arg 1 to binary_message(): got %s*, "
@@ -6651,7 +6674,7 @@ f_binary_message (svalue_t *sp)
                 /* NOTREACHED */
                 return sp;
             }
-            *p++ = (char)svp->u.number;
+            *p++ = (char)item->u.number;
         }
     }
     else /* it's a string */
