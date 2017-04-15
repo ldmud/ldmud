@@ -1797,7 +1797,7 @@ v_allocate (svalue_t *sp, int num_arg)
     {
         /* Special case: result is the empty array.
          * The condition catches ( ({}) ) as well as ( ({0}) )
-         * (the generic code below can't handle either of them).
+         * (the generic code below can only handle the later).
          */
         v = allocate_array(0);
     }
@@ -1833,16 +1833,20 @@ v_allocate (svalue_t *sp, int num_arg)
             )
         {
             p_int size;
+            svalue_t *item = get_rvalue(svp, NULL);
 
-            if (svp->type != T_NUMBER)
+            if (item == NULL)
+                item = svp;
+
+            if (item->type != T_NUMBER)
             {
                 errorf("Bad argument to allocate(): size[%d] is a '%s', "
                       "expected 'int'.\n"
-                     , (int)dim, typename(svp->type));
+                     , (int)dim, typename(item->type));
                 /* NOTREACHED */
             }
 
-            size = svp->u.number;
+            size = item->u.number;
 
             if (size < 0 || (max_array_size && (size_t)size > max_array_size))
                 errorf("Illegal array size: %"PRIdPINT"\n", size);
@@ -1922,7 +1926,10 @@ v_allocate (svalue_t *sp, int num_arg)
         } /* while() */
 
         /* The final vector is now in curvec[0] */
-        v = curvec[0];
+        if (!curvec[0])
+            v = ref_array(&null_vector);
+        else
+            v = curvec[0];
     }
     else
     {
@@ -2079,7 +2086,7 @@ x_filter_array (svalue_t *sp, int num_arg)
                 errorf("object used by filter(array) destructed");
             }
 
-            push_svalue(w++);
+            push_rvalue(w++);
 
             v = apply_callback(&cb, 1);
             if (!v || (v->type == T_NUMBER && !v->u.number) )
@@ -2099,7 +2106,7 @@ x_filter_array (svalue_t *sp, int num_arg)
     if (res) {
         for(v = p->item, w = vec->item, flags = &flags[p_size]; ; v++) {
             if (*--flags) {
-                assign_svalue_no_free (w++, v);
+                assign_rvalue_no_free (w++, v);
                 if (--res <= 0) break;
             }
         }
@@ -2183,9 +2190,9 @@ x_map_array (svalue_t *sp, int num_arg)
 
             v = get_map_value(m, w);
             if (v == &const0)
-                assign_svalue_no_free(x, w);
+                assign_rvalue_no_free(x, w);
             else
-                assign_svalue_no_free(x, v + column);
+                assign_rvalue_no_free(x, v + column);
         }
 
         if (num_arg > 2)
@@ -2229,12 +2236,12 @@ x_map_array (svalue_t *sp, int num_arg)
             if (!callback_object(&cb))
                 errorf("object used by map(array) destructed");
 
-            push_svalue(w);
+            push_rvalue(w);
 
             v = apply_callback(&cb, 1);
             if (v)
             {
-                transfer_svalue_no_free(x, v);
+                transfer_rvalue_no_free(x, v);
                 v->type = T_INVALID;
             }
         }
@@ -2542,12 +2549,14 @@ v_filter_objects (svalue_t *sp, int num_arg)
 
         for (cnt = 0; cnt < p_size; cnt++) {
             flags[cnt] = MY_FALSE;
-            v = &p->item[cnt];
+            v = get_rvalue(p->item + cnt, NULL);
 
             /* Coerce <v> into a (non-destructed) object ob (if necessary
              * by loading it). If that doesn't work, simply continue
              * with the next element.
              */
+            if (v == NULL)
+                continue;
             if (v->type != T_OBJECT)
             {
                 if (v->type != T_STRING)
@@ -2683,21 +2692,25 @@ v_map_objects (svalue_t *sp, int num_arg)
     func = find_tabled(func);
     if (NULL != func)
     {
-        for (cnt = size, v = p->item, x = r->item; --cnt >= 0; v++, x++) {
+        for (cnt = size, v = p->item, x = r->item; --cnt >= 0; v++, x++)
+        {
+            svalue_t * ob_sv = get_rvalue(v, NULL);
 
             /* Coerce <v> into a (non-destructed) object ob (if necessary
              * by loading it). If that doesn't work, simply continue
              * with the next element.
              */
-            if (v->type != T_OBJECT) {
-                if (v->type != T_STRING)
+            if (ob_sv == NULL)
+                continue;
+            if (ob_sv->type != T_OBJECT) {
+                if (ob_sv->type != T_STRING)
                     continue;
-                if ( !(ob = get_object(v->u.str)) )
+                if ( !(ob = get_object(ob_sv->u.str)) )
                     continue;
             } else {
-                ob = v->u.ob;
+                ob = ob_sv->u.ob;
                 if (ob->flags & O_DESTRUCTED) {
-                    assign_svalue(v, &const0);
+                    assign_svalue(ob_sv, &const0);
                     continue;
                 }
             }
@@ -3131,12 +3144,14 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
     ant = 0;
     for (cnt = 0; cnt < arr_size; cnt++)
     {
+        svalue_t *item;
         if (current_object->flags & O_DESTRUCTED)
             break;
             /* Don't call the filters anymore */
 
-        if (arr->item[cnt].type == T_OBJECT
-         && !destructed_object_ref(&(arr->item[cnt]))
+        item = get_rvalue(arr->item + cnt, NULL);
+        if (item != NULL && item->type == T_OBJECT
+         && !destructed_object_ref(item)
            )
         {
             /* It's usually done the other way around, but not here: if
@@ -3145,13 +3160,13 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
              * discriminator function in it.
              */
             if (!cb->is_lambda)
-                callback_change_object(cb, arr->item[cnt].u.ob);
+                callback_change_object(cb, item->u.ob);
             else
-                push_ref_object(inter_sp, arr->item[cnt].u.ob, "unique_array");
+                push_ref_object(inter_sp, item->u.ob, "unique_array");
 
             v = apply_callback(cb, cb->is_lambda ? 1 : 0);
             if (v && !sameval(v, skipnum))
-                ant = put_in(pool, &head, v, &(arr->item[cnt]));
+                ant = put_in(pool, &head, v, item);
         }
     }
 

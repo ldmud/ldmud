@@ -215,6 +215,7 @@ extern void put_c_string (svalue_t *sp, const char *p);
 extern void put_c_n_string (svalue_t *sp, const char *p, size_t len);
 
 extern void push_svalue(svalue_t *v);
+extern void push_rvalue(svalue_t *v);
 extern void push_svalue_block(int num, svalue_t *v);
 extern svalue_t *pop_n_elems (int n, svalue_t *sp);
 extern void pop_stack(void);

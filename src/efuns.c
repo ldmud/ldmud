@@ -395,14 +395,17 @@ v_md5 (svalue_t *sp, int num_arg)
 
         for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
         {
-            if (sp->u.vec->item[i].type != T_NUMBER)
+            svalue_t *item = get_rvalue(sp->u.vec->item + i, NULL);
+            if (item == NULL)
+                item = sp->u.vec->item + i;
+            if (item->type != T_NUMBER)
             {
                 free_mstring(arg);
                 errorf("Bad argument 1 to md5(): got mixed*, expected string/int*.\n");
                 /* NOTREACHED */
                 return sp;
             }
-            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+            argp[i] = (char)item->u.number & 0xff;
         }
 
         free_svalue(sp);
@@ -548,13 +551,16 @@ v_sha1 (svalue_t *sp, int num_arg)
 
         for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
         {
-            if (sp->u.vec->item[i].type != T_NUMBER)
+            svalue_t *item = get_rvalue(sp->u.vec->item + i, NULL);
+            if (item == NULL)
+                item = sp->u.vec->item + i;
+            if (item->type != T_NUMBER)
             {
                 free_mstring(arg);
                 errorf("Bad argument 1 to sha1(): got mixed*, expected string/int*.\n");
                 /* NOTREACHED */
             }
-            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+            argp[i] = (char)item->u.number & 0xff;
         }
 
         free_svalue(sp);
@@ -719,13 +725,16 @@ v_hash (svalue_t *sp, int num_arg)
 
         for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
         {
-            if (sp->u.vec->item[i].type != T_NUMBER)
+            svalue_t *item = get_rvalue(sp->u.vec->item + i, NULL);
+            if (item == NULL)
+                item = sp->u.vec->item + i;
+            if (item->type != T_NUMBER)
             {
                 free_mstring(arg);
                 errorf("Bad argument 2 to hash(): got mixed*, expected string/int*.\n");
                 /* NOTREACHED */
             }
-            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+            argp[i] = (char)item->u.number & 0xff;
         }
 
         free_svalue(sp);
@@ -792,13 +801,16 @@ f_hmac(svalue_t *sp)
 
         for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
         {
-            if (sp->u.vec->item[i].type != T_NUMBER)
+            svalue_t *item = get_rvalue(sp->u.vec->item + i, NULL);
+            if (item == NULL)
+                item = sp->u.vec->item + i;
+            if (item->type != T_NUMBER)
             {
                 free_mstring(arg);
-                errorf("Bad argument 2 to hash(): got mixed*, expected string/int*.\n");
+                errorf("Bad argument 2 to hmac(): got mixed*, expected string/int*.\n");
                 /* NOTREACHED */
             }
-            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+            argp[i] = (char)item->u.number & 0xff;
         }
 
         free_svalue(sp);
@@ -5884,13 +5896,10 @@ f_to_string (svalue_t *sp)
         svp = sp->u.vec->item;
         memsafe(s = alloc_mstring(size), size, "converted array");
         d = get_txt(s);
-        for (;;)
+        while (size--)
         {
-            if (!size--)
-            {
-                break;
-            }
-            if (svp->type != T_NUMBER)
+            svalue_t *item = get_rvalue(svp, NULL);
+            if (item == NULL || item->type != T_NUMBER)
             {
                 if (d == get_txt(s))
                 {
@@ -5902,7 +5911,7 @@ f_to_string (svalue_t *sp)
                            , d-get_txt(s), "converted array");
                 break;
             }
-            *d++ = (char)svp->u.number;
+            *d++ = (char)item->u.number;
             svp++;
         }
         free_array(sp->u.vec);
@@ -6006,7 +6015,7 @@ f_to_array (svalue_t *sp)
         left = struct_size(sp->u.strct);
         vec = allocate_array(left);
         while (left-- > 0)
-            assign_svalue_no_free(vec->item+left, sp->u.strct->member+left);
+            assign_rvalue_no_free(vec->item+left, sp->u.strct->member+left);
         free_struct(sp->u.strct);
         put_array(sp, vec);
         break;
@@ -6141,7 +6150,7 @@ v_to_struct (svalue_t *sp, int num_arg)
             st = struct_new_anonymous(VEC_SIZE(argp->u.vec));
 
         for (left = VEC_SIZE(argp->u.vec); left-- > 0; )
-            assign_svalue_no_free(st->member+left, argp->u.vec->item+left);
+            assign_rvalue_no_free(st->member+left, argp->u.vec->item+left);
         free_array(argp->u.vec);
         put_struct(argp, st);
         break;
@@ -6191,7 +6200,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                         put_number(&st->member[i], 1);
                     else if (num_values == 1)
                     {
-                        assign_svalue(&st->member[i], data);
+                        assign_rvalue_no_free(&st->member[i], data);
                     }
                     else
                     {
@@ -6210,7 +6219,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                         dest = vec->item;
                         for (j = 0; j < num_values; j++)
                         {
-                            assign_svalue_no_free(dest++, data++);
+                            assign_rvalue_no_free(dest++, data++);
                         }
 
                         put_array(&st->member[i], vec);
@@ -6262,7 +6271,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                     put_number(&st->member[i], 1);
                 else if (num_values == 1)
                 {
-                    assign_svalue(&st->member[i], member->data);
+                    assign_rvalue_no_free(&st->member[i], member->data);
                 }
                 else
                 {
@@ -6282,7 +6291,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                     src = member->data;
                     for (j = 0; j < num_values; j++)
                     {
-                        assign_svalue_no_free(dest++, src++);
+                        assign_rvalue_no_free(dest++, src++);
                     }
 
                     put_array(&st->member[i], vec);
@@ -6358,7 +6367,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                 {
                     // *_no_free, because the members of the new struct only contain 0,
                     // which need not to be freed.
-                    assign_svalue_no_free(memberp, omemberp);
+                    assign_rvalue_no_free(memberp, omemberp);
                 }
                 // the new struct may have more members than the old one (if oldstruct was
                 // the base. That is OK, the extra svalues just remain 0. On the other hand,
@@ -9271,20 +9280,27 @@ x_gm_localtime (svalue_t *sp, Bool localTime)
 
     if (sp->type != T_NUMBER)
     {
+        svalue_t *clock, *ms;
+
         if (VEC_SIZE(sp->u.vec) != 2)
             errorf("Bad arg 1 to %s(): Invalid array size %"PRIdPINT
                    ", expected 2.\n"
                  , localTime ? "localtime" : "gmtime"
                  , VEC_SIZE(sp->u.vec));
-        if (sp->u.vec->item[0].type != T_NUMBER)
+
+        clock = get_rvalue(sp->u.vec->item + 0, NULL);
+        if (clock == NULL || clock->type != T_NUMBER)
             errorf("Bad arg 1 to %s(): Element 0 is '%s', expected 'int'.\n"
                  , localTime ? "localtime" : "gmtime"
-                 , efun_arg_typename(sp->u.vec->item[0].type));
-        if (sp->u.vec->item[1].type != T_NUMBER)
+                 , efun_arg_typename((clock ? clock : (sp->u.vec->item + 0))->type));
+
+        ms = get_rvalue(sp->u.vec->item + 1, NULL);
+        if (ms == NULL || ms->type != T_NUMBER)
             errorf("Bad arg 1 to %s(): Element 1 is '%s', expected 'int'.\n"
                  , localTime ? "localtime" : "gmtime"
-                 , efun_arg_typename(sp->u.vec->item[1].type));
-        clk = sp->u.vec->item[0].u.number;
+                 , efun_arg_typename((ms ? ms : (sp->u.vec->item + 1))->type));
+
+        clk = clock->u.number;
     }
     else
     {
@@ -9527,23 +9543,26 @@ f_ctime(svalue_t *sp)
     if (sp->type != T_NUMBER)
     {
       /* utime case */
+        svalue_t *clock, *ms;
         if (VEC_SIZE(sp->u.vec) != 2)
             errorf("Bad arg 1 to ctime(): Invalid array size %"PRIdPINT
                    ", expected 2.\n", VEC_SIZE(sp->u.vec));
-        if (sp->u.vec->item[0].type != T_NUMBER)
-            errorf("Bad arg 1 to ctime(): Element 0 is '%s', expected 'int'.\n"
-                 , efun_arg_typename(sp->u.vec->item[0].type));
-        if (sp->u.vec->item[1].type != T_NUMBER)
-            errorf("Bad arg 1 to ctime(): Element 1 is '%s', expected 'int'.\n"
-                 , efun_arg_typename(sp->u.vec->item[1].type));
 
-        ts = utime_string( sp->u.vec->item[0].u.number
-                         , sp->u.vec->item[1].u.number);
+        clock = get_rvalue(sp->u.vec->item + 0, NULL);
+        if (clock == NULL || clock->type != T_NUMBER)
+            errorf("Bad arg 1 to ctime(): Element 0 is '%s', expected 'int'.\n"
+                 , efun_arg_typename((clock ? clock : (sp->u.vec->item + 0))->type));
+
+        ms = get_rvalue(sp->u.vec->item + 1, NULL);
+        if (ms == NULL || ms->type != T_NUMBER)
+            errorf("Bad arg 1 to ctime(): Element 1 is '%s', expected 'int'.\n"
+                 , efun_arg_typename((ms ? ms : (sp->u.vec->item + 1))->type));
+
+        ts = utime_string( clock->u.number, ms->u.number);
         if (!ts)
             errorf("Bad time in ctime(): ({%"PRIdPINT", %"PRIdPINT
                 "}) can't be represented by host system. Maybe too large?\n",
-                sp->u.vec->item[0].u.number,
-                sp->u.vec->item[1].u.number);
+                clock->u.number, ms->u.number);
 
         /* If the string contains nl characters, extract the substring
          * before the first one. Else just copy the (volatile) result
@@ -9696,7 +9715,8 @@ f_mktime (svalue_t *sp)
     struct tm * pTm; // broken-down time structure for mktime()
     time_t      clk; // unix timestamp corresponding to datum
     vector_t  * v;   // just for convenience, stores argument array 
-    int i; 
+    int i;
+    p_int val[9];
 
     v = sp->u.vec;
     if (VEC_SIZE(v) != 9)
@@ -9705,20 +9725,22 @@ f_mktime (svalue_t *sp)
     // all elements must be ints.
     for(i=0; i<VEC_SIZE(v); i++) 
     {
-        if ( v->item[i].type != T_NUMBER)
+        svalue_t *item = get_rvalue(v->item + i, NULL);
+        if ( item == NULL || item->type != T_NUMBER)
             errorf("Bad arg 1 to ctime(): Element %d is '%s', expected 'int'.\n"
-                 ,i, efun_arg_typename(v->item[0].type));
+                 ,i, efun_arg_typename((item ? item : (v->item + i))->type));
+        val[i] = item->u.number;
     }
 
     // create the time structure
     xallocate(pTm, sizeof(*pTm), "broken-down time structure for mktime()");
-    pTm->tm_sec   = v->item[TM_SEC].u.number;
-    pTm->tm_min   = v->item[TM_MIN].u.number;
-    pTm->tm_hour  = v->item[TM_HOUR].u.number;
-    pTm->tm_mday  = v->item[TM_MDAY].u.number;
-    pTm->tm_mon   = v->item[TM_MON].u.number;
-    pTm->tm_year  = v->item[TM_YEAR].u.number - 1900;
-    pTm->tm_isdst = v->item[TM_ISDST].u.number;
+    pTm->tm_sec   = val[TM_SEC];
+    pTm->tm_min   = val[TM_MIN];
+    pTm->tm_hour  = val[TM_HOUR];
+    pTm->tm_mday  = val[TM_MDAY];
+    pTm->tm_mon   = val[TM_MON];
+    pTm->tm_year  = val[TM_YEAR] - 1900;
+    pTm->tm_isdst = val[TM_ISDST];
     
     clk = mktime(pTm);
 
