@@ -753,6 +753,81 @@ mixed *tests = ({
        :)
     }),
     ({
+       "deep_copy with references in an array", 0,
+       (:
+           int a = 2017;
+           mixed res = deep_copy(({&a, &a}));
+
+           if(!deep_eq(res, ({2017, 2017})))
+               return 0;
+           res[0] = 2018;
+           return a == 2017 && res[1] == 2018;
+       :)
+    }),
+    ({
+       "deep_copy with references in a mapping", 0,
+       (:
+           int a = 2017;
+           mixed res = deep_copy(([1: &a, 2: &a]));
+
+           if(!deep_eq(res, ([1: 2017, 2: 2017])))
+               return 0;
+           res[1] = 2018;
+           return a == 2017 && res[2] == 2018;
+       :)
+    }),
+    ({
+       "deep_copy with string ranges in an array 1", 0,
+       (:
+           string str = "Good Luck!";
+           mixed res = deep_copy(({&(str[0..3]), &(str[5..8]), &str}));
+
+           if(!deep_eq(res, ({"Good", "Luck", "Good Luck!"})))
+               return 0;
+           res[0] = "Best";
+           return str == "Good Luck!" && res[2] == "Best Luck!";
+       :)
+    }),
+    ({
+       "deep_copy with string ranges in an array 2", 0,
+       (:
+           string str = "Good Luck!";
+           mixed res = deep_copy(({&str, &(str[0..3]), &(str[5..8])}));
+
+           if(!deep_eq(res, ({"Good Luck!", "Good", "Luck"})))
+               return 0;
+           res[1] = "Best";
+           return str == "Good Luck!" && res[0] == "Best Luck!";
+       :)
+    }),
+    ({
+       "deep_copy with char lvalues 1", 0,
+       (:
+           string str = "Char";
+           mixed res = deep_copy(({&(str[0]), &(str[1]), &str}));
+
+           if(!deep_eq(res, ({'C', 'h', "Char"})))
+               return 0;
+           res[0] = 'K';
+           res[1] = 'l';
+           return str == "Char" && res[2] == "Klar";
+       :)
+    }),
+    ({
+       "deep_copy with char lvalues 2", 0,
+       (:
+           string str = "Char";
+           mixed a;
+           mixed res = deep_copy(a = ({&str, &(str[0]), &(str[1])}));
+
+           if(!deep_eq(res, ({"Char", 'C', 'h'})))
+               return 0;
+           res[1] = 'K';
+           res[2] = 'l';
+           return str == "Char" && res[0] == "Klar";
+       :)
+    }),
+    ({
        "implode with references in the array 1", 0,
        (:
            string b = "B";
