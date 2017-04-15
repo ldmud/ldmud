@@ -6599,6 +6599,8 @@ copy_svalue (svalue_t *dest, svalue_t *src
         return;
     }
 
+    normalize_svalue(src, true);
+
     switch (src->type)
     {
     default:
@@ -6648,16 +6650,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
             /* Copy the values */
             for (i = 0; i < size; i++)
             {
-                svalue_t * svp = &old->item[i];
-
-                if (svp->type == T_QUOTED_ARRAY
-                 || svp->type == T_MAPPING
-                 || svp->type == T_POINTER
-                 || svp->type == T_STRUCT
-                   )
-                    copy_svalue(&new->item[i], svp, ptable, depth+1);
-                else
-                    assign_svalue_no_free(&new->item[i], svp);
+                copy_svalue(new->item + i, old->item + i, ptable, depth+1);
             }
         }
         else /* shared array we already encountered */
@@ -6700,16 +6693,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
             /* Copy the values */
             for (i = 0; i < size; i++)
             {
-                svalue_t * svp = &old->member[i];
-
-                if (svp->type == T_QUOTED_ARRAY
-                 || svp->type == T_MAPPING
-                 || svp->type == T_POINTER
-                 || svp->type == T_STRUCT
-                   )
-                    copy_svalue(&new->member[i], svp, ptable, depth+1);
-                else
-                    assign_svalue_no_free(&new->member[i], svp);
+                copy_svalue(new->member + i, old->member + i, ptable, depth+1);
             }
         }
         else /* shared struct we already encountered */
@@ -6774,6 +6758,171 @@ copy_svalue (svalue_t *dest, svalue_t *src
         }
         break;
       }
+
+    case T_LVALUE:
+        switch (src->x.lvalue_type)
+        {
+            default:
+                fatal("(deep_copy) Illegal lvalue %p type %d\n", src, src->x.lvalue_type);
+                break;
+
+            case LVALUE_PROTECTED:
+            {
+                struct protected_lvalue *l = src->u.protected_lvalue;
+                struct pointer_record *rec = find_add_pointer(ptable, l, MY_TRUE);
+
+                if (rec->ref_count++ < 0)
+                {
+                    /* Create a new protected lvalue to the copy of the contents. */
+                    svalue_t content;
+
+#if defined(DYNAMIC_COSTS)
+                    add_eval_cost((depth+1) / 10);
+#endif
+
+                    copy_svalue(&content, &(l->val), ptable, depth+1);
+                    assign_protected_lvalue_no_free(dest, &content);
+                    rec->data = dest->u.protected_lvalue;
+                    free_svalue(&content);
+                }
+                else
+                {
+                    /* Recreate the svalue from the pointer table to copy it
+                     * (so we don't have to do the proper ref-counting here.)
+                     */
+                    svalue_t sv;
+                    sv.type = T_LVALUE;
+                    sv.x.lvalue_type = LVALUE_PROTECTED;
+                    sv.u.protected_lvalue = (struct protected_lvalue *) rec->data;
+
+                    assign_svalue_no_free(dest, &sv);
+                }
+
+                break;
+            }
+
+            case LVALUE_PROTECTED_CHAR:
+            {
+                /* This should be a mutable string. */
+                struct protected_char_lvalue *l = src->u.protected_char_lvalue;
+                struct pointer_record *rec = find_add_pointer(ptable, l, MY_TRUE);
+
+                if (rec->ref_count++ < 0)
+                {
+                    string_t *dup;
+                    struct pointer_record *str_rec = find_add_pointer(ptable, l->str, MY_TRUE);
+                    if (str_rec->ref_count++ < 0)
+                    {
+                        dup = make_mutable(dup_mstring(l->str));
+                        str_rec->data = dup;
+                    }
+                    else
+                    {
+                        dup = ref_mstring((string_t*) str_rec->data);
+                    }
+
+                    assign_protected_char_lvalue_no_free(dest, dup, get_txt(dup) + (l->charp - get_txt(l->str)));
+                    rec->data = dest->u.protected_char_lvalue;
+                    deref_mstring(dup);
+                }
+                else
+                {
+                    svalue_t sv;
+                    sv.type = T_LVALUE;
+                    sv.x.lvalue_type = LVALUE_PROTECTED_CHAR;
+                    sv.u.protected_char_lvalue = (struct protected_char_lvalue *) rec->data;
+
+                    assign_svalue_no_free(dest, &sv);
+                }
+                break;
+            }
+
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = src->u.protected_range_lvalue;
+                struct pointer_record *rec = find_add_pointer(ptable, r, MY_TRUE);
+
+                if (rec->ref_count++ < 0)
+                {
+                    svalue_t vec;                          /* The copy of the vector.           */
+                    svalue_t vec_lvalue;                   /* Lvalue to the copy of the vector. */
+                    struct protected_lvalue *var = NULL;   /* = vec_lvalue.u.protected_lvalue.  */
+
+#if defined(DYNAMIC_COSTS)
+                    add_eval_cost((depth+1) / 10);
+#endif
+
+                    /* Check whether r->var is still valid. */
+                    if (r->var != NULL
+                     && ((r->vec.type == T_POINTER && r->var->val.type == T_POINTER && r->vec.u.vec == r->var->val.u.vec)
+                      || (r->vec.type == T_STRING  && r->var->val.type == T_STRING  && r->vec.u.str == r->var->val.u.str)))
+                    {
+                        struct pointer_record *var_rec = find_add_pointer(ptable, r->var, MY_TRUE);
+                        if (var_rec->ref_count++ < 0)
+                        {
+                            svalue_t var_content;
+
+                            copy_svalue(&var_content, &(r->var->val), ptable, depth+1);
+                            assign_protected_lvalue_no_free(&vec_lvalue, &var_content);
+                            var_rec->data = vec_lvalue.u.protected_lvalue;
+                            free_svalue(&var_content);
+                        }
+                        else
+                        {
+                            svalue_t sv;
+                            sv.type = T_LVALUE;
+                            sv.x.lvalue_type = LVALUE_PROTECTED;
+                            sv.u.protected_lvalue = (struct protected_lvalue *) var_rec->data;
+
+                            assign_svalue_no_free(&vec_lvalue, &sv);
+                        }
+                        var = vec_lvalue.u.protected_lvalue;
+                    }
+
+                    /* By virtue of the pointer table this should yield the same vector
+                     * as the one above for r->var.
+                     */
+                    copy_svalue(&vec, &(r->vec), ptable, depth+1);
+                    assign_protected_range_lvalue_no_free(dest, var, &vec, r->index1, r->index2);
+                    rec->data = dest->u.protected_range_lvalue;
+                    free_svalue(&vec);
+                    if (var != NULL)
+                        free_svalue(&vec_lvalue);
+                }
+                else
+                {
+                    svalue_t sv;
+                    sv.type = T_LVALUE;
+                    sv.x.lvalue_type = LVALUE_PROTECTED_RANGE;
+                    sv.u.protected_range_lvalue = (struct protected_range_lvalue *) rec->data;
+
+                    assign_svalue_no_free(dest, &sv);
+                }
+
+                break;
+            }
+        }
+        break;
+
+    case T_STRING:
+        if (mstr_mutable(src->u.str))
+        {
+            /* We must make a mutable copy of a mutable string. */
+            struct pointer_record *rec = find_add_pointer(ptable, src->u.str, MY_TRUE);
+            if (rec->ref_count++ < 0)
+            {
+                string_t *dup = make_mutable(dup_mstring(src->u.str));
+                put_string(dest, dup);
+                rec->data = dup;
+            }
+            else
+            {
+                put_ref_string(dest, (string_t*) rec->data);
+            }
+        }
+        else
+            assign_svalue_no_free(dest, src);
+        break;
     } /* switch(src->type) */
 } /* copy_svalue() */
 
@@ -6804,49 +6953,21 @@ f_deep_copy (svalue_t *sp)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
-      {
-        vector_t *old;
-
-        old = sp->u.vec;
-        if (old != &null_vector)
-        {
-            svalue_t new;
-
-            ptable = new_pointer_table();
-            if (!ptable)
-                errorf("(deep_copy) Out of memory for pointer table.\n");
-            copy_svalue(&new, sp, ptable, 0);
-            if (sp->type == T_QUOTED_ARRAY)
-                new.x.quotes = sp->x.quotes;
-            transfer_svalue(sp, &new);
-            free_pointer_table(ptable);
-        }
-        break;
-      }
+        if (sp->u.vec == &null_vector)
+            break;
+        /* FALLTHROUGH */
     case T_STRUCT:
-      {
-        struct_t *old;
-        svalue_t new;
-
-        old = sp->u.strct;
-        ptable = new_pointer_table();
-        if (!ptable)
-            errorf("(deep_copy) Out of memory for pointer table.\n");
-        copy_svalue(&new, sp, ptable, 0);
-        transfer_svalue(sp, &new);
-        free_pointer_table(ptable);
-        break;
-      }
     case T_MAPPING:
+    case T_LVALUE:
       {
-        mapping_t *old;
         svalue_t new;
 
-        old = sp->u.map;
         ptable = new_pointer_table();
         if (!ptable)
             errorf("(deep_copy) Out of memory for pointer table.\n");
         copy_svalue(&new, sp, ptable, 0);
+        if (sp->type == T_QUOTED_ARRAY)
+            new.x.quotes = sp->x.quotes;
         transfer_svalue(sp, &new);
         free_pointer_table(ptable);
         break;
