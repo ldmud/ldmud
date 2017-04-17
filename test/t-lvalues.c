@@ -904,6 +904,62 @@ mixed *tests = ({
         :)
     }),
     ({
+        "member with string ranges", 0,
+        (:
+            string str = "Hallo!";
+            return member(({str, &(str[1..3]), "x"}), "all") == 1;
+        :)
+    }),
+    ({
+        "member with lvalue references 1", 0,
+        (:
+            mixed obj = this_object();
+            return member(({&obj, obj}), this_object()) == 0;
+        :)
+    }),
+    ({
+        "member with lvalue references 2", 0,
+        (:
+            closure cl = (: 1 :);
+            return member(({&cl, cl}), cl) == 0;
+        :)
+    }),
+    ({
+        "member with lvalue references 3", 0,
+        (:
+            int i = 0;
+            return member(({&i, this_object()}), 0) == 0;
+        :)
+    }),
+    ({
+        "rmember with string ranges", 0,
+        (:
+            string str = "Hallo!";
+            return rmember(({str, &(str[1..3]), "x"}), "all") == 1;
+        :)
+    }),
+    ({
+        "rmember with lvalue references 1", 0,
+        (:
+            mixed obj = this_object();
+            return rmember(({obj, &obj}), this_object()) == 1;
+        :)
+    }),
+    ({
+        "rmember with lvalue references 2", 0,
+        (:
+            closure cl = (: 1 :);
+            return rmember(({cl, &cl}), cl) == 1;
+        :)
+    }),
+    ({
+        "rmember with lvalue references 3", 0,
+        (:
+            int i = 0;
+            return rmember(({this_object(), &i}), 0) == 1;
+        :)
+    }),
+    ({
        "transpose_array with references in the array 1", 0,
        (:
            int* a1 = ({1,2,3});

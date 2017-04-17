@@ -7383,13 +7383,28 @@ v_member (svalue_t *sp, int num_arg)
             case T_STRING:
               {
                 string_t *str;
-                svalue_t *item;
+                svalue_t *entry;
 
                 str = sp_u.str;
-                for(item = vec->item + startpos; --cnt >= 0; item++)
+                for(entry = vec->item + startpos; --cnt >= 0; entry++)
                 {
-                    if (item->type == T_STRING
-                     && mstreq(str, item->u.str))
+                    svalue_t *item = get_rvalue(entry, NULL);
+                    if (item == NULL)
+                    {
+                        struct protected_range_lvalue* r = entry->u.protected_range_lvalue;
+                        size_t len;
+
+                        if (r->vec.type != T_STRING)
+                            continue;
+
+                        len = mstrsize(str);
+                        if (len != r->index2 - r->index1)
+                            continue;
+
+                        if (memcmp(get_txt(str), get_txt(r->vec.u.str) + r->index1, len) == 0)
+                            break;
+                    }
+                    else if (item->type == T_STRING && mstreq(str, item->u.str))
                         break;
                 }
                 break;
@@ -7398,13 +7413,13 @@ v_member (svalue_t *sp, int num_arg)
             case T_CLOSURE:
               {
                 short type;
-                svalue_t *item;
+                svalue_t *entry;
 
                 type = sp->type;
-                for(item = vec->item + startpos; --cnt >= 0; item++)
+                for(entry = vec->item + startpos; --cnt >= 0; entry++)
                 {
-                    /* TODO: Is this C99 compliant? */
-                    if (item->type == type && closure_eq(sp, item))
+                    svalue_t *item = get_rvalue(entry, NULL);
+                    if (item != NULL && item->type == type && closure_eq(sp, item))
                         break;
                 }
                 break;
@@ -7416,12 +7431,16 @@ v_member (svalue_t *sp, int num_arg)
               {
                 short x_generic;
                 short type;
-                svalue_t *item;
+                svalue_t *entry;
 
                 type = sp->type;
                 x_generic = sp->x.generic;
-                for(item = vec->item + startpos; --cnt >= 0; item++)
+                for(entry = vec->item + startpos; --cnt >= 0; entry++)
                 {
+                    svalue_t *item = get_rvalue(entry, NULL);
+                    if (item == NULL)
+                        continue;
+
                     /* TODO: Is this C99 compliant? */
                     if (sp_u.str == item->u.str
                      && x_generic == item->x.generic
@@ -7439,11 +7458,15 @@ v_member (svalue_t *sp, int num_arg)
                      * changes them to 0).
                      */
 
-                    svalue_t *item;
+                    svalue_t *entry;
                     short type;
 
-                    for (item = vec->item + startpos; --cnt >= 0; item++)
+                    for (entry = vec->item + startpos; --cnt >= 0; entry++)
                     {
+                        svalue_t *item = get_rvalue(entry, NULL);
+                        if (item == NULL)
+                            continue;
+
                         if ( (type = item->type) == T_NUMBER)
                         {
                             if ( !item->u.number )
@@ -7465,11 +7488,15 @@ v_member (svalue_t *sp, int num_arg)
             case T_POINTER:
             case T_STRUCT:
               {
-                svalue_t *item;
+                svalue_t *entry;
                 short type = sp->type;
 
-                for (item = vec->item + startpos; --cnt >= 0; item++)
+                for (entry = vec->item + startpos; --cnt >= 0; entry++)
                 {
+                    svalue_t *item = get_rvalue(entry, NULL);
+                    if (item == NULL)
+                        continue;
+
                     /* TODO: Is this C99 compliant? */
                     if (sp_u.number == item->u.number
                      && item->type == type)
@@ -7605,14 +7632,31 @@ v_rmember (svalue_t *sp, int num_arg)
         case T_STRING:
           {
             string_t *str;
-            svalue_t *item;
+            svalue_t *entry;
 
             str = sp_u.str;
-            for (item = vec->item+cnt; --cnt >= 0; )
+            for (entry = vec->item+cnt; --cnt >= 0; )
             {
-                item--;
-                if (item->type == T_STRING
-                 && mstreq(str, item->u.str))
+                svalue_t *item;
+                entry--;
+
+                item = get_rvalue(entry, NULL);
+                if (item == NULL)
+                {
+                    struct protected_range_lvalue* r = entry->u.protected_range_lvalue;
+                    size_t len;
+
+                    if (r->vec.type != T_STRING)
+                        continue;
+
+                    len = mstrsize(str);
+                    if (len != r->index2 - r->index1)
+                        continue;
+
+                    if (memcmp(get_txt(str), get_txt(r->vec.u.str) + r->index1, len) == 0)
+                        break;
+                }
+                else if (item->type == T_STRING && mstreq(str, item->u.str))
                     break;
             }
             break;
@@ -7621,13 +7665,16 @@ v_rmember (svalue_t *sp, int num_arg)
         case T_CLOSURE:
           {
             short type;
-            svalue_t *item;
+            svalue_t *entry;
 
             type = sp->type;
-            for (item = vec->item+cnt; --cnt >= 0; )
+            for (entry = vec->item+cnt; --cnt >= 0; )
             {
-                item--;
-                if (item->type == type && closure_eq(sp, item))
+                svalue_t *item;
+
+                entry--;
+                item = get_rvalue(entry, NULL);
+                if (item != NULL && item->type == type && closure_eq(sp, item))
                     break;
             }
             break;
@@ -7639,13 +7686,19 @@ v_rmember (svalue_t *sp, int num_arg)
           {
             short x_generic;
             short type;
-            svalue_t *item;
+            svalue_t *entry;
 
             type = sp->type;
             x_generic = sp->x.generic;
-            for (item = vec->item+cnt; --cnt >= 0; )
+            for (entry = vec->item+cnt; --cnt >= 0; )
             {
-                item--;
+                svalue_t *item;
+
+                entry--;
+                item = get_rvalue(entry, NULL);
+                if (item == NULL)
+                    continue;
+
                 /* TODO: Is this C99 compliant? */
                 if (sp_u.str == item->u.str
                  && x_generic == item->x.generic
@@ -7663,12 +7716,18 @@ v_rmember (svalue_t *sp, int num_arg)
                  * changes them to 0).
                  */
 
-                svalue_t *item;
+                svalue_t *entry;
                 short type;
 
-                for (item = vec->item+cnt; --cnt >= 0; )
+                for (entry = vec->item+cnt; --cnt >= 0; )
                 {
-                    item--;
+                    svalue_t *item;
+
+                    entry--;
+                    item = get_rvalue(entry, NULL);
+                    if (item == NULL)
+                        continue;
+
                     if ( (type = item->type) == T_NUMBER)
                     {
                         if ( !item->u.number )
@@ -7690,12 +7749,18 @@ v_rmember (svalue_t *sp, int num_arg)
         case T_POINTER:
         case T_STRUCT:
           {
-            svalue_t *item;
+            svalue_t *entry;
             short type = sp->type;
 
-            for (item = vec->item+cnt; --cnt >= 0; )
+            for (entry = vec->item+cnt; --cnt >= 0; )
             {
-                item--;
+                svalue_t *item;
+
+                entry--;
+                item = get_rvalue(entry, NULL);
+                if (item == NULL)
+                    continue;
+
                 /* TODO: Is this C99 compliant? */
                 if (sp_u.number == item->u.number
                  && item->type == type)
