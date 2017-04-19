@@ -948,6 +948,16 @@ replace_programs (void)
     {
         program_t *old_prog;
 
+        /* Don't bother with destructed objects. */
+        if (r_ob->ob->flags & O_DESTRUCTED)
+        {
+            r_next = r_ob->next;
+            if (r_ob->lambda_rpp)
+                free_replace_program_protector(r_ob);
+            xfree(r_ob);
+            continue;
+        }
+
         /* Swap in the program. This can't fail when called during
          * a garbage collection because then the malloc privilege
          * is MALLOC_SYSTEM.
