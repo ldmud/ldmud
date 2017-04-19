@@ -1683,27 +1683,69 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 
 {
     enum compile_value_output_flags result_flags = 0;
+    svalue_t *rvalue = get_rvalue(value, NULL);
+    struct protected_range_lvalue* r = NULL;
+
+    if (rvalue == NULL)
+    {
+        r = value->u.protected_range_lvalue;
+        if (r->vec.type == T_POINTER)
+            rvalue = &(r->vec);
+        else
+            rvalue = value;
+    }
 
     if (!--current.levels_left)
         lambda_error("Too deep recursion inside lambda()\n");
 
-    switch(value->type)
+    switch(rvalue->type)
     {
+    case T_LVALUE:                             /* ----- T_LVALUE ----- */
+      {
+        /* Can only be a string range, otherwise get_rvalue
+         * would have returned another type. And array ranges
+         * were handled before.
+         */
+        svalue_t tmp;
+
+        assert(value->x.lvalue_type == LVALUE_PROTECTED_RANGE);
+        assert(r->vec.type == T_STRING);
+
+        assign_rvalue_no_free(&tmp, value);
+        insert_value_push(value);
+        free_svalue(&tmp);
+        break;
+      }
+
     case T_POINTER:                            /* ----- T_POINTER ----- */
       {
-        vector_t *block;  /* The block of svalues to compile */
+        svalue_t *block;  /* The block of svalues to compile */
         svalue_t *argp;   /* Pointer to the current svalue */
+        svalue_t *item;   /* The rvalue of argp. */
         ph_int type;      /* Various types */
+        mp_int block_size;/* Number of elements in block .*/
 
-        block = value->u.vec;
-        argp = block->item;
-        /* The first value must be a closure */
-        if (block == &null_vector || argp->type != T_CLOSURE)
+        block = rvalue->u.vec->item;
+        if (r != NULL)
         {
-            lambda_error("Missing function\n");
+            argp = block + r->index1;
+            block_size = (mp_int)(r->index2 - r->index1);
+        }
+        else
+        {
+            argp = block;
+            block_size = (mp_int)VEC_SIZE(rvalue->u.vec);
         }
 
-        if ( (type = argp->x.closure_type) < (ph_int)CLOSURE_SIMUL_EFUN)
+        /* The first value must be a closure */
+        if (block_size == 0)
+            lambda_error("Missing function\n");
+
+        item = get_rvalue(argp, NULL);
+        if (item == NULL || item->type != T_CLOSURE)
+            lambda_error("Missing function\n");
+
+        if ( (type = item->x.closure_type) < (ph_int)CLOSURE_SIMUL_EFUN)
         {
             /* Most common case: closure is an efun or an operator */
 
@@ -1715,9 +1757,6 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
             {
                 /* Closure is an operator */
 
-                mp_int block_size;  /* Number of entries */
-
-                block_size = (mp_int)VEC_SIZE(block);
                 switch (type - CLOSURE_OPERATOR)
                 {
                 default:
@@ -1788,7 +1827,8 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      */
                     i = block_size - 1;
                     branchp = alloca(i * sizeof *branchp);
-                    while (--i > 0) {
+                    while (--i > 0)
+                    {
                         compile_value(++argp, opt_flags & REF_ACCEPTED);
                         if (current.code_left < 2)
                             realloc_code();
@@ -2000,16 +2040,19 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      * for an answer, it is not compiled as it won't have
                      * any effect anyway.
                      */
-                   if (!(block_size & 1)
-                     && (opt_flags & (VOID_ACCEPTED|ZERO_ACCEPTED))
-                     && ( opt_flags & VOID_ACCEPTED
-                          ? argp[block_size-1].type != T_POINTER /* no side effect */
-                          :     argp[block_size-1].type == T_NUMBER
-                            && !argp[block_size-1].u.number
-                         ) )
+                    if (!(block_size & 1)
+                      && (opt_flags & (VOID_ACCEPTED|ZERO_ACCEPTED)))
                     {
-                    	/* Ignore the default-part by hiding it */
-                        block_size--;
+                       item = get_rvalue(argp + block_size - 1, NULL);
+                       if (!item)
+                           item = &(argp->u.protected_range_lvalue->vec);
+                       if (( opt_flags & VOID_ACCEPTED )
+                          ? item->type != T_POINTER /* no side effect */
+                          : (item->type == T_NUMBER && !item->u.number))
+                        {
+                            /* Ignore the default-part by hiding it */
+                            block_size--;
+                        }
                     }
 
                     /* Generate the code for the (cond, cond-part) pairs,
@@ -2612,7 +2655,8 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                           instrs[type - CLOSURE_OPERATOR].name
                         );
 
-                    if (argp[2].type == T_NUMBER && argp[2].u.number == 1)
+                    item = get_rvalue(argp + 2, NULL);
+                    if (item != NULL && item->type == T_NUMBER && item->u.number == 1)
                     {
                         compile_lvalue(argp+1, 0);
                         if (opt_flags & VOID_ACCEPTED)
@@ -2662,7 +2706,8 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                           instrs[type - CLOSURE_OPERATOR].name
                         );
 
-                    if (argp[2].type == T_NUMBER && argp[2].u.number == 1)
+                    item = get_rvalue(argp + 2, NULL);
+                    if (item != NULL && item->type == T_NUMBER && item->u.number == 1)
                     {
                         compile_lvalue(argp+1, 0);
                         if (opt_flags & VOID_ACCEPTED)
@@ -3047,7 +3092,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     }
 
                     /* Compile the condition and generate the branch */
-                    argp = block->item;
+                    argp = block;
                     void_given = compile_value(++argp, NEGATE_ACCEPTED);
 
                     if (current.code_left < 3)
@@ -3123,6 +3168,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     int    vars_given;
                     int    body_count;
                     bool   foreach_ref = false;
+                    svalue_t *svp;
 
                     body_count = block_size - 3;
                     if (body_count < 0)
@@ -3153,30 +3199,37 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 
                     /* Create the code to push the variable lvalues
                      */
-                    if ((++argp)->type != T_POINTER)
+                    item = get_rvalue(++argp, NULL);
+                    if (item == NULL)
+                    {
+                        struct protected_range_lvalue *vr = argp->u.protected_range_lvalue;
+
+                        if (vr->vec.type != T_POINTER)
+                            lambda_error("Missing variable lvalue to #'foreach\n");
+
+                        svp = vr->vec.u.vec->item + vr->index1;
+                        vars_given = i = vr->index2 - vr->index1;
+                    }
+                    else if (item->type != T_POINTER)
                     {
                         vars_given = 1;
-                        if (!is_lvalue(argp, MAKE_VAR_LVALUE))
-                            lambda_error("Missing variable lvalue to #'foreach\n");
-                        compile_lvalue(argp, MAKE_VAR_LVALUE);
+                        svp = item;
                     }
                     else
                     {
-                        svalue_t * svp;
+                        svp = item->u.vec->item;
+                        vars_given = i = (int)VEC_SIZE(item->u.vec);
+                    }
 
-                        svp = argp->u.vec->item;
-                        vars_given = i = (int)VEC_SIZE(argp->u.vec);
-
-                        if (!vars_given)
+                    if (!vars_given)
+                        lambda_error("Missing variable lvalue to #'foreach\n");
+                    if (vars_given > 0xFE)
+                        lambda_error("Too many lvalues to #'foreach: %d\n", vars_given);
+                    for (i = vars_given; i > 0; i--, svp++)
+                    {
+                        if (!is_lvalue(svp, MAKE_VAR_LVALUE))
                             lambda_error("Missing variable lvalue to #'foreach\n");
-                        if (vars_given > 0xFE)
-                            lambda_error("Too many lvalues to #'foreach: %d\n", vars_given);
-                        for ( ; i > 0; i--, svp++)
-                        {
-                            if (!is_lvalue(svp, MAKE_VAR_LVALUE))
-                                lambda_error("Missing variable lvalue to #'foreach\n");
-                            compile_lvalue(svp, MAKE_VAR_LVALUE);
-                        }
+                        compile_lvalue(svp, MAKE_VAR_LVALUE);
                     }
 
                     /* Create the code for the expression */
@@ -3256,14 +3309,18 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     flags = 0;
                     for (i = 3; i <= block_size; i++)
                     {
-                        if (argp[i-1].type == T_SYMBOL
-                         && mstreq(argp[i-1].u.str, STR_NOLOG))
+                        item = get_rvalue(argp + i -1, NULL);
+                        if (item == NULL)
+                            item = argp + i - 1;
+
+                        if (item->type == T_SYMBOL
+                         && mstreq(item->u.str, STR_NOLOG))
                             flags |= CATCH_FLAG_NOLOG;
-                        else if (argp[i-1].type == T_SYMBOL
-                         && mstreq(argp[i-1].u.str, STR_PUBLISH))
+                        else if (item->type == T_SYMBOL
+                         && mstreq(item->u.str, STR_PUBLISH))
                             flags |= CATCH_FLAG_PUBLISH;
-                        else if (argp[i-1].type == T_SYMBOL
-                         && mstreq(argp[i-1].u.str, STR_RESERVE)
+                        else if (item->type == T_SYMBOL
+                         && mstreq(item->u.str, STR_RESERVE)
                                  )
                         {
                             if (i > block_size)
@@ -3441,14 +3498,27 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     for (i = block_size; --i;)
                     {
                         svalue_t *element;
+                        item = get_rvalue(++argp, NULL);
 
-                        if ( (++argp)->type != T_POINTER )
+                        if (item == NULL)
+                        {
+                            struct protected_range_lvalue *ar = argp->u.protected_range_lvalue;
+                            if (ar->vec.type != T_POINTER)
+                                lambda_error("Bad argument to #'([\n");
+
+                            element = ar->vec.u.vec->item + ar->index1;
+                            j = ar->index2 - ar->index1;
+                        }
+                        else if (item->type == T_POINTER)
+                        {
+                            element = item->u.vec->item;
+                            j = (mp_int)VEC_SIZE(item->u.vec);
+                        }
+                        else
                             lambda_error("Bad argument to #'([\n");
 
-                        element = argp->u.vec->item;
 
                         /* The first array determines the width */
-                        j = (mp_int)VEC_SIZE(argp->u.vec);
                         if (j != num_values)
                         {
                             if (!j)
@@ -3509,13 +3579,14 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         size = STRUCT_MAX_MEMBERS;
                     }
 
-                    if (argp[1].type == T_STRUCT
-                     && struct_size(argp[1].u.strct) < size)
+                    item = get_rvalue(argp+1, NULL);
+                    if (item != NULL && item->type == T_STRUCT
+                     && struct_size(item->u.strct) < size)
                     {
                         lambda_error("Too many elements for struct %s.\n"
-                                    , get_txt(struct_name(argp[1].u.strct))
+                                    , get_txt(struct_name(item->u.strct))
                                     );
-                        size = struct_size(argp[1].u.strct);
+                        size = struct_size(item->u.strct);
                     }
                     i = size+1;
                     while (--i >= 0)
@@ -3727,15 +3798,35 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         mp_int j;             /* Number of (remaining) labels */
                         case_list_entry_t *l;
                         enum compile_value_output_flags opt_used;
+                        svalue_t tmp_label = { T_NUMBER };  /* Temporary string label. */
 
                         /* Compile the case labels */
 
                         ++argp;
-                        if (argp->type == T_POINTER) {
-                            labels = argp->u.vec->item;
-                            j = (mp_int)VEC_SIZE(argp->u.vec);
-                        } else {
-                            labels = argp;
+                        item = get_rvalue(argp, NULL);
+                        if (item == NULL)
+                        {
+                            struct protected_range_lvalue *lr = argp->u.protected_range_lvalue;
+                            if (lr->vec.type == T_POINTER)
+                            {
+                                labels = lr->vec.u.vec->item + lr->index1;
+                                j = lr->index2 - lr->index1;
+                            }
+                            else
+                            {
+                                assign_rvalue_no_free(&tmp_label, argp);
+                                labels = &tmp_label;
+                                j = 1;
+                            }
+                        }
+                        else if (item->type == T_POINTER)
+                        {
+                            labels = item->u.vec->item;
+                            j = (mp_int)VEC_SIZE(item->u.vec);
+                        }
+                        else
+                        {
+                            labels = item;
                             j = 1;
                         }
 
@@ -3747,10 +3838,13 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                             l->line = 1;
 
                             /* Create the case_list_entry for this case label */
-                            if (j && labels[1].type == T_CLOSURE
-                                  && labels[1].x.closure_type == F_RANGE +CLOSURE_EFUN )
+                            item = NULL;
+                            if (j > 1)
+                                item = get_rvalue(labels + 1, NULL);
+                            if (item != NULL && item->type == T_CLOSURE
+                                             && item->x.closure_type == F_RANGE +CLOSURE_EFUN )
                             {
-                                /* It's a ({#'.., <low>, <high>}) range */
+                                /* It's a ({<low>, #'[..], <high>}) range */
                             	
                                 if (j < 2) {
                                     lambda_error(
@@ -3807,9 +3901,12 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                 svalue_t stmp;
 
                                 if (some_numeric)
+                                {
+                                    free_svalue(&tmp_label);
                                     lambda_error(
                                       "mixed case label lists not supported\n"
                                     );
+                                }
 
                                 if (--current.values_left < 0)
                                     realloc_values();
@@ -3819,7 +3916,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                 *--current.valuep = stmp;
 
                                 l->key = (p_int)stmp.u.str;
-
+                                free_svalue(&tmp_label);
                             }
                             else if (labels->type == T_NUMBER)
                             {
@@ -3867,11 +3964,14 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         );
 
                         /* Check and compile the delimiter #', or #'break */
+                        item = get_rvalue(++argp, NULL);
+                        if (item == NULL)
+                            item = argp;
 
-                        if ((++argp)->type != T_CLOSURE
-                         || (   argp->x.closure_type !=
+                        if (item->type != T_CLOSURE
+                         || (   item->x.closure_type !=
                                   F_BREAK+CLOSURE_OPERATOR
-                             && (!i || argp->x.closure_type !=
+                             && (!i || item->x.closure_type !=
                                        F_POP_VALUE+CLOSURE_OPERATOR)) )
                         {
                             lambda_error("Bad delimiter in #'switch\n");
@@ -3883,7 +3983,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                 realloc_code();
                             current.code_left--;
                             STORE_CODE(current.codep
-                                      , (bytecode_t) argp->x.closure_type);
+                                      , (bytecode_t) item->x.closure_type);
                         }
                     } /* for (i = num_blocks) */
 
@@ -3929,15 +4029,11 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
             {
                 /* Closure is an python-defined efun */
 
-                result_flags = compile_python_efun_call(type, (mp_int)VEC_SIZE(block) - 1, argp+1, opt_flags);
+                result_flags = compile_python_efun_call(type, block_size - 1, argp+1, opt_flags);
             }
 #endif
             else /* it's an EFUN closure */
             {
-                mp_int block_size;  /* Number of entries */
-
-                block_size = (mp_int)VEC_SIZE(block);
-
                 switch (type - CLOSURE_EFUN)
                 {
                 /* ({#'&, <expr1>, ..., <exprn> })
@@ -4092,7 +4188,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                   }
 
                 default:
-                    result_flags = compile_efun_call(type, (mp_int)VEC_SIZE(block) - 1, argp+1, opt_flags);
+                    result_flags = compile_efun_call(type, block_size - 1, argp+1, opt_flags);
                     break;
 
                 } /* switch */
@@ -4102,7 +4198,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
         else switch (type) /* type >= CLOSURE_SIMUL_EFUN */
         {
         default: /* SIMUL_EFUN closure */
-            result_flags = compile_sefun_call(type, (mp_int)VEC_SIZE(block) - 1, argp+1, opt_flags);
+            result_flags = compile_sefun_call(type, block_size - 1, argp+1, opt_flags);
             break;
 
         case CLOSURE_PRELIMINARY:
@@ -4112,7 +4208,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
         case CLOSURE_BOUND_LAMBDA:
         case CLOSURE_LAMBDA:
         case CLOSURE_LFUN:
-            result_flags = compile_lambda_call(type, argp, (mp_int)VEC_SIZE(block) - 1, argp+1, opt_flags);
+            result_flags = compile_lambda_call(type, item, block_size - 1, argp+1, opt_flags);
             break;
 
         case CLOSURE_IDENTIFIER:
@@ -4130,8 +4226,8 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 
             lambda_t *l;
 
-            l = argp->u.lambda;
-            if (VEC_SIZE(block) != 1)
+            l = item->u.lambda;
+            if (block_size != 1)
                 lambda_error("Argument to variable\n");
 
             if (l->ob != current.lambda_origin)
@@ -4143,7 +4239,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                 current.code_left -= 1;
                 STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
 
-                insert_value_push(argp);
+                insert_value_push(item);
                 if (current.code_left < 3)
                     realloc_code();
                 current.code_left -= 3;
@@ -4173,7 +4269,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
         /* This compiles into the value itself minus one quote.
          */
 
-        insert_value_push(value);
+        insert_value_push(rvalue);
         if (!--current.valuep->x.quotes)
             current.valuep->type = T_POINTER;
         break;
@@ -4185,9 +4281,9 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
          * create the local variable in the first place.
          */
 
-        if (value->x.quotes > 1)
+        if (rvalue->x.quotes > 1)
         {
-            insert_value_push(value);
+            insert_value_push(rvalue);
             --current.valuep->x.quotes;
         }
         else
@@ -4197,7 +4293,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
              */
             symbol_t *sym;
 
-            sym = make_symbol(value->u.str);
+            sym = make_symbol(rvalue->u.str);
             if (sym->index < 0)
                 lambda_error("Symbol '%s' not bound\n"
                             , get_txt(sym->name));
@@ -4222,7 +4318,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
       	
         mp_int i;
 
-        i = value->u.number;
+        i = rvalue->u.number;
         if (i <= -0x100 || i >= 0x100)
         {
             insert_value_push(value);
@@ -4268,7 +4364,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 
     default:                                 /* ----- other value ----- */
         /* Generate a LAMBDA_(C)CONSTANT for this value. */
-        insert_value_push(value);
+        insert_value_push(rvalue);
         break;
     }
 
@@ -4761,21 +4857,42 @@ is_lvalue (svalue_t *argp, int flags)
  */
 
 {
-    switch(argp->type)
+    svalue_t *item = get_rvalue(argp, NULL);
+    struct protected_range_lvalue* r = NULL;
+    if (item == NULL)
+    {
+        r = argp->u.protected_range_lvalue;
+        item = &(r->vec);
+    }
+
+    switch(item->type)
     {
     case T_SYMBOL:
-        return argp->x.quotes == 1;
+        return item->x.quotes == 1;
 
     case T_POINTER:
       {
         vector_t *block;
+        p_int size;
 
-        block = argp->u.vec;
-        if (VEC_SIZE(block) < 1)
+        block = item->u.vec;
+
+        if (r != NULL)
+        {
+            size = r->index2 - r->index1;
+            argp = block->item + r->index1;
+        }
+        else
+        {
+            size = VEC_SIZE(block);
+            argp = block->item;
+        }
+
+        if (size < 1)
             break;
 
-        argp = block->item;
-        if (argp->type != T_CLOSURE)
+        argp = get_rvalue(argp, NULL);
+        if (argp == NULL || argp->type != T_CLOSURE)
             break;
 
         switch (argp->x.closure_type)
@@ -4791,7 +4908,7 @@ is_lvalue (svalue_t *argp, int flags)
           case F_AINDEX+CLOSURE_EFUN:
           case F_S_INDEX +CLOSURE_EFUN:
           case CLOSURE_IDENTIFIER:
-            if (VEC_SIZE(block) != 3)
+            if (size != 3)
                 break;
             return MY_TRUE;
 
@@ -4808,7 +4925,7 @@ is_lvalue (svalue_t *argp, int flags)
                break;
             /* Fallthrough */
           case F_MAP_INDEX +CLOSURE_EFUN:
-            if (VEC_SIZE(block) != 4)
+            if (size != 4)
                 break;
             return MY_TRUE;
         }
@@ -4816,7 +4933,7 @@ is_lvalue (svalue_t *argp, int flags)
       }
 
     case T_CLOSURE:
-        if (argp->x.closure_type == CLOSURE_IDENTIFIER)
+        if (item->x.closure_type == CLOSURE_IDENTIFIER)
             return MY_TRUE;
         break;
     }
@@ -4835,13 +4952,22 @@ compile_lvalue (svalue_t *argp, int flags)
  */
 
 {
+    svalue_t *item = get_rvalue(argp, NULL);
+    struct protected_range_lvalue* r = NULL;
+    if (item == NULL)
+    {
+        r = argp->u.protected_range_lvalue;
+        item = &(r->vec);
+    }
+
     /* These 3 flags are exclusive. */
     assert(((flags & PROTECT_LVALUE)?1:0) + ((flags & MAKE_VAR_LVALUE)?1:0) + ((flags & RESEATING_ACCEPTED)?1:0) <= 1);
 
     /* Function calls only allowed with PROTECT_LVALUE. */
     assert(!(flags & ALLOW_FUNCTION_CALL) || (flags & PROTECT_LVALUE));
 
-    switch(argp->type) {
+    switch(item->type)
+    {
 
     /* 'a: Symbol of a local variable.
      */
@@ -4854,11 +4980,11 @@ compile_lvalue (svalue_t *argp, int flags)
       {
         symbol_t *sym;
 
-        if (argp->x.quotes > 1)
+        if (item->x.quotes > 1)
             break;
 
         /* Find (or create) the variable for this symbol */
-        sym = make_symbol(argp->u.str);
+        sym = make_symbol(item->u.str);
         if (sym->index < 0)
         {
             sym->index = current.num_locals++;
@@ -4884,14 +5010,28 @@ compile_lvalue (svalue_t *argp, int flags)
      */
     case T_POINTER:
       {
-        vector_t *block;
+        argp = item->u.vec->item;
+        p_int size;
 
-        block = argp->u.vec;
-        if (block != &null_vector && (argp = block->item)->type == T_CLOSURE)
+        if (r != NULL)
+        {
+            size = r->index2 - r->index1;
+            argp += r->index1;
+        }
+        else
+        {
+            size = VEC_SIZE(item->u.vec);
+        }
+
+        if (size != 0)
         {
             bool is_struct = false;
 
-            switch (argp->x.closure_type)
+            svalue_t *cl = get_rvalue(argp, NULL);
+            if (cl == NULL || cl->type != T_CLOSURE)
+                break;
+
+            switch (cl->x.closure_type)
             {
 
             /* ({ #'[, map|array, index [, index] })
@@ -4905,7 +5045,7 @@ compile_lvalue (svalue_t *argp, int flags)
             case F_RINDEX+CLOSURE_EFUN:
             case F_AINDEX+CLOSURE_EFUN:
 
-                if (VEC_SIZE(block) == 3)
+                if (size == 3)
                 {
                     /* Indexing of an array or normal mapping.
                      */
@@ -4924,7 +5064,7 @@ compile_lvalue (svalue_t *argp, int flags)
                         realloc_code();
 
                     current.code_left--;
-                    switch (argp->x.closure_type)
+                    switch (cl->x.closure_type)
                     {
                         case F_INDEX + CLOSURE_EFUN:
                             STORE_CODE(current.codep
@@ -4959,10 +5099,10 @@ compile_lvalue (svalue_t *argp, int flags)
                         STORE_CODE(current.codep, F_MAKE_PROTECTED);
                     }
                     return;
-                } /* if (VEC_SIZE(block) == 3) */
+                } /* if (size == 3) */
 
-                if (VEC_SIZE(block) == 4
-                 && argp->x.closure_type == F_INDEX +CLOSURE_EFUN)
+                if (size == 4
+                 && cl->x.closure_type == F_INDEX +CLOSURE_EFUN)
                 {
                     /* Indexing of a wide mapping.
                      */
@@ -4980,7 +5120,7 @@ compile_lvalue (svalue_t *argp, int flags)
                         STORE_CODE(current.codep, F_MAKE_PROTECTED);
                     }
                     return;
-                } /* if (VEC_SIZE(block) == 4...) */
+                } /* if (size == 4...) */
 
                 /* Otherwise: raise an error */
                 break;
@@ -5010,11 +5150,11 @@ compile_lvalue (svalue_t *argp, int flags)
                 if (flags & MAKE_VAR_LVALUE)
                     break;
 
-                if (VEC_SIZE(block) != 4)
+                if (size != 4)
                     break;
 
                 code = F_ILLEGAL;
-                switch(argp->x.closure_type)
+                switch(cl->x.closure_type)
                 {
                 case F_RANGE+CLOSURE_EFUN:
                     code = F_RANGE_LVALUE;
@@ -5075,11 +5215,11 @@ compile_lvalue (svalue_t *argp, int flags)
                 if (flags & MAKE_VAR_LVALUE)
                     break;
 
-                if (VEC_SIZE(block) != 3)
+                if (size != 3)
                     break;
 
                 code = F_ILLEGAL;
-                switch(argp->x.closure_type)
+                switch(cl->x.closure_type)
                 {
                 case F_NX_RANGE+CLOSURE_EFUN:
                     code = F_NX_RANGE_LVALUE;
@@ -5111,7 +5251,7 @@ compile_lvalue (svalue_t *argp, int flags)
             /* ({ #'[, mapping, index [,index] })
              */
             case F_MAP_INDEX +CLOSURE_EFUN:
-                if (VEC_SIZE(block) != 4)
+                if (size != 4)
                     break;
 
                 compile_value(++argp, 0);
@@ -5137,7 +5277,7 @@ compile_lvalue (svalue_t *argp, int flags)
                 if (!(flags & RESEATING_ACCEPTED))
                     break;
 
-                if (VEC_SIZE(block) != 2)
+                if (size != 2)
                     break;
 
                 compile_lvalue(++argp, MAKE_VAR_LVALUE);
@@ -5147,10 +5287,10 @@ compile_lvalue (svalue_t *argp, int flags)
              */
             case CLOSURE_IDENTIFIER:
               {
-                if (VEC_SIZE(block) != 1)
+                if (size != 1)
                     break;
 
-                compile_lvalue(argp, flags);
+                compile_lvalue(cl, flags);
                 return;
               }
 
@@ -5160,7 +5300,7 @@ compile_lvalue (svalue_t *argp, int flags)
             case CLOSURE_LFUN:
                 if (flags & ALLOW_FUNCTION_CALL)
                 {
-                    compile_lambda_call(argp->x.closure_type, argp, (mp_int)VEC_SIZE(block) - 1, argp+1, LEAVE_LVALUE);
+                    compile_lambda_call(cl->x.closure_type, cl, (mp_int)size - 1, argp+1, LEAVE_LVALUE);
                     return;
                 }
                 break;
@@ -5168,7 +5308,7 @@ compile_lvalue (svalue_t *argp, int flags)
             default:
                 if (flags & ALLOW_FUNCTION_CALL)
                 {
-                    ph_int type = argp->x.closure_type;
+                    ph_int type = cl->x.closure_type;
 #ifdef USE_PYTHON
                     if (type < (ph_int)CLOSURE_PYTHON_EFUN)     /* Operator closure. */
 #else
@@ -5178,7 +5318,7 @@ compile_lvalue (svalue_t *argp, int flags)
 #ifdef USE_PYTHON
                     else if (type < (ph_int)CLOSURE_EFUN)       /* Python Efun closure. */
                     {
-                        compile_python_efun_call(type, (mp_int)VEC_SIZE(block) - 1, argp+1, LEAVE_LVALUE);
+                        compile_python_efun_call(type, (mp_int)size - 1, argp+1, LEAVE_LVALUE);
                         return;
                     }
 #endif
@@ -5188,12 +5328,12 @@ compile_lvalue (svalue_t *argp, int flags)
                         if (!instrs[type - CLOSURE_EFUN].might_return_lvalue)
                             break;
 
-                        compile_efun_call(type, (mp_int)VEC_SIZE(block) - 1, argp+1, LEAVE_LVALUE);
+                        compile_efun_call(type, (mp_int)size - 1, argp+1, LEAVE_LVALUE);
                         return;
                     }
                     else if (type < (ph_int)CLOSURE_LFUN)       /* Simul-Efun closure. */
                     {
-                        compile_sefun_call(type, (mp_int)VEC_SIZE(block) - 1, argp+1, LEAVE_LVALUE);
+                        compile_sefun_call(type, (mp_int)size - 1, argp+1, LEAVE_LVALUE);
                         return;
                     }
                 }
@@ -5207,13 +5347,13 @@ compile_lvalue (svalue_t *argp, int flags)
      */
     case T_CLOSURE:
       {
-        switch (argp->x.closure_type)
+        switch (item->x.closure_type)
         {
         case CLOSURE_IDENTIFIER:
           {
             lambda_t *l;
 
-            l = argp->u.lambda;
+            l = item->u.lambda;
             if (l->ob != current.lambda_origin)
                 break;
             if (current.code_left < 4)
@@ -5235,7 +5375,7 @@ compile_lvalue (svalue_t *argp, int flags)
         break;
       }
 
-    } /* switch(argp->type) */
+    } /* switch(item->type) */
 
     lambda_error("Illegal lvalue\n");
 } /* compile_lvalue() */
@@ -5289,12 +5429,13 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
     for (i = 0; i < j; i++, argp++)
     {
         symbol_t *sym;
+        svalue_t *item = get_rvalue(argp, NULL);
 
-        if (argp->type != T_SYMBOL)
+        if (item == NULL || item->type != T_SYMBOL)
         {
             lambda_error("Illegal argument type to lambda()\n");
         }
-        sym = make_symbol(argp->u.str);
+        sym = make_symbol(item->u.str);
         if (sym->index >= 0)
             lambda_error("Double symbol name in lambda arguments\n");
         sym->index = i;
