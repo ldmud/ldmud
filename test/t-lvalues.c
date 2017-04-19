@@ -1841,7 +1841,8 @@ mixed *tests = ({
             ({#'=, 'result,
                 ({#'&,
                     ({#'funcall,
-                        ({ #'lambda, 0, ({#'({, #'return, ({#'&, 'val}) }) })
+                        ({ #'lambda, '({'arg}), ({#'({, #'return, '({#'&, 'arg}) }) }),
+                        ({ #'&, 'val })
                     })
                 })
             }),
