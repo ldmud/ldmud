@@ -767,6 +767,33 @@ set_closure_user (svalue_t *svp, object_t *owner)
 
 /*-------------------------------------------------------------------------*/
 void
+free_replace_program_protector (replace_ob_t *r_ob)
+
+/* In case a replace program is aborted, free the lambda adjustment
+ * structure.
+ */
+
+{
+    struct lambda_replace_program_protector *lrpp = r_ob->lambda_rpp;
+    struct lambda_replace_program_protector *next_lrpp;
+
+    for (; lrpp; lrpp = next_lrpp)
+    {
+        next_lrpp = lrpp->next;
+
+        if (CLOSURE_HAS_CODE(lrpp->l.x.closure_type))
+        {
+            free_array(lrpp->args);
+            free_svalue(&lrpp->block);
+        }
+
+        free_closure(&lrpp->l);
+        xfree(lrpp);
+    }
+} /* free_replace_program_protector() */
+
+/*-------------------------------------------------------------------------*/
+void
 replace_program_lambda_adjust (replace_ob_t *r_ob)
 
 /* This function is called as the last step during the replacement of an

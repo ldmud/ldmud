@@ -110,6 +110,7 @@ extern long      find_function(const string_t *name, const program_t *prog);
 extern Bool      closure_eq (svalue_t * left, svalue_t * right);
 extern int       closure_cmp (svalue_t * left, svalue_t * right);
 extern void      set_closure_user(svalue_t *svp, object_t *owner);
+extern void      free_replace_program_protector (replace_ob_t *r_ob);
 extern void      replace_program_lambda_adjust(replace_ob_t *r_ob);
 extern void      closure_init_lambda (lambda_t * l, object_t * obj);
 extern lambda_t *closure_new_lambda (object_t * obj, unsigned short context_size, Bool raise_error);
