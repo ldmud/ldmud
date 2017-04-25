@@ -5780,6 +5780,9 @@ check_function_args(int fx, program_t *progp, bytecode_p funstart)
             // or is the formal argument of type TYPE_ANY (mixed)?
             if (!check_rtt_compatibility(arg_type[i], firstarg+i))
             {
+                // How many control stack frames to remove.
+                int num_csf = 0;
+
                 // Determine the lpctype of arg_type[i] for a better error message.
                 static char buff[512];
                 lpctype_t *realtype = get_rtt_type(arg_type[i], firstarg+i);
@@ -5793,12 +5796,12 @@ check_function_args(int fx, program_t *progp, bytecode_p funstart)
                 if (csp > CONTROL_STACK + 1)
                 {
                     // at least 3 frames on the stack. We can get rid of at least one of them.
-                    pop_control_stack();
+                    num_csf++;
                     // int_call_lambda() pushes a dummy control frame with funstart==0. This
                     // has to removed as well if existing.
                     // (Assumption: there are not other control stack frames with funstart==0.)
-                    if (!csp->funstart)
-                        pop_control_stack();
+                    if (!csp[-1].funstart)
+                        num_csf++;
                 }
                 else if (csp == CONTROL_STACK + 1)
                 {
@@ -5808,7 +5811,7 @@ check_function_args(int fx, program_t *progp, bytecode_p funstart)
                     // start of a top-level evaluation and both frames have to remain.
                     // In that case, we have to set inter_pc to a valid value.
                     if (CONTROL_STACK->funstart)
-                        pop_control_stack();
+                        num_csf++;
                     else
                         inter_pc = funstart;
                 }
@@ -5819,10 +5822,41 @@ check_function_args(int fx, program_t *progp, bytecode_p funstart)
                     // or it is a left-over from last execution.
                     inter_pc = funstart;
                 }
-                // unravel any lvalue indirection (if any)
-                errorf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
-                       , i+1, get_txt(header->name), buff,
-                       get_lpctype_name(arg_type[i]));
+
+                if (progp->flags & P_WARN_RTT_CHECKS)
+                {
+                    // We need the stack frames to continue execution.
+                    // But now they are in the way of a good error message...
+                    struct control_stack saved_csf[3];
+                    assert(num_csf < 3);
+
+                    push_control_stack(inter_sp, inter_pc, inter_fp, inter_context);
+                    for (int j = 0; j <= num_csf; j++)
+                        saved_csf[j] = *(csp--);
+                    csp++;
+
+                    // This one we saved, but also pull back into reality.
+                    pop_control_stack();
+
+                    // warnf will return (errors are caught).
+                    warnf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
+                           , i+1, get_txt(header->name), buff,
+                           get_lpctype_name(arg_type[i]));
+
+                    for (int j = num_csf; j >= 0; j--)
+                        *(++csp) = saved_csf[j];
+
+                    pop_control_stack();
+                }
+                else
+                {
+                    for (int j = 0; j < num_csf; j++)
+                        pop_control_stack();
+
+                    errorf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
+                           , i+1, get_txt(header->name), buff,
+                           get_lpctype_name(arg_type[i]));
+                }
             }
             ++i;
         }
@@ -8210,7 +8244,12 @@ again:
                 free_lpctype(realtype);
 
                 inter_sp = sp;
-                errorf("Bad return type in %s(): got '%s', expected '%s'.\n",
+                if (current_prog->flags & P_WARN_RTT_CHECKS)
+                    warnf("Bad return type in %s(): got '%s', expected '%s'.\n",
+                       get_txt(header->name), buff,
+                       get_lpctype_name(header->type));
+                else
+                    errorf("Bad return type in %s(): got '%s', expected '%s'.\n",
                        get_txt(header->name), buff,
                        get_lpctype_name(header->type));
             }

@@ -249,6 +249,7 @@ extern Bool pragma_warn_empty_casts;
 extern Bool pragma_check_overloads;
 extern Bool pragma_share_variables;
 extern Bool pragma_rtt_checks;
+extern Bool pragma_warn_rtt_checks;
 extern string_t *last_lex_string;
 extern ident_t *all_efuns;
 

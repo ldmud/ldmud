@@ -199,6 +199,10 @@ Bool pragma_rtt_checks;
   /* True: enable runtime type checks for this program
    */
 
+Bool pragma_warn_rtt_checks;
+  /* True: emit warnings when doing runtime type checks for this program
+   */
+
 string_t *last_lex_string;
   /* When lexing string literals, this is the (shared) string lexed
    * so far. It is used to pass string values to lang.c and may be
@@ -3459,11 +3463,20 @@ handle_pragma (char *str)
         {
             pragma_rtt_checks = MY_TRUE;
             pragma_save_types = MY_TRUE;
+            pragma_warn_rtt_checks = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "warn_rtt_checks", namelen) == 0)
+        {
+            pragma_rtt_checks = MY_TRUE;
+            pragma_save_types = MY_TRUE;
+            pragma_warn_rtt_checks = MY_TRUE;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "no_rtt_checks", namelen) == 0)
         {
             pragma_rtt_checks = MY_FALSE;
+            pragma_warn_rtt_checks = MY_FALSE;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "share_variables", namelen) == 0)
@@ -5415,6 +5428,7 @@ start_new_file (int fd, const char * fname)
     pragma_warn_empty_casts = MY_TRUE;
     pragma_share_variables = share_variables;
     pragma_rtt_checks = MY_FALSE;
+    pragma_warn_rtt_checks = MY_FALSE;
 
     nexpands = 0;
 

@@ -33,6 +33,8 @@ DESCRIPTION
                 check at compile time.
                 strong_types/strict_types is seriously recommended.
                 This pragma implicitly enables save_types as well.
+        warn_rtt_checks: runtime checks are enabled, just like rtt_checks,
+                but errors will be shown as warnings only.
         no_rtt_checks: disable runtime type checks for this program (default).
 
         pedantic: Certain warnings are treated as errors:

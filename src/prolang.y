@@ -17039,6 +17039,7 @@ epilog (void)
                     | (pragma_no_shadow ? P_NO_SHADOW : 0)
                     | (pragma_share_variables ? P_SHARE_VARIABLES : 0)
                     | (pragma_rtt_checks ? P_RTT_CHECKS : 0)
+                    | (pragma_warn_rtt_checks ? P_WARN_RTT_CHECKS : 0)
                     ;
 
         prog->load_time = current_time;
