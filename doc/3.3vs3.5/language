@@ -122,6 +122,8 @@ that you should pay attention to when updating.
     always give information about the context of an error.
     This pragma is ignored  (#702)
   + The pragma warn_deprecated is now enabled by default. (#702)
+  + The new pragma warn_rtt_checks shows runtime type errors
+    as warnings (#763)
 
 - 'deprecated' modifier
   The deprecated modifier can be used for lfuns (and sefuns) and global

@@ -8983,13 +8983,21 @@ static int nesting = 0;  /* Used to detect recursive calls */
                 get_lpctype_name_buf(realtype, realtypebuf, sizeof(realtypebuf));
                 free_lpctype(realtype);
 
-                free_svalue(v);
-                *v = const0;
-
-                errorf("Bad type when restoring %s from %s line %d. Expected "
+                if (ob->prog->flags & P_WARN_RTT_CHECKS)
+                    warnf("Bad type when restoring %s from %s line %d. Expected "
                        "%s, got %s.\n",
                        get_txt(current_object->name), name, lineno,
                        get_lpctype_name(vtype.t_type), realtypebuf);
+                else
+                {
+                    free_svalue(v);
+                    *v = const0;
+
+                    errorf("Bad type when restoring %s from %s line %d. Expected "
+                       "%s, got %s.\n",
+                       get_txt(current_object->name), name, lineno,
+                       get_lpctype_name(vtype.t_type), realtypebuf);
+                }
             }
         }
 

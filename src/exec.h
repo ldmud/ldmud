@@ -562,6 +562,7 @@ enum program_flags {
     P_SHARE_VARIABLES = 0x0010, /* Clone vars are assigned from 
                                  * the current blueprint vars. */
     P_RTT_CHECKS      = 0x0020, /* enable runtime type checks */
+    P_WARN_RTT_CHECKS = 0x0040, /* enable runtime type check warnings */
 };
 /* Special value for type_start in program_s designating that the function has
  * no type info. */
