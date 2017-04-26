@@ -41,6 +41,7 @@ that you should pay attention to when updating.
         set_heart_beat()         -> configure_object(ob, OC_HEART_BEAT, flag)
         enable_commands()        -> configure_object(ob, OC_COMMANDS_ENABLED, 1)
         disable_commands()       -> configure_object(ob, OC_COMMANDS_ENABLED, 0)
+        seteuid()                -> configure_object(ob, OC_EUID, euid)
         query_once_interactive() -> object_info(ob, OI_ONCE_INTERACTIVE)
         query_shadowing()        -> object_info(ob, OI_SHADOW_PREV)
         set_connection_charset() -> configure_object(ob, IC_CONNECTION_CHARSET_AS_STRING, val)
@@ -87,6 +88,9 @@ that you should pay attention to when updating.
   + The efun set_is_wizard() was removed. It can be implemented with
     normal actions. Example implementations are provided in
     /mudlib/deprecated. (#596)
+  + The efun export_uid() was removed. The object's UID is now constant
+    and can't be changed. Instead the EUID can be exported with
+    configure_object(ob, OC_EUID, geteuid()). (#828)
 
 - New efuns:
   + json_parse() parses strings encoding a JSON object into an

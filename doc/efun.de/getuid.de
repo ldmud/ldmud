@@ -13,4 +13,4 @@ GESCHICHTE
         Seit 3.2.1@47 ist diese Efun ein Alias fuer creator().
 
 SIEHE AUCH
-        seteuid(E), geteuid(E), export_uid(E), creator(E)
+        geteuid(E), configure_object(E), creator(E)

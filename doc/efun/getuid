@@ -12,4 +12,4 @@ HISTORY
         Since 3.2.1@47, this creator() is an alias for this efun.
 
 SEE ALSO
-        seteuid(E), geteuid(E), export_uid(E), creator(E)
+        geteuid(E), configure_object(E), creator(E)

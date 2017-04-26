@@ -1516,19 +1516,6 @@ int valid_snoop (object snoopee, object snooper)
 // If strict-euids, the function must exist and return a string.
 
 //---------------------------------------------------------------------------
-// int valid_seteuid (object obj, string neweuid)
-
-// Validate the change of an objects euid by efun seteuid().
-//
-// Arguments:
-//   obj    : The object requesting the new euid.
-//   neweuid: The new euid requested.
-//
-// Result:
-//   Return 1 to allow the change, any other value to disallow it.
-
-
-//---------------------------------------------------------------------------
 mixed valid_read  (string path, string euid, string fun, object caller)
 
 // Validate a reading/writing file operation.

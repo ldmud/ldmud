@@ -212,7 +212,6 @@ void reset_all()
             #'exp,
             #'expand_define,
             #'explode,
-            #'export_uid,
             #'extern_call,
 //            #'extract,
 //            #'file_name,
@@ -416,7 +415,6 @@ void reset_all()
             #'set_prompt,
             #'set_this_object,
             #'set_this_player,
-            #'seteuid,
             #'sgn,
             #'shadow,
             #'short_format_seconds,
@@ -637,8 +635,6 @@ void reset_all()
       while(remove_call_out("execute_file") != -1);
       while(remove_call_out("do_replay") != -1);
       while(remove_call_out("do_record") != -1);
-
-      seteuid(getuid());
 }
 
 int execute_file(string file)
@@ -686,8 +682,6 @@ int generate_file(string file)
     {
         DEBUG("ERROR: Cannot write file: "+file);
         debug_message(wrap("ERROR: Cannot write file: "+file));
-
-        seteuid(getuid());
 
         record("/save/crash/"+(mixed2str(utime())-"({,})"));
 

@@ -23,6 +23,7 @@
  */
 #define OC_COMMANDS_ENABLED    0
 #define OC_HEART_BEAT          1
+#define OC_EUID                2
 
 /* Possible options for configure_driver().
  */

@@ -4504,7 +4504,7 @@ f_configure_object (svalue_t *sp)
         ob = NULL;
 
     if ((current_object->flags & O_DESTRUCTED)
-     || (ob != current_object
+     || ((ob != current_object || sp[-1].u.number == OC_EUID)
       && !privilege_violation_n(STR_CONFIGURE_OBJECT, ob, sp, 2)))
     {
         sp = pop_n_elems(3, sp);
@@ -4538,6 +4538,25 @@ f_configure_object (svalue_t *sp)
         set_heart_beat(ob, sp->u.number != 0);
         break;
 
+    case OC_EUID:
+        if (!ob)
+            errorf("Default value for OC_EUID is not supported.\n");
+
+        if (sp->type == T_NUMBER)
+        {
+            if (sp->u.number != 0)
+                efun_arg_error(2, T_STRING, sp->type, sp);
+
+            ob->eff_user = 0;
+        }
+        else if (sp->type == T_STRING)
+        {
+            ob->eff_user = add_name(sp->u.str);
+        }
+        else
+            efun_arg_error(2, T_STRING, sp->type, sp);
+
+        break;
     }
 
     sp = pop_n_elems(3, sp);
@@ -4599,6 +4618,15 @@ f_object_info (svalue_t *sp)
         if (!ob)
             errorf("Default value for OC_HEART_BEAT is not supported.\n");
         put_number(&result, (ob->flags & O_HEART_BEAT) ? 1 : 0);
+        break;
+
+    case OC_EUID:
+        if (!ob)
+            errorf("Default value for OC_EUID is not supported.\n");
+        if (ob->eff_user && ob->eff_user->name)
+            put_ref_string(&result, ob->eff_user->name);
+        else
+            put_number(&result, 0);
         break;
 
     /* Object flags */

@@ -384,8 +384,6 @@ mixed do_plot_efun(closure cl)
     }
 
     set_this_object(ob);
-    seteuid(0);
-    seteuid(getuid());
 
     if(min_p != MIN_PARAMS || max_p != MAX_PARAMS)
     {
@@ -518,8 +516,6 @@ varargs void exec(mixed * exec, int quiet)
         debug_message(sprintf("exec: %s",str));
 
         set_this_object(ob);
-        seteuid(0);
-        seteuid(getuid());
         catch(apply(f, v); reserve (max(get_eval_cost()/2,100000)), nolog);
 
         if(get_eval_cost() < 100000)

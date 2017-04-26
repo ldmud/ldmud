@@ -101,7 +101,6 @@ void create() {
     so_fd = -1;
     return;
   }
-  seteuid(getuid());
   if (!sockets) sockets = m_allocate(0, 17);
   if (!used_fd) used_fd = ([]);
   if (!output)  output  = ({});

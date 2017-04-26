@@ -145,9 +145,6 @@
 // string get_bb_uid()
 //   Return the string to be used as temporary euid by process_string().
 //
-// int valid_seteuid (object obj, string neweuid)
-//   Validate the change of an objects euid by efun seteuid().
-//
 // int|string valid_read  (string path, string euid, string fun, object caller)
 // int|string valid_write (string path, string euid, string fun, object caller)
 //   Validate a reading/writing file operation.
@@ -1038,19 +1035,6 @@ string get_bb_uid()
 //
 // If strict-euids, this function must exist and return a string.
 // Otherwise the function is optional and/or may return 0.
-
-//---------------------------------------------------------------------------
-int valid_seteuid (object obj, string neweuid)
-
-// Validate the change of an objects euid by efun seteuid().
-//
-// Arguments:
-//   obj    : The object requesting the new euid.
-//   neweuid: The new euid requested.
-//
-// Result:
-//   Return 1 to allow the change, any other value to disallow it.
-
 
 //---------------------------------------------------------------------------
 mixed valid_read  (string path, string euid, string fun, object caller)

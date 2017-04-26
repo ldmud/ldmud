@@ -3721,35 +3721,6 @@ f_tell_object (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_export_uid (svalue_t *sp)
-
-/* EFUN export_uid()
- *
- *   void export_uid(object ob)
- *
- * Set the uid of object ob to the current object's effective uid.
- * It is only possible when object ob has an effective uid of 0.
- * TODO: seteuid() goes through the mudlib, why not this one, too?
- * TODO:: Actually, this efun is redundant, archaic and should
- * TODO:: vanish altogether.
- */
-
-{
-    object_t *ob;
-
-    if (!current_object->eff_user)
-        errorf("Illegal to export uid 0\n");
-    ob = sp->u.ob;
-    if (!ob->eff_user)        /* Only allowed to export when null */
-        ob->user = current_object->eff_user;
-    free_object(ob, "export_uid");
-    sp--;
-
-    return sp;
-} /* f_export_uid() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
 f_geteuid (svalue_t *sp)
 
 /* EFUN geteuid()
@@ -3782,69 +3753,6 @@ f_geteuid (svalue_t *sp)
 
     return sp;
 } /* f_geteuid() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_seteuid (svalue_t *sp)
-
-/* EFUN seteuid()
- *
- *   int seteuid(string str)
- *
- * Set effective uid to str. The calling object must be
- * privileged to do so by the master object. In most
- * installations it can always be set to the current uid of the
- * object, to the uid of the creator of the object file, or to 0.
- *
- * When this value is 0, the current object's uid can be changed
- * by export_uid(), and only then.
- *
- * Objects with euid 0 cannot load or clone other objects.
- */
-
-{
-    svalue_t *ret;
-    svalue_t *argp;
-
-    argp = sp;
-    if (argp->type == T_NUMBER)
-    {
-        /* Clear the euid of this_object */
-
-        if (argp->u.number != 0)
-            efun_arg_error(1, T_STRING, sp->type, sp);
-        current_object->eff_user = 0;
-        free_svalue(argp);
-        put_number(argp, 1);
-        return sp;
-    }
-
-    /* Call the master to clear this use of seteuid() */
-
-    push_ref_valid_object(sp, current_object, "seteuid");
-    push_ref_string(sp, argp->u.str);
-    inter_sp = sp;
-    ret = apply_master(STR_VALID_SETEUID, 2);
-    if (!ret || ret->type != T_NUMBER || ret->u.number != 1)
-    {
-        if (out_of_memory)
-        {
-            errorf("Out of memory\n");
-            /* NOTREACHED */
-            return sp;
-        }
-        free_svalue(argp);
-        put_number(argp, 0);
-    }
-    else
-    {
-        current_object->eff_user = add_name(argp->u.str);
-        free_svalue(argp);
-        put_number(argp, 1);
-    }
-
-    return argp;
-} /* f_seteuid() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

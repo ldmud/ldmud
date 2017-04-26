@@ -1,6 +1,7 @@
 inherit "inh";
 
 #include "inc/msg.inc"
+#include "sys/configuration.h"
 
 string geteuid()
 {
@@ -56,7 +57,8 @@ int run_test()
 {
     int errors;
     string res;
-    seteuid("efun");
+
+    configure_object(this_object(), OC_EUID, "efun");
 
     CHECK_PREFIX(geteuid, "lfun");
     CHECK_PREFIX(inh::geteuid, "inh");

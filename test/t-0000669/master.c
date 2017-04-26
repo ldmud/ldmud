@@ -22,8 +22,3 @@ string *epilog(int eflag)
     run_test();
     return 0;
 }
-
-int valid_seteuid(object ob, string str)
-{
-    return 1;
-}
