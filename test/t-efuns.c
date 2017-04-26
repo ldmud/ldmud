@@ -288,6 +288,26 @@ mixed *tests = ({
     ({ "implode 1", 0, (: implode(({ "foo", "bar", "" }), "*") == "foo*bar*":) }),
     ({ "implode 2", 0, (: implode(({ "a", 2, this_object(), "c" }), "b") == "abc" :) }),
     ({ "implode 3", 0, (: implode(({ "", "" }), "") == "":) }),
+    ({ "random", 0,
+        (:
+            /* Let's check every 8 bits for some randomness. */
+            int shift = 0;
+            for (int remaining = __INT_MAX__; remaining; remaining >>= 8)
+            {
+                mapping result = ([:0]);
+                foreach (int i: 2048)
+                    m_add(result, (random(__INT_MAX__) >> shift) & 255);
+
+                /* We expect 80% of the range to be filled. */
+                if (sizeof(result) < (remaining & 255) * 4 / 5)
+                    return 0;
+
+                shift += 8;
+            }
+
+            return 1;
+        :)
+    }),
     ({ "save_/restore_value", 0,
         (:
             foreach(mixed val:

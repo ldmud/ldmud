@@ -27,23 +27,61 @@ char * prng_device_name = NULL;
 /*                     Driver interface functions                          */
 /*-------------------------------------------------------------------------*/
 
+static p_uint scale(p_uint rand, p_uint n)
+
+/* Take a random number <rand> using the full size of p_uint
+ * and scale it to the range 0..<n>-1.
+ */
+
+{
+#define BITS (sizeof(p_uint)*8)
+#define HBITS (BITS/2)
+#define HMASK ((((p_uint)1)<<HBITS) - 1)
+
+    /* We split both rand and n into half. */
+    p_uint rand_h = rand >> HBITS;
+    p_uint rand_l = rand & HMASK;
+
+    p_uint n_h = n >> HBITS;
+    p_uint n_l = n & HMASK;
+
+    /* (rand * n) >> BITS
+     *  = ((rand_h << HBITS + rand_l) * (n_h << HBITS + n_l)) >> BITS
+     *  = ((rand_h * n_h) << BITS + (rand_h * n_l + rand_l * n_h) << HBITS + (rand_l * n_l)) >> BITS
+     *  = (rand_h * n_h) + (rand_h * n_l) >> HBITS + (rand_l * n_h) >> HBITS + (rand_l * n_l) >> BITS
+     *
+     * So we do each of these summands seperately, adding the overflowing bits
+     * from the lower half to the upper half.
+     */
+
+    p_uint result_h = rand_h * n_h;
+    p_uint result_l = rand_h * n_l;
+
+    result_h += result_l >> HBITS;
+    result_l &= HMASK;
+
+    result_l += rand_l * n_h;
+    result_h += result_l >> HBITS;
+    result_l &= HMASK;
+
+    result_l += (rand_l * n_l) >> HBITS;
+    result_h += result_l >> HBITS;
+
+    return result_h;
+} /* scale() */
+
 /* random_number() is in random.h to be inlined. */
 /* Return a random number in the range 0..n-1.
- *
- * The MT FAQ suggests:
- *  If the application is not sensitive to the rounding off error, then please
- *  multiply N to [0,1)-real uniform random numbers and take the integer part
- *  (this is sufficient for most applications).
- * I use the appropriate functions from the SFMT to generate random numbers on
- * the [0,1) interval and multiply with N.
  */
 #if SIZEOF_LONG == SIZEOF_CHAR_P
-uint64_t random_number(uint64_t n) {
-    return genrand_res53() * n;
+uint64_t random_number(uint64_t n)
+{
+    return scale(gen_rand64(), n);
 }
 #elif SIZEOF_INT == SIZEOF_CHAR_P
-uint32_t random_number(uint32 n) {
-     return genrand_real2() * n;
+uint32_t random_number(uint32 n)
+{
+    return scale(gen_rand32(), n);
 }
 #else
 #error We currently do not yet support a 128 bit integer type used as \
