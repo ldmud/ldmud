@@ -92,7 +92,7 @@ syn keyword     lpcApplies      contained __INIT catch_msg clean_up exit heart_b
 syn keyword     lpcApplies      contained catch_tell logon modify_command 
 "       master applies
 syn keyword     lpcApplies      contained compile_object connect creator_file dangling_lfun_closure disconnect epilog external_master_reload flag get_bb_uid get_ed_buffer_save_file_name get_master_uid get_simul_efun get_wiz_name heart_beat_error inaugurate_master include_file inherit_file log_error make_path_absolute notify_shutdown preload prepare_destruct printf_obj_name privilege_violation query_allow_shadow quota_demon reactivate_destructed_master receive_imp receive_udp remove_player retrieve_ed_setup runtime_error save_ed_setup slow_shutdown stale_erq
-syn keyword     lpcApplies      contained valid_exec valid_query_snoop valid_read valid_seteuid valid_snoop valid_trace valid_write
+syn keyword     lpcApplies      contained valid_exec valid_query_snoop valid_read valid_snoop valid_trace valid_write
 "       parsing
 syn keyword     lpcApplies      contained parse_command_adjectiv_id_list parse_command_all_word parse_command_id_list parse_command_plural_id_list parse_command_prepos_list
 
@@ -116,7 +116,7 @@ syn keyword     lpcNewEfuns     contained struct_info structp to_struct
 syn keyword     lpcNewEfuns     contained tls_query_connection_state tls_query_connection_info tls_init_connection tls_deinit_connection tls_error
 
 syn keyword     lpcCompatEfuns  contained creator 
-syn keyword     lpcNativeEfuns  contained export_uid geteuid getuid seteuid
+syn keyword     lpcNativeEfuns  contained geteuid getuid
 
 " simul efuns, add your simul efuns here
 syn keyword     lpcSimulEfuns   contained transfer

@@ -12,4 +12,4 @@ HISTORY
         Since 3.2.7, this efun is always available.
 
 SEE ALSO
-        seteuid(E), getuid(E), export_uid(E)
+        getuid(E), configure_object(E)

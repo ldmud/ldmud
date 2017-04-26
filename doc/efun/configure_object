@@ -30,6 +30,14 @@ DESCRIPTION
           via configuer_driver(DC_ENABLE_HEART_BEATS), which is the
           default.
 
+        <what> == OC_EUID
+          Set effective uid to <data>. <data> must be a string or 0.
+          This call will always trigger a privilege violation check,
+          even if <ob> is this_object().
+
+          If strict euid usage is enforced, objects with euid 0 cannot
+          load or clone other objects or do any file operations.
+
 
         The current values for these options can be queried using
         object_info().

@@ -605,9 +605,7 @@ void    set_this_player(null|object);
 
         /* uids and euids */
 
-void    export_uid(object);
 string  geteuid(object default: F_THIS_OBJECT);
-int     seteuid(string|null);
 string  getuid(object default: F_THIS_OBJECT);
 
 

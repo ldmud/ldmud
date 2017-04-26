@@ -28,11 +28,9 @@ DESCRIPTION
 
         As uids, euids are assigned at an objects creation through
         the two aformentioned driverhooks. They can be queried with
-        the efun geteuid() and changed with the efun seteuid(). Calls
-        to the latter are verified by the master lfun valid_seteuid().
-
-        Additionally objects can impose their uid onto an other objects
-        euid with the efun export_uid().
+        the efun geteuid() and changed with the efun configure_object
+        (using the OC_EUID option). Calls to the latter are verified by
+        the master lfun privilege_violation().
 
 
         If the driver is run in 'strict euids' mode, euids are taken
@@ -93,5 +91,6 @@ DESCRIPTION
         the appropriate driver hooks.
 
 SEE ALSO
-        native(C), get_root_uid(M), valid_seteuid(M),
-        objects(C), clone_object(E), geteuid(E), getuid(E), seteuid(E)
+        native(C), get_root_uid(M), privilege_violation(M),
+        objects(C), clone_object(E), geteuid(E), getuid(E),
+        configure_object(E)

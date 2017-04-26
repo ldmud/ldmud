@@ -305,9 +305,7 @@ extern svalue_t *v_replace_program(svalue_t *sp, int num_arg);
 extern svalue_t *f_tell_object(svalue_t *sp);
 extern svalue_t *f_set_next_reset(svalue_t *sp);
 
-extern svalue_t *f_export_uid(svalue_t *sp);
 extern svalue_t *f_geteuid(svalue_t *sp);
-extern svalue_t *f_seteuid(svalue_t *sp);
 extern svalue_t *f_getuid(svalue_t *sp);
 
 extern svalue_t *v_all_environment(svalue_t *sp, int num_arg);

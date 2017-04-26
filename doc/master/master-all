@@ -193,9 +193,6 @@ DESCRIPTION
         string get_bb_uid()
           Return the string to be used as root-uid.
 
-        int valid_seteuid (object obj, string neweuid)
-          Validate the change of an objects euid by efun seteuid().
-
         int|string valid_read (string path, string euid, string fun, object caller)
         int|string valid_write (string path, string euid, string fun, object caller)
           Validate a reading/writing file operation.

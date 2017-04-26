@@ -14,4 +14,4 @@ GESCHICHTE
         Seit 3.2.7 ist diese Efun immer verfuegbar.
 
 SIEHE AUCH
-        seteuid(E), getuid(E), export_uid(E)
+        getuid(E), configure_object(E)
