@@ -179,7 +179,6 @@ extern mapping_t *allocate_mapping(mp_int size, mp_int num_values);
 extern mapping_t *allocate_cond_mapping(wiz_list_t * user, mp_int size, mp_int num_values);
 extern Bool _free_mapping(mapping_t *m, Bool no_data);
 #define free_empty_mapping(m) _free_mapping(m, MY_TRUE)
-extern void free_protector_mapping(mapping_t *m);
 extern svalue_t *_get_map_lvalue(mapping_t *m, svalue_t *map_index, Bool need_lvalue, Bool check_size);
 #define get_map_value(m,x) _get_map_lvalue(m,x,MY_FALSE, MY_TRUE)
 #define get_map_lvalue(m,x) _get_map_lvalue(m,x,MY_TRUE, MY_TRUE)

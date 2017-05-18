@@ -6,6 +6,23 @@
 
 #include "exec.h"  /* bytecode_p, lpctype_t via types.h */
 
+/* --- Types --- */
+
+typedef struct lvalue_block_s      lvalue_block_t;
+
+/* --- struct lvalue_block_s: Store code for an lvalue expression ---
+ *
+ * This structure is used lvalue code has to be generated
+ * to save its whereabouts in the A_LVALUE_CODE block.
+ */
+
+struct lvalue_block_s
+{
+    p_int start;
+    p_int size;
+};
+
+
 /* --- Variables --- */
 
 extern lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_float,

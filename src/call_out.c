@@ -179,14 +179,12 @@ v_call_out (svalue_t *sp, int num_arg)
         error_index = setup_function_callback(&(cop->fun), current_object
                                              , arg[0].u.str
                                              , num_arg-2, arg+2
-                                             , MY_TRUE
                                              );
         free_string_svalue(arg);
     }
     else
         error_index = setup_closure_callback(&(cop->fun), arg
                                              , num_arg-2, arg+2
-                                             , MY_TRUE
                                              );
 
     if (error_index >= 0)

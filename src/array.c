@@ -58,6 +58,7 @@
 #include "typedefs.h"
 
 #include "my-alloca.h"
+#include <assert.h>
 #include <stddef.h>
 
 #include "array.h"
@@ -639,6 +640,7 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
     char *p;
     string_t *result;
     svalue_t *svp;
+    bool first = true;
 
     del_len = mstrsize(del);
     deltxt = get_txt(del);
@@ -648,14 +650,16 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
     size = -(mp_int)del_len;
     for (i = (arr_size = (mp_int)VEC_SIZE(arr)), svp = arr->item; --i >= 0; svp++)
     {
-        if (svp->type == T_STRING) {
-            size += (mp_int)del_len + mstrsize(svp->u.str);
-        }
-        else if (destructed_object_ref(svp))
+        svalue_t *elem = get_rvalue(svp, NULL);
+        if (elem == NULL)
         {
-            /* While we're here anyway... */
-            assign_svalue(svp, &const0);
+            /* This is a range. */
+            struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
+            if (r->vec.type == T_STRING)
+                size += (mp_int)del_len + r->index2 - r->index1;
         }
+        else if (elem->type == T_STRING)
+            size += (mp_int)del_len + mstrsize(elem->u.str);
     }
 
     /* Allocate the string; cop out if there's nothing to implode.
@@ -679,30 +683,46 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
      */
 
     svp = arr->item;
+    i = arr_size;
 
-    /* Look for the first element to add (there is at least one!) */
-    for (i = arr_size; svp->type != T_STRING; )
+    while (i-- > 0)
     {
-        --i;
-        svp++;
-    }
-
-    memcpy(p, get_txt(svp->u.str), mstrsize(svp->u.str));
-    p += mstrsize(svp->u.str);
-
-    /* Copy the others if any */
-    while (--i > 0)
-    {
-        svp++;
-        if (svp->type == T_STRING)
+        svalue_t *elem = get_rvalue(svp, NULL);
+        if (elem == NULL)
         {
-            memcpy(p, deltxt, del_len);
-            p += del_len;
-            memcpy(p, get_txt(svp->u.str), mstrsize(svp->u.str));
-            p += mstrsize(svp->u.str);
+            /* This is a range. */
+            struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
+            if (r->vec.type == T_STRING)
+            {
+                if (first)
+                    first = false;
+                else
+                {
+                    memcpy(p, deltxt, del_len);
+                    p += del_len;
+                }
+
+                memcpy(p, get_txt(r->vec.u.str) + r->index1, r->index2 - r->index1);
+                p += r->index2 - r->index1;
+            }
         }
+        else if (elem->type == T_STRING)
+        {
+            if (first)
+                first = false;
+            else
+            {
+                memcpy(p, deltxt, del_len);
+                p += del_len;
+            }
+            memcpy(p, get_txt(elem->u.str), mstrsize(elem->u.str));
+            p += mstrsize(elem->u.str);
+        }
+
+        svp++;
     }
 
+    assert(p - get_txt(result) == size);
     return result;
 } /* implode_array() */
 
@@ -729,7 +749,7 @@ slice_array (vector_t *p, mp_int from, mp_int to)
 
     d = allocate_array(to-from+1);
     for (cnt = from; cnt <= to; cnt++)
-        assign_svalue_no_free(&d->item[cnt-from], &p->item[cnt]);
+        assign_rvalue_no_free(&d->item[cnt-from], &p->item[cnt]);
 
     return d;
 }
@@ -797,7 +817,7 @@ get_array_order (vector_t * vec )
 
 /* Determine the order of the elements in vector <vec> and return the
  * sorted indices (actually svalue_t* pointer diffs). The order is
- * determined by svalue_cmp() (which happens to be high-to-low).
+ * determined by rvalue_cmp() (which happens to be high-to-low).
  *
  * As a side effect, strings in the vector are made shared, and
  * destructed objects in the vector are replaced by svalue 0s.
@@ -854,7 +874,7 @@ get_array_order (vector_t * vec )
             break;
 
         case 2:
-            if (svalue_cmp(vec->item, vec->item + 1) > 0)
+            if (rvalue_cmp(vec->item, vec->item + 1) > 0)
             {
                 sorted[0] = 0;
                 sorted[1] = 1;
@@ -873,20 +893,20 @@ get_array_order (vector_t * vec )
             sorted[0] = 0;
             sorted[1] = 1;
             sorted[2] = 2;
-            d = svalue_cmp(vec->item, vec->item + 1);
+            d = rvalue_cmp(vec->item, vec->item + 1);
             if (d < 0)
             {
                 sorted[1] = 0;
                 sorted[0] = 1;
             }
-            d = svalue_cmp(vec->item + sorted[0], vec->item + 2);
+            d = rvalue_cmp(vec->item + sorted[0], vec->item + 2);
             if (d < 0)
             {
                 ptrdiff_t tmp = sorted[2];
                 sorted[2] = sorted[0];
                 sorted[0] = tmp;
             }
-            d = svalue_cmp(vec->item + sorted[1], vec->item + sorted[2]);
+            d = rvalue_cmp(vec->item + sorted[1], vec->item + sorted[2]);
             if (d < 0)
             {
                 ptrdiff_t tmp = sorted[2];
@@ -921,7 +941,7 @@ get_array_order (vector_t * vec )
                 {
                     svalue_t *test = vec->item + sorted[test_idx];
 
-                    if (svalue_cmp(max, test) < 0)
+                    if (rvalue_cmp(max, test) < 0)
                     {
                         max_idx = test_idx;
                         max = test;
@@ -966,7 +986,7 @@ get_array_order (vector_t * vec )
 
         /* propagate the new element up in the heap as much as necessary */
         for (curix = j; 0 != (parix = curix>>1); ) {
-            if ( svalue_cmp(root[parix], inpnt) > 0 ) {
+            if ( rvalue_cmp(root[parix], inpnt) > 0 ) {
                 root[curix] = root[parix];
                 curix = parix;
             } else {
@@ -997,7 +1017,7 @@ get_array_order (vector_t * vec )
                 break;
             }
             if (root[child2]) {
-                if (!root[child] || svalue_cmp(root[child], root[child2]) > 0)
+                if (!root[child] || rvalue_cmp(root[child], root[child2]) > 0)
                 {
                     root[curix] = root[child2];
                     curix = child2;
@@ -1026,7 +1046,7 @@ vector_t *
 order_array (vector_t *vec)
 
 /* Order the array <vec> and return a new vector with the sorted data.
- * The sorting order is the internal order defined by svalue_cmp() (which
+ * The sorting order is the internal order defined by rvalue_cmp() (which
  * happens to be high-to-low).
  *
  * This function and lookup_key() are used in several places for internal
@@ -1072,7 +1092,7 @@ lookup_key (svalue_t *key, vector_t *vec)
  *   -2          -> key should be at position 1,
  *   -len(vec)-1 -> key should be appended to the vector.
  *
- * <vec> must be sorted according to svalue_cmp(), else the result will be
+ * <vec> must be sorted according to rvalue_cmp(), else the result will be
  * interesting, but useless.
  *
  * The function is used by object.c and pkg-alists.c .
@@ -1105,7 +1125,7 @@ lookup_key (svalue_t *key, vector_t *vec)
     i = keynum >> 1;
     o = (i+2) >> 1;
     for (;;) {
-        d = svalue_cmp(key, &vec->item[i]);
+        d = rvalue_cmp(key, &vec->item[i]);
         if (d < 0)
         {
             i -= o;
@@ -1131,7 +1151,7 @@ lookup_key (svalue_t *key, vector_t *vec)
         if (o <= 1)
         {
             /* Last element to try */
-            d = svalue_cmp(key, &vec->item[i]);
+            d = rvalue_cmp(key, &vec->item[i]);
             if (d == 0) return i;
             if (d > 0) return -(i+1)-1;
             return -i-1;
@@ -1197,7 +1217,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
             /* Even more special case: both vectors have just one elem */
             if (len2 == 1)
             {
-                if (!svalue_eq(vec1->item, vec2->item))
+                if (!rvalue_eq(vec1->item, vec2->item))
                 {
                     flags[0] = flags[1] = MY_TRUE;
                 }
@@ -1226,7 +1246,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
          */
         for ( ; rlen != 0; rlen--, rover++, rflag++)
         {
-            if (!svalue_eq(rover, elem))
+            if (!rvalue_eq(rover, elem))
                 *rflag = *eflag = MY_TRUE;
         }
 
@@ -1258,7 +1278,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
         {
             int d;
 
-            d = svalue_cmp(vec1->item + *index1, vec2->item + *index2);
+            d = rvalue_cmp(vec1->item + *index1, vec2->item + *index2);
             if (d == 0)
             {
                 /* Elements match */
@@ -1277,7 +1297,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
                     index1++;
                     len1--;
                     if (len1 != 0)
-                        d = svalue_eq(test_val, vec1->item + *index1);
+                        d = rvalue_eq(test_val, vec1->item + *index1);
                 }
                 while (len1 != 0 && d == 0);
 
@@ -1286,7 +1306,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
                     index2++;
                     len2--;
                     if (len2 != 0)
-                        d = svalue_eq(test_val, vec2->item + *index2);
+                        d = rvalue_eq(test_val, vec2->item + *index2);
                 }
                 while (len2 != 0 && d == 0);
 
@@ -1388,7 +1408,7 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
     {
         if (!flags[i])
         {
-            assign_svalue_no_free(dest, minuend->item+i);
+            assign_rvalue_no_free(dest, minuend->item+i);
             dest++;
             result_size--;
         }
@@ -1702,7 +1722,7 @@ is_ordered (vector_t *v)
  *
  * The conditions are:
  *   - every string is shared
- *   - all elements are sorted according to svalue_cmp().
+ *   - all elements are sorted according to rvalue_cmp().
  *
  * This predicate is currently used just by the swapper, historically
  * to avoid swapping out alist values. This is because the internal order
@@ -1716,7 +1736,7 @@ is_ordered (vector_t *v)
     for (svp = v->item, i = (mp_int)VEC_SIZE(v); --i > 0; svp++) {
         if (svp->type == T_STRING && !mstr_tabled(svp->u.str))
             return MY_FALSE;
-        if (svalue_cmp(svp, svp+1) > 0)
+        if (rvalue_cmp(svp, svp+1) > 0)
             return MY_FALSE;
     }
     if (svp->type == T_STRING && !mstr_tabled(svp->u.str))
@@ -1777,7 +1797,7 @@ v_allocate (svalue_t *sp, int num_arg)
     {
         /* Special case: result is the empty array.
          * The condition catches ( ({}) ) as well as ( ({0}) )
-         * (the generic code below can't handle either of them).
+         * (the generic code below can only handle the later).
          */
         v = allocate_array(0);
     }
@@ -1813,16 +1833,20 @@ v_allocate (svalue_t *sp, int num_arg)
             )
         {
             p_int size;
+            svalue_t *item = get_rvalue(svp, NULL);
 
-            if (svp->type != T_NUMBER)
+            if (item == NULL)
+                item = svp;
+
+            if (item->type != T_NUMBER)
             {
                 errorf("Bad argument to allocate(): size[%d] is a '%s', "
                       "expected 'int'.\n"
-                     , (int)dim, typename(svp->type));
+                     , (int)dim, typename(item->type));
                 /* NOTREACHED */
             }
 
-            size = svp->u.number;
+            size = item->u.number;
 
             if (size < 0 || (max_array_size && (size_t)size > max_array_size))
                 errorf("Illegal array size: %"PRIdPINT"\n", size);
@@ -1902,7 +1926,10 @@ v_allocate (svalue_t *sp, int num_arg)
         } /* while() */
 
         /* The final vector is now in curvec[0] */
-        v = curvec[0];
+        if (!curvec[0])
+            v = ref_array(&null_vector);
+        else
+            v = curvec[0];
     }
     else
     {
@@ -2059,7 +2086,7 @@ x_filter_array (svalue_t *sp, int num_arg)
                 errorf("object used by filter(array) destructed");
             }
 
-            push_svalue(w++);
+            push_rvalue(w++);
 
             v = apply_callback(&cb, 1);
             if (!v || (v->type == T_NUMBER && !v->u.number) )
@@ -2079,7 +2106,7 @@ x_filter_array (svalue_t *sp, int num_arg)
     if (res) {
         for(v = p->item, w = vec->item, flags = &flags[p_size]; ; v++) {
             if (*--flags) {
-                assign_svalue_no_free (w++, v);
+                assign_rvalue_no_free (w++, v);
                 if (--res <= 0) break;
             }
         }
@@ -2163,9 +2190,9 @@ x_map_array (svalue_t *sp, int num_arg)
 
             v = get_map_value(m, w);
             if (v == &const0)
-                assign_svalue_no_free(x, w);
+                assign_rvalue_no_free(x, w);
             else
-                assign_svalue_no_free(x, v + column);
+                assign_rvalue_no_free(x, v + column);
         }
 
         if (num_arg > 2)
@@ -2209,12 +2236,12 @@ x_map_array (svalue_t *sp, int num_arg)
             if (!callback_object(&cb))
                 errorf("object used by map(array) destructed");
 
-            push_svalue(w);
+            push_rvalue(w);
 
             v = apply_callback(&cb, 1);
             if (v)
             {
-                transfer_svalue_no_free(x, v);
+                transfer_rvalue_no_free(x, v);
                 v->type = T_INVALID;
             }
         }
@@ -2268,7 +2295,7 @@ v_sort_array (svalue_t * sp, int num_arg)
     svalue_t   *arg;
     callback_t  cb;
     int         error_index;
-    mp_int      step, halfstep, size;
+    mp_int      step, halfstep, offset, size;
     int         i, j, index1, index2, end1, end2;
     svalue_t   *source, *dest, *temp;
     Bool        inplace = MY_FALSE;
@@ -2292,14 +2319,40 @@ v_sort_array (svalue_t * sp, int num_arg)
      */
     if (arg->type == T_LVALUE)
     {
-        svalue_t * svp = arg;
-        vector_t * vec = NULL;
-        
-        do {
-            svp = svp->u.lvalue;
-        } while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE);
-        
-        if (svp->type != T_POINTER)
+        svalue_t * svp = get_rvalue(arg, NULL);
+
+        if (svp == NULL)
+        {
+            /* This is a range. */
+            struct protected_range_lvalue *r;
+
+            assert(arg->x.lvalue_type == LVALUE_PROTECTED_RANGE);
+            r = arg->u.protected_range_lvalue;
+
+            if (r->vec.type != T_POINTER)
+            {
+                inter_sp = sp;
+                errorf("Bad arg 1 to sort_array(): got '%s[..] &', "
+                       "expected 'mixed * / mixed *&'.\n"
+                       , typename(r->vec.type));
+                // NOTREACHED
+                return sp;
+            }
+
+            offset = r->index1;
+            size = r->index2 - r->index1;
+            data = r->vec.u.vec;
+        }
+        else if (svp->type == T_POINTER)
+        {
+            data = ref_array(svp->u.vec);
+            free_svalue(arg);
+            put_array(arg, data);
+
+            offset = 0;
+            size = (mp_int)VEC_SIZE(data);
+        }
+        else
         {
             inter_sp = sp;
             errorf("Bad arg 1 to sort_array(): got '%s &', "
@@ -2310,19 +2363,20 @@ v_sort_array (svalue_t * sp, int num_arg)
         }
 
         inplace = MY_TRUE;
-        
-        vec = ref_array(svp->u.vec);
-        free_svalue(arg);
-        put_array(arg, vec);
+
     }
-        
-    
+    else
+    {
+        offset = 0;
+        size = (mp_int)VEC_SIZE(arg->u.vec);
+        data = arg->u.vec;
+    }
+
     /* Get the array. Since the sort sorts in-place, we have
      * to make a shallow copy of arrays with more than one
      * ref. Exception is, if the array is given as reference/lvalue, then we
      * always sort in-place.
      */
-    data = arg->u.vec;
     check_for_destr(data);
 
     if (!inplace && data->ref != 1)
@@ -2335,7 +2389,6 @@ v_sort_array (svalue_t * sp, int num_arg)
         arg->u.vec = data;
     }
 
-    size = (mp_int)VEC_SIZE(data);
 
     /* Easiest case: nothing to sort */
     if (size <= 1)
@@ -2362,7 +2415,7 @@ v_sort_array (svalue_t * sp, int num_arg)
     }
 
     for (i = 0; i < size; i++)
-        source[i] = temp[i];
+        source[i] = temp[offset+i];
 
     step = 2;
     halfstep = 1;
@@ -2416,7 +2469,7 @@ v_sort_array (svalue_t * sp, int num_arg)
 
     temp = data->item;
     for (i = size; --i >= 0; )
-      temp[i] = source[i];
+      temp[offset+i] = source[i];
 
     free_callback(&cb);
     return arg;
@@ -2496,12 +2549,14 @@ v_filter_objects (svalue_t *sp, int num_arg)
 
         for (cnt = 0; cnt < p_size; cnt++) {
             flags[cnt] = MY_FALSE;
-            v = &p->item[cnt];
+            v = get_rvalue(p->item + cnt, NULL);
 
             /* Coerce <v> into a (non-destructed) object ob (if necessary
              * by loading it). If that doesn't work, simply continue
              * with the next element.
              */
+            if (v == NULL)
+                continue;
             if (v->type != T_OBJECT)
             {
                 if (v->type != T_STRING)
@@ -2637,21 +2692,25 @@ v_map_objects (svalue_t *sp, int num_arg)
     func = find_tabled(func);
     if (NULL != func)
     {
-        for (cnt = size, v = p->item, x = r->item; --cnt >= 0; v++, x++) {
+        for (cnt = size, v = p->item, x = r->item; --cnt >= 0; v++, x++)
+        {
+            svalue_t * ob_sv = get_rvalue(v, NULL);
 
             /* Coerce <v> into a (non-destructed) object ob (if necessary
              * by loading it). If that doesn't work, simply continue
              * with the next element.
              */
-            if (v->type != T_OBJECT) {
-                if (v->type != T_STRING)
+            if (ob_sv == NULL)
+                continue;
+            if (ob_sv->type != T_OBJECT) {
+                if (ob_sv->type != T_STRING)
                     continue;
-                if ( !(ob = get_object(v->u.str)) )
+                if ( !(ob = get_object(ob_sv->u.str)) )
                     continue;
             } else {
-                ob = v->u.ob;
+                ob = ob_sv->u.ob;
                 if (ob->flags & O_DESTRUCTED) {
-                    assign_svalue(v, &const0);
+                    assign_svalue(ob_sv, &const0);
                     continue;
                 }
             }
@@ -2701,111 +2760,136 @@ f_transpose_array (svalue_t *sp)
  */
 
 {
-    vector_t *v;  /* Input vector */
-    vector_t *w;  /* Result vector */
-    mp_int a;     /* size of <v> */
-    mp_int b;     /* size of <v>[ix] for all ix */
-    mp_int i, j;
-    int no_copy;
-      /* 1 if <v> has only one ref, else 0. Not just a boolean, it
-       * is compared with the ref counts of the subvectors of v.
-       */
-    svalue_t *x, *y, *z;
-    int o;
+    vector_t *src;      /* Input vector */
+    vector_t *dest;     /* Result vector */
+    mp_int srclen;      /* size of <src> */
+    mp_int srcwidth;    /* size of <src>[ix] for all ix */
+    bool no_copy;       /* true if <src> has only one ref, else false.  */
+
+    svalue_t *srcitem;  /* item within input vector. */
+    svalue_t *destitem; /* item within result vector. */
+    mp_int srccount;    /* remaining items in input vector. */
+    mp_int srcindex;    /* index within input vector. */
+    mp_int destindex;   /* index within result vector. */
 
     /* Get and test the arguments */
-    v = sp->u.vec;
+    src = sp->u.vec;
 
-    if ( !(a = (mp_int)VEC_SIZE(v)) )
+    if ( !(srclen = (mp_int)VEC_SIZE(src)) )
         return sp;
 
     /* Find the widest subarray in the main array */
-    b = 0;
-    for (x = v->item, i = a; i > 0; i--, x++)
+    srcwidth = 0;
+    for (srcitem = src->item, srccount = srclen; srccount > 0; srccount--, srcitem++)
     {
-        mp_int c;
+        svalue_t *entry = get_rvalue(srcitem, NULL);
+        mp_int entrylen = -1;
 
-        if (x->type != T_POINTER)
+        if (entry == NULL)
         {
-              errorf("Bad arg 1 to transpose_array(): not an array of arrays.\n");
-              /* NOTREACHED */
-              return sp;
+            /* This is a range lvalue. */
+            struct protected_range_lvalue *r = srcitem->u.protected_range_lvalue;
+            if (r->vec.type == T_POINTER)
+                entrylen = (mp_int) r->index2 - r->index1;
+
         }
-        c = (mp_int)VEC_SIZE(x->u.vec);
-        if (c > b)
-            b = c;
+        else
+        {
+            if (entry->type == T_POINTER)
+                entrylen = (mp_int)VEC_SIZE(entry->u.vec);
+        }
+
+        if (entrylen == -1)
+        {
+            errorf("Bad arg 1 to transpose_array(): not an array of arrays.\n");
+            /* NOTREACHED */
+            return sp;
+        }
+
+        if (entrylen > srcwidth)
+            srcwidth = entrylen;
     }
 
     /* If all subarrays are empty, just return an empty array */
-    if (!b)
+    if (!srcwidth)
     {
-        sp->u.vec = ref_array(v->item->u.vec);
-        free_array(v);
+        sp->u.vec = ref_array(&null_vector);
+        free_array(src);
         return sp;
     }
 
-    no_copy = (v->ref == 1) ? 1 : 0;
+    no_copy = (src->ref == 1);
 
     /* Allocate and initialize the result vector */
-    w = allocate_uninit_array(b);
-    for (j = b, x = w->item; --j >= 0; x++)
+    dest = allocate_uninit_array(srcwidth);
+    for (destindex = srcwidth, destitem = dest->item; --destindex >= 0; destitem++)
     {
-        put_array(x, allocate_array(a));
+        put_array(destitem, allocate_array(srclen));
     }
 
-    o = offsetof(vector_t, item);
-
-    for (i = a, y = v->item; --i >= 0; o += sizeof(svalue_t), y++)
+    srcindex = 0;
+    for (srccount = srclen, srcitem = src->item; --srccount >= 0; srcindex++, srcitem++)
     {
-        mp_int c;
+        bool last_reference = false;
+        svalue_t *srcentry = get_rvalue(srcitem, &last_reference);
+        mp_int srcentrylen, srcentrycount;
+        svalue_t *srcentryitem;
 
-        x = w->item;
-        if (y->type != T_POINTER)
-            break;
+        destitem = dest->item;
 
-        z = y->u.vec->item;
+        if (srcentry == NULL)
+        {
+            /* This is a range lvalue. */
+            struct protected_range_lvalue *r = srcitem->u.protected_range_lvalue;
+            if (r->vec.type != T_POINTER)
+                break;
+            srcentryitem = r->vec.u.vec->item + r->index1;
+            srcentrylen = (mp_int) r->index2 - r->index1;
+            if (r->vec.u.vec->ref != 1)
+                last_reference = false;
+        }
+        else
+        {
+            if (srcentry->type != T_POINTER)
+                break;
+            srcentryitem = srcentry->u.vec->item;
+            srcentrylen = (mp_int)VEC_SIZE(srcentry->u.vec);
+            if (srcentry->u.vec->ref != 1)
+                last_reference = false;
+        }
 
-        c = b;
-        if (VEC_SIZE(y->u.vec) < b
-         && !(c = (mp_int)VEC_SIZE(y->u.vec)) )
-                continue;
-
-        if (y->u.vec->ref == no_copy)
+        if (no_copy && last_reference)
         {
             /* Move the values to the result vector */
 
-            j = c;
+            srcentrycount = srcentrylen;
             do {
-                transfer_svalue_no_free(
-                  (svalue_t *)((char*)x->u.vec+o),
-                  z
-                );
-                x++;
-                z++;
-            } while (--j > 0);
-            free_empty_vector(y->u.vec);
-            y->type = T_INVALID;
+                transfer_rvalue_no_free(destitem->u.vec->item + srcindex, srcentryitem);
+
+                srcentryitem->type = T_INVALID;
+                destitem++;
+                srcentryitem++;
+            } while (--srcentrycount > 0);
+            free_svalue(srcitem);
+            srcitem->type = T_INVALID;
         }
         else
         {
             /* Assign the values to the result vector */
 
-            j = c;
+            srcentrycount = srcentrylen;
             do {
-                assign_svalue_no_free(
-                  (svalue_t *)((char*)x->u.vec+o),
-                  z
-                );
-                x++;
-                z++;
-            } while (--j > 0);
+                assign_rvalue_no_free(destitem->u.vec->item + srcindex, srcentryitem);
+                destitem++;
+                srcentryitem++;
+            } while (--srcentrycount > 0);
         }
     }
 
     /* Clean up and return the result */
 
     free_array(sp->u.vec);
-    sp->u.vec = w;
+    sp->u.vec = dest;
     return sp;
 } /* f_transpose_array() */
 
@@ -3060,12 +3144,14 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
     ant = 0;
     for (cnt = 0; cnt < arr_size; cnt++)
     {
+        svalue_t *item;
         if (current_object->flags & O_DESTRUCTED)
             break;
             /* Don't call the filters anymore */
 
-        if (arr->item[cnt].type == T_OBJECT
-         && !destructed_object_ref(&(arr->item[cnt]))
+        item = get_rvalue(arr->item + cnt, NULL);
+        if (item != NULL && item->type == T_OBJECT
+         && !destructed_object_ref(item)
            )
         {
             /* It's usually done the other way around, but not here: if
@@ -3074,13 +3160,13 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
              * discriminator function in it.
              */
             if (!cb->is_lambda)
-                callback_change_object(cb, arr->item[cnt].u.ob);
+                callback_change_object(cb, item->u.ob);
             else
-                push_ref_object(inter_sp, arr->item[cnt].u.ob, "unique_array");
+                push_ref_object(inter_sp, item->u.ob, "unique_array");
 
             v = apply_callback(cb, cb->is_lambda ? 1 : 0);
             if (v && !sameval(v, skipnum))
-                ant = put_in(pool, &head, v, &(arr->item[cnt]));
+                ant = put_in(pool, &head, v, item);
         }
     }
 

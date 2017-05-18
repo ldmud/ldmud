@@ -23,6 +23,7 @@
 #include "patchlevel.h"
 
 #include "my-alloca.h"
+#include <assert.h>
 #include <fcntl.h>
 #include <setjmp.h>
 #include <stdio.h>
@@ -624,7 +625,7 @@ fatal (const char *fmt, ...)
  */
 
 {
-    va_list va;
+    va_list va, va2;
     char *ts;
 
     /* Prevent double fatal. */
@@ -637,17 +638,21 @@ fatal (const char *fmt, ...)
     ts = time_stamp();
 
     va_start(va, fmt);
+    va_copy(va2, va);
 
     fflush(stdout);
     fprintf(stderr, "%s ", ts);
     vfprintf(stderr, fmt, va);
+    va_end(va);
+
     fflush(stderr);
     if (current_object)
         fprintf(stderr, "%s Current object was %s\n"
                       , ts, current_object->name
                             ? get_txt(current_object->name) : "<null>");
     debug_message("%s ", ts);
-    vdebug_message(fmt, va);
+    vdebug_message(fmt, va2);
+    va_end(va2);
     if (current_object)
         debug_message("%s Current object was %s\n"
                      , ts, current_object->name
@@ -658,8 +663,6 @@ fatal (const char *fmt, ...)
     fflush(stdout);
 
     sleep(1); /* let stdout settle down... abort can ignore the buffer... */
-
-    va_end(va);
 
     /* Before shutting down, try to inform the game about it */
     push_ref_string(inter_sp, STR_FATAL_ERROR);
@@ -3594,7 +3597,7 @@ free_callback_args (callback_t *cb)
         if (cb->arg.type != T_INVALID)
             free_svalue(&(cb->arg));
     }
-    else if (nargs > 1 && !cb->arg.x.extern_args)
+    else if (nargs > 1)
     {
         dest = cb->arg.u.lvalue;
 
@@ -3641,24 +3644,16 @@ free_callback (callback_t *cb)
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
-setup_callback_args (callback_t *cb, int nargs, svalue_t * args
-                    , Bool delayed_callback)
+setup_callback_args (callback_t *cb, int nargs, svalue_t * args)
 
 /* Setup the function arguments in the callback <cb> to hold the <nargs>
- * arguments starting from <args>. If <delayed_callback> is FALSE, 
- * the callback will happen within the current LPC cycle:  no argument may be
- * a protected lvalue, but normal lvalues are ok. If TRUE, the callback
- * will happen at a later time: protected lvalues are ok, but not normal ones.
+ * arguments starting from <args>.
  *
  * The arguments are transferred into the callback structure.
  *
  * Result is -1 on success, or, when encountering an illegal argument,
  * the index of the faulty argument (but even then all caller arguments
  * have been transferred or freed).
- *
- * TODO: It should be possible to accept protected lvalues by careful
- * TODO:: juggling of the protector structures. That, or rewriting the
- * TODO:: lvalue system.
  */
 
 {
@@ -3680,49 +3675,12 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
             xallocate(dest, sizeof(*dest) * nargs, "callback structure");
             cb->arg.type = T_LVALUE;
             cb->arg.u.lvalue = dest;
-            cb->arg.x.extern_args = MY_FALSE;
         }
         else
             dest = &(cb->arg);
 
         while (--nargs >= 0)
         {
-            Bool dontHandle = MY_FALSE;
-
-            if (args->type == T_LVALUE)
-            {
-                /* Check if we are allowed to handle the lvalues. */
-                Bool isProtected
-                  = (   args->u.lvalue->type == T_PROTECTED_CHAR_LVALUE
-                     || args->u.lvalue->type == T_PROTECTED_STRING_RANGE_LVALUE
-                     || args->u.lvalue->type == T_PROTECTED_POINTER_RANGE_LVALUE
-                     || args->u.lvalue->type == T_PROTECTED_LVALUE
-                    );
-
-                dontHandle =    ( delayed_callback && !isProtected)
-                             || (!delayed_callback &&  isProtected)
-                             ;
-            }
-
-            if (dontHandle)
-            {
-                /* We don't handle the lvalue - abort the process.
-                 * But to do that, we first have to free all
-                 * remaining arguments from the caller.
-                 */
-
-                int error_index = cb->num_arg - nargs - 1;
-
-                do {
-                    free_svalue(args++);
-                    (dest++)->type = T_INVALID;
-                } while (--nargs >= 0);
-
-                free_callback_args(cb);
-
-                return error_index;
-            }
-
             transfer_svalue_no_free(dest++, args++);
         }
     }
@@ -3734,14 +3692,10 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
 /*-------------------------------------------------------------------------*/
 int
 setup_function_callback ( callback_t *cb, object_t * ob, string_t * fun
-                        , int nargs, svalue_t * args, Bool delayed_callback)
+                        , int nargs, svalue_t * args)
 
 /* Setup the empty/uninitialized callback <cb> to hold a function
  * call to <ob>:<fun> with the <nargs> arguments starting from <args>.
- * If <delayed_callback> is FALSE, the callback will happen within the current
- * LPC cycle:  no argument may be a protected lvalue, but normal lvalues are
- * ok. If TRUE, the callback will happen at a later time: protected lvalues
- * are ok, but not normal ones.
  *
  * Both <ob> and <fun> are copied from the caller, but the arguments are
  * adopted (taken away from the caller).
@@ -3758,7 +3712,7 @@ setup_function_callback ( callback_t *cb, object_t * ob, string_t * fun
     cb->function.named.name = make_tabled_from(fun); /* for faster apply()s */
     cb->function.named.ob = ref_object(ob, "callback");
 
-    error_index = setup_callback_args(cb, nargs, args, delayed_callback);
+    error_index = setup_callback_args(cb, nargs, args);
     if (error_index >= 0)
     {
         free_object(cb->function.named.ob, "callback");
@@ -3773,14 +3727,10 @@ setup_function_callback ( callback_t *cb, object_t * ob, string_t * fun
 /*-------------------------------------------------------------------------*/
 int
 setup_closure_callback ( callback_t *cb, svalue_t *cl
-                       , int nargs, svalue_t * args, Bool delayed_callback)
+                       , int nargs, svalue_t * args)
 
 /* Setup the empty/uninitialized callback <cb> to hold a closure
  * call to <cl> with the <nargs> arguments starting from <args>.
- * If <delayed_callback> is FALSE, the callback will happen within the current
- * LPC cycle:  no argument may be a protected lvalue, but normal lvalues are
- * ok. If TRUE, the callback will happen at a later time: protected lvalues
- * are ok, but not normal ones.
  *
  * Both <cl> and the arguments are adopted (taken away from the caller).
  *
@@ -3806,7 +3756,7 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
     }
     else
     {
-        error_index = setup_callback_args(cb, nargs, args, delayed_callback);
+        error_index = setup_callback_args(cb, nargs, args);
         if (error_index >= 0)
         {
             free_svalue(&(cb->function.lambda));
@@ -3860,7 +3810,7 @@ setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs
 
     if (args[0].type == T_CLOSURE)
     {
-        error_index = setup_closure_callback(cb, args, nargs-1, args+1, MY_FALSE);
+        error_index = setup_closure_callback(cb, args, nargs-1, args+1);
     }
     else if (args[0].type == T_STRING)
     {
@@ -3903,8 +3853,7 @@ setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs
         {
             error_index = setup_function_callback(cb, ob, args[0].u.str
                                                  , nargs-first_arg
-                                                 , args+first_arg
-                                                 , MY_FALSE);
+                                                 , args+first_arg);
             if (error_index >= 0)
                 error_index += first_arg;
         }
@@ -4168,8 +4117,7 @@ clear_ref_in_callback (callback_t *cb)
     else if (cb->num_arg > 1)
     {
         clear_ref_in_vector(cb->arg.u.lvalue, (size_t)cb->num_arg);
-        if (!cb->arg.x.extern_args)
-            clear_memory_reference(cb->arg.u.lvalue);
+        clear_memory_reference(cb->arg.u.lvalue);
     }
 
     if (cb->is_lambda)
@@ -4198,8 +4146,7 @@ count_ref_in_callback (callback_t *cb)
     else if (cb->num_arg > 1)
     {
         count_ref_in_vector(cb->arg.u.lvalue, (size_t)cb->num_arg);
-        if (!cb->arg.x.extern_args)
-            note_malloced_block_ref(cb->arg.u.lvalue);
+        note_malloced_block_ref(cb->arg.u.lvalue);
     }
 
 #ifdef DEBUG
@@ -4419,6 +4366,7 @@ f_clone_object (svalue_t * sp)
         ob = clone_object(sp->u.ob->load_name);
     }
 
+    assert(inter_sp == sp);
     free_svalue(sp);
 
     if (ob)

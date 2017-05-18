@@ -685,67 +685,6 @@ _free_mapping (mapping_t *m, Bool no_data)
 } /* _free_mapping() */
 
 /*-------------------------------------------------------------------------*/
-void
-free_protector_mapping (mapping_t *m)
-
-/* Free the mapping <m> which is part of a T_PROTECTOR_MAPPING svalue.
- * Such svalues are created only for mappings with a hashed part, and
- * have the ref of the hashed part incremented at creation.
- *
- * This function is a wrapper around free_mapping() and takes care
- * to free m->hash->deleted if m->hash->ref reaches zero due to this
- * call.
- */
-
-{
-    mapping_hash_t *hm;
-
-#ifdef DEBUG
-    /* This type of mapping must have a hash part */
-
-    if (!m->hash || m->hash->ref <= 0)
-    {
-        /* This shouldn't happen */
-        printf("%s free_protector_mapping() : no hash %s\n"
-              , time_stamp(), m->hash ? "reference" : "part");
-#ifdef TRACE_CODE
-        {
-            last_instructions(TOTAL_TRACE_LENGTH, MY_TRUE, NULL);
-        }
-#endif
-        dump_trace(MY_FALSE, NULL, NULL);
-/*        printf("%s free_protector_mapping() : no hash %s\n"
-              , time_stamp(), m->hash ? "reference" : "part");
- */
-        free_mapping(m);
-    }
-#endif /* DEBUG */
-
-
-    /* If this was the last protective reference, execute
-     * the pending deletions.
-     */
-
-    if (!--(hm = m->hash)->ref)
-    {
-        map_chain_t *mc, *next;
-
-        for (mc = hm->deleted; mc; mc = next)
-        {
-            next = mc->next;
-            free_map_chain(m, mc, MY_FALSE);
-        }
-
-        hm->deleted = NULL;
-    }
-
-    /* Call free_mapping() if appropriate */
-
-    free_mapping(m);
-
-} /* free_protector_mapping() */
-
-/*-------------------------------------------------------------------------*/
 static INLINE mp_int
 mhash (svalue_t * svp)
 
@@ -842,6 +781,7 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
      && map_index->type != T_FLOAT
      && map_index->type != T_SYMBOL
      && map_index->type != T_QUOTED_ARRAY
+     && map_index->type != T_LVALUE
        )
         map_index->x.generic = (short)(map_index->u.number << 1);
 
@@ -971,17 +911,22 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
     mapping_hash_t * hm;
     svalue_t       * entry;
     mp_int           idx;
+    svalue_t         real_index;
 
 static svalue_t local_const0;
   /* Local svalue-0 instance to be returned if a lvalue
    * for a 0-width was requested.
    */
 
-    entry = find_map_entry(m, map_index, (p_int *)&idx, &mc, need_lvalue);
+    assign_rvalue_no_free(&real_index, map_index);
+
+    entry = find_map_entry(m, &real_index, (p_int *)&idx, &mc, need_lvalue);
 
     /* If we found the entry, return the values */
     if (entry != NULL)
     {
+        free_svalue(&real_index);
+
         if (!m->num_values)
             return &const1;
 
@@ -992,7 +937,10 @@ static svalue_t local_const0;
     }
 
     if (!need_lvalue)
+    {
+        free_svalue(&real_index);
         return &const0;
+    }
 
     /* We didn't find key and the caller wants the data.
      * So create a new entry and enter it into the hash index (also
@@ -1014,6 +962,7 @@ static svalue_t local_const0;
         }
         if (max_mapping_size && msize > (mp_int)max_mapping_size)
         {
+            free_svalue(&real_index);
             errorf("Illegal mapping size: %"PRIdMPINT" elements (%"
                 PRIdPINT" x %"PRIdPINT")\n"
                  , msize, MAP_SIZE(m)+1, m->num_values);
@@ -1021,6 +970,7 @@ static svalue_t local_const0;
         }
         if (max_mapping_keys && MAP_SIZE(m) > (mp_int)max_mapping_keys)
         {
+            free_svalue(&real_index);
             errorf("Illegal mapping size: %"PRIdMPINT" entries\n", msize+1);
             return NULL;
         }
@@ -1031,7 +981,10 @@ static svalue_t local_const0;
      */
     mc = new_map_chain(m);
     if (NULL == mc)
+    {
+        free_svalue(&real_index);
         return NULL;
+    }
 
     /* If the mapping has no hashed index, create one with just one
      * chain and put the new entry in there.
@@ -1046,6 +999,7 @@ static svalue_t local_const0;
         hm = get_new_hash(m, 1);
         if (!hm)
         {
+            free_svalue(&real_index);
             free_map_chain(m, mc, MY_TRUE);
             return NULL; /* Oops */
         }
@@ -1084,6 +1038,7 @@ static svalue_t local_const0;
             hm = xalloc(sizeof *hm - sizeof *mcp + sizeof *mcp * size);
             if (!hm)
             {
+                free_svalue(&real_index);
                 free_map_chain(m, mc, MY_TRUE);
                 return NULL;
             }
@@ -1125,7 +1080,7 @@ static svalue_t local_const0;
 
         /* Finally, insert the new entry into its chain */
 
-        idx = mhash(map_index) & hm->mask;
+        idx = mhash(&real_index) & hm->mask;
         mc->next = hm->chains[idx];
         hm->chains[idx] = mc;
     }
@@ -1134,7 +1089,7 @@ static svalue_t local_const0;
      * the statistics and copy the key value into the structure.
      */
 
-    assign_svalue_no_free(&(mc->data[0]), map_index);
+    transfer_svalue_no_free(&(mc->data[0]), &real_index);
     for (idx = m->num_values, entry = &(mc->data[1]); idx > 0
         ; idx--, entry++)
         put_number(entry, 0);
@@ -1445,10 +1400,13 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
     map_chain_t    * mc;
     mapping_hash_t * hm;
     p_int            num_values;
+    svalue_t         real_index;
 
     num_values = m->num_values;
 
-    entry = find_map_entry(m, map_index, &key_ix, &mc, MY_FALSE);
+    assign_rvalue_no_free(&real_index, map_index);
+    entry = find_map_entry(m, &real_index, &key_ix, &mc, MY_FALSE);
+    free_svalue(&real_index);
 
     if (NULL != entry)
     {
@@ -2174,15 +2132,6 @@ compact_mapping (mapping_t *m, Bool force)
        * Neat sideeffect: all allocations are guaranteed to work (or
        * the driver terminates).
        */
-
-    if (last_indexing_protector.type == T_PROTECTOR_MAPPING)
-    {
-        /* There is a slight chance that free_protector_mapping causes
-         * remove_empty_mappings().
-         */
-        free_protector_mapping(last_indexing_protector.u.map);
-        last_indexing_protector.type = T_NUMBER;
-    }
 
 #ifdef DEBUG
     if (!m->user)
@@ -3995,8 +3944,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
         /* Push the values as lvalues */
         for (j = num_values, data = (read_pointer++)->u.lvalue; --j >= 0; )
         {
-             (++sp2)->type = T_LVALUE;
-             sp2->u.lvalue = data++;
+             assign_protected_lvalue_no_free(++sp2, data++);
         }
 
         /* Call the function */
@@ -4156,7 +4104,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
             }
             else if (1 == num_values)
             {
-                push_svalue(read_pointer[1].u.lvalue);
+                push_rvalue(read_pointer[1].u.lvalue);
             }
             else
             {
@@ -4166,7 +4114,10 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
                 for (j = 0, svp = dvec->item
                     ; j < num_values
                     ; j++, svp++, v++)
-                    assign_svalue(svp, v);
+                {
+                    free_svalue(svp);
+                    assign_rvalue_no_free(svp, v);
+                }
                 push_svalue(dvec_sp);
             }
         }
@@ -4194,7 +4145,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
         }
         for (j = num_values, data = read_pointer[1].u.lvalue; --j >= 0; )
         {
-            assign_svalue_no_free(v++, data++);
+            assign_rvalue_no_free(v++, data++);
         }
     }
 
@@ -4385,7 +4336,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
             else if (1 == num_values)
             {
                 v = get_map_value(arg_m, key);
-                push_svalue(v);
+                push_rvalue(v);
             }
             else
             {
@@ -4394,7 +4345,10 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
                 v = get_map_value(arg_m, key);
                 for (j = 0, svp = dvec->item; j < num_values; j++, svp++, v++)
-                    assign_svalue(svp, v);
+                {
+                    free_svalue(svp);
+                    assign_rvalue_no_free(svp, v);
+                }
                 push_svalue(dvec_sp);
             }
         }
@@ -4415,7 +4369,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
         data = apply_callback(&cb, 1 + bFull);
         if (data)
         {
-            transfer_svalue_no_free(v, data);
+            transfer_rvalue_no_free(v, data);
             data->type = T_INVALID;
         }
     }
@@ -4508,12 +4462,12 @@ v_m_contains (svalue_t *sp, int num_arg)
         /* TODO: May this cause problems elsewhere, too? */
         if (destructed_object_ref(item))
         {
-            assign_svalue(sp[i].u.lvalue, &const0);
+            assign_svalue(sp+i, &const0);
             item++;
         }
         else
             /* mapping must not have been freed yet */
-            assign_svalue(sp[i].u.lvalue, item++);
+            assign_svalue(sp+i, item++);
         free_svalue(&sp[i]);
     }
 
@@ -4552,7 +4506,7 @@ f_m_entry (svalue_t *sp)
 
         for (i = 0; i < num_values; i++)
         {
-            assign_svalue(rc->item+i, data+i);
+            assign_rvalue_no_free(rc->item+i, data+i);
         }
     }
     else
@@ -4672,7 +4626,8 @@ v_mkmapping (svalue_t *sp, int num_arg)
 
             put_string(&key, st->type->member[i].name);
             data = get_map_lvalue_unchecked(m, &key);
-            assign_svalue(data, &st->member[i]);
+            free_svalue(data);
+            assign_rvalue_no_free(data, &st->member[i]);
         }
     }
 
@@ -4727,7 +4682,8 @@ v_mkmapping (svalue_t *sp, int num_arg)
                 /* If a key value appears multiple times, we have to free
                  * a previous assigned value to avoid a memory leak
                  */
-                assign_svalue(dest++, &sp[i].u.vec->item[length]);
+                free_svalue(dest);
+                assign_rvalue_no_free(dest++, &sp[i].u.vec->item[length]);
             }
         }
     }

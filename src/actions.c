@@ -1256,7 +1256,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
         }
 
         error_index = setup_function_callback(&(p->cb), ob, func->u.str
-                                             , 0, NULL, MY_TRUE
+                                             , 0, NULL
                                              );
         /* setup_function_callback makes its own copy, so we free ours. */
         free_mstring(func->u.str);
@@ -1265,7 +1265,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
     else if (func->type == T_CLOSURE)
     {
         error_index = setup_closure_callback(&(p->cb), func
-                                             , 0, NULL, MY_TRUE
+                                             , 0, NULL
                                              );
     }
     else

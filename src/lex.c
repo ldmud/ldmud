@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 
 #include "lex.h"
+#include "prolang.h"
 
 #include "array.h"
 #include "backend.h"
@@ -53,7 +54,6 @@
 #include "mstrings.h"
 #include "object.h"
 #include "patchlevel.h"
-#include "prolang.h"
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"

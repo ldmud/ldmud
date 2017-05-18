@@ -374,6 +374,9 @@ DESCRIPTION
         <what> == DI_NUM_REGEX_TABLE_SLOTS:
           Number of slots in the regexp cache table.
 
+        <what> == DI_NUM_LVALUES
+          Number of lvalues (values referenced by &var).
+
         <what> == DI_SIZE_ACTIONS:
           Total size of allocated actions.
 

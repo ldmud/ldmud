@@ -17,3 +17,33 @@ that you should pay attention to when updating.
 - The special driver actions ('status', 'malloc', dumpallobj' and 'opcdump')
   were removed. They can be implemented as normal actions. Example implementations
   are provided in /mudlib/deprecated/set_is_wizard.c (#596).
+
+- Lvalue references
+  Many restrictions for lvalue refrences (&var, &(arr[i]), &(arr[i1..i2]))
+  were lifted:
+   * They are not limited to the original variable's scope. Therefore they
+     can be returned from a function or passed to a call_out.
+   * For this reason the error message "Can't trace reference assignments."
+     doesn't exist anymore.
+   * A range can be indexed again, so it can be used as an array replacement.
+   * Multiple char references to the same string are allowed.
+
+  Lvalue references are automatically dereferenced when they are not used as
+  the left hand side of an expression without the '&' operator.
+
+  Variables that contain an lvalue reference can be 'reseated', i.e. change
+  their value without changing the lvalue they reference:
+    &var = new_value_or_reference;
+
+- Order of execution on indices
+  The order of execution of sub-expressions has changed:
+
+  Prior to 3.5:
+     Array#4[Expr#3][Expr#2] = Expr#1;
+  Now in 3.5:
+     Array#2[Expr#3][Expr#4] = Expr#1;
+
+  Assignments are done from right to left as usual, but the assigned-to
+  expression is now evaluated left to right. (For expressions that are
+  not the destination of an assignment the order of an index expression
+  was before and still is left-to-right.)

@@ -139,8 +139,8 @@ struct callback_s {
        *   - T_INVALID if no arguments
        *   - a single argument
        *   - T_LVALUE with u.lvalue pointing to the svalue_t[] with
-       *     the arguments. If arg.x.extern_args is TRUE, the block
-       *     was allocated from outside and is outside of our control.
+       *     the arguments (which shall be freed together with
+       *     the callback_s structure).
        * No argument can be a LVALUE itself.
        */
 };
@@ -244,8 +244,8 @@ extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** vola
 extern void check_shadow_sent (object_t *ob);
 extern void assert_shadow_sent (object_t *ob);
 extern void init_empty_callback (callback_t *cb);
-extern int  setup_function_callback(callback_t *cb, object_t* ob, string_t *fun, int nargs, svalue_t * args, Bool delayed_callback);
-extern int  setup_closure_callback(callback_t *cb, svalue_t *cl, int nargs, svalue_t * args, Bool delayed_callback);
+extern int  setup_function_callback(callback_t *cb, object_t* ob, string_t *fun, int nargs, svalue_t * args);
+extern int  setup_closure_callback(callback_t *cb, svalue_t *cl, int nargs, svalue_t * args);
 extern int  setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs, Bool bNoObj);
 #define setup_efun_callback(cb,args,nargs)       setup_efun_callback_base(cb,args,nargs,MY_FALSE)
 #define setup_efun_callback_noobj(cb,args,nargs) setup_efun_callback_base(cb,args,nargs,MY_TRUE)

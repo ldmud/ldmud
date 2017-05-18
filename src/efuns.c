@@ -85,6 +85,7 @@
 
 #include "my-alloca.h"
 #include "my-rusage.h"
+#include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
 #include <stddef.h>
@@ -394,14 +395,17 @@ v_md5 (svalue_t *sp, int num_arg)
 
         for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
         {
-            if (sp->u.vec->item[i].type != T_NUMBER)
+            svalue_t *item = get_rvalue(sp->u.vec->item + i, NULL);
+            if (item == NULL)
+                item = sp->u.vec->item + i;
+            if (item->type != T_NUMBER)
             {
                 free_mstring(arg);
                 errorf("Bad argument 1 to md5(): got mixed*, expected string/int*.\n");
                 /* NOTREACHED */
                 return sp;
             }
-            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+            argp[i] = (char)item->u.number & 0xff;
         }
 
         free_svalue(sp);
@@ -547,13 +551,16 @@ v_sha1 (svalue_t *sp, int num_arg)
 
         for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
         {
-            if (sp->u.vec->item[i].type != T_NUMBER)
+            svalue_t *item = get_rvalue(sp->u.vec->item + i, NULL);
+            if (item == NULL)
+                item = sp->u.vec->item + i;
+            if (item->type != T_NUMBER)
             {
                 free_mstring(arg);
                 errorf("Bad argument 1 to sha1(): got mixed*, expected string/int*.\n");
                 /* NOTREACHED */
             }
-            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+            argp[i] = (char)item->u.number & 0xff;
         }
 
         free_svalue(sp);
@@ -718,13 +725,16 @@ v_hash (svalue_t *sp, int num_arg)
 
         for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
         {
-            if (sp->u.vec->item[i].type != T_NUMBER)
+            svalue_t *item = get_rvalue(sp->u.vec->item + i, NULL);
+            if (item == NULL)
+                item = sp->u.vec->item + i;
+            if (item->type != T_NUMBER)
             {
                 free_mstring(arg);
                 errorf("Bad argument 2 to hash(): got mixed*, expected string/int*.\n");
                 /* NOTREACHED */
             }
-            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+            argp[i] = (char)item->u.number & 0xff;
         }
 
         free_svalue(sp);
@@ -791,13 +801,16 @@ f_hmac(svalue_t *sp)
 
         for (i = 0; i < VEC_SIZE(sp->u.vec); i++)
         {
-            if (sp->u.vec->item[i].type != T_NUMBER)
+            svalue_t *item = get_rvalue(sp->u.vec->item + i, NULL);
+            if (item == NULL)
+                item = sp->u.vec->item + i;
+            if (item->type != T_NUMBER)
             {
                 free_mstring(arg);
-                errorf("Bad argument 2 to hash(): got mixed*, expected string/int*.\n");
+                errorf("Bad argument 2 to hmac(): got mixed*, expected string/int*.\n");
                 /* NOTREACHED */
             }
-            argp[i] = (char)sp->u.vec->item[i].u.number & 0xff;
+            argp[i] = (char)item->u.number & 0xff;
         }
 
         free_svalue(sp);
@@ -916,12 +929,24 @@ f_regexp (svalue_t *sp)
         }
         sp = inter_sp;
 
-        for (num_match = i = 0; i < v_size; i++) {
+        for (num_match = i = 0; i < v_size; i++)
+        {
+            svalue_t *item = get_rvalue(v->item + i, NULL);
+            svalue_t tmp_line = { T_NUMBER };
             string_t *line;
 
             res[i] = MY_FALSE;
 
-            if (v->item[i].type != T_STRING)
+            if (item == NULL)
+            {
+                struct protected_range_lvalue *r = v->item[i].u.protected_range_lvalue;
+                if (r->vec.type != T_STRING)
+                    continue;
+
+                item = &tmp_line;
+                assign_rvalue_no_free(item, v->item + i);
+            }
+            else if (item->type != T_STRING)
                 continue;
 
             if (add_eval_cost(1))
@@ -929,11 +954,13 @@ f_regexp (svalue_t *sp)
                 /* Evalution cost exceeded: we abort matching at this point
                  * and let the interpreter detect the exception.
                  */
+                free_svalue(&tmp_line);
                 break;
             }
 
-            line = v->item[i].u.str;
+            line = item->u.str;
             rc = rx_exec(reg, line, 0);
+            free_svalue(&tmp_line);
             if (rc == 0)
                 continue;
             if (rc < 0)
@@ -954,7 +981,7 @@ f_regexp (svalue_t *sp)
         for (j=i=0; i < v_size && j < num_match; i++) {
             if (!res[i])
                 continue;
-            assign_svalue_no_free(&ret->item[j++], &v->item[i]);
+            assign_rvalue_no_free(&ret->item[j++], &v->item[i]);
         }
         /* Free regexp and the intermediate buffer res by freeing the error
          * handler. */
@@ -3338,7 +3365,7 @@ sscanf_decimal (char *str, struct sscanf_info *info)
             return;
 
         tmp_svalue.u.number = (p_int)((num ^ info->sign) - info->sign);
-        transfer_svalue((info->arg_current++)->u.lvalue, &tmp_svalue);
+        transfer_svalue(info->arg_current++, &tmp_svalue);
     }
 
     info->number_of_matches += info->flags.count_match;
@@ -3400,13 +3427,25 @@ sscanf_match_percent (char *str, char *fmt, struct sscanf_info *info)
             continue;
 
         case '*':
-            if (info->arg_current >= info->arg_end
-             || info->arg_current->u.lvalue->type != T_NUMBER)
+            if (info->arg_current >= info->arg_end)
             {
                 info->match_end = NULL;
                 return NULL;
             }
-            *nump = (mp_uint)((info->arg_current++)->u.lvalue->u.number);
+            else
+            {
+                svalue_t *val = get_rvalue(info->arg_current, NULL);
+                if (!val || val->type != T_NUMBER)
+                {
+                    info->match_end = NULL;
+                    return NULL;
+                }
+                else
+                {
+                    info->arg_current++;
+                    *nump = (mp_uint)(val->u.number);
+                }
+            }
             continue;
 
         case '.':
@@ -4103,7 +4142,7 @@ match_skipped:
                     memsafe(matchstr = new_n_mstring(in_string, (size_t)num)
                            , num, "matchstring");
                     put_string(&sv_tmp, matchstr);
-                    transfer_svalue(arg->u.lvalue, &sv_tmp);
+                    transfer_svalue(arg, &sv_tmp);
                 }
 
                 in_string = info.match_end;
@@ -5009,9 +5048,11 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
     char * fname = bMax ? "max" : "min";
     svalue_t *argp = sp-num_arg+1;
     svalue_t *valuep = argp;
+    svalue_t *rvaluep;
     int left = num_arg;
     Bool gotArray = MY_FALSE;
     svalue_t *result = NULL;
+    svalue_t tmp_str = { T_NUMBER };
 
 
     if (argp->type == T_POINTER)
@@ -5031,63 +5072,111 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
         }
     }
 
-    if (valuep->type == T_STRING)
+    rvaluep = get_rvalue(valuep, NULL);
+    if (rvaluep == NULL)
     {
-        result = valuep;
+        struct protected_range_lvalue *r = valuep->u.protected_range_lvalue;
+        if (r->vec.type != T_STRING)
+        {
+            /* We only need this for error messages. */
+            rvaluep = &(r->vec);
+        }
+        else
+        {
+            rvaluep = &tmp_str;
+            assign_rvalue_no_free(rvaluep, valuep);
+        }
+    }
+
+    if (rvaluep->type == T_STRING)
+    {
+        result = rvaluep;
 
         for (valuep++, left--; left > 0; valuep++, left--)
         {
             int cmp;
-
-            if (valuep->type != T_STRING)
+            svalue_t *item = get_rvalue(valuep, NULL);
+            svalue_t item_str = { T_NUMBER };
+            if (item == NULL)
             {
+                struct protected_range_lvalue *r = valuep->u.protected_range_lvalue;
+                if (r->vec.type != T_STRING)
+                {
+                    /* We only need this for error messages. */
+                    item = &(r->vec);
+                }
+                else
+                {
+                    item = &item_str;
+                    assign_rvalue_no_free(item, valuep);
+                }
+            }
+
+            if (item->type != T_STRING)
+            {
+                free_svalue(&tmp_str);
                 if (gotArray)
                     errorf("Bad argument to %s(): array[%d] is a '%s', "
                           "expected 'string'.\n"
                          , fname, (int)VEC_SIZE(argp->u.vec) - left + 1
-                         , typename(valuep->type));
+                         , typename(item->type));
                 else
-                    vefun_arg_error(num_arg - left + 1, T_STRING, valuep->type, sp);
+                    vefun_arg_error(num_arg - left + 1, T_STRING, item->type, sp);
                 /* NOTREACHED */
             }
 
-            cmp = mstrcmp(valuep->u.str, result->u.str);
+            cmp = mstrcmp(item->u.str, result->u.str);
             if (bMax ? (cmp > 0) : (cmp < 0))
-                result = valuep;
+            {
+                if (item == &item_str)
+                {
+                    free_svalue(&tmp_str);
+                    transfer_svalue_no_free(&tmp_str, &item_str);
+                    result = &(tmp_str);
+                }
+                else
+                    result = item;
+            }
+            else
+                free_svalue(&item_str);
         }
     }
-    else if (valuep->type == T_NUMBER || valuep->type == T_FLOAT)
+    else if (rvaluep->type == T_NUMBER || rvaluep->type == T_FLOAT)
     {
-        result = valuep;
+        result = rvaluep;
 
         for (valuep++, left--; left > 0; valuep++, left--)
         {
-            if (valuep->type != T_FLOAT && valuep->type != T_NUMBER)
+            svalue_t *item = get_rvalue(valuep, NULL);
+            if (item == NULL)
+                item = &(valuep->u.protected_range_lvalue->vec);
+
+            if (item->type != T_FLOAT && item->type != T_NUMBER)
             {
                 if (gotArray)
                     errorf("Bad argument to %s(): array[%d] is a '%s', "
                           "expected 'int' or 'float'.\n"
                          , fname, (int)VEC_SIZE(argp->u.vec) - left + 1
-                         , typename(valuep->type));
+                         , typename(item->type));
                 else
-                    vefun_exp_arg_error(num_arg - left + 1, TF_NUMBER|TF_FLOAT, valuep->type, sp);
+                    vefun_exp_arg_error(num_arg - left + 1, TF_NUMBER|TF_FLOAT, item->type, sp);
                 /* NOTREACHED */
             }
 
-            if (valuep->type == T_NUMBER && result->type == T_NUMBER)
+            if (item->type == T_NUMBER && result->type == T_NUMBER)
             {
-                if (bMax ? (valuep->u.number > result->u.number)
-                         : (valuep->u.number < result->u.number))
-                    result = valuep;
+                if (bMax ? (item->u.number > result->u.number)
+                         : (item->u.number < result->u.number))
+                    result = item;
             }
             else
             {
                 double v, r;
 
-                if (valuep->type == T_FLOAT)
-                    v = READ_DOUBLE(valuep);
+                if (item->type == T_FLOAT)
+                    v = READ_DOUBLE(item);
                 else
-                    v = (double)(valuep->u.number);
+                    v = (double)(item->u.number);
 
                 if (result->type == T_FLOAT)
                     r = READ_DOUBLE(result);
@@ -5096,7 +5185,7 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
 
                 if (bMax ? (v > r)
                          : (v < r))
-                    result = valuep;
+                    result = item;
             }
         } /* for (values) */
     }
@@ -5105,9 +5194,9 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
         if (gotArray)
             errorf("Bad argument to %s(): array[0] is a '%s', "
                   "expected 'string', 'int' or 'float'.\n"
-                 , fname, typename(valuep->type));
+                 , fname, typename(rvaluep->type));
         else
-            vefun_exp_arg_error(1, TF_STRING|TF_NUMBER|TF_FLOAT, valuep->type, sp);
+            vefun_exp_arg_error(1, TF_STRING|TF_NUMBER|TF_FLOAT, rvaluep->type, sp);
         /* NOTREACHED */
     }
 
@@ -5121,6 +5210,8 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
         sp = pop_n_elems(num_arg, sp) + 1;
         transfer_svalue_no_free(sp, &resvalue);
     }
+
+    free_svalue(&tmp_str);
 
     return sp;
 } /* x_min_max() */
@@ -5805,13 +5896,10 @@ f_to_string (svalue_t *sp)
         svp = sp->u.vec->item;
         memsafe(s = alloc_mstring(size), size, "converted array");
         d = get_txt(s);
-        for (;;)
+        while (size--)
         {
-            if (!size--)
-            {
-                break;
-            }
-            if (svp->type != T_NUMBER)
+            svalue_t *item = get_rvalue(svp, NULL);
+            if (item == NULL || item->type != T_NUMBER)
             {
                 if (d == get_txt(s))
                 {
@@ -5823,7 +5911,7 @@ f_to_string (svalue_t *sp)
                            , d-get_txt(s), "converted array");
                 break;
             }
-            *d++ = (char)svp->u.number;
+            *d++ = (char)item->u.number;
             svp++;
         }
         free_array(sp->u.vec);
@@ -5927,7 +6015,7 @@ f_to_array (svalue_t *sp)
         left = struct_size(sp->u.strct);
         vec = allocate_array(left);
         while (left-- > 0)
-            assign_svalue_no_free(vec->item+left, sp->u.strct->member+left);
+            assign_rvalue_no_free(vec->item+left, sp->u.strct->member+left);
         free_struct(sp->u.strct);
         put_array(sp, vec);
         break;
@@ -6062,7 +6150,7 @@ v_to_struct (svalue_t *sp, int num_arg)
             st = struct_new_anonymous(VEC_SIZE(argp->u.vec));
 
         for (left = VEC_SIZE(argp->u.vec); left-- > 0; )
-            assign_svalue_no_free(st->member+left, argp->u.vec->item+left);
+            assign_rvalue_no_free(st->member+left, argp->u.vec->item+left);
         free_array(argp->u.vec);
         put_struct(argp, st);
         break;
@@ -6112,7 +6200,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                         put_number(&st->member[i], 1);
                     else if (num_values == 1)
                     {
-                        assign_svalue(&st->member[i], data);
+                        assign_rvalue_no_free(&st->member[i], data);
                     }
                     else
                     {
@@ -6131,7 +6219,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                         dest = vec->item;
                         for (j = 0; j < num_values; j++)
                         {
-                            assign_svalue_no_free(dest++, data++);
+                            assign_rvalue_no_free(dest++, data++);
                         }
 
                         put_array(&st->member[i], vec);
@@ -6183,7 +6271,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                     put_number(&st->member[i], 1);
                 else if (num_values == 1)
                 {
-                    assign_svalue(&st->member[i], member->data);
+                    assign_rvalue_no_free(&st->member[i], member->data);
                 }
                 else
                 {
@@ -6203,7 +6291,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                     src = member->data;
                     for (j = 0; j < num_values; j++)
                     {
-                        assign_svalue_no_free(dest++, src++);
+                        assign_rvalue_no_free(dest++, src++);
                     }
 
                     put_array(&st->member[i], vec);
@@ -6279,7 +6367,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                 {
                     // *_no_free, because the members of the new struct only contain 0,
                     // which need not to be freed.
-                    assign_svalue_no_free(memberp, omemberp);
+                    assign_rvalue_no_free(memberp, omemberp);
                 }
                 // the new struct may have more members than the old one (if oldstruct was
                 // the base. That is OK, the extra svalues just remain 0. On the other hand,
@@ -6407,7 +6495,7 @@ f_copy (svalue_t *sp)
                 errorf("(copy) Out of memory: array[%lu] for copy.\n"
                      , (unsigned long) size);
             for (i = 0; i < size; i++)
-                assign_svalue_no_free(&new->item[i], &old->item[i]);
+                assign_rvalue_no_free(&new->item[i], &old->item[i]);
             free_array(old);
             sp->u.vec = new;
         }
@@ -6429,7 +6517,7 @@ f_copy (svalue_t *sp)
                 errorf("(copy) Out of memory: struct '%s' for copy.\n"
                      , get_txt(struct_name(old)));
             for (i = 0; i < size; i++)
-                assign_svalue_no_free(&new->member[i], &old->member[i]);
+                assign_rvalue_no_free(&new->member[i], &old->member[i]);
             free_struct(old);
             sp->u.strct = new;
         }
@@ -6520,6 +6608,8 @@ copy_svalue (svalue_t *dest, svalue_t *src
         return;
     }
 
+    normalize_svalue(src, true);
+
     switch (src->type)
     {
     default:
@@ -6569,16 +6659,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
             /* Copy the values */
             for (i = 0; i < size; i++)
             {
-                svalue_t * svp = &old->item[i];
-
-                if (svp->type == T_QUOTED_ARRAY
-                 || svp->type == T_MAPPING
-                 || svp->type == T_POINTER
-                 || svp->type == T_STRUCT
-                   )
-                    copy_svalue(&new->item[i], svp, ptable, depth+1);
-                else
-                    assign_svalue_no_free(&new->item[i], svp);
+                copy_svalue(new->item + i, old->item + i, ptable, depth+1);
             }
         }
         else /* shared array we already encountered */
@@ -6621,16 +6702,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
             /* Copy the values */
             for (i = 0; i < size; i++)
             {
-                svalue_t * svp = &old->member[i];
-
-                if (svp->type == T_QUOTED_ARRAY
-                 || svp->type == T_MAPPING
-                 || svp->type == T_POINTER
-                 || svp->type == T_STRUCT
-                   )
-                    copy_svalue(&new->member[i], svp, ptable, depth+1);
-                else
-                    assign_svalue_no_free(&new->member[i], svp);
+                copy_svalue(new->member + i, old->member + i, ptable, depth+1);
             }
         }
         else /* shared struct we already encountered */
@@ -6695,6 +6767,171 @@ copy_svalue (svalue_t *dest, svalue_t *src
         }
         break;
       }
+
+    case T_LVALUE:
+        switch (src->x.lvalue_type)
+        {
+            default:
+                fatal("(deep_copy) Illegal lvalue %p type %d\n", src, src->x.lvalue_type);
+                break;
+
+            case LVALUE_PROTECTED:
+            {
+                struct protected_lvalue *l = src->u.protected_lvalue;
+                struct pointer_record *rec = find_add_pointer(ptable, l, MY_TRUE);
+
+                if (rec->ref_count++ < 0)
+                {
+                    /* Create a new protected lvalue to the copy of the contents. */
+                    svalue_t content;
+
+#if defined(DYNAMIC_COSTS)
+                    add_eval_cost((depth+1) / 10);
+#endif
+
+                    copy_svalue(&content, &(l->val), ptable, depth+1);
+                    assign_protected_lvalue_no_free(dest, &content);
+                    rec->data = dest->u.protected_lvalue;
+                    free_svalue(&content);
+                }
+                else
+                {
+                    /* Recreate the svalue from the pointer table to copy it
+                     * (so we don't have to do the proper ref-counting here.)
+                     */
+                    svalue_t sv;
+                    sv.type = T_LVALUE;
+                    sv.x.lvalue_type = LVALUE_PROTECTED;
+                    sv.u.protected_lvalue = (struct protected_lvalue *) rec->data;
+
+                    assign_svalue_no_free(dest, &sv);
+                }
+
+                break;
+            }
+
+            case LVALUE_PROTECTED_CHAR:
+            {
+                /* This should be a mutable string. */
+                struct protected_char_lvalue *l = src->u.protected_char_lvalue;
+                struct pointer_record *rec = find_add_pointer(ptable, l, MY_TRUE);
+
+                if (rec->ref_count++ < 0)
+                {
+                    string_t *dup;
+                    struct pointer_record *str_rec = find_add_pointer(ptable, l->str, MY_TRUE);
+                    if (str_rec->ref_count++ < 0)
+                    {
+                        dup = make_mutable(dup_mstring(l->str));
+                        str_rec->data = dup;
+                    }
+                    else
+                    {
+                        dup = ref_mstring((string_t*) str_rec->data);
+                    }
+
+                    assign_protected_char_lvalue_no_free(dest, dup, get_txt(dup) + (l->charp - get_txt(l->str)));
+                    rec->data = dest->u.protected_char_lvalue;
+                    deref_mstring(dup);
+                }
+                else
+                {
+                    svalue_t sv;
+                    sv.type = T_LVALUE;
+                    sv.x.lvalue_type = LVALUE_PROTECTED_CHAR;
+                    sv.u.protected_char_lvalue = (struct protected_char_lvalue *) rec->data;
+
+                    assign_svalue_no_free(dest, &sv);
+                }
+                break;
+            }
+
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = src->u.protected_range_lvalue;
+                struct pointer_record *rec = find_add_pointer(ptable, r, MY_TRUE);
+
+                if (rec->ref_count++ < 0)
+                {
+                    svalue_t vec;                          /* The copy of the vector.           */
+                    svalue_t vec_lvalue;                   /* Lvalue to the copy of the vector. */
+                    struct protected_lvalue *var = NULL;   /* = vec_lvalue.u.protected_lvalue.  */
+
+#if defined(DYNAMIC_COSTS)
+                    add_eval_cost((depth+1) / 10);
+#endif
+
+                    /* Check whether r->var is still valid. */
+                    if (r->var != NULL
+                     && ((r->vec.type == T_POINTER && r->var->val.type == T_POINTER && r->vec.u.vec == r->var->val.u.vec)
+                      || (r->vec.type == T_STRING  && r->var->val.type == T_STRING  && r->vec.u.str == r->var->val.u.str)))
+                    {
+                        struct pointer_record *var_rec = find_add_pointer(ptable, r->var, MY_TRUE);
+                        if (var_rec->ref_count++ < 0)
+                        {
+                            svalue_t var_content;
+
+                            copy_svalue(&var_content, &(r->var->val), ptable, depth+1);
+                            assign_protected_lvalue_no_free(&vec_lvalue, &var_content);
+                            var_rec->data = vec_lvalue.u.protected_lvalue;
+                            free_svalue(&var_content);
+                        }
+                        else
+                        {
+                            svalue_t sv;
+                            sv.type = T_LVALUE;
+                            sv.x.lvalue_type = LVALUE_PROTECTED;
+                            sv.u.protected_lvalue = (struct protected_lvalue *) var_rec->data;
+
+                            assign_svalue_no_free(&vec_lvalue, &sv);
+                        }
+                        var = vec_lvalue.u.protected_lvalue;
+                    }
+
+                    /* By virtue of the pointer table this should yield the same vector
+                     * as the one above for r->var.
+                     */
+                    copy_svalue(&vec, &(r->vec), ptable, depth+1);
+                    assign_protected_range_lvalue_no_free(dest, var, &vec, r->index1, r->index2);
+                    rec->data = dest->u.protected_range_lvalue;
+                    free_svalue(&vec);
+                    if (var != NULL)
+                        free_svalue(&vec_lvalue);
+                }
+                else
+                {
+                    svalue_t sv;
+                    sv.type = T_LVALUE;
+                    sv.x.lvalue_type = LVALUE_PROTECTED_RANGE;
+                    sv.u.protected_range_lvalue = (struct protected_range_lvalue *) rec->data;
+
+                    assign_svalue_no_free(dest, &sv);
+                }
+
+                break;
+            }
+        }
+        break;
+
+    case T_STRING:
+        if (mstr_mutable(src->u.str))
+        {
+            /* We must make a mutable copy of a mutable string. */
+            struct pointer_record *rec = find_add_pointer(ptable, src->u.str, MY_TRUE);
+            if (rec->ref_count++ < 0)
+            {
+                string_t *dup = make_mutable(dup_mstring(src->u.str));
+                put_string(dest, dup);
+                rec->data = dup;
+            }
+            else
+            {
+                put_ref_string(dest, (string_t*) rec->data);
+            }
+        }
+        else
+            assign_svalue_no_free(dest, src);
+        break;
     } /* switch(src->type) */
 } /* copy_svalue() */
 
@@ -6725,49 +6962,21 @@ f_deep_copy (svalue_t *sp)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
-      {
-        vector_t *old;
-
-        old = sp->u.vec;
-        if (old != &null_vector)
-        {
-            svalue_t new;
-
-            ptable = new_pointer_table();
-            if (!ptable)
-                errorf("(deep_copy) Out of memory for pointer table.\n");
-            copy_svalue(&new, sp, ptable, 0);
-            if (sp->type == T_QUOTED_ARRAY)
-                new.x.quotes = sp->x.quotes;
-            transfer_svalue(sp, &new);
-            free_pointer_table(ptable);
-        }
-        break;
-      }
+        if (sp->u.vec == &null_vector)
+            break;
+        /* FALLTHROUGH */
     case T_STRUCT:
-      {
-        struct_t *old;
-        svalue_t new;
-
-        old = sp->u.strct;
-        ptable = new_pointer_table();
-        if (!ptable)
-            errorf("(deep_copy) Out of memory for pointer table.\n");
-        copy_svalue(&new, sp, ptable, 0);
-        transfer_svalue(sp, &new);
-        free_pointer_table(ptable);
-        break;
-      }
     case T_MAPPING:
+    case T_LVALUE:
       {
-        mapping_t *old;
         svalue_t new;
 
-        old = sp->u.map;
         ptable = new_pointer_table();
         if (!ptable)
             errorf("(deep_copy) Out of memory for pointer table.\n");
         copy_svalue(&new, sp, ptable, 0);
+        if (sp->type == T_QUOTED_ARRAY)
+            new.x.quotes = sp->x.quotes;
         transfer_svalue(sp, &new);
         free_pointer_table(ptable);
         break;
@@ -7167,13 +7376,28 @@ v_member (svalue_t *sp, int num_arg)
             case T_STRING:
               {
                 string_t *str;
-                svalue_t *item;
+                svalue_t *entry;
 
                 str = sp_u.str;
-                for(item = vec->item + startpos; --cnt >= 0; item++)
+                for(entry = vec->item + startpos; --cnt >= 0; entry++)
                 {
-                    if (item->type == T_STRING
-                     && mstreq(str, item->u.str))
+                    svalue_t *item = get_rvalue(entry, NULL);
+                    if (item == NULL)
+                    {
+                        struct protected_range_lvalue* r = entry->u.protected_range_lvalue;
+                        size_t len;
+
+                        if (r->vec.type != T_STRING)
+                            continue;
+
+                        len = mstrsize(str);
+                        if (len != r->index2 - r->index1)
+                            continue;
+
+                        if (memcmp(get_txt(str), get_txt(r->vec.u.str) + r->index1, len) == 0)
+                            break;
+                    }
+                    else if (item->type == T_STRING && mstreq(str, item->u.str))
                         break;
                 }
                 break;
@@ -7182,13 +7406,13 @@ v_member (svalue_t *sp, int num_arg)
             case T_CLOSURE:
               {
                 short type;
-                svalue_t *item;
+                svalue_t *entry;
 
                 type = sp->type;
-                for(item = vec->item + startpos; --cnt >= 0; item++)
+                for(entry = vec->item + startpos; --cnt >= 0; entry++)
                 {
-                    /* TODO: Is this C99 compliant? */
-                    if (item->type == type && closure_eq(sp, item))
+                    svalue_t *item = get_rvalue(entry, NULL);
+                    if (item != NULL && item->type == type && closure_eq(sp, item))
                         break;
                 }
                 break;
@@ -7200,12 +7424,16 @@ v_member (svalue_t *sp, int num_arg)
               {
                 short x_generic;
                 short type;
-                svalue_t *item;
+                svalue_t *entry;
 
                 type = sp->type;
                 x_generic = sp->x.generic;
-                for(item = vec->item + startpos; --cnt >= 0; item++)
+                for(entry = vec->item + startpos; --cnt >= 0; entry++)
                 {
+                    svalue_t *item = get_rvalue(entry, NULL);
+                    if (item == NULL)
+                        continue;
+
                     /* TODO: Is this C99 compliant? */
                     if (sp_u.str == item->u.str
                      && x_generic == item->x.generic
@@ -7223,11 +7451,15 @@ v_member (svalue_t *sp, int num_arg)
                      * changes them to 0).
                      */
 
-                    svalue_t *item;
+                    svalue_t *entry;
                     short type;
 
-                    for (item = vec->item + startpos; --cnt >= 0; item++)
+                    for (entry = vec->item + startpos; --cnt >= 0; entry++)
                     {
+                        svalue_t *item = get_rvalue(entry, NULL);
+                        if (item == NULL)
+                            continue;
+
                         if ( (type = item->type) == T_NUMBER)
                         {
                             if ( !item->u.number )
@@ -7249,11 +7481,15 @@ v_member (svalue_t *sp, int num_arg)
             case T_POINTER:
             case T_STRUCT:
               {
-                svalue_t *item;
+                svalue_t *entry;
                 short type = sp->type;
 
-                for (item = vec->item + startpos; --cnt >= 0; item++)
+                for (entry = vec->item + startpos; --cnt >= 0; entry++)
                 {
+                    svalue_t *item = get_rvalue(entry, NULL);
+                    if (item == NULL)
+                        continue;
+
                     /* TODO: Is this C99 compliant? */
                     if (sp_u.number == item->u.number
                      && item->type == type)
@@ -7389,14 +7625,31 @@ v_rmember (svalue_t *sp, int num_arg)
         case T_STRING:
           {
             string_t *str;
-            svalue_t *item;
+            svalue_t *entry;
 
             str = sp_u.str;
-            for (item = vec->item+cnt; --cnt >= 0; )
+            for (entry = vec->item+cnt; --cnt >= 0; )
             {
-                item--;
-                if (item->type == T_STRING
-                 && mstreq(str, item->u.str))
+                svalue_t *item;
+                entry--;
+
+                item = get_rvalue(entry, NULL);
+                if (item == NULL)
+                {
+                    struct protected_range_lvalue* r = entry->u.protected_range_lvalue;
+                    size_t len;
+
+                    if (r->vec.type != T_STRING)
+                        continue;
+
+                    len = mstrsize(str);
+                    if (len != r->index2 - r->index1)
+                        continue;
+
+                    if (memcmp(get_txt(str), get_txt(r->vec.u.str) + r->index1, len) == 0)
+                        break;
+                }
+                else if (item->type == T_STRING && mstreq(str, item->u.str))
                     break;
             }
             break;
@@ -7405,13 +7658,16 @@ v_rmember (svalue_t *sp, int num_arg)
         case T_CLOSURE:
           {
             short type;
-            svalue_t *item;
+            svalue_t *entry;
 
             type = sp->type;
-            for (item = vec->item+cnt; --cnt >= 0; )
+            for (entry = vec->item+cnt; --cnt >= 0; )
             {
-                item--;
-                if (item->type == type && closure_eq(sp, item))
+                svalue_t *item;
+
+                entry--;
+                item = get_rvalue(entry, NULL);
+                if (item != NULL && item->type == type && closure_eq(sp, item))
                     break;
             }
             break;
@@ -7423,13 +7679,19 @@ v_rmember (svalue_t *sp, int num_arg)
           {
             short x_generic;
             short type;
-            svalue_t *item;
+            svalue_t *entry;
 
             type = sp->type;
             x_generic = sp->x.generic;
-            for (item = vec->item+cnt; --cnt >= 0; )
+            for (entry = vec->item+cnt; --cnt >= 0; )
             {
-                item--;
+                svalue_t *item;
+
+                entry--;
+                item = get_rvalue(entry, NULL);
+                if (item == NULL)
+                    continue;
+
                 /* TODO: Is this C99 compliant? */
                 if (sp_u.str == item->u.str
                  && x_generic == item->x.generic
@@ -7447,12 +7709,18 @@ v_rmember (svalue_t *sp, int num_arg)
                  * changes them to 0).
                  */
 
-                svalue_t *item;
+                svalue_t *entry;
                 short type;
 
-                for (item = vec->item+cnt; --cnt >= 0; )
+                for (entry = vec->item+cnt; --cnt >= 0; )
                 {
-                    item--;
+                    svalue_t *item;
+
+                    entry--;
+                    item = get_rvalue(entry, NULL);
+                    if (item == NULL)
+                        continue;
+
                     if ( (type = item->type) == T_NUMBER)
                     {
                         if ( !item->u.number )
@@ -7474,12 +7742,18 @@ v_rmember (svalue_t *sp, int num_arg)
         case T_POINTER:
         case T_STRUCT:
           {
-            svalue_t *item;
+            svalue_t *entry;
             short type = sp->type;
 
-            for (item = vec->item+cnt; --cnt >= 0; )
+            for (entry = vec->item+cnt; --cnt >= 0; )
             {
-                item--;
+                svalue_t *item;
+
+                entry--;
+                item = get_rvalue(entry, NULL);
+                if (item == NULL)
+                    continue;
+
                 /* TODO: Is this C99 compliant? */
                 if (sp_u.number == item->u.number
                  && item->type == type)
@@ -7643,42 +7917,74 @@ f_reverse(svalue_t *sp)
  */
 
 {
-    Bool changeInPlace = MY_FALSE;
+    bool changeInPlace = false;
+    mp_int index1, index2;
+    svalue_t *data, *var = NULL;
 
     /* If the argument is passed in by reference, make sure that it is
      * an array, note the fact, and place it directly into the stack.
-     * TODO: Allow protected ranges here.
      */
-    if (sp->type == T_LVALUE || sp->type == T_PROTECTED_LVALUE)
+    if (sp->type == T_LVALUE)
     {
-        svalue_t * svp = sp;
-        vector_t * vec = NULL;
+        bool last_reference = false;
+        data = get_rvalue(sp, &last_reference);
 
-        while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
+        if (data == NULL)
         {
-            svp = svp->u.lvalue;
-        }
+            /* This is a range. */
+            struct protected_range_lvalue *r;
 
-        if (svp->type != T_POINTER)
+            assert(sp->x.lvalue_type == LVALUE_PROTECTED_RANGE);
+            r = sp->u.protected_range_lvalue;
+
+            index1 = r->index1;
+            index2 = r->index2;
+            data = &(r->vec);
+            var = &(r->var->val);
+        }
+        else if (data->type == T_POINTER)
+        {
+            vector_t *vec = ref_array(data->u.vec);
+            free_svalue(sp);
+            put_array(sp, vec);
+
+            index1 = 0;
+            index2 = (mp_int)VEC_SIZE(vec);
+            data = sp;
+        }
+        else if (data->type == T_STRING)
+        {
+            string_t *str = ref_mstring(data->u.str);
+            free_svalue(sp);
+            put_string(sp, str);
+
+            if(!last_reference)
+                var = data;
+
+            index1 = 0;
+            index2 = (mp_int)mstrsize(str);
+            data = sp;
+        }
+        else
         {
             inter_sp = sp;
             errorf("Bad arg 1 to reverse(): got '%s &', "
-                  "expected 'string/mixed */mixed * &'.\n"
-                 , typename(svp->type));
+                  "expected 'string/string &/mixed */mixed * &'.\n"
+                 , typename(data->type));
             /* NOTREACHED */
             return sp;
         }
 
-        changeInPlace = MY_TRUE;
-
-        vec = ref_array(svp->u.vec);
-        free_svalue(sp);
-        put_array(sp, vec);
+        changeInPlace = true;
     }
+    else
+        data = sp;
 
-    if (sp->type == T_NUMBER)
+    if (data->type == T_NUMBER)
     {
         p_int res;
+
+        assert(data == sp);
 
         /* Try to use a fast bit swapping algorithm.
          * The slow fallback default is a loop swapping bit-by-bit.
@@ -7686,7 +7992,7 @@ f_reverse(svalue_t *sp)
 
 #if SIZEOF_PINT == 8
 
-        res = sp->u.number;
+        res = data->u.number;
 
         res =   ((res & 0xaaaaaaaaaaaaaaaa) >> 1)
               | ((res & 0x5555555555555555) << 1);
@@ -7702,7 +8008,7 @@ f_reverse(svalue_t *sp)
 
 #elif SIZEOF_PINT == 4
 
-        res = sp->u.number;
+        res = data->u.number;
 
         res = ((res & 0xaaaaaaaa) >> 1) | ((res & 0x55555555) << 1);
 	res = ((res & 0xcccccccc) >> 2) | ((res & 0x33333333) << 2);
@@ -7715,7 +8021,7 @@ f_reverse(svalue_t *sp)
         unsigned char * from, * to;
         int num;
 
-        from = (unsigned char *)&sp->u.number;
+        from = (unsigned char *)&data->u.number;
         to = (unsigned char *)&res + sizeof(res) - 1;
 
         for (num = sizeof(res); num > 0; num--, from++, to--)
@@ -7748,48 +8054,88 @@ f_reverse(svalue_t *sp)
 
         put_number(sp, res);
     }
-    else if (sp->type == T_STRING)
+    else if (data->type == T_STRING)
     {
-        size_t len = mstrsize(sp->u.str);
+        size_t len = mstrsize(data->u.str);
 
         /* If the length of the string is less than 2, there nothing to do */
         if (len > 1)
         {
-            char *h, *str;
-            string_t *res;
+            char *p1, *p2;
 
-            memsafe(res = alloc_mstring(len), len, "reversed string");
-            h = get_txt(res);
-            h += len - 1;
-            str = get_txt(sp->u.str);
+            if (changeInPlace)
+            {
+                string_t *str;
+                memsafe(str = make_mutable(data->u.str), mstrsize(data->u.str)
+                       , "modifiable string");
 
-            while (len--)
-                *h-- = *str++;
-            free_string_svalue(sp);
-            put_string(sp, res);
+                if (var != NULL && var->type == T_STRING && var->u.str == data->u.str)
+                {
+                    free_mstring(var->u.str);
+                    var->u.str = ref_mstring(str);
+                }
+                data->u.str = str;
+
+                p1 = get_txt(str);
+            }
+            else
+            {
+                string_t *res = NULL;
+
+                memsafe(res = alloc_mstring(len), len, "reversed string");
+                p1 = get_txt(res);
+
+                memcpy(p1, get_txt(data->u.str), len);
+                free_string_svalue(data);
+                put_string(sp, res);
+            }
+
+            if(!changeInPlace)
+            {
+                index1 = 0;
+                index2 = (mp_int)len;
+            }
+
+            p2 = p1 + index2 - 1;
+            p1 += index1;
+
+            while (p1 < p2)
+            {
+                char c = *p1;
+                *p1 = *p2;
+                *p2 = c;
+
+                p1++;
+                p2--;
+            }
         }
     }
-    else if (sp->type == T_POINTER)
+    else if (data->type == T_POINTER)
     {
-        mp_int v_size;
+        mp_int r_size;
         vector_t *vec = NULL;
 
         /* If we change in place, the 'new' vector is the old one
-         * with just one reference added. Same if the vector has only
-         * one reference to begin with, or is the null vector.
+         * that lies already on the stack.
          */
         if (changeInPlace
-         || sp->u.vec->ref == 1
-         || sp->u.vec == &null_vector)
+         || data->u.vec->ref == 1
+         || data->u.vec == &null_vector)
         {
-            vec = ref_array(sp->u.vec);
+            vec = data->u.vec;
+            if (!changeInPlace)
+            {
+                changeInPlace = true;
+                index1 = 0;
+                index2 = (mp_int)VEC_SIZE(vec);
+            }
         }
         else
         {
             vector_t *old;
             size_t size, i;
 
-            old = sp->u.vec;
+            old = data->u.vec;
             size = VEC_SIZE(old);
             vec = allocate_uninit_array((int)size);
             if (!vec)
@@ -7797,30 +8143,39 @@ f_reverse(svalue_t *sp)
                      , (unsigned long) size);
             for (i = 0; i < size; i++)
                 assign_svalue_no_free(&vec->item[i], &old->item[i]);
+
+            index1 = 0;
+            index2 = size;
         }
 
-        /* If the length of the array is less than 2, there nothing to do */
-        if ((v_size = (mp_int)VEC_SIZE(vec)) > 1)
+        r_size = index2 - index1;
+
+        /* If the length of the range is less than 2, there nothing to do */
+        if (r_size > 1)
         {
-            mp_int half, i;
+            mp_int i1, i2;
 
-            DYN_ARRAY_COST(v_size);
+            DYN_ARRAY_COST(r_size);
 
-            i = 0;
-            half = v_size / 2;
-            while (i < half)
+            i1 = index1;
+            i2 = index2 - 1;
+            while (i1 < i2)
             {
                 svalue_t tmp;
-                tmp   = *(vec->item + i);
-                *(vec->item + i) = *(vec->item + (v_size - 1) - i);
-                *(vec->item + (v_size - 1) - i) = tmp;
-                i++;
+                tmp   = *(vec->item + i1);
+                *(vec->item + i1) = *(vec->item + i2);
+                *(vec->item + i2) = tmp;
+                i1++;
+                i2--;
             }
         }
 
-        /* Replace the old array by the new one. */
-        free_svalue(sp);
-        put_array(sp, vec);
+        if (!changeInPlace)
+        {
+            /* Replace the old array by the new one. */
+            free_svalue(sp);
+            put_array(sp, vec);
+        }
     }
     else
     {
@@ -8506,6 +8861,9 @@ f_driver_info (svalue_t *sp)
             rxcache_driver_info(&result, what);
             break;
 
+        case DI_NUM_LVALUES:
+            put_number(&result, num_protected_lvalues);
+            break;
 
         case DI_SIZE_ACTIONS:
             simulate_driver_info(&result, what);
@@ -8922,20 +9280,27 @@ x_gm_localtime (svalue_t *sp, Bool localTime)
 
     if (sp->type != T_NUMBER)
     {
+        svalue_t *clock, *ms;
+
         if (VEC_SIZE(sp->u.vec) != 2)
             errorf("Bad arg 1 to %s(): Invalid array size %"PRIdPINT
                    ", expected 2.\n"
                  , localTime ? "localtime" : "gmtime"
                  , VEC_SIZE(sp->u.vec));
-        if (sp->u.vec->item[0].type != T_NUMBER)
+
+        clock = get_rvalue(sp->u.vec->item + 0, NULL);
+        if (clock == NULL || clock->type != T_NUMBER)
             errorf("Bad arg 1 to %s(): Element 0 is '%s', expected 'int'.\n"
                  , localTime ? "localtime" : "gmtime"
-                 , efun_arg_typename(sp->u.vec->item[0].type));
-        if (sp->u.vec->item[1].type != T_NUMBER)
+                 , efun_arg_typename((clock ? clock : (sp->u.vec->item + 0))->type));
+
+        ms = get_rvalue(sp->u.vec->item + 1, NULL);
+        if (ms == NULL || ms->type != T_NUMBER)
             errorf("Bad arg 1 to %s(): Element 1 is '%s', expected 'int'.\n"
                  , localTime ? "localtime" : "gmtime"
-                 , efun_arg_typename(sp->u.vec->item[1].type));
-        clk = sp->u.vec->item[0].u.number;
+                 , efun_arg_typename((ms ? ms : (sp->u.vec->item + 1))->type));
+
+        clk = clock->u.number;
     }
     else
     {
@@ -9178,23 +9543,26 @@ f_ctime(svalue_t *sp)
     if (sp->type != T_NUMBER)
     {
       /* utime case */
+        svalue_t *clock, *ms;
         if (VEC_SIZE(sp->u.vec) != 2)
             errorf("Bad arg 1 to ctime(): Invalid array size %"PRIdPINT
                    ", expected 2.\n", VEC_SIZE(sp->u.vec));
-        if (sp->u.vec->item[0].type != T_NUMBER)
-            errorf("Bad arg 1 to ctime(): Element 0 is '%s', expected 'int'.\n"
-                 , efun_arg_typename(sp->u.vec->item[0].type));
-        if (sp->u.vec->item[1].type != T_NUMBER)
-            errorf("Bad arg 1 to ctime(): Element 1 is '%s', expected 'int'.\n"
-                 , efun_arg_typename(sp->u.vec->item[1].type));
 
-        ts = utime_string( sp->u.vec->item[0].u.number
-                         , sp->u.vec->item[1].u.number);
+        clock = get_rvalue(sp->u.vec->item + 0, NULL);
+        if (clock == NULL || clock->type != T_NUMBER)
+            errorf("Bad arg 1 to ctime(): Element 0 is '%s', expected 'int'.\n"
+                 , efun_arg_typename((clock ? clock : (sp->u.vec->item + 0))->type));
+
+        ms = get_rvalue(sp->u.vec->item + 1, NULL);
+        if (ms == NULL || ms->type != T_NUMBER)
+            errorf("Bad arg 1 to ctime(): Element 1 is '%s', expected 'int'.\n"
+                 , efun_arg_typename((ms ? ms : (sp->u.vec->item + 1))->type));
+
+        ts = utime_string( clock->u.number, ms->u.number);
         if (!ts)
             errorf("Bad time in ctime(): ({%"PRIdPINT", %"PRIdPINT
                 "}) can't be represented by host system. Maybe too large?\n",
-                sp->u.vec->item[0].u.number,
-                sp->u.vec->item[1].u.number);
+                clock->u.number, ms->u.number);
 
         /* If the string contains nl characters, extract the substring
          * before the first one. Else just copy the (volatile) result
@@ -9347,7 +9715,8 @@ f_mktime (svalue_t *sp)
     struct tm * pTm; // broken-down time structure for mktime()
     time_t      clk; // unix timestamp corresponding to datum
     vector_t  * v;   // just for convenience, stores argument array 
-    int i; 
+    int i;
+    p_int val[9];
 
     v = sp->u.vec;
     if (VEC_SIZE(v) != 9)
@@ -9356,20 +9725,22 @@ f_mktime (svalue_t *sp)
     // all elements must be ints.
     for(i=0; i<VEC_SIZE(v); i++) 
     {
-        if ( v->item[i].type != T_NUMBER)
+        svalue_t *item = get_rvalue(v->item + i, NULL);
+        if ( item == NULL || item->type != T_NUMBER)
             errorf("Bad arg 1 to ctime(): Element %d is '%s', expected 'int'.\n"
-                 ,i, efun_arg_typename(v->item[0].type));
+                 ,i, efun_arg_typename((item ? item : (v->item + i))->type));
+        val[i] = item->u.number;
     }
 
     // create the time structure
     xallocate(pTm, sizeof(*pTm), "broken-down time structure for mktime()");
-    pTm->tm_sec   = v->item[TM_SEC].u.number;
-    pTm->tm_min   = v->item[TM_MIN].u.number;
-    pTm->tm_hour  = v->item[TM_HOUR].u.number;
-    pTm->tm_mday  = v->item[TM_MDAY].u.number;
-    pTm->tm_mon   = v->item[TM_MON].u.number;
-    pTm->tm_year  = v->item[TM_YEAR].u.number - 1900;
-    pTm->tm_isdst = v->item[TM_ISDST].u.number;
+    pTm->tm_sec   = val[TM_SEC];
+    pTm->tm_min   = val[TM_MIN];
+    pTm->tm_hour  = val[TM_HOUR];
+    pTm->tm_mday  = val[TM_MDAY];
+    pTm->tm_mon   = val[TM_MON];
+    pTm->tm_year  = val[TM_YEAR] - 1900;
+    pTm->tm_isdst = val[TM_ISDST];
     
     clk = mktime(pTm);
 
