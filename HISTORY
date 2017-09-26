@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-xx-xxx-2009 (LDMud Team) -- 3.5.0
+xx-xxx-2017 (LDMud Team) -- 3.5.0
     - Fixed Crashes
        + xml_generate(), xml_parse() could crash the driver due to a wrong
          order during initialization of libxml2 (#671) and could lead to
@@ -15,17 +15,39 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
        + 'dumpallobj' crashed if there are strings with 0 refcounts (#725).
        + fixed a crash during tracing caused by a wrong call to add_message()
          in do_trace(), when compiled with --enable-debug (#736).
+       + sprintf() could result in a fatal error if some buffer overflowed.
+         Removed these overflow opportunities (#825).
+       + fixed a crash during compilation when the handling of a preprocessor
+         statement meet the end of the lexer input buffer (#833).
+       + fixed a crash in crypt() when given an invalid salt.
+       + fixed a crash when calling ctime(-1) the first time.
 
     - Changed Efuns:
+       + apply() now expands an lvalue reference to an array or an array range
+         as lvalue references to the array elements.
        + add_action(): The function can be given as a closure. (#243)
+       + call_other() and call_direct() now always accept an array of objects or
+         strings (object names) as argument and call the function in all of these
+         objects.
        + command(): Won't throw an error anymore when a static function
          in another object is called. Such an action will simply be skipped.
        + get_dir(): prepend '/' in plain mode for entries in the root directory,
          if paths are requested by GETDIR_PATH.
        + explode() always returns a non-empty array, even upon explode("","")
          (#180).
+       + net_connect() will return an error code from comm.h instead of
+         the system errno value (#427).
+       + net_connect() had the current udp port as an undocumented default value
+         for its second argument. Now both parameters are mandatory.
+       + object_info() was redesigned to just return a single information including
+         configuration options from configure_object(). (#596)
+       + The functionality of shadow(ob, 0) was removed in favor of
+         object_info(ob, OI_SHADOW_NEXT). There is a sefun implementation with
+         the old signature in /mudlib/deprecated/. (#596)
+       + restore_object()/restore_value() can now restore null bytes in strings.
        + sort_array() will sort in-place instead of a copying the array first,
          if the array is passed as reference. (#224)
+       + sort_array() and reverse() also work with array range references.
        + to_struct() can convert a struct into another one if one of them is
          a (indirect) base of the other. (#646)
        + restore_object() checks if the types of restored data are compatible
@@ -41,13 +63,81 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
        + The deprecated efuns cat() and tail() were removed. They can be
          easily and more flexibly replaced by sefuns, which are supplied with
          the driver. (#637, #228)
+       + The efun set_light() was removed. This includes the internal light
+         state managment in the driver. The mudlib does a better and more
+         flexible job at managing light in/from objects. (#775)
+       + The supporting efuns for alists were removed: insert_alist, order_alist,
+         intersect_alist, assoc. (#776)
+       + strlen() was removed. sizeof() can be used as a drop-in replacement, which
+         does exactly the same thing. (#798)
+       + The following efuns were removed in favor of new efuns.
+         There are sefun replacements in /mudlib/deprecated/. (#596)
+
+         set_heart_beat()         -> configure_object(ob, OC_HEART_BEAT, flag)
+         enable_commands()        -> configure_object(ob, OC_COMMANDS_ENABLED, 1)
+         disable_commands()       -> configure_object(ob, OC_COMMANDS_ENABLED, 0)
+         seteuid()                -> configure_object(ob, OC_EUID, euid)
+         query_once_interactive() -> object_info(ob, OI_ONCE_INTERACTIVE)
+         query_shadowing()        -> object_info(ob, OI_SHADOW_PREV)
+         set_connection_charset() -> configure_object(ob, IC_CONNECTION_CHARSET_AS_STRING, val)
+                                     configure_object(ob, IC_CONNECTION_CHARSET_AS_ARRAY, val)
+                                     configure_object(ob, IC_QUOTE_IAC, 1 resp. 0)
+         get_connection_charset() -> object_info(ob, IC_CONNECTION_CHARSET_AS_STRING)
+                                     object_info(ob, IC_CONNECTION_CHARSET_AS_STRING)
+                                     object_info(ob, IC_QUOTE_IAC)
+         set_combine_charset()    -> configure_object(ob, IC_COMBINE_CHARSET_AS_STRING, val)
+                                     configure_object(ob, IC_COMBINE_CHARSET_AS_ARRAY, val)
+         get_combine_charset()    -> object_info(ob, IC_COMBINE_CHARSET_AS_STRING)
+                                     object_info(ob, IC_COMBINE_CHARSET_AS_STRING)
+         set_buffer_size()        -> configure_interactive(ob, IC_SOCKET_BUFFER_SIZE, size)
+         enable_telnet()          -> configure_interactive(ob, IC_TELNET_ENABLED, state)
+         start_mccp_compress()    -> configure_interactive(ob, IC_MCCP, state)
+         end_mccp_compress()      -> configure_interactive(ob, IC_MCCP, 0)
+         query_mccp()             -> interactive_info(ob, IC_MCCP)
+         query_mccp_stats()       -> interactive_info(ob, II_MCCP_STATS)
+         set_prompt()             -> configure_interactive(ob, IC_PROMPT, prompt)
+         set_max_commands()       -> configure_interactive(ob, IC_MAX_COMMANDS, num)
+         get_max_commands()       -> interactive_info(ob, IC_MAX_COMMANDS)
+         set_modify_command()     -> configure_interactive(ob, IC_MODIFY_COMMAND, ob)
+         query_ip_name()          -> interactive_info(ob, II_IP_NAME)
+                                     interactive_info(ob, II_IP_ADDRESS)
+         query_ip_number()        -> interactive_info(ob, II_IP_NUMBER)
+                                     interactive_info(ob, II_IP_ADDRESS)
+         query_editing()          -> interactive_info(ob, II_EDITING)
+         query_idle()             -> interactive_info(ob, II_IDLE)
+         query_input_pending()    -> interactive_info(ob, II_INPUT_PENDING)
+         debug_info()             -> driver_info(...)
+                                     dump_driver_info(...)
+                                     objects(...)
+         query_limits()           -> driver_info(DC_DEFAULT_RUNTIME_LIMITS)
+                                     driver_info(DI_CURRENT_RUNTIME_LIMITS)
+         set_limits()             -> configure_driver(DC_DEFAULT_RUNTIME_LIMITS)
+         set_extra_wizinfo_size() -> configure_driver(DC_EXTRA_WIZINFO_SIZE)
+         query_load_average()     -> driver_info(DI_LOAD_AVERAGE_COMMANDS)
+                                     driver_info(DI_LOAD_AVERAGE_LINES)
+         query_mud_port()         -> driver_info(DI_MUD_PORTS)
+                                     interactive_info(ob, II_MUD_PORT)
+         query_udp_port()         -> driver_info(DI_UDP_PORT)
+         query_snoop()            -> interactive_info(ob, II_SNOOP_NEXT)
+
+       + The efun set_is_wizard() was removed. It can be implemented with
+         normal actions. Example implementations are provided in
+         /mudlib/deprecated. (#596)
+       + The efun export_uid() was removed. The object's UID is now constant
+         and can't be changed. Instead the EUID can be exported with
+         configure_object(ob, OC_EUID, geteuid()). (#828)
 
     - New Efuns:
        + json_parse() parses strings encoding a JSON object into an
          appropriate LPC value. (optional efun)
        + json_serialize() converts a LPC value into an JSON object and
          serializes it as LPC string. (optional efun)
-         
+       + configure_object() sets options for given objects. (#596)
+       + interactive_info() and driver_info() return information about
+         interactive objects resp. the driver and the LPC runtime. (#596)
+       + dump_driver_info() dumps information to a file. (#596)
+       + objects() returns an excerpt from the object list. (#596)
+
     - Portability
        + Removed built-in PCRE package, because it was awfully out of date.
          Since libpcre is installed on nearly every halfway POSIX compatible
@@ -97,13 +187,16 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          (e.g. #743)
        + A profiling feature for detecting long executions was introduced. It
          can be configured with configure_driver().
+       + Redefined structs (by re-compiling its program) are now always
+         considered compatible. (#838)
 
     - Language
        + Added a sefun:: specifier to explicitly call simul-efuns. (#669)
        + structs are always enabled. (#557)
        + 'new' inline closure are always enabled. (#557)
-       + Added two new pragmas:
+       + Added three new pragmas:
            'rtt_checks', which will enable type checks at runtime.
+           'warn_rtt_checks', which will only give warnings on type checks.
            'no_rtt_checks', which disables runtime type checks.
        + A base struct is recorded as base struct in a child struct even if
          the base struct has no members. (#695)
@@ -119,10 +212,35 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          instead of the traditional self-built format).
        + Implemented union types. (#721)
        + Private prototypes are now invisible in the inheriting program.
+       + Programs that are virtually inherited twice will always exist
+         only once, updating an older program if necessary. (#233)
+       + Visibility modifiers are not combinable anymore. (#771)
+       + Added a new modifier: visible (which is the default visibility).
+       + Many restrictions for lvalue refrences (&var, &(arr[i]),
+         &(arr[i1..i2])) were lifted:
+          - They are not limited to the original variable's scope.
+            Therefore they can be returned from a function or passed
+            to a call_out.
+          - For this reason the error message "Can't trace reference
+            assignments." doesn't exist anymore.
+          - A range can be indexed again, so it can be used as an array
+            replacement.
+          - Multiple char references to the same string are allowed.
+         Lvalue references are automatically dereferenced when they
+         are not used as the left hand side of an expression without
+         the '&' operator.
+         Variables that contain an lvalue reference can be 'reseated',
+         i.e. change their value without changing the lvalue they reference:
+            &var = new_value_or_reference;
 
     - Networking
        + UDP datagrams with lengths up to 65507 (including UDP and IPv4
          headers: 65535) bytes are supported.
+       + TLS: Use 2048 bit wide DH parameters per default. (#845)
+       + TLS: Disable weak ciphers/hashs (DES, 3DES, RC4, MD5) and
+         protocolls (SSLv3). (#847)
+       + TLS: DH parameters can be set with configure_driver(). (#846)
+       + TLS: Allowed ciphers can be set with configure_driver(). (#849)
 
     - Other
        + The driver requires a C99 compatible build system. Some checks and
@@ -139,7 +257,15 @@ xx-xxx-2009 (LDMud Team) -- 3.5.0
          floats losslessly. It additionally is simpler to write/restore and
          makes the savefiles more compact because only one representation of
          the float value is stored.
-
+       + A further savefile format (version 3) was added to store lvalue
+         references.
+       + Added --tls-keydirectory command line option to specify a multiple
+         TLS keys to choose from with configure_driver(DC_TLS_CERTIFICATE).
+       + Added the pkg-python package to allow definition of efuns in Python.
+       + The special driver actions ('status', 'malloc', dumpallobj'
+         and 'opcdump') were removed. They can be implemented as normal
+         actions. Example implementations are provided in
+         /mudlib/deprecated/set_is_wizard.c (#596).
 
 30-May-2009 (LDMud Team) -- 3.3.719
     - Fixed Crashes:
