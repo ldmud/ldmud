@@ -18,6 +18,8 @@ void run_test()
 {
     object ob;
 
+#ifdef __PYTHON__
+
     msg("\nRunning tests for pkg_python:\n"
           "-----------------------------\n");
 
@@ -207,6 +209,9 @@ void run_test()
         }
         return 0;
     :));
+#else
+    shutdown(0);
+#endif
 }
 
 int master_fun() { return 54321; }
