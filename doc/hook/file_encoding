@@ -1,0 +1,27 @@
+SYNOPSIS
+        #include <sys/driver_hooks.h>
+
+        set_driver_hook(H_FILE_ENCODING, value)
+
+        <value> being:
+
+          string <text>
+          string <closure>(string filename)
+
+DESCRIPTION
+        Optonal hook specifying the name of the encoding to be used
+        for decoding a file. Hook setting can be a string or a closure.
+
+        If no hook was specified or the closure returns 0, then the
+        default "ascii" is used (and thus will throw an error upon
+        chars greater than 0x7f in the file).
+
+        If the settings is a closure, it will be called for every file
+        opened by the compiler or by read_file() and write_file()
+        (unless an explicit encoding was given).
+
+HISTORY
+        Introduced in LDMud 3.5.1
+
+SEE ALSO
+        hooks(C)

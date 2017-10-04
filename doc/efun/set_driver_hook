@@ -75,6 +75,11 @@ DESCRIPTION
           Optional hook to specify a string to be included before the
           source of every compiled LPC object.
 
+        H_FILE_ENCODING
+          arg: lambda closure, lfun closure, string
+          Optonal hook specifying the name of the encoding to be used
+          for decoding a file (default: "ascii").
+
         H_TELNET_NEG
           arg: lambda closure, lfun closure, string.
           Optional hook to specifiy how to perform a single telnet

@@ -35,21 +35,23 @@ DESCRIPTION
 	The numeric escapes could be used to express a character directly
 	by its code in binary, octal, decimal or hexadecimal notation.
 	
-	  \0b   Beginning of binary notation
-	  \0o   Beginning of octal notation
-	  \0x   Beginning of hexadecimal notation
-	  \x    Beginning of hexadecimal notation
+	  \0b     Beginning of binary notation
+	  \0o     Beginning of octal notation
+	  \0x     Beginning of hexadecimal notation
+	  \x      Beginning of hexadecimal notation
+	  \u, \U  Beginning of extended hexadecimal notation
 
 	A backslash followed by a digit ([0-9]) which does not map to one
 	of the above starts an escape in decimal notation.
 
 	A numeric escape terminates when N digits have been used up or
 	when the first character that is not a valid digit in that
-	notation is encountered. N is 2 for hexadeximals, 3 for
-	decimals and octals and 8 for binarys.
+	notation is encountered. N is 2 for hexadeximals with \0x and \x,
+	3 for decimals and octals, 4 for hexadecimals with \u,
+	8 for binarys and for hexadecimals with \U.
 
 	If the specified code is greater than 255 a warning is issued and
-	the value modulo 256 is used.
+	the value modulo 256 is used (except for \u and \U).
 
 EXAMPLES
 	Put a newline at the end of user output

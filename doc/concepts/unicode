@@ -1,0 +1,33 @@
+CONCEPT
+        unicode
+
+DESCRIPTION
+        LPC strings come in two flavors: As byte sequences and as unicode
+        strings. For both types almost the full range of string operations
+        is available, but the types are not to be mixed. So for example
+        you cannot add a byte sequence to an unicode string or vice versa.
+
+        Byte sequences can store only bytes (values from 0 to 255),
+        but unicode strings can store the full unicode character set
+        (values from 0 to 1114111).
+
+        There are two conversion functions to convert between byte sequences
+        and unicode strings: to_text() which will return a unicode string,
+        and to_bytes() which returns a byte sequence. Both take either
+        a string or an array, and when converting between bytes and unicode
+        also the name of the encoding (to be) used for the byte sequence.
+
+        -- File handling --
+
+        When a file is accessed either by compiling, read_file(), write_file()
+        (not read_bytes() or write_bytes(), or when an explicit encoding was
+        given), the master is asked via the driver hook H_FILE_ENCODING for
+        the encoding of the file. If none is given, 7 bit ASCII is assumed.
+        Whenever codes are encounted that are not valid in the given encoding
+        a compile or runtime error will be raised.
+
+HISTORY
+        Introduced in LDMud 3.6.
+
+SEE ALSO
+        to_text(E), to_bytes(E)

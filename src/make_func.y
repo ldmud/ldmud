@@ -1592,6 +1592,8 @@ name_to_hook(char *name)
         return H_SEND_NOTIFY_FAIL;
     if ( !strcmp(name, "AUTO_INCLUDE") )
         return H_AUTO_INCLUDE;
+    if ( !strcmp(name, "FILE_ENCODING") )
+        return H_FILE_ENCODING;
     if ( !strcmp(name, "DEFAULT_METHOD") )
         return H_DEFAULT_METHOD;
     if ( !strcmp(name, "DEFAULT_PROMPT") )

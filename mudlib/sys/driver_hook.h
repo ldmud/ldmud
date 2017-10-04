@@ -29,8 +29,9 @@
 #define H_PRINT_PROMPT          22
 #define H_REGEXP_PACKAGE        23
 #define H_MSG_DISCARDED         24
+#define H_FILE_ENCODING         25
 
-#define NUM_DRIVER_HOOKS        25  /* Number of hooks */
+#define NUM_DRIVER_HOOKS        26  /* Number of hooks */
 
 #endif /* LPC_DRIVER_HOOK_ */
 

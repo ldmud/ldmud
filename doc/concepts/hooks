@@ -105,6 +105,11 @@ DESCRIPTION
           the source of every compiled LPC object.
 
 
+        H_FILE_ENCODING
+          Optonal hook specifying the name of the encoding to be used
+          for decoding a file (default: "ascii").
+
+
         H_TELNET_NEG
           Optional hook to specifiy how to perform a single telnet
           negotiation. If not set, most telnet options are rejected (read:

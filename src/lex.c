@@ -27,13 +27,16 @@
 
 #include "my-alloca.h"
 #include <stdio.h>
+#include <assert.h>
 #include <fcntl.h>
+#include <iconv.h>
 #include <ctype.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <wctype.h>
 
 #include "lex.h"
 #include "prolang.h"
@@ -126,6 +129,10 @@
 #define DEFBUF_1STLEN (DEFMAX+MAXLINE+1)
   /* Initial length of macro expansion buffer, enough
    * to allow DEFMAX + an input line + '\0'
+   */
+
+#define CONVBUFSIZE 2*MAXLINE
+  /* Size of the conversion buffer.
    */
 
 /*-------------------------------------------------------------------------*/
@@ -232,9 +239,14 @@ static Mempool lexpool = NULL;
 
 typedef struct source_s
 {
-    int        fd;       /* Filedescriptor or -1 */
-    string_t * str;      /* The source string (referenced), or NULL */
-    size_t     current;  /* Current position in .str */
+    int        fd;           /* Filedescriptor or -1 */
+    iconv_t    cd;           /* Conversion descriptor, or -1 (if fd is valid, then cd is valid also) */
+    char*      convbuf;      /* Conversion buffer of size CONVBUFSIZE, or NULL */
+    char*      convstart;    /* Start position of available bytes in the conversion buffer.*/
+    size_t     convleft;     /* Number of available bytes in the conversion buffer. */
+    char       convbytes[4]; /* Bytes that didn't fit into the destination buffer. */
+    string_t * str;          /* The source string (referenced), or NULL */
+    size_t     current;      /* Current position in .str */
 } source_t;
 
 static source_t yyin;
@@ -308,6 +320,10 @@ static char saved_char;
 
 static Bool lex_fatal;
   /* True: lexer encountered fatal error.
+   */
+
+static int lex_error_pos = -1;
+  /* For encoding errors, the byte position of the error.
    */
 
 static svalue_t *inc_list;
@@ -570,7 +586,7 @@ static char optab2[]
     , 0,      0,   QMARK,   1                 /* 68: ?         */
 };
 
-#define optab1(c) (_optab[(c)-' '])
+#define optab1(c) (isascii(c) ? _optab[(c)-' '] : 0)
   /* Use optab1 to index _optab with raw characters.
    */
 
@@ -613,7 +629,7 @@ static Bool expand_define(void);
 static Bool _expand_define(struct defn*, ident_t*);
 static INLINE void myungetc(char);
 static p_int cond_get_exp(int, svalue_t *);
-static int exgetc(void);
+static p_int exgetc (char** chpos);
 static char *get_current_file(char **);
 static char *get_current_line_buf(char **);
 static char *get_current_function(char **);
@@ -901,6 +917,149 @@ init_lexer(void)
         xfree(tmpf);
     }
 } /* init_lexer() */
+
+/*-------------------------------------------------------------------------*/
+static inline bool
+unicode_iswhite (p_int ch)
+
+/* Returns true, if the given character is a whitespace (excluding line breaks).
+ */
+
+{
+    return ch < 128 ? (_my_ctype[(unsigned char)ch]&_MCTs) : iswspace((wint_t) ch);
+} /* unicode_iswhite() */
+
+/*-------------------------------------------------------------------------*/
+static inline bool
+unicode_isalunum (p_int ch)
+
+/* Returns true, if the given character is a alphanumeric or an underscore.
+ */
+
+{
+    return ch < 128 ? (_my_ctype[(unsigned char)ch]&_MCTa) : iswalnum((wint_t) ch);
+} /* unicode_isalunum() */
+
+static inline bool
+unicode_isdigit (p_int ch)
+
+/* Returns true, if the given character is an ASCII digit.
+ */
+
+{
+    return ch >= '0' && ch <= '9';
+} /* unicode_isalunum() */
+
+/*-------------------------------------------------------------------------*/
+static inline size_t
+utf8_iswhite (const char* str)
+
+/* Returns the number of bytes of the first UTF8 character in <str>,
+ * if this character is a whitespace (excluding line breaks).
+ * Returns 0 if it isn't.
+ * The text is assumed to be zero-terminated.
+ */
+
+{
+    p_int ch;
+    size_t len = utf8_to_unicode(str, 4, &ch);
+    if (!len)
+        return 0;
+
+    return unicode_iswhite(ch) ? len : 0;
+} /* utf8_iswhite() */
+
+/*-------------------------------------------------------------------------*/
+static inline size_t
+utf8_isalunum (const char* str)
+
+/* Returns the number of bytes of the first UTF8 character in <str>,
+ * if this character is a alphanumeric or an underscore.
+ * Returns 0 if it isn't.
+ * The text is assumed to be zero-terminated.
+ */
+
+{
+    p_int ch;
+    size_t len = utf8_to_unicode(str, 4, &ch);
+    if (!len)
+        return 0;
+
+    return unicode_isalunum(ch) ? len : 0;
+} /* utf8_iswhite() */
+
+/*-------------------------------------------------------------------------*/
+static inline char*
+skip_line (char* str)
+
+/* Returns the position of the character after the next newline in <str>.
+ * It is assumed that there is a next newline.
+ */
+
+{
+    while (*str++ != '\n');
+
+    return str;
+} /* skip_line() */
+
+/*-------------------------------------------------------------------------*/
+static inline char*
+skip_white (char* str)
+
+/* Returns the position of the next non-white character in <str>.
+ * The text is assumed to be zero-terminated.
+ */
+
+{
+    size_t len;
+
+    while ((len = utf8_iswhite(str)) != 0)
+        str += len;
+
+    return str;
+} /* skip_white() */
+
+/*-------------------------------------------------------------------------*/
+static inline char*
+skip_alunum (char* str)
+
+/* Returns the position of the next character in <str>,
+ * that is not alphanumeric or an underscore.
+ * The text is assumed to be zero-terminated.
+ */
+
+{
+    size_t len;
+
+    while ((len = utf8_isalunum(str)) != 0)
+        str += len;
+
+    return str;
+} /* skip_alunum() */
+
+/*-------------------------------------------------------------------------*/
+static inline char*
+skip_nonspace (char* str)
+
+/* Returns the position of the next whitespace character in <str>.
+ * It is assumed that there is a whitespace character in the text.
+ */
+
+{
+    while (true)
+    {
+        p_int ch;
+        size_t len = utf8_to_unicode(str, 4, &ch);
+
+        if (!len)
+            return str;
+
+        if (!ch || iswspace((wint_t) ch))
+            return str;
+
+        str += len;
+    }
+} /* skip_nonspace() */
 
 /*-------------------------------------------------------------------------*/
 int
@@ -1461,7 +1620,7 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, efun_override_t is_
     /* If the first character is alphanumeric, the string names a function,
      * otherwise an operator.
      */
-    if (isalunum(*str))
+    if (utf8_isalunum(str))
     {
         /* It is a function or keyword.
          */
@@ -2076,30 +2235,131 @@ realloc_defbuf (void)
 
 /*-------------------------------------------------------------------------*/
 static void
-set_input_source (int fd, string_t * str)
+set_input_source (int fd, const char* fname, string_t * str)
 
 /* Set the current input source to <fd>/<str>.
  * If <str> is given, it will be referenced.
  */
 
 {
+    yyin.convbuf = NULL;
+
     yyin.fd = fd;
+    if (fd != -1)
+    {
+        /* Initialize the converter. */
+        string_t *encoding = NULL;
+
+        if (driver_hook[H_FILE_ENCODING].type == T_STRING)
+        {
+            encoding = driver_hook[H_FILE_ENCODING].u.str;
+        }
+        else if (driver_hook[H_FILE_ENCODING].type == T_CLOSURE)
+        {
+            svalue_t *svp;
+
+            /* Setup and call the closure */
+            push_c_string(inter_sp, fname);
+            svp = secure_apply_lambda(driver_hook+H_FILE_ENCODING, 1);
+
+            if (svp && svp->type == T_STRING)
+                encoding = svp->u.str;
+        }
+
+        yyin.cd = iconv_open("utf-8", encoding == NULL ? "ascii" : get_txt(encoding));
+        if (yyin.cd == (iconv_t)-1)
+        {
+            if (errno == EINVAL)
+                lexerrorf("Unsupported encoding '%s'.", get_txt(encoding));
+            else
+                lexerror(strerror(errno));
+        }
+        else
+        {
+            yyin.convbuf = xalloc(CONVBUFSIZE);
+
+            if (yyin.convbuf == NULL)
+            {
+                iconv_close(yyin.cd);
+                yyin.cd = (iconv_t)-1;
+                lexerror("Out of memory while allocating file buffer.");
+            }
+            else
+            {
+                yyin.convstart = yyin.convbuf + CONVBUFSIZE;
+                yyin.convleft = 0;
+            }
+        }
+    }
+    else
+        yyin.cd = (iconv_t)-1;
+
     yyin.str = str ? ref_mstring(str) : NULL;
     yyin.current = 0;
 } /* set_input_source() */
 
 /*-------------------------------------------------------------------------*/
 static void
-close_input_source (void)
+close_input_source (bool dontclosefd)
 
 /* Close the current input source: a file is closed, a string is deallocated
+ * If <dontclosefd> is true, the file descriptor shall stay open.
  */
 
 {
-    if (yyin.fd != -1)    close(yyin.fd);         yyin.fd = -1;
-    if (yyin.str != NULL) free_mstring(yyin.str); yyin.str = NULL;
+    if (yyin.fd != -1)
+    {
+        if (!dontclosefd)
+            close(yyin.fd);
+        yyin.fd = -1;
+    }
+    if (yyin.cd != (iconv_t)-1)
+    {
+        iconv_close(yyin.cd);
+        yyin.cd = (iconv_t)-1;
+    }
+    if (yyin.convbuf != NULL)
+    {
+        xfree(yyin.convbuf);
+        yyin.convbuf = NULL;
+    }
+    if (yyin.str != NULL)
+    {
+        free_mstring(yyin.str);
+        yyin.str = NULL;
+    }
     yyin.current = 0;
 } /* close_input_source() */
+
+/*-------------------------------------------------------------------------*/
+static void
+lexencodingerror (char* pos, char* msg)
+
+/* An error during decoding the file.
+ * We temporary set the current_loc to the position where
+ * the error occurred.
+ */
+
+{
+    int forward_lines = 0;
+    char *p = linebufstart;
+    char *linestart = p;
+
+    for (; p < pos; p++)
+        if (*p == '\n')
+        {
+            forward_lines++;
+            linestart = p;
+        }
+
+    current_loc.line += forward_lines;
+    lex_error_pos = pos - linestart;
+
+    lexerror(msg);
+
+    current_loc.line -= forward_lines;
+    lex_error_pos = -1;
+} /* lexencodingerror() */
 
 /*-------------------------------------------------------------------------*/
 static /* NO inline */ char *
@@ -2144,7 +2404,110 @@ _myfilbuf (void)
     /* Read the next block of data */
     p = linebufstart; /* == linebufend - MAXLINE */
     if (yyin.fd != -1)
-        i = read(yyin.fd, p, MAXLINE);
+    {
+        if (yyin.cd != (iconv_t)-1)
+        {
+            size_t outleft = MAXLINE;
+            char*  outptr  = p;
+            bool   ineof   = false;
+
+            assert(yyin.convbuf != NULL);
+
+            /* First look at any leftovers. */
+            for (int num = 0; num < 4 && yyin.convbytes[num]; num++, outptr++, outleft--)
+                *outptr = yyin.convbytes[num];
+            yyin.convbytes[0] = 0;
+
+            while (true)
+            {
+                size_t rc = (size_t)-1;
+                bool fillbuf = false;
+
+                if (yyin.convleft != 0)
+                    rc = iconv(yyin.cd, &yyin.convstart, &yyin.convleft, &outptr, &outleft);
+                else if (ineof)
+                    rc = iconv(yyin.cd, NULL, NULL, &outptr, &outleft);
+                else
+                    fillbuf = true;
+
+                if (rc == (size_t)-1)
+                {
+                    i = outptr - p;
+
+                    /* Incomplete sequence, need to fill the input buffer. */
+                    if (fillbuf || errno == EINVAL)
+                    {
+                        if (yyin.convstart + yyin.convleft == yyin.convbuf + CONVBUFSIZE)
+                        {
+                            size_t j;
+
+                            if (yyin.convleft > 0)
+                                memmove(yyin.convbuf, yyin.convstart, yyin.convleft);
+
+                            j = read(yyin.fd, yyin.convbuf + yyin.convleft, CONVBUFSIZE - yyin.convleft);
+
+                            yyin.convstart = yyin.convbuf;
+                            yyin.convleft += j;
+
+                            if (j != 0)
+                                continue;
+                        }
+
+                        if (fillbuf)
+                        {
+                            ineof = true;
+                            continue;
+                        }
+                        else
+                        {
+                            lexencodingerror(outptr, "Unexpected end of file");
+                            break;
+                        }
+                    }
+
+                    /* Output buffer to small? Then we are finished for now. */
+                    if (errno == E2BIG)
+                    {
+                        /* i needs to be MAXLINE, so we try to convert one
+                         * additional codepoint und put the remaining bytes
+                         * into yyin.convbytes.
+                         */
+                        if (i < MAXLINE)
+                        {
+                            size_t j = 0, k = 0;
+                            outleft = 4;
+                            outptr  = yyin.convbytes;
+
+                            iconv(yyin.cd, &yyin.convstart, &yyin.convleft, &outptr, &outleft);
+
+                            for (; j < 4-outleft && i < MAXLINE; i++, j++)
+                                p[i] = yyin.convbytes[j];
+                            for (k = 0; j < 4-outleft; j++, k++)
+                                yyin.convbytes[k] = yyin.convbytes[j];
+                            yyin.convbytes[k] = 0;
+                        }
+                        break;
+                    }
+
+                    /* Invalid sequence, abort. */
+                    if (errno == EILSEQ)
+                    {
+                        lexencodingerror(outptr, "Invalid character sequence");
+                        break;
+                    }
+
+                    /* Other error, abort also. */
+                    lexencodingerror(outptr, strerror(errno));
+                    break;
+                }
+
+                if (ineof)
+                    break;
+            }
+        }
+        else
+            i = read(yyin.fd, p, MAXLINE);
+    }
     else
     {
         i = mstrsize(yyin.str) - yyin.current;
@@ -2253,9 +2616,12 @@ gobble (char c)
  */
 
 {
-    if (c ==  mygetc())
+    if (c == *outp)
+    {
+        outp++;
         return MY_TRUE;
-    --outp;
+    }
+
     return MY_FALSE;
 }
 
@@ -2314,6 +2680,7 @@ skip_to (char *token, char *atoken)
     char *q;  /* The start of the preprocessor statement */
     char c;
     char nl = '\n';
+    size_t len;
     int nest; /* Current nesting depth of #if...#endif blocks */
 
     p = outp;
@@ -2328,65 +2695,55 @@ skip_to (char *token, char *atoken)
             /* Parse the preprocessor statement */
 
             /* Set q to the first non-blank character of the keyword */
-            while(lexwhite(*p++)) NOOP;
-            q = --p;
+            q = p = skip_white(p);
 
             /* Mark the end of the preprocessor keyword with \0 */
-            while (isalunum(*p++)) NOOP;
-            c = *--p;  /* needed for eventual undos */
-            *p = '\0';
+            p = skip_alunum(p);
+            len = p - q; /* characters to compare. */
 
             /* Set p to the first character of the next line */
-            if (c != nl)
-            {
-                while (*++p != nl) NOOP;
-            }
-            p++;
+            p = skip_line(p);
 
             /* Evaluate the token at <q> */
 
-            if (strcmp(q, "if") == 0
-             || strcmp(q, "ifdef") == 0
-             || strcmp(q, "ifndef") == 0)
+            if ((len == 2 && strncmp(q, "if", len) == 0)
+             || (len == 5 && strncmp(q, "ifdef", len) == 0)
+             || (len == 6 && strncmp(q, "ifndef", len) == 0))
             {
                 nest++;
             }
             else if (nest > 0)
             {
-                if (strcmp(q, "endif") == 0)
+                if (len == 5 && strncmp(q, "endif", len) == 0)
                     nest--;
             }
             else
             {
-                if (strcmp(q, token) == 0)
+                if (len == strlen(token) && strncmp(q, token, len) == 0)
                 {
-                    *(p-1) = nl;
                     outp = p;
                     if (!*p)
-                    {
                         _myfilbuf();
-                    }
+
                     return MY_TRUE;
                 }
                 else if (atoken)
                 {
-                    if (strcmp(q, atoken) == 0)
+                    if (len == strlen(atoken) && strncmp(q, atoken, len) == 0)
                     {
-                        *(p-1) = nl;
                         outp = p;
-                        if (!*p) {
+                        if (!*p)
                             _myfilbuf();
-                        }
+
                         return MY_FALSE;
                     }
-                    else if (strcmp(q, "elif") == 0)
+                    else if (len == 4 && strncmp(q, "elif", len) == 0)
                     {
                         /* Morph the 'elif' into '#if' and reparse it */
                         current_loc.line--;
                         total_lines--;
                         q[0] = nl;
                         q[1] = '#';
-                        q[4] = c;   /* undo the '\0' */
                         outp = q+1;
                         return MY_FALSE;
                     }
@@ -2405,7 +2762,8 @@ skip_to (char *token, char *atoken)
             }
 
             /* Skip the rest of the line */
-            while (c != nl) c = *p++;
+            if (c != nl)
+                p = skip_line(p);
         }
 
         /* Read new data from the file if necessary */
@@ -2535,7 +2893,7 @@ start_new_include (int fd, string_t * str
     linebufend   = outp - 1; /* allow trailing zero */
     linebufstart = linebufend - MAXLINE;
     *(outp = linebufend) = '\0';
-    set_input_source(fd, str);
+    set_input_source(fd, name, str);
     _myfilbuf();
 
     return MY_TRUE;
@@ -2585,6 +2943,13 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
         {
             auto_include_string = svp->u.str;
         }
+    }
+
+    /* We accept only unicode strings. */
+    if (auto_include_string != NULL && auto_include_string->info.unicode == STRING_BYTES)
+    {
+        auto_include_string = NULL;
+        yyerror("H_AUTO_INCLUDE string is a byte string, unicode string needed.");
     }
 
     if (auto_include_string != NULL)
@@ -2982,7 +3347,7 @@ handle_include (char *name)
         ident_t *d;
 
         /* Locate the end of the macro and look it up */
-        for (p = name; isalunum(*p); p++) NOOP;
+        p = skip_alunum(name);
         c = *p;
         *p = '\0';
         d = lookup_define(name);
@@ -3007,9 +3372,7 @@ handle_include (char *name)
         }
 
         /* Set name to the first non-blank of the expansion */
-        name = outp;
-        while (lexwhite(*name))
-            name++;
+        name = skip_white(outp);
     }
 
     /* Store the delimiter and set p to the closing delimiter */
@@ -3037,8 +3400,7 @@ handle_include (char *name)
         for (;;)
         {
             /* Find the first non-blank character after p */
-            while(lexwhite(*q))
-                q++;
+            q = skip_white(q);
             if (!*q || *q == '\n')
                 break;
 
@@ -3049,7 +3411,7 @@ handle_include (char *name)
                 ident_t *d;
 
                 /* Set r to the first blank after the macro name */
-                for (r = q; isalunum(*r); r++) NOOP;
+                r = skip_alunum(q);
 
                 /* Lookup the macro */
                 c = *r;
@@ -3088,11 +3450,9 @@ handle_include (char *name)
                     outp = old_outp;
                     return;
                 }
-                q = outp;
 
                 /* Skip the blanks until the next macro/filename */
-                while (lexwhite(*q))
-                    q++;
+                q = skip_white(outp);
             }
 
             /* Second, try to parse a string literal */
@@ -3259,17 +3619,13 @@ deltrail (char *sp)
  */
 
 {
-    char *p;
-
-    p = sp;
-    if (!*p)
+    if (!*sp)
     {
         lexerror("Illegal # command");
     }
     else
     {
-        while(*p && !isspace((unsigned char)*p))
-            p++;
+        char *p = skip_nonspace(sp);
         *p = '\0';
     }
 } /* deltrail() */
@@ -3591,7 +3947,7 @@ number (long i)
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
-parse_numeric_escape (char * cp, unsigned char * p_char)
+parse_numeric_escape (char * cp, p_int * p_char)
 
 /* Parse a character constant in one of the following formats:
  *   <decimal>      (max 3 digits)
@@ -3599,6 +3955,8 @@ parse_numeric_escape (char * cp, unsigned char * p_char)
  *   0x<sedecimal>  (max 2 digits)
  *   x<sedecimal>   (max 2 digits)
  *   0b<binary>     (max 8 digits)
+ *   u<sedecimal>   (max 4 digits)
+ *   U<sedecimal>   (max 8 digits)
  *
  * with <cp> pointing to the first character. The function parses
  * until the first illegal character, but at max the given number of
@@ -3612,53 +3970,67 @@ parse_numeric_escape (char * cp, unsigned char * p_char)
 {
     char c;
     int num_digits = 3;
+    bool check_digits = false;
     unsigned long l;
     unsigned long base = 10;
 
     c = *cp++;
 
-    if ('0' == c)
+    switch (c)
     {
-        /* '0' introduces decimal, octal, binary and sedecimal numbers, or it
-         * can be a float.
-         *
-         * Sedecimals are handled in a following if-clause to allow the
-         * two possible prefixes.
-         */
-
-        c = *cp++;
-
-        switch (c)
-        {
-        case 'X': case 'x':
-            /* Sedecimal number are handled below - here just fall
-             * through.
+        case '0':
+            /* '0' introduces decimal, octal, binary and sedecimal numbers, or it
+             * can be a float.
+             *
+             * Sedecimals are handled in a following if-clause to allow the
+             * two possible prefixes.
              */
-            NOOP;
+
+            c = *cp++;
+
+            switch (c)
+            {
+                case 'X': case 'x':
+                    num_digits = 2;
+                    break;
+
+                case 'b': case 'B':
+                {
+                    c = *cp++;
+                    num_digits = 8;
+                    base = 2;
+                    break;
+                }
+
+                case 'o': case 'O':
+                    c = *cp++;
+                    base = 8;
+                    num_digits = 3;
+                    break;
+
+                default:
+                    c = '0';
+                    cp--;
+                    break;
+            } /* switch(c) */
             break;
 
-        case 'b': case 'B':
-          {
-            c = *cp++;
+        case 'X': case 'x':
+            num_digits = 2;
+            break;
+
+        case 'u':
+            num_digits = 4;
+            check_digits = true;
+            break;
+
+        case 'U':
             num_digits = 8;
-            base = 2;
+            check_digits = true;
             break;
-          }
+    } /* switch(c) */
 
-        case 'o': case 'O':
-            c = *cp++;
-            base = 8;
-            num_digits = 3;
-            break;
-
-        default:
-            c = '0';
-            cp--;
-            break;
-        } /* switch(c) */
-    } /* if ('0' == c) */
-
-    if ( c == 'X' || c == 'x' )
+    if ( c == 'X' || c == 'x' || c == 'U' || c == 'u' )
     {
         if (!leXdigit(*cp))
         {
@@ -3671,7 +4043,6 @@ parse_numeric_escape (char * cp, unsigned char * p_char)
          * TODO: strtoul should be portable enough today... Re-check if we
          * TODO::require C99.
          */
-        num_digits = 2;
         l = 0;
         while(leXdigit(c = *cp++) && num_digits-- > 0)
         {
@@ -3679,6 +4050,17 @@ parse_numeric_escape (char * cp, unsigned char * p_char)
                 c = (char)((c & 0xf) + ( '9' + 1 - ('a' & 0xf) ));
             l <<= 4;
             l += c - '0';
+        }
+
+        if (num_digits > 0 && check_digits)
+        {
+            yywarn("Missing digits in Unicode character constant.");
+        }
+
+        if (l >= 0x110000)
+        {
+            yywarn("Character constant out of range (> 0x10FFFF)");
+            l &= 0xff;
         }
     }
     else
@@ -3696,12 +4078,15 @@ parse_numeric_escape (char * cp, unsigned char * p_char)
         }
         while (lexdigit(c = *cp++) && c < (char)('0'+base) && --num_digits > 0)
               l = l * base + (c - '0');
+
+        if (l >= 256)
+        {
+            yywarn("Character constant out of range (> 255)");
+            l &= 0xff;
+        }
     }
 
-    if (l >= 256)
-        yywarn("Character constant out of range (> 255)");
-
-    *p_char = l & 0xff;
+    *p_char = l;
     return cp-1;
 
 } /* parse_numeric_escape() */
@@ -3861,7 +4246,7 @@ lex_parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
-parse_escaped_char (char * cp, char * p_char)
+parse_escaped_char (char * cp, p_int * p_char)
 
 /* Parse the sequence for an escaped character:
  *
@@ -3889,33 +4274,45 @@ parse_escaped_char (char * cp, char * p_char)
 
     switch (c = *cp++)
     {
-    case '\n':
-    case CHAR_EOF:
-        return NULL; break;
+        case '\n':
+        case CHAR_EOF:
+            return NULL; break;
 
-    case 'a': c = '\007'; break;
-    case 'b': c = '\b';   break;
-    case 'e': c = '\033'; break;
-    case 'f': c = '\014'; break;
-    case 'n': c = '\n';   break;
-    case 'r': c = '\r';   break;
-    case 't': c = '\t';   break;
-    case '0': case '1': case '2': case '3': case '4':
-    case '5': case '6': case '7': case '8': case '9':
-    case 'x': case 'X':
-      {
-        char * cp2;
+        case 'a': *p_char = '\007'; break;
+        case 'b': *p_char = '\b';   break;
+        case 'e': *p_char = '\033'; break;
+        case 'f': *p_char = '\014'; break;
+        case 'n': *p_char = '\n';   break;
+        case 'r': *p_char = '\r';   break;
+        case 't': *p_char = '\t';   break;
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+        case 'x': case 'X': case 'u': case 'U':
+        {
+            char * cp2;
 
-        /* If no valid escaped character is found, treat the sequence
-         * as a normal escaped character.
-         */
-        cp2 = parse_numeric_escape(cp-1, (unsigned char *)&c);
-        if (cp2 != NULL)
-            cp = cp2;
-      }
+            /* If no valid escaped character is found, treat the sequence
+             * as a normal escaped character.
+             */
+            cp2 = parse_numeric_escape(cp-1, p_char);
+            if (cp2 != NULL)
+                cp = cp2;
+            else
+                *p_char = c;
+            break;
+        }
+
+        default:
+        {
+            size_t len = utf8_to_unicode(cp-1, 4, p_char);
+            if (!len)
+                return NULL;
+
+            cp += len - 1;
+            break;
+        }
     } /* switch() */
 
-    *p_char = c;
     return cp;
 } /* parse_escaped_char() */
 
@@ -3992,7 +4389,6 @@ closure (char *in_yyp)
 {
     register char * yyp = in_yyp;
 
-    register char c;
     ident_t *p;
     char *wordstart = ++yyp;
     char *super_name = NULL;
@@ -4002,11 +4398,7 @@ closure (char *in_yyp)
     /* Set yyp to the last character of the functionname
      * after the #'.
      */
-    do
-        c = *yyp++;
-    while (isalunum(c));
-    c = *--yyp;
-    /* the assignment is good for the data flow analysis :-} */
+    yyp = skip_alunum(yyp);
 
     /* Just one character? It must be an operator */
     if (yyp == wordstart && *yyp != ':')
@@ -4032,10 +4424,7 @@ closure (char *in_yyp)
     {
         super_name = wordstart;
         wordstart = yyp += 2;
-        do
-            c = *yyp++;
-        while (isalunum(c));
-        c = *--yyp;
+        yyp = skip_alunum(yyp);
     }
 
     /* Test for the 'efun::' override.
@@ -4061,8 +4450,9 @@ closure (char *in_yyp)
         short ix;
         unsigned short inhIndex;
         funflag_t flags;
+        char c = *yyp;
 
-        *yyp = '\0'; /* c holds the char at this place */
+        *yyp = '\0';
         *(wordstart-2) = '\0';
         ix = find_inherited_function(super_name, wordstart, &inhIndex, &flags);
         inhIndex++;
@@ -4129,9 +4519,10 @@ closure (char *in_yyp)
     /* Did we find a suitable identifier? */
     if (!p || p->type < I_TYPE_GLOBAL)
     {
+        char c = *yyp;
+
         if (p && p->type == I_TYPE_UNKNOWN)
             free_shared_identifier(p);
-        c = *yyp;
         *yyp = '\0';
         yyerrorf("Undefined function: %.50s", wordstart);
         *yyp = c;
@@ -4263,13 +4654,15 @@ closure (char *in_yyp)
         }
 
         /* None of these all */
-        c = *yyp;
-        *yyp = 0;
-        yyerrorf("Undefined function: %.50s", wordstart);
-        *yyp = c;
-        yylval.closure.number = CLOSURE_EFUN_OFFS;
+        {
+            char c = *yyp;
+            *yyp = 0;
+            yyerrorf("Undefined function: %.50s", wordstart);
+            *yyp = c;
+            yylval.closure.number = CLOSURE_EFUN_OFFS;
 
-        break;
+            break;
+        }
     }
     return L_CLOSURE;
 } /* closure() */
@@ -4284,9 +4677,7 @@ handle_preprocessor_statement (char * in_yyp)
  */
 
 {
-    register char * yyp = in_yyp;
-
-    register char c;
+    register char *yyp;
     char *sp = NULL; /* Begin of second word */
     Bool quote; /* In "" string? */
     size_t wlen;  /* Length of the preproc keyword */
@@ -4299,15 +4690,15 @@ handle_preprocessor_statement (char * in_yyp)
      */
 
     /* Skip initial blanks */
-    outp = yyp;
+    outp = skip_white(in_yyp);
     yyp = yytext;
-    do {
-        c = mygetc();
-    } while (lexwhite(c));
-
     wlen = 0;
+
     for (quote = MY_FALSE, last = '\0';;)
     {
+        register char c = mygetc();
+        p_int uc;
+        size_t uclen;
 
         /* Skip comments */
         while (!quote && c == '/')
@@ -4342,19 +4733,39 @@ handle_preprocessor_statement (char * in_yyp)
         else
             last = c;
 
-        /* Remember end of the first word in the line */
-        if (!sp && !isalunum(c))
-        {
-            sp = yyp;
-            wlen = yyp - yytext;
-        }
-
         if (c == '\n')
         {
+            /* Remember end of the first word in the line */
+            if (!sp)
+            {
+                sp = yyp;
+                wlen = yyp - yytext;
+            }
             break;
         }
-        SAVEC;
-        c = mygetc();
+
+        /* Need to read the whole UTF8 code. */
+        outp--;
+        uclen = utf8_to_unicode(outp, 4, &uc);
+        if (uclen)
+        {
+            if (!sp && !unicode_isalunum(uc))
+            {
+                sp = yyp;
+                wlen = yyp - yytext;
+            }
+
+            if (yyp >= yytext + MAXLINE - 4 - uclen)
+            {
+                lexerror("Line too long");
+                break;
+            }
+
+            do
+            {
+                *yyp++ = *outp++;
+            } while (--uclen);
+        }
     }
 
     /* Terminate the line copied to yytext[] */
@@ -4365,10 +4776,7 @@ handle_preprocessor_statement (char * in_yyp)
      */
     if (sp)
     {
-        while(lexwhite(*sp))
-        {
-            sp++;
-        }
+        sp = skip_white(sp);
     }
     else
     {
@@ -4388,12 +4796,17 @@ handle_preprocessor_statement (char * in_yyp)
          * to make sure that the lex can continue.
          */
         handle_include(sp);
+
+        current_loc.line++;
         myfilbuf();
+        current_loc.line--;
     }
     else
     {
        /* Make sure there is enough data in the buffer. */
+       current_loc.line++;
        myfilbuf();
+       current_loc.line--;
 
     if (strncmp("define", yytext, wlen) == 0)
     {
@@ -4418,7 +4831,9 @@ handle_preprocessor_statement (char * in_yyp)
         }
         else
         {
+            current_loc.line++;
             myfilbuf();
+            current_loc.line--;
             handle_cond(cond);
         }
     }
@@ -4621,82 +5036,86 @@ yylex1 (void)
 
 {
     register char *yyp;
-    register char c;
 
-#define TRY(c, t) if (*yyp == (c)) {yyp++; outp = yyp; return t;}
+#define READ_CHAR       clen = utf8_to_unicode(yyp, 4, &c); if (!clen) goto badlex; yyp += clen;
+#define RETURN(val)     { outp = yyp; return (val); }
 
     yyp = outp;
 
-    for(;;) {
-        switch((unsigned char)(c = *yyp++))
+    while (true)
+    {
+        p_int c;
+        size_t clen;
+
+        READ_CHAR;
+
+        switch(c)
         {
 
-        /* --- End Of File --- */
+            /* --- End Of File --- */
+            case CHAR_EOF:
 
-        case CHAR_EOF:
-
-            if (inctop)
-            {
-                /* It's the end of an included file: return the previous
-                 * file
-                 */
-                struct incstate *p;
-                Bool was_string_source = (yyin.fd == -1);
-
-                p = inctop;
-
-                /* End the lexing of the included file */
-                close_input_source();
-                nexpands = 0;
-                store_include_end(p->inc_offset, p->loc.line);
-
-                /* Restore the previous state */
-                current_loc = p->loc;
-                if (!was_string_source)
-                    current_loc.line++;
-
-                yyin = p->yyin;
-                saved_char = p->saved_char;
-                inctop = p->next;
-                *linebufend = '\n';
-                yyp = linebufend + 1;
-                linebufstart = &defbuf[defbuf_len] + p->linebufoffset;
-                linebufend   = linebufstart + MAXLINE;
-                mempool_free(lexpool, p);
-                if (!*yyp)
+                if (inctop)
                 {
-                    outp = yyp;
-                    yyp = _myfilbuf();
-                }
-                break;
-            }
+                    /* It's the end of an included file: return the previous
+                     * file
+                     */
+                    struct incstate *p;
+                    Bool was_string_source = (yyin.fd == -1);
 
-            /* Here it's the end of the main file */
+                    p = inctop;
 
-            if (iftop)
-            {
-                /* Oops, pending #if!
-                 * Note the error and clean up the if-stack.
-                 */
-                lpc_ifstate_t *p = iftop;
+                    /* End the lexing of the included file */
+                    close_input_source(false);
+                    nexpands = 0;
+                    store_include_end(p->inc_offset, p->loc.line);
 
-                yyerror(p->state == EXPECT_ENDIF ? "Missing #endif" : "Missing #else");
-                while(iftop)
-                {
-                    p = iftop;
-                    iftop = p->next;
+                    /* Restore the previous state */
+                    current_loc = p->loc;
+                    if (!was_string_source)
+                        current_loc.line++;
+
+                    yyin = p->yyin;
+                    saved_char = p->saved_char;
+                    inctop = p->next;
+                    *linebufend = '\n';
+                    yyp = linebufend + 1;
+                    linebufstart = &defbuf[defbuf_len] + p->linebufoffset;
+                    linebufend   = linebufstart + MAXLINE;
                     mempool_free(lexpool, p);
+                    if (!*yyp)
+                    {
+                        outp = yyp;
+                        yyp = _myfilbuf();
+                    }
+                    break;
                 }
-            }
 
-            /* Return the EOF condition */
-            outp = yyp-1;
-            return -1;
+                /* Here it's the end of the main file */
+
+                if (iftop)
+                {
+                    /* Oops, pending #if!
+                     * Note the error and clean up the if-stack.
+                     */
+                    lpc_ifstate_t *p = iftop;
+
+                    yyerror(p->state == EXPECT_ENDIF ? "Missing #endif" : "Missing #else");
+                    while(iftop)
+                    {
+                        p = iftop;
+                        iftop = p->next;
+                        mempool_free(lexpool, p);
+                    }
+                }
+
+                /* Return the EOF condition */
+                outp = yyp-1;
+                return -1;
 
 
-        /* --- Newline --- */
-
-        case '\n':
+            /* --- Newline --- */
+            case '\n':
             {
                 store_line_number_info();
                 nexpands = 0;
@@ -4707,633 +5126,649 @@ yylex1 (void)
                     outp = yyp;
                     yyp = _myfilbuf();
                 }
+                break;
             }
-            break;
 
 
-        /* --- Other line markers --- */
-
-        case 0x1a: /* Used by some MSDOS editors as EOF */
-        case '\r':
-            *(yyp-1) = *(yyp-2);
-            break;
-
-
-        /* --- White space --- */
-
-        case ' ':
-        case '\t':
-        case '\f':
-        case '\v':
-            break;
+            /* --- Other line markers --- */
+            case 0x1a: /* Used by some MSDOS editors as EOF */
+            case '\r':
+                *(yyp-1) = *(yyp-2);
+                break;
 
 
-        /* --- Multi-Char Operators --- */
-        case '+':
-            switch(c = *yyp++)
-            {
-            case '+': outp = yyp;
-                      return L_INC;
-            case '=': yylval.number = F_ADD_EQ;
-                      outp = yyp;
-                      return L_ASSIGN;
-            default:  yyp--;
-            }
-            outp = yyp;
-            return '+';
+            /* --- Multi-Char Operators --- */
+            case '+':
+                READ_CHAR;
 
-        case '-':
-            switch(c = *yyp++)
-            {
-            case '>': outp = yyp;
-                      return L_ARROW;
-            case '-': outp = yyp;
-                      return L_DEC;
-            case '=': yylval.number = F_SUB_EQ;
-                      outp = yyp;
-                      return L_ASSIGN;
-            default:  yyp--;
-            }
-            outp = yyp;
-            return '-';
+                switch(c)
+                {
+                    case '+':
+                        RETURN(L_INC);
 
-        case '&':
-            switch(c = *yyp++)
-            {
+                    case '=':
+                        yylval.number = F_ADD_EQ;
+                        RETURN(L_ASSIGN);
+
+                    default: 
+                        yyp -= clen;
+                        RETURN('+');
+                }
+
+            case '-':
+                READ_CHAR;
+
+                switch(c)
+                {
+                    case '>':
+                        RETURN(L_ARROW);
+
+                    case '-':
+                        RETURN(L_DEC);
+
+                    case '=':
+                        yylval.number = F_SUB_EQ;
+                        RETURN(L_ASSIGN);
+
+                    default:
+                        yyp -= clen;
+                        RETURN('-');
+                }
+
             case '&':
-                switch(c = *yyp++)
-                {
-                case '=': yylval.number = F_LAND_EQ;
-                          outp = yyp;
-                          return L_ASSIGN;
-                default:  yyp--;
-                }
-                outp = yyp;
-                return L_LAND;
-            case '=': yylval.number = F_AND_EQ;
-                      outp = yyp;
-                      return L_ASSIGN;
-            default:  yyp--;
-            }
-            outp = yyp;
-            return '&';
+                READ_CHAR;
 
-        case '|':
-            switch(c = *yyp++)
-            {
+                switch(c)
+                {
+                    case '&':
+                    {
+                        READ_CHAR;
+
+                        switch(c)
+                        {
+                            case '=':
+                                yylval.number = F_LAND_EQ;
+                                RETURN(L_ASSIGN);
+                            default:
+                                yyp -= clen;
+                                RETURN(L_LAND);
+                        }
+                    }
+
+                    case '=':
+                        yylval.number = F_AND_EQ;
+                        RETURN(L_ASSIGN);
+
+                    default:
+                        yyp -= clen;
+                        RETURN('&');
+                }
+
             case '|':
-                switch(c = *yyp++)
+                READ_CHAR;
+
+                switch(c)
                 {
-                case '=': yylval.number = F_LOR_EQ;
-                          outp = yyp;
-                          return L_ASSIGN;
-                default:  yyp--;
+                    case '|':
+                    {
+                        READ_CHAR;
+
+                        switch(c)
+                        {
+                            case '=':
+                                yylval.number = F_LOR_EQ;
+                                RETURN(L_ASSIGN);
+
+                            default:
+                                yyp -= clen;
+                                RETURN(L_LOR);
+                        }
+                    }
+
+                    case '=':
+                        yylval.number = F_OR_EQ;
+                        RETURN(L_ASSIGN);
+
+                    default:
+                        yyp -= clen;
+                        RETURN('|');
                 }
-                outp = yyp;
-                return L_LOR;
-            case '=': yylval.number = F_OR_EQ;
-                      outp = yyp;
-                      return L_ASSIGN;
-            default:  yyp--;
-            }
-            outp = yyp;
-            return '|';
 
-        case '^':
-            if (*yyp == '=')
-            {
-                yyp++;
-                yylval.number = F_XOR_EQ;
-                outp = yyp;
-                return L_ASSIGN;
-            }
-            outp = yyp;
-            return '^';
-
-        case '<':
-            c = *yyp++;;
-            if (c == '<')
-            {
+            case '^':
                 if (*yyp == '=')
                 {
                     yyp++;
-                    yylval.number = F_LSH_EQ;
-                    outp = yyp;
-                    return L_ASSIGN;
+                    yylval.number = F_XOR_EQ;
+                    RETURN(L_ASSIGN);
                 }
-                outp = yyp;
-                return L_LSH;
-            }
-            if (c == '=') {
-                outp=yyp;
-                return L_LE;
-            }
-            yyp--;
-            outp = yyp;
-            return '<';
+                else
+                    RETURN('^');
 
-        case '>':
-            c = *yyp++;
-            if (c == '>')
-            {
+            case '<':
+                READ_CHAR;
+
+                switch(c)
+                {
+                    case '<':
+                        if (*yyp == '=')
+                        {
+                            yyp++;
+                            yylval.number = F_LSH_EQ;
+                            RETURN(L_ASSIGN);
+                        }
+                        else
+                            RETURN(L_LSH);
+
+                    case '=':
+                        RETURN(L_LE);
+
+                    default:
+                        yyp -= clen;
+                        RETURN('<');
+                }
+
+            case '>':
+                READ_CHAR;
+
+                switch(c)
+                {
+                    case '>':
+                        switch(*yyp)
+                        {
+                            case '=':
+                                yyp++;
+                                yylval.number = F_RSH_EQ;
+                                RETURN(L_ASSIGN);
+
+                            case '>':
+                                yyp++;
+                                if (*yyp == '=')
+                                {
+                                    yyp++;
+                                    yylval.number = F_RSHL_EQ;
+                                    RETURN(L_ASSIGN);
+                                }
+                                else
+                                    RETURN(L_RSHL);
+
+                            default:
+                                RETURN(L_RSH);
+                        }
+
+                    case '=':
+                        RETURN(L_GE);
+
+                    default:
+                        yyp -= clen;
+                        RETURN('>');
+                }
+
+            case '*':
                 if (*yyp == '=')
                 {
                     yyp++;
-                    yylval.number = F_RSH_EQ;
-                    outp = yyp;
-                    return L_ASSIGN;
+                    yylval.number = F_MULT_EQ;
+                    RETURN(L_ASSIGN);
                 }
-                if (*yyp == '>')
+                else
+                    RETURN('*');
+
+            case '%':
+                if (*yyp == '=')
                 {
                     yyp++;
-                    if (*yyp == '=')
+                    yylval.number = F_MOD_EQ;
+                    RETURN(L_ASSIGN);
+                }
+                else
+                    RETURN('%');
+
+            case '/':
+                READ_CHAR;
+
+                switch(c)
+                {
+                    case '*':
+                    {
+                        outp = yyp;
+                        skip_comment();
+                        yyp = outp;
+                        if (lex_fatal)
+                            return -1;
+
+                        break;
+                    }
+
+                    case '/':
+                        yyp = skip_pp_comment(yyp);
+                        break;
+
+                    case '=':
+                        yylval.number = F_DIV_EQ;
+                        RETURN(L_ASSIGN);
+
+                    default:
+                        yyp -= clen;
+                        RETURN('/');
+                }
+                break;
+
+            case '=':
+                if (*yyp == '=')
+                {
+                    yyp++;
+                    RETURN(L_EQ);
+                }
+                else
+                {
+                    yylval.number = F_ASSIGN;
+                    RETURN(L_ASSIGN);
+                }
+
+            case '!':
+                if (*yyp == '=')
+                {
+                    yyp++;
+                    RETURN(L_NE);
+                }
+                else
+                    RETURN(L_NOT);
+
+            case '.':
+                if (*yyp == '.')
+                {
+                    yyp++;
+                    if (*yyp == '.')
                     {
                         yyp++;
-                        yylval.number = F_RSHL_EQ;
-                        outp = yyp;
-                        return L_ASSIGN;
+                        RETURN(L_ELLIPSIS);
                     }
-                    outp = yyp;
-                    return L_RSHL;
+                    else
+                        RETURN(L_RANGE);
                 }
-                outp = yyp;
-                return L_RSH;
-            }
-            if (c == '=')
-            {
-                outp = yyp;
-                return L_GE;
-            }
-            yyp--;
-            outp = yyp;
-            return '>';
+                else
+                    goto badlex;
 
-        case '*':
-            if (*yyp == '=')
-            {
-                yyp++;
-                yylval.number = F_MULT_EQ;
-                outp = yyp;
-                return L_ASSIGN;
-            }
-            outp = yyp;
-            return '*';
-
-        case '%':
-            if (*yyp == '=') {
-                yyp++;
-                yylval.number = F_MOD_EQ;
-                outp = yyp;
-                return L_ASSIGN;
-            }
-            outp = yyp;
-            return '%';
-
-        case '/':
-            c = *yyp++;
-            if (c == '*')
-            {
-                outp = yyp;
-                skip_comment();
-                yyp = outp;
-                if (lex_fatal)
+            case ':':
+                switch(*yyp)
                 {
-                    return -1;
-                }
-                break;
-            }
-            if (c == '/')
-            {
-                yyp = skip_pp_comment(yyp);
-                break;
-            }
-            if (c == '=')
-            {
-                yylval.number = F_DIV_EQ;
-                outp = yyp;
-                return L_ASSIGN;
-            }
-            yyp--;
-            outp = yyp;
-            return '/';
+                    case ':':
+                        yyp++;
+                        RETURN(L_COLON_COLON);
 
-        case '=':
-            TRY('=', L_EQ);
-            yylval.number = F_ASSIGN;
-            outp = yyp;
-            return L_ASSIGN;
+                    case ')':
+                        yyp++;
+                        RETURN(L_END_INLINE);
 
-        case '!':
-            TRY('=', L_NE);
-            outp = yyp;
-            return L_NOT;
-
-        case '.':
-            if (yyp[0] == '.' && yyp[1] == '.')
-            {
-                yyp += 2;
-                outp = yyp;
-                return L_ELLIPSIS;
-            }
-            TRY('.',L_RANGE);
-            goto badlex;
-
-        case ':':
-            TRY(':', L_COLON_COLON);
-            TRY(')', L_END_INLINE);
-            outp = yyp;
-            return ':';
-
-        /* --- Inline Function --- */
-
-        case '(':
-            /* Check for '(:' but ignore '(::' which can occur e.g.
-             * in 'if (::remove())'. However, accept '(:::' e.g. from
-             * '(:::remove()', and '(::)'.
-             */
-
-            if (*yyp == ':'
-             && (yyp[1] != ':' || yyp[2] == ':' || yyp[2] == ')'))
-            {
-                yyp++;
-                outp = yyp;
-                return L_BEGIN_INLINE;
-            }
-
-            /* FALL THROUGH */
-        /* --- Single-char Operators and Punctuation --- */
-
-        /* case '(' is a fall through from above */
-        case ';':
-        case ')':
-        case ',':
-        case '{':
-        case '}':
-        case '~':
-        case '[':
-        case ']':
-        case '?':
-            outp = yyp;
-            return c;
-
-
-        /* --- #: Preprocessor statement or symbol --- */
-
-        case '#':
-            if (*yyp == '\'')
-            {
-                /* --- #': Closure Symbol --- */
-
-                return closure(yyp);
-
-            } /* if (#') */
-
-            else if (*(yyp-2) == '\n' && !nexpands)
-            {
-                /* --- <newline>#: Preprocessor statement --- */
-
-                yyp = handle_preprocessor_statement(yyp);
-                if (lex_fatal)
-                {
-                    return -1;
+                    default:
+                        RETURN(':');
                 }
 
-                if (!*yyp)
-                {
-                    outp = yyp;
-                    yyp = _myfilbuf();
-                }
-                break;
-            }
 
-            else
-                goto badlex;
-
-
-        /* --- ': Character constant or lambda symbol --- */
-
-        case '\'':
-            c = *yyp++;
-
-            if (c == '\\')
-            {
-                /* Parse an escape sequence */
-
-                if ('\n' != *yyp && CHAR_EOF != *yyp)
-                {
-                    char *cp;
-                    char lc = 0; /* Since c is 'register' */
-
-                    cp = parse_escaped_char(yyp, &lc);
-                    if (!cp)
-                        yyerror("Illegal character constant");
-                    yyp = cp;
-                    c = lc;
-                }
-
-                /* Test if it's terminated by a quote (this also
-                 * catches the \<nl> and \<eof> case).
-                 */
-                if (*yyp++ != '\'')
-                {
-                    yyp--;
-                    yyerror("Illegal character constant");
-                }
-
-                /* Continue after the if() as if it's a normal constant */
-
-            }
-            else if (*yyp++ != '\''
-                  || (   c == '\''
-                      && (*yyp == '(' || isalunum(*yyp) || *yyp == '\'')) )
-            {
-                /* Parse the symbol or quoted aggregate.
-                 *
-                 * The test rejects all sequences of the form
-                 *   'x'
-                 * and
-                 *   '''x, with x indicating that the ' character itself
-                 *         is meant as the desired constant.
-                 *
-                 * It accepts all forms of quoted symbols, with one or
-                 * more leading ' characters.
+            /* --- Inline Function --- */
+            case '(':
+                /* Check for '(:' but ignore '(::' which can occur e.g.
+                 * in 'if (::remove())'. However, accept '(:::' e.g. from
+                 * '(:::remove()', and '(::)'.
                  */
 
-                char *wordstart;
-                int quotes = 1;
-
-                /* Count the total number of ' characters, set wordstart
-                 * on the first non-quote.
-                 */
-                yyp -= 2;
-                while (*yyp == '\'')
+                if (*yyp == ':'
+                 && (yyp[1] != ':' || yyp[2] == ':' || yyp[2] == ')'))
                 {
-                    quotes++;
                     yyp++;
+                    RETURN(L_BEGIN_INLINE);
                 }
-                wordstart = yyp;
 
-                /* If the first non-quote is not an alnum, it must
-                 * be a quoted aggregrate or an error.
-                 */
-                if (!isalpha((unsigned char)*yyp) && *yyp != '_')
+                /* FALL THROUGH */
+
+
+            /* --- Single-char Operators and Punctuation --- */
+            /* case '(' is a fall through from above */
+            case ';':
+            case ')':
+            case ',':
+            case '{':
+            case '}':
+            case '~':
+            case '[':
+            case ']':
+            case '?':
+                RETURN(c);
+
+
+            /* --- #: Preprocessor statement or symbol --- */
+            case '#':
+                if (*yyp == '\'')
                 {
-                    if (*yyp == '(' && yyp[1] == '{')
+                    /* --- #': Closure Symbol --- */
+                    return closure(yyp);
+                } /* if (#') */
+
+                if (*(yyp-2) == '\n' && !nexpands)
+                {
+                    /* --- <newline>#: Preprocessor statement --- */
+
+                    yyp = handle_preprocessor_statement(yyp);
+                    if (lex_fatal)
+                        return -1;
+
+                    if (!*yyp)
                     {
-                        outp = yyp + 2;
-                        yylval.number = quotes;
-                        return L_QUOTED_AGGREGATE;
+                        outp = yyp;
+                        yyp = _myfilbuf();
                     }
-                    yyerror("Illegal character constant");
-                    outp = yyp;
-                    return L_NUMBER;
-                }
-
-                /* Find the end of the symbol and make it a shared string. */
-                while (isalunum(*++yyp)) NOOP;
-                c = *yyp;
-                *yyp = 0;
-                yylval.symbol.name = new_unicode_tabled(wordstart);
-                *yyp = c;
-                yylval.symbol.quotes = quotes;
-                outp = yyp;
-                return L_SYMBOL;
-            }
-
-            /* It's a normal (or escaped) character constant.
-             * Make sure that characters with the MSB set appear
-             * as positive numbers.
-             */
-            yylval.number = (unsigned char)c;
-            outp = yyp;
-            return L_NUMBER;
-
-
-        /* --- ": String Literal --- */
-
-        case '"':
-        {
-            char *p = yyp;
-
-            /* Construct the string in yytext[], terminated with a \0.
-             * ANSI style string concatenation is done by a recursive
-             * call to yylex() after this literal is parsed completely.
-             * This way a mixture of macros and literals is easily
-             * handled.
-             */
-            yyp = yytext;
-            for(;;)
-            {
-                c = *p++;
-
-                /* No unescaped newlines allowed */
-                if (c == '\n')
-                {
-                    outp = p-1;
-                    /* myfilbuf(); not needed */
-                    lexerror("Newline in string");
-                    return string("", 0);
-                }
-                SAVEC;
-
-                /* Unescaped ": end of string */
-                if (c == '"') {
-                    *--yyp = '\0';
                     break;
                 }
 
-                /* Handle an escape sequence */
+                goto badlex;
+
+
+            /* --- ': Character constant or lambda symbol --- */
+            case '\'':
+            {
+                p_int c2;
+                size_t c2len;
+
+                READ_CHAR;
+
                 if (c == '\\')
                 {
-                    yyp--; /* Undo the SAVEC */
+                    /* Parse an escape sequence */
 
-                    switch(c = *p++)
+                    if ('\n' != *yyp && CHAR_EOF != *yyp)
                     {
-                    case '\r':
-                        /* \<cr><lf> defaults to \<lf>, but
-                         * \<cr> puts <cr> into the text.
-                         */
-                        if (*p++ != '\n')
-                        {
-                            p--;
-                            *yyp++ = c;
-                            break;
-                        }
-                        /* FALLTHROUGH*/
+                        char *cp = parse_escaped_char(yyp, &yylval.number);
+                        if (!cp)
+                            yyerror("Illegal character constant");
+                        else
+                            yyp = cp;
+                    }
 
-                    case '\n':
-                        /* \<lf> and \<lf><cr> are ignored */
-                        store_line_number_info();
-                        current_loc.line++;
-                        total_lines++;
-                        if (*p == CHAR_EOF )
+                    /* Test if it's terminated by a quote (this also
+                     * catches the \<nl> and \<eof> case).
+                     */
+                    if (*yyp++ != '\'')
+                    {
+                        yyp--;
+                        yyerror("Illegal character constant");
+                    }
+
+                    RETURN(L_NUMBER);
+                }
+
+                c2len = utf8_to_unicode(yyp, 4, &c2);
+                if (!c2len)
+                    goto badlex;
+                yyp += c2len;
+
+                if (c2 != '\''
+                  || (   c == '\''
+                      && (*yyp == '(' || utf8_isalunum(yyp) || *yyp == '\'')) )
+                {
+                    /* Parse the symbol or quoted aggregate.
+                     *
+                     * The test rejects all sequences of the form
+                     *   'x'
+                     * and
+                     *   '''x, with x indicating that the ' character itself
+                     *         is meant as the desired constant.
+                     *
+                     * It accepts all forms of quoted symbols, with one or
+                     * more leading ' characters.
+                     */
+
+                    char *wordstart;
+                    int quotes = 1;
+
+                    /* Count the total number of ' characters, set wordstart
+                     * on the first non-quote.
+                     */
+                    yyp -= clen + c2len;
+                    while (*yyp == '\'')
+                    {
+                        quotes++;
+                        yyp++;
+                    }
+                    wordstart = yyp;
+
+                    /* If the first non-quote is not an alnum, it must
+                     * be a quoted aggregrate or an error.
+                     */
+                    READ_CHAR;
+                    if (!iswalpha(c) && c != '_')
+                    {
+                        if (c == '(' && *yyp == '{')
                         {
-                            outp = p;
-                            lexerror("End of file (or 0x01 character) in string");
-                            return string("", 0);
+                            yyp++;
+                            yylval.number = quotes;
+                            RETURN(L_QUOTED_AGGREGATE);
                         }
-                        if (!*p)
-                        {
-                            outp = p;
-                            p = _myfilbuf();
-                        }
-                        if (*p++ != '\r')
-                            p--;
+
+                        yyerror("Illegal character constant");
+                        yyp -= clen;
+                        RETURN(L_NUMBER);
+                    }
+
+                    /* Find the end of the symbol and make it a shared string. */
+                    yyp = skip_alunum(yyp);
+                    yylval.symbol.name = new_n_unicode_tabled(wordstart, yyp-wordstart);
+                    yylval.symbol.quotes = quotes;
+                    RETURN(L_SYMBOL);
+                }
+
+                /* It's a normal (or escaped) character constant.
+                 * Make sure that characters with the MSB set appear
+                 * as positive numbers.
+                 */
+                yylval.number = (unsigned char)c;
+                RETURN(L_NUMBER);
+            }
+
+
+            /* --- ": String Literal --- */
+            case '"':
+            {
+                char *p = yyp;
+
+                /* Construct the string in yytext[], terminated with a \0.
+                 * ANSI style string concatenation is done by a recursive
+                 * call to yylex() after this literal is parsed completely.
+                 * This way a mixture of macros and literals is easily
+                 * handled.
+                 */
+                yyp = yytext;
+                for(;;)
+                {
+                    c = *p++;
+
+                    /* No unescaped newlines allowed */
+                    if (c == '\n')
+                    {
+                        outp = p-1;
+                        /* myfilbuf(); not needed */
+                        lexerror("Newline in string");
+                        return string("", 0);
+                    }
+                    SAVEC;
+
+                    /* Unescaped ": end of string */
+                    if (c == '"')
+                    {
+                        *--yyp = '\0';
                         break;
+                    }
 
-                    default:
-                      {
-                          char *cp, lc = 0;
+                    /* Handle an escape sequence */
+                    if (c == '\\')
+                    {
+                        yyp--; /* Undo the SAVEC */
 
-                          cp = parse_escaped_char(p-1, &lc);
-                          if (!cp)
-                              yyerror("Illegal escaped character in string.");
-                          p = cp;
-                          *yyp++ = lc;
-                          break;
-                      }
+                        switch(c = *p++)
+                        {
+                            case '\r':
+                                /* \<cr><lf> defaults to \<lf>, but
+                                 * \<cr> puts <cr> into the text.
+                                 */
+                                if (*p++ != '\n')
+                                {
+                                    p--;
+                                    *yyp++ = c;
+                                    break;
+                                }
+                                /* FALLTHROUGH*/
+
+                            case '\n':
+                                /* \<lf> and \<lf><cr> are ignored */
+                                store_line_number_info();
+                                current_loc.line++;
+                                total_lines++;
+                                if (*p == CHAR_EOF )
+                                {
+                                    outp = p;
+                                    lexerror("End of file (or 0x01 character) in string");
+                                    return string("", 0);
+                                }
+                                if (!*p)
+                                {
+                                    outp = p;
+                                    p = _myfilbuf();
+                                }
+                                if (*p++ != '\r')
+                                    p--;
+                                break;
+
+                            default:
+                            {
+                                char *cp;
+                                p_int lc = 0;
+
+                                cp = parse_escaped_char(p-1, &lc);
+                                if (!cp)
+                                    yyerror("Illegal escaped character in string.");
+                                else
+                                    p = cp;
+
+                                if (yyp + 9 >= yytext + MAXLINE)
+                                {
+                                    lexerror("Line too long");
+                                    return string("", 0);
+                                }
+
+                                yyp += unicode_to_utf8(lc, yyp);
+                                break;
+                            }
+                        }
+                    }
+                } /* for() */
+
+                outp = p;
+                return string(yytext, yyp-yytext);
+            }
+
+
+            /* --- Numbers --- */
+            case '0':case '1':case '2':case '3':case '4':
+            case '5':case '6':case '7':case '8':case '9':
+            {
+                char *numstart = yyp-clen;
+                unsigned long l;
+                char ch;
+                Bool overflow;
+
+                /* Scan ahead to see if this is a float number */
+                while (lexdigit(ch = *yyp++)) NOOP ;
+
+                /* If it's a float (and not a range), simply use strtod()
+                 * to convert the float and to update the text pointer.
+                 */
+                if ('.' == ch && '.' != *yyp)
+                {
+                    char * numend;  /* Because yyp is 'register' */
+                    errno = 0; /* Because strtod() doesn't clear it on success */
+                    yylval.float_number = strtod(numstart, &numend);
+                    if (errno == ERANGE)
+                    {
+                        yywarn("Floating point number out of range.");
+                    }
+                    else if (errno == EINVAL)
+                    {
+                        yyerror("Floating point number can't be represented.");
+                    }
+                    outp = numend;
+                    return L_FLOAT;
+                }
+
+                /* Nope, normal number */
+                yyp = parse_number(numstart, &l, &overflow);
+                if (overflow || (l > (unsigned long)LONG_MAX+1))
+                {
+                    /* Don't warn on __INT_MAX__+1 because there
+                     * may be a minus preceeding this number.
+                     */
+                    yywarnf("Number exceeds numeric limits");
+                }
+
+                outp = yyp;
+                return number((long)l);
+            }
+
+
+            /* --- Character classes and everything else --- */
+            default:
+                /* --- Identifier --- */
+                if (c == '$' || unicode_isalunum(c))
+                {
+                    ident_t *p;
+                    char *wordstart = yyp-clen;
+
+                    /* Find the end of the identifier */
+                    yyp = skip_alunum(yyp);
+
+                    /* Lookup/enter the identifier in the ident_table. */
+                    p = make_shared_identifier_n(wordstart, yyp-wordstart, I_TYPE_UNKNOWN, 0);
+
+                    if (!p)
+                    {
+                        lexerror("Out of memory");
+                        return 0;
+                    }
+
+                    /* Handle the identifier according to its type */
+                    switch(p->type)
+                    {
+                        case I_TYPE_DEFINE:
+                            outp = yyp;
+                            _expand_define(&p->u.define, p);
+                            if (lex_fatal)
+                                return -1;
+
+                            yyp=outp;
+                            continue;
+
+                        case I_TYPE_RESWORD:
+                            outp = yyp;
+                            return p->u.code;
+
+                        case I_TYPE_LOCAL:
+                            yylval.ident = p;
+                            RETURN(L_LOCAL);
+
+                        default:
+                            /* _UNKNOWN identifiers get their type assigned by the
+                             * parser.
+                             */
+                            yylval.ident = p;
+                            RETURN(L_IDENTIFIER);
                     }
                 }
-            } /* for() */
 
-            outp = p;
-            return string(yytext, yyp-yytext);
-        }
+                /* --- White space --- */
+                if (iswspace(c))
+                    break;
 
-
-        /* --- Numbers --- */
-
-        case '0':case '1':case '2':case '3':case '4':
-        case '5':case '6':case '7':case '8':case '9':
-        {
-            char *numstart = yyp-1;
-            unsigned long l;
-            Bool overflow;
-
-            /* Scan ahead to see if this is a float number */
-            while (lexdigit(c = *yyp++)) NOOP ;
-
-            /* If it's a float (and not a range), simply use strtod()
-             * to convert the float and to update the text pointer.
-             */
-            if ('.' == c && '.' != *yyp)
-            {
-                char * numend;  /* Because yyp is 'register' */
-                errno = 0; /* Because strtod() doesn't clear it on success */
-                yylval.float_number = strtod(numstart, &numend);
-                if (errno == ERANGE)
-                {
-                    yywarn("Floating point number out of range.");
-                }
-                else if (errno == EINVAL)
-                {
-                    yyerror("Floating point number can't be represented.");
-                }
-                outp = numend;
-                return L_FLOAT;
-            }
-
-            /* Nope, normal number */
-            yyp = parse_number(numstart, &l, &overflow);
-            if (overflow || (l > (unsigned long)LONG_MAX+1))
-            {
-                /* Don't warn on __INT_MAX__+1 because there
-                 * may be a minus preceeding this number.
-                 */
-                yywarnf("Number exceeds numeric limits");
-            }
-
-            outp = yyp;
-            return number((long)l);
-        }
-
-
-        /* --- Identifier --- */
-
-        case 'A':case 'B':case 'C':case 'D':case 'E':case 'F':case 'G':
-        case 'H':case 'I':case 'J':case 'K':case 'L':case 'M':case 'N':
-        case 'O':case 'P':case 'Q':case 'R':case 'S':case 'T':case 'U':
-        case 'V':case 'W':case 'X':case 'Y':case 'Z':case 'a':case 'b':
-        case 'c':case 'd':case 'e':case 'f':case 'g':case 'h':case 'i':
-        case 'j':case 'k':case 'l':case 'm':case 'n':case 'o':case 'p':
-        case 'q':case 'r':case 's':case 't':case 'u':case 'v':case 'w':
-        case 'x':case 'y':case 'z':case '_':case '$':
-        case 0xC0:case 0xC1:case 0xC2:case 0xC3:
-        case 0xC4:case 0xC5:case 0xC6:case 0xC7:
-        case 0xC8:case 0xC9:case 0xCA:case 0xCB:
-        case 0xCC:case 0xCD:case 0xCE:case 0xCF:
-        case 0xD0:case 0xD1:case 0xD2:case 0xD3:
-        case 0xD4:case 0xD5:case 0xD6:case 0xD7:
-        case 0xD8:case 0xD9:case 0xDA:case 0xDB:
-        case 0xDC:case 0xDD:case 0xDE:case 0xDF:
-        case 0xE0:case 0xE1:case 0xE2:case 0xE3:
-        case 0xE4:case 0xE5:case 0xE6:case 0xE7:
-        case 0xE8:case 0xE9:case 0xEA:case 0xEB:
-        case 0xEC:case 0xED:case 0xEE:case 0xEF:
-        case 0xF0:case 0xF1:case 0xF2:case 0xF3:
-        case 0xF4:case 0xF5:case 0xF6:case 0xF7:
-        case 0xF8:case 0xF9:case 0xFA:case 0xFB:
-        case 0xFC:case 0xFD:case 0xFE:case 0xFF:
-        {
-            ident_t *p;
-            char *wordstart = yyp-1;
-
-            /* Find the end of the identifier */
-            do
-                c = *yyp++;
-            while (isalunum(c));
-            --yyp; /* Remember to take back one character to honor the the wizard whose identifier this is. */
-
-            /* Lookup/enter the identifier in the ident_table. */
-            p = make_shared_identifier_n(wordstart, yyp-wordstart, I_TYPE_UNKNOWN, 0);
-
-            if (!p)
-            {
-                lexerror("Out of memory");
-                return 0;
-            }
-
-            /* printf("DEBUG: ident '%s' type is %p->%d\n", p->name, p, p->type); */
-
-            /* Handle the identifier according to its type */
-
-            switch(p->type)
-            {
-            case I_TYPE_DEFINE:
-
-                outp = yyp;
-                _expand_define(&p->u.define, p);
-                if (lex_fatal)
-                {
-                    return -1;
-                }
-                yyp=outp;
-                continue;
-
-            case I_TYPE_RESWORD:
-                outp = yyp;
-                return p->u.code;
-
-            case I_TYPE_LOCAL:
-                yylval.ident = p;
-                outp = yyp;
-                return L_LOCAL;
-
-            default:
-                /* _UNKNOWN identifiers get their type assigned by the
-                 * parser.
-                 */
-                yylval.ident = p;
-                outp = yyp;
-                return L_IDENTIFIER;
-            }
-        }
-
-
-        /* --- Everything else --- */
-
-        default:
-            goto badlex;
+                /* --- All other --- */
+                yyp -= clen;
+                goto badlex;
         } /* switch (c) */
 
     } /* for() */
@@ -5347,13 +5782,27 @@ badlex:
 
     {
         char buff[100];
-        sprintf(buff, "Illegal character (hex %02x) '%c'", c, c);
+        p_int c;
+        size_t clen = utf8_to_unicode(yyp, 4, &c);
+
+        if (!clen)
+        {
+            /* Not an Unicode character, just print the hex code. */
+            sprintf(buff, "Illegal character (hex %02x)", *yyp);
+            outp = yyp + 1;
+        }
+        else
+        {
+            sprintf(buff, "Illegal character (hex %02" PRIxPINT") '%.*s'", c, (int)clen, yyp);
+            outp = yyp + clen;
+        }
+
         yyerror(buff);
-        outp = yyp;
         return ' ';
     }
 
-#undef TRY
+#undef READ_CHAR
+#undef RETURN
 
 } /* yylex1() */
 
@@ -5399,7 +5848,7 @@ start_new_file (int fd, const char * fname)
     current_loc.file = new_source_file(fname, NULL);
     current_loc.line = 1; /* already used in first _myfilbuf() */
 
-    set_input_source(fd, NULL);
+    set_input_source(fd, object_file, NULL);
 
     if (!defbuf_len)
     {
@@ -5447,13 +5896,14 @@ end_new_file (void)
     {
         struct incstate *p;
         p = inctop;
-        close_input_source();
+        close_input_source(false);
         yyin = p->yyin;
         inctop = p->next;
     }
 
     iftop = NULL;
 
+    close_input_source(true);
     cleanup_source_files();
 
     mempool_reset(lexpool);
@@ -5532,37 +5982,6 @@ get_f_name (int n)
 } /* get_f_name() */
 
 /*-------------------------------------------------------------------------*/
-static char
-cmygetc (void)
-
-/* Get the next character from the input buffer (using mygetc()) which
- * is not part of a comment.
- */
-
-{
-    char c;
-
-    for(;;)
-    {
-        c = mygetc();
-        if (c == '/') {
-            if (gobble('*'))
-                skip_comment();
-            else if (gobble('/'))
-            {
-                outp = skip_pp_comment(outp);
-                current_loc.line--;
-                return '\n';
-            }
-            else
-                return c;
-        }
-        else
-            return c;
-    }
-} /* cmygetc() */
-
-/*-------------------------------------------------------------------------*/
 static Bool
 refill (Bool quote)
 
@@ -5617,8 +6036,11 @@ refill (Bool quote)
         }
     } while (c != '\n' && c != CHAR_EOF);
 
+
     /* Refill the input buffer */
+    current_loc.line+=2;        /* For correct erorr messages, because of yytext, current_loc is always one line behind. */
     myfilbuf();
+    current_loc.line--;
 
     /* Replace the trailing \n by a space */
     if (p[-1] == '\n')
@@ -5626,7 +6048,6 @@ refill (Bool quote)
     *p = '\0';
 
     nexpands = 0;
-    current_loc.line++;
     store_line_number_info();
 
     return quote;
@@ -5643,26 +6064,24 @@ handle_define (char *yyt, Bool quote)
  */
 
 {
-  /* Get the identfier (or punctuation) pointed to by p and copy it
-   * as null-terminated string to q, but at max up to address m.
+  /* Get the identfier (or punctuation) pointed to by <src> and copy it
+   * as null-terminated string to <dest>, but at maximal <size>-1 characters.
+   * Set <src> to the first character after that.
    */
-#define GETALPHA(p, q, m) \
-    while(isalunum(*p)) {\
-        *q = *p++;\
-        if (q < (m))\
-            q++;\
-        else {\
-            lexerror("Name too long");\
-            return;\
-        }\
-    }\
-    *q++ = 0
-
-  /* Skip all whitespace from the current position of char*-variable 'p'
-   * on.
-   */
-#define SKIPWHITE while(lexwhite(*p)) p++
-
+#define GETALPHA(src, dest, size)                       \
+    {                                                   \
+        char * wordstart = src;                         \
+        src = skip_alunum(src);                         \
+                                                        \
+        if (src - wordstart >= size)                    \
+        {                                               \
+            lexerror("Name too long");                  \
+            return;                                     \
+        }                                               \
+                                                        \
+        memcpy(dest, wordstart, src-wordstart);         \
+        dest[src-wordstart] = 0;                        \
+    }
 
     source_loc_t loc;         /* Location of the #define */
     char namebuf[NSIZE];      /* temp buffer for read identifiers */
@@ -5671,16 +6090,14 @@ handle_define (char *yyt, Bool quote)
       /* replacement text, with arguments replaced by the MARKS characters
        */
     char *p;                  /* current text pointer */
-    char *q;                  /* destination for parsed text */
 
     loc = current_loc;
 
     p = yyt;
-    strcat(p, " "); /* Make sure GETALPHA terminates */
+    strcat(yyt, " "); /* Make sure GETALPHA terminates */
 
     /* Get the defined name */
-    q = namebuf;
-    GETALPHA(p, q, namebuf+NSIZE-1);
+    GETALPHA(p, namebuf, NSIZE);
 
     if (*p == '(')
     {
@@ -5689,9 +6106,10 @@ handle_define (char *yyt, Bool quote)
         short arg;         /* Number of macro arguments */
         Bool inid;         /* true: parsing an identifier */
         char *ids = NULL;  /* Start of current identifier */
+        char *q;           /* Destination for parsed text */
 
         p++;        /* skip '(' and following whitespace */
-        SKIPWHITE;
+        p = skip_white(p);
 
         /* Parse the arguments (if any) */
 
@@ -5707,11 +6125,10 @@ handle_define (char *yyt, Bool quote)
             for (arg = 0; arg < NARGS; )
             {
                 /* Get the argname directly into args[][] */
-                q = args[arg];
-                GETALPHA(p, q, &args[arg][NSIZE-1]);
+                GETALPHA(p, args[arg], NSIZE);
                 arg++;
 
-                SKIPWHITE;
+                p = skip_white(p);
 
                 /* ')' -> no further argument */
 
@@ -5719,12 +6136,15 @@ handle_define (char *yyt, Bool quote)
                     break;
 
                 /* else a ',' is expected as separator */
-                if (*p++ != ',') {
+                if (*p++ != ',')
+                {
                     yyerror("Missing ',' in #define parameter list");
                     return;
                 }
-                SKIPWHITE;
+
+                p = skip_white(p);
             }
+
             if (arg == NARGS)
             {
                 lexerrorf("Too many macro arguments");
@@ -5740,11 +6160,20 @@ handle_define (char *yyt, Bool quote)
 
         for (inid = MY_FALSE, q = mtext; *p && *p != CHAR_EOF; )
         {
+            p_int c;
+            size_t len = utf8_to_unicode(p, 4, &c);
+            if (!len)
+            {
+                // We'll take the character as it is.
+                c = *(unsigned char*)p;
+                len++;
+            }
+
             /* Identifiers are parsed until complete, with the first
              * character pointed to by <ids>.
              */
 
-            if (isalunum(*p))
+            if (unicode_isalunum(c))
             {
                 /* Identifier. If inid is false, it is a new one.
                  */
@@ -5789,16 +6218,19 @@ handle_define (char *yyt, Bool quote)
             /* Whatever the character is, for now store it in mtext[].
              * Literal '@' are escaped.
              */
-            *q = *p;
-            if (*p++ == MARKS)
-                *++q = MARKS;
-            if (q < mtext+MLEN-2)
-                q++;
-            else
+            if (q + len + 1 > mtext + MLEN)
             {
                 lexerror("Macro text too long");
                 return;
             }
+
+            do
+            {
+                *q++ = *p++;
+            } while (--len);
+
+            if (p[-1] == MARKS)
+                *q++ = MARKS;
 
             /* If we are at line's end and it is escaped with '\',
              * get the next line and continue.
@@ -5835,6 +6267,8 @@ handle_define (char *yyt, Bool quote)
     else
     {
         /* --- Normal Macro --- */
+
+        char *q;           /* Destination for parsed text */
 
         /* Parse the replacement text into mtext[].
          */
@@ -6188,6 +6622,54 @@ expand_define (void)
 } /* expand_define() */
 
 /*-------------------------------------------------------------------------*/
+static void
+skip_outp_white_and_comments ()
+
+/* Move <outp> to the next character that is not a whitespace
+ * or part of a comment. Reads new lines as needed.
+ */
+
+{
+    while (true)
+    {
+        outp = skip_white(outp);
+        switch (*outp++)
+        {
+            case '/':
+                if (gobble('*'))
+                {
+                    skip_comment();
+                    break;
+                }
+                else if (gobble('/'))
+                {
+                    outp = skip_pp_comment(outp);
+                    current_loc.line--;
+                    // FALLTHROUGH
+                }
+                else
+                {
+                    outp--;
+                    return;
+                }
+
+            // FALLTHROUGH from C++ comments.
+            case '\n':
+                myfilbuf();
+                store_line_number_info();
+                current_loc.line++;
+                total_lines++;
+                break;
+
+            default:
+                outp--;
+                return;
+        }
+    }
+
+} /* skip_outp_white_and_comments() */
+
+/*-------------------------------------------------------------------------*/
 static Bool
 _expand_define (struct defn *p, ident_t * macro)
 
@@ -6201,22 +6683,6 @@ _expand_define (struct defn *p, ident_t * macro)
  */
 
 {
-  /* Skip the whitespace in the input buffer until the next non-blank
-   * and store that one in variable <c>.
-   */
-#define SKIPW \
-    for(;;) {\
-        do {\
-            c = cmygetc();\
-        } while(lexwhite(c));\
-        if (c == '\n') {\
-            myfilbuf();\
-            store_line_number_info();\
-            current_loc.line++;\
-            total_lines++;\
-        } else break;\
-    }
-
     static char *expbuf = NULL;
       /* The arguments of a function macro, separated by '\0' characters.
        */
@@ -6243,18 +6709,7 @@ _expand_define (struct defn *p, ident_t * macro)
     static int mutex = 0;
       /* TODO: The mutex may be used to implement a stack of buffers if needed.
        */
-#endif
 
-    char *args[NARGS];
-      /* Pointers into expbuf[] to the beginning of the actual
-       * macro arguments.
-       */
-    char *q;  /* Pointer into expbuf[] when parsing the args */
-    char *e;  /* Pointer to replacement text */
-    char *b;  /* Pointer into buf[] when expanding */
-    char *r;  /* Next character to read from input buffer */
-
-#if 0
     /* TODO: This was a test for recursive calls. If a stack of buffers is
      * TODO:: needed, this code fragments allow an easy implementation,
      * TODO:: especially because the DEMUTEX macros are already where
@@ -6300,8 +6755,9 @@ _expand_define (struct defn *p, ident_t * macro)
         }
         else
         {
-            e = (*p->exps.fun)(NULL);
-            if (!e) {
+            char *e = (*p->exps.fun)(NULL);
+            if (!e)
+            {
                 lexerror("Out of memory");
                 DEMUTEX;
                 return 0;
@@ -6316,16 +6772,24 @@ _expand_define (struct defn *p, ident_t * macro)
     {
         /* --- Function Macro --- */
 
-        int c;
+        char *args[NARGS];
+          /* Pointers into expbuf[] to the beginning of the actual
+           * macro arguments.
+           */
+
+        char *expptr;  /* Pointer to replacement text */
+        char *bufptr;  /* Pointer into buf[] when expanding */
+
         int brakcnt = 0; /* Number of pending open '[' */
         int parcnt = 0;  /* Number of pending open' (' */
         Bool dquote = MY_FALSE; /* true: in "" */
         Bool squote = MY_FALSE; /* true: in '' */
-        int n;           /* Number of parsed macro arguments */
+        int argnum;           /* Number of parsed macro arguments */
 
         /* Look for the argument list */
-        SKIPW;
-        if (c != '(') {
+        skip_outp_white_and_comments();
+        if (*outp++ != '(')
+        {
             yyerrorf("Macro '%s': Missing '(' in call", get_txt(macro->name));
             DEMUTEX;
             return MY_FALSE;
@@ -6337,228 +6801,274 @@ _expand_define (struct defn *p, ident_t * macro)
          * comments.
          */
 
-        SKIPW;
-        if (c == ')')
-            n = 0;  /* No args */
+        skip_outp_white_and_comments();
+        if (*outp == ')')
+        {
+            argnum = 0;  /* No args */
+            outp++;
+        }
         else
         {
             /* Setup */
-            r = outp;
-            *--r = (char)c;
-            q = expbuf;
-            args[0] = q;
 
-            for (n = 0;;)
+            char *inptr = outp;         /* Next character to read from input buffer */
+            char *argptr = expbuf;      /* Pointer into expbuf[] when parsing the args */
+            char *whitestart = NULL;    /* Pointer into expbuf[] to the tailing white spaces. */
+            args[0] = argptr;
+
+            for (argnum = 0;;)
             {
-                if (q >= expbuf + DEFMAX - 5)
+                char c;
+                if (argptr >= expbuf + DEFMAX - 5)
                 {
                     lexerrorf("Macro '%s': argument overflow", get_txt(macro->name));
                     DEMUTEX;
                     return MY_FALSE;
                 }
 
-                switch(c = *r++)
+                switch(c = *inptr++)
                 {
-                  case '"' :
-                    /* Begin of string literal, or '"' constant */
-                    if (!squote)
-                        dquote = !dquote;
-                    *q++ = (char)c;
-                    continue;
+                    case '"' :
+                        /* Begin of string literal, or '"' constant */
+                        if (!squote)
+                            dquote = !dquote;
+                        *argptr++ = c;
+                        whitestart = NULL;
+                        continue;
 
-                  case '#':
-                    /* Outside of strings it must be a #'symbol.
-                     */
-                    *q++ = (char)c;
-                    if (!squote && !dquote && *r == '\'')
-                    {
-                        r++;
-                        *q++ = '\'';
-                        if (isalunum(c = *r))
+                    case '#':
+                        /* Outside of strings it must be a #'symbol.
+                         */
+                        *argptr++ = c;
+                        whitestart = NULL;
+                        if (!squote && !dquote && *inptr == '\'')
                         {
-                            do {
-                                *q++ = (char)c;
-                                ++r;
-                            } while (isalunum(c = *r));
-                        }
-                        else
-                        {
-                            const char *end;
+                            char *wordstart = ++inptr;
+                            *argptr++ = '\'';
 
-                            if (symbol_operator(r, &end) < 0)
+                            inptr = skip_alunum(inptr);
+
+                            if (wordstart != inptr)
                             {
-                                yyerror("Missing function name after #'");
+                                /* Copy the whole word. */
+                                memcpy(argptr, wordstart, inptr - wordstart);
+                                argptr += inptr - wordstart;
                             }
-                            strncpy(q, r, (size_t)(end - r));
-                            q += end - r;
-                            r = (char *)end;
-                        }
-                    }
-                    continue;
-
-                  case '\'':
-                    /* Begin of character constant or quoted symbol.
-                     */
-                    if ( !dquote
-                     && (!isalunum(*r) || r[1] == '\'')
-                     && (*r != '(' || r[1] != '{') )
-                    {
-                        squote = !squote;
-                    }
-                    *q++ = (char)c;
-                    continue;
-
-                  case '[' :
-                    /* Begin of array/mapping index.
-                     */
-                    if (!squote && !dquote)
-                        brakcnt++;
-                    *q++ = (char)c;
-                    continue;
-
-                  case ']' :
-                    /* End of array/mapping index.
-                     */
-                    if (!squote && !dquote && brakcnt > 0)
-                    {
-                        brakcnt--;
-                    }
-                    *q++ = (char)c;
-                    continue;
-
-                  case '(' :
-                    /* Begin of nested expression.
-                     */
-                    if (!squote && !dquote)
-                        parcnt++;
-                    *q++ = (char)c;
-                    continue;
-
-                  case ')' :
-                    /* End of nested expression.
-                     */
-                    if (!squote && !dquote)
-                    {
-                        parcnt--;
-                        if (parcnt < 0)
-                        {
-                            /* We found the end of the argument list. Remove
-                             * trailing whitespace and terminate the arg. */
-                            while( lexwhite(*(--q)) ) ;
-                            ++q; // last non-whitespace char, increase by one
-                            *q++ = '\0'; // then terminate the arg.
-                            n++;
-                            break;
-                        }
-                    }
-                    *q++ = (char)c;
-                    continue;
-
-                  case '\\':
-                    /* In strings, escaped sequence.
-                     */
-                    *q++ = (char)c;
-                    if (squote || dquote)
-                    {
-                        c = *r++;
-                        if (c == '\r')
-                            c = *r++;
-                        if (c == '\n')  /* nope! This wracks consistency! */
-                        {
-                            store_line_number_info();
-                            current_loc.line++;
-                            total_lines++;
-                            if (!*r)
+                            else
                             {
-                                outp = r;
-                                r = _myfilbuf();
+                                const char *end;
+
+                                if (symbol_operator(inptr, &end) < 0)
+                                {
+                                    yyerror("Missing function name after #'");
+                                }
+                                memcpy(argptr, inptr, (size_t)(end - inptr));
+                                argptr += end - inptr;
+                                inptr = (char *)end;
                             }
-                            q--;        /* alas, long strings should work. */
-                            continue;
                         }
-                        if (c == CHAR_EOF) /* can't quote THAT */
+                        continue;
+
+                    case '\'':
+                        /* Begin of character constant or quoted symbol.
+                         */
+                        if (!dquote)
                         {
-                            r--;
-                            continue;
+                            size_t clen = utf8_isalunum(inptr);
+                            if ((!clen || inptr[clen] == '\'')
+                             && (*inptr != '(' || inptr[1] != '{'))
+                            {
+                                squote = !squote;
+                            }
                         }
-                        *q++ = (char)c;
-                    }
-                    continue;
+                        *argptr++ = c;
+                        whitestart = NULL;
+                        continue;
 
-                  case '\n':
-                    /* Next line.
-                     */
-                    store_line_number_info();
-                    current_loc.line++;
-                    total_lines++;
-                    *q++ = ' ';
-                    if (!*r) {
-                        outp = r;
-                        r = _myfilbuf();
-                    }
-                    if (squote || dquote) {
-                        lexerror("Newline in string");
-                        DEMUTEX;
-                        return MY_FALSE;
-                    }
-                    continue;
+                    case '[' :
+                        /* Begin of array/mapping index.
+                         */
+                        if (!squote && !dquote)
+                            brakcnt++;
+                        *argptr++ = c;
+                        whitestart = NULL;
+                        continue;
 
-                  case ',':
-                    /* Argument separation
-                     */
-                    if (!parcnt && !dquote && !squote && !brakcnt)
-                    {
-                        /* Remove trailing whitespace and terminate the arg. */
-                        while( lexwhite(*(--q)) ) NOOP;
-                        ++q; // last non-whitespace char, increase by one
-                        *q++ = '\0'; // then terminate the arg.
-                        // I don't skip the leading whitespace for the next
-                        // argument because there may be things like
-                        // linebreaks between two args which I don't want to
-                        // deal with in this case. This will be done below.
-                        args[++n] = q;
-                        if (n == NARGS - 1)
+                    case ']' :
+                        /* End of array/mapping index.
+                         */
+                        if (!squote && !dquote && brakcnt > 0)
                         {
-                            lexerror("Maximum macro argument count exceeded");
+                            brakcnt--;
+                        }
+                        *argptr++ = c;
+                        whitestart = NULL;
+                        continue;
+
+                    case '(' :
+                        /* Begin of nested expression.
+                         */
+                        if (!squote && !dquote)
+                            parcnt++;
+                        *argptr++ = c;
+                        whitestart = NULL;
+                        continue;
+
+                    case ')' :
+                        /* End of nested expression.
+                         */
+                        if (!squote && !dquote)
+                        {
+                            parcnt--;
+                            if (parcnt < 0)
+                            {
+                                /* We found the end of the argument list. Remove
+                                 * trailing whitespace and terminate the arg. */
+                                if (whitestart)
+                                    argptr = whitestart;
+                                *argptr++ = '\0'; // then terminate the arg.
+                                argnum++;
+                                break;
+                            }
+                        }
+                        *argptr++ = c;
+                        whitestart = NULL;
+                        continue;
+
+                    case '\\':
+                        /* In strings, escaped sequence.
+                         */
+                        *argptr++ = c;
+                        whitestart = NULL;
+                        if (squote || dquote)
+                        {
+                            c = *inptr++;
+                            if (c == '\r')
+                                c = *inptr++;
+                            if (c == '\n')  /* nope! This wracks consistency! */
+                            {
+                                store_line_number_info();
+                                current_loc.line++;
+                                total_lines++;
+                                if (!*inptr)
+                                {
+                                    outp = inptr;
+                                    inptr = _myfilbuf();
+                                }
+                                argptr--;        /* alas, long strings should work. */
+                                continue;
+                            }
+                            if (c == CHAR_EOF) /* can't quote THAT */
+                            {
+                                inptr--;
+                                continue;
+                            }
+                            *argptr++ = c;
+                        }
+                        continue;
+
+                    case '\n':
+                        /* Next line.
+                         */
+                        store_line_number_info();
+                        current_loc.line++;
+                        total_lines++;
+                        if (!whitestart)
+                            whitestart = argptr;
+                        *argptr++ = ' ';
+                        if (!*inptr)
+                        {
+                            outp = inptr;
+                            inptr = _myfilbuf();
+                        }
+                        if (squote || dquote)
+                        {
+                            lexerror("Newline in string");
                             DEMUTEX;
                             return MY_FALSE;
                         }
                         continue;
-                    }
-                    *q++ = (char)c;
-                    continue;
 
-                  case CHAR_EOF:
+                    case ',':
+                        /* Argument separation
+                         */
+                        if (!parcnt && !dquote && !squote && !brakcnt)
+                        {
+                            /* Remove trailing whitespace and terminate the arg. */
+                            if (whitestart)
+                                argptr = whitestart;
+                            *argptr++ = '\0'; // then terminate the arg.
+                            // I don't skip the leading whitespace for the next
+                            // argument because there may be things like
+                            // linebreaks between two args which I don't want to
+                            // deal with in this case. This will be done below.
+                            args[++argnum] = argptr;
+                            if (argnum == NARGS - 1)
+                            {
+                                lexerror("Maximum macro argument count exceeded");
+                                DEMUTEX;
+                                return MY_FALSE;
+                            }
+                            continue;
+                        }
+                        *argptr++ = c;
+                        whitestart = NULL;
+                        continue;
+
+                    case CHAR_EOF:
                         lexerror("Unexpected end of file (or a spurious 0x01 character)");
                         DEMUTEX;
                         return MY_FALSE;
 
-                  case '/':
-                    /* Probable comment
-                     */
-                    if (!squote && !dquote)
+                    case '/':
+                        /* Probable comment
+                         */
+                        if (!squote && !dquote)
+                        {
+                            if ( (c = *inptr++) == '*')
+                            {
+                                outp = inptr;
+                                skip_comment();
+                                inptr = outp;
+                            }
+                            else if ( c == '/')
+                            {
+                                inptr = skip_pp_comment(inptr);
+                            }
+                            else
+                            {
+                                --inptr;
+                                *argptr++ = '/';
+                                whitestart = NULL;
+                            }
+                            continue;
+                        }
+
+                    default:
                     {
-                        if ( (c = *r++) == '*')
+                        p_int ch;
+                        size_t clen = utf8_to_unicode(inptr-1, 4, &ch);
+
+                        if (!clen)
                         {
-                            outp = r;
-                            skip_comment();
-                            r = outp;
+                            *argptr++ = c;
+                            whitestart = NULL;
+                            continue;
                         }
-                        else if ( c == '/')
+
+                        if (!iswspace(ch))
+                            whitestart = NULL;
+                        else if(!whitestart)
+                            whitestart = argptr;
+
+                        inptr--;
+                        do
                         {
-                            r = skip_pp_comment(r);
-                        }
-                        else
-                        {
-                            --r;
-                            *q++ = '/';
-                        }
+                            *argptr++ = *inptr++;
+                        } while(--clen);
+
                         continue;
                     }
-
-                  default:
-                    *q++ = (char)c;
-                    continue;
                 } /* end switch */
 
                 /* The only way to come here is in the case ')' when the
@@ -6566,12 +7076,12 @@ _expand_define (struct defn *p, ident_t * macro)
                  * break the for().
                  */
                 break;
-            } /* for(n = 0..NARGS) */
-            outp = r;
+            } /* for(argnum = 0..NARGS) */
+            outp = inptr;
         } /* if (normal or function macro) */
 
         /* Proper number of arguments? */
-        if (n != p->nargs)
+        if (argnum != p->nargs)
         {
             yyerrorf("Macro '%s': Wrong number of arguments", get_txt(macro->name));
             DEMUTEX;
@@ -6590,25 +7100,25 @@ _expand_define (struct defn *p, ident_t * macro)
          * copy and replace.
          */
 
-        b = buf;
-        e = p->exps.str;
-        while (*e)
+        bufptr = buf;
+        expptr = p->exps.str;
+        while (*expptr)
         {
-            if (*e == MARKS)
+            if (*expptr == MARKS)
             {
-                if (*++e == MARKS)
-                    *b++ = *e++;
+                if (*++expptr == MARKS)
+                    *bufptr++ = *expptr++;
                 else
                 {
-                    q = args[*e++ - MARKS - 1];
+                    char *argptr = args[*expptr++ - MARKS - 1];
                     // the args may have leading whitespace (see above),
                     // we skip it here.
-                    while(lexwhite(*q)) ++q;
+                    argptr = skip_white(argptr);
 
-                    for ( ; *q ; )
+                    for ( ; *argptr ; )
                     {
-                        *b++ = *q++;
-                        if (b >= buf+DEFMAX)
+                        *bufptr++ = *argptr++;
+                        if (bufptr >= buf+DEFMAX)
                         {
                             lexerror("Macro expansion overflow");
                             DEMUTEX;
@@ -6619,8 +7129,8 @@ _expand_define (struct defn *p, ident_t * macro)
             }
             else
             {
-                *b++ = *e++;
-                if (b >= buf+DEFMAX)
+                *bufptr++ = *expptr++;
+                if (bufptr >= buf+DEFMAX)
                 {
                     lexerror("Macro expansion overflow");
                     DEMUTEX;
@@ -6630,7 +7140,7 @@ _expand_define (struct defn *p, ident_t * macro)
         }
 
         /* Terminate the expanded text and add it to the input */
-        *b++ = '\0';
+        *bufptr++ = '\0';
         add_input(buf);
     }
 
@@ -6638,71 +7148,77 @@ _expand_define (struct defn *p, ident_t * macro)
 
     DEMUTEX;
     return MY_TRUE;
-
-#undef SKIPW
 }
 
 /*-------------------------------------------------------------------------*/
-static int
-exgetc (void)
+static p_int
+exgetc (char** chpos)
 
-/* Get the first character of the next element of a condition
+/* Get the first character  of the next element of a condition
  * and return it, leaving the input pointing to the rest of it.
+ * Sets chpos to point to the first byte of the character.
  * Comments are skipped, identifiers not defined as macros are
  * replaced with ' 0 ', the predicate 'defined(<name>)' is
  * replaced with ' 0 ' or ' 1 ' depending on the result.
  */
 
 {
-#define SKPW         do c = (unsigned char)mygetc(); while(lexwhite(c)); myungetc((char)c)
-  /* Skip the whitespace in the input buffer until the first non-blank.
-   * End with the input pointing to this non-blank.
-   */
-
-    register unsigned char c;
-    register char *yyp;
-
-    c = (unsigned char)mygetc();
     for (;;)
     {
-        if ( isalpha(c) || c=='_' )
+        p_int c;
+        size_t clen;
+
+        clen = utf8_to_unicode(outp, 4, &c);
+        if (!clen)
+        {
+            char buff[100];
+            sprintf(buff, "Illegal character (hex %02x) '%c'", *outp, *outp);
+            yyerror(buff);
+
+            if (chpos != NULL)
+                *chpos = outp;
+            outp++;
+            return ' ';
+        }
+
+        if ( iswalpha(c) || c=='_' )
         {
             /* It's an identifier, maybe a macro name, maybe it's
              * an 'defined()' predicate.
              */
 
             /* Get the full identifier in yytext[] */
-            yyp = yytext;
-            do {
-                SAVEC;
-                c=(unsigned char)mygetc();
-            } while ( isalunum(c) );
-            myungetc((char)c);
+            char *wordstart = outp;
+            outp = skip_alunum(outp + clen);
 
-            *yyp='\0';
+            memcpy(yytext, wordstart, outp - wordstart);
+            yytext[outp - wordstart] = 0;
+
             if (strcmp(yytext, "defined") == 0)
             {
                 /* handle the 'defined' predicate */
-                do c = (unsigned char)mygetc(); while(lexwhite(c));
-                if (c != '(')
+                outp = skip_white(outp);
+                if (*outp != '(')
                 {
                     yyerror("Missing ( in defined");
                     continue;
                 }
-                do c = (unsigned char)mygetc(); while(lexwhite(c));
-                yyp=yytext;
-                while ( isalunum(c) )
+
+                wordstart = skip_white(outp + 1);
+                outp = skip_alunum(wordstart);
+
+                memcpy(yytext, wordstart, outp - wordstart);
+                yytext[outp - wordstart] = 0;
+
+                outp = skip_white(outp);
+                if (*outp != ')')
                 {
-                    SAVEC;
-                    c=(unsigned char)mygetc();
-                }
-                *yyp='\0';
-                while(lexwhite(c)) c = (unsigned char)mygetc();
-                if (c != ')') {
                     yyerror("Missing ) in defined");
                     continue;
                 }
-                SKPW;
+
+                outp = skip_white(outp + 1);
+
                 if (lookup_define(yytext))
                     add_input(" 1 ");
                 else
@@ -6714,9 +7230,8 @@ exgetc (void)
                 if (!expand_define())
                     add_input(" 0 ");
             }
-            c = (unsigned char)mygetc();
         }
-        else if (c == '\\' && (*outp == '\n' || *outp == '\r'))
+        else if (c == '\\' && (outp[clen] == '\n' || outp[clen] == '\r'))
         {
             /* Escaped new line: read the next line, strip
              * all comments, and then add the result again
@@ -6724,10 +7239,14 @@ exgetc (void)
              */
 
             Bool quote;
+            char *yyp;
 
-            outp++;
+            outp += clen + 1;
             if (outp[-1] == '\r' && *outp == '\n')
                 outp++;
+
+            current_loc.line++;
+            total_lines++;
             myfilbuf();
 
             yyp = yytext;
@@ -6736,42 +7255,47 @@ exgetc (void)
                 c = (unsigned char)mygetc();
                 if (c == '"')
                     quote = !quote;
-                while(!quote && c == '/') { /* handle comments cpp-like */
+                while(!quote && c == '/')
+                {
+                    /* handle comments cpp-like */
                     char c2;
 
-                    if ( (c2 = mygetc()) == '*') {
+                    if ( (c2 = mygetc()) == '*')
+                    {
                         skip_comment();
                         c=(unsigned char)mygetc();
-                    } else if (c2 == '/') {
+                    }
+                    else if (c2 == '/')
+                    {
                         outp = skip_pp_comment(outp);
                         current_loc.line--;
                         c = '\n';
-                    } else {
+                    }
+                    else
+                    {
                         --outp;
                         break;
                     }
                 }
                 SAVEC;
-                if (c == '\n') {
+                if (c == '\n')
                     break;
-                }
             }
             *yyp = '\0';
-            current_loc.line++;
-            total_lines++;
             add_input(yytext);
             nexpands = 0;
-            c = (unsigned char)mygetc();
         }
         else
         {
-            break;
+            if (chpos != NULL)
+                *chpos = outp;
+            outp += clen;
+            return c;
         }
     }
 
-    return c;
+    /* NOTREACHED */
 
-#undef SKPW
 } /* exgetc() */
 
 /*-------------------------------------------------------------------------*/
@@ -6790,13 +7314,12 @@ cond_get_exp (int priority, svalue_t *svp)
  */
 
 {
-    int c;
+    p_int c;
     p_int value = 0;
-    p_int value2, x;
-    svalue_t sv2;
+    char *opstart;      /* Will point to the first character of the last op. */
 
     svp->type = T_INVALID;
-    do c = exgetc(); while ( lexwhite(c) );
+    do c = exgetc(NULL); while ( unicode_iswhite(c) );
 
     /* Evaluate the first value */
 
@@ -6806,7 +7329,7 @@ cond_get_exp (int priority, svalue_t *svp)
 
         value = cond_get_exp(0, svp);
 
-        do c = exgetc(); while ( lexwhite(c) );
+        do c = exgetc(NULL); while ( lexwhite(c) );
         if ( c != ')' )
         {
             yyerror("parentheses not paired in #if");
@@ -6814,7 +7337,7 @@ cond_get_exp (int priority, svalue_t *svp)
                 myungetc('\n');
         }
     }
-    else if ( ispunct(c) )
+    else if ( iswpunct(c) )
     {
         /* It is a string or an unary operator */
 
@@ -6857,7 +7380,7 @@ cond_get_exp (int priority, svalue_t *svp)
         else
         {
             /* Is it really an operator? */
-            x = optab1(c);
+            int x = optab1(c);
             if (!x)
             {
                 yyerror("illegal character in #if");
@@ -6870,15 +7393,15 @@ cond_get_exp (int priority, svalue_t *svp)
             /* Evaluate the operator */
             switch ( optab2[x-1] )
             {
-              case BNOT  : value = ~value; break;
-              case LNOT  : value = !value; break;
-              case UMINUS: value = -value; break;
-              case UPLUS : break; // no action needed
-              default :
-                yyerror("illegal unary operator in #if");
-                free_svalue(svp);
-                svp->type = T_NUMBER;
-                return 0;
+                case BNOT  : value = ~value; break;
+                case LNOT  : value = !value; break;
+                case UMINUS: value = -value; break;
+                case UPLUS : break; // no action needed
+                default :
+                    yyerror("illegal unary operator in #if");
+                    free_svalue(svp);
+                    svp->type = T_NUMBER;
+                    return 0;
             }
 
             if (svp->type != T_NUMBER)
@@ -6891,23 +7414,17 @@ cond_get_exp (int priority, svalue_t *svp)
             svp->u.number = value;
         }
     }
-    else
+    else if (c == '\n')
     {
-        /* It must be a number */
+        yyerror("missing expression in #if");
+        myungetc(c);
+        return 0;
+    }
+    else if (unicode_isdigit(c) )
+    {
+        /* It's a number. */
 
-        int base;
-
-        if ( !lexdigit(c) )
-        {
-            if (c == '\n')
-            {
-                yyerror("missing expression in #if");
-                myungetc('\n');
-            }
-            else
-                yyerror("illegal character in #if");
-            return 0;
-        }
+        int base, x;
 
         value = 0;
 
@@ -6942,16 +7459,25 @@ cond_get_exp (int priority, svalue_t *svp)
         myungetc((char)c);
         put_number(svp, value);
     }
-
+    else
+    {
+        yyerror("illegal character in #if");
+        return 0;
+    }
 
     /* Now evaluate the following <binop> <expr> pairs (if any) */
 
     for (;;)
     {
-        do c=exgetc(); while ( lexwhite(c) );
+        p_int value2;
+        svalue_t sv2;
+        int x;
+        char c2;
+
+        do c=exgetc(&opstart); while ( lexwhite(c) );
 
         /* An operator or string must come next */
-        if ( !ispunct(c) )
+        if ( !iswpunct(c) )
             break;
 
         /* If it's a string, make it a string addition */
@@ -6968,12 +7494,12 @@ cond_get_exp (int priority, svalue_t *svp)
 
         /* See if the optab[] defines an operator for these characters
          */
-        value2 = mygetc();
+        c2 = mygetc();
         for (;;x+=3)
         {
             if (!optab2[x])
             {
-                myungetc((char)value2);
+                myungetc(c2);
                 if (!optab2[x+1])
                 {
                     yyerror("illegal operator use in #if");
@@ -6981,7 +7507,7 @@ cond_get_exp (int priority, svalue_t *svp)
                 }
                 break;
             }
-            if (value2 == optab2[x])
+            if (c2 == optab2[x])
                 break;
         }
 
@@ -6989,11 +7515,7 @@ cond_get_exp (int priority, svalue_t *svp)
          * with this (sub)expression.
          */
         if (priority >= optab2[x+2])
-        {
-            if (optab2[x])
-                myungetc((char)value2);
             break;
-        }
 
         /* Get the second operand */
         value2 = cond_get_exp(optab2[x+2], &sv2);
@@ -7006,46 +7528,47 @@ cond_get_exp (int priority, svalue_t *svp)
         {
             switch (optab2[x+1])
             {
-              case MULT   : value *= value2;                break;
-              case DIV    : if (!value2) lexerror("Division by zero");
-                            else value /= value2;         break;
-              case MOD    : if (!value2) lexerror("Division by zero");
-                            else value %= value2;         break;
-              case BPLUS  : value += value2;                break;
-              case BMINUS : value -= value2;                break;
-              case LSHIFT : if ((uint)value2 > MAX_SHIFT) value = 0;
-                            else value <<= value2; break;
-              case RSHIFT : value >>= (uint)value2 > MAX_SHIFT ? (int)MAX_SHIFT : value2;
-                            break;
-              case LESS   : value = value <  value2;        break;
-              case LEQ    : value = value <= value2;        break;
-              case GREAT  : value = value >  value2;        break;
-              case GEQ    : value = value >= value2;        break;
-              case EQ     : value = value == value2;        break;
-              case NEQ    : value = value != value2;        break;
-              case BAND   : value &= value2;                break;
-              case XOR    : value ^= value2;                break;
-              case BOR    : value |= value2;                break;
-              case LAND   : value = value && value2;        break;
-              case LOR    : value = value || value2;        break;
-              case QMARK  :
-                  do c=exgetc(); while( lexwhite(c) );
-                  if (c != ':')
-                  {
-                      yyerror("'?' without ':' in #if");
-                      myungetc((char)c);
-                      return 0;
-                  }
-                  if (value)
-                  {
-                      *svp = sv2;
-                      cond_get_exp(1, &sv2);
-                      free_svalue(&sv2);
-                      value = value2;
-                  }
-                  else
-                      value = cond_get_exp(1, svp);
-                  break;
+                case MULT   : value *= value2;                break;
+                case DIV    : if (!value2) lexerror("Division by zero");
+                              else value /= value2;         break;
+                case MOD    : if (!value2) lexerror("Division by zero");
+                              else value %= value2;         break;
+                case BPLUS  : value += value2;                break;
+                case BMINUS : value -= value2;                break;
+                case LSHIFT : if ((uint)value2 > MAX_SHIFT) value = 0;
+                              else value <<= value2; break;
+                case RSHIFT : value >>= (uint)value2 > MAX_SHIFT ? (int)MAX_SHIFT : value2;
+                              break;
+                case LESS   : value = value <  value2;        break;
+                case LEQ    : value = value <= value2;        break;
+                case GREAT  : value = value >  value2;        break;
+                case GEQ    : value = value >= value2;        break;
+                case EQ     : value = value == value2;        break;
+                case NEQ    : value = value != value2;        break;
+                case BAND   : value &= value2;                break;
+                case XOR    : value ^= value2;                break;
+                case BOR    : value |= value2;                break;
+                case LAND   : value = value && value2;        break;
+                case LOR    : value = value || value2;        break;
+                case QMARK  :
+                    do c=exgetc(&opstart); while( lexwhite(c) );
+
+                    if (c != ':')
+                    {
+                        yyerror("'?' without ':' in #if");
+                        outp = opstart;
+                        return 0;
+                    }
+                    if (value)
+                    {
+                        *svp = sv2;
+                        cond_get_exp(1, &sv2);
+                        free_svalue(&sv2);
+                        value = value2;
+                    }
+                    else
+                        value = cond_get_exp(1, svp);
+                    break;
             } /* switch() */
         }
         else if (svp->type == T_STRING && sv2.type == T_STRING)
@@ -7086,7 +7609,8 @@ cond_get_exp (int priority, svalue_t *svp)
             return 0;
         }
     }
-    myungetc((char)c);
+
+    outp = opstart;
     return value;
 } /* cond_get_expr() */
 
@@ -7119,6 +7643,11 @@ set_inc_list (vector_t *v)
         if (svp->type != T_STRING)
         {
             errorf("H_INCLUDE_DIRS argument has a non-string array element\n");
+        }
+
+        if (svp->u.str->info.unicode == STRING_BYTES)
+        {
+            errorf("H_INCLUDE_DIRS argument has a byte sequence in the array\n");
         }
 
         /* Set p to the beginning of the pathname, skipping leading
@@ -7563,6 +8092,13 @@ lex_error_context (void)
     static char buf[21];
     char *end;
     mp_int len;
+
+    if (lex_error_pos >= 0)
+    {
+        /* An encoding error, we just print the byte position. */
+        snprintf(buf, 21, " at byte %d", lex_error_pos);
+        return buf;
+    }
 
     strcpy(buf, ((signed char)yychar == -1 || yychar == CHAR_EOF)
                 ? (len = 6, " near ")

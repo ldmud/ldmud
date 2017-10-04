@@ -60,19 +60,21 @@ DESCRIPTION
                   \<LF>     : ignored
                   \<LF><CR> : ignored
 
-                  \N   : the character code N in decimal
-                  \0xN : the character code N in sedecimal
-                  \xN  : the character code N in sedecimal
-                  \0oN : the character code N in octal
-                  \0bN : the character code N in binary
-                  \a   : BEL (0x07)
-                  \b   : Backspace (0x08)
-                  \t   : Tab (0x09)
-                  \e   : Escape (0x1b)
-                  \n   : Newline (0x0a)
-                  \f   : Formfeed (0x0c)
-                  \r   : Carriage Return (0x0d)
-                  \"   : The double quote (")
+                  \N        : the character code N in decimal
+                  \0xN      : the character code N in sedecimal
+                  \xN       : the character code N in sedecimal
+                  \0oN      : the character code N in octal
+                  \0bN      : the character code N in binary
+                  \uNNNN    : Unicode character N in sedicimal
+                  \UNNNNNNNN: Unicode character N in sedicimal
+                  \a        : BEL (0x07)
+                  \b        : Backspace (0x08)
+                  \t        : Tab (0x09)
+                  \e        : Escape (0x1b)
+                  \n        : Newline (0x0a)
+                  \f        : Formfeed (0x0c)
+                  \r        : Carriage Return (0x0d)
+                  \"        : The double quote (")
                   \<other character>: the given character
 
                 Adjacent string literals are automatically

@@ -1,0 +1,9 @@
+// Greek encoding.
+// -*- coding: ISO8859-7 -*-
+
+#define ΑΠ¶ΝΤΗΣΗ "Καλή μέρα!"
+
+string ρωτήστε_χαιρετισμό()
+{
+    return ΑΠ¶ΝΤΗΣΗ;
+}
