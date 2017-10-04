@@ -628,6 +628,7 @@ ac_subst_vars='LTLIBOBJS
 ERQ_LIBS
 PKGLIBS
 erq_sub
+val_python_script
 val_tls_crldirectory
 val_tls_crlfile
 val_tls_trustdirectory
@@ -703,6 +704,7 @@ cdef_yydebug
 cdef_debug
 cdef_verbose_opcprof
 cdef_opcprof
+cdef_python_script
 cdef_tls_crldirectory
 cdef_tls_crlfile
 cdef_tls_trustdirectory
@@ -725,13 +727,13 @@ cdef_trace_code
 cdef_comm_stat
 cdef_use_process_string
 cdef_use_parse_command
-cdef_use_set_is_wizard
 cdef_use_gcrypt
 cdef_use_tls
 cdef_use_deprecated
 cdef_use_pcre
 cdef_use_mccp
 cdef_use_xml
+cdef_use_python
 cdef_use_json
 cdef_use_sqlite
 cdef_use_pgsql
@@ -760,6 +762,8 @@ IKSEMEL_LIBS
 IKSEMEL_CFLAGS
 XML2_LIBS
 XML2_CFLAGS
+PYTHON_LIBS
+PYTHON_CFLAGS
 JSON_LIBS
 JSON_CFLAGS
 JSONC_LIBS
@@ -854,7 +858,8 @@ with_tls_trustdirectory
 with_tls_crlfile
 with_tls_crldirectory
 enable_use_gcrypt
-enable_use_set_is_wizard
+enable_use_python
+with_python_script
 enable_use_parse_command
 enable_use_process_string
 enable_comm_stat
@@ -960,6 +965,8 @@ JSONC_CFLAGS
 JSONC_LIBS
 JSON_CFLAGS
 JSON_LIBS
+PYTHON_CFLAGS
+PYTHON_LIBS
 XML2_CFLAGS
 XML2_LIBS
 IKSEMEL_CFLAGS
@@ -1609,8 +1616,8 @@ Optional Features:
         Enables Transport Layer Security over Telnet: no/gnu/ssl/yes
   --enable-use-gcrypt  default=enabled
         Enables support for libgcrypt
-  --enable-use-set-is-wizard  default=enabled
-        Enables efun set_is_wizard()
+  --enable-use-python  default=disabled
+        Enables Python extension
   --enable-use-parse-command  default=enabled
         Enables efun parse_command()
   --enable-use-process-string  default=enabled
@@ -1685,6 +1692,8 @@ Optional Packages:
         Default filename holding certificate revocation lists
   --with-tls-crldirectory=VALUE  default=no
         Default directory holding certificate revocation lists
+  --with-python-script=VALUE  default=startup.py
+        Startup python script
   --with-optimize=VALUE  default=med
         Optimization level: no/low/med/high
   --with-access-file=VALUE  default=ACCESS.ALLOW
@@ -1830,6 +1839,9 @@ Some influential environment variables:
   JSONC_LIBS  linker flags for JSONC, overriding pkg-config
   JSON_CFLAGS C compiler flags for JSON, overriding pkg-config
   JSON_LIBS   linker flags for JSON, overriding pkg-config
+  PYTHON_CFLAGS
+              C compiler flags for PYTHON, overriding pkg-config
+  PYTHON_LIBS linker flags for PYTHON, overriding pkg-config
   XML2_CFLAGS C compiler flags for XML2, overriding pkg-config
   XML2_LIBS   linker flags for XML2, overriding pkg-config
   IKSEMEL_CFLAGS
@@ -3196,10 +3208,18 @@ if test "${enable_use_gcrypt+set}" = set; then :
 fi
 
 
-DEFAULTenable_use_set_is_wizard=yes
-# Check whether --enable-use-set-is-wizard was given.
-if test "${enable_use_set_is_wizard+set}" = set; then :
-  enableval=$enable_use_set_is_wizard;
+DEFAULTenable_use_python=no
+# Check whether --enable-use-python was given.
+if test "${enable_use_python+set}" = set; then :
+  enableval=$enable_use_python;
+fi
+
+
+DEFAULTwith_python_script=startup.py
+
+# Check whether --with-python-script was given.
+if test "${with_python_script+set}" = set; then :
+  withval=$with_python_script;
 fi
 
 
@@ -4000,6 +4020,23 @@ else
   enable_use_json="yes"
 fi
 
+if test "x$enable_use_python" = "x" && test "x$DEFAULTenable_use_python" != "x"; then
+  enable_use_python=$DEFAULTenable_use_python
+fi
+
+if test "x$enable_use_python" = "x" || test "x$enable_use_python" = "xyes"; then
+  cdef_use_python="#define"
+  python_path=
+  enable_use_python="yes"
+elif test "x$enable_use_python" = "xno"; then
+  cdef_use_python="#undef"
+  python_path=
+else
+  cdef_use_python="#define"
+  python_path="$enable_use_python"
+  enable_use_python="yes"
+fi
+
 if test "x$enable_use_tls" = "x" && test "x$DEFAULTenable_use_tls" != "x"; then
   enable_use_tls=$DEFAULTenable_use_tls
 fi
@@ -4132,16 +4169,6 @@ if test "x$enable_use_deprecated" = "xyes"; then
   cdef_use_deprecated="#define"
 else
   cdef_use_deprecated="#undef"
-fi
-
-if test "x$enable_use_set_is_wizard" = "x" && test "x$DEFAULTenable_use_set_is_wizard" != "x"; then
-  enable_use_set_is_wizard=$DEFAULTenable_use_set_is_wizard
-fi
-
-if test "x$enable_use_set_is_wizard" = "xyes"; then
-  cdef_use_set_is_wizard="#define"
-else
-  cdef_use_set_is_wizard="#undef"
 fi
 
 if test "x$enable_use_parse_command" = "x" && test "x$DEFAULTenable_use_parse_command" != "x"; then
@@ -4548,6 +4575,17 @@ if test "x$with_tls_crldirectory" = "x" && test "x$DEFAULTwith_tls_crldirectory"
 fi
 
 val_tls_crldirectory="\"$with_tls_crldirectory\""
+
+
+if test "x$with_python_script" != "x"; then
+  with_python_script=`echo $with_python_script|
+             sed -e 's/^\([^"]*\)\?.*$/\1/'`
+fi
+if test "x$with_python_script" = "x" && test "x$DEFAULTwith_python_script" != "x"; then
+  with_python_script=$DEFAULTwith_python_script
+fi
+
+val_python_script="\"$with_python_script\""
 
 
 if test "x$with_malloc" != "x"; then
@@ -5147,6 +5185,16 @@ fi
 
 if test "x$cdef_tls_crldirectory" = "x#undef"; then
   val_tls_crldirectory=
+fi
+
+if test "x$with_python_script" != "xno"; then
+  cdef_python_script="#define"
+else
+  cdef_python_script="#undef"
+fi
+
+if test "x$cdef_python_script" = "x#undef"; then
+  val_python_script=
 fi
 
 if test "x$cdef_opcprof" = "x#undef"; then
@@ -12848,6 +12896,228 @@ fi
     json_package=
 fi
 
+# --- PYTHON ---
+
+
+    if test "x$enable_use_python" = "xyes"; then
+        saveflags="$CFLAGS"
+        saveeflags="$EXTRA_CFLAGS"
+
+
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for PYTHON" >&5
+$as_echo_n "checking for PYTHON... " >&6; }
+
+if test -n "$PYTHON_CFLAGS"; then
+    pkg_cv_PYTHON_CFLAGS="$PYTHON_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"python3\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "python3") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_PYTHON_CFLAGS=`$PKG_CONFIG --cflags "python3" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$PYTHON_LIBS"; then
+    pkg_cv_PYTHON_LIBS="$PYTHON_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"python3\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "python3") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_PYTHON_LIBS=`$PKG_CONFIG --libs "python3" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        PYTHON_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "python3" 2>&1`
+        else
+	        PYTHON_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "python3" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$PYTHON_PKG_ERRORS" >&5
+
+	lp_cv_has_python3=no
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	lp_cv_has_python3=no
+else
+	PYTHON_CFLAGS=$pkg_cv_PYTHON_CFLAGS
+	PYTHON_LIBS=$pkg_cv_PYTHON_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	lp_cv_has_python3=yes
+fi
+
+
+        # No pkg-config, search manually.
+        if test "$lp_cv_has_python3" = "no"; then
+            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for python3 support" >&5
+$as_echo_n "checking for python3 support... " >&6; }
+            for TESTPATH in "" "${python_path}" "${python_path}/include" "${python_path}/include/python3" "/usr/include/python3" "/usr/local/include" "/usr/local/include/python3" ; do
+                if test "x$TESTPATH" != "x"; then
+                    CFLAGS="$saveflags -I$TESTPATH"
+                else
+                    CFLAGS="$saveflags"
+                fi
+                cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+    #include <Python.h>
+
+    void init(void)
+    {
+        Py_Initialize();
+        Py_Finalize();
+    }
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  lp_cv_has_python3=yes
+                    if test "x$TESTPATH" != "x"; then
+                        EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+                    fi
+                    break;
+
+else
+  CFLAGS="$saveflags"
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+            done
+            { $as_echo "$as_me:${as_lineno-$LINENO}: result: $lp_cv_has_python3" >&5
+$as_echo "$lp_cv_has_python3" >&6; }
+        elif test "x$PYTHON_CFLAGS" != "x"; then
+            EXTRA_CFLAGS="$PYTHON_CFLAGS $EXTRA_CFLAGS"
+        fi
+
+        if test "$lp_cv_has_python3" = "yes"; then
+            if test "x$PYTHON_LIBS" != "x"; then
+                PKGLIBS="$PKGLIBS $PYTHON_LIBS"
+            else
+                tmp=""
+
+                for TESTPATH in "" "${python_path}" "${python_path}/lib" "${python_path}/lib/python3" "/usr/lib/python3" "/usr/local/lib" "/usr/local/lib/python3" ; do
+                    if test "x$TESTPATH" != "x"; then
+                        CFLAGS="$saveflags -L$TESTPATH"
+                    else
+                        CFLAGS="$saveflags"
+                    fi
+
+                    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Py_Initialize in -lpython3" >&5
+$as_echo_n "checking for Py_Initialize in -lpython3... " >&6; }
+if ${ac_cv_lib_python3_Py_Initialize+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpython3  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char Py_Initialize ();
+int
+main ()
+{
+return Py_Initialize ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_python3_Py_Initialize=yes
+else
+  ac_cv_lib_python3_Py_Initialize=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_python3_Py_Initialize" >&5
+$as_echo "$ac_cv_lib_python3_Py_Initialize" >&6; }
+if test "x$ac_cv_lib_python3_Py_Initialize" = xyes; then :
+  if test "x$TESTPATH" != "x"; then
+                            tmp="$PKGLIBS -L$TESTPATH -lpython3"
+                        else
+                            tmp="$PKGLIBS -lpython3"
+                        fi
+                        break
+
+fi
+
+                done
+
+                if test "x$tmp" = "x"; then
+                    lp_cv_has_python3=no
+
+                    EXTRA_CFLAGS="$saveeflags"
+                else
+                    PKGLIBS="$tmp"
+                fi
+            fi
+
+            CFLAGS="$saveflags"
+        fi
+    fi
+
+
+if test "$lp_cv_has_python3" = "yes"; then
+
+$as_echo "#define HAS_PYTHON3 1" >>confdefs.h
+
+else
+    if test "$enable_use_python" = "yes"; then
+        echo "Python3 library not found - disabling Python support"
+        if test "x$not_available" = "x"; then
+    not_available="use-python"
+else
+    not_available="$not_available, use-python"
+fi
+    fi
+
+    cdef_use_python="#undef"
+    enable_use_python="no"
+fi
+
 # --- XML ---
 
 has_xml=no
@@ -14542,6 +14812,9 @@ fi
 val_malloc="$with_malloc"
 
 fi
+
+
+
 
 
 

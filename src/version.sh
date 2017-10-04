@@ -8,14 +8,14 @@
 # when in a git repository, determine these values from it automagically and
 # override the defaults
 if test -d ../.git && test -x "`which git 2>&1;true`"; then
-TAGNAME=`git describe --match 3.* |cut -d '-' -f 1`
+TAGNAME=`git describe --match '3.*' |cut -d '-' -f 1`
 version_major=`echo $TAGNAME |cut -d '.' -f 1`
 version_minor=`echo $TAGNAME |cut -d '.' -f 2`
 version_micro=`echo $TAGNAME |cut -d '.' -f 3`
 version_patch=`echo $TAGNAME |cut -d '.' -f 4`
 version_date=`git log --pretty=format:"%ad" -1 $TAGNAME`
 version_tagger=`git log --pretty=format:"%an <%ae>" -1 $TAGNAME`
-version_revision=`git describe --match 3.*`
+version_revision=`git describe --match '3.*'`
 
 # if source not tagged with 3.*, it is no release, but development
 if $( echo $version_revision | grep --quiet '-' ) ;then
@@ -35,10 +35,10 @@ else
 version_major=3
 version_minor=5
 version_micro=0
-version_patch=1
-version_type="dev"
-version_longtype="development"
-version_date="<unknown>"
-version_tagger="<unknown>"
-version_revision="<unknown>"
+version_patch=0
+version_type="rel"
+version_longtype="release"
+version_date="Wed Oct 4 22:00:00 2017 +0200"
+version_tagger="Gnomi <gnomi@unitopia.de>"
+version_revision="3.5.0"
 fi;

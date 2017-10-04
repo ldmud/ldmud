@@ -1,4 +1,4 @@
-/* machine.h.in.  Generated from configure.in by autoheader.  */
+/* machine.h.in.  Generated from configure.ac by autoheader.  */
 
 
 #ifndef MACHINE_H
@@ -77,6 +77,9 @@
 
 /* Does the machine offer PostgreSQL? */
 #undef HAS_PGSQL
+
+/* Does the machine offer CPython 3? */
+#undef HAS_PYTHON3
 
 /* Does the machine offer SQLite3? */
 #undef HAS_SQLITE3

@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-xx-xxx-2017 (LDMud Team) -- 3.5.0
+04-Oct-2017 (LDMud Team) -- 3.5.0
     - Fixed Crashes
        + xml_generate(), xml_parse() could crash the driver due to a wrong
          order during initialization of libxml2 (#671) and could lead to
