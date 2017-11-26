@@ -1336,6 +1336,7 @@ DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INHERIT, A_INHERITS)
 
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_FUNCTIONS, A_FUNCTIONS);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_UPDATE_INDEX_MAP, A_UPDATE_INDEX_MAP);
+DEFINE_RESERVE_MEM_BLOCK(RESERVE_INHERITS, A_INHERITS);
 
 #define byte_to_mem_block(n, b) \
     ((void)((mem_block[n].current_size == mem_block[n].max_size \
@@ -15539,6 +15540,13 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
    /*                                *
     *   Preparations for functions   *
     *                                */
+
+    /* We reserve space for update inherit entries,
+     * so there wouldn't happen any reallocation and thus
+     * no moving of our inherit entries later on.
+     */
+    if (!RESERVE_INHERITS(INHERIT_COUNT + 2*from->num_inherited + 1))
+        return -1;
 
     /* For now, we mask out the INHERIT field in the flags and
      * use NEW_INHERITED_INDEX for the value.
