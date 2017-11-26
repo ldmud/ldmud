@@ -16651,6 +16651,31 @@ epilog (void)
     }
 
 #if 0
+    printf("DEBUG: ----- Inherit list for %s: -----\n", current_loc.file->name);
+    for(i = 0; i < INHERIT_COUNT; i++)
+    {
+        inherit_t* inh = &INHERIT(i);
+
+        printf("DEBUG: [%03d: %02x] var: %3d%s, fun: %3d - %-32s ",
+            i, inh->inherit_type,
+            inh->variable_index_offset & ~NON_VIRTUAL_OFFSET_TAG,
+            (inh->variable_index_offset & NON_VIRTUAL_OFFSET_TAG) ? "r" : "v",
+            inh->function_index_offset,
+            get_txt(inh->prog->name));
+
+        if (inh->inherit_type & INHERIT_TYPE_MAPPED)
+            printf("(mapped to %d)\n", inh->updated_inherit);
+        else if (inh->inherit_type & INHERIT_TYPE_DUPLICATE)
+            printf("(duplicate)\n");
+        else if (inh->inherit_type & INHERIT_TYPE_EXTRA)
+            printf("(extra)\n");
+        else if (inh->inherit_type & INHERIT_TYPE_VIRTUAL)
+            printf("(virtual)\n");
+        else
+            printf("(regular)\n");
+    }
+    printf("DEBUG: ------\n");
+
     printf("DEBUG: ----- Function table for %s: -----\n", current_loc.file->name);
     for(i = 0; i < num_functions; i++)
     {
