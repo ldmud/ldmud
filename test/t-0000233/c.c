@@ -1,3 +1,6 @@
+#ifdef DOUBLE_INHERIT
+inherit "c2";
+#endif
 virtual inherit "a";
 
 private string c_var = "c";

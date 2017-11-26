@@ -1,6 +1,8 @@
 #include "/inc/base.inc"
 #include "/inc/testarray.inc"
 
+#include "/sys/rtlimits.h"
+
 mapping counter = ([:1]);
 int testnum;
 
@@ -28,9 +30,9 @@ void run_test()
 
     rm("a.c");
 
-    for(testnum = 0; testnum < 16; testnum++)
+    for(testnum = 0; testnum < 32; testnum++)
     {
-        foreach(string ob: ({"a","b","c","d"}))
+        foreach(string ob: ({"a","b","b2","c","c2","d"}))
             destruct(find_object(ob));
 
         counter = ([:1]);
@@ -119,7 +121,6 @@ void run_test()
                 }),
                 ({ "Run " + testname + ": Check for virtual variable closures in 'a'.", 0,
                     (:
-                        asin(0.0);
                         return funcall(d->get_a_var_cl()) == "a";
                     :)
                 }),
@@ -136,6 +137,28 @@ void run_test()
                 ({ "Run " + testname + ": Check for virtual variable (via symbol_variable) in a lambda closure in 'a'.", 0,
                     (:
                         return funcall(d->get_a_var_cl4()) == "a";
+                    :)
+                }),
+                ({ "Run " + testname + ": Check for double inherit: Merged Variables", 0,
+                    (:
+                        /* Test only for DOUBLE_INHERIT */
+                        if (!(testnum & 16))
+                            return 1;
+                        /* Those files don't have a "c". */
+                        if (member(([3,4,7,8]), i))
+                            return d->get_b2_count() == 3;
+                        return d->get_b2_count() + d->get_c2_count() == 7;
+                    :)
+                }),
+                ({ "Run " + testname + ": Check for double inherit: Locality of function overrides.", 0,
+                    (:
+                        /* Test only for DOUBLE_INHERIT */
+                        if (!(testnum & 16))
+                            return 1;
+                        /* Those files don't have a "c". */
+                        if (member(([3,4,7,8]), i))
+                            return d->get_b2_program() == "b2";
+                        return d->get_b2_program() == "b2" && d->get_c2_program() == "c2";
                     :)
                 }),
             }));
@@ -155,9 +178,10 @@ string *epilog(int eflag)
                 ((testnum & 1) ? "#define OLD_VARIABLES\n" : "") +
                 ((testnum & 2) ? "#define NEW_VARIABLES\n" : "") +
                 ((testnum & 4) ? "#define SUB_INHERIT\n" : "") +
-                ((testnum & 8) ? "#define TEST_VIRTUAL virtual\n" : "#define TEST_VIRTUAL\n");
+                ((testnum & 8) ? "#define TEST_VIRTUAL virtual\n" : "#define TEST_VIRTUAL\n") +
+                ((testnum &16) ? "#define DOUBLE_INHERIT\n" : "");
         });
 
-    run_test();
+    limited(#'run_test, LIMIT_EVAL, 1000000);
     return 0;
 }
