@@ -14973,7 +14973,7 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
              * but it may be referenced by the inherited program,
              * so we have to preserve that variable.
              */
-            *var_map = num_old_variables + oldinheritp->num_additional_variables;
+            *var_map = num_new_variables + oldinheritp->num_additional_variables;
 
             if (update_existing)
             {
