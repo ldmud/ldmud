@@ -841,7 +841,7 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
  * MAPPING:
  *    swtype, (size_t) swapsize, (p_int)width, (p_int)size, (wiz_list_t*) user, entries...
  *
- * Opaque, NUMBER, FLOAT, OBJECT, CLOSURE
+ * Opaque, NUMBER, FLOAT, OBJECT, CLOSURE, LVALUE
  *    svp->type, svp->x, svp->u
  *
  * Opaque are: contents of alists, empty arrays, structs/arrays/mappings with
@@ -1067,6 +1067,7 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
         case T_FLOAT:
         case T_OBJECT:
         case T_CLOSURE:
+        case T_LVALUE:
 swap_opaque:
             /* opaque swapped data must be prevented from recursive freeing */
             CHECK_SPACE(sizeof(*svp))
@@ -1222,6 +1223,7 @@ check_swapped_values (mp_int num, unsigned char * p)
         case T_FLOAT:
         case T_OBJECT:
         case T_CLOSURE:
+        case T_LVALUE:
             p += sizeof sv.x;
             p += sizeof sv.u;
             break;
@@ -1381,6 +1383,7 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
         case T_FLOAT:
         case T_OBJECT:
         case T_CLOSURE:
+        case T_LVALUE:
             p += sizeof sv.x;
             p += sizeof sv.u;
             fprintf(stderr, " opaque\n");
@@ -1565,6 +1568,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_MAPPING:
         case T_NUMBER:
         case T_FLOAT:
+        case T_LVALUE:
 advance:
             /* Opaque storage: skip it */
             p += 1 + sizeof svp->x + sizeof svp->u;
@@ -2067,6 +2071,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_FLOAT:
         case T_OBJECT:
         case T_CLOSURE:
+        case T_LVALUE:
             memcpy(&svp->x, p, sizeof svp->x);
             p += sizeof svp->x;
             memcpy(&svp->u, p, sizeof svp->u);
