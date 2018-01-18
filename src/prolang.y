@@ -8013,16 +8013,16 @@ new_arg_name:
               $1.t_flags &= ~illegal_flags;
           }
 
-          if (exact_types && !$1.t_type)
+          if (!$1.t_type)
           {
-              yyerror("Missing type for argument");
-              add_local_name($2, get_fulltype(lpctype_mixed), block_depth);
-                /* Supress more errors */
+              if (exact_types)
+                  yyerror("Missing type for argument");
+
+              /* Supress more errors */
+              $1.t_type = lpctype_mixed;
           }
-          else
-          {
-              add_local_name($2, $1, block_depth);
-          }
+
+          add_local_name($2, $1, block_depth);
       }
 
     | non_void_type L_LOCAL
@@ -8049,6 +8049,16 @@ new_arg_name:
               /* However, it is legal for the argument list of an inline
                * closure.
                */
+
+              if (!$1.t_type)
+              {
+                  if (exact_types)
+                      yyerror("Missing type for argument");
+
+                  /* Supress more errors */
+                  $1.t_type = lpctype_mixed;
+              }
+
               redeclare_local($2, $1, block_depth);
           }
       }
@@ -8062,7 +8072,10 @@ name_list:
       {
 %line
           if ($1.t_type == NULL)
+          {
               yyerror("Missing type");
+              $1.t_type = lpctype_mixed;
+          }
 
           define_global_variable($2, $1, MY_FALSE);
           $$ = $1;
@@ -8073,7 +8086,10 @@ name_list:
     | type L_IDENTIFIER
       {
           if ($1.t_type == NULL)
+          {
               yyerror("Missing type");
+              $1.t_type = lpctype_mixed;
+          }
 
           $<number>$ = define_global_variable($2, $1, MY_TRUE);
       }
