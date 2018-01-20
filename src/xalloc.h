@@ -139,7 +139,10 @@ extern int stack_direction;
 #define rexalloc_pass(old,size) rexalloc_traced((old),(size) MTRACE_PASS)
 
 extern size_t  xalloced_size (void * p)  __attribute__((nonnull(1)));
+extern size_t  xalloced_usable_size (void * p)  __attribute__((nonnull(1)));
 extern size_t  xalloc_overhead (void);
+extern size_t  xalloc_roundup (size_t size);
+extern bool    has_xalloced_size ();
 
 extern void * xalloc_traced(size_t size MTRACE_DECL)
        MALLOC __attribute__ ((warn_unused_result));

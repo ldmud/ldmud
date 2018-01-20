@@ -20,6 +20,8 @@ extern svalue_t * v_sl_exec (svalue_t * sp, int num_arg) ;
 extern svalue_t * f_sl_insert_id (svalue_t * sp);
 extern svalue_t * f_sl_close (svalue_t * sp) ;
 
+extern void pkg_sqlite_init ();
+
 #endif /* USE_SQLITE */
 
 #endif /* PKG_SQLITE_H__ */

@@ -73,6 +73,10 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#ifdef USE_SQLITE
+#include "pkg-sqlite.h"
+#endif
+
 #ifdef USE_MYSQL
 #include "pkg-mysql.h"
 #endif
@@ -501,6 +505,10 @@ main (int argc, char **argv)
         init_otable();
         for (i = 0; i < (int)(sizeof avg_consts / sizeof avg_consts[0]); i++)
             avg_consts[i] = exp(- i / 900.0);
+
+#ifdef USE_SQLITE
+        pkg_sqlite_init();
+#endif
 
 #ifdef USE_MYSQL
         if (!pkg_mysql_init())

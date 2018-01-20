@@ -596,6 +596,139 @@ f_sl_close (svalue_t * sp)
 } /* f_sl_close() */
 
 /*-------------------------------------------------------------------------*/
+static void *
+sl_mem_malloc (int size)
+
+/* malloc() implementation for SQLite to call our own allocator.
+ */
+
+{
+    if (!has_xalloced_size())
+    {
+        /* We remember the size for sl_mem_size(). */
+        void * ptr = pxalloc(size + sizeof(int));
+
+        if (!ptr)
+            return NULL;
+
+        *((int*)ptr) = size;
+        return ((char*)ptr) + sizeof(int);
+    }
+
+    return pxalloc(size);
+} /* sl_mem_malloc() */
+
+/*-------------------------------------------------------------------------*/
+static void
+sl_mem_free (void * ptr)
+
+/* free() implementation for SQLite to call our own allocator.
+ */
+
+{
+    if (!has_xalloced_size() && ptr)
+        ptr = ((char*)ptr) - sizeof(int);
+
+    pfree(ptr);
+} /* sl_mem_free() */
+
+/*-------------------------------------------------------------------------*/
+static void *
+sl_mem_realloc (void * ptr, int size)
+
+/* free() implementation for SQLite to call our own allocator.
+ */
+
+{
+    if (!has_xalloced_size())
+    {
+        if (!ptr)
+            return sl_mem_malloc(size);
+
+        ptr = ((char*)ptr) - sizeof(int);
+        ptr = prexalloc(ptr, size + sizeof(int));
+
+        if (!ptr)
+            return NULL;
+
+        *((int*)ptr) = size;
+        return ((char*)ptr) + sizeof(int);
+    }
+
+    return prexalloc(ptr, size);
+} /* sl_mem_realloc() */
+
+/*-------------------------------------------------------------------------*/
+static int
+sl_mem_size (void * ptr)
+
+/* malloc_usable_size() implementation for SQLite to call our own allocator.
+ */
+
+{
+    if (!has_xalloced_size())
+        return *(((int*)ptr) - 1);
+
+    return (int)xalloced_usable_size(ptr);
+} /* sl_mem_size() */
+
+/*-------------------------------------------------------------------------*/
+static int
+sl_mem_roundup (int size)
+
+/* Round the given size to size that malloc() would actually allocate.
+ */
+
+{
+    return (int)xalloc_roundup(size);
+} /* sl_mem_roundup() */
+
+/*-------------------------------------------------------------------------*/
+static int
+sl_mem_init (void* data)
+
+/* Initialize the allocator. We don't need to do that.
+ */
+
+{
+    return SQLITE_OK;
+} /* sl_mem_init() */
+
+/*-------------------------------------------------------------------------*/
+static void
+sl_mem_shutdown (void* data)
+
+/* Shutdown the allocator. We also don't need to do that.
+ */
+
+{
+} /* sl_mem_shutdown() */
+
+/*-------------------------------------------------------------------------*/
+void
+pkg_sqlite_init ()
+
+/* Initialize the SQLite library.
+ *
+ * We configure SQLite to use LDMud's memory allocator.
+ */
+
+{
+    static const sqlite3_mem_methods mem_methods = {
+        sl_mem_malloc,
+        sl_mem_free,
+        sl_mem_realloc,
+        sl_mem_size,
+        sl_mem_roundup,
+        sl_mem_init,
+        sl_mem_shutdown,
+        NULL
+    };
+
+    sqlite3_config(SQLITE_CONFIG_MALLOC, &mem_methods);
+} /* sl_init() */
+
+/*-------------------------------------------------------------------------*/
 
 #endif /* USE_SQLITE */
 

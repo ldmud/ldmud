@@ -335,6 +335,10 @@ mdb_log_sbrk (p_int size)
 #  error "No allocator specified."
 #endif
 
+#ifndef GRANULARITY
+#  define GRANULARITY sizeof(word_t)
+#endif
+
 #ifdef NO_MEM_BLOCK_SIZE
 #  if defined(GC_SUPPORT) || defined(REPLACE_MALLOC)
 #    error "For GC_SUPPORT or REPLACE_MALLOC, mem_block_size() must exist!"
@@ -375,6 +379,43 @@ xalloced_size (void * p
 
 /*-------------------------------------------------------------------------*/
 size_t
+xalloced_usable_size (void * p
+#ifdef NO_MEM_BLOCK_SIZE
+                         UNUSED
+#endif /* NO_MEM_BLOCK_SIZE */
+              )
+
+/* Return the allocation size (without overhead) of the block <p>.
+ */
+
+{
+#ifndef NO_MEM_BLOCK_SIZE
+    return mem_block_size((word_t*)p - XM_OVERHEAD) - XM_OVERHEAD_SIZE;
+#else
+#   ifdef __MWERKS__
+#       pragma unused(p)
+#   endif
+    return 0;
+#endif
+} /* xalloced_usable_size() */
+
+/*-------------------------------------------------------------------------*/
+bool
+has_xalloced_size ()
+
+/* Return whether xalloced_size() and xalloced_usable_size() works.
+ */
+
+{
+#ifndef NO_MEM_BLOCK_SIZE
+    return true;
+#else
+    return false;
+#endif
+} /* has_xalloced_size() */
+
+/*-------------------------------------------------------------------------*/
+size_t
 xalloc_overhead (void)
 
 /* Return the total overhead of an allocation - xalloc and allocator.
@@ -383,6 +424,18 @@ xalloc_overhead (void)
 {
     return mem_overhead() + XM_OVERHEAD_SIZE;
 } /* xalloc_overhead() */
+
+/*-------------------------------------------------------------------------*/
+size_t
+xalloc_roundup (size_t size)
+
+/* Round the given size to size that xalloc() would actually allocate.
+ */
+
+{
+    size_t overhead = xalloc_overhead();
+    return ((size + overhead + GRANULARITY - 1) & ~(GRANULARITY - 1)) - overhead;
+} /* xalloc_roundup() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
