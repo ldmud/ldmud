@@ -705,6 +705,20 @@ sl_mem_shutdown (void* data)
 } /* sl_mem_shutdown() */
 
 /*-------------------------------------------------------------------------*/
+static void
+sl_log (void* data UNUSED, int rc, const char* msg)
+
+/* This function is called for each logging event in SQLite.
+ */
+
+{
+    if (current_object)
+        debug_message("%s SQLite (%s): %s (rc=%d)\n", time_stamp(), get_txt(current_object->name), msg, rc);
+    else
+        debug_message("%s SQLite: %s (rc=%d)\n", time_stamp(), msg, rc);
+} /* sl_log() */
+
+/*-------------------------------------------------------------------------*/
 void
 pkg_sqlite_init ()
 
@@ -726,6 +740,8 @@ pkg_sqlite_init ()
     };
 
     sqlite3_config(SQLITE_CONFIG_MALLOC, &mem_methods);
+    sqlite3_config(SQLITE_CONFIG_LOG, &sl_log, NULL);
+
 } /* sl_init() */
 
 /*-------------------------------------------------------------------------*/
