@@ -214,19 +214,6 @@ my_sqlite3_authorizer (void * data, int what, const char* arg1, const char* arg2
 
             return val;
 
-        case SQLITE_ATTACH:
-            /* ATTACH "filename" AS "dbname"
-             *
-             *   arg1: filename
-             *   arg2, dbname, view: NULL
-             */
-
-            /* SQLite3 doesn't allow the filename to be changed,
-             * but at least we must convert an absolute pathname
-             * to a relative one. So we have to deactivate it...
-             */
-            return SQLITE_DENY;
-
         default:
             return SQLITE_OK;
     }
@@ -268,24 +255,15 @@ f_sl_open (svalue_t *sp)
  */
 
 {
-    string_t *file;
     sqlite3 *db;
     sqlite_dbs_t *tmp;
     int err;
-   
-    file = check_valid_path(sp->u.str, current_object, STR_SQLITE_OPEN , MY_TRUE);
-    if (!file)
-        errorf("Illegal use of sl_open('%s')\n", get_txt(sp->u.str));
-   
+
     tmp = find_db (current_object);
     if (tmp)
-    {
-        free_mstring(file);
         errorf("The current object already has a database open.\n");
-    }
 
-    err = sqlite3_open (get_txt(file), &db);
-    free_mstring(file);
+    err = sqlite3_open (get_txt(sp->u.str), &db);
     if (err)
     {
         const char* msg = sqlite3_errmsg(db);
@@ -719,12 +697,142 @@ sl_log (void* data UNUSED, int rc, const char* msg)
 } /* sl_log() */
 
 /*-------------------------------------------------------------------------*/
+static int
+sl_vfs_open (sqlite3_vfs* vfs, const char* name, sqlite3_file* file, int flags, int *out_flags)
+
+/* This function implements the Open call for the LDMud's SQLite VFS.
+ * It will just forward the call to the original VFS.
+ */
+
+{
+    return ((sqlite3_vfs*)vfs->pAppData)->xOpen((sqlite3_vfs*)vfs->pAppData, name, file, flags, out_flags);
+} /* sl_vfs_open() */
+
+/*-------------------------------------------------------------------------*/
+static int
+sl_vfs_delete (sqlite3_vfs* vfs, const char* name, int sync_dir)
+
+/* This function implements the Delete call for the LDMud's SQLite VFS.
+ * It will just forward the call to the original VFS.
+ */
+
+{
+    return ((sqlite3_vfs*)vfs->pAppData)->xDelete((sqlite3_vfs*)vfs->pAppData, name, sync_dir);
+} /* sl_vfs_delete() */
+
+/*-------------------------------------------------------------------------*/
+static int
+sl_vfs_access (sqlite3_vfs* vfs, const char* name, int flags, int* result)
+
+/* This function implements the open call for the LDMud's SQLite VFS.
+ * It will just forward the call to the original VFS.
+ */
+
+{
+    return ((sqlite3_vfs*)vfs->pAppData)->xAccess((sqlite3_vfs*)vfs->pAppData, name, flags, result);
+} /* sl_vfs_access() */
+
+/*-------------------------------------------------------------------------*/
+static int
+sl_vfs_full_pathname (sqlite3_vfs* vfs, const char* name, int len, char* buf)
+
+/* This function implements the FullPathname call for the LDMud's SQLite VFS.
+ * Here we do our access check. SQLite guarantees that this will always
+ * be called before sl_vfs_open().
+ * Then we pass this on to the original VFS.
+ */
+
+{
+    string_t *orig_file = new_mstring(name);
+    string_t *new_file = check_valid_path(orig_file, current_object, STR_SQLITE_OPEN , MY_TRUE);
+    int rc;
+
+    free_mstring(orig_file);
+
+    if (!new_file)
+        return SQLITE_AUTH;
+
+    if (mstrsize(new_file) >= len)
+    {
+        free_mstring(new_file);
+        return SQLITE_CANTOPEN;
+    }
+
+    rc = ((sqlite3_vfs*)vfs->pAppData)->xFullPathname((sqlite3_vfs*)vfs->pAppData, get_txt(new_file), len, buf);
+    free_mstring(new_file);
+
+    return rc;
+} /* sl_vfs_full_pathname() */
+
+/*-------------------------------------------------------------------------*/
+static int
+sl_vfs_randomness (sqlite3_vfs* vfs, int len, char* buf)
+
+/* This function implements the Randomness call for the LDMud's SQLite VFS.
+ * It will just forward the call to the original VFS.
+ */
+
+{
+    return ((sqlite3_vfs*)vfs->pAppData)->xRandomness((sqlite3_vfs*)vfs->pAppData, len, buf);
+} /* sl_vfs_randomness() */
+
+/*-------------------------------------------------------------------------*/
+static int
+sl_vfs_sleep (sqlite3_vfs* vfs, int microseconds)
+
+/* This function implements the Sleep call for the LDMud's SQLite VFS.
+ * It will just forward the call to the original VFS.
+ */
+
+{
+    return ((sqlite3_vfs*)vfs->pAppData)->xSleep((sqlite3_vfs*)vfs->pAppData, microseconds);
+} /* sl_vfs_sleep() */
+
+/*-------------------------------------------------------------------------*/
+static int
+sl_vfs_current_time (sqlite3_vfs* vfs, double* val)
+
+/* This function implements the xCurrentTime call for the LDMud's SQLite VFS.
+ * It will just forward the call to the original VFS.
+ */
+
+{
+    return ((sqlite3_vfs*)vfs->pAppData)->xCurrentTime((sqlite3_vfs*)vfs->pAppData, val);
+} /* sl_vfs_current_time() */
+
+/*-------------------------------------------------------------------------*/
+static int
+sl_vfs_get_last_error (sqlite3_vfs* vfs, int buflen, char* buf)
+
+/* This function implements the GetLastError call for the LDMud's SQLite VFS.
+ * It will just forward the call to the original VFS.
+ */
+
+{
+    return ((sqlite3_vfs*)vfs->pAppData)->xGetLastError((sqlite3_vfs*)vfs->pAppData, buflen, buf);
+} /* sl_vfs_get_last_error() */
+
+/*-------------------------------------------------------------------------*/
+static int
+sl_vfs_current_time_int64 (sqlite3_vfs* vfs, sqlite3_int64* val)
+
+/* This function implements the CurrentTimeInt64 call for the LDMud's SQLite VFS.
+ * It will just forward the call to the original VFS.
+ */
+
+{
+    return ((sqlite3_vfs*)vfs->pAppData)->xCurrentTimeInt64((sqlite3_vfs*)vfs->pAppData, val);
+} /* sl_vfs_current_time_int64() */
+
+/*-------------------------------------------------------------------------*/
 void
 pkg_sqlite_init ()
 
 /* Initialize the SQLite library.
  *
  * We configure SQLite to use LDMud's memory allocator.
+ * And we add a wrapper around the VFS to check the validity
+ * of file paths.
  */
 
 {
@@ -739,8 +847,52 @@ pkg_sqlite_init ()
         NULL
     };
 
+    static sqlite3_vfs vfs_methods = {
+        3,
+        0,
+        0,
+        NULL,
+        "ldmud",
+        NULL,
+        sl_vfs_open,
+        sl_vfs_delete,
+        sl_vfs_access,
+        sl_vfs_full_pathname,
+
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+
+        sl_vfs_randomness,
+        sl_vfs_sleep,
+        sl_vfs_current_time,
+        sl_vfs_get_last_error,
+        sl_vfs_current_time_int64,
+
+        NULL,
+        NULL,
+        NULL
+    };
+
+    sqlite3_vfs *orig_vfs;
+
     sqlite3_config(SQLITE_CONFIG_MALLOC, &mem_methods);
     sqlite3_config(SQLITE_CONFIG_LOG, &sl_log, NULL);
+
+    orig_vfs = sqlite3_vfs_find(NULL);
+    if (orig_vfs == NULL)
+        fatal("SQLite: No VFS registered.\n");
+
+
+    vfs_methods.szOsFile = orig_vfs->szOsFile;
+    vfs_methods.mxPathname = orig_vfs->mxPathname;
+    vfs_methods.pAppData = orig_vfs;
+
+    sqlite3_vfs_register(&vfs_methods, 1);
+
+    /* And disable URI handling, so no other VFS can be selected. */
+    sqlite3_config(SQLITE_CONFIG_URI, 0);
 
 } /* sl_init() */
 
