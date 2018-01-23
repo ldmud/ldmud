@@ -1336,6 +1336,7 @@ DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INHERIT, A_INHERITS)
 
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_FUNCTIONS, A_FUNCTIONS);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_UPDATE_INDEX_MAP, A_UPDATE_INDEX_MAP);
+DEFINE_RESERVE_MEM_BLOCK(RESERVE_INHERITS, A_INHERITS);
 
 #define byte_to_mem_block(n, b) \
     ((void)((mem_block[n].current_size == mem_block[n].max_size \
@@ -14827,6 +14828,137 @@ inherit_variable (variable_t *variable, funflag_t varmodifier, int redeclare)
 
 /*-------------------------------------------------------------------------*/
 static bool
+is_old_inherited_function (program_t* from, int first_function_index, inherit_t *oldinheritp, int oldix, bool update_existing)
+
+/* Check whether the function <oldix> in <oldinheritp> is actually inherited
+ * from there in <from> (where it is at <first_function_index>+<oldix>).
+ * <update_existing> is true, if <oldinheritp> was already fully handled.
+ */
+
+{
+    function_t* oldfunp = FUNCTION(oldinheritp->function_index_offset);
+    function_t* realoldfunp = oldfunp + oldix;
+
+    while (realoldfunp->flags & NAME_CROSS_DEFINED)
+        realoldfunp = realoldfunp + GET_CROSSDEF_OFFSET(realoldfunp->offset.func);
+
+    /* Check whether it's still the original function from <oldinheritp>.
+     * First condition: It must be in <oldinheritp>'s function block.
+     */
+    if (realoldfunp < oldfunp || oldfunp + oldinheritp->prog->num_functions <= realoldfunp)
+        return false;
+
+    if (update_existing)
+    {
+        /* Function entry must point to <oldinheritp>. */
+        return ((realoldfunp->flags & NAME_INHERITED) && realoldfunp->offset.inherit == (oldinheritp - &INHERIT(0)));
+    }
+    else
+    {
+        /* Function entry must point to <oldinheritp>, but because the inherit handling
+         * hasn't processed the function block fully, we must look at <from>'s function table.
+         */
+        funflag_t oldfunflag = from->functions[first_function_index + realoldfunp - oldfunp];
+        return (oldfunflag & (NAME_INHERITED|NAME_CROSS_DEFINED)) == NAME_INHERITED
+            && from->inherit[oldfunflag & INHERIT_MASK].prog == oldinheritp->prog;
+    }
+} /* is_old_inherited_function() */
+
+/*-------------------------------------------------------------------------*/
+static void
+update_duplicate_function (program_t* from, int first_function_index, inherit_t *oldinheritp, inherit_t *newinheritp, int oldix, int newix, bool update_existing)
+
+/* Do the cross-definition for a single function <oldix> in <oldinheritp> to <newix> in <newinheritp>.
+ * The function block of <oldinheritp> is at <first_function_index> in <from>.
+ * <update_existing> is true, if <oldinheritp> was already fully handled.
+ */
+
+{
+    function_t* oldfunp = FUNCTION(oldinheritp->function_index_offset);
+    function_t* newfunp = FUNCTION(newinheritp->function_index_offset);
+
+    /* A visible entry can't be a cross-definition in an inherited entry. */
+    assert(!(newfunp[newix].flags & NAME_CROSS_DEFINED));
+
+    if (is_old_inherited_function(from, first_function_index, oldinheritp, oldix, update_existing))
+    {
+        /* The function was not cross-defined or overridden in <from>.
+         * So, let's cross-define them, from old to new.
+         */
+        newfunp[newix].flags = (newfunp[newix].flags & ~(NAME_HIDDEN))
+                             | (oldfunp[oldix].flags & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|NAME_HIDDEN))
+                             | TYPE_MOD_VIRTUAL;
+
+        cross_define(newfunp + newix, oldfunp + oldix,
+            newinheritp->function_index_offset + newix - oldinheritp->function_index_offset - oldix);
+
+        update_function_identifier(newfunp + newix, newinheritp->function_index_offset + newix,
+                                   oldfunp + oldix, oldinheritp->function_index_offset + oldix);
+    }
+    else
+    {
+        /* <from> already did overload or cross-define it.
+         * Applying that to the new function.
+         */
+        cross_define(oldfunp + oldix, newfunp + newix,
+            oldinheritp->function_index_offset + oldix - newinheritp->function_index_offset - newix);
+
+        update_function_identifier(oldfunp + oldix, oldinheritp->function_index_offset + oldix,
+                                   newfunp + newix, newinheritp->function_index_offset + newix);
+    }
+
+} /* update_duplicatefunction() */
+
+/*-------------------------------------------------------------------------*/
+static void
+update_duplicate_functions (program_t* from, int first_function_index, inherit_t *oldinheritp, inherit_t *dupinheritp, inherit_t *newinheritp, bool update_existing)
+
+/* Do the cross-definitions to <newinheritp> that update_virtual_program()
+ * did for another inherit entry <oldinheritp> to the duplicate <dupinheritp>
+ * of it (with functions corresponding to the functions starting with
+ * <first_function_index> in <from>'s program).
+ * <update_existing> is true, if <dupinheritp> was already fully handled.
+ */
+
+{
+    program_t*  oldprogp = dupinheritp->prog;
+    function_t* newfunp = FUNCTION(newinheritp->function_index_offset);
+    function_t* oldfunp = FUNCTION(dupinheritp->function_index_offset);
+    A_UPDATE_INDEX_MAP_t* fun_map = GET_BLOCK(A_UPDATE_INDEX_MAP) + oldinheritp->function_map_offset;
+
+    /* And now cross-define as given in the function index map. */
+    for (int oldix = 0; oldix < oldprogp->num_functions; oldix++)
+    {
+        if (fun_map[oldix] == USHRT_MAX)
+        {
+            /* No destination but visible, make it undefined. */
+            if (!(oldfunp[oldix].flags & NAME_HIDDEN)
+             && is_old_inherited_function(from, first_function_index, dupinheritp, oldix, update_existing))
+                oldfunp[oldix].flags = NAME_UNDEFINED|NAME_HIDDEN|TYPE_MOD_PRIVATE;
+
+            continue;
+        }
+
+        update_duplicate_function(from, first_function_index, dupinheritp, newinheritp, oldix, fun_map[oldix], update_existing);
+    }
+
+    /* And hide any surfaced functions. */
+    {
+        program_t* newprogp = newinheritp->prog;
+        unsigned short *newix = newprogp->function_names;
+        int newleft = newprogp->num_function_names;
+
+        for (; --newleft >= 0; newix++)
+        {
+            if ( (newfunp[*newix].flags & (NAME_HIDDEN|NAME_CROSS_DEFINED)) == NAME_HIDDEN )
+                newfunp[*newix].flags |= TYPE_MOD_PRIVATE;
+        }
+    }
+
+} /* update_duplicate_functions() */
+
+/*-------------------------------------------------------------------------*/
+static bool
 update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newinheritp, int num_old_variables, int num_new_variables, int first_function_index, int first_variable_index, bool update_existing, funflag_t varmodifier)
 
 /* Patch the inherited old program in <oldinheritp> to the new program in
@@ -14970,7 +15102,7 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
              * but it may be referenced by the inherited program,
              * so we have to preserve that variable.
              */
-            *var_map = num_old_variables + oldinheritp->num_additional_variables;
+            *var_map = num_new_variables + oldinheritp->num_additional_variables;
 
             if (update_existing)
             {
@@ -15066,15 +15198,11 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
 
     {
         function_t *newfunp;
-        function_t *oldfunp, *lastoldfunp;
+        function_t *oldfunp;
         unsigned short *oldix = oldprogp->function_names;
         unsigned short *newix = newprogp->function_names;
         int oldleft = oldprogp->num_function_names;
         int newleft = newprogp->num_function_names;
-        int oldinheritidx;
-
-        if(update_existing)
-            oldinheritidx = oldinheritp - &INHERIT(0);
 
         /* Init each function map entry as undefined. */
         for (int j = 0; j < oldprogp->num_functions; j++)
@@ -15088,7 +15216,6 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
 
         newfunp = FUNCTION(updateinherit.function_index_offset);
         oldfunp = FUNCTION(oldinheritp->function_index_offset);
-        lastoldfunp = oldfunp + oldprogp->num_functions;
 
         for (;oldleft && newleft; oldix++, oldleft--)
         {
@@ -15108,45 +15235,8 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
             {
                 function_t *curoldfunp = oldfunp + *oldix;
                 function_t *curnewfunp = newfunp + *newix;
-                function_t *realoldfunp = curoldfunp;
 
-                while (realoldfunp->flags & NAME_CROSS_DEFINED)
-                    realoldfunp = realoldfunp + GET_CROSSDEF_OFFSET(realoldfunp->offset.func);
-
-                /* A visible entry can't be a cross-definition. */
-                assert(!(curnewfunp->flags & NAME_CROSS_DEFINED));
-
-                if ( (oldfunp <= realoldfunp && realoldfunp < lastoldfunp)
-                  && (update_existing
-                     ? ((realoldfunp->flags & NAME_INHERITED) && realoldfunp->offset.inherit == oldinheritidx)
-                     : ((from->functions[first_function_index + realoldfunp - oldfunp] & (NAME_INHERITED|NAME_CROSS_DEFINED)) == NAME_INHERITED)))
-                {
-                    /* The function was not cross-defined or overridden in <from>.
-                     * So, let's cross-define them, from old to new.
-                     */
-                    cross_define(curnewfunp, curoldfunp,
-                        updateinherit.function_index_offset + *newix - oldinheritp->function_index_offset - *oldix);
-
-                    update_function_identifier(curnewfunp, updateinherit.function_index_offset + *newix,
-                                               curoldfunp, oldinheritp->function_index_offset + *oldix);
-
-                    /* Also take over the visibility. */
-                    curnewfunp->flags = (curnewfunp->flags & ~(NAME_HIDDEN))
-                                      | (curoldfunp->flags & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED))
-                                      | TYPE_MOD_VIRTUAL;
-                }
-                else
-                {
-                    /* <from> already did overload or cross-define it.
-                     * Applying that to the new function.
-                     */
-                    cross_define(curoldfunp, curnewfunp,
-                        oldinheritp->function_index_offset + *oldix - updateinherit.function_index_offset - *newix);
-
-                    update_function_identifier(curoldfunp, oldinheritp->function_index_offset + *oldix,
-                                               curnewfunp, updateinherit.function_index_offset + *newix);
-                }
-
+                update_duplicate_function(from, first_function_index, oldinheritp, &updateinherit, *oldix, *newix, update_existing);
                 fun_map[*oldix] = *newix;
 
                 /* Check whether their signatures are compatible
@@ -15205,8 +15295,11 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
         oldix = oldprogp->function_names;
         for (oldleft = oldprogp->num_function_names; --oldleft >= 0; oldix++)
         {
-            if (fun_map[*oldix] == USHRT_MAX)
-                oldfunp[*oldix].flags = NAME_UNDEFINED|NAME_HIDDEN;
+            if (fun_map[*oldix] != USHRT_MAX)
+                continue;
+
+            if (is_old_inherited_function(from, first_function_index, oldinheritp, *oldix, update_existing))
+                oldfunp[*oldix].flags = NAME_UNDEFINED|NAME_HIDDEN|TYPE_MOD_PRIVATE;
         }
 
         /* Now we have to take care of the remaining functions with names
@@ -15247,9 +15340,7 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
         {
             if (dupinheritp->prog == oldprogp && dupinheritp->inherit_type != INHERIT_TYPE_NORMAL)
             {
-                int dupinheritidx = dupinheritp - &INHERIT(0);
                 inherit_t dupupdate;
-                function_t *oldfunp, *lastoldfunp, *newfunp;
 
                 /* If this is a virtual inherit, it must be a duplicate. */
                 assert((dupinheritp->inherit_type & (INHERIT_TYPE_DUPLICATE|INHERIT_TYPE_MAPPED)) == INHERIT_TYPE_DUPLICATE);
@@ -15259,87 +15350,20 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
                 dupupdate.inherit_depth = dupinheritp->inherit_depth;
                 dupupdate.function_index_offset = FUNCTION_COUNT;
 
+                dupinheritp->inherit_type |= INHERIT_TYPE_MAPPED;
+                dupinheritp->updated_inherit = INHERIT_COUNT;
+                dupinheritp->variable_index_offset = oldinheritp->variable_index_offset;
+                dupinheritp->num_additional_variables = oldinheritp->num_additional_variables;
+                dupinheritp->variable_map_offset = oldinheritp->variable_map_offset;
+                dupinheritp->function_map_offset = oldinheritp->function_map_offset;
+
                 if (!inherit_functions(dupupdate.prog, INHERIT_COUNT))
                     return false;
 
                 mem_block[A_FUNCTIONS].current_size += sizeof(A_FUNCTIONS_t) * dupupdate.prog->num_functions;
 
-                newfunp = FUNCTION(dupupdate.function_index_offset);
-                oldfunp = FUNCTION(dupinheritp->function_index_offset);
-                lastoldfunp = oldfunp + oldprogp->num_functions;
-
                 /* And now cross-define as given in the function index map. */
-                for (int oldix = 0; oldix < oldprogp->num_functions; oldix++)
-                {
-                    function_t *realoldfunp;
-                    ident_t *fun_ident;
-                    int newix;
-
-                    if (fun_map[oldix] == USHRT_MAX)
-                    {
-                        /* No destination but visible, make it undefined. */
-                        if (!(oldfunp[oldix].flags & NAME_HIDDEN))
-                            oldfunp[oldix].flags = NAME_UNDEFINED|NAME_HIDDEN;
-
-                        continue;
-                    }
-
-                    newix = fun_map[oldix];
-
-                    realoldfunp = oldfunp + oldix;
-                    fun_ident = find_shared_identifier_mstr(realoldfunp->name, I_TYPE_GLOBAL, 0);
-
-                    /* Ignore non-function identifier. */
-                    if (fun_ident && (fun_ident->type != I_TYPE_GLOBAL || fun_ident->u.global.function < 0))
-                        fun_ident = NULL;
-
-                    while (realoldfunp->flags & NAME_CROSS_DEFINED)
-                        realoldfunp = realoldfunp + GET_CROSSDEF_OFFSET(realoldfunp->offset.func);
-
-                    /* A visible entry can't be a cross-definition. */
-                    assert(!(newfunp[newix].flags & NAME_CROSS_DEFINED));
-
-                    if ( (oldfunp <= realoldfunp && realoldfunp < lastoldfunp)
-                      && (realoldfunp->flags & NAME_INHERITED)
-                      && realoldfunp->offset.inherit == dupinheritidx)
-                    {
-                        /* The function was not cross-defined or overridden in <from>.
-                         * So, let's cross-define them, from old to new.
-                         */
-                        cross_define(newfunp + newix, oldfunp + oldix,
-                            dupupdate.function_index_offset + newix - dupinheritp->function_index_offset - oldix);
-
-                        update_function_identifier(newfunp + newix, dupupdate.function_index_offset + newix,
-                                                   oldfunp + oldix, dupinheritp->function_index_offset + oldix);
-
-                        newfunp[newix].flags = (newfunp[newix].flags & ~(NAME_HIDDEN))
-                                             | (oldfunp[oldix].flags & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED))
-                                             | TYPE_MOD_VIRTUAL;
-                    }
-                    else
-                    {
-                        /* <from> already did overload or cross-define it.
-                         * Applying that to the new function.
-                         */
-                        cross_define(oldfunp + oldix, newfunp + newix,
-                            dupinheritp->function_index_offset + oldix - dupupdate.function_index_offset - newix);
-
-                        update_function_identifier(oldfunp + oldix, dupinheritp->function_index_offset + oldix,
-                                                   newfunp + newix, dupupdate.function_index_offset + newix);
-                    }
-                }
-
-                /* And hide any surfaced functions. */
-                {
-                    unsigned short *newix = newprogp->function_names;
-                    int newleft = newprogp->num_function_names;
-
-                    for (; --newleft >= 0; newix++)
-                    {
-                        if ( (newfunp[*newix].flags & (NAME_HIDDEN|NAME_CROSS_DEFINED)) == NAME_HIDDEN )
-                            newfunp[*newix].flags |= TYPE_MOD_PRIVATE;
-                    }
-                }
+                update_duplicate_functions(from, first_function_index, oldinheritp, dupinheritp, &dupupdate, true);
 
                 ADD_INHERIT(&dupupdate);
             }
@@ -15348,6 +15372,83 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
 
     return true;
 } /* update_virtual_program() */
+
+/*-------------------------------------------------------------------------*/
+static bool
+copy_updated_inherit (inherit_t *oldinheritp, inherit_t *newinheritp, program_t *from, int first_function_index, int first_variable_index, int last_variable_index, funflag_t varmodifier)
+
+/* We want to copy the variables for <newinheritp>, but we already
+ * got them in <oldinheritp>, and that one is an obsolete program
+ * (INHERIT_TYPE_MAPPED). Copy the information from there and update
+ * variable modifiers from <from> (variables from <first_variable_index>
+ * to <last_variable_index>) and <varmodifier>.
+ *
+ * Returns true on success, false otherwise (out of memory).
+ */
+
+{
+    /* We need to duplate the update inherit entry. */
+    inherit_t inheritupdate = INHERIT(oldinheritp->updated_inherit);
+
+    newinheritp->inherit_type |= INHERIT_TYPE_DUPLICATE|INHERIT_TYPE_MAPPED;
+    newinheritp->variable_index_offset = oldinheritp->variable_index_offset;
+    newinheritp->num_additional_variables = oldinheritp->num_additional_variables;
+    newinheritp->variable_map_offset = oldinheritp->variable_map_offset;
+    newinheritp->function_map_offset = oldinheritp->function_map_offset;
+    newinheritp->updated_inherit = INHERIT_COUNT;
+
+    /* Adjust modifier and identifier. */
+    for (int j = first_variable_index; j < last_variable_index; j++)
+    {
+        inherit_t* inheritvar = oldinheritp;
+        int varidx = j - first_variable_index;
+
+        do
+        {
+            inherit_t* inheritnext = &INHERIT(inheritvar->updated_inherit);
+            varidx = GET_BLOCK(A_UPDATE_INDEX_MAP)[inheritvar->variable_map_offset + varidx];
+
+            if (varidx >= inheritnext->prog->num_variables - inheritnext->prog->num_virtual_variables)
+            {
+                /* Additional variable. */
+                varidx -= inheritnext->prog->num_variables - inheritnext->prog->num_virtual_variables;
+                break;
+            }
+
+            inheritvar = inheritnext;
+        } while (inheritvar->inherit_type & INHERIT_TYPE_MAPPED);
+
+        if (!inherit_variable(from->variables + j, varmodifier, inheritvar->variable_index_offset + varidx))
+            return false;
+    }
+
+    inheritupdate.inherit_type |= INHERIT_TYPE_DUPLICATE;
+    inheritupdate.inherit_depth = newinheritp->inherit_depth;
+
+    /* Add the update function table. */
+    inheritupdate.function_index_offset = FUNCTION_COUNT;
+    if (!inherit_functions(inheritupdate.prog, INHERIT_COUNT))
+        return false;
+
+    mem_block[A_FUNCTIONS].current_size += sizeof(A_FUNCTIONS_t) * inheritupdate.prog->num_functions;
+
+    update_duplicate_functions(from, first_function_index, oldinheritp, newinheritp, &inheritupdate, false);
+
+    ADD_INHERIT(&inheritupdate);
+
+    /* Resolve further inherit mappings. */
+    while (inheritupdate.inherit_type & INHERIT_TYPE_MAPPED)
+    {
+        INHERIT(INHERIT_COUNT-1).updated_inherit = INHERIT_COUNT;
+
+        inheritupdate = INHERIT(inheritupdate.updated_inherit);
+        inheritupdate.inherit_type |= INHERIT_TYPE_DUPLICATE;
+        inheritupdate.inherit_depth = newinheritp->inherit_depth;
+        ADD_INHERIT(&inheritupdate);
+    }
+
+    return true;
+} /* copy_updated_inherit() */
 
 /*-------------------------------------------------------------------------*/
 static bool
@@ -15371,84 +15472,153 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
     /* Do we already know this inherit? */
     inherit_t* first_inherit = GET_BLOCK(A_INHERITS);
     inherit_t* inheritdup = first_inherit;
+    inherit_t* inheritorig = NULL;
     bool found = false;
 
+    /* First look for the same program already inherited virtually. */
     for (int i = INHERIT_COUNT; --i >= 0; inheritdup++)
     {
         /* Non-Virtual? */
         if(inheritdup->variable_index_offset & NON_VIRTUAL_OFFSET_TAG)
             continue;
 
-        /* Ignore obsoleted inherits or ones we already looked at. */
-        if(inheritdup->inherit_type & (INHERIT_TYPE_MAPPED|INHERIT_TYPE_DUPLICATE))
+        /* Ignore inherits we already looked at. */
+        if(inheritdup->inherit_type & INHERIT_TYPE_DUPLICATE)
             continue;
 
-        if (inheritdup->prog == progp)
+        if (inheritdup->prog != progp)
+            continue;
+
+        if(inheritdup->inherit_type & INHERIT_TYPE_MAPPED)
+        {
+            /* Found it, but is obsolete.
+             * We use its function and variable map and additional variables.
+             * And we copy its update inherit entry.
+             */
+            if (!copy_updated_inherit(inheritdup, newinheritp, from, first_function_index, first_variable_index, last_variable_index, varmodifier))
+                return false;
+        }
+        else
         {
             /* Found it, use their variables. */
             newinheritp->variable_index_offset = inheritdup->variable_index_offset;
             newinheritp->inherit_type |= INHERIT_TYPE_DUPLICATE;
-            found = true;
 
             /* Adjust modifier and identifier. */
             for (int j = first_variable_index; j < last_variable_index; j++)
                 if (!inherit_variable(from->variables + j, varmodifier, inheritdup->variable_index_offset + j - first_variable_index))
                     return false;
-
-            break;
         }
-        else if (mstreq(inheritdup->prog->name, progp->name))
+
+        found = true;
+        break;
+    }
+
+    /* Then we search for a program with the same name (also virtually inherited). */
+    inheritdup = first_inherit;
+    for (int i = INHERIT_COUNT; !found && --i >= 0; inheritdup++)
+    {
+        /* Non-Virtual? */
+        if(inheritdup->variable_index_offset & NON_VIRTUAL_OFFSET_TAG)
+            continue;
+
+        /* We are only interested in the newest one. */
+        if(inheritdup->inherit_type & INHERIT_TYPE_MAPPED)
+            continue;
+
+        if (!mstreq(inheritdup->prog->name, progp->name))
+            continue;
+
+        /* First determine the number of variables. */
+        program_t *inhprog = inheritdup->prog;
+        int first_inh_variable = inheritdup->variable_index_offset;
+        int last_inh_variable = inheritdup->variable_index_offset + inhprog->num_variables - inhprog->num_virtual_variables;
+
+        assert(last_variable_index == first_variable_index + progp->num_variables - progp->num_virtual_variables);
+
+        if ( (inhprog->load_time == progp->load_time)
+           ? (inhprog->id_number > progp->id_number)
+           : (inhprog->load_time > progp->load_time) )
         {
-            /* Same name? Let's check who is newer. */
-            program_t *inhprog = inheritdup->prog;
+            /* Phew, the already inherited program is newer.
+             * We'll use their variables but also create
+             * a mapping from old to new variable indices.
+             */
+            if (inheritdup->inherit_type & INHERIT_TYPE_DUPLICATE)
+                continue; /* The original will come later. */
 
-            /* First determine the number of variables. */
-            int first_inh_variable = inheritdup->variable_index_offset;
-            int last_inh_variable = inheritdup->variable_index_offset + inhprog->num_variables - inhprog->num_virtual_variables;
+            update_virtual_program(from
+                                  , newinheritp
+                                  , inheritdup
+                                  , last_variable_index - first_variable_index
+                                  , last_inh_variable - first_inh_variable
+                                  , first_function_index
+                                  , first_variable_index
+                                  , false
+                                  , varmodifier
+                                  );
 
-            assert(last_variable_index == first_variable_index + progp->num_variables - progp->num_virtual_variables);
+            found = true;
+        }
+        else if (!(inheritdup->inherit_type & INHERIT_TYPE_DUPLICATE))
+        {
+            /* Damn, we've inherited an old program.
+             * We'll have to fix that one now.
+             */
+            update_virtual_program(from
+                                  , inheritdup
+                                  , newinheritp
+                                  , last_inh_variable - first_inh_variable
+                                  , last_variable_index - first_variable_index
+                                  , first_function_index
+                                  , first_variable_index
+                                  , true
+                                  , varmodifier
+                                  );
 
-            if ( (inhprog->load_time == progp->load_time)
-               ? (inhprog->id_number > progp->id_number)
-               : (inhprog->load_time > progp->load_time) )
-            {
-                /* Phew, the already inherited program is newer.
-                 * We'll use their variables but also create
-                 * a mapping from old to new variable indices.
-                 */
-                update_virtual_program(from
-                                      , newinheritp
-                                      , inheritdup
-                                      , last_variable_index - first_variable_index
-                                      , last_inh_variable - first_inh_variable
-                                      , first_function_index
-                                      , first_variable_index
-                                      , false
-                                      , varmodifier
-                                      );
+            /* Remember this, in case we meet some duplicates. */
+            inheritorig = inheritdup;
 
-                found = true;
-            }
-            else
-            {
-                /* Damn, we've inherited an old program.
-                 * We'll have to fix that one now.
-                 */
-                update_virtual_program(from
-                                      , inheritdup
-                                      , newinheritp
-                                      , last_inh_variable - first_inh_variable
-                                      , last_variable_index - first_variable_index
-                                      , first_function_index
-                                      , first_variable_index
-                                      , true
-                                      , varmodifier
-                                      );
+            /* Variables still need to be inherited. */
+            found = false;
+        }
+        else
+        {
+            /* Okay, this is the duplicate of an old program.
+             * So we must have seen the non-duplicate version.
+             * Use that mapping.
+             */
+            assert(inheritorig != NULL);
+            assert(inheritorig->inherit_type & INHERIT_TYPE_MAPPED);
 
-                /* Variables still need to be inherited. */
-                found = false;
-            }
-            break;
+            inheritdup->inherit_type |= INHERIT_TYPE_MAPPED;
+            inheritdup->variable_index_offset = inheritorig->variable_index_offset;
+            inheritdup->num_additional_variables = inheritorig->num_additional_variables;
+            inheritdup->variable_map_offset = inheritorig->variable_map_offset;
+            inheritdup->function_map_offset = inheritorig->function_map_offset;
+            inheritdup->updated_inherit = INHERIT_COUNT;
+
+            /* We need to duplicate the update inherit as well. */
+            inherit_t inheritupdate = INHERIT(inheritorig->updated_inherit);
+            inheritupdate.inherit_type |= INHERIT_TYPE_DUPLICATE;
+            inheritupdate.inherit_depth = inheritdup->inherit_depth;
+
+            /* And now we need to cross-define its functions. */
+            inheritupdate.function_index_offset = FUNCTION_COUNT;
+            if (!inherit_functions(inheritupdate.prog, INHERIT_COUNT))
+                return false;
+
+            mem_block[A_FUNCTIONS].current_size += sizeof(A_FUNCTIONS_t) * inheritupdate.prog->num_functions;
+
+            update_duplicate_functions(from, first_function_index, inheritorig, inheritdup, &inheritupdate, true);
+
+            ADD_INHERIT(&inheritupdate);
+
+            /* The update inherit cannot already be obsoleted, too. */
+            assert(!(inheritupdate.inherit_type & INHERIT_TYPE_MAPPED));
+
+            /* Continue to other duplicates. */
+            found = false;
         }
     }
 
@@ -15556,6 +15726,13 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
     *   Preparations for functions   *
     *                                */
 
+    /* We reserve space for update inherit entries,
+     * so there wouldn't happen any reallocation and thus
+     * no moving of our inherit entries later on.
+     */
+    if (!RESERVE_INHERITS(INHERIT_COUNT + 2*from->num_inherited + 1))
+        return -1;
+
     /* For now, we mask out the INHERIT field in the flags and
      * use NEW_INHERITED_INDEX for the value.
      *
@@ -15653,7 +15830,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
         /* Create a new inherit entry. */
         inherit_t newinherit;
         newinherit = *inheritp;
-        newinherit.inherit_type = INHERIT_TYPE_EXTRA;
+        newinherit.inherit_type = INHERIT_TYPE_EXTRA | (inheritp->inherit_type & INHERIT_TYPE_DUPLICATE);
         newinherit.inherit_depth++;
         newinherit.function_index_offset += first_func_index;
         newinherit.variable_index_offset += V_VARIABLE_COUNT - last_bound_variable;
@@ -15662,7 +15839,8 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
 
         if (inheritp->inherit_type & INHERIT_TYPE_MAPPED)
         {
-            inherit_obsoleted_variables(&newinherit, from, last_bound_variable, varmodifier);
+            if (!(inheritp->inherit_type & INHERIT_TYPE_DUPLICATE))
+                inherit_obsoleted_variables(&newinherit, from, last_bound_variable, varmodifier);
             newinherit.inherit_type |= INHERIT_TYPE_MAPPED;
 
             if (!(inheritp->inherit_type & INHERIT_TYPE_DUPLICATE))
@@ -15674,7 +15852,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
 
             inherit_virtual_variables(&newinherit, from,
                 newinherit.function_index_offset - first_func_index,
-                last_bound_variable, next_bound_variable, varmodifier);
+                inheritp->variable_index_offset, next_bound_variable, varmodifier);
 
             if (!(inheritp->inherit_type & INHERIT_TYPE_DUPLICATE))
                 last_bound_variable = next_bound_variable;
@@ -16659,6 +16837,31 @@ epilog (void)
     }
 
 #if 0
+    printf("DEBUG: ----- Inherit list for %s: -----\n", current_loc.file->name);
+    for(i = 0; i < INHERIT_COUNT; i++)
+    {
+        inherit_t* inh = &INHERIT(i);
+
+        printf("DEBUG: [%03d: %02x] var: %3d%s, fun: %3d - %-32s ",
+            i, inh->inherit_type,
+            inh->variable_index_offset & ~NON_VIRTUAL_OFFSET_TAG,
+            (inh->variable_index_offset & NON_VIRTUAL_OFFSET_TAG) ? "r" : "v",
+            inh->function_index_offset,
+            get_txt(inh->prog->name));
+
+        if (inh->inherit_type & INHERIT_TYPE_MAPPED)
+            printf("(mapped to %d)\n", inh->updated_inherit);
+        else if (inh->inherit_type & INHERIT_TYPE_DUPLICATE)
+            printf("(duplicate)\n");
+        else if (inh->inherit_type & INHERIT_TYPE_EXTRA)
+            printf("(extra)\n");
+        else if (inh->inherit_type & INHERIT_TYPE_VIRTUAL)
+            printf("(virtual)\n");
+        else
+            printf("(regular)\n");
+    }
+    printf("DEBUG: ------\n");
+
     printf("DEBUG: ----- Function table for %s: -----\n", current_loc.file->name);
     for(i = 0; i < num_functions; i++)
     {
