@@ -324,7 +324,7 @@ int edit_room(string str)
 
 	match = 1;
 
-	if(strlen(str) >= 1) {
+	if(sizeof(str) >= 1) {
 		sel = str[0];
 		if(sel == 'h') {
 			show_help();
@@ -376,7 +376,7 @@ static
 int do_edit(string str) {
 	int	sel;
 
-	if(strlen(str) >= 1) {
+	if(sizeof(str) >= 1) {
 		sel = str[0];
 		if(sel == 's') {
 			write("Short name of room(" + short_string + "):");

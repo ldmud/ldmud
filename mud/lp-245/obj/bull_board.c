@@ -75,7 +75,7 @@ int new(string hd) {
 	write("You have to remove an old message first.\n");
 	return 1;
     }
-    if (strlen(hd) > 50) {
+    if (sizeof(hd) > 50) {
 	write("Too long header to fit the paper.\n");
 	return 1;
     }

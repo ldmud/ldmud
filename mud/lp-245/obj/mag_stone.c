@@ -69,7 +69,7 @@ int list_peoples() {
 	name = capitalize(name);
 	if (list[i]->short() == 0)
 	    name = "(" + name + ")";
-	if (strlen(name) < 8)
+	if (sizeof(name) < 8)
 	    name = name + "\t";
 	write(query_ip_number(list[i]) + "\t" + name + "\t" +
 	      list[i]->query_level() + "\t");

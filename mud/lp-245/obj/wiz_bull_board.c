@@ -123,7 +123,7 @@ int new_msg(string msg_head) {
 		write("You have to remove an old message first.\n");
 		return 1;
 	}
-	if (strlen(msg_head) > 50) {
+	if (sizeof(msg_head) > 50) {
 		write("Message header too long. Try again.\n");
 		return 1;
 	}

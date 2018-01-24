@@ -179,9 +179,9 @@ int Dump(string str) {
 	if (tmp) {
 	    string t;
 	    t = query_list[i] + ":";
-	    if (strlen(t) < 8)
+	    if (sizeof(t) < 8)
 		t += "\t\t";
-	    else if (strlen(t) < 16)
+	    else if (sizeof(t) < 16)
 		t += "\t";
 	    if (objectp(tmp))
 		tmp = object_name(tmp);

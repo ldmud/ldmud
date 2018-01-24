@@ -563,7 +563,7 @@ void preload (string file)
 {
     int last_time;
 
-    if (strlen(file) && file[0] != '#')
+    if (sizeof(file) && file[0] != '#')
     {
         last_time = current_time;
         debug_message(sprintf("Preloading file: %s", file));
@@ -1652,7 +1652,7 @@ mixed valid_write (string path, string euid, string fun, object caller)
 
     case "save_object":
         if ( user = GETUID(previous_object()) ) {
-            if ( path[0 .. strlen(user)+7] == "players/" + user
+            if ( path[0 .. sizeof(user)+7] == "players/" + user
              &&  sscanf(path, ".%s", user) == 0)
                 return ADD_SLASH(path);
         } else {
@@ -1673,7 +1673,7 @@ mixed valid_write (string path, string euid, string fun, object caller)
         if (path[0..3] == "log/"
          && !(   sizeof(regexp(({path[4..33]}), "/"))
               || path[4] == '.'
-              || strlen(path) > 34
+              || sizeof(path) > 34
             ) ) {
             return ADD_SLASH(path);
         }
@@ -1689,7 +1689,7 @@ mixed valid_write (string path, string euid, string fun, object caller)
          && path[0..3] == "log/"
          && !(   sizeof(regexp(({path[4..33]}), "/"))
               || path[4] == '.'
-              || strlen(path) > 34
+              || sizeof(path) > 34
             ) ) {
             return 1;
         }

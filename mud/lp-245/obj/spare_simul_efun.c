@@ -71,7 +71,7 @@ void ls (string path)
     for(i = sizeof(dir); i--; ) {
         if(dir[i--] == -2)
             dir[i]+="/";
-        len = strlen(dir[i]);
+        len = sizeof(dir[i]);
         if (len > max)
             max = len;
     }
@@ -81,7 +81,7 @@ void ls (string path)
     for (i=0; i < sizeof(dir); i+=2) {
 	string name;
             name = dir[i];
-	tmp = strlen(name);
+	tmp = sizeof(name);
 	if (len + tmp > 79) {
 	    len = 0;
 	    write("\n");
@@ -119,7 +119,7 @@ void log_file(string file,string str)
 
     file_name = "/log/" + file;
 #ifdef COMPAT_FLAG
-    if (sizeof(regexp(({file}), "/")) || file[0] == '.' || strlen(file) > 30 )
+    if (sizeof(regexp(({file}), "/")) || file[0] == '.' || sizeof(file) > 30 )
     {
         write("Illegal file name to log_file("+file+")\n");
         return;

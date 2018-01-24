@@ -83,7 +83,7 @@ int headers() {
     }
     for (i=0; i<sizeof(arr_messages); i+=2) {
 	name = i/2+1 + " " + arr_messages[i];
-	if (strlen(name) < 8)
+	if (sizeof(name) < 8)
 	    name += "\t";
 	write(name + "\t");
         n = sscanf(arr_messages[i+1],"%sRe:   %s\n%s",

@@ -264,7 +264,7 @@ int do_old(string verb, string str) {
 	write("arg=" + str + "\n");
     }
 
-    if(strlen(verb) <= 1 || verb[0] != '%') {
+    if(sizeof(verb) <= 1 || verb[0] != '%') {
 	write("do_old: return 0\n");
 	return 0;
     }
@@ -443,7 +443,7 @@ int history_add(string str) {
 	return 0;
     }
 
-    if(strlen(verb) > 1 && verb[0] == '%') {
+    if(sizeof(verb) > 1 && verb[0] == '%') {
 	if(is_debug) {
 	    write("calling do_old\n");
 	}

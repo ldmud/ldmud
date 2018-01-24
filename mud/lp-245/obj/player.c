@@ -136,7 +136,7 @@ int valid_name(string str)
         write("Invalid name");
         return 0;
     }
-    length = strlen(str);
+    length = sizeof(str);
     if (length > 11) {
         write("Too long name.\n");
         return 0;
@@ -1204,7 +1204,7 @@ static void new_password(string p)
         destruct(myself);
         return;
     }
-    if (strlen(p) < 6) {
+    if (sizeof(p) < 6) {
         write("The password must have at least 6 characters.\n");
         input_to("new_password", 1);
         write("Password: ");
@@ -1492,7 +1492,7 @@ int list_peoples() {
         name = capitalize(name);
         if (list[i]->short() == 0)
             name = "(" + name + ")";
-        if (strlen(name) < 8)
+        if (sizeof(name) < 8)
             name = name + "\t";
         write(query_ip_number(list[i]) + "\t" + name + "\t" +
               list[i]->query_level() + "\t");
@@ -2419,7 +2419,7 @@ mixed valid_read(string str, int lvl) {
     string who, file;
     int i;
 
-    i = strlen(str) - 1;
+    i = sizeof(str) - 1;
     while(i>0) {
         if (str[i] == '.' && str[i-1] == '.') {
             write("Illegal to have '..' in path.\n");
@@ -2625,7 +2625,7 @@ static int cd(string str) {
         int i;
         if (current_path == "")
             return 0;
-        i = strlen(current_path) - 1;
+        i = sizeof(current_path) - 1;
         while(i > 0 && current_path[i] != '/')
             i -= 1;
         if (i == 0)
