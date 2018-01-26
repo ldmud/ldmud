@@ -12662,6 +12662,8 @@ function_call:
                   add_short($1.real->u.global.python_efun);
                   CURRENT_PROGRAM_SIZE += 4;
 
+                  $$.type = get_fulltype(lpctype_mixed);
+
                   /* Always need an arg frame, as these
                    * calls are always handled as varargs.
                    */

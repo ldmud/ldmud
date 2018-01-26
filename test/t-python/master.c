@@ -155,6 +155,12 @@ void run_test()
                 return sizeof(oblist) == 2 && oblist[0] == this_object();
             :)
         }),
+        ({
+            "Compiler bug on type testing", TF_DONTCHECKERROR,
+            (:
+                load_object("/testcompiler");
+            :)
+        })
 
     }), //#'shutdown);
     (:
