@@ -49,6 +49,7 @@
 #include "svalue.h"
 #include "swap.h"
 #include "xalloc.h"
+#include "pkg-python.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -80,6 +81,11 @@ simul_efun_table_t simul_efun_table[SEFUN_TABLE_SIZE];
    * A .funstart of NULL marks unused/discarded entries.
    */
 
+ident_t *all_simul_efuns = NULL;
+  /* The list of all active simul_efun identifiers, which are also
+   * held in the symbol table.
+   */
+
 int num_simul_efun = 0;
   /* Number of functions (active or not) listed in simul_efunp.
    */
@@ -96,15 +102,34 @@ static program_t *simul_efun_program= NULL;
   /* The program of the primary simul_efun object.
    */
 
-static ident_t *all_simul_efuns = NULL;
-  /* The list of all active simul_efun identifiers, which are also
-   * held in the symbol table.
-   */
-
 static short all_discarded_simul_efun = -1;
   /* First index of the list of discarded sefuns in simul_efunp.
    * With this list, it is faster to find a sefun entry to reactivate.
    */
+
+/*-------------------------------------------------------------------------*/
+static void
+remove_efun_shadows (ident_t* list)
+
+/* Remove sefun shadows for efuns / python efuns in the given list.
+ */
+
+{
+    ident_t *id;
+    for (id = list; id; id = id->next_all)
+    {
+        int j = id->u.global.sim_efun;
+
+        /* If they are listed in the table, move them into the inactive list. */
+        if ((size_t)j < SIZE_SEFUN_TABLE)
+        {
+            simul_efunp[j].offset.next_sefun = all_discarded_simul_efun;
+            all_discarded_simul_efun = j;
+        }
+
+        id->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
+    }
+} /* remove_efun_shadows() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -116,8 +141,7 @@ invalidate_simul_efuns (void)
 
 {
     simul_efun_table_t *entry;
-    ident_t            *id;
-    int                 i, j;
+    int                 i;
 
     /* Invalidate the simul_efun table */
     for (entry = simul_efun_table, i = SIZE_SEFUN_TABLE; --i >= 0; )
@@ -126,27 +150,19 @@ invalidate_simul_efuns (void)
         entry++;
     }
 
-    /* Remove all sefun shadows for efuns.
-     * If they are listed in the table, move then into the inactive list.
-     */
-    for (id = all_efuns; id; id = id->next_all)
-    {
-        j = id->u.global.sim_efun;
-        if ((size_t)j < SIZE_SEFUN_TABLE)
-        {
-            simul_efunp[j].offset.next_sefun = all_discarded_simul_efun;
-            all_discarded_simul_efun = j;
-        }
-        id->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
-    }
+    /* Remove all sefun shadows for efuns and python efuns. */
+    remove_efun_shadows(all_efuns);
+#ifdef USE_PYTHON
+    remove_efun_shadows(all_python_efuns);
+#endif
 
     /* Mark all simulefun identifier entries as non-existing
      * and move them into the inactive list.
      */
     while (all_simul_efuns != NULL)
     {
-        id = all_simul_efuns;
-        j = id->u.global.sim_efun;
+        ident_t* id = all_simul_efuns;
+        int j = id->u.global.sim_efun;
 
         all_simul_efuns = all_simul_efuns->next_all;
 

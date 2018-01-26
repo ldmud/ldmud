@@ -77,6 +77,8 @@ static bool python_is_external = true;
 
 int num_python_efun = 0;
 
+ident_t *all_python_efuns = NULL;
+
 static PyObject* python_efun_table[PYTHON_EFUN_TABLE_SIZE];
   /* Python callables for all defined efuns. 
    */
@@ -149,13 +151,37 @@ python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
     if (ident->type == I_TYPE_UNKNOWN)
     {
         init_global_identifier(ident, MY_FALSE);
+        ident->next_all = all_python_efuns;
+        all_python_efuns = ident;
     }
-
-    /* There is higher level identifier?
-     * Should only happen during compile time, and that we forbid.
-     */
-    if (ident->type != I_TYPE_GLOBAL)
+    else if (ident->type == I_TYPE_GLOBAL)
     {
+        /* If this is a simul-efun, we need to remove it from
+         * the all_simul_efuns list, otherwise the simul-efun
+         * won't hesitate to unregister this efun.
+         */
+        if (ident->u.global.efun == I_GLOBAL_EFUN_OTHER &&
+            ident->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER)
+        {
+            for (ident_t** id = &all_simul_efuns; *id; id = &((*id)->next_all))
+                if (*id == ident)
+                {
+                    /* Remove it from the list. */
+                    *id = ident->next_all;
+
+                    /* And add it to our list. */
+                    ident->next_all = all_python_efuns;
+                    all_python_efuns = ident;
+
+                    break;
+                }
+        }
+    }
+    else
+    {
+        /* There is higher level identifier?
+         * Should only happen during compile time, and that we forbid.
+         */
         PyErr_SetString(PyExc_RuntimeError, "couldn't create efun entry");
         return NULL;
     }

@@ -37,6 +37,11 @@ extern char * python_startup_script;
 extern int num_python_efun;
   /* Next available ID for python efuns. */
 
+extern ident_t *all_python_efuns;
+  /* Start of the linked list of all non-shadowing python efuns.
+   * (All shadowed efuns are in the all_efuns list.)
+   */
+
 /* --- Prototypes --- */
 extern void pkg_python_init(char* prog_name);
 

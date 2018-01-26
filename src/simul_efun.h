@@ -38,6 +38,7 @@ extern function_t *simul_efunp;
 extern object_t *simul_efun_object;
 extern vector_t *simul_efun_vector;
 extern simul_efun_table_t simul_efun_table[];
+extern ident_t *all_simul_efuns;
 
 /* --- Prototypes --- */
 
