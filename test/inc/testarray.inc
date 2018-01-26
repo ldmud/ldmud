@@ -16,7 +16,7 @@ int run_array_without_callback(mixed* testarray)
 
         if(test[TI_FLAGS]&TF_ERROR)
         {
-            if(!catch(funcall(test[TI_CLOSURE]);nolog))
+            if(!catch(funcall(test[TI_CLOSURE]);publish))
             {
                 errors++;
                 msg(" FAILURE! (There was no error.)\n");
@@ -26,7 +26,7 @@ int run_array_without_callback(mixed* testarray)
         }
         else if (test[TI_FLAGS]&TF_DONTCHECKERROR)
         {
-            catch(funcall(test[TI_CLOSURE]);nolog);
+            catch(funcall(test[TI_CLOSURE]);publish);
             // if we surived the test: great
             msg(" Success.\n");
         }

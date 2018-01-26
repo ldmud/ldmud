@@ -117,6 +117,11 @@ void run_test()
                 return python_return();
             :)
         }),
+        ({ "getting an exception", TF_ERROR,
+            (:
+                return funcall(#'python_error);
+            :)
+        }),
         ({
             "Overriding efuns", 0,
             (:

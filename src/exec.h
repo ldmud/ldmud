@@ -336,6 +336,12 @@ static const bytecode_p EFUN_FUNSTART = (bytecode_p)-2;
   /* Special value used for funstart to mark efuns for dump_trace.
    */
 
+#ifdef USE_PYTHON
+static const bytecode_p PYTHON_EFUN_FUNSTART = (bytecode_p)-3;
+  /* Special value used for funstart to mark python efuns for dump_trace.
+   */
+#endif
+
 /* clang-700.1.81 (and other clang versions) with -Wduplicate-decl-specifier
  * issue warning about duplicate 'const' declaration specifiers, when
  * encountering 'const bytecode_p const bla'. The warnings disappear when

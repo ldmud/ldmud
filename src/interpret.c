@@ -17149,6 +17149,10 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool external)
 #ifdef USE_PYTHON
             if (i >= CLOSURE_PYTHON_EFUN && i < CLOSURE_EFUN)
             {
+                inter_pc = csp->funstart = PYTHON_EFUN_FUNSTART;
+                csp->instruction = i - CLOSURE_PYTHON_EFUN;
+                csp->num_local_variables = 0;
+
                 call_python_efun(i - CLOSURE_PYTHON_EFUN, num_arg);
                 CLEAN_CSP
                 return;
@@ -17729,6 +17733,20 @@ get_line_number_if_any (string_t **name)
 
         return 0;
     }
+
+#ifdef USE_PYTHON
+    if (csp >= &CONTROL_STACK[0] && csp->funstart == PYTHON_EFUN_FUNSTART)
+    {
+        static char buf[256] = "#'";
+        char *iname = closure_python_efun_to_string(csp->instruction + CLOSURE_PYTHON_EFUN);
+
+        strncpy(buf + 2, iname, sizeof(buf) - 2);
+        buf[sizeof(buf - 1)] = 0;
+        memsafe(*name = new_mstring(buf), strlen(buf), "python efun name");
+
+        return 0;
+    }
+#endif
 
     if (current_prog)
     {
