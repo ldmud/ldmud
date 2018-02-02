@@ -213,4 +213,9 @@
 
 #define DID_MEM_ES_MAX  9
 
+// Need some defines from driver_info.h if not yet included somewhere else
+#ifndef TRACE_MAX
+#include <driver_info.h>
+#endif
+
 #endif /* LPC_DEBUG_INFO_H_ */
