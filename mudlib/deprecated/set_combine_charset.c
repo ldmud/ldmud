@@ -11,7 +11,7 @@
 void set_combine_charset(int *|string charset)
 {
     object ob = efun::this_interactive();
-    if(!efun::interactive(ob))
+    if(!ob)
         return;
 
     if(stringp(charset))
@@ -23,7 +23,7 @@ void set_combine_charset(int *|string charset)
 int *|string get_combine_charset(int mode)
 {
     object ob = efun::this_interactive();
-    if(!efun::interactive(ob))
+    if(!ob)
         return 0;
 
     if(mode == CHARSET_STRING)

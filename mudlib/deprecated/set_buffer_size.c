@@ -9,6 +9,10 @@
 int set_buffer_size(int size)
 {
     object ob = efun::this_interactive();
+
+    if (!ob)
+        return -1;
+
     int oldsize = efun::interactive_info(ob, IC_SOCKET_BUFFER_SIZE);
 
     efun::configure_interactive(ob, IC_SOCKET_BUFFER_SIZE, size);

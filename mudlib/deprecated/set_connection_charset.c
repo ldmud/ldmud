@@ -11,7 +11,7 @@
 void set_connection_charset(int *|string charset, varargs int* quote_iac)
 {
     object ob = efun::this_interactive();
-    if(!efun::interactive(ob))
+    if(!ob)
         return;
 
     if(stringp(charset))
@@ -25,7 +25,7 @@ void set_connection_charset(int *|string charset, varargs int* quote_iac)
 int|int *|string get_connection_charset(int mode)
 {
     object ob = efun::this_interactive();
-    if(!efun::interactive(ob))
+    if(!ob)
         return 0;
 
     if(mode == CHARSET_STRING)
