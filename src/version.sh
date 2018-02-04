@@ -38,7 +38,7 @@ version_micro=0
 version_patch=0
 version_type="rel"
 version_longtype="release"
-version_date="Wed Oct 4 22:00:00 2017 +0200"
+version_date="Sun Jan 4 16:00:00 2018 +0100"
 version_tagger="Gnomi <gnomi@unitopia.de>"
-version_revision="3.5.0"
+version_revision="3.5.1"
 fi;

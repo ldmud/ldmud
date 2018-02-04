@@ -4,6 +4,25 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+04-Jan-2018 (LDMud Team) -- 3.5.1
+   - Fixed Crashes:
+      + missing type declarations resulted in a NULL pointer dereference
+        (#859).
+      + fixed handling of program updates with triply virtually inherited
+        programs.
+      + fixed crash when swapping out programs with lvalue references (#854).
+      + fixed a crash on exceptions in a call of Python efun closures.
+      + compiling a call to Python efuns resulted in an uninitialized type.
+      + SQLite crashed when LDMud's allocator replaced the system malloc.
+
+   - Runtime:
+      + sl_exec() allows the ATTACH statement now.
+      + SQLite log messages are now printed to the debug log (#835).
+
+   - Other:
+      + Corrected simul-efun implementations of deprecared efuns (#855, #857).
+      + Corrected the LP-245 mudlib to work with the current driver.
+
 04-Oct-2017 (LDMud Team) -- 3.5.0
     - Fixed Crashes
        + xml_generate(), xml_parse() could crash the driver due to a wrong
