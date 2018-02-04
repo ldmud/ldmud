@@ -371,8 +371,8 @@ lex.o : efun_defs.c ../mudlib/sys/driver_hook.h i-eval_cost.h pkg-python.h \
     bytecode_gen.h pkg-gnutls.h pkg-openssl.h machine.h
 
 main.o : ../mudlib/sys/regexp.h i-eval_cost.h pkg-python.h pkg-gcrypt.h \
-    pkg-iksemel.h pkg-xml2.h pkg-mysql.h xalloc.h wiz_list.h swap.h \
-    svalue.h stdstrings.h simul_efun.h simulate.h random.h pkg-tls.h \
+    pkg-iksemel.h pkg-xml2.h pkg-mysql.h pkg-sqlite.h xalloc.h wiz_list.h \
+    swap.h svalue.h stdstrings.h simul_efun.h simulate.h random.h pkg-tls.h \
     patchlevel.h otable.h object.h mstrings.h mregex.h mempools.h mapping.h \
     lex.h interpret.h gcollect.h filestat.h comm.h access_check.h array.h \
     backend.h main.h my-alloca.h typedefs.h driver.h machine.h strfuns.h \
@@ -481,6 +481,12 @@ pkg-pgsql.o : ../mudlib/sys/pgsql.h xalloc.h stdstrings.h simulate.h \
     strfuns.h sent.h bytecode.h hash.h backend.h exec.h port.h config.h \
     bytecode_gen.h types.h machine.h
 
+pkg-python.o : xalloc.h wiz_list.h typedefs.h swap.h structs.h simulate.h \
+    simul_efun.h prolang.h pkg-python.h object.h mstrings.h mapping.h lex.h \
+    interpret.h instrs.h gcollect.h exec.h closure.h array.h machine.h \
+    driver.h svalue.h strfuns.h hash.h sent.h bytecode.h ptrtable.h \
+    backend.h types.h port.h config.h bytecode_gen.h main.h
+
 pkg-sqlite.o : xalloc.h stdstrings.h object.h svalue.h simulate.h \
     mstrings.h interpret.h array.h my-alloca.h typedefs.h driver.h \
     strfuns.h sent.h bytecode.h hash.h backend.h exec.h port.h config.h \
@@ -517,11 +523,11 @@ regexp.o : i-eval_cost.h main.h xalloc.h simulate.h regexp.h driver.h \
 
 sha1.o : sha1.h my-stdint.h driver.h port.h config.h machine.h
 
-simul_efun.o : xalloc.h swap.h svalue.h stdstrings.h simulate.h prolang.h \
-    ptrtable.h object.h mstrings.h lex.h interpret.h gcollect.h exec.h \
-    array.h simul_efun.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
-    bytecode.h hash.h backend.h types.h port.h config.h bytecode_gen.h \
-    main.h machine.h
+simul_efun.o : pkg-python.h xalloc.h swap.h svalue.h stdstrings.h \
+    simulate.h prolang.h ptrtable.h object.h mstrings.h lex.h interpret.h \
+    gcollect.h exec.h array.h simul_efun.h my-alloca.h typedefs.h driver.h \
+    strfuns.h sent.h bytecode.h hash.h backend.h types.h port.h config.h \
+    bytecode_gen.h main.h machine.h
 
 simulate.o : ../mudlib/sys/rtlimits.h ../mudlib/sys/regexp.h \
     ../mudlib/sys/files.h ../mudlib/sys/driver_info.h \
@@ -625,6 +631,8 @@ parser.o : lang.c stdstrings.h instrs.h
 pkg-mysql.o : stdstrings.h instrs.h
 
 pkg-pgsql.o : stdstrings.h instrs.h
+
+pkg-python.o : instrs.h
 
 pkg-sqlite.o : stdstrings.h
 
