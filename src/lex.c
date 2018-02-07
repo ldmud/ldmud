@@ -5924,10 +5924,6 @@ yylex1 (void)
                             outp = yyp;
                             return p->u.code;
 
-                        case I_TYPE_LOCAL:
-                            yylval.ident = p;
-                            RETURN(L_LOCAL);
-
                         default:
                             /* _UNKNOWN identifiers get their type assigned by the
                              * parser.

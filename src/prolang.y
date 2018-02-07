@@ -767,6 +767,10 @@ static Bool variables_initialized;
   /* TRUE if the code for all variables has been created.
    */
 
+static ident_t * global_variable_initializing;
+  /* The global variable that is currently being initialized.
+   */
+
 static fulltype_t def_function_returntype;
 static ident_t *  def_function_ident;
 static int        def_function_num_args;
@@ -1004,7 +1008,7 @@ lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
 
 struct lvalue_s; /* Defined within YYSTYPE aka %union */
 
-static void define_local_variable (ident_t* name, lpctype_t* actual_type, struct lvalue_s *lv, Bool redeclare, Bool with_init);
+static ident_t* define_local_variable (ident_t* name, lpctype_t* actual_type, struct lvalue_s *lv, Bool redeclare, Bool with_init);
 static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2);
 static Bool add_lvalue_code ( struct lvalue_s * lv, int instruction);
 static void insert_pop_value(void);
@@ -3484,6 +3488,7 @@ free_all_local_names (void)
     current_break_stack_need = 0;
     max_break_stack_need = 0;
     def_function_ident = NULL;
+    global_variable_initializing = NULL;
 } /* free_all_local_names() */
 
 /*-------------------------------------------------------------------------*/
@@ -3577,6 +3582,7 @@ if (current_inline && current_inline->block_depth+2 == block_depth
         ident->u.local.num = current_number_of_locals;
         ident->u.local.depth = depth;
         ident->u.local.context = -1;
+        ident->u.local.initializing = false;
 
         /* Put the ident into the list of all locals */
         if (all_locals && all_locals->u.local.depth > depth)
@@ -3680,6 +3686,7 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n",
         /* Initialize the ident */
         ident->type = I_TYPE_LOCAL;
         ident->u.local.depth = depth;
+        ident->u.local.initializing = false;
         if (num < 0)
         {
             /* First initialize it as a local variable
@@ -4434,11 +4441,12 @@ check_variable_redefinition (ident_t *name, typeflags_t flags)
 } /* check_variable_redefinition */
 
 /*-------------------------------------------------------------------------*/
-static void
+static ident_t *
 define_variable (ident_t *name, fulltype_t type)
 
 /* Define a new global variable <name> of type <type>.
  * The references of <type> are NOT adopted.
+ * Return the identifier for the variable.
  */
 
 {
@@ -4536,6 +4544,8 @@ define_variable (ident_t *name, fulltype_t type)
             name->u.global.variable = NV_VARIABLE_COUNT;
         ADD_VARIABLE(&dummy);
     }
+
+    return name;
 } /* define_variable() */
 
 /*-------------------------------------------------------------------------*/
@@ -4648,25 +4658,60 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
 } /* redeclare_variable() */
 
 /*-------------------------------------------------------------------------*/
-static int
-verify_declared (ident_t *p)
+static ident_t*
+get_initialized_variable (ident_t *p)
 
-/* Check that <p> is a global variable.
- * If yes, return the index of that variable, -1 otherwise.
+/* Check that <p> is a variable that is not just being initialized.
+ * If it is an initializing variable, return the next outer variable or NULL,
+ * if non exists. If <p> is not a variable at all, return also NULL.
+ * If NULL is returned an error is thrown, also.
  */
 
 {
-    int r;
+    bool foundinitializing = false;
+    ident_t *result = p;
 
-    if (p->type != I_TYPE_GLOBAL
-     || (r = p->u.global.variable) < 0)
+    while (result)
     {
-        yyerrorf("Variable %s not declared !", get_txt(p->name));
-        return -1;
+        switch (result->type)
+        {
+            case I_TYPE_LOCAL:
+                if (result->u.local.initializing)
+                {
+                    foundinitializing = true;
+                    result = result->inferior;
+                    continue;
+                }
+                break;
+
+            case I_TYPE_GLOBAL:
+                if (result->u.global.variable >= 0)
+                {
+                    if (global_variable_initializing == result)
+                        foundinitializing = true;
+                    else
+                        break;
+                }
+
+                /* FALLTHROUGH */
+            default:
+                result = NULL;
+                break;
+        }
+
+        break;
     }
 
-    return r;
-} /* verify_declared() */
+    if (!result)
+    {
+        if (foundinitializing)
+            yyerrorf("Variable %s not initialized", get_txt(p->name));
+        else
+            yyerrorf("Variable %s not declared", get_txt(p->name));
+    }
+
+    return result;
+} /* get_initialized_variable() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -4693,11 +4738,11 @@ define_global_variable (ident_t* name, fulltype_t actual_type, Bool with_init)
     if (!pragma_share_variables)
         actual_type.t_flags |= VAR_INITIALIZED;
 
-    define_variable(name, actual_type);
-    i = verify_declared(name); /* Is the var declared? */
+    name = define_variable(name, actual_type);
+    i = name->u.global.variable;
 
 #ifdef DEBUG
-    if (i == -1)
+    if (name->type != I_TYPE_GLOBAL || i == -1)
         fatal("Variable not declared after defining it.\n");
 #endif
 
@@ -4765,6 +4810,8 @@ define_global_variable (ident_t* name, fulltype_t actual_type, Bool with_init)
             CURRENT_PROGRAM_SIZE += 4;
             add_new_init_jump();
         } /* PREPARE_INSERT() block */
+        else
+          global_variable_initializing = name;
     } /* if (float variable) */
 
     return i;
@@ -4784,6 +4831,8 @@ init_global_variable (int i, ident_t* name, fulltype_t actual_type
     add_type_check(actual_type.t_type);
 
     PREPARE_INSERT(4)
+
+    global_variable_initializing = NULL;
 
     if (!(actual_type.t_flags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
                           | TYPE_MOD_PROTECTED)))
@@ -6674,7 +6723,6 @@ delete_prog_string (void)
 %token L_INT
 %token L_LAND
 %token L_LE
-%token L_LOCAL
 %token L_LOR
 %token L_LSH
 %token L_MAPPING
@@ -6969,7 +7017,7 @@ delete_prog_string (void)
 %type <closure>      L_CLOSURE
 %type <symbol>       L_SYMBOL
 %type <number>       L_QUOTED_AGGREGATE
-%type <ident>        L_IDENTIFIER L_INLINE_FUN L_LOCAL
+%type <ident>        L_IDENTIFIER L_INLINE_FUN
 %type <typeflags>    type_modifier type_modifier_list
 
 %type <number>       optional_stars
@@ -8024,15 +8072,7 @@ decl_cast:
 identifier:
       L_IDENTIFIER
       {
-          string_t *p;
-
           /* Extract the string from the ident structure */
-          p = ref_mstring($1->name);
-          $$ = p;
-      }
-
-    | L_LOCAL
-      {
           $$ = ref_mstring($1->name);
       }
 ;
@@ -8074,45 +8114,27 @@ new_arg_name:
               $1.t_type = lpctype_mixed;
           }
 
-          add_local_name($2, $1, block_depth);
-      }
-
-    | non_void_type L_LOCAL
-      {
-          funflag_t illegal_flags = $1.t_flags & (TYPE_MOD_STATIC|TYPE_MOD_NO_MASK|TYPE_MOD_PRIVATE|TYPE_MOD_PUBLIC|TYPE_MOD_VIRTUAL|TYPE_MOD_PROTECTED|TYPE_MOD_NOSAVE|TYPE_MOD_VISIBLE);
-          if (illegal_flags)
+          if ($2->type == I_TYPE_LOCAL)
           {
-              yyerrorf("Illegal modifier for function argument: %s"
-                     , get_f_visibility(illegal_flags));
-              $1.t_flags &= ~illegal_flags;
-          }
-
-          /* A local name is redeclared. */
-          if (current_inline == NULL)
-          {
-              /* Since this is the argument list of a function, it can't be
-               * legal.
-               */
-              yyerror("Illegal to redeclare local name");
-              free_fulltype($1);
+              /* A local name is redeclared. */
+              if (current_inline == NULL)
+              {
+                  /* Since this is the argument list of a function, it can't be
+                   * legal.
+                   */
+                  yyerror("Illegal to redeclare local name");
+                  free_fulltype($1);
+              }
+              else
+              {
+                  /* However, it is legal for the argument list of an inline
+                   * closure.
+                   */
+                  redeclare_local($2, $1, block_depth);
+              }
           }
           else
-          {
-              /* However, it is legal for the argument list of an inline
-               * closure.
-               */
-
-              if (!$1.t_type)
-              {
-                  if (exact_types)
-                      yyerror("Missing type for argument");
-
-                  /* Supress more errors */
-                  $1.t_type = lpctype_mixed;
-              }
-
-              redeclare_local($2, $1, block_depth);
-          }
+              add_local_name($2, $1, block_depth);
       }
 ; /* new_arg_name */
 
@@ -8237,30 +8259,13 @@ statements:
 local_name_list:
       basic_type L_IDENTIFIER
       {
-          define_local_variable($2, $1, NULL, MY_FALSE, MY_FALSE);
-
-          $$ = $1;
-      }
-    | basic_type L_LOCAL
-      {
-          define_local_variable($2, $1, NULL, MY_TRUE, MY_FALSE);
+          define_local_variable($2, $1, NULL, $2->type == I_TYPE_LOCAL, MY_FALSE);
 
           $$ = $1;
       }
     | basic_type L_IDENTIFIER
       {
-          define_local_variable($2, $1, &$<lvalue>$, MY_FALSE, MY_TRUE);
-      }
-      L_ASSIGN expr0
-      {
-          init_local_variable($2, &$<lvalue>3, $4, $5.type);
-
-          free_fulltype($5.type);
-          $$ = $1;
-      }
-    | basic_type L_LOCAL
-      {
-          define_local_variable($2, $1, &$<lvalue>$, MY_TRUE, MY_TRUE);
+          $2 = define_local_variable($2, $1, &$<lvalue>$, $2->type == I_TYPE_LOCAL, MY_TRUE);
       }
       L_ASSIGN expr0
       {
@@ -8272,15 +8277,7 @@ local_name_list:
     | local_name_list ',' optional_stars L_IDENTIFIER
       {
           lpctype_t* type = get_array_type_with_depth($1, $3);
-          define_local_variable($4, type, NULL, MY_FALSE, MY_FALSE);
-          free_lpctype(type);
-
-          $$ = $1;
-      }
-    | local_name_list ',' optional_stars L_LOCAL
-      {
-          lpctype_t* type = get_array_type_with_depth($1, $3);
-          define_local_variable($4, type, NULL, MY_TRUE, MY_FALSE);
+          define_local_variable($4, type, NULL, $4->type == I_TYPE_LOCAL, MY_FALSE);
           free_lpctype(type);
 
           $$ = $1;
@@ -8288,20 +8285,7 @@ local_name_list:
     | local_name_list ',' optional_stars  L_IDENTIFIER
       {
           lpctype_t* type = get_array_type_with_depth($1, $3);
-          define_local_variable($4, type, &$<lvalue>$, MY_FALSE, MY_TRUE);
-          free_lpctype(type);
-      }
-      L_ASSIGN expr0
-      {
-          init_local_variable($4, &$<lvalue>5, $6, $7.type);
-
-          free_fulltype($7.type);
-          $$ = $1;
-      }
-    | local_name_list ',' optional_stars L_LOCAL
-      {
-          lpctype_t* type = get_array_type_with_depth($1, $3);
-          define_local_variable($4, type, &$<lvalue>$, MY_TRUE, MY_TRUE);
+          $4 = define_local_variable($4, type, &$<lvalue>$, $4->type == I_TYPE_LOCAL, MY_TRUE);
           free_lpctype(type);
       }
       L_ASSIGN expr0
@@ -11233,14 +11217,13 @@ expr4:
 %// The following expressions can be patched to lvalues for use in index_lvalue.
     | L_IDENTIFIER
       {
-          /* Access a global variable */
-          int i;
+          /* Access a local or global variable */
           mp_uint current;
           bytecode_p p;
-          variable_t *varp;
+          ident_t *varident;
 %line
-          i = verify_declared($1);
-          if (i == -1)
+          varident = get_initialized_variable($1);
+          if (!varident)
               /* variable not declared */
               YYACCEPT;
 
@@ -11253,107 +11236,105 @@ expr4:
           }
           p = PROGRAM_BLOCK + current;
 
-          if (i & VIRTUAL_VAR_TAG)
+          if (varident->type == I_TYPE_GLOBAL)
           {
-              /* Access a virtual variable */
+              /* A global variable. */
+              int i = varident->u.global.variable;
+              variable_t *varp;
 
-              bytecode_p q;
-
-              $$.lvalue = alloc_lvalue_block(2);
-              q = LVALUE_BLOCK + $$.lvalue.start;
-
-              q[0] = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
-              q[1] = i;
-
-              *p++ = F_VIRTUAL_VARIABLE;
-              *p = i;
-
-              varp = V_VARIABLE(i);
-              $$.type = ref_fulltype(varp->type);
-          }
-          else
-          {
-              /* Access a non-virtual variable */
-
-              if (i & ~0xff)
+              if (i & VIRTUAL_VAR_TAG)
               {
-                  bytecode_p q;
+                  /* Access a virtual variable */
 
-                  $$.lvalue = alloc_lvalue_block(3);
-                  q = LVALUE_BLOCK + $$.lvalue.start;
-
-                  q[0] = F_PUSH_IDENTIFIER16_LVALUE;
-                  PUT_SHORT(q+1, i);
-
-                  *p = F_IDENTIFIER16;
-                  upd_short(++current, i);
-              }
-              else
-              {
                   bytecode_p q;
 
                   $$.lvalue = alloc_lvalue_block(2);
                   q = LVALUE_BLOCK + $$.lvalue.start;
 
-                  q[0] = F_PUSH_IDENTIFIER_LVALUE;
+                  q[0] = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
                   q[1] = i;
 
-                  *p++ = F_IDENTIFIER;
+                  *p++ = F_VIRTUAL_VARIABLE;
                   *p = i;
+
+                  varp = V_VARIABLE(i);
+                  $$.type = ref_fulltype(varp->type);
               }
-              varp = NV_VARIABLE(i);
-              $$.type = ref_fulltype(varp->type);
-          }
-          if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
-          {
-              yywarnf("Using deprecated global variable %s.\n",
-                      get_txt(varp->name));
-          }
-          $$.type.t_flags = 0;
+              else
+              {
+                  /* Access a non-virtual variable */
 
-          CURRENT_PROGRAM_SIZE = current + 2;
-      }
+                  if (i & ~0xff)
+                  {
+                      bytecode_p q;
 
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | L_LOCAL
-      {
-          /* Access a local variable */
+                      $$.lvalue = alloc_lvalue_block(3);
+                      q = LVALUE_BLOCK + $$.lvalue.start;
 
-          mp_uint current;
-          bytecode_p p, q;
-          lpctype_t *type;
-%line
-          $1 = check_for_context_local($1, &type);
+                      q[0] = F_PUSH_IDENTIFIER16_LVALUE;
+                      PUT_SHORT(q+1, i);
 
-          $$.type = get_fulltype(ref_lpctype(type));
-          $$.start = current = CURRENT_PROGRAM_SIZE;
-          if (!realloc_a_program(2))
-          {
-              yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+2);
-              YYACCEPT;
-          }
-          p = PROGRAM_BLOCK + current;
+                      *p = F_IDENTIFIER16;
+                      upd_short(++current, i);
+                  }
+                  else
+                  {
+                      bytecode_p q;
 
-          $$.lvalue = alloc_lvalue_block(2);
-          q = LVALUE_BLOCK + $$.lvalue.start;
+                      $$.lvalue = alloc_lvalue_block(2);
+                      q = LVALUE_BLOCK + $$.lvalue.start;
 
-          if ($1->u.local.context >= 0)
-          {
-              q[0] = F_PUSH_CONTEXT_LVALUE;
-              q[1] = $1->u.local.context;
+                      q[0] = F_PUSH_IDENTIFIER_LVALUE;
+                      q[1] = i;
 
-              *p++ = F_CONTEXT_IDENTIFIER;
-              *p = $1->u.local.context;
+                      *p++ = F_IDENTIFIER;
+                      *p = i;
+                  }
+                  varp = NV_VARIABLE(i);
+                  $$.type = ref_fulltype(varp->type);
+              }
+
+              if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
+              {
+                  yywarnf("Using deprecated global variable %s.\n",
+                          get_txt(varp->name));
+              }
+
+              $$.type.t_flags = 0;
+
+              CURRENT_PROGRAM_SIZE = current + 2;
           }
           else
           {
-              q[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-              q[1] = $1->u.local.num;
+              /* A local variable. */
+              bytecode_p q;
+              lpctype_t *type;
 
-              *p++ = F_LOCAL;
-              *p = $1->u.local.num;
+              varident = check_for_context_local(varident, &type);
+
+              $$.type = get_fulltype(ref_lpctype(type));
+
+              $$.lvalue = alloc_lvalue_block(2);
+              q = LVALUE_BLOCK + $$.lvalue.start;
+
+              if (varident->u.local.context >= 0)
+              {
+                  q[0] = F_PUSH_CONTEXT_LVALUE;
+                  q[1] = varident->u.local.context;
+
+                  *p++ = F_CONTEXT_IDENTIFIER;
+                  *p = varident->u.local.context;
+              }
+              else
+              {
+                  q[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
+                  q[1] = varident->u.local.num;
+
+                  *p++ = F_LOCAL;
+                  *p = varident->u.local.num;
+              }
+              CURRENT_PROGRAM_SIZE = current + 2;
           }
-          CURRENT_PROGRAM_SIZE = current + 2;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11506,96 +11487,99 @@ name_lvalue:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     L_IDENTIFIER
       {
-          /* Generate the lvalue for a global variable */
-
-          int i;
-          variable_t *varp;
+          /* Generate the lvalue for a local or global variable */
+          ident_t *varident;
 %line
-          i = verify_declared($1);
-          if (i == -1)
+          varident = get_initialized_variable($1);
+          if (!varident)
               /* variable not declared */
               YYACCEPT;
 
-          if (i & VIRTUAL_VAR_TAG)
+          if (varident->type == I_TYPE_GLOBAL)
           {
-              bytecode_p q;
+              /* A global variable. */
+              int i = varident->u.global.variable;
+              variable_t *varp;
 
-              $$.lvalue = alloc_lvalue_block(2);
-              q = LVALUE_BLOCK + $$.lvalue.start;
-
-              q[0] = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
-              q[1] = i;
-              $$.vlvalue_inst = F_PUSH_VIRTUAL_VARIABLE_VLVALUE;
-              $$.num_arg = 1;
-
-              varp = V_VARIABLE(i);
-              $$.type = ref_lpctype(varp->type.t_type);
-          }
-          else
-          {
-              if (i & ~0xff)
-              {
-                  bytecode_p q;
-
-                  $$.lvalue = alloc_lvalue_block(3);
-                  q = LVALUE_BLOCK + $$.lvalue.start;
-
-                  q[0] = F_PUSH_IDENTIFIER16_LVALUE;
-                  PUT_SHORT(q+1, i);
-
-                  $$.vlvalue_inst = F_PUSH_IDENTIFIER16_VLVALUE;
-                  $$.num_arg = 2;
-              }
-              else
+              if (i & VIRTUAL_VAR_TAG)
               {
                   bytecode_p q;
 
                   $$.lvalue = alloc_lvalue_block(2);
                   q = LVALUE_BLOCK + $$.lvalue.start;
 
-                  q[0] = F_PUSH_IDENTIFIER_LVALUE;
+                  q[0] = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
                   q[1] = i;
-
-                  $$.vlvalue_inst = F_PUSH_IDENTIFIER_VLVALUE;
+                  $$.vlvalue_inst = F_PUSH_VIRTUAL_VARIABLE_VLVALUE;
                   $$.num_arg = 1;
+
+                  varp = V_VARIABLE(i);
+                  $$.type = ref_lpctype(varp->type.t_type);
               }
-              varp = NV_VARIABLE(i);
-              $$.type = ref_lpctype(varp->type.t_type);
-          }
-          if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
-              yywarnf("Using deprecated global variable %s.\n",
-                      get_txt(varp->name));
-      }
+              else
+              {
+                  if (i & ~0xff)
+                  {
+                      bytecode_p q;
 
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | L_LOCAL
-      {
-          lpctype_t *type;
-          bytecode_p q;
-%line
-          /* Generate the lvalue for a local */
+                      $$.lvalue = alloc_lvalue_block(3);
+                      q = LVALUE_BLOCK + $$.lvalue.start;
 
-          $1 = check_for_context_local($1, &type);
+                      q[0] = F_PUSH_IDENTIFIER16_LVALUE;
+                      PUT_SHORT(q+1, i);
 
-          $$.type = ref_lpctype(type);
-          $$.lvalue = alloc_lvalue_block(2);
-          q = LVALUE_BLOCK + $$.lvalue.start;
+                      $$.vlvalue_inst = F_PUSH_IDENTIFIER16_VLVALUE;
+                      $$.num_arg = 2;
+                  }
+                  else
+                  {
+                      bytecode_p q;
 
-          if ($1->u.local.context >= 0)
-          {
-              q[0] = F_PUSH_CONTEXT_LVALUE;
-              q[1] = $1->u.local.context;
+                      $$.lvalue = alloc_lvalue_block(2);
+                      q = LVALUE_BLOCK + $$.lvalue.start;
 
-              $$.vlvalue_inst = F_PUSH_CONTEXT_VLVALUE;
-              $$.num_arg = 1;
+                      q[0] = F_PUSH_IDENTIFIER_LVALUE;
+                      q[1] = i;
+
+                      $$.vlvalue_inst = F_PUSH_IDENTIFIER_VLVALUE;
+                      $$.num_arg = 1;
+                  }
+                  varp = NV_VARIABLE(i);
+                  $$.type = ref_lpctype(varp->type.t_type);
+              }
+              if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
+                  yywarnf("Using deprecated global variable %s.\n",
+                          get_txt(varp->name));
           }
           else
           {
-              q[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-              q[1] = $1->u.local.num;
+              lpctype_t *type;
+              bytecode_p q;
+%line
+              /* Generate the lvalue for a local */
 
-              $$.vlvalue_inst = F_PUSH_LOCAL_VARIABLE_VLVALUE;
-              $$.num_arg = 1;
+              varident = check_for_context_local(varident, &type);
+
+              $$.type = ref_lpctype(type);
+              $$.lvalue = alloc_lvalue_block(2);
+              q = LVALUE_BLOCK + $$.lvalue.start;
+
+              if (varident->u.local.context >= 0)
+              {
+                  q[0] = F_PUSH_CONTEXT_LVALUE;
+                  q[1] = varident->u.local.context;
+
+                  $$.vlvalue_inst = F_PUSH_CONTEXT_VLVALUE;
+                  $$.num_arg = 1;
+              }
+              else
+              {
+                  q[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
+                  q[1] = varident->u.local.num;
+
+                  $$.vlvalue_inst = F_PUSH_LOCAL_VARIABLE_VLVALUE;
+                  $$.num_arg = 1;
+              }
           }
       }
 ; /* name_lvalue */
@@ -11813,13 +11797,9 @@ name_var_lvalue:
 local_name_lvalue:
       basic_type L_IDENTIFIER
       {
-          define_local_variable($2, $1, &$$, MY_FALSE, MY_TRUE);
-          ref_lpctype($$.type);
-          free_lpctype($1);
-      }
-    | basic_type L_LOCAL
-      {
-          define_local_variable($2, $1, &$$, MY_TRUE, MY_TRUE);
+          $2 = define_local_variable($2, $1, &$$, $2->type == I_TYPE_LOCAL, MY_TRUE);
+          $2->u.local.initializing = false;
+
           ref_lpctype($$.type);
           free_lpctype($1);
       }
@@ -13286,26 +13266,24 @@ call_other_name:
 function_name:
       L_IDENTIFIER
       {
-          $$.super = NULL;
-          $$.real  = $1;
-      }
+          ident_t *fun = $1;
 
-    | L_LOCAL
-      {
-          ident_t *lvar = $1;
-          ident_t *fun = find_shared_identifier_mstr(lvar->name, I_TYPE_UNKNOWN, 0);
-
-          /* Search the inferior list for this identifier for a global
-           * (function) definition.
-           */
-
-          while (fun && fun->type > I_TYPE_GLOBAL)
-              fun = fun->inferior;
-
-          if (!fun || fun->type != I_TYPE_GLOBAL)
+          if (fun->type == I_TYPE_LOCAL)
           {
-              yyerrorf("Undefined function '%.50s'\n", get_txt(lvar->name));
-              YYACCEPT;
+              fun = find_shared_identifier_mstr(fun->name, I_TYPE_UNKNOWN, 0);
+
+              /* Search the inferior list for this identifier for a global
+               * (function) definition.
+               */
+
+              while (fun && fun->type > I_TYPE_GLOBAL)
+                  fun = fun->inferior;
+
+              if (!fun || fun->type != I_TYPE_GLOBAL)
+              {
+                  yyerrorf("Undefined function '%.50s'\n", get_txt($1->name));
+                  YYACCEPT;
+              }
           }
 
           $$.super = NULL;
@@ -13318,24 +13296,36 @@ function_name:
           $$.real  = $2;
       }
 
-    | L_COLON_COLON L_LOCAL
-      {
-          ident_t *lvar = $2;
-
-          *($$.super = yalloc(1)) = '\0';
-          $$.real  = lvar;
-      }
-
     | anchestor L_COLON_COLON L_IDENTIFIER
       {
 %line
+          ident_t *fun = $3;
+
+          if (fun->type == I_TYPE_LOCAL)
+          {
+              fun = find_shared_identifier_mstr(fun->name, I_TYPE_UNKNOWN, 0);
+
+              /* Search the inferior list for this identifier for a global
+               * (function) definition.
+               */
+
+              while (fun && fun->type > I_TYPE_GLOBAL)
+                  fun = fun->inferior;
+
+              if (!fun || fun->type != I_TYPE_GLOBAL)
+              {
+                  yyerrorf("Undefined function '%.50s'\n", get_txt($3->name));
+                  YYACCEPT;
+              }
+          }
+
           /* Attempt to call an efun directly even though there
            * is a nomask simul-efun for it?
            */
           if ( !strcmp($1, "efun")
-           && $3->type == I_TYPE_GLOBAL
-           && $3->u.global.sim_efun >= 0
-           && simul_efunp[$3->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
+           && fun->type == I_TYPE_GLOBAL
+           && fun->u.global.sim_efun >= 0
+           && simul_efunp[fun->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
            && master_ob
            && (!EVALUATION_TOO_LONG())
              )
@@ -13348,12 +13338,12 @@ function_name:
 
               push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
               push_c_string(inter_sp, current_loc.file->name);
-              push_ref_string(inter_sp, $3->name);
+              push_ref_string(inter_sp, fun->name);
               res = apply_master(STR_PRIVILEGE, 3);
               if (!res || res->type != T_NUMBER || res->u.number < 0)
               {
                   yyerrorf("Privilege violation: nomask simul_efun %s"
-                          , get_txt($3->name));
+                          , get_txt(fun->name));
                   yfree($1);
                   $$.super = NULL;
               }
@@ -13371,71 +13361,14 @@ function_name:
           {
               yyerrorf("Can't call master::%s for "
                        "'nomask simul_efun %s': eval cost too big"
-                      , get_txt(STR_PRIVILEGE), get_txt($3->name));
+                      , get_txt(STR_PRIVILEGE), get_txt(fun->name));
               yfree($1);
               $$.super = NULL;
           }
           else /* the qualifier is ok */
               $$.super = $1;
 
-          $$.real = $3; /* and don't forget the function ident */
-      }
-
-    | anchestor L_COLON_COLON L_LOCAL
-      {
-%line
-          ident_t *lvar = $3;
-
-          /* Attempt to call an efun directly even though there
-           * is a nomask simul-efun for it?
-           */
-          if ( !strcmp($1, "efun")
-           && lvar->type == I_TYPE_GLOBAL
-           && lvar->u.global.sim_efun >= 0
-           && simul_efunp[lvar->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
-           && master_ob
-           && (!EVALUATION_TOO_LONG())
-             )
-          {
-              /* Yup, check it with a privilege violation.
-               * If it's denied, ignore the "efun::" qualifier.
-               */
-
-              svalue_t *res;
-
-              push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
-              push_c_string(inter_sp, current_loc.file->name);
-              push_ref_string(inter_sp, lvar->name);
-              res = apply_master(STR_PRIVILEGE, 3);
-              if (!res || res->type != T_NUMBER || res->u.number < 0)
-              {
-                  yyerrorf("Privilege violation: nomask simul_efun %s"
-                          , get_txt(lvar->name));
-                  yfree($1);
-                  $$.super = NULL;
-              }
-              else if (!res->u.number)
-              {
-                  yfree($1);
-                  $$.super = NULL;
-              }
-              else
-              {
-                  $$.super = $1;
-              }
-          }
-          else if (EVALUATION_TOO_LONG())
-          {
-              yyerrorf("Can't call master::%s for "
-                       "'nomask simul_efun %s': eval cost too big"
-                      , get_txt(STR_PRIVILEGE), get_txt(lvar->name));
-              yfree($1);
-              $$.super = NULL;
-          }
-          else /* the qualifier is ok */
-              $$.super = $1;
-
-          $$.real = lvar; /* and don't forget the function ident */
+          $$.real = fun; /* and don't forget the function ident */
       }
 
 ; /* function_name */
@@ -13718,7 +13651,7 @@ lvalue_list:
 /*=========================================================================*/
 
 /*-------------------------------------------------------------------------*/
-static void
+static ident_t*
 define_local_variable (ident_t* name, lpctype_t* actual_type, struct lvalue_s *lv, Bool redeclare, Bool with_init)
 
 /* This is called directly from a parser rule: <type> <name>
@@ -13819,9 +13752,12 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
             ins_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
             ins_byte(q->u.local.num);
             ins_f_code(F_VOID_ASSIGN);
-            return;
         } /* if (float variable) */
     }
+    else
+        q->u.local.initializing = true;
+
+    return q;
 } /* define_local_variable() */
 
 /*-------------------------------------------------------------------------*/
@@ -13846,6 +13782,8 @@ if (current_inline && current_inline->parse_context)
   printf("DEBUG: inline context decl: name = expr, program_size %"PRIuMPINT"\n", 
          CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
+
+    name->u.local.initializing = false;
 
     /* Check the assignment for validity */
     if (exact_types && !has_common_type(exprtype.t_type, lv->type))

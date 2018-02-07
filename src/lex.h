@@ -185,15 +185,18 @@ struct ident_s
                */
 #endif
         } global;
-        struct {             /*   Local identifier: */
-            int num;         /*     Number, also the index on the stack */
-            int context;     /*     -1 for normal locals, or the index
-                              *       in the context frame. In that case,
-                              *       .num is either -1 or the index
-                              *       of the related local of the defining
-                              *       function.
-                              */
-            int depth;       /*     Definition depth */
+        struct {               /*   Local identifier: */
+            int num;           /*     Number, also the index on the stack */
+            int context;       /*     -1 for normal locals, or the index
+                                *       in the context frame. In that case,
+                                *       .num is either -1 or the index
+                                *       of the related local of the defining
+                                *       function.
+                                */
+            short depth;       /*     Definition depth */
+            bool initializing; /*    The initializer for the variable is
+                                *    compiled just now.
+                                */
         } local;
     } u;
     ident_t *next_all;       /* 'all_...' list link */
