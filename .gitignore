@@ -24,6 +24,7 @@ src/autoconf/aclocal.m4
 src/autoconf/autom4te.cache/
 src/util/Makefile
 src/util/erq/Makefile
+src/util/erq/erq
 src/util/indent/Makefile
 src/util/indent/indent
 src/util/xerq/Makefile
