@@ -108,7 +108,7 @@ struct equeue_s
 };
 
 /* --- struct socket_s: one socket descriptor
- * This structure is used for explicite TCP/UDP communication, as well
+ * This structure is used for explicit TCP/UDP communication, as well
  * as for the communication with spawned subprograms (then .handle and
  * .ticket are copied from the controlling child_t).
  */

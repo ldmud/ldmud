@@ -189,7 +189,7 @@ Commenting
          /* long comment which doesn't fit on one line.
           */
 
-    The major steps in a function should be preceeded by a comment
+    The major steps in a function should be preceded by a comment
     explaining them. Also, wherever a critical design decision has
     been made, a comment should line out the whats and whys:
 

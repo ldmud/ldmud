@@ -66,7 +66,7 @@
 
 /* When we have allocation tracing, the allocator annotates every
  * allocation with the source filename and line where the allocation
- * occured. To allow the annotation of the allocations of higher structures
+ * occurred. To allow the annotation of the allocations of higher structures
  * like strings with the place where the string as such is allocated (and not
  * the places in the string module), the following macros can be used
  * to declare and pass the necessary information transparently:

@@ -49,7 +49,7 @@
  * all buffered data is sent. Bear in mind that a Close() will not destruct
  * the socket object in that case and you will get the callbacks if the
  * issuing object still exists. If it does not exist anymore you cannot
- * tell if the data is really sent or some timeout occured. So in general
+ * tell if the data is really sent or some timeout occurred. So in general
  * you should wait with Send()s until the connection is established.
  *
  */
@@ -595,7 +595,7 @@ static void socket_cb(int* msg, int ufd) {
       break;
   }
 
-  // if we get here an error occured. the erq closed the socket already
+  // if we get here an error occurred. the erq closed the socket already
   if (member(sockets, fd)) sockets[fd, S_STATE] = S_CLOSING;
   callback(ufd, SOCKET_CLOSE, 0);
   socket_close(ufd);
@@ -669,7 +669,7 @@ static void write_cb(int* msg, int ufd, int offset) {
       break;
   }
 
-  // if we get here an error occured. the erq closed the socket already
+  // if we get here an error occurred. the erq closed the socket already
   if (member(sockets, fd)) sockets[fd, S_STATE] = S_CLOSING;
   callback(ufd, SOCKET_CLOSE, 0);
   socket_close(ufd);
@@ -939,7 +939,7 @@ static string to_ascii(int* msg) {
   return to_string(msg);
 }
 
-// some erq-error occured, log it
+// some erq-error occurred, log it
 static mixed* note_err(string str, int* msg, int fd) {
   string who, extra, e2;
 

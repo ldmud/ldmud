@@ -185,7 +185,7 @@ void input(string str)
 	}
 	case '?': {
 	  write("telnet: Escape commands:\n"
-		"All commands are preceeded by the escape (^[) character.\n"
+		"All commands are preceded by the escape (^[) character.\n"
 		"\n"
 		"c          Close session log.\n"
 		"d          Detach telnet session.\n"

@@ -33,7 +33,7 @@ $parse_err = undef; # Global error messages
 # returns value in perl
 # set start index to next char (if any) or -1
 #
-# If an error occured -1 will be returned and $parse_err set
+# If an error occurred -1 will be returned and $parse_err set
 
 sub get_value {
   my ($offsp, $str, $ret, $ret2, $data);

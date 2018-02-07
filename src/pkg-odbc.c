@@ -1088,7 +1088,7 @@ raise_critical_sql_exception( hDBC * handle, char * msg )
    if ( handle )
       dispose_db_connection( handle );
    
-   errorf( ( msg ? msg : "An unknown error occured during the current DB operation.\n" ) );
+   errorf( ( msg ? msg : "An unknown error occurred during the current DB operation.\n" ) );
       
    abort();
 }

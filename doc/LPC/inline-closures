@@ -64,7 +64,7 @@ DESCRIPTION
                                           { return val * x; };
           }
 
-        These explicite context variables are useful when the closures
+        These explicit context variables are useful when the closures
         needs to keep a state, or to improve performance:
 
           mapping m = ...;

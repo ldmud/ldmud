@@ -116,7 +116,7 @@ DESCRIPTION
 
         expr1 - expr2        Subtract 'expr2' from 'expr1'. Valid for
                         numbers, strings, arrays, mappings.
-                        For arrays and strings, all occurences of the
+                        For arrays and strings, all occurrences of the
                         elements resp. characters in 'expr2' are removed
                         from 'expr1', and the result is returned.
                         For mapping, all occurances of elemens in 'expr1'

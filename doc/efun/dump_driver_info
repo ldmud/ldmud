@@ -11,7 +11,7 @@ DESCRIPTION
         master->valid_write() to check that it can write
         the files. The file in question is always written anew
 
-        On success the efun returns 1, or 0 if an error occured.
+        On success the efun returns 1, or 0 if an error occurred.
 
         <what> == DDI_OBJECTS:
           Dumps information about all live objects.

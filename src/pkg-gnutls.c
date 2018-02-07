@@ -951,7 +951,7 @@ tls_read (interactive_t *ip, char *buffer, int length)
 /* Read up to <length> bytes data for the TLS connection of <ip>
  * and store it in <buffer>.
  * Return then number of bytes read, or a negative number if an error
- * occured.
+ * occurred.
  */
 
 {
@@ -1002,7 +1002,7 @@ tls_write (interactive_t *ip, char *buffer, int length)
 
 /* Write <length> bytes from <buffer> to the TLS connection of <ip>
  * Return the number of bytes written, or a negative number if an error
- * occured.
+ * occurred.
  */
 
 {

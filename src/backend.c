@@ -1039,7 +1039,7 @@ process_objects (void)
  *    Since swapping of variables is costly, care is taken that variables
  *    are not swapped out right before the next reset which in that case
  *    would cause a swap in/swap out-yoyo. Instead, such variable swapping
- *    is delayed until after the reset occured.
+ *    is delayed until after the reset occurred.
  *
  *    To disable swapping, set the swapping times (either in config.h or per
  *    commandline option) to a value <= 0.

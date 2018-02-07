@@ -1289,14 +1289,14 @@ f_regreplace (svalue_t *sp)
  *     string regreplace (string txt, string pattern, closure|string replace
  *                                                  , int flags)
  *
- * Search through <txt> for one/all occurences of <pattern> and replace them
+ * Search through <txt> for one/all occurrences of <pattern> and replace them
  * with the <replace> pattern, returning the result.
  * <replace> can be a string, or a closure returning a string. If it is
  * a closure, it will be called with the matched substring and
  * the position at which it was found as arguments.
  *
  * <flags> is the bit-or of the regexp options, including:
- *   RE_GLOBAL       = 1: when given, all occurences of <pattern> are replace,
+ *   RE_GLOBAL       = 1: when given, all occurrences of <pattern> are replace,
  *                        else just the first
  *
  * The function behaves like the s/<pattern>/<replace>/<flags> command
@@ -3137,7 +3137,7 @@ f_process_string(svalue_t *sp)
  *
  *     string process_string(string str)
  *
- * Searches string str for occurences of a "value by function
+ * Searches string str for occurrences of a "value by function
  * call", which is @@ followed by an implicit function call. See
  * "value_by_function_call" in the principles section.
  *

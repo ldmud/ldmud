@@ -147,7 +147,7 @@
  *    LPC functions ('lfuns') this means that the actual function call will
  *    remove excessive arguments or push '0's for missing arguments. The
  *    number of arguments will be stored in the control stack, so that
- *    the return instruction not needs to know it explicitely.
+ *    the return instruction not needs to know it explicitly.
  *
  *    If the function called is an lfun (inherited or not), the number
  *    of arguments passed to the call is encoded in the bytecode stream,
@@ -6350,7 +6350,7 @@ svalue_t *
 pull_error_context (svalue_t *sp, svalue_t *msg)
 
 /* Restore the context saved by a catch() after a throw() or runtime error
- * occured. <sp> is the current stackpointer and is used to pop the elements
+ * occurred. <sp> is the current stackpointer and is used to pop the elements
  * pushed since the catch().
  *
  * The function pops the topmost recovery entry, which must be the catch
@@ -6371,7 +6371,7 @@ pull_error_context (svalue_t *sp, svalue_t *msg)
 
     /* If there was a call_other() or similar, previous_ob and current_object
      * must be restored. For this, find the control frame where the call
-     * occured and get the proper values from there.
+     * occurred and get the proper values from there.
      */
     csp2 = p->save_csp;
     while (++csp2 <= csp)
@@ -6523,7 +6523,7 @@ adjust_variable_offsets ( const inherit_t * inheritp
  *
  * TODO: A better compiler might do some backpatching and at least
  * TODO:: leave hints where the variables are, so that we can omit
- * TODO:: the explicite search. Or some load-time patching.
+ * TODO:: the explicit search. Or some load-time patching.
  */
 {
     inherit_t * inh = NULL;
@@ -7201,7 +7201,7 @@ eval_instruction (bytecode_p first_instruction
  * is called recursively.
  *
  * There must not be destructed objects on the stack. The destruct_object()
- * function will automatically remove all occurences. The effect is that
+ * function will automatically remove all occurrences. The effect is that
  * all called efuns know that they won't have destructed objects as
  * arguments.
  *
@@ -9231,7 +9231,7 @@ again:
                 pc += offset;
                 break;
             }
-            /* No need to explicitely free_svalue(), it's just a number */
+            /* No need to explicitly free_svalue(), it's just a number */
         }
         else
         {
@@ -14631,7 +14631,7 @@ again:
          * generates a F_END_CATCH as last instruction of the
          * guarded code.
          *
-         * Executed when no error occured, it returns into
+         * Executed when no error occurred, it returns into
          * catch_instruction() to clean up the
          * error recovery information pushed by the F_CATCH
          * and leave a 0 on the stack.

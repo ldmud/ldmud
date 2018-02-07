@@ -745,7 +745,7 @@ mixed heart_beat_error (object culprit, string err,
 //   err    : The error message.
 //   prg    : The executed program (might be 0).
 //   curobj : The object causing the error (might be 0).
-//   line   : The line number where the error occured (might be 0).
+//   line   : The line number where the error occurred (might be 0).
 //   caught : 0 if the error is not caught, != 0 if it is caught.
 //
 // Result:
@@ -772,13 +772,13 @@ void runtime_error (string err, string prg, string curobj, int line
 //   err    : The error message.
 //   prg    : The executed program.
 //   curobj : The object causing the error.
-//   line   : The line number where the error occured.
+//   line   : The line number where the error occurred.
 //   culprit: -1 for runtime errors; the object holding the heart_beat()
 //            function for heartbeat errors.
 //   caught : 0 if the error is not caught, != 0 if it is caught.
 //
 // This function has to announce a runtime error to the active user,
-// resp. handle a runtime error which occured during the execution of
+// resp. handle a runtime error which occurred during the execution of
 // heart_beat() of <culprit>.
 //
 // For a normal runtime error, if the active user is a wizard, it might
@@ -827,7 +827,7 @@ void runtime_warning (string msg, string curobj, string prg, int line
 //   err    : The warning message.
 //   curobj : The object causing the warning, may be 0.
 //   prg    : The executed program, may be 0.
-//   line   : The line number where the warning occured.
+//   line   : The line number where the warning occurred.
 //   inside_catch : != 0 if the warning occurs inside a catch().
 //
 // This function is to allow the mudlib to handle runtime warnings, for

@@ -172,7 +172,7 @@ DESCRIPTION
         (and 'static' for functions only) are allowed here.
 
         The default visibility thus set affects only variables/functions with
-        no explicite visibility:
+        no explicit visibility:
 
           default private;
 

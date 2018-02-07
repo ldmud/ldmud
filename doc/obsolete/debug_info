@@ -47,7 +47,7 @@ DESCRIPTION
             check that it can write the files. The file in question is
             always written anew.
 
-            Result is 1 on success, or 0 if an error occured.
+            Result is 1 on success, or 0 if an error occurred.
 
             <arg2> == "objects": dump information about all live objects.
               Default filename is '/OBJ_DUMP', the valid_write() will read

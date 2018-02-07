@@ -1490,7 +1490,7 @@ f_write_file (svalue_t *sp)
  *   int write_file(string file, string str, int flags = 0)
  *
  * Append the string str to the file <file>. Returns 1 for success
- * and 0 if any failure occured.
+ * and 0 if any failure occurred.
  *
  * If <flags> is 1, the file is first removed; thus effectively
  * changing the 'append' into an 'overwrite'.

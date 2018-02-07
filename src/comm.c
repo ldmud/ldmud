@@ -1661,9 +1661,9 @@ add_message (const char *fmt, ...)
  * as <fmt> string to this function.
  *
  * Messages which can't be send (e.g. because the command_giver was
- * destructed or disconnected) are printed on stdout, preceeded by ']'.
+ * destructed or disconnected) are printed on stdout, preceded by ']'.
  *
- * If an error other than EINTR occured while sending the data to
+ * If an error other than EINTR occurred while sending the data to
  * the network, the message is discarded and the socket is marked
  * for disconnection.
  *
@@ -4056,7 +4056,7 @@ call_input_to (interactive_t *i, char *str, input_to_t *it)
 
     if (setjmp(error_recovery_info.con.text))
     {
-        /* An error occured: free the remaining data,
+        /* An error occurred: free the remaining data,
          * restore the error stack and return
          */
 

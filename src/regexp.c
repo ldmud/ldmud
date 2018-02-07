@@ -706,7 +706,7 @@ hs_regcomp (unsigned char *expr, Bool excompat
  * is TRUE; \( \) operators like in Unix ex are allowed. Result is the
  * regexp structure with the program.
  *
- * If an error occured during the compilation, *<errmsg> is set to the
+ * If an error occurred during the compilation, *<errmsg> is set to the
  * static string with the error message, *<erridx> to the approximate
  * position in <expr> where the error happened, and the function returns NULL.
  *

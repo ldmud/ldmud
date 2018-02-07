@@ -108,7 +108,7 @@ int
 flush_queue (equeue_t **qpp, int fd, int reply_handle)
 
 /* Try to write all pending data from queue <qpp> to socket <fd>.
- * Return -1 if an error occured, and 0 if the queue could be emptied.
+ * Return -1 if an error occurred, and 0 if the queue could be emptied.
  * Single queue elements which have been written are always removed.
  */
 
@@ -246,7 +246,7 @@ read_socket (socket_t *sp, int rw)
  *
  * If there is data pending on the socket, try to write it in any case.
  *
- * Return 0 on success, 1 if an error occured and the socket has been closed.
+ * Return 0 on success, 1 if an error occurred and the socket has been closed.
  */
 
 {
@@ -798,7 +798,7 @@ static int
 send_auth (auth_t *ap)
 
 /* We got connection to the authd - send our request.
- * Return 0 on success, 1 if an error occured and the socket has been closed.
+ * Return 0 on success, 1 if an error occurred and the socket has been closed.
  */
 
 {

@@ -316,7 +316,7 @@ raise_db_error (db_dat_t *dat)
 
     if ( !dat || !(tmp = mysql_error(dat->mysql_dat))[0] )
     {
-        errorf( "An unknown error occured during the current database-"
+        errorf( "An unknown error occurred during the current database-"
                "operation\n");
         /* NOTREACHED */
        abort();
@@ -543,7 +543,7 @@ f_db_error (svalue_t *sp)
  *
  *   string db_error(int handle)
  *
- * Return a string describing the error which occured during the last
+ * Return a string describing the error which occurred during the last
  * database transaction. If the last transaction was successful, 0
  * is returned.
  */
@@ -617,7 +617,7 @@ f_db_exec (svalue_t *sp)
 
     if ( mysql_query(dat->mysql_dat, get_txt(s)) )
     {
-        /* either a REAL error occured or just an error in the SQL-statement
+        /* either a REAL error occurred or just an error in the SQL-statement
          */
 
         err_no = mysql_errno(dat->mysql_dat);
@@ -626,7 +626,7 @@ f_db_exec (svalue_t *sp)
             || (err_no == CR_SERVER_LOST)
             || (err_no == CR_UNKNOWN_ERROR) )
         {
-            /* A REAL error occured */
+            /* A REAL error occurred */
             raise_db_error(dat);
             return sp;
         }

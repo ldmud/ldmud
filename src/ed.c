@@ -3682,14 +3682,14 @@ print_help (char arg)
     case 'd':
         add_message(
 "Command: d   Usage: d  or [range]d\n"
-"Deletes the current line unless preceeded with a range of lines,\n"
+"Deletes the current line unless preceded with a range of lines,\n"
 "then the entire range will be deleted.\n"
                    );
         break;
 
     case 'e':
         add_message(
-"Commmand: e  Usage: e filename\n"
+"Command: e  Usage: e filename\n"
 "Causes the current file to be wiped from memory, and the new file\n"
 "to be loaded in.\n"
                    );
@@ -3697,7 +3697,7 @@ print_help (char arg)
 
     case 'E':
         add_message(
-"Commmand: E  Usage: E filename\n"
+"Command: E  Usage: E filename\n"
 "Causes the current file to be wiped from memory, and the new file\n"
 "to be loaded in.  Different from 'e' in the fact that it will wipe\n"
 "the current file even if there are unsaved modifications.\n"
@@ -3896,7 +3896,7 @@ print_help (char arg)
             add_message("TODO: document the 's' command\n"
 "Command: s   Usage: s/pat/sub/[g]\n"
 "Replace regular expression <pat> by the text <sub>. If 'g' is given, all\n"
-"occurences of <pat> in a line are replaced, else just the first.\n"
+"occurrences of <pat> in a line are replaced, else just the first.\n"
 "<sub> may reference subexpressions of <pat> with '\\0'..'\\9', or to the\n"
 "whole matched pattern with '\\&'. The special characters '\\t', '\\b',\n"
 "'\\r' and '\\n' are recognized, as is '\\0xxx' for arbitrary characters.\n"

@@ -5407,7 +5407,7 @@ static mp_int bytes_written;
    */
 
 static Bool failed;
-  /* An IO error occured.
+  /* An IO error occurred.
    */
 
 static int save_object_descriptor = -1;

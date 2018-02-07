@@ -410,7 +410,7 @@ remove_wiz_list (void)
 void
 save_error (const char *msg, const char *file, int line)
 
-/* A runtime error <msg> occured for object <file> in line number <line>.
+/* A runtime error <msg> occurred for object <file> in line number <line>.
  * Store this information in the wizlist so that the mudlib can handle
  * it later with the efun get_error_file().
  * TODO: A proper runtime error handling could put this into the mudlib
@@ -643,11 +643,11 @@ f_get_error_file (svalue_t *sp)
  *
  *   mixed * get_error_file(string name, int set_forget_flag)
  *
- * Return information about the last error which occured for
+ * Return information about the last error which occurred for
  * <name> (where <name> is a valid name from the wiz list).
  *
  * Result is an array of four elements: the filename of the
- * program where the error occured, the linenumber in the
+ * program where the error occurred, the linenumber in the
  * program, the error message (runtime error messages usually
  * start with a '*'), and a numerical flag (the 'forget flag') if
  * the error information has been queried already.

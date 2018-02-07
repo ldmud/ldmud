@@ -1315,7 +1315,7 @@ static Option aOptions[]
     , { 'e', "no-preload",         cNoPreload,      MY_FALSE
       , "  -e|--no-preload\n"
       , "  -e|--no-preload\n"
-        "    Pass a non-zero argument (the number of occurences of this option)\n"
+        "    Pass a non-zero argument (the number of occurrences of this option)\n"
         "    to master->preload(), which usually inhibits all preloads of castles\n"
         "    and other objects.\n"
       }
@@ -1498,8 +1498,8 @@ static Option aOptions[]
       , "  --min-malloc <size>\n"
       , "  --min-malloc <size>\n"
         "  --min-small-malloc <size>\n"
-        "    Determine the sizes for the explicite initial large resp. small chunk\n"
-        "    allocation. A size of 0 disables the explicite initial allocations.\n"
+        "    Determine the sizes for the explicit initial large resp. small chunk\n"
+        "    allocation. A size of 0 disables the explicit initial allocations.\n"
       }
 
     , { 0,   "min-small-malloc",   cMinSmallMalloc, MY_TRUE

@@ -14,7 +14,7 @@ DESCRIPTION
         the time of the error. <line> is the linenumber within the program.
 
         If the error is a normal runtime error, <culprit> is -1. Otherwise,
-        the error occured during a heartbeat and <culprit> is the object which
+        the error occurred during a heartbeat and <culprit> is the object which
         heart_beat() function was executed. Also, in case of a heartbeat error,
         the heartbeat for the <culprit> has been turned off.
 

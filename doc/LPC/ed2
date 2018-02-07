@@ -15,7 +15,7 @@ DESCRIPTION
 
         Any character can used instead of '/':
         s!apa!bepa!g
-        The 'g' specifies that all occurences of apa on this line are
+        The 'g' specifies that all occurrences of apa on this line are
         changed to bepa.
 
         The pattern that are supposed to be replaced, can be a regular

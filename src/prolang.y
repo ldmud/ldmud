@@ -1020,7 +1020,7 @@ yyerror (const char *str)
 
 /* Raise the parse error <str>: usually generate the error message and log it.
  * If this is the first error in this file, account the wizard with an error.
- * If too many errors occured already, do nothing.
+ * If too many errors occurred already, do nothing.
  */
 
 {
@@ -5278,7 +5278,7 @@ add_struct_member ( string_t *name, lpctype_t *type
 
     if (STRUCT_MEMBER_COUNT != 0)
     {
-        /* Not the first member: check if the name already occured */
+        /* Not the first member: check if the name already occurred */
         int i;
 
         for ( i = STRUCT_MEMBER_COUNT-1 ; i >= 0 ; i--)
@@ -5379,7 +5379,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
  * Analyze the <list> of member descriptions and generate the appropriate
  * bytecode.
  *
- * Return TRUE on success, and FALSE if an error occured (the caller will
+ * Return TRUE on success, and FALSE if an error occurred (the caller will
  * then clean up the bytecode).
  */
 
@@ -6389,7 +6389,7 @@ printf("DEBUG:     -> F_LOCAL %d\n", lcmap[i]);
                 }
                 else if (got_mapped)
                 {
-                    /* This shouldn't happen, as all explicite context
+                    /* This shouldn't happen, as all explicit context
                      * variables are created before the first implicite
                      * reference can be encountered.
                      */
@@ -9898,7 +9898,7 @@ expr0:
               free_fulltype(restype);
               restype = ref_fulltype(type1);
               if ($2 != F_ASSIGN)
-                  yyerror("Only plain assigment allowed for structs");
+                  yyerror("Only plain assignment allowed for structs");
           }
 
           if ($2 == F_LAND_EQ || $2 == F_LOR_EQ)

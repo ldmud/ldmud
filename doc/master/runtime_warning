@@ -11,7 +11,7 @@ DESCRIPTION
               (the object itself might already be destructed), or 0 if there
               is none.
         <prog>, <line> determine the name of the program and the line where
-              the error occured if the current object exists, otherwise
+              the error occurred if the current object exists, otherwise
               they are 0.
         <inside_catch> : != 0 if the warning occurs inside a catch().
 

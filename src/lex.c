@@ -1486,7 +1486,7 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, efun_override_t is_
         }
 
         /* Lookup the identifier in the string in the global table
-         * of identifers.
+         * of identifiers.
          */
         if ( !(p = make_shared_identifier_n(str, len, I_TYPE_GLOBAL, 0)) )
         {
@@ -1895,7 +1895,7 @@ make_global_identifier (char *s, int n)
     ip = make_shared_identifier(s, n, 0);
     if (!ip)
     {
-        yyerrorf("Out of memory: identifer '%s'", s);
+        yyerrorf("Out of memory: identifier '%s'", s);
         return NULL;
     }
 

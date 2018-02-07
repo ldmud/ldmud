@@ -60,7 +60,7 @@ domain.
 All code taken from the MudOS driver is Copyright by Tim Hollebeek and
 the original authors. Use for other purposes than LPmud drivers or under
 licenses significantly different from the original LPmud license needs
-explicite permission.
+explicit permission.
 
 The random() efun is implemented using the SIMD oriented Fast Mersenne 
 Twister (SFMT) which is Copyright (C) 2006, 2007 Mutsuo Saito, Makoto

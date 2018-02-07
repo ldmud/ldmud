@@ -4,7 +4,7 @@ SYNOPSIS
 
 DESCRIPTION
         Append the string <str> to the file <file>. Returns 1 for success
-        and 0 if any failure occured.
+        and 0 if any failure occurred.
 
         If <flags> is 1, the file is removed first; thus making the
         'append' effectively an 'overwrite'. Default for <flags> is 0.

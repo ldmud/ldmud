@@ -259,7 +259,7 @@ string_t *current_error;
 string_t *current_error_file;
 string_t *current_error_object_name;
 mp_int    current_error_line_number;
-  /* When an error occured during secure_apply(), these four
+  /* When an error occurred during secure_apply(), these four
    * variables receive allocated copies (resp. counted refs) of
    * the error message, the name of the active program and object, and the
    * line number in the program.
@@ -269,7 +269,7 @@ vector_t *uncaught_error_trace = NULL;
 vector_t *current_error_trace = NULL;
 string_t *uncaught_error_trace_string = NULL;
 string_t *current_error_trace_string = NULL;
-  /* When an error occured, these variables hold the call chain in the
+  /* When an error occurred, these variables hold the call chain in the
    * format used by efun driver_info() for evaluation by the mudlib.
    * The variables are kept until the next error, or until a GC.
    * 'uncaught_error_trace': the most recent uncaught error
@@ -398,7 +398,7 @@ catch_instruction ( int flags, uint offset
      */
     if ( setjmp( push_error_context(INTER_SP, flags)->text ) )
     {
-        /* A throw() or error occured. We have to restore the
+        /* A throw() or error occurred. We have to restore the
          * control and error stack manually here.
          *
          * The error value to return will be stored in
@@ -620,7 +620,7 @@ dump_core(void)
 void
 fatal (const char *fmt, ...)
 
-/* A fatal error occured. Generate a message from printf-style <fmt>, including
+/* A fatal error occurred. Generate a message from printf-style <fmt>, including
  * a timestamp, dump the backtrace and abort.
  */
 
@@ -725,7 +725,7 @@ limit_error_format (char *fixed_fmt, size_t fixed_fmt_len, const char *fmt)
 void
 errorf (const char *fmt, ...)
 
-/* A system runtime error occured: generate a message from printf-style
+/* A system runtime error occurred: generate a message from printf-style
  * <fmt> with a timestamp, and handle it.
  * If the error is caught, just dump the trace on stderr, and jump to the
  * error handler, otherwise call the mudlib's error functions (this may cause
@@ -1078,7 +1078,7 @@ errorf (const char *fmt, ...)
 
     if (object_name)
     {
-        /* Error occured in a heart_beat() function */
+        /* Error occurred in a heart_beat() function */
 
         object_t *ob;
 
@@ -1250,7 +1250,7 @@ errorf (const char *fmt, ...)
 void
 warnf (char *fmt, ...)
 
-/* A system runtime warning occured: generate a message from printf-style
+/* A system runtime warning occurred: generate a message from printf-style
  * <fmt> with a timestamp, and print it using debug_message(). The message
  * is also passed to master::runtime_warning().
  *

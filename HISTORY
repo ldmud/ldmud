@@ -900,7 +900,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + The macros __FLOAT_MIN__ and __FLOAT_MAX__ gave a too-small range.
        + New pragma (no_)warn_function_inconsistent to control the handling
          of function redefinitions which differ in return or argument types.
-       + Implemented closures explicitely referencing inherited functions
+       + Implemented closures explicitly referencing inherited functions
            ("#'super::fun").
 
     - Runtime:
@@ -1113,7 +1113,7 @@ For a detailed list of all changes see the file CHANGELOG.
            Single values can be returned instead of the whole array.
        + printf(), sprintf(): A leading zero in the field size will now print
            only leading zeros and not interfere with the pad string option.
-       + printf(), sprintf(): If an explicite pad string is defined, even
+       + printf(), sprintf(): If an explicit pad string is defined, even
            if it is space, the efuns won't remove white space before a line
            end.
        + printf(), sprintf(): Printing numbers with leading zeroes and a
@@ -1368,7 +1368,7 @@ For a detailed list of all changes see the file CHANGELOG.
            name is available in the predefined macro __DEBUG_LOG__.
        + Pragma warn_deprecated causes the compiler to print a warning
            when a deprecated efun is used.
-       + Lfun closures can now explicite name inherited functions
+       + Lfun closures can now explicit name inherited functions
            (#'base::create).
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.

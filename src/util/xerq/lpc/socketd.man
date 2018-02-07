@@ -212,7 +212,7 @@ DESCRIPTION
           SOCKET_CLOSE:      This is called when the connection is closed
                              either from you or the other side.
 
-          SOCKET_ERROR:      An error occured.
+          SOCKET_ERROR:      An error occurred.
                              extra1: Short error message (of the xerq)(string)
                              extra2: The xerq packet with the error or zero
                              extra3: Description of the error ERQ_E_UNKNOWN.

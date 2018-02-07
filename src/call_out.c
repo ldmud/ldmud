@@ -282,7 +282,7 @@ call_out (void)
 
     if (setjmp(error_recovery_info.con.text))
     {
-        /* An error occured: recover and delete the guilty callout */
+        /* An error occurred: recover and delete the guilty callout */
 
         struct call *cop;
         object_t *ob;

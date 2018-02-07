@@ -1173,7 +1173,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
 
 /* Implementation of the efun add_action().
  *
- * This function returns TRUE if an error occured, or FALSE if the
+ * This function returns TRUE if an error occurred, or FALSE if the
  * action was successfull.
  */
 

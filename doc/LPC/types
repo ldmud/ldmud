@@ -11,9 +11,9 @@ DESCRIPTION
                 macros __INT_MIN__ and __INT_MAX__.
 
                 Integer values can be specified in decimal, in
-                sedecimal when preceeded by '0x' (e.g. 0x11), binary
+                sedecimal when preceded by '0x' (e.g. 0x11), binary
                 when preceeded by '0b' (e.g. 0b00010001), octal when
-                preceeded by '0o' (e.g. 0o21) and as character
+                preceded by '0o' (e.g. 0o21) and as character
                 yielding the charset value for the character as the number
                 to use (e.g. '0' yields 48 on ASCII machines).
 

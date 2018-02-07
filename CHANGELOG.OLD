@@ -209,7 +209,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
     a large number of certificates on usual installations (which are not
     related to client certificates) and GnuTLS clients have a problem with
     that (too large handshake data). Whoever wants to use client
-    certificates shall set it up explicitely.
+    certificates shall set it up explicitly.
     (configure)
   - Updated Avalon settings file.
     (settings/avalon)
@@ -488,7 +488,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 10-May-2009 (Zesstra)
   - (smalloc.c, slaballoc.) Replaced SINT by GRANULARITY
-    The define SINT was ill-named. All occurences were renamed to GRANULARITY
+    The define SINT was ill-named. All occurrences were renamed to GRANULARITY
     which describes the semantics of the define much better and it is now
     defined as being sizeof(word_t).
     Additionally, MEM_ALIGN is now defined as being the same as GRANULARITY.
@@ -1290,7 +1290,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
        namespace can get the driver confused with references to
        undefined structs. (Bug #493)
   - (simul_efun.c) If a simul_efun object appeared before being blessed
-       explicitely, it may be an old backup copy. This situation is
+       explicitly, it may be an old backup copy. This situation is
        now rejected as the variable/function definitions may differ
        subtly. (Bug #489)
 
@@ -2207,7 +2207,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
        into the bugtracker.
 
 26-Nov-2004 (Lars Duening)  (3.3.618, .619)
-  - (closure.c) Calls to explicitely inherited lfun closures weren't compiled
+  - (closure.c) Calls to explicitly inherited lfun closures weren't compiled
        correctly in lambda()s (Bug #0000145).
 
 25-Nov-2004 (Lars Duening)  (3.3.617)
@@ -2217,7 +2217,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 24-Nov-2004 (Lars Duening)  (3.3.616)
   - (closure, gcollect.c, interpret.c, object.c prolang) Implemented proper
-       closures explicitely referencing inherited functions.
+       closures explicitly referencing inherited functions.
 
 22-Nov-2004 (Lars Duening)  (3.3.615)
   - (comm.c) Efun net_connect(): on multihomed machines the created
@@ -3211,7 +3211,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 26-Jul-2003 (Lars Duening)  (3.3.466)
   - (mapping.c) Taking a cue from 3.2.10-594, the number of times a mapping
        is checked for destructed elements has been reduced. This was less of
-       a problem than in 3.2.10, but still occured far too often,
+       a problem than in 3.2.10, but still occurred far too often,
   - (mapping.c) The mapping compaction criterium has been extended to
        guarantee a compaction after 2 * TIME_TO_COMPACT seconds idle time.
 
@@ -4189,7 +4189,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
       every time_to_clean_up seconds (or 3600 seconds if no cleanup
       time is set); active objects are data-cleaned every time
       the processing gets to them.
-  - (swap.c) When swapping strings, the length is now explicitely stored
+  - (swap.c) When swapping strings, the length is now explicitly stored
       in the swap file. The old format added a \0 character as terminator,
       and consequently malfunctioned or crashed on strings using \0 as
       data character.
@@ -4497,7 +4497,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (object.c) Efun inherit_list(): the tagging of virtual inherits
        didn't work (reported by Dafire).
   - (prolang.y) The test for duplicate toplevel inherits got confused
-       when virtual inherits occured (reported by Zonk via Dafire).
+       when virtual inherits occurred (reported by Zonk via Dafire).
 
 18-Sep-2002 (Lars Duening)  (3.3.261)
   - (func_spec, interpret, simulate) Added the infrastructure to create
@@ -4539,7 +4539,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (closure.c) The argument checking when compiling sefuns in a lambda
        closure didn't work properly (reported by Coogan).
   - (exec.h) The mask SEC_TYPE_INFO was defined improperly.
-  - (prolang.y) If an explicite call to an inherited function couldn't
+  - (prolang.y) If an explicit call to an inherited function couldn't
        be compiled, the argument type stack got popped too often - eventually
        causing memory corruption.
 
@@ -4775,7 +4775,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
         create buggy code, so I removed it from the configure.
    - (object.c) Efun tell_room() leaked memory.
    - (simulate.c) check_valid_path() leaked the pathname when
-       an error occured.
+       an error occurred.
 
 14-Aug-2002 (Lars Duening) (3.3.222)
     - (comm.c) Compilation broke under BeOS.
@@ -4802,7 +4802,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
          error codes instead of calling regerror(). This puts it more
          in line with the PCRE implementation.
     - (configure, setting files) PCRE is now compilation default; however
-         I disabled it explicitedly in the setting files.
+         I disabled it explicitly in the setting files.
     - (regexp, pcre) Whenever the RE engine has to backtrack, the eval
          cost is incremented and checked. This will catch pathological
          matches like regexp(({"=XX==================="}), "X(.+)+X")
@@ -5493,7 +5493,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
         mess up the object statistics. As a first measure the GC after
         the mark phase checks the list of destructed objects if any
         of the objects on it haven't been referenced yet. If so, the
-        objects concerned are logged and then explicitely included into
+        objects concerned are logged and then explicitly included into
         the list of objects to free. This way at least the object statistics
         will be kept in sync for the time being.
 
@@ -5592,7 +5592,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 10-Dec-2001 (Lars Duening)  (3.3.137)
     - (interpret.c) gcc 2.91 on Linux/x86 generates buggy code for
-         MIN_INT % -1, so this case is now explicitely check for
+         MIN_INT % -1, so this case is now explicitly check for
          (reported by Menaures).
     - (interpret.c) Multiplication of a string with a number was
          not checked for numeric overflows in the computation of
@@ -6159,7 +6159,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
         arguments, the subsequent argument type checks were wrong
         (reported by Fiona).
     - (sprintf.c) Instead of using the new modifier '$', the efun now
-        uses the existence of an explicite pad string specification
+        uses the existence of an explicit pad string specification
         as flag whether to remove pad space before new lines or not.
         This is actually more logical to use than a modifier (suggested
         by Largo).
@@ -6195,7 +6195,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
          libraries. This might not be fully correct yet.
     - (make_func.y) Removed a couple of warnings under gcc 3.0 (thanks,
         Largo!).
-    - (comm.c) On a regular shutdown, stop the erq demon explicitely.
+    - (comm.c) On a regular shutdown, stop the erq demon explicitly.
     - (main.c) When compiling for MSDOS_FS, the erq pathname wasn't built
         correctly (reported by Coogan).
     - (sprintf.c) Simul-efun closures printed with %O are marked as such.
@@ -6447,7 +6447,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
          from the format string (reported by Robert).
     - (sprintf.c) A leading '0' used to pad the whole field with 0s.
          Now, only leading 0s are printed and this setting and the
-         explicite pad string are independent of each other (suggested
+         explicit pad string are independent of each other (suggested
          by Fiona).
     - (call_out.c) Removing call_outs, or call_outs going stale, messed
          up the 'number of callouts' statistics (provided by Gnomi).
@@ -6752,7 +6752,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
          compilation of prolang.y.
     - (backend.c) Simplified the error message output in write_file().
     - (simulate.c) The master apply runtime_error() receives an extra
-         argument describing if the error is a normal error, or occured
+         argument describing if the error is a normal error, or occurred
          during a heartbeat (suggested by Freaky).
     - (gcollect.c) Added a dump function for closure literals.
     - (lex.c, gcollect.c) Cosmetics.
@@ -7286,7 +7286,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
          efun.
 
 08-Aug-2000 (Lars Duening)
-    - (smalloc.c) Attempts to free a memory block twice are now explicitely
+    - (smalloc.c) Attempts to free a memory block twice are now explicitly
          flagged (when compiling with MALLOC_TRACE).
     - (lex.c) #else and #endif followed by uncommented text raise an error
          only in pedantic mode; otherwise just a warning is generated.
@@ -8038,7 +8038,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
     caused b-991123-0 and b-991123-1 in turn.
     - (comm.c) When accepting a line of non-negotiation text in charmode,
          interactive_t.tn_start became negative after the second char.
-         Similar if an error occured during a very long line - here
+         Similar if an error occurred during a very long line - here
          set_noecho() used wrong indices.
     - (comm.c) Charmode: when a client sent single CRs and there were no
          negotiations on the same line, the CR was re-read (almost)
@@ -8091,7 +8091,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 20-Nov-1999 (Lars Duening)
     - (autoconf/configure.in, configure, port.h) Small tweaks.
-    - (interpret.c) Correction to sort_array(): the GET_NUM_ARG occured
+    - (interpret.c) Correction to sort_array(): the GET_NUM_ARG occurred
          too late.
 
 19-Nov-1999 (Lars Duening)  (3.2.8-dev.156)
@@ -8596,7 +8596,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 29-Jul-1999 (Lars Duening)  (3.2.7-dev.131)
     - (simulate.c) I am surprised nobody complained about this one: when
-        an error occured, the runtime stack was unrolled too early and
+        an error occurred, the runtime stack was unrolled too early and
         left the runtime_error() apply with no valid commandgiver.
     - (func_spec, simulate) New efuns set_limits(), query_limits() and
         limited() to handle runtime limits. (f-981229-11)
@@ -8801,7 +8801,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
     - (machine.h.in, config.h.in, configure, autoconf/) Autoconfiguration
         is now based on autoconf 2. The old configuration code is in the
         subdirectory config-old/ held as backup. Special features are:
-          - rxcache and UDP port can be enabled/disabled explicitely.
+          - rxcache and UDP port can be enabled/disabled explicitly.
           - Enabling ERQ defines a symbol ERQ_INCLUDE pointing to the
             correct include file (util/erq/erq.h resp util/xerq/erq.h).
           - All config.h options can be set using parameters to configure.
@@ -9135,7 +9135,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
         it had to swap it in. This is useful for blueprints for inheritance
         and cloning, which would thrash otherwise. (thanks, Michael!)
     - (lex.c) The test against recursive calls in _expand_define() crashed
-        the driver if an error occured during the macro expansion and the
+        the driver if an error occurred during the macro expansion and the
         error handling itself called macro expansion (e.g. through the
         _expand_define_() efun). For now, non-reentrant recursive calls
         are allowed again.
@@ -9181,7 +9181,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
     - (etc/icon-*.ppm) The Icon for the Gamedriver.
     - (hosts/be/{Makefile, icon-*.raw, driver.r, driver.rscr) Added the
         icon to the compiled resources.
-    - (heartbeat.c) Fixed a crasher which occured when a heart_beat()
+    - (heartbeat.c) Fixed a crasher which occurred when a heart_beat()
         function managed to remove all remaining objects from the hb list.
 
 19-Apr-1999 (Lars Duening)
@@ -9914,7 +9914,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
         cases. Therefore, two DEBUG: messages remain to warn if this
         feature is used.
     - (hosts/be/*) Adapted for R4/x86.
-    - (*.c) Removed most of the 'Possibly unwanted assigment' warnings.
+    - (*.c) Removed most of the 'Possibly unwanted assignment' warnings.
 
 02-Nov-1998 (Lars Duening)
     - (simulate) Corrected bugs in make_name_sane() and load_object().

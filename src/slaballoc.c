@@ -3773,7 +3773,7 @@ esbrk (word_t size, size_t * pExtra)
 
             if (next - p == overhead)
             {
-                /* Our block directly preceedes the next one */
+                /* Our block directly precedes the next one */
                 *(next+1) &= ~PREV_BLOCK;
                 overlap += overhead * GRANULARITY;
                 count_back(&large_wasted_stat, overhead * GRANULARITY);
@@ -4337,7 +4337,7 @@ mem_identify_slab (int fd, const char * tag, int tableIx
                   , mslab_t * list, mslab_t * slab)
 
 /* Check if <slab> is member of the list starting at <listStart>.
- * If yes, print it's information preceeded by <tag> and return TRUE.
+ * If yes, print it's information preceded by <tag> and return TRUE.
  * Return FALSE otherwise.
  */
 

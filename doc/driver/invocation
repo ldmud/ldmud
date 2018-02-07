@@ -87,7 +87,7 @@ DESCRIPTION
             List the name of every compiled file on stderr.
 
           -e|--no-preload
-            Pass a non-zero argument (the number of occurences of this option)
+            Pass a non-zero argument (the number of occurrences of this option)
             to master->preload(), which usually inhibits all preloads of
             castles and other objects.
 
@@ -312,7 +312,7 @@ DESCRIPTION
           --args <filename>
             The driver reads and parses the given file and treats its contents
             as if given on the commandline right where the --args option
-            occured. The file itself can again contain --args options.
+            occurred. The file itself can again contain --args options.
 
 
 DESCRIPTION

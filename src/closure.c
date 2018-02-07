@@ -3759,7 +3759,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     case_list_entry_t *save_list0;
                     case_list_entry_t *save_list1;
                       /* Save the vitals of the outer switch.
-                       * We don't need an explicite list of case_states
+                       * We don't need an explicit list of case_states
                        * because compile_value() recurses.
                        */
 
@@ -6938,7 +6938,7 @@ store_case_labels( p_int total_length
         p_int cutoff;       /* Cutoff point during lookup table generation */
 
         /* Walk the list and join consecutive cases to ranges. Intermediate
-         * entries are removed from the list, explicite range end entries
+         * entries are removed from the list, explicit range end entries
          * are left in the list.
          */
         for (last_addr = 0xffffff, list1=list0; list1; list1 = list1->next)

@@ -3,7 +3,7 @@ SYNOPSIS
         string process_string(string str)
 
 DESCRIPTION
-        Searches string str for occurences of a "value by function
+        Searches string str for occurrences of a "value by function
         call", which is an implicit function call surrounded by @@. See
         "value_by_function_call" in the principles section.
 

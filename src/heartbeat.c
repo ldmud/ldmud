@@ -171,7 +171,7 @@ call_heart_beat (void)
 
     if (setjmp(error_recovery_info.con.text))
     {
-        /* An error occured: recover. The guilt heartbeat has already
+        /* An error occurred: recover. The guilt heartbeat has already
          * been removed by simulate::error().
          */
         mark_end_evaluation();

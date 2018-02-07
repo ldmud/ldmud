@@ -3,7 +3,7 @@ SYNOPSIS
         string db_error(int handle)
 
 DESCRIPTION
-        Return a string describing the error which occured during the last
+        Return a string describing the error which occurred during the last
         database transaction. If the last database transaction was successful,
         this call returns 0.
 

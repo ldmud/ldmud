@@ -548,7 +548,7 @@ explode_string (string_t *str, string_t *del)
         /* NOTREACHED */
     } /* --- End of special case --- */
 
-    /* Find the number of occurences of the delimiter 'del' by doing
+    /* Find the number of occurrences of the delimiter 'del' by doing
      * a first scan of the string.
      *
      * The number of array items is then one more than the number of
