@@ -1685,7 +1685,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
             }
 
             column_stat = 0; /* If there was a newline pending, it
-                              * will be implicitely added now.
+                              * will be implicitly added now.
                               */
             ADD_CHAR(st, '\n');
             st->line_start = st->bpos;

@@ -80,7 +80,7 @@ int join(string str) {
 	ob->query_name() + " to his team.\n", ob);
     tell_object(ob, "You are joined to the team of " +
 		leader_name + ".\n");
-    members = add(ob); /* takes members implicitely */
+    members = add(ob); /* takes members implicitly */
     write("Ok.\n");
     enable_commands();
     return 1;
