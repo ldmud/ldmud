@@ -33,7 +33,7 @@ DESCRIPTION
         with a call to the internal lfun __INIT().
         
         However, if #pragma share_variables is in effect (either explicitely
-        given in the source or implicitely as runtime option), the values for
+        given in the source or implicitly as runtime option), the values for
         a clone's uninitialized variables are taken from the _current_
         variables of the object's blueprint.
 

@@ -92,7 +92,7 @@
  *
  * .variables is the block of variables of this object. Obviously they
  * can't be shared between master and clones. The number of variables
- * implicitely known by the program.
+ * implicitly known by the program.
  *
  * .name and .load_name are the two names of the object. .name (an untabled
  * string) is the objects 'real' name: something like "std/thing" for

@@ -6390,11 +6390,11 @@ printf("DEBUG:     -> F_LOCAL %d\n", lcmap[i]);
                 else if (got_mapped)
                 {
                     /* This shouldn't happen, as all explicit context
-                     * variables are created before the first implicite
+                     * variables are created before the first implicit
                      * reference can be encountered.
                      */
-                    fatal("Explicite context var #%d has higher index than "
-                          "implicite context variables.", i);
+                    fatal("Explicit context var #%d has higher index than "
+                          "implicit context variables.", i);
                 }
                 else
                     num_explicit_context++;

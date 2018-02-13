@@ -80,7 +80,7 @@ DESCRIPTION
              a = ({1, 2, 3})
              foreach(x : a) { a[1..2] = ({4, 5}); write(x+" "); }
            will write ("1 4 5 ").
-         - operations which implicitely copy the array or struct (this
+         - operations which implicitly copy the array or struct (this
            includes range assignments which change the size) don't
            have an effect on the loop.
 

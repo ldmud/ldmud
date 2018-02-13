@@ -43,7 +43,7 @@ DESCRIPTION
         But changes of the closure context will not reflect on the
         local variable it was copied from and vice versa.
 
-        In addition to the implicite context inherited from the
+        In addition to the implicit context inherited from the
         defining function, additional context variables can be defined
         in the closure:
 

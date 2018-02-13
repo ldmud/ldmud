@@ -192,7 +192,7 @@ main(int argc, char *argv[])
         }
         else
         {
-            fprintf(stderr, "%s Dynamic attachement unimplemented\n"
+            fprintf(stderr, "%s Dynamic attachment unimplemented\n"
                           , time_stamp());
             die();
         }

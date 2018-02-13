@@ -31,7 +31,7 @@ DESCRIPTION
         H_CREATE_CLONE
           Optional hooks to initialize an object after creation.
 
-          H_CREATE_SUPER is called for blueprints implicitely loaded
+          H_CREATE_SUPER is called for blueprints implicitly loaded
           by inheritance, H_CREATE_OB for explicitely loaded
           blueprints/objects, and H_CREATE_CLONE for cloned objects.
 
