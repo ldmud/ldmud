@@ -8553,6 +8553,48 @@ f_configure_driver (svalue_t *sp)
             time_to_reset = sp->u.number;
             break;
 
+        case DC_DEBUG_FILE:
+            if (sp->type != T_STRING)
+                efun_arg_error(2, T_STRING, sp->type, sp);
+            else
+            {
+                free(debug_file);
+                debug_file = strdup(get_txt(sp->u.str));
+
+                reopen_debug_log = true;
+            }
+            break;
+
+        case DC_SIGACTION_SIGHUP:
+        case DC_SIGACTION_SIGINT:
+        case DC_SIGACTION_SIGUSR1:
+        case DC_SIGACTION_SIGUSR2:
+            if (sp->type != T_NUMBER)
+                efun_arg_error(2, T_NUMBER, sp->type, sp);
+            else if (sp->u.number < 0 || sp->u.number > DCS_THROW_EXCEPTION)
+                errorf("Illegal value for signal action in configure_driver()\n");
+            else
+            {
+                switch(sp[-1].u.number)
+                {
+                    case DC_SIGACTION_SIGHUP:
+                        sigaction_sighup = (char) sp->u.number;
+                        break;
+
+                    case DC_SIGACTION_SIGINT:
+                        sigaction_sigint = (char) sp->u.number;
+                        break;
+
+                    case DC_SIGACTION_SIGUSR1:
+                        sigaction_sigusr1 = (char) sp->u.number;
+                        break;
+
+                    case DC_SIGACTION_SIGUSR2:
+                        sigaction_sigusr2 = (char) sp->u.number;
+                        break;
+                }
+            }
+            break;
     }
 
     // free arguments
@@ -8656,6 +8698,26 @@ f_driver_info (svalue_t *sp)
 
         case DC_SWAP_COMPACT_MODE:
             put_number(&result, swap_compact_mode);
+            break;
+
+        case DC_DEBUG_FILE:
+            put_string(&result, new_mstring(debug_file));
+            break;
+
+        case DC_SIGACTION_SIGHUP:
+            put_number(&result, sigaction_sighup);
+            break;
+
+        case DC_SIGACTION_SIGINT:
+            put_number(&result, sigaction_sigint);
+            break;
+
+        case DC_SIGACTION_SIGUSR1:
+            put_number(&result, sigaction_sigusr1);
+            break;
+
+        case DC_SIGACTION_SIGUSR2:
+            put_number(&result, sigaction_sigusr2);
             break;
 
         /* Driver Environment */

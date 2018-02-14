@@ -142,6 +142,43 @@ DESCRIPTION
            <data> is an integer and measured in seconds.
            (Same as the --reset-time command line switch.)
 
+        <what> == DC_DEBUG_FILE
+           Sets the debug log file.
+           The filename can be given relative to the mudlib directory
+           or absolute with regard to the operating system.
+           Settings this option will force closing and reopening
+           the log file (even if the name didn't change).
+
+         <what> == DC_SIGACTION_SIGHUP
+         <what> == DC_SIGACTION_SIGINT
+         <what> == DC_SIGACTION_SIGUSR1
+         <what> == DC_SIGACTION_SIGUSR2
+           Sets the default action when the driver encounters those
+           POSIX signals. It can be set to one of the following options:
+
+             DCS_DEFAULT:
+                 This is the default action: Call handle_external_signal()
+                 in the master and act upon its result.
+
+             DCS_IGNORE:
+                 Ignore the signal.
+
+             DCS_TERMINATE:
+                 Terminate the process immediately.
+
+             DCS_SHUTDOWN:
+                 Do a graceful shutdown.
+
+             DCS_INFORM_MASTER:
+                 Call handle_external_signal(), but ignore its result.
+
+             DCS_RELOAD_MASTER:
+                 Reload the master object.
+
+             DCS_THROW_EXCEPTION:
+                 Cause an error in the currently running LPC or Python
+                 function.
+
 HISTORY
         Introduced in LDMud 3.3.719.
         DC_ENABLE_HEART_BEATS was added in 3.5.0.
@@ -156,6 +193,8 @@ HISTORY
         DC_SWAP_VAR_TIME was added in 3.5.2
         DC_CLEANUP_TIME was added in 3.5.2
         DC_RESET_TIME was added in 3.5.2
+        DC_DEBUG_FILE was added in 3.5.2.
+        DC_SIGACTION_* were added in 3.5.2.
 
 SEE ALSO
         configure_interactive(E)

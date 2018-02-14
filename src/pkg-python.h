@@ -55,6 +55,8 @@ extern void python_handle_fds(fd_set *readfds, fd_set *writefds, fd_set *exceptf
 extern void python_call_hook(int hook, bool is_external);
 extern void python_call_hook_object(int hook, bool is_external, object_t *ob);
 
+extern void python_interrupt();
+
 #ifdef GC_SUPPORT
 extern void python_clear_refs();
 extern void python_count_refs();
