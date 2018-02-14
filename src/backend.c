@@ -75,6 +75,7 @@
 
 #include "i-eval_cost.h"
 
+#include "../mudlib/sys/configuration.h"
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/debug_message.h"
 #include "../mudlib/sys/signals.h"
@@ -135,6 +136,10 @@ Bool extra_jobs_to_do = MY_FALSE;
    *   parsing commands or calling the heart_beat.
    */
 
+volatile bool interrupt_execution = false;
+  /* True: abort the current execution with an error.
+   */
+
 GC_Request gc_request = gcDont;
   /* gcDont: No garbage collection is due.
    * gcMalloc: The mallocator requested a gc (requires extra_jobs_to_do).
@@ -168,6 +173,14 @@ static time_t time_last_slow_shut = 0;
 
 static sigset_t pending_signals;
 /* The pending signals which should be delivered to the mudlib master.
+ */
+
+char sigaction_sighup  = DCS_DEFAULT,
+      sigaction_sigint  = DCS_DEFAULT,
+      sigaction_sigusr1 = DCS_DEFAULT,
+      sigaction_sigusr2 = DCS_DEFAULT;
+/* Configured reactions to signals, is one of DCS_* defines.
+ * They are evaluated immediately when the signal occurs.
  */
 
 /*-------------------------------------------------------------------------*/
@@ -305,34 +318,149 @@ do_state_check (int minlvl, const char *where)
 #endif
 
 /*-------------------------------------------------------------------------*/
+static bool install_sigint_handler();
+
 static void
 handle_signal (int sig)
 
-/* General signal handler: store the signal in a flag
+/* General signal handler:
+ * First we look at the configured actions: IGNORE, TERMINATE and
+ * THROW_EXCEPTION we handle immediately. For all other we store
+ * the signal in a flag to be handled in the backend loop.
+ *
  * Note: If we receive the same signal again before it is processed, the second
  *       signal will be lost.
  */
 {
-    sigaddset(&pending_signals, sig);
-    extra_jobs_to_do = MY_TRUE;
+    char action = DCS_DEFAULT;
+    switch (sig)
+    {
+        case SIGHUP:
+            action = sigaction_sighup;
+            break;
+
+        case SIGINT:
+            action = sigaction_sigint;
+            break;
+
+        case SIGUSR1:
+            action = sigaction_sigusr1;
+            break;
+
+        case SIGUSR2:
+            action = sigaction_sigusr2;
+            break;
+    }
+
+    switch (action)
+    {
+        case DCS_IGNORE:
+            /* Do nothing. */
+            break;
+
+        case DCS_TERMINATE:
+        {
+            /* Call the default handler, for all four signals
+             * this is termination.
+             */
+            struct sigaction sa;
+            sigemptyset(&sa.sa_mask);
+            sa.sa_flags = 0;
+            sa.sa_handler = SIG_DFL;
+            if (sigaction(sig, &sa, NULL) == 0)
+                raise(sig);
+            /* If we are still here, exit... */
+            exit(sig);
+            return;
+        }
+
+        case DCS_THROW_EXCEPTION:
+            /* Set a flag to be evaluated by the interpreter. */
+            interrupt_execution = true;
+#ifdef USE_PYTHON
+            /* Notify the python package. */
+            python_interrupt();
+#endif
+            break;
+
+        default:
+            /* Process it in the backend loop. */
+            sigaddset(&pending_signals, sig);
+            extra_jobs_to_do = MY_TRUE;
+            return;
+    }
+
+    // Reached in case of DCS_IGNORE and DCS_THROW_EXCEPTION.
+    // In both cases the signal handler has to be re-installed here
+    // (because process_pending_signals() - which would do it normally -
+    // isn't going to be called in these cases).
+    if (sig == SIGINT)
+        install_sigint_handler();
+
 } /* handle_signal() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE Bool
-defer_signal_to_master(int sig)
-// Notifies master about the signal <sig>.
-// Returns 1 if the master returns anything != 0. In this case it is assumed,
-// the master handled the signal.
+static bool
+install_sigint_handler ()
+
+/* Installs the SIGINT handler again.
+ * The handler is reset upon each signal, so we need to install it again.
+ * Returns true on success.
+ */
+
 {
-    svalue_t *res;
-    push_number(inter_sp, sig);
-    res = callback_master(STR_HANDLE_EXTERNAL_SIGNAL, 1);
-    if (res && res->type == T_NUMBER && res->u.number != 0)
+    struct sigaction sa;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART|SA_RESETHAND;
+    sa.sa_handler = handle_signal;
+    return (sigaction(SIGINT, &sa, NULL) == 0);
+}
+
+/*-------------------------------------------------------------------------*/
+static INLINE bool
+execute_signal_action (int sig, char configured)
+
+/* Executes the configured signal action, that were not already handled in the
+ * signal handler itself: DEFAULT, SHUTDOWN, INFORM_MASTER and RELOAD_MASTER.
+ *
+ * Returns true, if the action was executed.
+ * Returns false, if the default action (besides calling the master)
+ * shall be conducted.
+ */
+
+{
+    switch (configured)
     {
-        return MY_TRUE;
+        case DCS_SHUTDOWN:
+            extra_jobs_to_do = MY_TRUE;
+            game_is_being_shut_down = MY_TRUE;
+            break;
+
+        case DCS_RELOAD_MASTER:
+            extra_jobs_to_do = MY_TRUE;
+            master_will_be_updated = MY_TRUE;
+            break;
+
+        case DCS_INFORM_MASTER:
+        default:
+        {
+            svalue_t *res;
+
+            push_number(inter_sp, sig);
+            res = callback_master(STR_HANDLE_EXTERNAL_SIGNAL, 1);
+
+            // If we just inform the master or the master returned something
+            // that is not a number or the number 0 we go to the default action.
+            if (configured == DCS_INFORM_MASTER ||
+                !res || res->type != T_NUMBER || res->u.number == 0)
+                return false;
+
+            break;
+        }
     }
-    return MY_FALSE;
-} /* defer_signal_to_master() */
+
+    return true;
+} /* execute_signal_action() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -345,7 +473,8 @@ process_pending_signals (void)
     if (sigismember(&pending_signals, SIGTERM))
     {
         // SIGTERM: shutdown gracefully, but inform the mudlib master first.
-        defer_signal_to_master(LPC_SIGTERM);
+        //          The master can't veto the shutdown.
+        execute_signal_action(LPC_SIGTERM, DCS_DEFAULT);
         game_is_being_shut_down = MY_TRUE;
         // ignore the rest of the signals
         sigemptyset(&pending_signals);
@@ -355,7 +484,7 @@ process_pending_signals (void)
     {
         // SIGHUP: request a game shutdown.
         sigdelset(&pending_signals, SIGHUP);
-        if (!defer_signal_to_master(LPC_SIGHUP))
+        if (!execute_signal_action(LPC_SIGHUP, sigaction_sighup))
         {
             // master did not handle it, shut down.
             extra_jobs_to_do = MY_TRUE;
@@ -369,7 +498,7 @@ process_pending_signals (void)
     {
         // SIGUSR1: request a master update.
         sigdelset(&pending_signals, SIGUSR1);
-        if (!defer_signal_to_master(LPC_SIGUSR1))
+        if (!execute_signal_action(LPC_SIGUSR1, sigaction_sigusr1))
         {
             // Master did not handle it, update the master
             extra_jobs_to_do = MY_TRUE;
@@ -381,7 +510,7 @@ process_pending_signals (void)
     {
         // SIGUSR2: reopen the debug.log file.
         sigdelset(&pending_signals, SIGUSR2);
-        if (!defer_signal_to_master(LPC_SIGUSR2))
+        if (!execute_signal_action(LPC_SIGUSR2, sigaction_sigusr2))
         {
             // Master did not handle it, re-open the log
             reopen_debug_log = MY_TRUE;
@@ -393,7 +522,7 @@ process_pending_signals (void)
         // does not handle the signal, we send us the signal again (which terminates
         // us).
         sigdelset(&pending_signals, SIGINT);
-        if (!defer_signal_to_master(LPC_SIGINT))
+        if (!execute_signal_action(LPC_SIGINT, sigaction_sigint))
         {
             // if anything goes wrong, we terminate ourself, because it is the
             // standard behaviour in case of SIGINT.
@@ -406,15 +535,10 @@ process_pending_signals (void)
         // Otherwise we install our own handler again (the signal handler for
         // SIGINT is installed with the SA_RESETHAND flag and thus reset upon 
         // signal delivery)
-        else
+        else if (!install_sigint_handler())
         {
-            struct sigaction sa;
-            sigemptyset(&sa.sa_mask);
-            sa.sa_flags = SA_RESTART|SA_RESETHAND;
-            sa.sa_handler = handle_signal;
-            if (sigaction(SIGINT, &sa, NULL) == -1)
-                debug_message("%s Unable to reinstall signal handler for SIGINT: %s",
-                      time_stamp(), strerror(errno));
+            debug_message("%s Unable to reinstall signal handler for SIGINT: %s",
+                  time_stamp(), strerror(errno));
         }
     }
 } // process_pending_signals
@@ -506,6 +630,7 @@ void install_signal_handlers()
     // for SIGTERM and SIGINT the default handler should be restored upon signal
     // delivery, so that a repeated signal is handled immediately with the 
     // default action and not only in the next backend cycle.
+    sa.sa_handler = handle_signal;
     sa.sa_flags |= SA_RESETHAND;
     if (sigaction(SIGINT, &sa, NULL) == -1)
         perror("Unable to install signal handler for SIGINT");

@@ -35,6 +35,7 @@ extern statistic_t stat_last_data_cleaned;
 extern statistic_t stat_in_list;
 
 extern Bool extra_jobs_to_do;
+extern volatile bool interrupt_execution;
 
 typedef enum { gcDont = 0, gcMalloc, gcEfun } GC_Request;
 extern GC_Request gc_request;
@@ -42,6 +43,8 @@ extern statistic_t stat_load;
 extern statistic_t stat_compile;
 
 extern Bool mud_is_up;
+
+extern char sigaction_sighup, sigaction_sigint, sigaction_sigusr1, sigaction_sigusr2;
 
 /* --- Prototypes --- */
 

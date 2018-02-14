@@ -3834,6 +3834,52 @@ ldmud_quoted_array_create (svalue_t* sym)
 } /* ldmud_quoted_array_create */
 
 /*-------------------------------------------------------------------------*/
+/* Interrupt exception */
+
+static PyTypeObject ldmud_interrupt_exception_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.InterruptException",         /* tp_name */
+    sizeof(PyBaseExceptionObject),      /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    0,                                  /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    0,                                  /* tp_flags */
+    "Exception due to interrupt by signal",
+                                        /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    0,                                  /* tp_methods */
+    0,                                  /* tp_members */
+    0,                                  /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,                                  /* tp_init */
+    0,                                  /* tp_alloc */
+    0,                                  /* tp_new */
+};
+
+/*-------------------------------------------------------------------------*/
 
 /*=========================================================================*/
 
@@ -4229,6 +4275,10 @@ static PyObject* init_ldmud_module()
     if (PyType_Ready(&ldmud_quoted_array_type) < 0)
         return NULL;
 
+    ldmud_interrupt_exception_type.tp_base = (PyTypeObject *) PyExc_RuntimeError;
+    if (PyType_Ready(&ldmud_interrupt_exception_type) < 0)
+        return NULL;
+
     /* Initialize module. */
     module = PyModule_Create(&ldmud_module);
     if (module == NULL)
@@ -4242,6 +4292,7 @@ static PyObject* init_ldmud_module()
     Py_INCREF(&ldmud_closure_type);
     Py_INCREF(&ldmud_symbol_type);
     Py_INCREF(&ldmud_quoted_array_type);
+    Py_INCREF(&ldmud_interrupt_exception_type);
     PyModule_AddObject(module, "Object", (PyObject*) &ldmud_object_type);
     PyModule_AddObject(module, "Array", (PyObject*) &ldmud_array_type);
     PyModule_AddObject(module, "Mapping", (PyObject*) &ldmud_mapping_type);
@@ -4249,6 +4300,7 @@ static PyObject* init_ldmud_module()
     PyModule_AddObject(module, "Closure", (PyObject*) &ldmud_closure_type);
     PyModule_AddObject(module, "Symbol", (PyObject*) &ldmud_symbol_type);
     PyModule_AddObject(module, "QuotedArray", (PyObject*) &ldmud_quoted_array_type);
+    PyModule_AddObject(module, "InterruptException", (PyObject*) &ldmud_interrupt_exception_type);
 
     assert(PYTHON_HOOK_COUNT == sizeof(python_hook_names) / sizeof(python_hook_names[0]));
     for (int i = 0; i < PYTHON_HOOK_COUNT; i++)
@@ -4837,6 +4889,8 @@ python_set_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int *nfds)
 
 {
     python_is_external = true;
+    interrupt_execution = false;
+
     for (python_poll_fds_t *fds = poll_fds; fds != NULL; fds = fds->next)
     {
         short events = fds->events;
@@ -4888,6 +4942,8 @@ python_handle_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfd
 
 {
     python_is_external = true;
+    interrupt_execution = false;
+
     for (python_poll_fds_t *fds = poll_fds; fds != NULL; fds = fds->next)
     {
         int events = 0;
@@ -4947,6 +5003,8 @@ python_call_hook (int hook, bool is_external)
 {
     bool was_external = python_is_external;
     python_is_external = is_external;
+    if (is_external)
+        interrupt_execution = false;
 
     for(python_hook_t *entry = python_hooks[hook]; entry; entry = entry->next)
     {
@@ -4975,6 +5033,8 @@ python_call_hook_object (int hook, bool is_external, object_t *ob)
 
 {
     bool was_external = python_is_external;
+    if (is_external)
+        interrupt_execution = false;
 
     PyObject *args, *arg;
     if (python_hooks[hook] == NULL)
@@ -5018,6 +5078,35 @@ python_call_hook_object (int hook, bool is_external, object_t *ob)
 
     python_is_external = was_external;
 } /* python_call_hook_object */
+
+/*-------------------------------------------------------------------------*/
+int python_process_interrupt (void* arg UNUSED)
+
+/* Called from within the Python interpreter
+ * to cause an interrupt in the current running python efun.
+ */
+
+{
+    /* Was the interrupt request handled in the meanwhile? */
+    if (!interrupt_execution)
+        return 0;
+
+    interrupt_execution = false;
+
+    PyErr_SetString((PyObject *) &ldmud_interrupt_exception_type, "signal caught");
+    return -1;
+} /* python_process_interrupt */
+
+/*-------------------------------------------------------------------------*/
+void python_interrupt ()
+
+/* Called from the signal handler (!)
+ * to cause an interrupt in the current running python efun.
+ */
+
+{
+    Py_AddPendingCall(&python_process_interrupt, NULL);
+} /* python_interrupt */
 
 /*-------------------------------------------------------------------------*/
 const char*

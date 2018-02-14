@@ -835,6 +835,10 @@ mark_start_evaluation (void)
     }
     
     used_memory_at_eval_start = xalloc_used();
+
+    /* Also reset any interrupt flag that happened between threads. */
+    interrupt_execution = false;
+
 } /* mark_start_evaluation() */
 
 /*-------------------------------------------------------------------------*/
@@ -15655,6 +15659,14 @@ again:
                 "exceeded limit: %"PRIdPINT", allowed: %"PRIdPINT".\n",
                 xalloc_used() - used_memory_at_eval_start,
                 max_memory));
+    }
+
+    // Was there a signal to terminate this thread?
+    if (interrupt_execution)
+    {
+        /* Reset the flag, so the error handler can execute. */
+        interrupt_execution = false;
+        ERRORF(("Interrupt by external signal.\n"));
     }
 
     /* Execute the next instruction */
