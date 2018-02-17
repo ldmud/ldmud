@@ -202,6 +202,11 @@ p_int regex_package = RE_TRADITIONAL;
    * acknowledged bitflags.
    */
 
+static bool prng_seeded = false;
+  /* Set to true, if --random-seed was given and thus the
+   * prng is already seeded after command line parsing.
+   */
+
 /* -- Other Global Variables -- */
 svalue_t const0, const1;
   /* The values 0 and 1 as svalues, mem-copied when needed */
@@ -310,9 +315,6 @@ main (int argc, char **argv)
     // Set prng_device_name to the default //
     prng_device_name = strdup(PRNG_DEFAULT_DEVICE);
     // init PRG by the default device (/dev/urandom) 
-    // if --random-seed or --randomdevice is given on the command-line it
-    // will re-seeded later.
-    seed_random(prng_device_name);
     
 #ifdef ACCESS_FILE
     access_file = strdup(ACCESS_FILE);
@@ -486,6 +488,9 @@ main (int argc, char **argv)
           /* Also initializes the standard strings, which may be required
            * early on should an error happen.
            */
+
+        if (!prng_seeded)
+            seed_random(prng_device_name);
 
 #ifdef USE_TLS
         tls_global_init();
@@ -2773,17 +2778,17 @@ eval_arg (int eOption, const char * pValue)
         break;
         
     case cRandomdevice:
-        // sets prng_device_name to some file/device and re-seeds the PRNG
-        // from it.
+        // sets prng_device_name to some file/device.
         if (prng_device_name != NULL)
             free(prng_device_name);
         prng_device_name = strdup(pValue);
-        seed_random(prng_device_name);
+        prng_seeded = false;
         break;
 
     case cRandomSeed:
     	// seeds PRG with given value
         seed_random_from_int(strtoul(pValue, (char **)0, 0));
+        prng_seeded = true;
         break;
 
     case cReserved:
