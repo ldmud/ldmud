@@ -607,7 +607,8 @@ static INLINE int number(long);
 static INLINE int string(char *, size_t);
 static void handle_define(char *, Bool);
 static void add_define(char *, short, char *, source_loc_t);
-static void add_permanent_define(char *, short, void *, Bool);
+static void add_permanent_define_str(char *name, short nargs, char *text);
+static void add_permanent_define_fun(char *name, short nargs, defn_fun fun);
 static Bool expand_define(void);
 static Bool _expand_define(struct defn*, ident_t*);
 static INLINE void myungetc(char);
@@ -727,19 +728,19 @@ init_lexer(void)
     /* Add the standard permanent macro definitions */
     /* TODO: Make the strings tabled */
 
-    add_permanent_define("LPC3", -1, string_copy(""), MY_FALSE);
-    add_permanent_define("__LDMUD__", -1, string_copy(""), MY_FALSE);
+    add_permanent_define_str("LPC3", -1, "");
+    add_permanent_define_str("__LDMUD__", -1, "");
     if (compat_mode)
     {
-        add_permanent_define("COMPAT_FLAG", -1, string_copy(""), MY_FALSE);
-        add_permanent_define("__COMPAT_MODE__", -1, string_copy(""), MY_FALSE);
+        add_permanent_define_str("COMPAT_FLAG", -1, "");
+        add_permanent_define_str("__COMPAT_MODE__", -1, "");
     }
-    add_permanent_define("__EUIDS__", -1, string_copy(""), MY_FALSE);
+    add_permanent_define_str("__EUIDS__", -1, "");
 
     if (allow_filename_spaces)
-        add_permanent_define("__FILENAME_SPACES__", -1, string_copy(""), MY_FALSE);
+        add_permanent_define_str("__FILENAME_SPACES__", -1, "");
     if (strict_euids)
-        add_permanent_define("__STRICT_EUIDS__", -1, string_copy(""), MY_FALSE);
+        add_permanent_define_str("__STRICT_EUIDS__", -1, "");
 
     if (compat_mode)
     {
@@ -755,102 +756,99 @@ init_lexer(void)
         strcat(mtext+2, "\"");
     }
 
-    add_permanent_define("__MASTER_OBJECT__", -1, string_copy(mtext), MY_FALSE);
-    add_permanent_define("__FILE__", -1, (void *)get_current_file, MY_TRUE);
-    add_permanent_define("__FUNCTION__", -1, (void *)get_current_function, MY_TRUE);
-    add_permanent_define("__DIR__", -1, (void *)get_current_dir, MY_TRUE);
-    add_permanent_define("__PATH__", 1, (void *)get_sub_path, MY_TRUE);
-    add_permanent_define("__LINE__", -1, (void *)get_current_line_buf, MY_TRUE);
-    add_permanent_define("__VERSION__", -1, (void *)get_version, MY_TRUE);
-    add_permanent_define("__VERSION_MAJOR__", -1, string_copy(VERSION_MAJOR), MY_FALSE);
-    add_permanent_define("__VERSION_MINOR__", -1, string_copy(VERSION_MINOR), MY_FALSE);
-    add_permanent_define("__VERSION_MICRO__", -1, string_copy(VERSION_MICRO), MY_FALSE);
-    add_permanent_define("__VERSION_PATCH__", -1, string_copy(VERSION_PATCH), MY_FALSE);
-    add_permanent_define("__VERSION_COMMITID__", -1, string_copy("\"" COMMIT_ID "\""), MY_FALSE);
-    add_permanent_define("__VERSION_LOCAL__", -1, string_copy(LOCAL_LEVEL), MY_FALSE);
+    add_permanent_define_str("__MASTER_OBJECT__", -1, mtext);
+    add_permanent_define_fun("__FILE__", -1, get_current_file);
+    add_permanent_define_fun("__FUNCTION__", -1, get_current_function);
+    add_permanent_define_fun("__DIR__", -1, get_current_dir);
+    add_permanent_define_fun("__PATH__", 1, get_sub_path);
+    add_permanent_define_fun("__LINE__", -1, get_current_line_buf);
+    add_permanent_define_fun("__VERSION__", -1, get_version);
+    add_permanent_define_str("__VERSION_MAJOR__", -1, VERSION_MAJOR);
+    add_permanent_define_str("__VERSION_MINOR__", -1, VERSION_MINOR);
+    add_permanent_define_str("__VERSION_MICRO__", -1, VERSION_MICRO);
+    add_permanent_define_str("__VERSION_PATCH__", -1, VERSION_PATCH);
+    add_permanent_define_str("__VERSION_COMMITID__", -1, "\"" COMMIT_ID "\"");
+    add_permanent_define_str("__VERSION_LOCAL__", -1, LOCAL_LEVEL);
 
-    add_permanent_define("__HOST_NAME__", -1, (void *)get_hostname, MY_TRUE);
-    add_permanent_define("__DOMAIN_NAME__", -1, (void *)get_domainname, MY_TRUE);
-    add_permanent_define("__HOST_IP_NUMBER__", -1
-                        , (void*)get_host_ip_number, MY_TRUE);
+    add_permanent_define_fun("__HOST_NAME__", -1, get_hostname);
+    add_permanent_define_fun("__DOMAIN_NAME__", -1, get_domainname);
+    add_permanent_define_fun("__HOST_IP_NUMBER__", -1, (defn_fun) get_host_ip_number);
     sprintf(mtext, "%d", MAX_USER_TRACE);
-    add_permanent_define("__MAX_RECURSION__", -1, string_copy(mtext), MY_FALSE);
-    add_permanent_define("__EFUN_DEFINED__", 1, (void *)efun_defined, MY_TRUE);
+    add_permanent_define_str("__MAX_RECURSION__", -1, mtext);
+    add_permanent_define_fun("__EFUN_DEFINED__", 1, efun_defined);
 #ifdef ERQ_DEMON
     sprintf(mtext, "%d", ERQ_MAX_SEND);
-    add_permanent_define("__ERQ_MAX_SEND__", -1, string_copy(mtext), MY_FALSE);
+    add_permanent_define_str("__ERQ_MAX_SEND__", -1, mtext);
     sprintf(mtext, "%d", ERQ_MAX_REPLY);
-    add_permanent_define("__ERQ_MAX_REPLY__", -1, string_copy(mtext), MY_FALSE);
+    add_permanent_define_str("__ERQ_MAX_REPLY__", -1, mtext);
 #endif
-    add_permanent_define("__MAX_MALLOC__", -1, (void *)get_memory_limit_buf, MY_TRUE);
+    add_permanent_define_fun("__MAX_MALLOC__", -1, get_memory_limit_buf);
     sprintf(mtext, "%"PRId32, def_eval_cost);
-    add_permanent_define("__MAX_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
+    add_permanent_define_str("__MAX_EVAL_COST__", -1, mtext);
     sprintf(mtext, "%ld", (long)CATCH_RESERVED_COST);
-    add_permanent_define("__CATCH_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
+    add_permanent_define_str("__CATCH_EVAL_COST__", -1, mtext);
     sprintf(mtext, "%ld", (long)MASTER_RESERVED_COST);
-    add_permanent_define("__MASTER_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
-    add_permanent_define("__RESET_TIME__", -1, (void *)get_reset_time_buf, MY_TRUE);
-    add_permanent_define("__CLEANUP_TIME__", -1, (void *)get_cleanup_time_buf, MY_TRUE);
+    add_permanent_define_fun("__RESET_TIME__", -1, get_reset_time_buf);
+    add_permanent_define_fun("__CLEANUP_TIME__", -1, get_cleanup_time_buf);
     sprintf(mtext, "%ld", alarm_time);
-    add_permanent_define("__ALARM_TIME__", -1, string_copy(mtext), MY_FALSE);
+    add_permanent_define_str("__ALARM_TIME__", -1, mtext);
     sprintf(mtext, "%ld", heart_beat_interval);
-    add_permanent_define("__HEART_BEAT_INTERVAL__", -1, string_copy(mtext), MY_FALSE);
+    add_permanent_define_str("__HEART_BEAT_INTERVAL__", -1, mtext);
     if (synch_heart_beats)
-        add_permanent_define("__SYNCHRONOUS_HEART_BEAT__", -1, string_copy("1"), MY_FALSE);
+        add_permanent_define_str("__SYNCHRONOUS_HEART_BEAT__", -1, "1");
     sprintf(mtext, "%zu", (size_t)MAX_COMMAND_LENGTH - 1);
-    add_permanent_define("__MAX_COMMAND_LENGTH__", -1, string_copy(mtext),
-                         MY_FALSE);
+    add_permanent_define_str("__MAX_COMMAND_LENGTH__", -1, mtext);
 #ifdef EVAL_COST_TRACE
-    add_permanent_define("__EVAL_COST_TRACE__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__EVAL_COST_TRACE__", -1, "1");
 #endif
 #ifdef HAS_IDN
-    add_permanent_define("__IDNA__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__IDNA__", -1, "1");
 #endif
 #ifdef USE_IPV6
-    add_permanent_define("__IPV6__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__IPV6__", -1, "1");
 #endif
 #ifdef USE_MCCP
-    add_permanent_define("__MCCP__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__MCCP__", -1, "1");
 #endif
 #ifdef USE_MYSQL
-    add_permanent_define("__MYSQL__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__MYSQL__", -1, "1");
 #endif
 #ifdef USE_PGSQL
-    add_permanent_define("__PGSQL__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__PGSQL__", -1, "1");
 #endif
 #ifdef USE_SQLITE
-    add_permanent_define("__SQLITE__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__SQLITE__", -1, "1");
 #endif
 #ifdef USE_XML
-    add_permanent_define("__XML_DOM__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__XML_DOM__", -1, "1");
 #endif
 #ifdef USE_JSON
-    add_permanent_define("__JSON__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__JSON__", -1, "1");
 #endif
 #ifdef HAS_PCRE
-    add_permanent_define("__PCRE__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__PCRE__", -1, "1");
 #endif
-    add_permanent_define("__LPC_NOSAVE__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__LPC_NOSAVE__", -1, "1");
 #ifdef USE_DEPRECATED
-    add_permanent_define("__DEPRECATED__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__DEPRECATED__", -1, "1");
 #endif
-    add_permanent_define("__LPC_STRUCTS__", -1, string_copy("1"), MY_FALSE);
-    add_permanent_define("__LPC_INLINE_CLOSURES__", -1, string_copy("1"), MY_FALSE);
-    add_permanent_define("__LPC_ARRAY_CALLS__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__LPC_STRUCTS__", -1, "1");
+    add_permanent_define_str("__LPC_INLINE_CLOSURES__", -1, "1");
+    add_permanent_define_str("__LPC_ARRAY_CALLS__", -1, "1");
 #ifdef USE_TLS
-    add_permanent_define("__TLS__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__TLS__", -1, "1");
 #ifdef HAS_GNUTLS
-    add_permanent_define("__GNUTLS__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__GNUTLS__", -1, "1");
 #endif
 #ifdef HAS_OPENSSL
-    add_permanent_define("__OPENSSL__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__OPENSSL__", -1, "1");
 #endif
 #endif
 #ifdef USE_GCRYPT
-    add_permanent_define("__GCRYPT__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__GCRYPT__", -1, "1");
 #endif
 #ifdef USE_PYTHON
-    add_permanent_define("__PYTHON__", -1, string_copy("1"), MY_FALSE);
+    add_permanent_define_str("__PYTHON__", -1, "1");
 #endif
     if (wizlist_name[0] != '\0')
     {
@@ -867,19 +865,19 @@ init_lexer(void)
             strcpy(mtext+2, wizlist_name);
             strcat(mtext+2, "\"");
         }
-        add_permanent_define("__WIZLIST__", -1, string_copy(mtext), MY_FALSE);
+        add_permanent_define_str("__WIZLIST__", -1, mtext);
     }
 
     sprintf(mtext, "(%"PRIdPINT")", PINT_MAX);
-    add_permanent_define("__INT_MAX__", -1, string_copy(mtext), MY_FALSE);
+    add_permanent_define_str("__INT_MAX__", -1, mtext);
     sprintf(mtext, "(%"PRIdPINT")", PINT_MIN);
-    add_permanent_define("__INT_MIN__", -1, string_copy(mtext), MY_FALSE);
+    add_permanent_define_str("__INT_MIN__", -1, mtext);
     sprintf(mtext, "(%g)", DBL_MAX);
-    add_permanent_define("__FLOAT_MAX__", -1, string_copy(mtext), MY_FALSE);
+    add_permanent_define_str("__FLOAT_MAX__", -1, mtext);
     sprintf(mtext, "(%g)", DBL_MIN);
-    add_permanent_define("__FLOAT_MIN__", -1, string_copy(mtext), MY_FALSE);
+    add_permanent_define_str("__FLOAT_MIN__", -1, mtext);
     sprintf(mtext, "%"PRIdMPINT, get_current_time());
-    add_permanent_define("__BOOT_TIME__", -1, string_copy(mtext), MY_FALSE);
+    add_permanent_define_str("__BOOT_TIME__", -1, mtext);
 
     /* Add the permanent macro definitions given on the commandline */
 
@@ -897,7 +895,7 @@ init_lexer(void)
             fatal("-D%s: macroname too long (>%d)\n", tmpf->flag, NSIZE);
         if ( strlen(mtext) >= MLEN )
             fatal("-D%s: macrotext too long (>%d)\n", tmpf->flag, MLEN);
-        add_permanent_define(namebuf, -1, string_copy(mtext), MY_FALSE);
+        add_permanent_define_str(namebuf, -1, mtext);
 
         xfree(tmpf->flag);
         xfree(tmpf);
@@ -5095,7 +5093,7 @@ yylex1 (void)
                 while (isalunum(*++yyp)) NOOP;
                 c = *yyp;
                 *yyp = 0;
-                yylval.symbol.name = new_tabled(wordstart);
+                yylval.symbol.name = new_unicode_tabled(wordstart);
                 *yyp = c;
                 yylval.symbol.quotes = quotes;
                 outp = yyp;
@@ -5978,24 +5976,17 @@ add_define (char *name, short nargs, char *exps, source_loc_t loc)
 } /* add_define() */
 
 /*-------------------------------------------------------------------------*/
-static void
-add_permanent_define (char *name, short nargs, void *exps, Bool special)
+static ident_t*
+add_permanent_define (char *name, short nargs)
 
 /* Add a new permanent macro definition for macro <name>
- * with <nargs> arguments and the replacement text <exps>.
- * The positions where the arguments are to be put into <exps> have to be
- * marked with the MARKS character as described elsewhere.
- *
- * If <special> is true, <exps> is not a text pointer, but instead
- * a pointer to a function returning a text.
+ * with <nargs> arguments and returns the identifier for that define.
+ * The replacement text have to be put into that by the caller.
  *
  * The new macro is stored in the ident_table[] and also put into
  * the list of permanent_defines.
  *
  * If the macro <name> is already defined, an error is generated.
- *
- * TODO: Instead of <exps>,<special>, it should be <exps>,<fun>
- * TODO:: with proper types.
  */
 
 {
@@ -6006,20 +5997,15 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
     if (!p)
     {
         errorf("Out of memory for permanent macro '%s'\n", name);
+        return NULL;
     }
 
-    /* If such a macro already exists with different meaning,
-     * generate an error.
+    /* If such a macro already exists, generate an error.
      */
     if (p->type != I_TYPE_UNKNOWN)
     {
-        if (nargs != p->u.define.nargs
-         || p->u.define.special
-         || strcmp(exps,p->u.define.exps.str) != 0)
-        {
-            errorf("Permanent #define %s already defined\n", name);
-        }
-        return;
+        errorf("Permanent #define %s already defined\n", name);
+        return NULL;
     }
 
     /* New macro: initialise the ident.u.define and
@@ -6029,17 +6015,64 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
     p->type = I_TYPE_DEFINE;
     p->u.define.nargs = nargs;
     p->u.define.permanent = MY_TRUE;
-    p->u.define.special = (short)special;
-    if (!special)
-        p->u.define.exps.str = (char *)exps;
-    else
-        p->u.define.exps.fun = (defn_fun)exps;
     p->u.define.loc.file = NULL;
     p->u.define.loc.line = 0;
     p->next_all = permanent_defines;
     permanent_defines = p;
+
+    return p;
 } /* add_permanent_define() */
 
+/*-------------------------------------------------------------------------*/
+static void
+add_permanent_define_str (char *name, short nargs, char *text)
+
+/* Add a new permanent macro definition for macro <name>
+ * with <nargs> arguments and the replacement text <text>.
+ * The positions where the arguments are to be put into <text> have to be
+ * marked with the MARKS character as described elsewhere.
+ *
+ * The text is assumed to be 7-bit-ASCII.
+ *
+ * The new macro is stored in the ident_table[] and also put into
+ * the list of permanent_defines.
+ *
+ * If the macro <name> is already defined, an error is generated.
+ */
+
+{
+    ident_t *p = add_permanent_define(name, nargs);
+    if (!p)
+        return;
+
+    p->u.define.special = false;
+    p->u.define.exps.str = string_copy(text);
+
+} /* add_permanent_define_str() */
+
+static void add_permanent_define_fun(char *name, short nargs, defn_fun fun)
+
+/* Add a new permanent macro definition for macro <name>
+ * with <nargs> arguments and a function <fun>.
+ * Whenever the define is referenced the function is called
+ * with the macro arguments. For plain defines (nargs == -1) the
+ * function then shall return the replacement string, for macros
+ * (nargs >= 0) the function shall add the result via add_input().
+ *
+ * The new macro is stored in the ident_table[] and also put into
+ * the list of permanent_defines.
+ *
+ * If the macro <name> is already defined, an error is generated.
+ */
+
+{
+    ident_t *p = add_permanent_define(name, nargs);
+    if (!p)
+        return;
+
+    p->u.define.special = true;
+    p->u.define.exps.fun = fun;
+} /* add_permanent_define_fun() */
 /*-------------------------------------------------------------------------*/
 void
 free_defines (void)
