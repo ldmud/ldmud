@@ -42,6 +42,7 @@
 #define DC_CLEANUP_TIME                  12
 #define DC_RESET_TIME                    13
 #define DC_DEBUG_FILE                    14
+#define DC_FILESYSTEM_ENCODING           15
 
 #define DC_SIGACTION_SIGHUP              20
 #define DC_SIGACTION_SIGINT              21

@@ -26,8 +26,16 @@ DESCRIPTION
         Whenever codes are encounted that are not valid in the given encoding
         a compile or runtime error will be raised.
 
+        -- File names --
+
+        The filesystem encoding can be set with a call to
+        configure_driver(DC_FILESYSTEM_ENCODING, <encoding>). The default
+        encoding is derived from the LC_CTYPE environment setting.
+        If there is no environment setting (or it is set to the default
+        "C" locale), then UTF-8 is used.
+
 HISTORY
         Introduced in LDMud 3.6.
 
 SEE ALSO
-        to_text(E), to_bytes(E)
+        to_text(E), to_bytes(E), configure_driver(E)

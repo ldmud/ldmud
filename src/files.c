@@ -362,12 +362,12 @@ f_copy_file (svalue_t *sp)
 {
     struct stat to_stats, from_stats;
     string_t *path;
-    char *cp, *to;
     int result;
 
     /* Check the arguments */
 
-    do {
+    do
+    {
         char fromB[MAXPATHLEN+1];
         char toB[MAXPATHLEN+1];
 
@@ -379,9 +379,11 @@ f_copy_file (svalue_t *sp)
         if (!path)
             break;
 
-        /* We need our own copy of the result */
-        extract_cstr(fromB, path, sizeof(fromB));
-
+        if (!convert_path_to_native_buf(get_txt(path), mstrsize(path), fromB, sizeof(fromB)))
+        {
+            push_string(inter_sp, path);
+            errorf("Could not encode path '%s'.\n", get_txt(path));
+        }
         free_mstring(path);
 
         if (isdir(fromB))
@@ -397,12 +399,12 @@ f_copy_file (svalue_t *sp)
         {
             strcpy(toB, "./");
         }
-        else
+        else if (!convert_path_to_native_buf(get_txt(path), mstrsize(path), toB, sizeof(toB)))
         {
-            extract_cstr(toB, path, sizeof(toB));
+            push_string(inter_sp, path);
+            errorf("Could not encode path '%s'.\n", get_txt(path));
         }
 
-        to = toB;
         free_mstring(path);
 
         strip_trailing_slashes(fromB);
@@ -411,59 +413,68 @@ f_copy_file (svalue_t *sp)
         {
             /* Target is a directory; build full target filename. */
 
-            char *newto;
-
-            cp = strrchr(fromB, '/');
+            size_t tolen = strlen(toB);
+            char *cp = strrchr(fromB, '/');
             if (cp)
                 cp++;
             else
                 cp = fromB;
 
-            newto = alloca(strlen(toB) + 1 + strlen(cp) + 1);
-            strcpy(newto, toB);
-            strcat(newto, "/");
-            strcat(newto, cp);
-            to = newto;
+            if (tolen + strlen(cp) + 2 > sizeof(toB))
+                errorf("Target file name too long.\n");
+
+            toB[tolen++] = '/';
+            strcpy(toB + tolen, cp);
         }
 
         /* Now copy the file */
 
         if (lstat(fromB, &from_stats) != 0)
         {
-            errorf("%s: lstat failed\n", fromB);
+            char *strFromB = convert_path_from_native(fromB, strlen(fromB));
+            errorf("%s: lstat failed\n", strFromB == NULL ? get_txt(sp[-1].u.str) : strFromB);
             break;
         }
 
-        if (lstat(to, &to_stats) == 0)
+        if (lstat(toB, &to_stats) == 0)
         {
             if (from_stats.st_dev == to_stats.st_dev
               && from_stats.st_ino == to_stats.st_ino)
             {
-                errorf("'%s' and '%s' are the same file\n", fromB, to);
+                char tmp[MAXPATHLEN];
+                size_t fromLen = convert_path_from_native_buf(fromB, strlen(fromB), tmp, sizeof(tmp));
+                char *strToB = convert_path_from_native(toB, strlen(toB));
+
+                errorf("'%s' and '%s' are the same file\n",
+                    fromLen ? tmp : get_txt(sp[-1].u.str),
+                    strToB == NULL ? get_txt(sp[0].u.str) : strToB);
                 break;
             }
 
             if (S_ISDIR(to_stats.st_mode))
             {
-                errorf("%s: cannot overwrite directory\n", to);
+                char *strToB = convert_path_from_native(toB, strlen(toB));
+                errorf("%s: cannot overwrite directory\n", strToB == NULL ? get_txt(sp[0].u.str) : strToB);
                 break;
             }
 
         }
         else if (errno != ENOENT)
         {
+            char *strToB = convert_path_from_native(toB, strlen(toB));
             perror("copy_file");
-            errorf("%s: unknown error\n", to);
+            errorf("%s: unknown error\n", strToB == NULL ? get_txt(sp[0].u.str) : strToB);
             break;
         }
 
         if (!S_ISREG(from_stats.st_mode))
         {
-            errorf("cannot copy '%s': Not a regular file\n", fromB);
+            char *strFromB = convert_path_from_native(fromB, strlen(fromB));
+            errorf("cannot copy '%s': Not a regular file\n", strFromB == NULL ? get_txt(sp[-1].u.str) : strFromB);
             break;
         }
 
-        result = copy_file(fromB, to, from_stats.st_mode & 0777);
+        result = copy_file(fromB, toB, from_stats.st_mode & 0777);
     }while(0);
 
     /* Clean up the stack and return the result */
@@ -496,12 +507,19 @@ f_file_size (svalue_t *sp)
 
     st.st_mode = 0; /* Silences ZeroFault/AIX under high optimizations */
     file = check_valid_path(sp->u.str, current_object, STR_FILE_SIZE, MY_FALSE);
-    if (!file || ixstat(get_txt(file), &st) == -1)
+    if (!file)
         len = FSIZE_NOFILE;
-    else if (S_IFDIR & st.st_mode)
-        len = FSIZE_DIR;
     else
-        len = (long)st.st_size;
+    {
+        char *native = convert_path_to_native(get_txt(file), mstrsize(file));
+
+        if (!native || ixstat(native, &st) == -1)
+            len = FSIZE_NOFILE;
+        else if (S_IFDIR & st.st_mode)
+            len = FSIZE_DIR;
+        else
+            len = (long)st.st_size;
+    }
 
     free_mstring(file);
     free_svalue(sp);
@@ -604,7 +622,8 @@ f_get_dir (svalue_t *sp)
         /* We need to modify the returned path, and thus to make a
          * writeable copy.
          */
-        extract_cstr(path, fpath, sizeof(path));
+        convert_path_to_native_buf(get_txt(fpath), mstrsize(fpath), path, sizeof(path));
+        free_mstring(fpath);
 
         /* Convert the empty path to '.' */
         if (strlen(path) < 2)
@@ -672,7 +691,16 @@ f_get_dir (svalue_t *sp)
             {
                 if (mask & GETDIR_PATH)
                 {
-                    put_c_string(stmp, path);
+                    char *native = convert_path_from_native(path, strlen(path));
+                    if (!native)
+                    {
+                        /* If we can't encode it, it doesn't exist... */
+                        free_array(v);
+                        v = ref_array(&null_vector);
+                        break;
+                    }
+
+                    put_c_string(stmp, native);
                     if (!compat_mode)
                     {
                         string_t *tmp = stmp->u.str;
@@ -682,7 +710,16 @@ f_get_dir (svalue_t *sp)
                 }
                 else
                 {
-                    put_c_string(stmp, p);
+                    char *native = convert_path_from_native(p, strlen(p));
+                    if (!native)
+                    {
+                        /* If we can't encode it, it doesn't exist... */
+                        free_array(v);
+                        v = ref_array(&null_vector);
+                        break;
+                    }
+
+                    put_c_string(stmp, native);
                 }
                 stmp++;
             }
@@ -798,43 +835,41 @@ f_get_dir (svalue_t *sp)
 
             if (mask & GETDIR_NAMES)
             {
-                string_t *result;
+                char result[MAXPATHLEN];
+                size_t respos = 0;
 
                 if (mask & GETDIR_PATH)
                 {
-                    char * name;
-                    
-                    if (compat_mode)
+                    size_t reslen;
+                    if (!compat_mode)
                     {
-                        memsafe(result = alloc_mstring(namelen+pathlen+1)
-                               , namelen+pathlen+2
-                               , "getdir() names");
-                        name = get_txt(result);
+                        result[0] = '/';
+                        respos++;
                     }
-                    else
-                    {
-                        memsafe(result = alloc_mstring(namelen+pathlen+2)
-                               , namelen+pathlen+3
-                               , "getdir() names");
-                        name = get_txt(result);
-                        *name++ = '/';
-                    }
+
                     if (pathlen)
                     {
-                        memcpy(name, path, pathlen);
-                        name += pathlen;
-                        *name++ = '/';
+                        reslen = convert_path_from_native_buf(path, pathlen, result + respos, sizeof(result) - respos - 1);
+                        if (!reslen)
+                            continue;
+                        respos += reslen;
+                        result[respos++] = '/';
                     }
                     if (namelen)
-                        memcpy(name, de->d_name, namelen);
-                    name[namelen] = '\0';
+                    {
+                        reslen = convert_path_from_native_buf(de->d_name, namelen, result + respos, sizeof(result) - respos);
+                        if (!reslen)
+                            continue;
+                        respos += reslen;
+                    }
                 }
                 else
                 {
-                    memsafe(result = new_n_mstring(de->d_name, namelen, STRING_BYTES), namelen
-                           , "getdir() names");
+                    respos = convert_path_from_native_buf(de->d_name, namelen, result, sizeof(result));
+                    if (!respos)
+                        continue;
                 }
-                put_string(w->item+j, result);
+                put_c_n_string(w->item+j, result, respos);
                 j++;
             }
             if (mask & GETDIR_SIZES)
@@ -860,6 +895,19 @@ f_get_dir (svalue_t *sp)
             i++;
         }
         xclosedir(dirp);
+
+        if (i < count)
+        {
+            /* Some files vanished... */
+            vector_t *tmp = allocate_array(j);
+            svalue_t *old = v->item, *new = tmp->item;
+            while (j--)
+                *new++ = *old++;
+
+            free_empty_vector(v);
+            v = tmp;
+        }
+
         inter_sp--;
 
         if ( !((mask ^ 1) & (GETDIR_NAMES|GETDIR_UNSORTED)) )
@@ -870,8 +918,6 @@ f_get_dir (svalue_t *sp)
 
     }while(0);
 
-    if (fpath)
-        free_mstring(fpath);
     sp--; /* just an int */
     free_string_svalue(sp);
 
@@ -896,12 +942,13 @@ f_mkdir (svalue_t *sp)
  */
 
 {
-    int i;
+    int i = 0;
     string_t *path;
 
     path = check_valid_path(sp->u.str, current_object, STR_MKDIR, MY_TRUE);
-    i = !(path == 0 || mkdir(get_txt(path), 0775) == -1);
-    free_mstring(path);
+    if (path != NULL)
+        i = (mkdir(convert_path_str_to_native_or_throw(path), 0775) != -1);
+
     free_svalue(sp);
     put_number(sp, i);
 
@@ -928,7 +975,6 @@ v_read_bytes (svalue_t *sp, int num_arg)
 
 {
     string_t *rc;
-    string_t *file;
     svalue_t *arg;
     int start, len;
 
@@ -951,14 +997,15 @@ v_read_bytes (svalue_t *sp, int num_arg)
     /* Read the file */
 
     rc = NULL;
-    file = NULL;
 
     do{
         struct stat st;
+        string_t *file;
 
         char *str;
         int f;
         long size; /* TODO: fpos_t? */
+        char *native;
 
         /* Perform some sanity checks */
         if (len < 0 || (max_byte_xfer && len > max_byte_xfer))
@@ -966,13 +1013,15 @@ v_read_bytes (svalue_t *sp, int num_arg)
 
         file = check_valid_path(arg[0].u.str, current_object, STR_READ_BYTES, MY_FALSE);
         if (!file)
-            break;;
+            break;
+
+        native = convert_path_str_to_native_or_throw(file);
 
         /* Open the file and determine its size */
-        f = ixopen(get_txt(file), O_RDONLY);
+        f = ixopen(native, O_RDONLY);
         if (f < 0)
             break;;
-        FCOUNT_READ(file);
+        FCOUNT_READ(native);
 
         if (fstat(f, &st) == -1)
             fatal("Could not stat an open file.\n");
@@ -986,7 +1035,7 @@ v_read_bytes (svalue_t *sp, int num_arg)
             close(f);
             break;;
         }
-        if ((start+len) > size)
+        if (num_arg < 3 || (start+len) > size)
             len = (size - start);
 
         if (len <= 0)
@@ -1024,8 +1073,6 @@ v_read_bytes (svalue_t *sp, int num_arg)
 
     }while(0);
 
-    if (file)
-       free_mstring(file);
     free_svalue(sp--);
     if (rc == NULL)
         push_number(sp, 0);
@@ -1054,7 +1101,6 @@ v_read_file (svalue_t *sp, int num_arg)
 
 {
     string_t *rc;
-    string_t *file;
     svalue_t *arg;
     int start, len;
 
@@ -1076,13 +1122,14 @@ v_read_file (svalue_t *sp, int num_arg)
 
     /* Read the file */
     rc = NULL;
-    file = NULL;
 
     do {
         struct stat st;
+        string_t *file;
         FILE *f;
         char *str, *p, *p2, *end, c;
         long size; /* TODO: fpos_t? */
+        char *native;
 
         p = NULL; /* Silence spurious warnings */
         end = NULL;
@@ -1094,13 +1141,15 @@ v_read_file (svalue_t *sp, int num_arg)
         if (!file)
             break;
 
+        native = convert_path_str_to_native_or_throw(file);
+
         /* If the file would be opened in text mode, the size from fstat would
          * not match the number of characters that we can read.
          */
-        f = fopen(get_txt(file), "rb");
+        f = fopen(native, "rb");
         if (f == NULL)
-            break;;
-        FCOUNT_READ(get_txt(file));
+            break;
+        FCOUNT_READ(native);
 
         /* Check if the file is small enough to be read. */
 
@@ -1247,8 +1296,6 @@ v_read_file (svalue_t *sp, int num_arg)
         }
     } while(0);
 
-    if (file)
-       free_mstring(file);
     free_svalue(sp--);
     if (rc == NULL)
         push_number(sp, 0);
@@ -1280,11 +1327,9 @@ f_rename (svalue_t *sp)
  */
 
 {
-    int rc;
+    int rc = 1;
     char from[MAXPATHLEN+1], to[MAXPATHLEN+1];
 
-
-    rc = 1;
     do {
         string_t *path;
 
@@ -1292,24 +1337,26 @@ f_rename (svalue_t *sp)
         if (!path)
             break;
 
-        extract_cstr(from, path, sizeof(from));
+        if (!convert_path_to_native_buf(get_txt(path), mstrsize(path), from, sizeof(from)))
+        {
+            push_string(inter_sp, path);
+            errorf("Could not encode path '%s'.\n", get_txt(path));
+        }
         free_mstring(path);
 
         path = check_valid_path(sp->u.str, current_object, STR_RENAME_TO, MY_TRUE);
         if (!path)
-        {
             break;
-        }
 
         if (!mstrsize(path) && mstreq(sp->u.str, STR_SLASH))
         {
             strcpy(to, "./");
         }
-        else
+        else if (!convert_path_to_native_buf(get_txt(path), mstrsize(path), to, sizeof(to)))
         {
-            extract_cstr(to, path, sizeof(to));
+            push_string(inter_sp, path);
+            errorf("Could not encode path '%s'.\n", get_txt(path));
         }
-
         free_mstring(path);
 
         strip_trailing_slashes(from);
@@ -1387,13 +1434,13 @@ f_rmdir (svalue_t *sp)
  */
 
 {
-    int i;
+    int i = 0;
     string_t *path;
 
     path = check_valid_path(sp->u.str, current_object, STR_RMDIR, MY_TRUE);
-    i = !(path == 0 || rmdir(get_txt(path)) == -1);
     if (path != NULL)
-        free_mstring(path);
+        i = (rmdir(convert_path_str_to_native_or_throw(path)) != -1);
+
     free_svalue(sp);
     put_number(sp, i);
 
@@ -1416,16 +1463,14 @@ f_write_bytes (svalue_t *sp)
  */
 
 {
-    int rc;
-    string_t * file;
-
-    rc = 0;
-    file = NULL;
+    int rc = 0;
 
     do {
         struct stat st;
+        string_t * file;
         mp_int size, len,  start;
         int f;
+        char *native;
 
         start = sp[-1].u.number;
 
@@ -1434,14 +1479,16 @@ f_write_bytes (svalue_t *sp)
         if (!file)
             break;
 
+        native = convert_path_str_to_native_or_throw(file);
+
         len = mstrsize(sp->u.str);
         if (max_byte_xfer && len > max_byte_xfer)
             break;
 
-        f = ixopen(get_txt(file), O_WRONLY);
+        f = ixopen(native, O_WRONLY);
         if (f < 0)
             break;
-        FCOUNT_WRITE(get_txt(file));
+        FCOUNT_WRITE(native);
 
         if (fstat(f, &st) == -1)
             fatal("Could not stat an open file.\n");
@@ -1470,9 +1517,6 @@ f_write_bytes (svalue_t *sp)
         rc = 1;
     }while(0);
 
-    if (file)
-        free_mstring(file);
-
     free_svalue(sp--);
     free_svalue(sp--);
     free_svalue(sp);
@@ -1497,46 +1541,50 @@ f_write_file (svalue_t *sp)
  */
 
 {
-    int rc;
-    string_t *file;
+    int rc = 0;
 
-    rc = 0;
-    file = NULL;
-
-    do {
+    do
+    {
         FILE *f;
+        string_t *file;
+        char *native;
 
         file = check_valid_path(sp[-2].u.str, current_object, STR_WRITE_FILE, MY_TRUE);
         if (!file)
             break;
 
+        push_ref_string(inter_sp, file); /* Save the reference for later... */
+        native = convert_path_str_to_native_or_throw(file);
+
         if (sp->u.number & 1)
-            if (remove(get_txt(file)) && errno != ENOENT)
+            if (remove(native) && errno != ENOENT)
             {
                 perror("write_file (remove)");
                 errorf("Could not remove %s: errno %d.\n", get_txt(file), errno);
             }
 
-        f = fopen(get_txt(file), "a");
-        if (f == NULL) {
+        f = fopen(native, "a");
+        if (f == NULL)
+        {
             if ((errno == EMFILE
   #ifdef ENFILE
                  || errno == ENFILE
                 ) && current_loc.file
   #endif
-              ) {
+              )
+            {
                 /* We are called from within the compiler, probably to write
                  * an error message into a log.
                  * Call lex_close() (-> lexerror() -> yyerror() ->
                  * parse_error() -> apply_master_ob() ) to try to close some
                  * files, the try again.
                  */
-                push_string(inter_sp, file);
                 lex_close(NULL);
-                inter_sp--;
-                f = fopen(get_txt(file), "a");
+                f = fopen(native, "a");
             }
-            if (f == NULL) {
+
+            if (f == NULL)
+            {
                 char * emsg, * buf, * buf2;
                 int err = errno;
 
@@ -1547,21 +1595,18 @@ f_write_file (svalue_t *sp)
                 {
                     strcpy(buf, emsg);
                     extract_cstr(buf2, file, mstrsize(file)+1);
-                    free_mstring(file);
                     errorf("Could not open %s for append: (%d) %s.\n"
                          , buf2, err, buf);
                 }
                 else if (buf2)
                 {
                     extract_cstr(buf2, file, mstrsize(file)+1);
-                    free_mstring(file);
                     perror("write_file");
                     errorf("Could not open %s for append: errno %d.\n"
                          , buf2, err);
                 }
                 else
                 {
-                    free_mstring(file);
                     perror("write_file");
                     errorf("Could not open file for append: errno %d.\n"
                          , err);
@@ -1569,14 +1614,13 @@ f_write_file (svalue_t *sp)
                 /* NOTREACHED */
             }
         }
-        FCOUNT_WRITE(get_txt(file));
+        FCOUNT_WRITE(native);
+        free_string_svalue(inter_sp--);
+
         fwrite(get_txt(sp[-1].u.str), mstrsize(sp[-1].u.str), 1, f);
         fclose(f);
         rc = 1;
     } while(0);
-
-    if (file)
-        free_mstring(file);
 
     free_svalue(sp--);
     free_svalue(sp--);

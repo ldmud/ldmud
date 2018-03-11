@@ -848,18 +848,27 @@ doread (int lin, string_t *fname)
     unsigned long  bytes;
     unsigned int   lines;
     char    str[MAXLINE];
+    char          *native;
 
     err = 0;
     P_NONASCII = P_NULLCHAR = P_TRUNCATED = 0;
 
     if (P_DIAG) add_message("\"%s\" ",get_txt(fname));
-    if ((fp = fopen(get_txt(fname), "r")) == NULL )
+
+    native = convert_path_to_native(get_txt(fname), mstrsize(fname));
+    if (!native)
+    {
+        add_message("Could not encode path '%s'.\n", get_txt(fname));
+        return ERR ;
+    }
+
+    if ((fp = fopen(native, "r")) == NULL )
     {
         if (!P_DIAG) add_message("\"%s\" ",get_txt(fname));
         add_message(" isn't readable.\n");
         return ERR ;
     }
-    FCOUNT_READ(get_txt(fname));
+    FCOUNT_READ(native);
     _setCurLn( lin );
     for(lines = 0, bytes = 0;(err = egets(str,MAXLINE,fp)) > 0;) {
         bytes += err;
@@ -906,17 +915,26 @@ dowrite (int from, int to, string_t *fname, Bool apflg)
     unsigned long  bytes;
     char          *str;
     LINE          *lptr;
+    char          *native;
 
     err = 0;
     lines = bytes = 0;
 
     add_message("\"%s\" ",get_txt(fname));
-    if ((fp = fopen(get_txt(fname),(apflg?"a":"w"))) == NULL)
+
+    native = convert_path_to_native(get_txt(fname), mstrsize(fname));
+    if (!native)
+    {
+        add_message("Could not encode path '%s'.\n", get_txt(fname));
+        return ERR ;
+    }
+
+    if ((fp = fopen(native,(apflg?"a":"w"))) == NULL)
     {
         add_message(" can't be opened for writing!\n");
         return ERR;
     }
-    FCOUNT_WRITE(get_txt(fname));
+    FCOUNT_WRITE(native);
 
     lptr = getptr(from);
     for (lin = from; lin <= to; lin++)

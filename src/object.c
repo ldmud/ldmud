@@ -6909,6 +6909,7 @@ v_save_object (svalue_t *sp, int numarg)
     if (file)
     {
         string_t *sfile;
+        char *native;
 
         /* Get a valid filename */
 
@@ -6931,13 +6932,13 @@ v_save_object (svalue_t *sp, int numarg)
 
 
         /* Create the final and the temporary filename */
-        len = (long)mstrsize(sfile);
+        native = convert_path_str_to_native_or_throw(sfile);
+        len = (long)strlen(native);
         inter_sp = sp;
         name = xalloc_with_error_handler(len + (sizeof save_file_suffix) +
                                         len + (sizeof save_file_suffix) + 4);
         if (!name)
         {
-            free_mstring(sfile);
             errorf("Out of memory (%ld bytes) in save_object('%s')\n", 
                    2*len+2*sizeof(save_file_suffix)+4, get_txt(sp->u.str));
             /* NOTREACHED */
@@ -6946,12 +6947,12 @@ v_save_object (svalue_t *sp, int numarg)
         sp = inter_sp;
 
         tmp_name = name + len + sizeof save_file_suffix;
-        strcpy(name, get_txt(sfile));
 
-        strcpy(name+len, save_file_suffix);
-        sprintf(tmp_name, "%s.tmp", name);
+        memcpy(name, native, len);
+        memcpy(name + len, save_file_suffix, sizeof save_file_suffix);
 
-        free_mstring(sfile);
+        memcpy(tmp_name, name, len + sizeof save_file_suffix);
+        memcpy(tmp_name + len + sizeof save_file_suffix - 1, ".tmp", 5);
 
         /* Open the file */
 
@@ -9120,6 +9121,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
     if (file)
     {
         string_t *sfile;
+        char *native;
 
         /* Get a valid filename */
 
@@ -9154,7 +9156,8 @@ static int nesting = 0;  /* Used to detect recursive calls */
         /* Open the file and gets its length (binary mode is ignored on all
          * POSIX conforming platforms but not on Cygwin).
          */
-        f = fopen(name, "rb");
+        native = convert_path_to_native_or_throw(name, len + sizeof save_file_suffix);
+        f = fopen(native, "rb");
         if (!f || fstat(fileno(f), &st) == -1) {
             if (f)
                 fclose(f);
@@ -9171,7 +9174,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
             put_number(sp, 0);
             return sp;
         }
-        FCOUNT_REST(name);
+        FCOUNT_REST(native);
 
         /* Allocate the linebuffer. Unfortunately, the whole file
          * can be one single line.

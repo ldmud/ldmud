@@ -508,6 +508,7 @@ dumpstat (string_t *fname)
 {
     FILE *f;
     object_t *ob;
+    char *native;
 
     static char *swapstrings[] =
         {"", "PROG SWAPPED", "VAR SWAPPED", "SWAPPED", };
@@ -515,13 +516,12 @@ dumpstat (string_t *fname)
     fname = check_valid_path(fname, current_object, STR_OBJDUMP, MY_TRUE);
     if (!fname)
         return MY_FALSE;
-    f = fopen(get_txt(fname), "w");
+
+    native = convert_path_str_to_native_or_throw(fname);
+    f = fopen(native, "w");
     if (!f)
-    {
-        free_mstring(fname);
         return MY_FALSE;
-    }
-    FCOUNT_WRITE(get_txt(fname));
+    FCOUNT_WRITE(native);
 
     for (ob = obj_list; ob; ob = ob->next_all)
     {
@@ -571,7 +571,6 @@ dumpstat (string_t *fname)
         fprintf(f, " %s\n", timest);
     }
     fclose(f);
-    free_mstring(fname);
 
     return MY_TRUE;
 } /* dumpstat() */
@@ -588,17 +587,17 @@ dumpstat_dest(string_t *fname)
 {
     FILE *f;
     object_t *ob;
+    char *native;
 
     fname = check_valid_path(fname, current_object, STR_OBJDUMP, MY_TRUE);
     if (!fname)
         return MY_FALSE;
-    f = fopen(get_txt(fname), "w");
+
+    native = convert_path_str_to_native_or_throw(fname);
+    f = fopen(native, "w");
     if (!f)
-    {
-        free_mstring(fname);
         return MY_FALSE;
-    }
-    FCOUNT_WRITE(get_txt(fname));
+    FCOUNT_WRITE(native);
 
     for (ob = newly_destructed_objs; ob; ob = ob->next_all)
     {
@@ -624,7 +623,6 @@ dumpstat_dest(string_t *fname)
         );
     }
     fclose(f);
-    free_mstring(fname);
     return MY_TRUE;
 } /* dumpstat_dest() */
 

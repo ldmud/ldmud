@@ -5762,6 +5762,7 @@ f_attach_erq_demon (svalue_t *sp)
         if (privilege_violation4(STR_ATTACH_ERQ_DEMON,
             0, suffix, sp[1].u.number, sp+1))
         {
+            char *native = convert_path_str_to_native_or_throw(suffix);
             if (erq_demon != FLAG_NO_ERQ)
             {
                 if (sp[1].u.number & 1) {
@@ -5771,7 +5772,7 @@ f_attach_erq_demon (svalue_t *sp)
                 }
                 erq_proto_demon = -1;
             }
-            start_erq_demon(get_txt(suffix), mstrsize(suffix));
+            start_erq_demon(native, strlen(native));
             n = 1;
         }
 return_result:

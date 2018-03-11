@@ -18373,15 +18373,17 @@ opcdump (string_t * fname)
 {
     int i;
     FILE *f;
+    char *native;
 
     fname = check_valid_path(fname, current_object, STR_OPCDUMP, MY_TRUE);
     if (!fname)
         return MY_FALSE;
-    f = fopen(get_txt(fname), "w");
-    free_mstring(fname);
+
+    native = convert_path_str_to_native_or_throw(fname);
+    f = fopen(native, "w");
     if (!f)
         return MY_FALSE;
-    FCOUNT_WRITE(fname);
+    FCOUNT_WRITE(native);
 
 
     for(i = 0; i < MAXOPC; i++)

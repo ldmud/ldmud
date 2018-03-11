@@ -3089,9 +3089,9 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
 /* Open the include file <name> (length <namelen>) and return the file
  * descriptor. On failure, generate an error message and return -1.
  *
- * <buf> is a buffer of size INC_OPEN_BUFSIZE and may be used to
- * generate the real filename - <name> is just the name given in the
- * #include statement.
+ * <buf> is a buffer of size INC_OPEN_BUFSIZE, where the real
+ * filename will be written to - <name> is just the name given
+ * in the #include statement.
  *
  * <delim> is '"' for #include ""-type includes, and '>' else.
  * Relative "-includes are searched relative to the current file.
@@ -3114,7 +3114,7 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
     {
         svalue_t *res;
 
-        push_c_string(inter_sp, name);
+        push_c_n_string(inter_sp, name, namelen);
 
         if (!compat_mode)
         {
@@ -3144,6 +3144,12 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
                 return -1;
             }
 
+            if (res->u.str->info.unicode == STRING_BYTES)
+            {
+                yyerrorf("master::%s returned a byte string, unicode string needed.", get_txt(STR_INCLUDE_FILE));
+                return -1;
+            }
+
             if (mstrsize(res->u.str) >= INC_OPEN_BUFSIZE)
             {
                 yyerrorf("Include name '%s' too long.", get_txt(res->u.str));
@@ -3158,11 +3164,17 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
                 return -1;
             }
 
-            strcpy(buf, cp);
+            if (!convert_path_to_native_buf(cp, mstrsize(res->u.str) + get_txt(res->u.str) - cp, buf, INC_OPEN_BUFSIZE))
+            {
+                yyerrorf("Could not encode path '%s'.", get_txt(res->u.str));
+                return -1;
+            }
+
             if (!stat(buf, &aStat)
              && S_ISREG(aStat.st_mode)
              && (fd = ixopen(buf, O_RDONLY|O_BINARY)) >= 0 )
             {
+                strcpy(buf, cp); /* Put the UTF-8 encoded name into <buf>. */
                 FCOUNT_INCL(buf);
                 return fd;
             }
@@ -3185,13 +3197,22 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
 
     if (delim == '"') /* It's a "-include */
     {
+        char *native;
+
         /* Merge the <name> with the current filename. */
         merge(name, namelen, buf);
 
+        native = convert_path_to_native(buf, strlen(buf));
+        if (native == NULL)
+        {
+            yyerrorf("Could not encode path '%s'.", buf);
+            return -1;
+        }
+
         /* Test the file and open it */
-        if (!stat(buf, &aStat)
+        if (!stat(native, &aStat)
          && S_ISREG(aStat.st_mode)
-         && (fd = ixopen(buf, O_RDONLY|O_BINARY)) >= 0)
+         && (fd = ixopen(native, O_RDONLY|O_BINARY)) >= 0)
         {
             FCOUNT_INCL(buf);
             return fd;
@@ -3231,12 +3252,21 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
          */
         for (i = 0; (size_t)i < inc_list_size; i++)
         {
-            char * iname;
+            char * iname, * native;
+
             sprintf(buf, "%s%s", get_txt(inc_list[i].u.str), name);
             for (iname = buf; *iname == '/'; iname++) NOOP;
-            if (!stat(iname, &aStat)
+
+            native = convert_path_to_native(iname, strlen(iname));
+            if (native == NULL)
+            {
+                yyerrorf("Could not encode path '%s'.", buf);
+                return -1;
+            }
+
+            if (!stat(native, &aStat)
              && S_ISREG(aStat.st_mode)
-             && (fd = ixopen(iname, O_RDONLY|O_BINARY)) >= 0 )
+             && (fd = ixopen(native, O_RDONLY|O_BINARY)) >= 0 )
             {
                 FCOUNT_INCL(iname);
                 return fd;
@@ -3268,28 +3298,42 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
         svp = secure_apply_lambda(&driver_hook[H_INCLUDE_DIRS], 2);
 
         /* The result must be legal relative pathname */
+        if (!svp || svp->type != T_STRING)
+            return -1;
 
-        if (svp && svp->type == T_STRING
-         && mstrsize(svp->u.str) < INC_OPEN_BUFSIZE)
+        if (svp->u.str->info.unicode == STRING_BYTES)
+        {
+            yyerror("H_INCLUDE_DIRS returned a byte string, unicode string needed.");
+            return -1;
+        }
+
+        if (mstrsize(svp->u.str) < INC_OPEN_BUFSIZE)
         {
             char * cp;
 
             for (cp = get_txt(svp->u.str); *cp == '/'; cp++) NOOP;
-            strcpy(buf, cp);
-            if (legal_path(buf))
+
+            if (!legal_path(cp))
+                return -1;
+
+            if (!convert_path_to_native_buf(cp, mstrsize(svp->u.str) + get_txt(svp->u.str) - cp, buf, INC_OPEN_BUFSIZE))
             {
-                if (!stat(buf, &aStat)
-                 && S_ISREG(aStat.st_mode)
-                 && (fd = ixopen(buf, O_RDONLY|O_BINARY)) >= 0 )
-                {
-                    FCOUNT_INCL(buf);
-                    return fd;
-                }
-                if (errno == EMFILE) lexerror("File descriptors exhausted");
-#if ENFILE
-                if (errno == ENFILE) lexerror("File table overflow");
-#endif
+                yyerrorf("Could not encode path '%s'.", get_txt(svp->u.str));
+                return -1;
             }
+
+            if (!stat(buf, &aStat)
+             && S_ISREG(aStat.st_mode)
+             && (fd = ixopen(buf, O_RDONLY|O_BINARY)) >= 0 )
+            {
+                strcpy(buf, cp);
+                FCOUNT_INCL(buf);
+                return fd;
+            }
+            if (errno == EMFILE) lexerror("File descriptors exhausted");
+#if ENFILE
+            if (errno == ENFILE) lexerror("File table overflow");
+#endif
         }
 
         /* If we come here, the include file was not found */

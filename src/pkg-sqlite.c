@@ -745,6 +745,7 @@ sl_vfs_full_pathname (sqlite3_vfs* vfs, const char* name, int len, char* buf)
 {
     string_t *orig_file = new_unicode_mstring(name);
     string_t *new_file = check_valid_path(orig_file, current_object, STR_SQLITE_OPEN , MY_TRUE);
+    char *native;
     int rc;
 
     free_mstring(orig_file);
@@ -752,13 +753,14 @@ sl_vfs_full_pathname (sqlite3_vfs* vfs, const char* name, int len, char* buf)
     if (!new_file)
         return SQLITE_AUTH;
 
-    if (mstrsize(new_file) >= len)
+    native = convert_path_to_native(get_txt(new_file), mstrsize(new_file));
+    if (!native || strlen(native) >= len)
     {
         free_mstring(new_file);
         return SQLITE_CANTOPEN;
     }
 
-    rc = ((sqlite3_vfs*)vfs->pAppData)->xFullPathname((sqlite3_vfs*)vfs->pAppData, get_txt(new_file), len, buf);
+    rc = ((sqlite3_vfs*)vfs->pAppData)->xFullPathname((sqlite3_vfs*)vfs->pAppData, native, len, buf);
     free_mstring(new_file);
 
     return rc;

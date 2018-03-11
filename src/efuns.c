@@ -88,6 +88,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <iconv.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -8567,10 +8568,27 @@ f_configure_driver (svalue_t *sp)
                 efun_arg_error(2, T_STRING, sp->type, sp);
             else
             {
+                char *native = convert_path_to_native_or_throw(get_txt(sp->u.str), mstrsize(sp->u.str));
                 free(debug_file);
-                debug_file = strdup(get_txt(sp->u.str));
+                debug_file = strdup(native);
 
                 reopen_debug_log = true;
+            }
+            break;
+
+        case DC_FILESYSTEM_ENCODING:
+            if (sp->type != T_STRING)
+                efun_arg_error(2, T_STRING, sp->type, sp);
+            else
+            {
+                /* We do a quick check. */
+                iconv_t cd = iconv_open(get_txt(sp->u.str), "UTF-8");
+                if (cd == (iconv_t)-1)
+                    errorf("Unknown encoding '%s'.\n", get_txt(sp->u.str));
+
+                iconv_close(cd);
+                xfree(filesystem_encoding);
+                filesystem_encoding = string_copy(get_txt(sp->u.str));
             }
             break;
 
@@ -8710,7 +8728,14 @@ f_driver_info (svalue_t *sp)
             break;
 
         case DC_DEBUG_FILE:
-            put_string(&result, new_mstring(debug_file));
+        {
+            char *encoded = convert_path_from_native_or_throw(debug_file, strlen(debug_file));
+            put_c_string(&result, encoded);
+            break;
+        }
+
+        case DC_FILESYSTEM_ENCODING:
+            put_c_string(&result, filesystem_encoding);
             break;
 
         case DC_SIGACTION_SIGHUP:
@@ -9329,7 +9354,8 @@ f_dump_driver_info (svalue_t *sp)
                 fname = check_valid_path(fname, current_object, STR_MEMDUMP, MY_TRUE);
                 if (fname)
                 {
-                    fd = open(get_txt(fname), O_CREAT|O_APPEND|O_WRONLY, 0664);
+                    char *native = convert_path_str_to_native_or_throw(fname);
+                    fd = open(native, O_CREAT|O_APPEND|O_WRONLY, 0664);
                     if (fd < 0)
                     {
                         perror("open memdump file");
@@ -9343,8 +9369,6 @@ f_dump_driver_info (svalue_t *sp)
                         writes(fd, "\n");
                         close(fd);
                     }
-
-                    free_mstring(fname);
                 }
             }
             break;

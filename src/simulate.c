@@ -25,6 +25,9 @@
 #include "my-alloca.h"
 #include <assert.h>
 #include <fcntl.h>
+#include <iconv.h>
+#include <langinfo.h>
+#include <locale.h>
 #include <setjmp.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -274,6 +277,10 @@ string_t *current_error_trace_string = NULL;
    * The variables are kept until the next error, or until a GC.
    * 'uncaught_error_trace': the most recent uncaught error
    * 'current_error_trace': the most recent error, caught or uncaught.
+   */
+
+const char *filesystem_encoding = NULL;
+  /* The encoding for file names.
    */
 
 /* --- Runtime limits --- */
@@ -1986,6 +1993,7 @@ load_object (const char *lname, Bool create_super, int depth
     while (MY_TRUE)
     {
         /* This can happen after loading an inherited object: */
+        char *native;
         ob = lookup_object_hash_str((char *)name);
         if (ob)
         {
@@ -2002,13 +2010,14 @@ load_object (const char *lname, Bool create_super, int depth
                  , name, current_loc.file->name);
         }
 
-        fd = ixopen(fname, O_RDONLY | O_BINARY);
+        native = convert_path_to_native_or_throw(fname, strlen(fname));
+        fd = ixopen(native, O_RDONLY | O_BINARY);
         if (fd <= 0)
         {
             perror(fname);
             errorf("Could not read the file.\n");
         }
-        FCOUNT_COMP(fname);
+        FCOUNT_COMP(native);
 
         /* The file name is needed before compile_file(), in case there is
          * an initial 'line too long' error.
@@ -3476,6 +3485,201 @@ simulate_driver_info (svalue_t *svp, int value)
     }
 
 } /* simulate_driver_info() */
+
+/*-------------------------------------------------------------------------*/
+void init_filesystem_encoding ()
+
+/* Determines the encoding of the filesystem.
+ */
+
+{
+    /* If the locale is C, then we set the encoding at "UTF-8". */
+    if (strncmp(setlocale(LC_CTYPE, NULL), "C", 2) == 0)
+        filesystem_encoding = string_copy("UTF-8");
+    else
+    {
+        const char* codeset = nl_langinfo(CODESET);
+        filesystem_encoding = string_copy(codeset ? codeset : "UTF-8");
+    }
+} /* init_filesystem_encoding() */
+
+/*-------------------------------------------------------------------------*/
+static size_t
+convert_path_encoding (const char* pathenc, const char* path, size_t len, const char* bufenc, char* buf, size_t buflen)
+
+/* Convert the string <path> of length <len> with encoding <pathenc>
+ * into encoding <bufenc> into the buffer <buf> with size <buflen>.
+ * Returns the length of the result string, or 0 on an illegal string.
+ */
+
+{
+    iconv_t cd;
+
+    char*  in_buf_ptr = (char*)path;
+    size_t in_buf_left = len;
+
+    char*  out_buf_ptr = buf;
+    size_t out_buf_left = buflen;
+
+    cd = iconv_open(bufenc, pathenc);
+    if (cd == (iconv_t)-1)
+        return 0;
+
+    while (true)
+    {
+        size_t rc;
+        bool at_end = (in_buf_left == 0);
+
+        if (at_end)
+            rc = iconv(cd, NULL, NULL, &out_buf_ptr, &out_buf_left);
+        else
+            rc = iconv(cd, &in_buf_ptr, &in_buf_left, &out_buf_ptr, &out_buf_left);
+
+        if (rc == (size_t)-1)
+            return 0;
+
+        if (at_end)
+            break;
+    }
+
+    iconv_close(cd);
+
+    /* We need a byte for the null byte. */
+    if (out_buf_left == 0)
+        return 0;
+
+    *out_buf_ptr = 0;
+    return out_buf_ptr - buf;
+
+} /* convert_path_encoding() */
+
+/*-------------------------------------------------------------------------*/
+size_t
+convert_path_to_native_buf (const char* path, size_t len, char* buf, size_t buflen)
+
+/* Convert the string <path> of length <len> to the filesystem encoding.
+ * The result will be put into the buffer <buf> with size <buflen>.
+ * Returns the length of the result string, or 0 on an illegal string.
+ */
+
+{
+    return convert_path_encoding("UTF-8", path, len, filesystem_encoding, buf, buflen);
+} /* convert_path_to_native_buf() */
+
+/*-------------------------------------------------------------------------*/
+char *
+convert_path_to_native (const char* path, size_t len)
+
+/* Convert the string <path> of length <len> to the filesystem encoding.
+ * The result will be put into a static buffer that will be overwritten
+ * on the next call to this function. A pointer to this buffer will
+ * be returned or NULL on an illegal string.
+ */
+
+{
+    static char buf[MAXPATHLEN];
+
+    size_t result = convert_path_to_native_buf(path, len, buf, sizeof(buf));
+    if (result)
+        return buf;
+
+    return NULL;
+} /* convert_path_to_native() */
+
+/*-------------------------------------------------------------------------*/
+char *
+convert_path_to_native_or_throw (const char* path, size_t len)
+
+/* Convert the string <path> of length <len> to the filesystem encoding.
+ * The result will be put into a static buffer that will be overwritten
+ * on the next call to this function. A pointer to this buffer will
+ * be returned. In case of an illegal string an error will be raised.
+ */
+
+{
+    char* result = convert_path_to_native(path, len);
+    if (result)
+        return result;
+
+    errorf("Could not encode path '%s'.\n", path);
+    return NULL; /* NOTREACHED */
+} /* convert_path_to_native_or_throw() */
+
+/*-------------------------------------------------------------------------*/
+char *
+convert_path_str_to_native_or_throw (string_t *path)
+
+/* Convert the string <path> to the filesystem encoding.
+ * The result will be put into a static buffer that will be overwritten
+ * on the next call to this function. A pointer to this buffer will
+ * be returned. In case of an illegal string an error will be raised.
+ * In either case the reference of path will be adopted.
+ */
+
+{
+    char* result = convert_path_to_native(get_txt(path), mstrsize(path));
+    if (result)
+    {
+        free_mstring(path);
+        return result;
+    }
+
+    push_string(inter_sp, path);
+    errorf("Could not encode path '%s'.\n", get_txt(path));
+    return NULL; /* NOTREACHED */
+} /* convert_path_str_to_native_or_throw() */
+
+/*-------------------------------------------------------------------------*/
+size_t
+convert_path_from_native_buf (const char* path, size_t len, char* buf, size_t buflen)
+
+/* Convert the string <path> of length <len> from the filesystem encoding.
+ * The result will be put into the buffer <buf> with size <buflen>.
+ * Returns the length of the result string, or 0 on an illegal string.
+ */
+
+{
+    return convert_path_encoding(filesystem_encoding, path, len, "UTF-8", buf, buflen);
+} /* convert_path_from_native_buf() */
+
+/*-------------------------------------------------------------------------*/
+char *
+convert_path_from_native (const char* path, size_t len)
+
+/* Convert the string <path> of length <len> from the filesystem encoding.
+ * The result will be put into a static buffer that will be overwritten
+ * on the next call to this function. A pointer to this buffer will
+ * be returned or NULL on an illegal string.
+ */
+
+{
+    static char buf[MAXPATHLEN];
+
+    size_t result = convert_path_from_native_buf(path, len, buf, sizeof(buf));
+    if (result)
+        return buf;
+
+    return NULL;
+} /* convert_path_from_native() */
+
+/*-------------------------------------------------------------------------*/
+char *
+convert_path_from_native_or_throw (const char* path, size_t len)
+
+/* Convert the string <path> of length <len> from the filesystem encoding.
+ * The result will be put into a static buffer that will be overwritten
+ * on the next call to this function. A pointer to this buffer will
+ * be returned. In case of an illegal string an error will be raised.
+ */
+
+{
+    char* result = convert_path_from_native(path, len);
+    if (result)
+        return result;
+
+    errorf("Could not encode path '%s'.\n", path);
+    return NULL; /* NOTREACHED */
+} /* convert_path_from_native_or_throw() */
 
 /*-------------------------------------------------------------------------*/
 string_t *

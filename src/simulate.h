@@ -238,6 +238,8 @@ extern string_t *current_error_trace_string;
 extern Bool game_is_being_shut_down;
 extern Bool master_will_be_updated;
 
+extern const char *filesystem_encoding;
+
 /* --- Prototypes --- */
 
 extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp, int32 reserve_cost, svalue_t *i_context);
@@ -286,6 +288,14 @@ extern char *limit_error_format(char *fixed_fmt, size_t fixed_fmt_len, const cha
 extern Bool legal_path(const char *path);
 extern Bool check_no_parentdirs(const char *path);
 extern void parse_error(Bool warning, const char *error_file, int line, const char *what, const char *context);
+extern void init_filesystem_encoding();
+extern size_t convert_path_to_native_buf(const char* path, size_t len, char* buf, size_t buflen);
+extern char *convert_path_to_native(const char* path, size_t len);
+extern char *convert_path_to_native_or_throw(const char* path, size_t len);
+extern char *convert_path_str_to_native_or_throw(string_t *path);
+extern size_t convert_path_from_native_buf(const char* path, size_t len, char* buf, size_t buflen);
+extern char * convert_path_from_native(const char* path, size_t len);
+extern char * convert_path_from_native_or_throw(const char* path, size_t len);
 extern string_t *check_valid_path(string_t *path, object_t *caller, string_t *call_fun, Bool writeflg);
 extern Bool match_string(const char *match, const char *str, mp_int len);
 

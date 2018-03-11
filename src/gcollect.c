@@ -2431,6 +2431,7 @@ garbage_collection(void)
         note_ref(reserved_system_area);
 
     note_ref(mud_lib);
+    note_ref(filesystem_encoding);
     null_vector.ref++;
 
     /* Process the driver hooks */

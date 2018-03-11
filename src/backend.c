@@ -1658,6 +1658,7 @@ v_garbage_collection (svalue_t *sp, int num_arg)
         svalue_t * argp = sp - num_arg + 1;
         int fd;
         string_t * path;
+        char * native;
 
         if (num_arg > 1)
         {
@@ -1686,10 +1687,17 @@ v_garbage_collection (svalue_t *sp, int num_arg)
             return NULL;
         }
 
+        native = convert_path_to_native_or_throw(get_txt(path), mstrsize(path));
+        if (native == NULL)
+        {
+            inter_sp = ++sp; put_string(sp, path);
+            errorf("Could not encode path '%s'.\n", path);
+        }
+
         if (change_default)
-            fd = ixopen3(get_txt(path), O_CREAT|O_TRUNC|O_WRONLY, 0640);
+            fd = ixopen3(native, O_CREAT|O_TRUNC|O_WRONLY, 0640);
         else
-            fd = ixopen3(get_txt(path), O_CREAT|O_APPEND|O_WRONLY, 0640);
+            fd = ixopen3(native, O_CREAT|O_APPEND|O_WRONLY, 0640);
 
         if (fd < 0)
         {
