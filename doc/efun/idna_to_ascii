@@ -16,4 +16,4 @@ HISTORY
         Introduced in LDMud 3.3.713.
 
 SEE ALSO
-        convert_charset(E), idna_to_ascii(E), idna_stringprep(E)
+        idna_to_ascii(E), idna_stringprep(E)

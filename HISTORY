@@ -5,6 +5,10 @@ the host system.
 For a detailed list of all changes see the file CHANGELOG.
 
 xx-xxx-2019 (LDMud Team) -- 3.6.0
+    - Removed Efuns:
+       + The efun convert_charset() was removed, to new efuns
+         to_text() and to_bytes() can be used instead.
+
     - Runtime:
        + The string type and all its operation support the full
          Unicode character set (#432).
