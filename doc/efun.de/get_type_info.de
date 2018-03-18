@@ -13,6 +13,9 @@ BESCHREIBUNG
         Ist <flag> 0, wird nur das erste Element (d.h. der Datentyp) geliefert.
         Ist <flag> 1, wird nur das zweite Element geliefert.
 
+        When <arg> ein String ist, so liefert get_type_info() 1 zurueck,
+        wenn der String eine Byte-Sequenz darstellt, ansonsten 0.
+
         Wenn <arg> eine Closure enthaelt, so kann get_type_info() das Objekt
         der Closure liefern, wenn fuer <flag> 2 gesetzt ist. (Fuer 'alien
         lfun closures' ist das das Objekt, in dem die Closure definiert ist,

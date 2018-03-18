@@ -7139,6 +7139,17 @@ v_get_type_info (svalue_t *sp, int num_arg)
     switch(i)
     {
     case T_STRING:
+        if (flag == 2)
+        {
+            /* Return whether this is a byte sequence. */
+            bool isbyte = (sp[-1].u.str->info.unicode == STRING_BYTES);
+
+            sp--;
+            free_svalue(sp);
+            put_number(sp, isbyte ? 1 : 0);
+            return sp;
+        }
+
         j = (mstr_tabled(sp[-1].u.str)) ? 0 : 1;
         break;
     case T_MAPPING:
