@@ -241,8 +241,14 @@ void rx_init(void)
     memset(xtable, 0, sizeof(xtable));
 #endif
 #ifdef HAS_PCRE
+    int opt = 0;
+
     pcre_malloc = pcre_xalloc;
     pcre_free = xfree;
+    if (pcre_config(PCRE_CONFIG_UTF8, &opt) || !opt)
+        fprintf(stderr, "%s PCRE package does not support UTF-8 codes.\n", time_stamp());
+    if (pcre_config(PCRE_CONFIG_UNICODE_PROPERTIES, &opt) || !opt)
+        fprintf(stderr, "%s PCRE package does not support Unicode properties.\n", time_stamp());
 #endif
 } /* rx_init() */
 
@@ -393,7 +399,7 @@ rx_compile_pcre (string_t * expr, int opt, Bool from_ed, regdata_t * rdata)
 
     /* Determine the RE compilation options */
 
-    pcre_opt = 0;
+    pcre_opt = PCRE_UTF8 | PCRE_UCP;
     if (opt & RE_CASELESS)       pcre_opt |= PCRE_CASELESS;
     if (opt & RE_MULTILINE)      pcre_opt |= PCRE_MULTILINE;
     if (opt & RE_DOTALL)         pcre_opt |= PCRE_DOTALL;

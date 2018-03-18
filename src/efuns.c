@@ -96,6 +96,7 @@
 #include <sys/time.h>
 #endif
 #include <time.h>
+#include <wctype.h>
 
 #include "efuns.h"
 
@@ -173,12 +174,35 @@ f_capitalize(svalue_t *sp)
  */
 
 {
-    if (islower((unsigned char)(get_txt(sp->u.str)[0])))
+    string_t *str = sp->u.str;
+    p_int ch;
+    size_t chlen = utf8_to_unicode(get_txt(str), mstrsize(str), &ch);
+
+    if (chlen && iswlower(ch))
     {
         string_t *new;
-        memsafe(new = unshare_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
+        size_t newchlen;
+
+        ch = towupper(ch);
+        newchlen = utf8_size(ch);
+
+        if (newchlen == chlen)
+        {
+            memsafe(new = unshare_mstring(str), mstrsize(str), "result string");
+        }
+        else
+        {
+            size_t remaining = mstrsize(str) - chlen;
+            memsafe(new = alloc_mstring(newchlen + remaining), newchlen + remaining, "result string");
+            memcpy(get_txt(new) + newchlen, get_txt(str) + chlen, remaining);
+            if (newchlen > 1 || !is_ascii(get_txt(str) + chlen, remaining))
+                new->info.unicode = STRING_UTF8;
+            else
+                new->info.unicode = STRING_ASCII;
+        }
+
         sp->u.str = new;
-        get_txt(sp->u.str)[0] = toupper((unsigned char)get_txt(sp->u.str)[0]);
+        unicode_to_utf8(ch, get_txt(new));
     }
     return sp;
 } /* f_capitalize() */
@@ -250,6 +274,17 @@ f_explode (svalue_t * sp)
 {
     vector_t *v;
 
+    if (sp[-1].u.str->info.unicode == STRING_BYTES)
+    {
+        if (sp[0].u.str->info.unicode != STRING_BYTES)
+            efun_exp_arg_error(2, TF_BYTES, T_STRING, sp);
+    }
+    else
+    {
+        if (sp[0].u.str->info.unicode == STRING_BYTES)
+            efun_exp_arg_error(2, TF_STRING, T_BYTES, sp);
+    }
+
     v = explode_string((sp-1)->u.str, sp->u.str);
     free_string_svalue(sp);
     sp--;
@@ -288,6 +323,94 @@ f_implode (svalue_t * sp)
 } /* f_implode() */
 
 /*-------------------------------------------------------------------------*/
+static svalue_t *
+change_case (svalue_t *sp, bool upper)
+
+/* Implements the efuns upper_case() and lower_case().
+ * Replaces the string <sp> with a string where all characters
+ * are converted to upper case (<upper> == true)
+ * resp. lower case (<upper> == false)
+ */
+
+{
+    string_t* str = sp->u.str;
+    char *s;
+    size_t count, len;
+
+    /* Find the first non-uppercase resp. non-lowercase character in the string */
+    len = mstrsize(str);
+    for (s = get_txt(str), count = 0; count < len;)
+    {
+        p_int ch;
+        size_t chlen = utf8_to_unicode(s, len - count, &ch);
+
+        if (chlen && (upper ? iswlower(ch) : iswupper(ch)))
+            break;
+        if (!chlen)
+            chlen++;
+
+        s += chlen;
+        count += chlen;
+    }
+
+    if (count < len)  /* there are characters with the wrong case */
+    {
+        string_t *new;
+        memsafe(new = unshare_mstring(str), len, "result string");
+        sp->u.str = new;
+
+        for (s = get_txt(new) + count; count < len;)
+        {
+            p_int ch;
+            size_t oldchlen = utf8_to_unicode(s, len - count, &ch);
+
+            if (oldchlen && (upper ? iswlower(ch) : iswupper(ch)))
+            {
+                size_t newchlen;
+
+                ch = upper ? towupper(ch) : towlower(ch);
+                newchlen = utf8_size(ch);
+
+                if (newchlen != oldchlen)
+                {
+                    /* We need to resize the string. */
+                    size_t remaining = len - count - oldchlen;
+                    string_t *rep;
+
+                    memsafe(rep = alloc_mstring(count + newchlen + remaining), count + newchlen + remaining, "result string");
+                    memcpy(get_txt(rep), get_txt(new), count);
+                    memcpy(get_txt(rep) + count + newchlen, get_txt(new) + count + oldchlen, remaining);
+
+                    if (newchlen > 1 || !is_ascii(get_txt(new), count) || !is_ascii(get_txt(new) + count + oldchlen, remaining))
+                        rep->info.unicode = STRING_UTF8;
+                    else
+                        rep->info.unicode = STRING_ASCII;
+
+                    free_mstring(new);
+
+                    new = rep;
+                    sp->u.str = new;
+
+                    s = get_txt(new) + count;
+                    len += newchlen - oldchlen;
+                    oldchlen = newchlen;
+                }
+
+                unicode_to_utf8(ch, s);
+            }
+            else if (!oldchlen)
+                oldchlen++;
+
+            count += oldchlen;
+            s += oldchlen;
+        }
+    }
+
+    /* That's it */
+    return sp;
+} /* change_case() */
+
+/*-------------------------------------------------------------------------*/
 svalue_t *
 f_lower_case (svalue_t *sp)
 
@@ -300,32 +423,7 @@ f_lower_case (svalue_t *sp)
  */
 
 {
-    char *s, c;
-    size_t count, len;
-
-    /* Find the first uppercase character */
-    len = mstrsize(sp->u.str);
-    for ( s = get_txt(sp->u.str), count = 0
-        ; count < len && ('\0' == (c = *s) || !isupper((unsigned char)c))
-        ; s++, count++) NOOP;
-
-    if (count < len)
-    {
-        /* Yes, there is something to change... */
-
-        string_t *new;
-        memsafe(new = unshare_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
-        sp->u.str = new;
-
-        for ( s = get_txt(sp->u.str)+count; count < len; s++, count++)
-        {
-            c = *s;
-            if (c != '\0' && isupper((unsigned char)c))
-                *s = (char)tolower((unsigned char)c);
-        }
-    }
-
-    return sp;
+    return change_case(sp, false);
 } /* f_lower_case() */
 
 /*-------------------------------------------------------------------------*/
@@ -1755,6 +1853,94 @@ v_regmatch (svalue_t *sp, int num_arg)
 } /* v_regmatch() */
 
 /*-------------------------------------------------------------------------*/
+static svalue_t *
+find_string (svalue_t *sp, bool forward)
+
+/* Implements the efuns strstr (forward = true) and strrstr (forward = false).
+ *
+ * Returns the index of <sp-1> in <sp-2> searching from position <sp>
+ * forward (forward = true) or backward (forward = false).
+ * If the string is not found, -1 is returned. The returned
+ * index is relativ to the beginning of the string.
+ *
+ * If pos is negativ, it counts from the end of the string.
+ */
+
+{
+    const char *found;
+    string_t *base, *pattern;
+    p_int start, rc;
+
+    base = sp[-2].u.str;
+    pattern = sp[-1].u.str;
+
+    if (base->info.unicode == STRING_BYTES)
+    {
+        if (pattern->info.unicode != STRING_BYTES)
+            efun_exp_arg_error(2, TF_BYTES, T_STRING, sp);
+    }
+    else
+    {
+        if (pattern->info.unicode == STRING_BYTES)
+            efun_exp_arg_error(2, TF_STRING, T_BYTES, sp);
+    }
+
+    if ( 0 != (start = sp->u.number) )
+    {
+        if (base->info.unicode == STRING_UTF8)
+        {
+            /* Need to translate char index into bytes. */
+            bool error = false;
+
+            if (start < 0)
+            {
+                size_t len = byte_to_char_index(get_txt(base), mstrsize(base), &error);
+                if (error)
+                    errorf("Invalid character in string at index %zd.\n", len);
+                start += len;
+                if (start < 0)
+                    start = 0;
+            }
+
+            if (start > 0)
+            {
+                size_t pos = char_to_byte_index(get_txt(base), mstrsize(base), start, &error);
+                if (error)
+                    errorf("Invalid character in string at byte %zd.\n", pos);
+
+                start = pos;
+            }
+        }
+        else if (start < 0)
+        {
+            start += mstrsize(base);
+            if (start < 0)
+                start = 0;
+        }
+    }
+
+    if (forward)
+        found = mstring_mstr_n_str(base, start, get_txt(pattern), mstrsize(pattern));
+    else
+        found = mstring_mstr_rn_str(base, start, get_txt(pattern), mstrsize(pattern));
+
+    rc = found ? (found - get_txt(base)) : -1;
+
+    if (rc > 0 && base->info.unicode == STRING_UTF8)
+    {
+        bool error = false;
+        rc = byte_to_char_index(get_txt(base), rc, &error);
+    }
+
+    sp--;
+    free_svalue(sp--);
+    free_string_svalue(sp); /* Frees base ! */
+    put_number(sp, rc);
+
+    return sp;
+} /* find_string() */
+
+/*-------------------------------------------------------------------------*/
 svalue_t *
 f_strstr (svalue_t *sp)
 
@@ -1770,32 +1956,7 @@ f_strstr (svalue_t *sp)
  */
 
 {
-    const char *found;
-    string_t *base, *pattern;
-    p_int start, rc;
-
-    base = sp[-2].u.str;
-    pattern = sp[-1].u.str;
-
-    if ( 0 != (start = sp->u.number) )
-    {
-        if (start < 0)
-        {
-            start += mstrsize(base);
-            if (start < 0)
-                start = 0;
-        }
-    }
-
-    found = mstring_mstr_n_str(base, start, get_txt(pattern), mstrsize(pattern));
-    rc = found ? (found - get_txt(base)) : -1;
-
-    sp--;
-    free_svalue(sp--);
-    free_string_svalue(sp); /* Frees base ! */
-    put_number(sp, rc);
-
-    return sp;
+    return find_string(sp, true);
 } /* f_strstr() */
 
 /*-------------------------------------------------------------------------*/
@@ -1814,32 +1975,7 @@ f_strrstr (svalue_t *sp)
  */
 
 {
-    const char *found;
-    string_t *base, *pattern;
-    p_int start, rc;
-
-    base = sp[-2].u.str;
-    pattern = sp[-1].u.str;
-
-    if ( 0 != (start = sp->u.number) )
-    {
-        if (start < 0)
-        {
-            start += mstrsize(base);
-            if (start < 0)
-                start = 0;
-        }
-    }
-
-    found = mstring_mstr_rn_str(base, start, get_txt(pattern), mstrsize(pattern));
-    rc = found ? (found - get_txt(base)) : -1;
-
-    sp--;
-    free_svalue(sp--);
-    free_string_svalue(sp); /* Frees base ! */
-    put_number(sp, rc);
-
-    return sp;
+    return find_string(sp, false);
 } /* f_strrstr() */
 
 /*-------------------------------------------------------------------------*/
@@ -1868,8 +2004,8 @@ v_trim (svalue_t *sp, int num_arg)
     size_t    strarg_l;  /* Length of *strarg */
     char *str, *end;     /* Pointer to string begin and end */
     char *left, *right;  /* Pointer to the strings left and right end */
-    char def_ch[3]       /* Buffer for single characters to strip */
-      = { '\t', ' ', '\0' };
+    char def_ch[4]       /* Buffer for single characters to strip */
+      = { '\t', ' ' };
     char *strip;         /* String of characters to strip */
     size_t strip_l;      /* Length of *strip */
     p_int  where;
@@ -1897,13 +2033,15 @@ v_trim (svalue_t *sp, int num_arg)
     {
         if (argp[2].type == T_NUMBER)
         {
-            if (argp[2].u.number < 0 || argp[2].u.number >= 1 << CHAR_BIT)
+            size_t clen;
+
+            if (argp[2].u.number < 0)
                 errorf("Bad argument 3 to trim(): %"PRIdPINT
                        " is not a character\n", argp[2].u.number);
-            def_ch[0] = (char)argp[2].u.number;
-            def_ch[1] = '\0';
+
+            clen = unicode_to_utf8(argp[2].u.number, def_ch);
             strip = def_ch;
-            strip_l = 1;
+            strip_l = clen;
         }
         else /* it's a string */
         {
@@ -1921,19 +2059,54 @@ v_trim (svalue_t *sp, int num_arg)
     end = str + strarg_l;
     if (where & TRIM_LEFT)
     {
-        for ( left = str
-            ; left < str+strarg_l && memchr(strip, *left, strip_l) != NULL
-            ; left++
-            ) NOOP;
+        for (left = str; left < end; )
+        {
+            bool error = false;
+            size_t clen = char_to_byte_index(left, end - left, 1, &error);
+            char* chars = strip;
+            size_t chars_l = strip_l - clen + 1;
+
+            if (error)
+                break;
+
+            for (; chars_l; chars_l--, chars++)
+            {
+                if (!memcmp(left, chars, clen))
+                    break;
+            }
+
+            if (!chars_l)
+                break;
+
+            left += clen;
+        }
     }
     else
         left = str;
 
     if (where & TRIM_RIGHT && end != left)
     {
-        for (right = end
-            ; right != left && NULL != memchr(strip, right[-1], strip_l)
-            ; right--) NOOP;
+        for (right = end; right > left; )
+        {
+            char* prev = utf8_prev(right, right - left);
+            char* chars = strip;
+            size_t clen = right - prev;
+            size_t chars_l = strip_l - clen + 1;
+
+            if (!clen)
+                break;
+
+            for (; chars_l; chars_l--, chars++)
+            {
+                if (!memcmp(prev, chars, clen))
+                    break;
+            }
+
+            if (!chars_l)
+                break;
+
+            right = prev;
+        }
     }
     else
         right = end;
@@ -1974,33 +2147,7 @@ f_upper_case (svalue_t *sp)
  */
 
 {
-    char *s, c;
-    size_t count, len;
-
-    /* Find the first non-uppercase character in the string */
-    len = mstrsize(sp->u.str);
-    for (s = get_txt(sp->u.str), count = 0
-        ; count < len && ('\0' == (c = *s) || !islower((unsigned char)c))
-        ; s++, count++)
-        NOOP;
-
-    if (count < len)  /* there are lowercase characters */
-    {
-        string_t *new;
-        memsafe(new = unshare_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
-        sp->u.str = new;
-
-        for (s = get_txt(sp->u.str)+count; count < len; s++, count++)
-        {
-            c = *s;
-
-            if ('\0' != c && islower((unsigned char)c))
-                *s = (char)toupper((unsigned char)c);
-        }
-    }
-
-    /* That's it */
-    return sp;
+    return change_case(sp, true);
 } /* f_upper_case() */
 
 /*-------------------------------------------------------------------------*/
@@ -2025,6 +2172,36 @@ at_end (int i, int imax, int z, p_int *lens)
     }
     return MY_TRUE;
 }
+
+/*-------------------------------------------------------------------------*/
+static size_t
+chop_string (char* str, size_t oldsize, size_t newsize)
+
+/* Auxiliary function for e_terminal_colour().
+ *
+ * We need to reduce the string from <oldsize> to <newsize>.
+ * Find the position of the first character tbat is not
+ * fully within newsize and return that position.
+ */
+
+{
+    size_t pos = 0, idx = 0;
+    while (pos != newsize)
+    {
+        p_int c;
+        size_t clen = utf8_to_unicode(str + pos, oldsize - pos, &c);
+        if (!clen)
+            errorf("Invalid character in string at index %zd.\n", idx);
+
+        if (pos + clen > newsize)
+            return pos;
+
+        idx++;
+        pos += clen;
+    }
+
+    return pos;
+} /* chop_string() */
 
 /*-------------------------------------------------------------------------*/
 static string_t *
@@ -2438,7 +2615,14 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
     j_extra = 0; /* gathers the extra length needed during fmt'ing */
     for (i = 0; i < num; i++)
     {
-        if (lens[i] > 0)
+        if (indent_overflows || j >= MAX_STRING_LENGTH)
+        {
+            /* We are already at the maximum string length.
+             * reduce the remaining parts to zero.
+             */
+            lens[i] = 0;
+        }
+        else if (lens[i] > 0)
         {
             /* This part must be considered for wrapping/indentation */
             p_int len;
@@ -2473,8 +2657,10 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 /* Overflow: shorten this fragment to fit (and all
                  * the following ones will be shortened to 0 length).
                  */
-                lens[i] -= j - MAX_STRING_LENGTH;
-                j = MAX_STRING_LENGTH;
+                size_t newlen = chop_string(parts[i], lens[i], lens[i] + MAX_STRING_LENGTH - j);
+                j -= lens[i] - newlen;
+                lens[i] = newlen;
+                indent_overflows = MY_TRUE;
             }
 
             /* If wrapping is requested, perform the analysis */
@@ -2483,9 +2669,13 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 int   z;             /* Index into the current string */
                 char *p = parts[i];  /* Pointer into the current string */
 
-                for (z = 0; z < lens[i]; z++)
+                for (z = 0; z < lens[i];)
                 {
-                    char c = p[z];   /* current character */
+                    p_int c;  /* Current character */
+                    size_t clen = utf8_to_unicode(p + z, lens[i] - z, &c);
+                    if (!clen)
+                        errorf("Invalid character in string at index %d.\n", z);
+                    z += clen;
 
                     if (c == '\n')
                     {
@@ -2535,9 +2725,14 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                                     {
                                         if (lens[test_i] < 0)
                                             continue;
-                                        for ( ; !done && test_z < lens[test_i]; test_z++)
+                                        for ( ; !done && test_z < lens[test_i]; )
                                         {
-                                            char testc = parts[test_i][test_z];
+                                            p_int testc;
+                                            size_t testclen = utf8_to_unicode(parts[test_i] + test_z, lens[test_i] - test_z, &testc);
+                                            if (!testclen)
+                                                errorf("Invalid character in string at index %d.\n", test_z);
+                                            test_z += testclen;
+
                                             if (testc == ' ' || testc == '\n')
                                             {
                                                 done = MY_TRUE;
@@ -2584,7 +2779,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
                     /* If we get here, we ended a line */
 
-                    if (col || z + 1 != lens[i])
+                    if (col || z != lens[i])
                     {
                         /* Not at the end of the fragment: count in
                          * the indent from the new line.
@@ -2598,15 +2793,30 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                     /* Guard against overflow */
                     if (j > MAX_STRING_LENGTH)
                     {
-                        /* Reduce this part to fit; all the following
-                         * parts will be reduced to shreds.
+                        /* The newline and indentation resulted in an overflow.
                          */
-                        indent_overflows = MY_TRUE;
-                        lens[i] -= (j - MAX_STRING_LENGTH);
-                        j = MAX_STRING_LENGTH;
-                        if (lens[i] < z)
+                        if (j - MAX_STRING_LENGTH <= lens[i] - z)
                         {
-                            /* must have been ok or we wouldn't be here */
+                            /* We can do the line break and indentation.
+                             * Just strip a little of the end of this part.
+                             */
+                            size_t newlen = chop_string(parts[i], lens[i], lens[i] + MAX_STRING_LENGTH - j);
+                            j -= lens[i] - newlen;
+                            lens[i] = newlen;
+                            indent_overflows = MY_TRUE;
+                        }
+                        else
+                        {
+                            /* The end is right here,
+                             * Let's break it up at the line break.
+                             */
+                            indent_overflows = MY_TRUE;
+
+                            z -= clen;
+
+                            if (!maybe_at_end)
+                                j -= indent;
+                            j -= lens[i] - z;
                             lens[i] = z;
                             break;
                         }
@@ -2617,7 +2827,6 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
         else
         {
             /* This replacement does not need to be wrapped. */
-            indent_overflows = MY_FALSE;
             j += -lens[i];
             if (j > MAX_STRING_LENGTH)
             {
@@ -2625,8 +2834,10 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                  * to something usable. All following fragments
                  * will be shrunk to length 0.
                  */
-                lens[i] = -(-(lens[i]) - (j - MAX_STRING_LENGTH));
-                j = MAX_STRING_LENGTH;
+                size_t newlen = chop_string(parts[i], -lens[i], -lens[i] + MAX_STRING_LENGTH - j);
+                j -= -lens[i] - newlen;
+                lens[i] = -newlen;
+                indent_overflows = MY_TRUE;
             }
         } /* if (lens[i] > 0) */
     } /* for (i = 0..num) for wrapping analysis */
@@ -2645,15 +2856,13 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
          * to the length computation above.
          */
 
-        int space_garbage = 0;
-          /* Number of characters to be ignored since the last space,
-           * most of them are control codes and other junk.
-           */
         size_t tmpmem_size;
         char *tmpmem;
           /* Temporary buffer for the current line */
         char *pt;
           /* Pointer into tmpmem */
+        char *spacept;
+          /* Pointer to the last space (corresponding to the space variable). */
 
         tmpmem_size = (size_t)j+j_extra+1;
           /* Actually, the allocated '+j_extra' size is never used, but
@@ -2664,18 +2873,21 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
         col = 0;
         start = -1;
         space = 0;
+        spacept = NULL;
         pt = tmpmem;
 
         /* Loop over all parts */
         for (i = 0; i < num; i++)
         {
             int kind;            /* The kind of a line break */
-            int len;             /* Actual length of the line */
+            int spill;           /* Bytes to spill into the next line */
             p_int l = lens[i];   /* Length of current part */
             char *p = parts[i];  /* Current part */
 
             if (pt - tmpmem + ((l < 0) ? -l : l) >= (ptrdiff_t)tmpmem_size)
             {
+                xfree(tmpmem);
+                free_mstring(deststr);
                 errorf("Partial string '%s' too long (%td+%"PRIdPINT" >= %zu).\n"
                      , p
                      , (ptrdiff_t)(pt - tmpmem), ((l < 0) ? -l : l)
@@ -2689,23 +2901,32 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 /* String retrieved from the mapping: not to be counted */
                 memcpy(pt, p, (size_t)-l);
                 pt += -l;
-                space_garbage += -l;
                 continue;
             }
 
             /* Loop over the current part, copying and wrapping */
-            for (k = 0; k < lens[i]; k++)
+            for (k = 0; k < l; )
             {
                 int n;
-                char c = p[k];  /* Current character */
+                p_int c;  /* Current character */
+                size_t clen = utf8_to_unicode(p + k, l - k, &c);
+                if (!clen)
+                {
+                    xfree(tmpmem);
+                    free_mstring(deststr);
+                    errorf("Invalid character in string at index %d.\n", k);
+                }
 
                 /* Copy the character into tmpmem */
-                *pt++ = c;
+                memcpy(pt, p + k, clen);
+                pt += clen;
+                k += clen;
 
                 if (c == '\n')
                 {
                     /* Start a new line */
                     col = 0;
+                    spill = 0;
                     kind = 0;
                     start = -1;
                 }
@@ -2723,7 +2944,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                     if (c == ' ')
                     {
                         space = col;
-                        space_garbage = 0;
+                        spacept = pt;
                     }
 
                     /* Wrapping necessary? */
@@ -2750,10 +2971,18 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                                 {
                                     if (lens[test_i] < 0)
                                         continue;
-                                    for ( ; !done && test_k < lens[test_i]
-                                          ; test_k++)
+                                    for ( ; !done && test_k < lens[test_i]; )
                                     {
-                                        char testc = parts[test_i][test_k];
+                                        p_int testc;
+                                        size_t testclen = utf8_to_unicode(parts[test_i] + test_k, lens[test_i] - test_k, &testc);
+                                        if (!testclen)
+                                        {
+                                            xfree(tmpmem);
+                                            free_mstring(deststr);
+                                            errorf("Invalid character in string at index %d.\n", test_k);
+                                        }
+                                        test_k += testclen;
+
                                         if (testc == ' ' || testc == '\n')
                                         {
                                             done = MY_TRUE;
@@ -2772,11 +3001,13 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                                  */
                                 space = 0;
                                 col = 1;
+                                spill = clen;
                                 kind = 2;
                             }
                             else
                             {
                                 col -= space;
+                                spill = pt - spacept;
                                 space = 0;
                                 kind = 1;
                             }
@@ -2788,6 +3019,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                              * restart counting.
                              */
                             col = 1;
+                            spill = clen;
                             kind = 2;
                         }
 
@@ -2802,14 +3034,15 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                  *   kind == 0: hard line break
                  *           1: line wrapped at suitable space
                  *           2: line extended over the limit with no space
+                 *
+                 * col denotes the number of characters we have to take
+                 * over into the next line.
                  */
-
-                len = (kind == 1 ? col + space_garbage : col);
 
                 /* Determine the length of the _previous_ (and therefore
                  * wrapped) line and copy it from tmpmem into deststr.
                  */
-                n = (pt - tmpmem) - len;
+                n = (pt - tmpmem) - spill;
                 memcpy(cp, tmpmem, (size_t)n);
                 cp += n;
 
@@ -2825,8 +3058,8 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 }
 
                 /* Remove the previous line from tmpmem */
-                memmove(tmpmem, tmpmem + n, (size_t)len);
-                pt = tmpmem + len;
+                memmove(tmpmem, tmpmem + n, (size_t)spill);
+                pt = tmpmem + spill;
 
                 /* If we are indenting, check if we have to add the
                  * indentation space.
@@ -2836,7 +3069,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                  *   call to at_end().
                  */
                 if (indent != 0
-                 && (   len > space_garbage
+                 && (   col > 0
                      || !at_end(i, num, (kind == 2) ? k-1 : k, lens))
                    )
                 {
@@ -2848,8 +3081,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                     col += indent;
                 }
 
-                /* Since we're in a new line, all the 'garbage' is gone. */
-                space_garbage = 0;
+                space = 0;
             } /* for(k = 0.. lens[i] */
         } /* for(i = 0..num) */
 
@@ -2883,12 +3115,12 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
         num_tmp--;
     }
 
+    deststr->info.unicode = is_ascii(get_txt(deststr), mstrsize(deststr)) ? STRING_ASCII : STRING_UTF8;
 
     /* now we have what we want */
 #ifdef DEBUG
-    if ((long)(cp - get_txt(deststr)) != j
-     && (!indent_overflows || (long)(cp - get_txt(deststr)) != wrap)
-       ) {
+    if ((long)(cp - get_txt(deststr)) != j)
+    {
       fatal("Length miscalculated in terminal_colour()\n"
             "    Expected: %i (or %i) Was: %td\n"
             "    In string: %.*s\n"
@@ -5135,6 +5367,7 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
 
     if (rvaluep->type == T_STRING)
     {
+        bool isbyte = rvaluep->u.str->info.unicode == STRING_BYTES;
         result = rvaluep;
 
         for (valuep++, left--; left > 0; valuep++, left--)
@@ -5167,6 +5400,18 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
                          , typename(item->type));
                 else
                     vefun_arg_error(num_arg - left + 1, T_STRING, item->type, sp);
+                /* NOTREACHED */
+            }
+            if (isbyte != (item->u.str->info.unicode == STRING_BYTES))
+            {
+                free_svalue(&tmp_str);
+                if (gotArray)
+                    errorf("Bad argument to %s(): array[%d] is a '%s string', "
+                          "expected '%s string'.\n"
+                         , fname, (int)VEC_SIZE(argp->u.vec) - left + 1
+                         , isbyte ? "text" : "byte", isbyte ? "byte" : "text");
+                else
+                    vefun_arg_error(num_arg - left + 1, isbyte ? T_BYTES : T_STRING, isbyte ? T_STRING : T_BYTES, sp);
                 /* NOTREACHED */
             }
 
@@ -6873,6 +7118,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
                 if (rec->ref_count++ < 0)
                 {
                     string_t *dup;
+                    struct protected_lvalue *var = NULL;
                     struct pointer_record *str_rec = find_add_pointer(ptable, l->str, MY_TRUE);
                     if (str_rec->ref_count++ < 0)
                     {
@@ -6884,9 +7130,34 @@ copy_svalue (svalue_t *dest, svalue_t *src
                         dup = ref_mstring((string_t*) str_rec->data);
                     }
 
-                    assign_protected_char_lvalue_no_free(dest, dup, get_txt(dup) + (l->charp - get_txt(l->str)));
+                    /* Check whether r->var is still valid. */
+                    if (l->var != NULL && l->var->val.type == T_STRING && l->str == l->var->val.u.str)
+                    {
+                        struct pointer_record *var_rec = find_add_pointer(ptable, l->var, MY_TRUE);
+                        if (var_rec->ref_count++ < 0)
+                        {
+                            svalue_t var_content = { T_STRING };
+                            svalue_t var_lvalue;
+
+                            var_content.u.str = ref_mstring(dup);
+
+                            assign_protected_lvalue_no_free(&var_lvalue, &var_content);
+                            var_rec->data = var = var_lvalue.u.protected_lvalue;
+                            free_svalue(&var_content);
+                        }
+                        else
+                        {
+                            var = (struct protected_lvalue *) var_rec->data;
+                            var->ref++;
+                        }
+                    }
+
+                    assign_protected_char_lvalue_no_free(dest, var, dup, get_txt(dup) + (l->charp - get_txt(l->str)));
                     rec->data = dest->u.protected_char_lvalue;
                     deref_mstring(dup);
+
+                    if (var != NULL)
+                        var->ref--;
                 }
                 else
                 {
@@ -7388,9 +7659,10 @@ v_member (svalue_t *sp, int num_arg)
  *   int member(mixed *array, mixed elem, [int start])
  *   int member(mapping m, mixed key)
  *   int member(string s, int elem, [int start])
+ *   int member(bytes s, int elem, [int start])
  *
- * For arrays and strings, returns the index of the first occurance of
- * second arg in the first arg, or -1 if none found. If <start> is
+ * For arrays, strings and bytes, returns the index of the first occurance
+ * of second arg in the first arg, or -1 if none found. If <start> is
  * given and non-negative, the search starts at that position. A start
  * position beyond the end of the string or array will cause the efun
  * to return -1.
@@ -7593,16 +7865,56 @@ v_member (svalue_t *sp, int num_arg)
         if (sp->type != T_NUMBER)
             efun_arg_error(2, T_NUMBER, sp->type, sp);
         str = sp[-1].u.str;
-        
-        if (hasStart && (size_t)startpos >= mstrsize(str))
-            i = -1;
+
+        if (str->info.unicode == STRING_UTF8)
+        {
+            p_int ch = sp->u.number;
+            bool error = false;
+            size_t offset = char_to_byte_index(get_txt(str), mstrsize(str), startpos, &error);
+
+            if (error || ch < 0)
+                i = -1;
+            else
+            {
+                size_t len = mstrsize(str) - offset;
+
+                i = startpos;
+                str2 = get_txt(str) + offset;
+
+                while (true)
+                {
+                    p_int elem;
+                    size_t elemlen = utf8_to_unicode(str2, len, &elem);
+
+                    if (!elemlen)
+                    {
+                        i = -1;
+                        break;
+                    }
+
+                    if (elem == ch)
+                        break;
+
+                    i++;
+                    str2 += elemlen;
+                    len -= elemlen;
+                }
+            }
+        }
         else
         {
-            i = sp->u.number;
-            str2 = (i & ~0xff) ? NULL
-                               : memchr(get_txt(str)+startpos, i, mstrsize(str)-startpos);
-            i = str2 ? (str2 - get_txt(str)) : -1;
+            /* Byte or ASCII Sequence. We can use the fast memchr here. */
+            if (hasStart && (size_t)startpos >= mstrsize(str))
+                i = -1;
+            else
+            {
+                i = sp->u.number;
+                str2 = (i & ~0xff) ? NULL
+                                   : memchr(get_txt(str)+startpos, i, mstrsize(str)-startpos);
+                i = str2 ? (str2 - get_txt(str)) : -1;
+            }
         }
+
         free_svalue(sp--);
         free_svalue(sp);
         put_number(sp, i);
@@ -7644,6 +7956,7 @@ v_rmember (svalue_t *sp, int num_arg)
  *
  *   int rmember(mixed *array, mixed elem [, int startpos])
  *   int rmember(string s, int elem [, int startpos])
+ *   int rmember(bytes s, int elem [, int startpos])
  *
  * For arrays and strings, returns the index of the last occurance of
  * second arg in the first arg, or -1 if none found
@@ -7851,31 +8164,90 @@ v_rmember (svalue_t *sp, int num_arg)
         if (sp->type != T_NUMBER)
             efun_arg_error(2, T_NUMBER, sp->type, sp);
         str = sp[-1].u.str;
-        if (!hasStart || (size_t)startpos >= mstrsize(str))
-            startpos = mstrsize(str);
-        i = sp->u.number;
-        if ((i & ~0xff) != 0)
+
+        if (str->info.unicode == STRING_UTF8)
         {
-            i = -1;
+            p_int ch = sp->u.number;
+            bool error = false;
+            size_t offset;
+
+            if (!hasStart)
+                offset = mstrsize(str);
+            else
+                offset = char_to_byte_index(get_txt(str), mstrsize(str), startpos, &error);
+
+            /* The start position can be way behind the string length, recalculating. */
+            if (offset == mstrsize(str))
+                startpos = byte_to_char_index(get_txt(str), offset, &error);
+
+            if (error || ch < 0)
+                i = -1;
+            else
+            {
+                size_t len = offset;
+                char *pos = get_txt(str) + offset;
+
+                i = startpos - 1;
+
+                while (true)
+                {
+                    char *prevpos;
+                    p_int elem;
+                    size_t elemlen;
+
+                    if (!len)
+                    {
+                        i = -1;
+                        break;
+                    }
+
+                    prevpos = utf8_prev(pos, len);
+                    elemlen = utf8_to_unicode(prevpos, pos - prevpos, &elem);
+                    if (!elemlen)
+                    {
+                        i = -1;
+                        break;
+                    }
+
+                    if (elem == ch)
+                        break;
+
+                    i--;
+                    len -= (pos - prevpos);
+                    pos = prevpos;
+                }
+            }
         }
         else
         {
-            char * cp, *start, *str2;
-            start = get_txt(str);
-            cp = start + startpos;
-            str2 = NULL;
+            /* Byte or ASCII Sequence. */
 
-            do
+            if (!hasStart || (size_t)startpos >= mstrsize(str))
+                startpos = mstrsize(str);
+            i = sp->u.number;
+            if ((i & ~0xff) != 0)
             {
-                cp--;
-                if (*cp == i)
-                {
-                    str2 = cp;
-                    break;
-                }
-            } while (str2 == NULL && cp != start);
+                i = -1;
+            }
+            else
+            {
+                unsigned char * cp, *start, *str2;
+                start = (unsigned char*) get_txt(str);
+                cp = start + startpos;
+                str2 = NULL;
 
-            i = str2 ? (str2 - get_txt(str)) : -1;
+                do
+                {
+                    cp--;
+                    if (*cp == i)
+                    {
+                        str2 = cp;
+                        break;
+                    }
+                } while (str2 == NULL && cp != start);
+
+                i = str2 ? (str2 - (unsigned char*)get_txt(str)) : -1;
+            }
         }
         free_svalue(sp--);
         free_svalue(sp);
@@ -8148,6 +8520,7 @@ f_reverse(svalue_t *sp)
                 string_t *res = NULL;
 
                 memsafe(res = alloc_mstring(len), len, "reversed string");
+                res->info.unicode = data->u.str->info.unicode;
                 p1 = get_txt(res);
 
                 memcpy(p1, get_txt(data->u.str), len);
@@ -8161,8 +8534,45 @@ f_reverse(svalue_t *sp)
                 index2 = (mp_int)len;
             }
 
-            p2 = p1 + index2 - 1;
+            p2 = p1 + index2;
             p1 += index1;
+
+            if (data->u.str->info.unicode == STRING_UTF8)
+            {
+                /* We reverse the UTF8 bytes beforehand,
+                 * so they will be correct when the whole string is reversed.
+                 */
+                for (char *ptr = p1; ptr < p2;)
+                {
+                    p_int dummy;
+                    size_t chlen = utf8_to_unicode(ptr, p2 - ptr, &dummy);
+
+                    if (chlen < 2)
+                    {
+                        ptr++;
+                        continue;
+                    }
+                    else
+                    {
+                        char* p3 = ptr;
+                        char* p4 = ptr + chlen - 1;
+
+                        while (p3 < p4)
+                        {
+                            char c = *p3;
+                            *p3 = *p4;
+                            *p4 = c;
+
+                            p3++;
+                            p4--;
+                        }
+
+                        ptr += chlen;
+                    }
+                }
+            }
+
+            p2--;
 
             while (p1 < p2)
             {

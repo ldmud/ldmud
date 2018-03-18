@@ -205,6 +205,12 @@ struct svalue_s
    * to encode the acceptance of '0' instead of the real datatype.
    */
 
+#define T_BYTES         0x10
+  /* Also not an actual type, used in the efun_lpc_types[] table
+   * to differentiate between text and byte strings and
+   * for printing error messages.
+   */
+
 #define T_MOD_SWAPPED   0x80
   /* This flag is |-ed to the swapped-out type value if the value
    * data has been swapped out.
@@ -353,6 +359,7 @@ struct svalue_s
 #define TF_QUOTED_ARRAY  (1 << T_QUOTED_ARRAY)
 #define TF_NULL          (1 << T_NULL)
 #define TF_STRUCT        (1 << T_STRUCT)
+#define TF_BYTES         (1 << T_BYTES)
 
 #define TF_ANYTYPE       (~0)
   /* This is used in the efun_lpc_types[]

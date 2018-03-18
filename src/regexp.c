@@ -42,7 +42,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <ctype.h>
+#include <wctype.h>
 
 #include "regexp.h"
 #include "simulate.h"
@@ -153,7 +153,7 @@
  * Utility definitions.
  */
 
-#define SPECIAL  0x100
+#define SPECIAL  0x200000       // Big enough not to be a Unicode character.
 #define LBRAC    ('('|SPECIAL)
 #define RBRAC    (')'|SPECIAL)
 #define ASTERIX  ('*'|SPECIAL)
@@ -176,7 +176,6 @@
 #else
 #define UCHARAT(p) ((int)*(p)&CHARBIT_MASK)
 #endif
-#define ISWORDPART(c) isalunum(c)
 
 /*
  * Flags to be passed up and down.
@@ -189,7 +188,7 @@
 /*-------------------------------------------------------------------------*/
 /* Global work variables for hs_regcomp().
  */
-static short   *regparse;       /* Input-scan pointer. */
+static p_int   *regparse;       /* Input-scan pointer. */
 static int      regnpar;        /* () count. */
 static unsigned char regdummy;
 static unsigned char *regcode;  /* Code-emit pointer; &regdummy = don't. */
@@ -236,6 +235,22 @@ regc (char b)
     else
         regsize++;
 } /* regc() */
+
+/*-------------------------------------------------------------------------*/
+static void
+regunicode (p_int c)
+
+/* regunicode - emit (if appropriate) a unicode character
+ */
+
+{
+    c &= ~SPECIAL;
+
+    if (regcode != &regdummy)
+        regcode += unicode_to_utf8(c, (char*) regcode);
+    else
+        regsize += utf8_size(c);
+} /* regunicode() */
 
 /*-------------------------------------------------------------------------*/
 static unsigned char *
@@ -302,7 +317,7 @@ regpiece (int *flagp)
 {
     unsigned char  *ret;
     unsigned char  *nxt;
-    short  op;
+    p_int  op;
     int    flags;
 
     ret = regatom(&flags);
@@ -498,17 +513,17 @@ regatom (int *flagp)
                     regc('-');
                 else
                 {
-                    class = (CHARBIT_MASK & *(regparse - 2)) + 1;
-                    classend = (CHARBIT_MASK & *(regparse));
+                    class = (*(regparse - 2) & ~SPECIAL) + 1;
+                    classend = (*(regparse) & ~SPECIAL);
                     if (class > classend + 1)
                         FAIL("invalid [] range");
                     for (; class <= classend; class++)
-                        regc(class);
+                        regunicode(class);
                     regparse++;
                 }
             }
             else
-                regc(*regparse++);
+                regunicode(*regparse++);
         }
         regc('\0');
         if (*regparse != RSQBRAC)
@@ -542,7 +557,7 @@ regatom (int *flagp)
     default:
       {
         int   len;
-        short ender;
+        p_int ender;
 
         regparse--;
         for ( len = 0
@@ -569,7 +584,7 @@ regatom (int *flagp)
         ret = regnode(EXACTLY);
         while (len > 0)
         {
-            regc(*regparse++);
+            regunicode(*regparse++);
             len--;
         }
         regc('\0');
@@ -728,10 +743,10 @@ hs_regcomp (unsigned char *expr, Bool excompat
     unsigned char   *longest;
     int     len;
     int     flags;
-    short  *dest, c;
+    p_int  *dest, c;
     regexp *rc;       /* Holds the result to be returned */
     regexp  *r = NULL;       /* The resulting regexp */
-    short   *expr2 = NULL;   /* Expression currently compiled */
+    p_int   *expr2 = NULL;   /* Expression currently compiled */
 
     ppErrMsg = errmsg;
     *ppErrMsg = NULL;
@@ -758,15 +773,23 @@ hs_regcomp (unsigned char *expr, Bool excompat
         FAIL("NULL argument");
 
     /* Get some memory, maybe slightly more than needed */
-    expr2 = xalloc( (strlen((char *)expr)+1) * (sizeof(short[8])/sizeof(char[8])) );
+    expr2 = xalloc( (strlen((char *)expr)+1) * sizeof(p_int) );
     if (expr2 == NULL)
         FAIL("out of space");
 
     /* Copy the expression into expr2 for compilation, marking
      * the special characters.
      */
-    for (scan = expr, dest = expr2; '\0' != (c = *scan++); )
+    for (scan = expr, dest = expr2;;)
     {
+        size_t clen = utf8_to_unicode((char*)scan, 4, &c);
+        if (!clen)
+            FAIL("Invalid character in regexp pattern");
+        if (!c)
+            break;
+
+        scan += clen;
+
         switch (c)
         {
         case '(':
@@ -811,7 +834,7 @@ hs_regcomp (unsigned char *expr, Bool excompat
             *dest++ = c;
         }
     }
-    *dest = '\0';
+    *dest = 0;
 
     /* First pass: determine size, legality. */
     regparse = expr2;
@@ -1005,6 +1028,59 @@ regtry (regexp *prog, char *string)
 } /* regtry() */
 
 /*-------------------------------------------------------------------------*/
+static bool
+reg_iswordpart (unsigned char* txt)
+
+/* Return true, if the first character at <txt> is an alphanumeric character
+ * or '_', false otherwise.
+ */
+
+{
+    p_int ch;
+    size_t len = utf8_to_unicode((char*)txt, 4, &ch);
+    if (!len)
+        return false;
+    return ch == '_' || iswalnum(ch);
+} /* reg_iswordpart() */
+
+/*-------------------------------------------------------------------------*/
+static unsigned char*
+reg_previouschar (unsigned char* txt)
+
+/* Returns the pointer to the previous character at <txt>.
+ * It is assumed that <txt> is not the begining of the string.
+ */
+
+{
+    return (unsigned char*)utf8_prev((char*)txt, txt - regbol);
+} /* reg_previouschar() */
+
+/*-------------------------------------------------------------------------*/
+static ssize_t
+reg_strchr (unsigned char* chars, unsigned char* chptr)
+
+/* Searches the first character of <ch> in the string <chars>.
+ * Returns the number of bytes of this characters if found,
+ * the negative number otherwise, 0 on error.
+ */
+
+{
+    bool error = false;
+    size_t len = char_to_byte_index((char*)chptr, 4, 1, &error);
+    if (error)
+        return 0;
+
+    while (*chars)
+    {
+        if (!memcmp(chars, chptr, len))
+            return len;
+        chars++;
+    }
+
+    return -len;
+} /* reg_strchr() */
+
+/*-------------------------------------------------------------------------*/
 static Bool
 regmatch (unsigned char *prog)
 
@@ -1050,30 +1126,37 @@ regmatch (unsigned char *prog)
         case ANY:
             if (*reginput == '\0')
                 return RE_NOMATCH;
-            reginput++;
-            break;
+            else
+            {
+                p_int c;
+                size_t len = utf8_to_unicode((char*)reginput, 4, &c);
+                if (!len)
+                    return RE_NOMATCH;
+                reginput += len;
+                break;
+            }
         case WORDSTART:
             if (reginput == regbol)
                 break;
             if (*reginput == '\0'
-             || ISWORDPART( *(reginput-1) ) || !ISWORDPART( *reginput ) )
+             || reg_iswordpart(reg_previouschar(reginput)) || !reg_iswordpart(reginput) )
                 return RE_NOMATCH;
             break;
         case WORDEND:
             if (*reginput == '\0')
                 break;
             if ( reginput == regbol
-             || !ISWORDPART( *(reginput-1) ) || ISWORDPART( *reginput ) )
+             || !reg_iswordpart(reg_previouschar(reginput)) || reg_iswordpart(reginput) )
                 return RE_NOMATCH;
             break;
         case NOTEDGE:
             if (reginput == regbol)
             {
-                if (ISWORDPART(*reginput))
+                if (reg_iswordpart(reginput))
                     return RE_NOMATCH;
                 break;
             }
-            if ( ISWORDPART( *(reginput-1) ) != ISWORDPART( *reginput ) )
+            if ( reg_iswordpart(reg_previouschar(reginput)) != reg_iswordpart(reginput) )
                 return RE_NOMATCH;
             break;
         case EXACTLY:
@@ -1092,16 +1175,27 @@ regmatch (unsigned char *prog)
             break;
           }
         case ANYOF:
-            if (*reginput == '\0'
-             || strchr((char *)OPERAND(scan), *reginput) == NULL)
+            if (*reginput == '\0')
                 return RE_NOMATCH;
-            reginput++;
-            break;
+            else
+            {
+                ssize_t len = reg_strchr(OPERAND(scan), reginput);
+                if (len <= 0)
+                    return RE_NOMATCH;
+                reginput += len;
+                break;
+            }
         case ANYBUT:
-            if (*reginput == '\0'
-             || strchr((char *)OPERAND(scan), *reginput) != NULL)
+            if (*reginput == '\0')
                 return RE_NOMATCH;
-            reginput++;
+            else
+            {
+                ssize_t len = reg_strchr(OPERAND(scan), reginput);
+                if (len >= 0)
+                    return RE_NOMATCH;
+                reginput -= len;
+                break;
+            }
             break;
         case NOTHING:
             break;

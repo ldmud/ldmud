@@ -112,7 +112,7 @@ nosave mixed *tests = ({
     ({ "bitwise right shift assignment (int, >MAX_SHIFT)", 0,
        (: int i = 1073741824;
           i>>=10000;
-          return i == 1073741824; :)
+          return i == 0; :)
     }),
     ({ "bitwise right shift assignment (char)", 0,
        (: string s = "0"; // 48

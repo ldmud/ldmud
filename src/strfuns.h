@@ -37,6 +37,8 @@ extern char * xstrncpy(char * dest, const char * src, size_t num);
 extern size_t byte_to_char_index(char* text, size_t pos, bool* error);
 extern size_t char_to_byte_index(char* text, size_t len, size_t pos, bool* error);
 extern bool is_ascii(const char* text, size_t len);
+extern size_t utf8_size (p_int code);
+extern char* utf8_prev (char* text, size_t pos);
 extern size_t unicode_to_utf8(p_int code, char* buf);
 extern size_t utf8_to_unicode(const char* buf, size_t len, p_int *code);
 
@@ -45,7 +47,7 @@ extern svalue_t * v_to_text(svalue_t *sp, int num_arg);
 #ifdef HAS_ICONV
 extern svalue_t * f_convert_charset (svalue_t *sp); 
 #endif
-extern string_t * intersect_strings (const string_t * left, const string_t * right, Bool bSubtract);
+extern string_t * intersect_strings (string_t * left, string_t * right, Bool bSubtract);
 extern svalue_t * x_map_string (svalue_t *sp, int num_arg);
 extern svalue_t * x_filter_string (svalue_t *sp, int num_arg);
 

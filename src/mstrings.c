@@ -238,10 +238,14 @@ get_hash (string_t * pStr)
  */
 
 {
-    if (!pStr->hash)
-        pStr->hash = hash_string_inl(pStr->txt, pStr->size);
+    /* We store no hashes for mutable strings. */
+    if (pStr->info.type == STRING_MUTABLE)
+        return hash_string_inl(pStr->txt, pStr->size);
 
-    return pStr->hash;
+    if (!pStr->u.tabled.hash)
+        pStr->u.tabled.hash = hash_string_inl(pStr->txt, pStr->size);
+
+    return pStr->u.tabled.hash;
 } /* get_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -285,7 +289,7 @@ find_and_move (const char * const s, size_t size, bool is_byte, hash32_t hash)
                && is_byte == (rover->info.unicode == STRING_BYTES)
                && 0 == memcmp(get_txt(rover), s, size)
               )
-        ; prev = rover, rover = rover->next
+        ; prev = rover, rover = rover->u.tabled.next
         )
         mstr_searchlen_byvalue++;
 
@@ -294,8 +298,8 @@ find_and_move (const char * const s, size_t size, bool is_byte, hash32_t hash)
      */
     if (rover && prev)
     {
-        prev->next = rover->next;
-        rover->next = stringtable[idx];
+        prev->u.tabled.next = rover->u.tabled.next;
+        rover->u.tabled.next = stringtable[idx];
         stringtable[idx] = rover;
     }
 
@@ -324,7 +328,7 @@ move_to_head (string_t *s, int idx)
     mstr_searchlen++;
     for ( prev = NULL, rover = stringtable[idx]
         ; rover != NULL && rover != s
-        ; prev = rover, rover = rover->next
+        ; prev = rover, rover = rover->u.tabled.next
         )
     {
         mstr_searchlen++;
@@ -336,8 +340,8 @@ move_to_head (string_t *s, int idx)
 
     if (rover && prev)
     {
-        prev->next = rover->next;
-        rover->next = stringtable[idx];
+        prev->u.tabled.next = rover->u.tabled.next;
+        rover->u.tabled.next = stringtable[idx];
         stringtable[idx] = rover;
     }
 
@@ -373,7 +377,7 @@ make_new_tabled (const char * const pTxt, size_t size, enum unicode_type unicode
     /* Set up the structures and table the string */
 
     string->size = size;
-    string->hash = hash;
+    string->u.tabled.hash = hash;
     memcpy(string->txt, pTxt, size);
     string->txt[size] = '\0';
     string->info.type = STRING_TABLED;
@@ -389,7 +393,7 @@ make_new_tabled (const char * const pTxt, size_t size, enum unicode_type unicode
     else
         mstr_collisions++;
 
-    string->next = stringtable[idx];
+    string->u.tabled.next = stringtable[idx];
     stringtable[idx] = string;
 
     {
@@ -429,8 +433,8 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
 
     /* Set up the structures */
     string->size = iSize;
-    string->next = NULL;
-    string->hash = 0;
+    string->u.tabled.next = NULL;
+    string->u.tabled.hash = 0;
     string->txt[iSize] = '\0';
     string->info.type = STRING_UNTABLED;
     string->info.unicode = STRING_ASCII;
@@ -693,7 +697,7 @@ table_string (string_t * pStr MTRACE_DECL)
         else
             mstr_collisions++;
 
-        string->next = stringtable[idx];
+        string->u.tabled.next = stringtable[idx];
         stringtable[idx] = pStr;
 
         mstr_tabled_count++;
@@ -772,6 +776,8 @@ mstring_make_constant (string_t * pStr, bool in_place_only MTRACE_DECL)
             if (pStr->info.ref == 1)
             {
                 pStr->info.type = STRING_UNTABLED;
+                pStr->u.tabled.hash = 0;
+                pStr->u.tabled.next = NULL;
                 return pStr;
             }
             break;
@@ -816,7 +822,8 @@ mstring_make_mutable (string_t * pStr MTRACE_DECL)
             if (pStr->info.ref == 1)
             {
                 pStr->info.type = STRING_MUTABLE;
-                pStr->hash = 0;
+                pStr->u.mutable.char_lvalues = NULL;
+                pStr->u.mutable.range_lvalues = NULL;
                 return pStr;
             }
             break;
@@ -835,6 +842,8 @@ mstring_make_mutable (string_t * pStr MTRACE_DECL)
         return NULL;
 
     string->info.type = STRING_MUTABLE;
+    string->u.mutable.char_lvalues = NULL;
+    string->u.mutable.range_lvalues = NULL;
     free_mstring(pStr);
 
     return string;
@@ -895,8 +904,9 @@ mstring_unshare (string_t * pStr MTRACE_DECL)
      */
     if (pStr->info.type != STRING_TABLED && pStr->info.ref == 1)
     {
-        pStr->hash = 0;
         pStr->info.type = STRING_UNTABLED;
+        pStr->u.tabled.hash = 0;
+        pStr->u.tabled.next = NULL;
 
         return pStr;
     }
@@ -934,8 +944,9 @@ mstring_resize (string_t * pStr, size_t newlen MTRACE_DECL)
     if (pStr->info.type != STRING_TABLED && pStr->info.ref == 1
      && pStr->size == newlen)
     {
-        pStr->hash = 0;
         pStr->info.type = STRING_UNTABLED;
+        pStr->u.tabled.hash = 0;
+        pStr->u.tabled.next = NULL;
 
         return pStr;
     }
@@ -1064,7 +1075,7 @@ mstring_free (string_t *s)
                  );
         }
 
-        stringtable[idx] = s->next;
+        stringtable[idx] = s->u.tabled.next;
 
         if (NULL == stringtable[idx])
             mstr_chains--;
@@ -1836,7 +1847,7 @@ mstring_clear_refs (void)
     for (x = 0; x < HTABLE_SIZE; x++)
     {
         string_t *p;
-        for (p = stringtable[x]; p; p = p->next )
+        for (p = stringtable[x]; p; p = p->u.tabled.next )
         {
             p->info.ref = 0;
         }
@@ -1878,7 +1889,7 @@ mstring_walk_table (void (*func) (string_t *))
     for (x = 0; x < HTABLE_SIZE; x++)
     {
         string_t * p;
-        for (p = stringtable[x]; NULL != p; p = p->next)
+        for (p = stringtable[x]; NULL != p; p = p->u.tabled.next)
         {
             (*func)(p);
         }
@@ -1910,13 +1921,13 @@ mstring_gc_table (void)
                 /* Unlink the string from the table, then free it. */
                 if (prev == NULL)
                 {
-                    stringtable[x] = this->next;
-                    next = this->next;
+                    stringtable[x] = this->u.tabled.next;
+                    next = this->u.tabled.next;
                 }
                 else
                 {
-                    prev->next = this->next;
-                    next = this->next;
+                    prev->u.tabled.next = this->u.tabled.next;
+                    next = this->u.tabled.next;
                 }
 
                 mstr_untabled_count++;
@@ -1933,7 +1944,7 @@ mstring_gc_table (void)
             {
                 /* Step to next string */
                 prev = next;
-                next = next->next;
+                next = next->u.tabled.next;
             }
         }
     } /* for (x) */

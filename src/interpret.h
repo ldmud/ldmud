@@ -120,9 +120,13 @@ struct protected_lvalue
  */
 struct protected_char_lvalue
 {
-    p_int     ref;   /* Number of references to this structure. */
-    string_t *str;   /* The string that is indexed. */
-    char     *charp; /* The indexed character. */
+    p_int     ref;                      /* Number of references to this structure. */
+    string_t *str;                      /* The string that is indexed. */
+    char     *charp;                    /* The indexed character. */
+    struct protected_lvalue *var;       /* A (counted) protected_lvalue
+                                           referencing that string or vector. */
+
+    struct protected_char_lvalue* next; /* Next in the String's lvalue list. */
 };
 
 /* -- struct protected_range_lvalue: protected an lvalue to a
@@ -130,16 +134,18 @@ struct protected_char_lvalue
  * We also make the variable holding the vector a protected lvalue,
  * so we are able to update variable when changing the size of
  * a vector or changing the (not-mutable) string.
+ * Indices into a unicode string are given as byte offsets.
  */
 struct protected_range_lvalue
 {
-    p_int    ref;                    /* Number of references, */
-    svalue_t vec;                    /* The string or vector containing the range. */
-    mp_int   index1, index2;         /* first and last index of the range.
-                                        index2 is the index after the last
-                                        element of the range. */
-    struct protected_lvalue *var;    /* A (counted) protected_lvalue
-                                        referencing that string or vector. */
+    p_int    ref;                        /* Number of references, */
+    svalue_t vec;                        /* The string or vector containing the range. */
+    mp_int   index1, index2;             /* first and last index of the range.
+                                            index2 is the index after the last
+                                            element of the range. */
+    struct protected_lvalue *var;        /* A (counted) protected_lvalue
+                                            referencing that string or vector. */
+    struct protected_range_lvalue* next; /* Next in the String's lvalue list. */
 };
 
 
@@ -207,7 +213,7 @@ extern void transfer_svalue_no_free(svalue_t *dest, svalue_t *v);
 extern void transfer_rvalue_no_free(svalue_t *dest, svalue_t *v);
 extern void transfer_svalue(svalue_t *dest, svalue_t *v);
 extern void assign_protected_lvalue_no_free(svalue_t *dest, svalue_t *src);
-extern void assign_protected_char_lvalue_no_free(svalue_t *dest, string_t *src, char *charp);
+extern void assign_protected_char_lvalue_no_free(svalue_t *dest, struct protected_lvalue *var, string_t *src, char *charp);
 extern void assign_protected_range_lvalue_no_free(svalue_t *dest, struct protected_lvalue *var, svalue_t *vec, mp_int index1, mp_int index2);
 
 extern svalue_t *get_rvalue(svalue_t *v, bool *last_reference);

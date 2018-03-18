@@ -5644,8 +5644,6 @@ save_string (string_t *src, p_int start, p_int count)
 
     L_PUTC_PROLOG
 
-    L_PUTC('\"')
-
     cp = get_txt(src);
 
     if (start < 0)
@@ -5657,30 +5655,62 @@ save_string (string_t *src, p_int start, p_int count)
         cp += start;
         len = count;
     }
-    while ( len-- )
+
+    if (src->info.unicode == STRING_BYTES)
     {
-        c = *cp++;
-        if (isescaped(c))
+        L_PUTC('b')
+        L_PUTC('\"')
+
+        while (len--)
         {
-            switch(c) {
-            case '\007': c = 'a'; break;
-            case '\b'  : c = 'b'; break;
-            case '\t'  : c = 't'; break;
-            case '\n'  : c = 'n'; break;
-            case '\013': c = 'v'; break;
-            case '\014': c = 'f'; break;
-            case '\r'  : c = 'r'; break;
-            }
+            unsigned char b = (unsigned char) *cp++;
             L_PUTC('\\')
+            L_PUTC('x')
+
+            if (b >= 0xa0)
+                L_PUTC('a' + ((b - 0xa0) >> 4))
+            else
+                L_PUTC('0' + (b >> 4))
+
+            b &= 0x0f;
+            if (b >= 0x0a)
+                L_PUTC('a' + (b - 0x0a))
+            else
+                L_PUTC('0' + (b))
         }
-        else if (c == '\0')
-        {
-            c = '0';
-            L_PUTC('\\')
-        }
-        L_PUTC(c)
+
+        L_PUTC('\"')
     }
-    L_PUTC('\"')
+    else
+    {
+        L_PUTC('\"')
+
+        while ( len-- )
+        {
+            c = *cp++;
+            if (isescaped(c))
+            {
+                switch(c) {
+                case '\007': c = 'a'; break;
+                case '\b'  : c = 'b'; break;
+                case '\t'  : c = 't'; break;
+                case '\n'  : c = 'n'; break;
+                case '\013': c = 'v'; break;
+                case '\014': c = 'f'; break;
+                case '\r'  : c = 'r'; break;
+                }
+                L_PUTC('\\')
+            }
+            else if (c == '\0')
+            {
+                c = '0';
+                L_PUTC('\\')
+            }
+            L_PUTC(c)
+        }
+        L_PUTC('\"')
+    }
+
     L_PUTC_EPILOG
 } /* save_string() */
 
@@ -7364,6 +7394,11 @@ skip_element (char **str)
 
     switch(*pt)
     {
+        case 'b':   /* byte sequence */
+            pt++;
+            if (*pt != '\"')
+                return false;
+            /* FALLTHROUGH. */
         case '\"':  /* string */
         {
             int backslashes;
@@ -8538,6 +8573,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
 
 {
     char *cp;
+    bool isbyte = false;
 
     assert_stack_gap();
 
@@ -8596,6 +8632,17 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         break;
       }
 
+    case 'b':   /* A byte sequence */
+        cp++;
+        if (*cp != '\"')
+        {
+            *svp = const0;
+            return MY_FALSE;
+        }
+
+        isbyte = true;
+        /* FALLTHROUGH. */
+
     case '\"':  /* A string */
       {
         char *source, *start, c;
@@ -8632,6 +8679,34 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                     case 'v': c = '\013'; break;
                     case 'f': c = '\014'; break;
                     case 'r': c = '\r'  ; break;
+                    case 'x':
+                    {
+                        char result = 0;
+
+                        c = *source++;
+                        if (c >= '0' && c <= '9')
+                            result = (c - '0') << 4;
+                        else if (c >= 'a' && c <= 'f')
+                            result = (c - 'a' + 10) << 4;
+                        else
+                        {
+                            *svp = const0;
+                            return MY_FALSE;
+                        }
+
+                        c = *source++;
+                        if (c >= '0' && c <= '9')
+                            result += (c - '0');
+                        else if (c >= 'a' && c <= 'f')
+                            result += (c - 'a' + 10);
+                        else
+                        {
+                            *svp = const0;
+                            return MY_FALSE;
+                        }
+
+                        c = result;
+                    }
                 }
             } else if (c == '\"') break;
             *cp++ = c;
@@ -8639,7 +8714,10 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         }
         *cp = '\0';
         *pt = source;
-        put_string(svp, new_n_unicode_tabled(start, len));
+        if (isbyte)
+            put_string(svp, new_n_tabled(start, len, STRING_BYTES));
+        else
+            put_string(svp, new_n_unicode_tabled(start, len));
         if (!svp->u.str)
         {
             *svp = const0;

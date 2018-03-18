@@ -266,7 +266,7 @@ void    throw(mixed);
 
         /* Arrays, Mapings, Structs and Strings*/
 
-int     sizeof(null|string|mixed|mixed *|mapping|struct);
+int     sizeof(null|string|bytes|mixed|mixed *|mapping|struct);
 
         /* Functions and Closures */
 
@@ -319,7 +319,7 @@ float   sqrt(int|float);
 float   ceil(int|float);
 float   floor(int|float);
 float   pow(int|float,int|float);
-mixed   reverse(int|string|string &|mixed *|mixed *&);
+mixed&  reverse(int|string|bytes|string &|bytes &|mixed *|mixed *&);
 
 mixed   max(mixed|mixed*, ...);
 mixed   min(mixed|mixed*, ...);
@@ -328,12 +328,12 @@ int     sgn(int|float);
 int     to_int(int|string|float|closure);
 float   to_float(float|string|int);
 string  to_string(mixed);
-mixed  *to_array(string|mixed*|symbol|quoted_array|struct);
+mixed  *to_array(string|bytes|mixed*|symbol|quoted_array|struct);
 mixed   to_struct(mapping|mixed*|struct, void|struct);
 object  to_object(null|object|string|closure);
 
-string  to_bytes(string|int*, void|string);
-string  to_text(string|int*, void|string);
+string  to_bytes(string|bytes|int*, void|string);
+string  to_text(string|bytes|int*, void|string);
 
 mixed  *struct_info(struct, int);
 int     baseof(struct, struct);
@@ -365,33 +365,30 @@ void    set_extra_wizinfo(null|object|string, mixed);
         /* Strings */
 
 string  capitalize(string);
-#ifdef HAS_ICONV
-string  convert_charset(string, string, string);
-#endif
-string  crypt(string, string|int default: F_CONST0);
-string *explode(string, string);
+string  crypt(string|bytes, string|int default: F_CONST0);
+string *explode(string|bytes, string|bytes);
 #ifdef HAS_IDN
 string  idna_stringprep(string, int, int default: F_CONST0);
 string  idna_to_ascii(string);
 string  idna_to_unicode(string);
 #endif
-string  implode(string *, string);
+string  implode(string *|bytes *, string|bytes);
 string  lower_case(string);
-string  make_shared_string(string) "no longer useful";
-string  md5(int*|string, void|int) "obsoleted by hash";
-string  md5_crypt(string, string|int default: F_CONST0);
-string  hash(int, string|int *, void|int);
-string  hmac(int, string, string|int *);
+string  make_shared_string(string|bytes) "no longer useful";
+string  md5(int*|string|bytes, void|int) "obsoleted by hash";
+string  md5_crypt(string|bytes, string|int default: F_CONST0);
+string  hash(int, string|bytes|int *, void|int);
+string  hmac(int, string|bytes, string|bytes|int *);
 string *regexp(string *, string, int default: F_CONST0);
 string *regexplode(string, string, int default: F_CONST0);
 string  regreplace(string,string,closure|string,int);
 int     regexp_package();
 mixed   regmatch(string,string, void|int, void|int);
-string  sha1(int*|string, void|int) "obsoleted by hash";
+string  sha1(int*|string|bytes, void|int) "obsoleted by hash";
 void    printf(string, ...);
 string  sprintf(string, ...);
-int     strstr(string, string, int default: F_CONST0);
-int     strrstr(string, string, int default: F_NCONST1);
+int     strstr(string|bytes, string|bytes, int default: F_CONST0);
+int     strrstr(string|bytes, string|bytes, int default: F_NCONST1);
 string  terminal_colour(string, null|mapping|closure, void|int, void|int );
 string  trim(string, void|int, void|int|string);
 string  upper_case(string);
@@ -433,8 +430,8 @@ mixed  *m_indices(mapping);
 mapping m_reallocate(mapping, int);
 mixed  *m_values(mapping, int default: F_CONST0);
 mapping mkmapping(mixed *|struct, ...);
-int     member(mixed *|string|mapping, mixed, void|int);
-int     rmember(mixed *|string, mixed, void|int);
+int     member(mixed *|string|bytes|mapping, mixed, void|int);
+int     rmember(mixed *|string|bytes, mixed, void|int);
 mixed  *unmkmapping(mapping);
 void    walk_mapping(mapping, string|closure, ...);
 int     widthof(null|mapping);

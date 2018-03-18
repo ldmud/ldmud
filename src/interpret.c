@@ -227,6 +227,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#include "strfuns.h"
 #include "structs.h"
 #include "svalue.h"
 #include "swap.h"
@@ -451,7 +452,7 @@ static const char * svalue_typename[]
  = { /* T_INVALID */  "invalid"
    , /* T_LVALUE  */  "lvalue"
    , /* T_NUMBER  */  "number"
-   , /* T_STRING  */  "string"
+   , /* T_STRING  */  "text string"
    , /* T_POINTER */  "array"
    , /* T_OBJECT  */  "object"
    , /* T_MAPPING */  "mapping"
@@ -464,6 +465,7 @@ static const char * svalue_typename[]
    , /* T_ERROR_HANDLER */  "error-handler"
    , /* T_BREAK_ADDR */     "break-address"
    , /* T_NULL */           "null"
+   , /* T_BYTES */          "byte string"
    };
 
 /*-------------------------------------------------------------------------*/
@@ -639,8 +641,11 @@ struct unprotected_char
     char     *charp;              /* The indexed character. */
     string_t *str;                /* The string that is indexed
                                    * (not refcounted). */
+    struct protected_lvalue *var; /* A (uncounted) protected_lvalue
+                                   * referencing that string.
+                                   * Can be NULL. */
 } current_unprotected_char =      /* Static buffer, because there is only */
-  { NULL, NULL };                 /* one unprotected lvalue at a time. */
+  { NULL, NULL, NULL };           /* one unprotected lvalue at a time. */
 
   /* --- struct unprotected_range: a range in a string or vector */
 struct unprotected_range
@@ -1009,6 +1014,10 @@ static void transfer_protected_pointer_range(
 static void assign_string_range(svalue_t *source, Bool do_free);
 static void assign_protected_string_range(
     struct protected_range_lvalue *dest,svalue_t *source, Bool do_free);
+static p_int read_unprotected_char();
+static p_int read_protected_char(struct protected_char_lvalue *src);
+static p_int assign_unprotected_char(p_int ch);
+static p_int assign_protected_char(struct protected_char_lvalue *dest, p_int ch);
 
 /*-------------------------------------------------------------------------*/
 void INLINE
@@ -1069,6 +1078,25 @@ zero_object_svalue (svalue_t *v)
     free_object(ob, "zero_object_svalue");
     put_number(v, 0);
 }
+
+/*-------------------------------------------------------------------------*/
+void
+deref_protected_lvalue (struct protected_lvalue* lv)
+
+/* Decrement the reference count of <lv> by one,
+ * free the structure if it reaches zero.
+ * lv can be NULL, then it is ignored.
+ */
+
+{
+    if (lv && --(lv->ref) <= 0)
+    {
+        free_svalue(&(lv->val));
+        xfree(lv);
+
+        num_protected_lvalues--;
+    }
+} /* deref_protected_lvalue() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1165,13 +1193,7 @@ int_free_svalue (svalue_t *v)
             break;
 
         case LVALUE_PROTECTED:
-            if (--(v->u.protected_lvalue->ref) <= 0)
-            {
-                free_svalue(&(v->u.protected_lvalue->val));
-                xfree(v->u.protected_lvalue);
-
-                num_protected_lvalues--;
-            }
+            deref_protected_lvalue(v->u.protected_lvalue);
             break;
 
         case LVALUE_PROTECTED_CHAR:
@@ -1180,7 +1202,23 @@ int_free_svalue (svalue_t *v)
                 struct protected_char_lvalue *p;
                 p = v->u.protected_char_lvalue;
 
+                if (p->str->info.type == STRING_MUTABLE)
+                {
+                    /* Remove it from the string's lvalue list. */
+                    for (struct protected_char_lvalue **next = &(p->str->u.mutable.char_lvalues);
+                         *next != NULL;
+                         next = &((*next)->next))
+                    {
+                        if (*next == p)
+                        {
+                            *next = p->next;
+                            break;
+                        }
+                    }
+                }
+
                 free_mstring(p->str);
+                deref_protected_lvalue(p->var);
                 xfree(p);
 
                 num_protected_lvalues--;
@@ -1193,15 +1231,23 @@ int_free_svalue (svalue_t *v)
                 struct protected_range_lvalue *r;
                 r = v->u.protected_range_lvalue;
 
-                free_svalue(&(r->vec));
-                if (r->var && --(r->var->ref) <= 0)
+                if (r->vec.type == T_STRING && r->vec.u.str->info.type == STRING_MUTABLE)
                 {
-                    free_svalue(&(r->var->val));
-                    xfree(r->var);
-
-                    num_protected_lvalues--;
+                    /* Remove it from the string's lvalue list. */
+                    for (struct protected_range_lvalue **next = &(r->vec.u.str->u.mutable.range_lvalues);
+                         *next != NULL;
+                         next = &((*next)->next))
+                    {
+                        if (*next == r)
+                        {
+                            *next = r->next;
+                            break;
+                        }
+                    }
                 }
 
+                free_svalue(&(r->vec));
+                deref_protected_lvalue(r->var);
                 xfree(r);
 
                 num_protected_lvalues--;
@@ -1592,8 +1638,11 @@ internal_assign_rvalue_no_free ( svalue_t *to, svalue_t *from )
             break;
 
         case LVALUE_PROTECTED_CHAR:
-            put_number(to, (unsigned char) *from->u.protected_char_lvalue->charp);
-            break;
+            {
+                p_int ch = read_protected_char(from->u.protected_char_lvalue);
+                put_number(to, ch);
+                break;
+            }
 
         case LVALUE_PROTECTED_RANGE:
             {
@@ -1737,14 +1786,7 @@ normalize_svalue (svalue_t *svp, bool collapse_lvalues)
                   || (r->vec.type == T_POINTER && r->vec.u.vec != r->var->val.u.vec)
                   || (r->vec.type == T_STRING  && r->vec.u.str != r->var->val.u.str)))
                 {
-                    if(--(r->var->ref) <= 0)
-                    {
-                        free_svalue(&(r->var->val));
-                        xfree(r->var);
-
-                        num_protected_lvalues--;
-                    }
-
+                    deref_protected_lvalue(r->var);
                     r->var = NULL;
                 }
                 break;
@@ -1856,7 +1898,7 @@ inl_get_rvalue (svalue_t *v, bool *last_reference, bool collapse_lvalues)
                     *last_reference = true;
 
                 static svalue_t charval = { T_NUMBER };
-                charval.u.number = (unsigned char) *v->u.protected_char_lvalue->charp;
+                charval.u.number = read_protected_char(v->u.protected_char_lvalue);
 
                 return &charval;
             }
@@ -1946,7 +1988,7 @@ link_protected_lvalue (svalue_t *dest, svalue_t *lv)
                     if (lv->u.protected_lvalue->val.type != T_NUMBER)
                         return false;
 
-                    *dest->u.protected_char_lvalue->charp = (char)lv->u.protected_lvalue->val.u.number;
+                    assign_protected_char(dest->u.protected_char_lvalue, lv->u.protected_lvalue->val.u.number);
                     return link_protected_lvalue(lv, dest);
 
                 case LVALUE_PROTECTED_CHAR:
@@ -2073,7 +2115,7 @@ assign_svalue (svalue_t *dest, svalue_t *v)
 
         case LVALUE_UNPROTECTED_CHAR:
             if (v->type == T_NUMBER)
-                *current_unprotected_char.charp = (char)v->u.number;
+                assign_unprotected_char(v->u.number);
             return;
 
         case LVALUE_UNPROTECTED_RANGE:
@@ -2118,7 +2160,7 @@ assign_svalue (svalue_t *dest, svalue_t *v)
                 link_protected_lvalue(dest, v);
             }
             else if (v->type == T_NUMBER)
-                *dest->u.protected_char_lvalue->charp = (char)v->u.number;
+                assign_protected_char(dest->u.protected_char_lvalue, v->u.number);
             return;
 
         case LVALUE_PROTECTED_RANGE:
@@ -2255,7 +2297,7 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
 
         case LVALUE_UNPROTECTED_CHAR:
             if (v->type == T_NUMBER)
-                *current_unprotected_char.charp = (char)v->u.number;
+                assign_unprotected_char(v->u.number);
             else
                 free_svalue(v);
             return;
@@ -2304,7 +2346,7 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
                 return;
             }
             else if (v->type == T_NUMBER)
-                *dest->u.protected_char_lvalue->charp = (char)v->u.number;
+                assign_protected_char(dest->u.protected_char_lvalue, v->u.number);
             else
                 free_svalue(v);
             return;
@@ -2610,6 +2652,146 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
 } /* transfer_protected_pointer_range() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE mp_int
+get_updated_utf8_string_lvalue_index (mp_int lv_index, string_t *str, mp_int index1, mp_int index2, char *replacement, mp_int length)
+
+/* Calculate the new value for the index <lv_index> into <str> before the text
+ * between <index1> and <index2> is replaced by <length> bytes of <replacement>.
+ * <str> is assumed to be of STRING_UTF8 type.
+ */
+
+{
+    mp_int lv_chpos;
+    bool error = false;
+
+    if (lv_index >= index2)
+        return index1 + length + lv_index - index2;
+
+    if (lv_index <= index1)
+        return lv_index;
+
+    lv_chpos = byte_to_char_index(get_txt(str) + index1, lv_index - index1, &error);
+    return index1 + char_to_byte_index(replacement, length, lv_chpos, &error);
+} /* get_updated_utf8_string_lvalue_index() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE mp_int
+get_updated_byte_string_lvalue_index (mp_int lv_index, mp_int index1, mp_int index2, mp_int length)
+
+/* Calculate the new value for the index <lv_index> into a string before the text
+ * between <index1> and <index2> is replaced by <length> bytes of another string.
+ * The strings are assumed to be of STRING_BYTES or STRING_ASCII type.
+ */
+
+{
+    if (lv_index >= index2)
+        return index1 + length + lv_index - index2;
+
+    if (lv_index >= index1 + length)
+        return index1 + length;
+
+    return lv_index;
+} /* get_updated_utf8_string_lvalue_index() */
+
+/*-------------------------------------------------------------------------*/
+static void
+update_string_lvalue_indices (string_t *oldstr, string_t *newstr, mp_int index1, mp_int index2, char *replacement, mp_int length)
+
+/* Updates all indices and references in the lvalues from <oldstr> to <newstr>,
+ * where the text between <index1> and <index2> (byte offsets) is replaced
+ * by <length> bytes of <replacement>. If <oldstr> and <newstr> is the same,
+ * this function shall be called before the replacement.
+ */
+
+{
+    /* while(), so we can jump out with break. */
+    bool is_utf8 = (oldstr->info.unicode == STRING_UTF8 || newstr->info.unicode == STRING_UTF8);
+
+    assert(oldstr->info.type == STRING_MUTABLE);
+    assert(newstr->info.type == STRING_MUTABLE);
+
+    /* Nothing to do, when the length didn't change
+     * (and we don't have to deal with different encoded character lengths).
+     */
+    if (!is_utf8 && length == index2 - index1 && oldstr == newstr)
+        return;
+
+    for (struct protected_char_lvalue* lv = oldstr->u.mutable.char_lvalues;
+         lv != NULL;
+         lv = lv->next)
+    {
+        if (lv->str != oldstr)
+            continue;
+
+        if (is_utf8)
+            lv->charp = get_txt(newstr) + get_updated_utf8_string_lvalue_index(lv->charp - get_txt(oldstr), oldstr, index1, index2, replacement, length);
+        else
+            lv->charp = get_txt(newstr) + get_updated_byte_string_lvalue_index(lv->charp - get_txt(oldstr), index1, index2, length);
+
+        if (oldstr != newstr)
+        {
+            free_mstring(oldstr);
+            lv->str = ref_mstring(newstr);
+
+            if (lv->var != NULL
+             && lv->var->val.type == T_STRING
+             && lv->var->val.u.str == oldstr)
+            {
+                free_mstring(oldstr);
+                lv->var->val.u.str = ref_mstring(newstr);
+            }
+
+            if (lv->next == NULL)
+                lv->next = newstr->u.mutable.char_lvalues;
+        }
+    }
+
+    for (struct protected_range_lvalue* lv = oldstr->u.mutable.range_lvalues;
+         lv != NULL;
+         lv = lv->next)
+    {
+        if (lv->vec.u.str != oldstr)
+            continue;
+
+        if (is_utf8)
+        {
+            lv->index1 = get_updated_utf8_string_lvalue_index(lv->index1, oldstr, index1, index2, replacement, length);
+            lv->index2 = get_updated_utf8_string_lvalue_index(lv->index2, oldstr, index1, index2, replacement, length);
+        }
+        else
+        {
+            lv->index1 = get_updated_byte_string_lvalue_index(lv->index1, index1, index2, length);
+            lv->index2 = get_updated_byte_string_lvalue_index(lv->index2, index1, index2, length);
+        }
+
+        if (oldstr != newstr)
+        {
+            free_mstring(oldstr);
+            lv->vec.u.str = ref_mstring(newstr);
+
+            if (lv->var != NULL
+             && lv->var->val.type == T_STRING
+             && lv->var->val.u.str == oldstr)
+            {
+                free_mstring(oldstr);
+                lv->var->val.u.str = ref_mstring(newstr);
+            }
+
+            if (lv->next == NULL)
+                lv->next = newstr->u.mutable.range_lvalues;
+        }
+    }
+
+    if (oldstr != newstr)
+    {
+        newstr->u.mutable.char_lvalues = oldstr->u.mutable.char_lvalues;
+        newstr->u.mutable.range_lvalues = oldstr->u.mutable.range_lvalues;
+        oldstr->u.mutable.char_lvalues = NULL;
+        oldstr->u.mutable.range_lvalues = NULL;
+    }
+} /* update_string_lvalue_indices() */
+
+/*-------------------------------------------------------------------------*/
 static void
 assign_string_range (svalue_t *source, Bool do_free)
 
@@ -2630,6 +2812,7 @@ assign_string_range (svalue_t *source, Bool do_free)
         mp_int dsize;            /* size of destination string */
         mp_int ssize;            /* size of source string */
         mp_int index1, index2;   /* range indices */
+        bool free_ds = false;    /* Wether we need to free the reference to <ds>. */
 
         /* Set variables */
         index1 = current_unprotected_range.index1;
@@ -2647,34 +2830,53 @@ assign_string_range (svalue_t *source, Bool do_free)
                  );
 #endif /* NO_NEGATIVE_RANGES */
 
-        /* Create the new string */
-        rs = alloc_mstring((size_t)(dsize + ssize + index1 - index2));
-        if (!rs)
+        if (ssize != index2 - index1)
         {
-            /* We don't pop the stack here --> don't free source */
-            outofmem((dsize + ssize + index1 - index2), "new string");
-        }
+            /* Create the new string */
+            rs = alloc_mstring((size_t)(dsize + ssize + index1 - index2));
+            if (rs)
+                rs = make_mutable(rs);
+            if (!rs)
+            {
+                /* We don't pop the stack here --> don't free source */
+                outofmem((dsize + ssize + index1 - index2), "new string");
+            }
 
-        if (index1)
-            memcpy(get_txt(rs), get_txt(ds), (size_t)index1);
+            if (index1)
+                memcpy(get_txt(rs), get_txt(ds), (size_t)index1);
+
+            if (dsize > index2)
+                memcpy( get_txt(rs) + index1 + ssize, get_txt(ds) + index2
+                      , (size_t)(dsize - index2));
+
+            /* Assign the new string in place of the old */
+            dsvp->u.str = rs;
+            /* Free <ds> later, because we need it one more time. */
+            free_ds = true;
+
+            /* Update the original variable. */
+            if (current_unprotected_range.var != NULL
+             && current_unprotected_range.var->val.type == T_STRING
+             && current_unprotected_range.var->val.u.str == ds)
+            {
+                free_mstring(ds);
+                current_unprotected_range.var->val.u.str = ref_mstring(rs);
+            }
+        }
+        else
+            rs = ds;
+
+        update_string_lvalue_indices(ds, rs, index1, index2, get_txt(ss), ssize);
+        if (free_ds)
+            free_mstring(ds);
+
         if (ssize)
             memcpy(get_txt(rs) + index1, get_txt(ss), (size_t)ssize);
-        if (dsize > index2)
-            memcpy( get_txt(rs) + index1 + ssize, get_txt(ds) + index2
-                  , (size_t)(dsize - index2));
 
-        /* Assign the new string in place of the old */
-        free_string_svalue(dsvp);
-        dsvp->u.str = rs;
-
-        /* Update the original variable. */
-        if (current_unprotected_range.var != NULL
-         && current_unprotected_range.var->val.type == T_STRING
-         && current_unprotected_range.var->val.u.str == ds)
-        {
-            free_mstring(ds);
-            current_unprotected_range.var->val.u.str = ref_mstring(rs);
-        }
+        if (ss->info.unicode != STRING_ASCII)
+            rs->info.unicode = ss->info.unicode;
+        else
+            rs->info.unicode = is_ascii(get_txt(rs), mstrsize(rs)) ? STRING_ASCII : STRING_UTF8;
 
         if (do_free)
             free_string_svalue(source);
@@ -2712,7 +2914,6 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         string_t *rs;            /* result string */
         mp_int dsize;            /* size of destination string */
         mp_int ssize;            /* size of source string */
-        mp_int rsize;            /* size of result string */
         mp_int index1, index2;   /* range indices */
 
         assert(dest->vec.type == T_STRING);
@@ -2732,35 +2933,39 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
                  );
 #endif /* NO_NEGATIVE_RANGES */
 
-        /* Create a new string */
-        rsize = dsize + ssize + index1 - index2;
-        rs = alloc_mstring((size_t)rsize);
-        if (!rs)
+        if (ssize != index2 - index1)
         {
-            outofmem((dsize + ssize + index1 - index2), "new string");
+            /* Create a new string */
+            size_t rsize = dsize + ssize + index1 - index2;
+            rs = alloc_mstring(rsize);
+            if (rs)
+                rs = make_mutable(rs);
+            if (!rs)
+            {
+                outofmem(rsize, "new string");
+            }
+
+            if (index1)
+                memcpy(get_txt(rs), get_txt(ds), (size_t)index1);
+
+            if (dsize > index2)
+                memcpy( get_txt(rs) + index1 + ssize, get_txt(ds) + index2
+                      , (size_t)(dsize - index2));
         }
+        else
+            rs = ref_mstring(ds);
 
-        dest->index2 = (int)(index1 + ssize);
-        dest->vec.u.str = rs;
+        update_string_lvalue_indices(ds, rs, index1, index2, get_txt(ss), ssize);
 
-        if (index1)
-            memcpy(get_txt(rs), get_txt(ds), (size_t)index1);
         if (ssize)
             memcpy(get_txt(rs) + index1, get_txt(ss), (size_t)ssize);
-        if (dsize > index2)
-            memcpy( get_txt(rs) + dest->index2, get_txt(ds) + index2
-                  , (size_t)(dsize - index2));
 
-        /* Update the original variable. */
-        if (dest->var != NULL
-         && dest->var->val.type == T_STRING
-         && dest->var->val.u.str == ds)
-        {
-            free_mstring(ds);
-            dest->var->val.u.str = ref_mstring(rs);
-        }
+        if (ss->info.unicode != STRING_ASCII)
+            rs->info.unicode = ss->info.unicode;
+        else
+            rs->info.unicode = is_ascii(get_txt(rs), mstrsize(rs)) ? STRING_ASCII : STRING_UTF8;
 
-        free_mstring(ds);
+        free_mstring(rs);
 
         if (do_free)
             free_string_svalue(source);
@@ -2773,6 +2978,220 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
     }
 } /* transfer_protected_string_range() */
 
+/*-------------------------------------------------------------------------*/
+static p_int
+read_unprotected_char ()
+
+/* Read the character pointed to by <current_unprotected_char>.
+ */
+
+{
+    string_t *str = current_unprotected_char.str;
+
+    if (str->info.unicode == STRING_UTF8)
+    {
+        p_int ch = 0;
+        ssize_t result = utf8_to_unicode(current_unprotected_char.charp, get_txt(str) + mstrsize(str) - current_unprotected_char.charp, &ch);
+
+        if (!result)
+            errorf("Invalid character in string.\n");
+
+        return ch;
+    }
+    else
+        return *(unsigned char*)current_unprotected_char.charp;
+} /* read_unprotected_char() */
+
+/*-------------------------------------------------------------------------*/
+static p_int
+read_protected_char (struct protected_char_lvalue *src)
+
+/* Read the character pointed to by <src>.
+ */
+
+{
+    if (src->str->info.unicode == STRING_UTF8)
+    {
+        p_int ch = 0;
+        ssize_t result = utf8_to_unicode(src->charp, get_txt(src->str) + mstrsize(src->str) - src->charp, &ch);
+        if (!result)
+            errorf("Invalid character in string.\n");
+
+        return ch;
+    }
+    else
+        return *(unsigned char*)src->charp;
+} /* read_protected_char() */
+
+/*-------------------------------------------------------------------------*/
+static p_int
+assign_unprotected_char (p_int ch)
+
+/* Change the character pointed to by <current_unprotected_char> to <ch>,
+ * modifying the target string accordingly. Returns the value actually
+ * written.
+ */
+
+{
+    string_t *ds;               /* destination string (from dsvp) */
+
+    ds = current_unprotected_char.str;
+    if (ds->info.unicode == STRING_BYTES ||
+        (ds->info.unicode == STRING_ASCII && ch >= 0 && ch < 128))
+    {
+        /* This is easy, just change the byte. */
+        *current_unprotected_char.charp = ch;
+        return *(unsigned char*)current_unprotected_char.charp;
+    }
+    else
+    {
+        char buf[4];            /* buffer for the encoded character. */
+        string_t *rs;           /* result string */
+
+        size_t offset;          /* byte offset or the character in the string. */
+        size_t dsize;           /* size of the source string. */
+        size_t osize;           /* size of the replaced character. */
+        size_t nsize;           /* size of the new character. */
+        bool error = false;     /* error flag when reading. */
+        bool free_ds = false;   /* Wether we need to free the reference to <ds>. */
+
+        offset = current_unprotected_char.charp - get_txt(ds);
+        dsize = mstrsize(ds);
+        osize = char_to_byte_index(current_unprotected_char.charp, dsize - offset, 1, &error);
+        nsize = unicode_to_utf8(ch, buf);
+
+        if (nsize != osize)
+        {
+            /* Create the new string */
+            rs = alloc_mstring(dsize + nsize - osize);
+            if (rs)
+                rs = make_mutable(rs);
+            if (!rs)
+            {
+                /* We don't pop the stack here --> don't free source */
+                outofmem((dsize + nsize - osize), "new string");
+            }
+
+            if (offset)
+                memcpy(get_txt(rs), get_txt(ds), offset);
+
+            if (dsize > offset + osize)
+                memcpy(get_txt(rs) + offset + nsize, get_txt(ds) + offset + osize, dsize - offset - osize);
+
+            if (nsize > 1)
+                rs->info.unicode = STRING_UTF8;
+            else
+                rs->info.unicode = (is_ascii(get_txt(rs), offset) && is_ascii(get_txt(rs) + offset + nsize, dsize - offset - osize)) ? STRING_ASCII : STRING_UTF8;
+
+            current_unprotected_char.str = rs;
+
+            /* Update the original variable. */
+            if (current_unprotected_char.var != NULL
+             && current_unprotected_char.var->val.type == T_STRING
+             && current_unprotected_char.var->val.u.str == ds)
+            {
+                free_ds = true;
+                current_unprotected_char.var->val.u.str = rs;
+            }
+            else
+            {
+                /* Keep the string alive. */
+                free_svalue(&indexing_quickfix);
+                put_string(&indexing_quickfix, rs);
+            }
+        }
+        else
+            rs = ds;
+
+        update_string_lvalue_indices(ds, rs, offset, offset + osize, buf, nsize);
+        if (free_ds)
+            free_mstring(ds);
+
+        if (nsize)
+            memcpy(get_txt(rs) + offset, buf, nsize);
+
+        if (!osize)
+            return 0;
+
+        return ch;
+    }
+} /* assign_unprotected_char() */
+
+/*-------------------------------------------------------------------------*/
+static p_int
+assign_protected_char (struct protected_char_lvalue *dest, p_int ch)
+
+/* Change the character pointed to by <dest> to <ch>,
+ * modifying the target string accordingly.
+ */
+
+{
+    string_t *ds;               /* destination string (from dest) */
+
+    ds = dest->str;
+
+    if (ds->info.unicode == STRING_BYTES ||
+        (ds->info.unicode == STRING_ASCII && ch >= 0 && ch < 128))
+    {
+        /* This is easy, just change the byte. */
+        *dest->charp = ch;
+        return *(unsigned char*)dest->charp;
+    }
+    else
+    {
+        char buf[4];            /* buffer for the encoded character. */
+        string_t *rs;           /* result string */
+
+        size_t offset;          /* byte offset or the character in the string. */
+        size_t dsize;           /* size of the source string. */
+        size_t osize;           /* size of the replaced character. */
+        size_t nsize;           /* size of the new character. */
+        bool error = false;     /* error flag when reading. */
+
+        offset = dest->charp - get_txt(ds);
+        dsize = mstrsize(ds);
+        osize = char_to_byte_index(dest->charp, dsize - offset, 1, &error);
+        nsize = unicode_to_utf8(ch, buf);
+
+        if (nsize != osize)
+        {
+            /* Create the new string */
+            rs = alloc_mstring(dsize + nsize - osize);
+            if (rs)
+                rs = make_mutable(rs);
+            if (!rs)
+            {
+                /* We don't pop the stack here --> don't free source */
+                outofmem((dsize + nsize - osize), "new string");
+            }
+
+            if (offset)
+                memcpy(get_txt(rs), get_txt(ds), offset);
+
+            if (dsize > offset + osize)
+                memcpy(get_txt(rs) + offset + nsize, get_txt(ds) + offset + osize, dsize - offset - osize);
+
+            if (nsize > 1)
+                rs->info.unicode = STRING_UTF8;
+            else
+                rs->info.unicode = (is_ascii(get_txt(rs), offset) && is_ascii(get_txt(rs) + offset + nsize, dsize - offset - osize)) ? STRING_ASCII : STRING_UTF8;
+        }
+        else
+            rs = ref_mstring(ds);
+
+        update_string_lvalue_indices(ds, rs, offset, offset + osize, buf, nsize);
+
+        if (nsize)
+            memcpy(get_txt(rs) + offset, buf, nsize);
+
+        free_mstring(rs);
+
+        if (!osize)
+            return 0;
+
+        return ch;
+    }
+} /* assign_protected_char() */
 /*-------------------------------------------------------------------------*/
 static void
 add_number_to_lvalue (char* op, svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
@@ -2809,25 +3228,32 @@ add_number_to_lvalue (char* op, svalue_t *dest, int i, svalue_t *pre, svalue_t *
             break;
 
         case LVALUE_UNPROTECTED_CHAR:
-            if (pre) put_number(pre, (unsigned char)*current_unprotected_char.charp);
-            *(current_unprotected_char.charp) += i;
-            if (post) put_number(post, (unsigned char)*current_unprotected_char.charp);
+        {
+            p_int val = read_unprotected_char();
+            if (pre) put_number(pre, val);
+
+            val = assign_unprotected_char(val + i);
+
+            if (post) put_number(post, val);
             return;
+        }
 
         case LVALUE_PROTECTED:
             dest = &(dest->u.protected_lvalue->val);
             break;
 
         case LVALUE_PROTECTED_CHAR:
-            {
-                unsigned char* charp = (unsigned char*)dest->u.protected_char_lvalue->charp;
+        {
+            struct protected_char_lvalue* lv = dest->u.protected_char_lvalue;
 
-                if (pre) put_number(pre, *charp);
-                *charp += i;
-                if (post) put_number(post, *charp);
+            p_int val = read_protected_char(lv);
+            if (pre) put_number(pre, val);
 
-                return;
-            }
+            val = assign_protected_char(lv, val + i);
+
+            if (post) put_number(post, val);
+            return;
+        }
     } /* switch() */
 
     /* Now increment the non-LVALUE */
@@ -3389,7 +3815,7 @@ get_string_item_extended ( svalue_t * svp, mp_int size, mp_int offset
                          , svalue_t *sp, bytecode_p pc
                          , enum index_type itype)
 
-/* Index string <svp> starting at <offset> and having size <size>
+/* Index string <svp> starting at <offset> bytes and having size <size> bytes
  * with index <i> and return the pointer to the indexed item.
  * If <make_mutable> is TRUE, <svp> is made a mutable string
  * with just one reference.
@@ -3400,7 +3826,7 @@ get_string_item_extended ( svalue_t * svp, mp_int size, mp_int offset
 
 {
     static char nullchar = 0; /* We use that for allowed index at the end. */
-    mp_int ind;
+    mp_int ind, length;
 
     if (i->type != T_NUMBER)
     {
@@ -3409,9 +3835,19 @@ get_string_item_extended ( svalue_t * svp, mp_int size, mp_int offset
                ));
         return NULL;
     }
-    else
-
     ind = i->u.number;
+
+    /* For UTF8 strings determine the real length. */
+    if (svp->u.str->info.unicode == STRING_UTF8)
+    {
+        bool error = false;
+        length = byte_to_char_index(get_txt(svp->u.str) + offset, size, &error);
+        if (error)
+            ERRORF(("Invalid character in string at index %zd.\n", length));
+    }
+    else
+        length = size;
+
     switch (itype)
     {
         case REGULAR_INDEX:
@@ -3421,28 +3857,28 @@ get_string_item_extended ( svalue_t * svp, mp_int size, mp_int offset
                 /* NOTREACHED */
                 return NULL;
             }
-            if (ind > size )
+            if (ind > length )
             {
                 ERRORF(("Index out of bounds for []: %"PRIdMPINT
                         ", string length: %zu.\n"
-                       , ind, mstrsize(svp->u.str)));
+                       , ind, length));
                 /* NOTREACHED */
                 return NULL;
             }
-            if (ind == size)
+            if (ind == length)
             {
                 if (!allow_one_past)
                 {
                     ERRORF(("Index out of bounds for []: %"PRIdMPINT
                             ", string length: %zu.\n"
-                           , ind, mstrsize(svp->u.str)));
+                           , ind, length));
                     return NULL;
                 }
                 else if (!runtime_no_warn_deprecated)
                 {
                     warnf( "Warning: Indexing past string end is deprecated: "
                            "index %"PRIdMPINT", string length: %zu.\n"
-                         , ind, mstrsize(svp->u.str)
+                         , ind, length
                          );
                     return &nullchar;
                 }
@@ -3457,34 +3893,34 @@ get_string_item_extended ( svalue_t * svp, mp_int size, mp_int offset
             }
 
             /* Compute the real index. Allow ""[<1]. */
-            ind = size - ind;
-            if (!mstrsize(svp->u.str) && ind == -1)
+            ind = length - ind;
+            if (!length && ind == -1)
                 ind = 0;
 
             if ( ind < 0
-             ||  ind > size
+             ||  ind > length
                )
             {
                 ERRORF(("Index out of bounds for [<]: %"PRIdPINT
                         ", string length: %zu\n"
-                       , i->u.number, mstrsize(svp->u.str)));
+                       , i->u.number, length));
                 return NULL;
             }
 
-            if (ind == size)
+            if (ind == length)
             {
                 if (!allow_one_past)
                 {
                     ERRORF(("Index out of bounds for [<]: %"PRIdMPINT
                             ", string length: %zu.\n"
-                           , ind, mstrsize(svp->u.str)));
+                           , ind, length));
                     return NULL;
                 }
                 else if (!runtime_no_warn_deprecated)
                 {
                     warnf( "Warning: Indexing past string end is deprecated: "
                            "index %"PRIdMPINT", string length: %zu.\n"
-                         , ind, mstrsize(svp->u.str)
+                         , ind, length
                          );
                     return &nullchar;
                 }
@@ -3495,32 +3931,32 @@ get_string_item_extended ( svalue_t * svp, mp_int size, mp_int offset
             if (0 > ind)
             {
                 /* Compute the real index. Allow ""[<1]. */
-                ind = size + ind;
-                if (!mstrsize(svp->u.str) && ind == -1)
+                ind = length + ind;
+                if (!length && ind == -1)
                     ind = 0;
             }
-            if (ind < 0 || ind > size)
+            if (ind < 0 || ind > length)
             {
                 ERRORF(("Index out of bounds for [>]: %"PRIdPINT
                         ", string length: %zu\n"
-                       , i->u.number, mstrsize(svp->u.str)));
+                       , i->u.number, length));
                 return NULL;
             }
 
-            if (ind == size)
+            if (ind == length)
             {
                 if (!allow_one_past)
                 {
                     ERRORF(("Index out of bounds for [>]: %"PRIdMPINT
                             ", string length: %zu.\n"
-                           , ind, mstrsize(svp->u.str)));
+                           , ind, length));
                     return NULL;
                 }
                 else if (!runtime_no_warn_deprecated)
                 {
                     warnf( "Warning: Indexing past string end is deprecated: "
                            "index %"PRIdMPINT", string length: %zu.\n"
-                         , ind, mstrsize(svp->u.str)
+                         , ind, length
                          );
                     return &nullchar;
                 }
@@ -3541,6 +3977,15 @@ get_string_item_extended ( svalue_t * svp, mp_int size, mp_int offset
         memsafe(p = make_mutable(svp->u.str), mstrsize(svp->u.str)
                , "modifiable string");
         svp->u.str = p;
+    }
+
+    /* And now convert the character index back to byte index. */
+    if (svp->u.str->info.unicode == STRING_UTF8)
+    {
+        bool error = false;
+        ind = char_to_byte_index(get_txt(svp->u.str) + offset, size, ind, &error);
+        if (error)
+            ERRORF(("Invalid character in string at byte %zd.\n", ind));
     }
 
     return &(get_txt(svp->u.str)[ind + offset]);
@@ -3723,6 +4168,12 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc, bool 
 
     if (i->type == T_SYMBOL || i->type == T_STRING)
     {
+        if (i->type == T_STRING && i->u.str->info.unicode == STRING_BYTES)
+            ERRORF(("Illegal struct '%s'->(): got byte string, "
+                    "expected number/text string/symbol.\n"
+                   , get_txt(struct_name(st))
+                   ));
+
         ind = struct_find_member(st->type, i->u.str);
         if (ind < 0)
         {
@@ -3816,17 +4267,20 @@ assign_lvalue_no_free (svalue_t *dest, svalue_t *src)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-assign_char_lvalue_no_free (svalue_t *dest, string_t* src, char *cp)
+assign_char_lvalue_no_free (svalue_t *dest, struct protected_lvalue *var, string_t* src, char *cp)
 
 /* Put an unprotected char lvalue to <cp> into <dest>.
  * <dest> is considered empty at the time of call.
  */
 {
+    assert(src->info.type == STRING_MUTABLE);
+
     dest->type = T_LVALUE;
     dest->x.lvalue_type = LVALUE_UNPROTECTED_CHAR;
 
     current_unprotected_char.str = src;
     current_unprotected_char.charp = cp;
+    current_unprotected_char.var = var;
 } /* assign_char_lvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
@@ -3862,7 +4316,7 @@ assign_protected_lvalue_no_free (svalue_t *dest, svalue_t *src)
 
 /*-------------------------------------------------------------------------*/
 INLINE void
-assign_protected_char_lvalue_no_free (svalue_t *dest, string_t *src, char *charp)
+assign_protected_char_lvalue_no_free (svalue_t *dest, struct protected_lvalue *var, string_t *src, char *charp)
 
 /* Put a protected char lvalue to <cp> into <dest>.
  * <dest> is considered empty at the time of call.
@@ -3870,19 +4324,27 @@ assign_protected_char_lvalue_no_free (svalue_t *dest, string_t *src, char *charp
 {
     struct protected_char_lvalue *lval;
 
+    assert(src->info.type == STRING_MUTABLE);
+
     memsafe(lval = xalloc(sizeof(*lval)), sizeof(*lval)
            , "protected char lvalue");
 
     lval->ref = 1;
     lval->str = ref_mstring(src);
     lval->charp = charp;
+    lval->var = var;
+    lval->next = src->u.mutable.char_lvalues;
+
+    if (var)
+        var->ref++;
+    src->u.mutable.char_lvalues = lval;
 
     dest->type = T_LVALUE;
     dest->x.lvalue_type = LVALUE_PROTECTED_CHAR;
     dest->u.protected_char_lvalue = lval;
 
     num_protected_lvalues++;
-} /* assign_char_lvalue_no_free() */
+} /* assign_protected_char_lvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
 INLINE void
@@ -3900,6 +4362,17 @@ assign_protected_range_lvalue_no_free (svalue_t *dest, struct protected_lvalue *
     lval->ref = 1;
     lval->index1 = index1;
     lval->index2 = index2;
+
+    if (vec->type == T_STRING)
+    {
+        assert(vec->u.str->info.type == STRING_MUTABLE);
+
+        lval->next = vec->u.str->u.mutable.range_lvalues;
+        vec->u.str->u.mutable.range_lvalues = lval;
+    }
+    else
+        lval->next = NULL;
+
     /* Save the vector first. */
     assign_svalue_no_free(&(lval->vec), vec);
 
@@ -3912,7 +4385,7 @@ assign_protected_range_lvalue_no_free (svalue_t *dest, struct protected_lvalue *
     dest->u.protected_range_lvalue = lval;
 
     num_protected_lvalues++;
-} /* assign_char_lvalue_no_free() */
+} /* assign_protected_range_lvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
@@ -3949,6 +4422,7 @@ push_protected_lvalue (svalue_t *sp)
 
         case LVALUE_UNPROTECTED_CHAR:
             assign_protected_char_lvalue_no_free(sp,
+                current_unprotected_char.var,
                 current_unprotected_char.str, current_unprotected_char.charp);
             break;
 
@@ -4018,7 +4492,7 @@ get_unprotected_lvalue (svalue_t *lval)
             return &unprotected_lvalue;
 
         case LVALUE_PROTECTED_CHAR:
-            assign_char_lvalue_no_free(&unprotected_lvalue, lval->u.protected_char_lvalue->str, lval->u.protected_char_lvalue->charp);
+            assign_char_lvalue_no_free(&unprotected_lvalue, lval->u.protected_char_lvalue->var, lval->u.protected_char_lvalue->str, lval->u.protected_char_lvalue->charp);
             return &unprotected_lvalue;
 
         case LVALUE_PROTECTED_RANGE:
@@ -4114,7 +4588,7 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool rese
                     return sp;
                 }
 
-                assign_char_lvalue_no_free(&temp, r->vec.u.str, cp);
+                assign_char_lvalue_no_free(&temp, r->var, r->vec.u.str, cp);
                 free_svalue(sp--);
                 free_svalue(sp);
                 *sp = temp;
@@ -4144,6 +4618,7 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool rese
             case T_STRING:
             {
                 char * cp;
+                struct protected_lvalue *var = NULL;
 
                 if (reseating)
                     errorf("(index_vlvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
@@ -4151,6 +4626,12 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool rese
                 cp = get_string_item(vec, idx, /* make_mutable: */ MY_TRUE
                                     , /* allow_one_past: */ MY_FALSE
                                     , sp, pc, itype);
+
+                if (sp[-1].type == T_LVALUE)
+                {
+                    assert(sp[-1].x.lvalue_type == LVALUE_PROTECTED);
+                    var = sp[-1].u.protected_lvalue;
+                }
 
                 if (last_reference && vec->u.str->info.ref == 1)
                 {
@@ -4169,7 +4650,7 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool rese
                 free_svalue(sp--);
                 free_svalue(sp);
 
-                assign_char_lvalue_no_free(sp, vec->u.str, cp);
+                assign_char_lvalue_no_free(sp, var, vec->u.str, cp);
                 return sp;
             }
 
@@ -4371,7 +4852,9 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
 {
     svalue_t       *vec;          /* the indexed vector or string */
     mp_int         ind1, ind2;    /* Lower and upper range index */
-    mp_int         size;          /* size of <vec> in elements */
+    mp_int         size;          /* size of <vec> in elements for arrays
+                                     resp. in bytes for strings */
+    mp_int         length;        /* size of <vec> in elements */
     mp_int         offset;        /* offset into <vec> */
     bool last_reference = false;  /* Whether the value has
                                    * only one reference left.
@@ -4413,24 +4896,6 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
     }
     else
     {
-        switch (vec->type)
-        {
-            case T_POINTER:
-                size = VEC_SIZE(vec->u.vec);
-                offset = 0;
-                break;
-
-            case T_STRING:
-                size = mstrsize(vec->u.str);
-                offset = 0;
-                break;
-
-            default:
-                ERRORF(("Bad argument to [..] operand: got %s, "
-                        "expected string/array.\n", typename(vec->type))
-                        );
-        }
-
         if (sp[-2].type == T_LVALUE)
         {
             assert(sp[-2].x.lvalue_type == LVALUE_PROTECTED);
@@ -4442,7 +4907,42 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
             // We're referencing an svalue_t on the stack...
             last_reference = true;
         }
+
+        switch (vec->type)
+        {
+            case T_POINTER:
+                length = size = VEC_SIZE(vec->u.vec);
+                offset = 0;
+                break;
+
+            case T_STRING:
+            {
+                string_t *str;
+                memsafe(str = make_mutable(vec->u.str), mstrsize(vec->u.str), "modifiable string");
+                vec->u.str = str;
+
+                size = mstrsize(str);
+                offset = 0;
+                break;
+            }
+
+            default:
+                ERRORF(("Bad argument to [..] operand: got %s, "
+                        "expected string/array.\n", typename(vec->type))
+                        );
+        }
     }
+
+    /* Convert size in bytes to characters. */
+    if (vec->type == T_STRING && vec->u.str->info.unicode == STRING_UTF8)
+    {
+        bool error = false;
+        length = byte_to_char_index(get_txt(vec->u.str) + offset, size, &error);
+        if (error)
+            ERRORF(("Invalid character in string at index %zd.\n", length));
+    }
+    else
+        length = size;
 
     if (var && var->ref == 1)
         var = NULL;
@@ -4464,12 +4964,12 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
             break;
 
         case RN_RANGE:
-            ind1 = size - ind1;
+            ind1 = length - ind1;
             break;
 
         case AN_RANGE:
             if (ind1 < 0)
-                ind1 = size + ind1;
+                ind1 = length + ind1;
             break;
 
         default:
@@ -4484,12 +4984,12 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
             break;
 
         case NR_RANGE:
-            ind2 = size - ind2;
+            ind2 = length - ind2;
             break;
 
         case NA_RANGE:
             if (ind2 < 0)
-                ind2 = size + ind2;
+                ind2 = length + ind2;
             break;
 
         default:
@@ -4497,27 +4997,27 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
             break;
     }
 
-    if (ind1 < 0 || ind1 > size)
+    if (ind1 < 0 || ind1 > length)
     {
-        /* Appending (ind1 == size) is allowed */
+        /* Appending (ind1 == length) is allowed */
         inter_pc = pc;
         inter_sp = sp;
-        if (ind2 < -1 || ind2 >= size)
+        if (ind2 < -1 || ind2 >= length)
             errorf( "Warning: Out-of-bounds range limits: [%"
-                    PRIdMPINT"..%"PRIdMPINT"], size %"PRIdMPINT".\n"
-                  , ind1, ind2, size);
+                    PRIdMPINT"..%"PRIdMPINT"], length %"PRIdMPINT".\n"
+                  , ind1, ind2, length);
         else
             errorf( "Warning: Out-of-bounds lower range limits: %"
-                    PRIdMPINT", size %"PRIdMPINT".\n"
-                  , ind1, size);
+                    PRIdMPINT", length %"PRIdMPINT".\n"
+                  , ind1, length);
     }
-    else if (ind2 < -1 || ind2 >= size)
+    else if (ind2 < -1 || ind2 >= length)
     {
         inter_pc = pc;
         inter_sp = sp;
         errorf( "Warning: Out-of-bounds upper range limits: %"
-                PRIdMPINT", size %"PRIdMPINT".\n"
-              , ind2, size);
+                PRIdMPINT", length %"PRIdMPINT".\n"
+              , ind2, length);
     }
     else if (ind1 > ind2 + 1)
     {
@@ -4526,6 +5026,18 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
         errorf( "Warning: Ranges of negative size: %"PRIdMPINT
                 "..%"PRIdMPINT".\n"
               , ind1, ind2);
+    }
+
+    /* And now convert the character indices back to byte index. */
+    if (vec->type == T_STRING && vec->u.str->info.unicode == STRING_UTF8)
+    {
+        bool error = false;
+        ind1 = char_to_byte_index(get_txt(vec->u.str) + offset, size, ind1, &error);
+        if (error)
+            ERRORF(("Invalid character in string at byte %zd.\n", ind1));
+        ind2 = char_to_byte_index(get_txt(vec->u.str) + offset, size, ind2 + 1, &error) - 1;
+        if (error)
+            ERRORF(("Invalid character in string at byte %zd.\n", ind2));
     }
 
     /* Save information to the current_unprotected_range structure.
@@ -4590,7 +5102,21 @@ push_index_value (svalue_t *sp, bytecode_p pc, bool ignore_error, enum index_typ
 
             case T_STRING:
             {
-                int c = (unsigned char) *get_string_range_item(&(r->vec), r->index1, r->index2, idx, MY_FALSE, MY_TRUE, sp, pc, itype);
+                char *cp = get_string_range_item(&(r->vec), r->index1, r->index2, idx, MY_FALSE, MY_TRUE, sp, pc, itype);
+                p_int c;
+
+                if (r->vec.u.str->info.unicode == STRING_UTF8)
+                {
+                    if (!utf8_to_unicode(cp, 4, &c))
+                    {
+                        inter_sp = sp;
+                        inter_pc = pc;
+                        errorf("(index_value)Invalid character in string.\n");
+                        return NULL;
+                    }
+                }
+                else
+                    c = *((unsigned char*)cp);
 
                 free_svalue(sp--);
                 free_svalue(sp);
@@ -4617,12 +5143,23 @@ push_index_value (svalue_t *sp, bytecode_p pc, bool ignore_error, enum index_typ
              */
             case T_STRING:
             {
-                int c;
-
-                c = (unsigned char)
-                    *get_string_item(vec, idx, /* make_mutable: */ MY_FALSE
+                char *cp = get_string_item(vec, idx, /* make_mutable: */ MY_FALSE
                                     , /* allow_one_past: */ MY_TRUE
                                     , sp, pc, itype);
+                p_int c;
+
+                if (vec->u.str->info.unicode == STRING_UTF8)
+                {
+                    if (!utf8_to_unicode(cp, 4, &c))
+                    {
+                        inter_sp = sp;
+                        inter_pc = pc;
+                        errorf("(index_value)Invalid character in string.\n");
+                        return NULL;
+                    }
+                }
+                else
+                    c = *((unsigned char*)cp);
 
                 /* Remove the arguments and create and push the result. */
                 free_svalue(sp--);
@@ -4715,7 +5252,9 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
 {
     svalue_t      *vec;         /* the indexed vector or string */
     mp_int         ind1, ind2;  /* Lower and upper range index */
-    mp_int         size;        /* size of <vec> in elements */
+    mp_int         size;        /* size of <vec> in elements in arrays
+                                   resp. bytes in strings. */
+    mp_int         length;      /* size of <vec> in elements. */
     mp_int         offset;      /* offset into <vec> */
 
     /* get the arguments */
@@ -4769,6 +5308,17 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
         }
     }
 
+    /* Convert size in bytes to characters. */
+    if (vec->type == T_STRING && vec->u.str->info.unicode == STRING_UTF8)
+    {
+        bool error = false;
+        length = byte_to_char_index(get_txt(vec->u.str) + offset, size, &error);
+        if (error)
+            ERRORF(("Invalid character in string at index %zd.\n", length));
+    }
+    else
+        length = size;
+
     switch (code & NX_MASK)
     {
         case NN_RANGE:
@@ -4776,12 +5326,12 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
             break;
 
         case RN_RANGE:
-            ind1 = size - ind1;
+            ind1 = length - ind1;
             break;
 
         case AN_RANGE:
             if (ind1 < 0)
-                ind1 = size + ind1;
+                ind1 = length + ind1;
             break;
 
         default:
@@ -4796,12 +5346,12 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
             break;
 
         case NR_RANGE:
-            ind2 = size - ind2;
+            ind2 = length - ind2;
             break;
 
         case NA_RANGE:
             if (ind2 < 0)
-                ind2 = size + ind2;
+                ind2 = length + ind2;
             break;
 
         default:
@@ -4811,26 +5361,26 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
 
     if (runtime_array_range_check && vec->type == T_POINTER)
     {
-        if (ind1 < 0 || ind1 >= size)
+        if (ind1 < 0 || ind1 >= length)
         {
-            if (ind2 < 0 || ind2 >= size)
+            if (ind2 < 0 || ind2 >= length)
                 WARNF(("Warning: Out-of-bounds range limits: [%"
-                       PRIdMPINT"..%"PRIdMPINT"], size %"PRIdMPINT".\n"
-                      , ind1, ind2, size));
+                       PRIdMPINT"..%"PRIdMPINT"], length %"PRIdMPINT".\n"
+                      , ind1, ind2, length));
             else
                 WARNF(("Warning: Out-of-bounds lower range limits: %"
-                       PRIdMPINT", size %"PRIdMPINT".\n"
-                      , ind1, size));
+                       PRIdMPINT", length %"PRIdMPINT".\n"
+                      , ind1, length));
         }
-        else if (ind2 < 0 || ind2 >= size)
+        else if (ind2 < 0 || ind2 >= length)
         {
             WARNF(("Warning: Out-of-bounds upper range limits: %"
-                   PRIdMPINT", size %"PRIdMPINT".\n"
-                  , ind2, size));
+                   PRIdMPINT", length %"PRIdMPINT".\n"
+                  , ind2, length));
         }
         else if (ind1 > ind2 + 1)
         {
-            WARNF(("Warning: Ranges of negative size: %"PRIdMPINT
+            WARNF(("Warning: Ranges of negative length: %"PRIdMPINT
                    "..%"PRIdMPINT".\n"
                   , ind1, ind2));
         }
@@ -4840,9 +5390,9 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
     if (ind1 < 0)
         ind1 = 0;
 
-    /* Make sure, ind2 is lower then size. */
-    if (ind2 >= size)
-        ind2 = size-1;
+    /* Make sure, ind2 is lower then length. */
+    if (ind2 >= length)
+        ind2 = length-1;
 
     switch (vec->type)
     {
@@ -4865,7 +5415,21 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
             if (ind2 < ind1)
                 str = ref_mstring(STR_EMPTY);
             else
+            {
+                /* And now convert the character indices back to byte index. */
+                if (vec->u.str->info.unicode == STRING_UTF8)
+                {
+                    bool error = false;
+                    ind1 = char_to_byte_index(get_txt(vec->u.str) + offset, size, ind1, &error);
+                    if (error)
+                        ERRORF(("Invalid character in string at byte %zd.\n", ind1));
+                    ind2 = char_to_byte_index(get_txt(vec->u.str) + offset, size, ind2 + 1, &error) - 1;
+                    if (error)
+                        ERRORF(("Invalid character in string at byte %zd.\n", ind2));
+                }
+
                 str = mstr_extract(vec->u.str, offset + ind1, offset + ind2);
+            }
 
             pop_n_elems(3);
 
@@ -5211,7 +5775,32 @@ efun_arg_typename (long type)
 
     for (i = 0; i < numtypes; i++)
     {
-        if ((1 << i) & type)
+        if (i == T_STRING)
+        {
+            switch (type & (TF_STRING|TF_BYTES))
+            {
+                case TF_STRING|TF_BYTES:
+                    if (result[0] != '\0')
+                        strcat(result, "/string");
+                    else
+                        strcat(result, "string");
+                    break;
+                case TF_STRING:
+                    if (result[0] != '\0')
+                        strcat(result, "/text string");
+                    else
+                        strcat(result, "text string");
+                    break;
+                case TF_BYTES:
+                    if (result[0] != '\0')
+                        strcat(result, "/byte string");
+                    else
+                        strcat(result, "byte string");
+                    break;
+            }
+            type &= ~(TF_STRING|TF_BYTES);
+        }
+        else if ((1 << i) & type)
         {
             if (result[0] != '\0')
                 strcat(result, "/");
@@ -5539,18 +6128,22 @@ test_efun_args (int instr, int args, svalue_t *argp)
 
 {
     int i;
-    long * typep, type;
+    long * typep;
 
     typep = &(efun_lpc_types[instrs[instr].lpc_arg_index]);
     for (i = 1; i <= args; i++, typep++, argp++)
     {
-        type = *typep;
-        if (argp->type == T_NUMBER && !argp->u.number
-         && (type & TF_NULL)
-           )
+        long exp_type = *typep;
+        long act_type = argp->type;
+
+        if (argp->type == T_NUMBER && !argp->u.number && (exp_type & TF_NULL))
             continue;
-        if (!(*typep & (1 << argp->type)))
-            raise_arg_error(instr, i, *typep, argp->type);
+
+        if (argp->type == T_STRING && argp->u.str->info.unicode == STRING_BYTES)
+            act_type = T_BYTES;
+
+        if (!(exp_type & (1 << act_type)))
+            raise_arg_error(instr, i, exp_type, act_type);
     }
 } /* test_efun_args() */
 
@@ -7333,6 +7926,19 @@ eval_instruction (bytecode_p first_instruction
       /* Test the type of a certain argument.
        */
 
+#define OP_ARG_STRING_TEST(arg1,arg2,num) \
+            if ((arg1)->u.str->info.unicode == STRING_BYTES)            \
+            {                                                           \
+                if ((arg2)->u.str->info.unicode != STRING_BYTES)        \
+                    OP_ARG_ERROR((num), TF_BYTES, T_STRING);            \
+            }                                                           \
+            else                                                        \
+            {                                                           \
+                if ((arg2)->u.str->info.unicode == STRING_BYTES)        \
+                    OP_ARG_ERROR((num), TF_STRING, T_BYTES);            \
+            }
+      /* Check that both args use the same string type. */
+
 #   ifdef MARK
 #        define CASE(x) case (x): MARK(x);
 #   else
@@ -8944,8 +9550,12 @@ again:
         arg = sp - num_arg + 1;
         if (arg[0].type != T_STRING)
             BAD_ARG_ERROR(1, T_STRING, arg[0].type);
+        if (arg[0].u.str->info.unicode == STRING_BYTES)
+            BAD_ARG_ERROR(1, T_STRING, T_BYTES);
         if (arg[1].type != T_STRING)
             BAD_ARG_ERROR(2, T_STRING, arg[1].type);
+        if (arg[1].u.str->info.unicode == STRING_BYTES)
+            BAD_ARG_ERROR(2, T_STRING, T_BYTES);
         i = e_sscanf(num_arg, sp);
         pop_n_elems(num_arg-1);
         free_svalue(sp);
@@ -8977,10 +9587,14 @@ again:
         arg = sp - num_arg + 1;
         if (arg[0].type != T_STRING)
             BAD_ARG_ERROR(1, T_STRING, arg[0].type);
+        if (arg[0].u.str->info.unicode == STRING_BYTES)
+            BAD_ARG_ERROR(1, T_STRING, T_BYTES);
         if (arg[1].type != T_OBJECT && arg[1].type != T_POINTER)
             RAISE_ARG_ERROR(2, TF_OBJECT|TF_POINTER, arg[1].type);
         if (arg[2].type != T_STRING)
             BAD_ARG_ERROR(3, T_STRING, arg[2].type);
+        if (arg[2].u.str->info.unicode == STRING_BYTES)
+            BAD_ARG_ERROR(3, T_STRING, T_BYTES);
         if (arg[1].type == T_POINTER)
             check_for_destr(arg[1].u.vec);
 
@@ -9338,6 +9952,17 @@ again:
               {
                 string_t *left, *right, *res;
 
+                if (sp[-1].u.str->info.unicode == STRING_BYTES)
+                {
+                    if (sp[0].u.str->info.unicode != STRING_BYTES)
+                        OP_ARG_ERROR(2, TF_BYTES, T_STRING);
+                }
+                else
+                {
+                    if (sp[0].u.str->info.unicode == STRING_BYTES)
+                        OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
+                }
+
                 left = (sp-1)->u.str;
                 right = sp->u.str;
 
@@ -9360,6 +9985,9 @@ again:
                 char buff[80];
                 size_t len;
 
+                if (sp[-1].u.str->info.unicode == STRING_BYTES)
+                    OP_ARG_ERROR(2, TF_BYTES, T_STRING);
+
                 left = (sp-1)->u.str;
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%"PRIdPINT, sp->u.number);
@@ -9381,6 +10009,9 @@ again:
                 string_t *left, *res;
                 size_t len;
 
+                if (sp[-1].u.str->info.unicode == STRING_BYTES)
+                    OP_ARG_ERROR(2, TF_BYTES, T_STRING);
+
                 left = (sp-1)->u.str;
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%g", READ_DOUBLE( sp ) );
@@ -9398,7 +10029,10 @@ again:
               }
 
             default:
-                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+                if (sp[-1].u.str->info.unicode == STRING_BYTES)
+                    OP_ARG_ERROR(2, TF_BYTES, sp->type);
+                else
+                    OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
             break;
@@ -9412,6 +10046,9 @@ again:
                 char buff[80];
                 string_t *right, *res;
                 size_t len;
+
+                if (sp[0].u.str->info.unicode == STRING_BYTES)
+                    OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
 
                 right = sp->u.str;
                 buff[sizeof(buff)-1] = '\0';
@@ -9504,6 +10141,9 @@ again:
                 string_t *right, *res;
                 size_t len;
 
+                if (sp[0].u.str->info.unicode == STRING_BYTES)
+                    OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
+
                 right = sp->u.str;
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%g", READ_DOUBLE(sp-1) );
@@ -9569,7 +10209,7 @@ again:
           }
 
         default:
-            OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_FLOAT|TF_NUMBER
+            OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_BYTES|TF_FLOAT|TF_NUMBER
                           , sp[-1].type);
             /* NOTREACHED */
         }
@@ -9692,6 +10332,8 @@ again:
             string_t * result;
 
             TYPE_TEST_RIGHT(sp, T_STRING);
+            OP_ARG_STRING_TEST(sp-1, sp, 2);
+
             inter_sp = sp;
             result = intersect_strings((sp-1)->u.str, sp->u.str, MY_TRUE);
             free_string_svalue(sp);
@@ -9701,7 +10343,7 @@ again:
             break;
         }
 
-        OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_FLOAT|TF_NUMBER
+        OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_BYTES|TF_FLOAT|TF_NUMBER
                       , sp[-1].type);
         /* NOTREACHED */
     }
@@ -9867,7 +10509,7 @@ again:
                 put_array(sp, result);
                 break;
             }
-            OP_ARG_ERROR(2, TF_POINTER|TF_STRING|TF_FLOAT|TF_NUMBER
+            OP_ARG_ERROR(2, TF_POINTER|TF_STRING|TF_BYTES|TF_FLOAT|TF_NUMBER
                           , sp->type);
             /* NOTREACHED */
         case T_FLOAT:
@@ -9985,7 +10627,7 @@ again:
             /* NOTREACHED */
           }
         default:
-            OP_ARG_ERROR(1, TF_POINTER|TF_STRING|TF_FLOAT|TF_NUMBER
+            OP_ARG_ERROR(1, TF_POINTER|TF_STRING|TF_BYTES|TF_FLOAT|TF_NUMBER
                           , sp[-1].type);
             /* NOTREACHED */
         }
@@ -10124,6 +10766,8 @@ again:
 
         if ((sp-1)->type == T_STRING && sp->type == T_STRING)
         {
+            OP_ARG_STRING_TEST(sp-1, sp, 2);
+
             i = mstrcmp((sp-1)->u.str, sp->u.str) > 0;
             free_string_svalue(sp);
             sp--;
@@ -10164,8 +10808,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_BYTES|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_BYTES|TF_FLOAT);
         ERRORF(("Arguments to > don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -10184,6 +10828,8 @@ again:
 
         if ((sp-1)->type == T_STRING && sp->type == T_STRING)
         {
+            OP_ARG_STRING_TEST(sp-1, sp, 2);
+
             i = mstrcmp((sp-1)->u.str, sp->u.str) >= 0;
             free_string_svalue(sp);
             sp--;
@@ -10224,8 +10870,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_BYTES|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_BYTES|TF_FLOAT);
         ERRORF(("Arguments to >= don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -10244,6 +10890,8 @@ again:
 
         if ((sp-1)->type == T_STRING && sp->type == T_STRING)
         {
+            OP_ARG_STRING_TEST(sp-1, sp, 2);
+
             i = mstrcmp((sp-1)->u.str, sp->u.str) < 0;
             free_string_svalue(sp);
             sp--;
@@ -10284,8 +10932,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_BYTES|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_BYTES|TF_FLOAT);
         ERRORF(("Arguments to < don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -10304,6 +10952,8 @@ again:
 
         if ((sp-1)->type == T_STRING && sp->type == T_STRING)
         {
+            OP_ARG_STRING_TEST(sp-1, sp, 2);
+
             i = mstrcmp((sp-1)->u.str, sp->u.str) <= 0;
             free_string_svalue(sp);
             sp--;
@@ -10344,8 +10994,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_BYTES|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_BYTES|TF_FLOAT);
         ERRORF(("Arguments to <= don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -10551,6 +11201,8 @@ again:
         {
             string_t * result;
 
+            OP_ARG_STRING_TEST(sp-1, sp, 2);
+
             inter_sp = sp;
             result = intersect_strings(sp[-1].u.str, sp->u.str, MY_FALSE);
             free_string_svalue(sp-1);
@@ -10577,8 +11229,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_POINTER|TF_MAPPING);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_POINTER|TF_MAPPING);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER|TF_MAPPING);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER|TF_MAPPING);
         ERRORF(("Arguments to & don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -10837,7 +11489,7 @@ again:
             case LVALUE_UNPROTECTED_CHAR:
                 if (type2 == T_NUMBER)
                 {
-                    p_int left = (unsigned char)*current_unprotected_char.charp;
+                    p_int left = read_unprotected_char();
                     p_int right = u2.number;
 
                     if ((left >= 0 && right >= 0 && PINT_MAX - left < right)
@@ -10850,7 +11502,7 @@ again:
                         break;
                     }
 
-                    *current_unprotected_char.charp = (left += right);
+                    left = assign_unprotected_char(left + right);
                     pop_stack();
 
                     if (instruction == F_VOID_ADD_EQ)
@@ -10886,6 +11538,17 @@ again:
             {
                 string_t *left, *right;
                 size_t len;
+
+                if (argp->u.str->info.unicode == STRING_BYTES)
+                {
+                    if (sp[-1].u.str->info.unicode != STRING_BYTES)
+                        OP_ARG_ERROR(2, TF_BYTES, T_STRING);
+                }
+                else
+                {
+                    if (sp[-1].u.str->info.unicode == STRING_BYTES)
+                        OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
+                }
 
                 left = argp->u.str;
                 right = (sp-1)->u.str;
@@ -10930,7 +11593,10 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, type2);
+                if (argp->u.str->info.unicode == STRING_BYTES)
+                    OP_ARG_ERROR(2, TF_BYTES, type2);
+                else
+                    OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, type2);
                 /* NOTREACHED */
             }
 
@@ -10975,6 +11641,9 @@ again:
                 char buff[80];
                 string_t *right, *res;
                 size_t len;
+
+                if (sp[-1].u.str->info.unicode == STRING_BYTES)
+                    OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
 
                 right = (sp-1)->u.str;
                 buff[sizeof(buff)-1] = '\0';
@@ -11077,7 +11746,7 @@ again:
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
+            OP_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
                         , argp->type);
             /* NOTREACHED */
         } /* end of switch */
@@ -11142,7 +11811,7 @@ again:
             case LVALUE_UNPROTECTED_CHAR:
                 if (type2 == T_NUMBER)
                 {
-                    p_int left = (unsigned char)*current_unprotected_char.charp;
+                    p_int left = read_unprotected_char();
                     p_int right = u2.number;
 
                     if ((left >= 0 && right < 0 && PINT_MAX + right < left)
@@ -11155,7 +11824,7 @@ again:
                         break;
                     }
 
-                    *current_unprotected_char.charp = (left -= right);
+                    left = assign_unprotected_char(left - right);
                     pop_stack();
                     sp->u.number = left; /* It is already a T_NUMBER. */
                 }
@@ -11218,6 +11887,18 @@ again:
             if (type2 == T_STRING)
             {
                 string_t * result;
+
+                if (argp->u.str->info.unicode == STRING_BYTES)
+                {
+                    if (sp[-1].u.str->info.unicode != STRING_BYTES)
+                        OP_ARG_ERROR(2, TF_BYTES, T_STRING);
+                }
+                else
+                {
+                    if (sp[-1].u.str->info.unicode == STRING_BYTES)
+                        OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
+                }
+
                 inter_sp = sp;
                 result = intersect_strings(argp->u.str, (sp-1)->u.str, MY_TRUE);
                 free_string_svalue(argp);
@@ -11225,7 +11906,10 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_STRING, type2);
+                if (argp->u.str->info.unicode == STRING_BYTES)
+                    OP_ARG_ERROR(2, TF_BYTES, type2);
+                else
+                    OP_ARG_ERROR(2, TF_STRING, type2);
                 /* NOTREACHED */
             }
             break;
@@ -11318,7 +12002,7 @@ again:
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
+            OP_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
                         , argp->type);
             /* NOTREACHED */
         } /* end of switch */
@@ -11370,7 +12054,7 @@ again:
             case LVALUE_UNPROTECTED_CHAR:
                 if (sp[-1].type == T_NUMBER)
                 {
-                    p_int left = (unsigned char)*current_unprotected_char.charp;
+                    p_int left = read_unprotected_char();
                     p_int right = sp[-1].u.number;
 
                     if (left > 0 && right > 0)
@@ -11410,7 +12094,7 @@ again:
                         }
                     }
 
-                    *current_unprotected_char.charp = (left *= right);
+                    left = assign_unprotected_char(left * right);
                     pop_stack();
                     sp->u.number = left; /* It is already a T_NUMBER. */
                 }
@@ -11626,7 +12310,7 @@ again:
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_POINTER|TF_NUMBER
+            OP_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_FLOAT|TF_POINTER|TF_NUMBER
                         , argp->type);
             /* NOTREACHED */
             break;
@@ -11677,9 +12361,13 @@ again:
             case LVALUE_UNPROTECTED_CHAR:
                 if (sp[-1].type == T_NUMBER)
                 {
+                    p_int val = read_unprotected_char();
+
                     if (sp[-1].u.number == 0)
                         ERROR("Division by zero\n");
-                    sp[-1].u.number = (unsigned char)(*current_unprotected_char.charp /= sp[-1].u.number);
+
+                    val = assign_unprotected_char(val / sp[-1].u.number);
+                    sp[-1].u.number = val;
                     pop_stack();
                 }
                 else
@@ -11821,9 +12509,13 @@ again:
             case LVALUE_UNPROTECTED_CHAR:
                 if (sp[-1].type == T_NUMBER)
                 {
+                    p_int val = read_unprotected_char();
+
                     if (sp[-1].u.number == 0)
                         ERROR("Division by zero\n");
-                    sp[-1].u.number = (unsigned char)(*current_unprotected_char.charp %= sp[-1].u.number);
+
+                    val = assign_unprotected_char(val % sp[-1].u.number);
+                    sp[-1].u.number = val;
                     pop_stack();
                 }
                 else
@@ -11909,7 +12601,10 @@ again:
             case LVALUE_UNPROTECTED_CHAR:
                 if (sp[-1].type == T_NUMBER)
                 {
-                    sp[-1].u.number = (unsigned char)(*current_unprotected_char.charp &= sp[-1].u.number);
+                    p_int val = read_unprotected_char();
+
+                    val = assign_unprotected_char(val & sp[-1].u.number);
+                    sp[-1].u.number = val;
                     pop_stack();
                 }
                 else
@@ -12007,6 +12702,17 @@ again:
             {
                 string_t * result;
 
+                if (argp->u.str->info.unicode == STRING_BYTES)
+                {
+                    if (sp[-1].u.str->info.unicode != STRING_BYTES)
+                        OP_ARG_ERROR(2, TF_BYTES, T_STRING);
+                }
+                else
+                {
+                    if (sp[-1].u.str->info.unicode == STRING_BYTES)
+                        OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
+                }
+
                 inter_sp = sp;
                 result = intersect_strings(argp->u.str, (sp-1)->u.str, MY_FALSE);
 
@@ -12015,12 +12721,15 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_STRING, sp[-1].type);
+                if (argp->u.str->info.unicode == STRING_BYTES)
+                    OP_ARG_ERROR(2, TF_BYTES, sp[-1].type);
+                else
+                    OP_ARG_ERROR(2, TF_STRING, sp[-1].type);
                 /* NOTREACHED */
             }
             break;
         default:
-            OP_ARG_ERROR(1, TF_NUMBER|TF_STRING|TF_POINTER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER, argp->type);
             /* NOTREACHED */
         }
 
@@ -12066,7 +12775,9 @@ again:
             case LVALUE_UNPROTECTED_CHAR:
                 if (sp[-1].type == T_NUMBER)
                 {
-                    sp[-1].u.number = (unsigned char)(*current_unprotected_char.charp |= sp[-1].u.number);
+                    p_int val = read_unprotected_char();
+                    val = assign_unprotected_char(val | sp[-1].u.number);
+                    sp[-1].u.number = val;
                     pop_stack();
                 }
                 else
@@ -12171,7 +12882,9 @@ again:
             case LVALUE_UNPROTECTED_CHAR:
                 if (sp[-1].type == T_NUMBER)
                 {
-                    sp[-1].u.number = (unsigned char)(*current_unprotected_char.charp ^= sp[-1].u.number);
+                    p_int val = read_unprotected_char();
+                    val = assign_unprotected_char(val ^ sp[-1].u.number);
+                    sp[-1].u.number = val;
                     pop_stack();
                 }
                 else
@@ -12277,9 +12990,9 @@ again:
             case LVALUE_UNPROTECTED_CHAR:
                 if (sp[-1].type == T_NUMBER)
                 {
-                    if (shift > 8)
-                        shift = 8;
-                    sp[-1].u.number = (*(unsigned char*)current_unprotected_char.charp <<= shift);
+                    p_int val = read_unprotected_char();
+                    val = assign_unprotected_char(shift > MAX_SHIFT ? 0 : (val << shift));
+                    sp[-1].u.number = val;
                     pop_stack();
                 }
                 else
@@ -12303,7 +13016,10 @@ again:
         case T_NUMBER:
             if (sp[-1].type == T_NUMBER)
             {
-                argp->u.number <<= shift;
+                if (shift > MAX_SHIFT)
+                    argp->u.number = 0;
+                else
+                    argp->u.number <<= shift;
             }
             else
             {
@@ -12362,9 +13078,9 @@ again:
             case LVALUE_UNPROTECTED_CHAR:
                 if (sp[-1].type == T_NUMBER)
                 {
-                    if (shift > 8)
-                        shift = 8;
-                    sp[-1].u.number = (*(unsigned char*)current_unprotected_char.charp >>= shift);
+                    p_int val = read_unprotected_char();
+                    val = assign_unprotected_char(shift > MAX_SHIFT ? 0 : (val >> shift));
+                    sp[-1].u.number = val;
                     pop_stack();
                 }
                 else
@@ -12388,7 +13104,10 @@ again:
         case T_NUMBER:
             if (sp[-1].type == T_NUMBER)
             {
-                argp->u.number >>= shift;
+                if (shift > MAX_SHIFT)
+                    argp->u.number = 0;
+                else
+                    argp->u.number >>= shift;
             }
             else
             {
@@ -12447,9 +13166,9 @@ again:
                     /* We treat the chars as unsigned, so
                      * no difference here to F_RSH_EQ.
                      */
-                    if (shift > 8)
-                        shift = 8;
-                    sp[-1].u.number = (*(unsigned char*)current_unprotected_char.charp >>= shift);
+                    p_int val = read_unprotected_char();
+                    val = assign_unprotected_char(shift > MAX_SHIFT ? 0 : (val >> shift));
+                    sp[-1].u.number = val;
                     pop_stack();
                 }
                 else
@@ -13319,7 +14038,7 @@ again:
     CASE(F_AINDEX);                 /* --- aindex              --- */
         /* Operator F_AINDEX (string|vector v=sp[-1], int   i=sp[0])
          *
-         * Compute the value (v[<i]) and push it onto the stack.  If the value
+         * Compute the value (v[>i]) and push it onto the stack.  If the value
          * would be a destructed object, 0 is pushed onto the stack and the
          * ref to the object is removed from the vector/mapping.
          */
@@ -14211,9 +14930,17 @@ again:
          *                                 FOREACH_NEXT).
          *   sp[-1] -> number 'count': number of values left to loop over.
          *             x.generic:      <nargs>, or -<nargs> if the value
-         *                             is mapping
+         *                             is mapping or a string lvalue.
          *   sp[-2] -> array 'm_indices': if the value is a mapping, this
          *                             is the array with the indices.
+         *             string lvalue: if the value is a string used with
+         *                            FOREACH_REF, this is a range lvalue.
+         *
+         * When iterating over a string reference, the string might change
+         * its length due to UTF-8 encoding. To keep track of the length
+         * and the current position we store a protected range lvalue
+         * from the current position to the end. This will be updated
+         * accordingly.
          *
          * After pushing the values onto the stack, the instruction
          * branches to the FOREACH_NEXT instruction to start the first
@@ -14243,7 +14970,7 @@ again:
         if (gen_refs)
         {
             svalue_t argval;
-            svalue_t *argvar = NULL;
+            struct protected_lvalue* argvar = NULL;
 
             if (sp->type != T_LVALUE)
                 ERRORF(("foreach() got a %s, expected a &(string/array/mapping).\n"
@@ -14278,8 +15005,10 @@ again:
                  && r->var != NULL
                  && r->var->val.type == T_STRING
                  && r->var->val.u.str == arg->u.str )
-                    argvar = &(r->var->val);
+                    argvar = r->var;
             }
+            else if (sp->x.lvalue_type == LVALUE_PROTECTED && arg->type == T_STRING)
+                argvar = sp->u.protected_lvalue;
 
             if (arg->type == T_STRING)
             {
@@ -14294,12 +15023,15 @@ again:
                 if (arg->u.str != str)
                 {
                     arg->u.str = str;
-                    if (argvar != NULL)
+                    if (argvar != NULL && argvar->val.u.str != str)
                     {
-                        free_mstring(argvar->u.str);
-                        argvar->u.str = ref_mstring(str);
+                        free_mstring(argvar->val.u.str);
+                        argvar->val.u.str = ref_mstring(str);
                     }
                 }
+
+                if (argvar)
+                    argvar->ref++;
             }
 
             /* Replace the lvalue on the stack by the value
@@ -14311,6 +15043,33 @@ again:
             assign_svalue_no_free(&argval, arg);
             free_svalue(sp);
             transfer_svalue_no_free(sp, &argval);
+
+            if (argvar)
+            {
+                /* Remember that one for later updates. */
+                argval.type = T_LVALUE;
+                argval.x.lvalue_type = LVALUE_PROTECTED;
+                argval.u.protected_lvalue = argvar;
+            }
+            else if (arg->type == T_STRING)
+            {
+                /* We need the protected lvalue
+                 * to keep track of the string.
+                 */
+                assign_svalue_no_free(&argval, sp);
+                assign_protected_lvalue_no_free(sp+1, &argval);
+                free_svalue(sp+1);
+                argvar = argval.u.protected_lvalue;
+            }
+
+            if (argvar)
+            {
+                assign_protected_range_lvalue_no_free(sp+1, argvar, sp, start, count < 0 ? mstrsize(sp->u.str) : (start + count));
+                free_svalue(&argval);
+                sp++;
+
+                nargs = -nargs;
+            }
         }
         else if (use_range)
         {
@@ -14320,7 +15079,7 @@ again:
                        ));
         }
 
-        arg = sp;
+        arg = (nargs < 0) ? sp-1 : sp;
 
         if (arg->type != T_STRING
          && arg->type != T_POINTER
@@ -14468,14 +15227,14 @@ again:
 
         gen_refs = sp->x.generic;
 
-        if (sp[-1].x.generic < 0)
+        if (sp[-1].x.generic < 0 && sp[-2].type == T_POINTER)
         {
             /* We loop over a mapping */
 
             mapping_t *m;
             vector_t  *indices;
             svalue_t  *values;
-            p_int        left;
+            p_int      left;
 
             lvalue = sp + sp[-1].x.generic - 2;
 
@@ -14534,7 +15293,18 @@ again:
         }
         else
         {
-            lvalue = sp - sp[-1].x.generic - 1;
+            svalue_t *arg;
+
+            if (sp[-1].x.generic < 0)
+            {
+                lvalue = sp + sp[-1].x.generic - 2;
+                arg = sp - 3;
+            }
+            else
+            {
+                lvalue = sp - sp[-1].x.generic - 1;
+                arg = sp - 2;
+            }
 #ifdef DEBUG
             if (lvalue->type != T_LVALUE || lvalue->x.lvalue_type != LVALUE_UNPROTECTED)
                 fatal("Bad argument to foreach(): not a lvalue\n");
@@ -14542,27 +15312,69 @@ again:
 #endif
             lvalue = lvalue->u.lvalue;
 
-            if (sp[-2].type == T_NUMBER)
+            if (arg->type == T_NUMBER)
             {
                   free_svalue(lvalue);
                   put_number(lvalue, ix);
             }
-            else if (sp[-2].type == T_STRING)
+            else if (arg->type == T_STRING)
             {
+                size_t chlen;
+
                 free_svalue(lvalue);
                 if (!gen_refs)
                 {
-                    put_number(lvalue, get_txt(sp[-2].u.str)[ix]);
+                    string_t * str = arg->u.str;
+                    p_int ch = 0;
+
+                    if (str->info.unicode == STRING_UTF8)
+                        chlen = utf8_to_unicode(get_txt(str) + ix, sp[-1].u.number + 1, &ch);
+                    else
+                    {
+                        chlen = 1;
+                        ch = ((unsigned char*)get_txt(str))[ix];
+                    }
+
+                    put_number(lvalue, ch);
+
+                    if (chlen > 1)
+                    {
+                        sp->u.number += chlen - 1;
+                        sp[-1].u.number -= chlen - 1;
+                    }
                 }
                 else
                 {
-                    string_t * str = sp[-2].u.str;
-                    assign_protected_char_lvalue_no_free(lvalue, str, &(get_txt(str)[ix]));
+                    struct protected_range_lvalue* lv;
+                    string_t *str;
+                    bool error = false;
+
+                    assert(sp[-1].x.generic < 0);
+                    assert(sp[-2].type == T_LVALUE && sp[-2].x.lvalue_type == LVALUE_PROTECTED_RANGE);
+
+                    /* We use the count from the range lvalue. */
+                    lv = sp[-2].u.protected_range_lvalue;
+                    ix = lv->index1;
+                    str = lv->vec.u.str;
+
+                    if (str->info.unicode == STRING_UTF8)
+                        chlen = char_to_byte_index(get_txt(str) + ix, lv->index2 - ix, 1, &error);
+                    else
+                        chlen = 1;
+
+                    assign_protected_char_lvalue_no_free(lvalue, lv->var, str, get_txt(str) + ix);
+
+                    lv->index1 = ix += (chlen ? chlen : 1);
+
+                    /* But we update the count on the stack for the end check. */
+                    sp->u.number = ix;
+                    sp[-1].u.number = lv->index2 - lv->index1;
                 }
+
             }
-            else if (sp[-2].type == T_POINTER)
+            else if (arg->type == T_POINTER)
             {
-                if (ix >= VEC_SIZE(sp[-2].u.vec))
+                if (ix >= VEC_SIZE(arg->u.vec))
                     break;
                     /* Oops, this array shrunk while we're looping over it.
                      * We stop processing and continue with the following
@@ -14572,16 +15384,16 @@ again:
                 free_svalue(lvalue);
                 if (!gen_refs)
                 {
-                    assign_svalue_no_free(lvalue, sp[-2].u.vec->item+ix);
+                    assign_svalue_no_free(lvalue, arg->u.vec->item+ix);
                 }
                 else
                 {
-                    assign_protected_lvalue_no_free(lvalue, sp[-2].u.vec->item+ix);
+                    assign_protected_lvalue_no_free(lvalue, arg->u.vec->item+ix);
                 }
             }
-            else if (sp[-2].type == T_STRUCT)
+            else if (arg->type == T_STRUCT)
             {
-                if (ix >= struct_size(sp[-2].u.strct))
+                if (ix >= struct_size(arg->u.strct))
                     break;
                     /* Oops, somehow the struct managed to shring while
                      * we're looping over it.
@@ -14592,11 +15404,11 @@ again:
                 free_svalue(lvalue);
                 if (!gen_refs)
                 {
-                    assign_svalue_no_free(lvalue, sp[-2].u.strct->member+ix);
+                    assign_svalue_no_free(lvalue, arg->u.strct->member+ix);
                 }
                 else
                 {
-                    assign_protected_lvalue_no_free(lvalue, sp[-2].u.strct->member+ix);
+                    assign_protected_lvalue_no_free(lvalue, arg->u.strct->member+ix);
                 }
             }
             else
@@ -14820,7 +15632,7 @@ again:
         {
             i = (sp->u.ob->flags & O_CLONE);
         }
-        else if (sp->type == T_STRING)
+        else if (sp->type == T_STRING && sp->u.str->info.unicode != STRING_BYTES)
         {
             object_t *o;
 
@@ -15096,6 +15908,9 @@ again:
          */
 
         TYPE_TEST1(sp, T_STRING);
+        if (sp->u.str->info.unicode == STRING_BYTES)
+            RAISE_ARG_ERROR(1, TF_STRING, T_BYTES);
+
         ERRORF(("%s", get_txt(sp->u.str)));
       }
 
@@ -15134,6 +15949,13 @@ again:
         if (sp->type == T_STRING)
         {
             i = mstrsize(sp->u.str);
+            if (sp->u.str->info.unicode == STRING_UTF8)
+            {
+                bool error = false;
+                i = byte_to_char_index(get_txt(sp->u.str), i, &error);
+                if (error)
+                    ERRORF(("Invalid character in string at index %zd.\n", i));
+            }
             free_svalue(sp);
             put_number(sp, i);
             break;
@@ -15168,7 +15990,7 @@ again:
         if (sp->type == T_NUMBER && sp->u.number == 0)
             break;
 
-        RAISE_ARG_ERROR(1, TF_NULL|TF_MAPPING|TF_POINTER, sp->type);
+        RAISE_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_STRUCT|TF_MAPPING|TF_POINTER, sp->type);
         /* NOTREACHED */
     }
 
@@ -15225,7 +16047,13 @@ again:
             RAISE_ARG_ERROR(1, TF_OBJECT|TF_STRING|TF_POINTER, arg[0].type);
         }
 
+        if (arg[0].type == T_STRING && arg[0].u.str->info.unicode == STRING_BYTES)
+            RAISE_ARG_ERROR(1, TF_STRING|TF_OBJECT|TF_POINTER, T_BYTES);
+
         TYPE_TEST2(arg+1, T_STRING)
+        if (arg[1].u.str->info.unicode == STRING_BYTES)
+            RAISE_ARG_ERROR(2, TF_STRING, T_BYTES);
+
         if (get_txt(arg[1].u.str)[0] == ':')
             ERRORF(("Illegal function name in call_other: %s\n",
                   get_txt(arg[1].u.str)));
@@ -15346,6 +16174,12 @@ again:
                     ob = item->u.ob;
                 else if (item->type == T_STRING)
                 {
+                    if (item->u.str->info.unicode == STRING_BYTES)
+                        ERRORF(("Bad arg for call_other() at index %"PRIdMPINT": "
+                                "got byte string, expected text string/object\n"
+                               , (mp_int)(svp - arg->u.vec->item)
+                               ));
+
                     ob = get_object(item->u.str);
                     if (ob == NULL)
                     {

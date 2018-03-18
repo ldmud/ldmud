@@ -427,6 +427,7 @@ static long lpc_types[MAX_ARGTYPES];
 #    define LPC_T_QUOTED_ARRAY  (1 << 10)
 #    define LPC_T_STRUCT        (1 << 11)
 #    define LPC_T_NULL          (1 << 12)
+#    define LPC_T_BYTES         (1 << 13)
 
 
 static int last_current_type = 0;
@@ -660,7 +661,7 @@ check_for_duplicate_string (const char *key, const char *buf)
 
 %token NAME ID
 
-%token VOID INT STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
+%token VOID INT STRING BYTES OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
 %token MIXED UNKNOWN NUL STRUCT
 
 %token DEFAULT
@@ -670,7 +671,7 @@ check_for_duplicate_string (const char *key, const char *buf)
 %token UN_OP BIN_OP TRI_OP
 
 %type <number> VOID MIXED UNKNOWN NUL STRUCT
-%type <number> INT STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
+%type <number> INT STRING BYTES OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
 %type <number> basic arg_type
   /* Value is the basic type value
    */
@@ -971,7 +972,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' optional_name ';'
 
 type: basic opt_star opt_ref { $$ = $1 | $2 | $3; };
 
-basic: VOID | INT | STRING | MAPPING | FLOAT | MIXED | OBJECT | CLOSURE |
+basic: VOID | INT | STRING | BYTES | MAPPING | FLOAT | MIXED | OBJECT | CLOSURE |
         UNKNOWN | SYMBOL | QUOTED_ARRAY | STRUCT | NUL ;
 
 opt_star : '*' { $$ = MF_TYPE_MOD_POINTER; }
@@ -998,7 +999,28 @@ typel2: typel
 
 arg_type: type
     {
-        if ($1 != VOID)
+        if (($1 & ~(MF_TYPE_MOD_POINTER|MF_TYPE_MOD_REFERENCE)) == BYTES)
+        {
+            // In curr_arg_types we record this as STRING (&/*).
+            int pos = curr_arg_type_size;
+            int newtype = STRING | ($1 & (MF_TYPE_MOD_POINTER|MF_TYPE_MOD_REFERENCE));
+
+            while (pos-- && curr_arg_types[pos])
+            {
+                if (curr_arg_types[pos] == newtype)
+                    break;
+            }
+
+            if (!curr_arg_types[pos])
+            {
+                curr_arg_types[curr_arg_type_size++] = newtype;
+                if (curr_arg_type_size == NELEMS(curr_arg_types))
+                    yyerror("Too many arguments");
+            }
+
+            curr_lpc_types[curr_lpc_type_size] |= type2flag($1);
+        }
+        else if ($1 != VOID)
         {
             if ($1 != NUL)
                 curr_arg_types[curr_arg_type_size++] = $1;
@@ -1075,6 +1097,7 @@ static struct type types[]
   = { { "void",         VOID }
     , { "int",          INT }
     , { "string",       STRING }
+    , { "bytes",        BYTES }
     , { "object",       OBJECT }
     , { "mapping",      MAPPING }
     , { "float",        FLOAT }
@@ -2389,6 +2412,7 @@ etype (long n)
     CONVERT(LPC_T_POINTER, "TF_POINTER");
     CONVERT(LPC_T_NUMBER, "TF_NUMBER");
     CONVERT(LPC_T_STRING, "TF_STRING");
+    CONVERT(LPC_T_BYTES, "TF_BYTES");
     CONVERT(LPC_T_OBJECT, "TF_OBJECT");
     CONVERT(LPC_T_MAPPING, "TF_MAPPING");
     CONVERT(LPC_T_FLOAT, "TF_FLOAT");
@@ -2431,6 +2455,7 @@ type2flag (int n)
     switch(n) {
       case VOID:    return 0;            break;
       case STRING:  return LPC_T_STRING; break;
+      case BYTES:   return LPC_T_BYTES; break;
       case INT:     return LPC_T_NUMBER; break;
       case OBJECT:  return LPC_T_OBJECT; break;
       case MAPPING: return LPC_T_MAPPING; break;

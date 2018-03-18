@@ -68,14 +68,33 @@ enum unicode_type
 
 struct string_s
 {
-    struct {
+    struct
+    {
         enum string_type  type    :  2;
         enum unicode_type unicode :  2;
         unsigned int ref          : 28;
     } info;
-    string_t * next;    /* Linkpointer in string table. */
+
+    union /* Additional information according to the string type. */
+    {
+        /* tabled.hash is also used for STRING_UNTABLED. */
+        struct
+        {
+            string_t * next;    /* Linkpointer in string table. */
+            hash32_t   hash;    /* 0, or the hash of the string */
+        } tabled;
+
+        struct
+        {
+            /* These are not ref-counted pointers to lvalues
+             * of this string.
+             */
+            struct protected_char_lvalue* char_lvalues;
+            struct protected_range_lvalue* range_lvalues;
+        } mutable;
+    } u;
+
     size_t     size;    /* Length of the string */
-    hash32_t   hash;    /* 0, or the hash of the string */
     char       txt[1];  /* In fact .size characters plus one '\0' */
       /* The string text follows here */
 };
@@ -159,17 +178,6 @@ static INLINE size_t mstr_mem_size(const string_t * const s)
    */
 {
     return sizeof(string_t) + s->size;
-}
-
-static INLINE hash32_t mstr_hash(const string_t * const s)
-                                   __attribute__((nonnull(1)))
-                                   __attribute__((pure));
-static INLINE hash32_t mstr_hash(const string_t * const s)
-  /*   Return the hash value of string <s>, which is 0 if the
-   *   hash hasn't been computed yet.
-   */
-{
-    return s->hash;
 }
 
 static INLINE Bool mstr_untabled(const string_t * const s)
@@ -307,7 +315,7 @@ static INLINE void extract_cstr(char *d, const string_t *const s, size_t l)
 #define find_tabled(pStr)                  mstring_find_tabled(pStr)
 #define find_tabled_str(pTxt,unicode)      mstring_find_tabled_str(pTxt, strlen(pTxt), unicode)
 #define find_tabled_str_n(pTxt,n,unicode)  mstring_find_tabled_str(pTxt,n,unicode)
-#define mstr_get_hash(s)                   ((s)->hash ? (s)->hash : mstring_get_hash(s))
+#define mstr_get_hash(s)                   (((s)->info.type != STRING_MUTABLE && (s)->u.tabled.hash) ? (s)->u.tabled.hash : mstring_get_hash(s))
 #define mstrcmp(pStr1,pStr2)               mstring_compare(pStr1, pStr2)
 #define mstr_order(pStr1,pStr2)            mstring_order(pStr1, pStr2)
 #define mstreq(pStr1,pStr2)                mstring_equal(pStr1, pStr2)

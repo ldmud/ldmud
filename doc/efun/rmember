@@ -1,10 +1,11 @@
 SYNOPSIS
         int rmember(mixed *array, mixed elem [, int start])
         int rmember(string s, int elem [, int start])
+        int rmember(bytes s, int elem [, int start])
 
 DESCRIPTION
-        For arrays and strings, returns the index of the last
-        occurance of second arg in the first arg, or -1 if none found.
+        Returns the index of the last occurance of second arg
+        in the first arg, or -1 if none found.
         If <start> is given and non-negative, the search starts at
         that position.
 

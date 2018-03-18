@@ -185,6 +185,7 @@ enum format_err {
   ERR_NOMEM              =        0xD, /* Out of memory */
   ERR_SIZE_OVERFLOW      =        0xE, /* Fieldsize/precision numeric overflow */
   ERR_LOCAL_BUFF_OVERFLOW =       0xF, /* local buffer on stack overflowed */
+  ERR_INVALID_CHAR       =        0x10, /* Invalid character in string */
 };
 
 #define ERROR(x) (longjmp(st->error_jmp, (x)))
@@ -574,6 +575,140 @@ svalue_to_string_filter(svalue_t *key, svalue_t *data, void *extra)
 
 /*-------------------------------------------------------------------------*/
 static sprintf_buffer_t *
+string_to_string (fmt_state_t *st, string_t* obj, size_t index1, size_t index2, sprintf_buffer_t *str, Bool quoteStrings)
+
+/* Print the string <obj> from <index1> to <index2> (excl.) into the buffer <str>.
+ */
+
+{
+    static char hex[] = "0123456789abcdef";
+
+    stradd(st, &str, "\"");
+
+    if (obj->info.unicode == STRING_BYTES)
+    {
+        unsigned char *src;
+        char buf[4] = "\\x00";
+
+        src = (unsigned char*) get_txt(obj) + index1;
+        for (size_t i = index1; i < index2; i++)
+        {
+            unsigned char c = *src++;
+            buf[2] = hex[c >> 4];
+            buf[3] = hex[c & 0xf];
+
+            straddn(st, &str, buf, 4);
+        }
+    }
+    else if (!quoteStrings)
+    {
+        straddn(st, &str, get_txt(obj) + index1, index2 - index1);
+    }
+    else
+    {
+        /* Check for quotable characters. */
+        bool needquote = false;
+        for (size_t i = index1; i < index2; i++)
+        {
+            unsigned char c = (unsigned char) get_txt(obj)[i];
+            if (c < 0x20 || c >= 0x7F)
+            {
+                needquote = true;
+                break;
+            }
+        }
+
+        if (!needquote)
+        {
+            /* No special characters found */
+            straddn(st, &str, get_txt(obj) + index1, index2 - index1);
+        }
+        else
+        {
+            char *tmpstr, *src, *dest;
+
+            /* Allocate the temporary string */
+            tmpstr = alloca(10 * (index2-index1));
+
+            src = get_txt(obj) + index1;
+            dest = tmpstr;
+            for (size_t i = index1; i < index2;)
+            {
+                p_int c;
+                size_t clen = utf8_to_unicode(src, index2 - i, &c);
+                if (!clen)
+                {
+                    c = *(unsigned char*)src++;
+                    i++;
+                }
+                else
+                {
+                    src += clen;
+                    i += clen;
+                }
+
+                switch(c)
+                {
+                    case '"': strcpy(dest, "\\\""); dest += 2; break;
+                    case '\n': strcpy(dest, "\\n"); dest += 2; break;
+                    case '\r': strcpy(dest, "\\r"); dest += 2; break;
+                    case '\t': strcpy(dest, "\\t"); dest += 2; break;
+                    case '\a': strcpy(dest, "\\a"); dest += 2; break;
+                    case 0x1b: strcpy(dest, "\\e"); dest += 2; break;
+                    case 0x08: strcpy(dest, "\\b"); dest += 2; break;
+                    case 0x00: strcpy(dest, "\\0"); dest += 2; break;
+                    case '\\': strcpy(dest, "\\\\"); dest += 2; break;
+                    default:
+                        if (c < 0x20)
+                        {
+                            *dest++ = '\\';
+                            *dest++ = 'x';
+                            *dest++ = hex[c >> 4];
+                            *dest++ = hex[c & 0xf];
+                        }
+                        else if (c < 0x7f)
+                        {
+                           *dest++ = (char)c;
+                        }
+                        else if (c < 0x10000)
+                        {
+                            *dest++ = '\\';
+                            *dest++ = 'u';
+                            *dest++ = hex[(c >> 12) & 0xf];
+                            *dest++ = hex[(c >> 8) & 0xf];
+                            *dest++ = hex[(c >> 4) & 0xf];
+                            *dest++ = hex[c & 0xf];
+                        }
+                        else
+                        {
+                            *dest++ = '\\';
+                            *dest++ = 'U';
+                            *dest++ = hex[(c >> 28) & 0xf];
+                            *dest++ = hex[(c >> 24) & 0xf];
+                            *dest++ = hex[(c >> 20) & 0xf];
+                            *dest++ = hex[(c >> 16) & 0xf];
+                            *dest++ = hex[(c >> 12) & 0xf];
+                            *dest++ = hex[(c >> 8) & 0xf];
+                            *dest++ = hex[(c >> 4) & 0xf];
+                            *dest++ = hex[c & 0xf];
+                        }
+
+                        break;
+                }
+
+            } /* for() */
+
+            straddn(st, &str, tmpstr, dest - tmpstr);
+        }
+    }
+
+    stradd(st, &str, "\"");
+
+    return str;
+} /* string_to_string() */
+
+/*-------------------------------------------------------------------------*/
+static sprintf_buffer_t *
 svalue_to_string ( fmt_state_t *st
                  , svalue_t *obj, sprintf_buffer_t *str
                  , int indent, Bool trailing, Bool quoteStrings
@@ -617,20 +752,30 @@ svalue_to_string ( fmt_state_t *st
 
             case LVALUE_PROTECTED_CHAR:
             {
-                char buf[2];
-
-                buf[0] = *obj->u.protected_char_lvalue->charp;
-                buf[1] = '\0';
-
-                stradd(st, &str, "'");
-                stradd(st, &str, buf);
-                stradd(st, &str, "'");
-                if (!compact)
+                struct protected_char_lvalue* lv = obj->u.protected_char_lvalue;
+                if (lv->str->info.unicode != STRING_BYTES)
                 {
-                    stradd(st, &str, " (");
-                    numadd(st, &str, (unsigned char) buf[0]);
-                    stradd(st, &str, ")");
+                    bool error = false;
+                    size_t clen = char_to_byte_index(lv->charp, 4, 1, &error);
+                    if (!error)
+                    {
+                        stradd(st, &str, "'");
+                        straddn(st, &str, lv->charp, clen);
+                        stradd(st, &str, "'");
+
+                        if (!compact)
+                        {
+                            p_int ch = 0;
+                            utf8_to_unicode(lv->charp, 4, &ch);
+                            stradd(st, &str, " (");
+                            numadd(st, &str, ch);
+                            stradd(st, &str, ")");
+                        }
+                        break;
+                    }
                 }
+
+                numadd(st, &str, *(unsigned char*)lv->charp);
                 break;
             }
 
@@ -697,9 +842,7 @@ svalue_to_string ( fmt_state_t *st
 
                     case T_STRING:
                     {
-                        stradd(st, &str, "\"");
-                        straddn(st, &str, get_txt(vec->u.str) + r->index1, r->index2 - r->index1);
-                        stradd(st, &str, "\"");
+                        str = string_to_string(st, vec->u.str, r->index1, r->index2, str, true);
                         break;
                     }
 
@@ -738,100 +881,7 @@ svalue_to_string ( fmt_state_t *st
       }
 
     case T_STRING:
-        stradd(st, &str, "\"");
-
-        if (!quoteStrings)
-        {
-            straddn(st, &str, get_txt(obj->u.str), mstrsize(obj->u.str));
-        }
-        else
-        {
-            size_t len;
-
-            /* Compute the size of the result string */
-            for (len = 0, i = mstrsize(obj->u.str); i > 0; --i)
-            {
-                unsigned char c = (unsigned char) get_txt(obj->u.str)[i];
-
-                switch(c)
-                {
-                case '"':
-                case '\n':
-                case '\r':
-                case '\t':
-                case '\a':
-                case 0x1b:
-                case 0x08:
-                case 0x00:
-                case '\\':
-                    len += 2; break;
-                default:
-                    if (c >= 0x20 && c < 0x7F)
-                    {
-                       len++;
-                    }
-                    else
-                    {
-                       len += 4;
-                    }
-                    break;
-                }
-            }
-
-            if ( len == mstrsize(obj->u.str) )
-            {
-                /* No special characters found */
-                stradd(st, &str, get_txt(obj->u.str));
-            }
-            else
-            {
-                char * tmpstr, *dest;
-                unsigned char *src;
-
-                /* Allocate the temporary string */
-                tmpstr = alloca(len+1);
-
-                src = (unsigned char *)get_txt(obj->u.str);
-                dest = tmpstr;
-                for (i = mstrsize(obj->u.str); i > 0; --i)
-                {
-                    unsigned char c = *src++;
-
-                    switch(c)
-                    {
-                    case '"': strcpy(dest, "\\\""); dest += 2; break;
-                    case '\n': strcpy(dest, "\\n"); dest += 2; break;
-                    case '\r': strcpy(dest, "\\r"); dest += 2; break;
-                    case '\t': strcpy(dest, "\\t"); dest += 2; break;
-                    case '\a': strcpy(dest, "\\a"); dest += 2; break;
-                    case 0x1b: strcpy(dest, "\\e"); dest += 2; break;
-                    case 0x08: strcpy(dest, "\\b"); dest += 2; break;
-                    case 0x00: strcpy(dest, "\\0"); dest += 2; break;
-                    case '\\': strcpy(dest, "\\\\"); dest += 2; break;
-                    default:
-                        if (c >= 0x20 && c < 0x7F)
-                        {
-                           *dest++ = (char)c;
-                        }
-                        else
-                        {
-                           static char hex[] = "0123456789abcdef";
-                           *dest++ = '\\';
-                           *dest++ = 'x';
-                           *dest++ = hex[c >> 4];
-                           *dest++ = hex[c & 0xf];
-                        }
-                        break;
-                    }
-                } /* for() */
-                *dest = '\0';
-
-                stradd(st, &str, tmpstr);
-            }
-
-        }
-
-        stradd(st, &str, "\"");
+        str = string_to_string(st, obj->u.str, 0, mstrsize(obj->u.str), str, quoteStrings);
         break;
 
     case T_QUOTED_ARRAY:
@@ -1119,7 +1169,15 @@ add_justified ( fmt_state_t *st
     while (pos < len)
     {
         /* Find the end of the word */
-        for ( ; pos < len && str[pos] != ' '; pos++, num_chars++) NOOP;
+        for ( ; pos < len && str[pos] != ' '; num_chars++)
+        {
+            p_int ch;
+            size_t clen = utf8_to_unicode (str + pos, len - pos, &ch);
+            if (!clen)
+                ERROR(ERR_INVALID_CHAR);
+            pos += clen;
+        }
+
         if (pos >= len)
             break;
 
@@ -1191,7 +1249,7 @@ add_justified ( fmt_state_t *st
 /*-------------------------------------------------------------------------*/
 static void
 add_aligned ( fmt_state_t *st
-            , char *str, size_t len, char *pad, int fs
+            , char *str, size_t size, char *pad, int fs
             , format_info finfo)
 
 /* Align string <str> (length <len>) within the fieldsize <fs> according
@@ -1201,6 +1259,10 @@ add_aligned ( fmt_state_t *st
 {
     size_t sppos;
     Bool is_space_pad;
+    bool error;
+    size_t len = byte_to_char_index(str, size, &error);
+    if (error)
+        ERROR(ERR_INVALID_CHAR);
 
     if ((size_t)fs < len)
         fs = len;
@@ -1215,7 +1277,7 @@ add_aligned ( fmt_state_t *st
     case INFO_A_JUSTIFY:
     case INFO_A_LEFT:
         /* Also called for the last line of a justified block */
-        ADD_STRN(st, str, len);
+        ADD_STRN(st, str, size);
         if (is_space_pad)
             sppos = st->bpos;
         ADD_PADDING(st, pad, fs - len);
@@ -1232,7 +1294,7 @@ add_aligned ( fmt_state_t *st
         {
             ADD_PADDING(st, pad, (fs - len + 1) >> 1);
         }
-        ADD_STRN(st, str, len);
+        ADD_STRN(st, str, size);
         if (is_space_pad)
             sppos = st->bpos;
         ADD_PADDING(st, pad, (fs - len) >> 1);
@@ -1251,7 +1313,7 @@ add_aligned ( fmt_state_t *st
         {
             ADD_PADDING(st, pad, fs - len);
         }
-        ADD_STRN(st, str, len);
+        ADD_STRN(st, str, size);
       }
     }
 } /* add_aligned() */
@@ -1271,7 +1333,7 @@ add_column (fmt_state_t *st, cst **column)
 #define COL (*column)
 
     unsigned int done;
-    mp_int length;
+    size_t length;
     unsigned int save;
     char *COL_D = COL->d.col;
     char *p;
@@ -1281,7 +1343,16 @@ add_column (fmt_state_t *st, cst **column)
     length = COL->pres;
     if ((COL->info & INFO_A) == INFO_A_JUSTIFY && length > (mp_int)COL->size)
         length = COL->size;
-    for (p = COL_D; length && *p && *p !='\n'; p++, length--) NOOP;
+
+    for (p = COL_D; length && *p && *p !='\n'; length--)
+    {
+        p_int ch;
+        size_t clen = utf8_to_unicode (p, 4, &ch);
+        if (!clen)
+            ERROR(ERR_INVALID_CHAR);
+        p += clen;
+    }
+
     done = p - COL_D;
     if (*p && *p !='\n')
     {
@@ -1308,17 +1379,22 @@ add_column (fmt_state_t *st, cst **column)
                  * the case we might as well start breaking it up right
                  * here.
                  */
-                if (save-2 > done)
+                p_int ch;
+                size_t clen = utf8_to_unicode (p + 1, 4, &ch);
+                if (save > done + 1 + clen)
                 {
                     char *p2;
 
                     length = COL->pres;
-                    if ((COL->info & INFO_A) == INFO_A_JUSTIFY
-                     && length > (mp_int)COL->size)
+                    if ((COL->info & INFO_A) == INFO_A_JUSTIFY && length > (mp_int)COL->size)
                         length = COL->size;
-                    for ( p2 = p+1, length--
-                        ; length && *p2 && *p2 !='\n' && *p2 != ' '
-                        ; p2++, length--) NOOP;
+                    for ( p2 = p+1, length--; length && *p2 && *p2 !='\n' && *p2 != ' '; length--)
+                    {
+                        clen = utf8_to_unicode(p2, 4, &ch);
+                        if (!clen)
+                            ERROR(ERR_INVALID_CHAR);
+                        p2 += clen;
+                    }
                     if (*p2 && *p2 != '\n' && *p2 != ' ')
                     {
                         /* Yup, the next word is far too long. */
@@ -1605,6 +1681,10 @@ static char buff[BUFF_SIZE];         /* For error messages */
 
         case ERR_SIZE_OVERFLOW:
             err = "Fieldsize or precision too large.";
+            break;
+
+        case ERR_INVALID_CHAR:
+            err = "Invalid character in string.";
             break;
         }
 
@@ -2002,7 +2082,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
                   {
                     mp_int slen;
 
-                    if (carg->type != T_STRING)
+                    if (carg->type != T_STRING || carg->u.str->info.unicode == STRING_BYTES)
                         ERROR1(ERR_INCORRECT_ARG, 's');
                     slen = mstrsize(carg->u.str);
 
@@ -2068,6 +2148,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
                             s = TABLE;
                             if ( '\0' != (c = *(start = s)) ) for (;;)
                             {
+                                bool error;
                                 if (c != '\n')
                                 {
                                     if ( '\0' != (c = *++s) )
@@ -2075,7 +2156,10 @@ static char buff[BUFF_SIZE];         /* For error messages */
                                     else
                                         break;
                                 }
-                                len = s - start;
+
+                                len = byte_to_char_index(start, s - start, &error);
+                                if (error)
+                                    ERROR(ERR_INVALID_CHAR);
                                 if (len > max)
                                     max = len;
                                 n++;
@@ -2164,11 +2248,21 @@ add_table_now:
                     else
                     {
                         Bool justifyString;
+                        bool error = false;
+                        size_t reallen = (carg->u.str->info.unicode == STRING_UTF8)
+                                       ? byte_to_char_index(get_txt(carg->u.str), slen, &error)
+                                       : slen;
+
+                        if (error)
+                            ERROR(ERR_INVALID_CHAR);
 
                         /* not column or table */
-                        if (pres && pres < slen)
+                        if (pres && pres < reallen)
                         {
-                            slen = pres;
+                            reallen = pres;
+                            slen = (carg->u.str->info.unicode == STRING_UTF8)
+                                 ? char_to_byte_index(get_txt(carg->u.str), slen, pres, NULL)
+                                 : pres;
                         }
 
                         /* Determine whether to print this string
@@ -2183,11 +2277,11 @@ add_table_now:
                              */
                             for ( ;    slen > 0
                                     && get_txt(carg->u.str)[slen-1] == ' '
-                                  ; slen--
+                                  ; slen--, reallen--
                                ) NOOP;
 
                             if ( slen != 0
-                              && (unsigned int)slen <= fs
+                              && (unsigned int)reallen <= fs
                               && get_txt(carg->u.str)[slen-1] != '\n'
                                )
                                 justifyString = MY_TRUE;
@@ -2268,6 +2362,16 @@ add_table_now:
                         ADD_STRN(st, temp, sizeof(temp) - tmpl);
                     break;
                   }
+                  else if ((finfo & INFO_T ) == INFO_T_INT && format_char == 'c')
+                  {
+                    char temp[4];
+                    size_t clen = unicode_to_utf8(carg->u.number, temp);
+                    if (!clen)
+                        ERROR1(ERR_INCORRECT_ARG, 'c');
+
+                    ADD_STRN(st, temp, clen);
+                    break;
+                  }
                   else
                   {
                     /* Synthesized format for sprintf() */
@@ -2328,17 +2432,6 @@ add_table_now:
                             ERROR1(ERR_INCORRECT_ARG, format_char);
                         }
 
-                        /* System sprintf() can't handle ("%c", 0), but LDMud
-                         * strings can. So in that case we format with
-                         * character 0x01 and convert to 0 afterwards.
-                         */
-                        if (format_char == 'c') {
-                            if (carg->u.number == 0)
-                            {
-                            carg->u.number = 1;
-                            zeroCharHack = MY_TRUE;
-                            }
-                        }
                         /* insert the correct length modifier for a p_int
                          * type. (If the prefix is an empty string, this will
                          * be probably optimized by the compiler anyway. */

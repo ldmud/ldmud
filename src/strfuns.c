@@ -495,6 +495,54 @@ is_ascii (const char* text, size_t len)
 /*--------------------------------------------------------------------*/
 
 size_t
+utf8_size (p_int code)
+
+/* Determines the number of bytes needed for the unicode codepoint
+ * in UTF-8 (or 0 for illegal codes).
+ */
+
+{
+    if (!(code & ~0x7f))
+        return 1;
+
+    /* At most 3 continuation bytes are allowed. */
+    for (int bytes = 1, bits = 11; bytes < 4; bytes++, bits+=5)
+    {
+        if (code & ~((1 << bits)-1))
+            continue;
+
+        return bytes + 1;
+    }
+
+    return 0;
+} /* utf8_size() */
+
+/*-------------------------------------------------------------------------*/
+
+char*
+utf8_prev (char* text, size_t pos)
+
+/* Returns the pointer to the previous character at <text>.
+ * It is assumed that <pos> bytes are in the string prior
+ * to <text>.
+ */
+
+{
+    do
+    {
+        if (!pos)
+            return text;
+
+        text--;
+        pos--;
+    } while (((*(unsigned char*)text) & 0xc0) == 0x80);
+
+    return text;
+} /* utf8_prev() */
+
+/*--------------------------------------------------------------------*/
+
+size_t
 unicode_to_utf8 (p_int code, char* buf)
 
 /* Converts a unicode codepoint to UTF-8.
@@ -1428,13 +1476,16 @@ f_convert_charset (svalue_t *sp)
 #endif /* HAS_ICONV */
 
 /*--------------------------------------------------------------------*/
-static char *
-sort_string (const string_t * p_in, size_t len, long ** pos)
+static p_int *
+sort_string (const string_t * p_in, size_t size, size_t *plen, long ** pos)
 
-/* Sort the characters of string <in> (with length <len>) by their numeric
- * values and return a newly allocated memory block with the sorted string.
+/* Sort the characters of string <in> (with length <size> bytes) by
+ * their numeric values and return a newly allocated memory block
+ * with the sorted numeric values.
+ * The number of characters is returned in <len>.
  * If <pos> is not NULL, it will be set to a newly allocated memory block
  * giving the original positions of the characters in the sorted string.
+ * The string must not be empty.
  *
  * We use Mergesort to sort the strings.
  * TODO: Use Quicksort instead of Mergesort?
@@ -1442,16 +1493,17 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
 
 {
     const char * in;  /* Input string */
-    char   * out;     /* Result string */
+    p_int  * out;     /* Result array */
     long   * outpos;  /* Result position array */
-    char   * tmp;     /* Temporary string */
+    p_int  * tmp;     /* Temporary array */
     long   * tmppos;  /* Temporary position array */
+    size_t   len;     /* The number of characters. */
     size_t   step;
     size_t   i, j;
 
     in = get_txt((string_t *const)p_in);
-    out = xalloc(len+1);
-    tmp = xalloc(len+1);
+    out = xalloc(size * sizeof(p_int));
+    tmp = xalloc(size * sizeof(p_int));
     if (!out || !tmp)
     {
         if (out)
@@ -1459,16 +1511,13 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
         if (tmp)
             xfree(tmp);
         errorf("(sort_string) Out of memory (2 * %zu bytes) for temporaries.\n"
-             , len+1);
+             , size);
     }
-    out[len] = '\0';
-    tmp[len] = '\0';
 
     if (pos)
     {
-        outpos = xalloc(len * sizeof(*outpos) + 1);
-        tmppos = xalloc(len * sizeof(*outpos) + 1);
-          /* +1 so that smalloc won't complain when given an empty string */
+        outpos = xalloc(size * sizeof(*outpos));
+        tmppos = xalloc(size * sizeof(*outpos));
         if (!outpos || !tmppos)
         {
             if (out)
@@ -1480,7 +1529,7 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
             if (tmppos)
                 xfree(tmppos);
             errorf("(sort_string) Out of memory (2 * %zu bytes) for positions.\n"
-                 , len*sizeof(*outpos)+1);
+                 , size*sizeof(*outpos));
         }
     }
     else
@@ -1489,49 +1538,43 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
         tmppos = NULL;
     }
 
-    /* First Mergesort pass: comparison of adjacent characters
-     * and initialisation of the out arrays.
-     */
-    for (i = 0; i < len; i += 2)
+    /* Initialize the out arrays. */
+    if (p_in->info.unicode == STRING_UTF8)
     {
-        if (i == len-1)
+        for (i = 0, len = 0; i < size; len++)
         {
-            out[i] = in[i];
+            step = utf8_to_unicode(in + i, size - i, out + len);
+            if (!step)
+                errorf("Invalid character in string at index %zd.\n", len);
+            if (outpos)
+                outpos[len] = len;
+            i += step;
+        } /* for(initial pass) */
+    }
+    else
+    {
+        for (i = 0; i < size; i++)
+        {
+            out[i] = ((unsigned char*)in)[i];
             if (outpos)
                 outpos[i] = i;
-        }
-        else if (in[i] <= in[i+1])
-        {
-            out[i] = in[i];
-            out[i+1] = in[i+1];
-            if (outpos)
-            {
-                outpos[i] = i;
-                outpos[i+1] = i+1;
-            }
-        }
-        else /* (in[i] > in[i+1]) */
-        {
-            out[i] = in[i+1];
-            out[i+1] = in[i];
-            if (outpos)
-            {
-                outpos[i] = i+1;
-                outpos[i+1] = i;
-            }
-        }
-    } /* for(initial pass) */
+        } /* for(initial pass) */
+
+        len = size;
+    }
+
+    *plen = len;
 
     /* Mergesort loop: perform the mergesort passes with increasing steps.
      * Invariant: out is the (semi-sorted) data, tmp is the scratchspace.
      */
-    for (step = 2; step < len; step *= 2)
+    for (step = 1; step < len; step *= 2)
     {
         size_t start, dest, left;
 
         /* Exchange out and tmp */
         {
-            char *tmp2;
+            p_int *tmp2;
             long *tmp2pos;
 
             tmp2 = out; out = tmp; tmp = tmp2;
@@ -1602,7 +1645,7 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
 
 /*--------------------------------------------------------------------*/
 string_t *
-intersect_strings (const string_t * p_left, const string_t * p_right, Bool bSubtract)
+intersect_strings (string_t * p_left, string_t * p_right, Bool bSubtract)
 
 /* !bSubtract: Intersect string <left> with string <right> and return
  *   a newly allocated string with all those characters which are in
@@ -1615,31 +1658,47 @@ intersect_strings (const string_t * p_left, const string_t * p_right, Bool bSubt
  */
 
 {
-    size_t   len_left, len_right, len_out;
+    size_t   len_left, len_right, size_left, size_right, size_out;
     size_t   ix_left, ix_right;
-    long   * pos;
+    long   * pos, * rpos;
     CBool  * matches;
-    const char * left_txt;
-    char * left, * right, * result_txt;
+    p_int * left, * right;
+    char  * result_txt;
     string_t *result;
+    bool     utf8_left, utf8_out;
 
-    len_left = mstrsize(p_left);
-    len_right = mstrsize(p_right);
+    size_left = mstrsize(p_left);
+    size_right = mstrsize(p_right);
+    utf8_left = p_left->info.unicode == STRING_UTF8;
 
-    xallocate(matches, len_left+1, "intersection matches");
-      /* +1 so that smalloc won't complain when given an empty left string */
+    if (!size_left)
+        return ref_mstring(p_left);
+    if (!size_right)
+        return ref_mstring(bSubtract ? p_left : p_right);
 
-    for (ix_left = 0; ix_left < len_left; ix_left++)
+    xallocate(matches, size_left, "intersection matches");
+
+    for (ix_left = 0; ix_left < size_left; ix_left++)
         matches[ix_left] = bSubtract ? MY_TRUE : MY_FALSE;
 
     /* Sort the two strings */
-    left = sort_string(p_left, len_left, &pos);
-    right = sort_string(p_right, len_right, NULL);
+    left = sort_string(p_left, size_left, &len_left, &pos);
+    right = sort_string(p_right, size_right, &len_right, NULL);
+
+    rpos = xalloc(sizeof(long) * len_left);
+    if (rpos == NULL)
+    {
+        xfree(pos);
+        xfree(matches);
+        xfree(left);
+        xfree(right);
+
+        errorf("(intersect_strings) Out of memory (%zu bytes) for temporaries.\n", sizeof(long) * len_left);
+    }
 
     /* Intersect the two strings by mutual comparison.
      * Each non-matched character in left gets is pos[] set to -1.
      */
-    len_out = bSubtract ? len_left : 0;
     for ( ix_left = 0, ix_right = 0
         ; ix_left < len_left && ix_right < len_right
         ; )
@@ -1651,29 +1710,59 @@ intersect_strings (const string_t * p_left, const string_t * p_right, Bool bSubt
         else /* left[ix_left] == right[ix_right]) */
         {
             if (!bSubtract)
-            {
                 matches[pos[ix_left]] = MY_TRUE;
-                len_out++;
-            }
             else
-            {
                 matches[pos[ix_left]] = MY_FALSE;
-                len_out--;
-            }
+
             ix_left++;
         }
     }
 
+    /* Calculate the resulting size. */
+    size_out = 0;
+    utf8_out = false;
+    for (ix_left = 0; ix_left < len_left; ix_left++)
+    {
+        rpos[pos[ix_left]] = ix_left;
+
+        if (matches[pos[ix_left]])
+        {
+            if (utf8_left)
+            {
+                size_t chlen = utf8_size(left[ix_left]);
+                size_out += chlen;
+
+                if (chlen > 1)
+                    utf8_out = true;
+            }
+            else
+                size_out++;
+        }
+    }
+
     /* Create the result: copy all flagged characters */
-    memsafe(result = alloc_mstring(len_out), len_out, "intersection result");
-    left_txt = get_txt((string_t *const)p_left);
+    memsafe(result = alloc_mstring(size_out), size_out, "intersection result");
+    if (p_left->info.unicode == STRING_BYTES)
+        result->info.unicode = STRING_BYTES;
+    else
+        result->info.unicode = utf8_out ? STRING_UTF8 : STRING_ASCII;
+
     result_txt = get_txt(result);
     for (ix_left = 0, ix_right = 0; ix_left < len_left; ix_left++)
         if (matches[ix_left])
-            result_txt[ix_right++] = left_txt[ix_left];
+        {
+            if (utf8_out)
+            {
+                size_t chlen = unicode_to_utf8(left[rpos[ix_left]], result_txt + ix_right);
+                ix_right += chlen;
+            }
+            else
+                result_txt[ix_right++] = left[rpos[ix_left]];
+        }
 
     /* Free intermediate results */
     xfree(pos);
+    xfree(rpos);
     xfree(matches);
     xfree(left);
     xfree(right);

@@ -474,79 +474,113 @@ explode_string (string_t *str, string_t *del)
     
     len = (long)mstrsize(del);
 
-    /* --- Special case: Delimiter is an empty or one-char string --- */
-    if (len <= 1) {
+    /* Delimiter is empty: return an array which holds all characters as
+     *   single-character strings.
+     */
+    if (len < 1)
+    {
+        svalue_t *svp;
 
-        /* Delimiter is empty: return an array which holds all characters as
-         *   single-character strings.
-         */
-        if (len < 1) {
-            svalue_t *svp;
+        if (str->info.unicode == STRING_UTF8)
+        {
+            size_t size = mstrsize(str);
+            bool error = false;
 
+            len = byte_to_char_index(get_txt(str), size, &error);
+            if (error)
+                errorf("Invalid character in string at byte %ld.\n", len);
+
+            ret = allocate_array(len);
+            for (svp = ret->item, p = get_txt(str); size > 0; svp++)
+            {
+                size_t chlen = char_to_byte_index(p, size, 1, &error);
+                if (!chlen)
+                    chlen = 1;
+
+                buff = new_n_mstring(p, chlen, chlen == 1 ? STRING_ASCII : STRING_UTF8);
+                if (!buff)
+                {
+                    free_array(ret);
+                    outofmem(1, "explode() on a string");
+                }
+                put_string(svp, buff);
+
+                p += chlen;
+                size -= chlen;
+            }
+        }
+        else
+        {
             len = (long)mstrsize(str);
             ret = allocate_array(len);
             for ( svp = ret->item, p = get_txt(str)
                 ; --len >= 0
-                ; svp++, p++ ) {
+                ; svp++, p++ )
+            {
                 buff = new_n_mstring(p, 1, str->info.unicode);
-                if (!buff) {
+                if (!buff)
+                {
                     free_array(ret);
                     outofmem(1, "explode() on a string");
                 }
                 put_string(svp, buff);
             }
-            return ret;
-
         }
 
+        return ret;
+    }
+
+    if (len <= 1)
+    {
         /* Delimiter is one-char string: speedy implementation which uses
          *   direct character comparisons instead of calls to memcmp().
          */
-        else {
-            char c;
-            char * txt;
-            svalue_t *svp;
+        char c;
+        char * txt;
+        svalue_t *svp;
 
-            txt = get_txt(str);
-            len = (long)mstrsize(str);
-            c = get_txt(del)[0];
+        txt = get_txt(str);
+        len = (long)mstrsize(str);
+        c = get_txt(del)[0];
 
-            /* TODO: Remember positions here */
-            /* Determine the number of delimiters in the string. */
-            for (num = 1, p = txt
-                ; p < txt + len && NULL != (p = memchr(p, c, len - (p - txt)))
-                ; p++, num++) NOOP;
+        /* TODO: Remember positions here */
+        /* Determine the number of delimiters in the string. */
+        for (num = 1, p = txt
+            ; p < txt + len && NULL != (p = memchr(p, c, len - (p - txt)))
+            ; p++, num++) NOOP;
 
-            ret = allocate_array(num);
-            for ( svp = ret->item, left = len
-                ; NULL != (p = memchr(txt, c, left))
-                ; left -= (p + 1 - txt), txt = p + 1, svp++)
-            {
-                len = p - txt;
-                buff = new_n_mstring(txt, (size_t)len, str->info.unicode);
-                if (!buff) {
-                    free_array(ret);
-                    outofmem(len, "explode() on a string");
-                }
-                put_string(svp, buff);
-            }
-
-            /* txt now points to the (possibly empty) remains after
-             * the last delimiter.
-             */
-            len = get_txt(str) + mstrsize(str) - txt;
+        ret = allocate_array(num);
+        for ( svp = ret->item, left = len
+            ; NULL != (p = memchr(txt, c, left))
+            ; left -= (p + 1 - txt), txt = p + 1, svp++)
+        {
+            len = p - txt;
             buff = new_n_mstring(txt, (size_t)len, str->info.unicode);
-            if (!buff) {
+            if (!buff)
+            {
                 free_array(ret);
                 outofmem(len, "explode() on a string");
             }
             put_string(svp, buff);
-
-            return ret;
         }
 
-        /* NOTREACHED */
-    } /* --- End of special case --- */
+        /* txt now points to the (possibly empty) remains after
+         * the last delimiter.
+         */
+        len = get_txt(str) + mstrsize(str) - txt;
+        buff = new_n_mstring(txt, (size_t)len, str->info.unicode);
+        if (!buff)
+        {
+            free_array(ret);
+            outofmem(len, "explode() on a string");
+        }
+        if (buff->info.unicode == STRING_UTF8 && is_ascii(txt, len))
+            buff->info.unicode = STRING_ASCII;
+
+        put_string(svp, buff);
+
+        return ret;
+    }
 
     /* Find the number of occurrences of the delimiter 'del' by doing
      * a first scan of the string.
@@ -586,10 +620,14 @@ explode_string (string_t *str, string_t *del)
 
             bufflen = p - beg;
             buff = new_n_mstring(beg, (size_t)bufflen, str->info.unicode);
-            if (!buff) {
+            if (!buff)
+            {
                 free_array(ret);
                 outofmem(bufflen, "buffer for explode()");
             }
+
+            if (buff->info.unicode == STRING_UTF8 && is_ascii(beg, (size_t)bufflen))
+                buff->info.unicode = STRING_ASCII;
 
             put_string(ret->item+num, buff);
 
@@ -607,10 +645,13 @@ explode_string (string_t *str, string_t *del)
     /* Copy the last occurence (may be empty). */
     len = get_txt(str) + mstrsize(str) - beg;
     buff = new_n_mstring(beg, (size_t)len, str->info.unicode);
-    if (!buff) {
+    if (!buff)
+    {
         free_array(ret);
         outofmem(len, "last fragment in explode()");
     }
+    if (buff->info.unicode == STRING_UTF8 && is_ascii(beg, (size_t)len))
+        buff->info.unicode = STRING_ASCII;
     put_string(ret->item + num, buff);
 
     return ret;
@@ -641,6 +682,8 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
     string_t *result;
     svalue_t *svp;
     bool first = true;
+    bool isbyte = del->info.unicode == STRING_BYTES;
+    bool isutf8 = false;
 
     del_len = mstrsize(del);
     deltxt = get_txt(del);
@@ -655,10 +698,10 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
         {
             /* This is a range. */
             struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
-            if (r->vec.type == T_STRING)
+            if (r->vec.type == T_STRING && isbyte == (r->vec.u.str->info.unicode == STRING_BYTES))
                 size += (mp_int)del_len + r->index2 - r->index1;
         }
-        else if (elem->type == T_STRING)
+        else if (elem->type == T_STRING && isbyte == (elem->u.str->info.unicode == STRING_BYTES))
             size += (mp_int)del_len + mstrsize(elem->u.str);
     }
 
@@ -692,7 +735,7 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
         {
             /* This is a range. */
             struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
-            if (r->vec.type == T_STRING)
+            if (r->vec.type == T_STRING && isbyte == (r->vec.u.str->info.unicode == STRING_BYTES))
             {
                 if (first)
                     first = false;
@@ -703,10 +746,13 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
                 }
 
                 memcpy(p, get_txt(r->vec.u.str) + r->index1, r->index2 - r->index1);
+                if (!isutf8 && !isbyte && r->vec.u.str->info.unicode == STRING_UTF8 && !is_ascii(p, r->index2 - r->index1))
+                    isutf8 = true;
+
                 p += r->index2 - r->index1;
             }
         }
-        else if (elem->type == T_STRING)
+        else if (elem->type == T_STRING && isbyte == (elem->u.str->info.unicode == STRING_BYTES))
         {
             if (first)
                 first = false;
@@ -717,10 +763,14 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
             }
             memcpy(p, get_txt(elem->u.str), mstrsize(elem->u.str));
             p += mstrsize(elem->u.str);
+            if (elem->u.str->info.unicode == STRING_UTF8)
+                isutf8 = true;
         }
 
         svp++;
     }
+
+    result->info.unicode = isbyte ? STRING_BYTES : isutf8 ? STRING_UTF8 : STRING_ASCII;
 
     assert(p - get_txt(result) == size);
     return result;

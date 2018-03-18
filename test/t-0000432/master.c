@@ -1,8 +1,10 @@
 #include "/sys/regexp.h"
+#include "/sys/strings.h"
 
 #include "/inc/base.inc"
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
+#include "/inc/deep_eq.inc"
 
 void run_test()
 {
@@ -20,6 +22,592 @@ void run_test()
             (:
                 object ob = load_object("/utf-8.c");
                 return ob->"\u03c1\u03c9\u03c4\u03ae\u03c3\u03c4\u03b5\u005f\u03c7\u03b1\u03b9\u03c1\u03b5\u03c4\u03b9\u03c3\u03bc\u03cc"() == "\u039a\u03b1\u03bb\u03ae\u0020\u03bc\u03ad\u03c1\u03b1\u0021";
+            :)
+        }),
+        ({ "Switch with byte strings", 0,
+            (:
+                switch(to_bytes("\u2694\u2699", "utf-8"))
+                {
+                    case "\u2694\u2699":
+                        // Should not match (byte vs. text string)
+                        return 0;
+                    default:
+                        return 1;
+                }
+            :)
+        }),
+        ({ "Switch with unicode strings", 0,
+            (:
+                switch("\u2694" + "\u2699")
+                {
+                    case "\u2694\u2699":
+                        return 1;
+                    default:
+                        return 0;
+                }
+            :)
+        }),
+        ({ "sizeof() for unicode strings", 0,
+            (:
+                return sizeof("\U00002328") == 1;
+            :)
+        }),
+        ({ "sizeof() for byte sequences", 0,
+            (:
+                return sizeof(to_bytes("\U00002328", "UTF-8")) == 3;
+            :)
+        }),
+        ({ "String index", 0,
+            (:
+                string str = "\u2160\u2161\u2162\u2163\u2164";
+                return str[1] == 8545;
+            :)
+        }),
+        ({ "Byte index", 0,
+            (:
+                string str = to_bytes("\u2160\u2161\u2162\u2163\u2164", "utf-8");
+                return str[3] == 226;
+            :)
+        }),
+        ({ "String reverse index", 0,
+            (:
+                string str = "\u2160\u2161\u2162\u2163\u2164";
+                return str[<2] == 8547;
+            :)
+        }),
+        ({ "String arithmetic index", 0,
+            (:
+                string str = "\u2160\u2161\u2162\u2163\u2164";
+                return str[>-2] == 8547;
+            :)
+        }),
+        ({ "String range", 0,
+            (:
+                string str = "\U0001f0a1\U0001f0b1\U0001f0c1\U0001f0d1";
+                return str[1..2] == "\U0001f0b1\U0001f0c1";
+            :)
+        }),
+        ({ "Char lvalue 1", 0,
+            (:
+                string str = "\U0001f60b\U0001f62f\U0001f60e";
+                str[1] = '-';
+                return str == "\U0001f60b-\U0001f60e";
+            :)
+        }),
+        ({ "Char lvalue 2", 0,
+            (:
+                string str = "ABC";
+                str[1] = 128520;
+                return str == "A\U0001f608C";
+            :)
+        }),
+        ({ "Char lvalue 3", 0,
+            (:
+                string str = " " * 100;
+                str[0] = 8230;
+                return str == "\u2026" + " " * 99;
+            :)
+        }),
+        ({ "Char lvalue increment", 0,
+            (:
+                string str = "A\u007fA";
+                if (str[1]++ != 0x7f)
+                    return 0;
+                return str == "A\u0080A";
+            :)
+        }),
+        ({ "Char lvalue decrement", 0,
+            (:
+                string str = "A\u0080A";
+                if (str[1]-- != 0x80)
+                    return 0;
+                return str == "A\u007fA";
+            :)
+        }),
+        ({ "Char lvalue addition", 0,
+            (:
+                string str = "ABC";
+                str[1] += 9333;
+                return str == "A\u24b7C";
+            :)
+        }),
+        ({ "Char lvalue subtraction", 0,
+            (:
+                string str = "A\u24b7C";
+                str[1] -= 9333;
+                return str == "ABC";
+            :)
+        }),
+        ({ "String difference", 0,
+            (:
+                return ("\u2669\u266a\u266b\u2669" - "\u2669") == "\u266a\u266b";
+            :)
+        }),
+        ({ "String intersection", 0,
+            (:
+                return ("\u2669\u266a\u266b\u2669" & "\u266b\u2669") == "\u2669\u266b\u2669";
+            :)
+        }),
+        ({ "String vs. Byte comparison", 0,
+            (:
+                return "ABC" != to_bytes("ABC", "ASCII");
+            :)
+        }),
+        ({ "String range lvalue 1", 0,
+            (:
+                string str = "\U0001f1e6\U0001f1e7\U0001f1e8\U0001f1e9\U0001f1ea\U0001f1eb";
+                str[2..3] = "CD";
+                return str == "\U0001f1e6\U0001f1e7CD\U0001f1ea\U0001f1eb";
+            :)
+        }),
+        ({ "String range lvalue 2", 0,
+            (:
+                string str = "Music";
+                str[1..2] = "\u266a\u266b";
+                return str == "M\u266a\u266bic";
+            :)
+        }),
+        ({ "String range lvalue 3", 0,
+            (:
+                string str = " " * 100;
+                str[1..2] = "\u266a\u266b";
+                return str == " \u266a\u266b" + " " * 97;
+            :)
+        }),
+        ({ "Protected char lvalue 1", 0,
+            (:
+                string str = "\U0001f60b\U0001f62f\U0001f60e";
+                mixed ch = &(str[1]);
+                if (ch != 0x1f62f)
+                    return 0;
+
+                ch = '-';
+                return str == "\U0001f60b-\U0001f60e";
+            :)
+        }),
+        ({ "Protected char lvalue 2", 0,
+            (:
+                string str = "ABC";
+                mixed ch = &(str[1]);
+                if (ch != 'B')
+                    return 0;
+
+                ch = 128520;
+                return str == "A\U0001f608C";
+            :)
+        }),
+        ({ "Protected char lvalue 3", 0,
+            (:
+                string str = "\U0001f60b\U0001f62f\U0001f60e";
+                mixed ch1 = &(str[1]);
+                mixed ch2 = &(str[1]);
+                ch1 = '-';
+                return ch2 == '-' && str == "\U0001f60b-\U0001f60e";
+            :)
+        }),
+        ({ "Protected char lvalue 4", 0,
+            (:
+                string str = "ABC";
+                mixed ch1 = &(str[1]);
+                mixed ch2 = &(str[1]);
+                ch1 = 128520;
+                return ch2 == 128520 && str == "A\U0001f608C";
+            :)
+        }),
+        ({ "Protected char lvalue 5", 0,
+            (:
+                string str = " " * 100;
+                mixed ch1 = &(str[0]);
+                mixed ch2 = &(str[0]);
+                ch1 = 8230;
+                return str == "\u2026" + " " * 99 && ch2 == 8230;
+            :)
+        }),
+        ({ "Protected string range lvalue 1", 0,
+            (:
+                string str = "\U0001f1e6\U0001f1e7\U0001f1e8\U0001f1e9\U0001f1ea\U0001f1eb";
+                string range = &(str[2..3]);
+                if (range != "\U0001f1e8\U0001f1e9")
+                    return 0;
+
+                range = "CD";
+                return str == "\U0001f1e6\U0001f1e7CD\U0001f1ea\U0001f1eb";
+            :)
+        }),
+        ({ "Protected string range lvalue 2", 0,
+            (:
+                string str = "Music";
+                string range = &(str[1..2]);
+                if (range != "us")
+                    return 0;
+
+                range = "\u266a\u266b";
+                return str == "M\u266a\u266bic";
+            :)
+        }),
+        ({ "Protected string range lvalue 3", 0,
+            (:
+                string str = "\U0001f1e6\U0001f1e7\U0001f1e8\U0001f1e9\U0001f1ea\U0001f1eb";
+                string range1 = &(str[2..3]);
+                string range2 = &(str[2..3]);
+                range1 = "CD";
+                return range2 == "CD" && str == "\U0001f1e6\U0001f1e7CD\U0001f1ea\U0001f1eb";
+            :)
+        }),
+        ({ "Protected string range lvalue 4", 0,
+            (:
+                string str = "Music";
+                string range1 = &(str[1..2]);
+                string range2 = &(str[1..2]);
+                range1 = "\u266a\u266b";
+                return range2 == "\u266a\u266b" && str == "M\u266a\u266bic";
+            :)
+        }),
+        ({ "Protected tring range lvalue 5", 0,
+            (:
+                string str = " " * 100;
+                string range1 = &(str[1..2]);
+                string range2 = &(str[1..2]);
+                range1 = "\u266a\u266b";
+                return str == " \u266a\u266b" + " " * 97 && range2 == "\u266a\u266b";
+            :)
+        }),
+        ({ "Foreach over string", 0,
+            (:
+                int sum, num;
+                foreach(int ch: "\u24f5\u24f6\u24f7\u24f8\u24f9")
+                {
+                    sum+=ch;
+                    num++;
+                }
+
+                return num == 5 && sum == 47315;
+            :)
+        }),
+        ({ "Foreach over string reference 1", 0,
+            (:
+                string str = "\u24f5\u24f6\u24f7\u24f8\u24f9";
+                foreach(int ch: &str)
+                    ch -= 9412;
+
+                return str == "12345";
+            :)
+        }),
+        ({ "Foreach over string reference 2", 0,
+            (:
+                string str = "12345";
+                foreach(int ch: &str)
+                    ch += 9412;
+
+                return str == "\u24f5\u24f6\u24f7\u24f8\u24f9";
+            :)
+        }),
+        ({ "Reverse", 0,
+            (:
+                return reverse("\u24b6\u24b7\u24b8\u24b9\u24ba\u24bb") == "\u24bb\u24ba\u24b9\u24b8\u24b7\u24b6";
+            :)
+        }),
+        ({ "Reverse with reference", 0,
+            (:
+                string str = "\u24b6\u24b7\u24b8\u24b9\u24ba\u24bb";
+                return reverse(&(str[1..3])) == "\u24b9\u24b8\u24b7" && str == "\u24b6\u24b9\u24b8\u24b7\u24ba\u24bb";
+            :)
+        }),
+        ({ "save_value & restore_value with unicode string", 0,
+            (:
+                return deep_eq(
+                    to_array(restore_value(save_value("\U0001f634"))),
+                    ({ 128564 }));
+            :)
+        }),
+        ({ "save_value & restore_value with byte string 1", 0,
+            (:
+                return deep_eq(
+                    to_array(restore_value(save_value(to_bytes("\U0001f634", "UTF-8")))),
+                    ({ 0xF0, 0x9F, 0x98, 0xB4 }));
+            :)
+        }),
+        ({ "save_value & restore_value with byte string 2", 0,
+            (:
+                string result = save_value(to_bytes(({0, 34, 92, 0, 240})));
+                if (!sizeof(result))    // Should not throw an error.
+                    return 0;
+
+                return deep_eq(to_array(restore_value(result)), ({0, 34, 92, 0, 240}));
+            :)
+        }),
+#if 1 // These tests are dependant of the locale.
+        ({ "capitalize", 0,
+            (:
+                return capitalize("\u00e4gyptisch") == "\u00c4gyptisch";
+            :)
+        }),
+        ({ "lower_case", 0,
+            (:
+                return lower_case("\u00c4\u00d6\u00dc") == "\u00e4\u00f6\u00fc";
+            :)
+        }),
+        ({ "upper_case", 0,
+            (:
+                return upper_case("\u00e4\u00f6\u00fc") == "\u00c4\u00d6\u00dc";
+            :)
+        }),
+#endif
+        ({ "explode with unicode strings 1", 0,
+            (:
+                return deep_eq(explode("\u2745\u2744\u2746\u2744\u2745\u2744", "\u2744"),
+                    ({ "\u2745", "\u2746", "\u2745", "" }));
+            :)
+        }),
+        ({ "explode with unicode strings 2", 0,
+            (:
+                return deep_eq(explode("\u2745\u2744\u2746", ""),
+                    ({ "\u2745", "\u2744", "\u2746" }));
+            :)
+        }),
+        ({ "explode with bytes", 0,
+            (:
+                return deep_eq(explode(to_bytes("\u2745\u2744","UTF-8"), to_bytes(({0xe2}))),
+                    ({ to_bytes(({})), to_bytes(({0x9d, 0x85})), to_bytes(({0x9d, 0x84})) }));
+            :)
+        }),
+        ({ "implode with unicode strings", 0,
+            (:
+                return implode(({ "\u2745", "\u2746", "\u2745", "" }), "\u2744") ==
+                    "\u2745\u2744\u2746\u2744\u2745\u2744";
+            :)
+        }),
+        ({ "implode with bytes", 0,
+            (:
+                return implode(({ to_bytes(({})), to_bytes(({0x9d, 0x85})), to_bytes(({0x9d, 0x84})) }), to_bytes(({0xe2}))) ==
+                        to_bytes("\u2745\u2744","UTF-8");
+            :)
+        }),
+        ({ "member with unicode strings 1", 0,
+            (:
+                return member("\u2160\u2161\u2162\u2163\u2164\u2165\u2166\u2167\u2168\u2169\u216a\u216b", 8548) == 4;
+            :)
+        }),
+        ({ "member with unicode strings 2", 0,
+            (:
+                return member("\0\u2160\u2161\u2162\u2163\u2164\u2165\u2166\u2167\u2168\u2169\u216a\u216b", 8548) == 5;
+            :)
+        }),
+        ({ "member with unicode strings 3", 0,
+            (:
+                return member("\u2160\u2161\u2162\u2163\u2164\u2165\u2166\u2167\u2168X\u216a\u216b", 'X') == 9;
+            :)
+        }),
+        ({ "member with byte strings", 0,
+            (:
+                return member(to_bytes(({240,241,242,243,244,245,246,247,248,249,250})), 245) == 5;
+            :)
+        }),
+        ({ "rmember with unicode strings 1", 0,
+            (:
+                return rmember("\u2160\u2161\u2162\u2163\u2164\u2165\u2166\u2167\u2168\u2169\u216a\u216b", 8548) == 4;
+            :)
+        }),
+        ({ "rmember with unicode strings 2", 0,
+            (:
+                return rmember("\0\u2160\u2161\u2162\u2163\u2164\u2165\u2166\u2167\u2168\u2169\u216a\u216b\0", 8548) == 5;
+            :)
+        }),
+        ({ "rmember with unicode strings 3", 0,
+            (:
+                return rmember("\u2160\u2161\u2162\u2163\u2164\u2165\u2166\u2167\u2168X\u216a\u216b", 'X') == 9;
+            :)
+        }),
+        ({ "rmember with byte strings", 0,
+            (:
+                return rmember(to_bytes(({240,241,242,243,244,245,246,247,248,249,250})), 245) == 5;
+            :)
+        }),
+        ({ "regmatch with PCRE and unicode strings", 0,
+            (:
+                return regmatch("Sch\u00f6ne \u00c4ra", "[[:upper:]]ra", RE_PCRE) == "\u00c4ra";
+            :)
+        }),
+        ({ "regmatch with builtin regexp and unicode strings 1", 0,
+            (:
+                return regmatch("Sch\u00f6ne \u00c4ra", " \\<.ra", RE_TRADITIONAL) == " \u00c4ra";
+            :)
+        }),
+        ({ "regmatch with builtin regexp and unicode strings 2", 0,
+            (:
+                return regmatch("Sch\u00f6ne \u00c4ra", "[\u00c4\u00d6\u00dc]ra", RE_TRADITIONAL) == "\u00c4ra";
+            :)
+        }),
+        ({ "sprintf with unicode string", 0,
+            (:
+                return sprintf("%Q", "\u2615") == "\"\\u2615\"";
+            :)
+        }),
+        ({ "sprintf with unicode string range", 0,
+            (:
+                string str = "\u201e\u2135\u201d";
+                return sprintf("%Q", &(str[1..1])) == "\"\\u2135\"";
+            :)
+        }),
+        ({ "sprintf with unicode char lvalue", 0,
+            (:
+                string str = "\u201e\u2135\u201d";
+                return sprintf("%Q", &(str[1])) == "'\u2135' (8501)";
+            :)
+        }),
+        ({ "sprintf with bytes", 0,
+            (:
+                return sprintf("%Q", to_bytes("\u2615", "UTF-8")) == "\"\\xe2\\x98\\x95\"";
+            :)
+        }),
+        ({ "sprintf with byte range", 0,
+            (:
+                string str = to_bytes("\u201e\u2135\u201d", "UTF-8");
+                return sprintf("%Q", &(str[3..5])) == "\"\\xe2\\x84\\xb5\"";
+            :)
+        }),
+        ({ "sprintf with byte lvalue", 0,
+            (:
+                string str = to_bytes("\u201e\u2135\u201d", "UTF-8");
+                return sprintf("%Q", &(str[3])) == "226";
+            :)
+        }),
+        ({ "sprintf with an unicode character", 0,
+            (:
+                return sprintf("%c", 9774) == "\u262e";
+            :)
+        }),
+        ({ "sprintf chopping unicode strings", 0,
+            (:
+                return sprintf("%.10s", "\u266b"*20) == "\u266b"*10;
+            :)
+        }),
+        ({ "sprintf table with unicode strings", 0,
+            (:
+                return sprintf("%6#s\n", "\u2669\n"*10) == "  \u2669  \u2669\n"*5;
+            :)
+        }),
+        ({ "sprintf wrapping unicode characters", 0,
+            (:
+                return sprintf("%-=19s\n", "\u266a"*20) == "\u266a"*19 + "\n\u266a\n";
+            :)
+        }),
+        ({ "terminal_colour wrapping unicode characters 1", 0,
+            (:
+                return terminal_colour("\u266a"*20+"\n", 0, 19, 5) == "\u266a"*19 + "\n     \u266a\n";
+            :)
+        }),
+// Tests for the maximum string size of terminal_colour().
+#define TERMINAL_COLOUR_MAX 200000
+        ({ "terminal_colour wrapping unicode characters 2", 0,
+            (:
+                return terminal_colour("\u266b "*TERMINAL_COLOUR_MAX, 0, TERMINAL_COLOUR_MAX/2 - 500, 2000) == "\u266b " * (TERMINAL_COLOUR_MAX/4 - 250);
+            :)
+        }),
+        ({ "terminal_colour wrapping unicode characters 3", 0,
+            (:
+                return terminal_colour("\u266b "*TERMINAL_COLOUR_MAX, 0, TERMINAL_COLOUR_MAX/4 + 250, 2000) == "\u266b " * (TERMINAL_COLOUR_MAX/8 + 124) + "\u266b\n" + " " * 2000 + "\u266b " * (TERMINAL_COLOUR_MAX/8 - 875);
+            :)
+        }),
+        ({ "terminal_colour trimming unicode characters 1", 0,
+            (:
+                return sizeof(terminal_colour("%^X%^" + "\u266b"*TERMINAL_COLOUR_MAX, ([0: ""]), 0, 0)) == TERMINAL_COLOUR_MAX/3;
+            :)
+        }),
+        ({ "terminal_colour trimming unicode characters 2", 0,
+            (:
+                return sizeof(terminal_colour("\u266b"*TERMINAL_COLOUR_MAX, 0, TERMINAL_COLOUR_MAX/4, 0)) == 1 + TERMINAL_COLOUR_MAX/3;
+            :)
+        }),
+        ({ "strstr 1", 0,
+            (:
+                return strstr("\u263a\u263b\u263b\u263a", "\u263b", 1) == 1;
+            :)
+        }),
+        ({ "strstr 2", 0,
+            (:
+                return strstr("\u263a\u263b\u263b\u263a", "\u263b", 2) == 2;
+            :)
+        }),
+        ({ "strrstr 1", 0,
+            (:
+                return strrstr("\u263a\u263b\u263b\u263a", "\u263b", 1) == 1;
+            :)
+        }),
+        ({ "strrstr 2", 0,
+            (:
+                return strrstr("\u263a\u263b\u263b\u263a", "\u263b", -1) == 2;
+            :)
+        }),
+        ({ "trim 1", 0,
+            (:
+                return trim("\u22ef\u22ef\u22f0\u22f1\u22ef\u22ef", TRIM_BOTH, "\u22ef") == "\u22f0\u22f1";
+            :)
+        }),
+        ({ "trim 2", 0,
+            (:
+                return trim("\u22ef\u22ef\u22f0\u22f1\u22ef\u22ef", TRIM_BOTH, 0x22ef) == "\u22f0\u22f1";
+            :)
+        }),
+        ({ "read_bytes", 0,
+            (:
+                return read_bytes("/data.bin", 0, 7) == to_bytes("\u269d\U0001f44d", "UTF-8");
+            :)
+        }),
+        ({ "read_file", 0,
+            (:
+                return read_file("/data.bin", 2, 1) == "\u2328\u231b\n";
+            :)
+        }),
+        ({ "write_bytes", 0,
+            (:
+                string str;
+
+                write_file("/test.bin", "", 1);
+                write_bytes("/test.bin", 0, to_bytes(({0,1,2,3,4,5})));
+                str = read_bytes("/test.bin");
+                rm("/test.bin");
+
+                return str == to_bytes(({0,1,2,3,4,5}));
+            :)
+        }),
+        ({ "write_file", 0,
+            (:
+                string str;
+
+                write_file("/test.txt", "\u2620\u2623\n", 1);
+                str = read_file("/test.txt");
+                rm("/test.txt");
+
+                return str == "\u2620\u2623\n";
+            :)
+        }),
+#ifdef __XML_DOM__
+        ({ "XML with Unicode", 0,
+            (:
+                mixed val = ({ "\u00c4", ([ "\u00e4": "\u266b\u266a" ]), 0 });
+                return deep_eq(xml_parse(xml_generate(val)), val);
+            :)
+        }),
+#endif
+        ({ "Illegal characters in UTF-8 sequences", TF_ERROR,
+            (:
+                to_text(({0xf8,0x80,0x80,0x80,0x80}), "UTF-8");
+            :)
+        }),
+        ({ "Illegal characters with to_text(array)", TF_ERROR,
+            (:
+                to_text(({0x110000}));
+            :)
+        }),
+        ({ "Illegal characters with to_string(array)", TF_ERROR,
+            (:
+                to_string(({0x110000}));
+            :)
+        }),
+        ({ "Illegal characters with sprintf(\"%c\")", TF_ERROR,
+            (:
+                sprintf("%c", 0x110000);
             :)
         }),
     }),

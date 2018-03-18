@@ -1,11 +1,12 @@
 SYNOPSIS
         int member(mixed *array, mixed elem [, int start])
         int member(string s, int elem [, int start])
+        int member(bytes s, int elem [, int start])
         int member(mapping m, mixed key)
 
 DESCRIPTION
-        For arrays and strings, returns the index of the first
-        occurance of second arg in the first arg, or -1 if none found.
+        For arrays, strings and byte sequences, returns the index of the
+        first occurance of second arg in the first arg, or -1 if none found.
         If <start> is given and non-negative, the search starts at
         that position. A start position beyond the end of the string
         or array will cause the efun to return -1.
