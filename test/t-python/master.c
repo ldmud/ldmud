@@ -42,12 +42,19 @@ void run_test()
                        python_return(-__FLOAT_MIN__) == -__FLOAT_MIN__;
             :)
         }),
-        ({ "passing string", 0,
+        ({ "passing unicode string", 0,
             (:
                 return python_return("") == "" &&
                        python_return("Hi") == "Hi" &&
                        python_return("\0") == "\0" &&
-                       python_return("42\xe2\x82\xac") == "42\xe2\x82\xac"; // UTF-8 encoding allowed
+                       python_return("42\u20ac") == "42\u20ac";
+            :)
+        }),
+        ({ "passing byte string", 0,
+            (:
+                return python_return(to_bytes(({}))) == to_bytes(({})) &&
+                       python_return(to_bytes(({0,1,2,3,4}))) == to_bytes(({0,1,2,3,4})) &&
+                       python_return(to_bytes("42\u20ac", "UTF-8")) == to_bytes(({0x34, 0x32, 0xe2, 0x82, 0xac}));
             :)
         }),
         ({ "passing objects", 0,

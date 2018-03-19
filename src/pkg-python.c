@@ -4333,7 +4333,10 @@ svalue_to_python (svalue_t *svp)
             return PyFloat_FromDouble(READ_DOUBLE(svp));
 
         case T_STRING:
-            return PyUnicode_Decode(get_txt(svp->u.str), mstrsize(svp->u.str), "utf-8", "replace");
+            if (svp->u.str->info.unicode == STRING_BYTES)
+                return PyBytes_FromStringAndSize(get_txt(svp->u.str), mstrsize(svp->u.str));
+            else
+                return PyUnicode_Decode(get_txt(svp->u.str), mstrsize(svp->u.str), "utf-8", "replace");
 
         case T_POINTER:
             return ldmud_array_create(svp->u.vec);
@@ -4474,9 +4477,13 @@ python_to_svalue (svalue_t *dest, PyObject* val)
     {
         Py_ssize_t length;
         char * buf;
+        string_t * str;
 
         PyBytes_AsStringAndSize(val, &buf, &length);
-        put_c_n_string(dest, buf, length);
+        str = new_n_mstring(buf, length, STRING_BYTES);
+        if (str == NULL)
+            return "out of memory";
+        put_string(dest, str);
         return NULL;
     }
 
@@ -4485,14 +4492,19 @@ python_to_svalue (svalue_t *dest, PyObject* val)
         PyObject *utf8;
         Py_ssize_t length;
         char * buf;
+        string_t * str;
 
         utf8 = PyUnicode_AsEncodedString(val, "utf-8", "replace");
         if (utf8 == NULL)
             return "undecodable unicode string";
 
         PyBytes_AsStringAndSize(utf8, &buf, &length);
-        put_c_n_string(dest, buf, length);
+        str = new_n_unicode_mstring(buf, length);
         Py_DECREF(utf8);
+
+        if (str == NULL)
+            return "out of memory";
+        put_string(dest, str);
         return NULL;
     }
 
@@ -4620,7 +4632,7 @@ python_eq_svalue (PyObject* pval, svalue_t *sval)
 
     if (PyBytes_Check(pval))
     {
-        if (sval->type == T_STRING)
+        if (sval->type == T_STRING && sval->u.str->info.unicode == STRING_BYTES)
         {
             Py_ssize_t length;
             char * buf;
@@ -4636,7 +4648,7 @@ python_eq_svalue (PyObject* pval, svalue_t *sval)
 
     if (PyUnicode_Check(pval))
     {
-        if (sval->type == T_STRING)
+        if (sval->type == T_STRING && sval->u.str->info.unicode != STRING_BYTES)
         {
             PyObject *utf8;
             Py_ssize_t length;
