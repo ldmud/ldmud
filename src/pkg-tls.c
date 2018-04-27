@@ -349,7 +349,7 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
     {
         object_t * save_c_g = command_giver;
         command_giver = obj;
-        add_message(message_flush);
+        add_message_flush();
         command_giver = save_c_g;
     }
 
@@ -464,7 +464,7 @@ f_tls_deinit_connection(svalue_t *sp)
     {
         object_t * save_c_g = command_giver;
         command_giver = sp->u.ob;
-        add_message(message_flush);
+        add_message_flush();
         command_giver = save_c_g;
     }
 

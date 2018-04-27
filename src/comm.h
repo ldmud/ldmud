@@ -4,6 +4,7 @@
 #include "driver.h"
 #include "typedefs.h"
 #include <sys/types.h>
+#include <iconv.h>
 #ifdef USE_MCCP
 #    include <zlib.h>
 #endif
@@ -69,28 +70,7 @@
 
 #define MAX_TEXT  20480
 
-/* 'Format string' to use with add_message() when sending
- * a string_t* string to the player.
- */
-
-#define FMT_STRING ((const char *)&add_message)
-
-/* 'Format string' to use with add_message() when sending
- * a string with binary characters and of fixed size
- * to the player.
- */
-
-#define FMT_BINARY (FMT_STRING+1)
-
 /* --- Telnet Handling --- */
-
-#define SEND_TELNET_COMMAND(TEXT) {\
-        sending_telnet_command = MY_TRUE;\
-        TEXT\
-        sending_telnet_command = MY_FALSE;\
-}
-  /* Use this macro to safely send telnet commands with TEXT
-   */
 
 #ifdef DEBUG_TELNET
 
@@ -105,10 +85,6 @@
 #define DTF(x)
 
 #endif
-
-/* Special flush message for add_message(). */
-#define message_flush ((const char *)NULL)
-
 
 /* --- Types --- */
 
@@ -197,7 +173,6 @@ struct interactive_s {
     char noecho;                /* Input mode bitflags */
 
     char tn_state;              /* current state of telnet machine */
-    char save_tn_state;         /* saved state of telnet machine */
     CBool supress_go_ahead;     /* Keep track of the WILL SGA negotiation state
                                  * as some clients mix that up with DO SGA.
                                  * Other than that, this is of no concern.
@@ -208,14 +183,22 @@ struct interactive_s {
     discarded_msg_state_t msg_discarded;
                                 /* Indicates if an earlier message had
                                  * been discarded. */
-    short text_end;             /* first free char in buffer */
-    short command_start;        /* used for charmode */
-    short command_end;          /* where we are up to in player cmd buffer */
-    short tn_start;             /* first char of pending telnet neg */
-    short tn_end;               /* first char to check for telnet negotiation */
-    int32 chars_ready;          /* amount of pure data available. In charmode
-                                 * this is the amount of data already echoed
-                                 * back to the sender. */
+    short text_prefix;          /* Number of bytes at the beginning of .text that belong
+                                 * to the next multi-byte sequence.
+                                 */
+    short tn_start;             /* first char in .text of pending telnet subneg
+                                   (points to the byte after IAC SB) */
+    short tn_end;               /* first char in .text to check for telnet negotiation */
+    short text_end;             /* first free char in .text buffer */
+    short command_start;        /* used for charmode: The next char in .command
+                                 * to send to the input_to handler. */
+    short command_printed;      /* For charmode: When having escaped input, points beyond
+                                 * the last character that was echoed back by the driver. */
+    short command_end;          /* end of the parsed command in .command buffer
+                                 * (In charmode points beyond the line ending when TS_READY,
+                                 * otherwise doesn't include the line ending) */
+    short command_unprocessed_end;
+                                /* end of unprocessed chars in .command buffer */
     interactive_t *snoop_on;    /* whom we're snooping */
     object_t *snoop_by;         /* by whom we're snooped */
     mp_int last_time;           /* Time of last command executed */
@@ -239,31 +222,48 @@ struct interactive_s {
     long access_class;
       /* represents a "cluster" where this player comes from
        */
-    char charset[32];
+    char charset[16];
       /* A bitflag array: every non-zero flag allows the corresponding
        * character to be sent. Characters whose flag is 0 are excluded
        * from the sent data.
        */
-    char combine_cset[32];
+    char combine_cset[16];
       /* A bitflag array: all characters with their corresponding flag
        * set to non-zero flag may be combined into one string in
        * char-mode when received en-bloc anyway. Characters whose flag
        * is 0 are always returned in charmode in separate strings.
-       * TODO: The code for these two thingies assume 8 Bits per character.
        */
+    char encoding[128];
+      /* The encoding of the connection. */
+
     CBool quote_iac;
     CBool catch_tell_activ;
+    bool syncing;               /* Received a TCP Urgend notification. */
     char gobble_char;           /* Char to ignore at the next telnet_neg() */
-    char ts_data;               /* Telnet suboption? */
 
-    char text[MAX_TEXT+2];
-      /* The receive buffer. It can contain two extra characters:
-       * a '\r' that is recognized only after another character is read,
-       * and a terminating '\0'.
+    char text[MAX_TEXT];
+      /* The receive buffer. These are the raw bytes received from
+       * the network connection.
+       */
+
+    char command[MAX_TEXT];
+      /* The command read from network. Contains the text from .text
+       * after having telnet data removed and being converted from
+       * the source encoding to UTF-8.
        */
 
     char message_buf[MAX_SOCKET_PACKET_SIZE];
       /* The send buffer. */
+
+    iconv_t receive_cd;
+      /* The iconv conversion descriptor for receiving text.
+       * It is always a valid descriptor.
+       */
+
+    iconv_t send_cd;
+      /* The iconv conversion descriptor for sending text.
+       * It is always a valid descriptor.
+       */
 
 #ifdef USE_MCCP
     unsigned char   compressing;
@@ -375,7 +375,6 @@ struct interactive_s {
 
 /* --- Variables --- */
 
-extern Bool sending_telnet_command;
 extern interactive_t *all_players[MAX_PLAYERS];
 extern int num_player;
 extern char *domain_name;
@@ -397,13 +396,17 @@ extern void initialize_host_ip_number(const char *, const char *);
 extern void  prepare_ipc(void);
 extern void  ipc_remove(void);
 extern Bool comm_socket_write (char *msg, size_t size, interactive_t *ip, uint32 flags);
+extern void  add_message_flush();
+extern void  add_message_bytes (const char* bytes, size_t len);
+extern void  add_message_text (const char* str, size_t len);
+extern void  add_message_str (string_t *str);
 extern void  add_message VARPROT((const char *, ...), printf, 1, 2);
 extern void  flush_all_player_mess(void);
-extern Bool get_message(char *buff);
+extern Bool get_message(char *buff, size_t *bufflength);
 extern void remove_interactive(object_t *ob, Bool force);
 extern void set_noecho(interactive_t *i, char noecho, Bool local_change, Bool external);
 extern int  find_no_bang (interactive_t *ip);
-extern Bool call_function_interactive(interactive_t *i, char *str);
+extern Bool call_function_interactive(interactive_t *i, char *str, size_t length);
 extern void remove_all_players(void);
 extern void  print_prompt(void);
 extern void  init_telopts(void);

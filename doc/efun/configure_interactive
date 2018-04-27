@@ -35,7 +35,8 @@ DESCRIPTION
           interactive user <ob>. Non-combinable characters and single
           received characters are returned as separate strings as usual.
 
-          The newline '\n' and the NUL character '\0' are always
+          The newline '\n', the NUL character '\0' and non-ASCII
+          characters (unicode characters > 127) are always
           non-combinable.
 
           The given string should contain all combinable characters.
@@ -46,7 +47,7 @@ DESCRIPTION
           Set the set of characters which can be combined into a single
           string, just like IC_COMBINE_CHARSET_AS_STRING.
 
-          The given array shall contain an array of up to 32 integers
+          The given array shall contain an array of up to 16 integers
           that are interpreted as 8-bit-values. Each character is encoded
           as one bit (ASCII characters 0-7 in the first integer, and so on).
           So a character <n> is treated as combinable if
@@ -58,8 +59,10 @@ DESCRIPTION
 
         <what> == IC_CONNECTION_CHARSET_AS_STRING
           Set the set of characters which can be output to the interactive
-          user <ob>. All other characters are discarded. (This does not
-          apply to binary_message()).
+          user <ob>. All other characters are discarded. This does only
+          apply to characters in the ASCII character set (first 128
+          characters). This does not apply to unicode characters > 127
+          or to binary_message().
 
           The given string should contain all allowed characters.
           If given as the number 0, the default charset is re-established.
@@ -68,7 +71,7 @@ DESCRIPTION
           Set the set of characters which can be output to the interactive
           user <ob>, just like IC_CONNECTION_CHARSET_AS_STRING.
 
-          The given array shall contain an array of up to 32 integers
+          The given array shall contain an array of up to 16 integers
           that are interpreted as 8-bit-values. Each character is encoded
           as one bit (ASCII characters 0-7 in the first integer, and so on).
           So a character <n> is allowed to be output if
@@ -131,9 +134,20 @@ DESCRIPTION
           from modify_command() to something else using the
           H_MODIFY_COMMAND_FNAME hook.
 
+        <what> == IC_ENCODING
+          Sets the encoding to convert the network input to/from.
+          All received bytes (except telnet negotiations) will be converted
+          using this encoding to the internal unicode representation.
+          And all text strings will be converted back to this encoding
+          when sent to the interactive.
+
+          Default is "ISO-8859-1//TRANSLIT".
+
 
 HISTORY
         Introduced in LDMud 3.3.719.
+        IC_ENCODING introduced in LDMud 3.6.0.
+
 
 SEE ALSO
         configure_driver(E)

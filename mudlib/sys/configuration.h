@@ -18,6 +18,7 @@
 #define IC_PROMPT                        9
 #define IC_MAX_COMMANDS                 10
 #define IC_MODIFY_COMMAND               11
+#define IC_ENCODING                     12
 
 /* Possible options for configure_object().
  */

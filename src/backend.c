@@ -652,6 +652,10 @@ backend (void)
          * is the max size of the network receive buffer. IOW: no
          * buffer overruns are possible.
          */
+
+    size_t bufflength;
+        /* The size of the command in buff.*/
+
     Bool prevent_object_cleanup;
         /* Implement a low/high water mark handling for the call to
          * cleanup_all_objects(), as it turns out that a single
@@ -868,7 +872,7 @@ backend (void)
          * heart beat is due.
          */
 
-        if (get_message(buff))
+        if (get_message(buff, &bufflength))
         {
             interactive_t *ip;
 
@@ -911,29 +915,32 @@ backend (void)
 
             mark_start_evaluation();
 
-            if (buff[0] == input_escape
-             && buff[1] != '\0'
-               )
+            if (bufflength > 1 && buff[0] == input_escape)
             {
-                if(!call_function_interactive(ip, buff)) {
+                if(!call_function_interactive(ip, buff, bufflength))
+                {
                     /* We got a bang-input, but no input context wants
                     * to handle it - treat it as a normal command.
                     */
-                    if (ip->noecho & NOECHO)
+                    if ((ip->noecho & NOECHO) && ip->command_printed <= ip->command_start)
                     {
                         /* !message while in NOECHO - simulate the
                         * echo by sending the (remaining) raw data we got.
                         */
-                        add_message("%s\n", buff + ip->chars_ready);
-                        ip->chars_ready = 0;
+                        add_message("%.*s\n", ip->command_start - ip->command_printed, buff + bufflength + ip->command_printed - ip->command_start);
+                        ip->command_printed = ip->command_start;
                     }
+                    buff[bufflength] = 0;
                     execute_command(buff+1, command_giver);
                 }
             }
-            else if (call_function_interactive(ip, buff))
+            else if (call_function_interactive(ip, buff, bufflength))
                 NOOP;
             else
+            {
+                buff[bufflength] = 0;
                 execute_command(buff, command_giver);
+            }
 
             mark_end_evaluation();
 

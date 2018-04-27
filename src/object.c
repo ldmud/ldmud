@@ -1297,7 +1297,7 @@ tell_object (object_t *ob, string_t *str)
     {
         save_command_giver = command_giver;
         command_giver = ob;
-        add_message(FMT_STRING, str);
+        add_message_str(str);
         command_giver = save_command_giver;
         return;
     }
@@ -3701,7 +3701,7 @@ f_tell_object (svalue_t *sp)
             errorf("Object not found: %s.\n", get_txt(arg[0].u.str));
     }
 
-    if (arg[1].type == T_STRING)
+    if (arg[1].type == T_STRING && arg[1].u.str->info.unicode != STRING_BYTES)
     {
         tell_object(ob, sp->u.str);
         free_svalue(sp);
@@ -4680,8 +4680,12 @@ e_say (svalue_t *v, vector_t *avoid)
     switch(v->type)
     {
     case T_STRING:
-        message = v->u.str;
-        break;
+        if (v->u.str->info.unicode != STRING_BYTES)
+        {
+            message = v->u.str;
+            break;
+        }
+        /* else FALLTHROUGH */
 
     case T_OBJECT:
     case T_POINTER:
@@ -4696,12 +4700,8 @@ e_say (svalue_t *v, vector_t *avoid)
             stmp.u.ob = ob;
             if (lookup_key(&stmp, avoid) >= 0)
                 continue;
-            switch (v->type) {
-            case T_OBJECT:  push_ref_object(inter_sp, v->u.ob, "say"); break;
-            case T_POINTER: push_ref_array(inter_sp, v->u.vec); break;
-            case T_MAPPING: psh_ref_mapping(inter_sp, v->u.map); break;
-            case T_STRUCT:  push_ref_struct(inter_sp, v->u.strct); break;
-            }
+
+            assign_svalue_no_free(++inter_sp, v);
             push_ref_object(inter_sp, origin, "say");
             sapply(STR_CATCH_MSG, ob, 2);
         }
@@ -4891,8 +4891,12 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     switch(v->type)
     {
     case T_STRING:
-        message = v->u.str;
-        break;
+        if (v->u.str->info.unicode != STRING_BYTES)
+        {
+            message = v->u.str;
+            break;
+        }
+        /* else FALLTHROUGH */
 
     case T_OBJECT:
     case T_POINTER:
@@ -4914,12 +4918,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
             stmp.u.ob = ob;
             if (lookup_key(&stmp, avoid) >= 0)
                 continue;
-            switch (v->type) {
-            case T_OBJECT:  push_ref_object(inter_sp, v->u.ob, "tell_room"); break;
-            case T_POINTER: push_ref_array(inter_sp, v->u.vec); break;
-            case T_MAPPING: psh_ref_mapping(inter_sp, v->u.map); break;
-            case T_STRUCT:  push_ref_struct(inter_sp, v->u.strct); break;
-            }
+            assign_svalue_no_free(++inter_sp, v);
             push_ref_object(inter_sp, origin, "tell_room");
             sapply(STR_CATCH_MSG, ob, 2);
         }

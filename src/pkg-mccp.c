@@ -134,17 +134,17 @@ start_compress (interactive_t * ip, unsigned char telopt)
         /* version 1 or 2 support */
         if (telopt == TELOPT_COMPRESS)
         {
+            char cmd[] = { IAC, SB, telopt, WILL, SE };
             DTF (("%s TDEBUG: send IAC SB %02x WILL SE\n", time_stamp (), telopt));
-            SEND_TELNET_COMMAND (add_message ("%c", IAC);
-                                 add_message ("%c%c%c%c", SB, telopt, WILL, SE);
-                                 add_message (message_flush););
+            add_message_bytes(cmd, sizeof(cmd));
+            add_message_flush();
         }
         else if (telopt == TELOPT_COMPRESS2)
         {
-            DTF (("%s TDEBUG: send IAC SB %02x WILL SE\n", time_stamp (), telopt));
-            SEND_TELNET_COMMAND (add_message ("%c", IAC);
-                                 add_message ("%c%c%c%c", SB, telopt, IAC, SE);
-                                 add_message (message_flush););
+            char cmd[] = { IAC, SB, telopt, IAC, SE };
+            DTF (("%s TDEBUG: send IAC SB %02x IAC SE\n", time_stamp (), telopt));
+            add_message_bytes(cmd, sizeof(cmd));
+            add_message_flush();
         }
         else
         {

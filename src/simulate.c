@@ -4512,15 +4512,17 @@ print_svalue (svalue_t *arg)
     {
         interactive_t *ip;
 
+        if (arg->u.str->info.unicode == STRING_BYTES)
+            add_message("<BYTES>");
         /* Strings sent to monsters are now delivered */
-        if (command_giver && (command_giver->flags & O_ENABLE_COMMANDS)
+        else if (command_giver && (command_giver->flags & O_ENABLE_COMMANDS)
          && !(O_SET_INTERACTIVE(ip, command_giver)) )
         {
             tell_npc(command_giver, arg->u.str);
         }
         else
         {
-            add_message(FMT_STRING, arg->u.str);
+            add_message_str(arg->u.str);
         }
     }
     else if (arg->type == T_OBJECT)

@@ -245,6 +245,9 @@ p_int write_buffer_max_size = WRITE_BUFFER_MAX_SIZE;
    *  -1: Infinite queue.
    */
 
+char default_player_encoding[128] = "ISO-8859-1//TRANSLIT";
+  /* Default encoding for interactives. */
+
 static char udp_buf[65536];
   /* Buffer for incoming UDP datagrams in get_message(). 
    * If it is too small, the rest of the to be received datagram will be
@@ -400,11 +403,6 @@ static int min_nfds = 0;
 
 /* --- Telnet handling --- */
 
-Bool sending_telnet_command = MY_FALSE;
-  /* Mutex queried in add_message() to hide telnet commands
-   * from snoopers and shadows.
-   */
-
 static void (*telopts_do  [NTELOPTS])(int);
 static void (*telopts_dont[NTELOPTS])(int);
 static void (*telopts_will[NTELOPTS])(int);
@@ -414,24 +412,26 @@ static void (*telopts_wont[NTELOPTS])(int);
    */
 
 enum telnet_states {
-  TS_DATA = 0,
-  TS_IAC,
-  TS_WILL,
-  TS_WONT,
-  TS_DO,
-  TS_DONT,
-  TS_SB,
-  TS_SB_IAC,
-  TS_READY,
-  TS_SYNCH,
+  TS_DATA = 0,      /* Initial state, we expect regular data or the begin of a telnet sequence. */
+  TS_IAC,           /* Received an IAC, expect telnet command or another IAC. */
+  TS_WILL,          /* Received IAC WILL, expect telnet option code. */
+  TS_WONT,          /* Received IAC WONT, expect telnet option code. */
+  TS_DO,            /* Received IAC DO, expect telnet option code. */
+  TS_DONT,          /* Received IAC DONT, expect telnet option code. */
+  TS_SB,            /* Received IAC SB and any number of bytes != IAC for the subnegotiation. */
+  TS_SB_IAC,        /* Received IAC SB <contents> IAC. */
+  TS_READY,         /* Received a full line, that is now in the .command[] buffer (without the newline). */
+  TS_SYNCH,         /* Received SIGURG (out-of-band data) on the TCP channel and shall discard
+                       all data until an IAC DM is received. */
   TS_INVALID
 };
 
   /* Telnet states
    */
 
-static inline int TN_START_VALID(int x) {
-  return (x & ~TS_IAC) == TS_SB;
+static inline int TN_START_VALID(int x)
+{
+    return x == TS_SB || x == TS_SB_IAC;
 }
 
 
@@ -765,28 +765,15 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       case TS_INVALID: fprintf(stderr, " (TS_INVALID)\n"); break;
       default: putc('\n', stderr);
       }
-    fprintf(stderr, "  .save_tn_state:     %hhd", ip->save_tn_state);
-      switch(ip->save_tn_state) {
-      case TS_DATA:    fprintf(stderr, " (TS_DATA)\n"); break;
-      case TS_IAC:     fprintf(stderr, " (TS_IAC)\n"); break;
-      case TS_WILL:    fprintf(stderr, " (TS_WILL)\n"); break;
-      case TS_WONT:    fprintf(stderr, " (TS_WONT)\n"); break;
-      case TS_DO:      fprintf(stderr, " (TS_DO)\n"); break;
-      case TS_DONT:    fprintf(stderr, " (TS_DONT)\n"); break;
-      case TS_SB:      fprintf(stderr, " (TS_SB)\n"); break;
-      case TS_SB_IAC:  fprintf(stderr, " (TS_SB_IAC)\n"); break;
-      case TS_READY:   fprintf(stderr, " (TS_READY)\n"); break;
-      case TS_SYNCH:   fprintf(stderr, " (TS_SYNCH)\n"); break;
-      case TS_INVALID: fprintf(stderr, " (TS_INVALID)\n"); break;
-      default: putc('\n', stderr);
-      }
     fprintf(stderr, "  .supress_go_ahead:  %02hhx\n", (unsigned char)ip->supress_go_ahead);
-    fprintf(stderr, "  .text_end:          %hd (%p)\n", ip->text_end, ip->text+ip->text_end);
-    fprintf(stderr, "  .command_start:     %hd (%p)\n", ip->command_start, ip->text+ip->command_start);
-    fprintf(stderr, "  .command_end:       %hd (%p)\n", ip->command_end, ip->text+ip->command_end);
+    fprintf(stderr, "  .text_prefix:       %hd (%p)\n", ip->text_prefix, ip->text+ip->text_prefix);
     fprintf(stderr, "  .tn_start:          %hd (%p)\n", ip->tn_start, ip->text+ip->tn_start);
     fprintf(stderr, "  .tn_end:            %hd (%p)\n", ip->tn_end, ip->text+ip->tn_end);
-    fprintf(stderr, "  .chars_ready:       %"PRId32"\n",ip->chars_ready);
+    fprintf(stderr, "  .text_end:          %hd (%p)\n", ip->text_end, ip->text+ip->text_end);
+    fprintf(stderr, "  .command_start:     %hd (%p)\n", ip->command_start, ip->command+ip->command_start);
+    fprintf(stderr, "  .command_end:       %hd (%p)\n", ip->command_end, ip->command+ip->command_end);
+    fprintf(stderr, "  .command_unprc_end: %hd (%p)\n", ip->command_unprocessed_end, ip->command+ip->command_unprocessed_end);
+    fprintf(stderr, "  .command_printed:   %hd (%p)\n", ip->command_printed, ip->command+ip->command_printed);
     fprintf(stderr, "  .snoop_on:          %p", ip->snoop_on);
       if (ip->snoop_on && ip->snoop_on->ob) fprintf(stderr, " (%s)", get_txt(ip->snoop_on->ob->name));
       putc('\n', stderr);
@@ -815,9 +802,11 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
     fprintf(stderr, "  .quote_iac:         %02hhx\n", (unsigned char)ip->quote_iac);
     fprintf(stderr, "  .catch_tell_activ:  %02hhx\n", (unsigned char)ip->catch_tell_activ);
     fprintf(stderr, "  .gobble_char:       %02hhx\n", (unsigned char)ip->gobble_char);
-    fprintf(stderr, "  .ts_data:           %02hhx\n", (unsigned char)ip->ts_data);
+    fprintf(stderr, "  .syncing:           %02hhx\n", (unsigned char)ip->syncing);
     fprintf(stderr, "  .text:             ");
       dump_bytes(&(ip->text), sizeof(ip->text), 21);
+    fprintf(stderr, "  .command:          ");
+      dump_bytes(&(ip->command), sizeof(ip->command), 21);
     fprintf(stderr, "  .message_buf:      ");
       dump_bytes(&(ip->message_buf), sizeof(ip->message_buf), 21);
     fprintf(stderr, "------\n");
@@ -1635,37 +1624,317 @@ add_discarded_message (interactive_t *ip)
 
 /*-------------------------------------------------------------------------*/
 void
+add_message_flush ()
+
+/* Flush the message buffer of the current command giver.
+ *
+ * If an error other than EINTR occurred while sending the data to
+ * the network, the message is discarded and the socket is marked
+ * for disconnection.
+ */
+
+{
+    interactive_t *ip;       /* The interactive user */
+    int length;
+
+    if ( command_giver == NULL
+     || (command_giver->flags & O_DESTRUCTED)
+     || !(O_SET_INTERACTIVE(ip, command_giver)))
+        return;
+
+    length = ip->message_length;
+    if (!length)
+        return;
+
+    ip->message_length = 0; /* In case of any recursion. */
+    comm_socket_write(ip->message_buf, length, ip, 0);
+    clear_message_buf(ip);
+} /* add_messagee_flush() */
+
+/*-------------------------------------------------------------------------*/
+void
+add_message_bytes (const char* bytes, size_t len)
+
+/* Send the given bytes without encoding to the current command giver.
+ * Also there is no IAC quoting.
+ *
+ * All messages are accumulated in interactive.message_buf, which is
+ * flushed when it is full. This flush can be forced by calling
+ * add_message_flush().
+ */
+{
+    interactive_t *ip;       /* The interactive user */
+    int old_message_length;  /* accumulated message length so far */
+
+    if ( command_giver == NULL
+     || (command_giver->flags & O_DESTRUCTED)
+     || !(O_SET_INTERACTIVE(ip, command_giver)))
+        return;
+
+#ifdef COMM_STAT
+        add_message_calls++;
+#endif
+
+    old_message_length = ip->message_length;
+
+    while (len != 0)
+    {
+        if (len + ip->message_length <= MAX_SOCKET_PACKET_SIZE)
+        {
+            memcpy(ip->message_buf + ip->message_length, bytes, len);
+            ip->message_length += len;
+            break;
+        }
+        else
+        {
+            size_t remaining = MAX_SOCKET_PACKET_SIZE - ip->message_length;
+
+            memcpy(ip->message_buf + ip->message_length, bytes, remaining);
+            len -= remaining;
+            bytes += remaining;
+
+            ip->message_length = 0;
+
+            /* Write buffer is full, send it. */
+            if (!comm_socket_write(ip->message_buf, MAX_SOCKET_PACKET_SIZE, ip, 0))
+            {
+                if (old_message_length)
+                    clear_message_buf(ip);
+                return;
+            }
+        }
+    }
+
+    /* --- Final touches --- */
+
+    /* Update the list of interactives with pending data */
+
+    if ( ip->message_length && !old_message_length )
+    {
+        /* Buffer became 'dirty': add this interactive to the list. */
+        add_flush_entry(ip);
+    }
+
+    if ( !ip->message_length && old_message_length )
+    {
+        /* buffer has become empty */
+        clear_message_buf(ip);
+    }
+} /* add_message_bytes() */
+
+/*-------------------------------------------------------------------------*/
+void
+add_message_text (const char* str, size_t len)
+
+/* Send the given UTF-8 string to the current command giver.
+ *
+ * This function also does the telnet, snooping, and shadow handling.
+ * If an interactive player is shadowed, object.c::shadow_catch_message()
+ * is called to give the shadows the opportunity to intercept the message.
+ *
+ * The message is converted to the current encoding of the interactive
+ * and IAC bytes will be escaped.
+ *
+ * Messages which can't be send (e.g. because the command_giver was
+ * destructed or disconnected) are printed on stdout, preceded by ']'.
+ */
+
+{
+    interactive_t *ip;                  /* The interactive user */
+    object_t      *snooper;             /* Snooper of <ip> */
+    const char    *end = str + len;     /* End of the string */
+    char buf[MAX_SOCKET_PACKET_SIZE];   /* Conversion buffer */
+
+    /* Test if the command_giver is a real, living, undestructed user,
+     * and not disconnected, closing or actually a new ERQ demon.
+     * If the command_giver fails the test, the message is printed
+     * to stdout and the function returns.
+     */
+    if ( command_giver == NULL
+     || (command_giver->flags & O_DESTRUCTED)
+     || !(O_SET_INTERACTIVE(ip, command_giver))
+     || (ip->do_close)
+       )
+    {
+        putchar(']');
+        puts(str);
+        fflush(stdout);
+        return;
+    }
+
+    /* If there's a shadow successfully handling the
+     * message, return.
+     * This may cause a recursive call to add_message()!.
+     */
+
+    if (shadow_catch_message(command_giver, str))
+    {
+        return;
+    }
+
+    /* If there's a snooper, send it the new message prepended
+     * with a '%'.
+     * For interactive snoopers this means a recursion with
+     * the command_giver set to the snooper, for non-interactive
+     * snoopers it's a simple call to tell_npc(), with an
+     * adaption of the global trace_level to this users trace
+     * settings.
+     */
+
+    if ( NULL != (snooper = ip->snoop_by)
+     && !(snooper->flags & O_DESTRUCTED))
+    {
+        if (O_IS_INTERACTIVE(snooper))
+        {
+            object_t *save;
+
+            save = command_giver;
+            command_giver = snooper;
+
+            add_message_text("%", 1);
+            add_message_text(str, len);
+
+            command_giver = save;
+        }
+        else
+        {
+            trace_level |= ip->trace_level;
+
+            tell_npc(snooper, STR_PERCENT);
+            tell_npc_str(snooper, str);
+        }
+    } /* if (snooper) */
+
+    while (true)
+    {
+        char *start, *dest;
+        size_t inleft, outleft, rc;
+        bool at_end;
+
+        /* Skip any characters not in the charset.
+         * We also handle \n here (before converting to an arbitrary encoding).
+         */
+        for (; str != end; str++)
+        {
+            char c = *str;
+
+            /* Non-ASCII characters are always in the charset. */
+            if (c & ~0x7f)
+                break;
+
+            /* Lookup in the charset. */
+            if (ip->charset[(c&0x78)>>3] & 1<<(c&7))
+                break;
+
+            continue;
+        }
+
+        start = (char*) str;
+
+        /* Search for the next character we shouldn't send. */
+        for (; str != end; str++)
+        {
+            char c = *str;
+
+            if (c == '\n')
+                break;
+
+            /* Same procedure as last loop. */
+            if (c & ~0x7f)
+                continue;
+
+            if (ip->charset[(c&0x78)>>3] & 1<<(c&7))
+                continue;
+
+            break;
+        }
+
+        /* Now convert the range between start and str. */
+        at_end = (start == str);
+        inleft = str - start;
+        dest = buf;
+        outleft = sizeof(buf);
+
+        if (str != end && at_end && *str == '\n' && (ip->charset[1] & 4))
+        {
+            start = "\r\n";
+            inleft = 2;
+            at_end = false;
+
+            rc = iconv(ip->send_cd, &start, &inleft, &dest, &outleft);
+            start = (char*) str + 1;
+        }
+        else if (at_end)
+            rc = iconv(ip->send_cd, NULL, NULL, &dest, &outleft);
+        else
+            rc = iconv(ip->send_cd, &start, &inleft, &dest, &outleft);
+
+        /* Regardless of any error, we send what we managed to get. */
+        if (ip->quote_iac)
+        {
+            for (char* deststart = buf; deststart != dest;)
+            {
+                char* destend = deststart;
+                for (; destend != dest && *(unsigned char*)destend != IAC; destend++);
+
+                if (destend == dest)
+                {
+                    add_message_bytes(deststart, destend - deststart);
+                    break;
+                }
+                else
+                {
+                    /* Send the IAC twice. */
+                    add_message_bytes(deststart, destend - deststart + 1);
+                    add_message_bytes(destend, 1);
+                    deststart = destend + 1;
+                }
+            }
+        }
+        else
+            add_message_bytes(buf, dest - buf);
+
+        str = start;
+
+        if (rc == (size_t)-1 && errno != E2BIG && !at_end)
+        {
+            /* There was an invalid or incomplete multibyte sequence.
+             * Skip to the next character.
+             */
+            str++;
+        }
+
+        if (at_end)
+            break;
+    }
+} /* add_message_text() */
+
+/*-------------------------------------------------------------------------*/
+void
+add_message_str (string_t *str)
+
+/* Send a string to the current command_giver.
+ * The string can be binary (will be sent without encoding)
+ * or a unicode string (will be converted).
+ */
+
+{
+    if (str->info.unicode == STRING_BYTES)
+        add_message_bytes(get_txt(str), mstrsize(str));
+    else
+        add_message_text(get_txt(str), mstrsize(str));
+} /* add_message_str() */
+
+/*-------------------------------------------------------------------------*/
+void
 add_message (const char *fmt, ...)
 
 /* Send a message to the current command_giver. The message is composed
  * from the <fmt> string and the following arguments using the normal
  * printf() semantics.
  *
- * The format string "%s" is special in that it bypasses the normal
- * printf() handling and uses the given char* argument directly as data
- * source, allowing to send strings of arbitrary length.
- * The format string FMT_STRING accepts a string_t argument of arbitrary length.
- * The format string FMT_BINARY accepts a char* as text argument, followed
- * by a size_t with the string length. The text may contain any character.
- *
- * All other format strings compose the message to send in a local buffer
- * and are therefore subject to a length restriction.
- *
- * This function also does the telnet, snooping, and shadow handling.
- * If an interactive player is shadowed, object.c::shadow_catch_message()
- * is called to give the shadows the opportunity to intercept the message.
- *
- * All messages are accumulated in interactive.message_buf, which is
- * flushed when it is full. This flush can be forced by passing the
- * special 'string' message_flush (which is actually just a NULL pointer)
- * as <fmt> string to this function.
- *
- * Messages which can't be send (e.g. because the command_giver was
- * destructed or disconnected) are printed on stdout, preceded by ']'.
- *
- * If an error other than EINTR occurred while sending the data to
- * the network, the message is discarded and the socket is marked
- * for disconnection.
+ * The message will be composed in a local buffer and is therefore subject
+ * to a length restriction.
  *
  * Note that add_message() might be called recursively.
  */
@@ -1675,392 +1944,31 @@ add_message (const char *fmt, ...)
       /* Composition buffer for the final message.
        * We hope that it's big enough, but to be sure the code will
        * check for buffer overruns.
-       * Message is composed starting from buff[1] on, buff[0] is
-       * set to '%' for easier snooper-message generation.
        */
-    int   length;
-    int   min_length;
-      /* When accumulating data in ip.message_buf[], this is the
-       * threshold over which the buffer will be written to the
-       * socket.
-       * TODO: Actually, it is used just as a flag for flush/non-flush.
-       */
-    string_t *srcstr;
-      /* If not NULL, this string was passed in to be printed.
-       * source will point to the first real character of it.
-       */
-    int   old_message_length;  /* accumulated message length so far */
-    char *source;              /* Pointer to the final message to add */
-    size_t srclen;             /* Length of the message in source/srcstr */
-    char *end;                 /* One char past the end of .message_buf[] */
-    char *dest;                /* First free char in .message_buf[] */
     va_list va;
-    interactive_t *ip;       /* The interactive user */
-    object_t      *snooper;  /* Snooper of <ip> */
-
-    source = NULL;
-    srcstr = NULL;
-    srclen = 0;
-    length = 0;
+    size_t len;
 
     va_start(va, fmt);
+    len = vsnprintf(buff, sizeof(buff), fmt,va);
+    va_end(va);
 
-    /* Test if the command_giver is a real, living, undestructed user,
-     * and not disconnected, closing or actually a new ERQ demon.
-     * If the command_giver fails the test, the message is printed
-     * to stdout and the function returns.
-     */
-    if ( command_giver == NULL
-     || (   command_giver->flags & O_DESTRUCTED
-         && fmt != message_flush )
-     || !(O_SET_INTERACTIVE(ip, command_giver))
-     || (ip->do_close && fmt != message_flush && !sending_telnet_command)
-       )
+    /* old sprintf() implementations returned -1 if the output was
+     * truncated. Since size_t is an unsigned type, the check for 
+     * len == -1 is implicitly included by >= sizeof(...)-1, because
+     * -1 will be wrapped to SIZE_T_MAX which is the maximum sizeof()
+     * can return and can never be valid as return value here. */
+    if (len >= sizeof(buff))
     {
-        putchar(']');
-        if ( fmt == FMT_STRING )
-        {
-            /* Make sure to print embedded '\0' characters as well */
+        char err[] = "\n*** Message truncated ***\n";
+        debug_message("%s Message too long (Length: %zu): '%.200s...'\n"
+                     , time_stamp(), len, buff);
 
-            size_t len;
-
-            srcstr = va_arg(va, string_t *);
-            source = get_txt(srcstr);
-            srclen = mstrsize(srcstr);
-
-            for ( len = 0; len < srclen; )
-            {
-                if (*source == '\0')
-                {
-                    putc('\0', stdout);
-                    source++;
-                    len++;
-                }
-                else
-                {
-                    size_t slen;
-
-                    fputs(source, stdout);
-                    slen = strlen(source);
-                    source += slen;
-                    len += slen;
-                }
-            }
-        }
-        else if ( fmt != message_flush )
-        {
-            vprintf(fmt, va);
-        }
-        fflush(stdout);
-        va_end(va);
-        return;
+        /* We need to find the end of a character. */
+        add_message_text(buff, utf8_prev(buff + sizeof(buff) - 1, sizeof(buff) - 1) - buff);
+        add_message_text(err, sizeof(err)-1);
     }
-
-    old_message_length = ip->message_length;
-
-    /* --- Compose the final message --- */
-
-    /* Create the final message and handle snoopers and shadows.
-     */
-
-    min_length = MAX_SOCKET_PACKET_SIZE-1;
-      /* Allow some wiggle room for source characters like NL which
-       * expand into two characters.
-       */
-
-    if ( fmt == message_flush )
-    {
-        /* Just flush, nothing to add */
-
-        min_length = 1;
-        source = "";
-        srclen = 0;
-        srcstr = NULL;
-    }
-    else /* add the message */
-    {
-#ifdef COMM_STAT
-        add_message_calls++;
-#endif
-
-        /* Compose the final message in buff[] (while checking for overruns)
-         * and point source to it.
-         * Recognize the special formats '%s', FMT_STRING and FMT_BINARY
-         * to bypass buff[] for messages of arbitrary length and content.
-         */
-
-        if (fmt == FMT_STRING)
-        {
-            srcstr = va_arg(va, string_t *);
-            va_end(va);
-
-            source = get_txt(srcstr);
-            srclen = mstrsize(srcstr);
-        }
-        else if (fmt == FMT_BINARY)
-        {
-            source = va_arg(va, char *);
-            srclen = va_arg(va, size_t);
-            va_end(va);
-            srcstr = NULL;
-        }
-        else if (fmt[0] == '%' && fmt[1] == 's' && !fmt[2])
-        {
-            source = va_arg(va, char *);
-            va_end(va);
-            srclen = strlen(source);
-            srcstr = NULL;
-        }
-        else
-        {
-            size_t len;
-            len = vsnprintf(buff+1, sizeof(buff)-1, fmt,va);
-            va_end(va);
-            /* old sprintf() implementations returned -1 if the output was
-             * truncated. Since size_t is an unsigned type, the check for 
-             * len == -1 is implicitly included by >= sizeof(...)-1, because
-             * -1 will be wrapped to SIZE_T_MAX which is the maximum sizeof()
-             * can return and can never be valid as return value here. */
-            if (len >= sizeof(buff)-1)
-            {
-                char err[] = "\n*** Message truncated ***\n";
-                debug_message("%s Message too long (Length: %zu): '%.200s...'\n"
-                             , time_stamp(), len, buff);
-                (void)strcpy(buff+(sizeof(buff)-sizeof(err)), err);
-            }
-            source = buff+1;
-            srclen = strlen(buff+1);
-            srcstr = NULL;
-        }
-
-        /* If we're not sending a telnet command with this message,
-         * pass on the new data to any snooper and/or shadow
-         */
-
-        if (!sending_telnet_command)
-        {
-
-            /* If there's a shadow successfully handling the
-             * message, return.
-             * This may cause a recursive call to add_message()!.
-             */
-
-            if (shadow_catch_message(command_giver, source))
-            {
-                return;
-            }
-
-            /* If there's a snooper, send it the new message prepended
-             * with a '%'.
-             * For interactive snoopers this means a recursion with
-             * the command_giver set to the snooper, for non-interactive
-             * snoopers it's a simple call to tell_npc(), with an
-             * adaption of the global trace_level to this users trace
-             * settings.
-             */
-
-            if ( NULL != (snooper = ip->snoop_by)
-             && !(snooper->flags & O_DESTRUCTED))
-            {
-                buff[0] = '%';
-                if (O_IS_INTERACTIVE(snooper))
-                {
-                    object_t *save;
-
-                    save = command_giver;
-                    command_giver = snooper;
-                    if (source != buff+1)
-                    {
-                        if (srcstr != NULL)
-                        {
-                            add_message("%s", "%");
-                            add_message(FMT_STRING, srcstr);
-                        }
-                        else if (srclen >= sizeof buff - 1)
-                        {
-                            add_message("%s", "%");
-                            add_message("%s", source);
-                        }
-                        else
-                        {
-                            strcpy(buff+1, source);
-                            add_message("%s", buff);
-                        }
-                    }
-                    else
-                    {
-                        add_message("%s", buff);
-                    }
-                    command_giver = save;
-                }
-                else
-                {
-                    trace_level |= ip->trace_level;
-                    if (source != buff+1)
-                    {
-                        if (srcstr != NULL)
-                        {
-                            tell_npc(snooper, STR_PERCENT);
-                            tell_npc(snooper, srcstr);
-                        }
-                        else if (srclen >= sizeof buff - 1)
-                        {
-                            tell_npc(snooper, STR_PERCENT);
-                            tell_npc_str(snooper, source);
-                        }
-                        else
-                        {
-                            strcpy(buff+1, source);
-                            tell_npc_str(snooper, buff);
-                        }
-                    } else
-                    {
-                        tell_npc_str(snooper, buff);
-                    }
-                }
-            } /* if (snooper) */
-        } /* if (!sending_telnet_command */
-    } /* if (flush or not) */
-
-#ifdef DEBUG
-    if (d_flag > 1)
-        debug_message("%s [%s (%zu)]: %s"
-                     , time_stamp(), get_txt(command_giver->name)
-                     , srclen, source);
-#endif
-
-    /* --- Send the final message --- */
-
-    /* Append the final message to the .message_buf[], taking
-     * care of all the necessary charset and telnet translations.
-     */
-
-    dest = &ip->message_buf[old_message_length];
-    end  = &ip->message_buf[sizeof ip->message_buf];
-
-    /* If there's any recursive call, let it begin
-     * at the start.
-     */
-    ip->message_length = 0;
-    
-    /* This loop advances source until it reaches the end.
-     * Every character encountered is copied, translated or fed
-     * into the telnet machine.
-     */
-
-#ifdef DEBUG_TELNET
-if (sending_telnet_command)
-{
-    char *cp;
-    long left;
-    printf("%s TDEBUG: '%s' Sending telnet (%zu bytes): "
-          , time_stamp(), get_txt(ip->ob->name), strlen(source));
-    for (cp = source, left = srclen; left > 0; cp++, left--)
-        printf(" %02x", (unsigned char)*cp);
-    printf("\n");
-}
-#endif
-
-    do /* while (srclen != 0) */
-    {
-        ptrdiff_t chunk;  /* Current size of data in .message_buf[] */
-        char   c;         /* Currently processed character */
-
-        while (srclen != 0 && dest != end)
-        {
-            c = *source++;
-            srclen--;
-
-            /* Process the character:
-             *  - copy it if the corresponding .charset bit is set,
-             *    or if it's part of a telnet command.
-             *  - translate a '\n' into '\r\n'
-             *  - double an IAC if quote_iac is active.
-             *  - stop this loop if the source is exhausted or
-             *    if the buffer is full.
-             */
-            if (sending_telnet_command)
-            {
-                *dest++ = c;
-            }
-            else if (!(ip->charset[(c&0xff)>>3] & 1<<(c&7)))
-                NOOP;
-            else if (c == '\n')
-            {
-                if (dest + 1 == end)
-                {
-                    /* Not enough space in the buffer - revisit this char
-                     * on the next time around */
-                    source--;
-                    srclen++;
-                    break;
-                }
-
-                /* Insert CR before NL */
-                *dest++ = '\r';
-                *dest++ = c;
-            }
-            else if ( (unsigned char)c == IAC && ip->quote_iac)
-            {
-                if (dest + 1 == end)
-                {
-                    /* Not enough space in the buffer - revisit this char
-                     * on the next time around */
-                    source--;
-                    srclen++;
-                    break;
-                }
-
-                *dest++ = c;
-                *dest++ = c;
-            }
-            else
-            {
-                *dest++ = c;
-            }
-
-            /* Other characters are silently dropped */
-        } /* while() */
-
-        /* Check how much data there is in .message_buf[].
-         * If it is enough, send it, else terminate the outer loop
-         * (because *source must be exhausted for this to happen).
-         */
-        chunk = dest - ip->message_buf;
-        if (chunk < min_length)
-        {
-            break;
-        }
-
-        /* Write .message_buf[] to the network. */
-
-        if (!comm_socket_write(ip->message_buf, (size_t)chunk, ip, 0))
-        {
-            if (old_message_length)
-                clear_message_buf(ip);
-            return;
-        }
-
-        /* Continue with the processing of source */
-        dest = &ip->message_buf[0];
-    } while (srclen != 0);
-
-    /* --- Final touches --- */
-
-    ip->message_length = length = dest - ip->message_buf;
-
-    /* Update the list of interactives with pending data */
-
-    if ( length && !old_message_length )
-    {
-        /* Buffer became 'dirty': add this interactive to the list.
-         */
-        add_flush_entry(ip);
-    }
-    if ( !length && old_message_length ) /* buffer has become empty */
-    {
-        clear_message_buf(ip);
-    }
+    else
+        add_message_text(buff, len);
 } /* add_message() */
 
 /*-------------------------------------------------------------------------*/
@@ -2076,25 +1984,16 @@ reset_input_buffer (interactive_t *ip)
 {
     if (ip->command_start)
     {
-        DTN(("reset input buffer: cmd_start %hd, tn_start %hd, tn_end %hd, text_end %hd\n", 
-             ip->command_start, ip->tn_start, ip->tn_end, ip->text_end));
-        ip->tn_start -= ip->command_start;
-        ip->tn_end -= ip->command_start;
-        ip->text_end -= ip->command_start;
-        if (ip->tn_start < 0)
-            ip->tn_start = 0;
-        if (ip->tn_end < 0)
-            ip->tn_end = 0;
-        if (ip->text_end <= 0)
-            ip->text_end = 0;
+        DTN(("reset input buffer: cmd_start %hd, cmd_end %hd\n", 
+             ip->command_start, ip->command_end));
+
+        memmove(ip->command, ip->command + ip->command_start, ip->command_unprocessed_end - ip->command_start);
+        ip->command_end -= ip->command_start;
+        ip->command_unprocessed_end -= ip->command_end;
+        if (ip->command_printed > ip->command_start)
+            ip->command_printed -= ip->command_start;
         else
-        {
-            memmove( ip->text, ip->text + ip->command_start
-                       , ip->text_end
-                       );
-        }
-        if (ip->command_end)
-            ip->command_end = ip->tn_end;
+            ip->command_printed = 0;
         ip->command_start = 0;
     }
 } /* reset_input_buffer() */
@@ -2174,7 +2073,7 @@ flush_all_player_mess (void)
         nip = ip->next_player_for_flush;
           /* add_message() will clobber (ip)->next_player_for_flush! */
         command_giver = ip->ob;
-        add_message(message_flush);
+        add_message_flush();
 
         if(ip->msg_discarded == DM_SEND_INFO)
             add_discarded_message(ip);
@@ -2203,13 +2102,13 @@ clear_message_buf (interactive_t *ip)
 
 /*-------------------------------------------------------------------------*/
 Bool
-get_message (char *buff)
+get_message (char *buff, size_t *bufflength)
 
 /* Get a message from a user, or wait until it is time for the next
  * heartbeat/callout. You can tell this apart by the result:
  *
- *   true: a user message was received and placed into buff; the user
- *         object is set as command_giver.
+ *   true: a user message was received and placed into buff (its size
+ *         into bufflength); the user object is set as command_giver.
  *   false: it is just time to call the heart_beat.
  *
  * In both cases, time_to_call_heart_beat is set if a heartbeat is due.
@@ -2410,8 +2309,8 @@ get_message (char *buff)
                             continue;
                         if (FD_ISSET(ip->socket, &exceptfds))
                         {
-                            DTN(("ts_data = TS_SYNCH\n"));
-                            ip->ts_data = TS_SYNCH;
+                            DTN(("ts_syncing = true\n"));
+                            ip->syncing = true;
                             switch (ip->tn_state)
                             {
                               case TS_DATA:
@@ -2922,7 +2821,7 @@ get_message (char *buff)
                 telnet_neg(ip);
             } /* if (cmdgiver socket ready) */
 
-            /* if ip->text[0] does not hold a valid character, the outcome
+            /* if ip->command[0] does not hold a valid character, the outcome
              * of the comparison to input_escape does not matter.
              */
 
@@ -2931,32 +2830,21 @@ get_message (char *buff)
                 continue;
 
             /* ----- CHARMODE -----
-             * command_start is 0 at the beginning. Received chars start at
-             * text[0].  After the first character is processed, command_start
-             * will be 1.  Chars are in text[1] then. Only after a
-             * full_newline is command_start reset to 0. This is important for
-             * bang-escape, the first char in a 'line' is stored in text[0],
-             * subsequent chars are in text[1].
+             * command_start is 0 at the beginning.
+             * Received chars start at command[0]. After the first character
+             * is processed, command_start will be 1. Chars are in command[1]
+             * then. Only after a full_newline is command_start reset to 0.
+             * This is important for bang-escape, the first char in a 'line'
+             * is stored in command[0], subsequent chars are in command[1..].
              *
-             * chars_ready is the number of chars in the text buffer. If the
-             * user is slow this will be 1. If the user pastes data it could
-             * be more.  The chars are processed then one at a time (or if
-             * combine-charset is used that many until a non-combinable char
-             * is reached).
+             * command_end points beyond the last character in the text buffer.
+             * If the user is slow this will be 1. If the user pastes data it
+             * could be more. The chars are processed then one at a time (or
+             * if combine-charset is used that many until a non-combinable
+             * char is reached).
              *
              * The processed char(s) are copied to buff and handled in the
              * backend.
-             *
-             * If telnet_neg() returned state READY, we want to process the
-             * string end marker (which represents the \r\n) also and have to
-             * add 1 to strlen() for the chars_ready.
-             *
-             * The remark above 'if (destix > 0 && !buff[destix-1])' is not
-             * quite true (anymore). Because we process the string terminating
-             * \0 as a char, we will have a destix > 0 always - even if we got
-             * a new line.  Mind, that buff[destix-1] is always buff[0] in
-             * that 'if', because newlines are never combinable and we always
-             * start with a new buffer for it!
              *
 #ifndef SIMULATE_CHARMODE
              * TODO: I dont think that it is neccesary to disable charmode if
@@ -2974,7 +2862,8 @@ get_message (char *buff)
 #endif
             {
                 DTN(("CHARMODE_REQ\n"));
-                if (ip->text[0] != input_escape
+
+                if (ip->command[0] != input_escape
                  || find_no_bang(ip) & IGNORE_BANG )
                 {
                     /* Unescaped input.
@@ -2982,143 +2871,71 @@ get_message (char *buff)
                      * .command_start) into buff[0] and return the data.
                      */
 
-                    int destix;  /* Save index */
-                    Bool end_of_line = MY_FALSE;
+                    size_t destix;  /* Save index */
+                    size_t cmdlength = ip->command_end - ip->command_start;
+
+                    if (!cmdlength)
+                        continue;
 
                     DTN(("  Unescaped input\n"));
-
-                    if (ip->tn_state != TS_READY)
-                    {
-                        /* .text[] contains an incomplete negotiation.
-                         * Set .chars_ready the amount of pure data available
-                         * and temporarily suspend the telnet machine.
-                         */
-                        ssize_t slength = (TN_START_VALID(ip->tn_state)
-                                           ? ip->tn_start
-                                           : ip->command_end
-                                           ) - ip->command_start;
-                        DTN(("    incomplete negotiation: length %zd\n"
-                           , slength));
-                        if (!slength)
-                            continue;
-                        if (slength < 0)
-                        {
-                            comm_fatal(ip, "comm: data length < 0: %zd\n", slength);
-                            continue;
-                        }
-                        DTN(("    save machine state %hhd, set to %d (READY)\n"
-                          , ip->tn_state, TS_READY));
-                        ip->save_tn_state = ip->tn_state;
-                        ip->chars_ready = (int32_t)slength;
-                        ip->tn_state = TS_READY;
-                    }
-                    else if (!ip->chars_ready)
-                    {
-                        /* Empty input: we received an end of line.
-                         * The telnet machine is already suspended, but
-                         * we have to set the state for it to return to.
-                         * At the moment it is TS_INVALID, so the next
-                         * character received would be thrown away.
-                         */
-                        DTN(("    Empty input: save machine state %d (DATA)\n"
-                          , TS_DATA));
-                        length = strlen(ip->text + ip->command_start) + 1;
-                        ip->chars_ready = length;
-                        ip->save_tn_state = TS_DATA;
-                        end_of_line = MY_TRUE;
-                        /* tn_state is TS_READY */
-                    }
 
                     /* Copy as many characters from the text[] into
                      * the buff[] as possible.
                      */
-                    DTN(("  %"PRId32" chars ready\n", ip->chars_ready));
-                    if (end_of_line)
+                    DTN(("  %zd chars ready\n", cmdlength));
+                    for (destix = 0; destix < cmdlength; )
                     {
-                        DTN(("    faking NL\n"));
-                        buff[0] = '\n';
-                        destix = 1;
-                    }
-                    else for (destix = 0; destix < ip->chars_ready; )
-                    {
-                        char ch;
+                        p_int ch;
+                        size_t off = utf8_to_unicode(ip->command + ip->command_start + destix, cmdlength - destix, &ch);
 
-                        ch = ip->text[ip->command_start++];
-                        buff[destix++] = ch;
-                        if (!(ip->combine_cset[(ch&0xff) / 8] & (1 << (ch % 8)))
-                         || !ch
-                           )
+                        if(!off)
+                            break;
+
+                        if (ch & ~0x7f || !(ip->combine_cset[(ch&0x78) >> 3] & 1<<(ch&7)))
                         {
-                            /* This character can't be combined (or it is the
-                             * end of the line).
+                            /* This character can't be combined.
                              * If it is not the first character encountered,
-                             * undo the previous store; in either case break
+                             * take only this character. In either case break
                              * the loop.
                              */
-                            if (destix != 1)
-                            {
-                                destix--;
-                                ip->command_start--;
-                            }
+                            if (!destix)
+                                destix += off;
                             break;
                         }
+
+                        destix++;
                     }
+
+                    if (!destix)
+                        continue;
+
+                    memcpy(buff, ip->command + ip->command_start, destix);
+                    *bufflength = destix;
+                    ip->command_start += destix;
 
                     /* destix is now the number of characters stored in
                      * buff[], and is at least 1.
                      */
 
-                    if (!buff[destix-1])
+                    if (ip->command_start == ip->command_end)
                     {
-                        /* End of line. Reinitialise the telnet machine
-                         */
-                        DTN(("    end of line: reinit telnet machine\n"));
-                        destix--;
-                        ip->command_start = 0;
-                        ip->tn_state = TS_DATA;
-                        telnet_neg(ip);
-                    }
-
-                    buff[destix] = '\0';
-
-                    if (!end_of_line)
-                        ip->chars_ready -= destix;
-                    DTN(("  %"PRId32" chars left ready\n", ip->chars_ready));
-                    if (!ip->chars_ready)
-                    {
-                        /* All the pure data was read, now restore the
-                         * old telnet machine state.
-                         * Leave the first char in to make input escape
-                         * possible
-                         */
-                        DTN(("    restore old telnet machine state %hhd\n"
-                            , ip->save_tn_state));
-                        ip->tn_state = ip->save_tn_state;
-                        ip->save_tn_state = TS_INVALID;
-                        ip->tn_start -= ip->command_start - 1;
-                        ip->command_end -= ip->command_start - 1;
-
-                        if (ip->command_start && ip->command_end > 0)
+                        if (ip->tn_state == TS_READY)
                         {
-                            memmove( ip->text, ip->text+ip->command_start
-                                       , ip->command_end
-                                       );
+                            /* End of line. Reinitialise the telnet machine
+                             */
+                            DTN(("    end of line: reinit telnet machine\n"));
+                            telnet_neg(ip);
                         }
-
-                        ip->command_start = 1;
-
-                        /* When receiving a pure data line in charmode, starting
-                         * with the second char, these two values may become
-                         * negative. We have to correct them then to point
-                         * to ip->command_start.
-                         */
-                        DTN(("    tn_start %hd, command_end %hd\n", ip->tn_start, ip->command_end));
-                        if (ip->tn_start < 1)
-                            ip->tn_start = 1;
-                        if (ip->command_end < 1)
-                            ip->command_end = 1;
-
-                        ip->text_end = ip->tn_end = ip->command_end;
+                        else
+                        {
+                            /* All the pure data was read, make space for new
+                             * data, but leave char in to make input escape
+                             * possible
+                             */
+                            memmove(ip->command + 1, ip->command + ip->command_end, ip->command_unprocessed_end - ip->command_end);
+                            ip->command_unprocessed_end -= ip->command_end - 1;
+                            ip->command_start = ip->command_end = ip->command_printed = 1;
+                        }
                     }
 
                     command_giver = ip->ob;
@@ -3141,22 +2958,14 @@ get_message (char *buff)
                 else if (ip->tn_state != TS_READY)
                 {
                     DT(("'%s'   Escaped input\n", get_txt(ip->ob->name)));
-                    ssize_t slength = (TN_START_VALID(ip->tn_state)
-                                       ? ip->tn_start
-                                       : ip->command_end
-                                       ) - ip->command_start;
-                    DTN(("  data length %zd\n", slength));
-                    if (slength < 0)
+                    DTN(("  data length %zd\n", ip->command_end - ip->command_start));
+
+                    if (ip->command_printed < ip->command_end)
                     {
-                        comm_fatal(ip, "comm: data length < 0: %zd\n", slength);
-                        continue;
-                    }
-                    if (slength > ip->chars_ready)
-                    {
-                        comm_socket_write(ip->text + ip->chars_ready
-                                        , (size_t)(slength - ip->chars_ready)
+                        comm_socket_write(ip->command + ip->command_printed
+                                        , (size_t)(ip->command_end - ip->command_printed)
                                         , ip, 0);
-                        ip->chars_ready = (int32_t)slength;
+                        ip->command_printed = ip->command_end;
                     }
                 }
             } /* if (CHARMODE_REQ) */
@@ -3171,21 +2980,20 @@ get_message (char *buff)
                 /* We have a command: copy it into buff, handle a
                  * possible snooper and return.
                  */
+                *bufflength = ip->command_end - ip->command_start;
 
                 DTN(("telnet machine ready\n"));
                 /* buffer overflows here are impossible even with strcpy(),
                  * because buff is allocated in backend() as MAX_TEXT+4 and
-                 * ip->text is allocated as MAX_TEXT+2. Ok, as long as nobody
+                 * ip->command is allocated as MAX_TEXT. Ok, as long as nobody
                  * changes buff in backend() withour changing ip->text ... */
-                strcpy(buff, ip->text);
+                memcpy(buff, ip->command, *bufflength);
                 command_giver = ip->ob;
                 trace_level = ip->trace_level;
-                ip->chars_ready = 0; /* for escaped charmode */
 
                 /* Reinitialize the telnet machine, possibly already
                  * producing the next command in .text[].
                  */
-                ip->tn_state = TS_DATA;
                 telnet_neg(ip);
 
                 /* telnet_neg() might have destroyed this one. */
@@ -3316,7 +3124,7 @@ remove_interactive (object_t *ob, Bool force)
 
     if ( !(ob->flags & O_DESTRUCTED) )
     {
-        int numRemaining = interactive->text_end - interactive->command_start;
+        int numRemaining = interactive->command_unprocessed_end - interactive->command_start;
 
         command_giver = NULL;
         current_interactive = NULL;
@@ -3325,7 +3133,7 @@ remove_interactive (object_t *ob, Bool force)
         if (numRemaining > 0)
         {
             string_t * remaining = NULL;
-            memsafe( remaining = new_n_mstring(interactive->text+interactive->command_start, numRemaining, STRING_BYTES)
+            memsafe( remaining = new_n_unicode_mstring(interactive->command+interactive->command_start, numRemaining)
                    , numRemaining, "buffer for remaining data from socket");
             push_string(inter_sp, remaining);
         }
@@ -3372,7 +3180,7 @@ remove_interactive (object_t *ob, Bool force)
     {
         static unsigned char erq_welcome[] = { IAC, TELOPT_BINARY };
 
-        add_message(message_flush);
+        add_message_flush();
         remove_flush_entry(interactive); /* To be sure */
 
         erq_demon = interactive->socket;
@@ -3386,7 +3194,7 @@ remove_interactive (object_t *ob, Bool force)
         {
             /* Say goodbye to the user. */
             trace_level |= interactive->trace_level;
-            add_message(message_flush);
+            add_message_flush();
         }
 
         remove_flush_entry(interactive); /* To be sure */
@@ -3504,7 +3312,7 @@ set_default_conn_charset (char charset[32])
  */
 
 {
-    memset(charset, 255, 32);
+    memset(charset, 255, 16);
     charset['\0'/8] &= ~(1 << '\0' % 8);
 } /* set_default_conn_charset() */
 
@@ -3516,10 +3324,59 @@ set_default_combine_charset (char charset[32])
  */
 
 {
-    memset(charset, 0, 32);
+    memset(charset, 0, 16);
     charset['\n'/8] &= ~(1 << '\n' % 8);
     charset['\0'/8] &= ~(1 << '\0' % 8);
 } /* set_default_combine_charset() */
+
+/*-------------------------------------------------------------------------*/
+static bool
+set_encoding (interactive_t *ip, const char* encoding)
+
+/* Sets the encoding for the interactive <ip> to <encoding>.
+ * Returns true upon success, false otherwise (errno is set accordingly).
+ */
+{
+    iconv_t receiving, sending;
+    char base_encoding[128];
+    char *end = strchr(encoding, '/');
+
+    if (end)
+        end = strchr(end+1, '/');
+    if (end != NULL && *++end != 0)
+    {
+        memcpy(base_encoding, encoding, end - encoding);
+        receiving = iconv_open("UTF-8", base_encoding);
+    }
+    else
+        receiving = iconv_open("UTF-8", encoding);
+
+    if (receiving == (iconv_t)-1)
+        return false;
+
+    sending = iconv_open(encoding, "UTF-8");
+    if (sending == (iconv_t)-1)
+    {
+        iconv_close(receiving);
+        return false;
+    }
+
+    strcpy(ip->encoding, encoding);
+
+    if (ip->receive_cd != (iconv_t)-1)
+    {
+        iconv_close(ip->receive_cd);
+    }
+    if (ip->send_cd != (iconv_t)-1)
+    {
+        iconv_close(ip->send_cd);
+    }
+
+    ip->receive_cd = receiving;
+    ip->send_cd = sending;
+
+    return true;
+} /* set_encoding() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3685,15 +3542,16 @@ new_player ( object_t *ob, SOCKET_T new_socket
     new_interactive->supress_go_ahead = MY_FALSE;
     new_interactive->gobble_char = 0;
     new_interactive->catch_tell_activ = MY_TRUE;
-    new_interactive->text_end = 0;
-    new_interactive->command_start = 0;
-    new_interactive->command_end = 0;
-    new_interactive->chars_ready = 0;
-    new_interactive->save_tn_state = TS_INVALID;
+    new_interactive->text_prefix = 0;
     new_interactive->tn_start = 0;
     new_interactive->tn_end = 0;
+    new_interactive->text_end = 0;
+    new_interactive->command_start = 0;
+    new_interactive->command_printed = 0;
+    new_interactive->command_end = 0;
+    new_interactive->command_unprocessed_end = 0;
     new_interactive->tn_state = TS_DATA;
-    new_interactive->ts_data = TS_DATA;
+    new_interactive->syncing = false;
     new_interactive->snoop_on = NULL;
     new_interactive->snoop_by = NULL;
     new_interactive->last_time = current_time;
@@ -3705,7 +3563,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
     new_interactive->quote_iac = MY_TRUE;
     set_default_conn_charset(new_interactive->charset);
     set_default_combine_charset(new_interactive->combine_cset);
-    new_interactive->text[0] = '\0';
+    new_interactive->command[0] = '\0';
     memcpy(&new_interactive->addr, addr, addrlen);
     new_interactive->access_class = class;
     new_interactive->socket = new_socket;
@@ -3716,6 +3574,26 @@ new_player ( object_t *ob, SOCKET_T new_socket
     new_interactive->write_first = new_interactive->write_last = NULL;
     new_interactive->write_size = 0;
     new_interactive->write_max_size = -2;
+
+    new_interactive->receive_cd = (iconv_t) -1;
+    new_interactive->send_cd = (iconv_t) -1;
+    if (!set_encoding(new_interactive, default_player_encoding))
+    {
+        if (errno == EINVAL)
+            debug_message("%s Error setting up initial encoding: unsupported encoding '%s'.\n", time_stamp(), default_player_encoding);
+        else
+            debug_message("%s Error setting up initial encoding: %s.\n", time_stamp(), strerror(errno));
+
+        message = "Error setting up encoding.\r\n";
+        socket_write(new_socket, message, strlen(message));
+        socket_close(new_socket);
+
+        O_GET_INTERACTIVE(master_ob) = NULL;
+        xfree(new_interactive);
+        free_object(master_ob, "new_player");
+
+        return;
+    }
 
     /* Add the new interactive structure to the list of users */
 
@@ -3742,7 +3620,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
             return;
         }
         command_giver = master_ob;
-        add_message(message_flush);
+        add_message_flush();
     }
 
     /* ob is now a non-interactive object, either passed in from the caller
@@ -3876,14 +3754,6 @@ set_noecho (interactive_t *ip, char noecho, Bool local_change, Bool external)
                 }
                 if (~confirm & old & CHARMODE_MASK)
                 {
-                    if (ip->save_tn_state != TS_INVALID)
-                    {
-                        DT(("'%s' set_noecho():     0 chars ready, "
-                            "saved state %hhd\n", get_txt(ip->ob->name)
-                                              , ip->save_tn_state));
-                        ip->chars_ready = 0;
-                        ip->tn_state = ip->save_tn_state;
-                    }
                     reset_input_buffer(ip);
                 }
             }
@@ -3947,12 +3817,6 @@ set_noecho (interactive_t *ip, char noecho, Bool local_change, Bool external)
                         {
                             DTN(("set_noecho():     DONT TELOPT_SGA\n"));
                             send_dont(TELOPT_SGA);
-                        }
-                        if (ip->save_tn_state != TS_INVALID)
-                        {
-                            DTN(("set_noecho():     0 chars ready, saved state %hhd\n", ip->save_tn_state));
-                            ip->chars_ready = 0;
-                            ip->tn_state = ip->save_tn_state;
                         }
                     }
 
@@ -4034,7 +3898,7 @@ find_no_bang (interactive_t *ip)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-call_input_to (interactive_t *i, char *str, input_to_t *it)
+call_input_to (interactive_t *i, char *str, size_t length, input_to_t *it)
 
 /* Call the input_to handler <it> for this user <i> and the input <str>.
  * Return TRUE if this handler was executed successfully, and FALSE
@@ -4096,7 +3960,7 @@ call_input_to (interactive_t *i, char *str, input_to_t *it)
 
     /* Call the input_to() function with the newly input string */
 
-    push_c_string(inter_sp, str);
+    push_c_n_string(inter_sp, str, length);
     (void)backend_callback(&(current_it.fun), 1);
 
     rt_context = error_recovery_info.rt.last;
@@ -4107,7 +3971,7 @@ call_input_to (interactive_t *i, char *str, input_to_t *it)
 
 /*-------------------------------------------------------------------------*/
 Bool
-call_function_interactive (interactive_t *i, char *str)
+call_function_interactive (interactive_t *i, char *str, size_t length)
 
 /* Execute a pending input handler for this user <i> and the input <str>
  * Return TRUE if an input_to() or ed() was pending and executed, and FALSE
@@ -4125,7 +3989,7 @@ call_function_interactive (interactive_t *i, char *str)
         return MY_FALSE;
 
     /* Yes, there are. Check if we have to handle input escape. */
-    if (*str == input_escape && str[1])
+    if (length > 1 && *str == input_escape)
     {
         input_t * prev;
 
@@ -4150,8 +4014,8 @@ call_function_interactive (interactive_t *i, char *str)
                 /* !message for ECHO-context  while in NOECHO - simulate the
                  * echo by sending the (remaining) raw data we got.
                  */
-                add_message("%s\n", str + i->chars_ready);
-                i->chars_ready = 0;
+                add_message("%s\n", str + i->command_printed);
+                i->command_printed = i->command_end;
             }
 
             /* Don't hide the leading input escape */
@@ -4182,7 +4046,7 @@ call_function_interactive (interactive_t *i, char *str)
                 i->noecho |= NOECHO_STALE;
             }
 
-            res = call_input_to(i, str, (input_to_t*) ih);
+            res = call_input_to(i, str, length, (input_to_t*) ih);
 
             /* If NOECHO is no longer needed, turn it off. */
 
@@ -4197,6 +4061,7 @@ call_function_interactive (interactive_t *i, char *str)
         }
 
     case INPUT_ED:
+        str[length] = 0;
         ed_cmd(str, ih);
         return MY_TRUE;
     }
@@ -4330,7 +4195,7 @@ print_prompt_string (string_t *prompt)
             free_svalue(hook);
             put_number(hook, 0);
             current_object = NULL; /* So that catch_tell() can see it */
-            add_message(FMT_STRING, prompt);
+            add_message_str(prompt);
             errorf("H_PRINT_PROMPT for %s was a closure bound to a "
                    "now-destructed object - hook removed.\n", 
                    get_txt(command_giver->name));
@@ -4349,7 +4214,7 @@ print_prompt_string (string_t *prompt)
     else
     {
         current_object = NULL; /* So that catch_tell() can see it */
-        add_message(FMT_STRING, prompt);
+        add_message_str(prompt);
     }
 } /* print_prompt_string() */
 
@@ -4422,7 +4287,7 @@ print_prompt (void)
 
         call_lambda(prompt, 0);
         prompt = inter_sp;
-        if (prompt->type != T_STRING)
+        if (prompt->type != T_STRING || prompt->u.str->info.unicode == STRING_BYTES)
         {
             free_svalue(prompt);
         }
@@ -4436,7 +4301,7 @@ print_prompt (void)
         }
         inter_sp--;
     }
-    else if (prompt->type == T_STRING)
+    else if (prompt->type == T_STRING && prompt->u.str->info.unicode != STRING_BYTES)
     {
         print_prompt_string(prompt->u.str);
     }
@@ -4614,10 +4479,9 @@ send_telnet_option (char action, char option)
     msg[0] = IAC;
     msg[1] = action;
     msg[2] = option;
-    SEND_TELNET_COMMAND(
-      add_message(FMT_BINARY, msg, 3);
-      add_message(message_flush);
-    )
+
+    add_message_bytes(msg, 3);
+    add_message_flush();
 } /* send_telnet_option() */
 
 /*-------------------------------------------------------------------------*/
@@ -5029,7 +4893,7 @@ is_charmode (interactive_t * ip)
 
 {
     return (ip->noecho & CHARMODE_REQ)
-            && (   ip->text[0] != input_escape
+            && (   ip->command[0] != input_escape
                 || find_no_bang(ip) & IGNORE_BANG
                )
                
@@ -5037,31 +4901,50 @@ is_charmode (interactive_t * ip)
 } /* is_charmode() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE void
+set_tn_state (interactive_t * ip, enum telnet_states state)
+
+/* Set the new telnet state for <ip> to <state>.
+ */
+
+{
+    ip->tn_state = state;
+    DTN(("t_n: new state %d\n", state));
+} /* set_tn_state() */
+
+/*-------------------------------------------------------------------------*/
 static void
 telnet_neg (interactive_t *ip)
 
 /* Process the data read from the socket, performing any telnet negotiations
- * necessary, and extract the 'pure' command text. When the function returns,
- * all new data in .text[] has been used and .text_end set back as far
- * as possible.
+ * necessary, and extract the 'pure' command text converting it to UTF-8.
+ * When the function returns, all new data in .text[] has been used and .text_end
+ * set back as far as possible. The command text will be in .command[] up
+ * to .command_end.
  *
  * The start state for the telnet machine is TS_DATA, and whenever a command
- * text has been completed, it assumes the TS_READY state.
+ * text has been completed (when a line ending was found), it assumes the
+ * TS_READY state.
+ * In Charmode all input will be processed regardless of line endings
+ * (the state will change to TS_READY nevertheless whenever a newline
+ * was processed).
  *
- * The function tn_end and goes on until it reaches text_end or a full newline.
+ * The function starts at .tn_end and goes on until it reaches .text_end or
+ * a full newline.
  *
  * When it returns:
  *   tn_end is set to the first unprocessed character.
  * When a full newline is found:
- *   Processed commands start at command_start and are \0 terminated strings
- *    state is set to READY
+ *   Processed commands start at command_start and are \0 terminated strings,
+ *   tn_state is set to TS_READY.
  * else
- *   Processed commands start at command_start and end at command_end-1
- *   state is set to DATA (or something else if we got a fragmented
+ *   Processed commands start at command_start and end at command_end-1,
+ *   tn_state is set to TS_DATA (or something else if we got a fragmented
  *     telnet negotiation).
  *
- * text_end could move a bit to the start of text if we deleted chars
- * from the raw input string (e.g. because it was an IAC).
+ * Because the command is held in another buffer (.command[]) than the raw
+ * input data (.text[]), unprocessed data can be removed afterwards to
+ * the beginning of .text[] and therefore .text_end can move to the start.
  *
  * If gobble_char is set, that char is removed from a fresh text packet.
  * Removing of unwanted chars inside of a packet is done at the appropriate
@@ -5070,450 +4953,589 @@ telnet_neg (interactive_t *ip)
  * to gobble them in-packet.
  *
  * Example:
- * text = "say hello\r\nsay hi\r\n";
- * 
+ *   text = "say hello\r\nsay hi\r\n";
+ *   tn_end = 0
+ *   text_end = 19
+ *   command_start = 0
+ *   command_end = 0
+ *   tn_state = TS_DATA
+ *
  * Output would be:
- * text = "say hello\0\nsay hi\r\n";
- * 
- * command_start = 0
- * command_end = 0
- * tn_end = 11 (s of 2nd say)
- * text_end stays at 19 (first unused char in text)
- * state = TS_READY
+ *   text = "say hello\r\nsay hi\r\n";
+ *   command = "say hello\r\nsay hi\r\n";
+ *
+ *   command_start = 0
+ *   command_end = 9
+ *   command_unprocessed_end = 19
+ *   tn_end = 0
+ *   text_end = 0
+ *   tn_state = TS_READY
  *
  * After a second call of telnet_neg (almost always done by get_message())
  * will pre process the second command:
+ *   command_start = 9
  *
- * text = "say hi\0lo\0\nsay hi\r\n";
- * 
- * command_start = 0
- * command_end = 0
- * tn_end = 7
- * text_end = 7
- * state = READY
+ * Output would be:
+ *   text = "say hello\r\nsay hi\r\n";
+ *   command = "say hi\r\no\0\nsay hi\r\n";
+ *
+ *   command_start = 0
+ *   command_end = 6
+ *   command_unprocessed_end = 8
+ *   tn_end = 0
+ *   text_end = 0
+ *   state = TS_READY
  */
 
 {
-    fd_set exceptfds;
-    char *from;   /* Next char to process */
-    char *to;     /* Where to store the extracted command text */
-    int   state;
-    unsigned char ch;     /* Current character */
-    char *first;  /* Begin of the last pure command text */
-    char *end;    /* End of data in text[] */
-
-    first = ip->text;
-    from = &first[ip->tn_end];
-    end = &first[ip->text_end];
+    char *source = ip->text + ip->tn_end;       /* Next char to process. */
+    char *last = ip->text + ip->text_end;       /* End of the data to process. */
 
     DTN(("telnet_neg: state %hhd\n", ip->tn_state));
 
-    /* Gobble the character *from if gobble_char is set.
-     * Also test for the end of current buffer content.
-     *
-     * If we want to gobble NL, we also gobble NUL
-     * (used for CR NL and CR NUL digraphs)
+    /* When called after a TS_READY reset the pointers
+     * to process the next command.
      */
-    for (;;)
+    if (ip->tn_state == TS_READY)
     {
-        if (from >= end) {
-#if 0 /* cannot happen with the current calling pattern */
-            if (ip->state == TS_READY) return;
-#endif
-            ip->text_end = ip->tn_end = ip->command_end;
-            return;
-        }
-        if (ip->gobble_char) {
-            DTN(("t_n: gobble char %02hhx (in buf: %02x)\n"
-               , ip->gobble_char, *from));
-            if (*from == ip->gobble_char
-                || (*from == '\0' && ip->gobble_char == '\n')
-               )
-            {
-                from++;
-            }
-            ip->gobble_char = '\0';
-            continue;
-        }
-        break;
+        memmove(ip->command, ip->command + ip->command_end, ip->command_unprocessed_end - ip->command_end);
+        ip->command_unprocessed_end -= ip->command_end;
+        ip->command_start = ip->command_end = ip->command_printed = 0;
+        set_tn_state(ip, TS_DATA);
     }
-    to = &first[ip->command_end];
 
-    /* The processing loop */
-
-    do {
-        ch = (*from++ & 0xff);
-        DTN(("t_n: processing %02hhx '%c'\n"
-            , (unsigned char)ch, ch));
-        switch(ip->tn_state)
+    while (source < last || (ip->tn_state == TS_DATA && ip->command_end != ip->command_unprocessed_end))
+    {
+        switch (ip->tn_state)
         {
-        case TS_READY:
-            DTN(("t_n: still in TS_READY - return\n"));
-            /* Previous command hasn't been read yet - don't clobber it! */
-            return;
-
-        ts_data:
-            /* Most state functions end with a jump here to check if they
-             * exhausted their input.
-             */
-            if (from >= end)
-            {
-                ip->text_end = ip->tn_end = ip->command_end = (short)(to - first);
-                 DTN(("t_n: (ts_data) from >= end by %td, text_end := %hd\n (max %d)"
-                     , (ptrdiff_t)(from-end), ip->text_end, MAX_TEXT));
-                *to = '\0';
-                if (ip->text_end >= MAX_TEXT)
-                {
-                    /* this looks like a super-long command.
-                     * Return the text so far as partial command and restart
-                     * input from the beginning.
-                     * In charmode, we must not reset command_end, otherwise
-                     * it might fall under command_start.
-                     */
-                    ip->tn_state = TS_READY;
-                    ip->tn_end = 0;
-                    ip->text_end = 0;
-                    if (!(ip->noecho & (CHARMODE_REQ|CHARMODE)))
-                    {
-                        ip->command_end = 0;
-                    }
-                    return;
-                }
+            case TS_READY:
+                /* This shouldn't happen. We can't go into the loop with TS_READY,
+                 * and when switching to TS_READY we should exit this function.
+                 */
+                DTN(("t_n: somehow in TS_READY - return\n"));
                 return;
-            }
-            ch = (*from++ & 0xff);
-            DTN(("t_n: (ts_data) processing %02hhx '%c'\n", ch, ch));
-            /* FALLTHROUGH */
 
-        case TS_DATA: /* --- Copy/interpret plain data --- */
-            switch(ch)
+            case TS_DATA:
             {
-            case IAC:
-            new_iac:
-                  if (ip->tn_enabled)
-                  {
-                      state = TS_IAC;
-        change_state:
-                      DTN(("t_n: new state %d\n", state));
-                      ip->tn_state = (char)state;
-                      continue;
-                  }
-                  /* FALLTHROUGH if !tn_enabled */
+                char *command_from = ip->command + ip->command_end;             /* Next char to process. */
+                char *command_to = command_from;                                /* Where to put the processed chars. */
+                char *command_end = ip->command + ip->command_unprocessed_end;  /* End of the unprocessed chars. */
 
-            case '\b':        /* Backspace */
-            case 0x7f:        /* Delete */
-                /* In Linemode, just move to one char back.
-                 * In Charmode with escaped input, write the data gathered
-                 * so far and add a rubout sequence ('\b \b').
-                 * In Charmode with unescaped input, just pass it on to
-                 * the mudlib.
-                 *
-                 * If telnet is disabled, fallthrough to the general
-                 * data handling.
-                 */
-                if (ip->tn_enabled)
+                if (ip->command_start > 1)
                 {
-                    if ( !(ip->noecho & CHARMODE_REQ) )
-                    {
-                        if (to > first)
-                            to--;
-                        goto ts_data;
-                    }
-
-                    if (ip->text[0] == input_escape
-                     && ! (find_no_bang(ip) & IGNORE_BANG) )
-                    {
-                        if (to > &ip->text[ip->chars_ready])
-                        {
-                            comm_socket_write(&ip->text[ip->chars_ready]
-                                            , (size_t)(to - &ip->text[ip->chars_ready])
-                                            , ip, 0);
-                            ip->chars_ready = to - ip->text;
-                        }
-                        if (to > first)
-                        {
-                            comm_socket_write("\b \b", 3, ip, 0);
-                            to--;
-                            ip->chars_ready--;
-                        }
-                        goto ts_data;
-                    }
-                } /* if (ip->tn_enabled) */
-                /* FALLTHROUGH */
-
-            default:
-                *to++ = (char)ch;
-                /* FALLTHROUGH */
-
-            case '\0':
-                /* In Charmode, we should return the \0 (as with CR and LF),
-                 * but for the caller the \0 has magical properties.
-                 */
-                goto ts_data;
-
-            case '\r':
-                /* In Charmode we have to return the \r.
-                 */
-                if (is_charmode(ip))
-                {
-                    *to++ = (char)ch;
-                    goto ts_data;
+                    /* Move the already processed characters to the beginning.
+                     * But leave any escape chars at the first position.
+                     */
+                    memmove(ip->command + 1, ip->command + ip->command_start, ip->command_end - ip->command_start);
+                    command_to -= ip->command_start - 1;
+                    if (ip->command_printed >= ip->command_start)
+                        ip->command_printed -= ip->command_start - 1;
+                    else if (ip->command_printed > 1)
+                        ip->command_printed = 1;
+                    ip->command_start = 1;
                 }
 
-                if (from >= end)
+                if (ip->gobble_char && command_from != command_end)
                 {
-                    /* This might be a fragmented CR NL, CR NUL, or
-                     * a broken client that ends lines with CR only.
-                     * We proceed as full newline now, but gobble
-                     * NL or NUL if they are sent afterwards.
+                    if (*command_from == ip->gobble_char
+                     || (*command_from == '\0' && ip->gobble_char == '\n'))
+                        command_from++;
+
+                    ip->gobble_char = 0;
+                }
+
+                while (command_from != command_end)
+                {
+                    char ch = *command_from;
+                    switch (ch)
+                    {
+                        case '\b':              /* Backspace */
+                        case 0x7f:              /* Delete */
+                            /* In Linemode, just move to one char back.
+                             * In Charmode with escaped input, write the data gathered
+                             * so far and add a rubout sequence ('\b \b').
+                             * In Charmode with unescaped input, just pass it on to
+                             * the mudlib.
+                             *
+                             * If telnet is disabled, pass it as it is.
+                             */
+                            if (!ip->tn_enabled)
+                            {
+                                *command_to++ = ch;
+                                break;
+                            }
+
+                            if (!(ip->noecho & CHARMODE_REQ))
+                            {
+                                /* Linemode */
+                                if (command_to > ip->command)
+                                    command_to = utf8_prev(command_to, command_to - ip->command);
+                                break;
+                            }
+
+                            if (ip->command[0] == input_escape
+                             && ! (find_no_bang(ip) & IGNORE_BANG) )
+                            {
+                                /* Charmode with escaped input.
+                                 * If we have already printed the last character,
+                                 * we need to overwrite that with a space.
+                                 */
+                                if (command_to > ip->command)
+                                {
+                                    bool unprint = (ip->command + ip->command_printed == command_to);
+
+                                    command_to = utf8_prev(command_to, command_to - ip->command);
+                                    if (unprint)
+                                    {
+                                        comm_socket_write("\b \b", 3, ip, 0);
+                                        ip->command_printed = command_to - ip->command;
+                                    }
+                                }
+                                break;
+                            }
+
+                            /* Charmode, leave the character as it is. */
+                            *command_to++ = ch;
+                            break;
+
+                        /* Handle line endings:
+                         * In Charmode we pass them as they are.
+                         * In Linemode we handle combinations of CR, NL and NUL
+                         * (usually CR LF, but also CR NUL or single LF or NUL)
+                         * as the end of the command.
+                         */
+                        case '\0':
+                        case '\r':
+                        case '\n':
+                        {
+                            bool charmode = is_charmode(ip);
+                            if (charmode) /* We pass this on. */
+                                *command_to++ = ch;
+
+                            command_from++;
+
+                            /* Let's see if there's a second byte to skip. */
+                            if (command_from != command_end)
+                            {
+                                if ((ch == '\r' && (*command_from == '\n' || *command_from == '\0'))
+                                 || (ch == '\n' && *command_from == '\r'))
+                                {
+                                    if (charmode)
+                                        *command_to++ = *command_from;
+                                    command_from++;
+                                }
+                            }
+                            else if (!charmode)
+                            {
+                                if (ch == '\r')
+                                    ip->gobble_char = '\n';
+                                else if (ch == '\n')
+                                    ip->gobble_char = '\r';
+                            }
+
+                            set_tn_state(ip, TS_READY);
+
+                            /* Consolidate the .text[] buffer. */
+                            ip->tn_end = ip->text_prefix;
+                            ip->text_end = ip->text_prefix + last - source;
+                            memmove(ip->text + ip->text_prefix, source, last - source);
+
+                            /* Consolidate the .command[] buffer. */
+                            ip->command_end = command_to - ip->command;
+                            ip->command_unprocessed_end = command_end - command_from + command_to - ip->command;
+                            memmove(command_to, command_from, command_end - command_from);
+                            return;
+                        }
+
+                        default:
+                            *command_to++ = ch;
+                            break;
+                    }
+
+                    command_from++;
+                }
+
+                /* Finished processing all converted data in .command[],
+                 * now look through any received bytes in .text[].
+                 */
+                command_from = command_end = command_to;
+                ip->command_unprocessed_end = ip->command_end = command_to - ip->command;
+
+                if (source != last)
+                {
+                    /* We convert all non-telnet bytes acoording to the encoding
+                     * into the .command[] buffer. Therefore look for the next IAC.
                      */
-                    ip->gobble_char = '\n';
+                    size_t sourceleft, sourceleftorig, commandleft;
+                    char *next_tn = memchr(source, IAC, last - source);
+                    if (next_tn == NULL)
+                        next_tn = last;
+                    else if (next_tn == source)
+                    {
+                        source++;
+                        set_tn_state(ip, TS_IAC);
+                        continue;
+                    }
+
+                    if (ip->text_prefix > 0)
+                    {
+                        /* Move the pending multi-bytes just before the next ones. */
+                        source -= ip->text_prefix;
+                        if (source != ip->text)
+                            memmove(source, ip->text, ip->text_prefix);
+                    }
+
+                    sourceleftorig = sourceleft = next_tn - source;
+                    commandleft = ip->command + sizeof(ip->command) - command_end;
+
+                    iconv(ip->receive_cd, &source, &sourceleft, &command_end, &commandleft);
+                    ip->tn_end = source - ip->text;
+                    ip->command_unprocessed_end = command_end - ip->command;
+
+                    if (ip->text_prefix > sourceleftorig - sourceleft)
+                    {
+                        /* Some bytes of the prefix weren't processed. */
+                        ip->text_prefix -= sourceleftorig - sourceleft;
+                        memmove(ip->text, source, ip->text_prefix);
+                        source += ip->text_prefix;
+                    }
+                    else
+                        ip->text_prefix = 0;
+
+                    if (sourceleftorig == sourceleft)
+                    {
+                        /* We didn't process a new byte from the input.
+                         * Then we need to look at the error code.
+                         */
+                        switch (errno)
+                        {
+                            case E2BIG:
+                                /* Our command buffer is full and we have seen no newline.
+                                 * Return the text so far as partial command and restart
+                                 * input from the beginning.
+                                 */
+                                set_tn_state(ip, TS_READY);
+
+                                /* Consolidate the .text[] buffer. */
+                                ip->tn_end = ip->text_prefix;
+                                ip->text_end = ip->text_prefix + last - source;
+                                memmove(ip->text + ip->text_prefix, source, last - source);
+
+                                ip->command_end = ip->command_unprocessed_end = command_to - ip->command;
+                                return;
+
+                            case EINVAL:
+                                /* An incomplete multi-byte sequence found. */
+                                if (next_tn == last)
+                                {
+                                    /* We didn't receive any further bytes. Wait for them. */
+                                    ip->tn_end = 0;
+                                    ip->text_end = last - source;
+                                    memmove(ip->text, source, last - source);
+                                    return;
+                                }
+                                else
+                                {
+                                    /* There is a telnet sequence in the multi-byte sequence.
+                                     * We remember the bytes for later. And handle the IAC.
+                                     */
+                                    if (source != ip->text)
+                                        memmove(ip->text + ip->text_prefix, source, sourceleft);
+
+                                    ip->text_prefix += sourceleft;
+                                    set_tn_state(ip, TS_IAC);
+                                    continue;
+                                }
+
+                            case EILSEQ:
+                            default:
+                                /* An invalid byte sequence found. We just skip this byte. */
+                                source++;
+                                continue;
+                        }
+                    }
+                }
+                break;
+            } /* case TS_DATA */
+
+            case TS_IAC:
+            {
+                /* Begin a telnet negotiation */
+                unsigned char ch = *(unsigned char*)(source++);
+                switch (ch)
+                {
+                    case IAC:
+                        DTN(("t_n: got IAC\n"));
+                        /* We put this into the prefix, these are already telnet processed bytes. */
+                        *(ip->text + ip->text_prefix) = ch;
+                        ip->text_prefix++;
+                        set_tn_state(ip, TS_DATA);
+                        continue;
+
+                    case WILL:
+                        DTN(("t_n: got WILL\n"));
+                        set_tn_state(ip, TS_WILL);
+                        continue;
+
+                    case WONT:
+                        DTN(("t_n: got WONT\n"));
+                        set_tn_state(ip, TS_WONT);
+                        continue;
+
+                    case DO:
+                        DTN(("t_n: got DO\n"));
+                        set_tn_state(ip, TS_DO);
+                        continue;
+
+                    case DONT:
+                        DTN(("t_n: got DONT\n"));
+                        set_tn_state(ip, TS_DONT);
+                        continue;
+
+                    case SB:
+                        DTN(("t_n: got SB\n"));
+                        ip->tn_start = (short)(source - ip->text);
+                        set_tn_state(ip, TS_SB);
+                        continue;
+
+                    case DM:
+                        DTN(("t_n: got DM\n"));
+                        if (ip->syncing)
+                        {
+                            struct timeval timeout;
+                            fd_set exceptfds;
+
+                            FD_ZERO(&exceptfds);
+                            FD_SET(ip->socket, &exceptfds);
+                            timeout.tv_sec = 0;
+                            timeout.tv_usec = 0;
+                            if (!socket_select(ip->socket + 1, 0, 0, &exceptfds, &timeout))
+                            {
+                                if (d_flag)
+                                    debug_message("%s Synch operation finished.\n", time_stamp());
+                                ip->syncing = false;
+                            }
+                        }
+                        break;
+
+                    case NOP:
+                        DTN(("t_n: got NOP\n"));
+                        break;
+
+                    case GA:
+                        DTN(("t_n: got GA\n"));
+                        break;
+
+                    default:
+                        DTN(("t_n: got %02hhx\n", ch));
+                        break;
+                } /* switch(ch) */
+                set_tn_state(ip, ip->syncing ? TS_SYNCH : TS_DATA);
+                break;
+            }
+
+            case TS_WILL:
+            {
+                int ch = *(unsigned char*)(source++);
+
+                command_giver = ip->ob;
+                if (ch < NTELOPTS)
+                {
+                    DTN(("t_n: state WILL got %s (%02x)\n", telopts[ch], ch));
+                    if (d_flag)
+                        debug_message("%s Will %s\n", time_stamp(), telopts[ch]);
+                    (*telopts_will[ch])(ch);
                 }
                 else
                 {
-                    ch = (*from++ & 0xff);
-                    /* gobble following NL and NUL */
-                    if (ch && ch != '\n')
-                        from--;
+                    debug_message("%s Unknown telnet option Will %d\n", time_stamp(), ch);
+                    send_dont(ch);
                 }
-
-        full_newline:
-                /* Proper line end found: set telnet machine into TS_READY,
-                 * terminate the command with \0 and return.
-                 */
-                {
-                    ip->tn_state = TS_READY;
-                    ip->command_end = 0;
-                    ip->tn_end = (short)(from - first);
-
-                    /* Even in charmode we append the NUL in case the client
-                     * refused to use charmode, because then get_message()
-                     * will treat the data as if in linemode and expect
-                     * a trailing NUL.
-                     */
-                    *to = '\0';
-                    return;
-                }
-
-            case '\n':
-                /* In Charmode we have to return the \n.
-                 */
-                if (is_charmode(ip))
-                {
-                    *to++ = (char)ch;
-                    goto ts_data;
-                }
-
-                ip->gobble_char = '\r';
-                goto full_newline;
-            } /* switch(ch) */
-
-            /* NOTREACHED */
-
-        ts_iac:
-        case TS_IAC:
-            DTN(("t_n: state IAC\n"));
-            /* Begin a telnet negotiation */
-            switch(ch)
-            {
-            case IAC:
-                DTN(("t_n: got IAC\n"));
-                *to++ = ch;
-                ip->tn_state = state = TS_DATA;
-                goto ts_data;
-            case WILL:
-                DTN(("t_n: got WILL\n"));
-                state = TS_WILL;
-                goto change_state;
-            case WONT:
-                DTN(("t_n: got WONT\n"));
-                state = TS_WONT;
-                goto change_state;
-            case DO:
-                DTN(("t_n: got DO\n"));
-                state = TS_DO;
-                goto change_state;
-            case DONT:
-                DTN(("t_n: got DONT\n"));
-                state = TS_DONT;
-                goto change_state;
-            case SB:
-                DTN(("t_n: got SB\n"));
-                ip->tn_start = (short)(to - first);
-                state = TS_SB;
-                goto change_state;
-            case DM:
-                DTN(("t_n: got DM\n"));
-            data_mark:
-                if (ip->ts_data == TS_SYNCH)
-                {
-                    struct timeval timeout;
-
-                    FD_ZERO(&exceptfds);
-                    FD_SET(ip->socket, &exceptfds);
-                    timeout.tv_sec = 0;
-                    timeout.tv_usec = 0;
-                    if (! socket_select(ip->socket + 1, 0, 0, &exceptfds,
-                        &timeout))
-                    {
-                        if (d_flag)
-                            debug_message("%s Synch operation finished.\n"
-                                         , time_stamp());
-                        ip->ts_data = TS_DATA;
-                    }
-                }
+                set_tn_state(ip, ip->syncing ? TS_SYNCH : TS_DATA);
                 break;
-            case NOP:
-                DTN(("t_n: got NOP\n")); break;
-            case GA:
-                DTN(("t_n: got GA\n")); break;
-            default:
-                DTN(("t_n: got %02hhx\n", ch)); break;
-                break;
-            } /* switch(ch) */
-            state = ip->ts_data;
-            goto change_state;
-DIAGWARN_PUSH
-DIAG_IGNORE_TAUTOLOGICAL_CONST_OOR_CMP
-        case TS_WILL:
-            command_giver = ip->ob;
-            if (ch < NTELOPTS) {
-                DTN(("t_n: state WILL got %s (%02hhx)\n"
-                   , telopts[ch], ch));
-                if (d_flag)
-                    debug_message("%s Will %s\n", time_stamp(), telopts[ch]);
-                (*telopts_will[ch])(ch);
-            } else {
-                debug_message("%s Unknown telnet option Will %hhd\n"
-                             , time_stamp(), ch);
-                send_dont(ch);
             }
-            state = ip->ts_data;
-            goto change_state;
 
-        case TS_WONT:
-            command_giver = ip->ob;
-            if (ch < NTELOPTS) {
-                DTN(("t_n: state WONT got %s (%02hhx)\n"
-                   , telopts[ch], ch));
-                if (d_flag)
-                    debug_message("%s Wont %s\n", time_stamp(), telopts[ch]);
-                (*telopts_wont[ch])(ch);
-            } else {
-                debug_message("%s Unknown telnet option Wont %hhd\n"
-                             , time_stamp(), ch);
-            }
-            state = ip->ts_data;
-            goto change_state;
-
-        case TS_DO:
-            command_giver = ip->ob;
-            if (ch < NTELOPTS) {
-                DTN(("t_n: state DO got %s (%02hhx)\n"
-                   , telopts[ch], ch));
-                if (d_flag)
-                    debug_message("%s Do %s\n", time_stamp(), telopts[ch]);
-                (*telopts_do[ch])(ch);
-            } else {
-                debug_message("%s Unknown telnet option Do %hhd\n"
-                             , time_stamp(), ch);
-                send_wont(ch);
-            }
-            state = ip->ts_data;
-            goto change_state;
-
-        case TS_DONT:
-            command_giver = ip->ob;
-            if (ch < NTELOPTS) {
-                DTN(("t_n: state DONT got %s (%02hhx)\n"
-                   , telopts[ch], ch));
-                if (d_flag)
-                    debug_message("%s Dont %s\n", time_stamp(), telopts[ch]);
-                (*telopts_dont[ch])(ch);
-            } else {
-                debug_message("%s Unknown telnet option Dont %hhd\n"
-                             , time_stamp(), ch);
-            }
-            state = ip->ts_data;
-            goto change_state;
-DIAGWARN_POP
-        case TS_SB:
-            DTN(("t_n: state TS_SB got %02hhx\n", ch));
-            if (ch == IAC) {
-                state = TS_SB_IAC;
-                goto change_state;
-            }
-            *to++ = (char)ch;
-            continue;
-
-        case TS_SB_IAC:
-          {
-            mp_int size;
-            vector_t *v;
-
-            DTN(("t_n: state TS_SB_IAC got %02hhx\n", ch));
-            if (ch == IAC) {
-                DTN(("t_n: that is: state TS_SB_IAC got IAC\n"));
-                *to++ = (char)ch;
-                state = TS_SB;
-                goto change_state;
-            } else if ((ch == SE || ch == SB)
-                && (  (size = (to - first) - ip->tn_start - 1) <= (mp_int)max_array_size
-                    || !max_array_size)
-                && size >= 0
-                && (current_object = ip->ob,  v = allocate_array(size)) )
+            case TS_WONT:
             {
-                unsigned char *str;
-                svalue_t *svp;
+                int ch = *(unsigned char*)(source++);
 
-                str = (unsigned char *)&ip->text[ip->tn_start];
-                DTN(("t_n: that is: state TS_SB_IAC got useful SE or SB: neg SB %02hhx (%"PRIdMPINT" bytes)\n", *str, size));
-                push_number(inter_sp, SB);
-                push_number(inter_sp, *str++);
-                svp = v->item;
-                while (--size >= 0) {
-                    svp->u.number = *str++;
-                    svp++;
-                }
-                push_array(inter_sp, v);
                 command_giver = ip->ob;
-                h_telnet_neg(3);
+                if (ch < NTELOPTS)
+                {
+                    DTN(("t_n: state WONT got %s (%02x)\n", telopts[ch], ch));
+                    if (d_flag)
+                        debug_message("%s Wont %s\n", time_stamp(), telopts[ch]);
+                    (*telopts_wont[ch])(ch);
+                }
+                else
+                {
+                    debug_message("%s Unknown telnet option Wont %d\n", time_stamp(), ch);
+                }
+                set_tn_state(ip, ip->syncing ? TS_SYNCH : TS_DATA);
+                break;
             }
-            to = &first[ip->tn_start];
-            if (ch != SE)
-                goto ts_iac;
-            state = ip->ts_data;
-            goto change_state;
-          }
 
-        case TS_SYNCH:
-            DTN(("t_n: state TS_SYNCH got %02hhx\n", ch));
-            if (ch == IAC) goto new_iac;
-            if (ch == DM) goto data_mark;
-            continue;
+            case TS_DO:
+            {
+                int ch = *(unsigned char*)(source++);
 
-        default:
-            if (d_flag)
-                debug_message("%s Bad state: 0x%hhx\n", time_stamp(), ip->tn_state);
-            state = TS_DATA;
-            goto change_state;
-        } /* switch (ip->tn_state) */
+                command_giver = ip->ob;
+                if (ch < NTELOPTS)
+                {
+                    DTN(("t_n: state DO got %s (%02x)\n", telopts[ch], ch));
+                    if (d_flag)
+                        debug_message("%s Do %s\n", time_stamp(), telopts[ch]);
+                    (*telopts_do[ch])(ch);
+                }
+                else
+                {
+                    debug_message("%s Unknown telnet option Do %d\n", time_stamp(), ch);
+                    send_wont(ch);
+                }
+                set_tn_state(ip, ip->syncing ? TS_SYNCH : TS_DATA);
+                break;
+            }
 
-    } while(from < end);
+            case TS_DONT:
+            {
+                int ch = *(unsigned char*)(source++);
 
-    /* We used all the new data in .text[] but found no complete command.
-     * Reset all pointers necessary to read new data.
-     */
+                command_giver = ip->ob;
+                if (ch < NTELOPTS)
+                {
+                    DTN(("t_n: state DONT got %s (%02x)\n", telopts[ch], ch));
+                    if (d_flag)
+                        debug_message("%s Dont %s\n", time_stamp(), telopts[ch]);
+                    (*telopts_dont[ch])(ch);
+                }
+                else
+                {
+                    debug_message("%s Unknown telnet option Dont %d\n", time_stamp(), ch);
+                }
+                set_tn_state(ip, ip->syncing ? TS_SYNCH : TS_DATA);
+                break;
+            }
 
-    ip->text_end = ip->tn_end = ip->command_end = (short)(to - first);
-    if (ip->text_end == MAX_TEXT)
+            case TS_SB:
+            {
+                unsigned char ch = *(unsigned char*)(source++);
+                DTN(("t_n: state TS_SB got %02hhx\n", ch));
+                if (ch == IAC)
+                    set_tn_state(ip, TS_SB_IAC);
+                continue;
+            }
+
+            case TS_SB_IAC:
+            {
+                unsigned char ch = *(unsigned char*)(source);
+                DTN(("t_n: state TS_SB_IAC got %02hhx\n", ch));
+                switch (ch)
+                {
+                    case IAC:
+                        /* We had two IAC, compress them into one. */
+                        memmove(source, source+1, last - source);
+                        last--;
+                        set_tn_state(ip, TS_SB);
+                        continue;
+
+                    case SE:
+                    case SB:
+                    {
+                        vector_t *v;
+                        mp_int size = (source - ip->text) - ip->tn_start - 2;
+
+                        if (size >= 0
+                         && (size <= (mp_int)max_array_size || !max_array_size)
+                         && (current_object = ip->ob,  v = allocate_array(size)))
+                        {
+                            unsigned char *str = (unsigned char *)ip->text + ip->tn_start;
+                            svalue_t *svp;
+
+                            DTN(("t_n: that is: state TS_SB_IAC got useful SE or SB: neg SB %02hhx (%"PRIdMPINT" bytes)\n", *str, size));
+                            push_number(inter_sp, SB);
+                            push_number(inter_sp, *str++);
+                            svp = v->item;
+                            while (--size >= 0)
+                            {
+                                svp->u.number = *str++;
+                                svp++;
+                            }
+                            push_array(inter_sp, v);
+                            command_giver = ip->ob;
+                            h_telnet_neg(3);
+                        }
+
+                        if (ch == SE)
+                        {
+                            source++;
+                            set_tn_state(ip, ip->syncing ? TS_SYNCH : TS_DATA);
+                            continue;
+                        }
+                        // else FALLTHROUGH
+                    }
+
+                    default:
+                        set_tn_state(ip, TS_IAC);
+                        continue;
+                }
+                break;
+            }
+
+            case TS_SYNCH:
+            {
+                unsigned char ch = *(unsigned char*)(source++);
+                DTN(("t_n: state TS_SYNCH got %02hhx\n", ch));
+                switch (ch)
+                {
+                    case IAC:
+                        set_tn_state(ip, TS_IAC);
+                        continue;
+
+                    case DM:
+                        /* Let that by handled by the TS_IAC code. */
+                        set_tn_state(ip, TS_IAC);
+                        source--;
+                        continue;
+                }
+                /* All other chars we just ignore. */
+                continue;
+            }
+
+            default:
+                if (d_flag)
+                    debug_message("%s Bad state: 0x%hhx\n", time_stamp(), ip->tn_state);
+                set_tn_state(ip, TS_DATA);
+                break;
+        } /* switch() */
+    } /* while() */
+
+    /* We processed all the input. */
+    if (TN_START_VALID(ip->tn_state))
     {
-        /* telnet negotiation shouldn't have such large data chunks.
-         * Ignore all data altogether and return to text mode.
+        /* There is a subnegotation in progress.
+         * We are not allowed to reset the buffer.
          */
-        ip->text_end = ip->tn_end = ip->command_end = 0;
-        ip->tn_start = ip->command_start = 0;
-        ip->tn_state = TS_DATA;
+        ip->text_end = ip->tn_end = source - ip->text;
+        if (ip->tn_start > ip->text_prefix)
+        {
+            /* Consolidate the .text[] buffer. */
+            memmove(ip->text + ip->text_prefix, ip->text + ip->tn_start, ip->tn_end - ip->tn_start);
+            ip->text_end = ip->tn_end -= ip->tn_start - ip->text_prefix;
+            ip->tn_start = ip->text_prefix;
+        }
+        else if (ip->text_end == MAX_TEXT)
+        {
+            /* Telnet negotiation shouldn't have such large data chunks.
+             * Ignore all data altogether and return to text mode.
+             */
+            ip->text_end = ip->tn_end = 0;
+            ip->tn_state = TS_DATA;
+        }
+    }
+    else
+    {
+        /* Reset the buffers. */
+        ip->text_end = ip->tn_end = ip->text_prefix;
     }
 } /* telnet_neg() */
 
@@ -6412,7 +6434,7 @@ f_remove_interactive (svalue_t *sp)
     {
         if (victim->message_length) {
             command_giver = victim->ob;
-            add_message(message_flush);
+            add_message_flush();
 
             /* message_flush takes always directly effect on the
              * socket. No apply() is involved.
@@ -6704,6 +6726,7 @@ f_binary_message (svalue_t *sp)
             }
             *p++ = (char)item->u.number;
         }
+        msg->info.unicode = STRING_BYTES;
     }
     else /* it's a string */
     {
@@ -6723,21 +6746,17 @@ f_binary_message (svalue_t *sp)
         {
             /* Write before flush... */
 
-            sending_telnet_command = MY_TRUE; /* turn of IAC quoting */
-
-            add_message(FMT_STRING, msg);
-
-            sending_telnet_command = MY_FALSE;
+            add_message_str(msg);
 
             if (sp->u.number & 2)
-                add_message(message_flush);
+                add_message_flush();
 
             wrote = mstrsize(msg);
         }
         else
         {
             /* Flush, then write. */
-            add_message(message_flush);
+            add_message_flush();
 
             /* Since all pending data was flushed, we can write directly
              * to the socket now.
@@ -6826,7 +6845,7 @@ f_exec (svalue_t *sp)
             if (stale_interactive->message_length)
             {
                 command_giver = ob;
-                add_message(message_flush);
+                add_message_flush();
             }
         }
 
@@ -6834,7 +6853,7 @@ f_exec (svalue_t *sp)
 
         if (ip->message_length) {
             command_giver = obfrom;
-            add_message(message_flush);
+            add_message_flush();
         }
         command_giver = save_command;
 
@@ -7708,7 +7727,7 @@ static inline void translate_bit(char c, int i, int *length, string_t *rc, unsig
 } /* translate_bit */
 
 static void
-get_charset (svalue_t * sp, bool as_string, char charset[32])
+get_charset (svalue_t * sp, bool as_string, char charset[16])
 
 /* Translate the <charset> into an svalue and store it into <sp>:
  *   <as_string> == false: result is a bitvector array
@@ -7723,7 +7742,7 @@ get_charset (svalue_t * sp, bool as_string, char charset[32])
         vector_t * rc;
         int i;
 
-        rc = allocate_uninit_array(32);
+        rc = allocate_uninit_array(16);
         if (!rc)
         {
             outofmemory("result array");
@@ -7731,7 +7750,7 @@ get_charset (svalue_t * sp, bool as_string, char charset[32])
             return;
         }
 
-        for (i = 0; i < 32; i++)
+        for (i = 0; i < 16; i++)
             put_number(rc->item+i, (unsigned char)charset[i]);
 
         put_array(sp, rc);
@@ -7742,7 +7761,7 @@ get_charset (svalue_t * sp, bool as_string, char charset[32])
         int length, i;
 
         /* Count the number of bits set in the charset */
-        for (i = length = 0; i < 32; i++)
+        for (i = length = 0; i < 16; i++)
         {
             char c = charset[i];
             length +=   ((c & 0x80) ? 1 : 0)
@@ -7764,7 +7783,7 @@ get_charset (svalue_t * sp, bool as_string, char charset[32])
         }
 
         /* Translate the bits into characters */
-        for (i = length = 0; i < 32; i++)
+        for (i = length = 0; i < 16; i++)
         {
             char c = charset[i];
 
@@ -7777,6 +7796,7 @@ get_charset (svalue_t * sp, bool as_string, char charset[32])
             translate_bit(c, i, &length, rc, 6);
             translate_bit(c, i, &length, rc, 7);
         }
+        rc->info.unicode = STRING_ASCII;
 
         put_string(sp, rc);
     } /* as_string */
@@ -7784,7 +7804,7 @@ get_charset (svalue_t * sp, bool as_string, char charset[32])
 
 /*-------------------------------------------------------------------------*/
 static void
-set_charset_from_vector (vector_t* vec, char charset[32], const char* fun, int argnum)
+set_charset_from_vector (vector_t* vec, char charset[16], const char* fun, int argnum)
 
 /* Reads the charset from an vector of int <vec>,
  * where each element represents a byte in the charset.
@@ -7797,8 +7817,13 @@ set_charset_from_vector (vector_t* vec, char charset[32], const char* fun, int a
     svalue_t *svp;
     char *p;
 
+    /* For compatibility reasons we accept arrays > 16 bytes as long
+     * as they are <= 32 bytes long.
+     */
     if (i > 32)
         errorf("Bad arg %d to %s: int[] too long (%"PRIdMPINT")\n", argnum, fun, i);
+    if (i > 16)
+        i = 16;
 
     for ( svp = vec->item, p = charset
         ; --i >= 0
@@ -7807,13 +7832,13 @@ set_charset_from_vector (vector_t* vec, char charset[32], const char* fun, int a
         if (svp->type == T_NUMBER)
             *p = (char)svp->u.number;
     }
-    memset(p, 0, (size_t)(charset + 32 - p));
+    memset(p, 0, (size_t)(charset + 16 - p));
 
 } /* set_charset_from_vector */
 
 /*-------------------------------------------------------------------------*/
 static void
-set_charset_from_string (string_t* str, char charset[32], const char* fun, int argnum)
+set_charset_from_string (string_t* str, char charset[16], const char* fun, int argnum)
 
 /* Reads the charset from a string <str> containing all
  * chars of the charset.
@@ -7825,11 +7850,27 @@ set_charset_from_string (string_t* str, char charset[32], const char* fun, int a
     int i;
     char *p;
 
-    memset(charset, 0, 32);
+    memset(charset, 0, 16);
     for ( i = mstrsize(str), p = get_txt(str)
         ; i > 0
         ; i--, p++)
-        charset[(*p & 0xff) / 8] |= 1 << (*p % 8);
+    {
+        p_int ch;
+        size_t clen = utf8_to_unicode(p, i, &ch);
+
+        if (!clen)
+        {
+            i--;
+            p++;
+            continue;
+        }
+
+        i -= clen;
+        p += clen;
+
+        if (ch < 128)
+            charset[ch / 8] |= 1 << (ch % 8);
+    }
 
 } /* set_charset_from_string */
 
@@ -8342,6 +8383,8 @@ f_configure_interactive (svalue_t *sp)
                 break;
 
             case T_STRING:
+                if (sp->u.str->info.unicode == STRING_BYTES)
+                    efun_exp_arg_error(3, TF_STRING, T_BYTES, sp);
                 set_charset_from_string(sp->u.str, ip->combine_cset, "configure_interactive with IC_COMBINE_CHARSET_AS_STRING", 3);
                 break;
 
@@ -8390,6 +8433,8 @@ f_configure_interactive (svalue_t *sp)
                 break;
 
             case T_STRING:
+                if (sp->u.str->info.unicode == STRING_BYTES)
+                    efun_exp_arg_error(3, TF_STRING, T_BYTES, sp);
                 set_charset_from_string(sp->u.str, ip->charset, "configure_interactive with IC_CONNECTION_CHARSET_AS_STRING", 3);
                 break;
 
@@ -8484,6 +8529,9 @@ f_configure_interactive (svalue_t *sp)
         if (sp->type != T_STRING && sp->type != T_CLOSURE)
             efun_exp_arg_error(3, TF_STRING|TF_CLOSURE, sp->type, sp);
 
+        if (sp->type == T_STRING && sp->u.str->info.unicode == STRING_BYTES)
+            efun_exp_arg_error(3, TF_STRING, T_BYTES, sp);
+
         if (sp->type == T_CLOSURE && sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
             errorf("Bad arg 3 for configure_interactive with IC_PROMPT: lambda closure not bound\n");
 
@@ -8531,6 +8579,41 @@ f_configure_interactive (svalue_t *sp)
             ip->modify_command = ref_object(sp->u.ob, "configure_interactive(IC_MODIFY_COMMAND)");
         else
             ip->modify_command = NULL;
+        break;
+
+    case IC_ENCODING:
+        if (sp->type != T_STRING)
+            efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+        else if (sp->u.str->info.unicode == STRING_BYTES)
+            efun_exp_arg_error(3, TF_STRING, T_BYTES, sp);
+
+        if (mstrsize(sp->u.str) >= sizeof(default_player_encoding))
+            errorf("Illegal value to arg 3 of configure_interactive with IC_ENCODING: Encoding name too long.\n");
+
+        if (!ip)
+        {
+            /* Let's check the encoding before setting it as the default. */
+            iconv_t cd = iconv_open(get_txt(sp->u.str), "UTF-8");
+            if (cd == (iconv_t)-1)
+            {
+                if (errno == EINVAL)
+                    errorf("Error setting default encoding: unsupported encoding '%s'.\n", get_txt(sp->u.str));
+                else
+                    errorf("Error setting default encoding: %s.\n", strerror(errno));
+            }
+
+            iconv_close(cd);
+
+            memcpy(default_player_encoding, get_txt(sp->u.str), mstrsize(sp->u.str) + 1);
+        }
+        else if (!set_encoding(ip, get_txt(sp->u.str)))
+        {
+            if (errno == EINVAL)
+                errorf("Error setting encoding: unsupported encoding '%s'.\n", get_txt(sp->u.str));
+            else
+                errorf("Error setting encoding: %s.\n", strerror(errno));
+        }
+
         break;
     }
 
@@ -8703,6 +8786,13 @@ f_interactive_info (svalue_t *sp)
             put_ref_object(&result, ip->modify_command, "interactive_info(IC_MODIFY_COMMAND)");
         else
             put_number(&result, 0);
+        break;
+
+    case IC_ENCODING:
+        if (!ip)
+            put_c_string(&result, default_player_encoding);
+        else
+            put_c_string(&result, ip->encoding);
         break;
 
     /* Connection information */

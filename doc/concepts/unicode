@@ -34,6 +34,16 @@ DESCRIPTION
         If there is no environment setting (or it is set to the default
         "C" locale), then UTF-8 is used.
 
+        -- Interactives --
+
+        Each interactive has its own encoding. It can be set with
+        configure_interactive(IC_ENCODING, <encoding>). The default is
+        "ISO-8859-1//TRANSLIT" which maps each incoming byte to the
+        first 256 unicode characters and uses transliteration to encode
+        characters that are not in this character set. If an input or
+        output character can not be converted to/from the configured
+        encoding it will be silently discarded.
+
 HISTORY
         Introduced in LDMud 3.6.
 

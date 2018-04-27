@@ -509,7 +509,7 @@ mixed  *variable_list(object|string, int default: F_CONST1);
 
         /* Network IO */
 
-int     binary_message(int *|string, int default: F_CONST0);
+int     binary_message(int *|bytes, int default: F_CONST0);
 
 int     net_connect(string, int);
 

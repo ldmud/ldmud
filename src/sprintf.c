@@ -2562,7 +2562,7 @@ v_printf (svalue_t *sp, int num_arg)
     if (command_giver)
         tell_object(command_giver, str);
     else
-        add_message(FMT_STRING, str);
+        add_message_str(str);
     free_mstring(str);
     sp = pop_n_elems(num_arg, sp);
 
