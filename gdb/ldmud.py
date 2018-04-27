@@ -23,6 +23,10 @@ def print_ptr(val):
 class MStringPrinter:
     "Print an mstring"
 
+    STRING_ASCII = 0
+    STRING_UTF8  = 1
+    STRING_BYTES = 2
+
     def __init__(self, val):
         self.val = val
 
@@ -33,7 +37,17 @@ class MStringPrinter:
         if val.address == 0:
             return "0x0"
 
-        return '"' + val["txt"].string(length = val["size"]) + '"'
+        if val["info"]["unicode"] == self.STRING_BYTES:
+            result = '"'
+            for idx in range(val["size"]):
+                ch = val["txt"][idx]
+                if ch < 0:
+                    ch += 256
+                result += '\\x%02x' % (ch,)
+            result += '"'
+            return result
+        else:
+            return '"' + val["txt"].string(length = val["size"]) + '"'
 
 class PtrNamePrinter:
     "Print an pointer to a struct with an name entry"
