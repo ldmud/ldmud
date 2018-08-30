@@ -7231,7 +7231,7 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
           }
       }
 
-      block
+      inline_block
 
       {
 #ifdef DEBUG_INLINES
@@ -7379,6 +7379,13 @@ inline_comma_expr:
       }
 ; /* inline_comma_expr */
 
+/* Allow inline_func to complete the inline closure and therefore
+ * cleanly leave the block scope by catching any errors here.
+ */
+inline_block:
+      block
+    | error
+; /* inline_block */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* Definition of a struct
