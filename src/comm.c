@@ -2823,8 +2823,27 @@ get_message (char *buff)
 
             /* Get the data (if any), at max enough to fill .text[] */
 
-            if (FD_ISSET(ip->socket, &readfds)) {
+            if (FD_ISSET(ip->socket, &readfds))
+            {
                 int l;
+
+                /* Normally destructed objects will be removed before calling
+                 * get_message(), but wenn accepting new connections we may
+                 * well have a newly created & destructed object here.
+                 */
+                if (ip->ob->flags & O_DESTRUCTED)
+                {
+                    /* If this object is destructed, discard the input and skip to the next one. */
+                    char buf[MAX_TEXT];
+#ifdef USE_TLS
+                    if (ip->tls_status != TLS_INACTIVE)
+                        tls_read(ip, buf, MAX_TEXT);
+                    else
+#endif
+                        socket_read(ip->socket, buf, MAX_TEXT);
+
+                    continue;
+                }
 
                 l = MAX_TEXT - ip->text_end;
 
@@ -2906,6 +2925,10 @@ get_message (char *buff)
             /* if ip->text[0] does not hold a valid character, the outcome
              * of the comparison to input_escape does not matter.
              */
+
+            /* telnet_neg() might have destroyed this one. */
+            if (ip->ob->flags & O_DESTRUCTED)
+                continue;
 
             /* ----- CHARMODE -----
              * command_start is 0 at the beginning. Received chars start at
@@ -3164,6 +3187,10 @@ get_message (char *buff)
                  */
                 ip->tn_state = TS_DATA;
                 telnet_neg(ip);
+
+                /* telnet_neg() might have destroyed this one. */
+                if (ip->ob->flags & O_DESTRUCTED)
+                    continue;
 
                 /* If the user is not in ed, don't let him issue another command
                  * before the poll comes again.
