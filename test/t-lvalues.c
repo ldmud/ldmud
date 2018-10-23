@@ -180,9 +180,12 @@ mixed *tests = ({
     ({ "Unprotected rvalue-struct element by name", 0, (: mixed s = (<teststruct> -1, -2, -3); int result = funcall(s)->"b" = 55; return deep_eq(s, (<teststruct> -1, 55, -3)) && result == 55; :) }),
     ({ "Unprotected last rvalue-struct element by name", 0, (: int result = (<teststruct> -1, -2, ({-3}))->"b" = 55; return result == 55; :) }),
 
-    ({ "Unprotected lvalue-mapping element",         0, (: mapping m = ([ "a": 'a', "b": 'b', "c": ({'c'}) ]); int result = m["b"] = 'B'; return deep_eq(m, (["a":'a',"b":'B',"c":({'c'})])) && result == 'B'; :) }),
-    ({ "Unprotected rvalue-mapping element",         0, (: mapping m = ([ "a": 'a', "b": 'b', "c": ({'c'}) ]); int result = funcall(m)["b"] = 'B'; return deep_eq(m, (["a":'a',"b":'B',"c":({'c'})])) && result == 'B'; :) }),
-    ({ "Unprotected last rvalue-mapping element",    0, (: int result = ([ "a": 'a', "b": 'b', "c": ({'c'}) ])["b"] = 'B'; return result == 'B'; :) }),
+    ({ "Unprotected lvalue-mapping element 1",      0, (: mapping m = ([ "a": 'a', "b": 'b', "c": ({'c'}) ]); int result = m["b"]    = 'B'; return deep_eq(m, (["a":'a',"b":'B',"c":({'c'})])) && result == 'B'; :) }),
+    ({ "Unprotected lvalue-mapping element 2",      0, (: mapping m = ([ "a": 'a', "b": 'b', "c": ({'c'}) ]); int result = m["b", 0] = 'B'; return deep_eq(m, (["a":'a',"b":'B',"c":({'c'})])) && result == 'B'; :) }),
+    ({ "Unprotected rvalue-mapping element 1",      0, (: mapping m = ([ "a": 'a', "b": 'b', "c": ({'c'}) ]); int result = funcall(m)["b"]    = 'B'; return deep_eq(m, (["a":'a',"b":'B',"c":({'c'})])) && result == 'B'; :) }),
+    ({ "Unprotected rvalue-mapping element 2",      0, (: mapping m = ([ "a": 'a', "b": 'b', "c": ({'c'}) ]); int result = funcall(m)["b", 0] = 'B'; return deep_eq(m, (["a":'a',"b":'B',"c":({'c'})])) && result == 'B'; :) }),
+    ({ "Unprotected last rvalue-mapping element 1", 0, (: int result = ([ "a": 'a', "b": 'b', "c": ({'c'}) ])["b"]    = 'B'; return result == 'B'; :) }),
+    ({ "Unprotected last rvalue-mapping element 2", 0, (: int result = ([ "a": 'a', "b": 'b', "c": ({'c'}) ])["b", 0] = 'B'; return result == 'B'; :) }),
 
     ({ "Unprotected array range 1", 0, (: mixed a = ({1})*10; a[2..6]   = ({2})*5; return deep_eq(a, ({1})*2+({2})*5+({1})*3); :) }),
     ({ "Unprotected array range 2", 0, (: mixed a = ({1})*10; a[2..6] &&= ({2})*5; return deep_eq(a, ({1})*2+({2})*5+({1})*3); :) }),
@@ -1577,9 +1580,19 @@ mixed *tests = ({
     ({ "Lambda: Unprotected rvalue-struct element by name",      0, lambda(0, ({#',, ({#'=,'s,(<teststruct> -1,-2,-3)}), ({#'=, 'result, ({#'=,({#'->,({#'funcall,'s}),       "b"}), 55}) }), ({#'&&, ({#'deep_eq,'s,(<teststruct> -1,55,-3)}), ({#'==,'result,55}) }) })) }),
     ({ "Lambda: Unprotected last rvalue-struct element by name", 0, lambda(0, ({#',,                                     ({#'=, 'result, ({#'=,({#'->,(<teststruct> -1,-2,-3),"b"}), 55}) }),                                                   ({#'==,'result,55})    })) }),
 
-    ({ "Lambda: Unprotected lvalue-mapping element",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,'m,                              "b"}), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
-    ({ "Lambda: Unprotected rvalue-mapping element",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,({#'funcall,'m}),                "b"}), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
-    ({ "Lambda: Unprotected last rvalue-mapping element", 0, lambda(0, ({#',,                                             ({#'=, 'result, ({#'=,({#'[,(["a":'a',"b":'b',"c":({'c'})]), "b"}), 'B'}) }),                                                           ({#'==,'result,'B'})    })) }),
+    // There are three mapping index operations, we test each one of them:
+    // 1. ({ #'[, mapping, index })
+    // 2. ({ #'[, mapping, index, subindex })
+    // 3. ({ #'[,], mapping, index, subindex })
+    ({ "Lambda: Unprotected lvalue-mapping element 1",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,   'm,                              "b"   }), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
+    ({ "Lambda: Unprotected lvalue-mapping element 2",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,   'm,                              "b", 0}), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
+    ({ "Lambda: Unprotected lvalue-mapping element 3",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,], 'm,                              "b", 0}), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
+    ({ "Lambda: Unprotected rvalue-mapping element 1",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,   ({#'funcall,'m}),                "b"   }), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
+    ({ "Lambda: Unprotected rvalue-mapping element 2",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,   ({#'funcall,'m}),                "b", 0}), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
+    ({ "Lambda: Unprotected rvalue-mapping element 3",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,], ({#'funcall,'m}),                "b", 0}), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
+    ({ "Lambda: Unprotected last rvalue-mapping element 1", 0, lambda(0, ({#',,                                             ({#'=, 'result, ({#'=,({#'[,   (["a":'a',"b":'b',"c":({'c'})]), "b"   }), 'B'}) }),                                                           ({#'==,'result,'B'})    })) }),
+    ({ "Lambda: Unprotected last rvalue-mapping element 2", 0, lambda(0, ({#',,                                             ({#'=, 'result, ({#'=,({#'[,   (["a":'a',"b":'b',"c":({'c'})]), "b", 0}), 'B'}) }),                                                           ({#'==,'result,'B'})    })) }),
+    ({ "Lambda: Unprotected last rvalue-mapping element 3", 0, lambda(0, ({#',,                                             ({#'=, 'result, ({#'=,({#'[,], (["a":'a',"b":'b',"c":({'c'})]), "b", 0}), 'B'}) }),                                                           ({#'==,'result,'B'})    })) }),
 
     ({ "Lambda: Unprotected array range 1", 0, lambda(0, ({#',, ({#'=,'a,quote(({1})*10)}), ({#'=,  ({#'[..],'a,2,6}),quote(({2})*5)  }), ({#'deep_eq,'a,quote(({1})*2+({2})*5+({1})*3)}) })) }),
     ({ "Lambda: Unprotected array range 2", 0, lambda(0, ({#',, ({#'=,'a,quote(({1})*10)}), ({#'&&=,({#'[..],'a,2,6}),quote(({2})*5)  }), ({#'deep_eq,'a,quote(({1})*2+({2})*5+({1})*3)}) })) }),
@@ -2451,7 +2464,37 @@ mixed *tests = ({
             })
         }))
     }),
-    ({ "Lambda: Reseating of mapping entry", 0,
+    ({ "Lambda: Reseating of mapping entry 1", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'b, 11 }),
+            ({#'=, 'm, ({#'([, ({ "Hi", ({#'&,'b}) }) }) }),
+
+            ({#'=, ({#'[,'m,"Hi"}), 33}),
+            ({#'=, ({#'&, ({#'[,'m,"Hi"}) }), 22}),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": 22]) }),
+                ({#'==, 'b, 33})
+            })
+        }))
+    }),
+    ({ "Lambda: Reseating of mapping entry 2", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'b, 11 }),
+            ({#'=, 'm, ({#'([, ({ "Hi", ({#'&,'b}) }) }) }),
+
+            ({#'=, ({#'[,'m,"Hi",0}), 33}),
+            ({#'=, ({#'&, ({#'[,'m,"Hi",0}) }), 22}),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": 22]) }),
+                ({#'==, 'b, 33})
+            })
+        }))
+    }),
+    ({ "Lambda: Reseating of mapping entry 3", 0,
        lambda(0,
         ({#',,
             ({#'=, 'b, 11 }),

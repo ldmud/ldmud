@@ -5140,6 +5140,7 @@ compile_lvalue (svalue_t *argp, int flags)
                     if (current.code_left < 2)
                         realloc_code();
 
+                    current.code_left--;
                     STORE_CODE(current.codep, (flags & MAKE_VAR_LVALUE) ? F_MAP_INDEX_VLVALUE : F_MAP_INDEX_LVALUE);
                     if (flags & PROTECT_LVALUE)
                     {
