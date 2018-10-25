@@ -433,6 +433,60 @@ nosave mixed *tests = ({
             return sprintf("%b",1470) == "10110111110";
        }
     }),
+    ({ "0000868-1", 0,
+       function int ()
+       {
+            return funcall(lambda(0, ({#'+, 3, ({#'return, 2}) }))) == 2;
+       }
+    }),
+    ({ "0000868-2", 0,
+       function int ()
+       {
+            return funcall(lambda(0, ({#'=, ({ #'[, ({#'return, 2 }), 0 }), 10 }))) == 2;
+       }
+    }),
+    ({ "0000868-3", 0,
+       function int ()
+       {
+            return funcall(lambda(0, ({#'foreach, 'x, '({2,4,6}), ({#'return, 'x}) }))) == 2;
+       }
+    }),
+    ({ "0000868-4", 0,
+       function int ()
+       {
+            return funcall(lambda(0, ({#'foreach, ({'x, ({#'[, ({#'return, 2}), 0})}), ([1:'a', 2:'b', 3:'c']), 'x }))) == 2;
+       }
+    }),
+    ({ "0000868-5", 0,
+       function int ()
+       {
+            return funcall(lambda(0, ({#'foreach, 'x,  ({#'return, 2}), 'x }))) == 2;
+       }
+    }),
+    ({ "0000868-6", 0,
+       function int ()
+       {
+            return funcall(lambda(0, ({#'({, 0, 1, ({#'return, 2}), 3}))) == 2;
+       }
+    }),
+    ({ "0000868-7", 0,
+       function int ()
+       {
+            return funcall(lambda(0, ({#'+, 1, ({#'return, ({#'({, 0, 1, ({#'return, 2}) }), }) }))) == 2;
+       }
+    }),
+    ({ "0000868-8", 0,
+       function int ()
+       {
+            return funcall(lambda(0, ({#'+, ([0,1,2,3]), ({(: 0 :), 0, 1, ({#'return, 2}), 3})}))) == 2;
+       }
+    }),
+    ({ "0000868-9", 0,
+       function int ()
+       {
+            return funcall(bind_lambda(unbound_lambda(0, ({#'implode, '({"a","b","c"}), ({#'return, 2})})))) == 2;
+       }
+    }),
 });
 
 void run_test()

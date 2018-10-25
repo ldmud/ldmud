@@ -8216,7 +8216,14 @@ again:
         if (efp > sp)
             fatal("Bad stack at F_RETURN, %"PRIdMPINT" values too low\n"
                  , (mp_int)(efp - sp));
-        else if (efp < sp)
+        /* In lambda closures the F_RETURN can occur anywhere, even in the
+         * middle of an expression, so we allow residual values on the stack
+         * then. The loop below will take care of them anyway.
+         */
+        else if (efp < sp && (current_lambda.type != T_CLOSURE
+              || (current_lambda.x.closure_type != CLOSURE_LAMBDA
+               && current_lambda.x.closure_type != CLOSURE_BOUND_LAMBDA
+               && current_lambda.x.closure_type != CLOSURE_UNBOUND_LAMBDA)))
             fatal("Bad stack at F_RETURN, %"PRIdMPINT" values too high\n"
                  , (mp_int)(sp - efp));
 #endif
