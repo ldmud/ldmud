@@ -246,6 +246,7 @@ AC_MY_ARG_ENABLE(malloc-check,yes,,[Enable simple malloc checks (smalloc,slaball
 AC_MY_ARG_ENABLE(malloc-trace,no,,[Annotate allocations with source file:line])
 AC_MY_ARG_ENABLE(malloc-lpc-trace,no,,[Annotate allocations with LPC object info])
 AC_MY_ARG_ENABLE(malloc-sbrk-trace,no,,[Log all esbrk() calls (smalloc,slaballoc)])
+AC_MY_ARG_ENABLE(malloc-replaceable,no,,[Try to replace system malloc by our own (dangerous!)])
 AC_MY_ARG_ENABLE(dynamic-costs,no,,[Assign eval costs dynamically])
 AC_MY_ARG_ENABLE(eval-cost-trace,no,,[Writes the evaluation costs in the stracktrace])
 AC_MY_ARG_ENABLE(trace-code,yes,,[trace the most recently executed bytecode])
@@ -519,6 +520,7 @@ AC_CDEF_FROM_ENABLE(malloc_check)
 AC_CDEF_FROM_ENABLE(malloc_trace)
 AC_CDEF_FROM_ENABLE(malloc_lpc_trace)
 AC_CDEF_FROM_ENABLE(malloc_sbrk_trace)
+AC_CDEF_FROM_ENABLE(malloc_replaceable)
 AC_CDEF_FROM_ENABLE(dynamic_costs)
 AC_CDEF_FROM_ENABLE(eval_cost_trace)
 AC_CDEF_FROM_ENABLE(trace_code)
@@ -2593,104 +2595,6 @@ AC_RUN_IFELSE([
     [AC_MSG_RESULT([no])]
     )
 
-
-# check if we can replace malloc safely
-SAVE_LIBS="${LIBS}"
-SAVE_CFLAGS="${CFLAGS}"
-CFLAGS=''
-AC_MSG_CHECKING(if we can replace malloc)
-#this is read by the test program
-cat > conftest.data <<EOF
-42
-EOF
-
-for TESTFLAG in '' -static -Bstatic -n; do
-LIBS="${SAVE_LIBS} ${TESTFLAG}"
-AC_RUN_IFELSE([
-    AC_LANG_PROGRAM([
-      AC_INCLUDES_DEFAULT
-      #include <sys/mman.h>
-      [int my_malloc_used;
-      void* malloc(size_t size)
-{
-    my_malloc_used = 1;
-#ifdef HAVE_MMAP
-    size_t ps = sysconf(_SC_PAGESIZE);
-    while (ps < size + sizeof(size_t))
-        ps += sysconf(_SC_PAGESIZE);
-    void *q = mmap(0, ps, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
-#elif defined(SBRK_OK)    
-    size = sizeof size + size+7 & ~7;
-    void *q = sbrk(size);
-    if ((intptr_t)q == -1) exit(1);
-#endif
-    *(size_t *)q = size;
-    return q + sizeof size;
-}
-void* calloc(size_t size, size_t num)
-{
-    void *q;
-    q = malloc(size*num);
-    memset(q, 0, size);
-    return q;
-}
-void* realloc(void *p, size_t size)
-{
-    char *q;
-    if (*(size_t *)p >= size)
-        return p;
-    q = malloc(size);
-    
-    memcpy(q, p, size);
-    
-    *(size_t *)q = size;
-    return q + sizeof size;
-}
-void free(void *p)
-{}
-      ]],
-      [[
-    int i, j; 
-    FILE *f;
-#if !defined(HAVE_MMAP) && !defined(SBRK_OK)
-    exit(1); // malloc not replaceable.
-#endif
-    char *buf = malloc(256);
-    alarm(10); // a crash can be an infinite loop...
-    for (i = 0; i < 100; i++) {
-        my_malloc_used = 0;
-        // strdup seems to be partially unavailable
-        f = fopen("conftest.data", "r");
-        fscanf(f, "%d", &j);
-        /* linking in snprintf called with variable format makes shared libs
-         * worthwhile. Moreover, calling it is a good test
-         */
-        snprintf(buf, 256, f ? "%f%% successful\n" : (char*)f, 100.);        
-        fclose(f);
-        if (!my_malloc_used || j != 6*7)
-            exit(1); // fopen did not use our malloc, not replaceable.
-    }
-    exit(0);
-      ]])],
-    [ac_malloc_replaceable_result=yes
-     if test -z "${TESTFLAG}"; then
-        AC_DEFINE([MALLOC_REPLACEABLE], [1], [Defined if we can replace malloc.])
-    else
-        LDFLAGS="${LDFLAGS} ${TESTFLAG}"
-        EXTRA_CFLAGS="${EXTRA_CFLAGS} -DMALLOC_REPLACEABLE"
-    fi
-    break],
-    ac_malloc_replaceable_result=no,
-    ac_malloc_replaceable_result=no
-    [break]
-    )
-done
-AC_MSG_RESULT($ac_malloc_replaceable_result)
-LIBS="${SAVE_LIBS}"
-CFLAGS="${SAVE_CFLAGS}"
-rm conftest.data
-
-
 case "$EXTRA_CFLAGS" in
  *-Dsolaris*)
   if test "$ac_cv_lib_ucb_main" = "yes"; then
@@ -2790,6 +2694,7 @@ AC_SUBST(cdef_malloc_check)
 AC_SUBST(cdef_malloc_trace)
 AC_SUBST(cdef_malloc_lpc_trace)
 AC_SUBST(cdef_malloc_sbrk_trace)
+AC_SUBST(cdef_malloc_replaceable)
 AC_SUBST(cdef_dynamic_costs)
 AC_SUBST(cdef_eval_cost_trace)
 

@@ -284,6 +284,15 @@
  */
 @cdef_malloc_sbrk_trace@ MALLOC_SBRK_TRACE
 
+/* Shall we try to replace the system malloc with our own?
+ * It is highly system dependent if that works reliably and can easily cause
+ * crashes. Our memory allocator does not meet the requirements of a general
+ * memory allocator. If in doubt do not define this.
+ * However, without it, the reported memory usage misses the memory allocated
+ * by most of the shared libraries we use.
+ */
+@cdef_malloc_replaceable@ MALLOC_REPLACEABLE
+
 /* --- Wizlist --- */
 
 /* Where to save the WIZLIST information.
