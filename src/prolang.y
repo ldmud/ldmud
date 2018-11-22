@@ -7934,7 +7934,7 @@ single_basic_non_void_type:
       L_STATUS       { $$ = lpctype_int;        }
     | L_INT          { $$ = lpctype_int;        }
     | L_BYTES_DECL   { $$ = lpctype_bytes;      }
-    | L_STRING_DECL  { $$ = lpctype_string;     }
+    | L_STRING_DECL  { $$ = pragma_no_bytes_type ? lpctype_string_bytes : lpctype_string; }
     | L_OBJECT       { $$ = lpctype_object;     }
     | L_CLOSURE_DECL { $$ = lpctype_closure;    }
     | L_SYMBOL_DECL  { $$ = lpctype_symbol;     }

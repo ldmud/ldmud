@@ -24,6 +24,10 @@ DESCRIPTION
         save_types: the declaration data is kept after compilation and
                 checked at runtime. This is important for type-safe
                 inheritance.
+        no_bytes_type: removes the keyword 'bytes', also 'string' then
+                denotes the type <string|bytes>.
+        bytes_type: reactivates the keyword 'bytes' and distinguishes
+                between the 'bytes' and 'string' type.
 
         rtt_checks: runtime checks during execution of this program will be
                 enabled. The interpreter will check for correct datatypes of

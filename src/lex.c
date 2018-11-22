@@ -210,6 +210,11 @@ Bool pragma_warn_rtt_checks;
   /* True: emit warnings when doing runtime type checks for this program
    */
 
+bool pragma_no_bytes_type;
+  /* True: 'bytes' will be deactivated as a keyword and 'string'
+   *       means <string|bytes>.
+   */
+
 string_t *last_lex_string;
   /* When lexing string literals, this is the (shared) string lexed
    * so far. It is used to pass string values to lang.c and may be
@@ -3900,6 +3905,64 @@ handle_pragma (char *str)
                 pragma_share_variables = MY_FALSE;
             validPragma = MY_TRUE;
         }
+        else if (strncmp(base, "no_bytes_type", namelen) == 0)
+        {
+            if (!pragma_no_bytes_type)
+            {
+                /* Remove the bytes keyword. */
+                for (ident_t *p = find_shared_identifier_n("bytes", 5, I_TYPE_RESWORD, 0);
+                     p != NULL && p->type >= I_TYPE_RESWORD;
+                     p = p->inferior)
+                {
+                    if (p->type == I_TYPE_RESWORD)
+                    {
+                        free_shared_identifier(p);
+                        break;
+                    }
+                }
+
+                pragma_no_bytes_type = true;
+            }
+
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "bytes_type", namelen) == 0)
+        {
+            if (pragma_no_bytes_type)
+            {
+                /* Restore the bytes keyword. */
+                ident_t *p = make_shared_identifier("bytes", I_TYPE_RESWORD, 0);
+                if (!p)
+                    fatal("Out of memory\n");
+                if (p->type == I_TYPE_UNKNOWN)
+                {
+                    p->type = I_TYPE_RESWORD;
+                    p->u.code = L_BYTES_DECL;
+                }
+                else if (p->type > I_TYPE_RESWORD)
+                {
+                    /* We found a define... We have to insert a new entry below that. */
+                    ident_t *r;
+
+                    /* Remove the define. */
+                    unlink_shared_identifier(p);
+
+                    r = make_shared_identifier("bytes", I_TYPE_RESWORD, 0);
+                    r->type = I_TYPE_RESWORD;
+                    r->u.code = L_BYTES_DECL;
+
+                    /* And reinsert the define. */
+                    assert(ident_table[p->hash] == r);
+                    p->next = r->next;
+                    p->inferior = r;
+                    ident_table[p->hash] = p;
+                }
+
+                pragma_no_bytes_type = false;
+            }
+
+            validPragma = MY_TRUE;
+        }
 #if defined( DEBUG ) && defined ( TRACE_CODE )
         else if (strncmp(base, "set_code_window", namelen) == 0)
         {
@@ -5885,10 +5948,19 @@ start_new_file (int fd, const char * fname)
  */
 
 {
+    ident_t *p;
+
     object_file = fname;
 
     cleanup_source_files();
     free_defines();
+
+    /* Restore the bytes keyword. */
+    p = make_shared_identifier("bytes", I_TYPE_RESWORD, 0);
+    if (!p)
+        fatal("Out of memory\n");
+    p->type = I_TYPE_RESWORD;
+    p->u.code = L_BYTES_DECL;
 
     current_loc.file = new_source_file(fname, NULL);
     current_loc.line = 1; /* already used in first _myfilbuf() */
@@ -5923,6 +5995,7 @@ start_new_file (int fd, const char * fname)
     pragma_share_variables = share_variables;
     pragma_rtt_checks = MY_FALSE;
     pragma_warn_rtt_checks = MY_FALSE;
+    pragma_no_bytes_type = false;
 
     nexpands = 0;
 
