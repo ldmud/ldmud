@@ -1,7 +1,7 @@
 SYNOPSIS
         #include <erq.h>
 
-        int send_erq(int request, string|int * data, closure callback)
+        int send_erq(int request, bytes|int * data, closure callback)
 
 DESCRIPTION
         A request of given type (<request>, default is 0), equipped
@@ -15,8 +15,8 @@ DESCRIPTION
         closure expects the returned data packed into an array of
         integers or as a string.
 
-        <data> may be a string, or an array of integers which are then
-        interpreted as characters.
+        <data> may be a byte sequence, or an array of integers which are
+        then interpreted as bytes.
 
         <callback>, if set, is a closure of either these forms:
 

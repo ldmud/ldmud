@@ -12,4 +12,4 @@ GESCHICHTE
 
 SIEHE AUCH
         get_type_info(E), intp(E), objectp(E), floatp(E), pointerp(E),
-        closurep(E), symbolp(E), stringp(E), mappingp(E)
+        closurep(E), symbolp(E), stringp(E), bytesp(E), mappingp(E)

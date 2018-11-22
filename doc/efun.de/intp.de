@@ -6,4 +6,4 @@ BESCHREIBUNG
 
 SIEHE AUCH
         closurep(E), floatp(E), mappingp(E), objectp(E), pointerp(E),
-        referencep(E), stringp(E), symbolp(E), clonep(E)
+        referencep(E), stringp(E), bytesp(E), symbolp(E), clonep(E)

@@ -1,12 +1,14 @@
 SYNOPSIS
         int sizeof(mixed * val)
         int sizeof(string  val)
+        int sizeof(bytes   val)
         int sizeof(mapping val)
         int sizeof(struct xxx val)
 
 DESCRIPTION
         Returns the number of elements of an array or struct, the number of
-        characters in a string, or the number of keys in a mapping.
+        characters in a string, number of bytes in a byte sequence, or the
+        number of keys in a mapping.
 
         As a special case, the number 0 can be passed, and the function
         will return 0.

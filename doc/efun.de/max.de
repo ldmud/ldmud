@@ -1,9 +1,9 @@
 SYNOPSIS
-        string max(string arg, ...)
-        string max(string *arg)
+        string|bytes max(string|bytes arg, ...)
+        string|bytes max(string|bytes *arg)
 
-        int|float max(int|float arg, ...)
-        int|float max(int|float *arg)
+        int|float    max(int|float arg, ...)
+        int|float    max(int|float *arg)
 
 BESCHREIBUNG
         Die Funktion liefert den groessten Wert aller <arg> und liefert ihn

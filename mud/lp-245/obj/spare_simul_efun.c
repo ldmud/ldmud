@@ -832,7 +832,7 @@ varargs int tail(string file)
 
     if (!stringp(file) || !this_player())
         return 0;
-    string txt = read_bytes(file, -(TAIL_MAX_BYTES + 80), (TAIL_MAX_BYTES + 80));
+    string txt = to_text(read_bytes(file, -(TAIL_MAX_BYTES + 80), (TAIL_MAX_BYTES + 80)), "ASCII");
     if (!stringp(txt))
         return 0;
 

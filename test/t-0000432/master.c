@@ -65,7 +65,7 @@ void run_test()
         }),
         ({ "Byte index", 0,
             (:
-                string str = to_bytes("\u2160\u2161\u2162\u2163\u2164", "utf-8");
+                bytes str = to_bytes("\u2160\u2161\u2162\u2163\u2164", "utf-8");
                 return str[3] == 226;
             :)
         }),
@@ -150,7 +150,8 @@ void run_test()
         }),
         ({ "String vs. Byte comparison", 0,
             (:
-                return "ABC" != to_bytes("ABC", "ASCII");
+                mixed abc = "ABC";
+                return abc != to_bytes("ABC", "ASCII");
             :)
         }),
         ({ "String range lvalue 1", 0,
@@ -462,13 +463,13 @@ void run_test()
         }),
         ({ "sprintf with byte range", 0,
             (:
-                string str = to_bytes("\u201e\u2135\u201d", "UTF-8");
+                bytes str = to_bytes("\u201e\u2135\u201d", "UTF-8");
                 return sprintf("%Q", &(str[3..5])) == "\"\\xe2\\x84\\xb5\"";
             :)
         }),
         ({ "sprintf with byte lvalue", 0,
             (:
-                string str = to_bytes("\u201e\u2135\u201d", "UTF-8");
+                bytes str = to_bytes("\u201e\u2135\u201d", "UTF-8");
                 return sprintf("%Q", &(str[3])) == "226";
             :)
         }),
@@ -561,7 +562,7 @@ void run_test()
         }),
         ({ "write_bytes", 0,
             (:
-                string str;
+                bytes str;
 
                 write_file("/test.bin", "", 1);
                 write_bytes("/test.bin", 0, to_bytes(({0,1,2,3,4,5})));

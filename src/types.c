@@ -23,6 +23,7 @@ lpctype_t _lpctype_closure      = { 0, { TCLASS_PRIMARY, true }, {TYPE_CLOSURE},
 lpctype_t _lpctype_symbol       = { 0, { TCLASS_PRIMARY, true }, {TYPE_SYMBOL},       NULL, NULL };
 lpctype_t _lpctype_quoted_array = { 0, { TCLASS_PRIMARY, true }, {TYPE_QUOTED_ARRAY}, NULL, NULL };
 lpctype_t _lpctype_void         = { 0, { TCLASS_PRIMARY, true }, {TYPE_VOID},         NULL, NULL };
+lpctype_t _lpctype_bytes        = { 0, { TCLASS_PRIMARY, true }, {TYPE_BYTES},        NULL, NULL };
 lpctype_t _lpctype_unknown      = { 0, { TCLASS_PRIMARY, true }, {TYPE_UNKNOWN},      NULL, NULL };
 lpctype_t _lpctype_any_struct   = { 0, { TCLASS_STRUCT,  true }, {.t_struct = {NULL, NULL}},  NULL, NULL };
 
@@ -38,6 +39,7 @@ lpctype_t *lpctype_symbol       = &_lpctype_symbol;
 lpctype_t *lpctype_quoted_array = &_lpctype_quoted_array;
 lpctype_t *lpctype_any_struct   = &_lpctype_any_struct;
 lpctype_t *lpctype_void         = &_lpctype_void;
+lpctype_t *lpctype_bytes        = &_lpctype_bytes;
 lpctype_t *lpctype_unknown      = &_lpctype_unknown;
 
 /*-------------------------------------------------------------------------*/

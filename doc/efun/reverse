@@ -1,12 +1,14 @@
 SYNOPSIS
         int     reverse(int arg)
         string  reverse(string arg)
+        bytes   reverse(bytes arg)
         mixed * reverse(mixed * arg)
         mixed * reverse(mixed * & arg)
 
 DESCRIPTION
-        Reverse the content of array or string <arg> and return the result.
-        If <arg> is an integer, the bits in the integer are reversed.
+        Reverse the content of array, string or byte sequence <arg> and
+        return the result. If <arg> is an integer, the bits in the
+        integer are reversed.
 
         If called in the reference variant, the argument array itself
         is reversed and then returned.

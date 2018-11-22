@@ -2,11 +2,14 @@ SYNOPSIS
         #include <tls.h>
 
         string hash(int method, string arg [, int iterations ] )
+        string hash(int method, bytes  arg [, int iterations ] )
         string hash(int method, int *  arg [, int iterations ] )
 
 DESCRIPTION
         Calculate the hash from <arg> as determined by <method>. The hash is
         calculated with <iterations> iterations, default is 1 iteration.
+        If <arg> is a string, it will be converted to a UTF-8 byte sequence
+        of which then the hash will be created.
 
         <method> is one of the TLS_HASH_ constants defined in tls.h; not
         all recognized methods may be supported for a given driven:

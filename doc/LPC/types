@@ -82,6 +82,9 @@ DESCRIPTION
                 compiled. String literals joined with '+' are
                 concatenated by the LPC compiler as well.
 
+    o bytes     Byte sequences are similar to strings. They offer
+                the same operations, but cannot be mixed with strings.
+
     o object    Pointer to an object. Objects are always passed by
                 reference.
 

@@ -1,13 +1,14 @@
 SYNOPSIS
         int sizeof(mixed * val)
         int sizeof(string  val)
+        int sizeof(bytes   val)
         int sizeof(mapping val)
         int sizeof(struct xxx val)
 
 BESCHREIBUNG
         Liefert die Anzahl Elemente in einem Array <val>, die Anzahl
-        Zeichen in einem String <val> oder die Anzal Keys in einem Mapping
-        <val>.
+        Zeichen in einem String <val>, die Anzahl an Bytes in der
+        Bytefolge <val> oder die Anzal Keys in einem Mapping <val>.
 
         Als Spezialfall kann <val> auch 0 sein. In diesem Fall liefert die
         Funktion 0 zurueck.

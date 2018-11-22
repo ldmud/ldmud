@@ -982,13 +982,17 @@ static const char * compiled_file;
 
 static bool _lpctypes_initialized = false;
 lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_float,
-          _lpctype_int_array,     _lpctype_string_array, _lpctype_object_array;
+          _lpctype_int_array,     _lpctype_string_array, _lpctype_object_array,
+          _lpctype_bytes_array,   _lpctype_string_bytes, _lpctype_string_bytes_array;
 lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_any_array     = &_lpctype_any_array,
           *lpctype_int_float     = &_lpctype_int_float,
           *lpctype_int_array     = &_lpctype_int_array,
           *lpctype_string_array  = &_lpctype_string_array,
-          *lpctype_object_array  = &_lpctype_object_array;
+          *lpctype_object_array  = &_lpctype_object_array,
+          *lpctype_bytes_array   = &_lpctype_bytes_array,
+          *lpctype_string_bytes  = &_lpctype_string_bytes,
+          *lpctype_string_bytes_array = &_lpctype_string_bytes_array;
 
 
 /*-------------------------------------------------------------------------*/
@@ -1429,7 +1433,7 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
 {
     static char *type_name[] = { "unknown", "int", "string", "void",
                                  "object", "mapping", "float", "mixed",
-                                 "closure", "symbol", "quoted_array", "struct" };
+                                 "closure", "symbol", "quoted_array", "bytes" };
 
     if (bufsize <= 0)
         return 0;
@@ -1904,6 +1908,7 @@ binary_op_types_t types_add_assignment[] = {
     { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
     { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                  },
     { &_lpctype_string,    &_lpctype_float,     &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
     { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
     { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_union_array_type , NULL                  },
@@ -1915,6 +1920,7 @@ binary_op_types_t types_add_assignment[] = {
  */
 binary_op_types_t types_sub_assignment[] = {
     { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
     { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
     { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
@@ -1928,6 +1934,7 @@ binary_op_types_t types_mul_assignment[] = {
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
     { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
     { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_bytes,     &_lpctype_int,       &_lpctype_bytes,   NULL                  , NULL                  },
     { &_lpctype_any_array, &_lpctype_int,       NULL,              &get_first_type       , NULL                  },
     { NULL, NULL, NULL, NULL, NULL }
 };
@@ -1949,6 +1956,7 @@ binary_op_types_t types_binary_and_assignment[] = {
     { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_common_type      , NULL                  },
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
     { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
     { NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -1970,6 +1978,7 @@ binary_op_types_t types_binary_and[] = {
     { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_common_type      , NULL                  },
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
     { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
     { NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -1997,6 +2006,7 @@ binary_op_types_t types_addition[] = {
     { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
     { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                  },
     { &_lpctype_string,    &_lpctype_float,     &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
     { &_lpctype_int,       &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
     { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                  },
@@ -2011,6 +2021,7 @@ binary_op_types_t types_addition[] = {
  */
 binary_op_types_t types_subtraction[] = {
     { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
     { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                  },
     { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
@@ -2025,9 +2036,11 @@ binary_op_types_t types_multiplication[] = {
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
     { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                  },
     { &_lpctype_int,       &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_int,       &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
     { &_lpctype_int,       &_lpctype_any_array, NULL,              &get_second_type      , NULL                  },
     { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
     { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                  },
+    { &_lpctype_bytes,     &_lpctype_int,       &_lpctype_bytes,   NULL                  , NULL                  },
     { &_lpctype_any_array, &_lpctype_int,       NULL,              &get_first_type       , NULL                  },
     { NULL, NULL, NULL, NULL, NULL }
 };
@@ -2060,6 +2073,7 @@ unary_op_types_t types_unary_math[] = {
  */
 unary_op_types_t types_range_index[] = {
     { &_lpctype_string,                         &_lpctype_string,  NULL                  },
+    { &_lpctype_bytes,                          &_lpctype_bytes,   NULL                  },
     { &_lpctype_any_array,                      NULL,              &get_argument_type    },
     { NULL, NULL, NULL }
 };
@@ -2364,6 +2378,7 @@ get_index_result_type (lpctype_t* aggregate, fulltype_t index, int inst, lpctype
                 return ref_lpctype(member);
 
             case TYPE_STRING:
+            case TYPE_BYTES:
                 if (can_be_array_or_string)
                 {
                     /* Indexing a string, add int to the result. */
@@ -6603,6 +6618,7 @@ delete_prog_string (void)
 %token L_ASSIGN
 %token L_ARROW
 %token L_BREAK
+%token L_BYTES_DECL
 %token L_CASE
 %token L_CATCH
 %token L_CLOSURE
@@ -7917,6 +7933,7 @@ basic_non_void_type:
 single_basic_non_void_type:
       L_STATUS       { $$ = lpctype_int;        }
     | L_INT          { $$ = lpctype_int;        }
+    | L_BYTES_DECL   { $$ = lpctype_bytes;      }
     | L_STRING_DECL  { $$ = lpctype_string;     }
     | L_OBJECT       { $$ = lpctype_object;     }
     | L_CLOSURE_DECL { $$ = lpctype_closure;    }
@@ -9241,6 +9258,7 @@ foreach_expr:
           if (!has_common_type(lpctype_any_array, dtype)
            && !has_common_type(lpctype_any_struct, dtype)
            && !lpctype_contains(lpctype_string, dtype)
+           && !lpctype_contains(lpctype_bytes, dtype)
            && !lpctype_contains(lpctype_mapping, dtype)
            && (gen_refs || !lpctype_contains(lpctype_int, dtype))
            && (exact_types || dtype != lpctype_unknown)
@@ -16638,12 +16656,15 @@ prolog (const char * fname, Bool isMasterObj)
 
     if (!_lpctypes_initialized)
     {
-        make_static_type(get_array_type(lpctype_unknown),            &_lpctype_unknown_array);
-        make_static_type(get_array_type(lpctype_mixed),              &_lpctype_any_array);
-        make_static_type(get_union_type(lpctype_int, lpctype_float), &_lpctype_int_float);
-        make_static_type(get_array_type(lpctype_int),                &_lpctype_int_array);
-        make_static_type(get_array_type(lpctype_string),             &_lpctype_string_array);
-        make_static_type(get_array_type(lpctype_object),             &_lpctype_object_array);
+        make_static_type(get_array_type(lpctype_unknown),               &_lpctype_unknown_array);
+        make_static_type(get_array_type(lpctype_mixed),                 &_lpctype_any_array);
+        make_static_type(get_union_type(lpctype_int, lpctype_float),    &_lpctype_int_float);
+        make_static_type(get_array_type(lpctype_int),                   &_lpctype_int_array);
+        make_static_type(get_array_type(lpctype_string),                &_lpctype_string_array);
+        make_static_type(get_array_type(lpctype_object),                &_lpctype_object_array);
+        make_static_type(get_array_type(lpctype_bytes),                 &_lpctype_bytes_array);
+        make_static_type(get_union_type(lpctype_string, lpctype_bytes), &_lpctype_string_bytes);
+        make_static_type(get_array_type(lpctype_string_bytes),          &_lpctype_string_bytes_array);
 
         _lpctypes_initialized = true;
     }
@@ -17631,6 +17652,9 @@ clear_compiler_refs (void)
     clear_lpctype_ref(lpctype_int_array);
     clear_lpctype_ref(lpctype_string_array);
     clear_lpctype_ref(lpctype_object_array);
+    clear_lpctype_ref(lpctype_bytes_array);
+    clear_lpctype_ref(lpctype_string_bytes);
+    clear_lpctype_ref(lpctype_string_bytes_array);
 }
 
 void
@@ -17651,6 +17675,9 @@ count_compiler_refs (void)
     count_lpctype_ref(lpctype_int_array);
     count_lpctype_ref(lpctype_string_array);
     count_lpctype_ref(lpctype_object_array);
+    count_lpctype_ref(lpctype_bytes_array);
+    count_lpctype_ref(lpctype_string_bytes);
+    count_lpctype_ref(lpctype_string_bytes_array);
 }
 
 #endif

@@ -1,10 +1,13 @@
 SYNOPSIS
         string * explode(string str, string del)
+        bytes *  explode(bytes str, bytes del)
 
 BESCHREIBUNG
         Liefert ein Feld (Array) mit Zeichenketten (Strings), indem alle
         Vorkommen von del (delimiter = Trenner) aus str herausgeschnitten
-        werden und so str in mehrere Zeichenketten zerlegt wird.
+        werden und so str in mehrere Zeichenketten zerlegt wird. Falls
+        eine Bytefolge uebergeben wurde, so wird diese in gleicher Weise
+        zerschnitten und zurueckgegeben.
 
         implode(explode(str, del), del) == str ist immer wahr.
 

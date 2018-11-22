@@ -1,9 +1,9 @@
 SYNOPSIS
-        string    max(string arg, ...)
-        string    max(string *arg_array)
+        string|bytes max(string|bytes arg, ...)
+        string|bytes max(string|bytes *arg_array)
 
-        int|float max(int|float arg, ...)
-        int|float max(int|float *arg_array)
+        int|float    max(int|float arg, ...)
+        int|float    max(int|float *arg_array)
 
 DESCRIPTION
         Determaxe the maximum value of the <arg>uments and return it.

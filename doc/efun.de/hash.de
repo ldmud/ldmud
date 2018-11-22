@@ -2,12 +2,15 @@ SYNOPSIS
         #include <tls.h>
 
         string hash(int method, string arg [, int iterations ] )
+        string hash(int method, bytes  arg [, int iterations ] )
         string hash(int method, int *  arg [, int iterations ] )
 
 BESCHREIBUNG
         Berechne den Hash <method> vom Argument <arg>. Der Hash wird
         mit <iterations> Wiederholungen berechnet, wird der Wert weggelassen,
-        wird eine Wiederholung verwendet.
+        wird eine Wiederholung verwendet. Falls ein String als <arg>
+        uebergeben wurde, so wird dieser in eine UTF-8-Bytefolge konvertiert
+        und davon der Hash berechnet.
 
         <method> ist eine der TLS_HASH_-Konstanten in tls.h; nicht jede
         beschriebene Methode ist in einem gegebenen Driver vorhanden:

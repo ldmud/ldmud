@@ -269,7 +269,7 @@
   /* Maximum number of functions and tokens we care to handle.
    */
 
-#define MAX_ARGTYPES  500
+#define MAX_ARGTYPES  1000
   /* Size of the arg_types[] array.
    */
 
@@ -661,7 +661,7 @@ check_for_duplicate_string (const char *key, const char *buf)
 
 %token NAME ID
 
-%token VOID INT STRING BYTES OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
+%token VOID INT STRING BYTES BYTES_OR_STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
 %token MIXED UNKNOWN NUL STRUCT
 
 %token DEFAULT
@@ -680,7 +680,7 @@ check_for_duplicate_string (const char *key, const char *buf)
   /* Value is the appropriate bitflag or 0.
    */
 
-%type <number> type
+%type <number> type basic_utype utype
   /* Value is the complete type, incl. *-  and &-modifier bitflags
    */
 
@@ -772,7 +772,7 @@ optional_ID:   ID
 optional_default:   DEFAULT ':' ID { $$ = $3; }
                   | /* empty */    { $$ = "0"; } ;
 
-func: type ID optional_ID '(' arg_list optional_default ')' optional_name ';'
+func: utype ID optional_ID '(' arg_list optional_default ')' optional_name ';'
     {
         char buff[500];
         char *f_name;
@@ -985,6 +985,12 @@ arg_list: /* empty */             { $$ = 0; }
         | typel2                  { $$ = 1; if ($1) min_arg = 0; }
         | arg_list ',' typel2     { $$ = $1 + 1; if ($3) min_arg = $$ - 1; } ;
 
+basic_utype: basic
+           | STRING '|' BYTES     { $$ = BYTES_OR_STRING; };
+           | BYTES  '|' STRING    { $$ = BYTES_OR_STRING; };
+
+utype: basic_utype opt_star opt_ref  { $$ = $1 | $2 | $3; };
+
 typel2: typel
     {
         $$ = $1;
@@ -999,28 +1005,7 @@ typel2: typel
 
 arg_type: type
     {
-        if (($1 & ~(MF_TYPE_MOD_POINTER|MF_TYPE_MOD_REFERENCE)) == BYTES)
-        {
-            // In curr_arg_types we record this as STRING (&/*).
-            int pos = curr_arg_type_size;
-            int newtype = STRING | ($1 & (MF_TYPE_MOD_POINTER|MF_TYPE_MOD_REFERENCE));
-
-            while (pos-- && curr_arg_types[pos])
-            {
-                if (curr_arg_types[pos] == newtype)
-                    break;
-            }
-
-            if (!curr_arg_types[pos])
-            {
-                curr_arg_types[curr_arg_type_size++] = newtype;
-                if (curr_arg_type_size == NELEMS(curr_arg_types))
-                    yyerror("Too many arguments");
-            }
-
-            curr_lpc_types[curr_lpc_type_size] |= type2flag($1);
-        }
-        else if ($1 != VOID)
+        if ($1 != VOID)
         {
             if ($1 != NUL)
                 curr_arg_types[curr_arg_type_size++] = $1;
@@ -2486,6 +2471,9 @@ lpctypestr (int n)
     switch(n) {
       case VOID:    p = "&_lpctype_void";         break;
       case STRING:  p = "&_lpctype_string";       break;
+      case BYTES:   p = "&_lpctype_bytes";        break;
+      case BYTES_OR_STRING:
+                    p = "&_lpctype_string_bytes"; break;
       case INT:     p = "&_lpctype_int";          break;
       case OBJECT:  p = "&_lpctype_object";       break;
       case MAPPING: p = "&_lpctype_mapping";      break;
@@ -2504,6 +2492,11 @@ lpctypestr (int n)
                     p = "&_lpctype_int_array";    break;
       case MF_TYPE_MOD_POINTER|STRING:
                     p = "&_lpctype_string_array"; break;
+      case MF_TYPE_MOD_POINTER|BYTES:
+                    p = "&_lpctype_bytes_array";  break;
+      case MF_TYPE_MOD_POINTER|BYTES_OR_STRING:
+                    p = "&_lpctype_string_bytes_array";
+                                                  break;
       case MF_TYPE_MOD_POINTER|OBJECT:
                     p = "&_lpctype_object_array"; break;
 

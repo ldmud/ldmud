@@ -1,6 +1,8 @@
 SYNOPSIS
         string crypt(string str, int seed)
         string crypt(string str, string seed)
+        string crypt(bytes str, int seed)
+        string crypt(bytes str, string seed)
 
 DESCRIPTION
         Crypt the string <str> the first two characters

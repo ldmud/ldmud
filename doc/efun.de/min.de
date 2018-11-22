@@ -1,8 +1,8 @@
 SYNOPSIS
-        string    min(string arg, ... )
-        string    min(string *arg_array)
-        int|float min(int|float arg, ...)
-        int|float min(int|float *arg_array)
+        string|bytes min(string|bytes arg, ... )
+        string|bytes min(string|bytes *arg_array)
+        int|float    min(int|float arg, ...)
+        int|float    min(int|float *arg_array)
 
 BESCHREIBUNG
         Liefert das kleinste der Argumente <arg>. Wenn min() fuer ein

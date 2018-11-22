@@ -255,6 +255,7 @@ int     objectp(mixed);
 int     pointerp(mixed);
 int     referencep(mixed &);
 int     stringp(mixed);
+int     bytesp(mixed);
 int     structp(mixed);
 int     symbolp(mixed);
 int     typeof(mixed|mixed &);
@@ -332,7 +333,7 @@ mixed  *to_array(string|bytes|mixed*|symbol|quoted_array|struct);
 mixed   to_struct(mapping|mixed*|struct, void|struct);
 object  to_object(null|object|string|closure);
 
-string  to_bytes(string|bytes|int*, void|string);
+bytes   to_bytes(string|bytes|int*, void|string);
 string  to_text(string|bytes|int*, void|string);
 
 mixed  *struct_info(struct, int);
@@ -366,15 +367,15 @@ void    set_extra_wizinfo(null|object|string, mixed);
 
 string  capitalize(string);
 string  crypt(string|bytes, string|int default: F_CONST0);
-string *explode(string|bytes, string|bytes);
+string|bytes *explode(string|bytes, string|bytes);
 #ifdef HAS_IDN
 string  idna_stringprep(string, int, int default: F_CONST0);
 string  idna_to_ascii(string);
 string  idna_to_unicode(string);
 #endif
-string  implode(string *|bytes *, string|bytes);
+string|bytes implode(string *|bytes *, string|bytes);
 string  lower_case(string);
-string  make_shared_string(string|bytes) "no longer useful";
+string|bytes make_shared_string(string|bytes) "no longer useful";
 string  md5(int*|string|bytes, void|int) "obsoleted by hash";
 string  md5_crypt(string|bytes, string|int default: F_CONST0);
 string  hash(int, string|bytes|int *, void|int);
@@ -513,14 +514,14 @@ int     binary_message(int *|bytes, int default: F_CONST0);
 
 int     net_connect(string, int);
 
-int     send_udp(string, int, string|int*);
+int     send_udp(string, int, bytes|int*);
 
 void    write(mixed);
 object *users();
 
 #ifdef ERQ_DEMON
 int     attach_erq_demon(object|string, int default: F_CONST0);
-int     send_erq(int, int*|string, null|closure default: F_CONST0);
+int     send_erq(int, int*|bytes, null|closure default: F_CONST0);
 #endif
 
 
@@ -530,7 +531,7 @@ int     copy_file(string, string);
 int     file_size(string);
 mixed  *get_dir(string, int default: F_CONST1);
 int     mkdir(string);
-string  read_bytes(string, void|int, void|int);
+bytes   read_bytes(string, void|int, void|int);
 string  read_file(string, void|int, void|int);
 int     rename(string, string);
 int     rm(string);

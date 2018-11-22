@@ -2,11 +2,16 @@ SYNOPSIS
         #include <tls.h>
 
         string hmac(int method, string key, string arg )
+        string hmac(int method, string key, bytes  arg )
         string hmac(int method, string key, int *  arg )
+        string hmac(int method, bytes  key, string arg )
+        string hmac(int method, bytes  key, bytes  arg )
+        string hmac(int method, bytes  key, int *  arg )
 
 BESCHREIBUNG
         Berechnet den Hashed Message Authenication Code fuer <arg>
-        nach Methode <method> und fuer das Password <key>.
+        nach Methode <method> und fuer das Password <key>. Strings
+        werden zuvor in eine UTF-8-Bytefolge konvertiert.
 
         <method> ist eine der TLS_HASH_-Konstanten in tls.h; nicht jede
         beschriebene Methode ist in einem gegebenen Driver vorhanden:

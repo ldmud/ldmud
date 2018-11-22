@@ -44,6 +44,11 @@ DESCRIPTION
         output character can not be converted to/from the configured
         encoding it will be silently discarded.
 
+        -- ERQ / UDP --
+
+        Only byte sequences can be sent to the ERQ or via UDP,
+        and only byte sequences can be received from them.
+
 HISTORY
         Introduced in LDMud 3.6.
 

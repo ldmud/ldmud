@@ -1,6 +1,8 @@
 SYNOPSIS
         string md5_crypt(string str, int seed)
         string md5_crypt(string str, string seed)
+        string md5_crypt(bytes  str, int seed)
+        string md5_crypt(bytes  str, string seed)
 
 BESCHREIBUNG
         Verschluesselt den String <str> mit dem Schluessel <seed>.

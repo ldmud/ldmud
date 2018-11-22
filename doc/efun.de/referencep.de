@@ -9,5 +9,5 @@ BESCHREIBUNG
         uebergeben werden muss, z. B. referencep(&x).
 
 SIEHE AUCH
-        closurep(E), floatp(E), mappingp(E), objectp(E), intp(E),
+        bytesp(E), closurep(E), floatp(E), mappingp(E), objectp(E), intp(E),
         pointerp(E), stringp(E), symbolp(E), clonep(E), references(LPC)

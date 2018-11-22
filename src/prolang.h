@@ -26,9 +26,11 @@ struct lvalue_block_s
 /* --- Variables --- */
 
 extern lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_float,
-                 _lpctype_int_array,     _lpctype_string_array, _lpctype_object_array;
+                 _lpctype_int_array,     _lpctype_string_array, _lpctype_object_array,
+                 _lpctype_bytes_array,   _lpctype_string_bytes, _lpctype_string_bytes_array;
 extern lpctype_t *lpctype_unknown_array, *lpctype_any_array,    *lpctype_int_float,
-                 *lpctype_int_array,     *lpctype_string_array, *lpctype_object_array;
+                 *lpctype_int_array,     *lpctype_string_array, *lpctype_object_array,
+                 *lpctype_bytes_array,   *lpctype_string_bytes, *lpctype_string_bytes_array;
 
 extern int yychar;
 extern int32 current_id_number;

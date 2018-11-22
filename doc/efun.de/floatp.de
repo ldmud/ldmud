@@ -6,5 +6,5 @@ BESCHREIBUNG
         ansonsten 0.
 
 SIEHE AUCH
-        intp(E), mappingp(E), stringp(E), closurep(E), objectp(E),
-        referencep(E), pointerp(E), symbolp(E), clonep(E)
+        intp(E), mappingp(E), stringp(E), bytesp(E), closurep(E),
+        objectp(E), referencep(E), pointerp(E), symbolp(E), clonep(E)

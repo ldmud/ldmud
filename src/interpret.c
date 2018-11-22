@@ -452,7 +452,7 @@ static const char * svalue_typename[]
  = { /* T_INVALID */  "invalid"
    , /* T_LVALUE  */  "lvalue"
    , /* T_NUMBER  */  "number"
-   , /* T_STRING  */  "text string"
+   , /* T_STRING  */  "string"
    , /* T_POINTER */  "array"
    , /* T_OBJECT  */  "object"
    , /* T_MAPPING */  "mapping"
@@ -465,7 +465,7 @@ static const char * svalue_typename[]
    , /* T_ERROR_HANDLER */  "error-handler"
    , /* T_BREAK_ADDR */     "break-address"
    , /* T_NULL */           "null"
-   , /* T_BYTES */          "byte string"
+   , /* T_BYTES */          "bytes"
    };
 
 /*-------------------------------------------------------------------------*/
@@ -4169,8 +4169,8 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc, bool 
     if (i->type == T_SYMBOL || i->type == T_STRING)
     {
         if (i->type == T_STRING && i->u.str->info.unicode == STRING_BYTES)
-            ERRORF(("Illegal struct '%s'->(): got byte string, "
-                    "expected number/text string/symbol.\n"
+            ERRORF(("Illegal struct '%s'->(): got bytes, "
+                    "expected number/string/symbol.\n"
                    , get_txt(struct_name(st))
                    ));
 
@@ -5787,15 +5787,15 @@ efun_arg_typename (long type)
                     break;
                 case TF_STRING:
                     if (result[0] != '\0')
-                        strcat(result, "/text string");
+                        strcat(result, "/string");
                     else
-                        strcat(result, "text string");
+                        strcat(result, "string");
                     break;
                 case TF_BYTES:
                     if (result[0] != '\0')
-                        strcat(result, "/byte string");
+                        strcat(result, "/bytes");
                     else
-                        strcat(result, "byte string");
+                        strcat(result, "bytes");
                     break;
             }
             type &= ~(TF_STRING|TF_BYTES);
@@ -6197,7 +6197,10 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
             return MY_FALSE;
 
         case T_STRING:
-            valuetype = lpctype_string;
+            if (bsvp->u.str->info.unicode == STRING_BYTES)
+                valuetype = lpctype_bytes;
+            else
+                valuetype = lpctype_string;
             break;
 
         case T_POINTER:
@@ -9933,6 +9936,7 @@ again:
          * Possible type combinations:
          *   string      + (string,int,float) -> string
          *   (int,float) + string             -> string
+         *   bytes       + bytes              -> bytes
          *   int         + int                -> int
          *   float       + (int,float)        -> float
          *   int         + float              -> float
@@ -10226,6 +10230,7 @@ again:
          *   float       - (int,float)        -> float
          *   int         - float              -> float
          *   string      - string             -> string
+         *   bytes       - bytes              -> bytes
          *   vector      - vector             -> vector
          *   mapping     - mapping            -> mapping
          */
@@ -10361,6 +10366,8 @@ again:
          *   int         * float              -> float
          *   string      * int                -> string
          *   int         * string             -> string
+         *   bytes       * int                -> bytes
+         *   int         * bytes              -> bytes
          *   array       * int                -> array
          *   int         * array              -> array
          */
@@ -11173,6 +11180,7 @@ again:
          * Possible type combinations:
          *   int    & int    -> int
          *   string & string -> string
+         *   bytes  & bytes  -> bytes
          *   vector & vector -> vector
          *   vector & mapping  -> vector
          *   mapping & vector  -> mapping
@@ -11446,6 +11454,7 @@ again:
          *
          * Possible type combinations:
          *   string       + (string,int,float) -> string
+         *   bytes        + bytes              -> bytes
          *   int          + string             -> string
          *   int          + int                -> int
          *   int          + float              -> float
@@ -11775,6 +11784,7 @@ again:
          *   float       - (float,int)        -> float
          *   int         - float              -> float
          *   string      - string             -> string
+         *   bytes       - bytes              -> bytes
          *   vector      - vector             -> vector
          *   mapping     - mapping            -> mapping
          */
@@ -12022,6 +12032,7 @@ again:
          *   float       * (float,int)        -> float
          *   int         * float              -> float
          *   string      * int                -> string
+         *   bytes       * int                -> bytes
          *   array       * int                -> array
          *
          * TODO: Extend this to mappings.
@@ -12568,6 +12579,7 @@ again:
          * Possible type combinations:
          *   int    & int    -> int
          *   string & string -> string
+         *   bytes  & bytes  -> bytes
          *   array  & array  -> array
          *   array  & mapping -> array
          *   mapping & array -> mapping
@@ -15811,6 +15823,23 @@ again:
         break;
     }
 
+    CASE(F_BYTESP);                 /* --- bytesp              --- */
+    {
+        /* EFUN bytesp()
+         *
+         *   int bytesp(mixed)
+         *
+         * Returns 1 if the argument are bytes.
+         */
+
+        int i;
+
+        i = sp->type == T_BYTES;
+        free_svalue(sp);
+        put_number(sp, i);
+        break;
+    }
+
     CASE(F_STRUCTP);                /* --- structp             --- */
     {
         /* EFUN structp()
@@ -16176,7 +16205,7 @@ again:
                 {
                     if (item->u.str->info.unicode == STRING_BYTES)
                         ERRORF(("Bad arg for call_other() at index %"PRIdMPINT": "
-                                "got byte string, expected text string/object\n"
+                                "got bytes, expected string/object\n"
                                , (mp_int)(svp - arg->u.vec->item)
                                ));
 

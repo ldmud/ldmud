@@ -1,5 +1,5 @@
 SYNOPSIS
-        string read_bytes(string file, int start, int number)
+        bytes read_bytes(string file, int start, int number)
 
 DESCRIPTION
         Reads a given amount of bytes from file.

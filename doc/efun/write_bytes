@@ -1,5 +1,5 @@
 SYNOPSIS
-        int write_bytes(string file, int start, string str)
+        int write_bytes(string file, int start, bytes str)
 
 DESCRIPTION
         Write string str to file file by overwriting the old bytes at

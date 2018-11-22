@@ -1,5 +1,6 @@
 SYNOPSIS
         mixed * to_array(string)
+        mixed * to_array(bytes)
         mixed * to_array(symbol)
         mixed * to_array(quotedarray)
         mixed * to_array(mixed *)
@@ -12,6 +13,8 @@ DESCRIPTION
         consists of the args characters. Note that the string "12" will be
         converted to the array ({ 33, 34 }), and not ({ 33, 34, 0 }) (the
         LDMud versions prior to 3.3 returned the latter array).
+
+        Byte sequences are converted into an array of these bytes.
 
         Quoted arrays are ``dequoted'', and arrays are left as they
         are.

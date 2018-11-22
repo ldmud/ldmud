@@ -1,11 +1,15 @@
 SYNOPSIS
         string sha1(string arg [, int iterations])
+        string sha1(bytes  arg [, int iterations])
         string sha1(int *  arg [, int iterations])
 
 BESCHREIBUNG
         Berechnet den SHA1-Hashwert von <arg>.
-        Das Argument kann ein String, oder ein Array von Zahlen sein (von
-        welchen nur das unterste Byte betrachted wird).
+        Das Argument kann ein String, eine Bytefolge oder ein Array von
+        Zahlen sein (die als Folge von Bytes betrachtet wird, wobei
+        immer nur die untersten 8 Bits Verwendung finden). Falls ein String
+        uebergeben wurde, so wird dieser in eine UTF-8-Bytefolge konvertiert
+        und davon der Hash berechnet.
 
         Ist das <iterations> Argument eine Zahl groesser 0, berechnet der
         Driver den Digest mit diese Anzahl an Wiederholungen. Fehlt die

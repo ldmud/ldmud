@@ -1,12 +1,13 @@
 SYNOPSIS
         int member(mixed *array, mixed elem [, int start])
         int member(string s, int elem [, int start])
+        int member(bytes s, int elem [, int start])
         int member(mapping map, mixed key)
 
 BESCHREIBUNG
-        Fuer Arrays und String liefert member() den Index des ersten
-        Auftretens von <elem> in <arg>. Ist <elem> nicht in <arg> enthalten,
-        wird -1 zurueck gegeben.
+        Fuer Arrays, String und Bytefolgen liefert member() den Index
+        des ersten Auftretens von <elem> in <arg>. Ist <elem> nicht
+        in <arg> enthalten, wird -1 zurueck gegeben.
 
         Ist <start> als Zahl >= 0 gegeben, beginnt die Suche ab der
         angegebenen Position. Eine Startposition groesser als die

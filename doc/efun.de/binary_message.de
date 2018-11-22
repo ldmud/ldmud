@@ -1,6 +1,6 @@
 GESCHUETZT
 SYNOPSIS
-        int binary_message(int *|string messages, int flags)
+        int binary_message(int *|bytes messages, int flags)
 
 BESCHREIBUNG
         Liest den Output aus und sendet diesen direkt mit write() OHNE IAC

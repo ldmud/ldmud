@@ -1,9 +1,11 @@
 SYNOPSIS
-        string implode(mixed *arr, string del)
+        string implode(string *arr, string del)
+        bytes implode(bytes *arr, bytes del)
 
 DESCRIPTION
         Concatenate all strings found in array arr, with the string
         del between each element. Only strings are used from the array.
+        Works similar with arrays of byte sequences.
 
 EXAMPLES
         function                                        returns

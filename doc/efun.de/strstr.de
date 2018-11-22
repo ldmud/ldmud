@@ -1,6 +1,8 @@
 SYNOPSIS
         int strstr(string str, string muster)
         int strstr(string str, string muster, int pos)
+        int strstr(bytes  str, bytes  muster)
+        int strstr(bytes  str, bytes  muster, int pos)
 
 BESCHREIBUNG
         Liefert den Index des ersten Auftretens von <muster> in <str>,

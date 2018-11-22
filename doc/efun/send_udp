@@ -1,5 +1,5 @@
 SYNOPSIS
-        int send_udp(string host, int port, string message)
+        int send_udp(string host, int port, bytes message)
         int send_udp(string host, int port, int * message)
 
 DESCRIPTION

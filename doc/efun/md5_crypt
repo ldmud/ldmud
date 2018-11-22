@@ -1,6 +1,8 @@
 SYNOPSIS
         string md5_crypt(string str, int seed)
         string md5_crypt(string str, string seed)
+        string md5_crypt(bytes str, int seed)
+        string md5_crypt(bytes str, string seed)
 
 DESCRIPTION
         Crypt the string <str> the first two characters

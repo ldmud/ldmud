@@ -2,11 +2,17 @@ SYNOPSIS
         #include <tls.h>
 
         string hmac(int method, string key, string arg )
+        string hmac(int method, string key, bytes  arg )
         string hmac(int method, string key, int *  arg )
+        string hmac(int method, bytes  key, string arg )
+        string hmac(int method, bytes  key, bytes  arg )
+        string hmac(int method, bytes  key, int *  arg )
 
 DESCRIPTION
         Calculate the Hashed Message Authenication Code for <arg> based
         on the digest <method> and the password <key>. Return the HMAC.
+        Any strings given as <key> or <arg> are converted to a UTF-8
+        byte sequence before being used.
 
         <method> is one of the TLS_HASH_ constants defined in tls.h; not
         all recognized methods may be supported for a given driven:

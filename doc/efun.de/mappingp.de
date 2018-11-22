@@ -5,5 +5,6 @@ BESCHREIBUNG
         Liefert 1, wenn das Argument ein Mapping ist, ansonsten 0.
 
 SIEHE AUCH
-        intp(E), stringp(E), objectp(E), pointerp(E), mkmapping(E),
-        m_indices(E), m_values(E), m_delete(E), sizeof(E), widthof(E).
+        intp(E), stringp(E), bytesp(E), objectp(E), pointerp(E),
+        mkmapping(E), m_indices(E), m_values(E), m_delete(E),
+        sizeof(E), widthof(E).

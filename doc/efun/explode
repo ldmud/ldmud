@@ -1,9 +1,11 @@
 SYNOPSIS
         string * explode(string str, string del)
+        bytes *  explode(bytes str, bytes del)
 
 DESCRIPTION
         Return an array of strings, created when the string str is split
-        into substrings as divided by del.
+        into substrings as divided by del. When given a byte sequence
+        returns an array of byte sequences in a similar fashion.
 
         implode(explode(str, del), del) == str is always true.
 

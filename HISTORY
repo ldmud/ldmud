@@ -13,6 +13,10 @@ xx-xxx-2019 (LDMud Team) -- 3.6.0
        + The string type and all its operation support the full
          Unicode character set (#432).
 
+    - Language
+       + Introduced a new type named 'bytes' to differentiate between
+         Unicode character sequences (strings) and byte sequences.
+
 05-Apr-2019 (LDMud Team) -- 3.5.2
    - Fixed Crashes:
       + Syntax errors when parsing inline closures didn't clean

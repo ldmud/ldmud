@@ -1,12 +1,13 @@
 SYNOPSIS
         int     reverse (int arg)
         string  reverse (string arg)
+        bytes   reverse (bytes arg)
         mixed * reverse (mixed * arg)
         mixed * reverse (mixed * & arg)
 
 BESCHREIBUNG
-        Kehrt die Reihenfolge des Inhaltes von Array oder String <arg>
-        um und liefert den neuen Wert als Resultat.
+        Kehrt die Reihenfolge des Inhaltes eines Arrays, Strings oder
+        Bytefolge <arg> um und liefert den neuen Wert als Resultat.
         Ist <arg> eine Zahl, wird die Reihenfolge der Bits in <arg> umgekehrt.
 
         Wenn in der Referenz-Variante verwendet, wird das Argumentarray selber

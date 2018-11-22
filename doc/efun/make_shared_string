@@ -1,6 +1,7 @@
 DEPRECATED
 SYNOPSIS
         string make_shared_string(string str)
+        bytes make_shared_string(bytes str)
 
 DESCRIPTION
         Puts <str> in the table of shared strings of the game.

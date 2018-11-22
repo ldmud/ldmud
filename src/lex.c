@@ -472,6 +472,7 @@ struct s_reswords
 
 static struct s_reswords reswords[]
  = { { "break",          L_BREAK         }
+   , { "bytes",          L_BYTES_DECL    }
    , { "case",           L_CASE          }
    , { "catch",          L_CATCH         }
    , { "closure",        L_CLOSURE_DECL  }

@@ -61,6 +61,7 @@ enum primary_types
     TYPE_CLOSURE      =  8,
     TYPE_SYMBOL       =  9,
     TYPE_QUOTED_ARRAY = 10,
+    TYPE_BYTES        = 11,
 };
 
 struct struct_info_s
@@ -207,14 +208,14 @@ struct fulltype_s
 extern lpctype_t *lpctype_int, *lpctype_string, *lpctype_object,
                  *lpctype_mapping, *lpctype_float, *lpctype_mixed,
                  *lpctype_closure, *lpctype_symbol, *lpctype_quoted_array,
-                 *lpctype_any_struct, *lpctype_void,
+                 *lpctype_any_struct, *lpctype_void, *lpctype_bytes,
                  *lpctype_unknown;
 
 /* For use in initializers */
 extern lpctype_t _lpctype_int, _lpctype_string, _lpctype_object,
                  _lpctype_mapping, _lpctype_float, _lpctype_mixed,
                  _lpctype_closure, _lpctype_symbol, _lpctype_quoted_array,
-                 _lpctype_any_struct, _lpctype_void,
+                 _lpctype_any_struct, _lpctype_void, _lpctype_bytes,
                  _lpctype_unknown;
 
 

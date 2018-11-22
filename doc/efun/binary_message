@@ -1,5 +1,5 @@
 SYNOPSIS
-        int binary_message(int *|string message, int flags)
+        int binary_message(int *|bytes message, int flags)
 
 DESCRIPTION
         Flush output and send output directly with write WITHOUT IAC QUOTING.

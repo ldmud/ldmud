@@ -1,12 +1,15 @@
 OBSOLETE
 SYNOPSIS
         string sha1(string arg [, int iterations ])
+        string sha1(bytes  arg [, int iterations ])
         string sha1(int  * arg [, int iterations ])
 
 DESCRIPTION
         Create and return a SHA1 message digest from <arg>.
-        <arg> may be a string, or an array of numbers (each considered to
-        be a character, ignoring all but the lowest byte).
+        <arg> may be a string, a byte sequence, or an array of numbers
+        (each considered to be a byte, ignoring all but the lowest 8 bits).
+        A string is converted to a UTF-8 byte sequence of which then the
+        digest will be created.
 
         If <iterations> is given as a number greater than 0, it is
         the number of iterations used in the digest calculation. If omitted,

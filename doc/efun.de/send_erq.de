@@ -2,7 +2,7 @@ GESCHUETZT
 SYNOPSIS
         #include <erq.h>
 
-        int send_erq(int request, string|int *data, closure callback)
+        int send_erq(int request, bytes|int *data, closure callback)
 
 BESCHREIBUNG
         Eine Anfrage vom Typ <request> (standardmaessig 0) wird mit Inhalt
@@ -13,8 +13,8 @@ BESCHREIBUNG
 
             void <closure>(int *response_data, int len);
 
-        <data> kann entweder ein String oder ein Array von Integers sein,
-        wobei im zweiten Fall die Zahlen als Zeichen interpretiert werden.
+        <data> kann entweder eine Bytefolge oder ein Array von Integers sein,
+        wobei im zweiten Fall die Zahlen als Bytes interpretiert werden.
         Die unterschiedlichen Anfragen sind in <erq.h> definiert.
 
         Die Funktion liefert 0 zurueck, wenn das Senden fehlgeschlagen ist,
