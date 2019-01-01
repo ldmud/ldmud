@@ -117,6 +117,7 @@ char *telcmds[] = {
 #define  TELOPT_ZMP           93        /* Zenith Mud Protocol */
 #define  TELOPT_MUSHCLIENT   102        /* Mushclient/Aardwolf Protocol */
 #define  TELOPT_ATCP         200        /* Achaea Telnet Client Protocol */
+#define  TELOPT_GMCP         201        /* Generic Mud Communication Protocol */
 
 #define  NTELOPTS            256        /* was: (1+TELOPT_NEWENV) */
 
@@ -174,7 +175,7 @@ char *telopts[NTELOPTS]
    , "TELOPT 188", "TELOPT 189", "TELOPT 190", "TELOPT 191"
    , "TELOPT 192", "TELOPT 193", "TELOPT 194", "TELOPT 195"
    , "TELOPT 196", "TELOPT 197", "TELOPT 198", "TELOPT 199"
-   , "ATCP", "TELOPT 201", "TELOPT 202", "TELOPT 203"
+   , "ATCP", "GMCP", "TELOPT 202", "TELOPT 203"
    , "TELOPT 204", "TELOPT 205", "TELOPT 206", "TELOPT 207"
    , "TELOPT 208", "TELOPT 209", "TELOPT 210", "TELOPT 211"
    , "TELOPT 212", "TELOPT 213", "TELOPT 214", "TELOPT 215"
