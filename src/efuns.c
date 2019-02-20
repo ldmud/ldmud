@@ -8429,7 +8429,7 @@ f_configure_driver (svalue_t *sp)
             if (sp->type == T_NUMBER)
             {
                 if (sp->u.number != 0)
-                    errorf("Unexpected value %d for DC_TLS_DHE_PARAMETER.\n",
+                    errorf("Unexpected value %"PRIdPINT" for DC_TLS_DHE_PARAMETER.\n",
                            sp->u.number);
                 // set built-in defaults
                 if (!tls_import_dh_params(NULL, 0))
@@ -8453,7 +8453,7 @@ f_configure_driver (svalue_t *sp)
                 vefun_exp_arg_error(1, TF_STRING|TF_NUMBER, sp->type, sp);
             }
             break;
-        
+
         case DC_TLS_CIPHERLIST:
             if (!tls_available())
                 errorf("Cipher list could not be set: "
@@ -8462,7 +8462,7 @@ f_configure_driver (svalue_t *sp)
             if (sp->type == T_NUMBER)
             {
                 if (sp->u.number != 0)
-                    errorf("Unexpected value %d for DC_TLS_CIPHERLIST.\n",
+                    errorf("Unexpected value %"PRIdPINT" for DC_TLS_CIPHERLIST.\n",
                            sp->u.number);
                 // set built-in defaults
                 if (!tls_set_ciphers(NULL))
