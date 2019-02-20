@@ -37,5 +37,9 @@
 #define DC_EXTRA_WIZINFO_SIZE            7
 #define DC_DEFAULT_RUNTIME_LIMITS        8
 #define DC_SWAP_COMPACT_MODE             9
+#define DC_SWAP_TIME                     10
+#define DC_SWAP_VAR_TIME                 11
+#define DC_CLEANUP_TIME                  12
+#define DC_RESET_TIME                    13
 
 #endif /* LPC_CONFIGURATION_H_ */

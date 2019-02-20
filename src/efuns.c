@@ -8291,6 +8291,10 @@ f_configure_driver (svalue_t *sp)
  *        - DC_DATA_CLEAN_TIME     (3): time delay between data cleans
  *        - DC_TLS_CERTIFICATE     (4): TLS certificate to use (fingerprint)
  *        - DC_TLS_DHE_PARAMETER   (5): TLS Diffie-Hellman paramter to use
+ *        - DC_SWAP_TIME           (10): time to swap programs out
+ *        - DC_SWAP_VAR_TIME       (11): time to swap variables out
+ *        - DC_CLEANUP_TIME        (12): time to call cleanup hook
+ *        - DC_RESET_TIME          (13): time to call reset hook
  * 
  * <data> is dependent on <what>:
  *   DC_MEMORY_LIMIT:        ({soft-limit, hard-limit}) both <int>, given in Bytes.
@@ -8299,6 +8303,10 @@ f_configure_driver (svalue_t *sp)
  *   DC_DATA_CLEAN_TIME:     0 - __INT_MAX__/9 (int), given in seconds
  *   DC_TLS_CERTIFICATE      (string) SHA1 fingerprint
  *   DC_TLS_DHE_PARAMETER    (string) TLS Diffie-Hellman paramter (PEM-encoded)
+ *   DC_SWAP_TIME            (int) time (s) to swap programs >=0
+ *   DC_SWAP_VAR_TIME        (int) time (s) to swap variables >=0
+ *   DC_CLEANUP_TIME         (int) time (s) for calling cleanup, >= 0
+ *   DC_RESET_TIME           (int) time (s) for calling reset, >= 0
  *
  */
 
@@ -8484,7 +8492,7 @@ f_configure_driver (svalue_t *sp)
                 vefun_exp_arg_error(1, TF_STRING|TF_NUMBER, sp->type, sp);
             }
             break;
-            
+
 #endif /* USE_TLS */
 
         case DC_EXTRA_WIZINFO_SIZE:
@@ -8503,6 +8511,46 @@ f_configure_driver (svalue_t *sp)
             if (sp->type != T_NUMBER)
                 efun_arg_error(2, T_NUMBER, sp->type, sp);
             swap_compact_mode = (sp->u.number != 0);
+            break;
+
+        case DC_SWAP_TIME:
+            if (sp->type != T_NUMBER)
+                efun_arg_error(2, T_NUMBER, sp->type, sp);
+            if (sp->u.number < 0)
+            {
+                errorf("Time to swap programs must be >= 0!\n");
+            }
+            time_to_swap = sp->u.number;
+            break;
+
+        case DC_SWAP_VAR_TIME:
+            if (sp->type != T_NUMBER)
+                efun_arg_error(2, T_NUMBER, sp->type, sp);
+            if (sp->u.number < 0)
+            {
+                errorf("Time to swap variables must be >= 0!\n");
+            }
+            time_to_swap_variables = sp->u.number;
+            break;
+
+        case DC_CLEANUP_TIME:
+            if (sp->type != T_NUMBER)
+                efun_arg_error(2, T_NUMBER, sp->type, sp);
+            if (sp->u.number < 0)
+            {
+                errorf("Time to call cleanup hook must be >= 0!\n");
+            }
+            time_to_cleanup = sp->u.number;
+            break;
+
+        case DC_RESET_TIME:
+            if (sp->type != T_NUMBER)
+                efun_arg_error(2, T_NUMBER, sp->type, sp);
+            if (sp->u.number < 0)
+            {
+                errorf("Time to call reset hook must be >= 0!\n");
+            }
+            time_to_reset = sp->u.number;
             break;
 
     }
@@ -8614,6 +8662,25 @@ f_driver_info (svalue_t *sp)
         case DI_BOOT_TIME:
             put_number(&result, boot_time);
             break;
+
+        case DC_SWAP_TIME:
+            put_number(&result, time_to_swap);
+            break;
+
+        case DC_SWAP_VAR_TIME:
+            put_number(&result, time_to_swap_variables);
+            break;
+
+
+        case DC_CLEANUP_TIME:
+            put_number(&result, time_to_cleanup);
+            break;
+
+
+        case DC_RESET_TIME:
+            put_number(&result, time_to_reset);
+            break;
+
 
         /* LPC Runtime status */
         case DI_CURRENT_RUNTIME_LIMITS:

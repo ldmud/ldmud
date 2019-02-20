@@ -118,6 +118,30 @@ DESCRIPTION
            the swap file as small as possible.
            (Same as the --swap-compact command line switch.)
 
+        <what> == DC_SWAP_TIME
+           Sets the time until the program of an unused object is swapped out
+           (if possible). Setting the interval to 0 disables swapping of
+           programs.
+           <data> is an integer and measured in seconds.
+           (Same as the --swap-time command line switch.)
+
+        <what> == DC_SWAP_VAR_TIME
+           Sets the time until the variables of an unused object are swapped
+           out. Setting the interval to 0 disables swapping of variables.
+           <data> is an integer and measured in seconds.
+           (Same as the --swap-variables command line switch.)
+
+        <what> == DC_CLEANUP_TIME
+           Sets the time until the cleanup hook is called in unused objects.
+           <data> is an integer and measured in seconds.
+           (Same as the --cleanup-time command line switch.)
+
+        <what> == DC_RESET_TIME
+           Sets the default time until the reset hook is called in objects.
+           The change will take effect for each object after its next reset.
+           <data> is an integer and measured in seconds.
+           (Same as the --reset-time command line switch.)
+
 HISTORY
         Introduced in LDMud 3.3.719.
         DC_ENABLE_HEART_BEATS was added in 3.5.0.
@@ -128,6 +152,10 @@ HISTORY
         DC_TLS_DHE_PARAMETER was added in 3.5.0.
         DC_TLS_CIPHERLIST was added in 3.5.0.
         DC_SWAP_COMPACT_MODE was added in 3.5.0.
+        DC_SWAP_TIME was added in 3.5.2
+        DC_SWAP_VAR_TIME was added in 3.5.2
+        DC_CLEANUP_TIME was added in 3.5.2
+        DC_RESET_TIME was added in 3.5.2
 
 SEE ALSO
         configure_interactive(E)
