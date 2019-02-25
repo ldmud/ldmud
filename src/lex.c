@@ -614,7 +614,7 @@ static INLINE void myungetc(char);
 static p_int cond_get_exp(int, svalue_t *);
 static int exgetc(void);
 static char *get_current_file(char **);
-static char *get_current_line(char **);
+static char *get_current_line_buf(char **);
 static char *get_current_function(char **);
 static char *get_version(char **);
 static char *get_hostname(char **);
@@ -622,6 +622,7 @@ static char *get_domainname(char **);
 static char *get_current_dir(char **);
 static char *get_sub_path(char **);
 static char *efun_defined(char **);
+static char *get_memory_limit_buf(char **);
 static void lexerrorf VARPROT((char *, ...), printf, 1, 2);
 static void lexerror(char *);
 static ident_t *lookup_define(char *);
@@ -757,7 +758,7 @@ init_lexer(void)
     add_permanent_define("__FUNCTION__", -1, (void *)get_current_function, MY_TRUE);
     add_permanent_define("__DIR__", -1, (void *)get_current_dir, MY_TRUE);
     add_permanent_define("__PATH__", 1, (void *)get_sub_path, MY_TRUE);
-    add_permanent_define("__LINE__", -1, (void *)get_current_line, MY_TRUE);
+    add_permanent_define("__LINE__", -1, (void *)get_current_line_buf, MY_TRUE);
     add_permanent_define("__VERSION__", -1, (void *)get_version, MY_TRUE);
     add_permanent_define("__VERSION_MAJOR__", -1, string_copy(VERSION_MAJOR), MY_FALSE);
     add_permanent_define("__VERSION_MINOR__", -1, string_copy(VERSION_MINOR), MY_FALSE);
@@ -779,8 +780,7 @@ init_lexer(void)
     sprintf(mtext, "%d", ERQ_MAX_REPLY);
     add_permanent_define("__ERQ_MAX_REPLY__", -1, string_copy(mtext), MY_FALSE);
 #endif
-    sprintf(mtext, "%"PRIdMPINT, get_memory_limit(MALLOC_HARD_LIMIT));
-    add_permanent_define("__MAX_MALLOC__", -1, string_copy(mtext), MY_FALSE);
+    add_permanent_define("__MAX_MALLOC__", -1, (void *)get_memory_limit_buf, MY_TRUE);
     sprintf(mtext, "%"PRId32, def_eval_cost);
     add_permanent_define("__MAX_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", (long)CATCH_RESERVED_COST);
@@ -7231,9 +7231,10 @@ get_sub_path (char ** args)
     return NULL;
 } /* get_sub_path() */
 
+#define DYNAMIC_MACRO_BUFFER_SIZE 21
 /*-------------------------------------------------------------------------*/
 static char *
-get_current_line (char ** args UNUSED)
+get_current_line_buf (char ** args UNUSED)
 
 /* Dynamic macro __LINE__: return the number of the current line.
  */
@@ -7244,12 +7245,27 @@ get_current_line (char ** args UNUSED)
 #endif
     char *buf;
 
-    buf = xalloc(12);
+    buf = xalloc(DYNAMIC_MACRO_BUFFER_SIZE);
     if (!buf)
         return NULL;
-    sprintf(buf, "%d", current_loc.line);
+    snprintf(buf, DYNAMIC_MACRO_BUFFER_SIZE, "%d", current_loc.line);
     return buf;
-} /* get_current_line() */
+} /* get_current_line_buf() */
+
+/*-------------------------------------------------------------------------*/
+static char *
+get_memory_limit_buf (char ** args UNUSED)
+
+/* Dynamic macro __MAX_MALLOC__: return the current hard memory limit.
+ */
+
+{
+    char *buf = xalloc(DYNAMIC_MACRO_BUFFER_SIZE);
+    if (!buf)
+        return NULL;
+    snprintf(buf, DYNAMIC_MACRO_BUFFER_SIZE, "%"PRIdMPINT, get_memory_limit(MALLOC_HARD_LIMIT));
+    return buf;
+} /* get_memory_limit_buf() */
 
 /*-------------------------------------------------------------------------*/
 static char *
