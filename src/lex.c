@@ -622,6 +622,8 @@ static char *get_domainname(char **);
 static char *get_current_dir(char **);
 static char *get_sub_path(char **);
 static char *efun_defined(char **);
+static char *get_reset_time_buf(char **);
+static char *get_cleanup_time_buf(char **);
 static char *get_memory_limit_buf(char **);
 static void lexerrorf VARPROT((char *, ...), printf, 1, 2);
 static void lexerror(char *);
@@ -787,10 +789,8 @@ init_lexer(void)
     add_permanent_define("__CATCH_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", (long)MASTER_RESERVED_COST);
     add_permanent_define("__MASTER_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "%ld", time_to_reset);
-    add_permanent_define("__RESET_TIME__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "%ld", time_to_cleanup);
-    add_permanent_define("__CLEANUP_TIME__", -1, string_copy(mtext), MY_FALSE);
+    add_permanent_define("__RESET_TIME__", -1, (void *)get_reset_time_buf, MY_TRUE);
+    add_permanent_define("__CLEANUP_TIME__", -1, (void *)get_cleanup_time_buf, MY_TRUE);
     sprintf(mtext, "%ld", alarm_time);
     add_permanent_define("__ALARM_TIME__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", heart_beat_interval);
@@ -7251,6 +7251,36 @@ get_current_line_buf (char ** args UNUSED)
     snprintf(buf, DYNAMIC_MACRO_BUFFER_SIZE, "%d", current_loc.line);
     return buf;
 } /* get_current_line_buf() */
+
+/*-------------------------------------------------------------------------*/
+static char *
+get_reset_time_buf (char ** args UNUSED)
+
+/* Dynamic macro __RESET_TIME__: return the current default reset interval.
+ */
+
+{
+    char *buf = xalloc(DYNAMIC_MACRO_BUFFER_SIZE);
+    if (!buf)
+        return NULL;
+    snprintf(buf, DYNAMIC_MACRO_BUFFER_SIZE, "%ld", time_to_reset);
+    return buf;
+} /* get_reset_time_buf() */
+
+/*-------------------------------------------------------------------------*/
+static char *
+get_cleanup_time_buf (char ** args UNUSED)
+
+/* Dynamic macro __CLEANUP_TIME__: return the current cleanup interval.
+ */
+
+{
+    char *buf = xalloc(DYNAMIC_MACRO_BUFFER_SIZE);
+    if (!buf)
+        return NULL;
+    snprintf(buf, DYNAMIC_MACRO_BUFFER_SIZE, "%ld", time_to_cleanup);
+    return buf;
+} /* get_cleanup_time_buf() */
 
 /*-------------------------------------------------------------------------*/
 static char *
