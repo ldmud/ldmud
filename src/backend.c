@@ -421,7 +421,7 @@ static INLINE bool
 execute_signal_action (int sig, char configured)
 
 /* Executes the configured signal action, that were not already handled in the
- * signal handler itself: DEFAULT, SHUTDOWN, CALL_MASTER and RELOAD_MASTER.
+ * signal handler itself: DEFAULT, SHUTDOWN, INFORM_MASTER and RELOAD_MASTER.
  *
  * Returns true, if the action was executed.
  * Returns false, if the default action (besides calling the master)
