@@ -3485,6 +3485,9 @@ esbrk (word_t size, size_t * pExtra)
         *((word_t *)block+1) = PREV_BLOCK;
         p[M_LSIZE] = overhead;
         p[M_SIZE] = THIS_BLOCK | M_MASK; /* no M_GC_FREE */
+#ifdef MALLOC_CHECK
+        p[M_MAGIC] = LAMAGIC;
+#endif
         overlap = 0;
     }
     else
@@ -3507,6 +3510,9 @@ esbrk (word_t size, size_t * pExtra)
                 /* Separate from the heap */
                 p[M_LSIZE] = (heap_start - p + 1);
                 p[M_SIZE] = THIS_BLOCK | M_MASK; /* no M_GC_FREE */
+#ifdef MALLOC_CHECK
+                p[M_MAGIC] = LAMAGIC;
+#endif
                 overlap = 0;
             }
 
@@ -3518,6 +3524,9 @@ esbrk (word_t size, size_t * pExtra)
 
             p[M_SIZE] = THIS_BLOCK | M_MASK; /* no M_GC_FREE */
             p[M_LSIZE] =  overhead;
+#ifdef MALLOC_CHECK
+            p[M_MAGIC] = LAMAGIC;
+#endif
             if (block == (char *)heap_end)
             {
                 /* We can join with the existing heap */
@@ -3591,6 +3600,9 @@ esbrk (word_t size, size_t * pExtra)
                 /* We have to create a new bridge block */
                 p[M_SIZE] = THIS_BLOCK | M_MASK;  /* no M_GC_FREE */
                 p[M_LSIZE] = next - p + 1;
+#ifdef MALLOC_CHECK
+                p[M_MAGIC] = LAMAGIC;
+#endif
             }
         }
     }
