@@ -1,6 +1,7 @@
 SYNOPSIS
         int write_file(string file, string str)
         int write_file(string file, string str, int flags)
+        int write_file(string file, string str, int flags, string encoding)
 
 BESCHREIBUNG
         Haengt den String <str> an die Datei <file> an. Liefert 1 bei Erfolg,
@@ -10,6 +11,13 @@ BESCHREIBUNG
         Schreiben geloescht; das 'anhaengen' wird so effektiv ein
         'ueberschreiben'. Defaultwert fuer <flags> ist 0.
 
+        Mit <encoding> kann man den Zeichensatz angeben, welcher beim Schreiben
+        in die Datei verwendet werden soll. Falls er nicht angegeben oder 0 ist,
+        so wird der Hook H_FILE_ENCODING verwendet.
+
+GESCHICHTE
+        LDMud 3.6.0 fuegte den <encoding>-Parameter hinzu.
+
 SIEHE AUCH
         file_size(E), write_bytes(E), write_file(E), read_file(E),
-        read_bytes(E), rm(E)
+        read_bytes(E), rm(E), hooks(C)

@@ -38,6 +38,7 @@ extern int lstat(const char *, struct stat *);
 #include "svalue.h"
 #include "xalloc.h"
 
+#include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/files.h"
 
 /*-------------------------------------------------------------------------*/
@@ -335,6 +336,35 @@ get_dir_error_handler (error_handler_t *arg)
     if (ecp->v)
         free_array(ecp->v);
 } /* get_dir_error_handler() */
+
+/*-------------------------------------------------------------------------*/
+
+/* Error handling structure to close a iconv conversion descriptor.
+ */
+
+struct iconv_error_context
+{
+    error_handler_t head;
+    iconv_t cd;
+};
+
+/*-------------------------------------------------------------------------*/
+static void
+iconv_error_handler (error_handler_t *arg)
+
+/* T_ERROR_HANDLER function: <arg> is a (struct iconv_error_context*)
+ * with a conversion descriptor that needs to be closed.
+ * If the conversion descriptor is -1, then nothing needs to be done.
+ */
+
+{
+    struct iconv_error_context *ecp = (struct iconv_error_context *)arg;
+
+    if (ecp->cd != (iconv_t)-1)
+        iconv_close(ecp->cd);
+    xfree(ecp);
+
+} /* iconv_error_handler() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -1083,12 +1113,148 @@ v_read_bytes (svalue_t *sp, int num_arg)
 } /* v_read_bytes() */
 
 /*-------------------------------------------------------------------------*/
+static iconv_t
+get_file_encoding (string_t* filename, bool source)
+
+/* Determines the file's encoding via H_FILE_ENCODING hook.
+ * Returns an iconv conversion descriptor if successful.
+ * (Otherwise an error is thrown.)
+ * If <source> is true, the file is opened for reading.
+ */
+
+{
+    string_t *encoding = NULL;
+    iconv_t cd;
+
+    if (driver_hook[H_FILE_ENCODING].type == T_STRING)
+    {
+        encoding = driver_hook[H_FILE_ENCODING].u.str;
+    }
+    else if (driver_hook[H_FILE_ENCODING].type == T_CLOSURE)
+    {
+        svalue_t *svp;
+
+        /* Setup and call the closure */
+        push_ref_string(inter_sp, filename);
+        svp = secure_apply_lambda(driver_hook+H_FILE_ENCODING, 1);
+
+        if (svp && svp->type == T_STRING)
+            encoding = svp->u.str;
+    }
+
+    if (source)
+        cd = iconv_open("utf-8", encoding == NULL ? "ascii" : get_txt(encoding));
+    else
+        cd = iconv_open(encoding == NULL ? "ascii" : get_txt(encoding), "utf-8");
+
+    if (cd == (iconv_t)-1)
+        errorf("Unsupported encoding '%s'.\n", get_txt(encoding));
+
+    return cd;
+} /* get_file_encoding() */
+
+/*-------------------------------------------------------------------------*/
+struct iconv_file_info
+{
+    FILE *f;        /* The file to read. */
+    char *buffer;   /* Buffer containing the read bytes from the file. */
+    size_t size;    /* Size of the buffer. */
+    size_t num;     /* Number of bytes read. */
+    size_t left;    /* Number of bytes left to process. */
+    iconv_t cd;     /* Conversion descriptor. */
+    char *error;    /* Error message. */
+};
+
+static size_t
+read_file_iconv (struct iconv_file_info* info, char* dest, size_t len)
+
+/* Reads <len> UTF-8 bytes from the given file into <dest>.
+ * It tries to read as many characters as possible and returns
+ * the number of UTF-8 bytes in <dest>.
+ * Sets the <error> member in <info> upon decoding failures
+ * and returns the number of bytes done until that.
+ */
+
+{
+    char *bufstart = info->buffer + info->num - info->left;
+    char *deststart = dest;
+    size_t bufleft = info->left;
+    size_t destleft = len;
+    bool ineof = false;
+
+    while (destleft)
+    {
+        size_t rc;
+        bool fillbuf = false;
+
+        if (bufleft)
+            rc = iconv(info->cd, &bufstart, &bufleft, &deststart, &destleft);
+        else if (ineof)
+            rc = iconv(info->cd, NULL, NULL, &deststart, &destleft);
+        else
+            fillbuf = true;
+
+        if (fillbuf || rc == (size_t)-1)
+        {
+            /* Incomplete sequence, read next bytes from the file. */
+            if (fillbuf || errno == EINVAL)
+            {
+                /* It is expected that we always fill the buffer,
+                 * otherwise we are at the end of the file.
+                 */
+                if (bufstart + bufleft == info->buffer + info->size)
+                {
+                    size_t num;
+
+                    if (bufleft > 0)
+                        memmove(info->buffer, bufstart, bufleft);
+
+                    num = fread(info->buffer + bufleft, 1, info->size - bufleft, info->f);
+
+                    bufstart = info->buffer;
+                    bufleft += num;
+
+                    if (num != 0)
+                        continue;
+                }
+
+                if (fillbuf)
+                {
+                    ineof = true;
+                    continue;
+                }
+                else
+                {
+                    info->error = "Unexpected end of file";
+                    break;
+                }
+            }
+
+            /* So we're finished for now? */
+            if (errno == E2BIG)
+                break;
+
+            info->error = errno == EILSEQ ? "Invalid character sequence" : strerror(errno);
+            break;
+        }
+
+        if (ineof)
+            break;
+    }
+
+    info->num = bufstart - info->buffer + bufleft;
+    info->left = bufleft;
+
+    return len - destleft;
+} /* read_file_iconv() */
+
+/*-------------------------------------------------------------------------*/
 svalue_t *
 v_read_file (svalue_t *sp, int num_arg)
 
 /* EFUN read_file()
  *
- *   string read_file(string file, int start, int number)
+ *   string read_file(string file, int start, int number, string encoding)
  *
  * Reads lines from file.
  * If <start> is not given or 0, the file is read from the
@@ -1097,39 +1263,63 @@ v_read_file (svalue_t *sp, int num_arg)
  * just the given amount of lines.
  * If <start> would be outside the actual size of the file, 0 is
  * returned instead of a string.
+ * The read bytes are decoded with the charset <encoding>.
+ * If not given, ask the H_FILE_ENCODING driver hook.
  */
 
 {
+    struct iconv_error_context* iec;
     string_t *rc;
     svalue_t *arg;
     int start, len;
+    iconv_t cd;
 
     arg = sp- num_arg + 1;
 
     /* Get the arguments */
     start = 0;
     len = 0;
+    cd = (iconv_t)-1;
+
     if (num_arg > 1)
     {
         start = arg[1].u.number;
-        if (num_arg == 3)
+        if (num_arg > 2)
         {
             len = arg[2].u.number;
+            if (num_arg == 4)
+            {
+                cd = iconv_open("utf-8", get_txt(arg[3].u.str));
+                if (cd == (iconv_t)-1)
+                    errorf("Unsupported encoding '%s'.\n", get_txt(arg[3].u.str));
+
+                free_mstring(arg[3].u.str);
+                sp--;
+            }
             sp--;
         }
         sp--;
     }
 
+    inter_sp = sp;
+    iec = xalloc(sizeof(*iec));
+    if (!iec)
+        errorf("(read_file) Out of memory (%ld bytes) for error handler\n", sizeof(*iec));
+    iec->cd = cd;
+    push_error_handler(iconv_error_handler, &(iec->head));
+    sp++;
+
     /* Read the file */
     rc = NULL;
 
-    do {
+    do
+    {
         struct stat st;
         string_t *file;
-        FILE *f;
-        char *str, *p, *p2, *end, c;
-        long size; /* TODO: fpos_t? */
+        struct iconv_file_info conv;
         char *native;
+        char *str, *p, *p2, *end, c;
+        size_t size;
 
         p = NULL; /* Silence spurious warnings */
         end = NULL;
@@ -1141,69 +1331,91 @@ v_read_file (svalue_t *sp, int num_arg)
         if (!file)
             break;
 
+        if (cd == (iconv_t)-1)
+        {
+            push_string(inter_sp, file); /* In case of an error. */
+            iec->cd = cd = get_file_encoding(arg[0].u.str, true);
+            inter_sp--;
+        }
+
         native = convert_path_str_to_native_or_throw(file);
 
         /* If the file would be opened in text mode, the size from fstat would
          * not match the number of characters that we can read.
          */
-        f = fopen(native, "rb");
-        if (f == NULL)
+        conv.f = fopen(native, "rb");
+        if (conv.f == NULL)
             break;
         FCOUNT_READ(native);
 
         /* Check if the file is small enough to be read. */
 
-        if (fstat(fileno(f), &st) == -1)
+        if (fstat(fileno(conv.f), &st) == -1)
         {
             fatal("Could not stat an open file.\n");
             /* NOTREACHED */
             break;;
         }
 
-        size = (long)st.st_size;
+        size = st.st_size;
         if (max_file_xfer && size > max_file_xfer)
         {
             if ( start || len )
                 size = max_file_xfer;
-            else {
-                fclose(f);
+            else
+            {
+                fclose(conv.f);
                 break;;
             }
         }
 
         /* Make the arguments sane */
         if (!start) start = 1;
-        if (!len) len = size;
+        if (!len) len = INT_MAX;
 
         /* Get the memory */
-        str = mb_alloc(mbFile, (size_t)size + 1); /* allow a leading ' ' */
-        if (!str) {
-            fclose(f);
-            free_mstring(file);
+        conv.size = size;
+
+        /* A UTF-8 character is at most 4 bytes long,
+         * so using that for our buffer. */
+        size *= 4;
+
+        str = mb_alloc(mbFile, conv.size + size + 1); /* allow a leading ' ' */
+        if (!str)
+        {
+            fclose(conv.f);
             errorf("(read_file) Out of memory (%ld bytes) for buffer\n", size+1);
             /* NOTREACHED */
             break;
         }
-
         *str++ = ' '; /* this way, we can always read the 'previous' char... */
+
+        conv.buffer = str + size;
+        conv.num = conv.size;
+        conv.left = 0;
+        conv.cd = cd;
+        conv.error = NULL;
 
         /* Search for the first line to read.
          * For this, the file is read in chunks of <size> bytes, st.st_size
          * records the remaining length of the file.
          */
-        do {
+        do
+        {
             /* Read the next chunk */
-            if (size > st.st_size) /* Happens with the last block */
-                size = (long)st.st_size;
+            size_t num = read_file_iconv(&conv, str, size);
 
-            if ((!size && start > 1) || fread(str, (size_t)size, 1, f) != 1) {
-                fclose(f);
-                f = NULL;
+            if (!num)
+            {
+                fclose(conv.f);
+                conv.f = NULL;
                 mb_free(mbFile);
+                if (conv.error)
+                    errorf("%s.\n", conv.error);
                 break;
             }
-            st.st_size -= size;
-            end = str+size;
+
+            end = str + num;
 
             /* Find all the '\n' in the chunk and count them */
             for (p = str; NULL != ( p2 = memchr(p, '\n', (size_t)(end-p)) ) && --start; )
@@ -1211,16 +1423,13 @@ v_read_file (svalue_t *sp, int num_arg)
 
         } while ( start > 1 );
 
-        if (f == NULL) /* then the inner loop aborted and we have to, too */
+        if (conv.f == NULL) /* then the inner loop aborted and we have to, too */
             break;
 
         /* p now points to the first requested line.
-         * st.st_size is the remaining size of the file.
-         */
-
-        /* Shift the found lines back to the front of the buffer, and
+         *
+         * Shift the found lines back to the front of the buffer, and
          * count them.
-         * Also convert \r\n pairs into \n on MS-DOS filesystems.
          */
         for (p2 = str; p != end; ) {
             c = *p++;
@@ -1235,30 +1444,20 @@ v_read_file (svalue_t *sp, int num_arg)
 
         /* If there are still some lines missing, and parts of the file
          * are not read yet, read and scan those remaining parts.
+         *
+         * len is the number of lines still to read.
+         * p2 is the position where to append the remaining data.
          */
 
-        if ( len && st.st_size ) {
-
+        if ( len )
+        {
             /* Read the remaining file, but only as much as there is
              * space left in the buffer. As that one is max_file_xfer
              * long, it has to be sufficient.
              */
+            end = p2 + read_file_iconv(&conv, p2, str + size - p2);;
 
-            size -= ( p2-str) ;
-            if (size > st.st_size)
-                size = (long)st.st_size;
-
-            if (fread(p2, (size_t)size, 1, f) != 1) {
-                fclose(f);
-                mb_free(mbFile);
-                break;
-            }
-
-            st.st_size -= size;
-            end = p2+size;
-
-            /* Count the remaining lines, again converting \r\n into \n
-             * when necessary.
+            /* Count the remaining lines.
              */
             for (p = p2; p != end; ) {
                 c = *p++;
@@ -1274,15 +1473,25 @@ v_read_file (svalue_t *sp, int num_arg)
             /* If there are lines missing and the file is not at its end,
              * we have a failure.
              */
-            if ( st.st_size && len > 0) {
+            if ( len > 0 && (conv.left > 0 || ftell(conv.f) < st.st_size))
+            {
                 /* tried to read more than READ_MAX_FILE_SIZE */
-                fclose(f);
+                fclose(conv.f);
                 mb_free(mbFile);
+                if (conv.error)
+                    errorf("%s.\n", conv.error);
                 break;
             }
         }
 
-        fclose(f);
+        fclose(conv.f);
+
+        /* If we are above max_file_xfer, that's also a failure. */
+        if (max_file_xfer && byte_to_char_index(str, p2-str, NULL) > max_file_xfer)
+        {
+            mb_free(mbFile);
+            break;
+        }
 
         /* Make a copy of the valid parts of the str buffer, then
          * get rid of the largish buffer itself.
@@ -1290,12 +1499,11 @@ v_read_file (svalue_t *sp, int num_arg)
         rc = new_n_unicode_mstring(str, p2-str);
         mb_free(mbFile);
         if (!rc)
-        {
-            free_mstring(file);
             errorf("(read_file) Out of memory for result\n");
-        }
     } while(0);
 
+    /* Free the error handler and the first argument. */
+    free_svalue(sp--);
     free_svalue(sp--);
     if (rc == NULL)
         push_number(sp, 0);
@@ -1527,21 +1735,50 @@ f_write_bytes (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_write_file (svalue_t *sp)
+v_write_file (svalue_t *sp, int num_arg)
 
 /* EFUN write_file()
  *
- *   int write_file(string file, string str, int flags = 0)
+ *   int write_file(string file, string str, int flags, string encoding)
  *
  * Append the string str to the file <file>. Returns 1 for success
  * and 0 if any failure occurred.
  *
  * If <flags> is 1, the file is first removed; thus effectively
  * changing the 'append' into an 'overwrite'.
+ *
+ * Write the string with <encoding> to the file. If it is not given,
+ * ask the H_FILE_ENCODING driver hook.
  */
 
 {
+    struct iconv_error_context* iec;
+    svalue_t *arg = sp - num_arg + 1;
+    iconv_t cd = (iconv_t)-1;
+    int flags = 0;
     int rc = 0;
+
+    if (num_arg > 2)
+    {
+        flags = arg[2].u.number;
+        if (num_arg > 3)
+        {
+            cd = iconv_open(get_txt(arg[3].u.str), "utf-8");
+            if (cd == (iconv_t)-1)
+                errorf("Unsupported encoding '%s'.\n", get_txt(arg[3].u.str));
+            free_mstring(arg[3].u.str);
+            sp--;
+        }
+        sp--;
+    }
+
+    inter_sp = sp;
+    iec = xalloc(sizeof(*iec));
+    if (!iec)
+        errorf("(write_file) Out of memory (%ld bytes) for error handler\n", sizeof(*iec));
+    iec->cd = cd;
+    push_error_handler(iconv_error_handler, &(iec->head));
+    sp++;
 
     do
     {
@@ -1549,14 +1786,17 @@ f_write_file (svalue_t *sp)
         string_t *file;
         char *native;
 
-        file = check_valid_path(sp[-2].u.str, current_object, STR_WRITE_FILE, MY_TRUE);
+        file = check_valid_path(arg[0].u.str, current_object, STR_WRITE_FILE, MY_TRUE);
         if (!file)
             break;
 
         push_ref_string(inter_sp, file); /* Save the reference for later... */
         native = convert_path_str_to_native_or_throw(file);
 
-        if (sp->u.number & 1)
+        if (cd == (iconv_t)-1)
+            iec->cd = cd = get_file_encoding(arg[0].u.str, false);
+
+        if (flags & 1)
             if (remove(native) && errno != ENOENT)
             {
                 perror("write_file (remove)");
@@ -1577,7 +1817,7 @@ f_write_file (svalue_t *sp)
                  * an error message into a log.
                  * Call lex_close() (-> lexerror() -> yyerror() ->
                  * parse_error() -> apply_master_ob() ) to try to close some
-                 * files, the try again.
+                 * files, then try again.
                  */
                 lex_close(NULL);
                 f = fopen(native, "a");
@@ -1617,7 +1857,56 @@ f_write_file (svalue_t *sp)
         FCOUNT_WRITE(native);
         free_string_svalue(inter_sp--);
 
-        fwrite(get_txt(sp[-1].u.str), mstrsize(sp[-1].u.str), 1, f);
+        {
+            size_t inbufleft = mstrsize(arg[1].u.str);
+            size_t outbufsize = inbufleft;
+            char *inbuf = get_txt(arg[1].u.str);
+            char *outbuf;
+            bool atend = false;
+
+            if (outbufsize < 16)
+                outbufsize = 16;
+
+            outbuf = mb_alloc(mbFile, outbufsize);
+            if (!outbuf)
+            {
+                fclose(f);
+                errorf("(write_file) Out of memory (%ld bytes) for buffer\n", outbufsize);
+            }
+
+            while (true)
+            {
+                char * outbufptr = outbuf;
+                size_t outbufleft = outbufsize;
+                size_t res;
+
+                if (inbufleft)
+                    res = iconv(cd, &inbuf, &inbufleft, &outbufptr, &outbufleft);
+                else
+                {
+                    res = iconv(cd, NULL, NULL, &outbufptr, &outbufleft);
+                    atend = true;
+                }
+
+                if (outbufptr != outbuf)
+                    fwrite(outbuf, outbufptr - outbuf, 1, f);
+
+                if (res == (size_t)-1)
+                {
+                    if (errno != E2BIG)
+                    {
+                        mb_free(mbFile);
+                        fclose(f);
+                        errorf("%s.\n", strerror(errno));
+                    }
+                }
+                else if (atend)
+                    break;
+            }
+
+            mb_free(mbFile);
+        }
+
         fclose(f);
         rc = 1;
     } while(0);
@@ -1628,7 +1917,7 @@ f_write_file (svalue_t *sp)
     put_number(sp, rc);
 
     return sp;
-} /* f_write_file() */
+} /* v_write_file() */
 
 /***************************************************************************/
 

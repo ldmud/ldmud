@@ -1,5 +1,5 @@
 SYNOPSIS
-        string read_file(string file, int start, int anzahl)
+        string read_file(string file, int start, int anzahl, string encoding)
 
 BESCHREIBUNG
         Liest Zeilen aus einem File <file>. Wenn <start> angegeben ist und
@@ -9,11 +9,18 @@ BESCHREIBUNG
         Wenn <anzahl> nicht angegeben oder 0 ist, wird das gesamte File
         gelesen, sonst nur <anzahl> Zeilen.
 
+        Mit <encoding> kann man den Zeichensatz spezifieren, der beim
+        Lesen der Datei angewandt werden soll. Falls er nicht angeben oder
+        0 ist, so wird der Hook H_FILE_ENCODING verwendet.
+
         Wenn <start> ausserhalb der Groesse des Files liegt, liefert
         read_file() anstelle eines Strings 0 zurueck.
 
         Die max. Anzahl einzulesender Bytes (nicht Zeilen!) pro Aufruf dieser
         Funktion betraegt LIMIT_FILE (s. query_limits()).
 
+GESCHICHTE
+        LDMud 3.6.0 fuegte den <encoding>-Parameter hinzu.
+
 SIEHE AUCH
-        read_bytes(E), write_file(E)
+        read_bytes(E), write_file(E), hooks(C)

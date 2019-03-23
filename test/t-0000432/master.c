@@ -1,4 +1,5 @@
 #include "/sys/regexp.h"
+#include "/sys/rtlimits.h"
 #include "/sys/strings.h"
 
 #include "/inc/base.inc"
@@ -555,9 +556,70 @@ void run_test()
                 return read_bytes("/data.bin", 0, 7) == to_bytes("\u269d\U0001f44d", "UTF-8");
             :)
         }),
-        ({ "read_file", 0,
+        ({ "read_file 1", 0,
             (:
-                return read_file("/data.bin", 2, 1) == "\u2328\u231b\n";
+                return read_file("/data.bin", 2, 1, "UTF-8") == "\u2328\u231b\n";
+            :)
+        }),
+        ({ "read_file 2", TF_ERROR,
+            (:
+                return read_file("/data.bin", 2, 1, "ascii");
+            :)
+        }),
+        ({ "read_file 3", 0,
+            (:
+                int success;
+
+                write_file("/test.bin", "", 1);
+                write_bytes("/test.bin", 0, to_bytes(("\u00a0"*100+"\n")*10, "ISO8859-15"));
+                success = limited((:
+                    return read_file("/test.bin", 5, 1, "ISO8859-15") == "\u00a0"*100+"\n";
+                :), LIMIT_FILE, 110);
+
+                rm("/test.bin");
+                return success;
+            :)
+        }),
+        ({ "read_file 4", 0,
+            (:
+                int success;
+
+                write_file("/test.bin", "", 1);
+                write_bytes("/test.bin", 0, to_bytes(("\u00a0"*100+"\n")*10, "ISO8859-15"));
+                success = limited((:
+                    return read_file("/test.bin", 5, 1, "ISO8859-15") == 0;
+                :), LIMIT_FILE, 90);
+
+                rm("/test.bin");
+                return success;
+            :)
+        }),
+        ({ "read_file 5", 0,
+            (:
+                int success;
+
+                write_file("/test.bin", "", 1);
+                write_bytes("/test.bin", 0, to_bytes(("@"*100+"\n")*10, "UTF-32"));
+                success = limited((:
+                    return read_file("/test.bin", 5, 1, "UTF-32") == "@"*100+"\n";
+                :), LIMIT_FILE, 110);
+
+                rm("/test.bin");
+                return success;
+            :)
+        }),
+        ({ "read_file 6", 0,
+            (:
+                int success;
+
+                write_file("/test.bin", "", 1);
+                write_bytes("/test.bin", 0, to_bytes(("@"*100+"\n")*10, "UTF-32"));
+                success = limited((:
+                    return read_file("/test.bin", 5, 1, "UTF-32") == 0;
+                :), LIMIT_FILE, 90);
+
+                rm("/test.bin");
+                return success;
             :)
         }),
         ({ "write_bytes", 0,
@@ -572,15 +634,48 @@ void run_test()
                 return str == to_bytes(({0,1,2,3,4,5}));
             :)
         }),
-        ({ "write_file", 0,
+        ({ "write_file 1", 0,
             (:
                 string str;
 
-                write_file("/test.txt", "\u2620\u2623\n", 1);
-                str = read_file("/test.txt");
+                write_file("/test.txt", "\u2620\u2623\n", 1, "UTF-8");
+                str = read_file("/test.txt", 0, 0, "UTF-8");
                 rm("/test.txt");
 
                 return str == "\u2620\u2623\n";
+            :)
+        }),
+        ({ "write_file 2", 0,
+            (:
+                string str;
+
+                write_file("/test.txt", "\u2620\u2623\n", 1, "UTF-32");
+                str = read_file("/test.txt", 0, 0, "UTF-32");
+                rm("/test.txt");
+
+                return str == "\u2620\u2623\n";
+            :)
+        }),
+        ({ "write_file 3", 0,
+            (:
+                string str;
+
+                write_file("/test.txt", "@"*100+"\n", 1, "UTF-32");
+                str = read_file("/test.txt", 0, 0, "UTF-32");
+                rm("/test.txt");
+
+                return str == "@"*100+"\n";
+            :)
+        }),
+        ({ "write_file 4", 0,
+            (:
+                string str;
+
+                write_file("/test.txt", "\u00a0"*100+"\n", 1, "ISO8859-15");
+                str = read_file("/test.txt", 0, 0, "ISO8859-15");
+                rm("/test.txt");
+
+                return str == "\u00a0"*100+"\n";
             :)
         }),
 #ifdef __XML_DOM__
@@ -622,7 +717,8 @@ void run_test()
 
 private string get_file_encoding(string filename)
 {
-    string lines = read_file(filename, 0, 2);
+    string lines = read_file(filename, 0, 2, "ascii");
+
     if (!lines)
         return "UTF-8";
 

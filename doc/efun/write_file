@@ -1,6 +1,7 @@
 SYNOPSIS
         int write_file(string file, string str)
         int write_file(string file, string str, int flags)
+        int write_file(string file, string str, int flags, string encoding)
 
 DESCRIPTION
         Append the string <str> to the file <file>. Returns 1 for success
@@ -9,9 +10,14 @@ DESCRIPTION
         If <flags> is 1, the file is removed first; thus making the
         'append' effectively an 'overwrite'. Default for <flags> is 0.
 
+        <encoding> denotes the encoding to be used for saving the string
+        in the file. If it is not given or 0, the H_FILE_ENCODING driver
+        hook will be used.
+
 HISTORY
         LDMud 3.3.523 added the <flags> parameter.
+        LDMud 3.6.0 added the <encoding> parameter.
 
 SEE ALSO
         file_size(E), write_bytes(E), write_file(E), read_file(E),
-        read_bytes(E), rm(E), get_dir(E)
+        read_bytes(E), rm(E), get_dir(E), hooks(C)

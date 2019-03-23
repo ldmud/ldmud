@@ -18,7 +18,7 @@ extern svalue_t *f_rename (svalue_t *sp);
 extern svalue_t *f_rm (svalue_t *sp);
 extern svalue_t *f_rmdir (svalue_t *sp);
 extern svalue_t *f_write_bytes (svalue_t *sp);
-extern svalue_t *f_write_file (svalue_t *sp);
+extern svalue_t *v_write_file (svalue_t *sp, int num_arg);
 
 #endif /* FILES_H__ */
 
