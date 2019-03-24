@@ -678,6 +678,38 @@ void run_test()
                 return str == "\u00a0"*100+"\n";
             :)
         }),
+#ifdef __SQLITE__
+        ({ "SQLite Unicode", 0,
+            (:
+                string str = "\u00af\\_(\u30c4)_/\u00af";
+                int success;
+
+                sl_open("/test.db");
+                sl_exec("CREATE TABLE test(info TEXT)");
+                sl_exec("INSERT INTO test(info) VALUES (?)", str);
+
+                success = deep_eq(sl_exec("SELECT * FROM test"), ({ ({ str }) }));
+                sl_close();
+                rm("/test.db");
+                return success;
+            :)
+        }),
+        ({ "SQLite Blob", 0,
+            (:
+                bytes b = to_bytes(({1,2,3,4,5,6,7,8,9,10}));
+                int success;
+
+                sl_open("/test.db");
+                sl_exec("CREATE TABLE test(info BLOB)");
+                sl_exec("INSERT INTO test(info) VALUES (?)", b);
+
+                success = deep_eq(sl_exec("SELECT * FROM test"), ({ ({ b }) }));
+                sl_close();
+                rm("/test.db");
+                return success;
+            :)
+        }),
+#endif
 #ifdef __XML_DOM__
         ({ "XML with Unicode", 0,
             (:

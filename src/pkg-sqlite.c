@@ -390,8 +390,12 @@ v_sl_exec (svalue_t * sp, int num_arg)
             break;
     
         case T_STRING:
-            sqlite3_bind_text(stmt, num, get_txt(argp->u.str),
-                mstrsize(argp->u.str), SQLITE_STATIC);
+            if (argp->u.str->info.unicode == STRING_BYTES)
+                sqlite3_bind_blob(stmt, num, get_txt(argp->u.str),
+                    mstrsize(argp->u.str), SQLITE_STATIC);
+            else
+                sqlite3_bind_text(stmt, num, get_txt(argp->u.str),
+                    mstrsize(argp->u.str), SQLITE_STATIC);
             break;
         }
     }
@@ -445,7 +449,9 @@ v_sl_exec (svalue_t * sp, int num_arg)
                 break;
 
             case SQLITE_BLOB:
-                errorf("sl_exec: Blob columns are not supported.\n");
+                put_bytes_buf( entry
+                             , sqlite3_column_blob(stmt, col)
+                             , sqlite3_column_bytes(stmt, col));
                 break;
 
             case SQLITE_INTEGER:

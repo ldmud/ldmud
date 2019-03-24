@@ -3508,6 +3508,20 @@ put_c_n_string (svalue_t *sp, const char *p, size_t len)
 
 /*-------------------------------------------------------------------------*/
 void
+put_bytes_buf (svalue_t *sp, const void *p, size_t len)
+
+/* Put a copy of first <len> bytes of the buffer <*p> into <sp>.
+ */
+
+{
+    string_t * str;
+
+    memsafe(str = new_n_mstring((const char*)p, len, STRING_BYTES), len, "bytes");
+    put_string(sp, str);
+} /* put_bytes_buf() */
+
+/*-------------------------------------------------------------------------*/
+void
 push_svalue (svalue_t *v)
 
 /* Push the svalue <v> onto the stack as defined by <inter_sp>.

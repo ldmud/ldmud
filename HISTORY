@@ -12,6 +12,7 @@ xx-xxx-2019 (LDMud Team) -- 3.6.0
     - Runtime:
        + The string type and all its operation support the full
          Unicode character set (#432).
+       + sl_exec() supports blobs now.
 
     - Language
        + Introduced a new type named 'bytes' to differentiate between

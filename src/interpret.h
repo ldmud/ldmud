@@ -220,6 +220,7 @@ extern svalue_t *get_rvalue(svalue_t *v, bool *last_reference);
 
 extern void put_c_string (svalue_t *sp, const char *p);
 extern void put_c_n_string (svalue_t *sp, const char *p, size_t len);
+extern void put_bytes_buf (svalue_t *sp, const void *p, size_t len);
 
 extern void push_svalue(svalue_t *v);
 extern void push_rvalue(svalue_t *v);
