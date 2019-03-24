@@ -111,6 +111,10 @@ static string_t ** stringtable = NULL;
    * the string chains.
    */
 
+string_t *empty_byte_string;
+  /* Empty byte sequence.
+   */
+
 /* Statistics */
 
        mp_uint mstr_used = 0;
@@ -1829,6 +1833,8 @@ mstring_init (void)
         stringtable[x] = NULL;
 
     init_standard_strings();
+
+    empty_byte_string = new_n_tabled("", 0, STRING_BYTES);
 } /* mstring_init() */
 
 /*=========================================================================*/
@@ -1871,6 +1877,8 @@ mstring_note_refs (void)
     {
         count_ref_from_string(shstring[x]);
     }
+
+    count_ref_from_string(empty_byte_string);
 } /* mstring_note_refs() */
 
 /*-------------------------------------------------------------------------*/

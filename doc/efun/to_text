@@ -1,5 +1,5 @@
 SYNOPSIS
-        string to_text(string bytesequence, string encoding)
+        string to_text(bytes bytesequence, string encoding)
         string to_text(int* bytes, string encoding)
         string to_text(string unicode)
         string to_text(int* characters)

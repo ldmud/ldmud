@@ -32,6 +32,7 @@
 #define T_SYMBOL        0x9
 #define T_QUOTED_ARRAY  0xa
 #define T_STRUCT        0xb
+#define T_BYTES         0xc
 
 /* Closure types, stored as secondary type info */
 

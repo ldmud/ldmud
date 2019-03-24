@@ -207,10 +207,11 @@ class SValuePrinter:
     T_SYMBOL                         = 0x9
     T_QUOTED_ARRAY                   = 0xa
     T_STRUCT                         = 0xb
-    T_CALLBACK                       = 0xc
-    T_ERROR_HANDLER                  = 0xd
-    T_BREAK_ADDR                     = 0xe
-    T_NULL                           = 0xf
+    T_BYTES                          = 0xc
+    T_CALLBACK                       = 0xd
+    T_ERROR_HANDLER                  = 0xe
+    T_BREAK_ADDR                     = 0xf
+    T_NULL                           = 0x10
 
     LVALUE_UNPROTECTED               = 0x00
     LVALUE_UNPROTECTED_CHAR          = 0x01
@@ -232,6 +233,7 @@ class SValuePrinter:
         T_SYMBOL:                         "T_SYMBOL",
         T_QUOTED_ARRAY:                   "T_QUOTED_ARRAY",
         T_STRUCT:                         "T_STRUCT",
+        T_BYTES:                          "T_BYTES",
         T_CALLBACK:                       "T_CALLBACK",
         T_ERROR_HANDLER:                  "T_ERROR_HANDLER",
         T_BREAK_ADDR:                     "T_BREAK_ADDR",
@@ -285,7 +287,7 @@ class SValuePrinter:
                 return [(".x.lvalue_type", ltype)]
         elif stype == self.T_NUMBER:
             return [(".u.number", val["u"]["number"])]
-        elif stype == self.T_STRING:
+        elif stype == self.T_STRING or stype == self.T_BYTES:
             return [(".u.str", val["u"]["str"])]
         elif stype == self.T_POINTER:
             return [(".u.vec", val["u"]["vec"])]

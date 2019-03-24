@@ -19,6 +19,7 @@ int deep_eq(mixed arg1, mixed arg2)
         case T_NUMBER:
         case T_FLOAT:
         case T_STRING:
+        case T_BYTES:
         case T_OBJECT:
             return arg1 == arg2;
 

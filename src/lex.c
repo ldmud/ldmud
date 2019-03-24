@@ -2951,13 +2951,6 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
         }
     }
 
-    /* We accept only unicode strings. */
-    if (auto_include_string != NULL && auto_include_string->info.unicode == STRING_BYTES)
-    {
-        auto_include_string = NULL;
-        yyerror("H_AUTO_INCLUDE string is a byte string, unicode string needed.");
-    }
-
     if (auto_include_string != NULL)
     {
         /* The auto include string is handled like a normal include */
@@ -3150,12 +3143,6 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
                 return -1;
             }
 
-            if (res->u.str->info.unicode == STRING_BYTES)
-            {
-                yyerrorf("master::%s returned a byte string, unicode string needed.", get_txt(STR_INCLUDE_FILE));
-                return -1;
-            }
-
             if (mstrsize(res->u.str) >= INC_OPEN_BUFSIZE)
             {
                 yyerrorf("Include name '%s' too long.", get_txt(res->u.str));
@@ -3306,12 +3293,6 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
         /* The result must be legal relative pathname */
         if (!svp || svp->type != T_STRING)
             return -1;
-
-        if (svp->u.str->info.unicode == STRING_BYTES)
-        {
-            yyerror("H_INCLUDE_DIRS returned a byte string, unicode string needed.");
-            return -1;
-        }
 
         if (mstrsize(svp->u.str) < INC_OPEN_BUFSIZE)
         {
@@ -7761,11 +7742,6 @@ set_inc_list (vector_t *v)
         if (svp->type != T_STRING)
         {
             errorf("H_INCLUDE_DIRS argument has a non-string array element\n");
-        }
-
-        if (svp->u.str->info.unicode == STRING_BYTES)
-        {
-            errorf("H_INCLUDE_DIRS argument has a byte sequence in the array\n");
         }
 
         /* Set p to the beginning of the pathname, skipping leading

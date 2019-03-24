@@ -647,7 +647,7 @@ notify_no_command (char *command, object_t *save_command_giver)
         push_ref_valid_object(inter_sp, save_command_giver, "notify_no_command");
         call_lambda(svp, 1);
         /* add_message might cause an error, thus, we free the closure first. */
-        if (inter_sp->type == T_STRING && inter_sp->u.str->info.unicode != STRING_BYTES)
+        if (inter_sp->type == T_STRING)
         {
             if (!useHook)
             {
@@ -661,7 +661,7 @@ notify_no_command (char *command, object_t *save_command_giver)
             useHook = MY_FALSE;
         }
     }
-    else if (driver_hook[H_NOTIFY_FAIL].type == T_STRING && driver_hook[H_NOTIFY_FAIL].u.str->info.unicode != STRING_BYTES)
+    else if (driver_hook[H_NOTIFY_FAIL].type == T_STRING)
     {
         if (!useHook)
             tell_object(command_giver, driver_hook[H_NOTIFY_FAIL].u.str);
@@ -678,7 +678,7 @@ notify_no_command (char *command, object_t *save_command_giver)
         push_c_string(inter_sp, command);
         push_ref_valid_object(inter_sp, save_command_giver, "notify_no_command");
         call_lambda(&driver_hook[H_NOTIFY_FAIL], 2);
-        if (inter_sp->type == T_STRING && inter_sp->u.str->info.unicode != STRING_BYTES)
+        if (inter_sp->type == T_STRING)
         {
             if (!useHook)
             {

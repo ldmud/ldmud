@@ -266,6 +266,7 @@ f_explode (svalue_t * sp)
 /* EFUN explode()
  *
  *   string *explode(string str, string del)
+ *   string *explode(bytes str, bytes del)
  *
  * Return an array of strings, created when the string str is
  * split into substrings as divided by del.
@@ -274,16 +275,8 @@ f_explode (svalue_t * sp)
 {
     vector_t *v;
 
-    if (sp[-1].u.str->info.unicode == STRING_BYTES)
-    {
-        if (sp[0].u.str->info.unicode != STRING_BYTES)
-            efun_exp_arg_error(2, TF_BYTES, T_STRING, sp);
-    }
-    else
-    {
-        if (sp[0].u.str->info.unicode == STRING_BYTES)
-            efun_exp_arg_error(2, TF_STRING, T_BYTES, sp);
-    }
+    if (sp[-1].type != sp[0].type)
+        efun_arg_error(2, sp[-1].type, sp[0].type, sp);
 
     v = explode_string((sp-1)->u.str, sp->u.str);
     free_string_svalue(sp);
@@ -317,7 +310,10 @@ f_implode (svalue_t * sp)
     sp--;
     free_array(sp->u.vec);
 
-    put_string(sp, str);
+    if (sp[1].type == T_BYTES)
+        put_bytes(sp, str);
+    else
+        put_string(sp, str);
 
     return sp;
 } /* f_implode() */
@@ -1874,16 +1870,8 @@ find_string (svalue_t *sp, bool forward)
     base = sp[-2].u.str;
     pattern = sp[-1].u.str;
 
-    if (base->info.unicode == STRING_BYTES)
-    {
-        if (pattern->info.unicode != STRING_BYTES)
-            efun_exp_arg_error(2, TF_BYTES, T_STRING, sp);
-    }
-    else
-    {
-        if (pattern->info.unicode == STRING_BYTES)
-            efun_exp_arg_error(2, TF_STRING, T_BYTES, sp);
-    }
+    if (sp[-2].type != sp[-1].type)
+        efun_arg_error(2, sp[-2].type, sp[-1].type, sp);
 
     if ( 0 != (start = sp->u.number) )
     {
@@ -1947,6 +1935,7 @@ f_strstr (svalue_t *sp)
 /* EFUN strstr()
  *
  *   int strstr (string str, string str2, int pos)
+ *   int strstr (bytes str, bytes str2, int pos)
  *
  * Returns the index of str2 in str searching from position pos forward.
  * If str2 is not found in str, -1 is returned. The returned
@@ -1966,6 +1955,7 @@ f_strrstr (svalue_t *sp)
 /* EFUN strrstr()
  *
  *   int strrstr (string str, string str2, int pos)
+ *   int strrstr (bytes str, bytes str2, int pos)
  *
  * Returns the index of str2 in str searching from position pos backward.
  * If str2 is not found in str, -1 is returned. The returned
@@ -5353,7 +5343,7 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
     if (rvaluep == NULL)
     {
         struct protected_range_lvalue *r = valuep->u.protected_range_lvalue;
-        if (r->vec.type != T_STRING)
+        if (r->vec.type == T_POINTER)
         {
             /* We only need this for error messages. */
             rvaluep = &(r->vec);
@@ -5365,9 +5355,8 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
         }
     }
 
-    if (rvaluep->type == T_STRING)
+    if (rvaluep->type == T_STRING || rvaluep->type == T_BYTES)
     {
-        bool isbyte = rvaluep->u.str->info.unicode == STRING_BYTES;
         result = rvaluep;
 
         for (valuep++, left--; left > 0; valuep++, left--)
@@ -5390,28 +5379,17 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
                 }
             }
 
-            if (item->type != T_STRING)
+            if (item->type != rvaluep->type)
             {
                 free_svalue(&tmp_str);
                 if (gotArray)
                     errorf("Bad argument to %s(): array[%d] is a '%s', "
-                          "expected 'string'.\n"
+                          "expected '%s'.\n"
                          , fname, (int)VEC_SIZE(argp->u.vec) - left + 1
-                         , typename(item->type));
+                         , typename(item->type)
+                         , typename(rvaluep->type));
                 else
-                    vefun_arg_error(num_arg - left + 1, T_STRING, item->type, sp);
-                /* NOTREACHED */
-            }
-            if (isbyte != (item->u.str->info.unicode == STRING_BYTES))
-            {
-                free_svalue(&tmp_str);
-                if (gotArray)
-                    errorf("Bad argument to %s(): array[%d] is a '%s string', "
-                          "expected '%s string'.\n"
-                         , fname, (int)VEC_SIZE(argp->u.vec) - left + 1
-                         , isbyte ? "text" : "byte", isbyte ? "byte" : "text");
-                else
-                    vefun_arg_error(num_arg - left + 1, isbyte ? T_BYTES : T_STRING, isbyte ? T_STRING : T_BYTES, sp);
+                    vefun_arg_error(num_arg - left + 1, rvaluep->type, item->type, sp);
                 /* NOTREACHED */
             }
 
@@ -5483,10 +5461,10 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
     {
         if (gotArray)
             errorf("Bad argument to %s(): array[0] is a '%s', "
-                  "expected 'string', 'int' or 'float'.\n"
+                  "expected 'string', 'bytes', 'int' or 'float'.\n"
                  , fname, typename(rvaluep->type));
         else
-            vefun_exp_arg_error(1, TF_STRING|TF_NUMBER|TF_FLOAT, rvaluep->type, sp);
+            vefun_exp_arg_error(1, TF_STRING|TF_BYTES|TF_NUMBER|TF_FLOAT, rvaluep->type, sp);
         /* NOTREACHED */
     }
 
@@ -5512,11 +5490,11 @@ v_max (svalue_t *sp, int num_arg)
 
 /* VEFUN max()
  *
- *   string    max (string arg, ...)
- *   string    max (string * arg_array)
+ *   string|bytes max (string|bytes arg, ...)
+ *   string|bytes max (string|bytes * arg_array)
  *
- *   int|float max (int|float arg, ...)
- *   int|float max (int|float * arg_array)
+ *   int|float    max (int|float arg, ...)
+ *   int|float    max (int|float * arg_array)
  *
  * Determine the maximum value of the <arg>uments and return it.
  * If max() is called with an array (which must not be empty) as only
@@ -5533,11 +5511,11 @@ v_min (svalue_t *sp, int num_arg)
 
 /* VEFUN min()
  *
- *   string    min (string arg, ...)
- *   string    min (string * arg_array)
+ *   string|bytes min (string|bytes arg, ...)
+ *   string|bytes min (string|bytes * arg_array)
  *
- *   int|float min (int|float arg, ...)
- *   int|float min (int|float * arg_array)
+ *   int|float    min (int|float arg, ...)
+ *   int|float    min (int|float * arg_array)
  *
  * Determine the minimum value of the <arg>uments and return it.
  * If min() is called with an array (which must not be empty) as only
@@ -6227,6 +6205,7 @@ f_to_array (svalue_t *sp)
 /* EFUN to_array()
  *
  *   mixed *to_array(string)
+ *   mixed *to_array(bytes)
  *   mixed *to_array(symbol)
  *   mixed *to_array(quotedarray)
  *   mixed *to_array(mixed *)
@@ -6252,6 +6231,7 @@ f_to_array (svalue_t *sp)
         fatal("Bad arg 1 to to_array(): type %s\n", typename(sp->type));
         break;
     case T_STRING:
+    case T_BYTES:
     case T_SYMBOL:
         /* Split the string into an array of ints */
 
@@ -7131,12 +7111,14 @@ copy_svalue (svalue_t *dest, svalue_t *src
                     }
 
                     /* Check whether r->var is still valid. */
-                    if (l->var != NULL && l->var->val.type == T_STRING && l->str == l->var->val.u.str)
+                    if (l->var != NULL
+                     && (l->var->val.type == T_STRING || l->var->val.type == T_BYTES)
+                     && l->str == l->var->val.u.str)
                     {
                         struct pointer_record *var_rec = find_add_pointer(ptable, l->var, MY_TRUE);
                         if (var_rec->ref_count++ < 0)
                         {
-                            svalue_t var_content = { T_STRING };
+                            svalue_t var_content = { l->var->val.type };
                             svalue_t var_lvalue;
 
                             var_content.u.str = ref_mstring(dup);
@@ -7189,7 +7171,8 @@ copy_svalue (svalue_t *dest, svalue_t *src
                     /* Check whether r->var is still valid. */
                     if (r->var != NULL
                      && ((r->vec.type == T_POINTER && r->var->val.type == T_POINTER && r->vec.u.vec == r->var->val.u.vec)
-                      || (r->vec.type == T_STRING  && r->var->val.type == T_STRING  && r->vec.u.str == r->var->val.u.str)))
+                      || (r->vec.type == T_STRING  && r->var->val.type == T_STRING  && r->vec.u.str == r->var->val.u.str)
+                      || (r->vec.type == T_BYTES   && r->var->val.type == T_BYTES   && r->vec.u.str == r->var->val.u.str)))
                     {
                         struct pointer_record *var_rec = find_add_pointer(ptable, r->var, MY_TRUE);
                         if (var_rec->ref_count++ < 0)
@@ -7239,6 +7222,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
         break;
 
     case T_STRING:
+    case T_BYTES:
         if (mstr_mutable(src->u.str))
         {
             /* We must make a mutable copy of a mutable string. */
@@ -7246,12 +7230,14 @@ copy_svalue (svalue_t *dest, svalue_t *src
             if (rec->ref_count++ < 0)
             {
                 string_t *dup = make_mutable(dup_mstring(src->u.str));
-                put_string(dest, dup);
+                dest->type = src->type;
+                dest->u.str = dup;
                 rec->data = dup;
             }
             else
             {
-                put_ref_string(dest, (string_t*) rec->data);
+                dest->type = src->type;
+                dest->u.str = ref_mstring((string_t*) rec->data);
             }
         }
         else
@@ -7410,17 +7396,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
     switch(i)
     {
     case T_STRING:
-        if (flag == 2)
-        {
-            /* Return whether this is a byte sequence. */
-            bool isbyte = (sp[-1].u.str->info.unicode == STRING_BYTES);
-
-            sp--;
-            free_svalue(sp);
-            put_number(sp, isbyte ? 1 : 0);
-            return sp;
-        }
-
+    case T_BYTES:
         j = (mstr_tabled(sp[-1].u.str)) ? 0 : 1;
         break;
     case T_MAPPING:
@@ -7711,6 +7687,7 @@ v_member (svalue_t *sp, int num_arg)
             switch(sp->type)
             {
             case T_STRING:
+            case T_BYTES:
               {
                 string_t *str;
                 svalue_t *entry;
@@ -7724,7 +7701,7 @@ v_member (svalue_t *sp, int num_arg)
                         struct protected_range_lvalue* r = entry->u.protected_range_lvalue;
                         size_t len;
 
-                        if (r->vec.type != T_STRING)
+                        if (r->vec.type != sp->type)
                             continue;
 
                         len = mstrsize(str);
@@ -7734,7 +7711,7 @@ v_member (svalue_t *sp, int num_arg)
                         if (memcmp(get_txt(str), get_txt(r->vec.u.str) + r->index1, len) == 0)
                             break;
                     }
-                    else if (item->type == T_STRING && mstreq(str, item->u.str))
+                    else if (item->type == sp->type && mstreq(str, item->u.str))
                         break;
                 }
                 break;
@@ -7856,7 +7833,7 @@ v_member (svalue_t *sp, int num_arg)
 
     /* --- Search a string --- */
 
-    if (sp[-1].type == T_STRING)
+    if (sp[-1].type == T_STRING || sp[-1].type == T_BYTES)
     {
         string_t *str;
         char *str2;
@@ -8001,6 +7978,7 @@ v_rmember (svalue_t *sp, int num_arg)
         switch(sp->type)
         {
         case T_STRING:
+        case T_BYTES:
           {
             string_t *str;
             svalue_t *entry;
@@ -8017,7 +7995,7 @@ v_rmember (svalue_t *sp, int num_arg)
                     struct protected_range_lvalue* r = entry->u.protected_range_lvalue;
                     size_t len;
 
-                    if (r->vec.type != T_STRING)
+                    if (r->vec.type != sp->type)
                         continue;
 
                     len = mstrsize(str);
@@ -8027,7 +8005,7 @@ v_rmember (svalue_t *sp, int num_arg)
                     if (memcmp(get_txt(str), get_txt(r->vec.u.str) + r->index1, len) == 0)
                         break;
                 }
-                else if (item->type == T_STRING && mstreq(str, item->u.str))
+                else if (item->type == sp->type && mstreq(str, item->u.str))
                     break;
             }
             break;
@@ -8156,7 +8134,7 @@ v_rmember (svalue_t *sp, int num_arg)
 
     /* --- Search a string --- */
 
-    if (sp[-1].type == T_STRING)
+    if (sp[-1].type == T_STRING || sp[-1].type == T_BYTES)
     {
         string_t *str;
         ptrdiff_t i;
@@ -8389,7 +8367,7 @@ f_reverse(svalue_t *sp)
             index2 = (mp_int)VEC_SIZE(vec);
             data = sp;
         }
-        else if (data->type == T_STRING)
+        else if (data->type == T_STRING || data->type == T_BYTES)
         {
             string_t *str = ref_mstring(data->u.str);
             free_svalue(sp);
@@ -8491,7 +8469,7 @@ f_reverse(svalue_t *sp)
 
         put_number(sp, res);
     }
-    else if (data->type == T_STRING)
+    else if (data->type == T_STRING || data->type == T_BYTES)
     {
         size_t len = mstrsize(data->u.str);
 
@@ -8518,14 +8496,17 @@ f_reverse(svalue_t *sp)
             else
             {
                 string_t *res = NULL;
+                ph_int stringtype = data->type;
 
                 memsafe(res = alloc_mstring(len), len, "reversed string");
                 res->info.unicode = data->u.str->info.unicode;
                 p1 = get_txt(res);
 
                 memcpy(p1, get_txt(data->u.str), len);
+
                 free_string_svalue(data);
-                put_string(sp, res);
+                sp->type = stringtype;
+                sp->u.str = res;
             }
 
             if(!changeInPlace)

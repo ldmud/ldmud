@@ -3701,7 +3701,7 @@ f_tell_object (svalue_t *sp)
             errorf("Object not found: %s.\n", get_txt(arg[0].u.str));
     }
 
-    if (arg[1].type == T_STRING && arg[1].u.str->info.unicode != STRING_BYTES)
+    if (arg[1].type == T_STRING)
     {
         tell_object(ob, sp->u.str);
         free_svalue(sp);
@@ -4680,12 +4680,8 @@ e_say (svalue_t *v, vector_t *avoid)
     switch(v->type)
     {
     case T_STRING:
-        if (v->u.str->info.unicode != STRING_BYTES)
-        {
-            message = v->u.str;
-            break;
-        }
-        /* else FALLTHROUGH */
+        message = v->u.str;
+        break;
 
     case T_OBJECT:
     case T_POINTER:
@@ -4891,12 +4887,8 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     switch(v->type)
     {
     case T_STRING:
-        if (v->u.str->info.unicode != STRING_BYTES)
-        {
-            message = v->u.str;
-            break;
-        }
-        /* else FALLTHROUGH */
+        message = v->u.str;
+        break;
 
     case T_OBJECT:
     case T_POINTER:
@@ -6296,7 +6288,8 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                 /* Check whether the variable reference is still valid. */
                 var_valid = (r->var != NULL
                  && ((r->vec.type == T_POINTER && r->var->val.type == T_POINTER && r->vec.u.vec == r->var->val.u.vec)
-                  || (r->vec.type == T_STRING  && r->var->val.type == T_STRING  && r->vec.u.str == r->var->val.u.str)));
+                  || (r->vec.type == T_STRING  && r->var->val.type == T_STRING  && r->vec.u.str == r->var->val.u.str)
+                  || (r->vec.type == T_BYTES   && r->var->val.type == T_BYTES   && r->vec.u.str == r->var->val.u.str)));
 
                 /* Let's have alook whether we have to disclose to full
                  * array (although we only see a part of it here).
@@ -6325,6 +6318,7 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                             break;
 
                         case T_STRING:
+                        case T_BYTES:
                             save_string(r->vec.u.str, r->index1, r->index2 - r->index1);
                             break;
 
@@ -6416,6 +6410,7 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                         break;
 
                     case T_STRING:
+                    case T_BYTES:
                         save_string(r->vec.u.str, r->index1, r->index2 - r->index1);
                         break;
 
@@ -6454,6 +6449,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
     switch(v->type)
     {
     case T_STRING:
+    case T_BYTES:
         save_string(v->u.str, -1, -1);
         break;
 
@@ -6713,6 +6709,7 @@ register_svalue (svalue_t *svp)
     switch (svp->type)
     {
       case T_STRING:
+      case T_BYTES:
         (void)register_pointer(ptable, svp->u.str);
         break;
 
@@ -6770,7 +6767,8 @@ register_svalue (svalue_t *svp)
 
                     if (r->var != NULL
                      && ((r->vec.type == T_POINTER && r->var->val.type == T_POINTER && r->vec.u.vec == r->var->val.u.vec)
-                      || (r->vec.type == T_STRING  && r->var->val.type == T_STRING  && r->vec.u.str == r->var->val.u.str)))
+                      || (r->vec.type == T_STRING  && r->var->val.type == T_STRING  && r->vec.u.str == r->var->val.u.str)
+                      || (r->vec.type == T_BYTES   && r->var->val.type == T_BYTES   && r->vec.u.str == r->var->val.u.str)))
                     {
                         if (register_pointer(ptable, r->var) != NULL)
                             register_svalue(&(r->var->val));
@@ -8525,6 +8523,7 @@ restore_lvalue (svalue_t *svp, char **str)
             break;
 
         case T_STRING:
+        case T_BYTES:
             size = mstrsize(val->u.str);
             break;
 
@@ -8714,7 +8713,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         *cp = '\0';
         *pt = source;
         if (isbyte)
-            put_string(svp, new_n_tabled(start, len, STRING_BYTES));
+            put_bytes(svp, new_n_tabled(start, len, STRING_BYTES));
         else
             put_string(svp, new_n_unicode_tabled(start, len));
         if (!svp->u.str)

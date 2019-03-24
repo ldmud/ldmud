@@ -292,7 +292,7 @@ generate_xml_node(vector_t *vnode, iks *parent)
     /* get the name, as this is essential */
     element = &vnode->item[XML_TAG_NAME];
 
-    if (element->type != T_STRING || element->u.str->info.unicode == STRING_BYTES)
+    if (element->type != T_STRING)
     {
         errorf("Bad arg 1 to xml_generate(): first element of tag array not a "
                "string.\n");
@@ -375,7 +375,7 @@ generate_xml_node(vector_t *vnode, iks *parent)
         {
             element = &contents->item[i];
 
-            if (element->type == T_STRING && element->u.str->info.unicode != STRING_BYTES)
+            if (element->type == T_STRING)
             {
                 /* found a cdata */
                 memsafe(iks_insert_cdata(node, get_txt(element->u.str), mstrsize(element->u.str))

@@ -388,14 +388,15 @@ v_sl_exec (svalue_t * sp, int num_arg)
             else
                 sqlite3_bind_int(stmt, num, argp->u.number);
             break;
-    
+
         case T_STRING:
-            if (argp->u.str->info.unicode == STRING_BYTES)
-                sqlite3_bind_blob(stmt, num, get_txt(argp->u.str),
-                    mstrsize(argp->u.str), SQLITE_STATIC);
-            else
-                sqlite3_bind_text(stmt, num, get_txt(argp->u.str),
-                    mstrsize(argp->u.str), SQLITE_STATIC);
+            sqlite3_bind_text(stmt, num, get_txt(argp->u.str),
+                mstrsize(argp->u.str), SQLITE_STATIC);
+            break;
+
+        case T_BYTES:
+            sqlite3_bind_blob(stmt, num, get_txt(argp->u.str),
+                mstrsize(argp->u.str), SQLITE_STATIC);
             break;
         }
     }

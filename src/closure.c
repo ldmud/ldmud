@@ -1729,14 +1729,14 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
     {
     case T_LVALUE:                             /* ----- T_LVALUE ----- */
       {
-        /* Can only be a string range, otherwise get_rvalue
+        /* Can only be a string/bytes range, otherwise get_rvalue
          * would have returned another type. And array ranges
          * were handled before.
          */
         svalue_t tmp;
 
         assert(value->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        assert(r->vec.type == T_STRING);
+        assert(r->vec.type == T_STRING || r->vec.type == T_BYTES);
 
         assign_rvalue_no_free(&tmp, value);
         insert_value_push(value);
@@ -3918,7 +3918,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                 l->line = 0;
                                 l->key = labels->u.number;
                             }
-                            else if (labels->type == T_STRING)
+                            else if (labels->type == T_STRING || labels->type == T_BYTES)
                             {
                             	/* String label: we have to make the string shared
                             	 * and store it in the value table (to keep the
@@ -3938,8 +3938,8 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                 if (--current.values_left < 0)
                                     realloc_values();
                                 no_string = MY_FALSE;
-                                put_string(&stmp
-                                          , make_tabled_from(labels->u.str));
+                                stmp.type = labels->type;
+                                stmp.u.str = make_tabled_from(labels->u.str);
                                 *--current.valuep = stmp;
 
                                 l->key = (p_int)stmp.u.str;

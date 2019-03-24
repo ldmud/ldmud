@@ -2525,7 +2525,7 @@ get_message (char *buff, size_t *bufflength)
                                 string_t * str;
 
                                 str = new_n_mstring(rp + 8, rest, STRING_BYTES);
-                                push_string(inter_sp, str);
+                                push_bytes(inter_sp, str);
 
                                 num_arg = 1;
                             }
@@ -2677,7 +2677,7 @@ get_message (char *buff, size_t *bufflength)
                     ipaddr_str = inet6_ntoa(addr.sin_addr);
 #endif
                     push_c_string(inter_sp, ipaddr_str);
-                    push_string(inter_sp, udp_data); /* adopts the ref */
+                    push_bytes(inter_sp, udp_data); /* adopts the ref */
                     push_number(inter_sp, ntohs(addr.sin_port));
                     RESET_LIMITS;
                     callback_master(STR_RECEIVE_UDP, 3);
@@ -4287,7 +4287,7 @@ print_prompt (void)
 
         call_lambda(prompt, 0);
         prompt = inter_sp;
-        if (prompt->type != T_STRING || prompt->u.str->info.unicode == STRING_BYTES)
+        if (prompt->type != T_STRING)
         {
             free_svalue(prompt);
         }
@@ -4301,7 +4301,7 @@ print_prompt (void)
         }
         inter_sp--;
     }
-    else if (prompt->type == T_STRING && prompt->u.str->info.unicode != STRING_BYTES)
+    else if (prompt->type == T_STRING)
     {
         print_prompt_string(prompt->u.str);
     }
@@ -5867,7 +5867,7 @@ f_send_erq (svalue_t *sp)
 
 /* EFUN: send_erq()
  *
- *   int send_erq(int request, string|int* data, closure callback)
+ *   int send_erq(int request, bytes|int* data, closure callback)
  *
  * Send a request of type <request> and the data <data> to the ERQ>
  * If <callback> is set to a closure, it will be called with the
@@ -5887,7 +5887,8 @@ f_send_erq (svalue_t *sp)
 
     /* Set arg with the data to send. */
 
-    if (sp[-1].type == T_STRING) {
+    if (sp[-1].type == T_BYTES)
+    {
         arg = get_txt(sp[-1].u.str);
         arglen = mstrsize(sp[-1].u.str);
     }
@@ -5966,8 +5967,9 @@ failure:
         free_svalue(sp);
     }
     /* cleanup */
-    if (sp[-1].type != T_STRING) {
-        /* free arg only if sp-1 is not a string */
+    if (sp[-1].type != T_BYTES)
+    {
+        /* free arg only if sp-1 is not a byte sequence */
         xfree(arg);
     }
     free_svalue(--sp);
@@ -6509,7 +6511,7 @@ f_send_udp (svalue_t *sp)
 
 /* EFUN: send_udp()
  *
- *   int send_udp(string host, int port, string message)
+ *   int send_udp(string host, int port, bytes message)
  *   int send_udp(string host, int port, int * message)
  *
  * Sends The message in an UDP packet to the given host and port
@@ -6542,7 +6544,7 @@ f_send_udp (svalue_t *sp)
 
         /* Set msg/msglen to the data of the message to send */
 
-        if (sp->type == T_STRING)
+        if (sp->type == T_BYTES)
         {
             msg = get_txt(sp->u.str);
             msglen = mstrsize(sp->u.str);
@@ -6669,7 +6671,7 @@ f_binary_message (svalue_t *sp)
 
 /* EFUN: binary_message()
  *
- *   int binary_message(int *|string message, int flags)
+ *   int binary_message(int *|bytes message, int flags)
  *
  * Flush output and send output directly with write WITHOUT IAC QUOTING.
  * The message may contain zeroes if given as int *.
@@ -6728,7 +6730,7 @@ f_binary_message (svalue_t *sp)
         }
         msg->info.unicode = STRING_BYTES;
     }
-    else /* it's a string */
+    else /* it's a byte sequence */
     {
         msg = ref_mstring(sp[-1].u.str);
     }
@@ -8383,8 +8385,6 @@ f_configure_interactive (svalue_t *sp)
                 break;
 
             case T_STRING:
-                if (sp->u.str->info.unicode == STRING_BYTES)
-                    efun_exp_arg_error(3, TF_STRING, T_BYTES, sp);
                 set_charset_from_string(sp->u.str, ip->combine_cset, "configure_interactive with IC_COMBINE_CHARSET_AS_STRING", 3);
                 break;
 
@@ -8433,8 +8433,6 @@ f_configure_interactive (svalue_t *sp)
                 break;
 
             case T_STRING:
-                if (sp->u.str->info.unicode == STRING_BYTES)
-                    efun_exp_arg_error(3, TF_STRING, T_BYTES, sp);
                 set_charset_from_string(sp->u.str, ip->charset, "configure_interactive with IC_CONNECTION_CHARSET_AS_STRING", 3);
                 break;
 
@@ -8529,9 +8527,6 @@ f_configure_interactive (svalue_t *sp)
         if (sp->type != T_STRING && sp->type != T_CLOSURE)
             efun_exp_arg_error(3, TF_STRING|TF_CLOSURE, sp->type, sp);
 
-        if (sp->type == T_STRING && sp->u.str->info.unicode == STRING_BYTES)
-            efun_exp_arg_error(3, TF_STRING, T_BYTES, sp);
-
         if (sp->type == T_CLOSURE && sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
             errorf("Bad arg 3 for configure_interactive with IC_PROMPT: lambda closure not bound\n");
 
@@ -8584,8 +8579,6 @@ f_configure_interactive (svalue_t *sp)
     case IC_ENCODING:
         if (sp->type != T_STRING)
             efun_exp_arg_error(3, TF_STRING, sp->type, sp);
-        else if (sp->u.str->info.unicode == STRING_BYTES)
-            efun_exp_arg_error(3, TF_STRING, T_BYTES, sp);
 
         if (mstrsize(sp->u.str) >= sizeof(default_player_encoding))
             errorf("Illegal value to arg 3 of configure_interactive with IC_ENCODING: Encoding name too long.\n");

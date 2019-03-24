@@ -4512,10 +4512,8 @@ print_svalue (svalue_t *arg)
     {
         interactive_t *ip;
 
-        if (arg->u.str->info.unicode == STRING_BYTES)
-            add_message("<BYTES>");
         /* Strings sent to monsters are now delivered */
-        else if (command_giver && (command_giver->flags & O_ENABLE_COMMANDS)
+        if (command_giver && (command_giver->flags & O_ENABLE_COMMANDS)
          && !(O_SET_INTERACTIVE(ip, command_giver)) )
         {
             tell_npc(command_giver, arg->u.str);
@@ -4525,6 +4523,8 @@ print_svalue (svalue_t *arg)
             add_message_str(arg->u.str);
         }
     }
+    else if (arg->type == T_BYTES)
+        add_message("<BYTES>");
     else if (arg->type == T_OBJECT)
         add_message("OBJ(%s)", get_txt(arg->u.ob->name));
     else if (arg->type == T_NUMBER)
@@ -5074,7 +5074,7 @@ f_write (svalue_t *sp)
  * Write out something to the current user. What exactly will
  * be printed in the end depends of the type of msg.
  *	
- * If it is a string or a number then just prints it out.
+ * If it is a text string or a number then just prints it out.
  *	
  * If it is an object then the object will be printed in the
  * form: "OBJ("+file_name((object)mix)+")"
@@ -5082,6 +5082,7 @@ f_write (svalue_t *sp)
  * If it is an array just "<ARRAY>" will be printed.
  * If it is a mapping just "<MAPPING>" will be printed.
  * If it is a closure just "<CLOSURE>" will be printed.
+ * If it is a byte string just "<BYTES>" will be printed.
  * 	
  * If the write() function is invoked by a command of an living
  * but not interactive object and the given argument is a string

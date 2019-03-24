@@ -14,9 +14,6 @@ DESCRIPTION
         (i.e. the data type) is returned (as int). If <flag> is 1, the
         second element is returned.
 
-        if <arg> is a string, the <flag> setting 2 lets the efun
-        return 1 when the string is a byte sequence, 0 otherwise.
-
         If <arg> is a closure, the <flag> setting 2 lets the efun
         return the object of the closure (which for 'lfun closures' is
         the object the lfun is defined in, which is not necessarily the object

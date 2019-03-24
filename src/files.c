@@ -1107,7 +1107,7 @@ v_read_bytes (svalue_t *sp, int num_arg)
     if (rc == NULL)
         push_number(sp, 0);
     else
-        push_string(sp, rc);
+        push_bytes(sp, rc);
 
     return sp;
 } /* v_read_bytes() */

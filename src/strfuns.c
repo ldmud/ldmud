@@ -653,7 +653,7 @@ v_to_bytes (svalue_t *sp, int num_arg)
  *
  *   string to_bytes(string unicode, string encoding)
  *   string to_bytes(int* characters, string encoding)
- *   string to_bytes(string bytesequence)
+ *   string to_bytes(bytes bytesequence)
  *   string to_bytes(int* bytes)
  *
  * The first argument is converted to an encoded string.
@@ -723,7 +723,7 @@ v_to_bytes (svalue_t *sp, int num_arg)
                 result->info.unicode = STRING_BYTES;
 
                 sp = pop_n_elems(2, sp);
-                push_string(sp, result);
+                push_bytes(sp, result);
                 return sp;
             }
 
@@ -812,7 +812,7 @@ v_to_bytes (svalue_t *sp, int num_arg)
                 return sp; /* NOTREACHED */
             }
         }
-        else /* text->type == T_STRING */
+        else if (text->type == T_STRING)
         {
             iconv_t cd;
 
@@ -824,10 +824,6 @@ v_to_bytes (svalue_t *sp, int num_arg)
             char*  out_buf_start;
             size_t out_buf_size;
             size_t out_buf_left;
-
-            /* We were given an encoding, so this must be a unicode string. */
-            if (text->u.str->info.unicode == STRING_BYTES)
-                errorf("Bad arg 1 to to_bytes(): byte string and encoding given.\n");
 
             cd = iconv_open(get_txt(sp->u.str), "UTF-8");
             if (cd == (iconv_t)-1)
@@ -851,7 +847,7 @@ v_to_bytes (svalue_t *sp, int num_arg)
                 result->info.unicode = STRING_BYTES;
 
                 sp = pop_n_elems(2, sp);
-                push_string(sp, result);
+                push_bytes(sp, result);
                 return sp;
             }
 
@@ -926,10 +922,12 @@ v_to_bytes (svalue_t *sp, int num_arg)
                 return sp; /* NOTREACHED */
             }
         }
+        else
+            errorf("Bad arg 1 to to_bytes(): byte string and encoding given.\n");
 
         result->info.unicode = STRING_BYTES;
         sp = pop_n_elems(2, sp);
-        push_string(sp, result);
+        push_bytes(sp, result);
         return sp;
     }
     else if (sp->type == T_POINTER)
@@ -960,18 +958,19 @@ v_to_bytes (svalue_t *sp, int num_arg)
 
         result->info.unicode = STRING_BYTES;
         free_array(sp->u.vec);
-        put_string(sp, result);
+        put_bytes(sp, result);
 
         return sp;
     }
-    else /* sp->type == T_STRING */
+    else if (sp->type == T_BYTES)
     {
-        /* Must be string, check that it is a byte string. */
-        if (sp->u.str->info.unicode != STRING_BYTES)
-            errorf("Bad arg 1 to to_bytes(): unicode string given without encoding.\n");
-
         /* A byte string we just return. */
         return sp;
+    }
+    else
+    {
+        errorf("Bad arg 1 to to_bytes(): unicode string given without encoding.\n");
+        return sp; /* NOTREACHED */
     }
 
 } /* v_to_bytes() */
@@ -982,7 +981,7 @@ v_to_text (svalue_t *sp, int num_arg)
 
 /* EFUN to_text
  *
- *   string to_text(string bytesequence, string encoding)
+ *   string to_text(bytes bytesequence, string encoding)
  *   string to_text(int* bytes, string encoding)
  *   string to_text(string unicode)
  *   string to_text(int* characters)
@@ -1048,15 +1047,13 @@ v_to_text (svalue_t *sp, int num_arg)
                 }
             }
         }
-        else
+        else if (text->type == T_BYTES)
         {
-            /* We were given an encoding, so this must be a byte string. */
-            if (text->u.str->info.unicode != STRING_BYTES)
-                errorf("Bad arg 1 to to_text(): unicode string and encoding given.\n");
-
             in_buf_start = get_txt(text->u.str);
             in_buf_size = mstrsize(text->u.str);
         }
+        else
+            errorf("Bad arg 1 to to_text(): unicode string and encoding given.\n");
 
         cd = iconv_open("UTF-8", get_txt(sp->u.str));
         if (cd == (iconv_t)-1)
@@ -1237,13 +1234,14 @@ v_to_text (svalue_t *sp, int num_arg)
         put_string(sp, result);
         return sp;
     }
-    else /* sp->type == T_STRING */
+    else if (sp->type == T_STRING)
     {
-        /* Must be string, check that it is a unicode string. */
-        if (sp->u.str->info.unicode == STRING_BYTES)
-            errorf("Bad arg 1 to to_text(): byte string given without encoding.\n");
-
         /* A unicode string we just return. */
+        return sp;
+    }
+    else
+    {
+        errorf("Bad arg 1 to to_text(): byte string given without encoding.\n");
         return sp;
     }
 

@@ -917,6 +917,7 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
         {
 
         case T_STRING:
+        case T_BYTES:
             /* Use x.generic as flag whether the string is tabled or not */
             svp->x.generic = (mstr_tabled(svp->u.str) ? 0 : 1);
             /* FALL THROUGH */
@@ -1142,6 +1143,7 @@ check_swapped_values (mp_int num, unsigned char * p)
         switch(*p++)
         {
         case T_STRING | T_MOD_SWAPPED:
+        case T_BYTES  | T_MOD_SWAPPED:
         case T_SYMBOL | T_MOD_SWAPPED:
           {
             mp_int    len;
@@ -1214,6 +1216,7 @@ check_swapped_values (mp_int num, unsigned char * p)
           }
 
         case T_STRING:
+        case T_BYTES:
         case T_SYMBOL:
         case T_POINTER:
         case T_STRUCT:
@@ -1294,6 +1297,7 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
         switch(*p++)
         {
         case T_STRING | T_MOD_SWAPPED:
+        case T_BYTES  | T_MOD_SWAPPED:
         case T_SYMBOL | T_MOD_SWAPPED:
           {
             mp_int    len;
@@ -1374,6 +1378,7 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
           }
 
         case T_STRING:
+        case T_BYTES:
         case T_SYMBOL:
         case T_POINTER:
         case T_STRUCT:
@@ -1467,6 +1472,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         switch(*p)
         {
         case T_STRING | T_MOD_SWAPPED:
+        case T_BYTES  | T_MOD_SWAPPED:
         case T_SYMBOL | T_MOD_SWAPPED:
             {
                 mp_int strsize;
@@ -1561,6 +1567,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             }
 
         case T_STRING:
+        case T_BYTES:
         case T_SYMBOL:
         case T_POINTER:
         case T_STRUCT:
@@ -1846,6 +1853,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         switch(*p++)
         {
         case T_STRING | T_MOD_SWAPPED:
+        case T_BYTES  | T_MOD_SWAPPED:
         case T_SYMBOL | T_MOD_SWAPPED:
           {
             string_t *s;
@@ -1861,8 +1869,15 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             }
             else
             {
-                if (svp->type == T_STRING
-                 && svp->x.generic != 0)
+                if (svp->type == T_BYTES)
+                {
+                    if (svp->x.generic != 0)
+                        s = new_n_mstring((char *)p, len, STRING_BYTES);
+                    else
+                        s = new_n_tabled((char *)p, len, STRING_BYTES);
+                }
+                else if (svp->type == T_STRING
+                      && svp->x.generic != 0)
                 {
                     s = new_n_unicode_mstring((char *)p, len);
                 }
@@ -2062,6 +2077,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
           }
 
         case T_STRING:
+        case T_BYTES:
         case T_SYMBOL:
         case T_POINTER:
         case T_STRUCT:

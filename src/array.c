@@ -462,13 +462,14 @@ explode_string (string_t *str, string_t *del)
     long len, left;
     vector_t *ret;
     string_t *buff;
+    const ph_int stringtype = (str->info.unicode == STRING_BYTES) ? T_BYTES : T_STRING;
 
     /* Special case: str is an empty string. */
     if (mstrsize(str) == 0)
     {
         ret = allocate_array(1);
-        buff = new_n_mstring("", 0, str->info.unicode);
-        put_string(ret->item, buff);
+        ret->item->u.str = new_n_mstring("", 0, str->info.unicode);
+        ret->item->type = stringtype;
         return ret;
     }
     
@@ -523,7 +524,8 @@ explode_string (string_t *str, string_t *del)
                     free_array(ret);
                     outofmem(1, "explode() on a string");
                 }
-                put_string(svp, buff);
+                svp->u.str = buff;
+                svp->type = stringtype;
             }
         }
 
@@ -561,7 +563,8 @@ explode_string (string_t *str, string_t *del)
                 free_array(ret);
                 outofmem(len, "explode() on a string");
             }
-            put_string(svp, buff);
+            svp->u.str = buff;
+            svp->type = stringtype;
         }
 
         /* txt now points to the (possibly empty) remains after
@@ -577,7 +580,8 @@ explode_string (string_t *str, string_t *del)
         if (buff->info.unicode == STRING_UTF8 && is_ascii(txt, len))
             buff->info.unicode = STRING_ASCII;
 
-        put_string(svp, buff);
+        svp->u.str = buff;
+        svp->type = stringtype;
 
         return ret;
     }
@@ -629,7 +633,8 @@ explode_string (string_t *str, string_t *del)
             if (buff->info.unicode == STRING_UTF8 && is_ascii(beg, (size_t)bufflen))
                 buff->info.unicode = STRING_ASCII;
 
-            put_string(ret->item+num, buff);
+            ret->item[num].u.str = buff;
+            ret->item[num].type = stringtype;
 
             num++;
             beg = p + len;
@@ -652,7 +657,8 @@ explode_string (string_t *str, string_t *del)
     }
     if (buff->info.unicode == STRING_UTF8 && is_ascii(beg, (size_t)len))
         buff->info.unicode = STRING_ASCII;
-    put_string(ret->item + num, buff);
+    ret->item[num].u.str = buff;
+    ret->item[num].type = stringtype;
 
     return ret;
 } /* explode_string() */
@@ -682,7 +688,7 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
     string_t *result;
     svalue_t *svp;
     bool first = true;
-    bool isbyte = del->info.unicode == STRING_BYTES;
+    ph_int stringtype = (del->info.unicode == STRING_BYTES) ? T_BYTES : T_STRING;
     bool isutf8 = false;
 
     del_len = mstrsize(del);
@@ -698,10 +704,10 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
         {
             /* This is a range. */
             struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
-            if (r->vec.type == T_STRING && isbyte == (r->vec.u.str->info.unicode == STRING_BYTES))
+            if (r->vec.type == stringtype)
                 size += (mp_int)del_len + r->index2 - r->index1;
         }
-        else if (elem->type == T_STRING && isbyte == (elem->u.str->info.unicode == STRING_BYTES))
+        else if (elem->type == stringtype)
             size += (mp_int)del_len + mstrsize(elem->u.str);
     }
 
@@ -735,7 +741,7 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
         {
             /* This is a range. */
             struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
-            if (r->vec.type == T_STRING && isbyte == (r->vec.u.str->info.unicode == STRING_BYTES))
+            if (r->vec.type == stringtype)
             {
                 if (first)
                     first = false;
@@ -746,13 +752,13 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
                 }
 
                 memcpy(p, get_txt(r->vec.u.str) + r->index1, r->index2 - r->index1);
-                if (!isutf8 && !isbyte && r->vec.u.str->info.unicode == STRING_UTF8 && !is_ascii(p, r->index2 - r->index1))
+                if (!isutf8 && stringtype == T_STRING && r->vec.u.str->info.unicode == STRING_UTF8 && !is_ascii(p, r->index2 - r->index1))
                     isutf8 = true;
 
                 p += r->index2 - r->index1;
             }
         }
-        else if (elem->type == T_STRING && isbyte == (elem->u.str->info.unicode == STRING_BYTES))
+        else if (elem->type == stringtype)
         {
             if (first)
                 first = false;
@@ -770,7 +776,7 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
         svp++;
     }
 
-    result->info.unicode = isbyte ? STRING_BYTES : isutf8 ? STRING_UTF8 : STRING_ASCII;
+    result->info.unicode = (stringtype == T_BYTES) ? STRING_BYTES : isutf8 ? STRING_UTF8 : STRING_ASCII;
 
     assert(p - get_txt(result) == size);
     return result;
@@ -846,7 +852,7 @@ sanitize_array (vector_t * vec)
     keynum = VEC_SIZE(vec);
     for ( j = 0, inpnt = vec->item; j < keynum; j++, inpnt++)
     {
-        if (inpnt->type == T_STRING)
+        if (inpnt->type == T_STRING || inpnt->type == T_BYTES)
         {
             if (!mstr_tabled(inpnt->u.str))
             {
@@ -1157,9 +1163,9 @@ lookup_key (svalue_t *key, vector_t *vec)
 
     /* If key is a non-shared string, lookup and use the shared copy.
      */
-    if (key->type == T_STRING && !mstr_tabled(key->u.str))
+    if ((key->type == T_STRING || key->type == T_BYTES) && !mstr_tabled(key->u.str))
     {
-        shared_string_key.type = T_STRING;
+        shared_string_key.type = key->type;
         if ( !(shared_string_key.u.str = find_tabled(key->u.str)) )
         {
             return -1;
@@ -1784,12 +1790,12 @@ is_ordered (vector_t *v)
     mp_int i;
 
     for (svp = v->item, i = (mp_int)VEC_SIZE(v); --i > 0; svp++) {
-        if (svp->type == T_STRING && !mstr_tabled(svp->u.str))
+        if ((svp->type == T_STRING || svp->type == T_BYTES) && !mstr_tabled(svp->u.str))
             return MY_FALSE;
         if (rvalue_cmp(svp, svp+1) > 0)
             return MY_FALSE;
     }
-    if (svp->type == T_STRING && !mstr_tabled(svp->u.str))
+    if ((svp->type == T_STRING || svp->type == T_BYTES) && !mstr_tabled(svp->u.str))
         return MY_FALSE;
 
     return MY_TRUE;
@@ -3116,6 +3122,8 @@ sameval (svalue_t *arg1, svalue_t *arg2)
     } else if (arg1->type == T_POINTER && arg2->type == T_POINTER) {
         return arg1->u.vec == arg2->u.vec;
     } else if (arg1->type == T_STRING && arg2->type == T_STRING) {
+        return mstreq(arg1->u.str, arg2->u.str);
+    } else if (arg1->type == T_BYTES && arg2->type == T_BYTES) {
         return mstreq(arg1->u.str, arg2->u.str);
     } else if (arg1->type == T_OBJECT && arg2->type == T_OBJECT) {
         return arg1->u.ob == arg2->u.ob;

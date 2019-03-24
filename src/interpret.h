@@ -130,7 +130,7 @@ struct protected_char_lvalue
 };
 
 /* -- struct protected_range_lvalue: protected an lvalue to a
- * string or vector range. The reference to the vector is counted.
+ * bytes, string or vector range. The reference to the vector is counted.
  * We also make the variable holding the vector a protected lvalue,
  * so we are able to update variable when changing the size of
  * a vector or changing the (not-mutable) string.

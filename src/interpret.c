@@ -461,6 +461,7 @@ static const char * svalue_typename[]
    , /* T_SYMBOL  */  "symbol"
    , /* T_QUOTED_ARRAY */   "quoted-array"
    , /* T_STRUCT */         "struct"
+   , /* T_BYTES  */         "bytes"
    , /* T_CALLBACK */       "callback"
    , /* T_ERROR_HANDLER */  "error-handler"
    , /* T_BREAK_ADDR */     "break-address"
@@ -1023,14 +1024,14 @@ static p_int assign_protected_char(struct protected_char_lvalue *dest, p_int ch)
 void INLINE
 free_string_svalue (svalue_t *v)
 
-/* Free the string svalue <v>; <v> must be of type T_STRING.
+/* Free the string svalue <v>; <v> must be of type T_STRING or T_BYTES.
  */
 
 {
 #ifdef DEBUG
-    if (v->type != T_STRING)
+    if (v->type != T_STRING && v->type != T_BYTES)
     {
-        fatal("free_string_svalue(): Expected string, "
+        fatal("free_string_svalue(): Expected string|bytes, "
               "received svalue type (%"PRIdPHINT":%"PRIdPHINT")\n"
             , v->type, v->x.generic);
         /* NOTREACHED */
@@ -1134,6 +1135,17 @@ int_free_svalue (svalue_t *v)
     case T_STRING:
       {
         string_t *str = v->u.str;
+
+        assert(str->info.unicode != STRING_BYTES);
+        free_mstring(str);
+        break;
+      }
+
+    case T_BYTES:
+      {
+        string_t *str = v->u.str;
+
+        assert(str->info.unicode == STRING_BYTES);
         free_mstring(str);
         break;
       }
@@ -1159,6 +1171,7 @@ int_free_svalue (svalue_t *v)
         break;
 
     case T_SYMBOL:
+        assert(v->u.str->info.unicode != STRING_BYTES);
         free_mstring(v->u.str);
         break;
 
@@ -1231,7 +1244,8 @@ int_free_svalue (svalue_t *v)
                 struct protected_range_lvalue *r;
                 r = v->u.protected_range_lvalue;
 
-                if (r->vec.type == T_STRING && r->vec.u.str->info.type == STRING_MUTABLE)
+                if ((r->vec.type == T_STRING || r->vec.type == T_BYTES)
+                 && r->vec.u.str->info.type == STRING_MUTABLE)
                 {
                     /* Remove it from the string's lvalue list. */
                     for (struct protected_range_lvalue **next = &(r->vec.u.str->u.mutable.range_lvalues);
@@ -1484,6 +1498,7 @@ internal_assign_svalue_no_free (svalue_t *to, svalue_t *from)
     switch(from->type)
     {
     case T_STRING:
+    case T_BYTES:
         (void)ref_mstring(from->u.str);
         break;
 
@@ -1662,16 +1677,20 @@ internal_assign_rvalue_no_free ( svalue_t *to, svalue_t *from )
                     }
 
                 case T_STRING:
+                case T_BYTES:
                     {
                         string_t *slice;
                         if (r->index2 <= r->index1)
-                            slice = ref_mstring(STR_EMPTY);
+                            slice = ref_mstring(vec->type == T_STRING ? STR_EMPTY : empty_byte_string);
                         else
                             slice = mstr_extract(vec->u.str, r->index1, r->index2 - 1);
                         if (slice == NULL)
                             errorf("Out of memory: string[%"PRIdMPINT"..%"PRIdMPINT"].\n", r->index1, r->index2 - 1);
                         else
-                            put_string(to, slice);
+                        {
+                            to->type = vec->type;
+                            to->u.str = slice;
+                        }
                         break;
                     }
 
@@ -1690,14 +1709,14 @@ internal_assign_rvalue_no_free ( svalue_t *to, svalue_t *from )
         /* <from> is not an lvalue, so we can try to make
          * it constant again...
          */
-        if(from->type == T_STRING)
+        if(from->type == T_STRING || from->type == T_BYTES)
             try_make_constant(from->u.str);
 
         internal_assign_svalue_no_free(to, from);
     }
 
     /* If this was a mutable string, isolate it. */
-    if(to->type == T_STRING)
+    if(to->type == T_STRING || to->type == T_BYTES)
     {
         string_t *str = make_constant(to->u.str);
         if (str)
@@ -1784,7 +1803,8 @@ normalize_svalue (svalue_t *svp, bool collapse_lvalues)
                 if (r->var != NULL
                  && (r->vec.type != r->var->val.type
                   || (r->vec.type == T_POINTER && r->vec.u.vec != r->var->val.u.vec)
-                  || (r->vec.type == T_STRING  && r->vec.u.str != r->var->val.u.str)))
+                  || (r->vec.type == T_STRING  && r->vec.u.str != r->var->val.u.str)
+                  || (r->vec.type == T_BYTES   && r->vec.u.str != r->var->val.u.str)))
                 {
                     deref_protected_lvalue(r->var);
                     r->var = NULL;
@@ -2036,6 +2056,7 @@ link_protected_lvalue (svalue_t *dest, svalue_t *lv)
                             break;
 
                         case T_STRING:
+                        case T_BYTES:
                             assign_protected_string_range(prot_range, &(prot_lval->val), MY_FALSE);
                             break;
 
@@ -2130,6 +2151,7 @@ assign_svalue (svalue_t *dest, svalue_t *v)
                 return;
 
             case T_STRING:
+            case T_BYTES:
                 assign_string_range(v, MY_FALSE);
                 return;
 
@@ -2188,6 +2210,7 @@ assign_svalue (svalue_t *dest, svalue_t *v)
                         return;
 
                     case T_STRING:
+                    case T_BYTES:
                         assign_protected_string_range(r, v, MY_FALSE);
                         return;
 
@@ -2244,7 +2267,7 @@ inl_transfer_rvalue_no_free (svalue_t *dest, svalue_t *v)
 
 {
     if (v->type == T_LVALUE
-     || (v->type == T_STRING && mstr_mutable(v->u.str)))
+     || ((v->type == T_STRING || v->type == T_BYTES) && mstr_mutable(v->u.str)))
     {
         assign_rvalue_no_free(dest, v);
         free_svalue(v);
@@ -2313,6 +2336,7 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
                 return;
 
             case T_STRING:
+            case T_BYTES:
                 assign_string_range(v, MY_TRUE);
                 return;
 
@@ -2376,6 +2400,7 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
                         return;
 
                     case T_STRING:
+                    case T_BYTES:
                         assign_protected_string_range(r, v, MY_TRUE);
                         return;
 
@@ -2706,6 +2731,7 @@ update_string_lvalue_indices (string_t *oldstr, string_t *newstr, mp_int index1,
 {
     /* while(), so we can jump out with break. */
     bool is_utf8 = (oldstr->info.unicode == STRING_UTF8 || newstr->info.unicode == STRING_UTF8);
+    ph_int vartype = (oldstr->info.unicode == STRING_BYTES) ? T_BYTES : T_STRING;
 
     assert(oldstr->info.type == STRING_MUTABLE);
     assert(newstr->info.type == STRING_MUTABLE);
@@ -2734,7 +2760,7 @@ update_string_lvalue_indices (string_t *oldstr, string_t *newstr, mp_int index1,
             lv->str = ref_mstring(newstr);
 
             if (lv->var != NULL
-             && lv->var->val.type == T_STRING
+             && lv->var->val.type == vartype
              && lv->var->val.u.str == oldstr)
             {
                 free_mstring(oldstr);
@@ -2770,7 +2796,7 @@ update_string_lvalue_indices (string_t *oldstr, string_t *newstr, mp_int index1,
             lv->vec.u.str = ref_mstring(newstr);
 
             if (lv->var != NULL
-             && lv->var->val.type == T_STRING
+             && lv->var->val.type == vartype
              && lv->var->val.u.str == oldstr)
             {
                 free_mstring(oldstr);
@@ -2803,7 +2829,7 @@ assign_string_range (svalue_t *source, Bool do_free)
  */
 
 {
-    if (source->type == T_STRING)
+    if (source->type == current_unprotected_range.vec->type)
     {
         svalue_t *dsvp;          /* destination svalue (from current_unprotected_range) */
         string_t *ds;            /* destination string (from dsvp) */
@@ -2856,7 +2882,7 @@ assign_string_range (svalue_t *source, Bool do_free)
 
             /* Update the original variable. */
             if (current_unprotected_range.var != NULL
-             && current_unprotected_range.var->val.type == T_STRING
+             && current_unprotected_range.var->val.type == source->type
              && current_unprotected_range.var->val.u.str == ds)
             {
                 free_mstring(ds);
@@ -2907,7 +2933,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
  */
 
 {
-    if (source->type == T_STRING)
+    if (source->type == dest->vec.type)
     {
         string_t *ds;            /* destination string (from dsvp) */
         string_t *ss;            /* source string (from source) */
@@ -2916,7 +2942,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         mp_int ssize;            /* size of source string */
         mp_int index1, index2;   /* range indices */
 
-        assert(dest->vec.type == T_STRING);
+        assert(dest->vec.type == T_STRING || dest->vec.type == T_BYTES);
 
         /* Set variables */
         index1 = dest->index1;
@@ -3087,7 +3113,7 @@ assign_unprotected_char (p_int ch)
 
             /* Update the original variable. */
             if (current_unprotected_char.var != NULL
-             && current_unprotected_char.var->val.type == T_STRING
+             && current_unprotected_char.var->val.type == ((rs->info.unicode == STRING_BYTES) ? T_BYTES : T_STRING)
              && current_unprotected_char.var->val.u.str == ds)
             {
                 free_ds = true;
@@ -3097,7 +3123,10 @@ assign_unprotected_char (p_int ch)
             {
                 /* Keep the string alive. */
                 free_svalue(&indexing_quickfix);
-                put_string(&indexing_quickfix, rs);
+                if (rs->info.unicode == STRING_BYTES)
+                    put_bytes(&indexing_quickfix, rs);
+                else
+                    put_string(&indexing_quickfix, rs);
             }
         }
         else
@@ -3517,7 +3546,7 @@ put_bytes_buf (svalue_t *sp, const void *p, size_t len)
     string_t * str;
 
     memsafe(str = new_n_mstring((const char*)p, len, STRING_BYTES), len, "bytes");
-    put_string(sp, str);
+    put_bytes(sp, str);
 } /* put_bytes_buf() */
 
 /*-------------------------------------------------------------------------*/
@@ -4182,12 +4211,6 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc, bool 
 
     if (i->type == T_SYMBOL || i->type == T_STRING)
     {
-        if (i->type == T_STRING && i->u.str->info.unicode == STRING_BYTES)
-            ERRORF(("Illegal struct '%s'->(): got bytes, "
-                    "expected number/string/symbol.\n"
-                   , get_txt(struct_name(st))
-                   ));
-
         ind = struct_find_member(st->type, i->u.str);
         if (ind < 0)
         {
@@ -4377,7 +4400,7 @@ assign_protected_range_lvalue_no_free (svalue_t *dest, struct protected_lvalue *
     lval->index1 = index1;
     lval->index2 = index2;
 
-    if (vec->type == T_STRING)
+    if (vec->type == T_STRING || vec->type == T_BYTES)
     {
         assert(vec->u.str->info.type == STRING_MUTABLE);
 
@@ -4574,6 +4597,7 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool rese
             }
 
             case T_STRING:
+            case T_BYTES:
             {
                 svalue_t temp;
                 string_t * orig = r->vec.u.str;
@@ -4582,7 +4606,7 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool rese
                 /* Update the original variable. */
                 if (r->vec.u.str != orig
                  && r->var != NULL
-                 && r->var->val.type == T_STRING
+                 && r->var->val.type == r->vec.type
                  && r->var->val.u.str == orig)
                 {
                     free_mstring(orig);
@@ -4630,6 +4654,7 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool rese
             /* Index a string.
              */
             case T_STRING:
+            case T_BYTES:
             {
                 char * cp;
                 struct protected_lvalue *var = NULL;
@@ -4905,7 +4930,7 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
         size = r->index2 - r->index1;
         var = r->var;
 
-        if (vec->type != T_POINTER && vec->type != T_STRING)
+        if (vec->type != T_POINTER && vec->type != T_STRING && vec->type != T_BYTES)
             fatal("(range_lvalue)Illegal type for range lvalue '%s'.\n", typename(vec->type));
     }
     else
@@ -4930,6 +4955,7 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
                 break;
 
             case T_STRING:
+            case T_BYTES:
             {
                 string_t *str;
                 memsafe(str = make_mutable(vec->u.str), mstrsize(vec->u.str), "modifiable string");
@@ -5115,6 +5141,7 @@ push_index_value (svalue_t *sp, bytecode_p pc, bool ignore_error, enum index_typ
             }
 
             case T_STRING:
+            case T_BYTES:
             {
                 char *cp = get_string_range_item(&(r->vec), r->index1, r->index2, idx, MY_FALSE, MY_TRUE, sp, pc, itype);
                 p_int c;
@@ -5153,9 +5180,10 @@ push_index_value (svalue_t *sp, bytecode_p pc, bool ignore_error, enum index_typ
                 item = get_vector_item(vec->u.vec, idx, sp, pc, itype);
                 break;
 
-            /* Index a string.
+            /* Index a string or byte sequence.
              */
             case T_STRING:
+            case T_BYTES:
             {
                 char *cp = get_string_item(vec, idx, /* make_mutable: */ MY_FALSE
                                     , /* allow_one_past: */ MY_TRUE
@@ -5298,7 +5326,7 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
         offset = r->index1;
         size = r->index2 - r->index1;
 
-        if (vec->type != T_POINTER && vec->type != T_STRING)
+        if (vec->type != T_POINTER && vec->type != T_STRING && vec->type != T_BYTES)
             fatal("(range_value)Illegal type for range lvalue '%s'.\n", typename(vec->type));
     }
     else
@@ -5311,6 +5339,7 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
                 break;
 
             case T_STRING:
+            case T_BYTES:
                 size = mstrsize(vec->u.str);
                 offset = 0;
                 break;
@@ -5424,10 +5453,13 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
         }
 
         case T_STRING:
+        case T_BYTES:
         {
             string_t *str;
+            ph_int stringtype = vec->type;
+
             if (ind2 < ind1)
-                str = ref_mstring(STR_EMPTY);
+                str = ref_mstring(vec->type == T_STRING ? STR_EMPTY : empty_byte_string);
             else
             {
                 /* And now convert the character indices back to byte index. */
@@ -5448,7 +5480,11 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
             pop_n_elems(3);
 
             if (str)
-                push_string(sp, str);
+            {
+                sp++;
+                sp->type = stringtype;
+                sp->u.str = str;
+            }
             else
                 push_number(sp, 0);
             return sp;
@@ -5789,32 +5825,7 @@ efun_arg_typename (long type)
 
     for (i = 0; i < numtypes; i++)
     {
-        if (i == T_STRING)
-        {
-            switch (type & (TF_STRING|TF_BYTES))
-            {
-                case TF_STRING|TF_BYTES:
-                    if (result[0] != '\0')
-                        strcat(result, "/string");
-                    else
-                        strcat(result, "string");
-                    break;
-                case TF_STRING:
-                    if (result[0] != '\0')
-                        strcat(result, "/string");
-                    else
-                        strcat(result, "string");
-                    break;
-                case TF_BYTES:
-                    if (result[0] != '\0')
-                        strcat(result, "/bytes");
-                    else
-                        strcat(result, "bytes");
-                    break;
-            }
-            type &= ~(TF_STRING|TF_BYTES);
-        }
-        else if ((1 << i) & type)
+        if ((1 << i) & type)
         {
             if (result[0] != '\0')
                 strcat(result, "/");
@@ -6153,9 +6164,6 @@ test_efun_args (int instr, int args, svalue_t *argp)
         if (argp->type == T_NUMBER && !argp->u.number && (exp_type & TF_NULL))
             continue;
 
-        if (argp->type == T_STRING && argp->u.str->info.unicode == STRING_BYTES)
-            act_type = T_BYTES;
-
         if (!(exp_type & (1 << act_type)))
             raise_arg_error(instr, i, exp_type, act_type);
     }
@@ -6211,10 +6219,11 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
             return MY_FALSE;
 
         case T_STRING:
-            if (bsvp->u.str->info.unicode == STRING_BYTES)
-                valuetype = lpctype_bytes;
-            else
-                valuetype = lpctype_string;
+            valuetype = lpctype_string;
+            break;
+
+        case T_BYTES:
+            valuetype = lpctype_bytes;
             break;
 
         case T_POINTER:
@@ -7943,19 +7952,6 @@ eval_instruction (bytecode_p first_instruction
       /* Test the type of a certain argument.
        */
 
-#define OP_ARG_STRING_TEST(arg1,arg2,num) \
-            if ((arg1)->u.str->info.unicode == STRING_BYTES)            \
-            {                                                           \
-                if ((arg2)->u.str->info.unicode != STRING_BYTES)        \
-                    OP_ARG_ERROR((num), TF_BYTES, T_STRING);            \
-            }                                                           \
-            else                                                        \
-            {                                                           \
-                if ((arg2)->u.str->info.unicode == STRING_BYTES)        \
-                    OP_ARG_ERROR((num), TF_STRING, T_BYTES);            \
-            }
-      /* Check that both args use the same string type. */
-
 #   ifdef MARK
 #        define CASE(x) case (x): MARK(x);
 #   else
@@ -9212,7 +9208,7 @@ again:
                  */
                 s = (mp_int)ZERO_AS_STR_CASE_LABEL;
             }
-            else if ( sp->type == T_STRING )
+            else if ( sp->type == T_STRING || sp->type == T_BYTES)
             {
                 /* The case strings in the program shared, so whatever
                  * string we get on the stack, it must at least have
@@ -9567,12 +9563,8 @@ again:
         arg = sp - num_arg + 1;
         if (arg[0].type != T_STRING)
             BAD_ARG_ERROR(1, T_STRING, arg[0].type);
-        if (arg[0].u.str->info.unicode == STRING_BYTES)
-            BAD_ARG_ERROR(1, T_STRING, T_BYTES);
         if (arg[1].type != T_STRING)
             BAD_ARG_ERROR(2, T_STRING, arg[1].type);
-        if (arg[1].u.str->info.unicode == STRING_BYTES)
-            BAD_ARG_ERROR(2, T_STRING, T_BYTES);
         i = e_sscanf(num_arg, sp);
         pop_n_elems(num_arg-1);
         free_svalue(sp);
@@ -9604,14 +9596,10 @@ again:
         arg = sp - num_arg + 1;
         if (arg[0].type != T_STRING)
             BAD_ARG_ERROR(1, T_STRING, arg[0].type);
-        if (arg[0].u.str->info.unicode == STRING_BYTES)
-            BAD_ARG_ERROR(1, T_STRING, T_BYTES);
         if (arg[1].type != T_OBJECT && arg[1].type != T_POINTER)
             RAISE_ARG_ERROR(2, TF_OBJECT|TF_POINTER, arg[1].type);
         if (arg[2].type != T_STRING)
             BAD_ARG_ERROR(3, T_STRING, arg[2].type);
-        if (arg[2].u.str->info.unicode == STRING_BYTES)
-            BAD_ARG_ERROR(3, T_STRING, T_BYTES);
         if (arg[1].type == T_POINTER)
             check_for_destr(arg[1].u.vec);
 
@@ -9961,25 +9949,22 @@ again:
         switch ( sp[-1].type )
         {
 
+        case T_BYTES:
+            /* Just prevent adding numbers to them... */
+            TYPE_TEST_RIGHT(sp, T_BYTES);
+            /* FALLTHROUGH */
+
         case T_STRING:
             inter_pc = pc;
             inter_sp = sp;
             switch ( sp->type )
             {
             case T_STRING:
+            case T_BYTES:
               {
                 string_t *left, *right, *res;
 
-                if (sp[-1].u.str->info.unicode == STRING_BYTES)
-                {
-                    if (sp[0].u.str->info.unicode != STRING_BYTES)
-                        OP_ARG_ERROR(2, TF_BYTES, T_STRING);
-                }
-                else
-                {
-                    if (sp[0].u.str->info.unicode == STRING_BYTES)
-                        OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
-                }
+                TYPE_TEST_RIGHT(sp, sp[-1].type);
 
                 left = (sp-1)->u.str;
                 right = sp->u.str;
@@ -9993,7 +9978,7 @@ again:
                 free_string_svalue(sp);
                 sp--;
                 free_string_svalue(sp);
-                put_string(sp, res);
+                sp->u.str = res;
                 break;
               }
 
@@ -10002,9 +9987,6 @@ again:
                 string_t *left, *res;
                 char buff[80];
                 size_t len;
-
-                if (sp[-1].u.str->info.unicode == STRING_BYTES)
-                    OP_ARG_ERROR(2, TF_BYTES, T_STRING);
 
                 left = (sp-1)->u.str;
                 buff[sizeof(buff)-1] = '\0';
@@ -10027,9 +10009,6 @@ again:
                 string_t *left, *res;
                 size_t len;
 
-                if (sp[-1].u.str->info.unicode == STRING_BYTES)
-                    OP_ARG_ERROR(2, TF_BYTES, T_STRING);
-
                 left = (sp-1)->u.str;
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%g", READ_DOUBLE( sp ) );
@@ -10047,10 +10026,7 @@ again:
               }
 
             default:
-                if (sp[-1].u.str->info.unicode == STRING_BYTES)
-                    OP_ARG_ERROR(2, TF_BYTES, sp->type);
-                else
-                    OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
             break;
@@ -10064,9 +10040,6 @@ again:
                 char buff[80];
                 string_t *right, *res;
                 size_t len;
-
-                if (sp[0].u.str->info.unicode == STRING_BYTES)
-                    OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
 
                 right = sp->u.str;
                 buff[sizeof(buff)-1] = '\0';
@@ -10158,9 +10131,6 @@ again:
                 char buff[160];
                 string_t *right, *res;
                 size_t len;
-
-                if (sp[0].u.str->info.unicode == STRING_BYTES)
-                    OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
 
                 right = sp->u.str;
                 buff[sizeof(buff)-1] = '\0';
@@ -10346,19 +10316,18 @@ again:
             sp->u.map = m;
             break;
         }
-        else if ((sp-1)->type == T_STRING)
+        else if ((sp-1)->type == T_STRING || (sp-1)->type == T_BYTES)
         {
             string_t * result;
 
-            TYPE_TEST_RIGHT(sp, T_STRING);
-            OP_ARG_STRING_TEST(sp-1, sp, 2);
+            TYPE_TEST_RIGHT(sp, (sp-1)->type);
 
             inter_sp = sp;
             result = intersect_strings((sp-1)->u.str, sp->u.str, MY_TRUE);
             free_string_svalue(sp);
             sp--;
             free_string_svalue(sp);
-            put_string(sp, result);
+            sp->u.str = result;
             break;
         }
 
@@ -10453,10 +10422,11 @@ again:
                 sp->type = T_FLOAT;
                 break;
             }
-            if (sp->type == T_STRING)
+            if (sp->type == T_STRING || sp->type == T_BYTES)
             {
                 string_t * result;
                 size_t slen;
+                ph_int stringtype = sp->type;
 
                 if (sp[-1].u.number < 0)
                     ERROR("Bad right arg to *: negative number.\n");
@@ -10481,7 +10451,8 @@ again:
                 free_svalue(sp);
                 sp--;
                 /* No free_svalue(sp): it's just a number */
-                put_string(sp, result);
+                sp->type = stringtype;
+                sp->u.str = result;
                 break;
             }
             if (sp->type == T_POINTER)
@@ -10562,6 +10533,7 @@ again:
             /* NOTREACHED */
           }
         case T_STRING:
+        case T_BYTES:
           {
             if (sp->type == T_NUMBER)
             {
@@ -10591,7 +10563,7 @@ again:
                 /* No free_svalue(sp): it's just a number */
                 sp--;
                 free_string_svalue(sp);
-                put_string(sp, result);
+                sp->u.str = result;
                 break;
             }
             BAD_OP_ARG(2, T_NUMBER, sp->type);
@@ -10785,10 +10757,9 @@ again:
 
         int i;
 
-        if ((sp-1)->type == T_STRING && sp->type == T_STRING)
+        if (((sp-1)->type == T_STRING && sp->type == T_STRING)
+         || ((sp-1)->type == T_BYTES  && sp->type == T_BYTES))
         {
-            OP_ARG_STRING_TEST(sp-1, sp, 2);
-
             i = mstrcmp((sp-1)->u.str, sp->u.str) > 0;
             free_string_svalue(sp);
             sp--;
@@ -10847,10 +10818,9 @@ again:
 
         int i;
 
-        if ((sp-1)->type == T_STRING && sp->type == T_STRING)
+        if (((sp-1)->type == T_STRING && sp->type == T_STRING)
+         || ((sp-1)->type == T_BYTES  && sp->type == T_BYTES))
         {
-            OP_ARG_STRING_TEST(sp-1, sp, 2);
-
             i = mstrcmp((sp-1)->u.str, sp->u.str) >= 0;
             free_string_svalue(sp);
             sp--;
@@ -10909,10 +10879,9 @@ again:
 
         int i;
 
-        if ((sp-1)->type == T_STRING && sp->type == T_STRING)
+        if (((sp-1)->type == T_STRING && sp->type == T_STRING)
+         || ((sp-1)->type == T_BYTES  && sp->type == T_BYTES))
         {
-            OP_ARG_STRING_TEST(sp-1, sp, 2);
-
             i = mstrcmp((sp-1)->u.str, sp->u.str) < 0;
             free_string_svalue(sp);
             sp--;
@@ -10971,10 +10940,9 @@ again:
 
         int i;
 
-        if ((sp-1)->type == T_STRING && sp->type == T_STRING)
+        if (((sp-1)->type == T_STRING && sp->type == T_STRING)
+         || ((sp-1)->type == T_BYTES  && sp->type == T_BYTES))
         {
-            OP_ARG_STRING_TEST(sp-1, sp, 2);
-
             i = mstrcmp((sp-1)->u.str, sp->u.str) <= 0;
             free_string_svalue(sp);
             sp--;
@@ -11067,6 +11035,7 @@ again:
                 }
                 break;
             case T_STRING:
+            case T_BYTES:
                 i = mstreq((sp-1)->u.str, sp->u.str);
                 break;
             case T_OBJECT:
@@ -11136,6 +11105,7 @@ again:
                 i = (sp-1)->u.number != sp->u.number;
                 break;
             case T_STRING:
+            case T_BYTES:
                 i = !mstreq((sp-1)->u.str, sp->u.str);
                 break;
             case T_POINTER:
@@ -11219,18 +11189,17 @@ again:
             break;
         }
 
-        if (sp->type == T_STRING && (sp-1)->type == T_STRING)
+        if ((sp->type == T_STRING && (sp-1)->type == T_STRING)
+         || (sp->type == T_BYTES  && (sp-1)->type == T_BYTES))
         {
             string_t * result;
-
-            OP_ARG_STRING_TEST(sp-1, sp, 2);
 
             inter_sp = sp;
             result = intersect_strings(sp[-1].u.str, sp->u.str, MY_FALSE);
             free_string_svalue(sp-1);
             free_string_svalue(sp);
-            put_string(sp-1, result);
             sp--;
+            sp->u.str = result;
             break;
         }
 
@@ -11552,26 +11521,22 @@ again:
         switch(argp->type)
         {
 
+        case T_BYTES:   /* Adding to a byte sequence */
+            /* Just prevent adding numbers to them... */
+            TYPE_TEST_RIGHT(sp-1, T_BYTES);
+            /* FALLTHROUGH */
+
         case T_STRING:  /* Adding to a string */
           {
             string_t *new_string;
 
             /* Perform the addition, creating new_string */
-            if (type2 == T_STRING)
+            if (type2 == T_STRING || type2 == T_BYTES)
             {
                 string_t *left, *right;
                 size_t len;
 
-                if (argp->u.str->info.unicode == STRING_BYTES)
-                {
-                    if (sp[-1].u.str->info.unicode != STRING_BYTES)
-                        OP_ARG_ERROR(2, TF_BYTES, T_STRING);
-                }
-                else
-                {
-                    if (sp[-1].u.str->info.unicode == STRING_BYTES)
-                        OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
-                }
+                TYPE_TEST_RIGHT(sp-1, argp->type);
 
                 left = argp->u.str;
                 right = (sp-1)->u.str;
@@ -11616,16 +11581,13 @@ again:
             }
             else
             {
-                if (argp->u.str->info.unicode == STRING_BYTES)
-                    OP_ARG_ERROR(2, TF_BYTES, type2);
-                else
-                    OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, type2);
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, type2);
                 /* NOTREACHED */
             }
 
             /* Replace *argp by the new string */
             free_string_svalue(argp);
-            put_string(argp, new_string);
+            argp->u.str = new_string;
             break;
           }
 
@@ -11664,9 +11626,6 @@ again:
                 char buff[80];
                 string_t *right, *res;
                 size_t len;
-
-                if (sp[-1].u.str->info.unicode == STRING_BYTES)
-                    OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
 
                 right = (sp-1)->u.str;
                 buff[sizeof(buff)-1] = '\0';
@@ -11908,32 +11867,19 @@ again:
             break;
 
         case T_STRING:   /* Subtract from a string */
-            if (type2 == T_STRING)
+        case T_BYTES:    /* Subtract from a byte sequence */
+            if (type2 == argp->type)
             {
                 string_t * result;
-
-                if (argp->u.str->info.unicode == STRING_BYTES)
-                {
-                    if (sp[-1].u.str->info.unicode != STRING_BYTES)
-                        OP_ARG_ERROR(2, TF_BYTES, T_STRING);
-                }
-                else
-                {
-                    if (sp[-1].u.str->info.unicode == STRING_BYTES)
-                        OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
-                }
 
                 inter_sp = sp;
                 result = intersect_strings(argp->u.str, (sp-1)->u.str, MY_TRUE);
                 free_string_svalue(argp);
-                put_string(argp, result);
+                argp->u.str = result;
             }
             else
             {
-                if (argp->u.str->info.unicode == STRING_BYTES)
-                    OP_ARG_ERROR(2, TF_BYTES, type2);
-                else
-                    OP_ARG_ERROR(2, TF_STRING, type2);
+                BAD_OP_ARG(2, argp->type, type2);
                 /* NOTREACHED */
             }
             break;
@@ -12239,6 +12185,7 @@ again:
             break;
 
         case T_STRING:
+        case T_BYTES:
             if (sp[-1].type == T_NUMBER)
             {
                 string_t * result;
@@ -12271,7 +12218,7 @@ again:
                 DYN_STRING_COST(reslen)
 
                 free_string_svalue(argp);
-                put_string(argp, result);
+                argp->u.str = result;
             }
             else
             {
@@ -12724,33 +12671,20 @@ again:
             break;
 
         case T_STRING:
-            if (sp[-1].type == T_STRING)
+        case T_BYTES:
+            if (sp[-1].type == argp->type)
             {
                 string_t * result;
-
-                if (argp->u.str->info.unicode == STRING_BYTES)
-                {
-                    if (sp[-1].u.str->info.unicode != STRING_BYTES)
-                        OP_ARG_ERROR(2, TF_BYTES, T_STRING);
-                }
-                else
-                {
-                    if (sp[-1].u.str->info.unicode == STRING_BYTES)
-                        OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, T_BYTES);
-                }
 
                 inter_sp = sp;
                 result = intersect_strings(argp->u.str, (sp-1)->u.str, MY_FALSE);
 
                 free_string_svalue(argp);
-                put_string(argp, result);
+                argp->u.str = result;
             }
             else
             {
-                if (argp->u.str->info.unicode == STRING_BYTES)
-                    OP_ARG_ERROR(2, TF_BYTES, sp[-1].type);
-                else
-                    OP_ARG_ERROR(2, TF_STRING, sp[-1].type);
+                BAD_OP_ARG(2, argp->type, sp[-1].type);
                 /* NOTREACHED */
             }
             break;
@@ -15027,16 +14961,17 @@ again:
                 /* Remember the variable, if it is a string,
                  * because we might need to update it.
                  */
-                if (arg->type == T_STRING
+                if ((arg->type == T_STRING || arg->type == T_BYTES)
                  && r->var != NULL
-                 && r->var->val.type == T_STRING
+                 && r->var->val.type == arg->type
                  && r->var->val.u.str == arg->u.str )
                     argvar = r->var;
             }
-            else if (sp->x.lvalue_type == LVALUE_PROTECTED && arg->type == T_STRING)
+            else if (sp->x.lvalue_type == LVALUE_PROTECTED
+                  && (arg->type == T_STRING || arg->type == T_BYTES))
                 argvar = sp->u.protected_lvalue;
 
-            if (arg->type == T_STRING)
+            if (arg->type == T_STRING || arg->type == T_BYTES)
             {
                 /* If the string is tabled, i.e. not changeable, or has more
                  * than one reference, allocate a new copy which can be
@@ -15077,7 +15012,7 @@ again:
                 argval.x.lvalue_type = LVALUE_PROTECTED;
                 argval.u.protected_lvalue = argvar;
             }
-            else if (arg->type == T_STRING)
+            else if (arg->type == T_STRING || arg->type == T_BYTES)
             {
                 /* We need the protected lvalue
                  * to keep track of the string.
@@ -15108,11 +15043,12 @@ again:
         arg = (nargs < 0) ? sp-1 : sp;
 
         if (arg->type != T_STRING
+         && arg->type != T_BYTES
          && arg->type != T_POINTER
          && arg->type != T_NUMBER
          && arg->type != T_STRUCT
          && arg->type != T_MAPPING)
-            ERRORF(("foreach() got a %s, expected a (&)string/array/mapping/struct or number.\n"
+            ERRORF(("foreach() got a %s, expected a (&)string/bytes/array/mapping/struct or number.\n"
                    , typename(sp->type)
                    ));
 
@@ -15126,7 +15062,7 @@ again:
                         "number.", count));
             vars_required = 1;
         }
-        else if (arg->type == T_STRING)
+        else if (arg->type == T_STRING || arg->type == T_BYTES)
         {
             if (count < 0)
                 count = mstrsize(arg->u.str);
@@ -15343,7 +15279,7 @@ again:
                   free_svalue(lvalue);
                   put_number(lvalue, ix);
             }
-            else if (arg->type == T_STRING)
+            else if (arg->type == T_STRING || arg->type == T_BYTES)
             {
                 size_t chlen;
 
@@ -15658,7 +15594,7 @@ again:
         {
             i = (sp->u.ob->flags & O_CLONE);
         }
-        else if (sp->type == T_STRING && sp->u.str->info.unicode != STRING_BYTES)
+        else if (sp->type == T_STRING)
         {
             object_t *o;
 
@@ -15951,8 +15887,6 @@ again:
          */
 
         TYPE_TEST1(sp, T_STRING);
-        if (sp->u.str->info.unicode == STRING_BYTES)
-            RAISE_ARG_ERROR(1, TF_STRING, T_BYTES);
 
         ERRORF(("%s", get_txt(sp->u.str)));
       }
@@ -15989,7 +15923,7 @@ again:
 
         p_int i;
 
-        if (sp->type == T_STRING)
+        if (sp->type == T_STRING || sp->type == T_BYTES)
         {
             i = mstrsize(sp->u.str);
             if (sp->u.str->info.unicode == STRING_UTF8)
@@ -16090,12 +16024,7 @@ again:
             RAISE_ARG_ERROR(1, TF_OBJECT|TF_STRING|TF_POINTER, arg[0].type);
         }
 
-        if (arg[0].type == T_STRING && arg[0].u.str->info.unicode == STRING_BYTES)
-            RAISE_ARG_ERROR(1, TF_STRING|TF_OBJECT|TF_POINTER, T_BYTES);
-
         TYPE_TEST2(arg+1, T_STRING)
-        if (arg[1].u.str->info.unicode == STRING_BYTES)
-            RAISE_ARG_ERROR(2, TF_STRING, T_BYTES);
 
         if (get_txt(arg[1].u.str)[0] == ':')
             ERRORF(("Illegal function name in call_other: %s\n",
@@ -16217,12 +16146,6 @@ again:
                     ob = item->u.ob;
                 else if (item->type == T_STRING)
                 {
-                    if (item->u.str->info.unicode == STRING_BYTES)
-                        ERRORF(("Bad arg for call_other() at index %"PRIdMPINT": "
-                                "got bytes, expected string/object\n"
-                               , (mp_int)(svp - arg->u.vec->item)
-                               ));
-
                     ob = get_object(item->u.str);
                     if (ob == NULL)
                     {
@@ -20317,7 +20240,7 @@ expand_argument (svalue_t *sp)
             {
                 struct protected_range_lvalue *r = sp->u.protected_range_lvalue;
 
-                if (r->vec.type == T_STRING)
+                if (r->vec.type == T_STRING || r->vec.type == T_BYTES)
                     break;
                 else if (r->vec.type != T_POINTER)
                 {

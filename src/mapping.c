@@ -699,6 +699,7 @@ mhash (svalue_t * svp)
     switch (svp->type)
     {
     case T_STRING:
+    case T_BYTES:
         i = mstr_get_hash(svp->u.str);
         break;
 
@@ -763,7 +764,8 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
     *ppChain = NULL;
 
     /* If the key is a string, make it tabled */
-    if (map_index->type == T_STRING && !mstr_tabled(map_index->u.str)
+    if ((map_index->type == T_STRING || map_index->type == T_BYTES)
+     && !mstr_tabled(map_index->u.str)
      && bMakeTabled)
     {
         map_index->u.str = make_tabled(map_index->u.str);

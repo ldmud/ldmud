@@ -451,8 +451,6 @@ ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
         break;
     
     case T_STRING:
-        if (val->u.str->info.unicode == STRING_BYTES)
-            errorf("json_serialize(): can't serialize byte sequences.\n");
         jobj = json_object_new_string(get_txt(val->u.str));
         if (parent) ldmud_json_attach(parent, key, jobj);
         break;

@@ -26,6 +26,7 @@
 union u {
     string_t *str;
       /* T_STRING: pointer to the string.
+       * T_BYTES:  pointer to the byte string.
        * T_SYMBOL: pointer to the (shared) symbol string.
        * T_(PROTECTED_)STRING_RANGE_LVALUE: the target string holding
        *   the range.
@@ -181,34 +182,29 @@ struct svalue_s
 #define T_SYMBOL        0x9  /* a symbol */
 #define T_QUOTED_ARRAY  0xa  /* a quoted array */
 #define T_STRUCT        0xb  /* a struct */
+#define T_BYTES         0xc  /* a byte string */
 
-#define T_CALLBACK      0xc
+#define T_CALLBACK      0xd
   /* A callback structure referenced from the stack to allow
    * proper cleanup during error recoveries. The interpreter
    * knows how to free it, but that's all.
    */
 
-#define T_ERROR_HANDLER 0xd
+#define T_ERROR_HANDLER 0xe
   /* Not an actual value, this is used internally for cleanup
    * operations. See the description of the error_handler() member
    * for details.
    */
 
-#define T_BREAK_ADDR    0xe
+#define T_BREAK_ADDR    0xf
   /* Not an actual type, it's used internally for saving
    * the address where break statements within switch statements
    * should branch to.
    */
 
-#define T_NULL          0xf
+#define T_NULL          0x10
   /* Not an actual type, this is used in the efun_lpc_types[] table
    * to encode the acceptance of '0' instead of the real datatype.
-   */
-
-#define T_BYTES         0x10
-  /* Also not an actual type, used in the efun_lpc_types[] table
-   * to differentiate between text and byte strings and
-   * for printing error messages.
    */
 
 #define T_MOD_SWAPPED   0x80
@@ -517,6 +513,11 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
 #define put_string(sp,val) \
     ( (sp)->type = T_STRING, (sp)->u.str = val )
 
+#define put_ref_bytes(sp,val) \
+    ( (sp)->type = T_BYTES, (sp)->u.str = ref_mstring(val) )
+#define put_bytes(sp,val) \
+    ( (sp)->type = T_BYTES, (sp)->u.str = val )
+
 #define put_ref_symbol(sp,val,numquotes) \
     ( (sp)->type = T_SYMBOL, (sp)->u.str = ref_mstring(val), (sp)->x.quotes = (numquotes) )
 #define put_symbol(sp,val,numquotes) \
@@ -565,6 +566,8 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
 #define push_c_n_string(sp,txt,len) \
     ( (sp)++, put_c_n_string(sp, txt, len) )
 
+#define push_bytes(sp,val) \
+    ( (sp)++, put_bytes(sp,val) )
 
 #define psh_callback(sp,val) \
     ( (sp)++, put_callback(sp,val) )

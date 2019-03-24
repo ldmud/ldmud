@@ -310,7 +310,7 @@ write_xml_node(svalue_t * vnode, mp_int vsize, xmlTextWriterPtr writer)
     /* get the name, as this is essential */
     element = get_rvalue(vnode + XML_TAG_NAME, NULL);
 
-    if (element == NULL || element->type != T_STRING || element->u.str->info.unicode == STRING_BYTES)
+    if (element == NULL || element->type != T_STRING)
     {
         errorf("Bad arg 1 to xml_generate(): first element of tag array "
                "not a string.\n");
@@ -382,7 +382,7 @@ write_xml_node(svalue_t * vnode, mp_int vsize, xmlTextWriterPtr writer)
             if (element == NULL)
             {
                 struct protected_range_lvalue *cr = contents[i].u.protected_range_lvalue;
-                if (cr->vec.type == T_STRING && element->u.str->info.unicode != STRING_BYTES)
+                if (cr->vec.type == T_STRING)
                 {
                     svalue_t tmp_content;
                     assign_rvalue_no_free(&tmp_content, contents + i);
@@ -398,7 +398,7 @@ write_xml_node(svalue_t * vnode, mp_int vsize, xmlTextWriterPtr writer)
                     write_xml_node(cr->vec.u.vec->item + cr->index1, cr->index2 - cr->index1, writer);
                 }
             }
-            else if (element->type == T_STRING && element->u.str->info.unicode != STRING_BYTES)
+            else if (element->type == T_STRING)
             {
                 /* found content */
                 rc = xmlTextWriterWriteString(writer, (xmlChar *) get_txt(element->u.str));

@@ -459,6 +459,7 @@ cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
             break;
 
         case T_STRING:
+        case T_BYTES:
             if (!mstr_tabled(p->u.str))
                 p->u.str = make_tabled(p->u.str);
             break;
@@ -1386,6 +1387,7 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
             continue;
 
         case T_STRING:
+        case T_BYTES:
         case T_SYMBOL:
             clear_string_ref(p->u.str);
             break;
@@ -1568,6 +1570,7 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
             continue;
 
         case T_STRING:
+        case T_BYTES:
             MARK_MSTRING_REF(p->u.str);
             continue;
 
@@ -2805,6 +2808,7 @@ show_array(int d, void *block, int depth)
             break;
 
         case T_STRING:
+        case T_BYTES:
             if (is_freed(svp->u.str, 1) )
             {
                 WRITES(d, "String in freed block 0x");
@@ -2931,6 +2935,7 @@ show_struct(int d, void *block, int depth)
             break;
 
         case T_STRING:
+        case T_BYTES:
             if (is_freed(svp->u.str, 1) )
             {
                 WRITES(d, "String in freed block 0x");

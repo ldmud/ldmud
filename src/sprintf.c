@@ -841,6 +841,7 @@ svalue_to_string ( fmt_state_t *st
                     }
 
                     case T_STRING:
+                    case T_BYTES:
                     {
                         str = string_to_string(st, vec->u.str, r->index1, r->index2, str, true);
                         break;
@@ -881,6 +882,7 @@ svalue_to_string ( fmt_state_t *st
       }
 
     case T_STRING:
+    case T_BYTES:
         str = string_to_string(st, obj->u.str, 0, mstrsize(obj->u.str), str, quoteStrings);
         break;
 
@@ -2082,7 +2084,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
                   {
                     mp_int slen;
 
-                    if (carg->type != T_STRING || carg->u.str->info.unicode == STRING_BYTES)
+                    if (carg->type != T_STRING)
                         ERROR1(ERR_INCORRECT_ARG, 's');
                     slen = mstrsize(carg->u.str);
 

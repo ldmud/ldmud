@@ -1,7 +1,7 @@
 SYNOPSIS
         string to_bytes(string unicode, string encoding)
         string to_bytes(int* characters, string encoding)
-        string to_bytes(string bytesequence)
+        string to_bytes(bytes bytesequence)
         string to_bytes(int* bytes)
 
 DESCRIPTION

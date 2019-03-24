@@ -45,7 +45,7 @@ svalue_cmp (svalue_t *left, svalue_t *right)
     if (left->type == T_CLOSURE)
         return closure_cmp(left, right);
 
-    if (left->type == T_STRING)
+    if (left->type == T_STRING || left->type == T_BYTES)
     {
         return mstr_order(left->u.str, right->u.str);
     }
@@ -91,18 +91,19 @@ rvalue_cmp (svalue_t *left, svalue_t *right)
         /* Both are ranges. */
         struct protected_range_lvalue *lr = left->u.protected_range_lvalue, *rr = right->u.protected_range_lvalue;
         register p_int d;
+
         if (lr->vec.type != rr->vec.type)
         {
-            if (lr->vec.type == T_STRING)
-                return T_STRING - right->type;
-            else
-                return left->type - T_STRING;
+            if (lr->vec.type == T_POINTER)
+                return left->type - rr->vec.type;
+            else if (rr->vec.type == T_POINTER)
+                return lr->vec.type - right->type;
         }
 
-        if (lr->vec.type == T_STRING)
+        if (lr->vec.type != T_POINTER)
         {
             /* String ranges */
-            if ((d = (lr->vec.u.str->info.unicode == STRING_BYTES) - (rr->vec.u.str->info.unicode == STRING_BYTES)) != 0)
+            if ((d = (lr->vec.type - rr->vec.type)) != 0)
                 return d;
 
             if ((d = (lr->index2 - lr->index1) - (rr->index2 - rr->index1)) != 0)
@@ -123,14 +124,11 @@ rvalue_cmp (svalue_t *left, svalue_t *right)
         size_t len;
         register p_int d;
 
-        if (r->vec.type != T_STRING)
+        if (r->vec.type == T_POINTER)
             return left->type - right->type;
 
-        if (sv->type != T_STRING)
-            return ((sv->type < T_STRING) == (left_rv == NULL)) ? 1 : -1;
-
-        if ((d = (sv->u.str->info.unicode == STRING_BYTES) - (r->vec.u.str->info.unicode == STRING_BYTES)) != 0)
-            return ((d < 0) == (left_rv == NULL)) ? 1 : -1;
+        if (sv->type != r->vec.type)
+            return ((sv->type < r->vec.type) == (left_rv == NULL)) ? 1 : -1;
 
         len = mstrsize(sv->u.str);
         if ((d = (len - (r->index2 - r->index1))) != 0)
@@ -160,7 +158,7 @@ svalue_eq (svalue_t *left, svalue_t *right)
     if (left->type != right->type)
         return -1;
 
-    if (left->type == T_STRING)
+    if (left->type == T_STRING || left->type == T_BYTES)
     {
         return mstreq(left->u.str, right->u.str) ? 0 : -1;
     }
@@ -217,13 +215,10 @@ rvalue_eq (svalue_t *left, svalue_t *right)
         if (lr->vec.type != rr->vec.type)
             return -1;
 
-        if (lr->vec.type == T_STRING)
+        if (lr->vec.type != T_POINTER)
         {
             /* String ranges */
             if ((lr->index2 - lr->index1) != (rr->index2 - rr->index1))
-                return -1;
-
-            if ((lr->vec.u.str->info.unicode == STRING_BYTES) != (rr->vec.u.str->info.unicode == STRING_BYTES))
                 return -1;
 
             return (memcmp(get_txt(lr->vec.u.str) + lr->index1, get_txt(rr->vec.u.str) + rr->index1, lr->index2 - lr->index1) == 0) ? 0 : -1;
@@ -240,14 +235,11 @@ rvalue_eq (svalue_t *left, svalue_t *right)
         svalue_t *sv = (left_rv == NULL) ? right_rv : left_rv;
         size_t len;
 
-        if (r->vec.type != T_STRING || sv->type != T_STRING)
+        if (r->vec.type == T_POINTER || sv->type == T_POINTER || r->vec.type != sv->type)
             return -1;
 
         len = mstrsize(sv->u.str);
         if (len != r->index2 - r->index1)
-            return -1;
-
-        if ((r->vec.u.str->info.unicode == STRING_BYTES) != (sv->u.str->info.unicode == STRING_BYTES))
             return -1;
 
         return (memcmp(get_txt(sv->u.str), get_txt(r->vec.u.str) + r->index1, len) == 0) ? 0 : -1;

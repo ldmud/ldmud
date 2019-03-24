@@ -103,6 +103,7 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         return 0;
 
     case T_STRING:
+    case T_BYTES:
     case T_SYMBOL:
         // If ref==0 the string is probably shared a lot, but we can't estimate
         // the correct number, so we return 0 as memory consumption for the

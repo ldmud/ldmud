@@ -108,6 +108,7 @@ struct string_s
 
 extern mp_uint mstr_used;
 extern mp_uint mstr_used_size;
+extern string_t *empty_byte_string;
 
 /* --- Prototypes --- */
 
