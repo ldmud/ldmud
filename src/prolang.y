@@ -6618,6 +6618,7 @@ delete_prog_string (void)
 %token L_ASSIGN
 %token L_ARROW
 %token L_BREAK
+%token L_BYTES
 %token L_BYTES_DECL
 %token L_CASE
 %token L_CATCH
@@ -9537,7 +9538,7 @@ case_label:
           $$.numeric = MY_TRUE;
       }
 
-    | string_constant
+    | case_string_label
       {
 %line
           if ( case_state.some_numeric_labels )
@@ -9550,6 +9551,9 @@ case_label:
           last_string_constant = NULL;
       }
 ; /* case_label */
+
+
+case_string_label: string_constant | bytes_constant;
 
 
 default:
@@ -9752,6 +9756,24 @@ string_constant:
       { fatal("L_STRING LSTRING: presence of rule should prevent its reduction\n"); }
     | '(' string_constant ')'
 ; /* string_constant */
+
+
+bytes_constant:
+      L_BYTES
+      {
+          last_string_constant = last_lex_string;
+          last_lex_string = NULL;
+      }
+    | bytes_constant '+' L_BYTES
+      {
+          add_string_constant();
+      }
+    | L_BYTES L_BYTES
+      { fatal("L_BYTES L_BYTES: presence of rule should prevent its reduction\n"); }
+    | bytes_constant '+' L_BYTES L_BYTES
+      { fatal("L_BYTES L_BYTES: presence of rule should prevent its reduction\n"); }
+    | '(' bytes_constant ')'
+; /* bytes_constant */
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10829,6 +10851,35 @@ expr4:
           last_lex_string = NULL;
           $$.start = last_expression = CURRENT_PROGRAM_SIZE;
           $$.type = get_fulltype(lpctype_string);
+          $$.lvalue = (lvalue_block_t) {0, 0};
+
+          ins_prog_string(p);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | L_BYTES L_BYTES
+      {
+          /* The rule forces the parser to look ahead and
+           * thus lets the lexer execute any concatenation.
+           */
+          fatal("failed to concatenate byte sequence");
+
+          /* Just so yacc doesn't complain... */
+          $$.start = CURRENT_PROGRAM_SIZE;
+          $$.type = get_fulltype(lpctype_bytes);
+          $$.lvalue = (lvalue_block_t) {0, 0};
+      }
+
+    | L_BYTES
+      {
+          /* Push a constant byte sequence */
+
+          string_t *p;
+%line
+          p = last_lex_string;
+          last_lex_string = NULL;
+          $$.start = last_expression = CURRENT_PROGRAM_SIZE;
+          $$.type = get_fulltype(lpctype_bytes);
           $$.lvalue = (lvalue_block_t) {0, 0};
 
           ins_prog_string(p);

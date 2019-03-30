@@ -218,7 +218,7 @@ bool pragma_no_bytes_type;
 string_t *last_lex_string;
   /* When lexing string literals, this is the (shared) string lexed
    * so far. It is used to pass string values to lang.c and may be
-   * freed there.
+   * freed there. It is also used for byte sequence literals.
    */
 
 struct lpc_predef_s *lpc_predefs = NULL;
@@ -4335,7 +4335,7 @@ lex_parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
-parse_escaped_char (char * cp, p_int * p_char)
+parse_escaped_char (char * cp, bool is_bytes, p_int * p_char)
 
 /* Parse the sequence for an escaped character:
  *
@@ -4376,7 +4376,14 @@ parse_escaped_char (char * cp, p_int * p_char)
         case 't': *p_char = '\t';   break;
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
-        case 'x': case 'X': case 'u': case 'U':
+
+        case 'u': case 'U':
+            /* No unicode characters for byte sequences. */
+            if (is_bytes)
+                return NULL;
+            /* FALLTHROUGH */
+
+        case 'x': case 'X':
         {
             char * cp2;
 
@@ -4395,6 +4402,8 @@ parse_escaped_char (char * cp, p_int * p_char)
         {
             size_t len = utf8_to_unicode(cp-1, 4, p_char);
             if (!len)
+                return NULL;
+            if (is_bytes && *p_char > 127)
                 return NULL;
 
             cp += len - 1;
@@ -4452,6 +4461,12 @@ string (char *str, size_t slen)
 {
     if (last_lex_string)
     {
+        if (last_lex_string->info.unicode == STRING_BYTES)
+        {
+            lexerror("Can't concatenate string to byte sequence.");
+            return L_STRING;
+        }
+
         add_lex_string(str,  slen);
         return yylex();
     }
@@ -4466,6 +4481,40 @@ string (char *str, size_t slen)
     }
     return L_STRING;
 } /* string() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE int
+bytes (char *str, size_t slen)
+
+/* Return a byte sequence to yacc: set last_lex_string to <str>
+ * of length <slen> and return L_BYTES.
+ * If there is a string in last_lex_string already, <str> is appended
+ * and yylex() is called recursively to allow ANSI string concatenation.
+ */
+
+{
+    if (last_lex_string)
+    {
+        if (last_lex_string->info.unicode != STRING_BYTES)
+        {
+            lexerror("Can't concatenate byte sequence to string.");
+            return L_BYTES;
+        }
+
+        add_lex_string(str,  slen);
+        return yylex();
+    }
+    else
+    {
+        last_lex_string = new_n_tabled(str, slen, STRING_BYTES);
+        if (!last_lex_string)
+        {
+            lexerrorf("Out of memory for bytes literal (%zu bytes)",
+                      slen);
+        }
+    }
+    return L_BYTES;
+} /* bytes() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
@@ -5116,6 +5165,7 @@ yylex1 (void)
  *   L_NUMBER:  yylval.number is the parsed whole number or char constant.
  *   L_FLOAT:   yylval.float_number is the parsed float number.
  *   L_STRING:  last_lex_string is the (tabled) parsed string literal.
+ *   L_BYTES:   last_lex_string is the (tabled) parsed string literal.
  *   L_CLOSURE: yylval.closure.number/.inhIndex identifies the closure. See
  *              the source for which value means what (it's a bit longish).
  *   L_QUOTED_AGGREGATE: yylval.number is the number of quotes
@@ -5125,6 +5175,7 @@ yylex1 (void)
 
 {
     register char *yyp;
+    bool is_byte_literal = false;
 
 #define READ_CHAR       clen = utf8_to_unicode(yyp, 4, &c); if (!clen) goto badlex; yyp += clen;
 #define RETURN(val)     { outp = yyp; return (val); }
@@ -5566,7 +5617,7 @@ yylex1 (void)
 
                     if ('\n' != *yyp && CHAR_EOF != *yyp)
                     {
-                        char *cp = parse_escaped_char(yyp, &yylval.number);
+                        char *cp = parse_escaped_char(yyp, false, &yylval.number);
                         if (!cp)
                             yyerror("Illegal character constant");
                         else
@@ -5654,10 +5705,13 @@ yylex1 (void)
             }
 
 
-            /* --- ": String Literal --- */
+            /* --- ": String or Bytes Literal --- */
             case '"':
             {
                 char *p = yyp;
+                bool was_bytes = is_byte_literal;
+
+                is_byte_literal = false; /* for the next string. */
 
                 /* Construct the string in yytext[], terminated with a \0.
                  * ANSI style string concatenation is done by a recursive
@@ -5675,9 +5729,21 @@ yylex1 (void)
                     {
                         outp = p-1;
                         /* myfilbuf(); not needed */
-                        lexerror("Newline in string");
-                        return string("", 0);
+                        if (was_bytes)
+                        {
+                            lexerror("Newline in byte sequence");
+                            return bytes("", 0);
+                        }
+                        else
+                        {
+                            lexerror("Newline in string");
+                            return string("", 0);
+                        }
                     }
+
+                    if (was_bytes && c < 0)
+                        lexerror("Illegal character in byte sequence");
+
                     SAVEC;
 
                     /* Unescaped ": end of string */
@@ -5714,8 +5780,16 @@ yylex1 (void)
                                 if (*p == CHAR_EOF )
                                 {
                                     outp = p;
-                                    lexerror("End of file (or 0x01 character) in string");
-                                    return string("", 0);
+                                    if (was_bytes)
+                                    {
+                                        lexerror("End of file (or 0x01 character) in byte sequence");
+                                        return bytes("", 0);
+                                    }
+                                    else
+                                    {
+                                        lexerror("End of file (or 0x01 character) in string");
+                                        return string("", 0);
+                                    }
                                 }
                                 if (!*p)
                                 {
@@ -5731,19 +5805,24 @@ yylex1 (void)
                                 char *cp;
                                 p_int lc = 0;
 
-                                cp = parse_escaped_char(p-1, &lc);
-                                if (!cp)
-                                    yyerror("Illegal escaped character in string.");
-                                else
+                                cp = parse_escaped_char(p-1, was_bytes, &lc);
+                                if (cp)
                                     p = cp;
+                                else if (was_bytes)
+                                    yyerror("Illegal escaped character in byte sequence.");
+                                else
+                                    yyerror("Illegal escaped character in string.");
 
                                 if (yyp + 9 >= yytext + MAXLINE)
                                 {
                                     lexerror("Line too long");
-                                    return string("", 0);
+                                    return was_bytes ? bytes("", 0) : string("", 0);
                                 }
 
-                                yyp += unicode_to_utf8(lc, yyp);
+                                if (was_bytes)
+                                    *yyp++ = lc;
+                                else
+                                    yyp += unicode_to_utf8(lc, yyp);
                                 break;
                             }
                         }
@@ -5751,7 +5830,7 @@ yylex1 (void)
                 } /* for() */
 
                 outp = p;
-                return string(yytext, yyp-yytext);
+                return was_bytes ? bytes(yytext, yyp-yytext) : string(yytext, yyp-yytext);
             }
 
 
@@ -5801,6 +5880,13 @@ yylex1 (void)
                 return number((long)l);
             }
 
+            case 'b':
+                if (*yyp == '"')
+                {
+                    is_byte_literal = true;
+                    break;
+                }
+                /* FALLTHROUGH */
 
             /* --- Character classes and everything else --- */
             default:

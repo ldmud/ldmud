@@ -13,6 +13,16 @@ void run_test()
           "---------------------------\n");
 
     run_array(({
+        ({ "Byte literals 1", 0,
+            (:
+                return b"\x00\x01" b"\x02\x03" == to_bytes(({0,1,2,3}));
+            :)
+        }),
+        ({ "Byte literals 2", 0,
+            (:
+                return b"\xff\xfe" b"\xfd\xfc" == to_bytes(({255,254,253,252}));
+            :)
+        }),
         ({ "File encoding 1", 0,
             (:
                 object ob = load_object("/iso8859-7.c");
@@ -25,7 +35,7 @@ void run_test()
                 return ob->"\u03c1\u03c9\u03c4\u03ae\u03c3\u03c4\u03b5\u005f\u03c7\u03b1\u03b9\u03c1\u03b5\u03c4\u03b9\u03c3\u03bc\u03cc"() == "\u039a\u03b1\u03bb\u03ae\u0020\u03bc\u03ad\u03c1\u03b1\u0021";
             :)
         }),
-        ({ "Switch with byte strings", 0,
+        ({ "Switch with byte strings 1", 0,
             (:
                 switch(to_bytes("\u2694\u2699", "utf-8"))
                 {
@@ -34,6 +44,21 @@ void run_test()
                         return 0;
                     default:
                         return 1;
+                }
+            :)
+        }),
+        ({ "Switch with byte strings 2", 0,
+            (:
+                switch(to_bytes("\u2694\u2699", "utf-8"))
+                {
+                    case b"\xe2\x9a\x94\xe2\x9a\x99":
+                        return 1;
+                    case b"\xe2\x9a\x94\xe2\x9a\x9a":
+                        return 0;
+                    case b"\xe2\x9a\x94\xe2\x9a":
+                        return 0;
+                    default:
+                        return 0;
                 }
             :)
         }),

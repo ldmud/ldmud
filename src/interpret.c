@@ -7961,6 +7961,14 @@ eval_instruction (bytecode_p first_instruction
        * 'MARK' adds profiling support.
        */
 
+#   define push_ref_prog_string(idx) \
+        if (current_strings[idx]->info.unicode == STRING_BYTES) \
+            push_ref_bytes(sp, current_strings[idx]);           \
+        else                                                    \
+            push_ref_string(sp, current_strings[idx]);
+      /* Macro to put a program string <idx> onto the stack. */
+
+
     /* Setup the variables.
      * The next F_RETURN at this level will return out of eval_instruction().
      */
@@ -8489,7 +8497,7 @@ again:
         unsigned short string_number;
 
         LOAD_SHORT(string_number, pc);
-        push_ref_string(sp, current_strings[string_number]);
+        push_ref_prog_string(string_number);
         break;
     }
 
@@ -8499,7 +8507,7 @@ again:
          * <ix> is a 8-Bit uint.
          */
         unsigned int ix = LOAD_UINT8(pc);
-        push_ref_string(sp, current_strings[ix+0x300]);
+        push_ref_prog_string(ix+0x300);
         break;
     }
 
@@ -8509,7 +8517,7 @@ again:
          * <ix> is a 8-Bit uint.
          */
         unsigned int ix = LOAD_UINT8(pc);
-        push_ref_string(sp, current_strings[ix+0x200]);
+        push_ref_prog_string(ix+0x200);
         break;
     }
 
@@ -8519,7 +8527,7 @@ again:
          * <ix> is a 8-Bit uint.
          */
         unsigned int ix = LOAD_UINT8(pc);
-        push_ref_string(sp, current_strings[ix+0x100]);
+        push_ref_prog_string(ix+0x100);
         break;
     }
 
@@ -8529,7 +8537,7 @@ again:
          * <ix> is a 8-Bit uint.
          */
         unsigned int ix = LOAD_UINT8(pc);
-        push_ref_string(sp, current_strings[ix]);
+        push_ref_prog_string(ix);
         break;
     }
 

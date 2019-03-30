@@ -85,6 +85,15 @@ DESCRIPTION
     o bytes     Byte sequences are similar to strings. They offer
                 the same operations, but cannot be mixed with strings.
 
+                Byte sequence literals are written between double-quotes
+                prefixed with a 'b' (e.g. b""). Adjacent byte sequence
+                literals are automatically concatenated.
+
+                The text is allowed to consist of ASCII characters
+                (equivalent to bytes 0-127) and escape-sequences
+                just like strings, with the exception of the \u and \U
+                unicode escape sequences.
+
     o object    Pointer to an object. Objects are always passed by
                 reference.
 

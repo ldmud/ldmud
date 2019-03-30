@@ -566,6 +566,8 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
 #define push_c_n_string(sp,txt,len) \
     ( (sp)++, put_c_n_string(sp, txt, len) )
 
+#define push_ref_bytes(sp,val) \
+    ( (sp)++, put_ref_bytes(sp,val) )
 #define push_bytes(sp,val) \
     ( (sp)++, put_bytes(sp,val) )
 
