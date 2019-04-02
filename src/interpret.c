@@ -8119,7 +8119,7 @@ again:
                 sp->x.closure_type = (short)ix;
             }
 #ifdef USE_PYTHON
-            if (ix < CLOSURE_EFUN_OFFS)
+            else if (ix < CLOSURE_EFUN_OFFS)
             {
                 /* python-defined efun closure */
                 sp->x.closure_type = (short)ix;
