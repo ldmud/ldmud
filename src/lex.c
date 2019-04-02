@@ -5805,13 +5805,13 @@ handle_define (char *yyt, Bool quote)
              */
             if (!*p)
             {
-                if (p[-2] == '\\')
+                if (p > yytext + 1 && p[-2] == '\\')
                 {
                     q -= 2;
                     quote = refill(quote);
                     p = yytext;
                 }
-                else if (p[-2] == '\r' && p[-3] == '\\' )
+                else if (p > yytext + 2 && p[-2] == '\r' && p[-3] == '\\' )
                 {
                     q -= 3;
                     quote = refill(quote);
@@ -5855,13 +5855,13 @@ handle_define (char *yyt, Bool quote)
              */
             if (!*p)
             {
-                if (p[-2] == '\\')
+                if (p > yytext + 1 && p[-2] == '\\')
                 {
                     q -= 2;
                     quote = refill(quote);
                     p = yytext;
                 }
-                else if (p[-2] == '\r' && p[-3] == '\\' )
+                else if (p > yytext + 2 && p[-2] == '\r' && p[-3] == '\\' )
                 {
                     q -= 3;
                     quote = refill(quote);
