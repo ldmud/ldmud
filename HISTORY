@@ -4,6 +4,26 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+05-Apr-2019 (LDMud Team) -- 3.5.2
+   - Fixed Crashes:
+      + Syntax errors when parsing inline closures didn't clean
+        up status variables (#866).
+      + Destructing newly created interactives resulted in fatal errors.
+      + Calling lambda closures with mapping index operations resulted
+        in execution of random bytes (#867).
+      + #'return in a middle of an expression in a lambda closure could
+        result in a fatal error (#868).
+      + Replacing the system malloc could result in a segmentation fault
+        (#862).
+      + A garbage collection when using the slaballoc/smalloc allocator
+        with mmap could result in a fatal error.
+
+   - Runtime:
+      + Clean-up, reset and swap times can now be configured at runtime
+        using configure_driver().
+      + Reactions to the signals SIGINT, SIGHUP, SIGUSR1 and SIGUSR2 can
+        now be configured using configure_driver().
+
 04-Jan-2018 (LDMud Team) -- 3.5.1
    - Fixed Crashes:
       + missing type declarations resulted in a NULL pointer dereference
