@@ -265,13 +265,14 @@ arraylist.o : xalloc.h svalue.h simulate.h interpret.h arraylist.h array.h \
     config.h bytecode_gen.h main.h types.h machine.h
 
 backend.o : ../mudlib/sys/signals.h ../mudlib/sys/debug_message.h \
-    ../mudlib/sys/driver_hook.h i-eval_cost.h xalloc.h wiz_list.h swap.h \
-    svalue.h stdstrings.h simulate.h random.h pkg-python.h otable.h \
-    object.h mstrings.h mregex.h mapping.h main.h lex.h interpret.h \
-    heartbeat.h gcollect.h filestat.h exec.h ed.h comm.h closure.h \
-    call_out.h array.h actions.h backend.h my-alloca.h typedefs.h driver.h \
-    strfuns.h sent.h bytecode.h random/SFMT.h hash.h types.h pkg-tls.h \
-    port.h config.h bytecode_gen.h pkg-gnutls.h pkg-openssl.h machine.h
+    ../mudlib/sys/driver_hook.h ../mudlib/sys/configuration.h i-eval_cost.h \
+    xalloc.h wiz_list.h swap.h svalue.h stdstrings.h simulate.h random.h \
+    pkg-python.h otable.h object.h mstrings.h mregex.h mapping.h main.h \
+    lex.h interpret.h heartbeat.h gcollect.h filestat.h exec.h ed.h comm.h \
+    closure.h call_out.h array.h actions.h backend.h my-alloca.h typedefs.h \
+    driver.h strfuns.h sent.h bytecode.h random/SFMT.h hash.h types.h \
+    pkg-tls.h port.h config.h bytecode_gen.h pkg-gnutls.h pkg-openssl.h \
+    machine.h
 
 bitstrings.o : xalloc.h svalue.h simulate.h mstrings.h interpret.h \
     bitstrings.h typedefs.h driver.h strfuns.h sent.h bytecode.h hash.h \

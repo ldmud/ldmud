@@ -717,6 +717,7 @@ cdef_wizlist_file
 cdef_rxcache_table
 cdef_eval_cost_trace
 cdef_dynamic_costs
+cdef_malloc_replaceable
 cdef_malloc_sbrk_trace
 cdef_malloc_lpc_trace
 cdef_malloc_trace
@@ -809,6 +810,7 @@ infodir
 docdir
 oldincludedir
 includedir
+runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -869,6 +871,7 @@ enable_malloc_check
 enable_malloc_trace
 enable_malloc_lpc_trace
 enable_malloc_sbrk_trace
+enable_malloc_replaceable
 enable_dynamic_costs
 enable_eval_cost_trace
 enable_trace_code
@@ -1009,6 +1012,7 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
+runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE_TARNAME}'
@@ -1261,6 +1265,15 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
+  -runstatedir | --runstatedir | --runstatedi | --runstated \
+  | --runstate | --runstat | --runsta | --runst | --runs \
+  | --run | --ru | --r)
+    ac_prev=runstatedir ;;
+  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
+  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
+  | --run=* | --ru=* | --r=*)
+    runstatedir=$ac_optarg ;;
+
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -1398,7 +1411,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir
+		libdir localedir mandir runstatedir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -1551,6 +1564,7 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -1636,6 +1650,8 @@ Optional Features:
         Annotate allocations with LPC object info
   --enable-malloc-sbrk-trace  default=disabled
         Log all esbrk() calls (smalloc,slaballoc)
+  --enable-malloc-replaceable  default=disabled
+        Try to replace system malloc by our own (dangerous!)
   --enable-dynamic-costs  default=disabled
         Assign eval costs dynamically
   --enable-eval-cost-trace  default=disabled
@@ -3286,6 +3302,13 @@ if test "${enable_malloc_sbrk_trace+set}" = set; then :
 fi
 
 
+DEFAULTenable_malloc_replaceable=no
+# Check whether --enable-malloc-replaceable was given.
+if test "${enable_malloc_replaceable+set}" = set; then :
+  enableval=$enable_malloc_replaceable;
+fi
+
+
 DEFAULTenable_dynamic_costs=no
 # Check whether --enable-dynamic-costs was given.
 if test "${enable_dynamic_costs+set}" = set; then :
@@ -4259,6 +4282,16 @@ if test "x$enable_malloc_sbrk_trace" = "xyes"; then
   cdef_malloc_sbrk_trace="#define"
 else
   cdef_malloc_sbrk_trace="#undef"
+fi
+
+if test "x$enable_malloc_replaceable" = "x" && test "x$DEFAULTenable_malloc_replaceable" != "x"; then
+  enable_malloc_replaceable=$DEFAULTenable_malloc_replaceable
+fi
+
+if test "x$enable_malloc_replaceable" = "xyes"; then
+  cdef_malloc_replaceable="#define"
+else
+  cdef_malloc_replaceable="#undef"
 fi
 
 if test "x$enable_dynamic_costs" = "x" && test "x$DEFAULTenable_dynamic_costs" != "x"; then
@@ -14634,126 +14667,6 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
-
-# check if we can replace malloc safely
-SAVE_LIBS="${LIBS}"
-SAVE_CFLAGS="${CFLAGS}"
-CFLAGS=''
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking if we can replace malloc" >&5
-$as_echo_n "checking if we can replace malloc... " >&6; }
-#this is read by the test program
-cat > conftest.data <<EOF
-42
-EOF
-
-for TESTFLAG in '' -static -Bstatic -n; do
-LIBS="${SAVE_LIBS} ${TESTFLAG}"
-if test "$cross_compiling" = yes; then :
-  ac_malloc_replaceable_result=no
-    break
-
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-
-      $ac_includes_default
-      #include <sys/mman.h>
-      int my_malloc_used;
-      void* malloc(size_t size)
-{
-    my_malloc_used = 1;
-#ifdef HAVE_MMAP
-    size_t ps = sysconf(_SC_PAGESIZE);
-    while (ps < size + sizeof(size_t))
-        ps += sysconf(_SC_PAGESIZE);
-    void *q = mmap(0, ps, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
-#elif defined(SBRK_OK)
-    size = sizeof size + size+7 & ~7;
-    void *q = sbrk(size);
-    if ((intptr_t)q == -1) exit(1);
-#endif
-    *(size_t *)q = size;
-    return q + sizeof size;
-}
-void* calloc(size_t size, size_t num)
-{
-    void *q;
-    q = malloc(size*num);
-    memset(q, 0, size);
-    return q;
-}
-void* realloc(void *p, size_t size)
-{
-    char *q;
-    if (*(size_t *)p >= size)
-        return p;
-    q = malloc(size);
-
-    memcpy(q, p, size);
-
-    *(size_t *)q = size;
-    return q + sizeof size;
-}
-void free(void *p)
-{}
-
-int
-main ()
-{
-
-    int i, j;
-    FILE *f;
-#if !defined(HAVE_MMAP) && !defined(SBRK_OK)
-    exit(1); // malloc not replaceable.
-#endif
-    char *buf = malloc(256);
-    alarm(10); // a crash can be an infinite loop...
-    for (i = 0; i < 100; i++) {
-        my_malloc_used = 0;
-        // strdup seems to be partially unavailable
-        f = fopen("conftest.data", "r");
-        fscanf(f, "%d", &j);
-        /* linking in snprintf called with variable format makes shared libs
-         * worthwhile. Moreover, calling it is a good test
-         */
-        snprintf(buf, 256, f ? "%f%% successful\n" : (char*)f, 100.);
-        fclose(f);
-        if (!my_malloc_used || j != 6*7)
-            exit(1); // fopen did not use our malloc, not replaceable.
-    }
-    exit(0);
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_run "$LINENO"; then :
-  ac_malloc_replaceable_result=yes
-     if test -z "${TESTFLAG}"; then
-
-$as_echo "#define MALLOC_REPLACEABLE 1" >>confdefs.h
-
-    else
-        LDFLAGS="${LDFLAGS} ${TESTFLAG}"
-        EXTRA_CFLAGS="${EXTRA_CFLAGS} -DMALLOC_REPLACEABLE"
-    fi
-    break
-else
-  ac_malloc_replaceable_result=no
-fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
-done
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_malloc_replaceable_result" >&5
-$as_echo "$ac_malloc_replaceable_result" >&6; }
-LIBS="${SAVE_LIBS}"
-CFLAGS="${SAVE_CFLAGS}"
-rm conftest.data
-
-
 case "$EXTRA_CFLAGS" in
  *-Dsolaris*)
   if test "$ac_cv_lib_ucb_main" = "yes"; then
@@ -14812,6 +14725,7 @@ fi
 val_malloc="$with_malloc"
 
 fi
+
 
 
 

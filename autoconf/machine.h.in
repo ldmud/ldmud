@@ -269,9 +269,6 @@
 /* JSON-C supports 64 bit values. */
 #undef JSON_64_SUPPORT
 
-/* Defined if we can replace malloc. */
-#undef MALLOC_REPLACEABLE
-
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
 
