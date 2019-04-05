@@ -11,7 +11,7 @@ DESCRIPTION
         at once.
 
 EXAMPLES
-        mapping m = ([ 1:"foo":-1, 2:"bar":-2 ]);
+        mapping m = ([ 1:"foo";-1, 2:"bar";-2 ]);
 
         m_entry(m, 0) -> 0
         m_entry(m, 1) -> ({ "foo", -1 })

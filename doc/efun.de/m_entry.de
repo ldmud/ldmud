@@ -9,7 +9,7 @@ BESCHREIBUNG
         m_entry() 0.
 
 BEISPIELE
-        mapping m = ([1:"bla":-1, 2:"fasel":-2 ])
+        mapping m = ([1:"bla";-1, 2:"fasel";-2 ])
         m_entry(m, 0) -> 0
         m_entry(m, 1) -> ({"bla", -1})
 

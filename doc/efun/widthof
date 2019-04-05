@@ -6,7 +6,7 @@ DESCRIPTION
         If <map> is 0, the result is 0.
 
 EXAMPLES
-        mapping m = ([ "foo": 1,2 ]);
+        mapping m = ([ "foo": 1;2 ]);
         widthof(m)  --> returns 2
 
 HISTORY
