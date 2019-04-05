@@ -321,11 +321,10 @@ raise_db_error (db_dat_t *dat)
         /* NOTREACHED */
        abort();
     }
-    err_string = alloca(strlen(tmp) + 2);
+    err_string = alloca(strlen(tmp) + 1);
     strcpy(err_string, tmp);
-    strcat(err_string, "\n");
     remove_dat(dat);
-    errorf(err_string);
+    errorf("%s\n", err_string);
     /* NOTREACHED */
     abort();
 } /* raise_db_error() */
