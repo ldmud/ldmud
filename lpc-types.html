@@ -54,9 +54,17 @@ topic: doc
 
   <dt><code>string</code></dt>
   <dd>
-    A text. LPC strings are mutable and have variable length.
+    A text (a sequence of characters). LPC strings are mutable and have variable length.
 {% highlight c %}
     string str = "Hello!";
+{% endhighlight %}
+  </dd>
+
+  <dt><code>bytes</code></dt>
+  <dd>
+    Sequences of bytes (8 bit values). Similar to strings LPC bytes are mutable and have variable length.
+{% highlight c %}
+    bytes buf = b"Hello!";
 {% endhighlight %}
   </dd>
 
