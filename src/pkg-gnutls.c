@@ -44,7 +44,7 @@
 /* One server key and corresponding certicate chain. */
 struct tls_key_s
 {
-    char fingerprint[20]; /* SHA1 */
+    unsigned char fingerprint[20]; /* SHA1 */
     gnutls_x509_crt_t cert[MAX_CHAIN_LENGTH];
     gnutls_x509_privkey_t key;
     unsigned int num_certs;
@@ -822,7 +822,7 @@ tls_set_certificate (char *fingerprint, int len)
 }
 
 /*-------------------------------------------------------------------------*/
-const char *
+const unsigned char *
 tls_get_certificate_fingerprint (int *len)
 
 /* Returns the current certificate's fingerprint or NULL if there is

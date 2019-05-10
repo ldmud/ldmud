@@ -238,7 +238,7 @@ extern string_t *current_error_trace_string;
 extern Bool game_is_being_shut_down;
 extern Bool master_will_be_updated;
 
-extern const char *filesystem_encoding;
+extern char *filesystem_encoding;
 
 /* --- Prototypes --- */
 

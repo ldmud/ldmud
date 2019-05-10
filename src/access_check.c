@@ -162,8 +162,13 @@ find_access_class (struct sockaddr_in *full_addr, int port)
 #ifndef USE_IPV6
     addr = full_addr->sin_addr.s_addr;
 #else
-    addr = (uint32) full_addr->sin_addr.s_addr;
-    /* TODO: DANGER: The above cast might break under IPv6 */
+#ifndef s6_addr32
+#   define s6_addr32 __u6_addr.__u6_addr32
+#endif
+    addr = full_addr->sin_addr.s6_addr32[3];
+    /* TODO: DANGER: The above assignment will not work for any real IPv6 addresses.
+     * TODO::        The general format of the access file needs work for that.
+     */
 #endif
     tm_p = NULL;
     for (aap = all_access_addresses; aap; aap = aap->next) {

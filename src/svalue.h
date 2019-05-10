@@ -202,6 +202,7 @@ struct svalue_s
    * should branch to.
    */
 
+#undef T_NULL /* There is some T_NULL definition in system headers. */
 #define T_NULL          0x10
   /* Not an actual type, this is used in the efun_lpc_types[] table
    * to encode the acceptance of '0' instead of the real datatype.

@@ -1589,7 +1589,7 @@ ldmud_array_create (vector_t* vec)
 /*-------------------------------------------------------------------------*/
 /* Mappings */
 
-static bool ldmud_mapping_check(PyObject *ob);
+static bool ldmud_mapping_check(PyObject *ob) __attribute__((unused));
 static PyObject* ldmud_mapping_create(mapping_t *vec);
 
 /* This is used by the list itself and the iterator class. */

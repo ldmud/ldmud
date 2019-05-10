@@ -279,7 +279,7 @@ string_t *current_error_trace_string = NULL;
    * 'current_error_trace': the most recent error, caught or uncaught.
    */
 
-const char *filesystem_encoding = NULL;
+char *filesystem_encoding = NULL;
   /* The encoding for file names.
    */
 

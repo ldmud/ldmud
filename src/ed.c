@@ -1818,7 +1818,7 @@ subst (regexp_t *pat, char *sub, Bool gflg, Bool pflag)
 
 {
     int    nchngd = 0;
-    char  *new, *old, buf[MAXLINE];
+    char  *new, buf[MAXLINE];
     Bool   still_running = TRUE;
     LINE  *lastline = getptr( P_LINE2 );
 
@@ -1861,7 +1861,6 @@ subst (regexp_t *pat, char *sub, Bool gflg, Bool pflag)
                 strncpy( new, current, diff );
                 new += diff;
                 /* Do substitution */
-                old = new;
                 substr = rx_sub_str( pat, current, sub);
                 if (!substr)
                     return SUB_FAIL;

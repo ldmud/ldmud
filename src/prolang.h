@@ -55,7 +55,7 @@ extern mp_uint store_include_info(char *name, char *file, char delim, int inc_de
 extern void store_include_end(mp_uint inc_offset, int include_line);
 extern void compile_file(int fd, const char * fname, Bool isMasterObj);
 extern Bool is_undef_function (bytecode_p fun);
-extern short find_inherited_function (const char * super_name, const char * real_name , unsigned short * pInherit, funflag_t *flags);
+extern unsigned short find_inherited_function (const char * super_name, const char * real_name , unsigned short * pInherit, funflag_t *flags);
 extern const char *get_current_function_name();
 extern char *get_lpctype_name (lpctype_t *type);
 extern size_t get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize);

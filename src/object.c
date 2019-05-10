@@ -664,14 +664,9 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
     if (free_all)
     {
         int i;
-        bytecode_p program;
-        funflag_t *functions;
 
         /* Remove the swap entry */
         remove_prog_swap(progp, MY_FALSE);
-
-        program = progp->program;
-        functions = progp->functions;
 
         /* Free all function names. */
         for (i = progp->num_function_headers; --i >= 0; )
@@ -9620,9 +9615,7 @@ f_restore_value (svalue_t *sp)
     /* Check if there is a version line */
     if (buff[0] == '#')
     {
-        int i;
-
-        i = sscanf(buff+1, "%d:%d", &(ctx->restored_version), &(ctx->restored_host));
+        sscanf(buff+1, "%d:%d", &(ctx->restored_version), &(ctx->restored_host));
 
         /* Advance to the next line */
         p = strchr(buff, '\n');

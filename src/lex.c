@@ -2390,7 +2390,7 @@ _myfilbuf (void)
   */
 
 {
-    int i;
+    int i = 0;
     char *p;
 
     /* Restore the data clobbered by the old sentinel */
@@ -2535,7 +2535,7 @@ _myfilbuf (void)
         }
 
         p += i;
-        if (p - outp ? p[-1] != '\n' : current_loc.line == 1)
+        if ((p - outp) ? (p[-1] != '\n') : (current_loc.line == 1))
             *p++ = '\n';
         *p++ = CHAR_EOF;
         return outp;
@@ -4585,7 +4585,7 @@ closure (char *in_yyp)
 
     if (super_name != NULL)
     {
-        short ix;
+        unsigned short ix;
         unsigned short inhIndex;
         funflag_t flags;
         char c = *yyp;
@@ -4594,7 +4594,7 @@ closure (char *in_yyp)
         *(wordstart-2) = '\0';
         ix = find_inherited_function(super_name, wordstart, &inhIndex, &flags);
         inhIndex++;
-        if (ix < 0)
+        if (ix == USHRT_MAX)
         {
             yyerrorf("Undefined function: %.50s::%.50s"
                     , super_name, wordstart);

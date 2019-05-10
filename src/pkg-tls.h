@@ -75,7 +75,7 @@ extern vector_t *tls_query_connection_info(interactive_t *ip);
 extern vector_t *tls_check_certificate(interactive_t *ip, Bool more);
 extern Bool tls_available();
 extern Bool tls_set_certificate(char *fingerprint, int len);
-extern const char *tls_get_certificate_fingerprint(int *len);
+extern const unsigned char *tls_get_certificate_fingerprint(int *len);
 
 #ifdef GC_SUPPORT
 extern void tls_clear_refs();

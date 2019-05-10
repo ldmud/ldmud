@@ -1162,11 +1162,30 @@ rx_free_subdata (regdata_t * expr)
 
 {
 #ifdef HAS_PCRE
-    if (expr->pSubs)  xfree(expr->pSubs);  expr->pSubs = NULL;
-    if (expr->pHints) xfree(expr->pHints); expr->pHints = NULL;
-    if (expr->pProg)  xfree(expr->pProg);  expr->pProg = NULL;
+    if (expr->pSubs)
+    {
+        xfree(expr->pSubs);
+        expr->pSubs = NULL;
+    }
+
+    if (expr->pHints)
+    {
+        xfree(expr->pHints);
+        expr->pHints = NULL;
+    }
+
+    if (expr->pProg)
+    {
+        xfree(expr->pProg);
+        expr->pProg = NULL;
+    }
 #endif // HAS_PCRE
-    if (expr->rx)     xfree(expr->rx);     expr->rx = NULL;
+
+    if (expr->rx)
+    {
+         xfree(expr->rx);
+         expr->rx = NULL;
+    }
 } /* rx_free_subdata() */
 
 /*--------------------------------------------------------------------*/

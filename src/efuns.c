@@ -9087,9 +9087,9 @@ f_driver_info (svalue_t *sp)
         case DC_TLS_CERTIFICATE:
         {
             int len;
-            unsigned char *fp;
+            const unsigned char *fp;
 
-            fp = (unsigned char*) tls_get_certificate_fingerprint(&len);
+            fp = tls_get_certificate_fingerprint(&len);
             if (!fp)
                 put_number(&result, 0);
             else

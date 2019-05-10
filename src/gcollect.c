@@ -654,9 +654,9 @@ cleanup_object (object_t * obj)
     cleanup_t      * context = NULL;
 #ifdef LOG_CLEANUP
     struct timeval   t_begin, t_end;
-#endif /* LOG_CLEANUP */
     Bool             didSwap = MY_FALSE;
     unsigned long    numValues = 0;
+#endif /* LOG_CLEANUP */
 
 #ifdef LOG_CLEANUP
     if (gettimeofday(&t_begin, NULL))
@@ -668,9 +668,15 @@ cleanup_object (object_t * obj)
     context = cleanup_new(MY_FALSE);
     if (context != NULL)
     {
-        didSwap = cleanup_single_object(obj, context);
+#ifdef LOG_CLEANUP
+        didSwap =
+#endif /* LOG_CLEANUP */
+            cleanup_single_object(obj, context);
+
         cleanup_compact_mappings(context);
+#ifdef LOG_CLEANUP
         numValues = context->numValues;
+#endif /* LOG_CLEANUP */
         cleanup_free(context);
     }
     obj->time_cleanup = current_time + (9*time_to_data_cleanup)/10
@@ -731,8 +737,8 @@ cleanup_driver_structures (void)
     cleanup_t      * context = NULL;
 #ifdef LOG_CLEANUP
     struct timeval   t_begin, t_end;
-#endif /* LOG_CLEANUP */
     unsigned long    numValues = 0;
+#endif /* LOG_CLEANUP */
 
 static mp_int time_cleanup = 0;
     /* Time of the next regular cleanup. */
@@ -756,7 +762,9 @@ static mp_int time_cleanup = 0;
     {
         cleanup_structures(context);
         cleanup_compact_mappings(context);
+#ifdef LOG_CLEANUP
         numValues = context->numValues;
+#endif /* LOG_CLEANUP */
         cleanup_free(context);
     }
 
@@ -2492,13 +2500,12 @@ garbage_collection(void)
     reallocate_reserved_areas();
     if (!reserved_user_area)
     {
-        svalue_t *res = NULL;
         if (reserved_system_area)
         {
             RESET_LIMITS;
             CLEAR_EVAL_COST;
             malloc_privilege = MALLOC_MASTER;
-            res = callback_master(STR_QUOTA_DEMON, 0);
+            callback_master(STR_QUOTA_DEMON, 0);
         }
         /* Once: remove_uids(res && (res->type != T_NUMBER || res->u.number) );
          * but that function was never implemented.

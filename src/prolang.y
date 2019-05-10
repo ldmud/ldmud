@@ -2412,6 +2412,10 @@ get_index_result_type (lpctype_t* aggregate, fulltype_t index, int inst, lpctype
                 free_lpctype(oldresult);
             }
             break;
+
+        default:
+            /* All other types can't be indexed. Ignoring. */
+            break;
         }
 
         if (head->t_class == TCLASS_UNION)
@@ -5774,6 +5778,10 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
                 }
                 break;
             }
+
+        default:
+            /* All other types can't have struct members. Ignoring. */
+            break;
         }
 
         if (head->t_class == TCLASS_UNION)
@@ -14062,7 +14070,7 @@ is_function_defined (program_t *progp, int fx)
 
 /*-------------------------------------------------------------------------*/
 static bool
-adjust_virtually_inherited ( short *pFX, inherit_t **pIP)
+adjust_virtually_inherited ( unsigned short *pFX, inherit_t **pIP)
 
 /* The caller is about to create a call to the inherited function <pFX>
  * in <pIP>s program. We check whether this function is a virtually
@@ -14076,7 +14084,7 @@ adjust_virtually_inherited ( short *pFX, inherit_t **pIP)
  * true.
  */
 {
-    short fx = *pFX;
+    unsigned short fx = *pFX;
     inherit_t *ip = *pIP;
     funflag_t flags = ip->prog->functions[fx];
 
@@ -14126,14 +14134,14 @@ adjust_virtually_inherited ( short *pFX, inherit_t **pIP)
 
 /*-------------------------------------------------------------------------*/
 
-static short
+static unsigned short
 lookup_inherited (const char *super_name, string_t *real_name
                  , inherit_t **pIP, funflag_t *pFlags)
 
 /* Lookup an inherited function <super_name>::<real_name> and return
  * it's function index, setting *pIP to the inherit_t pointer and
  * *pFlags to the function flags.
- * Return -1 if not found, *pIP set to NULL, and *pFlags set to 0.
+ * Return USHRT_MAX if not found, *pIP set to NULL, and *pFlags set to 0.
  *
  * <super_name> can be an empty string or the (partial) name of one
  * of the inherits. <real_name> must be shared string.
@@ -14141,9 +14149,9 @@ lookup_inherited (const char *super_name, string_t *real_name
 {
     inherit_t *ip, *foundp;
     int num_inherits, super_length;
-    short found_ix;
+    unsigned short found_ix;
 
-    found_ix = -1;
+    found_ix = USHRT_MAX;
     *pIP = NULL;
     *pFlags = 0;
 
@@ -14249,7 +14257,7 @@ lookup_inherited (const char *super_name, string_t *real_name
 } /* lookup_inherited() */
 
 /*-------------------------------------------------------------------------*/
-short
+unsigned short
 find_inherited_function ( const char * super_name
                         , const char * real_name
                         , unsigned short * pInherit
@@ -14258,7 +14266,7 @@ find_inherited_function ( const char * super_name
 
 /* Lookup an inherited function <super_name>::<real_name> and return
  * it's function index as result, and the inheritance index in *<pInherit>.
- * Return -1 if not found.
+ * Return USHRT_MAX if not found.
  *
  * The returned function index is not adjusted for the compiled program's
  * function table.
@@ -14273,12 +14281,12 @@ find_inherited_function ( const char * super_name
 {
     inherit_t *ip;
     string_t *rname;
-    short     ix;
+    unsigned short ix;
 
     rname = find_tabled_str(real_name, STRING_UTF8);
 
-    ix =  rname ? lookup_inherited(super_name, rname, &ip, flags) : -1;
-    if (ix >= 0) /* Also return the inherit index. */
+    ix =  rname ? lookup_inherited(super_name, rname, &ip, flags) : USHRT_MAX;
+    if (ix != USHRT_MAX) /* Also return the inherit index. */
         *pInherit = ip - GET_BLOCK(A_INHERITS);
     else
         *pInherit = 0;
@@ -14320,7 +14328,7 @@ insert_inherited (char *super_name, string_t *real_name
 {
     inherit_t *ip;
     funflag_t flags;
-    short found_ix;
+    unsigned short found_ix;
 
     found_ix = lookup_inherited(super_name, real_name, &ip, &flags);
 
@@ -14355,7 +14363,7 @@ insert_inherited (char *super_name, string_t *real_name
         int calls = 0;
         int ip_index;
         int first_index;
-        short i;
+        unsigned short i;
 
         /* Prepare wildcard calls with arguments. */
         if (num_arg)
@@ -14437,6 +14445,7 @@ insert_inherited (char *super_name, string_t *real_name
 
             /* ip->prog->name includes .c */
             int l = mstrsize(ip0->prog->name) - 2;
+            int fx;
 
             ip = ip0; /* ip will be changed in the body */
 
@@ -14453,12 +14462,13 @@ insert_inherited (char *super_name, string_t *real_name
             if ( !match_string(super_name, get_txt(ip->prog->name), l) )
                 continue;
 
-            if ( (i = find_function(real_name, ip->prog)) < 0)
+            if ( (fx = find_function(real_name, ip->prog)) < 0)
                 continue;
 
-            if (!is_function_defined(ip->prog, i))
+            if (!is_function_defined(ip->prog, fx))
                 continue;
 
+            i = (unsigned short)fx;
             if (!adjust_virtually_inherited(&i, &ip))
                 continue;
 

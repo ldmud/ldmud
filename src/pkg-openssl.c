@@ -761,7 +761,7 @@ tls_set_certificate (char *fingerprint, int len)
 }
 
 /*-------------------------------------------------------------------------*/
-const char *
+const unsigned char *
 tls_get_certificate_fingerprint (int *len)
 
 /* Returns the current certificate's fingerprint or NULL if there is

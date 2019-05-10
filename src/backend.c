@@ -1698,7 +1698,7 @@ v_garbage_collection (svalue_t *sp, int num_arg)
         if (native == NULL)
         {
             inter_sp = ++sp; put_string(sp, path);
-            errorf("Could not encode path '%s'.\n", path);
+            errorf("Could not encode path '%s'.\n", get_txt(path));
         }
 
         if (change_default)

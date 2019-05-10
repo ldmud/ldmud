@@ -4476,7 +4476,7 @@ send_telnet_option (char action, char option)
 {
     char msg[3];
 
-    msg[0] = IAC;
+    msg[0] = (char) IAC;
     msg[1] = action;
     msg[2] = option;
 
@@ -4492,7 +4492,7 @@ send_wont (int option)
 
 {
     DTF(("%s TDEBUG: send IAC WONT %02x\n", time_stamp(), option));
-    send_telnet_option(WONT, option);
+    send_telnet_option((char) WONT, option);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -4503,7 +4503,7 @@ send_dont (int option)
 
 {
     DTF(("%s TDEBUG: send IAC DONT %02x\n", time_stamp(), option));
-    send_telnet_option(DONT, option);
+    send_telnet_option((char) DONT, option);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -4514,7 +4514,7 @@ send_will (int option)
 
 {
     DTF(("%s TDEBUG: send IAC WILL %02x\n", time_stamp(), option));
-    send_telnet_option(WILL, option);
+    send_telnet_option((char) WILL, option);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -4525,7 +4525,7 @@ send_do (int option)
 
 {
     DTF(("%s TDEBUG: send IAC DO %02x\n", time_stamp(), option));
-    send_telnet_option(DO, option);
+    send_telnet_option((char) DO, option);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -5845,8 +5845,15 @@ send_erq (int handle, int request, const char *arg, size_t arglen)
 
     /* Create the message and add it to buf[] */
     erq_pending_len = arglen + 9;
-    *(uint32*)buf = htonl(erq_pending_len);
-    *(uint32*)(buf+4) = htonl(handle);
+    /* Write erq_pending_len and handle in network byte order. */
+    buf[0] = (erq_pending_len >> 24) & 0xff;
+    buf[1] = (erq_pending_len >> 16) & 0xff;
+    buf[2] = (erq_pending_len >>  8) & 0xff;
+    buf[3] = (erq_pending_len      ) & 0xff;
+    buf[4] = (handle >> 24) & 0xff;
+    buf[5] = (handle >> 16) & 0xff;
+    buf[6] = (handle >>  8) & 0xff;
+    buf[7] = (handle      ) & 0xff;
     buf[8] = (char)request;
     memcpy(buf + 9, arg, arglen);
 
@@ -6042,12 +6049,7 @@ update_ip_entry (const char *oldname, const char *newname)
  */
 
 {
-    int i, ix;
-    Bool new_entry;
-
-    ix = -1;
-    new_entry = MY_FALSE;
-    for (i = 0; i < IPSIZE; i++)
+    for (int i = 0; i < IPSIZE; i++)
     {
         if (iptable[i].name
          && !strncmp(get_txt(iptable[i].name), oldname, mstrsize(iptable[i].name))

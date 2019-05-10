@@ -1168,8 +1168,7 @@ f_pg_conv_string (svalue_t *sp)
                                              , "escaped sql string");
 
     // PQescapeString(char *to, char *from, size_t length);
-    PQescapeString( (unsigned char *)get_txt(escaped)
-                  , (unsigned char *)get_txt(sp->u.str), size);
+    PQescapeString( get_txt(escaped), get_txt(sp->u.str), size);
     free_string_svalue(sp);
     put_string(sp, escaped);
     return sp;

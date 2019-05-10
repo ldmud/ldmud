@@ -14920,7 +14920,6 @@ again:
          * iteration.
          */
 
-        int vars_required;
         int8_t nargs;
         p_int count, start;
         unsigned short offset;
@@ -15049,7 +15048,7 @@ again:
         {
             if (sp->type != T_NUMBER)
                 ERRORF(("foreach() got a %s, requires a number for upper range bound.\n"
-                       , typename(arg->type)
+                       , typename(sp->type)
                        ));
         }
 
@@ -15073,26 +15072,22 @@ again:
             if (count < 0 && !use_range)
                 ERRORF(("foreach() got a %"PRIdPINT", expected a non-negative "
                         "number.", count));
-            vars_required = 1;
         }
         else if (arg->type == T_STRING || arg->type == T_BYTES)
         {
             if (count < 0)
                 count = mstrsize(arg->u.str);
-            vars_required = 1;
         }
         else if (arg->type == T_POINTER)
         {
             check_for_destr(arg->u.vec);
             if (count < 0)
                 count = VEC_SIZE(arg->u.vec);
-            vars_required = 1;
         }
         else if (arg->type == T_STRUCT)
         {
             struct_check_for_destr(arg->u.strct);
             count = struct_size(arg->u.strct);
-            vars_required = 1;
         }
         else
         {
@@ -15100,7 +15095,6 @@ again:
             vector_t  *indices;
 
             m = arg->u.map;
-            vars_required = 1 + m->num_values;
             indices = m_indices(m);
 
             /* after m_indices(), else we'd count destructed entries */
@@ -16453,13 +16447,12 @@ again:
     {
         received_prof_signal = MY_FALSE;
         char     *ts = time_stamp();
-        string_t *object_name = NULL;
         debug_message("%s Received profiling signal, evaluation time > %ld.%06lds\n",
                       ts, (long)profiling_timevalue.tv_sec, (long)profiling_timevalue.tv_usec);
         printf("%s Received profiling signal, evaluation time > %ld.%06lds\n",
                       ts, (long)profiling_timevalue.tv_sec, (long)profiling_timevalue.tv_usec);
         // dump stack trace and continue execution
-        object_name = dump_trace(MY_FALSE, NULL, NULL);
+        dump_trace(MY_FALSE, NULL, NULL);
         debug_message("%s ... execution continues.\n", ts);
         printf("%s ... execution continues.\n", ts);
     }
@@ -18570,10 +18563,10 @@ get_line_number_if_any (string_t **name)
     if (csp >= &CONTROL_STACK[0] && csp->funstart == PYTHON_EFUN_FUNSTART)
     {
         static char buf[256] = "#'";
-        char *iname = closure_python_efun_to_string(csp->instruction + CLOSURE_PYTHON_EFUN);
+        const char *iname = closure_python_efun_to_string(csp->instruction + CLOSURE_PYTHON_EFUN);
 
         strncpy(buf + 2, iname, sizeof(buf) - 2);
-        buf[sizeof(buf - 1)] = 0;
+        buf[sizeof(buf)-1] = 0;
         memsafe(*name = new_unicode_mstring(buf), strlen(buf), "python efun name");
 
         return 0;

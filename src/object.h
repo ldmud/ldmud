@@ -3,7 +3,8 @@
 
 #include "driver.h"
 #include "typedefs.h"
-
+#include "main.h"
+#include "mstrings.h"
 #include "sent.h"    /* O_GET_* */
 
 #ifdef DEBUG
@@ -142,110 +143,6 @@ struct replace_ob_s
 };
 
 
-/* --- Macros --- */
-
-/* object_t *ref_object(object_t *o, char *from)
- *   Add another ref to object <o> from function <from>
- *   and return the object <o>.
- */
-
-#ifndef DEBUG
-
-#    define ref_object(o,from) ((o)->ref++, (o))
-
-#else
-
-#    define ref_object(o,from) (\
-     (o)->ref++,\
-     d_flag > 1 ? printf("Add ref to object %s: %"PRIdPINT" (%s) %s %d\n" \
-                        , get_txt((o)->name), (o)->ref, from, __FILE__, __LINE__) : 0, \
-     (o))
-
-#endif
-
-/* object_t *ref_valid_object(object_t *o, char *from)
- *   Add another ref to object <o> from function <from> if <o>
- *   is not a destructed object or the NULL pointer.
- *   Return <o>, or NULL if <o> is destructed.
- */
-
-#define ref_valid_object(o,from) \
-    ( ((o) && !((o)->flags & O_DESTRUCTED)) \
-      ? ref_object(o,from) : NULL)
-
-/* void free_object(object_t *o, char *)
- *   Subtract one ref from object <o> from function <o>, and free the
- *   object fully if the refcount reaches zero.
- */
-
-#ifndef DEBUG
-
-#ifndef CHECK_OBJECT_REF
-#  define free_object(o,from) MACRO( \
-      object_t * tmp_ = o; \
-      if (tmp_->ref == 2) dest_last_ref_gone = MY_TRUE; \
-      if (--(tmp_->ref) <= 0) dealloc_object(tmp_);\
-   )
-#else
-#  define free_object(o,from) MACRO( \
-      object_t * tmp_ = o; \
-      if (tmp_->ref == 2) dest_last_ref_gone = MY_TRUE; \
-      if (--(tmp_->ref) <= 0) dealloc_object(tmp_, __FILE__, __LINE__); \
-   )
-#endif
-
-#else
-
-#ifndef CHECK_OBJECT_REF
-#  define free_object(o,from) MACRO(\
-      object_t * tmp_ = o; \
-      if (tmp_->ref == 2) dest_last_ref_gone = MY_TRUE; \
-      tmp_->ref--;\
-      if (d_flag > 1) printf("Sub ref from object %s: %"PRIdPINT" (%s) %s %d\n"\
-                            , get_txt(tmp_->name), tmp_->ref, from, __FILE__, __LINE__);\
-      if (tmp_->ref <= 0) dealloc_object(tmp_); \
-    )
-#else
-#  define free_object(o,from) MACRO(\
-      object_t * tmp_ = o; \
-      if (tmp_->ref == 2) dest_last_ref_gone = MY_TRUE; \
-      tmp_->ref--;\
-      if (d_flag > 1) printf("Sub ref from object %s: %"PRIdPINT" (%s) %s %d\n"\
-                            , get_txt(tmp_->name), tmp_->ref, from, __FILE__, __LINE__);\
-      if (tmp_->ref <= 0) dealloc_object(tmp_, __FILE__, __LINE__); \
-    )
-#endif
-
-#endif
-
-/* void deref_object(object_t *o, char *from)
- *   Subtract one ref from object <o> from function <from>, but don't
- *   check if it needs to be freed.
- */
-
-#ifndef DEBUG
-
-#    define deref_object(o, from) (--(o)->ref)
-
-#else
-
-#    define deref_object(o,from) (--(o)->ref, \
-       d_flag > 1 ? printf("Sub ref from object %s: %"PRIdPINT" (%s)\n" \
-                          , get_txt((o)->name), (o)->ref, from) : 0)
-
-#endif
-
-
-#define check_object(o) ((o)&&((o)->flags&O_DESTRUCTED) ? NULL :(o))
-
-  /* Return NULL, if object <o> is NULL or destructed,
-   * return <o> else.
-   */
-
-#ifdef CHECK_OBJECT_REF
-#define free_prog(p,f) _free_prog(p,f, __FILE__, __LINE__)
-#endif
-
 /* --- Variables --- */
 
 extern replace_ob_t *obj_list_replace;
@@ -333,5 +230,139 @@ extern svalue_t *f_restore_object(svalue_t *sp);
 extern svalue_t *f_restore_value(svalue_t *sp);
 
 extern void free_save_object_buffers(void);
+
+
+/* --- Inline functions and macros --- */
+
+#ifndef DEBUG
+
+static INLINE object_t *ref_object(object_t *const o, const char* const from) __attribute__((nonnull(1,2)));
+static INLINE object_t *ref_object(object_t *const o, const char* const from)
+  /*   Add another ref to object <o> from function <from>
+   *   and return the object <o>.
+   */
+{
+    o->ref++;
+    return o;
+}
+
+#else
+
+static INLINE object_t *_ref_object(object_t *const o, const char* const from, const char* const file, int const line) __attribute__((nonnull(1,2,3)));
+static INLINE object_t *_ref_object(object_t *const o, const char* const from, const char* const file, int const line)
+  /*   Add another ref to object <o> from function <from>
+   *   and return the object <o>.
+   */
+{
+    o->ref++;
+    if (d_flag > 1)
+        printf("Add ref to object %s: %"PRIdPINT" (%s) %s %d\n"
+              , get_txt((o)->name), (o)->ref, from, file, line);
+
+    return o;
+}
+#    define ref_object(o,from) _ref_object((o),(from), __FILE__, __LINE__)
+
+#endif /* DEBUG */
+
+static INLINE object_t *ref_valid_object(object_t *const o, const char* const from) __attribute__((nonnull(2)));
+static INLINE object_t *ref_valid_object(object_t *const o, const char* const from)
+/*   Add another ref to object <o> from function <from> if <o>
+ *   is not a destructed object or the NULL pointer.
+ *   Return <o>, or NULL if <o> is destructed.
+ */
+{
+    if (o && !(o->flags & O_DESTRUCTED))
+        return ref_object(o,from);
+    return NULL;
+}
+
+#if !defined(DEBUG) && !defined(CHECK_OBJECT_REF)
+
+static INLINE void free_object(object_t *const o, const char* const from) __attribute__((nonnull(1,2)));
+static INLINE void free_object(object_t *const o, const char* const from)
+/*   Subtract one ref from object <o> from function <o>, and free the
+ *   object fully if the refcount reaches zero.
+ */
+{
+    if (o->ref == 2)
+        dest_last_ref_gone = MY_TRUE;
+    if (--(o->ref) <= 0)
+        dealloc_object(o);
+}
+
+#else /* DEBUG || CHECK_OBJECT_REF */
+
+static INLINE void _free_object(object_t *const o, const char* const from, const char* const file, int const line) __attribute__((nonnull(1,2,3)));
+static INLINE void _free_object(object_t *const o, const char* const from, const char* const file, int const line)
+/*   Subtract one ref from object <o> from function <o>, and free the
+ *   object fully if the refcount reaches zero.
+ */
+{
+    if (o->ref == 2)
+        dest_last_ref_gone = MY_TRUE;
+    o->ref--;
+
+#ifdef DEBUG
+    if (d_flag > 1)
+        printf("Sub ref from object %s: %"PRIdPINT" (%s) %s %d\n"
+              , get_txt(o->name), o->ref, from, file, line);
+#endif
+
+    if (o->ref <= 0)
+#ifndef CHECK_OBJECT_REF
+        dealloc_object(o);
+#else
+        dealloc_object(o, file, line);
+#endif
+}
+#    define free_object(o,from) _free_object((o),(from), __FILE__, __LINE__)
+
+#endif
+
+#ifndef DEBUG
+
+static INLINE void deref_object(object_t *const o, const char* const from) __attribute__((nonnull(1,2)));
+static INLINE void deref_object(object_t *const o, const char* const from)
+/*   Subtract one ref from object <o> from function <from>, but don't
+ *   check if it needs to be freed.
+ */
+{
+    o->ref--;
+}
+
+#else
+
+static INLINE void _deref_object(object_t *const o, const char* const from, const char* const file, int const line) __attribute__((nonnull(1,2,3)));
+static INLINE void _deref_object(object_t *const o, const char* const from, const char* const file, int const line)
+/*   Subtract one ref from object <o> from function <from>, but don't
+ *   check if it needs to be freed.
+ */
+{
+    o->ref--;
+    if (d_flag > 1)
+        printf("Sub ref from object %s: %"PRIdPINT" (%s)\n"
+              , get_txt((o)->name), (o)->ref, from);
+}
+
+#    define deref_object(o,from) _deref_object(o, from, __FILE__, __LINE__)
+
+#endif
+
+static INLINE object_t* check_object(object_t *const o) __attribute__((pure));
+static INLINE object_t* check_object(object_t *const o)
+  /* Return NULL, if object <o> is NULL or destructed,
+   * return <o> else.
+   */
+{
+    if (o && (o->flags&O_DESTRUCTED))
+        return NULL;
+    else
+        return o;
+}
+
+#ifdef CHECK_OBJECT_REF
+#define free_prog(p,f) _free_prog(p,f, __FILE__, __LINE__)
+#endif
 
 #endif /* OBJECT_H__ */
