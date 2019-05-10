@@ -2742,6 +2742,8 @@ update_string_lvalue_indices (string_t *oldstr, string_t *newstr, mp_int index1,
     if (!is_utf8 && length == index2 - index1 && oldstr == newstr)
         return;
 
+    ref_mstring(oldstr); /* Keep the string alive till we are finished. */
+
     for (struct protected_char_lvalue* lv = oldstr->u.mutable.char_lvalues;
          lv != NULL;
          lv = lv->next)
@@ -2815,6 +2817,9 @@ update_string_lvalue_indices (string_t *oldstr, string_t *newstr, mp_int index1,
         oldstr->u.mutable.char_lvalues = NULL;
         oldstr->u.mutable.range_lvalues = NULL;
     }
+
+    free_mstring(oldstr);
+
 } /* update_string_lvalue_indices() */
 
 /*-------------------------------------------------------------------------*/
