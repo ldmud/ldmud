@@ -1563,7 +1563,7 @@ fi
 # searchpath.
 
 AC_CACHE_CHECK(for PostgresSQL,lp_cv_has_pgsql,
-for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include/pgsql" "/usr/include/pgsql" "/usr/lib/pgsql" "/usr/local/include"; do
+for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include/pgsql" "/usr/include/pgsql" "/usr/include/postgresql" "/usr/local/include/postgresql" "/usr/lib/pgsql" "/usr/local/include"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="$saveflags -I$TESTPATH"

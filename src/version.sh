@@ -7,7 +7,7 @@
 
 # when in a git repository, determine these values from it automagically and
 # override the defaults
-if test -d ../.git && test -x "`which git 2>&1;true`"; then
+if test -d ../.git && test -x "`which git 2>&1;true`" && git describe --match '3.*' 2>/dev/null; then
 TAGNAME=`git describe --match '3.*' |cut -d '-' -f 1`
 version_major=`echo $TAGNAME |cut -d '.' -f 1`
 version_minor=`echo $TAGNAME |cut -d '.' -f 2`

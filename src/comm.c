@@ -8147,16 +8147,24 @@ f_net_connect (svalue_t *sp)
         memset(&hints, 0, sizeof(struct addrinfo));
 #ifndef USE_IPV6
         hints.ai_family = AF_INET;      // Allow only IPv4
-        hints.ai_flags = AI_ADDRCONFIG;  // only IPv4 if at least one interface with IPv4 and only IPv6 if at least one interface with IPv6
+        // only IPv4 if at least one interface with IPv4 and
+        // only IPv6 if at least one interface with IPv6
+        hints.ai_flags = AI_ADDRCONFIG|AI_NUMERICSERV;
 #else
         hints.ai_family = AF_INET6;      // Allow only IPv6
         // only IPv6 if at least one interface with IPv6.
         // And list IPv4 addresses as IPv4-mapped IPv6 addresses if no IPv6 addresses could be found.
-        hints.ai_flags = AI_ADDRCONFIG|AI_V4MAPPED;
+        hints.ai_flags = AI_ADDRCONFIG|AI_V4MAPPED|AI_NUMERICSERV;
 #endif
         hints.ai_socktype = SOCK_STREAM; // TCP socket
         hints.ai_protocol = 0;          // Any protocol
-        
+
+#ifdef INSIDE_TRAVIS
+        // The Travis-CI environment only has loopback devices activated,
+        // the AI_ADDRCONFIG would therefore never find a name.
+        hints.ai_flags &= ~AI_ADDRCONFIG;
+#endif
+
         /* TODO: Uh-oh, blocking DNS in the execution thread.
          * TODO:: Better would be to start an ERQ lookup and fill in the
          * TODO:: data in the background.
