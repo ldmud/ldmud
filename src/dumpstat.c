@@ -169,7 +169,7 @@ svalue_size (svalue_t *v, mp_int * pTotal)
                 record->ref_count = 1;
                 record->id_number = 0;
 
-                overhead = sizeof *v->u.vec - sizeof v->u.vec->item
+                overhead = sizeof *v->u.vec
                          + sizeof(svalue_t) * v->u.vec->size + sizeof(char *);
                 for (i=0; i < (mp_int)VEC_SIZE(v->u.vec); i++)
                 {

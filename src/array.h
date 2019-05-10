@@ -23,14 +23,14 @@ struct vector_s {
     p_int extra_ref;   /* Second refcount, used to check .ref. */
 #endif
     wiz_list_t *user;  /* Save who made the vector */
-    svalue_t item[1];
+    svalue_t item[];
 };
 
 
 /* --- Macros --- */
 /* See array.c for a description of what the following macros do. */
 
-/* Helper for LOCAL_VECn() */
+/* Helper for VEC_HEAD */
 #ifdef DEBUG
 #    define VEC_DEBUGREF(ref) ref,
 #else
@@ -41,15 +41,6 @@ struct vector_s {
 #define VEC_HEAD(size) size, 1, VEC_DEBUGREF(1) NULL
 
 #define VEC_SIZE(v) ((v)->size)
-
-#define LOCAL_VEC1(name, type1) \
-    struct { vector_t v; } name \
-      = { { VEC_HEAD(1), { { type1, { 0 } } } } }
-
-#define LOCAL_VEC2(name, type1, type2) \
-    struct { vector_t v; svalue_t item[1]; } name \
-      = { { VEC_HEAD(2), { { type1, { 0 } } } }, { { type2, { 0 } } } }
-
 
 /* --- Variables --- */
 

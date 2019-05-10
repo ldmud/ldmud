@@ -706,10 +706,9 @@ static INLINE bytecode_p PROGRAM_END(program_t program) {
 struct linenumbers_s
 {
     size_t     size;             /* Total allocated size of this structure */
-    bytecode_t line_numbers[1];
+    bytecode_t line_numbers[];
       /* Array [.size - sizeof(.size)] with the delta-compressed
-       * line number information. This is actually one byte too many, but
-       * that simplifies the swapping code.
+       * line number information.
        */
 };
 

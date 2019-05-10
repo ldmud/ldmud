@@ -95,7 +95,7 @@ struct string_s
     } u;
 
     size_t     size;    /* Length of the string */
-    char       txt[1];  /* In fact .size characters plus one '\0' */
+    char       txt[];   /* In fact .size characters plus one '\0' */
       /* The string text follows here */
 };
 
@@ -178,7 +178,7 @@ static INLINE size_t mstr_mem_size(const string_t * const s)
    *   Used only to keep the statistics up to date.
    */
 {
-    return sizeof(string_t) + s->size;
+    return sizeof(string_t) + s->size + 1;
 }
 
 static INLINE Bool mstr_untabled(const string_t * const s)

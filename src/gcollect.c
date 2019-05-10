@@ -2740,7 +2740,7 @@ show_array(int d, void *block, int depth)
      */
     a_size = (mp_int)(  xalloced_size(a)
                    - ( xalloc_overhead() +
-                       ( sizeof(vector_t) - sizeof(svalue_t) ) 
+                       sizeof(vector_t)
                      )
 
                   ) / (sizeof(svalue_t));
@@ -2761,7 +2761,7 @@ show_array(int d, void *block, int depth)
         }
         if (freed || !wl || a_size <= 0 || a_size > MAX_ARRAY_SIZE
          || xalloced_size((char *)a) - xalloc_overhead() !=
-              sizeof(vector_t) + sizeof(svalue_t) * (a_size - 1) )
+              sizeof(vector_t) + sizeof(svalue_t) * a_size )
         {
             WRITES(d, "Array in freed block 0x");
             write_x(d, (p_uint)((unsigned *)block - xalloc_overhead()));

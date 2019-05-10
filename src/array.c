@@ -42,13 +42,6 @@
  *       <size> elements and 1 ref. This does not include the
  *       element initialisers.
  *
- *   LOCAL_VEC1(name, type1)
- *   LOCAL_VEC2(name, type1, type2)
- *       Construct a local vector instance named <name> with 1(2)
- *       elements of type <type1> (and <type2>). Both elements are
- *       initialised to 0, and the actual vector can be accessed
- *       as '<name>.v'.
- *
  * This module contains both low-level and efun-level functions.
  * The latter are collected in the lower half of the source.
  *---------------------------------------------------------------------------
@@ -82,10 +75,10 @@
 /*-------------------------------------------------------------------------*/
 
 #define ALLOC_VECTOR(nelem) \
-      ((size_t)nelem >= (SSIZE_MAX - sizeof(vector_t)) / sizeof(svalue_t)) \
+      ((size_t)nelem > (SSIZE_MAX - sizeof(vector_t)) / sizeof(svalue_t)) \
       ? NULL \
       : (vector_t *)xalloc_pass(sizeof(vector_t) + \
-                                sizeof(svalue_t) * (nelem - 1))
+                                sizeof(svalue_t) * (nelem))
 
 /* ALLOC_VECTOR(size,file,line): Allocate dynamically the memory for
  *    a vector of <size> elements.
@@ -97,7 +90,7 @@
 int num_arrays;
   /* Total number of allocated arrays */
 
-vector_t null_vector = { VEC_HEAD(0), { { T_INVALID } } };
+vector_t null_vector = { VEC_HEAD(0) };
   /* The global empty array ({}).
    * Reusing it is cheaper than repeated allocations/deallocations.
    */
@@ -398,7 +391,7 @@ total_array_size (void)
     for (wl = all_wiz; wl; wl = wl->next)
         total += wl->size_array;
     total *= sizeof(svalue_t);
-    total += num_arrays * (sizeof(vector_t) - sizeof(svalue_t));
+    total += num_arrays * sizeof(vector_t);
     return total;
 }
 

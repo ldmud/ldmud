@@ -373,8 +373,8 @@ make_new_tabled (const char * const pTxt, size_t size, enum unicode_type unicode
 
     /* Get the memory for a new one */
 
-    string = xalloc_pass(size + sizeof(*string));
-      /* sizeof(*string) includes the extra data byte */
+    string = xalloc_pass(size + 1 + sizeof(*string));
+      /* We add one null byte. */
     if (!string)
         return NULL;
 
@@ -431,7 +431,7 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
 
     /* Get the memory */
 
-    string = xalloc_pass(iSize + sizeof(*string));
+    string = xalloc_pass(iSize + 1 + sizeof(*string));
     if (!string)
         return NULL;
 
@@ -2175,7 +2175,7 @@ string_driver_info (svalue_t *svp, int value)
             break;
 
         case DI_SIZE_STRING_OVERHEAD:
-            put_number(svp, sizeof(string_t)-1);
+            put_number(svp, sizeof(string_t));
             break;
 
 

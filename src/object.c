@@ -4601,7 +4601,7 @@ e_say (svalue_t *v, vector_t *avoid)
         origin = command_giver;
 
         /* Save the commandgiver to avoid, if needed */
-        if (avoid->item[0].type == T_NUMBER)
+        if (avoid->item[0].type == T_INVALID)
         {
             put_ref_object(avoid->item, command_giver, "say");
         }
@@ -4767,21 +4767,21 @@ v_say (svalue_t *sp, int num_arg)
  */
 
 {
-    static LOCAL_VEC2(vtmp, T_NUMBER, T_NUMBER);
-      /* Default 'avoid' array passed to say() giving the object
-       * to exclude in the second item. The first entry is reserved
-       * for e_say() to insert its command_giver object.
-       */
-
     if (num_arg == 1)
     {
         /* No objects to exclude */
+        vector_t *vec = allocate_uninit_array(1);
 
-        vtmp.v.item[0].type = T_NUMBER;
-          /* this marks the place for the command_giver */
-        vtmp.v.item[1].type = T_NUMBER;
-          /* nothing to exclude... */
-        e_say(sp, &vtmp.v);
+        /* Mark this item as the place for the command giver. */
+        vec->item[0].type = T_INVALID;
+
+        /* Save it in case of errors. */
+        push_array(sp, vec);
+        inter_sp = sp;
+
+        e_say(sp-1, vec);
+
+        free_svalue(sp--);
     }
     else
     {
@@ -4793,23 +4793,15 @@ v_say (svalue_t *sp, int num_arg)
         }
         else /* it's an object */
         {
-            vtmp.v.item[0].type = T_NUMBER;
-            put_ref_object(vtmp.v.item+1, sp->u.ob, "say");
-            e_say(sp-1, &vtmp.v);
+            /* Create an array with the command giver and the object. */
+            vector_t *vec = allocate_uninit_array(2);
+            vec->item[0].type = T_INVALID;
+            transfer_svalue_no_free(vec->item + 1, sp);
+            put_array(sp, vec);
+
+            e_say(sp-1, vec);
         }
         free_svalue(sp--);
-    }
-
-    /* We may have received object references in vtmp - clear them */
-    if (vtmp.v.item[0].type != T_NUMBER)
-    {
-        free_svalue(&(vtmp.v.item[0]));
-        vtmp.v.item[0].type = T_NUMBER;
-    }
-    if (vtmp.v.item[1].type != T_NUMBER)
-    {
-        free_svalue(&(vtmp.v.item[1]));
-        vtmp.v.item[1].type = T_NUMBER;
     }
 
     free_svalue(sp--);

@@ -85,7 +85,7 @@ struct lambda_s
            */
     } function;
 
-    svalue_t context[ /* .lfun.context_size */ 1];
+    svalue_t context[ /* .lfun.context_size */ ];
       /* lfun-closure context variables, if any.
        * Putting this array into the function.lfun somehow causes memory
        * corruption because some lambda structures won't be allocated large
@@ -99,7 +99,7 @@ struct lambda_s
    * constant value (the one with index number 0).
    */
 
-#define SIZEOF_LAMBDA(num) (sizeof(struct lambda_s) + (((int)num)-1) * sizeof(svalue_t))
+#define SIZEOF_LAMBDA(num) (sizeof(struct lambda_s) + ((int)num) * sizeof(svalue_t))
   /* size_t SIZEOF_LAMBDA(int num)
    *   Size of a lambda closure with <num> context variables.
    */

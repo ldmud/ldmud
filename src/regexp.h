@@ -39,7 +39,7 @@ typedef struct regexp
       /* Internal  use: length of regmust.
        */
     long regalloc;          /* Allocated total length, used by rxcache */
-    unsigned char program[1];  /* The compiled regexp. */
+    unsigned char program[];  /* The compiled regexp. */
 } regexp;
 
 /* --- Prototypes --- */
