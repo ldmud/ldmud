@@ -395,16 +395,16 @@ parse_one_plural (string_t *str)
     case 's':
     case 'x':
     case 'h':
-        return new_mstring(strcat(pbuf, "ses"));
+        return new_unicode_mstring(strcat(pbuf, "ses"));
 
     case 'y':
-        return new_mstring(strcat(pbuf, "ies"));
+        return new_unicode_mstring(strcat(pbuf, "ies"));
 
     case 'e':
         if (ch2 == 'f')
         {
             pbuf[sl-1] = 0;
-            return new_mstring(strcat(pbuf, "ves"));
+            return new_unicode_mstring(strcat(pbuf, "ves"));
         }
     }
 
@@ -419,7 +419,7 @@ parse_one_plural (string_t *str)
 
     /* Default: just append 's' */
     pbuf[sl] = ch;
-    return new_mstring(strcat(pbuf, "s"));
+    return new_unicode_mstring(strcat(pbuf, "s"));
 } /* parse_one_plural() */
 
 /*-------------------------------------------------------------------------*/
@@ -873,7 +873,7 @@ check_adjectiv (size_t obix, vector_t *wvec, size_t from, size_t to)
                 strcat(adstrp, get_txt(wvec->item[sum].u.str));
             }
 
-            adstr = new_mstring(adstrp);
+            adstr = new_unicode_mstring(adstrp);
 
             if ((member_string(adstr, ids) >= 0)
              || (member_string(adstr, gAdjid_list_d) >= 0))
