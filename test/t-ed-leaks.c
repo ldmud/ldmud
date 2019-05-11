@@ -6,7 +6,7 @@
 void run_ed()
 {
     // Just to make sure.
-    call_out(#'shutdown, __HEART_BEAT_INTERVAL__, 1);
+    call_out(#'shutdown, __ALARM_TIME__ * 2, 1);
 
     rm("/dummy");
     ed("/dummy","ed_ends");
