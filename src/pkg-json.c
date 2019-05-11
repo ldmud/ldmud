@@ -40,6 +40,7 @@
 #define NDEBUG
 #endif
 #include <assert.h>
+#include <stdio.h>
 
 struct json_error_handler_s {
     error_handler_t     head;
@@ -290,7 +291,6 @@ ldmud_json_parse (svalue_t *sp, struct json_object *jobj)
         break;
     case json_type_int:
         {
-#ifdef JSON_64_SUPPORT
         int64_t val = json_object_get_int64(jobj);
 #if PINT_MAX < INT64_MAX
         // if val may exceed the numerical limits of our p_int.
@@ -298,10 +298,6 @@ ldmud_json_parse (svalue_t *sp, struct json_object *jobj)
             warnf("json_parse(): 64 bit long integer %"PRId64" was truncated to 32 bit.\n",
                   val);
 #endif
-#else
-        int32_t val = json_object_get_int(jobj);
-        // val is only 32 bit wide, no check needed.
-#endif // JSON_64_SUPPORT
         put_number(sp, val);
         }
         break;
@@ -433,22 +429,30 @@ ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
 
     switch((val != NULL ? val : sp)->type) {
     case T_NUMBER:
-#ifdef JSON_64_SUPPORT
         jobj = json_object_new_int64(val->u.number);
-#else
-        if (val->u.number > INT32_MAX || val->u.number < INT32_MIN)
-            warnf("json_serialize(): truncated 64 bit long number %ld to 32 bit due missing support in JSON-C.\n",
-                  val->u.number);
-        jobj = json_object_new_int(val->u.number);
-#endif   // JSON_64_SUPPORT
-
         if (parent) ldmud_json_attach(parent, key, jobj);
         break;
     
     case T_FLOAT:
-        jobj = json_object_new_double(READ_DOUBLE(val));
+    {
+        // We'll make sure that it won't be printed as an integer.
+        char buf[100];
+        size_t size = snprintf(buf, sizeof(buf), "%.17g", READ_DOUBLE(val));
+
+        if (strspn(buf, "0123456789") == size && size + 2 < sizeof(buf))
+        {
+            // Consists only of digits, we add the ".0" to the string.
+            buf[size] = '.';
+            buf[size+1] = '0';
+            buf[size+2] = 0;
+        }
+        else
+            buf[sizeof(buf)-1] = 0;
+
+        jobj = json_object_new_double_s(READ_DOUBLE(val), buf);
         if (parent) ldmud_json_attach(parent, key, jobj);
         break;
+    }
     
     case T_STRING:
         jobj = json_object_new_string(get_txt(val->u.str));

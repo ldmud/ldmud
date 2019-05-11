@@ -1738,9 +1738,13 @@ else
 fi
 
 # --- JSON ---
-AC_MY_SEARCH_LIB(JSONC,json-c >= 0.11,lp_cv_has_jsonc,json-c >= 0.11,json_path,
+AC_MY_SEARCH_LIB(JSONC,json-c >= 0.12,lp_cv_has_jsonc,json-c >= 0.12,json_path,
 [
     #include <json-c/json.h>
+
+    #if JSON_C_VERSION_NUM < 0x000c00
+    #error libjson-c >= 0.12 is needed.
+    #endif
 
     json_object *foo(void)
     {
@@ -1748,49 +1752,17 @@ AC_MY_SEARCH_LIB(JSONC,json-c >= 0.11,lp_cv_has_jsonc,json-c >= 0.11,json_path,
         return ob=json_object_new_int(1);
     }
 ],json-c,json_object_get_type,enable_use_json)
-# If not found, fall back and try json-c <= 0.10 (yes, called libjson then).
-if test "$lp_cv_has_jsonc" = "no"; then
-AC_MY_SEARCH_LIB(JSON,json,lp_cv_has_json,json,json_path,
-[
-    #include <json/json.h>
-
-    json_object *foo(void)
-    {
-        struct json_object *ob;
-        return ob=json_object_new_int(1);
-    }
-],json,json_object_get_type,enable_use_json)
-fi
 
 if test "$lp_cv_has_jsonc" = "yes"; then
     AC_DEFINE(HAS_JSONC, 1, [Does the machine offer JSON-C?])
-    AC_DEFINE(JSON_64_SUPPORT, 1, [JSON-C supports 64 bit values.])
-elif test "$lp_cv_has_json" = "yes"; then
-    AC_DEFINE(HAS_JSON, 1, [Does the machine offer JSON-C?])
-    if test "x$enable_use_json" = "xyes"; then
-        savelibs="$LIBS"
-        LIBS="$LIBS $PKGLIBS"
-        # Check if it supports 64 bit values
-        AC_SEARCH_LIBS(json_object_new_int64,,
-            lp_cv_json_64bit=yes,
-            lp_cv_json_64bit=no
-        )
-
-        if test "$lp_cv_json_64bit" = "yes" ; then
-            AC_DEFINE(JSON_64_SUPPORT, 1, [JSON-C supports 64 bit values.])
-        fi
-
-        LIBS="$savelibs"
-    fi
 else
     if test "$enable_use_json" = "yes"; then
-        echo "libjson-c library not found - disabling JSON support"
+        echo "libjson-c library (>= 0.12) not found - disabling JSON support"
         AC_NOT_AVAILABLE(use-json)
     fi
 
     cdef_use_json="#undef"
     enable_use_json="no"
-    json_package=
 fi
 
 # --- PYTHON ---
