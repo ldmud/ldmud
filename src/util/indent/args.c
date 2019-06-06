@@ -29,13 +29,18 @@ static char sccsid[] = "@(#)args.c	5.6 (Berkeley) 9/15/88";
 
 #include "indent_globs.h"
 #include <ctype.h>
+#include <string.h>
 #include "version.h"
+#include "io.h"
+#include "lexi.h"
 
 int else_endif_col;
 
 extern char *in_name;
 
 char       *getenv();
+void       scan_profile(FILE *f);
+void       set_option( char *arg, int explicit);
 
 /* profile types */
 enum profile {PRO_BOOL, /* boolean */
@@ -241,7 +246,7 @@ struct pro pro[] = {
  * set_profile reads $HOME/.indent.pro and ./.indent.pro and handles arguments
  * given in these files.
  */
-set_profile()
+void set_profile()
 {
     register FILE *f;
     char *fname;
@@ -263,7 +268,7 @@ set_profile()
     free (fname);
 }
 
-scan_profile(f)
+void scan_profile(f)
     register FILE *f;
 {
     register int i;
@@ -287,7 +292,7 @@ scan_profile(f)
    an argument.  Compare the two, returning true if they are equal,
    and if they are equal set *START_PARAM to point to the argument
    in S2.  */
-eqin(s1, s2, start_param)
+int eqin(s1, s2, start_param)
      register char *s1;
      register char *s2;
      char **start_param;
@@ -303,7 +308,7 @@ eqin(s1, s2, start_param)
 /*
  * Set the defaults.
  */
-set_defaults()
+void set_defaults()
 {
     register struct pro *p;
 
@@ -317,7 +322,7 @@ set_defaults()
    specified (as opposed to being taken from a PRO_SETTINGS group of
    settings).  */
 
-set_option (arg, explicit)
+void set_option (arg, explicit)
      char *arg;
      int explicit;
 {

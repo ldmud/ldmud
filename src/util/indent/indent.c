@@ -32,7 +32,19 @@ static char sccsid[] = "@(#)indent.c	5.11 (Berkeley) 9/15/88";
 
 #define MAIN
 #include "indent_globs.h"
+#include "io.h"
+#include "lexi.h"
+#include "args.h"
+#include "parse.h"
+#include "pr_comment.h"
 #include <ctype.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+void bakcopy();
 
 char       *in_name = 0;	/* will always point to name of input
 					 * file */
@@ -42,7 +54,7 @@ char       *out_name = 0;	/* will always point to name
 /* The following variables are documented in indent_globs.h.  */
 int else_or_endif = false;
 
-main(argc, argv)
+int main(argc, argv)
     int         argc;
     char      **argv;
 {
@@ -220,6 +232,7 @@ main(argc, argv)
     if (lpc) {
 	addkey("string", 4);
 	addkey("object", 4);
+	addkey("mapping", 4);
     } else {
 	addkey("long", 4);
 	addkey("short", 4);
@@ -236,7 +249,7 @@ main(argc, argv)
     parse(semicolon);
     {
 	register char *p = buf_ptr;
-	register    col = 1;
+	register int col = 1;
 
 	while (1) {
 	    if (*p == ' ')
@@ -695,22 +708,27 @@ check_type:
 		parser_state_tos->want_blank = false;
 		break;
 	    }
-	    parser_state_tos->in_stmt = false;	/* seeing a label does not imply we are in a
+	    if(!lpc || scase) {
+	        parser_state_tos->in_stmt = false;	/* seeing a label does not imply we are in a
 				 * stmt */
-	    for (t_ptr = s_code; *t_ptr; ++t_ptr)
-		*e_lab++ = *t_ptr;	/* turn everything so far into a label */
-	    e_code = s_code;
-	    *e_lab++ = ':';
-	    *e_lab++ = ' ';
-	    *e_lab = '\0';
+	        for (t_ptr = s_code; *t_ptr; ++t_ptr)
+		    *e_lab++ = *t_ptr;	/* turn everything so far into a label */
+	        e_code = s_code;
+	        *e_lab++ = ':';
+	        *e_lab++ = ' ';
+	        *e_lab = '\0';
 
-	    force_nl = parser_state_tos->pcase = scase;	/* parser_state_tos->pcase will be used by
+	        force_nl = parser_state_tos->pcase = scase;	/* parser_state_tos->pcase will be used by
 						 * dump_line to decide how to
 						 * indent the label. force_nl
 						 * will force a case n: to be
 						 * on a line by itself */
-	    scase = false;
-	    parser_state_tos->want_blank = false;
+	        scase = false;
+	        parser_state_tos->want_blank = false;
+	    } else {
+		*e_code++ = ':';
+		parser_state_tos->want_blank = true;
+	    }
 	    break;
 
 	case semicolon:	/* got a ';' */
@@ -1160,7 +1178,7 @@ check_type:
 
 	    if (strncmp(s_lab, "#if", 3) == 0) {
 		if (blanklines_around_conditional_compilation) {
-		    register    c;
+		    register int   c;
 		    prefix_blankline_requested++;
 		    while ((c = *in_prog_pos++) == '\n');
 		    in_prog_pos--;
@@ -1315,7 +1333,7 @@ check_type:
  * backup file will be "file.BAK" then make the backup file the input and
  * original input file the output
  */
-bakcopy()
+void bakcopy()
 {
     /* file descriptor for the output file */
     int bakchn;

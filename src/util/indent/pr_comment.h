@@ -1,0 +1,2 @@
+void pr_comment();
+

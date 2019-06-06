@@ -23,7 +23,9 @@ static char sccsid[] = "@(#)parse.c	5.8 (Berkeley) 9/15/88";
 #endif /* not lint */
 
 #include "indent_globs.h"
+#include "io.h"
 
+void reduce();
 struct parser_state *parser_state_tos;
 
 /* like ++parser_state_tos->tos but checks for stack overflow and extends
@@ -277,7 +279,7 @@ parse(tk)
 /*----------------------------------------------*\
 |   REDUCTION PHASE				    |
 \*----------------------------------------------*/
-reduce()
+void reduce()
 {
 
     register int i;

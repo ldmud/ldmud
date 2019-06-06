@@ -96,7 +96,7 @@ GLOBAL FILE       *output;		/* the output file */
 #endif
 #define check_size(name) \
 	if (paste(e_,name) >= paste(l_,name)) { \
-	    register nsize = paste(l_,name)-paste(s_,name)+400; \
+	    register int nsize = paste(l_,name)-paste(s_,name)+400; \
 	    paste(name,buf) = (char *) xrealloc(paste(name,buf), nsize); \
 	    paste(e_,name) = paste(name,buf) + \
 	      (paste(e_,name)-paste(s_,name)) + 1; \

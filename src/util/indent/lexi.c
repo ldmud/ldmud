@@ -28,8 +28,10 @@ static char sccsid[] = "@(#)lexi.c	5.11 (Berkeley) 9/15/88";
  * of token scanned.
  */
 
+#include <string.h>
 #include "indent_globs.h"
 #include "ctype.h"
+#include "io.h"
 
 #define alphanum 1
 #define opchar 3
@@ -335,6 +337,10 @@ lexi()
 		  break;
 	      }
 	    buf_ptr++;
+	    if (lpc && qchar == '\'' && !(isalnum(*buf_ptr)||*buf_ptr=='_')) {
+	      code = ident;
+	      break;
+	    }
 	    if (buf_ptr >= buf_end)
 	      fill_buffer ();
 	  }
@@ -372,6 +378,19 @@ lexi()
 	break;
 
     case '#':
+	if (lpc && *buf_ptr == '\'' ) { /* it's a closure */
+	    buf_ptr++;
+	    while(!(isspace(*buf_ptr)||*buf_ptr=='{'||*buf_ptr=='}'))
+	      {
+	        buf_ptr++;
+		if (*buf_ptr == ',' )
+		  break;
+		if (buf_ptr >= buf_end)
+		  fill_buffer();
+	      }
+	    code = ident;
+	    break;
+	}
 	unary_delim = parser_state_tos->last_u_d;
 	code = preesc;
 	break;
@@ -545,7 +564,7 @@ lexi()
 /*
  * Add the given keyword to the keyword table, using val as the keyword type
  */
-addkey(key, val)
+void addkey(key, val)
     char       *key;
      enum rwcodes val;
 {
