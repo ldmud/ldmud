@@ -712,22 +712,27 @@ check_type:
 		parser_state_tos->want_blank = false;
 		break;
 	    }
-	    parser_state_tos->in_stmt = false;	/* seeing a label does not imply we are in a
+	    if(!lpc || scase) {
+	        parser_state_tos->in_stmt = false;	/* seeing a label does not imply we are in a
 				 * stmt */
-	    for (t_ptr = s_code; *t_ptr; ++t_ptr)
-		*e_lab++ = *t_ptr;	/* turn everything so far into a label */
-	    e_code = s_code;
-	    *e_lab++ = ':';
-	    *e_lab++ = ' ';
-	    *e_lab = '\0';
+	        for (t_ptr = s_code; *t_ptr; ++t_ptr)
+		    *e_lab++ = *t_ptr;	/* turn everything so far into a label */
+	        e_code = s_code;
+	        *e_lab++ = ':';
+	        *e_lab++ = ' ';
+	        *e_lab = '\0';
 
-	    force_nl = parser_state_tos->pcase = scase;	/* parser_state_tos->pcase will be used by
+	        force_nl = parser_state_tos->pcase = scase;	/* parser_state_tos->pcase will be used by
 						 * dump_line to decide how to
 						 * indent the label. force_nl
 						 * will force a case n: to be
 						 * on a line by itself */
-	    scase = false;
-	    parser_state_tos->want_blank = false;
+	        scase = false;
+	        parser_state_tos->want_blank = false;
+	    } else {
+		*e_code++ = ':';
+		parser_state_tos->want_blank = true;
+	    }
 	    break;
 
 	case semicolon:	/* got a ';' */
