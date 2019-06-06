@@ -23,7 +23,11 @@ static char sccsid[] = "@(#)io.c	5.10 (Berkeley) 9/15/88";
 #endif /* not lint */
 
 #include "indent_globs.h"
+#include "io.h"
 #include <ctype.h>
+#include <string.h>
+#include <stdarg.h>
+#include <unistd.h>
 /* POSIX says that fcntl.h should exist.  Linking either sys/fcntl.h
    or sys/file.h to fcntl.h should work fine if you don't have fcntl.h */
 #include <fcntl.h>
@@ -39,7 +43,7 @@ int paren_target;
 /* true if INDENT OFF is in effect */
 static int inhibit_formatting;
 
-dump_line()
+void dump_line()
 {				/* dump_line is the routine that actually
 				 * effects the printing of the new source. It
 				 * prints the label section, followed by the
@@ -47,7 +51,7 @@ dump_line()
 				 * level, followed by any comments */
     register int cur_col,
                 target_col;
-    static      not_first_line;
+    static int not_first_line;
 
     if (parser_state_tos->procname[0]) {
 	if (troff) {
@@ -136,7 +140,7 @@ dump_line()
 		  += ind_size - 1;
 	      }
 	    {
-		register    i;
+		register int   i;
 
 		for (i = 0; i < parser_state_tos->p_l_follow; i++)
 		    if (parser_state_tos->paren_indents[i] >= 0)
@@ -210,7 +214,7 @@ dump_line()
 		}
 	    }
 	    else {		/* print comment, if any */
-		register    target = parser_state_tos->com_col;
+		register int   target = parser_state_tos->com_col;
 		register char *com_st = s_com;
 
 		target += parser_state_tos->comment_delta;
@@ -286,14 +290,14 @@ inhibit_newline:
 int
 compute_code_target()
 {
-    register    target_col = parser_state_tos->ind_level + 1;
+    register int   target_col = parser_state_tos->ind_level + 1;
 
     if (parser_state_tos->paren_level)
 	if (!lineup_to_parens)
 	    target_col += continuation_indent * parser_state_tos->paren_level;
 	else {
-	    register    w;
-	    register    t = paren_target;
+	    register int   w;
+	    register int   t = paren_target;
 
 	    if ((w = count_spaces(t, s_code) - max_col) > 0
 		    && count_spaces(target_col, s_code) <= max_col) {
@@ -414,7 +418,7 @@ read_stdin()
    function is a historical artifact from before the time that indent
    kept the whole source file in memory). */
 
-fill_buffer()
+void fill_buffer()
 {
   /* Point various places in the buffer.  */
   char *p;
@@ -522,7 +526,7 @@ fill_buffer()
  * HISTORY: initial coding 	November 1976	D A Willcox of CAC
  *
  */
-pad_output(current, target)	/* writes tabs and blanks (if necessary) to
+int pad_output(current, target)	/* writes tabs and blanks (if necessary) to
 				 * get the current output position up to the
 				 * target column */
     int         current;	/* the current column value */
@@ -611,24 +615,31 @@ int	found_err;
 /* Signal an error.  LEVEL is nonzero if it is an error (as opposed to
    a warning.  MSG is a printf-style format string.  Additional
    arguments are additional arguments for printf.  */
-diag(level, msg, a, b)
+void diag(int level,const char *msg, ...)
 {
+    va_list argp;
+
     if (level)
 	found_err = 1;
     if (output == stdout) {
 	fprintf(stdout, "/**INDENT** %s@%d: ", level == 0 ? "Warning" : "Error", line_no);
-	fprintf(stdout, (char *)msg, a, b);
+        va_start(argp,msg);
+	vfprintf(stdout, msg, argp);
+	va_end(argp);
 	fprintf(stdout, " */\n");
     }
     else {
 	fprintf(stderr, "%s: %d: ", in_name, line_no);
-	fprintf(stderr, (char *)msg, a, b);
+	va_start(argp,msg);
+	vfprintf(stderr, msg, argp);
+	va_end(argp);
 	fprintf(stderr, "\n");
     }
 }
 
-writefdef(f, nm)
+void writefdef(f, nm)
     register struct fstate *f;
+    int nm;
 {
     fprintf(output, ".ds f%c %s\n.nr s%c %d\n",
 	    nm, f->font, nm, f->size);
@@ -671,7 +682,7 @@ chfont(of, nf, s)
 }
 
 
-parsefont(f, s0)
+void parsefont(f, s0)
     register struct fstate *f;
     char       *s0;
 {

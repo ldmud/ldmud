@@ -32,7 +32,19 @@ static char sccsid[] = "@(#)indent.c	5.11 (Berkeley) 9/15/88";
 
 #define MAIN
 #include "indent_globs.h"
+#include "io.h"
+#include "lexi.h"
+#include "args.h"
+#include "parse.h"
+#include "pr_comment.h"
 #include <ctype.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+void bakcopy();
 
 char       *in_name = 0;	/* will always point to name of input
 					 * file */
@@ -42,7 +54,7 @@ char       *out_name = 0;	/* will always point to name
 /* The following variables are documented in indent_globs.h.  */
 int else_or_endif = false;
 
-main(argc, argv)
+int main(argc, argv)
     int         argc;
     char      **argv;
 {
@@ -236,7 +248,7 @@ main(argc, argv)
     parse(semicolon);
     {
 	register char *p = buf_ptr;
-	register    col = 1;
+	register int col = 1;
 
 	while (1) {
 	    if (*p == ' ')
@@ -1160,7 +1172,7 @@ check_type:
 
 	    if (strncmp(s_lab, "#if", 3) == 0) {
 		if (blanklines_around_conditional_compilation) {
-		    register    c;
+		    register int   c;
 		    prefix_blankline_requested++;
 		    while ((c = *in_prog_pos++) == '\n');
 		    in_prog_pos--;
@@ -1315,7 +1327,7 @@ check_type:
  * backup file will be "file.BAK" then make the backup file the input and
  * original input file the output
  */
-bakcopy()
+void bakcopy()
 {
     /* file descriptor for the output file */
     int bakchn;

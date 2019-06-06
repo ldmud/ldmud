@@ -55,9 +55,9 @@ static char sccsid[] = "@(#)pr_comment.c	5.9 (Berkeley) 9/15/88";
 
 
 #include "indent_globs.h"
+#include "io.h"
 
-
-pr_comment()
+void pr_comment()
 {
     int         now_col;	/* column we are in now */
     int         adj_max_col;	/* Adjusted max_col for when we decide to
@@ -114,7 +114,7 @@ pr_comment()
 		parser_state_tos->com_col = 1 + !format_col1_comments;
 	}
 	else {
-	    register    target_col;
+	    register int   target_col;
 	    break_delim = 0;
 	    if (s_code != e_code)
 		target_col = count_spaces(compute_code_target(), s_code);

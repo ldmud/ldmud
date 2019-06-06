@@ -28,8 +28,11 @@ static char sccsid[] = "@(#)lexi.c	5.11 (Berkeley) 9/15/88";
  * of token scanned.
  */
 
+#include <string.h>
 #include "indent_globs.h"
 #include "ctype.h"
+#include "io.h"
+#include "lexi.h"
 
 #define alphanum 1
 #define opchar 3
@@ -545,7 +548,7 @@ lexi()
 /*
  * Add the given keyword to the keyword table, using val as the keyword type
  */
-addkey(key, val)
+void addkey(key, val)
     char       *key;
      enum rwcodes val;
 {
