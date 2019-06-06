@@ -340,6 +340,14 @@ lexi()
 	    buf_ptr++;
 	    if (buf_ptr >= buf_end)
 	      fill_buffer ();
+	    /* This check must come for the second byte, to avoid treating
+	     * characters as symbols.
+	     */
+	    if (lpc && qchar == '\'' && !(isalnum(*buf_ptr) || *buf_ptr=='_')) {
+	      /* It's a symbol. */
+	      code = ident;
+	      break;
+	    }
 	  }
 	if (*buf_ptr == '\n' || *buf_ptr == 0)
 	  {
@@ -375,6 +383,21 @@ lexi()
 	break;
 
     case '#':
+	if (lpc && *buf_ptr == '\'' ) { /* it's a closure */
+	    buf_ptr++;
+	    if (buf_ptr >= buf_end)
+	      fill_buffer ();
+	    while(!(isspace(*buf_ptr) || *buf_ptr=='{' || *buf_ptr=='}'))
+	      {
+	        buf_ptr++;
+	        if (buf_ptr >= buf_end)
+	          fill_buffer ();
+		if (*buf_ptr == ',' )
+		  break;
+	      }
+	    code = ident;
+	    break;
+	}
 	unary_delim = parser_state_tos->last_u_d;
 	code = preesc;
 	break;
