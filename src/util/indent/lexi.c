@@ -570,7 +570,7 @@ void addkey(key, val)
 	user_specials_max = 5;
 	user_specials_idx = 0;
       }
-    else if (user_specials_idx == user_specials_max)
+    else if (user_specials_idx == user_specials_max-1)
       {
 	user_specials_max += 5;
 	user_specials = (struct templ *) xrealloc ((char *) user_specials,

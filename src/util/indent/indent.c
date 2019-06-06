@@ -232,6 +232,11 @@ int main(argc, argv)
     if (lpc) {
 	addkey("string", 4);
 	addkey("object", 4);
+	addkey("mapping", 4);
+	addkey("closure", 4);
+	addkey("symbol", 4);
+	addkey("bytes", 4);
+	addkey("mixed", 4);
     } else {
 	addkey("long", 4);
 	addkey("short", 4);
