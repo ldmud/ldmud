@@ -1397,7 +1397,11 @@ tls_query_connection_info (interactive_t *ip)
     put_number(&(rc->item[TLS_CIPHER])
               , gnutls_cipher_get(ip->tls_session));
     put_number(&(rc->item[TLS_COMP])
+#if GNUTLS_VERSION_NUMBER < 0x030600
               , gnutls_compression_get(ip->tls_session));
+#else
+              , 0); /* GnuTLS 3.6.0 does not support compression anymore. */
+#endif
     put_number(&(rc->item[TLS_KX])
               , gnutls_kx_get(ip->tls_session));
     put_number(&(rc->item[TLS_MAC])
