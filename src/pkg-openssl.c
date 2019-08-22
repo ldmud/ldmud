@@ -113,13 +113,21 @@ DH *get_dh2048()
   DH *dh;
   if ((dh=DH_new()) == NULL)
     return(NULL);
-  dh->p=BN_bin2bn(dh2048_p,sizeof(dh2048_p),NULL);
-  dh->g=BN_bin2bn(dh2048_g,sizeof(dh2048_g),NULL);
-  if ((dh->p == NULL) || (dh->g == NULL))
+
+  BIGNUM *p = BN_bin2bn(dh2048_p,sizeof(dh2048_p),NULL);
+  BIGNUM *g = BN_bin2bn(dh2048_g,sizeof(dh2048_g),NULL);
+  if (p == NULL || g == NULL)
   {
     DH_free(dh);
     return(NULL);
   }
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  DH_set0_pqg(dh, p, NULL, g);
+#else
+  dh->p=p;
+  dh->g=g;
+#endif
+
   return(dh);
 } /* get_dh2048 */
 
@@ -268,7 +276,7 @@ no_passphrase_callback (char * buf, int num, int w, void *arg)
 } /* no_passphrase_callback() */
 
 static void *
-openssl_malloc (size_t size)
+openssl_malloc (size_t size, const char* file, int line)
 /*
  * Wrapper function for using our own allocator in openssl.
  */
@@ -277,9 +285,9 @@ openssl_malloc (size_t size)
 }
 
 static void
-openssl_free (void * ptr) __attribute__((nonnull));
+openssl_free (void * ptr, const char* file, int line) __attribute__((nonnull(1)));
 static void
-openssl_free (void * ptr)
+openssl_free (void * ptr, const char* file, int line)
 /*
  * Wrapper function for using our own allocator in openssl.
  */
@@ -288,9 +296,9 @@ openssl_free (void * ptr)
 }
 
 static void *
-openssl_realloc (void * ptr, size_t size) __attribute__((nonnull));
+openssl_realloc (void * ptr, size_t size, const char* file, int line) __attribute__((nonnull(1)));
 static void *
-openssl_realloc (void * ptr, size_t size)
+openssl_realloc (void * ptr, size_t size, const char* file, int line)
 /*
  * Wrapper function for using our own allocator in openssl.
  */
@@ -316,7 +324,11 @@ tls_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
         char buf[512];
         printf("%s tls_verify_callback(%d, ...)\n", time_stamp(), preverify_ok);
 
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+        X509_NAME_oneline(X509_get_issuer_name(X509_STORE_CTX_get_current_cert(ctx)), buf, sizeof buf);
+#else
         X509_NAME_oneline(X509_get_issuer_name(ctx->current_cert), buf, sizeof buf);
+#endif
         printf("depth %d: %s\n", X509_STORE_CTX_get_error_depth(ctx), buf);
     }
     return MY_TRUE;
@@ -346,7 +358,7 @@ tls_add_entropy()
     if (nextpoll < tv.tv_sec)
     {
         unsigned char rbyte;
-        RAND_pseudo_bytes(&rbyte, 1);
+        RAND_bytes(&rbyte, 1);
         nextpoll = tv.tv_sec + PRNG_RESEED_PERIOD/2
                    + ((PRNG_RESEED_PERIOD * rbyte) / UCHAR_MAX);
         if (RAND_poll() == 0)
@@ -1231,7 +1243,11 @@ tls_check_certificate (interactive_t *ip, Bool more)
             put_c_n_string(&(extra->item[3 * i + 1]), buf, len);
             
             put_c_string(&(extra->item[3 * i + 2])
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+                        , (const char *)ASN1_STRING_get0_data(X509_NAME_ENTRY_get_data(entry)));
+#else
                         , (char *)ASN1_STRING_data(X509_NAME_ENTRY_get_data(entry)));
+#endif
         }
         put_array(&(v->item[1]), extra);
 
@@ -1250,6 +1266,7 @@ tls_check_certificate (interactive_t *ip, Bool more)
                 int iter, count;
 
                 X509_EXTENSION *ext = NULL;
+                ASN1_OBJECT* ob = NULL;
                 STACK_OF(GENERAL_NAME) *ext_vals = NULL;
 
                 ext = X509_get_ext(peer, i);
@@ -1257,10 +1274,15 @@ tls_check_certificate (interactive_t *ip, Bool more)
                     break;
                 }
                 /* extension name */
-                len = OBJ_obj2txt(buf, sizeof buf, ext->object, 1),
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+                ob = X509_EXTENSION_get_object(ext);
+#else
+                ob = ext->object;
+#endif
+                len = OBJ_obj2txt(buf, sizeof buf, ob, 1),
                 put_c_n_string(&(extensions->item[3 * i]), (char *)buf, len);
 
-                len = OBJ_obj2txt(buf, sizeof buf, ext->object, 0),
+                len = OBJ_obj2txt(buf, sizeof buf, ob, 0),
                 put_c_n_string(&(extensions->item[3 * i + 1]), (char *)buf, len);
 
                 /* extension values */
@@ -1288,14 +1310,22 @@ tls_check_certificate (interactive_t *ip, Bool more)
                         len = OBJ_obj2txt(buf, sizeof buf, ext_val->d.otherName->type_id, 0),
                         put_c_n_string(&(extension->item[3 * iter + 1]), buf, len);
                         put_c_string(&(extension->item[3 * iter + 2])
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+                                    , (const char*)ASN1_STRING_get0_data(value));
+#else
                                     , (char*)ASN1_STRING_data(value));
+#endif
                         break;
                     case GEN_DNS:
                         value = ext_val->d.dNSName;
                         put_c_n_string(&(extension->item[3 * iter]), "dNSName", 7);
                         put_c_n_string(&(extension->item[3 * iter + 1]), "dNSName", 7);
                         put_c_string(&(extension->item[3 * iter + 2])
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+                                    , (const char*)ASN1_STRING_get0_data(value));
+#else
                                     , (char*)ASN1_STRING_data(value));
+#endif
 
                         break;
                     case GEN_EMAIL:
@@ -1303,14 +1333,22 @@ tls_check_certificate (interactive_t *ip, Bool more)
                         put_c_n_string(&(extension->item[3 * iter]), "rfc822Name", 10);
                         put_c_n_string(&(extension->item[3 * iter + 1]), "rfc822Name", 10);
                         put_c_string(&(extension->item[3 * iter + 2])
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+                                    , (const char*)ASN1_STRING_get0_data(value));
+#else
                                     , (char*)ASN1_STRING_data(value));
+#endif
                         break;
                     case GEN_URI:
                         value = ext_val->d.uniformResourceIdentifier;
                         put_c_n_string(&(extension->item[3 * iter]), "uniformResourceIdentifier", 25);
                         put_c_n_string(&(extension->item[3 * iter + 1]), "uniformResourceIdentifier", 25);
                         put_c_string(&(extension->item[3 * iter + 2])
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+                                    , (const char*)ASN1_STRING_get0_data(value));
+#else
                                     , (char*)ASN1_STRING_data(value));
+#endif
                         break;
 
                     /* TODO: the following are unimplemented 
@@ -1505,6 +1543,16 @@ calc_digest (digest_t md, void *dest, size_t destlen, void *msg, size_t msglen, 
 #if defined(OPENSSL_NO_HMAC)
         errorf("OpenSSL wasn't configured to provide the hmac() method.\n");
         /* NOTREACHED */
+#elif OPENSSL_VERSION_NUMBER >= 0x10100000L
+        HMAC_CTX *ctx = HMAC_CTX_new();
+        if (ctx == NULL)
+            errorf("Can't calculate a HMAC with OpenSSL.\n");
+
+        HMAC_Init_ex(ctx, key, keylen, md, NULL);
+        HMAC_Update(ctx, msg, msglen);
+        HMAC_Final(ctx, dest, NULL);
+
+        HMAC_CTX_free(ctx);
 #else
         HMAC_CTX ctx;
 
@@ -1515,11 +1563,23 @@ calc_digest (digest_t md, void *dest, size_t destlen, void *msg, size_t msglen, 
     }
     else
     {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+        EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+        if (ctx == NULL)
+            errorf("Can't calculate a digest with OpenSSL.\n");
+
+        EVP_DigestInit(ctx, md);
+        EVP_DigestUpdate(ctx, msg, msglen);
+        EVP_DigestFinal(ctx, dest, NULL);
+
+        EVP_MD_CTX_free(ctx);
+#else
         EVP_MD_CTX ctx;
 
         EVP_DigestInit(&ctx, md);
         EVP_DigestUpdate(&ctx, msg, msglen);
         EVP_DigestFinal(&ctx, dest, NULL);
+#endif
     }
 } /* calc_digest() */
 

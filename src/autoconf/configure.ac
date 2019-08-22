@@ -1074,7 +1074,7 @@ if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
             ))
             if test "$lp_cv_need_lib_ssl" = "yes"; then
                 lp_cv_has_lib_ssl=no
-                AC_CHECK_LIB(ssl,SSL_library_init,
+                AC_CHECK_LIB(ssl,SSL_new,
                              PKGLIBS="$PKGLIBS -lssl"
                              lp_cv_has_lib_ssl=yes
                             )
