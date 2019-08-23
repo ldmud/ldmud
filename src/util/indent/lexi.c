@@ -112,6 +112,11 @@ char        chartype[128] =
 };
 
 
+static void inc_buf_ptr()
+{
+    if(++buf_ptr >= buf_end)
+        fill_buffer();
+}
 
 
 enum codes
@@ -136,8 +141,7 @@ lexi()
     while (*buf_ptr == ' ' || *buf_ptr == '\t') {	/* get rid of blanks */
 	parser_state_tos->col_1 = false;	/* leading blanks imply token is not in column
 				 * 1 */
-	if (++buf_ptr >= buf_end)
-	    fill_buffer();
+	inc_buf_ptr();
     }
 
     token = buf_ptr;
@@ -157,9 +161,10 @@ lexi()
 	                seenexp = 0;
 	    if (*buf_ptr == '0' &&
 		    (buf_ptr[1] == 'x' || buf_ptr[1] == 'X')) {
-	        buf_ptr += 2;
+	        buf_ptr++;
+	        inc_buf_ptr();
 		while (isxdigit(*buf_ptr))
-		    buf_ptr++;
+		    inc_buf_ptr();
 	    }
 	    else
 		while (1) {
@@ -168,31 +173,28 @@ lexi()
 			    break;
 			else
 			    seendot++;
-		    buf_ptr++;
+		    inc_buf_ptr();
 		    if (!isdigit(*buf_ptr) && *buf_ptr != '.')
 			if ((*buf_ptr != 'E' && *buf_ptr != 'e') || seenexp)
 			    break;
 			else {
 			    seenexp++;
 			    seendot++;
-			    buf_ptr++;
+			    inc_buf_ptr();
 			    if (*buf_ptr == '+' || *buf_ptr == '-')
-				buf_ptr++;
+				inc_buf_ptr();
 			}
 		}
 	    if (*buf_ptr == 'L' || *buf_ptr == 'l')
-		buf_ptr++;
+		inc_buf_ptr();
 	}
 	else
 	    while (chartype[*buf_ptr] == alphanum) {	/* copy it over */
-		buf_ptr++;
-		if (buf_ptr >= buf_end)
-		    fill_buffer();
+		inc_buf_ptr();
 	    }
 	token_end = buf_ptr;
 	while (*buf_ptr == ' ' || *buf_ptr == '\t') {	/* get rid of blanks */
-	    if (++buf_ptr >= buf_end)
-		fill_buffer();
+	    inc_buf_ptr();
 	}
 	parser_state_tos->its_a_keyword = false;
 	parser_state_tos->sizeof_keyword = false;
@@ -301,9 +303,7 @@ lexi()
     /* If it is not a one character token, token_end will get changed
        later.  */
     token_end = buf_ptr + 1;
-
-    if (++buf_ptr >= buf_end)
-	fill_buffer();
+    inc_buf_ptr();
 
     switch (*token) {
     case '\n':
@@ -329,17 +329,13 @@ lexi()
 	  {
 	    if (*buf_ptr == '\\')
 	      {
-		buf_ptr++;
-		if (buf_ptr >= buf_end)
-		  fill_buffer ();
+		inc_buf_ptr();
 		if (*buf_ptr == '\n')
 		  ++line_no;
 		if (*buf_ptr == 0)
 		  break;
 	      }
-	    buf_ptr++;
-	    if (buf_ptr >= buf_end)
-	      fill_buffer ();
+	    inc_buf_ptr();
 	    /* This check must come for the second byte, to avoid treating
 	     * characters as symbols.
 	     */
@@ -360,9 +356,7 @@ lexi()
 	else
 	  {
 	    /* Advance over end quote char.  */
-	    buf_ptr++;
-	    if (buf_ptr >= buf_end)
-	      fill_buffer ();
+	    inc_buf_ptr();
 	  }
 
 	code = ident;
@@ -370,7 +364,7 @@ lexi()
 
     case ('('):
         if (lpc && *buf_ptr == '{') {
-	    buf_ptr++;
+	    inc_buf_ptr();
 	}
     case ('['):
 	unary_delim = true;
@@ -384,14 +378,10 @@ lexi()
 
     case '#':
 	if (lpc && *buf_ptr == '\'' ) { /* it's a closure */
-	    buf_ptr++;
-	    if (buf_ptr >= buf_end)
-	      fill_buffer ();
+	    inc_buf_ptr();
 	    while(!(isspace(*buf_ptr) || *buf_ptr=='{' || *buf_ptr=='}'))
 	      {
-	        buf_ptr++;
-	        if (buf_ptr >= buf_end)
-	          fill_buffer ();
+	        inc_buf_ptr();
 		if (*buf_ptr == ',' )
 		  break;
 	      }
@@ -409,7 +399,7 @@ lexi()
 
     case (':'):
         if (lpc && *buf_ptr == ':') {
-	    buf_ptr++;
+	    inc_buf_ptr();
 	    code = unary_op;
 	    unary_delim = true;
 	    break;
@@ -452,7 +442,7 @@ lexi()
 
     case ('}'):
         if (lpc && *buf_ptr == ')') {
-	    buf_ptr++;
+	    inc_buf_ptr();
 	    code = rparen;
 	    break;
 	}
@@ -486,7 +476,7 @@ lexi()
 
 	if (*buf_ptr == token[0]) {
 	    /* check for doubled character */
-	    buf_ptr++;
+	    inc_buf_ptr();
 	    /* buffer overflow will be checked at end of loop */
 	    if (last_code == ident || last_code == rparen) {
 		code = (parser_state_tos->last_u_d ? unary_op : postop);
@@ -496,10 +486,10 @@ lexi()
 	}
 	else if (*buf_ptr == '=')
 	    /* check for operator += */
-	    buf_ptr++;
+	    inc_buf_ptr();
 	else if (*buf_ptr == '>') {
 	    /* check for operator -> */
-	    buf_ptr++;
+	    inc_buf_ptr();
 	    if (!pointer_as_binop) {
 		unary_delim = false;
 		code = unary_op;
@@ -514,7 +504,7 @@ lexi()
 	    parser_state_tos->block_init = 1;
 
 	if (*buf_ptr == '=') /* == */
-	    buf_ptr++;
+	    inc_buf_ptr();
 
 	code = binary_op;
 	unary_delim = true;
@@ -525,8 +515,7 @@ lexi()
     case '<':
     case '!':			/* ops like <, <<, <=, !=, etc */
 	if (*buf_ptr == '>' || *buf_ptr == '<' || *buf_ptr == '=') {
-	    if (++buf_ptr >= buf_end)
-		fill_buffer();
+	    inc_buf_ptr();
 	}
 
 	code = (parser_state_tos->last_u_d ? unary_op : binary_op);
@@ -537,8 +526,7 @@ lexi()
 	if (token[0] == '/' && *buf_ptr == '*') {
 	    /* it is start of comment */
 
-	    if (++buf_ptr >= buf_end)
-		fill_buffer();
+	    inc_buf_ptr();
 
 	    code = comment;
 	    unary_delim = parser_state_tos->last_u_d;
@@ -548,8 +536,7 @@ lexi()
 	    /*
 	     * handle ||, &&, etc, and also things as in int *****i
 	     */
-	    if (++buf_ptr >= buf_end)
-		fill_buffer();
+	    inc_buf_ptr();
 	}
 	code = (parser_state_tos->last_u_d ? unary_op : binary_op);
 	unary_delim = true;
