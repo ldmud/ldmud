@@ -32,6 +32,7 @@ static char sccsid[] = "@(#)lexi.c	5.11 (Berkeley) 9/15/88";
 #include "indent_globs.h"
 #include "ctype.h"
 #include "io.h"
+#include "lexi.h"
 
 #define alphanum 1
 #define opchar 3
