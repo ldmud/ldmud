@@ -37,17 +37,6 @@ static char sccsid[] = "@(#)lexi.c	5.11 (Berkeley) 9/15/88";
 #define alphanum 1
 #define opchar 3
 
-enum rwcodes {
-  rw_break,
-  rw_switch,
-  rw_case,
-  rw_struct_like, /* struct, enum, union */
-  rw_decl,
-  rw_sp_paren, /* if, while, for */
-  rw_sp_nparen, /* do, else */
-  rw_sizeof
-  };
-
 struct templ {
     char       *rwd;
     enum rwcodes rwcode;
