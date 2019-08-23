@@ -36,17 +36,6 @@ static char sccsid[] = "@(#)lexi.c	5.11 (Berkeley) 9/15/88";
 #define alphanum 1
 #define opchar 3
 
-enum rwcodes {
-  rw_break,
-  rw_switch,
-  rw_case,
-  rw_struct_like, /* struct, enum, union */
-  rw_decl,
-  rw_sp_paren, /* if, while, for */
-  rw_sp_nparen, /* do, else */
-  rw_sizeof
-  };
-
 struct templ {
     char       *rwd;
     enum rwcodes rwcode;
@@ -158,7 +147,7 @@ lexi()
 		    (buf_ptr[1] == 'x' || buf_ptr[1] == 'X')) {
 	        buf_ptr += 2;
 		while (isxdigit(*buf_ptr))
-		    buf_ptr++;
+		    if(++buf_ptr >= buf_end) fill_buffer();
 	    }
 	    else
 		while (1) {
@@ -167,24 +156,24 @@ lexi()
 			    break;
 			else
 			    seendot++;
-		    buf_ptr++;
+		    if(++buf_ptr >= buf_end) fill_buffer();
 		    if (!isdigit(*buf_ptr) && *buf_ptr != '.')
 			if ((*buf_ptr != 'E' && *buf_ptr != 'e') || seenexp)
 			    break;
 			else {
 			    seenexp++;
 			    seendot++;
-			    buf_ptr++;
+			    if(++buf_ptr >= buf_end) fill_buffer();
 			    if (*buf_ptr == '+' || *buf_ptr == '-')
-				buf_ptr++;
+				if(++buf_ptr >= buf_end) fill_buffer();
 			}
 		}
 	    if (*buf_ptr == 'L' || *buf_ptr == 'l')
-		buf_ptr++;
+		if(++buf_ptr >= buf_end) fill_buffer();
 	}
 	else
 	    while (chartype[*buf_ptr] == alphanum) {	/* copy it over */
-		buf_ptr++;
+		if(++buf_ptr >= buf_end) fill_buffer();
 		if (buf_ptr >= buf_end)
 		    fill_buffer();
 	    }
@@ -328,21 +317,17 @@ lexi()
 	  {
 	    if (*buf_ptr == '\\')
 	      {
-		buf_ptr++;
-		if (buf_ptr >= buf_end)
-		  fill_buffer ();
+		if(++buf_ptr >= buf_end) fill_buffer();
 		if (*buf_ptr == '\n')
 		  ++line_no;
 		if (*buf_ptr == 0)
 		  break;
 	      }
-	    buf_ptr++;
-	    if (lpc && qchar == '\'' && !(isalnum(*buf_ptr)||*buf_ptr=='_')) {
+	    if(++buf_ptr >= buf_end) fill_buffer();
+	    if (lpc && qchar == '\'' && !(isalnum(*buf_ptr)||*buf_ptr=='_')) /* it's a symbol */ {
 	      code = ident;
 	      break;
 	    }
-	    if (buf_ptr >= buf_end)
-	      fill_buffer ();
 	  }
 	if (*buf_ptr == '\n' || *buf_ptr == 0)
 	  {
@@ -355,9 +340,7 @@ lexi()
 	else
 	  {
 	    /* Advance over end quote char.  */
-	    buf_ptr++;
-	    if (buf_ptr >= buf_end)
-	      fill_buffer ();
+	    if(++buf_ptr >= buf_end) fill_buffer();
 	  }
 
 	code = ident;
@@ -365,7 +348,7 @@ lexi()
 
     case ('('):
         if (lpc && *buf_ptr == '{') {
-	    buf_ptr++;
+	    if(++buf_ptr >= buf_end) fill_buffer();
 	}
     case ('['):
 	unary_delim = true;
@@ -379,14 +362,12 @@ lexi()
 
     case '#':
 	if (lpc && *buf_ptr == '\'' ) { /* it's a closure */
-	    buf_ptr++;
+	    if(++buf_ptr >= buf_end) fill_buffer();
 	    while(!(isspace(*buf_ptr)||*buf_ptr=='{'||*buf_ptr=='}'))
 	      {
-	        buf_ptr++;
+	        if(++buf_ptr >= buf_end) fill_buffer(); 
 		if (*buf_ptr == ',' )
 		  break;
-		if (buf_ptr >= buf_end)
-		  fill_buffer();
 	      }
 	    code = ident;
 	    break;
@@ -402,7 +383,7 @@ lexi()
 
     case (':'):
         if (lpc && *buf_ptr == ':') {
-	    buf_ptr++;
+	    if(++buf_ptr >= buf_end) fill_buffer();
 	    code = unary_op;
 	    unary_delim = true;
 	    break;
@@ -445,7 +426,7 @@ lexi()
 
     case ('}'):
         if (lpc && *buf_ptr == ')') {
-	    buf_ptr++;
+	    if(++buf_ptr >= buf_end) fill_buffer();
 	    code = rparen;
 	    break;
 	}
@@ -479,7 +460,7 @@ lexi()
 
 	if (*buf_ptr == token[0]) {
 	    /* check for doubled character */
-	    buf_ptr++;
+	    if(++buf_ptr >= buf_end) fill_buffer();
 	    /* buffer overflow will be checked at end of loop */
 	    if (last_code == ident || last_code == rparen) {
 		code = (parser_state_tos->last_u_d ? unary_op : postop);
@@ -489,10 +470,10 @@ lexi()
 	}
 	else if (*buf_ptr == '=')
 	    /* check for operator += */
-	    buf_ptr++;
+	    if(++buf_ptr >= buf_end) fill_buffer();
 	else if (*buf_ptr == '>') {
 	    /* check for operator -> */
-	    buf_ptr++;
+	    if(++buf_ptr >= buf_end) fill_buffer();
 	    if (!pointer_as_binop) {
 		unary_delim = false;
 		code = unary_op;
@@ -507,7 +488,7 @@ lexi()
 	    parser_state_tos->block_init = 1;
 
 	if (*buf_ptr == '=') /* == */
-	    buf_ptr++;
+	    if(++buf_ptr >= buf_end) fill_buffer();
 
 	code = binary_op;
 	unary_delim = true;
