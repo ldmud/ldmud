@@ -1,0 +1,192 @@
+NAME
+        doc/3.5vs3.6
+
+DESCRIPTION
+        The main release focus of LDMud 3.6 is the introduction of
+        unicode strings. For a introduction see unicode(C), this
+        document concentrates on the steps needed for transition from
+        LDMud 3.5 to 3.6.
+
+
+        -- Encodings --
+
+        LDMud 3.6 offers a charset agnostic view to texts, so it needs
+        to know the string encoding for external sources to decode
+        them properly:
+         - File names
+         - File contents (this includes LPC files)
+         - User input and output
+
+        So at first you need to decide which encoding to use for each
+        of the cases above. The driver tries to detect the encoding
+        of file names (by looking at the LC_CTYPE environment variable)
+        but you can set it manually in the master object with
+        configure_driver(E), e.g.
+            configure_driver(DC_FILESYSTEM_ENCODING, "UTF-8");
+
+        For encoding conversion the driver uses the iconv library, for
+        a list of supported encodings you can query the iconv tool:
+            iconv -l
+
+        Regarding file contents there is no such detection. By default
+        the encoding of files is assumed to be 7-bit ASCII. If then a
+        file contains characters not in the 7-bit ASCII set a
+        compile or runtime error will be raised. Although the efuns
+        read_file(E) and write_file(E) take the encoding as an
+        additional argument, it is recommended to implement a global
+        default encoding with the H_FILE_ENCODING driver hook, e.g.
+            set_driver_hook(H_FILE_ENCODING, "UTF-8");
+        In /doc/examples/file_encoding there is a more elaborate
+        version of how to detect the encoding or files.
+
+        Because the master must be loaded first to set the encoding
+        for other files using the file_encoding(H) hook, the master
+        itself must be written in 7-bit ASCII only. If you need Unicode
+        characters (e.g. in the notify_fail(H) hook) you can use
+        Unicode escape sequences like "\u2165" or "\U0001F603".
+
+        The user encoding is the most tricky one. It can be set using
+        configure_interactive(E), but it is hard to choose the right one.
+        It is recommended to use the TELOPT_CHARSET telnet negotiation
+        to query the encoding from the client. But many clients do not
+        support that telnet option, for these clients you might want
+        to implement a configuration option for the players to set the
+        encoding manually.
+
+        It is recommended to use the TRANSLIT option when setting the
+        user encoding, e.g.:
+            configure_interactive(player, IC_ENCODING,
+                                  "ISO8859-1//TRANSLIT);
+        This option activates transliteration for every character
+        that is not in the target character set. If this option is
+        not activated any such character will silently be dropped.
+        Regardless of the option this will also be done for every
+        character the player sends but is not in the configured
+        character set of the player. So for example if "ASCII" is
+        set as the player's encoding then any non-ASCII character
+        the player sends will be ignored and any non-ASCII character
+        that is printed by the mudlib to the player will not be send
+        to him.
+
+
+        -- File encoding --
+
+        After having chosen an encoding for files and configured it
+        using the H_FILE_ENCODING driver hook, you must verify that
+        each file adheres to that decision. LPC files that don't
+        follow the configured encoding will produce compile errors.
+        (Even if wrongly encoded characters are only in LPC comments.)
+
+        This also applies to any file read or written with read_file(E)
+        and write_file(E). But these two efuns take also an optional
+        argument specifying the encoding. So you can either specify
+        a global default with file_encoding(H) or put it in the efun
+        call.
+
+        save_object(E) and restore_object(E) are not affected. The save
+        files written now are always ASCII files. Save files from
+        earlier versions that happen to have non-ASCII characters in
+        them will be read anyway and each such character mapped to
+        the corresponding Unicode codepoint (basically interpreting
+        the file as ISO8859-1).
+
+
+        -- Bytes datatype --
+
+        LDMud 3.6 introduces a new type and keyword: bytes.
+        First this means that no variable or function may have this
+        name, so you should search your codebase for any occurrences.
+        (There is a pragma no_bytes_type to deactivate that keyword,
+        but it should only used for the transition, not as a long-term
+        solution.)
+
+        Beside that some efuns and operations will now return a bytes
+        value instead of a string. This makes it difficult to do a
+        slow transition to 3.6. There are three possibilities to cope
+        with code that needs to run in LDMud 3.5 as well as 3.6:
+
+        1. Use #if
+
+                #if __VERSION__ >= "3.5.99"
+                    // Code that knows 'bytes'
+                #else
+                    // Code that doesn't.
+                #endif
+
+        2. Deactivate the keyword in LDMud 3.6:
+
+                #pragma no_bytes_type
+
+           The pragma (can be included in the H_AUTO_INCLUDE driver
+           hook) removes the 'bytes' keyword and changes the meaning
+           of 'string' to '<string|bytes>'.
+
+           This will weaken type safety. The bytes datatype nevertheless
+           exists at runtime. So type mismatches (e.g. adding a string
+           to a byte sequence) will not be caught at compile time
+           anymore, but at runtime only.
+
+        3. Add the bytes keyword to LDMud 3.5:
+
+                #define bytes string
+
+           This can be included in the H_AUTO_INCLUDE driver hook
+           if the mud is run under LDMud 3.5, or be given on the
+           command line.
+
+
+        -- Modified efuns and master lfuns --
+
+        Some efuns now work with bytes instead of unicode strings.
+        Unfortunately you have to check each call to these functions
+        in your mudlib. You'll probably need to change the type
+        declaration for any variables used for holding the bytes
+        and also add conversions to/from strings (using to_text(E)
+        and to_bytes(E)). These are the efuns that changed in this
+        manner:
+         - binary_message(E)
+         - read_bytes(E)
+         - send_erq(E)
+         - send_udp(E)
+         - write_bytes(E)
+
+        Also the lfun receive_udp(M) now gets the UDP packet as
+        a byte sequence instead of a string and needs to be
+        modified accordingly.
+
+        Finally the efun convert_charset(E) was removed, you can
+        achieve the same with a combination of to_text(E) and
+        to_bytes(E).
+
+
+        -- Modifying existing code --
+
+        Most of the LPC code should work fine with the new driver
+        as it doesn't touch any byte sequences and works with the
+        new Unicode strings as fine as before. All string operations
+        work as before (with smaller alterations, e.g. a string
+        index operation like str[10] might return a number up to
+        0x10ffff).
+
+        Changes are needed where bytes are concerned. First you'll
+        need to change the variable type to 'bytes' (unless you'll
+        use #pragma no_bytes_type). Then the bytes needed to be
+        converted from/to string:
+            string str = to_text(buf, "UTF-8");
+            bytes buf = to_bytes(str, "UTF-8");
+        Both functions expect an encoding to be given ("UTF-8" in
+        the example). For to_text(E) this is the encoding used in
+        the byte sequence to read the string from, for to_bytes(E)
+        this is the encoding to write the string in the function's
+        result.
+
+        Working with bytes should be as easy as with strings. The
+        string operations and efuns work with bytes as well (but you
+        are not allowed to mix strings and bytes). You can also
+        specify bytes literals with the 'b' prefix:
+            bytes buf = b"Hi: \xa1";
+
+
+SEE ALSO
+        unicode(C), configure_driver(E), configure_interactive(E),
+        to_text(E), to_bytes(E), file_encoding(H)

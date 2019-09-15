@@ -1,0 +1,48 @@
+NAME
+        doc/examples/file_encoding
+
+DESCRIPTION
+        The driver needs to know the file encoding for files to read.
+        This is an example for detecting the encoding like Python does
+        (PEP 263): It looks at the first or second line (which must
+        be in ASCII) to have a comment like:
+
+            // coding=<encoding name>
+        or
+            // -*- coding: <encoding name> -*-
+        or
+            // vim: set fileencoding=<encoding name> :
+
+EXAMPLES
+        #include <driver_hook.h>
+        #include <regexp.h>
+
+        /* Read the first two lines from the file and look for
+         * encoding specifications.
+         */
+        private string get_file_encoding(string filename)
+        {
+            string lines = read_file(filename, 0, 2, "ascii");
+
+            if (!lines)
+                return "UTF-8";
+
+            string* enc = regmatch(lines,
+                "(^|\n)[ \t]*/[/*].*coding[:=][ \t]*([-_.a-zA-Z0-9]+)",
+                RE_MATCH_SUBS);
+
+            /* Use UTF-8 as a fallback if no encoding is given. */
+            if (!enc)
+                return "UTF-8";
+
+            return enc[2];
+        }
+
+        string *epilog(int eflag)
+        {
+            set_driver_hook(H_FILE_ENCODING, #'get_file_encoding);
+        }
+
+
+SEE ALSO
+        file_encoding(H)
