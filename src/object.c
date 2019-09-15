@@ -5465,6 +5465,16 @@ static struct restore_context_s *restore_ctx = NULL;
  * the file if necessary.
  */
 
+#define L_PUT_HEX(d) {              \
+    unsigned char digit = (d);      \
+    if (digit >= 0x0a)              \
+        L_PUTC('a' + digit - 0x0a)  \
+    else                            \
+        L_PUTC('0' + digit)         \
+}
+/* Write the digit (0 - 15) hexadecimally into the write buffer. */
+
+
 #define L_PUTC_EPILOG buf_pnt = l_buf_pnt; buf_left = l_buf_left;
 /* Update the global buffer variables with the local values.
  */
@@ -5617,7 +5627,7 @@ save_string (string_t *src, p_int start, p_int count)
  */
 
 {
-    register char c, *cp;
+    register char *cp;
     size_t len;
 
     L_PUTC_PROLOG
@@ -5645,16 +5655,8 @@ save_string (string_t *src, p_int start, p_int count)
             L_PUTC('\\')
             L_PUTC('x')
 
-            if (b >= 0xa0)
-                L_PUTC('a' + ((b - 0xa0) >> 4))
-            else
-                L_PUTC('0' + (b >> 4))
-
-            b &= 0x0f;
-            if (b >= 0x0a)
-                L_PUTC('a' + (b - 0x0a))
-            else
-                L_PUTC('0' + (b))
+            L_PUT_HEX(b >> 4);
+            L_PUT_HEX(b & 0x0f);
         }
 
         L_PUTC('\"')
@@ -5663,10 +5665,39 @@ save_string (string_t *src, p_int start, p_int count)
     {
         L_PUTC('\"')
 
-        while ( len-- )
+        while ( len )
         {
-            c = *cp++;
-            if (isescaped(c))
+            p_int c;
+            size_t clen = utf8_to_unicode(cp, len, &c);
+            if (!clen)
+            {
+                c = *(unsigned char*)cp;
+                clen = 1;
+            }
+
+            cp += clen;
+            len -= clen;
+
+            if (c >= 0x80)
+            {
+                L_PUTC('\\');
+                if (c >= 0x10000)
+                {
+                    L_PUTC('U');
+                    L_PUT_HEX((c & 0xf0000000) >> 28);
+                    L_PUT_HEX((c & 0x0f000000) >> 24);
+                    L_PUT_HEX((c & 0x00f00000) >> 20);
+                    L_PUT_HEX((c & 0x000f0000) >> 16);
+                }
+                else
+                    L_PUTC('u');
+                L_PUT_HEX((c & 0xf000) >> 12);
+                L_PUT_HEX((c & 0x0f00) >>  8);
+                L_PUT_HEX((c & 0x00f0) >>  4);
+                L_PUT_HEX((c & 0x000f));
+                continue;
+            }
+            else if (isescaped(c))
             {
                 switch(c) {
                 case '\007': c = 'a'; break;
@@ -8631,6 +8662,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
     case '\"':  /* A string */
       {
         char *source, *start, c;
+        char *buf = NULL;       /* Dynamic memory in case the <cp> buf gets to small. */
         p_int len = 0;
 
         start = cp;
@@ -8638,35 +8670,61 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
 
         for(;;)
         {
+            p_int result;
+
             if ( !(c = *source++) )
             {
+                xfree(buf);
                 *svp = const0;
                 return MY_FALSE;
             }
 
             if (c == '\r')
-                c = '\n';
-
-            if (c == '\\')
+                result = '\n';
+            else if (c == '\\')
             {
                 if ( !(c = *source++) )
                 {
+                    xfree(buf);
                     *svp = const0;
                     return MY_FALSE; /* String ends with a \\ buggy probably */
                 }
                 switch(c)
                 {
-                    case '0': c = '\0';   break;
-                    case 'a': c = '\007'; break;
-                    case 'b': c = '\b'  ; break;
-                    case 't': c = '\t'  ; break;
-                    case 'n': c = '\n'  ; break;
-                    case 'v': c = '\013'; break;
-                    case 'f': c = '\014'; break;
-                    case 'r': c = '\r'  ; break;
+                    case '0': result = '\0';   break;
+                    case 'a': result = '\007'; break;
+                    case 'b': result = '\b'  ; break;
+                    case 't': result = '\t'  ; break;
+                    case 'n': result = '\n'  ; break;
+                    case 'v': result = '\013'; break;
+                    case 'f': result = '\014'; break;
+                    case 'r': result = '\r'  ; break;
+
+                    case 'u': case 'U':
+                    {
+                        result = 0;
+                        for(int digits = (c == 'u') ? 4 : 8; digits--;)
+                        {
+                            result <<= 4;
+                            c = *source++;
+
+                            if (c >= '0' && c <= '9')
+                                result |= (c - '0');
+                            else if (c >= 'a' && c <= 'f')
+                                result |= (c - 'a' + 10);
+                            else
+                            {
+                                xfree(buf);
+                                *svp = const0;
+                                return MY_FALSE;
+                            }
+                        }
+                        break;
+                    }
+
                     case 'x':
                     {
-                        char result = 0;
+                        result = 0;
 
                         c = *source++;
                         if (c >= '0' && c <= '9')
@@ -8675,6 +8733,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                             result = (c - 'a' + 10) << 4;
                         else
                         {
+                            xfree(buf);
                             *svp = const0;
                             return MY_FALSE;
                         }
@@ -8686,16 +8745,58 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                             result += (c - 'a' + 10);
                         else
                         {
+                            xfree(buf);
                             *svp = const0;
                             return MY_FALSE;
                         }
-
-                        c = result;
+                        break;
                     }
+
+                    default:
+                        result = (unsigned char)c;
+                        break;
                 }
-            } else if (c == '\"') break;
-            *cp++ = c;
-            len++;
+            }
+            else if (c == '\"')
+                break;
+            else
+                result = (unsigned char)c;
+
+            if (isbyte)
+            {
+                *cp++ = (unsigned char)result;
+                len++;
+            }
+            else
+            {
+                if (!buf && (result & ~0x7f) && source - cp < 4)
+                {
+                    /* We need to use another memory block for the target
+                     * string.
+                     */
+                    buf = (char*) xalloc(len + 4*strlen(cp) + 4);
+                    if (!buf)
+                    {
+                        *svp = const0;
+                        errorf("(restore) Out of memory (%zu bytes) for string.\n"
+                             , len + 4*strlen(cp) + 4);
+                    }
+
+                    memcpy(buf, start, len);
+                    start = buf;
+                    cp = buf + len;
+                }
+
+                size_t clen = unicode_to_utf8(result, cp);
+                if (!clen)
+                {
+                    xfree(buf);
+                    *svp = const0;
+                    return MY_FALSE;
+                }
+                cp += clen;
+                len += clen;
+            }
         }
         *cp = '\0';
         *pt = source;
@@ -8703,6 +8804,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
             put_bytes(svp, new_n_tabled(start, len, STRING_BYTES));
         else
             put_string(svp, new_n_unicode_tabled(start, len));
+        xfree(buf);
         if (!svp->u.str)
         {
             *svp = const0;
