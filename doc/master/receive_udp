@@ -1,5 +1,5 @@
 SYNOPSIS
-        void receive_udp(string host, string msg, int hostport)
+        void receive_udp(string host, bytes msg, int hostport)
 
 DESCRIPTION
         Handle a received UDP message.

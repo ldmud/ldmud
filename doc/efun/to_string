@@ -10,8 +10,9 @@ DESCRIPTION
         Converts closures and structs into an appropriate name (this
         has mostly debugging purposes).
 
-        CAVEAT: Arrays are considered exploded strings, ie. arrays of char
-        codes, and are 'imploded' up to the first non-number entry, whatever
+        CAVEAT: Arrays are considered exploded strings, ie. arrays of
+        Unicode codepoints (i.e. each number is one Unicode character),
+        and are 'imploded' up to the first non-number entry, whatever
         comes first. That means that to_string(({ 49, 50 })) will return
         "12" and not "({ 49, 50 })".
 

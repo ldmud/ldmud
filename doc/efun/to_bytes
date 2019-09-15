@@ -1,11 +1,11 @@
 SYNOPSIS
-        string to_bytes(string unicode, string encoding)
-        string to_bytes(int* characters, string encoding)
-        string to_bytes(bytes bytesequence)
-        string to_bytes(int* bytes)
+        bytes to_bytes(string unicode, string encoding)
+        bytes to_bytes(int* characters, string encoding)
+        bytes to_bytes(bytes bytesequence)
+        bytes to_bytes(int* bytes)
 
 DESCRIPTION
-        The first argument is converted to an encoded string.
+        The first argument is converted to a byte sequence.
 
         The first two variants convert a unicode string resp. a sequence
         of unicode characters to a byte sequence that represents
