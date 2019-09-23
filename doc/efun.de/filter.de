@@ -28,7 +28,7 @@ BESCHREIBUNG
         ist, ins Ergebnis mit einbezogen.
 
         Wenn <arg> ein Mapping ist, wird die Funktion <func> mit jedem Key
-        als erstem und (falls vorhanden) den Werten dieses Keys als restliche
+        als erstem und (falls vorhanden) den Werten dieses Keys als zweitem
         Parameter, gefolgt von den <extra> Argumenten, aufgerufen. Wenn die
         Funktion TRUE ergibt, wird das betreffende Element des Mappings ins
         Ergebnis aufgenommen.
