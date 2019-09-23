@@ -1,10 +1,16 @@
 SYNOPSIS
-        mixed * filter(mixed *arg, string func, string|object ob,
-                                                      mixed extra...)
+        mixed * filter(mixed *arg, string fun, string|object ob
+                                             , mixed extra...)
         mixed * filter(mixed *arg, closure cl, mixed extra...)
         mixed * filter(mixed *arg, mapping map, mixed extra...)
-        mapping filter(mapping arg, string func, string|object ob,
-                                                      mixed extra...)
+
+        string  filter(string arg, string fun, string|object ob
+                                          , mixed extra...)
+        string  filter(string arg, closure cl, mixed extra...)
+        string  filter(string arg, mapping map, mixed extra...)
+
+        mapping filter(mapping arg, string func, string|object ob
+                                               , mixed extra...)
         mapping filter(mapping arg, closure cl, mixed extra...)
 
 BESCHREIBUNG
@@ -18,10 +24,10 @@ BESCHREIBUNG
         Wird <ob> nicht angegeben oder ist es weder ein String noch ein
         Objekt, wird standardmaessig this_object() verwendet.
 
-        Ist <arg> ein Array, wird <fun> mit jedem Element des Arrays als
-        ersten Parameter aufgerufen, gefolgt von den <extra> Argumenten.
-        Wenn das Resultat der Funktion TRUE ergibt, wird das Element in das
-        Ergebnis der filter() Operation mit einbezogen.
+        Ist <arg> ein Array oder struct, wird <fun> mit jedem Element des
+        Arrays/der struct als ersten Parameter aufgerufen, gefolgt von den
+        <extra> Argumenten. Wenn das Resultat der Funktion TRUE ergibt, wird
+        das Element in das Ergebnis der filter() Operation mit einbezogen.
 
         Wird filter() mit einem Mapping <map> anstelle der Funktion <func>
         aufgerufen, wird jedes Element im Array <arg>, das ein Key von <map>
@@ -36,16 +42,22 @@ BESCHREIBUNG
         Abhaengig von der Groesse des Mappings <arg> erfolgt der Aufruf der
         Funktion auf drei unterschiedliche Arten:
 
-            widthof(arg) == 0:  ob->func(key, 0, extra,...);
-            widthof(arg) == 1:  ob->func(key, arg[key], extra, ...);
-            widthof(arg) >1:    ob->fund(key, ({arg[key,0]...arg[key, n-1]}),
-                                     extra, ...);
+            widthof(arg) == 0: ob->func(key, 0, extra...)
+                         == 1: ob->func(key, arg[key], extra...)
+                          > 1: ob->func( key
+                                       , ({ arg[key,0] ...arg[key,width-1] })
+                                       , extra...)
 
         Der Vorteil dieser Vorgehensweise ist, dass beide Typen von
         multidimensionalen Mappings (Mappings mit mehreren Werte pro Key und
         Mappings aus Arrays) gleich verarbeitet werden koennen.
 
+        Ist <arg> ein String, werden der Filterfunktion die einzelnen Zeichen
+        des Strings uebergeben und nur jene Zeichen im zurueckgegebenen
+        String aufgenommen, fuer die die Filterfunkton != 0 zurueckgibt.
+
 ANMERKUNGEN
+
         Fuer Arrays wirkt filter() wie filter_array(), fuer Mappings stellt
         filter() eine Verallgemeinerung von filter_indices() dar.
 

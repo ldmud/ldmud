@@ -54,11 +54,15 @@ DESCRIPTION
         multi-dimensional mappings (mappings with multiple values
         per key, and mappings of arrays) can be treated in the same way.
 
+        If <arg> is a string, the function will be called with each of the
+        characters of the string. If the result is true, the character in
+        question is included into the result.
+
+NOTES
 
         Historical Note: filter() used with arrays behaves like
         filter_array(), but used with mappings is a generalisation of
         filter_indices().
-
 
 HISTORY
         Introduced in LDMud 3.2.6, obsoletes filter_array().
