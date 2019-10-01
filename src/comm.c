@@ -421,6 +421,7 @@ enum telnet_states {
   TS_SB,            /* Received IAC SB and any number of bytes != IAC for the subnegotiation. */
   TS_SB_IAC,        /* Received IAC SB <contents> IAC. */
   TS_READY,         /* Received a full line, that is now in the .command[] buffer (without the newline). */
+  TS_CHAR_READY,    /* Received at least one character in charmode, no line endings, yet. */
   TS_SYNCH,         /* Received SIGURG (out-of-band data) on the TCP channel and shall discard
                        all data until an IAC DM is received. */
   TS_INVALID
@@ -752,17 +753,18 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       fprintf(stderr, " %s\n", decode_noecho(ip->noecho));
     fprintf(stderr, "  .tn_state:          %hhd", ip->tn_state);
       switch(ip->tn_state) {
-      case TS_DATA:    fprintf(stderr, " (TS_DATA)\n"); break;
-      case TS_IAC:     fprintf(stderr, " (TS_IAC)\n"); break;
-      case TS_WILL:    fprintf(stderr, " (TS_WILL)\n"); break;
-      case TS_WONT:    fprintf(stderr, " (TS_WONT)\n"); break;
-      case TS_DO:      fprintf(stderr, " (TS_DO)\n"); break;
-      case TS_DONT:    fprintf(stderr, " (TS_DONT)\n"); break;
-      case TS_SB:      fprintf(stderr, " (TS_SB)\n"); break;
-      case TS_SB_IAC:  fprintf(stderr, " (TS_SB_IAC)\n"); break;
-      case TS_READY:   fprintf(stderr, " (TS_READY)\n"); break;
-      case TS_SYNCH:   fprintf(stderr, " (TS_SYNCH)\n"); break;
-      case TS_INVALID: fprintf(stderr, " (TS_INVALID)\n"); break;
+      case TS_DATA:       fprintf(stderr, " (TS_DATA)\n"); break;
+      case TS_IAC:        fprintf(stderr, " (TS_IAC)\n"); break;
+      case TS_WILL:       fprintf(stderr, " (TS_WILL)\n"); break;
+      case TS_WONT:       fprintf(stderr, " (TS_WONT)\n"); break;
+      case TS_DO:         fprintf(stderr, " (TS_DO)\n"); break;
+      case TS_DONT:       fprintf(stderr, " (TS_DONT)\n"); break;
+      case TS_SB:         fprintf(stderr, " (TS_SB)\n"); break;
+      case TS_SB_IAC:     fprintf(stderr, " (TS_SB_IAC)\n"); break;
+      case TS_READY:      fprintf(stderr, " (TS_READY)\n"); break;
+      case TS_CHAR_READY: fprintf(stderr, " (TS_CHAR_READY)\n"); break;
+      case TS_SYNCH:      fprintf(stderr, " (TS_SYNCH)\n"); break;
+      case TS_INVALID:    fprintf(stderr, " (TS_INVALID)\n"); break;
       default: putc('\n', stderr);
       }
     fprintf(stderr, "  .supress_go_ahead:  %02hhx\n", (unsigned char)ip->supress_go_ahead);
@@ -2218,12 +2220,13 @@ get_message (char *buff, size_t *bufflength)
                     continue;
                 }
 
-                if (ip->tn_state == TS_READY)
+                if (ip->tn_state == TS_READY || ip->tn_state == TS_CHAR_READY)
                 {
                     /* If telnet is ready for commands, react quickly. */
                     twait = 0;
                 }
-                else
+
+                if (ip->tn_state != TS_READY)
                 {
                     FD_SET(ip->socket, &readfds);
                     if (socket_number(ip->socket) >= nfds)
@@ -2315,6 +2318,7 @@ get_message (char *buff, size_t *bufflength)
                             {
                               case TS_DATA:
                               case TS_READY:
+                              case TS_CHAR_READY:
                                 ip->tn_state = TS_SYNCH;
                                 ip->gobble_char = '\0';
                                 DTN(("tn_state = TS_SYNCH\n"));
@@ -2919,23 +2923,11 @@ get_message (char *buff, size_t *bufflength)
 
                     if (ip->command_start == ip->command_end)
                     {
-                        if (ip->tn_state == TS_READY)
-                        {
-                            /* End of line. Reinitialise the telnet machine
-                             */
-                            DTN(("    end of line: reinit telnet machine\n"));
-                            telnet_neg(ip);
-                        }
-                        else
-                        {
-                            /* All the pure data was read, make space for new
-                             * data, but leave char in to make input escape
-                             * possible
-                             */
-                            memmove(ip->command + 1, ip->command + ip->command_end, ip->command_unprocessed_end - ip->command_end);
-                            ip->command_unprocessed_end -= ip->command_end - 1;
-                            ip->command_start = ip->command_end = ip->command_printed = 1;
-                        }
+                        /* Out of characters to process.
+                         * Continue the telnet machine.
+                         */
+                        DTN(("    out of chars: reinit telnet machine\n"));
+                        telnet_neg(ip);
                     }
 
                     command_giver = ip->ob;
@@ -4925,9 +4917,9 @@ telnet_neg (interactive_t *ip)
  * The start state for the telnet machine is TS_DATA, and whenever a command
  * text has been completed (when a line ending was found), it assumes the
  * TS_READY state.
- * In Charmode all input will be processed regardless of line endings
- * (the state will change to TS_READY nevertheless whenever a newline
- * was processed).
+ * In Charmode all input will be processed regardless of line endings,
+ * as soon as characters are available for processing, the state is changed
+ * to TS_CHAR_READY, when a newline es encountered it is changed to TS_READY.
  *
  * The function starts at .tn_end and goes on until it reaches .text_end or
  * a full newline.
@@ -5003,12 +4995,29 @@ telnet_neg (interactive_t *ip)
         ip->command_start = ip->command_end = ip->command_printed = 0;
         set_tn_state(ip, TS_DATA);
     }
+    else if (ip->tn_state == TS_CHAR_READY)
+    {
+        /* Remove any processed characters, but leave the first character
+         * to make input escape last.
+         */
+        if (ip->command_start > 1)
+        {
+            memmove(ip->command + 1, ip->command + ip->command_start, ip->command_unprocessed_end - ip->command_start);
+            ip->command_unprocessed_end -= ip->command_start - 1;
+            ip->command_end -= ip->command_start - 1;
+            ip->command_printed -= ip->command_start - 1;
+            ip->command_start = 1;
+        }
+
+        set_tn_state(ip, TS_DATA);
+    }
 
     while (source < last || (ip->tn_state == TS_DATA && ip->command_end != ip->command_unprocessed_end))
     {
         switch (ip->tn_state)
         {
             case TS_READY:
+            case TS_CHAR_READY:
                 /* This shouldn't happen. We can't go into the loop with TS_READY,
                  * and when switching to TS_READY we should exit this function.
                  */
@@ -5020,6 +5029,7 @@ telnet_neg (interactive_t *ip)
                 char *command_from = ip->command + ip->command_end;             /* Next char to process. */
                 char *command_to = command_from;                                /* Where to put the processed chars. */
                 char *command_end = ip->command + ip->command_unprocessed_end;  /* End of the unprocessed chars. */
+                bool ready = false;                                             /* Whether we have a command to return. */
 
                 if (ip->command_start > 1)
                 {
@@ -5047,6 +5057,7 @@ telnet_neg (interactive_t *ip)
                 while (command_from != command_end)
                 {
                     char ch = *command_from;
+
                     switch (ch)
                     {
                         case '\b':              /* Backspace */
@@ -5135,16 +5146,8 @@ telnet_neg (interactive_t *ip)
 
                             set_tn_state(ip, TS_READY);
 
-                            /* Consolidate the .text[] buffer. */
-                            ip->tn_end = ip->text_prefix;
-                            ip->text_end = ip->text_prefix + last - source;
-                            memmove(ip->text + ip->text_prefix, source, last - source);
-
-                            /* Consolidate the .command[] buffer. */
-                            ip->command_end = command_to - ip->command;
-                            ip->command_unprocessed_end = command_end - command_from + command_to - ip->command;
-                            memmove(command_to, command_from, command_end - command_from);
-                            return;
+                            ready = true;
+                            break;
                         }
 
                         default:
@@ -5152,7 +5155,36 @@ telnet_neg (interactive_t *ip)
                             break;
                     }
 
+                    if (ready)
+                        break;
+
                     command_from++;
+
+                }
+
+                /* It is charmode and we have at least one character ready and
+                 * either we are then out of characters or a telnet sequence
+                 * is coming, then handle the characters first. */
+                if (!ready
+                 && command_to != ip->command + ip->command_start && is_charmode(ip)
+                 && (source == last || *(unsigned char*)(source) == IAC))
+                {
+                    set_tn_state(ip, TS_CHAR_READY);
+                    ready = true;
+                }
+
+                if (ready)
+                {
+                    /* Consolidate the .text[] buffer. */
+                    ip->tn_end = ip->text_prefix;
+                    ip->text_end = ip->text_prefix + last - source;
+                    memmove(ip->text + ip->text_prefix, source, last - source);
+
+                    /* Consolidate the .command[] buffer. */
+                    ip->command_end = command_to - ip->command;
+                    ip->command_unprocessed_end = command_end - command_from + command_to - ip->command;
+                    memmove(command_to, command_from, command_end - command_from);
+                    return;
                 }
 
                 /* Finished processing all converted data in .command[],
