@@ -1759,7 +1759,7 @@ add_message_text (const char* str, size_t len)
        )
     {
         putchar(']');
-        puts(str);
+        fputs(str, stdout);
         fflush(stdout);
         return;
     }
