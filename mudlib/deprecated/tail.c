@@ -14,20 +14,21 @@ varargs int tail(string file)
 
     if (!stringp(file) || !this_player())
         return 0;
-    string txt = read_bytes(file, -(TAIL_MAX_BYTES + 80), (TAIL_MAX_BYTES + 80));
-    if (!stringp(txt))
+    bytes txt = read_bytes(file, -(TAIL_MAX_BYTES + 80), (TAIL_MAX_BYTES + 80));
+    if (!bytesp(txt))
         return 0;
 
     // cut off first (incomplete) line
-    int index = strstr(txt, "\n");
-    if (index > -1) {
+    int index = strstr(txt, b"\n");
+    if (index > -1)
+    {
         if (index + 1 < sizeof(txt))
             txt = txt[index+1..];
         else
-            txt = "";
+            txt = b"";
     }
 
-    tell_object(this_player(), txt);
+    tell_object(this_player(), to_text(txt, "ISO8859-1"));
 
     return 1;
 }

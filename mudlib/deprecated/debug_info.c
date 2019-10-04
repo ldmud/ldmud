@@ -6,6 +6,7 @@
 
 #include <driver_info.h>
 #include <debug_info.h>
+#include <object_info.h>
 
 mixed debug_info(int what, varargs mixed* args)
 {
@@ -428,6 +429,8 @@ mixed debug_info(int what, varargs mixed* args)
         case DINFO_EVAL_NUMBER:
             return efun::driver_info(DI_EVAL_NUMBER);
     }
+
+    return 0;
 }
 
 #endif
