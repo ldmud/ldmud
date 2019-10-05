@@ -3501,6 +3501,12 @@ handle_pragma (char *str)
                 pragma_share_variables = MY_FALSE;
             validPragma = MY_TRUE;
         }
+        else if (strncmp(base, "no_bytes_type", namelen) == 0
+              || strncmp(base, "bytes_type", namelen) == 0)
+        {
+            // Just ignore them for upward compatibility.
+            validPragma = MY_TRUE;
+        }
 #if defined( DEBUG ) && defined ( TRACE_CODE )
         else if (strncmp(base, "set_code_window", namelen) == 0)
         {
