@@ -17,6 +17,11 @@ DESCRIPTION
                 Registers a new efun name. This is not allowed during
                 compilation of an LPC object.
 
+                If the Python function has type annotations for its
+                arguments and return value, the type is checked
+                at compile and runtime. Union types can be specified
+                as tuples of types.
+
           - unregister_efun(name) -> None
                 Removes a python efun from registration. This is not
                 allowed during compilation of an LPC object. The
@@ -130,8 +135,9 @@ DESCRIPTION
 EXAMPLE
         import ldmud
 
-        def hello_world():
-            print("Hello, world!\n")
+        def hello_world(name: str) -> int:
+            print("Hello, world, %s!\n" % (name,))
+            return 1
 
         ldmud.register_efun("hello", hello_world)
 
@@ -179,6 +185,7 @@ NOTES
 
 HISTORY
         LDMud 3.5 implemented the python functionality.
+        LDMud 3.6 added type checks.
 
 SEE ALSO
         simul_efun(C)

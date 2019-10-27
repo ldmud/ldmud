@@ -43,10 +43,25 @@
 /* --- Type declarations --- */
 typedef struct ldmud_gc_var_s ldmud_gc_var_t;
 typedef void (*CClosureFun)(void*);
+typedef struct python_efun_s python_efun_t;
 typedef struct python_poll_fds_s python_poll_fds_t;
 typedef struct python_hook_s python_hook_t;
 
 /* --- Type definitions --- */
+struct python_efun_s
+{
+    PyObject*   callable;       /* Python callable of the efun.        */
+    ident_t*    name;           /* The identifier of the efun.         */
+    lpctype_t** types;          /* The return type and argument types:
+                                 *   [0]:           return type
+                                 *   [1 .. maxarg]: argument types
+                                 *   [maxarg + 1]:  vararg type.
+                                 */
+    int         minarg;         /* Minimum number of arguments.        */
+    int         maxarg;         /* Maximum number of arguments.        */
+    bool        varargs;        /* Whether we have a variable number.  */
+};
+
 struct python_poll_fds_s
 {
     int fd;                   /* file descriptor */
@@ -79,13 +94,8 @@ int num_python_efun = 0;
 
 ident_t *all_python_efuns = NULL;
 
-static PyObject* python_efun_table[PYTHON_EFUN_TABLE_SIZE];
-  /* Python callables for all defined efuns. 
-   */
-
-static ident_t*  python_efun_names[PYTHON_EFUN_TABLE_SIZE];
-  /* For each python-defined efun store its identifier
-   * here, so we can reverse lookup python efun indices.
+static python_efun_t python_efun_table[PYTHON_EFUN_TABLE_SIZE];
+  /* Information about all defined efuns.
    */
 
 static python_poll_fds_t *poll_fds = NULL;
@@ -109,6 +119,7 @@ static ldmud_gc_var_t *gc_object_list = NULL,
                       *gc_quoted_array_list = NULL;
 
 /* -- Function prototypes --- */
+static lpctype_t* pythontype_to_lpctype(PyObject* ptype);
 static const char* python_to_svalue(svalue_t *dest, PyObject* val);
 static PyObject* svalue_to_python (svalue_t *svp);
 static bool python_eq_svalue(PyObject* pval, svalue_t *sval);
@@ -131,6 +142,7 @@ python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
     char *name;
     PyObject *fun;
     ident_t *ident;
+    python_efun_t* python_efun_entry;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "sO:register_efun", kwlist, &name, &fun))
         return NULL;
@@ -191,9 +203,9 @@ python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
     {
         int idx = ident->u.global.python_efun;
 
-        Py_XDECREF(python_efun_table[idx]);
-        python_efun_table[idx] = fun;
-        /* No need for python_efun_names, because the ident_t didn't change. */
+        python_efun_entry = python_efun_table + idx;
+        Py_XDECREF(python_efun_table[idx].callable);
+        xfree(python_efun_table[idx].types);
     }
     else if(num_python_efun == PYTHON_EFUN_TABLE_SIZE)
     {
@@ -202,14 +214,130 @@ python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
     }
     else
     {
+        python_efun_entry = python_efun_table + num_python_efun;
+        python_efun_entry->name = ident;
         ident->u.global.python_efun = (short)num_python_efun;
-        python_efun_table[num_python_efun] = fun;
-        python_efun_names[num_python_efun] = ident;
+
         num_python_efun++;
     }
 
+    /* Update the efun table entry. */
+    python_efun_entry->callable = fun;
+    python_efun_entry->types = NULL;
+    python_efun_entry->minarg = 0;
+    python_efun_entry->maxarg = 0;
+    python_efun_entry->varargs = true;
+
+    /* Let's check whether we have type information. */
+    do  /* A loop, so we can exit this block easily. */
+    {
+        PyObject *annotations, *code, *property, *varnames, *returnname, *defaults;
+        lpctype_t **types;
+        long argcount, kwonlyargcount, flags;
+
+        /* We have only enough information for real functions. */
+        if (!PyFunction_Check(fun))
+            break;
+
+        /* First let's try to get the argument counts. */
+        code = PyFunction_GetCode(fun);
+        if (!code || !PyCode_Check(code))
+            break;
+
+        property = PyObject_GetAttrString(code, "co_argcount");
+        if (!property || !PyLong_Check(property))
+        {
+            Py_XDECREF(property);
+            break;
+        }
+        argcount = PyLong_AsLong(property);
+        Py_XDECREF(property);
+
+        property = PyObject_GetAttrString(code, "co_kwonlyargcount");
+        if (!property || !PyLong_Check(property))
+        {
+            Py_XDECREF(property);
+            break;
+        }
+        kwonlyargcount = PyLong_AsLong(property);
+        Py_XDECREF(property);
+
+        property = PyObject_GetAttrString(code, "co_flags");
+        if (!property || !PyLong_Check(property))
+        {
+            Py_XDECREF(property);
+            break;
+        }
+        flags = PyLong_AsLong(property);
+        Py_XDECREF(property);
+
+        python_efun_entry->minarg = (int)argcount;
+        python_efun_entry->maxarg = (int)argcount;
+        python_efun_entry->varargs = (flags & CO_VARARGS) ? true : false;
+
+        defaults = PyFunction_GetDefaults(fun);
+        if (defaults && PySequence_Check(defaults))
+            python_efun_entry->minarg -= (int)PySequence_Length(defaults);
+
+        /* And now look at annotations to get the types. */
+        annotations = PyFunction_GetAnnotations(fun);
+        if (!annotations || !PyMapping_Check(annotations))
+            break;
+
+        varnames = PyObject_GetAttrString(code, "co_varnames");
+        if (!varnames || !PySequence_Check(varnames))
+        {
+            Py_XDECREF(varnames);
+            break;
+        }
+
+        python_efun_entry->types = types = xalloc(sizeof(lpctype_t*) * (1 + argcount + ((flags & CO_VARARGS) ? 1 : 0)));
+
+        returnname = PyUnicode_FromString("return");
+        if (returnname)
+        {
+            PyObject* retanno = PyObject_GetItem(annotations, returnname);
+            if (retanno)
+                types[0] = pythontype_to_lpctype(retanno);
+            else
+                types[0] = NULL;
+
+            Py_XDECREF(retanno);
+            Py_DECREF(returnname);
+        }
+
+        for (long pos = 0; pos < argcount + ((flags & CO_VARARGS) ? 1 : 0); pos++)
+        {
+            PyObject* argname = PySequence_ITEM(varnames, pos == argcount ? argcount + kwonlyargcount : pos);
+            PyObject* arganno;
+            if (!argname || !PyUnicode_Check(argname))
+            {
+                Py_XDECREF(argname);
+                types[1 + pos] = NULL;
+                continue;
+            }
+
+            arganno = PyObject_GetItem(annotations, argname);
+            if (!arganno)
+            {
+                Py_DECREF(argname);
+                types[1 + pos] = NULL;
+                continue;
+            }
+
+            types[1 + pos] = pythontype_to_lpctype(arganno);
+
+            Py_DECREF(argname);
+            Py_DECREF(arganno);
+        }
+
+        Py_DECREF(varnames);
+    } while (false);
+
     Py_XINCREF(fun);
     Py_INCREF(Py_None);
+    PyErr_Clear();
+
     return Py_None;
 } /* python_register_efun */
 
@@ -257,8 +385,10 @@ python_unregister_efun (PyObject *module, PyObject *args, PyObject *kwds)
     {
         int idx = ident->u.global.python_efun;
 
-        Py_XDECREF(python_efun_table[idx]);
-        python_efun_table[idx] = NULL;
+        Py_XDECREF(python_efun_table[idx].callable);
+        xfree(python_efun_table[idx].types);
+        python_efun_table[idx].callable = NULL;
+        python_efun_table[idx].types = NULL;
     }
 
     Py_INCREF(Py_None);
@@ -4317,6 +4447,94 @@ static PyObject* init_ldmud_module()
 
 /*-------------------------------------------------------------------------*/
 
+static lpctype_t*
+pythontype_to_lpctype (PyObject* ptype)
+
+/* Creates an lpctype_t object from the given Python type.
+ * <ptype> may also be None, which is translated to void.
+ * Returns NULL for any non-type value or unknown type,
+ * a ref-counted instance of an lpctype_t otherwise.
+ */
+
+{
+    if (ptype == Py_None)
+        return lpctype_void;
+    else if (PyType_Check(ptype))
+    {
+        /* Most of them are static type objects, so we don't
+         * need to ref-count them.
+         */
+        if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_object_type))
+            return lpctype_object;
+
+        if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_array_type))
+            return get_array_type(lpctype_mixed);
+
+        if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_mapping_type))
+            return lpctype_mapping;
+
+        if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_struct_type))
+            return lpctype_any_struct;
+
+        if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_closure_type))
+            return lpctype_closure;
+
+        if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_symbol_type))
+            return lpctype_symbol;
+
+        if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_quoted_array_type))
+            return lpctype_quoted_array;
+
+        if (PyObject_IsSubclass(ptype, (PyObject*) &PyLong_Type))
+            return lpctype_int;
+
+        if (PyObject_IsSubclass(ptype, (PyObject*) &PyBool_Type))
+            return lpctype_int;
+
+        if (PyObject_IsSubclass(ptype, (PyObject*) &PyFloat_Type))
+            return lpctype_float;
+
+        if (PyObject_IsSubclass(ptype, (PyObject*) &PyBytes_Type))
+            return lpctype_bytes;
+
+        if (PyObject_IsSubclass(ptype, (PyObject*) &PyUnicode_Type))
+            return lpctype_string;
+
+        return NULL;
+    }
+    else  if (PyTuple_Check(ptype))
+    {
+        /* We regard tuples as LPC union types. */
+        lpctype_t *result = NULL;
+
+        for (Py_ssize_t len = PyTuple_Size(ptype); len--; )
+        {
+            lpctype_t *part = pythontype_to_lpctype(PyTuple_GetItem(ptype, len));
+            if (!part)
+                continue;
+
+            if (!result)
+                result = part;
+            else
+            {
+                lpctype_t *old = result;
+
+                result = get_union_type(result, part);
+                free_lpctype(old);
+                free_lpctype(part);
+            }
+        }
+
+        return result;
+    }
+    else
+        return NULL;
+
+} /* pythontype_to_lpctype */
+
+
+/*-------------------------------------------------------------------------*/
+
 static PyObject*
 svalue_to_python (svalue_t *svp)
 
@@ -4776,9 +4994,60 @@ is_python_efun (ident_t *p)
  */
 
 {
-    return p->u.global.python_efun >= 0 && python_efun_table[p->u.global.python_efun] != NULL;
+    return p->u.global.python_efun >= 0 && python_efun_table[p->u.global.python_efun].callable != NULL;
 } /* is_python_efun */
 
+
+/*-------------------------------------------------------------------------*/
+
+lpctype_t *
+check_python_efun_args (ident_t *p, int num_arg, fulltype_t *args)
+
+/* Check whether the given argument types match the ones
+ * the Python efun expects. Any errors will be printed using yyerrorf().
+ * This function returns the return type of the efun.
+ */
+
+{
+    python_efun_t * entry = python_efun_table + p->u.global.python_efun;
+
+    if (num_arg < entry->minarg)
+        yyerrorf("Too few arguments to %s", get_txt(p->name));
+    else if(!entry->varargs && num_arg > entry->maxarg)
+    {
+        yyerrorf("Too many arguments to %s", get_txt(p->name));
+        num_arg = entry->maxarg;
+    }
+
+    if (!entry->types)
+        return lpctype_mixed;
+
+    for (int pos = 0; pos < num_arg; pos++)
+    {
+        lpctype_t* expected;
+
+        if (pos >= entry->maxarg)
+            expected = entry->types[1 + entry->maxarg];
+        else
+            expected = entry->types[1 + pos];
+
+        if (!expected)
+            continue;
+
+        if (!has_common_type(expected, args[pos].t_type))
+        {
+            yyerrorf("Bad arg %d type to %s(): got %s, expected %s"
+                    , 1 + pos, get_txt(p->name)
+                    , get_fulltype_name(args[pos])
+                    , get_lpctype_name(expected));
+        }
+    }
+
+    if (entry->types[0])
+        return entry->types[0];
+    return lpctype_mixed;
+
+} /* check_python_efun_args */
 
 /*-------------------------------------------------------------------------*/
 
@@ -4796,33 +5065,64 @@ call_python_efun (int idx, int num_arg)
     int pos;
     svalue_t *argp;
     bool was_external = python_is_external;
+    python_efun_t* python_efun_entry = python_efun_table + idx;
 
     /* Efun still registered?
      * (F_PYTHON_EFUN opcodes may still be floating around.)
      */
-    if (python_efun_table[idx] == NULL)
+    if (python_efun_entry->callable == NULL)
         errorf("Python-defined efun vanished: %s\n"
-             , get_txt(python_efun_names[idx]->name));
+             , get_txt(python_efun_entry->name->name));
 
+    /* We leave the argument count check to Python.
+     * But we check the types if there are annotations about it.
+     */
     args = num_arg ? PyTuple_New(num_arg) : NULL;
     argp = inter_sp - num_arg + 1;
     for (pos = 0; pos < num_arg; pos++,argp++)
     {
-        PyObject *arg = svalue_to_python(argp);
+        PyObject *arg;
+
+        if (python_efun_entry->types)
+        {
+            lpctype_t *expected;
+            if (pos < python_efun_entry->maxarg)
+                expected = python_efun_entry->types[1 + pos];
+            else if (python_efun_entry->varargs)
+                expected = python_efun_entry->types[1 + python_efun_entry->maxarg];
+            else
+                expected = NULL;
+
+            if (expected && !check_rtt_compatibility(expected, argp))
+            {
+                static char buff[512];
+                lpctype_t *realtype = get_rtt_type(expected, argp);
+                get_lpctype_name_buf(realtype, buff, sizeof(buff));
+                free_lpctype(realtype);
+
+                Py_DECREF(args);
+
+                errorf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
+                      , pos + 1, get_txt(python_efun_entry->name->name)
+                      , buff, get_lpctype_name(expected));
+            }
+        }
+
+        arg = svalue_to_python(argp);
         if (arg == NULL)
         {
             Py_DECREF(args);
 
             errorf("Bad argument %d to %s().\n"
                  , pos+1
-                 , get_txt(python_efun_names[idx]->name));
+                 , get_txt(python_efun_entry->name->name));
         }
         PyTuple_SET_ITEM(args, pos, arg);
     }
     inter_sp = pop_n_elems(num_arg, inter_sp);
 
     python_is_external = false;
-    result = PyObject_CallObject(python_efun_table[idx], args);
+    result = PyObject_CallObject(python_efun_entry->callable, args);
     python_is_external = was_external;
     Py_XDECREF(args);
 
@@ -4868,7 +5168,7 @@ call_python_efun (int idx, int num_arg)
         PyErr_Print();
 
         errorf("%s: %s\n"
-             , get_txt(python_efun_names[idx]->name)
+             , get_txt(python_efun_entry->name->name)
              , msg);
     }
     else
@@ -4879,7 +5179,7 @@ call_python_efun (int idx, int num_arg)
         if (err != NULL)
         {
             errorf("Bad return value from %s(): %s\n"
-                  , get_txt(python_efun_names[idx]->name)
+                  , get_txt(python_efun_entry->name->name)
                   , err);
         }
 
@@ -5125,7 +5425,7 @@ closure_python_efun_to_string (int type)
  */
 
 {
-    return get_txt(python_efun_names[type - CLOSURE_PYTHON_EFUN]->name);
+    return get_txt(python_efun_table[type - CLOSURE_PYTHON_EFUN].name->name);
 }
 
 #ifdef GC_SUPPORT
@@ -5138,6 +5438,13 @@ python_clear_refs ()
  */
 
 {
+    for (int idx = 0; idx < PYTHON_EFUN_TABLE_SIZE; idx++)
+    {
+        if (python_efun_table[idx].types)
+            for (int pos = 0; pos < 1 + python_efun_table[idx].maxarg + (python_efun_table[idx].varargs ? 1 : 0); pos++)
+                clear_lpctype_ref(python_efun_table[idx].types[pos]);
+    }
+
     for(ldmud_gc_var_t* var = gc_object_list; var != NULL; var = var->gcnext)
     {
         object_t* ob = ((ldmud_object_t*)var)->lpc_object;
@@ -5203,6 +5510,18 @@ python_count_refs ()
  */
 
 {
+    /* The efun table */
+    for (int idx = 0; idx < PYTHON_EFUN_TABLE_SIZE; idx++)
+    {
+        if (python_efun_table[idx].types)
+        {
+            note_malloced_block_ref(python_efun_table[idx].types);
+
+            for (int pos = 0; pos < 1 + python_efun_table[idx].maxarg + (python_efun_table[idx].varargs ? 1 : 0); pos++)
+                count_lpctype_ref(python_efun_table[idx].types[pos]);
+        }
+    }
+
     /* Our polling list */
     for (python_poll_fds_t *fds = poll_fds; fds != NULL; fds = fds->next)
         note_malloced_block_ref(fds);

@@ -12743,12 +12743,15 @@ function_call:
 
                   PREPARE_INSERT(4)
 
+                  /* Check the arguments. */
+                  lpctype_t *result = check_python_efun_args($1.real, $4, get_argument_types_start($4));
+
                   add_f_code(F_USE_ARG_FRAME);
                   add_f_code(F_PYTHON_EFUN);
                   add_short($1.real->u.global.python_efun);
                   CURRENT_PROGRAM_SIZE += 4;
 
-                  $$.type = get_fulltype(lpctype_mixed);
+                  $$.type = get_fulltype(ref_lpctype(result));
 
                   /* Always need an arg frame, as these
                    * calls are always handled as varargs.

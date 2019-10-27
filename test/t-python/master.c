@@ -116,12 +116,27 @@ void run_test()
 #endif
         ({ "passing too many arguments", TF_ERROR,
             (:
-                return python_return(1,2);
+                return funcall(#'python_return, 1, 2);
             :)
         }),
         ({ "passing less arguments", TF_ERROR,
             (:
-                return python_return();
+                return funcall(#'python_return);
+            :)
+        }),
+        ({ "passing invalid arguments 1", TF_ERROR,
+            (:
+                return funcall(#'python_typecheck, 10);
+            :)
+        }),
+        ({ "passing invalid arguments 2", TF_ERROR,
+            (:
+                return funcall(#'python_typecheck, "", "");
+            :)
+        }),
+        ({ "passing valid arguments", 0,
+            (:
+                return funcall(#'python_typecheck, "", 1, 2);
             :)
         }),
         ({ "getting an exception", TF_ERROR,
