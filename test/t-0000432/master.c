@@ -465,6 +465,26 @@ void run_test()
                 return regmatch("Sch\u00f6ne \u00c4ra", "[\u00c4\u00d6\u00dc]ra", RE_TRADITIONAL) == "\u00c4ra";
             :)
         }),
+        ({ "regreplace with builtin regexp and unicode strings 1", 0,
+            (:
+                return regreplace("\u216c\u216e\u216f\u2164\u216e", "(.)", " \\1 ", RE_TRADITIONAL | RE_GLOBAL) == " \u216c  \u216e  \u216f  \u2164  \u216e ";
+            :)
+        }),
+        ({ "regreplace with builtin regexp and unicode strings 2", 0,
+            (:
+                return regreplace("\u216c\u216e\u216f\u2164\u216e", "", "*", RE_TRADITIONAL | RE_GLOBAL) == "*\u216c*\u216e*\u216f*\u2164*\u216e*";
+            :)
+        }),
+        ({ "regreplace with PCRE and unicode strings 1", 0,
+            (:
+                return regreplace("\u216c\u216e\u216f\u2164\u216e", "(.)", " \\1 ", RE_PCRE | RE_GLOBAL) == " \u216c  \u216e  \u216f  \u2164  \u216e ";
+            :)
+        }),
+        ({ "regreplace with PCRE and unicode strings 2", 0,
+            (:
+                return regreplace("\u216c\u216e\u216f\u2164\u216e", "", "*", RE_PCRE | RE_GLOBAL) == "*\u216c*\u216e*\u216f*\u2164*\u216e*";
+            :)
+        }),
         ({ "sprintf with unicode string", 0,
             (:
                 return sprintf("%Q", "\u2615") == "\"\\u2615\"";

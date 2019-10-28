@@ -1545,9 +1545,14 @@ f_regreplace (svalue_t *sp)
             break;
         if (match->start == start)
         {
-            ++reslen; /* Empty match leaves old char in place */
-            if (++start > mstrsize(text))
+            /* Empty match leaves old char in place */
+            bool error = false;
+            size_t next = char_to_byte_index(get_txt(text) + start, mstrsize(text) - start, 1, &error);
+            if (error || !next)
                 break;
+
+            reslen += next;
+            start += next;
         }
 
         /* If RE_GLOBAL is not set, don't look for a second match */
