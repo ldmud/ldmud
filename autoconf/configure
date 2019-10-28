@@ -765,8 +765,6 @@ XML2_LIBS
 XML2_CFLAGS
 PYTHON_LIBS
 PYTHON_CFLAGS
-JSON_LIBS
-JSON_CFLAGS
 JSONC_LIBS
 JSONC_CFLAGS
 SQLITE3_LIBS
@@ -966,8 +964,6 @@ SQLITE3_CFLAGS
 SQLITE3_LIBS
 JSONC_CFLAGS
 JSONC_LIBS
-JSON_CFLAGS
-JSON_LIBS
 PYTHON_CFLAGS
 PYTHON_LIBS
 XML2_CFLAGS
@@ -1853,8 +1849,6 @@ Some influential environment variables:
   JSONC_CFLAGS
               C compiler flags for JSONC, overriding pkg-config
   JSONC_LIBS  linker flags for JSONC, overriding pkg-config
-  JSON_CFLAGS C compiler flags for JSON, overriding pkg-config
-  JSON_LIBS   linker flags for JSON, overriding pkg-config
   PYTHON_CFLAGS
               C compiler flags for PYTHON, overriding pkg-config
   PYTHON_LIBS linker flags for PYTHON, overriding pkg-config
@@ -10063,9 +10057,9 @@ fi
 $as_echo "$lp_cv_need_lib_ssl" >&6; }
             if test "$lp_cv_need_lib_ssl" = "yes"; then
                 lp_cv_has_lib_ssl=no
-                { $as_echo "$as_me:${as_lineno-$LINENO}: checking for SSL_library_init in -lssl" >&5
-$as_echo_n "checking for SSL_library_init in -lssl... " >&6; }
-if ${ac_cv_lib_ssl_SSL_library_init+:} false; then :
+                { $as_echo "$as_me:${as_lineno-$LINENO}: checking for SSL_new in -lssl" >&5
+$as_echo_n "checking for SSL_new in -lssl... " >&6; }
+if ${ac_cv_lib_ssl_SSL_new+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_check_lib_save_LIBS=$LIBS
@@ -10079,27 +10073,27 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 #ifdef __cplusplus
 extern "C"
 #endif
-char SSL_library_init ();
+char SSL_new ();
 int
 main ()
 {
-return SSL_library_init ();
+return SSL_new ();
   ;
   return 0;
 }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_ssl_SSL_library_init=yes
+  ac_cv_lib_ssl_SSL_new=yes
 else
-  ac_cv_lib_ssl_SSL_library_init=no
+  ac_cv_lib_ssl_SSL_new=no
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
 LIBS=$ac_check_lib_save_LIBS
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ssl_SSL_library_init" >&5
-$as_echo "$ac_cv_lib_ssl_SSL_library_init" >&6; }
-if test "x$ac_cv_lib_ssl_SSL_library_init" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ssl_SSL_new" >&5
+$as_echo "$ac_cv_lib_ssl_SSL_new" >&6; }
+if test "x$ac_cv_lib_ssl_SSL_new" = xyes; then :
   PKGLIBS="$PKGLIBS -lssl"
                              lp_cv_has_lib_ssl=yes
 
@@ -11573,7 +11567,7 @@ $as_echo_n "checking for PostgresSQL... " >&6; }
 if ${lp_cv_has_pgsql+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include/pgsql" "/usr/include/pgsql" "/usr/lib/pgsql" "/usr/local/include"; do
+  for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include/pgsql" "/usr/include/pgsql" "/usr/include/postgresql" "/usr/local/include/postgresql" "/usr/lib/pgsql" "/usr/local/include"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="$saveflags -I$TESTPATH"
@@ -12440,12 +12434,12 @@ if test -n "$JSONC_CFLAGS"; then
     pkg_cv_JSONC_CFLAGS="$JSONC_CFLAGS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"json-c >= 0.11\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "json-c >= 0.11") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"json-c >= 0.12\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "json-c >= 0.12") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_JSONC_CFLAGS=`$PKG_CONFIG --cflags "json-c >= 0.11" 2>/dev/null`
+  pkg_cv_JSONC_CFLAGS=`$PKG_CONFIG --cflags "json-c >= 0.12" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -12457,12 +12451,12 @@ if test -n "$JSONC_LIBS"; then
     pkg_cv_JSONC_LIBS="$JSONC_LIBS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"json-c >= 0.11\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "json-c >= 0.11") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"json-c >= 0.12\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "json-c >= 0.12") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_JSONC_LIBS=`$PKG_CONFIG --libs "json-c >= 0.11" 2>/dev/null`
+  pkg_cv_JSONC_LIBS=`$PKG_CONFIG --libs "json-c >= 0.12" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -12483,9 +12477,9 @@ else
         _pkg_short_errors_supported=no
 fi
         if test $_pkg_short_errors_supported = yes; then
-	        JSONC_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "json-c >= 0.11" 2>&1`
+	        JSONC_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "json-c >= 0.12" 2>&1`
         else
-	        JSONC_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "json-c >= 0.11" 2>&1`
+	        JSONC_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "json-c >= 0.12" 2>&1`
         fi
 	# Put the nasty error message in config.log where it belongs
 	echo "$JSONC_PKG_ERRORS" >&5
@@ -12506,9 +12500,9 @@ fi
 
         # No pkg-config, search manually.
         if test "$lp_cv_has_jsonc" = "no"; then
-            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for json-c >= 0.11 support" >&5
-$as_echo_n "checking for json-c >= 0.11 support... " >&6; }
-            for TESTPATH in "" "${json_path}" "${json_path}/include" "${json_path}/include/json-c >= 0.11" "/usr/include/json-c >= 0.11" "/usr/local/include" "/usr/local/include/json-c >= 0.11" ; do
+            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for json-c >= 0.12 support" >&5
+$as_echo_n "checking for json-c >= 0.12 support... " >&6; }
+            for TESTPATH in "" "${json_path}" "${json_path}/include" "${json_path}/include/json-c >= 0.12" "/usr/include/json-c >= 0.12" "/usr/local/include" "/usr/local/include/json-c >= 0.12" ; do
                 if test "x$TESTPATH" != "x"; then
                     CFLAGS="$saveflags -I$TESTPATH"
                 else
@@ -12518,6 +12512,10 @@ $as_echo_n "checking for json-c >= 0.11 support... " >&6; }
 /* end confdefs.h.  */
 
     #include <json-c/json.h>
+
+    #if JSON_C_VERSION_NUM < 0x000c00
+    #error libjson-c >= 0.12 is needed.
+    #endif
 
     json_object *foo(void)
     {
@@ -12558,7 +12556,7 @@ $as_echo "$lp_cv_has_jsonc" >&6; }
             else
                 tmp=""
 
-                for TESTPATH in "" "${json_path}" "${json_path}/lib" "${json_path}/lib/json-c >= 0.11" "/usr/lib/json-c >= 0.11" "/usr/local/lib" "/usr/local/lib/json-c >= 0.11" ; do
+                for TESTPATH in "" "${json_path}" "${json_path}/lib" "${json_path}/lib/json-c >= 0.12" "/usr/lib/json-c >= 0.12" "/usr/local/lib" "/usr/local/lib/json-c >= 0.12" ; do
                     if test "x$TESTPATH" != "x"; then
                         CFLAGS="$saveflags -L$TESTPATH"
                     else
@@ -12626,297 +12624,14 @@ fi
         fi
     fi
 
-# If not found, fall back and try json-c <= 0.10 (yes, called libjson then).
-if test "$lp_cv_has_jsonc" = "no"; then
-
-    if test "x$enable_use_json" = "xyes"; then
-        saveflags="$CFLAGS"
-        saveeflags="$EXTRA_CFLAGS"
-
-
-
-pkg_failed=no
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for JSON" >&5
-$as_echo_n "checking for JSON... " >&6; }
-
-if test -n "$JSON_CFLAGS"; then
-    pkg_cv_JSON_CFLAGS="$JSON_CFLAGS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"json\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "json") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_JSON_CFLAGS=`$PKG_CONFIG --cflags "json" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-if test -n "$JSON_LIBS"; then
-    pkg_cv_JSON_LIBS="$JSON_LIBS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"json\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "json") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_JSON_LIBS=`$PKG_CONFIG --libs "json" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-
-
-
-if test $pkg_failed = yes; then
-   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-
-if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
-        _pkg_short_errors_supported=yes
-else
-        _pkg_short_errors_supported=no
-fi
-        if test $_pkg_short_errors_supported = yes; then
-	        JSON_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "json" 2>&1`
-        else
-	        JSON_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "json" 2>&1`
-        fi
-	# Put the nasty error message in config.log where it belongs
-	echo "$JSON_PKG_ERRORS" >&5
-
-	lp_cv_has_json=no
-elif test $pkg_failed = untried; then
-     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-	lp_cv_has_json=no
-else
-	JSON_CFLAGS=$pkg_cv_JSON_CFLAGS
-	JSON_LIBS=$pkg_cv_JSON_LIBS
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-	lp_cv_has_json=yes
-fi
-
-
-        # No pkg-config, search manually.
-        if test "$lp_cv_has_json" = "no"; then
-            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for json support" >&5
-$as_echo_n "checking for json support... " >&6; }
-            for TESTPATH in "" "${json_path}" "${json_path}/include" "${json_path}/include/json" "/usr/include/json" "/usr/local/include" "/usr/local/include/json" ; do
-                if test "x$TESTPATH" != "x"; then
-                    CFLAGS="$saveflags -I$TESTPATH"
-                else
-                    CFLAGS="$saveflags"
-                fi
-                cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-    #include <json/json.h>
-
-    json_object *foo(void)
-    {
-        struct json_object *ob;
-        return ob=json_object_new_int(1);
-    }
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  lp_cv_has_json=yes
-                    if test "x$TESTPATH" != "x"; then
-                        EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
-                    fi
-                    break;
-
-else
-  CFLAGS="$saveflags"
-
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-            done
-            { $as_echo "$as_me:${as_lineno-$LINENO}: result: $lp_cv_has_json" >&5
-$as_echo "$lp_cv_has_json" >&6; }
-        elif test "x$JSON_CFLAGS" != "x"; then
-            EXTRA_CFLAGS="$JSON_CFLAGS $EXTRA_CFLAGS"
-        fi
-
-        if test "$lp_cv_has_json" = "yes"; then
-            if test "x$JSON_LIBS" != "x"; then
-                PKGLIBS="$PKGLIBS $JSON_LIBS"
-            else
-                tmp=""
-
-                for TESTPATH in "" "${json_path}" "${json_path}/lib" "${json_path}/lib/json" "/usr/lib/json" "/usr/local/lib" "/usr/local/lib/json" ; do
-                    if test "x$TESTPATH" != "x"; then
-                        CFLAGS="$saveflags -L$TESTPATH"
-                    else
-                        CFLAGS="$saveflags"
-                    fi
-
-                    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for json_object_get_type in -ljson" >&5
-$as_echo_n "checking for json_object_get_type in -ljson... " >&6; }
-if ${ac_cv_lib_json_json_object_get_type+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-ljson  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char json_object_get_type ();
-int
-main ()
-{
-return json_object_get_type ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_json_json_object_get_type=yes
-else
-  ac_cv_lib_json_json_object_get_type=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_json_json_object_get_type" >&5
-$as_echo "$ac_cv_lib_json_json_object_get_type" >&6; }
-if test "x$ac_cv_lib_json_json_object_get_type" = xyes; then :
-  if test "x$TESTPATH" != "x"; then
-                            tmp="$PKGLIBS -L$TESTPATH -ljson"
-                        else
-                            tmp="$PKGLIBS -ljson"
-                        fi
-                        break
-
-fi
-
-                done
-
-                if test "x$tmp" = "x"; then
-                    lp_cv_has_json=no
-
-                    EXTRA_CFLAGS="$saveeflags"
-                else
-                    PKGLIBS="$tmp"
-                fi
-            fi
-
-            CFLAGS="$saveflags"
-        fi
-    fi
-
-fi
 
 if test "$lp_cv_has_jsonc" = "yes"; then
 
 $as_echo "#define HAS_JSONC 1" >>confdefs.h
 
-
-$as_echo "#define JSON_64_SUPPORT 1" >>confdefs.h
-
-elif test "$lp_cv_has_json" = "yes"; then
-
-$as_echo "#define HAS_JSON 1" >>confdefs.h
-
-    if test "x$enable_use_json" = "xyes"; then
-        savelibs="$LIBS"
-        LIBS="$LIBS $PKGLIBS"
-        # Check if it supports 64 bit values
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing json_object_new_int64" >&5
-$as_echo_n "checking for library containing json_object_new_int64... " >&6; }
-if ${ac_cv_search_json_object_new_int64+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_func_search_save_LIBS=$LIBS
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char json_object_new_int64 ();
-int
-main ()
-{
-return json_object_new_int64 ();
-  ;
-  return 0;
-}
-_ACEOF
-for ac_lib in '' ; do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_json_object_new_int64=$ac_res
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext
-  if ${ac_cv_search_json_object_new_int64+:} false; then :
-  break
-fi
-done
-if ${ac_cv_search_json_object_new_int64+:} false; then :
-
-else
-  ac_cv_search_json_object_new_int64=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_json_object_new_int64" >&5
-$as_echo "$ac_cv_search_json_object_new_int64" >&6; }
-ac_res=$ac_cv_search_json_object_new_int64
-if test "$ac_res" != no; then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
-  lp_cv_json_64bit=yes
-else
-  lp_cv_json_64bit=no
-
-fi
-
-
-        if test "$lp_cv_json_64bit" = "yes" ; then
-
-$as_echo "#define JSON_64_SUPPORT 1" >>confdefs.h
-
-        fi
-
-        LIBS="$savelibs"
-    fi
 else
     if test "$enable_use_json" = "yes"; then
-        echo "libjson-c library not found - disabling JSON support"
+        echo "libjson-c library (>= 0.12) not found - disabling JSON support"
         if test "x$not_available" = "x"; then
     not_available="use-json"
 else
@@ -12926,7 +12641,6 @@ fi
 
     cdef_use_json="#undef"
     enable_use_json="no"
-    json_package=
 fi
 
 # --- PYTHON ---
