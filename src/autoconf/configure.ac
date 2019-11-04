@@ -814,10 +814,7 @@ AC_CHECK_SIZEOF(double)
 # Checking for programs
 AC_PROG_INSTALL
 AC_CONFIG_HEADERS(machine.h)
-AC_PROG_YACC
-if test "$YACC" != "bison -y"; then
-  AC_MSG_ERROR([bison not found, please install it!])
-fi
+AC_CHECK_PROGS(BISON, bison)
 AC_PROG_CPP
 
 AH_TOP([
@@ -2477,75 +2474,6 @@ else
     AC_MSG_RESULT(no)
 fi
 
-AC_MSG_CHECKING(if ${YACC} includes bogus malloc prototypes)
-cat > conftest.y <<EOF
-%{
-#include "confdefs.h"
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
-#include <memory.h>
-#endif
-#ifdef HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-%}
-%%
-all: 'a';
-%%
-int main(){ return 0; }
-int yyerror(){}
-int yylex(){ return 0; }
-EOF
-rm -f y.tab.c y_tab.c
-${YACC} conftest.y
-if mv y.tab.c conftest.c > /dev/null 2>&1; then
-  YACCTAB=y.tab.
-else
-  mv y_tab.c conftest.c
-  YACCTAB=y_tab.
-fi
-if eval $ac_compile 2>&5; then
-  MOVE_YACC_TAB='$(MV) $(YACCTAB)c'
-  CLEAN_YACC_TAB=''
-  AC_MSG_RESULT(no)
-else
-  MOVE_YACC_TAB='tail $TAIL_N +2 $(YACCTAB)c >'
-  CLEAN_YACC_TAB='$(RM) $(YACCTAB)c'
-  AC_MSG_RESULT(yes)
-fi
-rm -f conftest*
-
-AC_MSG_CHECKING(for ${YACC} / <malloc.h> / -DSGI_SOURCE / afree name clash)
-cat > conftest.y <<EOF
-%{
-#include "confdefs.h"
-#define afree free
-%}
-%%
-all: 'a';
-%%
-int main(){ return 0; }
-int yyerror(){}
-int yylex(){ return 0; }
-EOF
-rm -f y.tab.c y_tab.c
-${YACC} conftest.y
-if mv y.tab.c conftest.c > /dev/null 2>&1; then
-  YACCTAB=y.tab.
-else
-  mv y_tab.c conftest.c
-  YACCTAB=y_tab.
-fi
-if eval $ac_compile 2>&5 ; then
-  AC_MSG_RESULT(no)
-else
-  EXTRA_CFLAGS="${EXTRA_CFLAGS} -U_SGI_SOURCE"
-  AC_MSG_RESULT(yes)
-fi
-rm -f conftest*
-
 # check for a working sbrk().
 AC_MSG_CHECKING(for a working sbrk())
 AC_RUN_IFELSE([
@@ -2626,9 +2554,6 @@ AC_SUBST(DCFLAGS)
 AC_SUBST(LDFLAGS)
 AC_SUBST(EXTRA_CFLAGS)
 AC_SUBST(OPTIMIZE_LINKING)
-AC_SUBST(MOVE_YACC_TAB)
-AC_SUBST(CLEAN_YACC_TAB)
-AC_SUBST(YACCTAB)
 AC_SUBST(CONFIG_SHELL)
 AC_SUBST(EXEEXT)
 
