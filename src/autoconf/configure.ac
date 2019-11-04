@@ -839,8 +839,9 @@ yes
 
 dnl Checking for headers
 AC_HEADER_STDBOOL
-AC_CHECK_HEADERS(sys/rusage.h sys/time.h unistd.h stdlib.h libc.h memory.h)
+AC_CHECK_HEADERS(sys/rusage.h sys/time.h sys/types.h unistd.h stdlib.h libc.h memory.h)
 AC_CHECK_HEADERS(string.h bstring.h netdb.h crypt.h sys/param.h sys/termios.h)
+AC_CHECK_HEADERS(netinet/in.h arpa/nameser.h)
 
 dnl extra check for <limits.h>; must be there!
 AC_CHECK_HEADERS(limits.h)
