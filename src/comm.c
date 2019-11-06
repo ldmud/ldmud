@@ -73,6 +73,7 @@
 
 #include "my-alloca.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <sys/time.h>
@@ -245,7 +246,7 @@ p_int write_buffer_max_size = WRITE_BUFFER_MAX_SIZE;
    *  -1: Infinite queue.
    */
 
-char default_player_encoding[128] = "ISO-8859-1//TRANSLIT";
+char default_player_encoding[sizeof(((interactive_t*)0)->encoding)] = "ISO-8859-1//TRANSLIT";
   /* Default encoding for interactives. */
 
 static char udp_buf[65536];
@@ -3330,14 +3331,27 @@ set_encoding (interactive_t *ip, const char* encoding)
  */
 {
     iconv_t receiving, sending;
-    char base_encoding[128];
-    char *end = strchr(encoding, '/');
+    char base_encoding[sizeof(default_player_encoding)];
+    const char *end = encoding;
 
-    if (end)
-        end = strchr(end+1, '/');
-    if (end != NULL && *++end != 0)
+    assert(strlen(encoding) < sizeof(base_encoding));
+
+    /* Find a double slash and remove it for
+     * the receiving encoding.
+     */
+    while ((end = strchr(end, '/')))
+    {
+        if (end[1] == '/')
+            break;
+        else
+            end++;
+    }
+
+    if (end != NULL)
     {
         memcpy(base_encoding, encoding, end - encoding);
+        base_encoding[end - encoding] = '\0';
+
         receiving = iconv_open("UTF-8", base_encoding);
     }
     else
