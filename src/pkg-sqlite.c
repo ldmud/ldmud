@@ -889,20 +889,18 @@ pkg_sqlite_init ()
     sqlite3_config(SQLITE_CONFIG_MALLOC, &mem_methods);
     sqlite3_config(SQLITE_CONFIG_LOG, &sl_log, NULL);
 
+    /* Disable URI handling, so no other VFS can be selected. */
+    sqlite3_config(SQLITE_CONFIG_URI, 0);
+
     orig_vfs = sqlite3_vfs_find(NULL);
     if (orig_vfs == NULL)
         fatal("SQLite: No VFS registered.\n");
-
 
     vfs_methods.szOsFile = orig_vfs->szOsFile;
     vfs_methods.mxPathname = orig_vfs->mxPathname;
     vfs_methods.pAppData = orig_vfs;
 
     sqlite3_vfs_register(&vfs_methods, 1);
-
-    /* And disable URI handling, so no other VFS can be selected. */
-    sqlite3_config(SQLITE_CONFIG_URI, 0);
-
 } /* sl_init() */
 
 /*-------------------------------------------------------------------------*/
