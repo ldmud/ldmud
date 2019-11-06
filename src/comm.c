@@ -1865,7 +1865,10 @@ add_message_text (const char* str, size_t len)
             at_end = false;
 
             rc = iconv(ip->send_cd, &start, &inleft, &dest, &outleft);
-            start = (char*) str + 1;
+            if (rc == (size_t)-1)
+                start = (char*) str;
+            else
+                start = (char*) str + 1;
         }
         else if (at_end)
             rc = iconv(ip->send_cd, NULL, NULL, &dest, &outleft);
