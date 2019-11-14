@@ -3491,7 +3491,6 @@ free_local_names (int depth)
     {
         q = all_locals;
         all_locals = q->next_all;
-        free_shared_identifier(q);
         if (q->u.local.context >= 0)
         {
             free_fulltype(type_of_context[q->u.local.context]);
@@ -3501,6 +3500,7 @@ free_local_names (int depth)
             current_number_of_locals--;
             free_fulltype(type_of_locals[current_number_of_locals]);
         }
+        free_shared_identifier(q);
     }
 } /* free_local_names() */
 
