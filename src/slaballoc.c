@@ -206,24 +206,15 @@
  *
  *   The last word in the user area holds the size of the block in words.
  *
-#ifdef HAVE_MADVISE
- * TODO: Not tested for in configure, not documented.
-#endif
  *---------------------------------------------------------------------------
  */
 
 #include "driver.h"
 #include "typedefs.h"
 
-#if defined(HAVE_MADVISE) || defined(HAVE_MMAP)
+#if defined(HAVE_MMAP)
 #    include <sys/types.h>
 #    include <sys/mman.h>
-#endif
-
-#ifdef HAVE_MADVISE
-#    define MADVISE(new,old)  madvise(new,old,MADV_RANDOM)
-#else
-#    define MADVISE(new,old)  NOOP
 #endif
 
 // for sysconf()
@@ -1672,9 +1663,6 @@ mem_alloc (size_t size)
 {
     word_t *block = NULL;
     int     ix;
-#if defined(HAVE_MADVISE)
-    size_t orig_size = size;
-#endif
 
     assert_stack_gap();
 
@@ -1797,8 +1785,6 @@ mem_alloc (size_t size)
 
         block += M_OVERHEAD;
 
-        MADVISE(block, orig_size);
-
 #ifdef MALLOC_EXT_STATISTICS
         extstat_update_max(extstats + SIZE_INDEX(size));
 #endif /* MALLOC_EXT_STATISTICS */
@@ -1915,8 +1901,6 @@ mem_alloc (size_t size)
                         | (M_SMALL|M_GC_FREE|M_REF);
         MAKE_SMALL_CHECK_UNCHECKED(block, size);
         block += M_OVERHEAD;
-
-        MADVISE(block, orig_size);
 
         count_back(&small_free_stat, size);
 #ifdef MALLOC_EXT_STATISTICS
@@ -3223,7 +3207,7 @@ large_malloc ( word_t size, Bool force_more)
 {
     word_t real_size;
     word_t *ptr;
-#if defined(HAVE_MADVISE) || defined(DEBUG) || defined(DEBUG_MALLOC_ALLOCS)
+#if defined(DEBUG) || defined(DEBUG_MALLOC_ALLOCS)
     size_t orig_size = size;
 #endif
 
@@ -3510,7 +3494,6 @@ found_fit:
 #ifdef MALLOC_CHECK
     ptr[M_MAGIC] = LAMAGIC;
 #endif
-    MADVISE(ptr+M_OVERHEAD, orig_size);
     return (char *) (ptr + M_OVERHEAD);
 } /* large_malloc() */
 
