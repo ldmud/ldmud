@@ -109,17 +109,18 @@ strbuf_grow (strbuf_t *buf, size_t len)
     if (buf->alloc_len - buf->length > len)
         return len;
 
-    /* Allocate more than we need in anticipation of further adds,
+    /* Allocate more than we need in anticipation of further adds
+     * (rounded to a multiple of the word size),
      * but not more than we can manage
      */
-    if (MAX_STRBUF_LEN - buf->length < len * 3)
+    if (MAX_STRBUF_LEN - buf->length < len * 3 + sizeof(void*)-1)
     {
         new_len = MAX_STRBUF_LEN;
         if (new_len - buf->length < len)
             len = new_len - buf->length;
     }
     else
-        new_len = buf->length + len * 3;
+        new_len = (buf->length + len * 3 + sizeof(void*)-1) & ~(sizeof(void*)-1);
 
 
     /* Is this the first allocation? */
