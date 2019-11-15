@@ -2061,7 +2061,7 @@ v_trim (svalue_t *sp, int num_arg)
             char* chars = strip;
             size_t chars_l = strip_l - clen + 1;
 
-            if (error)
+            if (error || clen > strip_l)
                 break;
 
             for (; chars_l; chars_l--, chars++)
@@ -2088,7 +2088,7 @@ v_trim (svalue_t *sp, int num_arg)
             size_t clen = right - prev;
             size_t chars_l = strip_l - clen + 1;
 
-            if (!clen)
+            if (!clen || clen > strip_l)
                 break;
 
             for (; chars_l; chars_l--, chars++)

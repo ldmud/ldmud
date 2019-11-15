@@ -596,6 +596,11 @@ void run_test()
                 return trim("\u22ef\u22ef\u22f0\u22f1\u22ef\u22ef", TRIM_BOTH, 0x22ef) == "\u22f0\u22f1";
             :)
         }),
+        ({ "trim 3", 0,
+            (:
+                return trim(" \U00010990 ") == "\U00010990";
+            :)
+        }),
         ({ "read_bytes", 0,
             (:
                 return read_bytes("/data.bin", 0, 7) == to_bytes("\u269d\U0001f44d", "UTF-8");
