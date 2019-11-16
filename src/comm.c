@@ -5607,7 +5607,7 @@ start_erq_demon (const char *suffix, size_t suffixlen)
     char path[MAXPATHLEN+1];
     int sockets[2];
     int pid, i;
-    char c;
+    char c = 0;
 
     /* Create the freelist in pending_erq[] */
     pending_erq[0].fun.type = T_INVALID;

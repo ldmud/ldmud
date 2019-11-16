@@ -921,7 +921,7 @@ v_to_bytes (svalue_t *sp, int num_arg)
             {
                 size_t rc;
                 bool at_end = elem == end;
-                svalue_t *item = get_rvalue(elem, NULL);
+                svalue_t *item = at_end ? NULL : get_rvalue(elem, NULL);
 
                 /* We stop at non-numbers. */
                 if (!at_end)

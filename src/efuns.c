@@ -4322,6 +4322,7 @@ e_sscanf (int num_arg, svalue_t *sp)
 
     info.arg_end = arg0 + num_arg;
     info.arg_current = arg0 + 2;
+    info.match_req = MY_FALSE;
 
     /* Loop for every % or substring in the format. Update the
      * arg pointer continuosly. Assigning is done manually, for speed.

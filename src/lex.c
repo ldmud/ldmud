@@ -7928,8 +7928,9 @@ get_current_dir (char ** args UNUSED)
     int len;
 
     buf = current_loc.file->name + strlen(current_loc.file->name);
-    while (*(--buf) != '/' && buf >= current_loc.file->name) NOOP;
-    len = (buf - current_loc.file->name) + 1;
+    while (buf > current_loc.file->name && buf[-1] != '/')
+        buf--;
+    len = (buf - current_loc.file->name);
     buf = xalloc(len + 4);
     if (!buf)
         return NULL;

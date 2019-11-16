@@ -268,6 +268,12 @@ mixed *tests = ({
     ({ "regmatch 9", 0, (: deep_eq(regmatch("", "^$", RE_MATCH_SUBS), ({"", 1})) :) }),
     ({ "regmatch 10", 0, (: deep_eq(regmatch("", "(a|)", RE_MATCH_SUBS), ({ "", "", 1})) :) }),
 
+    ({ "sscanf 1", 0, (: sscanf("A10", "A%~d") == 1 :) }),
+    ({ "sscanf 2", 0, (: sscanf("B10", "A%~d") == 0 :) }),
+    ({ "sscanf 3", 0, (: sscanf("A10", "A%!d") == 0 :) }),
+    ({ "sscanf 4", 0, (: int x; return sscanf("A10", "A%d", x) == 1 && x == 10; :) }),
+    ({ "sscanf 5", 0, (: int x; return sscanf("B10", "A%d", x) == 0 && x == 0; :) }),
+
     ({ "to_text 1", 0, (: deep_eq(to_array(to_text( ({}) )), ({}) ) :) }),
     ({ "to_text 2", 0, (: deep_eq(to_array(to_text( ({0, 65, 66, 67}) )), ({0, 65, 66, 67}) ) :) }),
     ({ "to_text 3", 0, (: deep_eq(to_array(to_text( ({65, 66, 67, "ABC"}) )), ({65, 66, 67}) ) :) }),
