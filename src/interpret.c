@@ -15017,6 +15017,7 @@ again:
             assign_svalue_no_free(&argval, arg);
             free_svalue(sp);
             transfer_svalue_no_free(sp, &argval);
+            arg = sp;
 
             if (argvar)
             {
