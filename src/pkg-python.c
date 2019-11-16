@@ -300,7 +300,10 @@ python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
             if (retanno)
                 types[0] = pythontype_to_lpctype(retanno);
             else
+            {
+                PyErr_Clear();
                 types[0] = NULL;
+            }
 
             Py_XDECREF(retanno);
             Py_DECREF(returnname);
@@ -312,6 +315,7 @@ python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
             PyObject* arganno;
             if (!argname || !PyUnicode_Check(argname))
             {
+                PyErr_Clear();
                 Py_XDECREF(argname);
                 types[1 + pos] = NULL;
                 continue;
@@ -320,6 +324,7 @@ python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
             arganno = PyObject_GetItem(annotations, argname);
             if (!arganno)
             {
+                PyErr_Clear();
                 Py_DECREF(argname);
                 types[1 + pos] = NULL;
                 continue;
