@@ -8059,9 +8059,9 @@ again:
         if (ix < CLOSURE_EFUN_OFFS)
 #endif
         {
-            sp++;
             inter_sp = sp;
             inter_pc = pc;
+            sp++;
             closure_literal(sp, ix, inhIndex, explicit_context_size + implicit_context_size);
             /* If out of memory, this will set sp to svalue-0 and
              * throw an error.
