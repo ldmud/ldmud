@@ -3240,7 +3240,6 @@ retry:
         word_t minsplit;
         word_t tempsize;
 
-        ptr += M_OVERHEAD;  /* 'NULL' including overhead */
         minsplit = size + SMALL_BLOCK_MAX + 1;
           /* The split-off block must still count as 'large' */
         q = free_tree;
@@ -3324,7 +3323,8 @@ retry:
         } /* end outer for */
 
 found_fit:
-        ptr -= M_OVERHEAD;
+        if (ptr)
+            ptr -= M_OVERHEAD;
     } /* if (!force_more) */
 
     if (!ptr)
