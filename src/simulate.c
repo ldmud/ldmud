@@ -2204,7 +2204,7 @@ load_object (const char *lname, Bool create_super, int depth
             pop_stack();
             return NULL;
         }
-        reset_object(ob, create_super ? H_CREATE_SUPER : H_CREATE_OB);
+        reset_object(ob, create_super ? H_CREATE_SUPER : H_CREATE_OB, 0);
 
         /* If the master inherits anything -Ugh- we have to have
          * some object to attribute initialized variables to.
@@ -2282,10 +2282,12 @@ make_new_name (string_t *str)
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-clone_object (string_t *str1)
+clone_object (string_t *str1, int num_arg)
 
 /* Create a clone of the object named <str1>, which may be a clone itself.
- * On success, return the new object, otherwise NULL.
+ * On success, return the new object, otherwise NULL. <num_arg> values
+ * on the stack will be passed to the H_CREATE_CLONE hook and removed
+ * from the stack afterwards.
  */
 
 {
@@ -2301,7 +2303,10 @@ clone_object (string_t *str1)
     /* If the object self-destructed...
      */
     if (ob == NULL)
+    {
+        inter_sp = pop_n_elems(num_arg, inter_sp);
         return NULL;
+    }
 
     /* If ob is a clone, try finding the blueprint first via the object's
      * program, then via the load_name.
@@ -2419,6 +2424,7 @@ clone_object (string_t *str1)
     {
         warnf("Object '%s' was destroyed before initialization.\n"
              , get_txt(new_ob->name));
+        inter_sp = pop_n_elems(num_arg, inter_sp);
         return NULL;
     }
     init_object_variables(new_ob, ob);
@@ -2427,9 +2433,10 @@ clone_object (string_t *str1)
     {
         warnf("Object '%s' was destroyed during initialization.\n"
              , get_txt(new_ob->name));
+        inter_sp = pop_n_elems(num_arg, inter_sp);
         return NULL;
     }
-    reset_object(new_ob, H_CREATE_CLONE);
+    reset_object(new_ob, H_CREATE_CLONE, num_arg);
     command_giver = check_object(save_command_giver);
 
     /* Never know what can happen ! :-( */
@@ -4565,12 +4572,12 @@ print_svalue (svalue_t *arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_clone_object (svalue_t * sp)
+v_clone_object (svalue_t *sp, int num_arg)
 
 /* EFUN clone_object()
  *
- *   object clone_object(string name)
- *   object clone_object(object template)
+ *   object clone_object(string name, ...)
+ *   object clone_object(object template, ...)
  *
  * Clone a new object from definition <name>, or alternatively from
  * the object <template>. In both cases, the new object is given an
@@ -4579,28 +4586,29 @@ f_clone_object (svalue_t * sp)
 
 {
     object_t *ob;
+    svalue_t *argp = sp - num_arg + 1;
 
     /* Get the argument and clone the object */
-    if (sp->type == T_STRING)
+    if (argp->type == T_STRING)
     {
-        ob = clone_object(sp->u.str);
+        ob = clone_object(argp->u.str, num_arg - 1);
     }
     else
     {
-        ob = clone_object(sp->u.ob->load_name);
+        ob = clone_object(argp->u.ob->load_name, num_arg - 1);
     }
 
-    assert(inter_sp == sp);
-    free_svalue(sp);
+    assert(inter_sp == argp);
+    free_svalue(argp);
 
     if (ob)
     {
-        put_ref_object(sp, ob, "F_CLONE_OBJECT");
+        put_ref_object(argp, ob, "F_CLONE_OBJECT");
     }
     else
-        put_number(sp, 0);
+        put_number(argp, 0);
 
-    return sp;
+    return argp;
 } /* f_clone_object() */
 
 /*-------------------------------------------------------------------------*/

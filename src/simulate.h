@@ -300,7 +300,7 @@ extern string_t *check_valid_path(string_t *path, object_t *caller, string_t *ca
 extern Bool match_string(const char *match, const char *str, mp_int len);
 
 extern svalue_t *f_write(svalue_t *sp);
-extern svalue_t *f_clone_object(svalue_t *sp);
+extern svalue_t *v_clone_object(svalue_t *sp, int num_arg);
 extern svalue_t *f_destruct(svalue_t *sp);
 extern svalue_t *f_find_object(svalue_t *sp);
 extern svalue_t *f_load_object(svalue_t *sp);

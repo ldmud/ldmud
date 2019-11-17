@@ -471,7 +471,7 @@ mixed  *heart_beat_info();
         /* Objects */
 
 object  blueprint(string|object default: F_THIS_OBJECT); /* PRELIMINARY */
-object  clone_object(string|object);
+object  clone_object(string|object, ...);
 object *clones(void|int|string|object, void|int);
 void    configure_interactive(null|object, int, mixed);
 void    configure_object(null|object, int, mixed);

@@ -1,6 +1,6 @@
 SYNOPSIS
-        object clone_object(string name)
-        object clone_object(object template)
+        object clone_object(string name, ...)
+        object clone_object(object template, ...)
 
 BESCHREIBUNG
         Clont ein neues Objekt aus der Definiton <name> oder alternativ aus
@@ -14,6 +14,9 @@ BESCHREIBUNG
 
         Den Blueprint erkennt man daran, dass er keine Nummer im Objektnamen
         traegt. clone_object() liefert niemals einen Blueprint zurueck.
+
+        Alle weiteren Argumente werden an den H_CREATE_CLONE-Hook weiter-
+        gereicht, um damit das geclonte Objekt zu initialisieren.
 
         Wenn der Blueprint existiert und einen heart_beat() aufweist, schaltet
         clone_object() diesen aus.

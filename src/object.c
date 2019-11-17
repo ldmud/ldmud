@@ -809,7 +809,7 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
 
 /*-------------------------------------------------------------------------*/
 void
-reset_object (object_t *ob, int arg)
+reset_object (object_t *ob, int arg, int num_arg)
 
 /* Depending on <arg>, call one of the initialisation functions in <ob>.
  * The actual function is given in <arg> through its hook index.
@@ -833,6 +833,8 @@ reset_object (object_t *ob, int arg)
  * the called function, it is set to a random value between time_to_reset/2
  * and time_to_reset. Upon time of call, the object must not be
  * in the reset table; this function will enter it there.
+ *
+ * <num_arg> values from inter_sp will be passed to the called function.
  */
 
 {
@@ -857,14 +859,19 @@ reset_object (object_t *ob, int arg)
              * object.
              */
             l->ob = ref_object(current_object, "reset_object");
-            push_ref_object(inter_sp, ob, "reset");
-            call_lambda(&driver_hook[arg], 1);
+
+            /* We need to insert the object before the other arguments. */
+            inter_sp++;
+            memmove(inter_sp - num_arg + 1, inter_sp - num_arg, num_arg * sizeof(*inter_sp));
+            put_ref_object(inter_sp - num_arg, ob, "reset");
+            call_lambda(&driver_hook[arg], 1 + num_arg);
         }
         else
         {
             /* no arguments, just bind to target */
             l->ob = ref_object(ob, "reset_object");
             call_lambda(&driver_hook[arg], 0);
+            inter_sp = pop_n_elems(num_arg, inter_sp);
         }
 
         /* If the call returned a non-zero number, use it as the current
@@ -882,7 +889,7 @@ reset_object (object_t *ob, int arg)
         if (arg == H_RESET)
             previous_ob = current_object = ob;
 
-        if (!sapply_ign_prot(driver_hook[arg].u.str, ob, 0)
+        if (!sapply_ign_prot(driver_hook[arg].u.str, ob, num_arg)
          && arg == H_RESET)
             ob->time_reset = 0;
     }

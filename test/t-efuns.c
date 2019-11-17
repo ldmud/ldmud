@@ -233,6 +233,28 @@ mixed *tests = ({
     ({ "call_direct_resolved array 3",  0, (: int* result; return deep_eq(call_direct_resolved(&result, ({clone,clone,object_name(clone),this_object(),0}), "h", 10, ({ 20 })), ({0, 0, 0, 0, 0})) && deep_eq(result, ({  0,  0,  0,  0, 0})); :) }),
     ({ "crypt", TF_ERROR,  (: crypt("ABC", "$$") :) }),
     ({ "ctime", TF_DONTCHECKERROR,  (: ctime(-1) :) }), /* This must be the first ctime call of this test suite. */
+    ({ "clone_object 1", 0,
+        (:
+            /* Check that our arguments went into the new object. */
+            set_driver_hook(H_CREATE_CLONE, "create_clone");
+
+            object o = clone_object(this_object(), 42, 10);
+            mixed res = o->get_args();
+            destruct(o);
+            return res == 52;
+        :)
+    }),
+    ({ "clone_object 2", 0,
+        (:
+            /* Check that our arguments went into the new object. */
+            set_driver_hook(H_CREATE_CLONE, unbound_lambda(({'ob, 'arg1, 'arg2}), ({#'call_other, 'ob, "create_clone", 'arg1, 20})));
+
+            object o = clone_object(this_object(), 42, 10);
+            mixed res = o->get_args();
+            destruct(o);
+            return res == 62;
+        :)
+    }),
     ({ "get_type_info(int,0)", 0, (: get_type_info(10,              0) == T_NUMBER       :) }),
     ({ "get_type_info(str,0)", 0, (: get_type_info("10",            0) == T_STRING       :) }),
     ({ "get_type_info(str,1)", 0, (: get_type_info("10",            1) == 0              :) }), /* Shared string */
@@ -767,12 +789,12 @@ mixed *tests = ({
         :)
     }),
 
-    ({ "variable_list 1", 0, (: deep_eq(variable_list(this_object()),                        ({ "last_rt_warning",            "json_testdata", "json_teststring", "b",              "dhe_testdata", "global_var", "clone",     "tests"                   })) :) }),
+    ({ "variable_list 1", 0, (: deep_eq(variable_list(this_object()),                        ({ "last_rt_warning",            "json_testdata", "json_teststring", "b",              "dhe_testdata", "global_var", "clone",     "tests",                   "args"      })) :) }),
     ({ "variable_list 2", 0, (: deep_eq(map(variable_list(this_object(), RETURN_FUNCTION_FLAGS), #'&, NAME_INHERITED|TYPE_MOD_NOSAVE|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|TYPE_MOD_VIRTUAL|TYPE_MOD_NO_MASK|TYPE_MOD_PUBLIC),
-                                                                                             ({ 0,                            0,               0,                 TYPE_MOD_NO_MASK, 0,              0,            0,           0                         })) :) }),
-    ({ "variable_list 3", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_TYPE),  ({ TYPE_MOD_POINTER|TYPE_STRING, TYPE_MAPPING,    TYPE_STRING,       TYPE_BYTES,       TYPE_STRING,    TYPE_ANY,     TYPE_OBJECT, TYPE_MOD_POINTER|TYPE_ANY })) :) }),
+                                                                                             ({ 0,                            0,               0,                 TYPE_MOD_NO_MASK, 0,              0,            0,           0,                         0           })) :) }),
+    ({ "variable_list 3", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_TYPE),  ({ TYPE_MOD_POINTER|TYPE_STRING, TYPE_MAPPING,    TYPE_STRING,       TYPE_BYTES,       TYPE_STRING,    TYPE_ANY,     TYPE_OBJECT, TYPE_MOD_POINTER|TYPE_ANY, TYPE_NUMBER })) :) }),
     ({ "variable_list 4", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_NAME | RETURN_FUNCTION_TYPE), 
-                                ({ "last_rt_warning", TYPE_MOD_POINTER|TYPE_STRING, "json_testdata", TYPE_MAPPING, "json_teststring", TYPE_STRING, "b", TYPE_BYTES, "dhe_testdata", TYPE_STRING, "global_var", TYPE_ANY, "clone", TYPE_OBJECT, "tests", TYPE_MOD_POINTER|TYPE_ANY })) :) }),
+                                ({ "last_rt_warning", TYPE_MOD_POINTER|TYPE_STRING, "json_testdata", TYPE_MAPPING, "json_teststring", TYPE_STRING, "b", TYPE_BYTES, "dhe_testdata", TYPE_STRING, "global_var", TYPE_ANY, "clone", TYPE_OBJECT, "tests", TYPE_MOD_POINTER|TYPE_ANY, "args", TYPE_NUMBER })) :) }),
     ({ "variable_list 5", 0, (: variable_list(this_object(), RETURN_VARIABLE_VALUE)[3] == b"\x00" :) }),
 
 #ifdef __JSON__
@@ -886,4 +908,16 @@ string *epilog(int eflag)
 int f(int arg)
 {
     return arg + 1;
+}
+
+// For the clone_object test.
+int args;
+void create_clone(int arg1, int arg2)
+{
+    args = arg1 + arg2;
+}
+
+int get_args()
+{
+    return args;
 }

@@ -1363,7 +1363,7 @@ static Bool did_swap;
                 command_giver = 0;
                 previous_ob = NULL;
                 trace_level = 0;
-                reset_object(obj, H_RESET);
+                reset_object(obj, H_RESET, 0);
                 mark_end_evaluation();
                 if (obj->flags & O_DESTRUCTED)
                     continue;
