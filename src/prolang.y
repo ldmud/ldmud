@@ -6719,7 +6719,6 @@ delete_prog_string (void)
 %token L_IF
 %token L_INC
 %token L_INHERIT
-%token L_INLINE_FUN
 %token L_INT
 %token L_LAND
 %token L_LE
@@ -6803,7 +6802,7 @@ delete_prog_string (void)
        */
 
     ident_t *ident;
-      /* L_IDENTIFIER, L_INLINE_FUN: The recognized identifier
+      /* L_IDENTIFIER: The recognized identifier
        */
 
     typeflags_t typeflags;
@@ -7017,7 +7016,7 @@ delete_prog_string (void)
 %type <closure>      L_CLOSURE
 %type <symbol>       L_SYMBOL
 %type <number>       L_QUOTED_AGGREGATE
-%type <ident>        L_IDENTIFIER L_INLINE_FUN
+%type <ident>        L_IDENTIFIER
 %type <typeflags>    type_modifier type_modifier_list
 
 %type <number>       optional_stars
