@@ -67,7 +67,8 @@
  *
  *   lpctype_t* argument_types[]: (only with #pragma save_types)
  *       The types of all function arguments of the program in the
- *       order they were encountered.
+ *       order they were encountered. Also contains the types used
+ *       for assignment runtime type checks in an arbitrary order.
  *
  *   unsigned short type_start[]: (only with #pragma save_types)
  *       Lookup table [.num_function_names] function index

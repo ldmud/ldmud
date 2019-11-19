@@ -15580,6 +15580,42 @@ again:
         break;
     }
 
+    CASE(F_TYPE_CHECK);             /* --- type_check <ix>     --- */
+    {
+        /* Check the top value off the stack against the type
+         * at prog->argument_types[<ix>]. Raise an error if
+         * it doesn't match. Do nothing otherwise.
+         */
+
+        unsigned short ix;
+        lpctype_t* exptype;
+
+        LOAD_SHORT(ix, pc);
+
+        /* Types were saved? */
+        if (!current_prog->argument_types)
+            break;
+
+        exptype = current_prog->argument_types[ix];
+        if (!check_rtt_compatibility(exptype, sp))
+        {
+            static char buff[512];
+            lpctype_t *realtype = get_rtt_type(exptype, sp);
+            get_lpctype_name_buf(realtype, buff, sizeof(buff));
+            free_lpctype(realtype);
+
+            inter_sp = sp;
+            if (current_prog->flags & P_WARN_RTT_CHECKS)
+                warnf("Bad type for assignment: got '%s', expected '%s'.\n",
+                   buff, get_lpctype_name(exptype));
+            else
+                errorf("Bad type for assignment: got '%s', expected '%s'.\n",
+                   buff, get_lpctype_name(exptype));
+        }
+
+        break;
+    }
+
     /* --- Efuns: Miscellaneous --- */
 
     CASE(F_CLONEP);                 /* --- clonep              --- */

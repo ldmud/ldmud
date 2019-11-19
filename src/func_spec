@@ -231,6 +231,7 @@
         dup_n
         pop_n
         put_array_element
+        type_check
 #ifdef USE_PYTHON
         python_efun
 #endif

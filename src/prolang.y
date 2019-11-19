@@ -822,6 +822,11 @@ static lpctype_t * exact_types;
    * is not counted, a counted reference is held in the parser tokens.)
    */
 
+static bool arg_types_exhausted;
+  /* True, if the A_ARGUMENT_TYPES block is full (USHRT_MAX entries)
+   * and a warning was already given about that.
+   */
+
 static funflag_t default_varmod;
 static funflag_t default_funmod;
   /* Default visibility modifiers for variables resp. function.
@@ -1003,6 +1008,7 @@ static void define_local_variable (ident_t* name, lpctype_t* actual_type, struct
 static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2);
 static Bool add_lvalue_code ( struct lvalue_s * lv, int instruction);
 static void insert_pop_value(void);
+static void add_type_check (lpctype_t *expected);
 static int insert_inherited(char *, string_t *, program_t **, function_t *, int, bytecode_p);
   /* Returnvalues from insert_inherited(): */
 #  define INHERITED_NOT_FOUND            (-1)
@@ -3953,20 +3959,30 @@ store_argument_types ( int num_arg )
 
     /* Store the function arguments, if required.
      */
-    if (!exact_types)
+    if (!exact_types || arg_types_exhausted)
     {
         argument_start_index = INDEX_START_NONE;
     }
     else
     {
-        int i;
-
         /* Save the argument types.
          */
         argument_start_index = ARGTYPE_COUNT;
-        for (i = 0; i < num_arg; i++)
+        if (num_arg + argument_start_index > 1 + (long)USHRT_MAX)
         {
-            ADD_ARGUMENT_TYPE(ref_lpctype(type_of_locals[i].t_type));
+            arg_types_exhausted = true;
+            argument_start_index = INDEX_START_NONE;
+
+            yywarnf("Type buffer exhausted, cannot store and verify argument types.");
+        }
+        else
+        {
+            int i;
+
+            for (i = 0; i < num_arg; i++)
+            {
+                ADD_ARGUMENT_TYPE(ref_lpctype(type_of_locals[i].t_type));
+            }
         }
     }
 
@@ -4765,6 +4781,8 @@ init_global_variable (int i, ident_t* name, fulltype_t actual_type
  */
 
 {
+    add_type_check(actual_type.t_type);
+
     PREPARE_INSERT(4)
 
     if (!(actual_type.t_flags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
@@ -8972,6 +8990,8 @@ expr_decl:
               yyerror("Only plain assignments allowed here");
           }
 
+          add_type_check($1.type);
+
           /* Add the bytecode to create the lvalue and do the
            * assignment.
            */
@@ -9976,6 +9996,9 @@ expr0:
           }
           else
           {
+              if ($2 == F_ASSIGN)
+                 add_type_check(type1.t_type);
+
               if (!add_lvalue_code(&$1, $2))
               {
                   free_lpctype($1.type);
@@ -10747,6 +10770,7 @@ expr0:
               restype = ref_fulltype(type1);
           }
 
+          add_type_check(type1.t_type);
           if (!add_lvalue_code(&$1, $2))
           {
               free_lpctype($1.type);
@@ -13834,6 +13858,8 @@ if (current_inline && current_inline->parse_context)
         yyerror("Only plain assignments allowed here");
     }
 
+    add_type_check(lv->type);
+
     if (!add_lvalue_code(lv, F_VOID_ASSIGN))
         return;
 } /* init_local_variable() */
@@ -13964,6 +13990,49 @@ insert_pop_value (void)
     
     last_expression = -1;
 } /* insert_pop_value() */
+
+/*-------------------------------------------------------------------------*/
+static void
+add_type_check (lpctype_t *expected)
+/* Adds an instruction for type checking the topmost value
+ * on the stack against <expected>.
+ */
+
+{
+    int idx;
+
+    /* If the required pragmas are not on, skip it. */
+    if (!pragma_rtt_checks || !pragma_save_types)
+        return;
+
+    /* Also we don't check for mixed... */
+    if (expected == lpctype_mixed || expected == lpctype_unknown)
+        return;
+
+    /* Now get an index for the type in our type list. */
+    for (idx = 0; idx < ARGTYPE_COUNT; idx++)
+        if (ARGUMENT_TYPE(idx) == expected)
+            break;
+
+    if (idx == ARGTYPE_COUNT)
+    {
+        /* Check that there is space in the argument type list. */
+        if (arg_types_exhausted)
+            return;
+
+        if (idx > (long)USHRT_MAX)
+        {
+            arg_types_exhausted = true;
+            yywarnf("Type buffer exhausted, cannot store and verify argument types.");
+            return;
+        }
+
+        ADD_ARGUMENT_TYPE(ref_lpctype(expected));
+    }
+
+    ins_f_code(F_TYPE_CHECK);
+    ins_short(idx);
+} /* add_type_check() */
 
 /*-------------------------------------------------------------------------*/
 int
@@ -16790,6 +16859,7 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
     variables_initialized = 0;
     argument_level = 0;
     got_ellipsis[0] = MY_FALSE;
+    arg_types_exhausted = false;
 
     max_number_of_init_locals = 0;
 

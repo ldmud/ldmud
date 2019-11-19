@@ -30,9 +30,12 @@ DESCRIPTION
                 between the 'bytes' and 'string' type.
 
         rtt_checks: runtime checks during execution of this program will be
-                enabled. The interpreter will check for correct datatypes of
-                arguments on function calls. (Later it will include checks
-                upon assignments.)
+                enabled. The interpreter will check for correct datatypes in
+                the following circumstances:
+                  - arguments on function calls,
+                  - return values of functions,
+                  - assignment to variables,
+                  - restoration of values to variables or struct members.
                 Don't confuse this with strong/strict_types, they only
                 check at compile time.
                 strong_types/strict_types is seriously recommended.
