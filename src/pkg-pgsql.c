@@ -989,7 +989,7 @@ v_pg_connect (svalue_t *sp, int num_arg)
     dbconn_t   *db;
     int         st;
     int         error_index;
-    callback_t  cb;
+    callback_t *cb;
     object_t   *cb_object;
     svalue_t   *arg = sp - num_arg + 1;
 
@@ -997,6 +997,7 @@ v_pg_connect (svalue_t *sp, int num_arg)
 
     /* Get the callback information */
 
+    inter_sp = sp;
     error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
 
     if (error_index >= 0)
@@ -1006,12 +1007,11 @@ v_pg_connect (svalue_t *sp, int num_arg)
         return arg;
     }
     inter_sp = sp = arg+1;
-    put_callback(sp, &cb);
+    put_callback(sp, cb);
 
-    cb_object = callback_object(&cb);
+    cb_object = callback_object(cb);
     if (!cb_object)
     {
-        free_callback(&cb);
         errorf("pgconnect(): Callback object is destructed.\n");
         /* NOTREACHED */
         return arg;
@@ -1026,7 +1026,6 @@ v_pg_connect (svalue_t *sp, int num_arg)
             dealloc_dbconn(db);
         else
         {
-            free_callback(&cb);
             errorf("pgconnect(): Already connected\n");
             /* NOTREACHED */
             return arg;
@@ -1036,8 +1035,9 @@ v_pg_connect (svalue_t *sp, int num_arg)
     /* Connect to the database */
 
     db = alloc_dbconn();
-    db->callback = cb;
-    
+    db->callback = *cb;
+    xfree(cb);
+
     st = pgconnect(db, get_txt(arg[0].u.str));
     if (st < 0)
         pgclose(db);

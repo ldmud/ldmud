@@ -3775,11 +3775,11 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
 
 /*-------------------------------------------------------------------------*/
 int
-setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs
+setup_efun_callback_base ( callback_t **cb, svalue_t *args, int nargs
                          , Bool bNoObj)
 
-/* Setup the empty/uninitialized callback <cb> with the <nargs>
- * values starting at <args>. This function is used to implement the
+/* Allocate a callback structure with the <nargs> values starting at <args>
+ * and put the result into <*cb>.. This function is used to implement the
  * callbacks for efuns like map_array() and accepts these forms:
  *
  *   (string fun)
@@ -3815,7 +3815,8 @@ setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs
 
     if (args[0].type == T_CLOSURE)
     {
-        error_index = setup_closure_callback(cb, args, nargs-1, args+1);
+        memsafe(*cb = xalloc(sizeof(callback_t)) , sizeof(callback_t), "callback structure");
+        error_index = setup_closure_callback(*cb, args, nargs-1, args+1);
     }
     else if (args[0].type == T_STRING)
     {
@@ -3856,7 +3857,8 @@ setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs
 
         if (ob != NULL)
         {
-            error_index = setup_function_callback(cb, ob, args[0].u.str
+            memsafe(*cb = xalloc(sizeof(callback_t)), sizeof(callback_t), "callback structure");
+            error_index = setup_function_callback(*cb, ob, args[0].u.str
                                                  , nargs-first_arg
                                                  , args+first_arg);
             if (error_index >= 0)
@@ -3873,6 +3875,7 @@ setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs
                 free_svalue(args+i);
 
             error_index = 1;
+            *cb = NULL;
         }
 
         /* Free the function spec */
@@ -3891,6 +3894,13 @@ setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs
             free_svalue(args+i);
 
         error_index = 0;
+        *cb = NULL;
+    }
+
+    if (error_index >= 0 && *cb)
+    {
+        xfree(*cb);
+        *cb = NULL;
     }
 
     return error_index;

@@ -2139,7 +2139,7 @@ x_filter_array (svalue_t *sp, int num_arg)
         /* --- Filter by function call --- */
 
         int         error_index;
-        callback_t  cb;
+        callback_t *cb;
 
         assign_eval_cost();
         inter_sp = sp;
@@ -2153,7 +2153,7 @@ x_filter_array (svalue_t *sp, int num_arg)
             return arg;
         }
         inter_sp = sp = arg+1;
-        put_callback(sp, &cb);
+        put_callback(sp, cb);
 
         /* Loop over all elements in p and call the filter.
          * w is the current element filtered.
@@ -2171,7 +2171,7 @@ x_filter_array (svalue_t *sp, int num_arg)
             if (destructed_object_ref(w))
                 assign_svalue(w, &const0);
 
-            if (!callback_object(&cb))
+            if (!callback_object(cb))
             {
                 inter_sp = sp;
                 errorf("object used by filter(array) destructed");
@@ -2179,7 +2179,7 @@ x_filter_array (svalue_t *sp, int num_arg)
 
             push_rvalue(w++);
 
-            v = apply_callback(&cb, 1);
+            v = apply_callback(cb, 1);
             if (!v || (v->type == T_NUMBER && !v->u.number) )
                 continue;
 
@@ -2187,7 +2187,7 @@ x_filter_array (svalue_t *sp, int num_arg)
             res++;
         }
 
-        free_callback(&cb);
+        pop_stack();
     }
 
     /* flags[] holds the filter results, res is the number of
@@ -2295,7 +2295,7 @@ x_map_array (svalue_t *sp, int num_arg)
     {
         /* --- Map through function call --- */
 
-        callback_t  cb;
+        callback_t *cb;
         int         error_index;
 
         error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
@@ -2306,7 +2306,7 @@ x_map_array (svalue_t *sp, int num_arg)
             return arg;
         }
         inter_sp = sp = arg+1;
-        put_callback(sp, &cb);
+        put_callback(sp, cb);
         num_arg = 2;
 
         res = allocate_array(cnt);
@@ -2324,12 +2324,12 @@ x_map_array (svalue_t *sp, int num_arg)
             if (destructed_object_ref(w))
                 assign_svalue(w, &const0);
 
-            if (!callback_object(&cb))
+            if (!callback_object(cb))
                 errorf("object used by map(array) destructed");
 
             push_rvalue(w);
 
-            v = apply_callback(&cb, 1);
+            v = apply_callback(cb, 1);
             if (v)
             {
                 transfer_rvalue_no_free(x, v);
@@ -2337,7 +2337,7 @@ x_map_array (svalue_t *sp, int num_arg)
             }
         }
 
-        free_callback(&cb);
+        free_svalue(inter_sp - 1); /* The callback. */
     }
 
     /* The arguments have been removed already, now just replace
@@ -2384,7 +2384,7 @@ v_sort_array (svalue_t * sp, int num_arg)
 {
     vector_t   *data;
     svalue_t   *arg;
-    callback_t  cb;
+    callback_t *cb;
     int         error_index;
     mp_int      step, halfstep, offset, size;
     int         i, j, index1, index2, end1, end2;
@@ -2401,7 +2401,7 @@ v_sort_array (svalue_t * sp, int num_arg)
         return arg;
     }
     inter_sp = sp = arg+1;
-    put_callback(sp, &cb);
+    put_callback(sp, cb);
     num_arg = 2;
 
     /* If the argument is passed in by reference, make sure that it is
@@ -2484,7 +2484,7 @@ v_sort_array (svalue_t * sp, int num_arg)
     /* Easiest case: nothing to sort */
     if (size <= 1)
     {
-        free_callback(&cb);
+        pop_stack();
         return arg;
     }
 
@@ -2527,12 +2527,12 @@ v_sort_array (svalue_t * sp, int num_arg)
             {
                 svalue_t *d;
 
-                if (!callback_object(&cb))
+                if (!callback_object(cb))
                     errorf("object used by sort_array destructed");
 
                 push_svalue(source+index1);
                 push_svalue(source+index2);
-                d = apply_callback(&cb, 2);
+                d = apply_callback(cb, 2);
 
                 if (d && (d->type != T_NUMBER || d->u.number > 0))
                     dest[j++] = source[index2++];
@@ -2562,7 +2562,7 @@ v_sort_array (svalue_t * sp, int num_arg)
     for (i = size; --i >= 0; )
       temp[offset+i] = source[i];
 
-    free_callback(&cb);
+    pop_stack();
     return arg;
 } /* v_sort_array() */
 
@@ -3324,7 +3324,6 @@ v_unique_array (svalue_t *sp, int num_arg)
 {
     vector_t *res;
     svalue_t *argp = sp - num_arg + 1;
-    callback_t  cb; /* must persist until the end of the function */
 
     check_for_destr(argp->u.vec);
 
@@ -3341,6 +3340,7 @@ v_unique_array (svalue_t *sp, int num_arg)
     {
         /* Extract the callback information from the stack */
         int         error_index;
+        callback_t *cb;
 
         assign_eval_cost();
         inter_sp = sp;
@@ -3360,7 +3360,7 @@ v_unique_array (svalue_t *sp, int num_arg)
         }
 
         /* Callback creation successful, now setup the stack */
-        put_callback(argp+1, &cb);
+        put_callback(argp+1, cb);
         transfer_svalue_no_free(argp+2, sp);
 
         inter_sp = sp = argp+2;
