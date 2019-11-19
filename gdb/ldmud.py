@@ -81,7 +81,7 @@ class ArrayPrinter:
         def __iter__(self):
             return self
 
-        def next(self):
+        def __next__(self):
             if self.pos >= self.size:
                 raise StopIteration
 
@@ -90,6 +90,9 @@ class ArrayPrinter:
             self.pos += 1
 
             return result
+
+        def next(self):
+            return self.__next__()
 
     def __init__(self, val):
         self.val = val
@@ -139,7 +142,7 @@ class MappingPrinter:
         def __iter__(self):
             return self
 
-        def next(self):
+        def __next__(self):
             item = None
 
             key = self.pos / self.width
@@ -171,6 +174,9 @@ class MappingPrinter:
                 self.hashchain = self.hashchain.dereference()["next"]
 
             return result
+
+        def next(self):
+            return self.__next__()
 
     def __init__(self, val):
         self.val = val
