@@ -12811,7 +12811,7 @@ function_call:
 
                   /* Check the types of the arguments
                    */
-                  if (max != -1 && exact_types && num_arg)
+                  if (exact_types && num_arg)
                   {
                       int         argn;
                       fulltype_t *aargp;
@@ -12824,6 +12824,11 @@ function_call:
                       for (argn = 0; argn < num_arg; argn++)
                       {
                           fulltype_t *beginArgp = argp;
+
+                          /* For varargs efuns stop, when we run out of
+                           * declared argument types. */
+                          if (max == -1 && argp->t_type == NULL)
+                              break;
 
                           for (;;argp++)
                           {
