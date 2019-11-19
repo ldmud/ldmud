@@ -1640,10 +1640,11 @@ x_filter_string (svalue_t *sp, int num_arg)
         /* --- Filter by function call --- */
 
         int         error_index;
-        callback_t  cb;
+        callback_t *cb;
         mp_int cnt;
 
         assign_eval_cost();
+        inter_sp = sp;
 
         /* setup_efun_callback() will adopt and therefore remove the 
          * arguments from arg+1 on to arg+num_arg from the stack and update 
@@ -1657,7 +1658,7 @@ x_filter_string (svalue_t *sp, int num_arg)
         }
         /* push the callback structure onto the stack. */
         sp = arg + 1;
-        put_callback(sp, &cb);
+        put_callback(sp, cb);
 
         /* Allocate memory for the flag array. Simultaneously an error
          * handler is pushed onto the stack (after the arguments) for freeing
@@ -1686,7 +1687,7 @@ x_filter_string (svalue_t *sp, int num_arg)
                  * flags array with 0es.
                  */
 
-            if (!callback_object(&cb))
+            if (!callback_object(cb))
             {
                 inter_sp = sp;
                 errorf("object used by filter(array) destructed");
@@ -1694,7 +1695,7 @@ x_filter_string (svalue_t *sp, int num_arg)
 
             push_number(inter_sp, *src);
 
-            v = apply_callback(&cb, 1);
+            v = apply_callback(cb, 1);
             if (!v || (v->type == T_NUMBER && !v->u.number) )
                 continue;
 
@@ -1823,7 +1824,7 @@ x_map_string (svalue_t *sp, int num_arg)
     {
         /* --- Map through function call --- */
 
-        callback_t  cb;
+        callback_t *cb;
         int         error_index;
 
         error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
@@ -1834,7 +1835,7 @@ x_map_string (svalue_t *sp, int num_arg)
             return arg;
         }
         inter_sp = sp = arg+1;
-        put_callback(sp, &cb);
+        put_callback(sp, cb);
         num_arg = 2;
 
         res = alloc_mstring(len);
@@ -1851,12 +1852,12 @@ x_map_string (svalue_t *sp, int num_arg)
             if (current_object->flags & O_DESTRUCTED)
                 continue;
 
-            if (!callback_object(&cb))
+            if (!callback_object(cb))
                 errorf("object used by map(string) destructed");
 
             push_number(inter_sp, *src);
 
-            v = apply_callback(&cb, 1);
+            v = apply_callback(cb, 1);
 
             if (v)
             {
@@ -1870,7 +1871,7 @@ x_map_string (svalue_t *sp, int num_arg)
             }
         }
 
-        free_callback(&cb);
+        free_svalue(sp); /* The callback structure. */
     }
 
     /* The arguments have been removed already, now just replace

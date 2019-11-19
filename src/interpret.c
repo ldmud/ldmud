@@ -1181,6 +1181,7 @@ int_free_svalue (svalue_t *v)
 
     case T_CALLBACK:
         free_callback(v->u.cb);
+        xfree(v->u.cb);
         break;
 
     case T_ERROR_HANDLER:

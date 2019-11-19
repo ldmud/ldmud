@@ -1455,7 +1455,7 @@ x_map_struct (svalue_t *sp, int num_arg)
     {
         /* --- Map through function call --- */
 
-        callback_t  cb;
+        callback_t *cb;
         int         error_index;
 
         error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
@@ -1466,7 +1466,7 @@ x_map_struct (svalue_t *sp, int num_arg)
             return arg;
         }
         inter_sp = sp = arg+1;
-        put_callback(sp, &cb);
+        put_callback(sp, cb);
         num_arg = 2;
 
         res = struct_new(st->type);
@@ -1483,12 +1483,12 @@ x_map_struct (svalue_t *sp, int num_arg)
             if (destructed_object_ref(w))
                 assign_svalue(w, &const0);
 
-            if (!callback_object(&cb))
+            if (!callback_object(cb))
                 errorf("object used by map_array destructed");
 
             push_svalue(w);
 
-            v = apply_callback(&cb, 1);
+            v = apply_callback(cb, 1);
             if (v)
             {
                 transfer_svalue_no_free(x, v);
@@ -1496,7 +1496,7 @@ x_map_struct (svalue_t *sp, int num_arg)
             }
         }
 
-        free_callback(&cb);
+        free_svalue(sp); /* The callback structure. */
     }
     
     /* The arguments have been removed already, now just replace

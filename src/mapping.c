@@ -3769,7 +3769,10 @@ f_walk_mapping_cleanup (error_handler_t *arg)
     data = (walk_mapping_t*) arg;
 
     if (data->callback)
+    {
         free_callback(data->callback);
+        xfree(data->callback);
+    }
 
     m = data->map;
 
@@ -3893,7 +3896,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
 
 {
     svalue_t *arg;           /* Begin of the args on the stack */
-    callback_t cb;
+    callback_t *cb;
     int error_index;
     mapping_t *m;            /* Mapping to walk */
     p_int num_values;        /* Number of values per entry */
@@ -3923,7 +3926,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
     check_map_for_destr_keys(m); // no keys referencing destructed objects
     assign_eval_cost();
 
-    read_pointer = walk_mapping_prologue(m, sp, &cb);
+    read_pointer = walk_mapping_prologue(m, sp, cb);
     i = m->num_entries;
     inter_sp = ++sp; /* walk_mapping_prologue() pushed one value */
 
@@ -3937,7 +3940,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
         p_int j;
         svalue_t *sp2, *data;
 
-        if (!callback_object(&cb))
+        if (!callback_object(cb))
             errorf("Object used by walk_mapping destructed\n");
 
         /* Push the key */
@@ -3951,7 +3954,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
 
         /* Call the function */
         inter_sp = sp2;
-        (void)apply_callback(&cb, 1 + num_values);
+        (void)apply_callback(cb, 1 + num_values);
     }
 
     /* This frees the whole array allocated by the prologue,
@@ -4000,7 +4003,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
     svalue_t *arg;           /* Start of arguments on the stack */
     mapping_t *m;            /* Mapping to filter */
     int         error_index;
-    callback_t  cb;
+    callback_t *cb;
     p_int num_values;        /* Width of the mapping */
     p_int num_entries;       /* Size of the mapping */
     vector_t *dvec;          /* Values of one key */
@@ -4045,7 +4048,8 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
         if (!dvec)
         {
             inter_sp = sp;
-            free_callback(&cb);
+            free_callback(cb);
+            xfree(cb);
             errorf("Out of memory\n");
         }
         ++sp;
@@ -4053,7 +4057,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
         dvec_sp = sp;
     }
 
-    read_pointer = walk_mapping_prologue(m, sp, &cb);
+    read_pointer = walk_mapping_prologue(m, sp, cb);
 
     m = allocate_mapping(num_entries, num_values);
     if (!m)
@@ -4088,7 +4092,6 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
             {
                 put_number(dvec_sp, 0);
                 inter_sp = sp;
-                free_callback(&cb);
                 errorf("Out of memory\n");
             }
             else
@@ -4124,12 +4127,12 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
             }
         }
 
-        if (!callback_object(&cb))
+        if (!callback_object(cb))
             errorf("Object used by %s destructed"
                  , bFull ? "filter" : "filter_mapping");
 
 
-        v = apply_callback(&cb, 1 + bFull);
+        v = apply_callback(cb, 1 + bFull);
 
         /* Did the filter return TRUE? */
         if (!v || (v->type == T_NUMBER && !v->u.number) )
@@ -4154,7 +4157,6 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
     /* Cleanup the temporary data except for the reference to m.
      * The arguments have been removed before already.
      */
-    free_callback(&cb);
     i = num_arg + (dvec != NULL ? 1 : 0);
     do
     {
@@ -4237,7 +4239,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
     vector_t *dvec;          /* Values of one key */
     p_int i;
     svalue_t *key;
-    callback_t cb;
+    callback_t *cb;
     int error_index;
 
     /* Locate and extract arguments */
@@ -4257,7 +4259,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
     sp++;
     inter_sp = sp;
-    put_callback(sp, &cb);
+    put_callback(sp, cb);
 
     /* Preparations */
 
@@ -4364,11 +4366,11 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
             return NULL;
         }
 
-        if (!callback_object(&cb))
+        if (!callback_object(cb))
             errorf("Object used by %s destructed"
                  , bFull ? "map" : "map_mapping");
 
-        data = apply_callback(&cb, 1 + bFull);
+        data = apply_callback(cb, 1 + bFull);
         if (data)
         {
             transfer_rvalue_no_free(v, data);

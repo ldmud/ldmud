@@ -320,17 +320,13 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
 
         inter_sp = sp;
 
-        memsafe(cb = xalloc(sizeof *cb) , sizeof *cb , "callback structure");
-
         assign_eval_cost();
 
-        error_index = setup_efun_callback(cb, argp+1, num_arg-1);
+        error_index = setup_efun_callback(&cb, argp+1, num_arg-1);
 
         if (error_index >= 0)
         {
             /* The callback values have already been removed. */
-            
-            xfree(cb);
             inter_sp = sp = argp;
             vefun_bad_arg(error_index+2, argp);
             /* NOTREACHED */
