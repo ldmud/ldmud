@@ -2816,6 +2816,8 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                             break;
                         }
                     }
+
+                    space = 0;
                 } /* for (z = 0..lens[i]) */
             } /* if (wrap) */
         }

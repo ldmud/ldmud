@@ -487,6 +487,13 @@ nosave mixed *tests = ({
             return funcall(bind_lambda(unbound_lambda(0, ({#'implode, '({"a","b","c"}), ({#'return, 2})})))) == 2;
        }
     }),
+    ({ "0000872", 0,
+       function int()
+       {
+            terminal_colour("X \n" + ("X"*3), ([]), 2);
+            return 1;
+       }
+    }),
 });
 
 void run_test()
