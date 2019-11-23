@@ -60,7 +60,7 @@ extern const char *get_current_function_name();
 extern char *get_lpctype_name (lpctype_t *type);
 extern size_t get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize);
 extern char *get_fulltype_name (fulltype_t type);
-
+extern void init_compiler();
 
 #if defined( DEBUG ) && defined ( TRACE_CODE )
 extern void set_code_window(void);

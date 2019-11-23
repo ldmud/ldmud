@@ -64,6 +64,7 @@
 #include "otable.h"
 #include "patchlevel.h"
 #include "pkg-tls.h"
+#include "prolang.h"
 #include "random.h"
 #include "simulate.h"
 #include "simul_efun.h"
@@ -573,6 +574,7 @@ main (int argc, char **argv)
           /* The lexer needs the master_name, but also the VM
            * to throw errors.
            */
+        init_compiler();
 
 #ifdef USE_PYTHON
         pkg_python_init(argv[0]);

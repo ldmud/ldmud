@@ -980,7 +980,6 @@ static const char * compiled_file;
    * their ref count to zero).
    */
 
-static bool _lpctypes_initialized = false;
 lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_float,
           _lpctype_int_array,     _lpctype_string_array, _lpctype_object_array,
           _lpctype_bytes_array,   _lpctype_string_bytes, _lpctype_string_bytes_array;
@@ -16702,6 +16701,25 @@ store_include_end (mp_uint inc_offset, int include_line)
 } /* store_include_end() */
 
 /*-------------------------------------------------------------------------*/
+void
+init_compiler ()
+
+/* Initializes the compiler at program startup.
+ */
+
+{
+    make_static_type(get_array_type(lpctype_unknown),               &_lpctype_unknown_array);
+    make_static_type(get_array_type(lpctype_mixed),                 &_lpctype_any_array);
+    make_static_type(get_union_type(lpctype_int, lpctype_float),    &_lpctype_int_float);
+    make_static_type(get_array_type(lpctype_int),                   &_lpctype_int_array);
+    make_static_type(get_array_type(lpctype_string),                &_lpctype_string_array);
+    make_static_type(get_array_type(lpctype_object),                &_lpctype_object_array);
+    make_static_type(get_array_type(lpctype_bytes),                 &_lpctype_bytes_array);
+    make_static_type(get_union_type(lpctype_string, lpctype_bytes), &_lpctype_string_bytes);
+    make_static_type(get_array_type(lpctype_string_bytes),          &_lpctype_string_bytes_array);
+} /* init_compiler() */
+
+/*-------------------------------------------------------------------------*/
 static void
 prolog (const char * fname, Bool isMasterObj)
 
@@ -16722,22 +16740,6 @@ prolog (const char * fname, Bool isMasterObj)
         type_of_arguments.block = xalloc(type_of_arguments.max_size);
     }
     type_of_arguments.current_size = 0;
-
-    if (!_lpctypes_initialized)
-    {
-        make_static_type(get_array_type(lpctype_unknown),               &_lpctype_unknown_array);
-        make_static_type(get_array_type(lpctype_mixed),                 &_lpctype_any_array);
-        make_static_type(get_union_type(lpctype_int, lpctype_float),    &_lpctype_int_float);
-        make_static_type(get_array_type(lpctype_int),                   &_lpctype_int_array);
-        make_static_type(get_array_type(lpctype_string),                &_lpctype_string_array);
-        make_static_type(get_array_type(lpctype_object),                &_lpctype_object_array);
-        make_static_type(get_array_type(lpctype_bytes),                 &_lpctype_bytes_array);
-        make_static_type(get_union_type(lpctype_string, lpctype_bytes), &_lpctype_string_bytes);
-        make_static_type(get_array_type(lpctype_string_bytes),          &_lpctype_string_bytes_array);
-
-        _lpctypes_initialized = true;
-    }
-
 
     /* Initialize all the globals */
     variables_defined = MY_FALSE;
