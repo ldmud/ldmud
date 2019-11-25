@@ -17773,7 +17773,7 @@ get_line_number_if_any (string_t **name)
         if (csp->funstart < current_prog->program
          || csp->funstart > PROGRAM_END(*current_prog))
         {
-            static char name_buffer[24];
+            static char name_buffer[32];
             string_t * location, *tmp;
             lambda_t * l;
 
