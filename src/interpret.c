@@ -16489,6 +16489,7 @@ again:
         printf("%s Received profiling signal, evaluation time > %ld.%06lds\n",
                       ts, (long)profiling_timevalue.tv_sec, (long)profiling_timevalue.tv_usec);
         // dump stack trace and continue execution
+        inter_pc = pc;
         dump_trace(MY_FALSE, NULL, NULL);
         debug_message("%s ... execution continues.\n", ts);
         printf("%s ... execution continues.\n", ts);
