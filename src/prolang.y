@@ -10529,14 +10529,35 @@ expr0:
            * we just do a declarative cast.
            */
 
-          if($1 == lpctype_mixed || $2.type.t_type == lpctype_mixed || $2.type.t_type == lpctype_unknown)
+          if($1 == lpctype_mixed)
           {
-              /* Do nothing... */
+              if(pragma_warn_empty_casts)
+              {
+                  if (pragma_pedantic)
+                      yyerrorf("Casting a value to mixed has no effect");
+                  else
+                      yywarnf("Casting a value to mixed has no effect");
+              }
+          }
+          else if($2.type.t_type == lpctype_mixed || $2.type.t_type == lpctype_unknown)
+          {
+              if(pragma_warn_empty_casts)
+              {
+                  if (pragma_pedantic)
+                      yyerrorf("Casting a value of an unknown type has no effect");
+                  else
+                      yywarnf("Casting a value of an unknown type has no effect");
+              }
           }
           else if($1 == $2.type.t_type)
           {
               if(pragma_warn_empty_casts)
-                  yywarnf("casting a value to its own type: %s", get_lpctype_name($1));
+              {
+                  if (pragma_pedantic)
+                      yyerrorf("Casting a value to its own type: %s", get_lpctype_name($1));
+                  else
+                      yywarnf("Casting a value to its own type: %s", get_lpctype_name($1));
+              }
           }
           else if($1 == lpctype_int)
           {

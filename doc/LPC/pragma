@@ -45,7 +45,11 @@ DESCRIPTION
         no_rtt_checks: disable runtime type checks for this program (default).
 
         pedantic: Certain warnings are treated as errors:
-                - failure to pass enough arguments to simul efuns
+                  - failure to pass enough arguments to simul efuns
+                  - type casts with no effect
+                  - inconsistent declarations
+                  - inconsistent overloads
+                  - double inherits
         sloppy: Turns off pedantic (the default).
 
         range_check: Use of questionable ranges (ranges of negative sizes,
@@ -58,8 +62,8 @@ DESCRIPTION
         no_warn_deprecated: Turns off warn_deprecated.
 
         warn_empty_casts: A cast of a value to its own type generates
-                a warning (the default). Exception are casts to type
-                'mixed'.
+                a warning. Also casting a value of mixed/unknown type or
+                casting to mixed will generate a warning (the default).
         no_warn_empty_casts: Turns off warn_empty_casts.
 
         warn_missing_return: Warn if a value-returning function is missing
