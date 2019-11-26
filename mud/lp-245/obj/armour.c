@@ -77,7 +77,7 @@ string short() {
     return short_desc;
 }
 
-long(string str) {
+void long(string str) {
     write(long_desc);
 }
 

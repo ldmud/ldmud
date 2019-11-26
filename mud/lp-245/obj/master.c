@@ -777,9 +777,9 @@ object compile_object (string filename)
   filepath = implode(explode(filename,"/")[0..<2],"/");
   vmaster = filepath+"/vmaster";
   if (0 <= file_size(vmaster+".c"))
-    room = (object)vmaster->compile_object(explode(filename,"/")[<1]);
+    room = ({object})vmaster->compile_object(explode(filename,"/")[<1]);
   if (!room && 0 <= file_size(filepath+".c"))
-    room = (object)filepath->compile_object(explode(filename,"/")[<1]);
+    room = ({object})filepath->compile_object(explode(filename,"/")[<1]);
   return room;
 }
 
@@ -904,7 +904,7 @@ handle_super_compat (object super, object ob)
 	    if (error = catch(super->exit(ob),0))
 		write("exit"+": "+error);
 	}
-	if ( error = catch((weight = (mixed)ob->query_weight()),0) ) {
+	if ( error = catch((weight = ob->query_weight()),0) ) {
 	    write("query_weight"+": "+error);
             return 1;
 	}
@@ -1368,7 +1368,7 @@ int query_player_level (string what)
 
     if (this_player() == 0)
 	return 0;
-    level = (int)this_player()->query_level();
+    level = ({int})this_player()->query_level();
     switch(what) {
     case "wizard":
 	return level >= 20;
@@ -1399,7 +1399,7 @@ int valid_trace (string what)
 
     if (this_player() == 0)
 	return 0;
-    level = (int)this_player()->query_level();
+    level = ({int})this_player()->query_level();
     switch(what) {
     case "trace":
     case "traceprefix":
@@ -1581,14 +1581,14 @@ mixed valid_read  (string path, string euid, string fun, object caller)
         case "make_path_absolute": /* internal use, see below */
             set_this_object(caller);
             if( this_player() && interactive(this_player()) ) {
-                path = (string)this_player()->valid_read(path);
+                path = ({string})this_player()->valid_read(path);
                 if (!stringp(path)) {
                     write("Bad file name.\n");
                     return 0;
                 }
                 return ADD_SLASH(path);
             }
-            path = (string)"obj/player"->valid_read(path);
+            path = ({string})"obj/player"->valid_read(path);
             if (stringp(path))
                 return ADD_SLASH(path);
             return 0;
@@ -1703,14 +1703,14 @@ mixed valid_write (string path, string euid, string fun, object caller)
     set_this_object(caller);
     if( this_player() && interactive(this_player()) )
     {
-        path = (string)this_player()->valid_write(path);
+        path = ({string})this_player()->valid_write(path);
         if (!stringp(path)) {
             write("Bad file name.\n");
             return 0;
         }
         return ADD_SLASH(path);
     }
-    path = (string)"obj/player"->valid_write(path);
+    path = ({string})"obj/player"->valid_write(path);
     if (stringp(path))
         return ADD_SLASH(path);
 
@@ -1762,7 +1762,7 @@ int save_ed_setup (object who, int code)
 
     if (!intp(code))
 	return 0;
-    file = "/players/" + lower_case((string)who->query_name()) + "/.edrc";
+    file = "/players/" + lower_case(({string})who->query_name()) + "/.edrc";
     rm(file);
     return write_file(file, code + "");
 }
@@ -1782,7 +1782,7 @@ int retrieve_ed_setup (object who)
     string file;
     int code;
 
-    file = "/players/" + lower_case((string)who->query_name()) + "/.edrc";
+    file = "/players/" + lower_case(({string})who->query_name()) + "/.edrc";
     if (file_size(file) <= 0)
 	return 0;
     sscanf(read_file(file), "%d", code);

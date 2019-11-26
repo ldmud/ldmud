@@ -25,7 +25,7 @@ or
 int id(string str);
 string short();
 
-debug_toggle(str) {
+int debug_toggle(string str) {
 	if(!str || !id(str)) return 0;
 
 	is_debug += 1;
@@ -38,7 +38,7 @@ debug_toggle(str) {
 	return 1;
 }
 
-query_debug() { return is_debug; }
+int query_debug() { return is_debug; }
 
-set_debug(arg) { is_debug = arg; }
+void set_debug(int arg) { is_debug = arg; }
 
