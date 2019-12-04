@@ -44,9 +44,6 @@ extern size_t utf8_to_unicode(const char* buf, size_t len, p_int *code);
 
 extern svalue_t * v_to_bytes(svalue_t *sp, int num_arg);
 extern svalue_t * v_to_text(svalue_t *sp, int num_arg);
-#ifdef HAS_ICONV
-extern svalue_t * f_convert_charset (svalue_t *sp); 
-#endif
 extern string_t * intersect_strings (string_t * left, string_t * right, Bool bSubtract);
 extern svalue_t * x_map_string (svalue_t *sp, int num_arg);
 extern svalue_t * x_filter_string (svalue_t *sp, int num_arg);

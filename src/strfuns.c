@@ -17,7 +17,8 @@
  *
  * --- Efuns and Operators ---
  *
- * f_convert_charset(): Convert charsets using iconv().
+ * v_to_bytes(): Convert unicode strings into a given encoding.
+ * v_to_text(): Converts a given encoding to a unicode string.
  * intersect_strings(): Implements '&' and '-' on strings
  * x_filter_string(): Filter a string through a callback or mapping.
  * x_map_string(): Map a string through a callback or mapping.
