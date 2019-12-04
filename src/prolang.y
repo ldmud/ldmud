@@ -10502,7 +10502,10 @@ expr0:
               if(result == NULL || result == $2.type.t_type)
               {
                   /* No common type or not specialized. */
-                  yyerrorf("Declarative casts are only legal from general to specialized types: %s", get_two_lpctypes($2.type.t_type, $1));
+                  if ($2.type.t_type == $1)
+                      yyerrorf("Declarative cast of a value to its own type: %s", get_lpctype_name($1));
+                  else
+                      yyerrorf("Declarative casts are only legal from general to specialized types: %s", get_two_lpctypes($2.type.t_type, $1));
               }
 
               if(result == NULL)
