@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <assert.h>
 #include <iconv.h>
 
 #include "strfuns.h"
@@ -366,6 +367,130 @@ trim_all_spaces (const string_t * txt)
     return rc;
 } /* trim_all_spaces() */
 
+/*--------------------------------------------------------------------*/
+size_t
+get_escaped_character (p_int c, char* buf, size_t buflen)
+
+/* Writes the character <c> into the <buf> which has space for
+ * <buflen> bytes (<buflen> should be 10 or more). If the character
+ * doesn't need escaping it is written as a regular character.
+ * Returns the number of bytes written.
+ */
+
+{
+    static const char hex[] = "0123456789abcdef";
+
+    switch(c)
+    {
+        case '"':
+            if (buflen < 2)
+                return 0;
+            memcpy(buf, "\\\"", 2);
+            return 2;
+
+        case '\n':
+            if (buflen < 2)
+                return 0;
+            memcpy(buf, "\\n", 2);
+            return 2;
+
+        case '\r':
+            if (buflen < 2)
+                return 0;
+            memcpy(buf, "\\r", 2);
+            return 2;
+
+        case '\t':
+            if (buflen < 2)
+                return 0;
+            memcpy(buf, "\\t", 2);
+            return 2;
+
+        case '\a':
+            if (buflen < 2)
+                return 0;
+            memcpy(buf, "\\a", 2);
+            return 2;
+
+        case 0x1b:
+            if (buflen < 2)
+                return 0;
+            memcpy(buf, "\\e", 2);
+            return 2;
+
+        case 0x08:
+            if (buflen < 2)
+                return 0;
+            memcpy(buf, "\\b", 2);
+            return 2;
+
+        case 0x00:
+            if (buflen < 2)
+                return 0;
+            memcpy(buf, "\\0", 2);
+            return 2;
+
+        case '\\':
+            if (buflen < 2)
+                return 0;
+            memcpy(buf, "\\\\", 2);
+            return 2;
+
+        default:
+            if (c < 0x20)
+            {
+                if (buflen < 4)
+                    return 0;
+
+                *buf++ = '\\';
+                *buf++ = 'x';
+                *buf++ = hex[c >> 4];
+                *buf++ = hex[c & 0xf];
+                return 4;
+            }
+            else if (c < 0x7f)
+            {
+                if (!buflen)
+                    return 0;
+
+               *buf = (char)c;
+               return 1;
+            }
+            else if (c < 0x10000)
+            {
+                if (buflen < 6)
+                    return 0;
+
+                *buf++ = '\\';
+                *buf++ = 'u';
+                *buf++ = hex[(c >> 12) & 0xf];
+                *buf++ = hex[(c >> 8) & 0xf];
+                *buf++ = hex[(c >> 4) & 0xf];
+                *buf++ = hex[c & 0xf];
+                return 6;
+            }
+            else
+            {
+                if (buflen < 10)
+                    return 0;
+
+                *buf++ = '\\';
+                *buf++ = 'U';
+                *buf++ = hex[(c >> 28) & 0xf];
+                *buf++ = hex[(c >> 24) & 0xf];
+                *buf++ = hex[(c >> 20) & 0xf];
+                *buf++ = hex[(c >> 16) & 0xf];
+                *buf++ = hex[(c >> 12) & 0xf];
+                *buf++ = hex[(c >> 8) & 0xf];
+                *buf++ = hex[(c >> 4) & 0xf];
+                *buf++ = hex[c & 0xf];
+                return 10;
+            }
+    }
+
+    return 0;
+} /* get_escaped_character() */
+
 /*====================================================================*/
 
 /*                          ENCODING                                  */
@@ -640,6 +765,61 @@ utf8_to_unicode (const char* buf, size_t len, p_int *code)
 
     return 0; /* NOTREACHED. */
 } /* unicode_to_utf8() */
+
+/*--------------------------------------------------------------------*/
+
+char*
+get_illegal_sequence (char* buf, size_t len, iconv_t cd)
+
+/* Return a string depicting an illegal sequence.
+ * This function should be called when iconv with the given descriptor
+ * return EILSEQ. It tries to detect the amount of illegal bytes
+ * and returns a string with them as a byte sequence.
+ */
+
+{
+    /* We try to convert a limited amount of bytes until we
+     * receive EILSEQ as well.
+     */
+    for (size_t i = 1; i <= len; i++)
+    {
+        char tmp[8];
+        char *inbuf = buf, *outbuf = tmp;
+        size_t inleft = i, outleft = sizeof(tmp);
+
+        size_t res = iconv(cd, &inbuf, &inleft, &outbuf, &outleft);
+        assert(res == (size_t)-1);
+
+        if (errno == EILSEQ || i == len)
+        {
+            static const char hex[] = "0123456789abcdef";
+            static char result[36] = "\"";
+            int pos = 1;
+
+            /* Print at most 8 bytes. */
+            if (i > 8)
+                i = 8;
+
+            for (size_t j = 0; j < i; j++)
+            {
+                unsigned char c = *buf++;
+                result[pos++] = '\\';
+                result[pos++] = 'x';
+                result[pos++] = hex[c >> 4];
+                result[pos++] = hex[c & 0xf];
+            }
+
+            result[pos++] = '"';
+            result[pos] = 0;
+            assert(pos < sizeof(result));
+            return result;
+        }
+
+        assert(errno == EINVAL);
+    }
+
+    return "";
+} /* get_illegal_sequence() */
 
 /*====================================================================*/
 
@@ -1122,15 +1302,67 @@ v_to_text (svalue_t *sp, int num_arg)
                     continue;
                 }
 
+                idx = in_buf_size - in_buf_left;
+                if (errno == EILSEQ)
+                {
+                    if (at_end)
+                    {
+                        iconv_close(cd);
+                        xfree(out_buf_start);
+                        if (text->type == T_POINTER)
+                            xfree(in_buf_start);
+                        errorf("to_text(): Invalid character sequence at byte %zd.\n", idx);
+                    }
+                    else
+                    {
+                        char* errseq = get_illegal_sequence(in_buf_ptr, in_buf_left, cd);
+                        char context[128];
+                        size_t pos = sizeof(context);
+
+                        context[--pos] = 0;
+                        context[--pos] = '"';
+
+                        for (int contextlen = 0; contextlen < 10 && out_buf_ptr > out_buf_start; )
+                        {
+                            char escbuf[16];
+                            char *prev = utf8_prev(out_buf_ptr, out_buf_ptr - out_buf_start);
+                            p_int c;
+                            size_t clen = utf8_to_unicode(prev, out_buf_ptr - prev, &c);
+                            size_t esclen;
+
+                            if (!clen)
+                                c = *(unsigned char*)prev;
+
+                            out_buf_ptr = prev;
+                            contextlen++;
+
+                            esclen = get_escaped_character(c, escbuf, sizeof(escbuf));
+                            if (esclen && esclen < pos)
+                            {
+                                pos -= esclen;
+                                memcpy(context + pos, escbuf, esclen);
+                            }
+                        }
+
+                        context[--pos] = '"';
+
+                        iconv_close(cd);
+                        xfree(out_buf_start);
+                        if (text->type == T_POINTER)
+                            xfree(in_buf_start);
+
+                        errorf("to_text(): Invalid character sequence at byte %zd after %s: %s.\n"
+                              , idx
+                              , context + pos
+                              , errseq);
+                    }
+                }
+
                 /* Other error: clean up */
                 iconv_close(cd);
                 xfree(out_buf_start);
                 if (text->type == T_POINTER)
                     xfree(in_buf_start);
-
-                idx = in_buf_size - in_buf_left;
-                if (errno == EILSEQ)
-                    errorf("to_text(): Invalid character sequence at byte %zd.\n", idx);
 
                 if (errno == EINVAL)
                     errorf("to_text(): Incomplete character sequence at byte %zd.\n", idx);

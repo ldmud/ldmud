@@ -1,6 +1,8 @@
 #ifndef STRFUNS_H_
 #define STRFUNS_H_ 1
 
+#include <iconv.h>
+
 #include "driver.h"
 #include "typedefs.h"
 
@@ -33,6 +35,7 @@ extern void strbuf_copy (strbuf_t *buf, char *cbuf);
 #define strbuf_length(sbuf) ((sbuf)->length)
 extern string_t * trim_all_spaces (const string_t * txt);
 extern char * xstrncpy(char * dest, const char * src, size_t num);
+extern size_t get_escaped_character(p_int c, char* buf, size_t buflen);
 
 extern size_t byte_to_char_index(char* text, size_t pos, bool* error);
 extern size_t char_to_byte_index(char* text, size_t len, size_t pos, bool* error);
@@ -41,6 +44,8 @@ extern size_t utf8_size (p_int code);
 extern char* utf8_prev (char* text, size_t pos);
 extern size_t unicode_to_utf8(p_int code, char* buf);
 extern size_t utf8_to_unicode(const char* buf, size_t len, p_int *code);
+
+extern char* get_illegal_sequence(char* buf, size_t len, iconv_t cd);
 
 extern svalue_t * v_to_bytes(svalue_t *sp, int num_arg);
 extern svalue_t * v_to_text(svalue_t *sp, int num_arg);

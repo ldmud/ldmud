@@ -90,6 +90,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#include "strfuns.h"
 #include "structs.h"
 #include "svalue.h"
 #include "swap.h"
@@ -626,9 +627,10 @@ string_to_string (fmt_state_t *st, string_t* obj, size_t index1, size_t index2, 
         else
         {
             char *tmpstr, *src, *dest;
+            size_t tmpsize = 10 * (index2-index1);
 
             /* Allocate the temporary string */
-            tmpstr = alloca(10 * (index2-index1));
+            tmpstr = alloca(tmpsize);
 
             src = get_txt(obj) + index1;
             dest = tmpstr;
@@ -647,55 +649,7 @@ string_to_string (fmt_state_t *st, string_t* obj, size_t index1, size_t index2, 
                     i += clen;
                 }
 
-                switch(c)
-                {
-                    case '"': strcpy(dest, "\\\""); dest += 2; break;
-                    case '\n': strcpy(dest, "\\n"); dest += 2; break;
-                    case '\r': strcpy(dest, "\\r"); dest += 2; break;
-                    case '\t': strcpy(dest, "\\t"); dest += 2; break;
-                    case '\a': strcpy(dest, "\\a"); dest += 2; break;
-                    case 0x1b: strcpy(dest, "\\e"); dest += 2; break;
-                    case 0x08: strcpy(dest, "\\b"); dest += 2; break;
-                    case 0x00: strcpy(dest, "\\0"); dest += 2; break;
-                    case '\\': strcpy(dest, "\\\\"); dest += 2; break;
-                    default:
-                        if (c < 0x20)
-                        {
-                            *dest++ = '\\';
-                            *dest++ = 'x';
-                            *dest++ = hex[c >> 4];
-                            *dest++ = hex[c & 0xf];
-                        }
-                        else if (c < 0x7f)
-                        {
-                           *dest++ = (char)c;
-                        }
-                        else if (c < 0x10000)
-                        {
-                            *dest++ = '\\';
-                            *dest++ = 'u';
-                            *dest++ = hex[(c >> 12) & 0xf];
-                            *dest++ = hex[(c >> 8) & 0xf];
-                            *dest++ = hex[(c >> 4) & 0xf];
-                            *dest++ = hex[c & 0xf];
-                        }
-                        else
-                        {
-                            *dest++ = '\\';
-                            *dest++ = 'U';
-                            *dest++ = hex[(c >> 28) & 0xf];
-                            *dest++ = hex[(c >> 24) & 0xf];
-                            *dest++ = hex[(c >> 20) & 0xf];
-                            *dest++ = hex[(c >> 16) & 0xf];
-                            *dest++ = hex[(c >> 12) & 0xf];
-                            *dest++ = hex[(c >> 8) & 0xf];
-                            *dest++ = hex[(c >> 4) & 0xf];
-                            *dest++ = hex[c & 0xf];
-                        }
-
-                        break;
-                }
-
+                dest += get_escaped_character(c, dest, tmpstr + tmpsize - dest);
             } /* for() */
 
             straddn(st, &str, tmpstr, dest - tmpstr);

@@ -35,6 +35,7 @@ extern int lstat(const char *, struct stat *);
 #include "mstrings.h"
 #include "simulate.h"
 #include "stdstrings.h"
+#include "strfuns.h"
 #include "svalue.h"
 #include "xalloc.h"
 
@@ -1166,13 +1167,15 @@ struct iconv_file_info
 };
 
 static size_t
-read_file_iconv (struct iconv_file_info* info, char* dest, size_t len)
+read_file_iconv (struct iconv_file_info* info, char* dest, size_t len, char* prevstr, size_t prevlen)
 
 /* Reads <len> UTF-8 bytes from the given file into <dest>.
  * It tries to read as many characters as possible and returns
  * the number of UTF-8 bytes in <dest>.
  * Sets the <error> member in <info> upon decoding failures
  * and returns the number of bytes done until that.
+ * <prevstr> and <prevlen> denote the previous read strings
+ * to offer context in error messages.
  */
 
 {
@@ -1234,7 +1237,67 @@ read_file_iconv (struct iconv_file_info* info, char* dest, size_t len)
             if (errno == E2BIG)
                 break;
 
-            info->error = errno == EILSEQ ? "Invalid character sequence" : strerror(errno);
+            if (errno != EILSEQ)
+                info->error = strerror(errno);
+            else if (!bufleft)
+                info->error = "Invalid character sequence";
+            else
+            {
+                static char errmsg[256];                // The final error message
+                char context[128];                      // The context string
+                int pos;                                // The position in the context string
+
+                bool indest = true;                     // Wether we search the context in <dest>
+                char *contextstr = dest, *lastcontext = deststart;
+
+                pos = sizeof(context);                  // We are going backwards.
+                context[--pos] = 0;
+                context[--pos] = '"';
+
+                /* Let's generate some context... */
+                for (int contextlen = 0; contextlen < 10; )
+                {
+                    if (lastcontext > contextstr)
+                    {
+                        char escbuf[16];
+                        char *prev = utf8_prev(lastcontext, lastcontext - contextstr);
+                        p_int c;
+                        size_t clen = utf8_to_unicode(prev, lastcontext - prev, &c);
+                        size_t esclen;
+
+                        if (!clen)
+                            c = *(unsigned char*)prev;
+
+                        lastcontext = prev;
+                        contextlen++;
+
+                        esclen = get_escaped_character(c, escbuf, sizeof(escbuf));
+                        if (esclen && esclen < pos)
+                        {
+                            pos -= esclen;
+                            memcpy(context + pos, escbuf, esclen);
+                        }
+                    }
+                    else if (indest)
+                    {
+                        indest = false;
+                        contextstr = prevstr;
+                        lastcontext = prevstr + prevlen;
+                    }
+                    else
+                        break;
+                }
+
+                context[--pos] = '"';
+
+                snprintf(errmsg, sizeof(errmsg), "Invalid character sequence at byte %ld after %s: %s"
+                                               , ftell(info->f) - bufleft
+                                               , context + pos
+                                               , get_illegal_sequence(bufstart, bufleft, info->cd));
+                errmsg[sizeof(errmsg)-1] = 0;
+
+                info->error = errmsg;
+            }
             break;
         }
 
@@ -1319,7 +1382,7 @@ v_read_file (svalue_t *sp, int num_arg)
         struct iconv_file_info conv;
         char *native;
         char *str, *p, *p2, *end, c;
-        size_t size;
+        size_t size, num = 0;
 
         p = NULL; /* Silence spurious warnings */
         end = NULL;
@@ -1403,7 +1466,7 @@ v_read_file (svalue_t *sp, int num_arg)
         do
         {
             /* Read the next chunk */
-            size_t num = read_file_iconv(&conv, str, size);
+            num = read_file_iconv(&conv, str, size, str, num);
 
             if (!num)
             {
@@ -1455,7 +1518,10 @@ v_read_file (svalue_t *sp, int num_arg)
              * space left in the buffer. As that one is max_file_xfer
              * long, it has to be sufficient.
              */
-            end = p2 + read_file_iconv(&conv, p2, str + size - p2);;
+            if (p2 - str < str + num - p2)
+                end = p2 + read_file_iconv(&conv, p2, str + size - p2, p2, str + num - p2);
+            else
+                end = p2 + read_file_iconv(&conv, p2, str + size - p2, str, p2 - str);
 
             /* Count the remaining lines.
              */
