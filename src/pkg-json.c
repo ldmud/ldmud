@@ -48,7 +48,7 @@ struct json_error_handler_s {
 };
 
 static void json_error_cleanup(error_handler_t *arg) __attribute__((nonnull(1)));
-static INLINE Bool push_json_error_handler(struct json_object *jobj) __attribute__((nonnull(1)));
+static INLINE bool push_json_error_handler(struct json_object *jobj) __attribute__((nonnull(1)));
 static void ldmud_json_walker(svalue_t *key, svalue_t *val, void *parent) __attribute__((nonnull(1,2,3)));
 static INLINE void ldmud_json_attach(struct json_object *parent, const char *key, struct json_object *val) __attribute__((nonnull(1,3)));
 svalue_t *ldmud_json_parse (svalue_t *sp, struct json_object *val) __attribute__((nonnull(1,2)));
@@ -216,7 +216,7 @@ f_json_serialize (svalue_t *sp)
 /*-------------------------------------------------------------------------*/
 
 /*-------------------------------------------------------------------------*/
-static INLINE Bool
+static INLINE bool
 push_json_error_handler(struct json_object * jobj)
 /* An error handler is pushed onto the value stack so that the given json_object
  * is safely freed either by manually freeing the svalue on the stack or during
@@ -230,12 +230,12 @@ push_json_error_handler(struct json_object * jobj)
     handler = xalloc(sizeof(*handler));
     if (!handler)
     {
-        return FALSE;
+        return false;
     }
     handler->jobj = jobj;
     /* now push error handler onto the value stack */
     push_error_handler(json_error_cleanup, &(handler->head));
-    return TRUE;
+    return true;
 } /* alloc_with_error_handler */
 
 /*-------------------------------------------------------------------------*/
