@@ -848,6 +848,16 @@ enum line_numbe_bytecodes {
    */
 };
 
+/* Operation used for the F_TYPE_CHECK.
+ */
+enum type_check_operation
+{
+    TYPECHECK_ASSIGNMENT,
+    TYPECHECK_VAR_INIT,
+    TYPECHECK_CAST,
+    TYPECHECK_DECL_CAST,
+};
+
 /***************************************************************************/
 
 /* Static helper functions */

@@ -15580,14 +15580,16 @@ again:
         break;
     }
 
-    CASE(F_TYPE_CHECK);             /* --- type_check <ix>     --- */
+    CASE(F_TYPE_CHECK);             /* --- type_check <op> <ix> --- */
     {
         /* Check the top value off the stack against the type
          * at prog->argument_types[<ix>]. Raise an error if
          * it doesn't match. Do nothing otherwise.
+         * <op> contains a value of enum type_check_operation to
+         * give a specific error message.
          */
 
-        unsigned short ix;
+        unsigned short ix, op = LOAD_UINT8(pc);
         lpctype_t* exptype;
 
         LOAD_SHORT(ix, pc);
@@ -15600,17 +15602,40 @@ again:
         if (!check_rtt_compatibility(exptype, sp))
         {
             static char buff[512];
+            const char* op_str;
             lpctype_t *realtype = get_rtt_type(exptype, sp);
             get_lpctype_name_buf(realtype, buff, sizeof(buff));
             free_lpctype(realtype);
 
             inter_sp = sp;
+            switch (op)
+            {
+                case TYPECHECK_ASSIGNMENT:
+                    op_str = "assignment";
+                    break;
+
+                case TYPECHECK_VAR_INIT:
+                    op_str = "variable initialization";
+                    break;
+
+                case TYPECHECK_CAST:
+                    op_str = "type cast";
+                    break;
+
+                case TYPECHECK_DECL_CAST:
+                    op_str = "declarative type cast";
+                    break;
+
+                default:
+                    op_str = "unknown operation";
+                    break;
+            }
             if (current_prog->flags & P_WARN_RTT_CHECKS)
-                warnf("Bad type for assignment: got '%s', expected '%s'.\n",
-                   buff, get_lpctype_name(exptype));
+                warnf("Bad type for %s: got '%s', expected '%s'.\n",
+                   op_str, buff, get_lpctype_name(exptype));
             else
-                errorf("Bad type for assignment: got '%s', expected '%s'.\n",
-                   buff, get_lpctype_name(exptype));
+                errorf("Bad type for %s: got '%s', expected '%s'.\n",
+                   op_str, buff, get_lpctype_name(exptype));
         }
 
         break;

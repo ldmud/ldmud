@@ -1012,7 +1012,7 @@ static ident_t* define_local_variable (ident_t* name, lpctype_t* actual_type, st
 static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2);
 static Bool add_lvalue_code ( struct lvalue_s * lv, int instruction);
 static void insert_pop_value(void);
-static void add_type_check (lpctype_t *expected);
+static void add_type_check (lpctype_t *expected, enum type_check_operation op);
 static int insert_inherited(char *, string_t *, program_t **, function_t *, int, bytecode_p);
   /* Returnvalues from insert_inherited(): */
 #  define INHERITED_NOT_FOUND            (-1)
@@ -4828,7 +4828,7 @@ init_global_variable (int i, ident_t* name, fulltype_t actual_type
  */
 
 {
-    add_type_check(actual_type.t_type);
+    add_type_check(actual_type.t_type, TYPECHECK_VAR_INIT);
 
     PREPARE_INSERT(4)
 
@@ -8973,7 +8973,7 @@ expr_decl:
               yyerror("Only plain assignments allowed here");
           }
 
-          add_type_check($1.type);
+          add_type_check($1.type, TYPECHECK_VAR_INIT);
 
           /* Add the bytecode to create the lvalue and do the
            * assignment.
@@ -9980,7 +9980,7 @@ expr0:
           else
           {
               if ($2 == F_ASSIGN)
-                 add_type_check(type1.t_type);
+                 add_type_check(type1.t_type, TYPECHECK_ASSIGNMENT);
 
               if (!add_lvalue_code(&$1, $2))
               {
@@ -10517,6 +10517,8 @@ expr0:
               }
           }
 
+          add_type_check($$.type.t_type, TYPECHECK_DECL_CAST);
+
           free_fulltype($2.type);
       }
 
@@ -10551,6 +10553,7 @@ expr0:
                   else
                       yywarnf("Casting a value of an unknown type has no effect");
               }
+              add_type_check($$.type.t_type, TYPECHECK_CAST);
           }
           else if($1 == $2.type.t_type)
           {
@@ -10561,6 +10564,7 @@ expr0:
                   else
                       yywarnf("Casting a value to its own type: %s", get_lpctype_name($1));
               }
+              add_type_check($$.type.t_type, TYPECHECK_CAST);
           }
           else if($1 == lpctype_int)
           {
@@ -10585,6 +10589,7 @@ expr0:
           else if(is_type_struct($1))
           {
               /* Do nothing, just adapt the type information */
+              add_type_check($$.type.t_type, TYPECHECK_CAST);
           }
           else
           {
@@ -10777,7 +10782,7 @@ expr0:
               restype = ref_fulltype(type1);
           }
 
-          add_type_check(type1.t_type);
+          add_type_check(type1.t_type, TYPECHECK_ASSIGNMENT);
           if (!add_lvalue_code(&$1, $2))
           {
               free_lpctype($1.type);
@@ -13819,7 +13824,7 @@ if (current_inline && current_inline->parse_context)
         yyerror("Only plain assignments allowed here");
     }
 
-    add_type_check(lv->type);
+    add_type_check(lv->type, TYPECHECK_VAR_INIT);
 
     if (!add_lvalue_code(lv, F_VOID_ASSIGN))
         return;
@@ -13954,7 +13959,7 @@ insert_pop_value (void)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_type_check (lpctype_t *expected)
+add_type_check (lpctype_t *expected, enum type_check_operation op)
 /* Adds an instruction for type checking the topmost value
  * on the stack against <expected>.
  */
@@ -13992,6 +13997,7 @@ add_type_check (lpctype_t *expected)
     }
 
     ins_f_code(F_TYPE_CHECK);
+    ins_byte(op);
     ins_short(idx);
 } /* add_type_check() */
 

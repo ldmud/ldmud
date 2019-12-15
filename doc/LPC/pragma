@@ -35,6 +35,7 @@ DESCRIPTION
                   - arguments on function calls,
                   - return values of functions,
                   - assignment to variables,
+                  - declarative type casts,
                   - restoration of values to variables or struct members.
                 Don't confuse this with strong/strict_types, they only
                 check at compile time.
