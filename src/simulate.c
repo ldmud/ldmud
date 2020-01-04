@@ -3535,7 +3535,7 @@ convert_path_encoding (const char* pathenc, const char* path, size_t len, const 
         else
             rc = iconv(cd, &in_buf_ptr, &in_buf_left, &out_buf_ptr, &out_buf_left);
 
-        if (rc == (size_t)-1)
+        if (rc == (size_t)-1 && (errno != EILSEQ || in_buf_left))
             return 0;
 
         if (at_end)

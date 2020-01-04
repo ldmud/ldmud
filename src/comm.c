@@ -1900,18 +1900,18 @@ add_message_text (const char* str, size_t len)
         else
             add_message_bytes(buf, dest - buf);
 
+        if (at_end)
+            break;
+
         str = start;
 
-        if (rc == (size_t)-1 && errno != E2BIG && !at_end)
+        if (rc == (size_t)-1 && errno != E2BIG && inleft)
         {
             /* There was an invalid or incomplete multibyte sequence.
              * Skip to the next character.
              */
             str++;
         }
-
-        if (at_end)
-            break;
     }
 } /* add_message_text() */
 

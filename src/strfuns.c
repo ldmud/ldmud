@@ -965,6 +965,10 @@ v_to_bytes (svalue_t *sp, int num_arg)
                         continue;
                     }
 
+                    /* Ignore EILSEQ at the end, they come from //IGNORE. */
+                    if (errno == EILSEQ && !in_buf_left)
+                        continue;
+
                     /* Other error: clean up */
                     iconv_close(cd);
                     xfree(out_buf_start);
@@ -1073,6 +1077,10 @@ v_to_bytes (svalue_t *sp, int num_arg)
                         out_buf_size  = new_size;
                         continue;
                     }
+
+                    /* Ignore EILSEQ at the end, they come from //IGNORE. */
+                    if (errno == EILSEQ && !in_buf_left)
+                        continue;
 
                     /* Other error: clean up */
                     iconv_close(cd);

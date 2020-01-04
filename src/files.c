@@ -1959,7 +1959,7 @@ v_write_file (svalue_t *sp, int num_arg)
 
                 if (res == (size_t)-1)
                 {
-                    if (errno != E2BIG)
+                    if (errno != E2BIG && (inbufleft || errno != EILSEQ))
                     {
                         mb_free(mbFile);
                         fclose(f);
