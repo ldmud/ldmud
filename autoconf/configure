@@ -628,6 +628,7 @@ ac_subst_vars='LTLIBOBJS
 ERQ_LIBS
 PKGLIBS
 erq_sub
+val_valgrind_redzone
 val_python_script
 val_tls_crldirectory
 val_tls_crlfile
@@ -692,6 +693,7 @@ val_erq_max_send
 val_erq_max_reply
 val_access_log
 val_access_file
+cdef_valgrind
 cdef_dump_gc_refs
 cdef_check_object_gc_ref
 cdef_check_object_ref
@@ -748,9 +750,6 @@ cdef_access_log
 cdef_access_control
 cdef_erq_demon
 CONFIG_SHELL
-YACCTAB
-CLEAN_YACC_TAB
-MOVE_YACC_TAB
 OPTIMIZE_LINKING
 EXTRA_CFLAGS
 DCFLAGS
@@ -774,8 +773,7 @@ PKG_CONFIG_PATH
 PKG_CONFIG
 ALLOCA
 LIBOBJS
-YFLAGS
-YACC
+BISON
 INSTALL_DATA
 INSTALL_SCRIPT
 INSTALL_PROGRAM
@@ -887,6 +885,7 @@ enable_check_mapping_total
 enable_check_object_ref
 enable_check_object_gc_ref
 enable_dump_gc_refs
+enable_valgrind
 with_optimize
 with_access_file
 with_access_log
@@ -944,6 +943,7 @@ with_pcre_recursion_limit
 with_wizlist_file
 with_max_net_connects
 with_random_period_length
+with_valgrind_redzone
 with_setting
 '
       ac_precious_vars='build_alias
@@ -955,8 +955,6 @@ LDFLAGS
 LIBS
 CPPFLAGS
 CPP
-YACC
-YFLAGS
 PKG_CONFIG
 PKG_CONFIG_PATH
 PKG_CONFIG_LIBDIR
@@ -1682,6 +1680,8 @@ Optional Features:
         check object references in GC
   --enable-dump-gc-refs  default=disabled
         trace GC references
+  --enable-valgrind  default=disabled
+        instrument allocators with valgrind client requests?
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -1820,6 +1820,8 @@ Optional Packages:
         maximum number of concurrent connection attempts
   --with-random-period-length=607 / 1279 / 2281 / 4253 / 11213 / 19937 / 44497 / 86243 / 132049 / 216091  default=19937
         period length of the random number generator
+  --with-valgrind-redzone=VALUE  default=0
+        add an unused buffer at the begin and end of each memory block in words
   --with-setting=SETTING  include a predefined setting
 
 Some influential environment variables:
@@ -1831,12 +1833,6 @@ Some influential environment variables:
   CPPFLAGS    (Objective) C/C++ preprocessor flags, e.g. -I<include dir> if
               you have headers in a nonstandard directory <include dir>
   CPP         C preprocessor
-  YACC        The `Yet Another Compiler Compiler' implementation to use.
-              Defaults to the first program found out of: `bison -y', `byacc',
-              `yacc'.
-  YFLAGS      The list of arguments that will be passed by default to $YACC.
-              This script will default YFLAGS to the empty string to avoid a
-              default value of `-d' given by some make applications.
   PKG_CONFIG  path to pkg-config utility
   PKG_CONFIG_PATH
               directories to add to pkg-config's search path
@@ -3425,6 +3421,13 @@ if test "${enable_dump_gc_refs+set}" = set; then :
 fi
 
 
+DEFAULTenable_valgrind=no
+# Check whether --enable-valgrind was given.
+if test "${enable_valgrind+set}" = set; then :
+  enableval=$enable_valgrind;
+fi
+
+
 
 DEFAULTwith_optimize=med
 
@@ -3883,6 +3886,14 @@ DEFAULTwith_random_period_length=19937
 # Check whether --with-random-period-length was given.
 if test "${with_random_period_length+set}" = set; then :
   withval=$with_random_period_length;
+fi
+
+
+DEFAULTwith_valgrind_redzone=0
+
+# Check whether --with-valgrind-redzone was given.
+if test "${with_valgrind_redzone+set}" = set; then :
+  withval=$with_valgrind_redzone;
 fi
 
 
@@ -4459,6 +4470,16 @@ if test "x$enable_dump_gc_refs" = "xyes"; then
   cdef_dump_gc_refs="#define"
 else
   cdef_dump_gc_refs="#undef"
+fi
+
+if test "x$enable_valgrind" = "x" && test "x$DEFAULTenable_valgrind" != "x"; then
+  enable_valgrind=$DEFAULTenable_valgrind
+fi
+
+if test "x$enable_valgrind" = "xyes"; then
+  cdef_valgrind="#define"
+else
+  cdef_valgrind="#undef"
 fi
 
 
@@ -5115,6 +5136,16 @@ if test "x$with_random_period_length" = "x" && test "x$DEFAULTwith_random_period
 fi
 
 val_random_period_length=$with_random_period_length
+
+if test "x$with_valgrind_redzone" != "x"; then
+  with_valgrind_redzone=`echo $with_valgrind_redzone|
+             sed -e 's/^\(-\?\(0x[0-9a-fA-F]\+\)\?[0-9]*\)[^0-9]\?.*$/\1/'`
+fi
+if test "x$with_valgrind_redzone" = "x" && test "x$DEFAULTwith_valgrind_redzone" != "x"; then
+  with_valgrind_redzone=$DEFAULTwith_valgrind_redzone
+fi
+
+val_valgrind_redzone=$with_valgrind_redzone
 
 
 if test "x$cdef_access_control" = "x#undef"; then
@@ -8346,17 +8377,17 @@ test -z "$INSTALL_DATA" && INSTALL_DATA='${INSTALL} -m 644'
 
 ac_config_headers="$ac_config_headers machine.h"
 
-for ac_prog in 'bison -y' byacc
+for ac_prog in bison
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_prog_YACC+:} false; then :
+if ${ac_cv_prog_BISON+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  if test -n "$YACC"; then
-  ac_cv_prog_YACC="$YACC" # Let the user override the test.
+  if test -n "$BISON"; then
+  ac_cv_prog_BISON="$BISON" # Let the user override the test.
 else
 as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
 for as_dir in $PATH
@@ -8365,7 +8396,7 @@ do
   test -z "$as_dir" && as_dir=.
     for ac_exec_ext in '' $ac_executable_extensions; do
   if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_prog_YACC="$ac_prog"
+    ac_cv_prog_BISON="$ac_prog"
     $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
     break 2
   fi
@@ -8375,23 +8406,19 @@ IFS=$as_save_IFS
 
 fi
 fi
-YACC=$ac_cv_prog_YACC
-if test -n "$YACC"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $YACC" >&5
-$as_echo "$YACC" >&6; }
+BISON=$ac_cv_prog_BISON
+if test -n "$BISON"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $BISON" >&5
+$as_echo "$BISON" >&6; }
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
 fi
 
 
-  test -n "$YACC" && break
+  test -n "$BISON" && break
 done
-test -n "$YACC" || YACC="yacc"
 
-if test "$YACC" != "bison -y"; then
-  as_fn_error $? "bison not found, please install it!" "$LINENO" 5
-fi
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
@@ -8642,7 +8669,7 @@ $as_echo "#define HAVE_STDBOOL_H 1" >>confdefs.h
 
 fi
 
-for ac_header in sys/rusage.h sys/time.h unistd.h stdlib.h libc.h memory.h
+for ac_header in sys/rusage.h sys/time.h sys/types.h unistd.h stdlib.h libc.h memory.h
 do :
   as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
 ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
@@ -8656,6 +8683,19 @@ fi
 done
 
 for ac_header in string.h bstring.h netdb.h crypt.h sys/param.h sys/termios.h
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+
+done
+
+for ac_header in netinet/in.h arpa/nameser.h
 do :
   as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
 ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
@@ -14260,81 +14300,6 @@ else
 $as_echo "no" >&6; }
 fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking if ${YACC} includes bogus malloc prototypes" >&5
-$as_echo_n "checking if ${YACC} includes bogus malloc prototypes... " >&6; }
-cat > conftest.y <<EOF
-%{
-#include "confdefs.h"
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
-#include <memory.h>
-#endif
-#ifdef HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-%}
-%%
-all: 'a';
-%%
-int main(){ return 0; }
-int yyerror(){}
-int yylex(){ return 0; }
-EOF
-rm -f y.tab.c y_tab.c
-${YACC} conftest.y
-if mv y.tab.c conftest.c > /dev/null 2>&1; then
-  YACCTAB=y.tab.
-else
-  mv y_tab.c conftest.c
-  YACCTAB=y_tab.
-fi
-if eval $ac_compile 2>&5; then
-  MOVE_YACC_TAB='$(MV) $(YACCTAB)c'
-  CLEAN_YACC_TAB=''
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-else
-  MOVE_YACC_TAB='tail $TAIL_N +2 $(YACCTAB)c >'
-  CLEAN_YACC_TAB='$(RM) $(YACCTAB)c'
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-fi
-rm -f conftest*
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ${YACC} / <malloc.h> / -DSGI_SOURCE / afree name clash" >&5
-$as_echo_n "checking for ${YACC} / <malloc.h> / -DSGI_SOURCE / afree name clash... " >&6; }
-cat > conftest.y <<EOF
-%{
-#include "confdefs.h"
-#define afree free
-%}
-%%
-all: 'a';
-%%
-int main(){ return 0; }
-int yyerror(){}
-int yylex(){ return 0; }
-EOF
-rm -f y.tab.c y_tab.c
-${YACC} conftest.y
-if mv y.tab.c conftest.c > /dev/null 2>&1; then
-  YACCTAB=y.tab.
-else
-  mv y_tab.c conftest.c
-  YACCTAB=y_tab.
-fi
-if eval $ac_compile 2>&5 ; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-else
-  EXTRA_CFLAGS="${EXTRA_CFLAGS} -U_SGI_SOURCE"
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-fi
-rm -f conftest*
-
 # check for a working sbrk().
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for a working sbrk()" >&5
 $as_echo_n "checking for a working sbrk()... " >&6; }
@@ -14439,7 +14404,6 @@ fi
 val_malloc="$with_malloc"
 
 fi
-
 
 
 
