@@ -1217,7 +1217,7 @@ if test "$tls_package" != "ssl"; then
 
         AC_CHECK_LIB(gcrypt,gcry_check_version, tmp="$PKGLIBS -lgcrypt")
 
-        if test "x$tmp" == "x" && test "x$gcrypt_path" != "x"; then
+        if test "x$tmp" = "x" && test "x$gcrypt_path" != "x"; then
             unset ac_cv_lib_gcrypt_main
             if test -d "${gcrypt_path}/lib/gcrypt"; then
                 CFLAGS="$saveflags -L${gcrypt_path}/lib/gcrypt"
@@ -1231,7 +1231,7 @@ if test "$tls_package" != "ssl"; then
             fi
         fi
 
-        if test "x$tmp" == "x"; then
+        if test "x$tmp" = "x"; then
             echo "libgcrypt library not found - disabling gcrypt support"
             AC_NOT_AVAILABLE(use-gcrypt)
             cdef_use_gcrypt="#undef"
@@ -1602,7 +1602,7 @@ if test "$lp_cv_has_pgsql" = "yes"; then
 
     AC_CHECK_LIB(pq,main, tmp="$PKGLIBS -lpq")
 
-    if test "x$pgsql_path" == "x"; then
+    if test "x$pgsql_path" = "x"; then
         unset ac_cv_lib_pq_main
         if test -d "${pgsql_path}/lib/pgsql"; then
             CFLAGS="$saveflags -L${pgsql_path}/lib/pgsql"
@@ -1616,7 +1616,7 @@ if test "$lp_cv_has_pgsql" = "yes"; then
         fi
     fi
 
-    if test "x$tmp" == "x"; then
+    if test "x$tmp" = "x"; then
         unset ac_cv_lib_pq_main
         if test -d "/usr/local/pgsql/lib"; then
             CFLAGS="$saveflags -L/usr/local/pgsql/lib"
@@ -1624,7 +1624,7 @@ if test "$lp_cv_has_pgsql" = "yes"; then
         fi
     fi
 
-    if test "x$tmp" == "x"; then
+    if test "x$tmp" = "x"; then
         echo "libpq library not found - disabling PostgreSQL support"
         AC_NOT_AVAILABLE(use-pgsql)
         cdef_use_pgsql="#undef"
