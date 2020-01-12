@@ -60,6 +60,11 @@ DESCRIPTION
                     Called just before an object will be destructed,
                     with the object as its first and only argument.
 
+                  ON_CHILD_PROCESS_TERMINATED
+                    Called without any arguments whenever a SIGCHLD signal
+                    was received. This could also happen for processes
+                    spawned by the driver itself (eg. erq).
+
           - unregister_hook(hook, function) -> None
                 Removes a hook function.
 

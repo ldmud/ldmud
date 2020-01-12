@@ -84,6 +84,10 @@ struct python_hook_s
 /* --- Variables --- */
 char * python_startup_script = NULL;
 
+static volatile bool python_pending_sigchld = false;
+ /* We received a SIGCHLD and need to pass it to Python.
+  */
+
 static bool python_is_external = true;
  /* Remember how python code was called,
   * false, when called from a running LPC program,
@@ -107,6 +111,7 @@ static const char* python_hook_names[] = {
     "ON_HEARTBEAT",
     "ON_OBJECT_CREATED",
     "ON_OBJECT_DESTRUCTED",
+    "ON_CHILD_PROCESS_TERMINATED",
 };
 
 static ldmud_gc_var_t *gc_object_list = NULL,
@@ -4349,7 +4354,11 @@ static PyMethodDef ldmud_methods[] =
         "    any LPC code of the object ran.\n\n"
         "  ON_OBJECT_DESTRUCTED\n"
         "    Called just before an object will be destructed,\n"
-        "    with the object as its first and only argument."
+        "    with the object as its first and only argument.\n\n"
+        "  ON_CHILD_PROCESS_TERMINATED\n"
+        "    Called without any arguments whenever a SIGCHLD signal\n"
+        "    was received. This could also happen for processes\n"
+        "    spawned by the driver itself (eg. erq)."
     },
 
     {
@@ -5420,6 +5429,31 @@ void python_interrupt ()
 {
     Py_AddPendingCall(&python_process_interrupt, NULL);
 } /* python_interrupt */
+
+/*-------------------------------------------------------------------------*/
+void
+python_handle_sigchld ()
+
+/* Called from the SIGCHLD signal handler.
+ * We will remember that and handle it in the backend loop.
+ */
+
+{
+    comm_return_to_backend = true;
+    python_pending_sigchld = true;
+} /* python_handle_sigchld */
+
+/*-------------------------------------------------------------------------*/
+void
+python_process_pending_jobs ()
+
+{
+    if (python_pending_sigchld)
+    {
+        python_pending_sigchld = false;
+        python_call_hook(PYTHON_HOOK_ON_SIGCHLD, true);
+    }
+} /* python_handle_sigchld */
 
 /*-------------------------------------------------------------------------*/
 const char*

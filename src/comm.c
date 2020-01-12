@@ -46,10 +46,11 @@
  * Timing is implemented this way: The driver usually stays in the input
  * loop, waiting in 1 second intervals for incoming data. An alarm() is
  * triggered by backend.c every 2 seconds and sets the flag variable
- * comm_time_to_call_heart_beat. The loop checks this variable every second
- * and, if it is set, aborts its input loop and returns to the backend.
- * To mark the cause of the return, the variable time_to_call_heart_beat is
- * set before return.
+ * comm_time_to_call_heart_beat and comm_return_to_backend. The loop checks
+ * the later variable every second and, if it is set, aborts its input loop
+ * and returns to the backend. To mark the cause of the return, the variable
+ * time_to_call_heart_beat is set before return when
+ * comm_time_to_call_heart_beat was set as well.
  *
  * TODO: The noecho/charmode logic, especially in combination with
  * TODO:: the telnet machine is frustratingly underdocumented.
@@ -103,8 +104,6 @@
 #    include <sys/param.h>
 #endif
 
-#include <signal.h>
-
 #if defined(_AIX)
 #    include <sys/select.h>
 #endif
@@ -155,6 +154,7 @@
 /* if driver is compiled for ERQ demon then include the necessary file
  */
 #ifdef ERQ_DEMON
+#    include <sys/wait.h>
 #    ifdef ERQ_INCLUDE
 #        include ERQ_INCLUDE
 #    else
@@ -193,9 +193,6 @@ extern int socketpair(int, int, int, int[2]);
 
 #ifndef EPROTO
 #    define EPROTO EINTR
-#endif
-#ifndef SIGCLD
-#    define SIGCLD SIGCHLD
 #endif
 
 #ifndef MAXHOSTNAMELEN
@@ -291,9 +288,18 @@ statcounter_t inet_volume_in = 0;
 #ifdef ERQ_DEMON
 
 #define MAX_PENDING_ERQ  32  /* Max number of pending requests */
+#define MAX_ERQ_PIDS      5  /* Maximum number of ERQ processes to wait. */
 
 #define FLAG_NO_ERQ   -2    /* No ERQ connected */
 #define FLAG_ERQ_STOP -1    /* Severing connection */
+
+
+static pid_t erq_pids[MAX_ERQ_PIDS];
+  /* PIDs of child processes we started. To prevent zombie processes we
+   * have to wait() for them after they terminated. And because there may
+   * be some overlap between starting a new one and killing the old one
+   * we remember more than one PID.
+   */
 
 static SOCKET_T erq_demon = FLAG_NO_ERQ;
   /* Socket of the connection to the erq demon. */
@@ -2197,7 +2203,7 @@ get_message (char *buff, size_t *bufflength)
             int retries;  /* retries of select() after EINTR */
 
             flush_all_player_mess();
-            twait = comm_time_to_call_heart_beat ? 0 : 1;
+            twait = comm_return_to_backend ? 0 : 1;
               /* If the heart_beat is due, just check the state
                * of the sockets, but don't wait.
                */
@@ -2278,7 +2284,7 @@ get_message (char *buff, size_t *bufflength)
                          * But finish the select call since we already have
                          * prepared readfds.
                          */
-                        if (comm_time_to_call_heart_beat)
+                        if (comm_return_to_backend)
                             twait = 0;
                         if (--retries >= 0)
                             continue;
@@ -2640,6 +2646,8 @@ get_message (char *buff, size_t *bufflength)
                 time_to_call_heart_beat = MY_TRUE;
                 return MY_FALSE;
             }
+            if (comm_return_to_backend)
+                return MY_FALSE;
         } /* if (no NextCmdGiver) */
 
         /* See if we got any udp messages.
@@ -5630,8 +5638,6 @@ start_erq_demon (const char *suffix, size_t suffixlen)
         return;
     }
 
-    (void)signal(SIGCLD, SIG_IGN); /* don't create zombie processes */
-
     printf("%s Attempting to start erq '%s%s'.\n"
           , time_stamp(), erq_file, suffix);
     debug_message("%s Attempting to start erq '%s%s'.\n"
@@ -5663,9 +5669,23 @@ start_erq_demon (const char *suffix, size_t suffixlen)
     }
 
     close(sockets[0]);
-    if (pid == -1) {
+    if (pid == -1)
+    {
         close(sockets[1]);
         return;
+    }
+    else
+    {
+        bool found = false;
+        for (i = 0; i < MAX_ERQ_PIDS; i++)
+            if (!erq_pids[i])
+            {
+                erq_pids[i] = pid;
+                found = true;
+                break;
+            }
+        if (!found)
+            erq_pids[0] = pid;
     }
 
     /* Read the first character from the ERQ. If it's '0', the ERQ
@@ -5688,6 +5708,24 @@ start_erq_demon (const char *suffix, size_t suffixlen)
     if (socket_number(erq_demon) >= min_nfds)
         min_nfds = socket_number(erq_demon)+1;
 } /* start_erq_demon() */
+
+/*-------------------------------------------------------------------------*/
+void
+wait_erq_demon ()
+
+/* Calls wait() upon the ERQ demon. This function is called whenever we
+ * we received a SIGCHLD to check whether there is a zombie ERQ process.
+ */
+
+{
+    for (int i = 0; i < MAX_ERQ_PIDS; i++)
+        if (erq_pids[i])
+        {
+            pid_t result =  waitpid(erq_pids[i], NULL, WNOHANG);
+            if (result < 0 || result == erq_pids[i])
+                erq_pids[i] = 0;
+        }
+} /* wait_erq_demon() */
 
 /*-------------------------------------------------------------------------*/
 static void

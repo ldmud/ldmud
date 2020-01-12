@@ -25,6 +25,7 @@ struct statistic_s
 extern mp_int current_time;
 extern Bool time_to_call_heart_beat;
 extern volatile Bool comm_time_to_call_heart_beat;
+extern volatile Bool comm_return_to_backend;
 extern uint32 total_player_commands;
 extern volatile mp_int total_alarms;
 extern uint num_listed_objs;

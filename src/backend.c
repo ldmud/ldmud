@@ -105,6 +105,11 @@ volatile Bool comm_time_to_call_heart_beat = MY_FALSE;
    *   causes comm.c to set time_to_call_heart_beat.
    */
 
+volatile Bool comm_return_to_backend = MY_FALSE;
+  /* True: A signal to be handled by the backend has happened.
+   *   This causes comm.c to return without handling any further messages.
+   */
+
 volatile mp_int total_alarms = 0;
   /* The total number of alarm()s so far, incremented from the alarm handler.
    */
@@ -321,6 +326,21 @@ do_state_check (int minlvl, const char *where)
 static bool install_sigint_handler();
 
 static void
+handle_sigchild (int sig)
+
+/* Handler for SIGCHLD signal. We inform comm (for erq) and Python.
+ */
+{
+#ifdef ERQ_DEMON
+    wait_erq_demon();
+#endif
+#ifdef USE_PYTHON
+    /* Notify the python package. */
+    python_handle_sigchld();
+#endif
+}
+
+static void
 handle_signal (int sig)
 
 /* General signal handler:
@@ -387,6 +407,7 @@ handle_signal (int sig)
             /* Process it in the backend loop. */
             sigaddset(&pending_signals, sig);
             extra_jobs_to_do = MY_TRUE;
+            comm_return_to_backend = MY_TRUE;
             return;
     }
 
@@ -637,6 +658,12 @@ void install_signal_handlers()
     if (sigaction(SIGTERM, &sa, NULL) == -1)
         perror("Unable to install signal handler for SIGTERM");
 
+    sa.sa_handler = handle_sigchild;
+    sa.sa_flags = SA_NOCLDSTOP;
+    if (sigaction(SIGCHLD, &sa, NULL) == -1)
+        perror("Unable to install signal handler for SIGCHLD");
+
+    handle_sigchild(SIGCHLD); /* In case we already have some zombies. */
 }
 /*-------------------------------------------------------------------------*/
 void
@@ -865,6 +892,10 @@ backend (void)
 
         } /* if (extra_jobs_to_do */
 
+#ifdef USE_PYTHON
+        python_process_pending_jobs();
+#endif /* USE_PYTHON */
+
         do_state_check(2, "before get_message()");
 
         /*
@@ -968,6 +999,9 @@ backend (void)
             (void)time_stamp();
         } /* if (get_message()) */
 
+        /* get_message() returned... */
+        comm_return_to_backend = MY_FALSE;
+
         /* Do the periodic functions if it's time.
          */
         if (time_to_call_heart_beat)
@@ -1043,7 +1077,7 @@ backend (void)
 
 #ifdef ALARM_HANDLER
 
-ALARM_HANDLER(catch_alarm, alarm_called = MY_TRUE; comm_time_to_call_heart_beat = MY_TRUE; total_alarms++; )
+ALARM_HANDLER(catch_alarm, alarm_called = MY_TRUE; comm_return_to_backend = MY_TRUE; comm_time_to_call_heart_beat = MY_TRUE; total_alarms++; )
 
 #else
 
@@ -1054,6 +1088,7 @@ catch_alarm (int dummy UNUSED)
 #    pragma unused(dummy)
 #endif
     alarm_called = MY_TRUE;
+    comm_return_to_backend = MY_TRUE;
     comm_time_to_call_heart_beat = MY_TRUE;
     total_alarms++;
 }
@@ -1130,6 +1165,7 @@ void check_alarm (void)
         }
         last_alarm_time = curtime; /* Since we just restarted it */
 
+        comm_return_to_backend = MY_TRUE;
         comm_time_to_call_heart_beat = MY_TRUE;
         time_to_call_heart_beat = MY_TRUE;
     }

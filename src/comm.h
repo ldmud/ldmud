@@ -415,6 +415,7 @@ extern svalue_t *v_input_to (svalue_t *sp, int num_arg);
 
 #ifdef ERQ_DEMON
 extern void  start_erq_demon(const char *suffix, size_t suffixlen);
+extern void  wait_erq_demon();
 extern svalue_t *f_attach_erq_demon(svalue_t *sp);
 extern svalue_t *f_send_erq(svalue_t *sp);
 #endif
