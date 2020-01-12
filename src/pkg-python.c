@@ -5249,8 +5249,8 @@ python_set_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int *nfds)
         if(events & POLLPRI)
             FD_SET(fds->fd, exceptfds);
 
-        if(events & (POLLIN|POLLOUT|POLLPRI))
-            (*nfds)++;
+        if((events & (POLLIN|POLLOUT|POLLPRI)) && *nfds <= fds->fd)
+            (*nfds) = fds->fd + 1;
     }
 } /* python_set_fds */
 
