@@ -5263,8 +5263,30 @@ python_handle_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfd
  */
 
 {
-    python_is_external = true;
-    interrupt_execution = false;
+    int num_cbs = 0, pos_cbs = 0;
+    PyObject **cb_funs, **cb_args;
+
+    /* First count the number of calls we need to make. */
+    for (python_poll_fds_t *fds = poll_fds; fds != NULL; fds = fds->next)
+        if (FD_ISSET(fds->fd, readfds) || FD_ISSET(fds->fd, writefds) || FD_ISSET(fds->fd, exceptfds))
+            num_cbs++;
+
+    /* Nothign to do? */
+    if (!num_cbs)
+        return;
+
+    /* Then we collect the callbacks. We can't do them while we are
+     * iterating through the structure, because they may alter the
+     * structure in the meanwhile.
+     */
+    cb_funs = xalloc(sizeof(PyObject*)*num_cbs);
+    cb_args = xalloc(sizeof(PyObject*)*num_cbs);
+
+    /* If we don't have any memory, we skip it now.
+     * They will be checked the next time around, too.
+     */
+    if (!cb_funs || !cb_args)
+        return;
 
     for (python_poll_fds_t *fds = poll_fds; fds != NULL; fds = fds->next)
     {
@@ -5281,7 +5303,7 @@ python_handle_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfd
 
         if (events != 0)
         {
-            PyObject *result, *args, *arg;
+            PyObject *args, *arg;
 
             args = PyTuple_New(1);
             if (args == NULL)
@@ -5300,19 +5322,37 @@ python_handle_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfd
 
             PyTuple_SET_ITEM(args, 0, arg);
 
-            result = PyObject_CallObject(fds->fun, args);
-            Py_XDECREF(args);
-
-            if (result == NULL)
-            {
-                /* Exception occurred. */
-                if (PyErr_Occurred())
-                    PyErr_Print();
-            }
-            else
-                Py_DECREF(result);
+            Py_INCREF(fds->fun);
+            cb_funs[pos_cbs] = fds->fun;
+            cb_args[pos_cbs] = args;
+            pos_cbs++;
         }
     }
+
+    assert(pos_cbs == num_cbs);
+
+    /* And now call them. */
+    python_is_external = true;
+    interrupt_execution = false;
+
+    for (int i = 0; i < pos_cbs; i++)
+    {
+        PyObject *result = PyObject_CallObject(cb_funs[i], cb_args[i]);
+        Py_DECREF(cb_funs[i]);
+        Py_DECREF(cb_args[i]);
+
+        if (result == NULL)
+        {
+            /* Exception occurred. */
+            if (PyErr_Occurred())
+                PyErr_Print();
+        }
+        else
+            Py_DECREF(result);
+    }
+
+    xfree(cb_funs);
+    xfree(cb_args);
 } /* python_handle_fds */
 
 /*-------------------------------------------------------------------------*/
