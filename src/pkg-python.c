@@ -12,6 +12,7 @@
 
 #include <poll.h>
 
+#include "actions.h"
 #include "array.h"
 #include "closure.h"
 #include "exec.h"
@@ -39,6 +40,10 @@
 
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
+
+#if PY_VERSION_HEX >= 0x03070000
+#define USE_PYTHON_CONTEXT
+#endif
 
 /* --- Type declarations --- */
 typedef struct ldmud_gc_var_s ldmud_gc_var_t;
@@ -123,12 +128,23 @@ static ldmud_gc_var_t *gc_object_list = NULL,
                       *gc_symbol_list = NULL,
                       *gc_quoted_array_list = NULL;
 
+#ifdef USE_PYTHON_CONTEXT
+static PyObject * python_contextvar_current_object = NULL;
+static PyObject * python_contextvar_command_giver = NULL;
+  /* Context variables that store the current object
+   * and command giver.
+   */
+#endif
+
 /* -- Function prototypes --- */
 static lpctype_t* pythontype_to_lpctype(PyObject* ptype);
 static const char* python_to_svalue(svalue_t *dest, PyObject* val);
 static PyObject* svalue_to_python (svalue_t *svp);
 static bool python_eq_svalue(PyObject* pval, svalue_t *sval);
 static bool call_lpc_secure(CClosureFun fun, void* data);
+static void python_save_context();
+static void python_clear_context();
+static void python_restore_context();
 
 /* -- Python definitions and functions --- */
 
@@ -3348,7 +3364,7 @@ ldmud_closure_call_closure(struct ldmud_closure_call_closure_s* data)
 static PyObject*
 ldmud_closure_call(ldmud_closure_t *cl, PyObject *arg, PyObject *kw)
 {
-    if(!current_object)
+    if(!(python_is_external ? master_ob : current_object))
     {
         PyErr_SetString(PyExc_RuntimeError, "can't call a closure without a current object");
         return NULL;
@@ -4079,7 +4095,7 @@ ldmud_efun_call_efun(struct ldmud_efun_call_closure_s* data)
 static PyObject*
 ldmud_efun_call(ldmud_efun_t *func, PyObject *arg, PyObject *kw)
 {
-    if(!current_object)
+    if(!(python_is_external ? master_ob : current_object))
     {
         PyErr_SetString(PyExc_RuntimeError, "can't call an efun without a current object");
         return NULL;
@@ -4102,7 +4118,9 @@ ldmud_efun_call(ldmud_efun_t *func, PyObject *arg, PyObject *kw)
         struct ldmud_efun_call_closure_s data = { { T_CLOSURE}, (int)PyTuple_GET_SIZE(arg)};
 
         data.efun_closure.x.closure_type = (short)(func->efun_idx + CLOSURE_EFUN);
-        data.efun_closure.u.ob = current_object;
+        if (python_is_external)
+            python_restore_context();
+        data.efun_closure.u.ob = current_object == NULL ? master_ob : current_object;
 
         /* Put all arguments on the stack. */
         for (int i = 0; i < data.num_arg; i++)
@@ -4941,7 +4959,9 @@ call_lpc_secure (CClosureFun fun, void* data)
             /* We do externally called python code
              * in the context of the master ob.
              */
-            current_object = master_ob;
+            python_restore_context();
+            if (!current_object)
+                current_object = master_ob;
             mark_start_evaluation();
         }
 
@@ -4959,6 +4979,128 @@ call_lpc_secure (CClosureFun fun, void* data)
 
     return result;
 } /* call_lpc_secure */
+
+/*-------------------------------------------------------------------------*/
+#ifdef USE_PYTHON_CONTEXT
+static void
+python_save_contextvar_object (PyObject** contextvar, const char* name, object_t* object)
+
+/* Save the given object into a the corresponding Python context variable.
+ */
+
+{
+    PyObject *tok, *ob;
+
+    if (!*contextvar)
+    {
+        if (!object)
+            return;
+
+        *contextvar = PyContextVar_New(name, NULL);
+    }
+
+    if (object)
+        ob = ldmud_object_create(object);
+    else
+    {
+        Py_INCREF(Py_None);
+        ob = Py_None;
+    }
+    if (!ob)
+        PyErr_Clear();
+    else
+    {
+        tok = PyContextVar_Set(*contextvar, ob);
+        if (!tok)
+            PyErr_Clear();
+        else
+            Py_DECREF(tok);
+        Py_DECREF(ob);
+    }
+} /* python_save_contextvar_object() */
+#endif
+
+/*-------------------------------------------------------------------------*/
+static void
+python_save_context ()
+
+/* Save the current context (current object, current command giver) into
+ * the corresponding Python context variables.
+ */
+
+{
+#ifdef USE_PYTHON_CONTEXT
+    python_save_contextvar_object(&python_contextvar_current_object, "ldmud.current_object", current_object);
+    python_save_contextvar_object(&python_contextvar_command_giver, "ldmud.command_giver", command_giver);
+#endif
+} /* python_save_context() */
+
+/*-------------------------------------------------------------------------*/
+static void
+python_clear_context ()
+
+/* Clear the current context in the Python context variables.
+ */
+
+{
+#ifdef USE_PYTHON_CONTEXT
+    python_save_contextvar_object(&python_contextvar_current_object, "ldmud.current_object", NULL);
+    python_save_contextvar_object(&python_contextvar_command_giver, "ldmud.command_giver", NULL);
+#endif
+} /* python_clear_context() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef USE_PYTHON_CONTEXT
+static void
+python_restore_contextvar_object (PyObject* contextvar, object_t** object)
+
+/* Restore an object from the corresponding Python context variable.
+ */
+
+{
+    PyObject *val;
+
+    if (!contextvar)
+        return;
+
+    if (PyContextVar_Get(contextvar, NULL, &val) < 0)
+    {
+        PyErr_Clear();
+        *object = NULL;
+    }
+    else if (val == NULL)
+        *object = NULL;
+    else if (val == Py_None || !ldmud_object_check(val))
+    {
+        *object = NULL;
+        Py_DECREF(val);
+    }
+    else
+    {
+        *object = ((ldmud_object_t*)val)->lpc_object;
+        Py_DECREF(val);
+    }
+} /* python_restore_contextvar_object() */
+#endif
+
+/*-------------------------------------------------------------------------*/
+static void
+python_restore_context ()
+
+/* Restore the current context (current object, current command giver) from
+ * the corresponding Python context variables. Should only be called for
+ * external calls.
+ */
+
+{
+#ifdef USE_PYTHON_CONTEXT
+    python_restore_contextvar_object(python_contextvar_current_object, &current_object);
+    python_restore_contextvar_object(python_contextvar_command_giver, &command_giver);
+#else
+    current_object = NULL;
+    command_giver = NULL;
+#endif
+} /* python_restore_context() */
 
 /*=========================================================================*/
 
@@ -5136,6 +5278,7 @@ call_python_efun (int idx, int num_arg)
     inter_sp = pop_n_elems(num_arg, inter_sp);
 
     python_is_external = false;
+    python_save_context();
     result = PyObject_CallObject(python_efun_entry->callable, args);
     python_is_external = was_external;
     Py_XDECREF(args);
@@ -5212,6 +5355,7 @@ python_set_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int *nfds)
 {
     python_is_external = true;
     interrupt_execution = false;
+    python_clear_context();
 
     for (python_poll_fds_t *fds = poll_fds; fds != NULL; fds = fds->next)
     {
@@ -5334,6 +5478,7 @@ python_handle_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfd
     /* And now call them. */
     python_is_external = true;
     interrupt_execution = false;
+    python_clear_context();
 
     for (int i = 0; i < pos_cbs; i++)
     {
@@ -5366,7 +5511,12 @@ python_call_hook (int hook, bool is_external)
     bool was_external = python_is_external;
     python_is_external = is_external;
     if (is_external)
+    {
+        python_clear_context();
         interrupt_execution = false;
+    }
+    else
+        python_save_context();
 
     for(python_hook_t *entry = python_hooks[hook]; entry; entry = entry->next)
     {
@@ -5395,12 +5545,17 @@ python_call_hook_object (int hook, bool is_external, object_t *ob)
 
 {
     bool was_external = python_is_external;
-    if (is_external)
-        interrupt_execution = false;
-
     PyObject *args, *arg;
     if (python_hooks[hook] == NULL)
         return;
+
+    if (is_external)
+    {
+        python_clear_context();
+        interrupt_execution = false;
+    }
+    else
+        python_save_context();
 
     args = PyTuple_New(1);
     if (args == NULL)
