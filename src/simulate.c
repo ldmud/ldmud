@@ -3579,6 +3579,12 @@ convert_path_to_native (const char* path, size_t len)
 {
     static char buf[MAXPATHLEN];
 
+    if (!len)
+    {
+        buf[0] = 0;
+        return buf;
+    }
+
     size_t result = convert_path_to_native_buf(path, len, buf, sizeof(buf));
     if (result)
         return buf;
