@@ -788,6 +788,12 @@ void run_test()
                 sprintf("%c", 0x110000);
             :)
         }),
+        ({ "Lexer handling of multi-byte characters.", 0,
+            (:
+                object ob = load_object("/utf-8-on-boundary.c");
+                return ob->run_test();
+            :)
+        }),
     }),
     (:
         if($1)

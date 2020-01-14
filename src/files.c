@@ -361,7 +361,7 @@ iconv_error_handler (error_handler_t *arg)
 {
     struct iconv_error_context *ecp = (struct iconv_error_context *)arg;
 
-    if (ecp->cd != (iconv_t)-1)
+    if (iconv_valid(ecp->cd))
         iconv_close(ecp->cd);
     xfree(ecp);
 
@@ -1148,7 +1148,7 @@ get_file_encoding (string_t* filename, bool source)
     else
         cd = iconv_open(encoding == NULL ? "ascii" : get_txt(encoding), "utf-8");
 
-    if (cd == (iconv_t)-1)
+    if (!iconv_valid(cd))
         errorf("Unsupported encoding '%s'.\n", get_txt(encoding));
 
     return cd;
@@ -1342,7 +1342,7 @@ v_read_file (svalue_t *sp, int num_arg)
     /* Get the arguments */
     start = 0;
     len = 0;
-    cd = (iconv_t)-1;
+    cd = iconv_init();
 
     if (num_arg > 1)
     {
@@ -1353,7 +1353,7 @@ v_read_file (svalue_t *sp, int num_arg)
             if (num_arg == 4)
             {
                 cd = iconv_open("utf-8", get_txt(arg[3].u.str));
-                if (cd == (iconv_t)-1)
+                if (!iconv_valid(cd))
                     errorf("Unsupported encoding '%s'.\n", get_txt(arg[3].u.str));
 
                 free_mstring(arg[3].u.str);
@@ -1394,7 +1394,7 @@ v_read_file (svalue_t *sp, int num_arg)
         if (!file)
             break;
 
-        if (cd == (iconv_t)-1)
+        if (!iconv_valid(cd))
         {
             push_string(inter_sp, file); /* In case of an error. */
             iec->cd = cd = get_file_encoding(arg[0].u.str, true);
@@ -1820,7 +1820,7 @@ v_write_file (svalue_t *sp, int num_arg)
 {
     struct iconv_error_context* iec;
     svalue_t *arg = sp - num_arg + 1;
-    iconv_t cd = (iconv_t)-1;
+    iconv_t cd = iconv_init();
     int flags = 0;
     int rc = 0;
 
@@ -1830,7 +1830,7 @@ v_write_file (svalue_t *sp, int num_arg)
         if (num_arg > 3)
         {
             cd = iconv_open(get_txt(arg[3].u.str), "utf-8");
-            if (cd == (iconv_t)-1)
+            if (!iconv_valid(cd))
                 errorf("Unsupported encoding '%s'.\n", get_txt(arg[3].u.str));
             free_mstring(arg[3].u.str);
             sp--;
@@ -1859,7 +1859,7 @@ v_write_file (svalue_t *sp, int num_arg)
         push_ref_string(inter_sp, file); /* Save the reference for later... */
         native = convert_path_str_to_native_or_throw(file);
 
-        if (cd == (iconv_t)-1)
+        if (!iconv_valid(cd))
             iec->cd = cd = get_file_encoding(arg[0].u.str, false);
 
         if (flags & 1)

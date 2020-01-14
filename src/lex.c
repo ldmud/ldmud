@@ -29,7 +29,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include <fcntl.h>
-#include <iconv.h>
 #include <ctype.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -49,6 +48,7 @@
 #include "filestat.h"
 #include "gcollect.h"
 #include "hash.h"
+#include "iconv_opt.h"
 #include "instrs.h"
 #include "interpret.h"
 #include "lang.h"
@@ -2273,7 +2273,7 @@ set_input_source (int fd, const char* fname, string_t * str)
         }
 
         yyin.cd = iconv_open("utf-8", encoding == NULL ? "ascii" : get_txt(encoding));
-        if (yyin.cd == (iconv_t)-1)
+        if (!iconv_valid(yyin.cd))
         {
             if (errno == EINVAL)
                 lexerrorf("Unsupported encoding '%s'.", get_txt(encoding));
@@ -2287,7 +2287,7 @@ set_input_source (int fd, const char* fname, string_t * str)
             if (yyin.convbuf == NULL)
             {
                 iconv_close(yyin.cd);
-                yyin.cd = (iconv_t)-1;
+                yyin.cd = iconv_init();
                 lexerror("Out of memory while allocating file buffer.");
             }
             else
@@ -2298,7 +2298,7 @@ set_input_source (int fd, const char* fname, string_t * str)
         }
     }
     else
-        yyin.cd = (iconv_t)-1;
+        yyin.cd = iconv_init();
 
     yyin.str = str ? ref_mstring(str) : NULL;
     yyin.current = 0;
@@ -2319,10 +2319,10 @@ close_input_source (bool dontclosefd)
             close(yyin.fd);
         yyin.fd = -1;
     }
-    if (yyin.cd != (iconv_t)-1)
+    if (iconv_valid(yyin.cd))
     {
         iconv_close(yyin.cd);
-        yyin.cd = (iconv_t)-1;
+        yyin.cd = iconv_init();
     }
     if (yyin.convbuf != NULL)
     {
@@ -2411,7 +2411,7 @@ _myfilbuf (void)
     p = linebufstart; /* == linebufend - MAXLINE */
     if (yyin.fd != -1)
     {
-        if (yyin.cd != (iconv_t)-1)
+        if (iconv_valid(yyin.cd))
         {
             size_t outleft = MAXLINE;
             char*  outptr  = p;

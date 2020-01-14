@@ -3360,11 +3360,11 @@ set_encoding (interactive_t *ip, const char* encoding)
     else
         receiving = iconv_open("UTF-8", encoding);
 
-    if (receiving == (iconv_t)-1)
+    if (!iconv_valid(receiving))
         return false;
 
     sending = iconv_open(encoding, "UTF-8");
-    if (sending == (iconv_t)-1)
+    if (!iconv_valid(sending))
     {
         iconv_close(receiving);
         return false;
@@ -3372,11 +3372,11 @@ set_encoding (interactive_t *ip, const char* encoding)
 
     strcpy(ip->encoding, encoding);
 
-    if (ip->receive_cd != (iconv_t)-1)
+    if (iconv_valid(ip->receive_cd))
     {
         iconv_close(ip->receive_cd);
     }
-    if (ip->send_cd != (iconv_t)-1)
+    if (iconv_valid(ip->send_cd))
     {
         iconv_close(ip->send_cd);
     }
@@ -3584,8 +3584,8 @@ new_player ( object_t *ob, SOCKET_T new_socket
     new_interactive->write_size = 0;
     new_interactive->write_max_size = -2;
 
-    new_interactive->receive_cd = (iconv_t) -1;
-    new_interactive->send_cd = (iconv_t) -1;
+    new_interactive->receive_cd = iconv_init();
+    new_interactive->send_cd = iconv_init();
     if (!set_encoding(new_interactive, default_player_encoding))
     {
         if (errno == EINVAL)
@@ -8646,7 +8646,7 @@ f_configure_interactive (svalue_t *sp)
         {
             /* Let's check the encoding before setting it as the default. */
             iconv_t cd = iconv_open(get_txt(sp->u.str), "UTF-8");
-            if (cd == (iconv_t)-1)
+            if (!iconv_valid(cd))
             {
                 if (errno == EINVAL)
                     errorf("Error setting default encoding: unsupported encoding '%s'.\n", get_txt(sp->u.str));

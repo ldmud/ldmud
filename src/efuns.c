@@ -88,7 +88,6 @@
 #include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <iconv.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -110,6 +109,7 @@
 #include "exec.h"
 #include "gcollect.h"
 #include "heartbeat.h"
+#include "iconv_opt.h"
 #include "interpret.h"
 #include "lex.h"
 #include "main.h"
@@ -8993,7 +8993,7 @@ f_configure_driver (svalue_t *sp)
             {
                 /* We do a quick check. */
                 iconv_t cd = iconv_open(get_txt(sp->u.str), "UTF-8");
-                if (cd == (iconv_t)-1)
+                if (!iconv_valid(cd))
                     errorf("Unknown encoding '%s'.\n", get_txt(sp->u.str));
 
                 iconv_close(cd);

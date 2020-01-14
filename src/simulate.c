@@ -25,7 +25,6 @@
 #include "my-alloca.h"
 #include <assert.h>
 #include <fcntl.h>
-#include <iconv.h>
 #include <langinfo.h>
 #include <locale.h>
 #include <setjmp.h>
@@ -49,6 +48,7 @@
 #include "filestat.h"
 #include "gcollect.h"
 #include "heartbeat.h"
+#include "iconv_opt.h"
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
@@ -3522,7 +3522,7 @@ convert_path_encoding (const char* pathenc, const char* path, size_t len, const 
     size_t out_buf_left = buflen;
 
     cd = iconv_open(bufenc, pathenc);
-    if (cd == (iconv_t)-1)
+    if (!iconv_valid(cd))
         return 0;
 
     while (true)

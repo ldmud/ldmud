@@ -4,11 +4,11 @@
 #include "driver.h"
 #include "typedefs.h"
 #include <sys/types.h>
-#include <iconv.h>
 #ifdef USE_MCCP
 #    include <zlib.h>
 #endif
 
+#include "iconv_opt.h"
 #include "simulate.h"   /* callback_t for TLS */
 #include "svalue.h"
 #include "pkg-tls.h"

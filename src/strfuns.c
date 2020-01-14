@@ -39,12 +39,12 @@
 #include <string.h>
 #include <sys/types.h>
 #include <assert.h>
-#include <iconv.h>
 
 #include "strfuns.h"
 
 #include "array.h"
 #include "comm.h"
+#include "iconv_opt.h"
 #include "interpret.h"
 #include "main.h"
 #include "mapping.h"
@@ -883,7 +883,7 @@ v_to_bytes (svalue_t *sp, int num_arg)
             size_t endianoffset = bigendian ? (sizeof(p_int) - 4) : 0;
 
             cd = iconv_open(get_txt(sp->u.str), bigendian ? "UTF-32BE" : "UTF-32LE");
-            if (cd == (iconv_t)-1)
+            if (!iconv_valid(cd))
             {
                 if (errno == EINVAL)
                     errorf("Bad arg 2 to to_bytes(): Unsupported encoding '%s'.\n", get_txt(sp->u.str));
@@ -1012,7 +1012,7 @@ v_to_bytes (svalue_t *sp, int num_arg)
             size_t out_buf_left;
 
             cd = iconv_open(get_txt(sp->u.str), "UTF-8");
-            if (cd == (iconv_t)-1)
+            if (!iconv_valid(cd))
             {
                 if (errno == EINVAL)
                     errorf("Bad arg 2 to to_bytes(): Unsupported encoding '%s'.\n", get_txt(sp->u.str));
@@ -1246,7 +1246,7 @@ v_to_text (svalue_t *sp, int num_arg)
             errorf("Bad arg 1 to to_text(): unicode string and encoding given.\n");
 
         cd = iconv_open("UTF-8", get_txt(sp->u.str));
-        if (cd == (iconv_t)-1)
+        if (!iconv_valid(cd))
         {
             if (errno == EINVAL)
                 errorf("Bad arg 2 to to_text(): Unsupported encoding '%s'.\n", get_txt(sp->u.str));

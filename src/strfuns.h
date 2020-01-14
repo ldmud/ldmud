@@ -1,9 +1,8 @@
 #ifndef STRFUNS_H_
 #define STRFUNS_H_ 1
 
-#include <iconv.h>
-
 #include "driver.h"
+#include "iconv_opt.h"
 #include "typedefs.h"
 
 #include <sys/types.h> /* TODO: Does C99 guarantee u_long in here? */
