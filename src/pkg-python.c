@@ -365,7 +365,7 @@ python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
     PyErr_Clear();
 
     return Py_None;
-} /* python_register_efun */
+} /* python_register_efun() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -419,7 +419,7 @@ python_unregister_efun (PyObject *module, PyObject *args, PyObject *kwds)
 
     Py_INCREF(Py_None);
     return Py_None;
-} /* python_register_efun */
+} /* python_unregister_efun() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -496,7 +496,7 @@ python_register_socket (PyObject *module, PyObject *args, PyObject *kwds)
 
     Py_INCREF(Py_None);
     return Py_None;
-} /* python_register_socket */
+} /* python_register_socket() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -532,7 +532,7 @@ python_unregister_socket (PyObject *module, PyObject *args, PyObject *kwds)
 
     Py_INCREF(Py_None);
     return Py_None;
-} /* python_unregister_socket */
+} /* python_unregister_socket() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -579,7 +579,7 @@ python_register_hook (PyObject *module, PyObject *args, PyObject *kwds)
     Py_XINCREF(fun);
     Py_INCREF(Py_None);
     return Py_None;
-} /* python_register_hook */
+} /* python_register_hook() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -619,7 +619,7 @@ python_unregister_hook (PyObject *module, PyObject *args, PyObject *kwds)
 
     Py_INCREF(Py_None);
     return Py_None;
-} /* python_unregister_hook */
+} /* python_unregister_hook() */
 
 /*=========================================================================*/
 
@@ -711,7 +711,7 @@ add_gc_object (ldmud_gc_var_t** list, ldmud_gc_var_t* var)
         (*list)->gcprev = var;
     }
     *list = var;
-} /* add_gc_object */
+} /* add_gc_object() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -737,7 +737,7 @@ remove_gc_object (ldmud_gc_var_t** list, ldmud_gc_var_t* var)
         if(var->gcnext)
             var->gcnext->gcprev = var->gcprev;
     }
-} /* remove_gc_object */
+} /* remove_gc_object() */
 
 /*-------------------------------------------------------------------------*/
 /* Objects */
@@ -755,7 +755,7 @@ ldmud_object_dealloc (ldmud_object_t* self)
     remove_gc_object(&gc_object_list, (ldmud_gc_var_t*)self);
 
     Py_TYPE(self)->tp_free((PyObject*)self);
-} /* ldmud_object_dealloc */
+} /* ldmud_object_dealloc() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -775,7 +775,7 @@ ldmud_object_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->lpc_object = NULL;
     add_gc_object(&gc_object_list, (ldmud_gc_var_t*)self);
     return (PyObject *)self;
-} /* ldmud_object_new */
+} /* ldmud_object_new() */
 
 /*-------------------------------------------------------------------------*/
 struct ldmud_object_init_closure_s
@@ -785,14 +785,14 @@ struct ldmud_object_init_closure_s
 };
 
 static void
-ldmud_object_init_getobject(struct ldmud_object_init_closure_s* data)
+ldmud_object_init_getobject (struct ldmud_object_init_closure_s* data)
 
 /* Helper function for ldmud_object_init().
  */
 
 {
     data->ob = get_object(data->filename);
-} /* ldmud_object_init_getobject */
+} /* ldmud_object_init_getobject() */
 
 static int
 ldmud_object_init (ldmud_object_t *self, PyObject *args, PyObject *kwds)
@@ -836,33 +836,31 @@ ldmud_object_init (ldmud_object_t *self, PyObject *args, PyObject *kwds)
         else
             return -1;
     }
-}
+} /* ldmud_object_init() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
 ldmud_object_repr (ldmud_object_t *val)
 
-/**
- * Return a string representation of this object.
+/* Return a string representation of this object.
  */
 
 {
     if(!val->lpc_object)
         return PyUnicode_FromString("<LPC empty object>");
     return PyUnicode_FromFormat("<LPC object /%s>", get_txt(val->lpc_object->name));
-}
+} /* ldmud_object_repr() */
 
 /*-------------------------------------------------------------------------*/
 static Py_hash_t
 ldmud_object_hash (ldmud_object_t *val)
 
-/**
- * Return a hash of this object.
+/* Return a hash of this object.
  */
 
 {
     return _Py_HashPointer(val->lpc_object);
-}
+} /* ldmud_object_hash() */
 
 /*-------------------------------------------------------------------------*/
 static bool ldmud_object_check(PyObject *ob);
@@ -870,8 +868,7 @@ static bool ldmud_object_check(PyObject *ob);
 static PyObject*
 ldmud_object_richcompare (ldmud_object_t *self, PyObject *other, int op)
 
-/**
- * Compare <self> to <other> with the compare operation <op>.
+/* Compare <self> to <other> with the compare operation <op>.
  */
 
 {
@@ -915,14 +912,13 @@ ldmud_object_richcompare (ldmud_object_t *self, PyObject *other, int op)
     resultval = result ? Py_True : Py_False;
     Py_INCREF(resultval);
     return resultval;
-}
+} /* ldmud_object_richcompare() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_get_name(ldmud_object_t *val, void *closure)
+ldmud_object_get_name (ldmud_object_t *val, void *closure)
 
-/**
- * Return the value for the name member.
+/* Return the value for the name member.
  */
 
 {
@@ -933,7 +929,7 @@ ldmud_object_get_name(ldmud_object_t *val, void *closure)
     }
 
     return PyUnicode_FromFormat("/%s", get_txt(val->lpc_object->name));
-}
+} /* ldmud_object_get_name() */
 
 /*-------------------------------------------------------------------------*/
 static PyMethodDef ldmud_object_methods[] =
@@ -999,7 +995,7 @@ ldmud_object_check (PyObject *ob)
 
 {
     return Py_TYPE(ob) == &ldmud_object_type;
-}
+} /* ldmud_object_check() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -1019,7 +1015,7 @@ ldmud_object_create (object_t* ob)
     add_gc_object(&gc_object_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_object_create */
+} /* ldmud_object_create() */
 
 /*-------------------------------------------------------------------------*/
 /* Arrays */
@@ -1040,7 +1036,7 @@ ldmud_array_dealloc (ldmud_array_t* self)
     remove_gc_object(&gc_array_list, (ldmud_gc_var_t*)self);
 
     Py_TYPE(self)->tp_free((PyObject*)self);
-} /* ldmud_array_dealloc */
+} /* ldmud_array_dealloc() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -1061,7 +1057,7 @@ ldmud_array_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
     add_gc_object(&gc_array_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_array_new */
+} /* ldmud_array_new() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1082,7 +1078,7 @@ python_error_handler (const char *fmt, ...)
     va_end(va);
 
     PyErr_SetString(PyExc_MemoryError, msg);
-} /* python_error_handler */
+} /* python_error_handler() */
 /*-------------------------------------------------------------------------*/
 
 static int
@@ -1244,7 +1240,7 @@ ldmud_array_init (ldmud_array_t *self, PyObject *args, PyObject *kwds)
 
         return PyErr_Occurred() ? -1 : 0;
     }
-} /* ldmud_array_init */
+} /* ldmud_array_init() */
 
 /*-------------------------------------------------------------------------*/
 static Py_ssize_t
@@ -1255,7 +1251,7 @@ ldmud_array_length (ldmud_array_t *val)
 
 {
     return VEC_SIZE(val->lpc_array);
-} /* ldmud_array_length */
+} /* ldmud_array_length() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -1310,7 +1306,7 @@ ldmud_array_concat (ldmud_array_t *val, PyObject *second)
         result->lpc_array = vec;
         return (PyObject*)result;
     }
-} /* ldmud_array_concat */
+} /* ldmud_array_concat() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -1353,7 +1349,7 @@ ldmud_array_repeat (ldmud_array_t *val, Py_ssize_t num)
 
     result->lpc_array = vec;
     return (PyObject*)result;
-} /* ldmud_array_repeat */
+} /* ldmud_array_repeat() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -1375,7 +1371,7 @@ ldmud_array_item (ldmud_array_t *val, Py_ssize_t idx)
         PyErr_SetString(PyExc_ValueError, "Unsupported data type.");
 
     return result;
-} /* ldmud_array_item */
+} /* ldmud_array_item() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -1415,7 +1411,7 @@ ldmud_array_ass_item (ldmud_array_t *val, Py_ssize_t idx, PyObject *v)
         transfer_svalue(val->lpc_array->item + idx, &sv);
     }
     return 0;
-} /* ldmud_array_ass_item */
+} /* ldmud_array_ass_item() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -1429,7 +1425,7 @@ ldmud_array_contains (ldmud_array_t *val, PyObject *v)
         if (python_eq_svalue(v, val->lpc_array->item + i))
             return 1;
     return 0;
-} /* ldmud_array_contains */
+} /* ldmud_array_contains() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -1492,7 +1488,7 @@ ldmud_array_subscript (ldmud_array_t *val, PyObject *key)
         return NULL;
     }
 
-} /* ldmud_array_subscript */
+} /* ldmud_array_subscript() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -1635,7 +1631,7 @@ ldmud_array_ass_sub (ldmud_array_t *val, PyObject *key, PyObject *value)
                     key->ob_type->tp_name);
         return -1;
     }
-} /* ldmud_array_ass_item */
+} /* ldmud_array_ass_sub() */
 
 /*-------------------------------------------------------------------------*/
 static PySequenceMethods ldmud_array_as_sequence = {
@@ -1718,7 +1714,7 @@ ldmud_array_check (PyObject *ob)
 
 {
     return Py_TYPE(ob) == &ldmud_array_type;
-}
+} /* ldmud_array_check() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -1740,7 +1736,7 @@ ldmud_array_create (vector_t* vec)
     add_gc_object(&gc_array_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_object_create */
+} /* ldmud_array_create() */
 
 /*-------------------------------------------------------------------------*/
 /* Mappings */
@@ -1781,11 +1777,17 @@ ldmud_mapping_list_dealloc (ldmud_mapping_list_t* self)
     remove_gc_object(&gc_mapping_list_list, (ldmud_gc_var_t*)self);
 
     Py_TYPE(self)->tp_free((PyObject*)self);
-} /* ldmud_mapping_dealloc */
+} /* ldmud_mapping_list_dealloc() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
 ldmud_mapping_iter_next (ldmud_mapping_list_t* self)
+
+/* Return the next object for this iteration.
+ * The state of the iterator is kept and updated in the ldmud_mapping_list_t
+ * object.
+ */
+
 {
     PyObject *result = NULL;
 
@@ -1852,7 +1854,7 @@ ldmud_mapping_iter_next (ldmud_mapping_list_t* self)
 
     self->pos++;
     return result;
-} /* ldmud_mapping_iter_next */
+} /* ldmud_mapping_iter_next() */
 
 /*-------------------------------------------------------------------------*/
 static PyTypeObject ldmud_mapping_iter_type =
@@ -1918,7 +1920,7 @@ ldmud_mapping_iter_create (mapping_t *map, vector_t *indices, enum ldmud_mapping
     add_gc_object(&gc_mapping_list_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_object_create */
+} /* ldmud_mapping_iter_create() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
@@ -1926,9 +1928,10 @@ ldmud_mapping_list_iter (ldmud_mapping_list_t* self)
 
 /* Creates an iterator for ourselves.
  */
+
 {
     return ldmud_mapping_iter_create(self->map, self->indices, self->mode);
-}
+} /* ldmud_mapping_list_iter() */
 
 /*-------------------------------------------------------------------------*/
 static Py_ssize_t
@@ -1939,7 +1942,7 @@ ldmud_mapping_list_length (ldmud_mapping_list_t *val)
 
 {
     return MAP_SIZE(val->map);
-} /* ldmud_mapping_list_length */
+} /* ldmud_mapping_list_length() */
 
 /*-------------------------------------------------------------------------*/
 struct ldmud_mapping_list_contains_info_s
@@ -1962,7 +1965,7 @@ ldmud_mapping_list_contains_walker (svalue_t *key, svalue_t *val, void *extra)
 
     if (python_eq_svalue(info->v, val))
         info->result = true;
-} /* ldmud_mapping_list_contains_walker */
+} /* ldmud_mapping_list_contains_walker() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -2031,7 +2034,7 @@ ldmud_mapping_list_contains (ldmud_mapping_list_t *val, PyObject *v)
     PyErr_SetString(PyExc_SystemError, "invalid state");
     return -1;
 
-} /* ldmud_mapping_list_contains */
+} /* ldmud_mapping_list_contains() */
 
 
 /*-------------------------------------------------------------------------*/
@@ -2129,7 +2132,7 @@ ldmud_mapping_list_create (mapping_t *map, enum ldmud_mapping_iterator_mode mode
     add_gc_object(&gc_mapping_list_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_object_create */
+} /* ldmud_mapping_list_create() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -2145,7 +2148,7 @@ ldmud_mapping_dealloc (ldmud_mapping_t* self)
     remove_gc_object(&gc_mapping_list, (ldmud_gc_var_t*)self);
 
     Py_TYPE(self)->tp_free((PyObject*)self);
-} /* ldmud_mapping_dealloc */
+} /* ldmud_mapping_dealloc() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -2174,7 +2177,7 @@ ldmud_mapping_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
     add_gc_object(&gc_mapping_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_mapping_new */
+} /* ldmud_mapping_new() */
 
 /*-------------------------------------------------------------------------*/
 
@@ -2369,7 +2372,7 @@ ldmud_mapping_init (ldmud_mapping_t *self, PyObject *args, PyObject *kwds)
         }
         return 0;
     }
-} /* ldmud_mapping_init */
+} /* ldmud_mapping_init() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
@@ -2388,7 +2391,7 @@ ldmud_mapping_iter (ldmud_mapping_t *self)
     iter = PyObject_GetIter(list);
     Py_DECREF(list);
     return iter;
-} /* ldmud_mapping_iter */
+} /* ldmud_mapping_iter() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -2409,7 +2412,7 @@ ldmud_mapping_contains (ldmud_mapping_t *val, PyObject *v)
     free_svalue(&sv);
 
     return result ? 1 : 0;
-} /* ldmud_mapping_contains */
+} /* ldmud_mapping_contains() */
 
 /*-------------------------------------------------------------------------*/
 static Py_ssize_t
@@ -2420,7 +2423,7 @@ ldmud_mapping_length (ldmud_mapping_t *val)
 
 {
     return MAP_SIZE(val->lpc_mapping);
-} /* ldmud_mapping_length */
+} /* ldmud_mapping_length() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -2486,7 +2489,7 @@ ldmud_mapping_subscript (ldmud_mapping_t *val, PyObject *key)
         PyErr_SetString(PyExc_ValueError, "Unsupported data type.");
 
     return result;
-} /* ldmud_mapping_subscript */
+} /* ldmud_mapping_subscript() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -2576,7 +2579,7 @@ ldmud_mapping_ass_sub (ldmud_mapping_t *val, PyObject *key, PyObject *value)
         transfer_svalue(dest + idx, &sval);
     }
     return 0;
-} /* ldmud_mapping_ass_item */
+} /* ldmud_mapping_ass_sub() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
@@ -2587,7 +2590,7 @@ ldmud_mapping_keys (ldmud_mapping_t *self)
 
 {
     return ldmud_mapping_list_create(self->lpc_mapping, MappingIterator_Keys);
-} /* ldmud_mapping_keys */
+} /* ldmud_mapping_keys() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
@@ -2598,7 +2601,7 @@ ldmud_mapping_items (ldmud_mapping_t *self)
 
 {
     return ldmud_mapping_list_create(self->lpc_mapping, MappingIterator_Items);
-} /* ldmud_mapping_items */
+} /* ldmud_mapping_items() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
@@ -2609,19 +2612,19 @@ ldmud_mapping_values (ldmud_mapping_t *self)
 
 {
     return ldmud_mapping_list_create(self->lpc_mapping, MappingIterator_Values);
-} /* ldmud_mapping_values */
+} /* ldmud_mapping_values() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
 ldmud_mapping_get_width (ldmud_mapping_t *val, void *closure)
 
-/**
- * Return the value for the width member.
+/* Return the value for the width member.
  */
 
 {
     return PyLong_FromLong(val->lpc_mapping->num_values);
-} /* ldmud_mapping_get_width */
+} /* ldmud_mapping_get_width() */
+
 /*-------------------------------------------------------------------------*/
 
 /* This is needed for 'in' functionality. */
@@ -2729,7 +2732,7 @@ ldmud_mapping_check (PyObject *ob)
 
 {
     return Py_TYPE(ob) == &ldmud_mapping_type;
-}
+} /* ldmud_mapping_check() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -2751,7 +2754,7 @@ ldmud_mapping_create (mapping_t* map)
     add_gc_object(&gc_mapping_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_object_create */
+} /* ldmud_mapping_create() */
 
 /*-------------------------------------------------------------------------*/
 /* Structs */
@@ -2769,7 +2772,7 @@ ldmud_struct_dealloc (ldmud_struct_t* self)
     remove_gc_object(&gc_struct_list, (ldmud_gc_var_t*)self);
 
     Py_TYPE(self)->tp_free((PyObject*)self);
-} /* ldmud_struct_dealloc */
+} /* ldmud_struct_dealloc() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -2790,7 +2793,7 @@ ldmud_struct_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
     add_gc_object(&gc_struct_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_struct_new */
+} /* ldmud_struct_new() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -3027,7 +3030,7 @@ ldmud_struct_init (ldmud_struct_t *self, PyObject *args, PyObject *kwds)
     self->lpc_struct = lpc_struct;
 
     return 0;
-}
+} /* ldmud_struct_init() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -3062,7 +3065,7 @@ ldmud_struct_getattr (ldmud_struct_t *obj, char *name)
         PyErr_SetString(PyExc_ValueError, "Unsupported data type.");
 
     return result;
-}
+} /* ldmud_struct_getattr() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -3100,7 +3103,7 @@ ldmud_struct_setattr (ldmud_struct_t *obj, char *name, PyObject *value)
     }
 
     return 0;
-}
+} /* ldmud_struct_setattr() */
 
 /*-------------------------------------------------------------------------*/
 static PyMethodDef ldmud_struct_methods[] =
@@ -3167,7 +3170,7 @@ ldmud_closure_dealloc (ldmud_closure_t* self)
     remove_gc_object(&gc_closure_list, (ldmud_gc_var_t*)self);
 
     Py_TYPE(self)->tp_free((PyObject*)self);
-} /* ldmud_closure_dealloc */
+} /* ldmud_closure_dealloc() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -3188,7 +3191,7 @@ ldmud_closure_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
     add_gc_object(&gc_closure_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_closure_new */
+} /* ldmud_closure_new() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -3274,19 +3277,18 @@ ldmud_closure_init (ldmud_closure_t *self, PyObject *args, PyObject *kwds)
 
         return 0;
     }
-}
+} /* ldmud_closure_init() */
 
 /*-------------------------------------------------------------------------*/
 static Py_hash_t
 ldmud_closure_hash (ldmud_closure_t *val)
 
-/**
- * Return a hash of this closure.
+/* Return a hash of this closure.
  */
 
 {
     return _Py_HashPointer(val->lpc_closure.u.ob) ^ val->lpc_closure.x.closure_type;
-}
+} /* ldmud_closure_hash() */
 
 /*-------------------------------------------------------------------------*/
 static bool ldmud_closure_check(PyObject *ob);
@@ -3294,8 +3296,7 @@ static bool ldmud_closure_check(PyObject *ob);
 static PyObject*
 ldmud_closure_richcompare (ldmud_closure_t *self, PyObject *other, int op)
 
-/**
- * Compare <self> to <other> with the compare operation <op>.
+/* Compare <self> to <other> with the compare operation <op>.
  */
 
 {
@@ -3340,7 +3341,7 @@ ldmud_closure_richcompare (ldmud_closure_t *self, PyObject *other, int op)
     resultval = result ? Py_True : Py_False;
     Py_INCREF(resultval);
     return resultval;
-}
+} /* ldmud_closure_richcompare() */
 
 /*-------------------------------------------------------------------------*/
 
@@ -3351,18 +3352,22 @@ struct ldmud_closure_call_closure_s
 };
 
 static void
-ldmud_closure_call_closure(struct ldmud_closure_call_closure_s* data)
+ldmud_closure_call_closure (struct ldmud_closure_call_closure_s* data)
 
 /* Helper function for ldmud_closure_call().
  */
 
 {
     call_lambda(&data->closure->lpc_closure, data->num_arg);
-} /* ldmud_closure_call_getobject */
+} /* ldmud_closure_call_closure() */
 
 
 static PyObject*
-ldmud_closure_call(ldmud_closure_t *cl, PyObject *arg, PyObject *kw)
+ldmud_closure_call (ldmud_closure_t *cl, PyObject *arg, PyObject *kw)
+
+/* Implement the call operator for closures.
+ */
+
 {
     if(!(python_is_external ? master_ob : current_object))
     {
@@ -3407,7 +3412,7 @@ ldmud_closure_call(ldmud_closure_t *cl, PyObject *arg, PyObject *kw)
     }
 
     return NULL;
-}
+} /* ldmud_closure_call() */
 
 /*-------------------------------------------------------------------------*/
 static PyMethodDef ldmud_closure_methods[] =
@@ -3472,7 +3477,7 @@ ldmud_closure_check (PyObject *ob)
 
 {
     return Py_TYPE(ob) == &ldmud_closure_type;
-}
+} /* ldmud_closure_check() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -3492,7 +3497,7 @@ ldmud_closure_create (svalue_t* cl)
     add_gc_object(&gc_closure_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_closure_create */
+} /* ldmud_closure_create() */
 
 /*-------------------------------------------------------------------------*/
 /* Symbols */
@@ -3510,7 +3515,7 @@ ldmud_symbol_dealloc (ldmud_symbol_t* self)
     remove_gc_object(&gc_symbol_list, (ldmud_gc_var_t*)self);
 
     Py_TYPE(self)->tp_free((PyObject*)self);
-} /* ldmud_symbol_dealloc */
+} /* ldmud_symbol_dealloc() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -3531,7 +3536,7 @@ ldmud_symbol_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
     add_gc_object(&gc_symbol_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_symbol_new */
+} /* ldmud_symbol_new() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -3573,27 +3578,25 @@ ldmud_symbol_init (ldmud_symbol_t *self, PyObject *args, PyObject *kwds)
 
     put_symbol(&self->lpc_symbol, str, quotes);
     return 0;
-}
+} /* ldmud_symbol_init() */
 
 /*-------------------------------------------------------------------------*/
 static Py_hash_t
 ldmud_symbol_hash (ldmud_symbol_t *val)
 
-/**
- * Return a hash of this symbol.
+/* Return a hash of this symbol.
  */
 
 {
     return _Py_HashPointer(val->lpc_symbol.u.str) ^ val->lpc_symbol.x.quotes;
-}
+} /* ldmud_symbol_hash() */
 
 /*-------------------------------------------------------------------------*/
 
 static PyObject*
 ldmud_symbol_richcompare (ldmud_symbol_t *self, PyObject *other, int op)
 
-/**
- * Compare <self> to <other> with the compare operation <op>.
+/* Compare <self> to <other> with the compare operation <op>.
  */
 
 {
@@ -3642,14 +3645,13 @@ ldmud_symbol_richcompare (ldmud_symbol_t *self, PyObject *other, int op)
     resultval = result ? Py_True : Py_False;
     Py_INCREF(resultval);
     return resultval;
-}
+} /* ldmud_symbol_richcompare() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_symbol_get_name(ldmud_symbol_t *val, void *closure)
+ldmud_symbol_get_name (ldmud_symbol_t *val, void *closure)
 
-/**
- * Return the value for the name member.
+/* Return the value for the name member.
  */
 
 {
@@ -3660,14 +3662,13 @@ ldmud_symbol_get_name(ldmud_symbol_t *val, void *closure)
     }
 
     return PyUnicode_Decode(get_txt(val->lpc_symbol.u.str), mstrsize(val->lpc_symbol.u.str), "utf-8", "replace");
-}
+} /* ldmud_symbol_get_name() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_symbol_get_quotes(ldmud_symbol_t *val, void *closure)
+ldmud_symbol_get_quotes (ldmud_symbol_t *val, void *closure)
 
-/**
- * Return the value for the quotes member.
+/* Return the value for the quotes member.
  */
 
 {
@@ -3677,7 +3678,7 @@ ldmud_symbol_get_quotes(ldmud_symbol_t *val, void *closure)
         return Py_None;
     }
     return PyLong_FromLong(val->lpc_symbol.x.quotes);
-}
+} /* ldmud_symbol_get_quotes() */
 
 /*-------------------------------------------------------------------------*/
 static PyMethodDef ldmud_symbol_methods[] =
@@ -3744,7 +3745,7 @@ ldmud_symbol_check (PyObject *ob)
 
 {
     return Py_TYPE(ob) == &ldmud_symbol_type;
-}
+} /* ldmud_symbol_check() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -3764,7 +3765,7 @@ ldmud_symbol_create (svalue_t* sym)
     add_gc_object(&gc_symbol_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_symbol_create */
+} /* ldmud_symbol_create() */
 
 /*-------------------------------------------------------------------------*/
 /* Quoted Arrays */
@@ -3782,7 +3783,7 @@ ldmud_quoted_array_dealloc (ldmud_quoted_array_t* self)
     remove_gc_object(&gc_quoted_array_list, (ldmud_gc_var_t*)self);
 
     Py_TYPE(self)->tp_free((PyObject*)self);
-} /* ldmud_quoted_array_dealloc */
+} /* ldmud_quoted_array_dealloc() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -3803,7 +3804,7 @@ ldmud_quoted_array_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
     add_gc_object(&gc_quoted_array_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_quoted_array_new */
+} /* ldmud_quoted_array_new() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -3861,14 +3862,13 @@ ldmud_quoted_array_init (ldmud_quoted_array_t *self, PyObject *args, PyObject *k
     self->lpc_quoted_array.x.quotes = quotes;
 
     return 0;
-}
+} /* ldmud_quoted_array_init() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_quoted_array_get_array(ldmud_quoted_array_t *val, void *closure)
+ldmud_quoted_array_get_array (ldmud_quoted_array_t *val, void *closure)
 
-/**
- * Return the value for the array member.
+/* Return the value for the array member.
  */
 
 {
@@ -3879,14 +3879,13 @@ ldmud_quoted_array_get_array(ldmud_quoted_array_t *val, void *closure)
     }
 
     return ldmud_array_create(val->lpc_quoted_array.u.vec);
-}
+} /* ldmud_quoted_array_get_array() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_quoted_array_get_quotes(ldmud_quoted_array_t *val, void *closure)
+ldmud_quoted_array_get_quotes (ldmud_quoted_array_t *val, void *closure)
 
-/**
- * Return the value for the quotes member.
+/* Return the value for the quotes member.
  */
 
 {
@@ -3896,7 +3895,7 @@ ldmud_quoted_array_get_quotes(ldmud_quoted_array_t *val, void *closure)
         return Py_None;
     }
     return PyLong_FromLong(val->lpc_quoted_array.x.quotes);
-}
+} /* ldmud_quoted_array_get_quotes() */
 
 /*-------------------------------------------------------------------------*/
 static PyMethodDef ldmud_quoted_array_methods[] =
@@ -3963,7 +3962,7 @@ ldmud_quoted_array_check (PyObject *ob)
 
 {
     return Py_TYPE(ob) == &ldmud_quoted_array_type;
-}
+} /* ldmud_quoted_array_check() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
@@ -3983,7 +3982,7 @@ ldmud_quoted_array_create (svalue_t* sym)
     add_gc_object(&gc_quoted_array_list, (ldmud_gc_var_t*)self);
 
     return (PyObject *)self;
-} /* ldmud_quoted_array_create */
+} /* ldmud_quoted_array_create() */
 
 /*-------------------------------------------------------------------------*/
 /* Interrupt exception */
@@ -4053,25 +4052,23 @@ typedef struct ldmud_efun_s ldmud_efun_t;
 static PyObject*
 ldmud_efun_repr (ldmud_efun_t *val)
 
-/**
- * Return a string representation of this efun.
+/* Return a string representation of this efun.
  */
 
 {
     return PyUnicode_FromFormat("<efun %s>", instrs[val->efun_idx].name);
-}
+} /* ldmud_efun_repr() */
 
 /*-------------------------------------------------------------------------*/
 static Py_hash_t
 ldmud_efun_hash (ldmud_efun_t *val)
 
-/**
- * Return a hash of this efun.
+/* Return a hash of this efun.
  */
 
 {
     return _Py_HashPointer(instrs + val->efun_idx);
-}
+} /* ldmud_efun_hash() */
 
 /*-------------------------------------------------------------------------*/
 
@@ -4082,18 +4079,22 @@ struct ldmud_efun_call_closure_s
 };
 
 static void
-ldmud_efun_call_efun(struct ldmud_efun_call_closure_s* data)
+ldmud_efun_call_efun (struct ldmud_efun_call_closure_s* data)
 
 /* Helper function for ldmud_efun_call().
  */
 
 {
     call_lambda(&data->efun_closure, data->num_arg);
-} /* ldmud_efun_call_getobject */
+} /* ldmud_efun_call_efun() */
 
 
 static PyObject*
-ldmud_efun_call(ldmud_efun_t *func, PyObject *arg, PyObject *kw)
+ldmud_efun_call (ldmud_efun_t *func, PyObject *arg, PyObject *kw)
+
+/* The call operator for efun objects.
+ */
+
 {
     if(!(python_is_external ? master_ob : current_object))
     {
@@ -4148,7 +4149,7 @@ ldmud_efun_call(ldmud_efun_t *func, PyObject *arg, PyObject *kw)
     }
 
     return NULL;
-}
+} /* ldmud_efun_call() */
 
 /*-------------------------------------------------------------------------*/
 static bool ldmud_efun_check(PyObject *ob);
@@ -4156,8 +4157,7 @@ static bool ldmud_efun_check(PyObject *ob);
 static PyObject*
 ldmud_efun_richcompare (ldmud_efun_t *self, PyObject *other, int op)
 
-/**
- * Return a hash of this efun.
+/* Compare this efun with another one.
  */
 
 {
@@ -4175,19 +4175,18 @@ ldmud_efun_richcompare (ldmud_efun_t *self, PyObject *other, int op)
     result = (equal == (op == Py_EQ)) ? Py_True : Py_False;
     Py_INCREF(result);
     return result;
-}
+} /* ldmud_efun_richcompare() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_efun_get_name(ldmud_efun_t *efun, void *closure)
+ldmud_efun_get_name (ldmud_efun_t *efun, void *closure)
 
-/**
- * Return the value for the name member.
+/* Return the value for the name member.
  */
 
 {
     return PyUnicode_FromString(instrs[efun->efun_idx].name);
-}
+} /* ldmud_efun_get_name() */
 
 /*-------------------------------------------------------------------------*/
 
@@ -4239,10 +4238,15 @@ static PyTypeObject ldmud_efun_type =
     0,                                  /* tp_new */
 };
 
-static bool ldmud_efun_check(PyObject *ob)
+static bool
+ldmud_efun_check (PyObject *ob)
+
+/* Return true, if the given object as an efun object.
+ */
+
 {
     return Py_TYPE(ob) == &ldmud_efun_type;
-}
+} /* ldmud_efun_check() */
 
 
 static PyTypeObject ldmud_efun_namespace =
@@ -4253,7 +4257,7 @@ static PyTypeObject ldmud_efun_namespace =
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-create_efun_namespace()
+create_efun_namespace ()
 
 /* Add all the efuns to the ldmud_efun_namespace and return it.
  */
@@ -4293,7 +4297,7 @@ create_efun_namespace()
     }
 
     return (PyObject*)&ldmud_efun_namespace;
-}
+} /* create_efun_namespace() */
 
 
 /*-------------------------------------------------------------------------*/
@@ -4310,7 +4314,7 @@ ldmud_get_master (PyObject* self, PyObject* args UNUSED)
         Py_RETURN_NONE;
 
     return ldmud_object_create(master_ob);
-}
+} /* ldmud_get_master() */
 
 static PyObject*
 ldmud_get_simul_efun (PyObject* self, PyObject* args UNUSED)
@@ -4323,7 +4327,7 @@ ldmud_get_simul_efun (PyObject* self, PyObject* args UNUSED)
         Py_RETURN_NONE;
 
     return ldmud_object_create(simul_efun_object);
-}
+} /* ldmud_get_simul_efun() */
 
 static PyMethodDef ldmud_methods[] =
 {
@@ -4409,7 +4413,12 @@ static PyModuleDef ldmud_module =
     NULL, NULL, NULL, NULL
 };
 
-static PyObject* init_ldmud_module()
+static PyObject*
+init_ldmud_module ()
+
+/* Create the ldmud module.
+ */
+
 {
     PyObject *module, *efuns;
 
@@ -4471,7 +4480,7 @@ static PyObject* init_ldmud_module()
     PyModule_AddObject(module, "efuns", efuns);
 
     return module;
-}
+} /* init_ldmud_module() */
 
 /*=========================================================================*/
 
@@ -4562,7 +4571,7 @@ pythontype_to_lpctype (PyObject* ptype)
     else
         return NULL;
 
-} /* pythontype_to_lpctype */
+} /* pythontype_to_lpctype() */
 
 
 /*-------------------------------------------------------------------------*/
@@ -4631,7 +4640,7 @@ svalue_to_python (svalue_t *svp)
             return NULL;
     }
 
-} /* svalue_to_python */
+} /* svalue_to_python() */
 
 
 /*-------------------------------------------------------------------------*/
@@ -4760,7 +4769,7 @@ python_to_svalue (svalue_t *dest, PyObject* val)
 
     return "unknown type";
 
-} /* python_to_svalue */
+} /* python_to_svalue() */
 
 /*-------------------------------------------------------------------------*/
 
@@ -4921,7 +4930,7 @@ python_eq_svalue (PyObject* pval, svalue_t *sval)
 
     return false;
 
-} /* python_eq_svalue */
+} /* python_eq_svalue() */
 
 /*-------------------------------------------------------------------------*/
 static bool
@@ -4978,7 +4987,7 @@ call_lpc_secure (CClosureFun fun, void* data)
     rt_context = error_recovery_info.rt.last;
 
     return result;
-} /* call_lpc_secure */
+} /* call_lpc_secure() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef USE_PYTHON_CONTEXT
@@ -5134,7 +5143,7 @@ pkg_python_init (char* prog_name)
         flags.cf_flags = 0;
         PyRun_SimpleFileExFlags(script_file, python_startup_script, 1, &flags);
     }
-} /* pkg_python_init */
+} /* pkg_python_init() */
 
 
 /*-------------------------------------------------------------------------*/
@@ -5151,7 +5160,7 @@ is_python_efun (ident_t *p)
 
 {
     return p->u.global.python_efun >= 0 && python_efun_table[p->u.global.python_efun].callable != NULL;
-} /* is_python_efun */
+} /* is_python_efun() */
 
 
 /*-------------------------------------------------------------------------*/
@@ -5203,7 +5212,7 @@ check_python_efun_args (ident_t *p, int num_arg, fulltype_t *args)
         return entry->types[0];
     return lpctype_mixed;
 
-} /* check_python_efun_args */
+} /* check_python_efun_args() */
 
 /*-------------------------------------------------------------------------*/
 
@@ -5342,7 +5351,7 @@ call_python_efun (int idx, int num_arg)
 
         inter_sp++;
     }
-} /* call_python_efun */
+} /* call_python_efun() */
 
 
 /*-------------------------------------------------------------------------*/
@@ -5396,7 +5405,7 @@ python_set_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int *nfds)
         if((events & (POLLIN|POLLOUT|POLLPRI)) && *nfds <= fds->fd)
             (*nfds) = fds->fd + 1;
     }
-} /* python_set_fds */
+} /* python_set_fds() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -5498,7 +5507,7 @@ python_handle_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfd
 
     xfree(cb_funs);
     xfree(cb_args);
-} /* python_handle_fds */
+} /* python_handle_fds() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -5534,7 +5543,7 @@ python_call_hook (int hook, bool is_external)
     }
 
     python_is_external = was_external;
-} /* python_call_hook */
+} /* python_call_hook() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -5594,10 +5603,11 @@ python_call_hook_object (int hook, bool is_external, object_t *ob)
     Py_DECREF(args);
 
     python_is_external = was_external;
-} /* python_call_hook_object */
+} /* python_call_hook_object() */
 
 /*-------------------------------------------------------------------------*/
-int python_process_interrupt (void* arg UNUSED)
+int
+python_process_interrupt (void* arg UNUSED)
 
 /* Called from within the Python interpreter
  * to cause an interrupt in the current running python efun.
@@ -5612,10 +5622,11 @@ int python_process_interrupt (void* arg UNUSED)
 
     PyErr_SetString((PyObject *) &ldmud_interrupt_exception_type, "signal caught");
     return -1;
-} /* python_process_interrupt */
+} /* python_process_interrupt() */
 
 /*-------------------------------------------------------------------------*/
-void python_interrupt ()
+void
+python_interrupt ()
 
 /* Called from the signal handler (!)
  * to cause an interrupt in the current running python efun.
@@ -5623,7 +5634,7 @@ void python_interrupt ()
 
 {
     Py_AddPendingCall(&python_process_interrupt, NULL);
-} /* python_interrupt */
+} /* python_interrupt() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -5636,11 +5647,15 @@ python_handle_sigchld ()
 {
     comm_return_to_backend = true;
     python_pending_sigchld = true;
-} /* python_handle_sigchld */
+} /* python_handle_sigchld() */
 
 /*-------------------------------------------------------------------------*/
 void
 python_process_pending_jobs ()
+
+/* Called from the backend to do some pending jobs,
+ * to call some hooks.
+ */
 
 {
     if (python_pending_sigchld)
@@ -5648,7 +5663,7 @@ python_process_pending_jobs ()
         python_pending_sigchld = false;
         python_call_hook(PYTHON_HOOK_ON_SIGCHLD, true);
     }
-} /* python_handle_sigchld */
+} /* python_process_pending_jobs() */
 
 /*-------------------------------------------------------------------------*/
 const char*
@@ -5660,7 +5675,7 @@ closure_python_efun_to_string (int type)
 
 {
     return get_txt(python_efun_table[type - CLOSURE_PYTHON_EFUN].name->name);
-}
+} /* closure_python_efun_to_string() */
 
 #ifdef GC_SUPPORT
 
