@@ -120,6 +120,29 @@ DESCRIPTION
                           One of the following:
                           VIS_PRIVATE, VIS_PROTECTED, VIS_VISIBLE, VIS_PUBLIC
 
+                  variables
+                      Contains all variables as attributes. They contain the
+                      following attributes:
+
+                      name
+                          The name of the variable
+
+                      value
+                          The value of the variable. This attribute is writable
+                          to assign a new value.
+
+                      type
+                          The type as a Python object (maybe missing if
+                          unknown or mixed).
+
+                      flags
+                          A combination of the following flags:
+                          VF_NOSAVE, VF_NOMASK, VF_VIRTUAL and VF_DEPRECATED
+
+                      visibility:
+                          One of the following:
+                          VIS_PRIVATE, VIS_PROTECTED, VIS_VISIBLE, VIS_PUBLIC
+
           - Array([values | size])
                 Corresponds to an LPC array.
                 Can either be initialized with a list of values

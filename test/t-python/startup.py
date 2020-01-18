@@ -51,6 +51,28 @@ class TestObject(unittest.TestCase):
 
         self.assertEqual(fun(10, "A", "B", "C"), 3)
 
+    def testVariableInfo(self):
+        ob = ldmud.Object("/testob")
+        self.assertIsNotNone(ob)
+
+        self.assertTrue('testvar' in dir(ob.variables))
+        self.assertTrue('testvar' in ob.variables.__dict__)
+
+        var = ob.variables.testvar
+        self.assertIsNotNone(var)
+        self.assertEqual(var.name, "testvar")
+        self.assertEqual(var.value, 42)
+        self.assertSetEqual(set(var.type), set((int, float,)))
+        self.assertEqual(var.flags, ldmud.VF_NOSAVE)
+        self.assertEqual(var.visibility, ldmud.VIS_PROTECTED)
+
+        var.value = 84
+        self.assertEqual(var.value, 84)
+
+        with self.assertRaises(TypeError):
+            var.value = "42"
+        self.assertEqual(var.value, 84)
+
 class TestArray(unittest.TestCase):
     def testInitEmpty(self):
         arr = ldmud.Array()
