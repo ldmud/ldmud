@@ -257,6 +257,7 @@ extern svalue_t *sapply_int(string_t *fun, object_t *ob, int num_arg, Bool b_ign
 #define sapply_ign_prot(f,o,n) sapply_int(f,o,n, MY_TRUE, MY_TRUE)
 extern svalue_t *apply(string_t *fun, object_t *ob, int num_arg);
 extern void call_function(program_t *progp, int fx);
+extern void call_function_args(object_t* ob, int fx, int num_arg);
 extern int get_line_number(bytecode_p p, program_t *progp, string_t **namep);
 extern string_t *collect_trace(strbuf_t * sbuf, vector_t ** rvec);
 extern string_t *dump_trace(Bool how, vector_t **rvec, string_t ** rstr);

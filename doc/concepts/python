@@ -84,6 +84,42 @@ DESCRIPTION
                 On instantiation a filename for an object
                 to search or load is required.
 
+                Has the following members:
+
+                  name
+                      The object name
+
+                  functions
+                      Contains all the visible functions (private functions
+                      are excluded) as attributes. They support the call
+                      operator and contain the following attributes:
+
+                      name
+                          The name of the function
+
+                      file_name
+                          The file that contains the function's definition
+
+                      line_number
+                          The starting line number of the function's definition
+
+                      arguments
+                          A list of all arguments with their type, flags
+                          (combination of LA_* constants) and position.
+
+                      return_type
+                          The return type as Python object (maybe missing if
+                          unknown or mixed).
+
+                      flags
+                          A combination of the following flags:
+                          LF_STATIC, LF_NOMASK, LF_VARARGS, LF_VIRTUAL and
+                          LF_DEPRECATED
+
+                      visibility:
+                          One of the following:
+                          VIS_PRIVATE, VIS_PROTECTED, VIS_VISIBLE, VIS_PUBLIC
+
           - Array([values | size])
                 Corresponds to an LPC array.
                 Can either be initialized with a list of values
@@ -136,6 +172,17 @@ DESCRIPTION
               registered python efuns or simul-efuns). These can be called
               as a regular function.
 
+
+        There is mapping of LPC values to Python values for the following types:
+            int    <-> int(, bool)
+            float  <-> float
+            string <-> str
+            bytes  <-> bytes
+
+        Type definitions are translated in a similar fashion, additionally the
+        following mappings are done:
+            void   <-> None
+            union  <-> tuple of types
 
 EXAMPLE
         import ldmud

@@ -18336,6 +18336,47 @@ call_function (program_t *progp, int fx)
 } /* call_function() */
 
 /*-------------------------------------------------------------------------*/
+void
+call_function_args (object_t* ob, int fx, int num_arg)
+
+/* Call the function <fx> in object <ob> with <num_arg> arguments.
+ * The return value will be left on the stack.
+ *
+ * The function is called directly, no shadows will be considered.
+ */
+
+{
+    ob->flags &= ~O_RESET_STATE;
+    ob->time_of_ref = current_time;
+    if (ob->flags & O_SWAPPED)
+    {
+        if (load_ob_from_swap(ob) < 0)
+            errorf("Out of memory\n");
+    }
+
+    push_control_stack(inter_sp, inter_pc, inter_fp, inter_context);
+    csp->ob = current_object;
+    csp->prev_ob = previous_ob;
+    csp->num_local_variables = num_arg;
+
+    previous_ob = current_object;
+    current_object = ob;
+    current_prog = ob->prog;
+    setup_new_frame(fx, NULL);
+
+    /* check_function_args might remove frames from the control stack without
+     * restoring the current_object.
+     */
+    previous_ob = csp->prev_ob;
+    current_object = csp->ob;
+    check_function_args(current_prog->function_headers[FUNCTION_HEADER_INDEX(csp->funstart)].offset.fx, current_prog, csp->funstart);
+    previous_ob = current_object;
+    current_object = ob;
+
+    eval_instruction(csp->funstart, inter_sp);
+} /* call_function_args() */
+
+/*-------------------------------------------------------------------------*/
 int
 get_line_number (bytecode_p p, program_t *progp, string_t **namep)
 

@@ -26,6 +26,31 @@ class TestObject(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             ob = ldmud.Object("/imnotthere")
 
+    def testFunctionInfo(self):
+        ob = ldmud.Object("/testob")
+        self.assertIsNotNone(ob)
+
+        self.assertTrue('testfun' in dir(ob.functions))
+        self.assertTrue('testfun' in ob.functions.__dict__)
+
+        fun = ob.functions.testfun
+        self.assertIsNotNone(fun)
+        self.assertEqual(fun.name, "testfun")
+        self.assertEqual(fun.file_name, "/testob.c")
+        self.assertEqual(fun.return_type, int)
+        self.assertEqual(fun.flags, ldmud.LF_NOMASK)
+        self.assertEqual(fun.visibility, ldmud.VIS_PROTECTED)
+
+        args = fun.arguments
+        self.assertEqual(len(args), 2)
+        self.assertEqual(args[0].position, 1)
+        self.assertSetEqual(set(args[0].type), set((int, float,)))
+        self.assertEqual(args[1].position, 2)
+        self.assertEqual(args[1].flags, ldmud.LA_VARARGS)
+        self.assertEqual(args[1].type, ldmud.Array)
+
+        self.assertEqual(fun(10, "A", "B", "C"), 3)
+
 class TestArray(unittest.TestCase):
     def testInitEmpty(self):
         arr = ldmud.Array()
@@ -409,10 +434,14 @@ ob_list = []
 def ob_created(ob):
     ob_list.append(ob)
 
+def ob_destroyed(ob):
+    ob_list.remove(ob)
+
 def get_hook_info():
     return ldmud.Array((num_hb, ldmud.Array(ob_list),))
 
 ldmud.register_hook(ldmud.ON_HEARTBEAT, hb_hook)
 ldmud.register_hook(ldmud.ON_OBJECT_CREATED, ob_created)
+ldmud.register_hook(ldmud.ON_OBJECT_DESTRUCTED, ob_destroyed)
 
 ldmud.register_efun("python_get_hook_info", get_hook_info)

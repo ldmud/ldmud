@@ -10,6 +10,64 @@
 
 #if defined(USE_PYTHON) && defined(HAS_PYTHON3)
 
+
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+#include <structmember.h>
+
+/* structmember.h has defines for T_FLOAT, T_STRING as do we.
+ * We need to rename and undef them...
+ */
+enum python_structmember_type
+{
+    PYTHON_SMT_SHORT          = T_SHORT,
+    PYTHON_SMT_INT            = T_INT,
+    PYTHON_SMT_LONG           = T_LONG,
+    PYTHON_SMT_FLOAT          = T_FLOAT,
+    PYTHON_SMT_DOUBLE         = T_DOUBLE,
+    PYTHON_SMT_STRING         = T_STRING,
+    PYTHON_SMT_OBJECT         = T_OBJECT,
+    PYTHON_SMT_CHAR           = T_CHAR,
+    PYTHON_SMT_BYTE           = T_BYTE,
+    PYTHON_SMT_UBYTE          = T_UBYTE,
+    PYTHON_SMT_USHORT         = T_USHORT,
+    PYTHON_SMT_UINT           = T_UINT,
+    PYTHON_SMT_ULONG          = T_ULONG,
+    PYTHON_SMT_STRING_INPLACE = T_STRING_INPLACE,
+    PYTHON_SMT_BOOL           = T_BOOL,
+    PYTHON_SMT_OBJECT_EX      = T_OBJECT_EX,
+    PYTHON_SMT_LONGLONG       = T_LONGLONG,
+    PYTHON_SMT_ULONGLONG      = T_ULONGLONG,
+    PYTHON_SMT_PYSSIZET       = T_PYSSIZET,
+    PYTHON_SMT_NONE           = T_NONE
+};
+
+#undef T_SHORT
+#undef T_INT
+#undef T_LONG
+#undef T_FLOAT
+#undef T_DOUBLE
+#undef T_STRING
+#undef T_OBJECT
+#undef T_CHAR
+#undef T_BYTE
+#undef T_UBYTE
+#undef T_USHORT
+#undef T_UINT
+#undef T_ULONG
+#undef T_STRING_INPLACE
+#undef T_BOOL
+#undef T_OBJECT_EX
+#undef T_LONGLONG
+#undef T_ULONGLONG
+#undef T_PYSSIZET
+#undef T_NONE
+
+/* Python.h defined these also again... */
+#undef _GNU_SOURCE
+#undef _POSIX_C_SOURCE
+#undef _XOPEN_SOURCE
+
 #include <poll.h>
 
 #include "actions.h"
@@ -27,19 +85,13 @@
 #include "prolang.h"
 #include "simul_efun.h"
 #include "simulate.h"
+#include "stdstrings.h"
 #include "structs.h"
 #include "swap.h"
 #include "typedefs.h"
 #include "wiz_list.h"
 #include "xalloc.h"
 
-/* Python.h defines these again... */
-#undef _GNU_SOURCE
-#undef _POSIX_C_SOURCE
-#undef _XOPEN_SOURCE
-
-#define PY_SSIZE_T_CLEAN
-#include <Python.h>
 
 #if PY_VERSION_HEX >= 0x03070000
 #define USE_PYTHON_CONTEXT
@@ -51,6 +103,35 @@ typedef void (*CClosureFun)(int,void*);
 typedef struct python_efun_s python_efun_t;
 typedef struct python_poll_fds_s python_poll_fds_t;
 typedef struct python_hook_s python_hook_t;
+
+/* --- Enum definitions --- */
+enum lfun_flags
+{
+    LFUN_FLAG_STATIC     = 1 << 0,
+    LFUN_FLAG_NOMASK     = 1 << 1,
+    LFUN_FLAG_VARARGS    = 1 << 2,
+    LFUN_FLAG_VIRTUAL    = 1 << 3,
+    LFUN_FLAG_DEPRECATED = 1 << 4,
+
+    LFUN_FLAG_COUNT      =      5
+};
+
+enum lfun_argument_flags
+{
+    LFUN_ARGUMENT_FLAG_VARARGS = 1 << 0,
+
+    LFUN_ARGUMENT_FLAG_COUNT   =      1
+};
+
+enum visibility
+{
+    VISIBILITY_PRIVATE,
+    VISIBILITY_PROTECTED,
+    VISIBILITY_VISIBLE,
+    VISIBILITY_PUBLIC,
+
+    VISIBILITY_COUNT
+};
 
 /* --- Type definitions --- */
 struct python_efun_s
@@ -119,6 +200,25 @@ static const char* python_hook_names[] = {
     "ON_CHILD_PROCESS_TERMINATED",
 };
 
+static const char* lfun_flag_names[] = {
+    "LF_STATIC",
+    "LF_NOMASK",
+    "LF_VARARGS",
+    "LF_VIRTUAL",
+    "LF_DEPRECATED",
+};
+
+static const char* lfun_argument_flag_names[] = {
+    "LA_VARARGS",
+};
+
+static const char* visibility_names[] = {
+    "VIS_PRIVATE",
+    "VIS_PROTECTED",
+    "VIS_VISIBLE",
+    "VIS_PUBLIC",
+};
+
 static ldmud_gc_var_t *gc_object_list = NULL,
                       *gc_array_list = NULL,
                       *gc_mapping_list = NULL,
@@ -137,6 +237,7 @@ static PyObject * python_contextvar_command_giver = NULL;
 #endif
 
 /* -- Function prototypes --- */
+static PyObject* lpctype_to_pythontype(lpctype_t *type);
 static lpctype_t* pythontype_to_lpctype(PyObject* ptype);
 static const char* python_to_svalue(svalue_t *dest, PyObject* val);
 static PyObject* svalue_to_python (svalue_t *svp);
@@ -664,6 +765,24 @@ struct ldmud_object_s
     object_t *lpc_object;       /* Can be NULL. */
 };
 
+struct ldmud_object_lfun_s
+{
+    struct ldmud_object_s ob_base;
+                                /* Object can never by NULL. */
+
+    unsigned short index;       /* Function index. */
+};
+
+struct ldmud_object_lfun_argument_s
+{
+
+    PyObject_HEAD
+
+    PyObject *type;             /* The type of the argument. */
+    int position;               /* Position of the argument, starting with 1. */
+    int flags;                  /* Flags of the argument, bitmask of LA_xxx constants. */
+};
+
 struct ldmud_closure_s
 {
     PyGCObject_HEAD
@@ -690,6 +809,8 @@ typedef struct ldmud_mapping_s ldmud_mapping_t;
 typedef struct ldmud_struct_s ldmud_struct_t;
 typedef struct ldmud_object_s ldmud_object_t;
 typedef struct ldmud_closure_s ldmud_closure_t;
+typedef struct ldmud_object_lfun_s ldmud_object_lfun_t;
+typedef struct ldmud_object_lfun_argument_s ldmud_object_lfun_argument_t;
 typedef struct ldmud_symbol_s ldmud_symbol_t;
 typedef struct ldmud_quoted_array_s ldmud_quoted_array_t;
 
@@ -742,6 +863,880 @@ remove_gc_object (ldmud_gc_var_t** list, ldmud_gc_var_t* var)
 /*-------------------------------------------------------------------------*/
 /* Objects */
 
+/*-------------------------------------------------------------------------*/
+static void
+ldmud_object_lfun_argument_dealloc (ldmud_object_lfun_argument_t* self)
+
+/* Destroy the ldmud_object_lfun_argument_t object
+ */
+
+{
+    Py_XDECREF(self->type);
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_object_lfun_argument_dealloc() */
+
+/*-------------------------------------------------------------------------*/
+static PyMemberDef ldmud_object_lfun_argument_members[] = {
+    { "position", PYTHON_SMT_INT,       offsetof(ldmud_object_lfun_argument_t, position), READONLY, "Position of the argument" },
+    { "type",     PYTHON_SMT_OBJECT_EX, offsetof(ldmud_object_lfun_argument_t, type),     READONLY, "Type of the argument"     },
+    { "flags",    PYTHON_SMT_INT,       offsetof(ldmud_object_lfun_argument_t, flags),    READONLY, "Flags of the argument"    },
+    { NULL }
+};
+
+static PyTypeObject ldmud_object_lfun_argument_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.LfunArgument",               /* tp_name */
+    sizeof(ldmud_object_lfun_argument_t),  /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_object_lfun_argument_dealloc, /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC lfun argument",                /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    0,                                  /* tp_methods */
+    ldmud_object_lfun_argument_members, /* tp_members */
+    0,                                  /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,                                  /* tp_init */
+    0,                                  /* tp_alloc */
+    0,                                  /* tp_new */
+};
+
+/*-------------------------------------------------------------------------*/
+static void
+ldmud_object_lfun_dealloc (ldmud_object_lfun_t* self)
+
+/* Destroy the ldmud_object_lfun_t object
+ */
+
+{
+    if(self->ob_base.lpc_object)
+        free_object(self->ob_base.lpc_object, "ldmud_object_lfun_dealloc");
+
+    remove_gc_object(&gc_object_list, (ldmud_gc_var_t*)self);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_object_lfun_dealloc() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_object_lfun_repr (ldmud_object_lfun_t *val)
+
+/* Return a string representation of this lfun.
+ */
+
+{
+    function_t* fun;
+
+    if(!val->ob_base.lpc_object)
+        return PyUnicode_FromString("<LPC vanished lfun>");
+
+    fun = get_function_header(val->ob_base.lpc_object->prog, val->index);
+    return PyUnicode_FromFormat("<LPC lfun /%s->%s()>", get_txt(val->ob_base.lpc_object->name), get_txt(fun->name));
+} /* ldmud_object_lfun_repr() */
+
+/*-------------------------------------------------------------------------*/
+static Py_hash_t
+ldmud_object_lfun_hash (ldmud_object_lfun_t *val)
+
+/* Return a hash of the lfun.
+ */
+
+{
+    return _Py_HashPointer(val->ob_base.lpc_object) ^ val->index;
+} /* ldmud_object_lfun_hash() */
+
+/*-------------------------------------------------------------------------*/
+static void
+ldmud_object_lfun_call_lfun (int num_arg, ldmud_object_lfun_t* lfun)
+
+/* Helper function for ldmud_object_lfun_call().
+ */
+
+{
+    call_function_args(lfun->ob_base.lpc_object, lfun->index, num_arg);
+}
+
+static PyObject*
+ldmud_object_lfun_call (ldmud_object_lfun_t *lfun, PyObject *arg, PyObject *kw)
+
+/* Call the given lfun.
+ */
+
+{
+    function_t *fun;
+
+    if(!(python_is_external ? master_ob : current_object))
+    {
+        PyErr_SetString(PyExc_RuntimeError, "can't call an efun without a current object");
+        return NULL;
+    }
+
+    fun = get_function_header(lfun->ob_base.lpc_object->prog, lfun->index);
+    if (kw != NULL && PyDict_Size(kw) != 0)
+    {
+        PyErr_Format(PyExc_TypeError, "%.200s() takes no keyword arguments",
+                     get_txt(fun->name));
+        return NULL;
+    }
+    else
+    {
+        svalue_t *sp = inter_sp;
+        PyObject *result;
+        int num_arg = (int)PyTuple_GET_SIZE(arg);
+
+        if (!(fun->flags & TYPE_MOD_VARARGS))
+        {
+            if (num_arg < fun->num_arg - ((fun->flags & TYPE_MOD_XVARARGS) ? 1 : 0))
+            {
+                PyErr_Format(PyExc_TypeError, "%.200s() missing %d required positional argument",
+                             get_txt(fun->name), fun->num_arg - ((fun->flags & TYPE_MOD_XVARARGS) ? 1 : 0) - num_arg);
+                return NULL;
+            }
+            else if (num_arg > fun->num_arg && !(fun->flags & TYPE_MOD_XVARARGS))
+            {
+                PyErr_Format(PyExc_TypeError, "%.200s() takes %d positional argument but %d were given",
+                             get_txt(fun->name), fun->num_arg, num_arg);
+                return NULL;
+            }
+        }
+
+        /* Put all arguments on the stack. */
+        for (int i = 0; i < num_arg; i++)
+        {
+            const char* err = python_to_svalue(++sp, PyTuple_GetItem(arg, i));
+            if (err != NULL)
+            {
+                PyErr_SetString(PyExc_ValueError, err);
+                pop_n_elems(i, sp);
+                return NULL;
+            }
+        }
+
+        inter_sp = sp;
+
+        if(call_lpc_secure((CClosureFun)ldmud_object_lfun_call_lfun, num_arg, lfun))
+        {
+            result = svalue_to_python(inter_sp);
+            pop_stack();
+        }
+        else
+            result = NULL;
+
+        return result;
+    }
+
+    return NULL;
+
+} /* ldmud_object_lfun_call() */
+
+/*-------------------------------------------------------------------------*/
+static bool ldmud_object_lfun_check(PyObject *ob);
+
+static PyObject*
+ldmud_object_lfun_richcompare (ldmud_object_lfun_t *self, PyObject *other, int op)
+
+/* Compare <self> to <other> with the compare operation <op>.
+ */
+
+{
+    object_t *self_ob, *other_ob;
+    bool result;
+    PyObject* resultval;
+
+    if (!ldmud_object_lfun_check(other))
+    {
+        Py_INCREF(Py_NotImplemented);
+        return Py_NotImplemented;
+    }
+
+    self_ob = self->ob_base.lpc_object;
+    other_ob = ((ldmud_object_lfun_t*)other)->ob_base.lpc_object;
+
+    if(self_ob == NULL && other_ob == NULL)
+        result = op == Py_LE || op == Py_EQ || op == Py_GE;
+    else if(self_ob == NULL)
+        result = op == Py_LT || op == Py_LE || op == Py_NE;
+    else if(other_ob == NULL)
+        result = op == Py_GT || op == Py_GE || op == Py_NE;
+    else
+    {
+        switch (op)
+        {
+            case Py_LT:
+            {
+                int cmp = mstring_compare(self_ob->name, other_ob->name);
+                if (cmp != 0)
+                {
+                    result = cmp < 0;
+                    break;
+                }
+
+                result = (self->index < ((ldmud_object_lfun_t*)other)->index);
+                break;
+            }
+
+            case Py_LE:
+            {
+                int cmp = mstring_compare(self_ob->name, other_ob->name);
+                if (cmp != 0)
+                {
+                    result = cmp <= 0;
+                    break;
+                }
+
+                result = (self->index <= ((ldmud_object_lfun_t*)other)->index);
+                break;
+            }
+
+            case Py_EQ:
+                 result = (self_ob == other_ob && self->index == ((ldmud_object_lfun_t*)other)->index);
+                 break;
+
+            case Py_NE:
+                 result = (self_ob != other_ob || self->index != ((ldmud_object_lfun_t*)other)->index);
+                 break;
+
+            case Py_GT:
+            {
+                int cmp = mstring_compare(self_ob->name, other_ob->name);
+                if (cmp != 0)
+                {
+                    result = cmp > 0;
+                    break;
+                }
+
+                result = (self->index > ((ldmud_object_lfun_t*)other)->index);
+                break;
+            }
+
+            case Py_GE:
+            {
+                int cmp = mstring_compare(self_ob->name, other_ob->name);
+                if (cmp != 0)
+                {
+                    result = cmp >= 0;
+                    break;
+                }
+
+                result = (self->index >= ((ldmud_object_lfun_t*)other)->index);
+                break;
+            }
+
+            default:
+            {
+                Py_INCREF(Py_NotImplemented);
+                return Py_NotImplemented;
+            }
+        }
+    }
+
+    resultval = result ? Py_True : Py_False;
+    Py_INCREF(resultval);
+    return resultval;
+} /* ldmud_object_lfun_richcompare() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_object_lfun_get_name (ldmud_object_lfun_t *lfun, void *closure)
+
+/* Return the name for the lfun.
+ */
+
+{
+    function_t* fun;
+
+    if(!lfun->ob_base.lpc_object)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    fun = get_function_header(lfun->ob_base.lpc_object->prog, lfun->index);
+    return PyUnicode_FromStringAndSize(get_txt(fun->name), mstrsize(fun->name));
+} /* ldmud_object_lfun_get_name() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_object_lfun_get_file_name (ldmud_object_lfun_t *lfun, void *closure)
+
+/* Return the file name for the lfun.
+ */
+
+{
+    program_t *progp;
+    int fx;
+    bytecode_p funstart;
+    string_t *name;
+    PyObject* result;
+
+    if(!lfun->ob_base.lpc_object)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    get_function_header_extended(lfun->ob_base.lpc_object->prog, lfun->index, (const program_t**) &progp, &fx);
+    funstart = progp->program + (progp->functions[fx] & FUNSTART_MASK);
+    if (is_undef_function(funstart))
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    get_line_number(funstart, progp, &name);
+    if (name == STR_UNDEFINED)
+    {
+        free_mstring(name);
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    result = PyUnicode_FromFormat("/%s", get_txt(name));
+    free_mstring(name);
+    return result;
+} /* ldmud_object_lfun_get_file_name() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_object_lfun_get_line_number (ldmud_object_lfun_t *lfun, void *closure)
+
+/* Return the starting line number for the lfun.
+ */
+
+{
+    program_t *progp;
+    int fx, pos;
+    bytecode_p funstart;
+    string_t *name;
+
+    if(!lfun->ob_base.lpc_object)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    get_function_header_extended(lfun->ob_base.lpc_object->prog, lfun->index, (const program_t**) &progp, &fx);
+    funstart = progp->program + (progp->functions[fx] & FUNSTART_MASK);
+    if (is_undef_function(funstart))
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    pos = get_line_number(funstart, progp, &name);
+    free_mstring(name);
+
+    if (pos == 0)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    return PyLong_FromLong(pos);
+} /* ldmud_object_lfun_get_line_number() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_object_lfun_get_arguments (ldmud_object_lfun_t *lfun, void *closure)
+
+/* Return the argument list for the lfun.
+ */
+
+{
+    const program_t *progp;
+    function_t *fun;
+    int fx;
+    PyObject* result;
+
+    if(!lfun->ob_base.lpc_object)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    fun = get_function_header_extended(lfun->ob_base.lpc_object->prog, lfun->index, &progp, &fx);
+    result = PyList_New(fun->num_arg);
+    if (result == NULL)
+        return result;
+
+    for (int i = 0; i < fun->num_arg; i++)
+    {
+        ldmud_object_lfun_argument_t* arg = (ldmud_object_lfun_argument_t*)ldmud_object_lfun_argument_type.tp_alloc(&ldmud_object_lfun_argument_type, 0);
+        if (arg == NULL)
+        {
+            Py_DECREF(result);
+            return NULL;
+        }
+
+        arg->position = i+1;
+        arg->flags = (fun->flags & TYPE_MOD_XVARARGS) ? LFUN_ARGUMENT_FLAG_VARARGS : 0;
+        arg->type = NULL;
+
+        if (progp->argument_types && progp->type_start && progp->type_start[fx] != INDEX_START_NONE)
+            arg->type = lpctype_to_pythontype(progp->argument_types[progp->type_start[fx] + i]);
+
+        PyList_SET_ITEM(result, i, (PyObject*)arg);
+    }
+
+    return result;
+
+} /* ldmud_object_lfun_get_arguments() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_object_lfun_get_return_type (ldmud_object_lfun_t *lfun, void *closure)
+
+/* Return the return type for the lfun.
+ */
+
+{
+    function_t *fun;
+    PyObject* result;
+
+    if(!lfun->ob_base.lpc_object)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    fun = get_function_header(lfun->ob_base.lpc_object->prog, lfun->index);
+    result = lpctype_to_pythontype(fun->type);
+    if (!result)
+        PyErr_Format(PyExc_AttributeError, "Function '%s' has no type information or mixed return type", fun->name);
+
+    return result;
+
+} /* ldmud_object_lfun_get_return_type() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_object_lfun_get_flags (ldmud_object_lfun_t *lfun, void *closure)
+
+/* Return the flags for the lfun.
+ */
+
+{
+    funflag_t flags;
+
+    if(!lfun->ob_base.lpc_object)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    flags = lfun->ob_base.lpc_object->prog->functions[lfun->index];
+
+    return PyLong_FromLong(
+          ((flags & TYPE_MOD_STATIC)     ? LFUN_FLAG_STATIC     : 0)
+        | ((flags & TYPE_MOD_NO_MASK)    ? LFUN_FLAG_NOMASK     : 0)
+        | ((flags & TYPE_MOD_VARARGS)    ? LFUN_FLAG_VARARGS    : 0)
+        | ((flags & TYPE_MOD_VIRTUAL)    ? LFUN_FLAG_VIRTUAL    : 0)
+        | ((flags & TYPE_MOD_DEPRECATED) ? LFUN_FLAG_DEPRECATED : 0));
+
+} /* ldmud_object_lfun_get_flags() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_object_lfun_get_visibility (ldmud_object_lfun_t *lfun, void *closure)
+
+/* Return the visibility for the lfun.
+ */
+
+{
+    funflag_t flags;
+
+    if(!lfun->ob_base.lpc_object)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    flags = lfun->ob_base.lpc_object->prog->functions[lfun->index];
+
+    return PyLong_FromLong(
+        (flags & TYPE_MOD_PRIVATE)   ? VISIBILITY_PRIVATE :
+        (flags & TYPE_MOD_PROTECTED) ? VISIBILITY_PROTECTED :
+        (flags & TYPE_MOD_PUBLIC)    ? VISIBILITY_PUBLIC :
+                                       VISIBILITY_VISIBLE);
+} /* ldmud_object_lfun_get_visibility() */
+
+/*-------------------------------------------------------------------------*/
+static PyGetSetDef ldmud_object_lfun_getset [] = {
+    {"name",        (getter)ldmud_object_lfun_get_name,        NULL, NULL},
+    {"file_name",   (getter)ldmud_object_lfun_get_file_name,   NULL, NULL},
+    {"line_number", (getter)ldmud_object_lfun_get_line_number, NULL, NULL},
+    {"arguments",   (getter)ldmud_object_lfun_get_arguments,   NULL, NULL},
+    {"return_type", (getter)ldmud_object_lfun_get_return_type, NULL, NULL},
+    {"flags",       (getter)ldmud_object_lfun_get_flags,       NULL, NULL},
+    {"visibility",  (getter)ldmud_object_lfun_get_visibility,  NULL, NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_object_lfun_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.Lfun",                       /* tp_name */
+    sizeof(ldmud_object_lfun_t),        /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_object_lfun_dealloc, /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    (reprfunc)ldmud_object_lfun_repr,   /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    (hashfunc)ldmud_object_lfun_hash,   /* tp_hash  */
+    (ternaryfunc)ldmud_object_lfun_call,/* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC lfun",                         /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    (richcmpfunc)ldmud_object_lfun_richcompare, /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    0,                                  /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_object_lfun_getset,           /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,                                  /* tp_init */
+    0,                                  /* tp_alloc */
+    0,                                  /* tp_new */
+};
+
+/*-------------------------------------------------------------------------*/
+static bool
+ldmud_object_lfun_check (PyObject *ob)
+
+/* Return true, if the given object is an lfun object.
+ */
+
+{
+    return Py_TYPE(ob) == &ldmud_object_lfun_type;
+} /* ldmud_object_lfun_check() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_object_functions_repr (ldmud_object_t *val)
+
+/* Return a string representation of this object.
+ */
+
+{
+    if(!val->lpc_object)
+        return PyUnicode_FromString("<LPC empty function list>");
+    return PyUnicode_FromFormat("<LPC functions of /%s>", get_txt(val->lpc_object->name));
+} /* ldmud_object_functions_repr() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_object_functions_getattro (ldmud_object_t *val, PyObject *name)
+
+/* Return a function of the function list.
+ */
+
+{
+    PyObject *result, *utf8;
+    char* namebuf;
+    ssize_t namelength;
+    string_t* funname;
+
+    /* First check real attributes... */
+    result = PyObject_GenericGetAttr((PyObject *)val, name);
+    if (result || !PyErr_ExceptionMatches(PyExc_AttributeError))
+        return result;
+
+    if (!val->lpc_object)
+        return NULL;
+
+    PyErr_Clear();
+
+    /* And now search for a function. */
+    if (!PyUnicode_Check(name))
+    {
+        PyErr_Format(PyExc_TypeError,
+                     "attribute name must be string, not '%.200s'",
+                     name->ob_type->tp_name);
+        return NULL;
+    }
+
+    utf8 = PyUnicode_AsEncodedString(name, "utf-8", "replace");
+    if (utf8 == NULL)
+    {
+        PyErr_SetString(PyExc_ValueError, "undecodable function name");
+        return NULL;
+    }
+
+    PyBytes_AsStringAndSize(utf8, &namebuf, &namelength);
+
+    /* Make the program resident */
+    if (O_PROG_SWAPPED(val->lpc_object))
+    {
+        val->lpc_object->time_of_ref = current_time;
+        if (load_ob_from_swap(val->lpc_object) < 0)
+        {
+            Py_DECREF(utf8);
+            PyErr_Format(PyExc_MemoryError, "out of memory when unswapping object '%s'", get_txt(val->lpc_object->name));
+            return NULL;
+        }
+    }
+
+    funname = find_tabled_str_n(namebuf, namelength, STRING_UTF8);
+    Py_DECREF(utf8);
+
+    if (funname)
+    {
+        long ix = find_function(funname, val->lpc_object->prog);
+        if (ix >= 0)
+        {
+            ldmud_object_lfun_t* lfun = (ldmud_object_lfun_t*)ldmud_object_lfun_type.tp_alloc(&ldmud_object_lfun_type, 0);
+            if (lfun == NULL)
+                return NULL;
+
+            lfun->ob_base.lpc_object = ref_object(val->lpc_object, "ldmud_object_functions_getattro");
+            lfun->index = ix;
+            add_gc_object(&gc_object_list, (ldmud_gc_var_t*)lfun);
+            return (PyObject*) lfun;
+        }
+    }
+
+    PyErr_Format(PyExc_AttributeError, "Function '%U' does not exist", name);
+    return NULL;
+} /* ldmud_object_functions_getattro() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_object_functions_dir (ldmud_object_t *self)
+
+/* Returns a list of all attributes, this includes all function names.
+ */
+
+{
+    PyObject *dict, *cls, *result;
+    PyObject *attrs = NULL;
+
+    /* First add the regular dictionaries. */
+    cls = PyObject_GetAttrString((PyObject*)self, "__class__");
+    if (cls != NULL)
+    {
+        dict = PyObject_Dir(cls);
+        Py_DECREF(cls);
+    }
+    else
+        dict = NULL;
+    if (dict == NULL)
+        PyErr_Clear();
+    else
+    {
+        attrs = PySet_New(dict);
+        if (attrs == NULL)
+            PyErr_Clear();
+        Py_DECREF(dict);
+    }
+
+    if (attrs == NULL)
+    {
+        attrs = PySet_New(dict);
+        if (attrs == NULL)
+            return NULL;
+    }
+
+    /* Now add all the functions. */
+    if (self->lpc_object)
+    {
+        program_t *progp;
+
+        /* Make the program resident */
+        if (O_PROG_SWAPPED(self->lpc_object))
+        {
+            self->lpc_object->time_of_ref = current_time;
+            if (load_ob_from_swap(self->lpc_object) < 0)
+            {
+                Py_DECREF(attrs);
+                PyErr_Format(PyExc_MemoryError, "out of memory when unswapping object '%s'", get_txt(self->lpc_object->name));
+                return NULL;
+            }
+        }
+
+        progp = self->lpc_object->prog;
+        for (int idx = 0; idx < progp->num_function_names; idx++)
+        {
+            string_t *fun = get_function_header(progp, progp->function_names[idx])->name;
+            PyObject *funname = PyUnicode_FromStringAndSize(get_txt(fun), mstrsize(fun));
+
+            if (funname == NULL)
+            {
+                PyErr_Clear();
+                continue;
+            }
+
+            if (PySet_Add(attrs, funname) < 0)
+                PyErr_Clear();
+            Py_DECREF(funname);
+        }
+    }
+
+    /* And return the keys of our dict. */
+    result = PySequence_List(attrs);
+    Py_DECREF(attrs);
+    return result;
+} /* ldmud_object_functions_dir() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_object_functions_dict (ldmud_object_t *self, void *closure)
+
+/* Returns a list of all lfuns.
+ */
+
+{
+    PyObject *result, *dict = PyDict_New();
+    if (!dict)
+        return NULL;
+
+    if (self->lpc_object)
+    {
+        program_t *progp;
+
+        /* Make the program resident */
+        if (O_PROG_SWAPPED(self->lpc_object))
+        {
+            self->lpc_object->time_of_ref = current_time;
+            if (load_ob_from_swap(self->lpc_object) < 0)
+            {
+                Py_DECREF(dict);
+                PyErr_Format(PyExc_MemoryError, "out of memory when unswapping object '%s'", get_txt(self->lpc_object->name));
+                return NULL;
+            }
+        }
+
+        progp = self->lpc_object->prog;
+        for (int idx = 0; idx < progp->num_function_names; idx++)
+        {
+            int fx = progp->function_names[idx];
+            string_t *fun = get_function_header(progp, fx)->name;
+            PyObject *funname = PyUnicode_FromStringAndSize(get_txt(fun), mstrsize(fun));
+            ldmud_object_lfun_t* lfun;
+
+            if (funname == NULL)
+            {
+                PyErr_Clear();
+                continue;
+            }
+
+            lfun = (ldmud_object_lfun_t*)ldmud_object_lfun_type.tp_alloc(&ldmud_object_lfun_type, 0);
+            if (lfun == NULL)
+            {
+                PyErr_Clear();
+                Py_DECREF(funname);
+                continue;
+            }
+
+            lfun->ob_base.lpc_object = ref_object(self->lpc_object, "ldmud_object_functions_dict");
+            lfun->index = fx;
+            add_gc_object(&gc_object_list, (ldmud_gc_var_t*)lfun);
+
+            if (PyDict_SetItem(dict, funname, (PyObject*)lfun) < 0)
+                PyErr_Clear();
+            Py_DECREF(funname);
+            Py_DECREF(lfun);
+        }
+    }
+
+    result = PyDictProxy_New(dict);
+    Py_DECREF(dict);
+    return result;
+} /* ldmud_object_functions_dict() */
+
+/*-------------------------------------------------------------------------*/
+static void ldmud_object_dealloc(ldmud_object_t* self);
+
+static PyMethodDef ldmud_object_functions_methods[] =
+{
+    {
+        "__dir__",
+        (PyCFunction)ldmud_object_functions_dir, METH_NOARGS,
+        "__dir__() -> List\n\n"
+        "Returns a list of all attributes."
+    },
+
+    {NULL}
+};
+
+static PyGetSetDef ldmud_object_functions_getset [] = {
+    {"__dict__", (getter)ldmud_object_functions_dict, NULL, NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_object_functions_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.Functions",                  /* tp_name */
+    sizeof(ldmud_object_t),             /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_object_dealloc,   /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    (reprfunc)ldmud_object_functions_repr, /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    (getattrofunc)ldmud_object_functions_getattro, /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC function list",                /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_object_functions_methods,     /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_object_functions_getset,      /* tp_getset */
+};
+
+/*-------------------------------------------------------------------------*/
 static void
 ldmud_object_dealloc (ldmud_object_t* self)
 
@@ -932,6 +1927,32 @@ ldmud_object_get_name (ldmud_object_t *val, void *closure)
 } /* ldmud_object_get_name() */
 
 /*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_object_get_functions (ldmud_object_t *val, void *closure)
+
+/* Return the value for the functions member.
+ */
+
+{
+    ldmud_object_t *result;
+
+    if(!val->lpc_object)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    result = (ldmud_object_t*)ldmud_object_functions_type.tp_alloc(&ldmud_object_functions_type, 0);
+    if (result == NULL)
+        return NULL;
+
+    result->lpc_object = ref_object(val->lpc_object, "ldmud_object_get_functions");
+    add_gc_object(&gc_object_list, (ldmud_gc_var_t*)result);
+
+    return (PyObject *)result;
+} /* ldmud_object_get_functions() */
+
+/*-------------------------------------------------------------------------*/
 static PyMethodDef ldmud_object_methods[] =
 {
     {NULL}
@@ -939,7 +1960,8 @@ static PyMethodDef ldmud_object_methods[] =
 
 static PyGetSetDef ldmud_object_getset[] =
 {
-    {"name", (getter)ldmud_object_get_name,   NULL, NULL},
+    {"name",      (getter)ldmud_object_get_name,      NULL, NULL},
+    {"functions", (getter)ldmud_object_get_functions, NULL, NULL},
     {NULL}
 };
 
@@ -4409,6 +5431,12 @@ init_ldmud_module ()
     /* Initialize types. */
     if (PyType_Ready(&ldmud_object_type) < 0)
         return NULL;
+    if (PyType_Ready(&ldmud_object_functions_type) < 0)
+        return NULL;
+    if (PyType_Ready(&ldmud_object_lfun_type) < 0)
+        return NULL;
+    if (PyType_Ready(&ldmud_object_lfun_argument_type) < 0)
+        return NULL;
     if (PyType_Ready(&ldmud_array_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_mapping_type) < 0)
@@ -4457,6 +5485,18 @@ init_ldmud_module ()
     for (int i = 0; i < PYTHON_HOOK_COUNT; i++)
         PyModule_AddIntConstant(module, python_hook_names[i], i);
 
+    assert(LFUN_FLAG_COUNT == sizeof(lfun_flag_names) / sizeof(lfun_flag_names[0]));
+    for (int i = 0; i < LFUN_FLAG_COUNT; i++)
+        PyModule_AddIntConstant(module, lfun_flag_names[i], 1 << i);
+
+    assert(LFUN_ARGUMENT_FLAG_COUNT == sizeof(lfun_argument_flag_names) / sizeof(lfun_argument_flag_names[0]));
+    for (int i = 0; i < LFUN_ARGUMENT_FLAG_COUNT; i++)
+        PyModule_AddIntConstant(module, lfun_argument_flag_names[i], 1 << i);
+
+    assert(VISIBILITY_COUNT == sizeof(visibility_names) / sizeof(visibility_names[0]));
+    for (int i = 0; i < VISIBILITY_COUNT; i++)
+        PyModule_AddIntConstant(module, visibility_names[i], i);
+
     /* Add the efuns as a sub-namespace. */
     efuns = create_efun_namespace();
     if (!efuns)
@@ -4469,6 +5509,130 @@ init_ldmud_module ()
 /*=========================================================================*/
 
 /*                          Helper functions                               */
+
+/*-------------------------------------------------------------------------*/
+
+static PyObject*
+lpctype_to_pythontype (lpctype_t *type)
+
+/* Creates a Python type from an lpctype_t.
+ * mixed/unknown will be returned as NULL.
+ */
+
+{
+    if (!type)
+        return NULL;
+
+    switch (type->t_class)
+    {
+        case TCLASS_PRIMARY:
+            switch (type->t_primary)
+            {
+                case TYPE_NUMBER:
+                    Py_INCREF(&PyLong_Type);
+                    return (PyObject *)&PyLong_Type;
+
+                case TYPE_STRING:
+                    Py_INCREF(&PyUnicode_Type);
+                    return (PyObject *)&PyUnicode_Type;
+
+                case TYPE_VOID:
+                    Py_INCREF(Py_None);
+                    return Py_None;
+
+                case TYPE_OBJECT:
+                    Py_INCREF(&ldmud_object_type);
+                    return (PyObject *)&ldmud_object_type;
+
+                case TYPE_MAPPING:
+                    Py_INCREF(&ldmud_mapping_type);
+                    return (PyObject *)&ldmud_mapping_type;
+
+                case TYPE_FLOAT:
+                    Py_INCREF(&PyFloat_Type);
+                    return (PyObject *)&PyFloat_Type;
+
+                case TYPE_CLOSURE:
+                    Py_INCREF(&ldmud_closure_type);
+                    return (PyObject *)&ldmud_closure_type;
+
+                case TYPE_SYMBOL:
+                    Py_INCREF(&ldmud_symbol_type);
+                    return (PyObject *)&ldmud_symbol_type;
+
+                case TYPE_QUOTED_ARRAY:
+                    Py_INCREF(&ldmud_quoted_array_type);
+                    return (PyObject *)&ldmud_quoted_array_type;
+
+                case TYPE_BYTES:
+                    Py_INCREF(&PyBytes_Type);
+                    return (PyObject *)&PyBytes_Type;
+
+                case TYPE_UNKNOWN:
+                case TYPE_ANY:
+                    break;
+            }
+            break;
+
+        case TCLASS_STRUCT:
+            Py_INCREF(&ldmud_struct_type);
+            return (PyObject *)&ldmud_struct_type;
+
+        case TCLASS_ARRAY:
+            Py_INCREF(&ldmud_array_type);
+            return (PyObject *)&ldmud_array_type;
+
+        case TCLASS_UNION:
+        {
+            PyObject *result, *part;
+            lpctype_t *cur = type;
+            int i = 0, num = 1;
+
+            while (cur->t_class == TCLASS_UNION)
+            {
+                num++;
+                cur = cur->t_union.head;
+            }
+
+            result = PyTuple_New(num);
+            if (!result)
+            {
+                PyErr_Clear();
+                return NULL;
+            }
+
+            cur = type;
+            while (cur->t_class == TCLASS_UNION)
+            {
+                part = lpctype_to_pythontype(cur->t_union.member);
+                if (!part)
+                {
+                    Py_DECREF(result);
+                    return NULL;
+                }
+
+                PyTuple_SET_ITEM(result, i, part);
+
+                i++;
+                cur = cur->t_union.head;
+            }
+
+            part = lpctype_to_pythontype(cur);
+            if (!part)
+            {
+                Py_DECREF(result);
+                return NULL;
+            }
+
+            PyTuple_SET_ITEM(result, i, part);
+
+            return result;
+        }
+    }
+
+    return NULL;
+} /* lpctype_to_pythontype() */
+
 
 /*-------------------------------------------------------------------------*/
 
