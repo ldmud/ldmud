@@ -568,6 +568,13 @@ svalue_t apply_return_value = { T_NUMBER };
    * direct advantage of this variable.
    */
 
+static svalue_t struct_member_temporary = { T_NUMBER };
+  /* This variable holds the a temporary used for relaxed struct member
+   * lookups. get_struct_item() will return a pointer to this variable
+   * whenever a struct member is not found. An lvalue may be created
+   * from it.
+   */
+
 #define SIZEOF_STACK (EVALUATOR_STACK_SIZE<<1)
 #if SIZEOF_STACK > INT_MAX
 #error SIZEOF_STACK is > INT_MAX.
@@ -4207,8 +4214,6 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc, bool 
 /* Index struct <st> with index <i> and return the pointer to the
  * indexed item.
  * If the index is invalid throw an error, unless <ignore_error> is set, then return 0.
- * <ignore_error> may only be set for read-access, because get_struct_item() might
- * then return a reference to const0, which must not be changed.
  */
 
 {
@@ -4221,9 +4226,13 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc, bool 
         if (ind < 0)
         {
             if (ignore_error)
-                return &const0;
+            {
+                free_svalue(&struct_member_temporary);
+                put_number(&struct_member_temporary, 0);
+                return &struct_member_temporary;
+            }
 
-            ERRORF(("Illegal struct '%s'->(): member '%s' not found.\n"
+            ERRORF(("Illegal struct '%s' member: '%s' not found.\n"
                    , get_txt(struct_name(st))
                    , get_txt(i->u.str)
                    ));
@@ -4233,7 +4242,7 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc, bool 
     }
     else if (i->type != T_NUMBER)
     {
-        ERRORF(("Illegal struct '%s'->(): got %s, "
+        ERRORF(("Illegal struct '%s' member: got %s, "
                 "expected number/string/symbol.\n"
                , get_txt(struct_name(st))
                , typename(i->type)
@@ -4245,7 +4254,7 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc, bool 
         ind = i->u.number;
         if (ind < 0)
         {
-            ERRORF(("Illegal struct '%s'->(): not a positive number.\n"
+            ERRORF(("Illegal struct '%s' member: not a positive number.\n"
                    , get_txt(struct_name(st))
                   ));
             /* NOTREACHED */
@@ -4253,7 +4262,14 @@ get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc, bool 
         }
         if (ind >= struct_size(st))
         {
-            ERRORF(("Illegal struct '%s'->: out of bounds: "
+            if (ignore_error)
+            {
+                free_svalue(&struct_member_temporary);
+                put_number(&struct_member_temporary, 0);
+                return &struct_member_temporary;
+            }
+
+            ERRORF(("Illegal struct '%s' member: out of bounds: "
                     "%"PRIdPINT", struct sized: %lu.\n"
                    , get_txt(struct_name(st))
                    , ind
@@ -4551,24 +4567,28 @@ get_unprotected_lvalue (svalue_t *lval)
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool reseating)
+push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool reseating, bool ignore_error)
 
 /* Operator F_INDEX_LVALUE    (string|vector v=sp[-1], int   i=sp[0])
  *          F_RINDEX_LVALUE   (string|vector v=sp[-1], int   i=sp[0])
  *          F_AINDEX_LVALUE   (string|vector v=sp[-1], int   i=sp[0])
  *          F_INDEX_LVALUE    (mapping       v=sp[-1], mixed i=sp[0])
  *          F_S_INDEX_LVALUE  (struct        v=sp[-1], mixed i=sp[0])
+ *          F_SX_INDEX_LVALUE (struct        v=sp[-1], mixed i=sp[0])
  *          F_INDEX_VLVALUE   (string|vector v=sp[-1], int   i=sp[0])
  *          F_RINDEX_VLVALUE  (string|vector v=sp[-1], int   i=sp[0])
  *          F_AINDEX_VLVALUE  (string|vector v=sp[-1], int   i=sp[0])
  *          F_INDEX_VLVALUE   (mapping       v=sp[-1], mixed i=sp[0])
  *          F_S_INDEX_VLVALUE (struct        v=sp[-1], mixed i=sp[0])
+ *          F_SX_INDEX_VLVALUE(struct        v=sp[-1], mixed i=sp[0])
  *
  * Compute the index &(v[i]) of lrvalue <v> and push it onto the stack
  * as an lvalue.
  * If <v> is a string-lvalue, it is made a malloced string if necessary,
  * and the pushed result will be a lvalue pointing to a CHAR_LVALUE stored
  * in <current_unprotected_char>.
+ * <ignore_error> will just be passed to get_struct_item() and results in
+ * making an lvalue for a tempoary, when a struct member is not found.
  */
 
 {
@@ -4710,7 +4730,7 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool rese
                     return NULL;
                 }
 
-                item = get_struct_item(vec->u.strct, idx, sp, pc, false);
+                item = get_struct_item(vec->u.strct, idx, sp, pc, ignore_error);
 
                 if (last_reference)
                     last_reference = (vec->u.strct->ref == 1);
@@ -5112,6 +5132,7 @@ push_index_value (svalue_t *sp, bytecode_p pc, bool ignore_error, enum index_typ
  *          F_AINDEX  (string|vector v=sp[-1], int        i=sp[0])
  *          F_INDEX   (mapping       v=sp[-1], mixed      i=sp[0])
  *          F_S_INDEX (struct        v=sp[-1], string|int i=sp[0])
+ *          F_SX_INDEX(struct        v=sp[-1], string|int i=sp[0])
  *
  * Compute the value (v[i]) and push it onto the stack.
  * If the value would be a destructed object, 0 is pushed onto the stack
@@ -7713,6 +7734,8 @@ free_interpreter_temporaries (void)
     indexing_quickfix.type = T_NUMBER;
     free_svalue(&apply_return_value);
     apply_return_value.type = T_NUMBER;
+    free_svalue(&struct_member_temporary);
+    struct_member_temporary.type = T_NUMBER;
 
 #ifdef TRACE_CODE
     {
@@ -13904,6 +13927,7 @@ again:
         break;
 
     CASE(F_S_INDEX_LVALUE);         /* --- s_index_lvalue     --- */
+    CASE(F_SX_INDEX_LVALUE);        /* --- sx_index_lvalue    --- */
         /* Op. (struct v=sp[-2], mixed i=sp[-1], short idx=sp[0])
          *
          * Compute the index &(v[i]) of rvalue <v> and push it into the
@@ -13912,10 +13936,14 @@ again:
          * <idx> gives the index of the expected struct type - the
          * operator accepts a struct of this type, or any of its children.
          * An negative <idx> accepts any struct.
+         *
+         * F_SX_INDEX_LVALUE is the relaxed variant that will not throw
+         * an error if the member is not found. Instead an lvalue to
+         * a temporary will be put on the stack.
          */
 
         sp = check_struct_op(sp, pc, NULL);
-        sp = push_index_lvalue(sp, pc, REGULAR_INDEX, false);
+        sp = push_index_lvalue(sp, pc, REGULAR_INDEX, false, instruction == F_SX_INDEX_LVALUE);
         break;
 
     CASE(F_MAP_INDEX_LVALUE);       /* --- map_index_lvalue   --- */
@@ -13951,7 +13979,7 @@ again:
                 /* NOTREACHED */
             }
         }
-        sp = push_index_lvalue(sp, pc, REGULAR_INDEX, false);
+        sp = push_index_lvalue(sp, pc, REGULAR_INDEX, false, false);
         break;
 
     CASE(F_RINDEX_LVALUE);          /* --- rindex_lvalue      --- */
@@ -13964,7 +13992,7 @@ again:
          * CHAR_LVALUE stored in <special_lvalue>.
          */
 
-        sp = push_index_lvalue(sp, pc, REVERSE_INDEX, false);
+        sp = push_index_lvalue(sp, pc, REVERSE_INDEX, false, false);
         break;
 
     CASE(F_AINDEX_LVALUE);          /* --- aindex_lvalue      --- */
@@ -13977,12 +14005,14 @@ again:
          * CHAR_LVALUE stored in <special_lvalue>.
          */
 
-        sp = push_index_lvalue(sp, pc, ARITHMETIC_INDEX, false);
+        sp = push_index_lvalue(sp, pc, ARITHMETIC_INDEX, false, false);
         break;
 
     CASE(F_S_INDEX);                /* --- s_index            --- */
+    CASE(F_SX_INDEX);               /* --- sx_index           --- */
     {
         /* Operator F_S_INDEX (struct v=sp[-2], mixed i=sp[-1], short idx=sp[0])
+         * Operator F_SX_INDEX (struct v=sp[-2], mixed i=sp[-1], short idx=sp[0])
          *
          * Compute the value (v->i) and push it onto the stack.  If the value
          * would be a destructed object, 0 is pushed onto the stack and the
@@ -13991,10 +14021,17 @@ again:
          * <idx> gives the index of the expected struct type - the
          * operator accepts a struct of this type, or any of its children.
          * An negative <idx> accepts any struct.
+         *
+         * F_SX_INDEX is similar to F_S_INDEX, but it will not throw an
+         * error if the member doesn't exist.
          */
 
         bool ignore_error = false;
         sp = check_struct_op(sp, pc, &ignore_error);
+
+        if (instruction == F_SX_INDEX)
+            ignore_error = true;
+
         sp = push_index_value(sp, pc, ignore_error, REGULAR_INDEX);
         break;
     }
@@ -14331,7 +14368,7 @@ again:
                   ));
             /* NOTREACHED */
         }
-        sp = push_index_lvalue(sp, pc, REGULAR_INDEX, true);
+        sp = push_index_lvalue(sp, pc, REGULAR_INDEX, true, false);
         break;
 
     CASE(F_RINDEX_VLVALUE);         /* --- rindex_vlvalue      --- */
@@ -14343,7 +14380,7 @@ again:
          * lvalue references in that entry.
          */
 
-        sp = push_index_lvalue(sp, pc, REVERSE_INDEX, true);
+        sp = push_index_lvalue(sp, pc, REVERSE_INDEX, true, false);
         break;
 
     CASE(F_AINDEX_VLVALUE);         /* --- aindex_vlvalue      --- */
@@ -14355,10 +14392,11 @@ again:
          * stack. The computed index is a lvalue itself.
          */
 
-        sp = push_index_lvalue(sp, pc, ARITHMETIC_INDEX, true);
+        sp = push_index_lvalue(sp, pc, ARITHMETIC_INDEX, true, false);
         break;
 
     CASE(F_S_INDEX_VLVALUE);        /* --- s_index_vlvalue     --- */
+    CASE(F_SX_INDEX_VLVALUE);       /* --- sx_index_vlvalue    --- */
         /* Op. (struct v=sp[-2], mixed i=sp[-1], short idx=sp[0])
          *
          * Compute the index &(v[i]) of rvalue <v> and push it into the
@@ -14371,10 +14409,13 @@ again:
          * This'll create an unprotected lvalue directly to the entry,
          * so the entry can be changed without respecting any existing
          * stack. The computed index is a lvalue itself.
+         *
+         * F_SX_INDEX_VLVALUE is the relaxed variant that will create
+         * an lvalue to a tempoary if the struct member is not found.
          */
 
         sp = check_struct_op(sp, pc, NULL);
-        sp = push_index_lvalue(sp, pc, REGULAR_INDEX, true);
+        sp = push_index_lvalue(sp, pc, REGULAR_INDEX, true, instruction == F_SX_INDEX_VLVALUE);
         break;
 
     CASE(F_MAP_INDEX_VLVALUE);      /* --- map_index_vlvalue   --- */

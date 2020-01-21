@@ -4462,7 +4462,7 @@ compile_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_val
     /* The 'efun' #'-> needs a hidden argument
      * for the struct type index.
      */
-    if (f == F_S_INDEX)
+    if (f == F_S_INDEX || f == F_SX_INDEX)
     {
         current.code_left--;
         STORE_CODE(current.codep, (bytecode_t)F_NCONST1);
@@ -4934,6 +4934,7 @@ is_lvalue (svalue_t *argp, int flags)
           case F_RINDEX+CLOSURE_EFUN:
           case F_AINDEX+CLOSURE_EFUN:
           case F_S_INDEX +CLOSURE_EFUN:
+          case F_SX_INDEX +CLOSURE_EFUN:
           case CLOSURE_IDENTIFIER:
             if (size != 3)
                 break;
@@ -5063,9 +5064,11 @@ compile_lvalue (svalue_t *argp, int flags)
 
             /* ({ #'[, map|array, index [, index] })
              * ({ #'[<, map|array, index })
+             * ({ #'., struct, index })
              * ({ #'->, struct, index })
              */
             case F_S_INDEX +CLOSURE_EFUN:
+            case F_SX_INDEX +CLOSURE_EFUN:
                 is_struct = true;
                 /* FALLTHROUGH */
             case F_INDEX +CLOSURE_EFUN:
@@ -5112,11 +5115,14 @@ compile_lvalue (svalue_t *argp, int flags)
                             break;
 
                         case F_S_INDEX + CLOSURE_EFUN:
+                        case F_SX_INDEX + CLOSURE_EFUN:
                             current.code_left --;
                             STORE_CODE(current.codep, (bytecode_t) F_NCONST1);
                             STORE_CODE(current.codep
                                       , (bytecode_t)
-                                        ((flags & MAKE_VAR_LVALUE) ? F_S_INDEX_VLVALUE : F_S_INDEX_LVALUE));
+                                        ((cl->x.closure_type ==  F_S_INDEX + CLOSURE_EFUN)
+                                         ? ((flags & MAKE_VAR_LVALUE) ? F_S_INDEX_VLVALUE : F_S_INDEX_LVALUE)
+                                         : ((flags & MAKE_VAR_LVALUE) ? F_SX_INDEX_VLVALUE : F_SX_INDEX_LVALUE)));
                             break;
                     }
 

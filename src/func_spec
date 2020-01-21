@@ -107,6 +107,7 @@
         aindex    binary
         map_index ternary
         s_index   binary
+        sx_index   binary
 ".."    range     ternary
 "..<"   nr_range  ternary
 "<.."   rn_range  ternary
@@ -181,6 +182,7 @@
         rindex_lvalue
         aindex_lvalue
         s_index_lvalue
+        sx_index_lvalue
         range_lvalue
         nr_range_lvalue
         rn_range_lvalue
@@ -205,6 +207,7 @@
         rindex_vlvalue
         aindex_vlvalue
         s_index_vlvalue
+        sx_index_vlvalue
         map_index_vlvalue
         simul_efun
         aggregate

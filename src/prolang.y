@@ -5664,14 +5664,18 @@ get_struct_index (struct_name_t * pName)
 
 /*-------------------------------------------------------------------------*/
 static lpctype_t*
-get_struct_member_result_type (lpctype_t* structure, string_t* member_name, short* struct_index, int* member_index)
+get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool strict_lookup, short* struct_index, int* member_index)
 
 /* Determines the result type of a struct member lookup operation
- * <structure> -> <member_name>. It checks whether <structure> is a valid
- * struct type for access to <member_name>.
+ * <structure> -> <member_name> resp. <structure> . <member_name>.
+ * It checks whether <structure> is a valid struct type for access
+ * to <member_name>.
  *
  * <member_name> is NULL for runtime lookups, otherwise it contains the
  * name of the struct member to lookup at compile time.
+ *
+ * If <strict_lookup> is true, an error is thrown if the member could not
+ * be found, otherwise it is degraded to a runtime lookup.
  *
  * If <member_name> is non-NULL, then the corresponding struct index will
  * be written into <struct_index> and the member index into <member_index>.
@@ -5862,14 +5866,20 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, shor
 
     if (*struct_index == FSM_NO_STRUCT)
     {
-        if (is_struct)
+        if (!is_struct)
+            yyerrorf("Bad type for struct lookup: %s"
+                    , get_lpctype_name(structure));
+        else if (strict_lookup)
             yyerrorf("No such member '%s' for struct '%s'"
                     , get_txt(member_name)
                     , get_lpctype_name(structure)
                     );
         else
-            yyerrorf("Bad type for struct lookup: %s"
-                    , get_lpctype_name(structure));
+        {
+            *struct_index = FSM_AMBIGUOUS;
+            *member_index = -1;
+            return lpctype_mixed;
+        }
 
         return NULL;
     }
@@ -11384,7 +11394,7 @@ expr4:
           int m_index = -1;
 
 %line
-          lpctype_t* result = get_struct_member_result_type($1.type.t_type, $3, &s_index, &m_index);
+          lpctype_t* result = get_struct_member_result_type($1.type.t_type, $3, $2.strict_member, &s_index, &m_index);
           if (!result)
               result = lpctype_mixed;
 
@@ -11408,9 +11418,9 @@ expr4:
           ins_number(s_index);
 
           /* Put that expression also into an lvalue buffer. */
-          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, F_S_INDEX_LVALUE);
+          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, $2.strict_member ? F_S_INDEX_LVALUE : F_SX_INDEX_LVALUE);
 
-          ins_f_code(F_S_INDEX);
+          ins_f_code($2.strict_member ? F_S_INDEX : F_SX_INDEX);
 
           free_fulltype($1.type);
       }
@@ -11757,7 +11767,7 @@ lvalue:
           int m_index = -1;
 
 %line
-          lpctype_t* result = get_struct_member_result_type($1.type.t_type, $3, &s_index, &m_index);
+          lpctype_t* result = get_struct_member_result_type($1.type.t_type, $3, $2.strict_member, &s_index, &m_index);
           if (!result)
               result = lpctype_mixed;
 
@@ -11783,12 +11793,12 @@ lvalue:
 
               /* Insert the struct type index and the index opcode */
               ins_number(s_index);
-              ins_f_code(F_S_INDEX_LVALUE);
+              ins_f_code($2.strict_member ? F_S_INDEX_LVALUE : F_SX_INDEX_LVALUE);
 
               /* Now move that into an lvalue buffer. */
               $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, 0);
 
-              $$.vlvalue_inst = F_S_INDEX_VLVALUE;
+              $$.vlvalue_inst = $2.strict_member ? F_S_INDEX_VLVALUE : F_SX_INDEX_VLVALUE;
               $$.num_arg = 0;
 
               /* And remove it from the program block. */

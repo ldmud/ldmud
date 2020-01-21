@@ -173,12 +173,18 @@ mixed *tests = ({
     ({ "Unprotected rvalue-array element [>-2]", 0, (: mixed a = ({0,1,2,3}); int result = funcall(a)[>-2] = 5; return deep_eq(a, ({0,1,5,3})) && result == 5; :) }),
     ({ "Unprotected last array element [>-2]",     0, (: int result = ({0,1,2,({3})})[>-2] = 5; return result == 5; :) }),
 
-    ({ "Unprotected lvalue-struct element",         0, (: struct teststruct s = (<teststruct> -1, -2, -3); int result = s->b = 55; return deep_eq(s, (<teststruct> -1, 55, -3)) && result == 55; :) }),
-    ({ "Unprotected rvalue-struct element",         0, (: struct teststruct s = (<teststruct> -1, -2, -3); int result = funcall(s)->b = 55; return deep_eq(s, (<teststruct> -1, 55, -3)) && result == 55; :) }),
-    ({ "Unprotected last rvalue-struct element",    0, (: int result = (<teststruct> -1, -2, ({-3}))->b = 55;   return result == 55; :) }),
-    ({ "Unprotected lvalue-struct element by name", 0, (: mixed s = (<teststruct> -1, -2, -3); int result = s->"b" = 55; return deep_eq(s, (<teststruct> -1, 55, -3)) && result == 55; :) }),
-    ({ "Unprotected rvalue-struct element by name", 0, (: mixed s = (<teststruct> -1, -2, -3); int result = funcall(s)->"b" = 55; return deep_eq(s, (<teststruct> -1, 55, -3)) && result == 55; :) }),
-    ({ "Unprotected last rvalue-struct element by name", 0, (: int result = (<teststruct> -1, -2, ({-3}))->"b" = 55; return result == 55; :) }),
+    ({ "Unprotected strict lvalue-struct element",               0, (: struct teststruct s = (<teststruct> -1, -2, -3); int result = s.b  = 55; return deep_eq(s, (<teststruct> -1, 55, -3)) && result == 55; :) }),
+    ({ "Unprotected relaxed lvalue-struct element",              0, (: struct teststruct s = (<teststruct> -1, -2, -3); int result = s->b = 55; return deep_eq(s, (<teststruct> -1, 55, -3)) && result == 55; :) }),
+    ({ "Unprotected strict rvalue-struct element",               0, (: struct teststruct s = (<teststruct> -1, -2, -3); int result = funcall(s).b  = 55; return deep_eq(s, (<teststruct> -1, 55, -3)) && result == 55; :) }),
+    ({ "Unprotected relaxed rvalue-struct element",              0, (: struct teststruct s = (<teststruct> -1, -2, -3); int result = funcall(s)->b = 55; return deep_eq(s, (<teststruct> -1, 55, -3)) && result == 55; :) }),
+    ({ "Unprotected strict last rvalue-struct element",          0, (: int result = (<teststruct> -1, -2, ({-3})).b  = 55;   return result == 55; :) }),
+    ({ "Unprotected relaxed last rvalue-struct element",         0, (: int result = (<teststruct> -1, -2, ({-3}))->b = 55;   return result == 55; :) }),
+    ({ "Unprotected strict lvalue-struct element by name",       0, (: mixed s = (<teststruct> -1, -2, -3); int result = s."b" = 55; return deep_eq(s, (<teststruct> -1, 55, -3)) && result == 55; :) }),
+    ({ "Unprotected relaxed rvalue-struct element by name",      0, (: mixed s = (<teststruct> -1, -2, -3); int result = funcall(s)->"b" = 55; return deep_eq(s, (<teststruct> -1, 55, -3)) && result == 55; :) }),
+    ({ "Unprotected strict last rvalue-struct element by name",  0, (: int result = (<teststruct> -1, -2, ({-3}))."b" = 55; return result == 55; :) }),
+    ({ "Unprotected relaxed last rvalue-struct element by name", 0, (: int result = (<teststruct> -1, -2, ({-3}))->"b" = 55; return result == 55; :) }),
+    ({ "Unprotected strict non-existant lvalue-struct element",  TF_ERROR, (: struct teststruct s = (<teststruct> -1, -2, -3); int result = s.("d")  = 55; return deep_eq(s, (<teststruct> -1, -2, -3)) && result == 55; :) }),
+    ({ "Unprotected relaxed non-existant lvalue-struct element", 0,        (: struct teststruct s = (<teststruct> -1, -2, -3); int result = s->("d") = 55; return deep_eq(s, (<teststruct> -1, -2, -3)) && result == 55; :) }),
 
     ({ "Unprotected lvalue-mapping element 1",      0, (: mapping m = ([ "a": 'a', "b": 'b', "c": ({'c'}) ]); int result = m["b"]    = 'B'; return deep_eq(m, (["a":'a',"b":'B',"c":({'c'})])) && result == 'B'; :) }),
     ({ "Unprotected lvalue-mapping element 2",      0, (: mapping m = ([ "a": 'a', "b": 'b', "c": ({'c'}) ]); int result = m["b", 0] = 'B'; return deep_eq(m, (["a":'a',"b":'B',"c":({'c'})])) && result == 'B'; :) }),
@@ -263,6 +269,35 @@ mixed *tests = ({
             return sizeof(m)==2 && "X"+ind[0] != "X"+ind[1];
         :)
     }),
+
+    ({ "Protected strict struct non-existant member lvalue", TF_ERROR,
+        (:
+            struct teststruct s = (<teststruct> -1, -2, -3);
+            int result = &(s.("d"));
+        :)
+    }),
+    ({ "Protected relaxed struct non-existant member lvalue", 0,
+        (:
+            struct teststruct s = (<teststruct> -1, -2, -3);
+            int result = &(s->("d"));
+
+            // Non existant member shall return 0.
+            if (result != 0)
+                return 0;
+
+            result = 55;
+
+            // Any write access shall not change our struct.
+            if (!deep_eq(s, (<teststruct> -1, -2, -3)))
+                return 0;
+
+            // Any further non-existant member access
+            // shall not disturb our temporary lvalue.
+            s->("e") = 99;
+            return result == 55;
+        :)
+    }),
+
     ({ "Protected array range 1", 0, (: mixed a = ({1,2,3,4,5}); funcall((: $1 = $2; :), &(a[1..2]), &(a[3..3])); return deep_eq(a, ({1,4,4,5})); :) }),
     ({ "Protected array range 2", 0, (: mixed a = ({1,2,3,4,5}); funcall((: $1[1] = "a"; :), &(a[1..2])); return deep_eq(a, ({1,2,"a",4,5})); :) }),
     ({ "Protected array range 3", 0, (: mixed a = ({0,1,2,3,4}); funcall((: $1 = ({}); :), &(a[0..1])); return deep_eq(a, ({2,3,4})); :) }),
@@ -1486,8 +1521,8 @@ mixed *tests = ({
             int b = 100;
             struct teststruct s = (<teststruct> &b, 300, 500);
 
-            s->a = 101;
-            &(s->a) = 200;
+            s.a = 101;
+            &(s.a) = 200;
 
             return deep_eq(s, (<teststruct> 200, 300, 500)) && b == 101;
         :),
@@ -1576,9 +1611,14 @@ mixed *tests = ({
     ({ "Lambda: Unprotected rvalue-array element [>-2]", 0, lambda(0, ({#',, ({#'=,'a,'({0,1,2,3})}), ({#'=, 'result, ({#'=,({#'[>,({#'funcall,'a}),-2}),5}) }), ({#'&&, ({#'deep_eq,'a,'({0,1,5,3})}), ({#'==,'result,5}) }) })) }),
     ({ "Lambda: Unprotected last array element [>-2]",   0, lambda(0, ({#',,                          ({#'=, 'result, ({#'=,({#'[>,'({0,2,3,({3})}),-2}),5}) }),                                        ({#'==,'result,5})    })) }),
 
-    ({ "Lambda: Unprotected lvalue-struct element by name",      0, lambda(0, ({#',, ({#'=,'s,(<teststruct> -1,-2,-3)}), ({#'=, 'result, ({#'=,({#'->,'s,                     "b"}), 55}) }), ({#'&&, ({#'deep_eq,'s,(<teststruct> -1,55,-3)}), ({#'==,'result,55}) }) })) }),
-    ({ "Lambda: Unprotected rvalue-struct element by name",      0, lambda(0, ({#',, ({#'=,'s,(<teststruct> -1,-2,-3)}), ({#'=, 'result, ({#'=,({#'->,({#'funcall,'s}),       "b"}), 55}) }), ({#'&&, ({#'deep_eq,'s,(<teststruct> -1,55,-3)}), ({#'==,'result,55}) }) })) }),
-    ({ "Lambda: Unprotected last rvalue-struct element by name", 0, lambda(0, ({#',,                                     ({#'=, 'result, ({#'=,({#'->,(<teststruct> -1,-2,-3),"b"}), 55}) }),                                                   ({#'==,'result,55})    })) }),
+    ({ "Lambda: Unprotected strict lvalue-struct element by name",       0,        lambda(0, ({#',, ({#'=,'s,(<teststruct> -1,-2,-3)}), ({#'=, 'result, ({#'=,({#'., 's,                     "b"}), 55}) }), ({#'&&, ({#'deep_eq,'s,(<teststruct> -1,55,-3)}), ({#'==,'result,55}) }) })) }),
+    ({ "Lambda: Unprotected relaxed lvalue-struct element by name",      0,        lambda(0, ({#',, ({#'=,'s,(<teststruct> -1,-2,-3)}), ({#'=, 'result, ({#'=,({#'->,'s,                     "b"}), 55}) }), ({#'&&, ({#'deep_eq,'s,(<teststruct> -1,55,-3)}), ({#'==,'result,55}) }) })) }),
+    ({ "Lambda: Unprotected strict rvalue-struct element by name",       0,        lambda(0, ({#',, ({#'=,'s,(<teststruct> -1,-2,-3)}), ({#'=, 'result, ({#'=,({#'., ({#'funcall,'s}),       "b"}), 55}) }), ({#'&&, ({#'deep_eq,'s,(<teststruct> -1,55,-3)}), ({#'==,'result,55}) }) })) }),
+    ({ "Lambda: Unprotected relaxed rvalue-struct element by name",      0,        lambda(0, ({#',, ({#'=,'s,(<teststruct> -1,-2,-3)}), ({#'=, 'result, ({#'=,({#'->,({#'funcall,'s}),       "b"}), 55}) }), ({#'&&, ({#'deep_eq,'s,(<teststruct> -1,55,-3)}), ({#'==,'result,55}) }) })) }),
+    ({ "Lambda: Unprotected strict last rvalue-struct element by name",  0,        lambda(0, ({#',,                                     ({#'=, 'result, ({#'=,({#'., (<teststruct> -1,-2,-3),"b"}), 55}) }),                                                   ({#'==,'result,55})    })) }),
+    ({ "Lambda: Unprotected relaxed last rvalue-struct element by name", 0,        lambda(0, ({#',,                                     ({#'=, 'result, ({#'=,({#'->,(<teststruct> -1,-2,-3),"b"}), 55}) }),                                                   ({#'==,'result,55})    })) }),
+    ({ "Lambda: Unprotected strict non-existant lvalue-struct element",  TF_ERROR, lambda(0, ({#',, ({#'=,'s,(<teststruct> -1,-2,-3)}), ({#'=, 'result, ({#'=,({#'., 's,                     "d"}), 55}) }), ({#'&&, ({#'deep_eq,'s,(<teststruct> -1,-2,-3)}), ({#'==,'result,55}) }) })) }),
+    ({ "Lambda: Unprotected relaxed non-existant lvalue-struct element", 0,        lambda(0, ({#',, ({#'=,'s,(<teststruct> -1,-2,-3)}), ({#'=, 'result, ({#'=,({#'->,'s,                     "d"}), 55}) }), ({#'&&, ({#'deep_eq,'s,(<teststruct> -1,-2,-3)}), ({#'==,'result,55}) }) })) }),
 
     // There are three mapping index operations, we test each one of them:
     // 1. ({ #'[, mapping, index })

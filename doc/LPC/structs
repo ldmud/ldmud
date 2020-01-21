@@ -113,10 +113,11 @@ USAGE
         in the same literal.
 
 
-        A struct member is accessed using the -> operator:
+        A struct member is accessed using the . and -> operators:
 
             struct Foo var = ...;
 
+            var.one = 1;
             var->one = 1;
 
 
@@ -125,24 +126,14 @@ USAGE
             struct Foo bar = ...;
             string member = "one";
 
+            bar.(member)  = 1; // Sets bar.one to 1
+            bar.(0) = 1;       // Sets bar.one to 1
             bar->(member) = 1; // sets bar->one to 1
             bar->(0) = 1;      // sets bar->one to 1
 
 
-        When using struct values held in variables/expressions of type
-        'mixed', the 'mixed' value should to be casted to the struct
-        value. The cast can be omitted if the looked-up member exists
-        in only one struct (and its children) known to the compiler:
-
-            struct Foo { int one; };
-            struct Bar { int two; };
-            struct Baz { int two; };
-            mixed var;
-
-                        var->one  // looks up Foo->one
-            (struct Foo)var->one  // looks up Foo->one
-                        var->two  // ERROR: ambiguous lookup
-            (struct Bar)var->one  // looks up Bar->one
+        If the given member does not exist, the -> operator will return 0,
+        but the . operator will throw an error.
 
 
 USAGE IN CLOSURES
@@ -219,6 +210,8 @@ HISTORY
         The implementation was revised in LDMud 3.3.344.
         The reactivation of unchanged structs in object updates was
         implemented in LDMud 3.3.417.
+        In LDMud 3.6.2 the . operator for struct member access was introduced
+        and the -> operator changed into a relaxed access operation.
 
 
 SEE ALSO

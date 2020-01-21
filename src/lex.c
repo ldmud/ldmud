@@ -1139,7 +1139,8 @@ symbol_operator (const char *symbol, const char **endp)
  *   #'[>     -> F_AINDEX
  *   #'({     -> F_AGGREGATE
  *   #'([     -> F_M_CAGGREGATE
- *   #'->     -> F_S_INDEX
+ *   #'.      -> F_S_INDEX
+ *   #'->     -> F_SX_INDEX
  *   #'(<     -> F_S_AGGREGATE
  *
  * Note that all operators must have a instrs[].Default value of '0'.
@@ -1187,7 +1188,7 @@ symbol_operator (const char *symbol, const char **endp)
         else if (c == '>')
         {
             symbol++;
-            ret = F_S_INDEX;
+            ret = F_SX_INDEX;
             break;
         }
 
@@ -1222,6 +1223,10 @@ symbol_operator (const char *symbol, const char **endp)
             break;
         }
         ret = F_MOD;
+        break;
+
+    case '.':
+        ret = F_S_INDEX;
         break;
 
     case ',':
