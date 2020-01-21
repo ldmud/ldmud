@@ -1,0 +1,26 @@
+SYNOPSIS
+        unknown call_direct_strict(object|string ob, string func, ...)
+
+DESCRIPTION
+        Similar to call_other(). Call a member function <fun> in another
+        object <ob> if the function is defined and publicly accessible.
+        Any of the optional extra arguments are passed to the function.
+        Result is the value returned from the called function.
+
+        This efun is a twin to call_strict(), with the difference
+        being that call_direct_strict() never calls a default method.
+
+        Thus if ob::fun does not define a publicly accessible function,
+        the efun will raise a runtime error.
+
+        ob can also be an object_name. If a string is passed for ob
+        and an object with that name can't be found or loaded, an
+        error occurs.
+
+HISTORY
+        Introduced in LDMud 3.6.2.
+
+SEE ALSO
+        call_other(E), call_resolved(E), call_direct(E), call_strict(E),
+        call_direct_resolved(E), create(A), pragma(LPC), extern_call(E),
+        function_exists(E), functions(LPC), map_objects(E)

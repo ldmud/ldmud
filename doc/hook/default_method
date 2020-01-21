@@ -13,14 +13,14 @@ DESCRIPTION
         calls. Hook setting can be any closure, or the name of the
         function to call in the object.
 
-        This hook is called whenever a call_other(), call_resolved()
-        or call_out() on named function (as opposed to a closure)
-        couldn't be resolved. The hook has then the opportunity to
-        provide a default implementation.
+        This hook is called whenever a call_other(), call_resolved(),
+        call_strict() or call_out() on named function (as opposed to
+        a closure) couldn't be resolved. The hook has then the
+        opportunity to provide a default implementation.
 
         Exempt from this behaviour are calls to the master object, to
-        simul-efuns, and calls done with call_direct() and
-        call_direct_resolved().
+        simul-efuns, and calls done with call_direct(),
+        call_direct_resolved() and call_strict_resolved().
 
         If the hook is the name of an lfun, it is called in the target
         object; otherwise if it is a closure, the target object is

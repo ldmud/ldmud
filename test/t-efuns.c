@@ -29,6 +29,7 @@ string dhe_testdata =
   "-----END DH PARAMETERS-----\n";
 
 int f(int arg);
+object clone = clonep() ? 0 : clone_object(this_object());
 
 mixed *tests = ({
     // TODO: Add cases for indexing at string end ("abc"[3])
@@ -143,6 +144,30 @@ mixed *tests = ({
     ({ "asin 2", TF_ERROR, (: funcall(#'asin,"1.0") :) }),
     ({ "asin 3", TF_ERROR, (: asin(1.1) :) }),
     ({ "asin 4", TF_ERROR, (: asin(-1.1) :) }),
+    ({ "call_strict 1",          0,        (: call_strict(clone,                     "f", 10, ({ 20 })) == 11 :) }),
+    ({ "call_strict 2",          0,        (: call_strict(object_name(clone),        "f", 10, ({ 20 })) == 11 :) }),
+    ({ "call_strict 3",          0,        (: call_strict(clone,                     "g", 10, ({ 20 })) == 12 :) }),
+    ({ "call_strict 4",          0,        (: call_strict(object_name(clone),        "g", 10, ({ 20 })) == 12 :) }),
+    ({ "call_strict 5",          TF_ERROR, (: call_strict(clone,                     "h", 10, ({ 20 })) :) }),
+    ({ "call_strict 6",          TF_ERROR, (: call_strict(object_name(clone),        "h", 10, ({ 20 })) :) }),
+    ({ "call_direct_strict 1",   0,        (: call_direct_strict(clone,              "f", 10, ({ 20 })) == 11 :) }),
+    ({ "call_direct_strict 2",   0,        (: call_direct_strict(object_name(clone), "f", 10, ({ 20 })) == 11 :) }),
+    ({ "call_direct_strict 3",   TF_ERROR, (: call_direct_strict(clone,              "g", 10, ({ 20 })) :) }),
+    ({ "call_direct_strict 4",   TF_ERROR, (: call_direct_strict(object_name(clone), "g", 10, ({ 20 })) :) }),
+    ({ "call_direct_strict 5",   TF_ERROR, (: call_direct_strict(clone,              "h", 10, ({ 20 })) :) }),
+    ({ "call_direct_strict 6",   TF_ERROR, (: call_direct_strict(object_name(clone), "h", 10, ({ 20 })) :) }),
+    ({ "call_resolved 1",        0,        (: int result; return  call_resolved(&result, clone,                     "f", 10, ({ 20 })) && result == 11; :) }),
+    ({ "call_resolved 2",        0,        (: int result; return  call_resolved(&result, object_name(clone),        "f", 10, ({ 20 })) && result == 11; :) }),
+    ({ "call_resolved 3",        0,        (: int result; return  call_resolved(&result, clone,                     "g", 10, ({ 20 })) && result == 12; :) }),
+    ({ "call_resolved 4",        0,        (: int result; return  call_resolved(&result, object_name(clone),        "g", 10, ({ 20 })) && result == 12; :) }),
+    ({ "call_resolved 5",        0,        (: int result; return !call_resolved(&result, clone,                     "h", 10, ({ 20 })); :) }),
+    ({ "call_resolved 6",        0,        (: int result; return !call_resolved(&result, object_name(clone),        "h", 10, ({ 20 })); :) }),
+    ({ "call_direct_resolved 1", 0,        (: int result; return  call_direct_resolved(&result, clone,              "f", 10, ({ 20 })) && result == 11; :) }),
+    ({ "call_direct_resolved 2", 0,        (: int result; return  call_direct_resolved(&result, object_name(clone), "f", 10, ({ 20 })) && result == 11; :) }),
+    ({ "call_direct_resolved 3", 0,        (: int result; return !call_direct_resolved(&result, clone,              "g", 10, ({ 20 })); :) }),
+    ({ "call_direct_resolved 4", 0,        (: int result; return !call_direct_resolved(&result, object_name(clone), "g", 10, ({ 20 })); :) }),
+    ({ "call_direct_resolved 5", 0,        (: int result; return !call_direct_resolved(&result, clone,              "h", 10, ({ 20 })); :) }),
+    ({ "call_direct_resolved 6", 0,        (: int result; return !call_direct_resolved(&result, object_name(clone), "h", 10, ({ 20 })); :) }),
     ({ "crypt", TF_ERROR,  (: crypt("ABC", "$$") :) }),
     ({ "ctime", TF_DONTCHECKERROR,  (: ctime(-1) :) }), /* This must be the first ctime call of this test suite. */
     ({ "save_object 1", 0, (: stringp(save_object()) :) }), /* Bug #594 */
@@ -551,6 +576,17 @@ void run_test()
 string *epilog(int eflag)
 {
     configure_driver(DC_MEMORY_LIMIT, ({ 0x10000000, 0x20000000 }));
+
+    set_driver_hook(H_DEFAULT_METHOD, function int(mixed result, object ob, string fun, varargs mixed* args)
+    {
+        if (fun == "g")
+        {
+            result = ob->f(args...) + 1;
+            return 1;
+        }
+
+        return 0;
+    });
 
     run_test();
     return 0;

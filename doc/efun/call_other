@@ -91,6 +91,6 @@ HISTORY
         LDMud 3.5.0 made the call on arrays of objects non-optional.
 
 SEE ALSO
-        call_direct(E), call_direct_resolved(E), call_resolved(E), create(A),
-        pragma(LPC), extern_call(E), function_exists(E), functions(LPC),
-        map_objects(E)
+        call_direct(E), call_strict(E), call_direct_strict(E),
+        call_resolved(E), call_direct_resolved(E), create(A), pragma(LPC),
+        extern_call(E), function_exists(E), functions(LPC), map_objects(E)
