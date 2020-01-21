@@ -22,7 +22,7 @@ BESCHREIBUNG
 BEISPIELE
         Verwendet man
 
-                return notify_fail(message);
+                return notify_fail(message); return 0;
 
         anstelle von 
 

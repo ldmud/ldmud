@@ -21,7 +21,7 @@ DESCRIPTION
         instead of simply 'What ?'.
 
         It is also better to use
-                return notify_fail(message);
+                return notify_fail(message); return 0;
         instead of
                 write(message); return 1;
 
