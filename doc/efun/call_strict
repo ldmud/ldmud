@@ -1,11 +1,23 @@
 SYNOPSIS
         unknown call_strict(object|string ob, string func, ...)
 
+        ob.fun(...)
+        ob->"fun"(...)
+        ob->(fun)(...)
+
 DESCRIPTION
         Similar to call_other(). Call a member function <fun> in another
         object <ob> if the function is defined and publicly accessible.
         Any of the optional extra arguments are passed to the function.
         Result is the value returned from the called function.
+
+        ob.fun(args) and ob."fun"(args) are equivalent to
+        call_strict(ob, "fun", args).
+        "ob_name".fun(args) and "ob_name"."fun"(args) are equivalent to
+        call_strict("ob_name", "fun", args);
+        ob.(fun)(args) is equivalent to call_strict(ob, fun, args),
+        "ob_name".(fun)(args) is equivalent to
+        call_strict("ob_name", fun, args).
 
         If ob::fun does not define a publicly accessible function, the
         efun will call the H_DEFAULT_METHOD hook if set. If the hook

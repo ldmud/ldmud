@@ -5533,7 +5533,7 @@ yylex1 (void)
                         RETURN(L_RANGE);
                 }
                 else
-                    goto badlex;
+                    RETURN('.');
 
             case ':':
                 switch(*yyp)

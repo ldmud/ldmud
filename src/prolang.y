@@ -844,6 +844,10 @@ static int call_other_sefun;
   /* Index of the call_other() sefun, or < 0 if none;
    */
 
+static int call_strict_sefun;
+  /* Index of the call_strict() sefun, or < 0 if none;
+   */
+
 static ident_t *all_globals = NULL;
   /* List of all created global identifiers (variables and functions).
    */
@@ -6997,6 +7001,13 @@ delete_prog_string (void)
        * member initializer.
        */
 
+    struct
+    {
+        bool strict_member; /* true, if we have ob.fun(),
+                             * false for ob->fun().
+                             */
+    } struct_member_operator;
+
 } /* YYSTYPE */
 
 /*-------------------------------------------------------------------------*/
@@ -7049,7 +7060,7 @@ delete_prog_string (void)
 %type <sh_string>    struct_member_name
 %type <function_name> function_name
 %type <function_call_result> function_call
-
+%type <struct_member_operator> member_operator
 
 /* Special uses of <number> */
 
@@ -7118,7 +7129,7 @@ delete_prog_string (void)
 %left     '*'     '/'   '%'
 %right    '~'     L_NOT
 %nonassoc L_INC   L_DEC
-%left     L_ARROW '['
+%left     '.'     L_ARROW '['
 %%
 
 /*-------------------------------------------------------------------------*/
@@ -11366,7 +11377,7 @@ expr4:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 L_ARROW struct_member_name
+    | expr4 member_operator struct_member_name %prec L_ARROW
       {
           /* Lookup a struct member */
           short s_index = -1;
@@ -11739,7 +11750,7 @@ lvalue:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 L_ARROW struct_member_name
+    | expr4 member_operator struct_member_name %prec L_ARROW
       {
           /* Create a struct member lvalue */
           short s_index = -1;
@@ -13008,10 +13019,11 @@ function_call:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 L_ARROW call_other_name %prec L_ARROW
+    | expr4 member_operator call_other_name %prec L_ARROW
       {
 %line
           string_t *name;
+          int sefun;
 
           /* Don't need <expr4> as an lvalue. */
           free_lvalue_block($1.lvalue);
@@ -13070,9 +13082,10 @@ function_call:
            * however yields a faulty grammar.
            */
 
+          sefun = $2.strict_member ? call_strict_sefun : call_other_sefun;
           if (!disable_sefuns
-           && call_other_sefun >= 0
-           && (unsigned long)call_other_sefun >= SEFUN_TABLE_SIZE)
+           && sefun >= 0
+           && (unsigned long)sefun >= SEFUN_TABLE_SIZE)
           {
               /* The simul-efun has to be called by name:
                * insert the extra args for the call_other
@@ -13103,7 +13116,8 @@ function_call:
               upd_short($1.start+1, store_prog_string(
                         ref_mstring(query_simul_efun_file_name())));
               p[4] = F_STRING;
-              upd_short($1.start+4, store_prog_string(ref_mstring(STR_CALL_OTHER)));
+              upd_short($1.start+4, store_prog_string(ref_mstring(
+                  $2.strict_member ? STR_CALL_STRICT : STR_CALL_OTHER)));
 
               CURRENT_PROGRAM_SIZE += 6;
           }
@@ -13133,13 +13147,14 @@ function_call:
           PREPARE_INSERT(10)
           Bool has_ellipsis;
           Bool ap_needed;
+          int sefun = $2.strict_member ? call_strict_sefun : call_other_sefun;
 
           has_ellipsis = got_ellipsis[argument_level];
           ap_needed = MY_TRUE;
 
           $$.might_lvalue = true;
 
-          if (!disable_sefuns && call_other_sefun >= 0)
+          if (!disable_sefuns && sefun >= 0)
           {
               /* SIMUL EFUN */
 
@@ -13148,15 +13163,15 @@ function_call:
 
               num_arg = $6 + 2; /* Don't forget the obj and the fun! */
 
-              funp = &simul_efunp[call_other_sefun];
+              funp = &simul_efunp[sefun];
               if (num_arg > funp->num_arg
                && !(funp->flags & TYPE_MOD_XVARARGS)
                && !has_ellipsis)
                   yyerrorf("Too many arguments to simul_efun %s"
                           , get_txt(funp->name));
 
-              /* call_other_sefun is >= 0 (see above) */
-              if ((unsigned long)call_other_sefun >= SEFUN_TABLE_SIZE)
+              /* sefun is >= 0 (see above) */
+              if ((unsigned long)sefun >= SEFUN_TABLE_SIZE)
               {
                   /* call-other: the number of arguments will be
                    * detected and corrected at runtime.
@@ -13207,16 +13222,17 @@ function_call:
                       CURRENT_PROGRAM_SIZE++;
                   }
                   add_f_code(F_SIMUL_EFUN);
-                  add_short(call_other_sefun);
+                  add_short(sefun);
                   CURRENT_PROGRAM_SIZE += 3;
               }
               $$.type = get_fulltype(funp->type);
           }
           else /* true call_other */
           {
-              add_f_code(F_CALL_OTHER);
+              int call_instr = $2.strict_member ? F_CALL_STRICT : F_CALL_OTHER;
+              add_f_code(call_instr);
               CURRENT_PROGRAM_SIZE++;
-              $$.type = get_fulltype(instrs[F_CALL_OTHER].ret_type);
+              $$.type = get_fulltype(instrs[call_instr].ret_type);
           }
           $$.start = $1.start;
           pop_arg_stack($6);
@@ -13265,6 +13281,12 @@ function_call:
       }
 
 ; /* function_call */
+
+
+member_operator:
+      L_ARROW { $$.strict_member = false; }
+    | '.'     { $$.strict_member = true;  }
+; /* member_operator */
 
 
 call_other_name:
@@ -16756,6 +16778,41 @@ init_compiler ()
 } /* init_compiler() */
 
 /*-------------------------------------------------------------------------*/
+static int
+get_simul_efun_index (string_t *name)
+
+/* Searches for a simul-efun of that name and returns its index.
+ * If none was found or sefuns are disabled, returns -1.
+ */
+
+{
+    if (!disable_sefuns)
+    {
+        ident_t *id = make_shared_identifier_mstr(name, I_TYPE_UNKNOWN, 0);
+
+        if (!id)
+            fatal("Out of memory: identifier '%s'.\n", get_txt(name));
+
+        if (id->type != I_TYPE_UNKNOWN)
+        {
+            /* This shouldn't be necessary, but just in case... */
+            while (id && id->type > I_TYPE_GLOBAL)
+                id = id->inferior;
+
+            if ( id
+              && id->u.global.function < 0
+              && id->u.global.sim_efun >= 0)
+            {
+                /* There is a sefun for call_other() */
+                return id->u.global.sim_efun;
+            }
+        }
+    } /* if (!disable_sefuns) */
+
+    return -1;
+} /* get_simul_efun_index() */
+
+/*-------------------------------------------------------------------------*/
 static void
 prolog (const char * fname, Bool isMasterObj)
 
@@ -16767,7 +16824,6 @@ prolog (const char * fname, Bool isMasterObj)
 
 {
     int i;
-    ident_t *id;
 
     /* Initialize the memory for the argument types */
     if (type_of_arguments.block == NULL)
@@ -16832,30 +16888,8 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
 
     /* Check if call_other() has been replaced by a sefun.
      */
-    call_other_sefun = -1;
-
-    if (!disable_sefuns)
-    {
-        id = make_shared_identifier_mstr(STR_CALL_OTHER, I_TYPE_UNKNOWN, 0);
-
-        if (!id)
-            fatal("Out of memory: identifier '%s'.\n", get_txt(STR_CALL_OTHER));
-
-        if (id->type != I_TYPE_UNKNOWN)
-        {
-            /* This shouldn't be necessary, but just in case... */
-            while (id && id->type > I_TYPE_GLOBAL)
-                id = id->inferior;
-
-            if ( id
-              && id->u.global.function < 0
-              && id->u.global.sim_efun >= 0)
-            {
-                /* There is a sefun for call_other() */
-                call_other_sefun = id->u.global.sim_efun;
-            }
-        }
-    } /* if (!disable_sefuns) */
+    call_other_sefun = get_simul_efun_index(STR_CALL_OTHER);
+    call_strict_sefun = get_simul_efun_index(STR_CALL_STRICT);
 
 } /* prolog() */
 

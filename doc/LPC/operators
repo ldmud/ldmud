@@ -189,6 +189,12 @@ DESCRIPTION
                         used as the file_name of an object, and calls
                         the function 'name' in this object.
 
+        expr1.name(...) The operator form of call_strict(). 'expr1'
+                        gives either an object or a string which is
+                        used as the file name of an object, and calls
+                        the function 'name' in this object. Throws
+                        an error, if the function does not exist.
+
         ident::name(...)
                         Call the inherited function 'name' with the
                         given parameters in the parent 'ident'.
@@ -208,6 +214,7 @@ HISTORY
         LDMud 3.2.9 added '>>>', '>>>=', '&&=' and '||='.
         LDMud 3.2.10 extended '&' to mappings.
         LDMud 3.3 extended '|' and '^' to arrays.
+        LDMud 3.6.2 added '.'.
 
 SEE ALSO
         arrays(LPC), alists(LPC), mappings(LPC), closures(LPC)

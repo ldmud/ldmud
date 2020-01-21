@@ -13,15 +13,26 @@ DESCRIPTION
 
         An example looks like this:
 
-        call_other(drink, "QueryShort");
+            call_other(drink, "QueryShort");
 
         This call may also be written as
 
-        drink->QueryShort();
+            drink->QueryShort();
 
         This means call_other(object, "function", args...) can also be
         written as object->function(args...). The second form is
         preferred as it is easier to read.
+
+        call_other() will return 0, if the function does not exist
+        or is not accessible. As an alternative there is call_strict()
+        which will result in an error in such a case. The call is
+        similar:
+
+            call_strict(drink, "QueryShort")
+
+        And can be written as
+
+            drink.QueryShort();
 
         Some lfuns have a special meaning for the LPC driver, because
         they are applied by the interpreter instead from an LPC object.
