@@ -1,5 +1,6 @@
 SYNOPSIS
         int call_resolved(mixed result, object ob, string func, mixed arg,...)
+        int* call_resolved(mixed* result, object* ob, string func, mixed arg,...)
 
 BESCHREIBUNG
         Die Funktion ist aehnlich zu call_other(). Wenn obj->func() definiert
@@ -14,7 +15,19 @@ BESCHREIBUNG
         das Objekt mit diesem Namen nicht gefunden oder geladen werden kann,
         tritt ein Fehler auf.
 
+        Ausserdem akzeptiert diese Efun auch Arrays von Objekten in <ob>:
+        The Funktion wird dann mit den gleichen Argumenten in allen angegebenen
+        Objekten aufgerufen. Die Ergebnisse des Funktionsaufrufes werden
+        in einem Array gespeichert, das an <result> zugewiesen wird, und die
+        Status-Codes werden in einem zweiten Array gesammelt, welches von der
+        Efun zurueckgeliefert wird. In dem Array koennen Objekte oder Namen
+        der Objekte angegebenen werden. Zerstoerte Objekte oder Nullen werden
+        als 0 in beiden Arrays eingetragen, verursachen jedoch keinen Fehler.
+
+GESCHICHTE
+        LDMud 3.6.2 fuegte die Aufrufe von Arrays hinzu.
+
 SIEHE AUCH
-        call_other(E), call_direct(E), call_direct_resolved(E), 
-        create(A), pragma(LPC), extern_call(E), function_exists(E),
-        functions(LPC), map_objects(E)
+        call_other(E), call_strict(E), call_direct(E), call_direct_strict(E),
+        call_direct_resolved(E), create(A), pragma(LPC), extern_call(E),
+        function_exists(E), functions(LPC), map_objects(E)

@@ -757,6 +757,13 @@ int num_protected_lvalues = 0;
 
 enum { APPLY_NOT_FOUND = 0, APPLY_FOUND, APPLY_DEFAULT_FOUND };
 static int int_apply(string_t *, object_t *, int, Bool, Bool);
+enum call_other_error_handling
+{
+    CO_IGNORE, /* call_other    */
+    CO_RESULT, /* call_resolved */
+    CO_ERROR   /* call_strict   */
+};
+static svalue_t* int_call_other(bool b_use_default, enum call_other_error_handling error_handling, char* efunname, svalue_t *sp, int num_arg);
 static int expand_argument(svalue_t *sp);
 static void call_simul_efun(unsigned int code, object_t *ob, int num_arg);
 #ifdef DEBUG
@@ -16139,8 +16146,6 @@ again:
          */
 
         svalue_t *arg;
-        object_t *ob;
-        Bool      b_use_default;
 
         num_arg = sp - ap + 1;
         inter_pc = pc;
@@ -16159,209 +16164,11 @@ again:
 
         TYPE_TEST2(arg+1, T_STRING)
 
-        if (get_txt(arg[1].u.str)[0] == ':')
-            ERRORF(("Illegal function name in call_other: %s\n",
-                  get_txt(arg[1].u.str)));
-
-        /* No external calls may be done when this object is
-         * destructed.
-         */
-        if (current_object->flags & O_DESTRUCTED)
-        {
-            pop_n_elems(num_arg);
-            push_number(sp, 0);
-            WARNF(("Call from destructed object '%s' ignored.\n"
-                  , get_txt(current_object->name)));
-            break;
-        }
-
-        if (arg[0].type != T_POINTER)
-        {
-            /* --- The normal call other to a single object --- */
-
-            assign_eval_cost_inl();
-
-            if (arg[0].type == T_OBJECT)
-                ob = arg[0].u.ob;
-            else /* it's a string */
-            {
-                ob = get_object(arg[0].u.str);
-                if (ob == NULL)
-                    ERRORF(("call_other() failed: can't get object '%s'\n"
-                           , get_txt(arg[0].u.str)));
-            }
-
-            b_use_default =    (instruction != F_CALL_DIRECT)
-                            && (ob != master_ob);
-
-            /* Traceing, if necessary */
-            if (TRACEP(TRACE_CALL_OTHER) && TRACE_IS_INTERACTIVE())
-            {
-                if (!++traceing_recursion)
-                {
-                    do_trace("Call other ", get_txt(arg[1].u.str), "\n");
-                }
-                traceing_recursion--;
-            }
-
-            /* Call the function with the remaining args on the stack.
-             */
-            if (!int_apply(arg[1].u.str, ob, num_arg-2, MY_FALSE, b_use_default))
-            {
-                /* Function not found */
-                if (b_use_default) /* int_apply() removed the args */
-                {
-                    sp -= num_arg-2;
-                    assert(inter_sp == sp);
-                }
-                else
-                    pop_n_elems(num_arg-2);
-                pop_n_elems(2);
-                push_number(sp, 0);
-                break;
-            }
-            sp -= num_arg - 3;
-
-            /* The result of the function call is on the stack. But so
-             * is the function name and object that was called.
-             * These have to be removed.
-             */
-            arg = sp;           /* Remember where the function call result is */
-            free_string_svalue(--sp);
-            free_svalue(--sp);  /* Remove old arguments to call_other */
-            *sp = *arg;         /* Re-insert function result */
-        }
+        assign_eval_cost_inl();
+        if (instruction == F_CALL_DIRECT)
+            sp = int_call_other(false, CO_IGNORE, "call_direct", sp, num_arg);
         else
-        {
-            /* --- The other call other to an array of objects --- */
-
-            svalue_t *svp;
-            size_t    size;
-
-            /* The array with the objects will also hold the results.
-             * For that, it mustn't be shared, therefore we create a
-             * copy if necessary.
-             */
-            size = VEC_SIZE(arg->u.vec);
-            if (arg->u.vec->ref != 1 && size != 0)
-            {
-                vector_t *vec;
-                svalue_t *to;
-
-                vec = allocate_array_unlimited(size);
-                if (!vec)
-                    ERROR("Out of memory.\n");
-                for (svp = arg->u.vec->item, to = vec->item
-                    ; size != 0
-                    ; size--, svp++, to++)
-                    assign_svalue_no_free(to, svp);
-                free_array(arg->u.vec);
-                arg->u.vec = vec; /* adopts the reference */
-            }
-
-            /* Now loop over the array of objects and call the function
-             * in each of it. For that, the arguments are duly replicated
-             * for every call.
-             */
-            size = VEC_SIZE(arg->u.vec);
-            svp = arg->u.vec->item;
-            for ( ; size != 0; size--, svp++)
-            {
-                int i;
-                svalue_t * item = get_rvalue(svp, NULL);
-                if(!item)
-                    item = svp;
-
-                assign_eval_cost_inl();
-                inter_sp = sp; /* Might be clobbered from previous loop */
-
-                if (item->type == T_OBJECT)
-                    ob = item->u.ob;
-                else if (item->type == T_STRING)
-                {
-                    ob = get_object(item->u.str);
-                    if (ob == NULL)
-                    {
-                        ERRORF(("call_other() failed: can't get object '%s'\n"
-                               , get_txt(item->u.str)));
-                        /* NOTREACHED */
-                        continue;
-                    }
-                }
-                else if (item->type == T_NUMBER && item->u.number == 0)
-                {
-                    /* Write 0 as a result. */
-                    free_svalue(svp);
-                    put_number(svp, 0);
-                    continue;
-                }
-                else
-                    ERRORF(("Bad arg for call_other() at index %"PRIdMPINT": "
-                            "got %s, expected string/object\n"
-                           , (mp_int)(svp - arg->u.vec->item)
-                           , typename(item->type)
-                           ));
-
-                /* Destructed objects yield 0 */
-                if (ob->flags & O_DESTRUCTED)
-                {
-                    free_svalue(item);
-                    put_number(item, 0);
-                    continue;
-                }
-
-                b_use_default =    (instruction != F_CALL_DIRECT)
-                                && (ob != master_ob);
-
-                /* Traceing, if necessary */
-                if (TRACEP(TRACE_CALL_OTHER) && TRACE_IS_INTERACTIVE())
-                {
-                    if (!++traceing_recursion)
-                    {
-                        do_trace("Call other ", get_txt(arg[1].u.str), "\n");
-                    }
-                    traceing_recursion--;
-                }
-
-                /* Duplicate the arguments to pass, increasing sp on
-                 * the way. Optimizing this for the last pass is
-                 * dangerous as not every iteration will come here.
-                 */
-                for (i = 2; i < num_arg; i++)
-                    assign_svalue_no_free(++sp, arg+i);
-
-                /* Call the function with the remaining args on the stack.
-                 */
-                inter_sp = sp; /* update to new setting */
-                if (!int_apply(arg[1].u.str, ob, num_arg-2, MY_FALSE, b_use_default))
-                {
-                    /* Function not found, Assign 0 as result.
-                     */
-                    if (b_use_default) /* int_apply() removed the args */
-                        sp -= num_arg-2;
-                    else
-                        pop_n_elems(num_arg-2);
-                    free_svalue(svp);
-                    put_number(svp, 0);
-                }
-                else
-                {
-                    /* Function found - assign the result from the stack */
-                    sp -= num_arg-3;
-                    free_svalue(svp);
-                    transfer_svalue_no_free(svp, sp--);
-                }
-            } /* for (objects in array) */
-
-            /* Remove the original function call arguments from the stack.
-             */
-            pop_n_elems(num_arg-2);
-
-            /* Calls complete, left on the stack are now the function name
-             * and, in arg, the final result.
-             */
-            free_string_svalue(sp); sp--;
-        }
+            sp = int_call_other(true, CO_IGNORE, "call_other", sp, num_arg);
 
         break;
     }
@@ -20610,37 +20417,40 @@ v_funcall (svalue_t *sp, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 static svalue_t *
-int_call_resolved (bool b_use_default, bool b_throw_error, svalue_t *sp, int num_arg)
+int_call_other (bool b_use_default, enum call_other_error_handling error_handling, char* efunname, svalue_t *sp, int num_arg)
 
-/* EFUN call_resolved(), call_direct_resolved(),
+/* EFUN call_other(), call_direct(),
+ *      call_resolved(), call_direct_resolved(),
  *      call_strict(), call_direct_strict()
  *
- *   int call_resolved(mixed & result, object ob, string func, ...)
- *   int call_direct_resolved(mixed & result, object ob, string func, ...)
- *   unknown call_strict(object ob, string func, ...)
- *   unknown call_direct_strict(object ob, string func, ...)
+ *   unknown call_other(object|object* ob, string fun, mixed arg, ...)
+ *   unknown call_direct(object|object* ob, string fun, mixed arg, ...)
+ *   int|int* call_resolved(mixed & result, object|object* ob, string func, ...)
+ *   int|int* call_direct_resolved(mixed & result, object|object* ob, string func, ...)
+ *   unknown call_strict(object|object* ob, string func, ...)
+ *   unknown call_direct_strict(object|object* ob, string func, ...)
  *
- * Similar to call_other(_direct)(). If ob->func() is defined and publicly
- * accessible, any of the optional extra arguments are passed to
- * ob->func(...). If b_throw_erorr is false, then the result of that
+ * Implementation of calls to other functions. If ob->func() is defined and
+ * publicly accessible, any of the optional extra arguments are passed to
+ * ob->func(...). If error_handling is CO_RESULT, then the result of that
  * function call is stored in result, which must be passed by reference,
  * otherwise it is returned directly.
  *
  * If the current object is already destructed, or the ob does not
  * exist, or ob does not define a public accessible function named
- * func, call_direct_resolved() returns 0 as failure code, else 1 for
- * success. call_direct_strict() will raise an error in this case.
- *
- * If the current object is already destructed, or the ob does not
- * exist, or ob does not define a public accessible function named
- * func and no default method is available, call_resolved() returns 0,
- * call_strict() will raise an error.
- * If the call succeeded, call_resolved() returns 1; if the call succeeded
- * through a default method, the efun returns -1. call_strict() will
- * just return the result in both cases.
+ * func, then the default method will be executed if b_use_default is true.
+ * If b_use_default is false or the default method is not successful,
+ * the handling is defined by error_handling. For CO_IGNORE and CO_RESULT
+ * 0 is returned, CO_ERROR will raise an error in this case. In a successful
+ * call CO_IGNORE and CO_ERROR will return the function result,
+ * CA_RESULT will return 1 (or -1 if the default method was called).
  *
  * ob can also be a file_name. If a string is passed for ob, and
  * no object with that name does exist, an error occurs.
+ *
+ * ob can also be given as an array. In this case the results will
+ * be returned as arrays as well. When having CO_ERROR an error will
+ * be raised if at least one call failed.
  */
 
 {
@@ -20652,41 +20462,24 @@ int_call_resolved (bool b_use_default, bool b_throw_error, svalue_t *sp, int num
     call_num_arg = num_arg - 2;
 
     /* Ignore the result lvalue for now, so we can treat all variants alike. */
-    if (!b_throw_error)
+    if (error_handling == CO_RESULT)
     {
         arg++;
         call_num_arg--;
     }
 
     /* Test the arguments */
-    if (arg[0].type == T_NUMBER)
-        ob = NULL;
-    else if (arg[0].type == T_OBJECT)
-        ob = arg[0].u.ob;
-    else /* it's a string */
-    {
-        ob = get_object(arg[0].u.str);
-        if (!ob)
-            errorf("%s() failed: can't get object '%s'.\n"
-                 , b_throw_error
-                   ? (b_use_default ? "call_resolved" : "call_direct_resolved")
-                   : (b_use_default ? "call_strict"   : "call_direct_strict")
-                 , get_txt(arg[0].u.str));
-    }
+    if (get_txt(arg[1].u.str)[0] == ':')
+        errorf("Illegal function name in %s: %s\n",
+              get_txt(arg[1].u.str), efunname);
 
     /* No external calls may be done when this object is
      * destructed.
-     * Similar, don't do calls if the target object is destructed.
      */
-    if (current_object->flags & O_DESTRUCTED
-     || NULL == ob)
+    if (current_object->flags & O_DESTRUCTED)
     {
-        if (b_throw_error)
-        {
-            errorf("%s() %s destructed object.\n"
-                 , b_use_default ? "call_strict" : "call_direct_strict"
-                 , (current_object->flags & O_DESTRUCTED) ? "from" : "to");
-        }
+        if (error_handling == CO_ERROR)
+            errorf("%s() from destructed object.\n", efunname);
 
         sp = _pop_n_elems(num_arg, sp);
         push_number(sp, 0);
@@ -20696,63 +20489,288 @@ int_call_resolved (bool b_use_default, bool b_throw_error, svalue_t *sp, int num
         return sp;
     }
 
-    /* Handle traceing. */
-    if (TRACEP(TRACE_CALL_OTHER) && TRACE_IS_INTERACTIVE())
+    if (arg[0].type != T_POINTER)
     {
-        if (!++traceing_recursion)
+        /* --- The normal call other to a single object --- */
+
+        if (arg[0].type == T_NUMBER)
         {
+            if (error_handling == CO_ERROR)
+                errorf("%s() to destructed object.\n", efunname);
+
+            sp = _pop_n_elems(num_arg, sp);
+            push_number(sp, 0);
             inter_sp = sp;
-            do_trace("Call other ", get_txt(arg[1].u.str), "\n");
+            warnf("Call to destructed object ignored.\n");
+            return sp;
         }
-        traceing_recursion--;
-    }
-
-    /* Send the remaining arguments to the function.
-     */
-    if (ob == master_ob)
-        b_use_default = MY_FALSE;
-    rc = int_apply(arg[1].u.str, ob, call_num_arg, MY_FALSE, b_use_default);
-    if (rc == APPLY_NOT_FOUND)
-    {
-        /* Function not found */
-        if (b_throw_error)
+        else if (arg[0].type == T_OBJECT)
+            ob = arg[0].u.ob;
+        else /* it's a string */
         {
-            errorf("Function %.50s() not found in %s.\n"
-                 , get_txt(arg[1].u.str)
-                 , get_txt(ob->name));
+            ob = get_object(arg[0].u.str);
+            if (!ob)
+                errorf("%s() failed: can't get object '%s'.\n"
+                     , efunname
+                     , get_txt(arg[0].u.str));
         }
 
-        if (b_use_default)
-            sp -= num_arg-3;
+        /* Handle traceing. */
+        if (TRACEP(TRACE_CALL_OTHER) && TRACE_IS_INTERACTIVE())
+        {
+            if (!++traceing_recursion)
+            {
+                inter_sp = sp;
+                do_trace("Call other ", get_txt(arg[1].u.str), "\n");
+            }
+            traceing_recursion--;
+        }
+
+        /* Send the remaining arguments to the function.
+         */
+        if (ob == master_ob)
+            b_use_default = MY_FALSE;
+        rc = int_apply(arg[1].u.str, ob, call_num_arg, MY_FALSE, b_use_default);
+        if (rc == APPLY_NOT_FOUND)
+        {
+            /* Function not found */
+            if (error_handling == CO_ERROR)
+            {
+                errorf("Function %.50s() not found in %s.\n"
+                     , get_txt(arg[1].u.str)
+                     , get_txt(ob->name));
+            }
+
+            if (b_use_default)
+                sp -= call_num_arg;
+            else
+                sp = _pop_n_elems(call_num_arg, sp);
+            sp = _pop_n_elems(2, sp);
+
+            if (error_handling == CO_RESULT)
+                free_svalue(sp--);
+            push_number(sp, 0);
+            return sp;
+        }
+
+        /* The result of the function call is on the stack. But, so
+         * is the function name and object that was called.
+         * These have to be removed.
+         */
+        sp = inter_sp;
+        if (error_handling == CO_RESULT)
+        {
+            transfer_svalue(arg-1, sp--);   /* Copy the function call result */
+            sp = _pop_n_elems(2, sp);       /* Remove old arguments to call_solved */
+            free_svalue(sp);                /* Free the lvalue */
+            put_number(sp, rc == APPLY_FOUND ? 1 : -1);
+            return sp;
+        }
         else
-            sp = _pop_n_elems(num_arg-3, sp);
-        sp = _pop_n_elems(2, sp);
-        free_svalue(sp);
-        put_number(sp, 0);
-        return sp;
+        {
+            _pop_n_elems(2, sp-1);
+            transfer_svalue_no_free(arg, sp);
+            return arg;
+        }
+    }
+    else /* arg[0].type == T_POINTER */
+    {
+        /* --- The other call other to an array of objects --- */
+
+        svalue_t *svp, *rcp;
+        size_t    size;
+
+        /* The array with the objects will also hold the results.
+         * For that, it mustn't be shared, therefore we create a
+         * copy if necessary.
+         */
+        size = VEC_SIZE(arg->u.vec);
+        if (arg->u.vec->ref != 1 && size != 0)
+        {
+            vector_t *vec;
+            svalue_t *to;
+
+            vec = allocate_array_unlimited(size);
+            if (!vec)
+                errorf("Out of memory.\n");
+            for (svp = arg->u.vec->item, to = vec->item
+                ; size != 0
+                ; size--, svp++, to++)
+                assign_svalue_no_free(to, svp);
+            free_array(arg->u.vec);
+            arg->u.vec = vec; /* adopts the reference */
+        }
+
+        if (error_handling == CO_RESULT)
+        {
+            /* For call_resolved we need a second array holding
+             * return value.
+             */
+            vector_t *vec = allocate_array_unlimited(size);
+            if (!vec)
+                errorf("Out of memory.\n");
+
+            push_array(sp, vec);
+            rcp = vec->item;
+
+            inter_sp = sp;
+        }
+        else
+            rcp = arg->u.vec->item;
+
+        /* Now loop over the array of objects and call the function
+         * in each of it. For that, the arguments are duly replicated
+         * for every call.
+         */
+        size = VEC_SIZE(arg->u.vec);
+        svp = arg->u.vec->item;
+        for ( ; size != 0; size--, svp++, rcp++)
+        {
+            int i;
+            bool use_default_for_ob;
+
+            svalue_t * item = get_rvalue(svp, NULL);
+            if(!item)
+                item = svp;
+
+            assign_eval_cost_inl();
+            inter_sp = sp; /* Might be clobbered from previous loop */
+
+            if (item->type == T_OBJECT)
+                ob = item->u.ob;
+            else if (item->type == T_STRING)
+            {
+                ob = get_object(item->u.str);
+                if (ob == NULL)
+                {
+                    errorf("%s() failed: can't get object '%s'\n"
+                         , efunname
+                         , get_txt(item->u.str));
+                    /* NOTREACHED */
+                    continue;
+                }
+            }
+            else if (item->type == T_NUMBER && item->u.number == 0)
+            {
+                if (error_handling == CO_ERROR)
+                    errorf("%s() to destructed object at index %"PRIdMPINT".\n"
+                         , efunname
+                         , (mp_int)(svp - arg->u.vec->item));
+
+                /* Write 0 as a result. */
+                free_svalue(svp);
+                put_number(svp, 0);
+                put_number(rcp, 0);
+                continue;
+            }
+            else
+                errorf("Bad arg for %s() at index %"PRIdMPINT": "
+                       "got %s, expected string/object\n"
+                      , efunname
+                      , (mp_int)(svp - arg->u.vec->item)
+                      , typename(item->type));
+
+            /* Destructed objects yield 0 */
+            if (ob->flags & O_DESTRUCTED)
+            {
+                if (error_handling == CO_ERROR)
+                    errorf("%s() to destructed object at index %"PRIdMPINT".\n"
+                         , efunname
+                         , (mp_int)(svp - arg->u.vec->item));
+
+                free_svalue(item);
+                put_number(item, 0);
+
+                free_svalue(svp);
+                put_number(svp, 0);
+                put_number(rcp, 0);
+                continue;
+            }
+
+            /* Traceing, if necessary */
+            if (TRACEP(TRACE_CALL_OTHER) && TRACE_IS_INTERACTIVE())
+            {
+                if (!++traceing_recursion)
+                {
+                    do_trace("Call other ", get_txt(arg[1].u.str), "\n");
+                }
+                traceing_recursion--;
+            }
+
+            /* Duplicate the arguments to pass, increasing sp on
+             * the way. Optimizing this for the last pass is
+             * dangerous as not every iteration will come here.
+             */
+            for (i = 0; i < call_num_arg; i++)
+                assign_svalue_no_free(++sp, arg+2+i);
+
+            /* Call the function with the remaining args on the stack.
+             */
+            inter_sp = sp; /* update to new setting */
+            use_default_for_ob = b_use_default && (ob != master_ob);
+            rc = int_apply(arg[1].u.str, ob, call_num_arg, MY_FALSE, use_default_for_ob);
+            if (rc == APPLY_NOT_FOUND)
+            {
+                /* Function not found. */
+                if (error_handling == CO_ERROR)
+                {
+                    errorf("Function %.50s() not found in %s.\n"
+                         , get_txt(arg[1].u.str)
+                         , get_txt(ob->name));
+                }
+
+                /* Assign 0 as result. */
+                if (use_default_for_ob) /* int_apply() removed the args */
+                    sp -= call_num_arg;
+                else
+                    sp = _pop_n_elems(call_num_arg, sp);
+
+                free_svalue(svp);
+                put_number(svp, 0);
+                put_number(rcp, 0);
+            }
+            else
+            {
+                /* Function found - assign the result from the stack */
+                sp -= call_num_arg;
+                free_svalue(svp);
+                transfer_svalue_no_free(svp, sp+1);
+
+                if (error_handling == CO_RESULT)
+                    put_number(rcp, rc == APPLY_FOUND ? 1 : -1);
+            }
+        } /* for (objects in array) */
+
+        if (error_handling == CO_RESULT)
+        {
+            /* sp points to the efun result array,
+             * arg points to the function call result array.
+             * between them are function call arguments and
+             * the function name, and below arg is the lvalue.
+             */
+
+            transfer_svalue(arg-1, arg);           /* results into lvalue.    */
+            free_svalue(arg-1);
+            transfer_svalue_no_free(arg-1, sp--);  /* efun result.            */
+            sp = _pop_n_elems(call_num_arg+1, sp); /* args and function name. */
+            assert(sp == arg); sp--;               /* We already transfered.  */
+            return sp;
+        }
+        else
+        {
+            /* Remove the original function call arguments from the stack.
+             */
+            sp = _pop_n_elems(call_num_arg, sp);
+
+            /* Calls complete, left on the stack are now the function name
+             * and, in arg, the final result.
+             */
+            free_string_svalue(sp--);
+            return sp;
+        }
     }
 
-    /* The result of the function call is on the stack. But, so
-     * is the function name and object that was called.
-     * These have to be removed.
-     */
-    sp = inter_sp;
-    if (b_throw_error)
-    {
-        _pop_n_elems(2, sp-1);
-        transfer_svalue_no_free(arg, sp);
-        return arg;
-    }
-    else
-    {
-        transfer_svalue(arg-1, sp--);   /* Copy the function call result */
-        sp = _pop_n_elems(2, sp);       /* Remove old arguments to call_solved */
-        free_svalue(sp);                /* Free the lvalue */
-        put_number(sp, rc == APPLY_FOUND ? 1 : -1);
-        return sp;
-    }
-
-} /* f_call_resolved() */
+} /* int_call_other() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -20764,7 +20782,7 @@ v_call_resolved (svalue_t *sp, int num_arg)
  */
 
 {
-    return int_call_resolved(true, false, sp, num_arg);
+    return int_call_other(true, CO_RESULT, "call_resolved", sp, num_arg);
 } /* v_call_resolved() */
 
 /*-------------------------------------------------------------------------*/
@@ -20777,7 +20795,7 @@ v_call_direct_resolved (svalue_t *sp, int num_arg)
  */
 
 {
-    return int_call_resolved(false, false, sp, num_arg);
+    return int_call_other(false, CO_RESULT, "call_direct_resolved", sp, num_arg);
 } /* v_call_direct_resolved() */
 
 /*-------------------------------------------------------------------------*/
@@ -20790,7 +20808,7 @@ v_call_strict (svalue_t *sp, int num_arg)
  */
 
 {
-    return int_call_resolved(true, true, sp, num_arg);
+    return int_call_other(true, CO_ERROR, "call_strict", sp, num_arg);
 } /* v_call_strict() */
 
 /*-------------------------------------------------------------------------*/
@@ -20803,7 +20821,7 @@ v_call_direct_strict (svalue_t *sp, int num_arg)
  */
 
 {
-    return int_call_resolved(false, true, sp, num_arg);
+    return int_call_other(false, CO_ERROR, "call_direct_strict", sp, num_arg);
 } /* v_call_direct_strict() */
 
 /*-------------------------------------------------------------------------*/

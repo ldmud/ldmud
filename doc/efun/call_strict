@@ -1,5 +1,6 @@
 SYNOPSIS
         unknown call_strict(object|string ob, string func, ...)
+        unknown call_strict(object*|string* ob, string func, ...)
 
         ob.fun(...)
         ob->"fun"(...)
@@ -31,6 +32,13 @@ DESCRIPTION
         ob can also be an object_name. If a string is passed for ob
         and an object with that name can't be found or loaded, an
         error occurs.
+
+        Additionally the efun accepts an array of objects as <ob>: the
+        function is called with the same arguments in all the given objects.
+        The single results are collected in an array and yield the final
+        result. Array elements can be objects or the names of existing
+        objects. If a call to any of the objects failes, the efun will
+        raise a runtime error.
 
 HISTORY
         Introduced in LDMud 3.6.2.
