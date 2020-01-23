@@ -436,12 +436,33 @@ def python_error():
 def python_typecheck(arg: str, *args: int):
     return arg
 
+testob_lfun = None
+testob_var = None
+def python_remember_testob(ob: ldmud.Object) -> None:
+    """Remember a lfun and variable object."""
+    global testob_lfun, testob_var
+    testob_lfun = ob.functions.fun_testob
+    testob_var = ob.variables.var_testob
+
+def python_check_testob() -> bool:
+    """Verify the lfun and variable object from python_remember_testob()."""
+    global testob_lfun, testob_var
+    if testob_lfun() != "f_testob":
+        print("testob->fun_testob() returned wrong result.\n", file=sys.stderr)
+        return False
+    if testob_var.value != "v_testob":
+        print("testob->var_testob has wrong value.\n", file=sys.stderr)
+        return False
+    return True
+
 ldmud.register_efun("python_test", python_test)
 ldmud.register_efun("python_return", python_return)
 ldmud.register_efun("python_get", python_get)
 ldmud.register_efun("python_set", python_set)
 ldmud.register_efun("python_error", python_error)
 ldmud.register_efun("python_typecheck", python_typecheck)
+ldmud.register_efun("python_remember_testob", python_remember_testob)
+ldmud.register_efun("python_check_testob", python_check_testob)
 
 ldmud.register_efun("abs", lambda x: x*2)
 ldmud.register_efun("unregister_abs", lambda: ldmud.unregister_efun("abs"))

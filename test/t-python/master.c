@@ -201,6 +201,13 @@ void run_test()
                 quote(({11, 13, 17}))
             ));
 
+            python_remember_testob(load_object("/testrp"));
+            if (!python_check_testob())
+            {
+                shutdown(1);
+                return 0;
+            }
+
             start_gc(function void(int result)
             {
                 mixed val = python_get();
@@ -237,6 +244,12 @@ void run_test()
                     return;
                 }
 
+                if(!python_check_testob())
+                {
+                    shutdown(1);
+                    return;
+                }
+
                 start_gc(#'shutdown);
             });
         }
@@ -251,6 +264,8 @@ int master_fun() { return 54321; }
 
 string *epilog(int eflag)
 {
+    set_driver_hook(H_CREATE_OB, "create");
+
     run_test();
     return 0;
 }

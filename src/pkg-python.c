@@ -177,6 +177,13 @@ struct python_hook_s
     python_hook_t *next;
 };
 
+/* A linked list of lfun and variable references. */
+struct python_replace_program_protector
+{
+    PyObject* ref;
+    struct python_replace_program_protector* next;
+};
+
 /* --- Variables --- */
 char * python_startup_script = NULL;
 
@@ -911,6 +918,53 @@ ldmud_object_check_available (ldmud_object_t* self)
 } /* ldmud_object_check_available() */
 
 /*-------------------------------------------------------------------------*/
+static bool
+ldmud_object_register_replace_program_protector (ldmud_object_and_index_t* ref)
+
+/* Helper function to check whether the object has replace_program()
+ * in progress. If so, adds the object to the protector.
+ * Returns true on success, false otherwise (sets a Python error in this case).
+ */
+
+{
+    object_t* ob = ref->ob_base.lpc_object;
+    if (!ob)
+        return true;
+
+    if (ob->prog->flags & P_REPLACE_ACTIVE)
+    {
+        /* There will be a replace_program() in the backend cycle.
+         * Create a protector, so we can adjust the indices afterwards.
+         */
+        for (replace_ob_t* r_ob = obj_list_replace; r_ob; r_ob = r_ob->next)
+        {
+            struct python_replace_program_protector *prpp;
+
+            if (r_ob->ob != ob)
+                continue;
+
+            prpp = xalloc(sizeof(struct python_replace_program_protector));
+            if (!prpp)
+            {
+                PyErr_SetString(PyExc_MemoryError, "out of memory when creating replace_program() protector");
+                return false;
+            }
+
+            Py_INCREF(ref);
+            prpp->ref = (PyObject*)ref;
+            prpp->next = r_ob->python_rpp;
+            r_ob->python_rpp = prpp;
+            return true;
+        }
+    }
+
+    /* Prevent replace_program(). */
+    ob->flags |= O_LAMBDA_REFERENCED;
+
+    return true;
+} /* ldmud_object_register_replace_program_protector() */
+
+/*-------------------------------------------------------------------------*/
 static void
 ldmud_object_lfun_argument_dealloc (ldmud_object_lfun_argument_t* self)
 
@@ -1529,6 +1583,11 @@ ldmud_object_functions_getattro (ldmud_object_t *val, PyObject *name)
             lfun->ob_base.lpc_object = ref_object(val->lpc_object, "ldmud_object_functions_getattro");
             lfun->index = ix;
             add_gc_object(&gc_object_list, (ldmud_gc_var_t*)lfun);
+            if (!ldmud_object_register_replace_program_protector(lfun))
+            {
+                Py_DECREF(lfun);
+                return NULL;
+            }
             return (PyObject*) lfun;
         }
     }
@@ -1656,6 +1715,13 @@ ldmud_object_functions_dict (ldmud_object_t *self, void *closure)
             lfun->ob_base.lpc_object = ref_object(self->lpc_object, "ldmud_object_functions_dict");
             lfun->index = fx;
             add_gc_object(&gc_object_list, (ldmud_gc_var_t*)lfun);
+            if (!ldmud_object_register_replace_program_protector(lfun))
+            {
+                PyErr_Clear();
+                Py_DECREF(funname);
+                Py_DECREF(lfun);
+                continue;
+            }
 
             if (PyDict_SetItem(dict, funname, (PyObject*)lfun) < 0)
                 PyErr_Clear();
@@ -2022,6 +2088,11 @@ ldmud_object_variables_getattro (ldmud_object_t *val, PyObject *name)
                 var->index = ix;
 
                 add_gc_object(&gc_object_list, (ldmud_gc_var_t*)var);
+                if (!ldmud_object_register_replace_program_protector(var))
+                {
+                    Py_DECREF(var);
+                    return NULL;
+                }
                 return (PyObject*) var;
             }
     }
@@ -2148,6 +2219,13 @@ ldmud_object_variables_dict (ldmud_object_t *self, void *closure)
             varob->ob_base.lpc_object = ref_object(self->lpc_object, "ldmud_object_variables_dict");
             varob->index = ix;
             add_gc_object(&gc_object_list, (ldmud_gc_var_t*)varob);
+            if (!ldmud_object_register_replace_program_protector(varob))
+            {
+                PyErr_Clear();
+                Py_DECREF(varname);
+                Py_DECREF(varob);
+                continue;
+            }
 
             if (PyDict_SetItem(dict, varname, (PyObject*)varob) < 0)
                 PyErr_Clear();
@@ -7312,6 +7390,83 @@ closure_python_efun_to_string (int type)
 {
     return get_txt(python_efun_table[type - CLOSURE_PYTHON_EFUN].name->name);
 } /* closure_python_efun_to_string() */
+
+/*-------------------------------------------------------------------------*/
+void
+python_free_replace_program_protector (replace_ob_t *r_ob)
+
+/* Free the python replace_program() protector and all references
+ * it holds.
+ */
+
+{
+    struct python_replace_program_protector *prpp = r_ob->python_rpp;
+    while (prpp)
+    {
+        struct python_replace_program_protector *next = prpp->next;
+
+        Py_DECREF(prpp->ref);
+        xfree(prpp);
+
+        prpp = next;
+    }
+} /* python_free_replace_program_protector() */
+
+/*-------------------------------------------------------------------------*/
+static void
+python_replace_program_adjust_single_ref (ldmud_object_and_index_t* ref, int offset, int max_index)
+
+/* Update a single reference after a replace_program().
+ */
+
+{
+    int index = ref->index;
+
+    index -= offset;
+    if (index < 0 || index >= max_index)
+    {
+        /* We set the object to NULL. */
+        free_object(ref->ob_base.lpc_object, "python_replace_program_adjust");
+        ref->ob_base.lpc_object = NULL;
+        ref->index = 0;
+    }
+    else
+        ref->index = index;
+} /* python_replace_program_adjust_single_ref() */
+
+/*-------------------------------------------------------------------------*/
+void
+python_replace_program_adjust (replace_ob_t *r_ob)
+
+/* Walk through the references and adjust the indices of lfuns and variables.
+ * Also free the protectors.
+ */
+
+{
+    struct python_replace_program_protector *prpp = r_ob->python_rpp;
+    while (prpp)
+    {
+        struct python_replace_program_protector *next = prpp->next;
+
+        /* At least one more reference, otherwise we don't need to care. */
+        if (prpp->ref->ob_refcnt > 1)
+        {
+            if (Py_TYPE(prpp->ref) == &ldmud_object_lfun_type)
+                python_replace_program_adjust_single_ref((ldmud_object_and_index_t*)prpp->ref
+                                                       , r_ob->fun_offset
+                                                       , r_ob->new_prog->num_functions);
+            else if (Py_TYPE(prpp->ref) == &ldmud_object_variable_type)
+                python_replace_program_adjust_single_ref((ldmud_object_and_index_t*)prpp->ref
+                                                       , r_ob->var_offset
+                                                       , r_ob->new_prog->num_variables);
+        }
+
+        Py_DECREF(prpp->ref);
+        xfree(prpp);
+
+        prpp = next;
+    }
+} /* python_replace_program_adjust() */
 
 #ifdef GC_SUPPORT
 

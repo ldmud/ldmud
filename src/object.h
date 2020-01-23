@@ -140,6 +140,10 @@ struct replace_ob_s
        * after the replacement was scheduled. The exact information
        * is private to closure.c.
        */
+#ifdef USE_PYTHON
+    struct python_replace_program_protector *python_rpp;
+      /* Similar to lambdas above, this one is for Python. */
+#endif
 };
 
 

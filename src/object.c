@@ -949,6 +949,10 @@ replace_programs (void)
             r_next = r_ob->next;
             if (r_ob->lambda_rpp)
                 free_replace_program_protector(r_ob);
+#ifdef USE_PYTHON
+            if (r_ob->python_rpp)
+                python_free_replace_program_protector(r_ob);
+#endif
             xfree(r_ob);
             continue;
         }
@@ -1085,6 +1089,11 @@ replace_programs (void)
             obj_list_replace = r_next;
             replace_program_lambda_adjust(r_ob);
         }
+
+#ifdef USE_PYTHON
+        if (r_ob->python_rpp)
+            python_replace_program_adjust(r_ob);
+#endif
 
         /* Remove current shadows */
 
@@ -3615,6 +3624,9 @@ v_replace_program (svalue_t *sp, int num_arg)
     {
         tmp = xalloc(sizeof *tmp);
         tmp->lambda_rpp = NULL;
+#ifdef USE_PYTHON
+        tmp->python_rpp = NULL;
+#endif
         tmp->ob = current_object;
         tmp->next = obj_list_replace;
         obj_list_replace = tmp;

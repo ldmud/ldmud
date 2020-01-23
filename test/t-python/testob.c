@@ -2,6 +2,12 @@
 
 nosave protected int|float testvar = 42;
 
+string var_testob = "v_testob";
+string fun_testob()
+{
+    return "f_testob";
+}
+
 int loaded()
 {
     return 1;
