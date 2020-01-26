@@ -12775,7 +12775,7 @@ function_call:
                   PREPARE_INSERT(4)
 
                   /* Check the arguments. */
-                  lpctype_t *result = check_python_efun_args($1.real, $4, get_argument_types_start($4));
+                  lpctype_t *result = check_python_efun_args($1.real, $4, has_ellipsis, get_argument_types_start($4));
 
                   add_f_code(F_USE_ARG_FRAME);
                   add_f_code(F_PYTHON_EFUN);

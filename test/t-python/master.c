@@ -126,17 +126,17 @@ void run_test()
         }),
         ({ "passing invalid arguments 1", TF_ERROR,
             (:
-                return funcall(#'python_typecheck, 10);
+                return funcall(#'python_typecheck, 10, "");
             :)
         }),
         ({ "passing invalid arguments 2", TF_ERROR,
             (:
-                return funcall(#'python_typecheck, "", "");
+                return funcall(#'python_typecheck, "", "", "");
             :)
         }),
         ({ "passing valid arguments", 0,
             (:
-                return funcall(#'python_typecheck, "", 1, 2);
+                return funcall(#'python_typecheck, "", "", 1, 2);
             :)
         }),
         ({ "getting an exception", TF_ERROR,
@@ -175,6 +175,12 @@ void run_test()
             (:
                 object* oblist = python_get_hook_info()[1];
                 return sizeof(oblist) == 2 && oblist[0] == this_object();
+            :)
+        }),
+        ({
+           "passing valid arguments with ...", 0,
+            (:
+                return load_object("/testcompileargcheck")->check();
             :)
         }),
         ({

@@ -433,7 +433,7 @@ def python_error():
     """Make an exception."""
     raise Exception("Testing")
 
-def python_typecheck(arg: str, *args: int):
+def python_typecheck(arg: str, arg2: str, *args: int):
     return arg
 
 testob_lfun = None

@@ -6880,7 +6880,7 @@ is_python_efun (ident_t *p)
 /*-------------------------------------------------------------------------*/
 
 lpctype_t *
-check_python_efun_args (ident_t *p, int num_arg, fulltype_t *args)
+check_python_efun_args (ident_t *p, int num_arg, bool has_ellipsis, fulltype_t *args)
 
 /* Check whether the given argument types match the ones
  * the Python efun expects. Any errors will be printed using yyerrorf().
@@ -6890,7 +6890,7 @@ check_python_efun_args (ident_t *p, int num_arg, fulltype_t *args)
 {
     python_efun_t * entry = python_efun_table + p->u.global.python_efun;
 
-    if (num_arg < entry->minarg)
+    if (num_arg < entry->minarg && !has_ellipsis)
         yyerrorf("Too few arguments to %s", get_txt(p->name));
     else if(!entry->varargs && num_arg > entry->maxarg)
     {

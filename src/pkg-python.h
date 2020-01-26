@@ -47,7 +47,7 @@ extern ident_t *all_python_efuns;
 extern void pkg_python_init(char* prog_name);
 
 extern bool is_python_efun(ident_t *p);
-extern lpctype_t* check_python_efun_args(ident_t *p, int num_arg, fulltype_t *args);
+extern lpctype_t* check_python_efun_args(ident_t *p, int num_arg, bool has_ellipsis, fulltype_t *args);
 extern void call_python_efun(int idx, int num_arg);
 extern const char* closure_python_efun_to_string(int type);
 
