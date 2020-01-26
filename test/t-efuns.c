@@ -157,6 +157,8 @@ mixed *tests = ({
     ({ "strstr 09", 0, (: strstr("abcdefa","a", 7) == -1 :) }),
     ({ "strstr 10", 0, (: strstr("abcdefabc","a", 7) == -1 :) }),
     ({ "strstr 11", 0, (: strstr("abcdefabc","c") == 2 :) }),
+    ({ "this_object", 0, (: this_object(({})...) == this_object() :) }),
+    ({ "this_player", 0, (: this_player(({})...) == 0 :) }),
     ({ "hash string (MD5)", 0, (:
                          hash(TLS_HASH_MD5, "line 13: Warning: Missing "
                               "'return <value>' statement") ==

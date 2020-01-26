@@ -8136,6 +8136,28 @@ again:
     }
 #endif /* DEBUG */
 
+    /* If an argument frame is in effect, check the number of arguments
+     * for unprefixed efuns, the compiler didn't check them in this case.
+     * We have an argument frame when use_ap is set or the efun doesn't have
+     * a fixed number of arguments.
+     */
+    if (instrs[instruction].Default != -1
+     && (use_ap || instrs[instruction].min_arg != instrs[instruction].max_arg))
+    {
+        int numarg = sp - ap + 1;
+
+        if (numarg < instrs[instruction].min_arg)
+            ERRORF(("Not enough args for %s: got %d, expected %d.\n"
+                   , instrs[instruction].name
+                   , numarg, instrs[instruction].min_arg));
+        if (numarg > instrs[instruction].max_arg && instrs[instruction].max_arg >= 0)
+            ERRORF(("Too many args for %s: got %d, expected %d.\n"
+                   , instrs[instruction].name
+                   , numarg, instrs[instruction].min_arg));
+
+        use_ap = false;
+    }
+
     /* The monster switch to execute the instruction.
      * The order of the cases is held (mostly) in the order
      * the instructions appear in func_spec.
