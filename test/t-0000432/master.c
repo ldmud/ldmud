@@ -23,16 +23,34 @@ void run_test()
                 return b"\xff\xfe" b"\xfd\xfc" == to_bytes(({255,254,253,252}));
             :)
         }),
+        ({ "Character literals 1", 0,
+           (:
+                return '\u270d' == 0x270d;
+            :)
+        }),
+        ({ "Character literals 2", 0,
+           (:
+                return '\U0001f609' == 0x1f609;
+            :)
+        }),
         ({ "File encoding 1", 0,
             (:
                 object ob = load_object("/iso8859-7.c");
-                return ob->"\u03c1\u03c9\u03c4\u03ae\u03c3\u03c4\u03b5\u005f\u03c7\u03b1\u03b9\u03c1\u03b5\u03c4\u03b9\u03c3\u03bc\u03cc"() == "\u039a\u03b1\u03bb\u03ae\u0020\u03bc\u03ad\u03c1\u03b1\u0021";
+                if (ob->"\u03c1\u03c9\u03c4\u03ae\u03c3\u03c4\u03b5\u005f\u03c7\u03b1\u03b9\u03c1\u03b5\u03c4\u03b9\u03c3\u03bc\u03cc"() != "\u039a\u03b1\u03bb\u03ae\u0020\u03bc\u03ad\u03c1\u03b1\u0021")
+                    return 0;
+                if (ob->"\u03c1\u03c9\u03c4\u03ae\u03c3\u03c4\u03b5_\u03c7\u03b1\u03c1\u03b1\u03ba\u03c4\u03ae\u03c1\u03b1"() != 960)
+                    return 0;
+                return 1;
             :)
         }),
         ({ "File encoding 2", 0,
             (:
                 object ob = load_object("/utf-8.c");
-                return ob->"\u03c1\u03c9\u03c4\u03ae\u03c3\u03c4\u03b5\u005f\u03c7\u03b1\u03b9\u03c1\u03b5\u03c4\u03b9\u03c3\u03bc\u03cc"() == "\u039a\u03b1\u03bb\u03ae\u0020\u03bc\u03ad\u03c1\u03b1\u0021";
+                if (ob->"\u03c1\u03c9\u03c4\u03ae\u03c3\u03c4\u03b5\u005f\u03c7\u03b1\u03b9\u03c1\u03b5\u03c4\u03b9\u03c3\u03bc\u03cc"() != "\u039a\u03b1\u03bb\u03ae\u0020\u03bc\u03ad\u03c1\u03b1\u0021")
+                    return 0;
+                if (ob->"\u03c1\u03c9\u03c4\u03ae\u03c3\u03c4\u03b5_\u03c7\u03b1\u03c1\u03b1\u03ba\u03c4\u03ae\u03c1\u03b1"() != 960)
+                    return 0;
+                return 1;
             :)
         }),
         ({ "Switch with byte strings 1", 0,

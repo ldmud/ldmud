@@ -5707,11 +5707,8 @@ yylex1 (void)
                     RETURN(L_SYMBOL);
                 }
 
-                /* It's a normal (or escaped) character constant.
-                 * Make sure that characters with the MSB set appear
-                 * as positive numbers.
-                 */
-                yylval.number = (unsigned char)c;
+                /* It's a normal character constant. */
+                yylval.number = c;
                 RETURN(L_NUMBER);
             }
 
