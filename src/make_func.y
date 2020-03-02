@@ -1246,7 +1246,7 @@ add_input (const char *p)
 
     l = strlen(p);
     outp -= l;
-    strncpy(outp, p, l);
+    memcpy(outp, p, l);
 }
 
 /*-------------------------------------------------------------------------*/

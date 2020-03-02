@@ -486,7 +486,7 @@ MD5Encode(unsigned char *pw,
     /*
      * It stops at the first '$' or 8 chars, whichever comes first
      */
-    for (ep = sp; (*ep != '\0') && (*ep != '$') && (ep < (sp + 8)); ep++) {
+    for (ep = sp; (*ep != '\0') && (*ep != '$') && (ep - sp < 8); ep++) {
         continue;
     }
 
