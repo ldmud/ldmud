@@ -1647,7 +1647,6 @@ add_message_flush ()
     int length;
 
     if ( command_giver == NULL
-     || (command_giver->flags & O_DESTRUCTED)
      || !(O_SET_INTERACTIVE(ip, command_giver)))
         return;
 
