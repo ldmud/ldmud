@@ -2254,6 +2254,7 @@ set_input_source (int fd, const char* fname, string_t * str)
 
 {
     yyin.convbuf = NULL;
+    yyin.convbytes[0] = 0;
 
     yyin.fd = fd;
     if (fd != -1)
