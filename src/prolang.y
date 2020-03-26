@@ -995,7 +995,8 @@ static const char * compiled_file;
 
 lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_float,
           _lpctype_int_array,     _lpctype_string_array, _lpctype_object_array,
-          _lpctype_bytes_array,   _lpctype_string_bytes, _lpctype_string_bytes_array;
+          _lpctype_bytes_array,   _lpctype_string_bytes, _lpctype_string_bytes_array,
+          _lpctype_string_object, _lpctype_string_object_array;
 lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_any_array     = &_lpctype_any_array,
           *lpctype_int_float     = &_lpctype_int_float,
@@ -1004,7 +1005,9 @@ lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_object_array  = &_lpctype_object_array,
           *lpctype_bytes_array   = &_lpctype_bytes_array,
           *lpctype_string_bytes  = &_lpctype_string_bytes,
-          *lpctype_string_bytes_array = &_lpctype_string_bytes_array;
+          *lpctype_string_bytes_array = &_lpctype_string_bytes_array,
+          *lpctype_string_object = &_lpctype_string_object,
+          *lpctype_string_object_array = &_lpctype_string_object_array;
 
 
 /*-------------------------------------------------------------------------*/
@@ -1915,6 +1918,27 @@ get_argument_type (lpctype_t* t)
 }
 
 
+/*-------------------------------------------------------------------------*/
+static bool
+check_unknown_type (lpctype_t* t)
+
+/* Checks if the argument <t> is the unknown type.
+ * If it is a compile error will be raised an true returned.
+ * Otherwise returns false. If NULL is given, true will be
+ * returned but no error given.
+ */
+
+{
+    if (t == lpctype_unknown)
+    {
+        yywarnf("Function call result must be casted due to pragma strict_types");
+        return true;
+    }
+
+    return t == NULL;
+} /* check_unknown_type() */
+
+/*-------------------------------------------------------------------------*/
 /* Operator type table for assignment with addition.
  */
 binary_op_types_t types_add_assignment[] = {
@@ -2105,7 +2129,7 @@ check_unary_op_type (lpctype_t* t, const char* op_name, unary_op_types_t* type_t
     lpctype_t* result = NULL;
 
     /* No type info? Use the fallback. */
-    if (t == NULL)
+    if (check_unknown_type(t))
         return ref_lpctype(error_type);
 
     for (unary_op_types_t* entry = type_table; entry->t; ++entry)
@@ -2195,10 +2219,10 @@ check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary
     if (t1 == NULL && t2 == NULL)
         return error_type ? ref_lpctype(error_type) : lpctype_mixed;
 
-    if (t1 == NULL)
+    if (check_unknown_type(t1))
         t1 = lpctype_mixed;
 
-    if (t2 == NULL)
+    if (check_unknown_type(t2))
         t2 = lpctype_mixed;
 
     for (binary_op_types_t* entry = type_table; entry->t1; ++entry)
@@ -2351,7 +2375,7 @@ get_index_result_type (lpctype_t* aggregate, fulltype_t index, int inst, lpctype
         yyerror("Reference used as index");
 
     /* No type information, then it might be anything... */
-    if (aggregate == NULL)
+    if (check_unknown_type(aggregate))
         return lpctype_mixed;
 
     /* Treat index as anything, if we don't know what it is. */
@@ -4877,7 +4901,9 @@ init_global_variable (int i, ident_t* name, fulltype_t actual_type
 
     /* Do the types match? */
     actual_type.t_flags &= TYPE_MOD_MASK;
-    if (!has_common_type(exprtype.t_type, actual_type.t_type))
+
+    if (!check_unknown_type(exprtype.t_type)
+     && !has_common_type(exprtype.t_type, actual_type.t_type))
     {
         yyerrorf("Type mismatch %s when initializing %s"
                 , get_two_lpctypes(actual_type.t_type, exprtype.t_type)
@@ -5501,7 +5527,8 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
                 ; member++, pmember++, p = p->next
                 )
             {
-                if (!has_common_type(pmember->type, p->type.t_type) )
+                if (!check_unknown_type(p->type.t_type)
+                 && !has_common_type(pmember->type, p->type.t_type) )
                 {
                     yyerrorf("Type mismatch %s for member '%s' "
                              "in struct '%s'"
@@ -5701,6 +5728,9 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool
 
     *struct_index = FSM_NO_STRUCT;
     *member_index = -1;
+
+    if (check_unknown_type(structure))
+        return NULL;
 
     while (true)
     {
@@ -7486,6 +7516,7 @@ inline_comma_expr:
       {
           /* Add a F_RETURN to complete the statement */
           ins_f_code(F_RETURN);
+          check_unknown_type($1.type.t_type);
           free_fulltype($1.type);
       }
 ; /* inline_comma_expr */
@@ -8427,6 +8458,8 @@ return:
 
           if (exact_types)
           {
+              check_unknown_type(type2.t_type);
+
               /* More checks, ie. mixed vs non-mixed, would be nice,
                * but the general type tracking is too lacking for it.
                */
@@ -8484,6 +8517,8 @@ while:
           p_int addr = pop_address();
           p_int length = CURRENT_PROGRAM_SIZE - addr;
           bytecode_p expression;
+
+          check_unknown_type($4.type.t_type);
 
           /* Take the <cond> code, add the BBRANCH instruction and
            * store all of it outside the program. After the <body>
@@ -8660,6 +8695,8 @@ do:
           mp_uint current;
           bytecode_p dest;
 
+          check_unknown_type($7.type.t_type);
+
           current = CURRENT_PROGRAM_SIZE;
           if (!realloc_a_program(3))
           {
@@ -8770,7 +8807,7 @@ for:
           $<number>$ = CURRENT_PROGRAM_SIZE;
       }
 
-      for_expr ';'
+      for_cond_expr ';'
 
       {
 %line
@@ -8813,7 +8850,7 @@ for:
           last_expression = -1;
       }
 
-      for_expr ')'
+      for_iter_expr ')'
 
       {
 %line
@@ -8984,7 +9021,9 @@ expr_decl:
 
           /* Check the assignment for validity */
           type2 = $3.type;
-          if (exact_types && !has_common_type(type2.t_type, $1.type))
+          if (exact_types
+           && !check_unknown_type(type2.t_type)
+           && !has_common_type(type2.t_type, $1.type))
           {
               yyerrorf("Bad assignment %s", get_two_lpctypes($1.type, type2.t_type));
           }
@@ -9032,7 +9071,20 @@ expr_decl:
 ; /* expr_decl */
 
 
-for_expr:
+for_cond_expr:
+      /* EMPTY */
+      {
+          last_expression = mem_block[A_PROGRAM].current_size;
+          ins_number(1);
+      }
+    | comma_expr
+      {
+          check_unknown_type($1.type.t_type);
+          free_fulltype($1.type);
+      }
+; /* for_cond_expr */
+
+for_iter_expr:
       /* EMPTY */
       {
           last_expression = mem_block[A_PROGRAM].current_size;
@@ -9042,7 +9094,7 @@ for_expr:
       {
           free_fulltype($1.type);
       }
-; /* for_expr */
+; /* for_iter_expr */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* The foreach() statement
@@ -9284,6 +9336,8 @@ foreach_expr:
           gen_refs = ($1.type.t_flags & TYPE_MOD_REFERENCE) != 0;
           dtype = $1.type.t_type;
 
+          check_unknown_type(dtype);
+
           /* Allowed are arrays of all kinds, strings, mappings,
            * ints (but not &int), mixed and unknown (when !exact_types).
            */
@@ -9316,9 +9370,8 @@ foreach_expr:
 
           dtype = $1.type.t_type;
 
-          if (!lpctype_contains(lpctype_int, dtype)
-           && (exact_types || dtype != lpctype_unknown)
-             )
+          if (!check_unknown_type(dtype)
+           && !lpctype_contains(lpctype_int, dtype))
           {
               fulltype_error("Expression for foreach() of wrong type", $1.type);
           }
@@ -9330,9 +9383,8 @@ foreach_expr:
 
           dtype = $3.type.t_type;
 
-          if (!lpctype_contains(lpctype_int, dtype)
-           && (exact_types || dtype != lpctype_unknown)
-             )
+          if (!check_unknown_type(dtype)
+           && !lpctype_contains(lpctype_int, dtype))
           {
               fulltype_error("Expression for foreach() of wrong type", $3.type);
           }
@@ -9377,6 +9429,8 @@ switch:
 
         case_state_t *statep;
 %line
+        check_unknown_type($3.type.t_type);
+
         current_break_stack_need++;
         if ( current_break_stack_need > max_break_stack_need )
             max_break_stack_need = current_break_stack_need;
@@ -9628,6 +9682,8 @@ condStart:
 
           mp_uint current;
           bytecode_p current_code;
+
+          check_unknown_type($3.type.t_type);
 
           /* Turn off the case labels */
 
@@ -9926,7 +9982,9 @@ expr0:
            *
            *  a = b = 0;
            */
-          if(type2.t_type == lpctype_mixed && !type2.t_flags)
+          if (check_unknown_type(type2.t_type))
+              restype.t_type = lpctype_mixed;
+          else if(type2.t_type == lpctype_mixed && !type2.t_flags)
               restype.t_type = lpctype_mixed;
           else
               restype.t_type = get_common_type(type1.t_type, type2.t_type);
@@ -10031,6 +10089,8 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '?'
       {
+          check_unknown_type($1.type.t_type);
+
           /* Insert the branch to the :-part and remember this address */
           ins_f_code(F_BRANCH_WHEN_ZERO);
           $<address>$ = CURRENT_PROGRAM_SIZE;
@@ -10138,6 +10198,8 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_LOR %prec L_LOR
       {
+          check_unknown_type($1.type.t_type);
+
           /* Insert the LOR and remember the position */
 
           ins_f_code(F_LOR);
@@ -10164,6 +10226,8 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_LAND %prec L_LAND
       {
+          check_unknown_type($1.type.t_type);
+
           /* Insert the LAND and remember the position */
 
           ins_f_code(F_LAND);
@@ -10273,6 +10337,9 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '>'  expr0
       {
+          check_unknown_type($1.type.t_type);
+          check_unknown_type($3.type.t_type);
+
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
 
@@ -10283,6 +10350,9 @@ expr0:
       }
     | expr0 L_GE  expr0
       {
+          check_unknown_type($1.type.t_type);
+          check_unknown_type($3.type.t_type);
+
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
 
@@ -10293,6 +10363,9 @@ expr0:
       }
     | expr0 '<'  expr0
       {
+          check_unknown_type($1.type.t_type);
+          check_unknown_type($3.type.t_type);
+
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
 
@@ -10303,6 +10376,9 @@ expr0:
       }
     | expr0 L_LE  expr0
       {
+          check_unknown_type($1.type.t_type);
+          check_unknown_type($3.type.t_type);
+
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
 
@@ -10646,6 +10722,8 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | L_NOT expr0
       {
+          check_unknown_type($2.type.t_type);
+
           $$ = $2;
           last_expression = CURRENT_PROGRAM_SIZE;
           ins_f_code(F_NOT);        /* Any type is valid here. */
@@ -10659,7 +10737,8 @@ expr0:
       {
 %line
           $$ = $2;
-          if (exact_types && !lpctype_contains(lpctype_int, $2.type.t_type))
+          if (!check_unknown_type($2.type.t_type)
+           && exact_types && !lpctype_contains(lpctype_int, $2.type.t_type))
               fulltype_error("Bad argument to ~", $2.type);
 
           ins_f_code(F_COMPL);
@@ -10784,7 +10863,9 @@ expr0:
           type1.t_flags = 0;
           type2 = $3.type;
 
-          if(type2.t_type == lpctype_mixed && !type2.t_flags)
+          if (check_unknown_type(type2.t_type))
+              restype.t_type = lpctype_mixed;
+          else if(type2.t_type == lpctype_mixed && !type2.t_flags)
               restype.t_type = lpctype_mixed;
           else
               restype.t_type = get_common_type(type1.t_type, type2.t_type);
@@ -11154,6 +11235,8 @@ expr4:
       {
           ins_f_code(F_M_ALLOCATE);
 
+          check_unknown_type($6.type.t_type);
+
           $$.type = get_fulltype(lpctype_mapping);
           $$.start = $4;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -11518,6 +11601,8 @@ expr4:
           if ($3.type.t_flags & TYPE_MOD_REFERENCE
            || $5.type.t_flags & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
+
+          check_unknown_type($1.type.t_type);
 
           if (exact_types && !lpctype_contains(lpctype_mapping, $1.type.t_type))
               fulltype_error("Bad type to indexed lvalue", $1.type);
@@ -12227,8 +12312,8 @@ expr_list:
 ; /* expr_list */
 
 expr_list2:
-      expr0                 { $$ = 1;      add_arg_type($1.type); }
-    | expr_list2 ',' expr0  { $$ = $1 + 1; add_arg_type($3.type); }
+      expr0                 { $$ = 1;      add_arg_type($1.type); check_unknown_type($1.type.t_type); }
+    | expr_list2 ',' expr0  { $$ = $1 + 1; add_arg_type($3.type); check_unknown_type($3.type.t_type); }
 ; /* expr_list2 */
 
 
@@ -12308,6 +12393,7 @@ m_expr_list2:
           $$[0] = 1 + $2;
           $$[1] = $2;
           add_arg_type($1.type); /* order doesn't matter */
+          check_unknown_type($1.type.t_type);
       }
 
     | m_expr_list2 ',' expr0 m_expr_values
@@ -12318,12 +12404,13 @@ m_expr_list2:
           $$[0] = $1[0] + 1 + $4;
           $$[1] = $1[1];
           add_arg_type($3.type);
+          check_unknown_type($3.type.t_type);
       }
 ; /* m_expr_list2 */
 
 m_expr_values:
-      ':' expr0                { $$ = 1;      add_arg_type($2.type); }
-    | m_expr_values ';' expr0  { $$ = $1 + 1; add_arg_type($3.type); }
+      ':' expr0                { $$ = 1;      add_arg_type($2.type); check_unknown_type($2.type.t_type); }
+    | m_expr_values ';' expr0  { $$ = $1 + 1; add_arg_type($3.type); check_unknown_type($3.type.t_type); }
 ; /* m_expr_values */
 
 
@@ -12346,7 +12433,8 @@ struct_member_name:
     |  '(' expr0 ')'
       {
           $$ = NULL;
-          if (!lpctype_contains(lpctype_string, $2.type.t_type)
+          if (!check_unknown_type($2.type.t_type)
+           && !lpctype_contains(lpctype_string, $2.type.t_type)
            && !lpctype_contains(lpctype_int, $2.type.t_type))
               fulltype_error("Illegal type for struct member name", $2.type);
 
@@ -12755,7 +12843,8 @@ function_call:
 
                           for (argno = 1, i = num_arg; --i >= 0; argno++)
                           {
-                              if (!has_common_type(argp->t_type, *arg_types))
+                              if (!check_unknown_type(argp->t_type)
+                               && !has_common_type(argp->t_type, *arg_types))
                               {
                                   yyerrorf("Bad type for argument %d of %s %s",
                                     argno,
@@ -12773,7 +12862,8 @@ function_call:
 
                               for (i = anum_arg - num_arg; --i >=0; )
                               {
-                                  if (!has_common_type(argp->t_type, flat_type))
+                                  if (!check_unknown_type(argp->t_type)
+                                   && !has_common_type(argp->t_type, flat_type))
                                   {
                                       yyerrorf("Bad type for argument %d of %s %s",
                                           anum_arg - i,
@@ -12796,6 +12886,15 @@ function_call:
                   PREPARE_INSERT(4)
 
                   /* Check the arguments. */
+                  if (exact_types && $4)
+                  {
+                      /* Check for unknown type. */
+                      fulltype_t *argp = get_argument_types_start($4);
+
+                      for (int argn = 0; argn < $4; argn++)
+                         check_unknown_type(argp[argn].t_type);
+                  }
+
                   lpctype_t *result = check_python_efun_args($1.real, $4, has_ellipsis, get_argument_types_start($4));
 
                   add_f_code(F_USE_ARG_FRAME);
@@ -12877,26 +12976,33 @@ function_call:
                       {
                           fulltype_t *beginArgp = argp;
 
-                          /* For varargs efuns stop, when we run out of
-                           * declared argument types. */
+                          /* For varargs efuns just check for unknown,
+                           * when we run out of declared argument types. */
                           if (max == -1 && argp->t_type == NULL)
-                              break;
-
-                          for (;;argp++)
                           {
-                              if ( argp->t_type == NULL )
-                              {
-                                  /* Possible types for this arg exhausted */
-                                  efun_argument_error(argn+1, f, beginArgp
-                                                     , *aargp);
-                                  break;
-                              }
+                              check_unknown_type(aargp->t_type);
+                              aargp++;
+                              continue;
+                          }
 
-                              /* Break if types are compatible.
-                               */
-                              if (has_common_type(argp->t_type, aargp->t_type))
-                                  break;
-                          } /* end for (efun_arg_types) */
+                          if (!check_unknown_type(aargp->t_type))
+                          {
+                              for (;;argp++)
+                              {
+                                  if ( argp->t_type == NULL )
+                                  {
+                                      /* Possible types for this arg exhausted */
+                                      efun_argument_error(argn+1, f, beginArgp
+                                                         , *aargp);
+                                      break;
+                                  }
+
+                                  /* Break if types are compatible.
+                                   */
+                                  if (has_common_type(argp->t_type, aargp->t_type))
+                                      break;
+                              } /* end for (efun_arg_types) */
+                          }
 
                           /* Advance argp to point to the allowed argtypes
                            * of the next arg.
@@ -13243,6 +13349,13 @@ function_call:
               add_f_code(call_instr);
               CURRENT_PROGRAM_SIZE++;
               $$.type = get_fulltype(instrs[call_instr].ret_type);
+
+              if (!check_unknown_type($1.type.t_type)
+               && !has_common_type(lpctype_string_object, $1.type.t_type)
+               && !has_common_type(lpctype_string_object_array, $1.type.t_type))
+              {
+                  efun_argument_error(1, call_instr, efun_arg_types + instrs[call_instr].arg_index, $1.type);
+              }
           }
           $$.start = $1.start;
           pop_arg_stack($6);
@@ -13315,7 +13428,8 @@ call_other_name:
     |  '(' expr0 ')'
       {
           $$ = NULL;
-          if (!lpctype_contains(lpctype_string, $2.type.t_type))
+          if (!check_unknown_type($2.type.t_type)
+           && !lpctype_contains(lpctype_string, $2.type.t_type))
               fulltype_error("Illegal type for lfun name", $2.type);
           free_fulltype($2.type);
       }
@@ -13621,7 +13735,8 @@ opt_catch_modifier :
           }
           else if (mstreq($1, STR_RESERVE))
           {
-              if (!lpctype_contains(lpctype_int, $2.type.t_type))
+              if (!check_unknown_type($2.type.t_type)
+               && !lpctype_contains(lpctype_int, $2.type.t_type))
                   yyerrorf("Bad 'reserve' expression type to catch(): %s, "
                            "expected int"
                           , get_fulltype_name($2.type)
@@ -13652,6 +13767,20 @@ opt_catch_modifier :
 sscanf:
       L_SSCANF note_start '(' expr0 ',' expr0 lvalue_list ')'
       {
+          if (!check_unknown_type($4.type.t_type)
+           && !lpctype_contains(lpctype_string, $4.type.t_type))
+          {
+              fulltype_t arg[] = { { lpctype_string, 0 }, { NULL, 0 } };
+              efun_argument_error(1, F_SSCANF, arg, $4.type);
+          }
+
+          if (!check_unknown_type($6.type.t_type)
+           && !lpctype_contains(lpctype_string, $6.type.t_type))
+          {
+              fulltype_t arg[] = { { lpctype_string, 0 }, { NULL, 0 } };
+              efun_argument_error(2, F_SSCANF, arg, $6.type);
+          }
+
           ins_f_code(F_SSCANF);
           ins_byte($7 + 2);
           $$.start = $2;
@@ -13667,6 +13796,28 @@ parse_command:
       L_PARSE_COMMAND note_start
       '(' expr0 ',' expr0 ',' expr0 lvalue_list ')'
       {
+          if (!check_unknown_type($4.type.t_type)
+           && !lpctype_contains(lpctype_string, $4.type.t_type))
+          {
+              fulltype_t arg[] = { { lpctype_string, 0 }, { NULL, 0 } };
+              efun_argument_error(1, F_PARSE_COMMAND, arg, $4.type);
+          }
+
+          if (!check_unknown_type($6.type.t_type)
+           && !lpctype_contains(lpctype_object, $6.type.t_type)
+           && !lpctype_contains(lpctype_object_array, $6.type.t_type))
+          {
+              fulltype_t arg[] = { { lpctype_object, 0 }, { lpctype_object_array, 0 }, { NULL, 0 } };
+              efun_argument_error(2, F_PARSE_COMMAND, arg, $6.type);
+          }
+
+          if (!check_unknown_type($8.type.t_type)
+           && !lpctype_contains(lpctype_string, $8.type.t_type))
+          {
+              fulltype_t arg[] = { { lpctype_string, 0 }, { NULL, 0 } };
+              efun_argument_error(3, F_PARSE_COMMAND, arg, $8.type);
+          }
+
           ins_f_code(F_PARSE_COMMAND);
           ins_byte($9 + 3);
           $$.start = $2;
@@ -13846,7 +13997,8 @@ if (current_inline && current_inline->parse_context)
     name->u.local.initializing = false;
 
     /* Check the assignment for validity */
-    if (exact_types && !has_common_type(exprtype.t_type, lv->type))
+    if (!check_unknown_type(exprtype.t_type)
+     && exact_types && !has_common_type(exprtype.t_type, lv->type))
     {
         yyerrorf("Bad assignment %s", get_two_lpctypes(lv->type, exprtype.t_type));
     }
@@ -16785,6 +16937,8 @@ init_compiler ()
     make_static_type(get_array_type(lpctype_bytes),                 &_lpctype_bytes_array);
     make_static_type(get_union_type(lpctype_string, lpctype_bytes), &_lpctype_string_bytes);
     make_static_type(get_array_type(lpctype_string_bytes),          &_lpctype_string_bytes_array);
+    make_static_type(get_union_type(lpctype_string, lpctype_object),&_lpctype_string_object);
+    make_static_type(get_array_type(lpctype_string_object),         &_lpctype_string_object_array);
 } /* init_compiler() */
 
 /*-------------------------------------------------------------------------*/
@@ -17807,6 +17961,8 @@ clear_compiler_refs (void)
     clear_lpctype_ref(lpctype_bytes_array);
     clear_lpctype_ref(lpctype_string_bytes);
     clear_lpctype_ref(lpctype_string_bytes_array);
+    clear_lpctype_ref(lpctype_string_object);
+    clear_lpctype_ref(lpctype_string_object_array);
 }
 
 void
@@ -17830,6 +17986,8 @@ count_compiler_refs (void)
     count_lpctype_ref(lpctype_bytes_array);
     count_lpctype_ref(lpctype_string_bytes);
     count_lpctype_ref(lpctype_string_bytes_array);
+    count_lpctype_ref(lpctype_string_object);
+    count_lpctype_ref(lpctype_string_object_array);
 }
 
 #endif
