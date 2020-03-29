@@ -2159,7 +2159,7 @@ at_end (int i, int imax, int z, p_int *lens)
  */
 
 {
-    if (z + 1 < lens[i])
+    if (z < lens[i])
         return MY_FALSE;
     for (i++; i < imax; i++) {
         if (lens[i] > 0)

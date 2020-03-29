@@ -114,6 +114,12 @@ mixed *tests = ({
           return array[0] == 42;
       :)
    }),
+   ({ "Length miscalculation in terminal_colour() with indent.", 0,
+      (:
+          terminal_colour("X\n ", 0, 80, 8);
+          return 1;
+      :)
+   }),
 });
 
 void run_test()
