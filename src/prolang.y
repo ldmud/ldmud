@@ -13226,19 +13226,19 @@ function_call:
               /* Move the generated code forward by 6 */
               p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE - 1;
               q = p + 6;
-              for (left = CURRENT_PROGRAM_SIZE - $1.start
+              for (left = CURRENT_PROGRAM_SIZE - $1.start - 1
                   ; left > 0
                   ; left--, p--, q--)
                   *q = *p;
 
-              /* p now points to program[$1.start]-1.
+              /* p now points to program[$1.start].
                * Store the first two call-other args there.
                */
               p[1] = F_STRING;
-              upd_short($1.start+1, store_prog_string(
+              upd_short($1.start+2, store_prog_string(
                         ref_mstring(query_simul_efun_file_name())));
               p[4] = F_STRING;
-              upd_short($1.start+4, store_prog_string(ref_mstring(
+              upd_short($1.start+5, store_prog_string(ref_mstring(
                   $2.strict_member ? STR_CALL_STRICT : STR_CALL_OTHER)));
 
               CURRENT_PROGRAM_SIZE += 6;
@@ -13395,9 +13395,9 @@ function_call:
               bytecode_p src, dest;
               size_t left;
 
-              dest = PROGRAM_BLOCK + $<function_call_head>4.start;
+              dest = PROGRAM_BLOCK + $1.start;
               src = dest+1;
-              left = CURRENT_PROGRAM_SIZE - $<function_call_head>4.start - 1;
+              left = CURRENT_PROGRAM_SIZE - $1.start - 1;
 
               while (left-- > 0)
               {
@@ -13409,7 +13409,7 @@ function_call:
               /* If last_expression lies within the program area
                * that was moved one bytecode adjust it accordingly.
                */
-              if(last_expression > $<function_call_head>4.start)
+              if(last_expression > $1.start)
                   last_expression--;
           }
 
