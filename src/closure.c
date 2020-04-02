@@ -4656,9 +4656,7 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
         string_sv.u.str = simul_efunp[simul_efun].name;
         compile_value(&string_sv, 0);
     }
-    else if (simul_efunp[simul_efun].num_arg == SIMUL_EFUN_VARARGS
-          || 0 != (simul_efunp[simul_efun].flags & TYPE_MOD_XVARARGS)
-            )
+    else if (0 != (simul_efunp[simul_efun].flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS)))
     {
         /* varargs efuns need the arg frame */
 
@@ -4675,7 +4673,7 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
     {
         function_t *funp = &simul_efunp[simul_efun];
         if (num_arg > funp->num_arg
-          && !(funp->flags & TYPE_MOD_XVARARGS)
+          && !(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
            )
         {
             lambda_error(
@@ -4717,7 +4715,7 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
              */
 
             if (num_arg < funp->num_arg
-              && funp->num_arg != SIMUL_EFUN_VARARGS
+              && !(funp->flags & TYPE_MOD_VARARGS)
                )
             {
                 lambda_error(

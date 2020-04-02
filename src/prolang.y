@@ -2513,6 +2513,64 @@ get_flattened_type (lpctype_t* t)
 } /* check_binary_op_types() */
 
 /*-------------------------------------------------------------------------*/
+static void
+check_function_call_types (fulltype_t *aargs, int num_aarg, function_t *funp, lpctype_t **dargs)
+
+/* Checks the actual function arguments (<aargs> with <num_aarg> entries)
+ * against the function definition <funp> with <dargs> argument type list.
+ */
+
+{
+    int num_darg = funp->num_arg;
+    bool missingargs = false;
+
+    if (funp->flags & TYPE_MOD_XVARARGS)
+        num_darg--; /* last argument is checked separately */
+
+    if (num_darg > num_aarg)
+    {
+        num_darg = num_aarg;
+        missingargs = true;
+    }
+
+    for (int argno = 1; argno <= num_darg; argno++)
+    {
+        if (!check_unknown_type(aargs->t_type)
+         && !has_common_type(aargs->t_type, *dargs))
+        {
+            yyerrorf("Bad type for argument %d of %s %s",
+                argno,
+                get_txt(funp->name),
+                get_two_lpctypes(*dargs, aargs->t_type));
+        }
+
+        aargs++;
+        dargs++;
+    } /* for (all args) */
+
+    if ((funp->flags & TYPE_MOD_XVARARGS) && !missingargs)
+    {
+        lpctype_t *flat_type = get_flattened_type(*dargs);
+
+        for (int argno = num_darg+1; argno <= num_aarg; argno++)
+        {
+            if (!check_unknown_type(aargs->t_type)
+             && !has_common_type(aargs->t_type, flat_type))
+            {
+                yyerrorf("Bad type for argument %d of %s %s",
+                    argno,
+                    get_txt(funp->name),
+                    get_two_lpctypes(flat_type, aargs->t_type));
+            }
+
+            aargs++;
+        }
+
+        free_lpctype(flat_type);
+    } /* if (xvarargs) */
+} /* check_function_call_types() */
+
+/*-------------------------------------------------------------------------*/
 static funflag_t
 check_visibility_flags (funflag_t flags, funflag_t default_vis, bool function)
 
@@ -12646,14 +12704,13 @@ function_call:
 
                   funp = &simul_efunp[simul_efun];
 
-                  if (funp->num_arg != SIMUL_EFUN_VARARGS
-                   && !(funp->flags & TYPE_MOD_XVARARGS))
+                  if (!(funp->flags & TYPE_MOD_VARARGS))
                   {
-                      if ($4 > funp->num_arg)
+                      if ($4 > funp->num_arg && !(funp->flags & TYPE_MOD_XVARARGS))
                           yyerrorf("Too many arguments to simul_efun %s"
                                   , get_txt(funp->name));
 
-                      if ($4 < funp->num_arg && !has_ellipsis)
+                      if ($4 < funp->num_arg - ((funp->flags & TYPE_MOD_XVARARGS)?1:0) && !has_ellipsis)
                       {
                           if (pragma_pedantic)
                               yyerrorf("Missing arguments to simul_efun %s"
@@ -12672,10 +12729,12 @@ function_call:
                       yywarnf("Calling deprecated simul_efun \'%s\'",
                               get_txt(funp->name));
                       
-                  if (funp->num_arg == SIMUL_EFUN_VARARGS
-                   || (funp->flags & TYPE_MOD_XVARARGS)
+                  if ((funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
                    || has_ellipsis)
                       ap_needed = MY_TRUE;
+
+                  if (funp->offset.argtypes != NULL)
+                      check_function_call_types(get_argument_types_start($4), $4, funp, funp->offset.argtypes);
 
                   /* simul_efun is >= 0, see above) */
                   if ((unsigned long)simul_efun >= SEFUN_TABLE_SIZE)
@@ -12821,61 +12880,8 @@ function_call:
                   /* Check the argument types.
                    */
                   if (exact_types && first_arg != INDEX_START_NONE)
-                  {
-                      int i;
-                      fulltype_t *argp;
-                      int num_arg, anum_arg;
+                      check_function_call_types(get_argument_types_start($4), $4, funp, arg_types + first_arg);
 
-                      if ( 0 != (num_arg = funp->num_arg) )
-                      {
-                          /* There are arguments to check */
-
-                          int argno; /* Argument number for error message */
-
-                          if (funp->flags & TYPE_MOD_XVARARGS)
-                              num_arg--; /* last argument is checked separately */
-
-                          if (num_arg > (anum_arg = $4) )
-                              num_arg = anum_arg;
-
-                          arg_types += first_arg;
-                          argp = get_argument_types_start(anum_arg);
-
-                          for (argno = 1, i = num_arg; --i >= 0; argno++)
-                          {
-                              if (!check_unknown_type(argp->t_type)
-                               && !has_common_type(argp->t_type, *arg_types))
-                              {
-                                  yyerrorf("Bad type for argument %d of %s %s",
-                                    argno,
-                                    get_txt(funp->name),
-                                    get_two_lpctypes(*arg_types, argp->t_type));
-                              }
-
-                              argp++;
-                              arg_types++;
-                          } /* for (all args) */
-
-                          if (funp->flags & TYPE_MOD_XVARARGS)
-                          {
-                              lpctype_t *flat_type = get_flattened_type(*arg_types);
-
-                              for (i = anum_arg - num_arg; --i >=0; )
-                              {
-                                  if (!check_unknown_type(argp->t_type)
-                                   && !has_common_type(argp->t_type, flat_type))
-                                  {
-                                      yyerrorf("Bad type for argument %d of %s %s",
-                                          anum_arg - i,
-                                          get_txt(funp->name),
-                                          get_two_lpctypes(flat_type, argp->t_type));
-                                  }
-                                  argp++;
-                              }
-                          } /* if (xvarargs) */
-
-                      } /* if (has args) */
-                  } /* if (check types) */
               } /* if (inherited lfun) */
 
 %ifdef USE_PYTHON
@@ -13253,6 +13259,12 @@ function_call:
            * the code and value have been already generated.
            */
 
+          if (!disable_sefuns && sefun >= 0)
+          {
+              /* Create argument type list for type checking. */
+              add_arg_type(ref_fulltype($1.type));
+              add_arg_type(get_fulltype(lpctype_string));
+          }
       }
 
       '(' arg_expr_list ')'
@@ -13281,10 +13293,13 @@ function_call:
 
               funp = &simul_efunp[sefun];
               if (num_arg > funp->num_arg
-               && !(funp->flags & TYPE_MOD_XVARARGS)
+               && !(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
                && !has_ellipsis)
                   yyerrorf("Too many arguments to simul_efun %s"
                           , get_txt(funp->name));
+
+              if (funp->offset.argtypes != NULL)
+                  check_function_call_types(get_argument_types_start(num_arg), num_arg, funp, funp->offset.argtypes);
 
               /* sefun is >= 0 (see above) */
               if ((unsigned long)sefun >= SEFUN_TABLE_SIZE)
@@ -13298,8 +13313,7 @@ function_call:
               else
               {
                   /* Direct call */
-                  if (funp->num_arg != SIMUL_EFUN_VARARGS
-                   && !(funp->flags & TYPE_MOD_XVARARGS)
+                  if (!(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
                    && !has_ellipsis)
                   {
                       int i;
@@ -13327,8 +13341,7 @@ function_call:
                       }
                   }
 
-                  if (funp->num_arg != SIMUL_EFUN_VARARGS
-                   && !(funp->flags & TYPE_MOD_XVARARGS)
+                  if (!(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
                    && !has_ellipsis)
                       ap_needed = MY_FALSE;
 
@@ -13342,6 +13355,8 @@ function_call:
                   CURRENT_PROGRAM_SIZE += 3;
               }
               $$.type = get_fulltype(funp->type);
+
+              pop_arg_stack(2); /* For sefun call_other there are two more arguments. */
           }
           else /* true call_other */
           {

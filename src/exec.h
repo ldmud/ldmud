@@ -759,6 +759,9 @@ struct function_s
         uint32 fx;       /* Function index, this is not an offset. */
 
         /* These entries are used by simul_efun.c. */
+        lpctype_t **argtypes;
+           /* Argument types for this simul_efun. */
+
         uint32 next_sefun;
            /* Next index in the simul_efun function table for
             * functions that have been discarded due to a
@@ -771,10 +774,6 @@ struct function_s
     lpctype_t    *type;       /* Return type of function (counted). */
     unsigned char num_locals; /* Number of local variables */
     unsigned char num_arg;    /* Number of arguments needed. */
-};
-
-enum {
-    SIMUL_EFUN_VARARGS = 0xff,  /* Magic num_arg value for varargs */
 };
 
 /* --- Bytecodes used to encode line numbers ---

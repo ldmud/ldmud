@@ -362,6 +362,7 @@ assert_simul_efun_object (void)
         {
             string_t *function_name;
             ident_t *p;
+            unsigned short type_idx;
             unsigned char num_arg;
 
             function_name = funheader->name;
@@ -376,9 +377,6 @@ assert_simul_efun_object (void)
                 all_simul_efuns = p;
             }
 
-            if (flags & TYPE_MOD_VARARGS)
-                num_arg = SIMUL_EFUN_VARARGS;
-
             /* Find the proper index in simul_efunp[] */
             switch(0) { default: /* TRY... */
 
@@ -392,7 +390,8 @@ assert_simul_efun_object (void)
                     j = all_discarded_simul_efun;
                     while ( (j = simul_efunp[last = j].offset.next_sefun) >= 0)
                     {
-                        if (num_arg != simul_efunp[j].num_arg
+                        if ((!(flags & TYPE_MOD_VARARGS) && num_arg != simul_efunp[j].num_arg)
+                         || 0 != ((simul_efunp[j].flags ^ flags) & TYPE_MOD_VARARGS)
                          || 0 != ((simul_efunp[j].flags ^ flags) & TYPE_MOD_XVARARGS)
                            )
                             continue;
@@ -419,7 +418,6 @@ assert_simul_efun_object (void)
                       );
                 }
                 simul_efunp[j].name    = function_name;
-                simul_efunp[j].num_arg = num_arg;
             } /* switch() */
 
             /* j now indexes the simul_efunp[] entry to use */
@@ -428,6 +426,13 @@ assert_simul_efun_object (void)
             simul_efunp[j].flags      = funheader->flags;
             simul_efunp[j].type       = funheader->type;
             simul_efunp[j].num_locals = funheader->num_locals;
+            simul_efunp[j].num_arg    = num_arg;
+
+            if (inherit_progp->type_start
+             && (type_idx = inherit_progp->type_start[funheader->offset.fx]) != INDEX_START_NONE)
+                simul_efunp[j].offset.argtypes = inherit_progp->argument_types + type_idx;
+            else
+                simul_efunp[j].offset.argtypes = NULL;
 
             /* If possible, make an entry in the simul_efun table */
             if ((size_t)j < SEFUN_TABLE_SIZE)

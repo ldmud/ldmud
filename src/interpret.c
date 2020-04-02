@@ -14465,8 +14465,7 @@ again:
         def_narg = simul_efunp[code].num_arg;
 
         if (use_ap
-         || def_narg == SIMUL_EFUN_VARARGS
-         || (simul_efunp[code].flags & TYPE_MOD_XVARARGS)
+         || (simul_efunp[code].flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
            )
         {
             use_ap = MY_FALSE;  /* Reset the flag */
@@ -14476,7 +14475,7 @@ again:
             num_arg = def_narg;
 
         /* Correct the number of arguments on the stack */
-        if (num_arg != def_narg && def_narg != SIMUL_EFUN_VARARGS)
+        if (num_arg != def_narg && !(simul_efunp[code].flags & TYPE_MOD_VARARGS))
         {
             /* If it's an XVARARGS, we don't require the last argument. */
             if (simul_efunp[code].flags & TYPE_MOD_XVARARGS)
