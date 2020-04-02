@@ -2000,7 +2000,7 @@ reset_input_buffer (interactive_t *ip)
 
         memmove(ip->command, ip->command + ip->command_start, ip->command_unprocessed_end - ip->command_start);
         ip->command_end -= ip->command_start;
-        ip->command_unprocessed_end -= ip->command_end;
+        ip->command_unprocessed_end -= ip->command_start;
         if (ip->command_printed > ip->command_start)
             ip->command_printed -= ip->command_start;
         else
