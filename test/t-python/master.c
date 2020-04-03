@@ -184,6 +184,12 @@ void run_test()
             :)
         }),
         ({
+           "passing valid arguments with ...", TF_ERROR,
+            (:
+                load_object("/testcompileargstrict");
+            :)
+        }),
+        ({
             "Compiler bug on type testing", TF_DONTCHECKERROR,
             (:
                 load_object("/testcompiler");

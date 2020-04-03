@@ -1931,7 +1931,7 @@ check_unknown_type (lpctype_t* t)
 {
     if (t == lpctype_unknown)
     {
-        yywarnf("Function call result must be casted due to pragma strict_types");
+        yyerror("Function call result must be casted due to pragma strict_types");
         return true;
     }
 
