@@ -156,32 +156,33 @@ struct ident_s
         struct defn define;  /*   Macro definition */
         int code;            /*   Reserved word: lexem code */
         struct {             /*   Global identifier: */
-            short function;
-              /* >= 0: lfun: Index number of the lfun in den function table,
-               * < 0: Undefined
+            unsigned short function;
+              /* lfun: Index number of the lfun in den function table,
+               * == I_GLOBAL_FUNCTION_OTHER: Undefined
                */
-            short variable;
-              /* >= 0: variable: Index number in the variable table.
-               *       During compilation, virtual variables are offset
-               *       by VIRTUAL_VAR_TAG.
-               * < 0: -2: efun/sefun, -1: lfun/inherited hidden var
+            unsigned short variable;
+              /* variable: Index number in the variable table.
+               *           During compilation, virtual variables are offset
+               *           by VIRTUAL_VAR_TAG.
+               * == I_GLOBAL_VARIABLE_OTHER: lfun/inherited hidden var
+               * == I_GLOBAL_VARIABLE_FUN:   efun/sefun
                */
-            short efun;
-              /* efun: Index in instrs[], negative else
-               * < 0: -1: gvar/sefun
+            unsigned short efun;
+              /* efun: Index in instrs[]
+               * == I_GLOBAL_EFUN_OTHER: gvar/sefun
                */
-            short sim_efun;
+            unsigned short sim_efun;
               /* simul-efun: Index in simul_efun[], negative else
-               * < 0: -1: efun/gvar
+               * == I_GLOBAL_SEFUN_OTHER: efun/gvar
                */
-            short struct_id;
+            unsigned short struct_id;
               /* struct index ('id') in the current program's struct table.
-               * < 0: undefined
+               * == I_GLOBAL_STRUCT_NONE: undefined
                */
 #ifdef USE_PYTHON
-            short python_efun;
+            unsigned short python_efun;
               /* python-efun: Index into python_efun_table, negative else
-               * < 0: -1: efun/sefun/gvar
+               * == I_GLOBAL_PYTHON_EFUN_OTHER: efun/sefun/gvar
                */
 #endif
         } global;
@@ -212,18 +213,18 @@ struct ident_s
 
 /* ident_t.global magic values */
 
-#define I_GLOBAL_FUNCTION_OTHER  (-1)
-#define I_GLOBAL_VARIABLE_OTHER  (-1)
-#define I_GLOBAL_VARIABLE_FUN    (-2)
-#define I_GLOBAL_EFUN_OTHER      (-1)
-#define I_GLOBAL_SEFUN_OTHER     (-1)
-#define I_GLOBAL_STRUCT_NONE     (-1)
+#define I_GLOBAL_FUNCTION_OTHER  (USHRT_MAX)
+#define I_GLOBAL_VARIABLE_OTHER  (USHRT_MAX)
+#define I_GLOBAL_VARIABLE_FUN    (USHRT_MAX - 1)
+#define I_GLOBAL_EFUN_OTHER      (USHRT_MAX)
+#define I_GLOBAL_SEFUN_OTHER     (USHRT_MAX)
+#define I_GLOBAL_STRUCT_NONE     (USHRT_MAX)
 #ifdef USE_PYTHON
-#  define I_GLOBAL_PYTHON_EFUN_OTHER (-1)
+#  define I_GLOBAL_PYTHON_EFUN_OTHER (USHRT_MAX)
 #endif
 
 
-#define lookup_predef(p) (p->type == I_TYPE_GLOBAL ? p->u.global.efun : -1)
+#define lookup_predef(p) (((p)->type == I_TYPE_GLOBAL && (p)->u.global.efun != I_GLOBAL_EFUN_OTHER) ? (p)->u.global.efun : -1)
 
 
 /* Values of pragma_strict_types */

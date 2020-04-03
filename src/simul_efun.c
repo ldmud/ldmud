@@ -102,7 +102,7 @@ static program_t *simul_efun_program= NULL;
   /* The program of the primary simul_efun object.
    */
 
-static short all_discarded_simul_efun = -1;
+static unsigned short all_discarded_simul_efun = I_GLOBAL_SEFUN_OTHER;
   /* First index of the list of discarded sefuns in simul_efunp.
    * With this list, it is faster to find a sefun entry to reactivate.
    */
@@ -121,7 +121,7 @@ remove_efun_shadows (ident_t* list)
         int j = id->u.global.sim_efun;
 
         /* If they are listed in the table, move them into the inactive list. */
-        if ((size_t)j < SIZE_SEFUN_TABLE)
+        if (j != I_GLOBAL_SEFUN_OTHER && j < SIZE_SEFUN_TABLE)
         {
             simul_efunp[j].offset.next_sefun = all_discarded_simul_efun;
             all_discarded_simul_efun = j;
@@ -383,12 +383,12 @@ assert_simul_efun_object (void)
                 /* Try to find a discarded sefun entry with matching
                  * name, number of arguments and XVARARGS flag to reuse.
                  */
-                if (all_discarded_simul_efun >= 0)
+                if (all_discarded_simul_efun != I_GLOBAL_SEFUN_OTHER)
                 {
-                    int last;
+                    int last = I_GLOBAL_SEFUN_OTHER;
 
                     j = all_discarded_simul_efun;
-                    while ( (j = simul_efunp[last = j].offset.next_sefun) >= 0)
+                    do
                     {
                         if ((!(flags & TYPE_MOD_VARARGS) && num_arg != simul_efunp[j].num_arg)
                          || 0 != ((simul_efunp[j].flags ^ flags) & TYPE_MOD_VARARGS)
@@ -399,11 +399,15 @@ assert_simul_efun_object (void)
                             continue;
 
                         /* Found one: remove it from the 'discarded' list */
-                        simul_efunp[last].offset.next_sefun =
-                              simul_efunp[j].offset.next_sefun;
+                        if (last == I_GLOBAL_SEFUN_OTHER)
+                            all_discarded_simul_efun = simul_efunp[j].offset.next_sefun;
+                        else
+                            simul_efunp[last].offset.next_sefun = simul_efunp[j].offset.next_sefun;
                         break;
                     }
-                    if (j >= 0)
+                    while ( (j = simul_efunp[last = j].offset.next_sefun) != I_GLOBAL_SEFUN_OTHER);
+
+                    if (j != I_GLOBAL_SEFUN_OTHER)
                         break; /* switch */
                 }
 

@@ -6873,7 +6873,7 @@ is_python_efun (ident_t *p)
  */
 
 {
-    return p->u.global.python_efun >= 0 && python_efun_table[p->u.global.python_efun].callable != NULL;
+    return p->u.global.python_efun != I_GLOBAL_PYTHON_EFUN_OTHER && python_efun_table[p->u.global.python_efun].callable != NULL;
 } /* is_python_efun() */
 
 

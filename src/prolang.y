@@ -271,7 +271,7 @@ struct efun_shadow_s
 #define align(x) (((x) + (sizeof(char*)-1) ) & ~(sizeof(char*)-1) )
 
 #define defined_function(s) \
-    ((s)->type == I_TYPE_GLOBAL ? (s)->u.global.function : -1)
+    (((s)->type == I_TYPE_GLOBAL && (s)->u.global.function != I_GLOBAL_FUNCTION_OTHER) ? (s)->u.global.function : -1)
   /* Return the index of the function <s> if global (and therefore existing),
    * and -1 otherwise.
    */
@@ -4116,7 +4116,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         Bool args_differ, compare_args;
 
         if (p->type != I_TYPE_GLOBAL) break;
-        if ((num = p->u.global.function) < 0) break;
+        if ((num = p->u.global.function) == I_GLOBAL_FUNCTION_OTHER) break;
 
         funp = FUNCTION(num);
 
@@ -4565,7 +4565,8 @@ define_variable (ident_t *name, fulltype_t type)
         all_globals = name;
     }
     else if (name->u.global.function == I_GLOBAL_FUNCTION_OTHER
-          && (name->u.global.efun >= 0 || name->u.global.sim_efun >= 0
+          && (name->u.global.efun != I_GLOBAL_EFUN_OTHER
+           || name->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
 #ifdef USE_PYTHON
            || is_python_efun(name)
 #endif
@@ -4593,7 +4594,8 @@ define_variable (ident_t *name, fulltype_t type)
     }
 
     /* If the variable already exists, make sure that we can redefine it */
-    if ( (n = name->u.global.variable) >= 0)
+    n = name->u.global.variable;
+    if (n != I_GLOBAL_VARIABLE_OTHER && n != I_GLOBAL_VARIABLE_FUN)
     {
         typeflags_t vn_flags = VARIABLE(n)->type.t_flags;
 
@@ -4667,7 +4669,8 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
         all_globals = name;
     }
     else if (name->u.global.function == I_GLOBAL_FUNCTION_OTHER
-          && (name->u.global.efun >= 0 || name->u.global.sim_efun >= 0
+          && (name->u.global.efun != I_GLOBAL_EFUN_OTHER
+           || name->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
 #ifdef USE_PYTHON
            || is_python_efun(name)
 #endif
@@ -4700,7 +4703,9 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
         flags ^= TYPE_MOD_NOSAVE;
     }
 
-    if (name->u.global.variable >= 0 && name->u.global.variable != n)
+    if (name->u.global.variable != I_GLOBAL_VARIABLE_OTHER
+     && name->u.global.variable != I_GLOBAL_VARIABLE_FUN
+     && name->u.global.variable != n)
     {
         check_variable_redefinition(name, flags);
     }
@@ -4771,7 +4776,8 @@ get_initialized_variable (ident_t *p)
                 break;
 
             case I_TYPE_GLOBAL:
-                if (result->u.global.variable >= 0)
+                if (result->u.global.variable != I_GLOBAL_VARIABLE_OTHER
+                 && result->u.global.variable != I_GLOBAL_VARIABLE_FUN)
                 {
                     if (global_variable_initializing == result)
                         foundinitializing = true;
@@ -4828,7 +4834,7 @@ define_global_variable (ident_t* name, fulltype_t actual_type, Bool with_init)
     i = name->u.global.variable;
 
 #ifdef DEBUG
-    if (name->type != I_TYPE_GLOBAL || i == -1)
+    if (name->type != I_TYPE_GLOBAL || i == I_GLOBAL_VARIABLE_OTHER)
         fatal("Variable not declared after defining it.\n");
 #endif
 
@@ -5298,7 +5304,7 @@ define_new_struct ( Bool proto, ident_t *p, const char * prog_name, funflag_t fl
     struct_def_t sdef;
 
     /* If this is a redeclaration, check for consistency. */
-    if (p->type == I_TYPE_GLOBAL && (num = p->u.global.struct_id) >= 0
+    if (p->type == I_TYPE_GLOBAL && (num = p->u.global.struct_id) != I_GLOBAL_STRUCT_NONE
      && !(flags & NAME_HIDDEN)
       )
     {
@@ -5425,7 +5431,7 @@ find_struct ( string_t * name )
     while (p != NULL && p->type != I_TYPE_GLOBAL)
         p = p->inferior;
 
-    if (p == NULL || p->u.global.struct_id < 0)
+    if (p == NULL || p->u.global.struct_id == I_GLOBAL_STRUCT_NONE)
         return -1;
     if (STRUCT_DEF(p->u.global.struct_id).flags & NAME_HIDDEN)
         return -1;
@@ -7641,7 +7647,7 @@ opt_base_struct:
               while (p != NULL && p->type != I_TYPE_GLOBAL)
                   p = p->inferior;
 
-              if (p == NULL || (num = p->u.global.struct_id) < 0)
+              if (p == NULL || (num = p->u.global.struct_id) == I_GLOBAL_STRUCT_NONE)
               {
                   yyerrorf("Unknown base struct '%s'", get_txt($2->name));
               }
@@ -12632,14 +12638,14 @@ function_call:
               all_globals = real_name;
           }
           else if ( ($1.super ? ( $<function_call_head>$.efun_override == OVERRIDE_SEFUN )
-                              : ( real_name->u.global.function < 0 ))
-                && real_name->u.global.sim_efun >= 0
+                              : ( real_name->u.global.function == I_GLOBAL_FUNCTION_OTHER ))
+                && real_name->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
                 && !disable_sefuns)
           {
               /* It's a real simul-efun */
 
               $<function_call_head>$.simul_efun = real_name->u.global.sim_efun;
-              /* real_name->u.global.sim_efun is >=0 (see above), so it can
+              /* real_name->u.global.sim_efun is also unsigned, so it can
                * be casted to unsigned long before comparison (SEFUN_TABLE_SIZE
                * is unsigned long) */
               if ((unsigned long)real_name->u.global.sim_efun >= SEFUN_TABLE_SIZE)
@@ -13513,7 +13519,7 @@ function_name:
            */
           if ( !strcmp($1, "efun")
            && fun->type == I_TYPE_GLOBAL
-           && fun->u.global.sim_efun >= 0
+           && fun->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
            && simul_efunp[fun->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
            && master_ob
            && (!EVALUATION_TOO_LONG())
@@ -16374,7 +16380,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
                  * subsequent inheritors would receive illegal function
                  * start offsets.
                  */
-                if ( n >= 0 && n != first_func_index + i)
+                if ( n != I_GLOBAL_FUNCTION_OTHER && n != first_func_index + i)
                 {
                     /* Already inherited from somewhere else.
                      * Don't try to resolve cross-references inside the
@@ -16520,7 +16526,8 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
                 /* Handle the non-lfun aspects of the identifier */
                 {
                     if (n != I_GLOBAL_FUNCTION_OTHER
-                     || (p->u.global.efun < 0 && p->u.global.sim_efun < 0
+                     || (p->u.global.efun == I_GLOBAL_EFUN_OTHER
+                      && p->u.global.sim_efun == I_GLOBAL_SEFUN_OTHER
 #ifdef USE_PYTHON
                       && !is_python_efun(p)
 #endif
@@ -16532,7 +16539,8 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
                          * a (simul-)efun.
                          */
 
-                        if (p->u.global.efun >= 0 || p->u.global.sim_efun >= 0
+                        if (p->u.global.efun != I_GLOBAL_EFUN_OTHER
+                         || p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
 #ifdef USE_PYTHON
                          || is_python_efun(p)
 #endif
@@ -16557,7 +16565,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
                          * to the newly read function, unless of course
                          * the code above already took care of that change.
                          */
-                        if (p->u.global.function < 0)
+                        if (p->u.global.function == I_GLOBAL_FUNCTION_OTHER)
                             p->u.global.function = current_func_index;
                     }
                     /* else: inherited private defined function must not hide
@@ -16979,8 +16987,8 @@ get_simul_efun_index (string_t *name)
                 id = id->inferior;
 
             if ( id
-              && id->u.global.function < 0
-              && id->u.global.sim_efun >= 0)
+              && id->u.global.function == I_GLOBAL_FUNCTION_OTHER
+              && id->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER)
             {
                 /* There is a sefun for call_other() */
                 return id->u.global.sim_efun;
@@ -17177,7 +17185,7 @@ epilog (void)
 
     /* Get and check the numbers of functions, strings, and variables */
     num_functions = FUNCTION_COUNT;
-    if (num_functions > 0x10000)
+    if (num_functions > 0xffff)
     {
         yyerror("Too many functions");
     }

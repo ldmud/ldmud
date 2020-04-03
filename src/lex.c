@@ -1693,9 +1693,9 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, efun_override_t is_
         /* It is a real identifier */
 
         if (!p || p->type < I_TYPE_GLOBAL
-         || (( efun_override == OVERRIDE_EFUN || p->u.global.sim_efun < 0 )
+         || (( efun_override == OVERRIDE_EFUN || p->u.global.sim_efun == I_GLOBAL_SEFUN_OTHER )
           && ( efun_override == OVERRIDE_SEFUN  || 
-              ( p->u.global.efun < 0
+              ( p->u.global.efun == I_GLOBAL_EFUN_OTHER
 #ifdef USE_PYTHON
              && !is_python_efun(p)
 #endif
@@ -1714,7 +1714,7 @@ undefined_function:
         /* Attempting to override a 'nomask' simul efun?
          * Check it with a privilege violation.
          */
-        if (!privileged && efun_override == OVERRIDE_EFUN && p->u.global.sim_efun >= 0
+        if (!privileged && efun_override == OVERRIDE_EFUN && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
          && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK)
         {
             svalue_t *res;
@@ -1742,7 +1742,7 @@ undefined_function:
         /* Symbol is ok - create the closure value */
 
         sp->type = T_CLOSURE;
-        if (efun_override != OVERRIDE_EFUN && p->u.global.sim_efun >= 0)
+        if (efun_override != OVERRIDE_EFUN && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER)
         {
             /* Handle non-overridden simul efuns */
 
@@ -1759,7 +1759,7 @@ undefined_function:
         else
         {
             /* Handle efuns (possibly aliased).
-             * We know that p->u.global.efun >= 0 here.
+             * We know that p->u.global.efun != I_GLOBAL_EFUN_OTHER here.
              */
             sp->x.closure_type = (short)(p->u.global.efun + CLOSURE_EFUN);
             if (sp->x.closure_type > LAST_INSTRUCTION_CODE + CLOSURE_EFUN)
@@ -4687,9 +4687,9 @@ closure (char *in_yyp)
      * (iow: a nomask simul-efun overrules an efun override).
      */
     if (efun_override == OVERRIDE_EFUN
-     && p->u.global.sim_efun >= 0
+     && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
      && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
-     && (p->u.global.efun >= 0
+     && (p->u.global.efun != I_GLOBAL_EFUN_OTHER
 #ifdef USE_PYTHON
       || is_python_efun(p)
 #endif
@@ -4736,7 +4736,7 @@ closure (char *in_yyp)
     switch(0) { default:
 
         /* lfun? */
-        if (efun_override == OVERRIDE_NONE && p->u.global.function >= 0)
+        if (efun_override == OVERRIDE_NONE && p->u.global.function != I_GLOBAL_FUNCTION_OTHER)
         {
             int i;
 
@@ -4751,7 +4751,7 @@ closure (char *in_yyp)
         }
 
         /* simul-efun? */
-        if (efun_override != OVERRIDE_EFUN && p->u.global.sim_efun >= 0)
+        if (efun_override != OVERRIDE_EFUN && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER)
         {
             yylval.closure.number =
               p->u.global.sim_efun + CLOSURE_SIMUL_EFUN_OFFS;
@@ -4768,7 +4768,7 @@ closure (char *in_yyp)
 #endif
 
         /* efun? */
-        if (efun_override != OVERRIDE_SEFUN && p->u.global.efun >= 0)
+        if (efun_override != OVERRIDE_SEFUN && p->u.global.efun != I_GLOBAL_EFUN_OTHER)
         {
             yylval.closure.number =
               p->u.global.efun + CLOSURE_EFUN_OFFS;
@@ -4785,7 +4785,8 @@ closure (char *in_yyp)
         }
 
         /* object variable? */
-        if (p->u.global.variable >= 0)
+        if (p->u.global.variable != I_GLOBAL_VARIABLE_OTHER
+         && p->u.global.variable != I_GLOBAL_VARIABLE_FUN)
         {
             if (p->u.global.variable & VIRTUAL_VAR_TAG) {
                 /* Handling this would require an extra coding of
@@ -8138,7 +8139,7 @@ efun_defined (char **args)
     }
 
     add_input(
-      (p && p->type == I_TYPE_GLOBAL && (p->u.global.efun >= 0
+      (p && p->type == I_TYPE_GLOBAL && (p->u.global.efun != I_GLOBAL_EFUN_OTHER
 #ifdef USE_PYTHON
                                       || is_python_efun(p)
 #endif
