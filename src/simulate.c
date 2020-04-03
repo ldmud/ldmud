@@ -4888,9 +4888,10 @@ f_unshadow (svalue_t *sp)
             /* Our victim is no longer shadowed, so maybe it
              * doesn't need its shadow sentence anymore.
              */
-            remove_shadow_actions(current_object, shadowing);
             check_shadow_sent(shadowing);
         }
+
+        remove_shadow_actions(current_object, shadowing);
 
         shadow_sent->shadowed_by = NULL;
         shadow_sent->shadowing = NULL;

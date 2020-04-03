@@ -1190,16 +1190,17 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
     shadow_ob = NULL;
     ob = current_object;
 
-    /* Check if the call comes from a shadow of the current object */
-    if (func->type == T_STRING
-     && ob->flags & O_SHADOW && O_GET_SHADOW(ob)->shadowing)
+    /* Check if the call comes from a shadow of the current object.
+     * Get the real object and also check privileges.
+     */
+    if ((ob->flags & O_SHADOW) && O_GET_SHADOW(ob)->shadowing)
     {
         shadow_ob = ob;
-        str = find_tabled(func->u.str);
+        str = func->type == T_STRING ? find_tabled(func->u.str) : NULL;
         do
         {
             ob = O_GET_SHADOW(ob)->shadowing;
-            if (find_function(str, ob->prog) >= 0)
+            if (str && find_function(str, ob->prog) >= 0)
             {
                 if (!privilege_violation4(
                     STR_SHADOW_ADD_ACTION, ob, str, 0, inter_sp)
