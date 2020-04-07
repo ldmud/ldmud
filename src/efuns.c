@@ -1621,6 +1621,8 @@ f_regreplace (svalue_t *sp)
         }
     }
 
+    result->info.unicode = is_ascii(get_txt(result), reslen) ? STRING_ASCII : STRING_UTF8;
+
     /* Cleanup */
     free_svalue(sp);
     sp--;

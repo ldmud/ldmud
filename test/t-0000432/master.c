@@ -619,6 +619,30 @@ void run_test()
                 return trim(" \U00010990 ") == "\U00010990";
             :)
         }),
+        ({ "regreplace 1", 0,
+            (:
+                string result = regreplace("*\u00c4*\u00d6*\u00dc*","[[:alpha:]]", "", RE_PCRE|RE_GLOBAL);
+                return sizeof(result) == 4 && result == "****";
+            :)
+        }),
+        ({ "regreplace 2", 0,
+            (:
+                string result = regreplace("*\u00c4*\u00d6*\u00dc*","[^[:alpha:]]", "", RE_PCRE|RE_GLOBAL);
+                return sizeof(result) == 3 && result == "\u00c4\u00d6\u00dc";
+            :)
+        }),
+        ({ "regreplace 3", 0,
+            (:
+                string result = regreplace("*\u00c4*\u00d6*\u00dc*","[\u00c4\u00d6\u00dc]", "", RE_TRADITIONAL|RE_GLOBAL);
+                return sizeof(result) == 4 && result == "****";
+            :)
+        }),
+        ({ "regreplace 4", 0,
+            (:
+                string result = regreplace("*\u00c4*\u00d6*\u00dc*","[^\u00c4\u00d6\u00dc]", "", RE_TRADITIONAL|RE_GLOBAL);
+                return sizeof(result) == 3 && result == "\u00c4\u00d6\u00dc";
+            :)
+        }),
         ({ "read_bytes", 0,
             (:
                 return read_bytes("/data.bin", 0, 7) == to_bytes("\u269d\U0001f44d", "UTF-8");
