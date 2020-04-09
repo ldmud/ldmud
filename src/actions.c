@@ -1267,6 +1267,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
         error_index = setup_closure_callback(&(p->cb), func
                                              , 0, NULL
                                              );
+        func->type = T_INVALID; /* So that an error won't free it again. */
     }
     else
     {
@@ -1307,9 +1308,13 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
         {
             if ((size_t)(-flag) >= mstrsize(p->verb))
             {
+                /* Put the verb back on the stack. */
+                put_string(cmd, p->verb);
+                p->verb = NULL;
+
                 free_action_sent(p);
                 errorf("Bad arg 3 to add_action(): value %"PRIdPINT" larger than verb '%s'.\n"
-                     , flag, get_txt(p->verb));
+                     , flag, get_txt(cmd->u.str));
                 /* NOTREACHED */
                 return MY_TRUE;
             }
