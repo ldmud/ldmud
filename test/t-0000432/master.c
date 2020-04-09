@@ -1,3 +1,4 @@
+#include "/sys/configuration.h"
 #include "/sys/regexp.h"
 #include "/sys/rtlimits.h"
 #include "/sys/strings.h"
@@ -398,6 +399,53 @@ void run_test()
             :)
         }),
 #endif
+        ({
+            "add_action 1", 0,
+            (:
+                mixed** result;
+
+                efun::configure_object(this_object(), OC_COMMANDS_ENABLED, 1);
+                efun::set_this_player(this_object());
+
+                add_action((: 0 :), "\u03bb\u03b4\u03bc\u03c5\u03b4", -2);
+                result = match_command("\u03bb\u03b4", this_object());
+
+                efun::configure_object(this_object(), OC_COMMANDS_ENABLED, 0);
+
+                return sizeof(result) == 1;
+            :)
+        }),
+        ({
+            "add_action 2", 0,
+            (:
+                mixed** result;
+
+                efun::configure_object(this_object(), OC_COMMANDS_ENABLED, 1);
+                efun::set_this_player(this_object());
+
+                add_action((: 0 :), "\u03bb\u03b4\u03bc\u03c5\u03b4", -2);
+                result = match_command("\u03bb", this_object());
+
+                efun::configure_object(this_object(), OC_COMMANDS_ENABLED, 0);
+
+                return sizeof(result) == 0;
+            :)
+        }),
+        ({
+            "add_action 3", 0,
+            (:
+                string error;
+
+                efun::configure_object(this_object(), OC_COMMANDS_ENABLED, 1);
+                efun::set_this_player(this_object());
+
+                error = catch(add_action((: 0 :), "\u03bb\u03b4\u03bc\u03c5\u03b4", -6));
+
+                efun::configure_object(this_object(), OC_COMMANDS_ENABLED, 0);
+
+                return error != 0;
+            :)
+        }),
         ({ "explode with unicode strings 1", 0,
             (:
                 return deep_eq(explode("\u2745\u2744\u2746\u2744\u2745\u2744", "\u2744"),

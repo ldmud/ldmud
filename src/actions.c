@@ -851,10 +851,10 @@ parse_command (char *buff, Bool from_efun)
              * but not shorter than .short_verb.
              */
             size_t len;
-            if (sa->short_verb)
+            if (sa->short_verb_bytes)
             {
                 len = mstrsize(last_verb);
-                if (len < sa->short_verb
+                if (len < sa->short_verb_bytes
                  || len > mstrsize(sa->verb)
                  || (   sa->verb != last_verb
                      && strncmp(get_txt(sa->verb), get_txt(last_verb), len) != 0))
@@ -1289,7 +1289,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
     /* Set ->verb to the command verb, made tabled */
     p->verb = make_tabled(cmd->u.str); cmd->type = T_NUMBER;
     p->sent.type = SENT_PLAIN;
-    p->short_verb = 0;
+    p->short_verb = p->short_verb_bytes = 0;
 
     if (flag)
     {
@@ -1307,7 +1307,17 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
         }
         else if (flag < AA_VERB)
         {
-            if ((size_t)(-flag) >= mstrsize(p->verb))
+            bool error = false;
+            size_t bytes = char_to_byte_index(get_txt(p->verb), mstrsize(p->verb), (size_t)(-flag), &error);
+
+            if (error)
+            {
+                free_action_sent(p);
+                errorf("Bad arg 2 to add_action(): Invalid character in string at byte %zd.\n", bytes);
+                /* NOTREACHED */
+                return MY_TRUE;
+            }
+            else if (bytes >= mstrsize(p->verb))
             {
                 /* Put the verb back on the stack. */
                 put_string(cmd, p->verb);
@@ -1323,6 +1333,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
             {
                 p->sent.type = SENT_SHORT_VERB;
                 p->short_verb = 0 - (unsigned short)flag;
+                p->short_verb_bytes = (unsigned short)bytes;
             }
         }
         else
@@ -1653,10 +1664,10 @@ f_match_command(svalue_t * sp)
              * but not shorter than .short_verb.
              */
             size_t len;
-            if (sa->short_verb)
+            if (sa->short_verb_bytes)
             {
                 len = mstrsize(verb);
-                if (len < sa->short_verb
+                if (len < sa->short_verb_bytes
                  || len > mstrsize(sa->verb)
                  || (   !mstreq(sa->verb, verb)
                      && strncmp(get_txt(sa->verb), get_txt(verb), len) != 0))

@@ -47,6 +47,11 @@ struct action_s
       /* SENT_SHORT_VERB: the number of characters which have to
        *   match at minimum.
        */
+
+    unsigned short short_verb_bytes;
+      /* SENT_SHORT_VERB: the number of bytes for the characters
+       *   that have to match.
+       */
 };
 
 /* --- Variables --- */
