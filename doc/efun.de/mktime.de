@@ -5,8 +5,10 @@ SYNOPSIS
 
 BESCHREIBUNG
         Ist das Argument <ts> ein Array mit 9 Elementen (int) entsprechend
-        des Rueckgabewertes von local_time()/gm_time(), so liefert die Funktion
+        des Rueckgabewertes von localtime(), so liefert die Funktion
         die Anzahl Sekunden seit dem 01. Januar 1970, 00:00:00 zurueck.
+        Hierbei wird immer die aktuelle Zeitzone des Hostrechners zugrunde
+        gelegt.
         Dies ist von Nutzen, wenn man ein Datum/Uhrzeit hat, diese aber als
         Ganzzahl-Wert speichern will oder eine Zeitdifferenz zwischen zwei
         Daten ausrechnen will.
@@ -20,19 +22,22 @@ BESCHREIBUNG
             int TM_YEAR   (5):  Jahr (z.B. 2001)
             int TM_WDAY   (6):  Wochentag (0..6, Sonntag = 0)
             int TM_YDAY   (7):  Tag im Jahr (0..365)
-            inz TM_ISDST  (8):  TRUE: Daylight Saving Time
+            inz TM_ISDST  (8):  Sommerzeit, Daylight Saving Time (1,0,-1)
 
         TM_YDAY und TM_WDAY werden ignoriert und koennen beliebige Zahlen
         enthalten.
+        TM_ISDST kann 1 (Sommerzeit), 0 (keine Sommerzeit) oder -1 sein. Bei
+        -1 wird versucht, zu erraten, ob Sommerzeit fuer die angegebene Zeit
+        aktiv sein sollte.
 
 BEISPIELE
         Man hat ein Datum/Uhrzeit (z.B. Benutzereingabe), welches als
         Unix-Zeitstempel gespeichert werden soll:
         // "Mit, 24. Okt 2007, 10:48:00" entspricht folgendem Zeitstempel:
         int unixzeit = mktime(({0, 48, 09, 24, 09, 2007, 0, 01, 0}));
-      
+
 GESCHICHTE
         Eingefuehrt in LDMud 3.3.718.
 
 SIEHE AUCH
-        ctime(E), gmtime(E), local_time(E), time(E), utime(E)
+        ctime(E), gmtime(E), localtime(E), time(E), utime(E)
