@@ -2668,13 +2668,13 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
                 for (z = 0; z < lens[i];)
                 {
-                    p_int c;  /* Current character */
-                    size_t clen = utf8_to_unicode(p + z, lens[i] - z, &c);
+                    int width; /* Number of columns for the next grapheme. */
+                    size_t clen = next_grapheme_break(p + z, lens[i] - z, &width);
                     if (!clen)
                         errorf("Invalid character in string at index %d.\n", z);
                     z += clen;
 
-                    if (c == '\n')
+                    if (p[z-1] == '\n')
                     {
                         /* Hard line break: start a new line */
                         col = 0;
@@ -2682,11 +2682,13 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                     }
                     else
                     {
+                        bool isspace = clen == 1 && p[z-1] == ' ';
+
                         /* All space characters in columns before col <start>
                          * do not count.
                          */
-                        if (col > start || c != ' ')
-                            col++;
+                        if (col > start || !isspace)
+                            col += width;
                         else
                         {
                             j--;
@@ -2694,10 +2696,10 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                         }
 
                         /* If space, remember the position */
-                        if (c == ' ')
+                        if (isspace)
                             space = col;
 
-                        if (col == wrap+1)
+                        if (col > wrap && col > width)
                         {
                             /* Wrapping necessary */
 
@@ -2724,18 +2726,19 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                                             continue;
                                         for ( ; !done && test_z < lens[test_i]; )
                                         {
-                                            p_int testc;
-                                            size_t testclen = utf8_to_unicode(parts[test_i] + test_z, lens[test_i] - test_z, &testc);
+                                            int testwidth;
+                                            size_t testclen = next_grapheme_break(parts[test_i] + test_z, lens[test_i] - test_z, &testwidth);
                                             if (!testclen)
                                                 errorf("Invalid character in string at index %d.\n", test_z);
                                             test_z += testclen;
 
-                                            if (testc == ' ' || testc == '\n')
+                                            if (parts[test_i][test_z-1] == '\n'
+                                             || (testclen == 1 && parts[test_i][test_z-1] == ' '))
                                             {
                                                 done = MY_TRUE;
                                                 break;
                                             }
-                                            next_word_len++;
+                                            next_word_len += testwidth;
                                         }
                                         test_z = 0;
                                     }
@@ -2906,9 +2909,8 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
             /* Loop over the current part, copying and wrapping */
             for (k = 0; k < l; )
             {
-                int n;
-                p_int c;  /* Current character */
-                size_t clen = utf8_to_unicode(p + k, l - k, &c);
+                int n, width;
+                size_t clen = next_grapheme_break(p + k, l - k, &width);
                 if (!clen)
                 {
                     xfree(tmpmem);
@@ -2921,7 +2923,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 pt += clen;
                 k += clen;
 
-                if (c == '\n')
+                if (p[k-1] == '\n')
                 {
                     /* Start a new line */
                     col = 0;
@@ -2931,23 +2933,25 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 }
                 else
                 {
+                    bool isspace = clen == 1 && p[k-1] == ' ';
+
                     /* All space characters in columns before col <start>
                      * do not count.
                      */
-                    if (col > start || c != ' ')
-                        col++;
+                    if (col > start || !isspace)
+                        col += width;
                     else
                         pt--;
 
                     /* If space, remember the position */
-                    if (c == ' ')
+                    if (isspace)
                     {
                         space = col;
                         spacept = pt;
                     }
 
                     /* Wrapping necessary? */
-                    if (col == wrap+1)
+                    if (col > wrap && col > width)
                     {
                         if (space)
                         {
@@ -2972,8 +2976,8 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                                         continue;
                                     for ( ; !done && test_k < lens[test_i]; )
                                     {
-                                        p_int testc;
-                                        size_t testclen = utf8_to_unicode(parts[test_i] + test_k, lens[test_i] - test_k, &testc);
+                                        int testwidth;
+                                        size_t testclen = next_grapheme_break(parts[test_i] + test_k, lens[test_i] - test_k, &testwidth);
                                         if (!testclen)
                                         {
                                             xfree(tmpmem);
@@ -2982,12 +2986,13 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                                         }
                                         test_k += testclen;
 
-                                        if (testc == ' ' || testc == '\n')
+                                        if (parts[test_i][test_k-1] == '\n'
+                                         || (testclen == 1 && parts[test_i][test_k-1] == ' '))
                                         {
                                             done = MY_TRUE;
                                             break;
                                         }
-                                        next_word_len++;
+                                        next_word_len += testwidth;
                                     }
                                     test_k = 0;
                                 }

@@ -53,6 +53,7 @@
 #include "simulate.h"
 #include "stdstrings.h"
 #include "svalue.h"
+#include "unidata.h"
 #include "xalloc.h"
 
 
@@ -821,6 +822,465 @@ get_illegal_sequence (char* buf, size_t len, iconv_t cd)
 
     return "";
 } /* get_illegal_sequence() */
+
+/*====================================================================*/
+
+/*                          GRAPHEMES                                 */
+
+/*--------------------------------------------------------------------*/
+
+static inline struct unicode_char_data_s*
+get_unicode_char_data (p_int ch)
+
+/* Return the entry from the unicode character database for <ch>.
+ */
+
+{
+    return unicode_char_data + unicode_table2[unicode_table1[ch >> UNICODE_TABLE_SHIFT] + (ch & ((1 << UNICODE_TABLE_SHIFT)-1))];
+}
+
+/*--------------------------------------------------------------------*/
+
+/* State machine for the Grapheme Breaks. A break between two codepoints is allowed,
+ * whenever the resulting state is GRAPHEME_BREAK, otherwise the entry denotes the
+ * new state which has to be looked up with the next codepoint.
+ */
+enum unicode_grapheme_cluster_break grapheme_state[GRAPHEME_BREAK][GRAPHEME_BREAK] =
+{
+    /* GRAPHEME_CONTROL */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+    },
+
+    /* GRAPHEME_CARRIAGE_RETURN */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+    },
+
+    /* GRAPHEME_LINE_FEED */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_CARRIAGE_RETURN,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+    },
+
+    /* GRAPHEME_SPACING_MARK */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_SPACING_MARK,
+        GRAPHEME_EXTEND,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_ZERO_WIDTH_JOINER,
+        GRAPHEME_BREAK,
+    },
+
+    /* GRAPHEME_EXTEND */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_SPACING_MARK,
+        GRAPHEME_EXTEND,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_ZERO_WIDTH_JOINER,
+        GRAPHEME_BREAK,
+    },
+
+    /* GRAPHEME_PREPEND */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_SPACING_MARK,
+        GRAPHEME_EXTEND,
+        GRAPHEME_PREPEND,
+        GRAPHEME_HANGUL_SYLLABLE_L,
+        GRAPHEME_HANGUL_SYLLABLE_V,
+        GRAPHEME_HANGUL_SYLLABLE_LV,
+        GRAPHEME_HANGUL_SYLLABLE_T,
+        GRAPHEME_HANGUL_SYLLABLE_LVT,
+        GRAPHEME_REGIONAL_INDICATOR,
+        GRAPHEME_ZERO_WIDTH_JOINER,
+        GRAPHEME_OTHER,
+    },
+
+    /* GRAPHEME_HANGUL_SYLLABLE_L */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_SPACING_MARK,
+        GRAPHEME_EXTEND,
+        GRAPHEME_BREAK,
+        GRAPHEME_HANGUL_SYLLABLE_L,
+        GRAPHEME_HANGUL_SYLLABLE_V,
+        GRAPHEME_HANGUL_SYLLABLE_LV,
+        GRAPHEME_BREAK,
+        GRAPHEME_HANGUL_SYLLABLE_LVT,
+        GRAPHEME_BREAK,
+        GRAPHEME_ZERO_WIDTH_JOINER,
+        GRAPHEME_BREAK,
+    },
+
+    /* GRAPHEME_HANGUL_SYLLABLE_V */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_SPACING_MARK,
+        GRAPHEME_EXTEND,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_HANGUL_SYLLABLE_V,
+        GRAPHEME_BREAK,
+        GRAPHEME_HANGUL_SYLLABLE_T,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_ZERO_WIDTH_JOINER,
+        GRAPHEME_BREAK,
+    },
+
+    /* GRAPHEME_HANGUL_SYLLABLE_LV */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_SPACING_MARK,
+        GRAPHEME_EXTEND,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_HANGUL_SYLLABLE_V,
+        GRAPHEME_BREAK,
+        GRAPHEME_HANGUL_SYLLABLE_T,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_ZERO_WIDTH_JOINER,
+        GRAPHEME_BREAK,
+    },
+
+    /* GRAPHEME_HANGUL_SYLLABLE_T */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_SPACING_MARK,
+        GRAPHEME_EXTEND,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_HANGUL_SYLLABLE_T,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_ZERO_WIDTH_JOINER,
+        GRAPHEME_BREAK,
+    },
+
+    /* GRAPHEME_HANGUL_SYLLABLE_LVT */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_SPACING_MARK,
+        GRAPHEME_EXTEND,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_HANGUL_SYLLABLE_T,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_ZERO_WIDTH_JOINER,
+        GRAPHEME_BREAK,
+    },
+
+    /* GRAPHEME_REGIONAL_INDICATOR */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_SPACING_MARK,
+        GRAPHEME_EXTEND,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_OTHER,
+        GRAPHEME_ZERO_WIDTH_JOINER,
+        GRAPHEME_BREAK,
+    },
+
+    /* GRAPHEME_ZERO_WIDTH_JOINER */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_SPACING_MARK,
+        GRAPHEME_EXTEND,
+        GRAPHEME_PREPEND,
+        GRAPHEME_HANGUL_SYLLABLE_L,
+        GRAPHEME_HANGUL_SYLLABLE_V,
+        GRAPHEME_HANGUL_SYLLABLE_LV,
+        GRAPHEME_HANGUL_SYLLABLE_T,
+        GRAPHEME_HANGUL_SYLLABLE_LVT,
+        GRAPHEME_REGIONAL_INDICATOR,
+        GRAPHEME_ZERO_WIDTH_JOINER,
+        GRAPHEME_OTHER,
+    },
+
+    /* GRAPHEME_OTHER */
+    {
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_SPACING_MARK,
+        GRAPHEME_EXTEND,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_BREAK,
+        GRAPHEME_ZERO_WIDTH_JOINER,
+        GRAPHEME_BREAK,
+    },
+};
+
+/*--------------------------------------------------------------------*/
+
+size_t
+next_grapheme_break (char* str, size_t len, int* width)
+
+/* Determines the position for the next break, i.e. the length of the
+ * grapheme at the beginning of <str>.
+ *
+ * In <width> the terminal width of the grapheme will be returned.
+ * There is no easy or standardized way to determine that, so we'll
+ * just take the widest codepoint within the grapheme and return that.
+ */
+
+{
+    size_t glen = 0;
+    p_int ch;
+    enum unicode_grapheme_cluster_break last_gcb;
+    struct unicode_char_data_s* chdata;
+
+    glen = utf8_to_unicode(str, len, &ch);
+    if (!glen)
+        return 0;
+    chdata = get_unicode_char_data(ch);
+    last_gcb = chdata->gcb;
+    str += glen;
+    len -= glen;
+    *width = (p_int)chdata->width;
+
+    if (ch == 27 || ch == 0x9a || ch == 0x9b)
+    {
+        /* Handle Escape sequences as a grapheme. */
+        if (ch == 27)
+        {
+            size_t chlen = utf8_to_unicode(str, len, &ch);
+            if (!chlen)
+                return glen;
+            glen += chlen;
+            str += chlen;
+            len -= chlen;
+        }
+        else if (ch == 0x9a)
+            ch = '%';
+        else if (ch == 0x9b)
+            ch = '[';
+
+        switch (ch)
+        {
+            case '%':   /* ROI */
+            case '[':   /* CSI */
+            {
+                size_t pos = 0;
+                while (pos < len && str[pos] >= 0x20 && str[pos] <= 0x3f)
+                    pos++;
+                glen += pos;
+                str += pos;
+                len -= pos;
+                /* FALLTHROUGH */
+            }
+
+            case 'Z':   /* SCI */
+            {
+                /* A single additional character. */
+                size_t chlen = utf8_to_unicode(str, len, &ch);
+                glen += chlen;
+                str += chlen;
+                len -= chlen;
+                break;
+            }
+
+            default:
+                /* Just eat the next character. */
+                break;
+        }
+
+        /* As control codes they are always a single grapheme. */
+        return glen;
+    }
+
+    while (len)
+    {
+        /* Look at the next character. */
+        enum unicode_grapheme_cluster_break cur_gcb;
+        size_t chlen = utf8_to_unicode(str, len, &ch);
+        if (!chlen)
+            return glen;
+        chdata = get_unicode_char_data(ch);
+        cur_gcb = chdata->gcb;
+
+        /* And walk through the state machine with state <last_gcb>
+         * and transition <cur_gcb>.
+         */
+        last_gcb = grapheme_state[last_gcb][cur_gcb];
+        if (last_gcb == GRAPHEME_BREAK)
+            return glen;
+
+        if ((p_int)chdata->width > *width)
+            *width = (p_int)chdata->width;
+
+        str += chlen;
+        len -= chlen;
+        glen += chlen;
+    }
+
+    return glen;
+}
+
+/*--------------------------------------------------------------------*/
+
+int
+get_string_width (char* str, size_t len, bool* error)
+
+/* Determines the displayed width of the given UTF-8 string.
+ * If there are errors in the encoding returns the width up to the
+ * faulty byte and sets the <error> flag (if not NULL).
+ */
+
+{
+    int result = 0;
+
+    while (len != 0)
+    {
+        int gwidth;
+        size_t glen = next_grapheme_break(str, len, &gwidth);
+
+        if (!glen)
+        {
+            if (error)
+                *error = true;
+            return result;
+        }
+
+        result += gwidth;
+        str += glen;
+        len -= glen;
+    }
+
+    if (error)
+        *error = false;
+    return result;
+}
+
+
+/*--------------------------------------------------------------------*/
+
+size_t
+get_string_up_to_width (char* str, size_t len, int width, bool* error)
+
+/* Determines the length (in bytes) for <str> that will not exceed
+ * the given width. If there are errors in the encoding returns the length
+ * up to the faulty byte and sets the <error> flag (if not NULL).
+ */
+
+{
+    size_t result = 0;
+
+    while (len != 0 && width >= 0)
+    {
+        int gwidth;
+        size_t glen = next_grapheme_break(str, len, &gwidth);
+
+        if (!glen)
+        {
+            if (error)
+                *error = true;
+            return result;
+        }
+
+        if (gwidth > width)
+            break;
+
+        result += glen;
+        str += glen;
+        len -= glen;
+        width -= gwidth;
+    }
+
+    if (error)
+        *error = false;
+    return result;
+}
+
 
 /*====================================================================*/
 

@@ -105,7 +105,7 @@ SRC = access_check.c actions.c array.c arraylist.c backend.c bitstrings.c \
       pkg-pgsql.c pkg-sqlite.c pkg-tls.c pkg-openssl.c pkg-gnutls.c \
       port.c ptrtable.c \
       random.c regexp.c sha1.c simulate.c simul_efun.c stdstrings.c \
-      strfuns.c structs.c sprintf.c swap.c types.c wiz_list.c xalloc.c 
+      strfuns.c structs.c sprintf.c swap.c types.c unidata.c wiz_list.c xalloc.c 
 OBJ = access_check.o actions.o array.o arraylist.o backend.o bitstrings.o \
       call_out.o closure.o comm.o \
       dumpstat.o ed.o efuns.o files.o gcollect.o hash.o heartbeat.o \
@@ -117,7 +117,7 @@ OBJ = access_check.o actions.o array.o arraylist.o backend.o bitstrings.o \
       pkg-pgsql.o pkg-sqlite.o pkg-tls.o pkg-openssl.o pkg-gnutls.o \
       port.o ptrtable.o \
       random.o regexp.o sha1.o simulate.o simul_efun.o stdstrings.o \
-      strfuns.o structs.o sprintf.o swap.o types.o wiz_list.o xalloc.o @ALLOCA@ 
+      strfuns.o structs.o sprintf.o swap.o types.o unidata.o wiz_list.o xalloc.o @ALLOCA@ 
 
 all: make-patchlevel ldmud@EXEEXT@
 
@@ -563,7 +563,7 @@ strfuns.o : array.h backend.h bytecode.h bytecode_gen.h comm.h config.h \
     driver.h exec.h hash.h iconv_opt.h interpret.h machine.h main.h \
     mapping.h mstrings.h my-alloca.h object.h pkg-gnutls.h pkg-openssl.h \
     pkg-tls.h port.h sent.h simulate.h stdstrings.h strfuns.h svalue.h \
-    typedefs.h types.h xalloc.h
+    typedefs.h types.h unidata.h xalloc.h
 
 structs.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_info.h \
     ../mudlib/sys/lpctypes.h ../mudlib/sys/struct_info.h array.h backend.h \
@@ -583,6 +583,8 @@ swap.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_info.h array.h \
 types.o : bytecode.h bytecode_gen.h config.h driver.h exec.h gcollect.h \
     hash.h iconv_opt.h machine.h mstrings.h port.h sent.h simulate.h \
     strfuns.h structs.h svalue.h typedefs.h types.h xalloc.h
+
+unidata.o : unidata.h
 
 wiz_list.o : ../mudlib/sys/wizlist.h array.h backend.h bytecode.h \
     bytecode_gen.h config.h driver.h exec.h gcollect.h hash.h iconv_opt.h \

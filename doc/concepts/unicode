@@ -49,6 +49,21 @@ DESCRIPTION
         Only byte sequences can be sent to the ERQ or via UDP,
         and only byte sequences can be received from them.
 
+        -- Formatting --
+
+        The efuns sprintf() and terminal_colour() work not just on unicode
+        codepoints but on extended grapheme clusters. Those are several
+        unicode characters that will form a single user-perceived character.
+        These clusters will not be split by those efuns. Also those efuns
+        will try to guess the width of those characters and apply formatting
+        modifiers accordingly. But as this is dependent upon the client's
+        rendering of such characters it will never be perfect.
+
+        The grapheme cluster handling only applies to sprintf() and
+        terminal_colour(). Other efun and operators like sizeof(), explode()
+        and the index operator still work on single unicode codepoints and
+        thus allow to split such grapheme clusters.
+
 HISTORY
         Introduced in LDMud 3.6.
 

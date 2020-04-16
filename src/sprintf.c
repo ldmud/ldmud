@@ -1125,12 +1125,13 @@ add_justified ( fmt_state_t *st
     while (pos < len)
     {
         /* Find the end of the word */
-        for ( ; pos < len && str[pos] != ' '; num_chars++)
+        for ( ; pos < len && str[pos] != ' '; )
         {
-            p_int ch;
-            size_t clen = utf8_to_unicode (str + pos, len - pos, &ch);
+            int width;
+            size_t clen = next_grapheme_break(str + pos, len - pos, &width);
             if (!clen)
                 ERROR(ERR_INVALID_CHAR);
+            num_chars += width;
             pos += clen;
         }
 
@@ -1216,7 +1217,7 @@ add_aligned ( fmt_state_t *st
     size_t sppos;
     Bool is_space_pad;
     bool error;
-    size_t len = byte_to_char_index(str, size, &error);
+    size_t len = get_string_width(str, size, &error);
     if (error)
         ERROR(ERR_INVALID_CHAR);
 
@@ -1292,6 +1293,7 @@ add_column (fmt_state_t *st, cst **column)
     size_t length;
     unsigned int save;
     char *COL_D = COL->d.col;
+    char *COL_E = COL_D + strlen(COL_D);
     char *p;
 
     /* Set done to the actual number of characters to copy.
@@ -1300,12 +1302,19 @@ add_column (fmt_state_t *st, cst **column)
     if ((COL->info & INFO_A) == INFO_A_JUSTIFY && length > (mp_int)COL->size)
         length = COL->size;
 
-    for (p = COL_D; length && *p && *p !='\n'; length--)
+    for (p = COL_D; length && *p && *p !='\n';)
     {
-        p_int ch;
-        size_t clen = utf8_to_unicode (p, 4, &ch);
+        int width;
+        size_t clen = next_grapheme_break(p, COL_E - p, &width);
         if (!clen)
             ERROR(ERR_INVALID_CHAR);
+        if (width > length)
+        {
+            if (p == COL_D) /* We should at least handle one character. */
+                p += clen;
+            break;
+        }
+        length -= width;
         p += clen;
     }
 
@@ -1330,13 +1339,13 @@ add_column (fmt_state_t *st, cst **column)
             }
             if (*p == ' ')
             {
-                /* If went more than one character back, check if
+                /* If we went more than one character back, check if
                  * the next word is longer than permitted. If that is
                  * the case we might as well start breaking it up right
                  * here.
                  */
-                p_int ch;
-                size_t clen = utf8_to_unicode (p + 1, 4, &ch);
+                int width;
+                size_t clen = next_grapheme_break(p + 1, COL_E - p - 1, &width);
                 if (save > done + 1 + clen)
                 {
                     char *p2;
@@ -1344,11 +1353,14 @@ add_column (fmt_state_t *st, cst **column)
                     length = COL->pres;
                     if ((COL->info & INFO_A) == INFO_A_JUSTIFY && length > (mp_int)COL->size)
                         length = COL->size;
-                    for ( p2 = p+1, length--; length && *p2 && *p2 !='\n' && *p2 != ' '; length--)
+                    for ( p2 = p+1, length--; length && *p2 && *p2 !='\n' && *p2 != ' ';)
                     {
-                        clen = utf8_to_unicode(p2, 4, &ch);
+                        clen = next_grapheme_break(p2, COL_E - p2, &width);
                         if (!clen)
                             ERROR(ERR_INVALID_CHAR);
+                        if (width > length)
+                            break;
+                        length -= width;
                         p2 += clen;
                     }
                     if (*p2 && *p2 != '\n' && *p2 != ' ')
@@ -2113,7 +2125,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
                                         break;
                                 }
 
-                                len = byte_to_char_index(start, s - start, &error);
+                                len = get_string_width(start, s - start, &error);
                                 if (error)
                                     ERROR(ERR_INVALID_CHAR);
                                 if (len > max)
@@ -2206,7 +2218,7 @@ add_table_now:
                         Bool justifyString;
                         bool error = false;
                         size_t reallen = (carg->u.str->info.unicode == STRING_UTF8)
-                                       ? byte_to_char_index(get_txt(carg->u.str), slen, &error)
+                                       ? get_string_width(get_txt(carg->u.str), slen, &error)
                                        : slen;
 
                         if (error)
@@ -2217,7 +2229,7 @@ add_table_now:
                         {
                             reallen = pres;
                             slen = (carg->u.str->info.unicode == STRING_UTF8)
-                                 ? char_to_byte_index(get_txt(carg->u.str), slen, pres, NULL)
+                                 ? get_string_up_to_width(get_txt(carg->u.str), slen, pres, NULL)
                                  : pres;
                         }
 

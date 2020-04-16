@@ -635,6 +635,37 @@ void run_test()
                 return sprintf("%-=19s\n", "\u266a"*20) == "\u266a"*19 + "\n\u266a\n";
             :)
         }),
+        ({ "sprintf chopping unicode grapheme clusters 1", 0,
+            (:
+                return sprintf("%.10s", "\e[34mA\u0308\e[0m"*20) == "\e[34mA\u0308\e[0m"*10+"\e[34m";
+            :)
+        }),
+        ({ "sprintf chopping unicode grapheme clusters 2", 0,
+            (:
+                return sprintf("%.5s", "\U0001f600\ufe0f"*20) == "\U0001f600\ufe0f"*2;
+            :)
+        }),
+        ({ "sprintf wrapping unicode grapheme clusters", 0,
+            (:
+                foreach(string cluster: ({
+                    "A\u0308",
+                    "\U0001f600\ufe0f",
+                    "\U0001f3f3\ufe0f\u200d\U0001f308",
+                    "\U0001F1E9\U0001F1EA",
+                    "\u1100\u1161\u11ab",
+                    "\u0e01\u0e33",
+                }))
+                {
+                    foreach(int i: 3*sizeof(cluster))
+                    {
+                        // Cluster must stay in one piece
+                        if (sizeof(map(explode(sprintf("%-=*s", i+1, 20*cluster), cluster), #'trim) - ({cluster, "\n", ""})))
+                            return 0;
+                    }
+                }
+                return 1;
+            :)
+        }),
         ({ "terminal_colour wrapping unicode characters 1", 0,
             (:
                 return terminal_colour("\u266a"*20+"\n", 0, 19, 5) == "\u266a"*19 + "\n     \u266a\n";
@@ -660,6 +691,27 @@ void run_test()
         ({ "terminal_colour trimming unicode characters 2", 0,
             (:
                 return sizeof(terminal_colour("\u266b"*TERMINAL_COLOUR_MAX, 0, TERMINAL_COLOUR_MAX/4, 0)) == 1 + TERMINAL_COLOUR_MAX/3;
+            :)
+        }),
+        ({ "terminal_colour wrapping unicode grapheme clusters", 0,
+            (:
+                foreach(string cluster: ({
+                    "A\u0308",
+                    "\U0001f600\ufe0f",
+                    "\U0001f3f3\ufe0f\u200d\U0001f308",
+                    "\U0001F1E9\U0001F1EA",
+                    "\u1100\u1161\u11ab",
+                    "\u0e01\u0e33",
+                }))
+                {
+                    foreach(int i: 3*sizeof(cluster))
+                    {
+                        // Cluster must stay in one piece
+                        if (sizeof(map(explode(terminal_colour(20*cluster, 0, i+1), cluster), #'trim) - ({cluster, "\n", ""})))
+                            return 0;
+                    }
+                }
+                return 1;
             :)
         }),
         ({ "strstr 1", 0,

@@ -46,6 +46,10 @@ extern size_t utf8_to_unicode(const char* buf, size_t len, p_int *code);
 
 extern char* get_illegal_sequence(char* buf, size_t len, iconv_t cd);
 
+extern size_t next_grapheme_break(char* str, size_t len, int* width) __attribute__((nonnull(1,3)));
+extern int get_string_width(char* str, size_t len, bool* error) __attribute__((nonnull(1)));
+extern size_t get_string_up_to_width(char* str, size_t len, int width, bool* error) __attribute__((nonnull(1)));
+
 extern svalue_t * v_to_bytes(svalue_t *sp, int num_arg);
 extern svalue_t * v_to_text(svalue_t *sp, int num_arg);
 extern string_t * intersect_strings (string_t * left, string_t * right, Bool bSubtract);
