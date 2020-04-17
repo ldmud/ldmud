@@ -5290,6 +5290,10 @@ yylex1 (void)
                 break;
 
 
+            /* --- Byte Order Mark --- */
+            case 0xfeff:
+                break;
+
             /* --- Multi-Char Operators --- */
             case '+':
                 READ_CHAR;

@@ -54,6 +54,16 @@ void run_test()
                 return 1;
             :)
         }),
+        ({ "File encoding with BoM", 0,
+            (:
+                object ob = load_object("/utf-8-bom.c");
+                if (ob->"\u03c1\u03c9\u03c4\u03ae\u03c3\u03c4\u03b5\u005f\u03c7\u03b1\u03b9\u03c1\u03b5\u03c4\u03b9\u03c3\u03bc\u03cc"() != "\u039a\u03b1\u03bb\u03ae\u0020\u03bc\u03ad\u03c1\u03b1\u0021")
+                    return 0;
+                if (ob->"\u03c1\u03c9\u03c4\u03ae\u03c3\u03c4\u03b5_\u03c7\u03b1\u03c1\u03b1\u03ba\u03c4\u03ae\u03c1\u03b1"() != 960)
+                    return 0;
+                return 1;
+            :)
+        }),
         ({ "Switch with byte strings 1", 0,
             (:
                 switch(to_bytes("\u2694\u2699", "utf-8"))
@@ -895,8 +905,12 @@ void run_test()
 
 private string get_file_encoding(string filename)
 {
-    string lines = read_file(filename, 0, 2, "ascii");
+    string lines;
 
+    if (read_bytes(filename, 0, 3) == b"\xef\xbb\xbf")
+        return "UTF-8";
+
+    lines = read_file(filename, 0, 2, "ascii");
     if (!lines)
         return "UTF-8";
 
