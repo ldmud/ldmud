@@ -1252,7 +1252,7 @@ regmatch (unsigned char *prog)
                 }
                 /* Couldn't or didn't -- back up. */
                 no--;
-                reginput = save + no;
+                reginput = (unsigned char*) utf8_prev((char*) reginput, reginput - save);
                 if (add_eval_cost(1))
                     return RE_ERROR_BACKTRACK;
             }
@@ -1337,35 +1337,55 @@ regrepeat (unsigned char *p)
     opnd = OPERAND(p);
     switch (OP(p))
     {
-    case ANY:
-        count = strlen((char *)scan);
-        scan += count;
-        break;
-    case EXACTLY:
-        while (*opnd == *scan)
+        case ANY:
         {
-            count++;
-            scan++;
+            size_t len = strlen((char *)scan);
+            count = byte_to_char_index((char*) scan, len, NULL);
+            scan += count;
+            break;
         }
-        break;
-    case ANYOF:
-        while (*scan != '\0' && strchr((char *)opnd, *scan) != NULL)
+
+        case EXACTLY:
+            // Quick check
+            if (*opnd == *scan)
+            {
+                size_t chlen = strlen((char*)opnd);
+                while (strncmp((char*)opnd, (char*)scan, chlen) == 0)
+                {
+                    count++;
+                    scan += chlen;
+                }
+            }
+            break;
+
+        case ANYOF:
         {
-            count++;
-            scan++;
+            ssize_t len;
+
+            while (*scan != '\0' && (len = reg_strchr(opnd, scan)) > 0)
+            {
+                count++;
+                scan += len;
+            }
+            break;
         }
-        break;
-    case ANYBUT:
-        while (*scan != '\0' && strchr((char *)opnd, *scan) == NULL)
+
+        case ANYBUT:
         {
-            count++;
-            scan++;
+            ssize_t len;
+
+            while (*scan != '\0' && (len = reg_strchr(opnd, scan)) < 0)
+            {
+                count++;
+                scan += -len;
+            }
+            break;
         }
-        break;
-    default:                        /* Oh dear.  Called inappropriately. */
-        fatal("regexp: internal foulup\n");
-        count = 0;                /* Best compromise. */
-        break;
+
+        default:                        /* Oh dear.  Called inappropriately. */
+            fatal("regexp: internal foulup\n");
+            count = 0;                /* Best compromise. */
+            break;
     }
     reginput = scan;
 

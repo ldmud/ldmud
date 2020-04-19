@@ -526,9 +526,14 @@ void run_test()
                 return rmember(to_bytes(({240,241,242,243,244,245,246,247,248,249,250})), 245) == 5;
             :)
         }),
-        ({ "regmatch with PCRE and unicode strings", 0,
+        ({ "regmatch with PCRE and unicode strings 1", 0,
             (:
                 return regmatch("Sch\u00f6ne \u00c4ra", "[[:upper:]]ra", RE_PCRE) == "\u00c4ra";
+            :)
+        }),
+        ({ "regmatch with PCRE and unicode strings 2", 0,
+            (:
+                return regmatch("\uff2c\uff24\uff2d\uff55\uff44", "\uff2c*", RE_PCRE) == "\uff2c";
             :)
         }),
         ({ "regmatch with builtin regexp and unicode strings 1", 0,
@@ -541,6 +546,16 @@ void run_test()
                 return regmatch("Sch\u00f6ne \u00c4ra", "[\u00c4\u00d6\u00dc]ra", RE_TRADITIONAL) == "\u00c4ra";
             :)
         }),
+        ({ "regmatch with builtin regexp and unicode strings 3", 0,
+            (:
+                return regmatch("\uff2c\uff24\uff2d\uff55\uff44", "\uff2c*", RE_TRADITIONAL) == "\uff2c";
+            :)
+        }),
+        ({ "regmatch with builtin regexp and unicode strings 4", 0,
+            (:
+                return regmatch("\uff2c\uff24\uff2d\uff55\uff44", "\uff2c*\uff2c", RE_TRADITIONAL) == "\uff2c";
+            :)
+        }),
         ({ "regreplace with builtin regexp and unicode strings 1", 0,
             (:
                 return regreplace("\u216c\u216e\u216f\u2164\u216e", "(.)", " \\1 ", RE_TRADITIONAL | RE_GLOBAL) == " \u216c  \u216e  \u216f  \u2164  \u216e ";
@@ -549,6 +564,11 @@ void run_test()
         ({ "regreplace with builtin regexp and unicode strings 2", 0,
             (:
                 return regreplace("\u216c\u216e\u216f\u2164\u216e", "", "*", RE_TRADITIONAL | RE_GLOBAL) == "*\u216c*\u216e*\u216f*\u2164*\u216e*";
+            :)
+        }),
+        ({ "regreplace with builtin regexp and unicode strings 3", 0,
+            (:
+                return regreplace("a\u00e5", "[a\u00e4]*", "", RE_TRADITIONAL | RE_GLOBAL) == "\u00e5";
             :)
         }),
         ({ "regreplace with PCRE and unicode strings 1", 0,
