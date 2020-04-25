@@ -87,6 +87,13 @@ DESCRIPTION
                 mudlib code - in general one should fix the warnings,
                 not turn them off.
 
+        warn_unused_variables: Warn about variables that are not used.
+                If will warn about variables never written to, variables
+                never read from or variables never used at all.
+                This applies to local variables and private global variables.
+        no_warn_unused_variables: Turn off warn_unused_variables
+                (the default).
+
         When an object is compiled with type testing (#pragma
         strict_types), all types are saved of the arguments for that
         function during compilation.  If the #pragma save_types is

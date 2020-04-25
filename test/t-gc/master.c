@@ -39,8 +39,6 @@ void run_after(int errors)
 
 void run_test()
 {
-    int errors;
-    
     msg("\nRunning test for t-gc:\n"
           "----------------------\n");
 

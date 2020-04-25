@@ -124,8 +124,6 @@ mixed *tests = ({
 
 void run_test()
 {
-    int errors;
-    
     msg("\nRunning old error test suite:\n"
           "-----------------------------\n");
 

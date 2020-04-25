@@ -215,6 +215,10 @@ bool pragma_no_bytes_type;
    *       means <string|bytes>.
    */
 
+bool pragma_warn_unused_variables;
+  /* True: Warn about declared but never used variables.
+   */
+
 string_t *last_lex_string;
   /* When lexing string literals, this is the (shared) string lexed
    * so far. It is used to pass string values to lang.c and may be
@@ -3876,6 +3880,16 @@ handle_pragma (char *str)
             pragma_warn_rtt_checks = MY_FALSE;
             validPragma = MY_TRUE;
         }
+        else if (strncmp(base, "warn_unused_variables", namelen) == 0)
+        {
+            pragma_warn_unused_variables = true;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_warn_unused_variables", namelen) == 0)
+        {
+            pragma_warn_unused_variables = false;
+            validPragma = MY_TRUE;
+        }
         else if (strncmp(base, "share_variables", namelen) == 0)
         {
             if (variables_defined)
@@ -6075,6 +6089,7 @@ start_new_file (int fd, const char * fname)
     pragma_rtt_checks = MY_FALSE;
     pragma_warn_rtt_checks = MY_FALSE;
     pragma_no_bytes_type = false;
+    pragma_warn_unused_variables = false;
 
     nexpands = 0;
 

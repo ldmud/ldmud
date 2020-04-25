@@ -41,11 +41,9 @@ void run_test()
 
     foreach(string file: get_dir("/tf-*.c"))
     {
-	string err;
-	
 	msg("Running Test %s...\n", file[0..<3]);
 	
-	if((err = catch(load_object(file[0..<3]);nolog)))
+	if(catch(load_object(file[0..<3]);nolog))
 	{
 	    msg("    Success.\n");
 	}

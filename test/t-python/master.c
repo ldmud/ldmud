@@ -16,8 +16,6 @@ struct test_struct
 
 void run_test()
 {
-    object ob;
-
 #ifdef __PYTHON__
 
     msg("\nRunning tests for pkg_python:\n"

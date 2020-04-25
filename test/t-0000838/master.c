@@ -20,8 +20,6 @@ object compile_object(string filename)
 
 void run_test()
 {
-    int errors;
-
     msg("\nRunning test for #0000838:\n"
           "---------------------------\n");
 

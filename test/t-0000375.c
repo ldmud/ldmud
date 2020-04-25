@@ -46,8 +46,6 @@ void heart_beat()
 
 void run_test()
 {
-    int result;
-
     msg("\nRunning test for #0000375:\n"
         "--------------------------\n");
 

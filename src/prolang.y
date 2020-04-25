@@ -127,6 +127,8 @@ typedef struct const_list_svalue_s const_list_svalue_t;
 typedef struct struct_init_s       struct_init_t;
 typedef struct efun_shadow_s       efun_shadow_t;
 typedef struct mem_block_s         mem_block_t;
+typedef struct local_variable_s    local_variable_t;
+typedef struct global_variable_s   global_variable_t;
 
 /*-------------------------------------------------------------------------*/
 /* Exported result variables */
@@ -257,6 +259,40 @@ struct efun_shadow_s
     ident_t       *shadow;  /* Identifier of the shadow */
 };
 
+/* --- enum variable_use: Information about the usage of a variable.
+ */
+enum variable_usage
+{
+    VAR_USAGE_NONE      = 0x00, /* Variable was only declared.       */
+    VAR_USAGE_WRITE     = 0x01, /* The variable was only written to. */
+    VAR_USAGE_READ      = 0x02, /* The variable was only read from.  */
+    VAR_USAGE_READWRITE = 0x03, /* The variable was used both ways.  */
+};
+
+/* --- struct local_variable_s: Store info about local variables ---
+ *
+ * This structure is used in the A_LOCAL_VARIABLES memory block to keep
+ * information about the local variables, including context variables.
+ */
+
+struct local_variable_s
+{
+    fulltype_t          type;   /* The type of the variable.  */
+    enum variable_usage usage;  /* How the variable was used. */
+};
+
+/* --- struct global_variable_s: Store info about global variables ---
+ *
+ * This structure is used in the A_GLOBAL_VARIABLES memory block to keep
+ * information about the global variables, that will not be stored
+ * permanently in the program.
+ */
+
+struct global_variable_s
+{
+    enum variable_usage usage;  /* How the variable was used. */
+};
+
 
 /*-------------------------------------------------------------------------*/
 /* Macros */
@@ -372,10 +408,15 @@ enum e_internal_areas {
     * a chain is marked by a negative next-index.
     */
 
- , A_LOCAL_TYPES
-   /* (lpctype_t*) The full types of local and context variables.
+ , A_LOCAL_VARIABLES
+   /* (local_variable_t*) The full types of local and context variables.
     * For normal functions, only the beginning of the area is used.
     * The rest is used stack-wise for nested inline closures.
+    */
+
+ , A_GLOBAL_VARIABLES
+   /* (global_variables_t*) Usage information for not-inherited (and
+    * therefore not virtual) global variables.
     */
 
  , A_INLINE_PROGRAM
@@ -405,13 +446,14 @@ enum e_internal_areas {
 
 typedef struct inline_closure_s inline_closure_t;
 
-typedef function_t       A_FUNCTIONS_t;
-typedef int              A_STRING_NEXT_t;
-typedef fulltype_t       A_LOCAL_TYPES_t;
-typedef bytecode_t       A_INLINE_PROGRAM_t;
-typedef inline_closure_t A_INLINE_CLOSURE_t;
-typedef struct_member_t  A_STRUCT_MEMBERS_t;
-typedef bytecode_t       A_LVALUE_CODE_t;
+typedef function_t        A_FUNCTIONS_t;
+typedef int               A_STRING_NEXT_t;
+typedef local_variable_t  A_LOCAL_VARIABLES_t;
+typedef global_variable_t A_GLOBAL_VARIABLES_t;
+typedef bytecode_t        A_INLINE_PROGRAM_t;
+typedef inline_closure_t  A_INLINE_CLOSURE_t;
+typedef struct_member_t   A_STRUCT_MEMBERS_t;
+typedef bytecode_t        A_LVALUE_CODE_t;
 
 /* --- struct mem_block_s: One memory area ---
  * Every mem_block keeps one memory area. As it grows by using realloc(),
@@ -552,12 +594,20 @@ static mem_block_t mem_block[NUMAREAS];
   /* Return the total number of include files encountered so far.
    */
 
-#define LOCAL_TYPE_COUNT        GET_BLOCK_COUNT(A_LOCAL_TYPES)
-  /* Return the total number of types.
+#define LOCAL_VARIABLE_COUNT    GET_BLOCK_COUNT(A_LOCAL_VARIABLES)
+  /* Return the total number of local variables.
    */
 
-#define LOCAL_TYPE(n)           GET_BLOCK(A_LOCAL_TYPES)[n]
-  /* Return the local/context var type at index <n>.
+#define LOCAL_VARIABLE(n)       GET_BLOCK(A_LOCAL_VARIABLES)[n]
+  /* Return the local/context var information at index <n>.
+   */
+
+#define GLOBAL_VARIABLE_COUNT    GET_BLOCK_COUNT(A_GLOBAL_VARIABLES)
+  /* Return the total number of non-virtual global variables.
+   */
+
+#define GLOBAL_VARIABLE(n)       GET_BLOCK(A_GLOBAL_VARIABLES)[n]
+  /* Return the global variable information at index <n>.
    */
 
 #define INLINE_PROGRAM_BLOCK(n) (GET_BLOCK(A_INLINE_PROGRAM) + (n))
@@ -706,13 +756,13 @@ struct inline_closure_s
     int max_break_stack_size;
       /* Current and max break stack size at definition point.
        */
-    mp_uint full_local_type_start;
-    mp_uint full_context_type_start;
-      /* Start indices of the local/context variable type information
-       * in A_LOCAL_TYPES.
+    mp_uint full_local_var_start;
+    mp_uint full_context_var_start;
+      /* Start indices of the local/context variable information
+       * in A_LOCAL_VARIABLES.
        */
-    mp_uint full_local_type_size;
-      /* Current size of the A_LOCAL_TYPES memblocks.
+    mp_uint full_local_var_size;
+      /* Current size of the A_LOCAL_VARIABLES memblocks.
        */
 };
 
@@ -788,15 +838,15 @@ static mem_block_t type_of_arguments;
    * but will be reused.
    */
 
-static A_LOCAL_TYPES_t* type_of_locals = NULL;
-  /* The full types of the local variables.
-   * Points to a location in mem_block A_LOCAL_TYPES, it is NULL between
+static A_LOCAL_VARIABLES_t* local_variables = NULL;
+  /* The full types and usage information of the local variables.
+   * Points to a location in mem_block A_LOCAL_VARIABLES, it is NULL between
    * compilations.
    */
 
-static A_LOCAL_TYPES_t* type_of_context = NULL;
-  /* The full types of the context variables.
-   * Points to a location in mem_block A_LOCAL_TYPES, it is NULL between
+static A_LOCAL_VARIABLES_t* context_variables = NULL;
+  /* The full types and usage information of the context variables.
+   * Points to a location in mem_block A_LOCAL_VARIABLES, it is NULL between
    * compilations.
    */
 
@@ -1017,6 +1067,8 @@ struct lvalue_s; /* Defined within YYSTYPE aka %union */
 
 static ident_t* define_local_variable (ident_t* name, lpctype_t* actual_type, struct lvalue_s *lv, Bool redeclare, Bool with_init);
 static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2);
+static void use_variable (ident_t* name, enum variable_usage usage);
+static void warn_variable_usage (string_t* name, enum variable_usage usage, const char* prefix);
 static Bool add_lvalue_code ( struct lvalue_s * lv, int instruction);
 static void insert_pop_value(void);
 static void add_type_check (lpctype_t *expected, enum type_check_operation op);
@@ -1349,6 +1401,7 @@ DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_ARGUMENT_INDEX, A_ARGUMENT_INDEX)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_FUNCTION, A_FUNCTIONS)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_VIRTUAL_VAR, A_VIRTUAL_VAR)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_VARIABLE, A_VARIABLES)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_GLOBAL_VARIABLE_INFO, A_GLOBAL_VARIABLES)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_STRUCT_DEF, A_STRUCT_DEFS)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_STRUCT_MEMBER, A_STRUCT_MEMBERS)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INLINE_CLOSURE, A_INLINE_CLOSURE)
@@ -3554,18 +3607,18 @@ free_all_local_names (void)
         free_shared_identifier(p);
     }
 
-    while (current_number_of_locals > 0 && type_of_locals)
+    while (current_number_of_locals > 0 && local_variables)
     {
         current_number_of_locals--;
-        free_fulltype(type_of_locals[current_number_of_locals]);
+        free_fulltype(local_variables[current_number_of_locals].type);
     }
 
     /* Free also types of context variables. */
-    if (type_of_context && type_of_context != &(LOCAL_TYPE(0)))
+    if (context_variables && context_variables != &(LOCAL_VARIABLE(0)))
     {
         int i;
         for (i=0; i<MAX_LOCAL; i++)
-            free_fulltype(type_of_context[i]);
+            free_fulltype(context_variables[i].type);
     }
 
     all_locals = NULL;
@@ -3609,12 +3662,19 @@ free_local_names (int depth)
         all_locals = q->next_all;
         if (q->u.local.context >= 0)
         {
-            free_fulltype(type_of_context[q->u.local.context]);
+            if (pragma_warn_unused_variables)
+                warn_variable_usage(q->name, context_variables[q->u.local.context].usage, "Context");
+
+            free_fulltype(context_variables[q->u.local.context].type);
         }
         else
         {
             current_number_of_locals--;
-            free_fulltype(type_of_locals[current_number_of_locals]);
+
+            if (pragma_warn_unused_variables)
+                warn_variable_usage(q->name, local_variables[current_number_of_locals].usage, "Local");
+
+            free_fulltype(local_variables[current_number_of_locals].type);
         }
         free_shared_identifier(q);
     }
@@ -3678,7 +3738,9 @@ if (current_inline && current_inline->block_depth+2 == block_depth
         all_locals = ident;
 
         /* Record the type */
-        type_of_locals[current_number_of_locals++] = type;
+        local_variables[current_number_of_locals].usage = VAR_USAGE_NONE;
+        local_variables[current_number_of_locals].type = type;
+        current_number_of_locals++;
 
         /* And update the scope information */
         if (current_number_of_locals > max_number_of_locals)
@@ -3811,10 +3873,20 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n",
         }
 
         /* Record the type */
-        type_of_context[block->num_locals] = get_fulltype(ref_lpctype(type));
+        context_variables[block->num_locals].type = get_fulltype(ref_lpctype(type));
 
         if (num < 0)
-            type_of_locals[ident->u.local.num] = get_fulltype(ref_lpctype(type));
+        {
+            /* Independently defined context variable. */
+            context_variables[block->num_locals].usage = VAR_USAGE_NONE;
+            local_variables[ident->u.local.num].type = get_fulltype(ref_lpctype(type));
+            local_variables[ident->u.local.num].usage = VAR_USAGE_NONE;
+        }
+        else
+        {
+            /* Inherited context variable. */
+            context_variables[block->num_locals].usage = VAR_USAGE_WRITE;
+        }
 
         block->num_locals++;
     }
@@ -3846,7 +3918,7 @@ check_for_context_local (ident_t *ident, lpctype_t ** pType)
        )
     {
         inline_closure_t *closure;
-        A_LOCAL_TYPES_t *save_type_of_context = type_of_context;
+        A_LOCAL_VARIABLES_t *save_context_variables = context_variables;
         mp_int closure_nr;
         lpctype_t* type;
 
@@ -3885,16 +3957,16 @@ check_for_context_local (ident_t *ident, lpctype_t ** pType)
         if (ident->u.local.context >= 0)
         {
             /* It's a context variable. */
-            type = LOCAL_TYPE(closure->full_context_type_start
+            type = LOCAL_VARIABLE(closure->full_context_var_start
                               + ident->u.local.context
-                             ).t_type;
+                             ).type.t_type;
         }
         else
         {
             /* It's a local variable. */
-            type = LOCAL_TYPE(closure->full_local_type_start
+            type = LOCAL_VARIABLE(closure->full_local_var_start
                               + ident->u.local.num
-                             ).t_type;
+                             ).type.t_type;
         }
 
         /* Now pass this context variable through
@@ -3914,9 +3986,14 @@ check_for_context_local (ident_t *ident, lpctype_t ** pType)
                  * closure's block.
                  */
                 if (next_closure)
-                    type_of_context = &(LOCAL_TYPE(next_closure->full_context_type_start));
+                    context_variables = &(LOCAL_VARIABLE(next_closure->full_context_var_start));
                 else
-                    type_of_context = save_type_of_context;
+                    context_variables = save_context_variables;
+
+                if (ident->u.local.context >= 0)
+                    LOCAL_VARIABLE(closure->full_context_var_start + ident->u.local.context).usage |= VAR_USAGE_READ;
+                else
+                    LOCAL_VARIABLE(closure->full_local_var_start + ident->u.local.num).usage |= VAR_USAGE_READ;
 
                 ident = add_context_name(closure, ident, type,
                      ident->u.local.context >= 0
@@ -3930,14 +4007,14 @@ check_for_context_local (ident_t *ident, lpctype_t ** pType)
             closure = next_closure;
         }
 
-        type_of_context = save_type_of_context;
+        context_variables = save_context_variables;
 
         *pType = type;
     }
     else if (ident->u.local.context >= 0)
-        *pType = type_of_context[ident->u.local.context].t_type;
+        *pType = context_variables[ident->u.local.context].type.t_type;
     else
-        *pType = type_of_locals[ident->u.local.num].t_type;
+        *pType = local_variables[ident->u.local.num].type.t_type;
 
     return ident;
 } /* check_for_context_local() */
@@ -3967,9 +4044,10 @@ adapt_context_names (void)
 
         while (q != NULL && q->u.local.depth == depth)
         {
-            free_fulltype(type_of_locals[q->u.local.num]);
-
             q->u.local.context = q->u.local.num - scope->first_local;
+            context_variables[q->u.local.context].usage |= local_variables[q->u.local.num].usage;
+
+            free_fulltype(local_variables[q->u.local.num].type);
             q->u.local.num = -1;
 
             q = q->next_all;
@@ -4052,7 +4130,7 @@ get_current_function_name()
 static unsigned short
 store_argument_types ( int num_arg )
 
-/* Store the <num_arg> argument types from global type_of_locals[] into
+/* Store the <num_arg> argument types from global local_variables[] into
  * the proper memblock and return the new argument start index.
  * It is task of the caller to store this start index where it belongs.
  *
@@ -4087,7 +4165,7 @@ store_argument_types ( int num_arg )
 
             for (i = 0; i < num_arg; i++)
             {
-                ADD_ARGUMENT_TYPE(ref_lpctype(type_of_locals[i].t_type));
+                ADD_ARGUMENT_TYPE(ref_lpctype(local_variables[i].type.t_type));
             }
         }
     }
@@ -4308,7 +4386,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
                     for (i = 0; i < num_args; i++ )
                     {
-                        new_type = type_of_locals[i].t_type;
+                        new_type = local_variables[i].type.t_type;
                         old_type = argp[i];
                         if (new_type != old_type)
                         {
@@ -4644,6 +4722,7 @@ define_variable (ident_t *name, fulltype_t type)
         if (!(flags & NAME_HIDDEN))
             name->u.global.variable = NV_VARIABLE_COUNT;
         ADD_VARIABLE(&dummy);
+        ADD_GLOBAL_VARIABLE_INFO((global_variable_t){.usage = VAR_USAGE_NONE});
     }
 
     return name;
@@ -4991,6 +5070,8 @@ init_global_variable (int i, ident_t* name, fulltype_t actual_type
     add_f_code(F_VOID_ASSIGN);
     CURRENT_PROGRAM_SIZE += 3;
     add_new_init_jump();
+
+    use_variable(name, (exprtype.t_flags & TYPE_MOD_REFERENCE) ? VAR_USAGE_READWRITE : VAR_USAGE_WRITE);
 } /* init_global_variable() */
 
 /*-------------------------------------------------------------------------*/
@@ -5116,24 +5197,24 @@ def_function_prototype (int num_args, Bool is_inline)
     /* We got the complete prototype: define it */
 
     if ( current_number_of_locals
-     && (type_of_locals[current_number_of_locals-1].t_flags
+     && (local_variables[current_number_of_locals-1].type.t_flags
          & TYPE_MOD_VARARGS)
        )
     {
         /* The last argument has to allow an array. */
-        fulltype_t *t;
+        local_variable_t *t;
 
         returntype->t_flags |= TYPE_MOD_XVARARGS;
 
-        t = type_of_locals + (current_number_of_locals-1);
-        if (!lpctype_contains(lpctype_unknown_array, t->t_type))
+        t = local_variables + (current_number_of_locals-1);
+        if (!lpctype_contains(lpctype_unknown_array, t->type.t_type))
         {
             yyerror("varargs parameter must be declared array or mixed");
 
             /* Keep the visibility, but change the type to 'mixed'.
              */
-            free_lpctype(t->t_type);
-            t->t_type = lpctype_mixed;
+            free_lpctype(t->type.t_type);
+            t->type.t_type = lpctype_mixed;
         }
     }
 
@@ -6106,27 +6187,27 @@ printf("DEBUG:   start: %"PRIuMPINT", depth %d, locals: %d/%d, break: %d/%d\n",
     ict.max_num_locals       = max_number_of_locals;
     ict.exact_types          = exact_types;
     ict.include_handle       = get_include_handle();
-    ict.full_local_type_start   = type_of_locals - &(LOCAL_TYPE(0));
-    ict.full_context_type_start = type_of_context - &(LOCAL_TYPE(0));
-    ict.full_local_type_size    = mem_block[A_LOCAL_TYPES].current_size;
+    ict.full_local_var_start = local_variables - &(LOCAL_VARIABLE(0));
+    ict.full_context_var_start = context_variables - &(LOCAL_VARIABLE(0));
+    ict.full_local_var_size  = mem_block[A_LOCAL_VARIABLES].current_size;
 #ifdef DEBUG_INLINES
 printf("DEBUG:   local types: %"PRIuMPINT", context types: %"PRIuMPINT"\n", 
-       ict.full_local_type_start, ict.full_context_type_start);
+       ict.full_local_var_start, ict.full_context_var_start);
 #endif /* DEBUG_INLINES */
 
     /* Extend the type memblocks */
     {
-        mp_uint type_count = LOCAL_TYPE_COUNT;
+        mp_uint type_count = LOCAL_VARIABLE_COUNT;
 
-        extend_mem_block(A_LOCAL_TYPES, 2 * MAX_LOCAL * sizeof(A_LOCAL_TYPES_t));
-        memset(&LOCAL_TYPE(type_count), 0
-              , (LOCAL_TYPE_COUNT - type_count) * sizeof(A_LOCAL_TYPES_t));
+        extend_mem_block(A_LOCAL_VARIABLES, 2 * MAX_LOCAL * sizeof(A_LOCAL_VARIABLES_t));
+        memset(&LOCAL_VARIABLE(type_count), 0
+              , (LOCAL_VARIABLE_COUNT - type_count) * sizeof(A_LOCAL_VARIABLES_t));
 
-        type_of_context = &(LOCAL_TYPE(type_count));
-        type_of_locals = &(LOCAL_TYPE(type_count+MAX_LOCAL));
+        context_variables = &(LOCAL_VARIABLE(type_count));
+        local_variables = &(LOCAL_VARIABLE(type_count+MAX_LOCAL));
 #ifdef DEBUG_INLINES
 printf("DEBUG:   type ptrs: %p, %p\n", 
-       type_of_locals, type_of_context );
+       local_variables, context_variables );
 #endif /* DEBUG_INLINES */
     }
 
@@ -6273,17 +6354,17 @@ printf("DEBUG:   move li data forward: from %"PRIuMPINT", length %"PRIuMPINT
 
 #ifdef DEBUG_INLINES
 printf("DEBUG:   local types: %"PRIuMPINT", context types: %"PRIuMPINT"\n", 
-       current_inline->full_local_type_start, current_inline->full_context_type_start);
+       current_inline->full_local_var_start, current_inline->full_context_var_start);
 #endif /* DEBUG_INLINES */
-    type_of_locals = &(LOCAL_TYPE(current_inline->full_local_type_start));
-    type_of_context = &(LOCAL_TYPE(current_inline->full_context_type_start));
+    local_variables = &(LOCAL_VARIABLE(current_inline->full_local_var_start));
+    context_variables = &(LOCAL_VARIABLE(current_inline->full_context_var_start));
 #ifdef DEBUG_INLINES
-printf("DEBUG:   type ptrs: %p, %p\n", type_of_locals, type_of_context );
+printf("DEBUG:   type ptrs: %p, %p\n", local_variables, context_variables );
 #endif /* DEBUG_INLINES */
 
     /* Don't free the current_inline->returntype as it's not counted. */
 
-    mem_block[A_LOCAL_TYPES].current_size = current_inline->full_local_type_size;
+    mem_block[A_LOCAL_VARIABLES].current_size = current_inline->full_local_var_size;
 
     /* Remove the structure from the lexical nesting stack */
     if (current_inline->prev == -1)
@@ -6965,6 +7046,7 @@ delete_prog_string (void)
 
     struct rvalue_s
     {
+        ident_t *  name;   /* A corresponding variable to be marked. */
         fulltype_t type;   /* Type of the expression */
         uint32     start;  /* Startaddress of the expression */
     } rvalue;
@@ -6972,6 +7054,7 @@ delete_prog_string (void)
 
     struct lrvalue_s
     {
+        ident_t *      name;     /* A corresponding variable to be marked. */
         fulltype_t     type;     /* Type of the expression */
         uint32         start;    /* Startaddress of the instruction */
         lvalue_block_t lvalue;   /* Code of the expression as an lvalue */
@@ -7053,6 +7136,7 @@ delete_prog_string (void)
 
     struct lvalue_s {
         lpctype_t *    type;
+        ident_t *      name;
         lvalue_block_t lvalue;
         short          vlvalue_inst;
         short          num_arg;
@@ -7070,6 +7154,9 @@ delete_prog_string (void)
        * then vlvalue_inst (if != 0) will contain the instruction that
        * must replace the last instruction in the lvalue block.
        * (The last instruction will have .num_arg bytes following it.)
+       *
+       * If the lvalue directly refers to a variable, name points to
+       * the identifier, otherwise it's NULL.
        */
 
     struct {
@@ -7378,9 +7465,9 @@ printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROG
               block_scope[current_inline->block_depth].first_local = current_inline->num_locals;
 
           /* Set type of locals back to the locals of the outer block.*/
-          type_of_locals = &(LOCAL_TYPE(current_inline->full_local_type_start));
+          local_variables = &(LOCAL_VARIABLE(current_inline->full_local_var_start));
 
-          /* Note, that type_of_context must not be reset, as add_context_name()
+          /* Note, that context_variables must not be reset, as add_context_name()
            * needs it where it points now. check_for_context_local() will take
            * care of finding the right type for context variables.
            */
@@ -7408,7 +7495,7 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
           block_scope[current_inline->block_depth+1].accessible = MY_TRUE;
           current_inline->parse_context = MY_FALSE;
           adapt_context_names();
-          type_of_locals = type_of_context + MAX_LOCAL;
+          local_variables = context_variables + MAX_LOCAL;
 
           /* Find the correct max_num_locals to update.
            * That is the one of the last closure with parse_context set.
@@ -7457,6 +7544,7 @@ printf("DEBUG: After inline block: program size %"PRIuMPINT"\n", CURRENT_PROGRAM
 #endif /* DEBUG_INLINES */
          $$.start = current_inline->end;
          $$.type = get_fulltype(lpctype_closure);
+         $$.name = NULL;
 
          complete_inline_closure();
          free_lpctype($2);
@@ -7483,6 +7571,7 @@ printf("DEBUG: After L_BEGIN_INLINE: program size %"PRIuMPINT"\n", CURRENT_PROGR
               sprintf(name, "$%d", i);
               ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
               add_local_name(ident, get_fulltype(lpctype_mixed), block_depth);
+              use_variable(ident, VAR_USAGE_READWRITE);
           }
 
           if (!inline_closure_prototype(9))
@@ -7520,6 +7609,7 @@ printf("DEBUG: After L_END_INLINE: program size %"PRIuMPINT"\n", CURRENT_PROGRAM
 
          $$.start = current_inline->end;
          $$.type = get_fulltype(lpctype_closure);
+         $$.name = NULL;
 
          complete_inline_closure();
       }
@@ -7540,6 +7630,7 @@ inline_opt_args:
               sprintf(name, "$%d", i);
               ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
               add_local_name(ident, get_fulltype(lpctype_mixed), block_depth);
+              use_variable(ident, VAR_USAGE_READWRITE);
           }
 
           $$ = 9;
@@ -7593,6 +7684,8 @@ inline_comma_expr:
       {
           /* Add a F_RETURN to complete the statement */
           ins_f_code(F_RETURN);
+
+          use_variable($1.name, VAR_USAGE_READ);
           check_unknown_type($1.type.t_type);
           free_fulltype($1.type);
       }
@@ -8226,6 +8319,8 @@ new_arg_name:
       non_void_type L_IDENTIFIER
       {
           funflag_t illegal_flags = $1.t_flags & (TYPE_MOD_STATIC|TYPE_MOD_NO_MASK|TYPE_MOD_PRIVATE|TYPE_MOD_PUBLIC|TYPE_MOD_VIRTUAL|TYPE_MOD_PROTECTED|TYPE_MOD_NOSAVE|TYPE_MOD_VISIBLE);
+          ident_t *varident = NULL;
+
           if (illegal_flags)
           {
               yyerrorf("Illegal modifier for function argument: %s"
@@ -8258,11 +8353,15 @@ new_arg_name:
                   /* However, it is legal for the argument list of an inline
                    * closure.
                    */
-                  redeclare_local($2, $1, block_depth);
+                  varident = redeclare_local($2, $1, block_depth);
               }
           }
           else
-              add_local_name($2, $1, block_depth);
+              varident = add_local_name($2, $1, block_depth);
+
+          /* Arguments may be ignored,
+           * thus will not show a warning if done so. */
+          use_variable(varident, VAR_USAGE_READWRITE);
       }
 ; /* new_arg_name */
 
@@ -8298,6 +8397,7 @@ name_list:
 
       L_ASSIGN expr0
       {
+          use_variable($5.name, VAR_USAGE_READ);
           init_global_variable($<number>3, $2, $1, $4, $5.type);
           free_fulltype($5.type);
           $$ = $1;
@@ -8332,6 +8432,7 @@ name_list:
           type.t_type = get_array_type_with_depth($1.t_type, $3);
           type.t_flags = $1.t_flags;
 
+          use_variable($7.name, VAR_USAGE_READ);
           init_global_variable($<number>5, $4, type, $6, $7.type);
 
           free_fulltype(type);
@@ -8397,6 +8498,7 @@ local_name_list:
       }
       L_ASSIGN expr0
       {
+          use_variable($5.name, VAR_USAGE_READ);
           init_local_variable($2, &$<lvalue>3, $4, $5.type);
 
           free_fulltype($5.type);
@@ -8418,6 +8520,7 @@ local_name_list:
       }
       L_ASSIGN expr0
       {
+          use_variable($7.name, VAR_USAGE_READ);
           init_local_variable($4, &$<lvalue>5, $6, $7.type);
 
           free_fulltype($7.type);
@@ -8533,6 +8636,8 @@ return:
 %line
           fulltype_t type2 = $2.type;
 
+          use_variable($2.name, VAR_USAGE_READ);
+
           if (exact_types)
           {
               check_unknown_type(type2.t_type);
@@ -8595,6 +8700,7 @@ while:
           p_int length = CURRENT_PROGRAM_SIZE - addr;
           bytecode_p expression;
 
+          use_variable($4.name, VAR_USAGE_READ);
           check_unknown_type($4.type.t_type);
 
           /* Take the <cond> code, add the BBRANCH instruction and
@@ -8772,6 +8878,7 @@ do:
           mp_uint current;
           bytecode_p dest;
 
+          use_variable($7.name, VAR_USAGE_READ);
           check_unknown_type($7.type.t_type);
 
           current = CURRENT_PROGRAM_SIZE;
@@ -9112,6 +9219,9 @@ expr_decl:
 
           add_type_check($1.type, TYPECHECK_VAR_INIT);
 
+          use_variable($3.name, VAR_USAGE_READ);
+          use_variable($1.name, ($3.type.t_flags & TYPE_MOD_REFERENCE) ? VAR_USAGE_READWRITE : VAR_USAGE_WRITE);
+
           /* Add the bytecode to create the lvalue and do the
            * assignment.
            */
@@ -9156,6 +9266,7 @@ for_cond_expr:
       }
     | comma_expr
       {
+          use_variable($1.name, VAR_USAGE_READ);
           check_unknown_type($1.type.t_type);
           free_fulltype($1.type);
       }
@@ -9370,6 +9481,10 @@ foreach_var_decl:  /* Generate the code for one lvalue */
 
           free_lpctype($1.type);
 
+          /* We allow non-read variables without warnings for foreach,
+             so mark them as read. */
+          use_variable($1.name, VAR_USAGE_READWRITE);
+
           if (!res)
               YYACCEPT;
       }
@@ -9413,6 +9528,7 @@ foreach_expr:
           gen_refs = ($1.type.t_flags & TYPE_MOD_REFERENCE) != 0;
           dtype = $1.type.t_type;
 
+          use_variable($1.name, VAR_USAGE_READ);
           check_unknown_type(dtype);
 
           /* Allowed are arrays of all kinds, strings, mappings,
@@ -9446,6 +9562,9 @@ foreach_expr:
           }
 
           dtype = $1.type.t_type;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           if (!check_unknown_type(dtype)
            && !lpctype_contains(lpctype_int, dtype))
@@ -9506,6 +9625,7 @@ switch:
 
         case_state_t *statep;
 %line
+        use_variable($3.name, VAR_USAGE_READ);
         check_unknown_type($3.type.t_type);
 
         current_break_stack_need++;
@@ -9760,6 +9880,7 @@ condStart:
           mp_uint current;
           bytecode_p current_code;
 
+          use_variable($3.name, VAR_USAGE_READ);
           check_unknown_type($3.type.t_type);
 
           /* Turn off the case labels */
@@ -9977,6 +10098,7 @@ comma_expr:
       {
           $$.start = $1.start;
           $$.type = $4.type;
+          $$.name = $4.name;
 
           free_fulltype($1.type);
       }
@@ -10148,6 +10270,20 @@ expr0:
           }
           $$.type = restype;
 
+          /* For a normal assignment the lvalue is not marked as
+           * read, even if the resulting expr0 is used, because the
+           * assignment itself is then still superfluous. For all
+           * other assignments the lvalue's content is used.
+           */
+          if ($2 == F_ASSIGN)
+              $$.name = NULL;
+          else
+              $$.name = $1.name;
+
+          use_variable($4.name, VAR_USAGE_READ);
+          if ($4.type.t_flags & TYPE_MOD_REFERENCE)
+              use_variable($1.name, VAR_USAGE_READWRITE);
+
           free_lpctype($1.type);
           free_fulltype($4.type);
       }
@@ -10166,6 +10302,7 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '?'
       {
+          use_variable($1.name, VAR_USAGE_READ);
           check_unknown_type($1.type.t_type);
 
           /* Insert the branch to the :-part and remember this address */
@@ -10266,6 +10403,10 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(get_union_type(type1.t_type, type2.t_type));
+          $$.name = NULL;
+
+          use_variable($4.name, VAR_USAGE_READ);
+          use_variable($7.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($4.type);
@@ -10275,6 +10416,7 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_LOR %prec L_LOR
       {
+          use_variable($1.name, VAR_USAGE_READ);
           check_unknown_type($1.type.t_type);
 
           /* Insert the LOR and remember the position */
@@ -10295,6 +10437,7 @@ expr0:
 
           /* Determine the result type */
           $$.type.t_type = get_union_type($1.type.t_type, $4.type.t_type);
+          $$.name = $4.name;
 
           free_fulltype($1.type);
           free_fulltype($4.type);
@@ -10303,6 +10446,7 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_LAND %prec L_LAND
       {
+          use_variable($1.name, VAR_USAGE_READ);
           check_unknown_type($1.type.t_type);
 
           /* Insert the LAND and remember the position */
@@ -10323,6 +10467,7 @@ expr0:
 
           /* Determine the result type */
           $$.type = $4.type; /* It's the second value or zero. */
+          $$.name = $4.name;
 
           free_fulltype($1.type);
        } /* LAND */
@@ -10334,6 +10479,10 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(result);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
@@ -10348,6 +10497,10 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(result);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
@@ -10362,6 +10515,10 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(result);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
@@ -10380,6 +10537,9 @@ expr0:
                       , get_two_fulltypes($1.type, $3.type));
           }
 
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
+
           free_fulltype($1.type);
           free_fulltype($3.type);
           free_lpctype(result);
@@ -10388,6 +10548,7 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
+          $$.name = NULL;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10401,6 +10562,9 @@ expr0:
                       , get_two_fulltypes($1.type, $3.type));
           }
 
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
+
           free_fulltype($1.type);
           free_fulltype($3.type);
           free_lpctype(result);
@@ -10409,6 +10573,7 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
+          $$.name = NULL;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10419,6 +10584,10 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
@@ -10432,6 +10601,10 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
@@ -10445,6 +10618,10 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
@@ -10458,6 +10635,10 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
@@ -10473,6 +10654,10 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
@@ -10487,6 +10672,10 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
@@ -10501,6 +10690,10 @@ expr0:
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
@@ -10597,6 +10790,11 @@ expr0:
               ins_f_code(F_ADD);
           }
 
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($4.name, VAR_USAGE_READ);
+
           free_fulltype($1.type);
           free_fulltype($4.type);
       } /* '+' */
@@ -10608,6 +10806,10 @@ expr0:
           $$ = $1;
           lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "-", types_subtraction, lpctype_mixed);
           $$.type = get_fulltype(result);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           ins_f_code(F_SUBTRACT);
           free_fulltype($1.type);
@@ -10620,6 +10822,10 @@ expr0:
           $$ = $1;
           lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "*", types_multiplication, lpctype_mixed);
           $$.type = get_fulltype(result);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           ins_f_code(F_MULTIPLY);
           free_fulltype($1.type);
@@ -10632,6 +10838,10 @@ expr0:
           $$ = $1;
           lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "%", types_modulus, lpctype_int);
           $$.type = get_fulltype(result);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           ins_f_code(F_MOD);
           free_fulltype($1.type);
@@ -10643,6 +10853,10 @@ expr0:
           $$ = $1;
           lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "/", types_division, lpctype_int);
           $$.type = get_fulltype(result);
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
 
           ins_f_code(F_DIVIDE);
           free_fulltype($1.type);
@@ -10793,6 +11007,7 @@ expr0:
           }
 
           $$.type = get_fulltype(result);
+          $$.name = $2.name;
 
           free_lpctype($2.type);
       }
@@ -10876,6 +11091,7 @@ expr0:
 
           /* Check the types */
           $$.type = get_fulltype(check_unary_op_type($1.type, "++", types_unary_math, lpctype_mixed));
+          $$.name = $1.name;
 
           free_lpctype($1.type);
       } /* post-inc */
@@ -10895,6 +11111,7 @@ expr0:
 
           /* Check the types */
           $$.type = get_fulltype(check_unary_op_type($1.type, "--", types_unary_math, NULL));
+          $$.name = $1.name;
 
           free_lpctype($1.type);
       } /* post-dec */
@@ -10918,6 +11135,7 @@ expr0:
           $$.start = current;
           $$.type = get_fulltype($1.type); /* Adapt the reference. */
           $$.type.t_flags |= TYPE_MOD_REFERENCE;
+          $$.name = $1.name;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10971,6 +11189,11 @@ expr0:
           }
 
           $$.type = restype;
+          $$.name = NULL;
+
+          use_variable($3.name, VAR_USAGE_READ);
+          if ($3.type.t_flags & TYPE_MOD_REFERENCE)
+              use_variable($1.name, VAR_USAGE_READWRITE);
 
           free_lpctype($1.type);
           free_fulltype($3.type);
@@ -10982,6 +11205,7 @@ expr0:
 %line
           $$.start = $1.start;
           $$.type = $1.type;
+          $$.name = $1.name;
 
           free_lvalue_block($1.lvalue);
       }
@@ -10994,12 +11218,14 @@ lvalue_reference:
       '&' name_lvalue
       {
           $$ = $2;
+          use_variable($2.name, VAR_USAGE_READWRITE);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '&' '(' lvalue ')'
       {
           $$ = $3;
+          use_variable($3.name, VAR_USAGE_READWRITE);
       }
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '&' '(' function_call ')'
@@ -11034,24 +11260,28 @@ expr4:
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.start =  $1.start;
           $$.type =   $1.type;
+          $$.name =   NULL;
       }
     | inline_func    %prec '~'
       {
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.start =  $1.start;
           $$.type =   $1.type;
+          $$.name =   NULL;
       }
     | catch          %prec '~'
       {
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.start =  $1.start;
           $$.type =   $1.type;
+          $$.name =   NULL;
       }
     | sscanf         %prec '~'
       {
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.start =  $1.start;
           $$.type =   $1.type;
+          $$.name =   NULL;
       }
 %ifdef USE_PARSE_COMMAND
     | parse_command  %prec '~'
@@ -11059,6 +11289,7 @@ expr4:
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.start =  $1.start;
           $$.type =   $1.type;
+          $$.name =   NULL;
       }
 %endif /* USE_PARSE_COMMAND */
 
@@ -11074,6 +11305,7 @@ expr4:
           $$.start = last_expression = CURRENT_PROGRAM_SIZE;
           $$.type = get_fulltype(lpctype_string);
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
 
           ins_prog_string(p);
       }
@@ -11090,6 +11322,7 @@ expr4:
           $$.start = CURRENT_PROGRAM_SIZE;
           $$.type = get_fulltype(lpctype_bytes);
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
       }
 
     | L_BYTES
@@ -11103,6 +11336,7 @@ expr4:
           $$.start = last_expression = CURRENT_PROGRAM_SIZE;
           $$.type = get_fulltype(lpctype_bytes);
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
 
           ins_prog_string(p);
       }
@@ -11118,6 +11352,7 @@ expr4:
 %line
           $$.start = last_expression = current = CURRENT_PROGRAM_SIZE;
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
           number = $1;
           if ( number == 0 )
           {
@@ -11163,6 +11398,7 @@ expr4:
 
           $$.start = CURRENT_PROGRAM_SIZE;
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
           if (!pragma_warn_deprecated)
               ins_byte(F_NO_WARN_DEPRECATED);
           ix = $1.number;
@@ -11191,10 +11427,13 @@ expr4:
               {
                   // closure to global variable
                   // the lexxer only creates closure to non-virtual variables - our luck ;)
-                  variable_t *varp = NV_VARIABLE(ix - CLOSURE_IDENTIFIER_OFFS - num_virtual_variables);
+                  int varidx = ix - CLOSURE_IDENTIFIER_OFFS - num_virtual_variables;
+                  variable_t *varp = NV_VARIABLE(varidx);
+
                   if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
                       yywarnf("Creating closure to deprecated global variable %s.\n",
                               get_txt(varp->name));
+                  GLOBAL_VARIABLE(varidx).usage = VAR_USAGE_READWRITE;
               }
           }
           ins_f_code(F_CLOSURE);
@@ -11213,6 +11452,7 @@ expr4:
 
           $$.start = CURRENT_PROGRAM_SIZE;
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
           quotes = $1.quotes;
           string_number = store_prog_string($1.name);
           if (quotes == 1 && string_number < 0x100)
@@ -11238,6 +11478,7 @@ expr4:
 
           $$.start = CURRENT_PROGRAM_SIZE;
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
           ins_f_code(F_FLOAT);
 #ifdef FLOAT_FORMAT_2
           ins_double($1);
@@ -11257,6 +11498,7 @@ expr4:
           $$.type = $3.type;
           $$.start = $2;
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name = $3.name;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11271,6 +11513,7 @@ expr4:
           $$.type = get_fulltype(get_aggregate_type($4));
           $$.start = $3;
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11292,6 +11535,7 @@ expr4:
           $$.type = get_fulltype(lpctype_quoted_array);
           $$.start = $2;
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
           quotes = $1;
           do {
                 ins_f_code(F_QUOTE);
@@ -11312,11 +11556,13 @@ expr4:
       {
           ins_f_code(F_M_ALLOCATE);
 
+          use_variable($6.name, VAR_USAGE_READ);
           check_unknown_type($6.type.t_type);
 
           $$.type = get_fulltype(lpctype_mapping);
           $$.start = $4;
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name = NULL;
 
           free_fulltype($6.type);
       }
@@ -11351,6 +11597,7 @@ expr4:
           $$.type = get_fulltype(lpctype_mapping);
           $$.start = $3;
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11360,6 +11607,7 @@ expr4:
           $$.type = get_fulltype(lpctype_unknown);
           $$.start = $3;
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
       }
     | '(' '<' note_start error ')'
       {
@@ -11367,6 +11615,7 @@ expr4:
           $$.type = get_fulltype(lpctype_unknown);
           $$.start = $3;
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
       }
     | '(' '<' identifier '>'
       {
@@ -11420,6 +11669,7 @@ expr4:
           $$.type = get_fulltype(get_struct_type(pdef->type));
           $$.start = $6;
           $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11544,6 +11794,8 @@ expr4:
               }
               CURRENT_PROGRAM_SIZE = current + 2;
           }
+
+          $$.name = varident;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11579,7 +11831,9 @@ expr4:
 
           /* Put that expression also into an lvalue buffer. */
           $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, $2.strict_member ? F_S_INDEX_LVALUE : F_SX_INDEX_LVALUE);
+          $$.name = NULL;
 
+          use_variable($1.name, VAR_USAGE_READ);
           ins_f_code($2.strict_member ? F_S_INDEX : F_SX_INDEX);
 
           free_fulltype($1.type);
@@ -11613,6 +11867,9 @@ expr4:
 
           /* Check and compute the types */
           $$.type = get_fulltype(get_index_result_type($1.type.t_type, $2.type1, $2.rvalue_inst, lpctype_mixed));
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($2.type1);
@@ -11646,6 +11903,9 @@ expr4:
 
           /* Check the types */
           $$.type = get_fulltype(check_unary_op_type($1.type.t_type, "range index", types_range_index, lpctype_mixed));
+          $$.name = NULL;
+
+          use_variable($1.name, VAR_USAGE_READ);
 
           if (!lpctype_contains(lpctype_int, $2.type1.t_type))
               fulltype_error("Bad type of index", $2.type1);
@@ -11672,6 +11932,8 @@ expr4:
           free_lvalue_block($1.lvalue);
           $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, F_MAP_INDEX_LVALUE);
           $$.type = get_fulltype(lpctype_mixed);
+          $$.name = NULL;
+
           ins_f_code(F_MAP_INDEX);
 
           /* Check and compute types */
@@ -11686,6 +11948,10 @@ expr4:
 
           if (exact_types && !lpctype_contains(lpctype_int, $5.type.t_type))
               fulltype_error("Bad type of index", $5.type);
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
@@ -11792,6 +12058,9 @@ name_lvalue:
                   $$.num_arg = 1;
               }
           }
+
+          $$.name = varident;
+          use_variable(varident, VAR_USAGE_WRITE);
       }
 ; /* name_lvalue */
 
@@ -11822,6 +12091,7 @@ lvalue:
               $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, $2.lvalue_inst);
           }
 
+          $$.name = NULL;
           $$.vlvalue_inst = $2.vlvalue_inst;
           $$.num_arg = 0;
 
@@ -11831,6 +12101,8 @@ lvalue:
 
           /* Check and compute the types */
           $$.type = get_index_result_type($1.type.t_type, $2.type1, $2.rvalue_inst, lpctype_mixed);
+
+          use_variable($1.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($2.type1);
@@ -11851,6 +12123,7 @@ lvalue:
           free_lvalue_block($1.lvalue);
           $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, F_MAP_INDEX_LVALUE);
           $$.type = lpctype_mixed;
+          $$.name = NULL;
 
           $$.vlvalue_inst = F_MAP_INDEX_VLVALUE;
           $$.num_arg = 0;
@@ -11869,6 +12142,10 @@ lvalue:
 
           if (exact_types && !lpctype_contains(lpctype_int, $5.type.t_type))
               fulltype_error("Bad type of index", $5.type);
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
@@ -11901,6 +12178,7 @@ lvalue:
               $$.lvalue = compose_lvalue_block($1.lvalue, F_MAKE_PROTECTED, $2.start, $2.lvalue_inst);
           }
 
+          $$.name = NULL;
           $$.vlvalue_inst = 0;
           $$.num_arg = 0;
 
@@ -11915,6 +12193,8 @@ lvalue:
               fulltype_error("Bad type of index", $2.type1);
           if (exact_types && !lpctype_contains(lpctype_int, $2.type2.t_type))
               fulltype_error("Bad type of index", $2.type2);
+
+          use_variable($1.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($2.type1);
@@ -11959,6 +12239,7 @@ lvalue:
 
               /* Now move that into an lvalue buffer. */
               $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, 0);
+              $$.name = NULL;
 
               $$.vlvalue_inst = $2.strict_member ? F_S_INDEX_VLVALUE : F_SX_INDEX_VLVALUE;
               $$.num_arg = 0;
@@ -11969,6 +12250,8 @@ lvalue:
 
               $$.type = result;
           }
+
+          use_variable($1.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
       }
@@ -11985,6 +12268,7 @@ lvalue:
 
            $$.type = lpctype_mixed;
            $$.lvalue = (lvalue_block_t) {0, 0};
+           $$.name = NULL;
            $$.vlvalue_inst = 0;
            $$.num_arg = 0;
       }
@@ -12038,6 +12322,7 @@ index_expr :
                 $$.end++;
             }
 
+            use_variable($2.name, VAR_USAGE_READ);
         }
 
     | '[' '<' expr0 ']'
@@ -12054,6 +12339,8 @@ index_expr :
                 ins_byte(F_NO_WARN_DEPRECATED);
                 $$.end++;
             }
+
+            use_variable($3.name, VAR_USAGE_READ);
         }
 
     | '[' '>' expr0 ']'
@@ -12070,6 +12357,8 @@ index_expr :
                 ins_byte(F_NO_WARN_DEPRECATED);
                 $$.end++;
             }
+
+            use_variable($3.name, VAR_USAGE_READ);
         }
 
 ; /* index_expr */
@@ -12114,6 +12403,8 @@ index_range :
           $$.end          = CURRENT_PROGRAM_SIZE;
           $$.type1        = get_fulltype(lpctype_int);
           $$.type2        = $3.type;
+
+          use_variable($3.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12155,6 +12446,8 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = get_fulltype(lpctype_int);
           $$.type2       = $4.type;
+
+          use_variable($4.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12196,6 +12489,8 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = get_fulltype(lpctype_int);
           $$.type2       = $4.type;
+
+          use_variable($4.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12210,6 +12505,9 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = $2.type;
           $$.type2       = $4.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($4.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12224,6 +12522,9 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = $2.type;
           $$.type2       = $5.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12238,6 +12539,9 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = $3.type;
           $$.type2       = $5.type;
+
+          use_variable($3.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12252,6 +12556,9 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = $3.type;
           $$.type2       = $6.type;
+
+          use_variable($3.name, VAR_USAGE_READ);
+          use_variable($6.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12266,6 +12573,9 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = $2.type;
           $$.type2       = $5.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12280,6 +12590,9 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = $3.type;
           $$.type2       = $5.type;
+
+          use_variable($3.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12294,6 +12607,9 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = $3.type;
           $$.type2       = $6.type;
+
+          use_variable($3.name, VAR_USAGE_READ);
+          use_variable($6.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12308,6 +12624,9 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = $3.type;
           $$.type2       = $6.type;
+
+          use_variable($3.name, VAR_USAGE_READ);
+          use_variable($6.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12322,6 +12641,9 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = $3.type;
           $$.type2       = $6.type;
+
+          use_variable($3.name, VAR_USAGE_READ);
+          use_variable($6.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12336,6 +12658,8 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = $2.type;
           $$.type2       = get_fulltype(lpctype_int);
+
+          use_variable($2.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12354,6 +12678,8 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = $3.type;
           $$.type2       = get_fulltype(lpctype_int);
+
+          use_variable($3.name, VAR_USAGE_READ);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12372,6 +12698,8 @@ index_range :
           $$.end         = CURRENT_PROGRAM_SIZE;
           $$.type1       = $3.type;
           $$.type2       = get_fulltype(lpctype_int);
+
+          use_variable($3.name, VAR_USAGE_READ);
       }
 ; /* index_range */
 
@@ -12389,8 +12717,8 @@ expr_list:
 ; /* expr_list */
 
 expr_list2:
-      expr0                 { $$ = 1;      add_arg_type($1.type); check_unknown_type($1.type.t_type); }
-    | expr_list2 ',' expr0  { $$ = $1 + 1; add_arg_type($3.type); check_unknown_type($3.type.t_type); }
+      expr0                 { $$ = 1;      add_arg_type($1.type); check_unknown_type($1.type.t_type); use_variable($1.name, VAR_USAGE_READ); }
+    | expr_list2 ',' expr0  { $$ = $1 + 1; add_arg_type($3.type); check_unknown_type($3.type.t_type); use_variable($3.name, VAR_USAGE_READ); }
 ; /* expr_list2 */
 
 
@@ -12407,6 +12735,7 @@ arg_expr_list2:
       expr0
       {
           $$ = 1;
+          use_variable($1.name, VAR_USAGE_READ);
           if (!got_ellipsis[argument_level])
               add_arg_type($1.type);
           else
@@ -12427,6 +12756,7 @@ arg_expr_list2:
           $$ = 0;
           got_ellipsis[argument_level] = MY_TRUE;
           add_f_code(F_FLATTEN_XARG);
+          use_variable($1.name, VAR_USAGE_READ);
           free_fulltype($1.type);
           CURRENT_PROGRAM_SIZE++;
       }
@@ -12434,6 +12764,7 @@ arg_expr_list2:
     | arg_expr_list2 ',' expr0
       {
           $$ = $1 + 1;
+          use_variable($3.name, VAR_USAGE_READ);
           if (!got_ellipsis[argument_level])
               add_arg_type($3.type);
           else
@@ -12450,6 +12781,7 @@ arg_expr_list2:
           $$ = $1;
           got_ellipsis[argument_level] = MY_TRUE;
           add_f_code(F_FLATTEN_XARG);
+          use_variable($3.name, VAR_USAGE_READ);
           free_fulltype($3.type);
           CURRENT_PROGRAM_SIZE++;
       }
@@ -12471,6 +12803,7 @@ m_expr_list2:
           $$[1] = $2;
           add_arg_type($1.type); /* order doesn't matter */
           check_unknown_type($1.type.t_type);
+          use_variable($1.name, VAR_USAGE_READ);
       }
 
     | m_expr_list2 ',' expr0 m_expr_values
@@ -12482,12 +12815,13 @@ m_expr_list2:
           $$[1] = $1[1];
           add_arg_type($3.type);
           check_unknown_type($3.type.t_type);
+          use_variable($3.name, VAR_USAGE_READ);
       }
 ; /* m_expr_list2 */
 
 m_expr_values:
-      ':' expr0                { $$ = 1;      add_arg_type($2.type); check_unknown_type($2.type.t_type); }
-    | m_expr_values ';' expr0  { $$ = $1 + 1; add_arg_type($3.type); check_unknown_type($3.type.t_type); }
+      ':' expr0                { $$ = 1;      add_arg_type($2.type); check_unknown_type($2.type.t_type); use_variable($2.name, VAR_USAGE_READ); }
+    | m_expr_values ';' expr0  { $$ = $1 + 1; add_arg_type($3.type); check_unknown_type($3.type.t_type); use_variable($3.name, VAR_USAGE_READ); }
 ; /* m_expr_values */
 
 
@@ -12515,6 +12849,7 @@ struct_member_name:
            && !lpctype_contains(lpctype_int, $2.type.t_type))
               fulltype_error("Illegal type for struct member name", $2.type);
 
+          use_variable($2.name, VAR_USAGE_READ);
           free_fulltype($2.type);
       }
 
@@ -12573,11 +12908,15 @@ struct_init:
       {
           $$.name = $1;
           $$.type = $3.type;
+
+          use_variable($3.name, VAR_USAGE_READ);
       }
     | expr0
       {
           $$.name = NULL;
           $$.type = $1.type;
+
+          use_variable($1.name, VAR_USAGE_READ);
       }
 ; /* struct_init */
 
@@ -13434,6 +13773,8 @@ function_call:
 
           argument_level--;
 
+          use_variable($1.name, VAR_USAGE_READ);
+
           free_fulltype($1.type);
       }
 
@@ -13466,6 +13807,8 @@ call_other_name:
            && !lpctype_contains(lpctype_string, $2.type.t_type))
               fulltype_error("Illegal type for lfun name", $2.type);
           free_fulltype($2.type);
+
+          use_variable($2.name, VAR_USAGE_READ);
       }
 
 ; /* call_other_name */
@@ -13699,6 +14042,7 @@ catch:
 
           $$.start = origstart;
           $$.type  = get_fulltype(lpctype_string);
+          $$.name  = NULL;
       }
 ; /* catch */
 
@@ -13782,6 +14126,9 @@ opt_catch_modifier :
                       "expected 'nolog', 'publish' or 'reserve <expr>'"
                       , get_txt($1)
                       );
+
+          use_variable($2.name, VAR_USAGE_READ);
+
           free_mstring($1);
           free_fulltype($2.type);
       }
@@ -13819,6 +14166,10 @@ sscanf:
           ins_byte($7 + 2);
           $$.start = $2;
           $$.type = get_fulltype(lpctype_int);
+          $$.name = NULL;
+
+          use_variable($4.name, VAR_USAGE_READ);
+          use_variable($6.name, VAR_USAGE_READ);
 
           free_fulltype($4.type);
           free_fulltype($6.type);
@@ -13856,6 +14207,11 @@ parse_command:
           ins_byte($9 + 3);
           $$.start = $2;
           $$.type = get_fulltype(lpctype_int);
+          $$.name = NULL;
+
+          use_variable($4.name, VAR_USAGE_READ);
+          use_variable($6.name, VAR_USAGE_READ);
+          use_variable($8.name, VAR_USAGE_READ);
 
           free_fulltype($4.type);
           free_fulltype($6.type);
@@ -13982,6 +14338,7 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
         lv->num_arg = 1;
 
         lv->type = actual_type;
+        lv->name = q;
     }
 
     if (!with_init)
@@ -14043,10 +14400,76 @@ if (current_inline && current_inline->parse_context)
     }
 
     add_type_check(lv->type, TYPECHECK_VAR_INIT);
+    use_variable(name, (exprtype.t_flags & TYPE_MOD_REFERENCE) ? VAR_USAGE_READWRITE : VAR_USAGE_WRITE);
 
     if (!add_lvalue_code(lv, F_VOID_ASSIGN))
         return;
 } /* init_local_variable() */
+
+/*-------------------------------------------------------------------------*/
+static void
+use_variable (ident_t* name, enum variable_usage usage)
+
+/* Registers the usage for the local variable.
+ * If <name> is NULL, this function does nothign.
+ */
+
+{
+    if (!name)
+        return;
+
+    if (name->type == I_TYPE_GLOBAL)
+    {
+        int idx = name->u.global.variable;
+        if (!(idx & VIRTUAL_VAR_TAG))
+            GLOBAL_VARIABLE(idx).usage |= usage;
+    }
+    else if (name->u.local.context >= 0)
+    {
+        // Do we have to look at the outer closure?
+        if (name->u.local.depth <= current_inline->block_depth)
+            // We must only look at the next one, because check_for_context_local()
+            // will have created any intermediate context variables.
+            LOCAL_VARIABLE(current_inline->full_context_var_start + name->u.local.context).usage |= usage;
+        else
+            context_variables[name->u.local.context].usage |= usage;
+    }
+    else
+    {
+        local_variables[name->u.local.num].usage |= usage;
+    }
+
+} /* use_variable() */
+
+/*-------------------------------------------------------------------------*/
+static void
+warn_variable_usage (string_t* name, enum variable_usage usage, const char* prefix)
+
+/* Check whether the usage warrants a warning and if so issue one.
+ * The pragma warn_unused_variable is not checked here.
+ */
+
+{
+    switch (usage)
+    {
+        case VAR_USAGE_NONE:
+            yywarnf("%s variable %s was never used", prefix, get_txt(name));
+            break;
+
+        case VAR_USAGE_WRITE:
+            yywarnf("%s variable %s was assigned a value, but never used", prefix, get_txt(name));
+            break;
+
+        case VAR_USAGE_READ:
+            yywarnf("%s variable %s was never assigned a value, but was used", prefix, get_txt(name));
+            break;
+
+        case VAR_USAGE_READWRITE:
+            /* Everything is fine. */
+            break;
+    }
+
+} /* warn_variable_usage() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -17061,13 +17484,13 @@ prolog (const char * fname, Bool isMasterObj)
         mem_block[i].max_size = START_BLOCK_SIZE;
     }
 
-    extend_mem_block(A_LOCAL_TYPES, MAX_LOCAL * sizeof(A_LOCAL_TYPES_t));
-    memset(&LOCAL_TYPE(0), 0, LOCAL_TYPE_COUNT * sizeof(A_LOCAL_TYPES_t));
+    extend_mem_block(A_LOCAL_VARIABLES, MAX_LOCAL * sizeof(A_LOCAL_VARIABLES_t));
+    memset(&LOCAL_VARIABLE(0), 0, LOCAL_VARIABLE_COUNT * sizeof(A_LOCAL_VARIABLES_t));
 
-    type_of_locals = &(LOCAL_TYPE(0));
-    type_of_context = type_of_locals;
+    local_variables = &(LOCAL_VARIABLE(0));
+    context_variables = local_variables;
 #ifdef DEBUG_INLINES
-printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
+printf("DEBUG: prolog: type ptrs: %p, %p\n", local_variables, context_variables );
 #endif /* DEBUG_INLINES */
 
     compiled_file = fname;
@@ -17494,6 +17917,19 @@ epilog (void)
         }
 
         /* Done: functions are sorted, resolved, etc etc */
+
+        /* Check for unused variables. */
+        if (pragma_warn_unused_variables)
+        {
+            for (int vidx = 0; vidx < GLOBAL_VARIABLE_COUNT; vidx++)
+            {
+                /* Check only private variables, that were not inherited. */
+                variable_t *varp = NV_VARIABLE(vidx);
+                if ((varp->type.t_flags & (NAME_INHERITED|TYPE_MOD_PRIVATE)) == TYPE_MOD_PRIVATE)
+                    warn_variable_usage(varp->name, GLOBAL_VARIABLE(vidx).usage, "Global");
+            }
+        }
+
     } /* if (parse successful) */
 
     /* Free unneeded memory */
@@ -17845,8 +18281,8 @@ epilog (void)
             xfree(mem_block[i].block);
         }
 
-        type_of_locals = NULL;
-        type_of_context = NULL;
+        local_variables = NULL;
+        context_variables = NULL;
 
         /* Reference the program and all inherits, but avoid multiple
          * referencing when an object inherits more than one object
@@ -17903,8 +18339,8 @@ epilog (void)
             xfree(mem_block[i].block);
         }
 
-        type_of_locals = NULL;
-        type_of_context = NULL;
+        local_variables = NULL;
+        context_variables = NULL;
         return;
     }
 
