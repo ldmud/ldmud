@@ -3846,6 +3846,7 @@ check_for_context_local (ident_t *ident, lpctype_t ** pType)
        )
     {
         inline_closure_t *closure;
+        A_LOCAL_TYPES_t *save_type_of_context = type_of_context;
         mp_int closure_nr;
         lpctype_t* type;
 
@@ -3901,23 +3902,35 @@ check_for_context_local (ident_t *ident, lpctype_t ** pType)
          */
         while (MY_TRUE)
         {
+            inline_closure_t *next_closure = (closure->next >= 0) ? &(INLINE_CLOSURE(closure->next)) : NULL;
+
             /* Skip closures whose context is being parsed,
              * because current_inline is not created
              * in their runtime.
              */
             if (!closure->parse_context)
             {
+                /* add_context_name() expects type_of_context to point to the
+                 * closure's block.
+                 */
+                if (next_closure)
+                    type_of_context = &(LOCAL_TYPE(next_closure->full_context_type_start));
+                else
+                    type_of_context = save_type_of_context;
+
                 ident = add_context_name(closure, ident, type,
                      ident->u.local.context >= 0
                      ? CONTEXT_VARIABLE_BASE + ident->u.local.context
                      : ident->u.local.num);
             }
 
-            if (closure->next == -1)
+            if (!next_closure)
                 break;
 
-            closure = &(INLINE_CLOSURE(closure->next));
+            closure = next_closure;
         }
+
+        type_of_context = save_type_of_context;
 
         *pType = type;
     }
