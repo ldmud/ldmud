@@ -27,6 +27,7 @@ extern svalue_t *f_strstr(svalue_t *);
 extern svalue_t *f_strrstr(svalue_t *);
 extern svalue_t *v_trim(svalue_t *, int num_arg);
 extern svalue_t *f_upper_case(svalue_t *);
+extern svalue_t *f_text_width(svalue_t *);
 extern svalue_t *v_terminal_colour(svalue_t *, int num_arg);
 #ifdef USE_PROCESS_STRING
 extern svalue_t *f_process_string(svalue_t *sp);  /* optional */

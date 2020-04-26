@@ -2148,6 +2148,63 @@ f_upper_case (svalue_t *sp)
 } /* f_upper_case() */
 
 /*-------------------------------------------------------------------------*/
+svalue_t *
+f_text_width (svalue_t *sp)
+
+/* EFUN text_width()
+ *
+ *    int text_width (string s)
+ *
+ * Calculate the screen width of <s>.
+ */
+
+{
+    string_t* str = sp->u.str;
+    char *s = get_txt(str);
+    size_t len = mstrsize(str);
+    p_int width = 0, col = 0;
+
+    for (size_t pos = 0; pos < len;)
+    {
+        switch (s[pos])
+        {
+            case '\t':
+                pos++;
+                col += 8 - (col % 8);
+                break;
+
+            case '\n':
+                pos++;
+                if (col > width)
+                    width = col;
+                col = 0;
+                break;
+
+            default:
+            {
+                int gwidth;
+                size_t glen = next_grapheme_break(s + pos, len - pos, &gwidth);
+
+                if (!glen)
+                    errorf("Invalid character in string at index %zd.\n", pos);
+
+                col += gwidth;
+                pos += glen;
+                break;
+            }
+        }
+    }
+
+    if (col > width)
+        width = col;
+
+    free_mstring(str);
+    put_number(sp, width);
+
+    return sp;
+} /* f_text_width() */
+
+/*-------------------------------------------------------------------------*/
 static Bool
 at_end (int i, int imax, int z, p_int *lens)
 

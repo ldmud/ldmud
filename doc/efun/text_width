@@ -1,0 +1,26 @@
+SYNOPSIS
+        int text_width(string str)
+
+DESCRIPTION
+        Returns the approximate screen width of the given string.
+
+        Normally the width is the same as the string length, but this efun
+        takes ANSI escape sequences and wide unicode characters into account.
+        Thus the result might be smaller or larger than the string length.
+
+        If the string contains line breaks the width of the widest line
+        is returned.
+
+        Note that the actual rendering of unicode strings is entirely
+        dependent upon the client's capabilities, regional context and the
+        fonts used there. So this efun will only return a guess for the
+        displayed width.
+
+EXAMPLES
+        text_width("\e[1mHeya!\e[0m") -> 5
+
+HISTORY
+        Introduced in LDMud 3.6.2.
+
+SEE ALSO
+        sizeof(E)
