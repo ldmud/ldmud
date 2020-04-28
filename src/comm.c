@@ -3030,7 +3030,7 @@ get_message (char *buff, size_t *bufflength)
                     if (O_IS_INTERACTIVE(snooper))
                     {
                         command_giver = snooper;
-                        add_message("%% %s\n", buff);
+                        add_message("%% %.*s\n", (int)*bufflength, buff);
                     }
                     else
                     {
@@ -3039,7 +3039,7 @@ get_message (char *buff, size_t *bufflength)
                          * from a very high stack depth, so alloca() is 
                          * probably ok. */
                         char *snoop_message = alloca(strlen(buff) + 4);
-                        sprintf(snoop_message, "%% %s\n", buff);
+                        sprintf(snoop_message, "%% %.*s\n", (int)*bufflength, buff);
                         tell_npc_str(snooper, snoop_message);
                     }
                     command_giver = ip->ob;
@@ -3063,7 +3063,7 @@ get_message (char *buff, size_t *bufflength)
 #endif /* SIMULATE_CHARMODE */
 
                 DTN(("--- return with line command ---\n"));
-                DTN(("--- '%s'\n", buff));
+                DTN(("--- '%.*s'\n", (int)*bufflength, buff));
                 return MY_TRUE;
             } /* if (have a command) */
 
