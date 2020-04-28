@@ -238,54 +238,54 @@ depend: $(SRC) $(GENSRC)
 
 # --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS FOLLOW ---
 access_check.o : access_check.h bytecode.h bytecode_gen.h comm.h config.h \
-    driver.h filestat.h machine.h pkg-gnutls.h pkg-openssl.h pkg-tls.h \
-    port.h sent.h simulate.h strfuns.h svalue.h typedefs.h xalloc.h
+    driver.h filestat.h iconv_opt.h machine.h pkg-gnutls.h pkg-openssl.h \
+    pkg-tls.h port.h sent.h simulate.h strfuns.h svalue.h typedefs.h \
+    xalloc.h
 
 actions.o : ../mudlib/sys/commands.h ../mudlib/sys/driver_hook.h actions.h \
     array.h backend.h bytecode.h bytecode_gen.h closure.h comm.h config.h \
-    driver.h dumpstat.h efuns.h exec.h hash.h interpret.h machine.h main.h \
-    mapping.h mstrings.h my-alloca.h object.h pkg-gcrypt.h pkg-gnutls.h \
-    pkg-openssl.h pkg-tls.h port.h sent.h simulate.h stdstrings.h strfuns.h \
-    svalue.h typedefs.h types.h wiz_list.h xalloc.h
-
-alloca.o : config.h driver.h machine.h mempools.h port.h typedefs.h
+    driver.h dumpstat.h efuns.h exec.h hash.h iconv_opt.h interpret.h \
+    machine.h main.h mapping.h mstrings.h my-alloca.h object.h pkg-gcrypt.h \
+    pkg-gnutls.h pkg-openssl.h pkg-tls.h port.h sent.h simulate.h \
+    stdstrings.h strfuns.h svalue.h typedefs.h types.h wiz_list.h xalloc.h
 
 array.o : array.h backend.h bytecode.h bytecode_gen.h closure.h config.h \
-    driver.h exec.h hash.h i-svalue_cmp.h interpret.h machine.h main.h \
-    mapping.h mempools.h mstrings.h my-alloca.h object.h port.h sent.h \
-    simulate.h stdstrings.h strfuns.h svalue.h swap.h typedefs.h types.h \
-    wiz_list.h xalloc.h
+    driver.h exec.h hash.h i-svalue_cmp.h iconv_opt.h interpret.h machine.h \
+    main.h mapping.h mempools.h mstrings.h my-alloca.h object.h port.h \
+    sent.h simulate.h stdstrings.h strfuns.h svalue.h swap.h typedefs.h \
+    types.h wiz_list.h xalloc.h
 
 arraylist.o : array.h arraylist.h backend.h bytecode.h bytecode_gen.h \
-    config.h driver.h exec.h interpret.h machine.h main.h port.h sent.h \
-    simulate.h strfuns.h svalue.h typedefs.h types.h xalloc.h
+    config.h driver.h exec.h iconv_opt.h interpret.h machine.h main.h \
+    port.h sent.h simulate.h strfuns.h svalue.h typedefs.h types.h xalloc.h
 
 backend.o : ../mudlib/sys/configuration.h ../mudlib/sys/debug_message.h \
     ../mudlib/sys/driver_hook.h ../mudlib/sys/signals.h actions.h array.h \
     backend.h bytecode.h bytecode_gen.h call_out.h closure.h comm.h \
     config.h driver.h ed.h exec.h filestat.h gcollect.h hash.h heartbeat.h \
-    i-eval_cost.h interpret.h lex.h machine.h main.h mapping.h mregex.h \
-    mstrings.h my-alloca.h object.h otable.h pkg-gnutls.h pkg-openssl.h \
-    pkg-python.h pkg-tls.h port.h random.h random/SFMT.h sent.h simulate.h \
-    stdstrings.h strfuns.h svalue.h swap.h typedefs.h types.h wiz_list.h \
-    xalloc.h
+    i-eval_cost.h iconv_opt.h interpret.h lex.h machine.h main.h mapping.h \
+    mregex.h mstrings.h my-alloca.h object.h otable.h pkg-gnutls.h \
+    pkg-openssl.h pkg-python.h pkg-tls.h port.h random.h random/SFMT.h \
+    sent.h simulate.h stdstrings.h strfuns.h svalue.h swap.h typedefs.h \
+    types.h wiz_list.h xalloc.h
 
 bitstrings.o : backend.h bitstrings.h bytecode.h bytecode_gen.h config.h \
-    driver.h exec.h hash.h interpret.h machine.h main.h mstrings.h port.h \
-    sent.h simulate.h strfuns.h svalue.h typedefs.h types.h xalloc.h
+    driver.h exec.h hash.h iconv_opt.h interpret.h machine.h main.h \
+    mstrings.h port.h sent.h simulate.h strfuns.h svalue.h typedefs.h \
+    types.h xalloc.h
 
 call_out.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_info.h \
     actions.h array.h backend.h bytecode.h bytecode_gen.h call_out.h \
     closure.h comm.h config.h driver.h exec.h gcollect.h hash.h \
-    i-eval_cost.h interpret.h machine.h main.h mstrings.h object.h \
-    pkg-gnutls.h pkg-openssl.h pkg-tls.h port.h sent.h simulate.h \
+    i-eval_cost.h iconv_opt.h interpret.h machine.h main.h mstrings.h \
+    object.h pkg-gnutls.h pkg-openssl.h pkg-tls.h port.h sent.h simulate.h \
     stdstrings.h strfuns.h svalue.h swap.h typedefs.h types.h wiz_list.h \
     xalloc.h
 
 closure.o : array.h backend.h bytecode.h bytecode_gen.h closure.h config.h \
-    driver.h exec.h hash.h i-svalue_cmp.h instrs.h interpret.h lex.h \
-    machine.h main.h mstrings.h my-alloca.h object.h pkg-python.h port.h \
-    prolang.h ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h \
+    driver.h exec.h hash.h i-svalue_cmp.h iconv_opt.h instrs.h interpret.h \
+    lex.h machine.h main.h mstrings.h my-alloca.h object.h pkg-python.h \
+    port.h prolang.h ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h \
     strfuns.h structs.h svalue.h swap.h switch.h typedefs.h types.h \
     xalloc.h
 
@@ -294,117 +294,104 @@ comm.o : ../mudlib/sys/comm.h ../mudlib/sys/configuration.h \
     ../mudlib/sys/interactive_info.h ../mudlib/sys/telnet.h access_check.h \
     actions.h array.h backend.h bytecode.h bytecode_gen.h closure.h comm.h \
     config.h driver.h ed.h exec.h filestat.h gcollect.h hash.h \
-    i-eval_cost.h interpret.h machine.h main.h mstrings.h my-alloca.h \
-    object.h pkg-gnutls.h pkg-mccp.h pkg-openssl.h pkg-pgsql.h pkg-python.h \
-    pkg-tls.h port.h sent.h simulate.h stdstrings.h strfuns.h svalue.h \
-    swap.h typedefs.h types.h util/erq/erq.h wiz_list.h xalloc.h
+    i-eval_cost.h iconv_opt.h interpret.h machine.h main.h mstrings.h \
+    my-alloca.h object.h pkg-gnutls.h pkg-mccp.h pkg-openssl.h pkg-pgsql.h \
+    pkg-python.h pkg-tls.h port.h sent.h simulate.h stdstrings.h strfuns.h \
+    svalue.h swap.h typedefs.h types.h util/erq/erq.h wiz_list.h xalloc.h
 
 dumpstat.o : array.h backend.h bytecode.h bytecode_gen.h closure.h config.h \
-    driver.h dumpstat.h exec.h filestat.h hash.h instrs.h interpret.h \
-    machine.h main.h mapping.h mstrings.h object.h port.h ptrtable.h sent.h \
-    simulate.h stdstrings.h strfuns.h structs.h svalue.h typedefs.h types.h \
-    xalloc.h
+    driver.h dumpstat.h exec.h filestat.h hash.h iconv_opt.h instrs.h \
+    interpret.h machine.h main.h mapping.h mstrings.h object.h port.h \
+    ptrtable.h sent.h simulate.h stdstrings.h strfuns.h structs.h svalue.h \
+    typedefs.h types.h xalloc.h
 
 ed.o : ../mudlib/sys/regexp.h actions.h backend.h bytecode.h bytecode_gen.h \
     comm.h config.h driver.h ed.h exec.h filestat.h gcollect.h hash.h \
-    interpret.h lex.h machine.h main.h mregex.h mstrings.h object.h \
-    pkg-gnutls.h pkg-openssl.h pkg-tls.h port.h sent.h simulate.h \
+    iconv_opt.h interpret.h lex.h machine.h main.h mregex.h mstrings.h \
+    object.h pkg-gnutls.h pkg-openssl.h pkg-tls.h port.h sent.h simulate.h \
     stdstrings.h strfuns.h svalue.h typedefs.h types.h xalloc.h
-
-efun_defs.o : bytecode.h bytecode_gen.h config.h driver.h exec.h machine.h \
-    port.h prolang.h typedefs.h types.h
 
 efuns.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_hook.h \
     ../mudlib/sys/driver_info.h ../mudlib/sys/object_info.h \
     ../mudlib/sys/regexp.h ../mudlib/sys/strings.h ../mudlib/sys/time.h \
     ../mudlib/sys/tls.h actions.h array.h backend.h bytecode.h \
     bytecode_gen.h call_out.h closure.h comm.h config.h driver.h dumpstat.h \
-    efuns.h exec.h gcollect.h hash.h heartbeat.h i-eval_cost.h interpret.h \
-    lex.h machine.h main.h mapping.h md5.h mempools.h mregex.h mstrings.h \
-    my-alloca.h my-rusage.h my-stdint.h object.h otable.h pkg-gcrypt.h \
-    pkg-gnutls.h pkg-openssl.h pkg-tls.h port.h ptrtable.h random.h \
-    random/SFMT.h sent.h sha1.h simulate.h stdstrings.h strfuns.h structs.h \
-    svalue.h swap.h typedefs.h types.h wiz_list.h xalloc.h
+    efuns.h exec.h gcollect.h hash.h heartbeat.h i-eval_cost.h iconv_opt.h \
+    interpret.h lex.h machine.h main.h mapping.h md5.h mempools.h mregex.h \
+    mstrings.h my-alloca.h my-rusage.h my-stdint.h object.h otable.h \
+    pkg-gcrypt.h pkg-gnutls.h pkg-openssl.h pkg-tls.h port.h ptrtable.h \
+    random.h random/SFMT.h sent.h sha1.h simulate.h stdstrings.h strfuns.h \
+    structs.h svalue.h swap.h typedefs.h types.h wiz_list.h xalloc.h
 
 files.o : ../mudlib/sys/driver_hook.h ../mudlib/sys/files.h array.h \
     backend.h bytecode.h bytecode_gen.h comm.h config.h driver.h exec.h \
-    files.h filestat.h hash.h interpret.h lex.h machine.h main.h mempools.h \
-    mstrings.h my-alloca.h pkg-gnutls.h pkg-openssl.h pkg-tls.h port.h \
-    sent.h simulate.h stdstrings.h strfuns.h svalue.h typedefs.h types.h \
-    xalloc.h
+    files.h filestat.h hash.h iconv_opt.h interpret.h lex.h machine.h \
+    main.h mempools.h mstrings.h my-alloca.h pkg-gnutls.h pkg-openssl.h \
+    pkg-tls.h port.h sent.h simulate.h stdstrings.h strfuns.h svalue.h \
+    typedefs.h types.h xalloc.h
 
 gcollect.o : ../mudlib/sys/driver_hook.h actions.h array.h backend.h \
     bytecode.h bytecode_gen.h call_out.h closure.h comm.h config.h driver.h \
     efuns.h exec.h filestat.h gcollect.h hash.h heartbeat.h i-eval_cost.h \
-    instrs.h interpret.h lex.h machine.h main.h mapping.h mempools.h \
-    mregex.h mstrings.h object.h otable.h parse.h pkg-gcrypt.h pkg-gnutls.h \
-    pkg-openssl.h pkg-pgsql.h pkg-python.h pkg-tls.h port.h prolang.h \
-    ptrtable.h random.h random/SFMT.h sent.h simul_efun.h simulate.h \
-    stdstrings.h strfuns.h structs.h svalue.h swap.h typedefs.h types.h \
-    wiz_list.h xalloc.h
+    iconv_opt.h instrs.h interpret.h lex.h machine.h main.h mapping.h \
+    mempools.h mregex.h mstrings.h object.h otable.h parse.h pkg-gcrypt.h \
+    pkg-gnutls.h pkg-openssl.h pkg-pgsql.h pkg-python.h pkg-tls.h port.h \
+    prolang.h ptrtable.h random.h random/SFMT.h sent.h simul_efun.h \
+    simulate.h stdstrings.h strfuns.h structs.h svalue.h swap.h typedefs.h \
+    types.h wiz_list.h xalloc.h
 
 hash.o : config.h driver.h machine.h port.h
 
 heartbeat.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_info.h \
     actions.h array.h backend.h bytecode.h bytecode_gen.h comm.h config.h \
-    driver.h exec.h gcollect.h hash.h heartbeat.h i-eval_cost.h interpret.h \
-    machine.h main.h mstrings.h object.h pkg-gnutls.h pkg-openssl.h \
-    pkg-tls.h port.h sent.h simulate.h strfuns.h svalue.h typedefs.h \
-    types.h wiz_list.h xalloc.h
+    driver.h exec.h gcollect.h hash.h heartbeat.h i-eval_cost.h iconv_opt.h \
+    interpret.h machine.h main.h mstrings.h object.h pkg-gnutls.h \
+    pkg-openssl.h pkg-tls.h port.h sent.h simulate.h strfuns.h svalue.h \
+    typedefs.h types.h wiz_list.h xalloc.h
 
 interpret.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_hook.h \
     ../mudlib/sys/driver_info.h ../mudlib/sys/trace.h actions.h array.h \
     backend.h bytecode.h bytecode_gen.h call_out.h closure.h comm.h \
     config.h driver.h efuns.h exec.h filestat.h gcollect.h hash.h \
-    heartbeat.h i-eval_cost.h instrs.h interpret.h lex.h machine.h main.h \
-    mapping.h mstrings.h my-alloca.h object.h otable.h parse.h pkg-gcrypt.h \
-    pkg-gnutls.h pkg-openssl.h pkg-python.h pkg-tls.h port.h prolang.h \
-    ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h strfuns.h \
-    structs.h svalue.h swap.h switch.h typedefs.h types.h wiz_list.h \
-    xalloc.h
-
-lang.o : ../mudlib/sys/driver_hook.h array.h backend.h bytecode.h \
-    bytecode_gen.h closure.h config.h driver.h exec.h gcollect.h hash.h \
-    i-eval_cost.h instrs.h interpret.h lex.h machine.h main.h mapping.h \
-    mstrings.h my-alloca.h object.h pkg-python.h port.h prolang.h \
-    ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h strfuns.h \
-    structs.h svalue.h swap.h switch.h typedefs.h types.h wiz_list.h \
-    xalloc.h
+    heartbeat.h i-eval_cost.h iconv_opt.h instrs.h interpret.h lex.h \
+    machine.h main.h mapping.h mstrings.h my-alloca.h object.h otable.h \
+    parse.h pkg-gcrypt.h pkg-gnutls.h pkg-openssl.h pkg-python.h pkg-tls.h \
+    port.h prolang.h ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h \
+    strfuns.h structs.h svalue.h swap.h switch.h typedefs.h types.h \
+    wiz_list.h xalloc.h
 
 lex.o : ../mudlib/sys/driver_hook.h array.h backend.h bytecode.h \
     bytecode_gen.h closure.h comm.h config.h driver.h efun_defs.c exec.h \
-    filestat.h gcollect.h hash.h i-eval_cost.h instrs.h interpret.h lang.h \
-    lex.h machine.h main.h mempools.h mstrings.h my-alloca.h object.h \
-    patchlevel.h pkg-gnutls.h pkg-openssl.h pkg-python.h pkg-tls.h port.h \
-    prolang.h ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h \
-    strfuns.h svalue.h typedefs.h types.h wiz_list.h xalloc.h
+    filestat.h gcollect.h hash.h i-eval_cost.h iconv_opt.h instrs.h \
+    interpret.h lang.h lex.h machine.h main.h mempools.h mstrings.h \
+    my-alloca.h object.h patchlevel.h pkg-gnutls.h pkg-openssl.h \
+    pkg-python.h pkg-tls.h port.h prolang.h ptrtable.h sent.h simul_efun.h \
+    simulate.h stdstrings.h strfuns.h svalue.h typedefs.h types.h \
+    wiz_list.h xalloc.h
 
 main.o : ../mudlib/sys/regexp.h access_check.h array.h backend.h bytecode.h \
     bytecode_gen.h comm.h config.h driver.h exec.h filestat.h gcollect.h \
-    hash.h i-eval_cost.h interpret.h lex.h machine.h main.h mapping.h \
-    mempools.h mregex.h mstrings.h my-alloca.h object.h otable.h \
+    hash.h i-eval_cost.h iconv_opt.h interpret.h lex.h machine.h main.h \
+    mapping.h mempools.h mregex.h mstrings.h my-alloca.h object.h otable.h \
     patchlevel.h pkg-gcrypt.h pkg-gnutls.h pkg-iksemel.h pkg-mysql.h \
     pkg-openssl.h pkg-python.h pkg-sqlite.h pkg-tls.h pkg-xml2.h port.h \
     prolang.h ptrtable.h random.h random/SFMT.h sent.h simul_efun.h \
     simulate.h stdstrings.h strfuns.h svalue.h swap.h typedefs.h types.h \
     wiz_list.h xalloc.h
 
-make_func.o : ../mudlib/sys/driver_hook.h bytecode.h bytecode_gen.h \
-    config.h driver.h exec.h hash.h machine.h my-alloca.h port.h typedefs.h \
-    types.h
-
 mapping.o : array.h backend.h bytecode.h bytecode_gen.h closure.h config.h \
-    driver.h exec.h gcollect.h hash.h i-svalue_cmp.h interpret.h machine.h \
-    main.h mapping.h mstrings.h my-alloca.h object.h port.h sent.h \
-    simulate.h strfuns.h structs.h svalue.h typedefs.h types.h wiz_list.h \
-    xalloc.h
+    driver.h exec.h gcollect.h hash.h i-svalue_cmp.h iconv_opt.h \
+    interpret.h machine.h main.h mapping.h mstrings.h my-alloca.h object.h \
+    port.h sent.h simulate.h strfuns.h structs.h svalue.h typedefs.h \
+    types.h wiz_list.h xalloc.h
 
-md5.o : config.h driver.h machine.h md5.h port.h strfuns.h typedefs.h
+md5.o : config.h driver.h iconv_opt.h machine.h md5.h port.h strfuns.h \
+    typedefs.h
 
 mempools.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_info.h \
-    bytecode.h bytecode_gen.h config.h driver.h gcollect.h machine.h \
-    mempools.h port.h sent.h simulate.h strfuns.h svalue.h typedefs.h \
-    xalloc.h
+    bytecode.h bytecode_gen.h config.h driver.h gcollect.h iconv_opt.h \
+    machine.h mempools.h port.h sent.h simulate.h strfuns.h svalue.h \
+    typedefs.h xalloc.h
 
 mkfunc.o : ../mudlib/sys/driver_hook.h bytecode.h bytecode_gen.h config.h \
     driver.h exec.h hash.h machine.h make_func.c my-alloca.h port.h \
@@ -413,121 +400,120 @@ mkfunc.o : ../mudlib/sys/driver_hook.h bytecode.h bytecode_gen.h config.h \
 mregex.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_hook.h \
     ../mudlib/sys/driver_info.h ../mudlib/sys/regexp.h backend.h bytecode.h \
     bytecode_gen.h comm.h config.h driver.h exec.h gcollect.h hash.h \
-    interpret.h machine.h main.h mregex.h mstrings.h pkg-gnutls.h \
-    pkg-openssl.h pkg-pcre.h pkg-tls.h port.h regexp.h sent.h simulate.h \
-    strfuns.h svalue.h typedefs.h types.h xalloc.h
+    iconv_opt.h interpret.h machine.h main.h mregex.h mstrings.h \
+    pkg-gnutls.h pkg-openssl.h pkg-pcre.h pkg-tls.h port.h regexp.h sent.h \
+    simulate.h strfuns.h svalue.h typedefs.h types.h xalloc.h
 
 mstrings.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_info.h \
-    bytecode.h bytecode_gen.h config.h driver.h gcollect.h hash.h machine.h \
-    main.h mstrings.h port.h sent.h simulate.h stdstrings.h strfuns.h \
-    svalue.h typedefs.h xalloc.h
+    bytecode.h bytecode_gen.h config.h driver.h gcollect.h hash.h \
+    iconv_opt.h machine.h main.h mstrings.h port.h sent.h simulate.h \
+    stdstrings.h strfuns.h svalue.h typedefs.h xalloc.h
 
 object.o : ../mudlib/sys/driver_hook.h ../mudlib/sys/functionlist.h \
     ../mudlib/sys/include_list.h ../mudlib/sys/inherit_list.h \
     ../mudlib/sys/lpctypes.h actions.h array.h backend.h bytecode.h \
     bytecode_gen.h closure.h comm.h config.h driver.h exec.h filestat.h \
-    hash.h instrs.h interpret.h lex.h machine.h main.h mapping.h mempools.h \
-    mstrings.h my-alloca.h object.h otable.h pkg-gnutls.h pkg-openssl.h \
-    pkg-python.h pkg-tls.h port.h prolang.h ptrtable.h random.h \
-    random/SFMT.h sent.h simul_efun.h simulate.h stdstrings.h strfuns.h \
-    structs.h svalue.h swap.h typedefs.h types.h wiz_list.h xalloc.h
+    hash.h iconv_opt.h instrs.h interpret.h lex.h machine.h main.h \
+    mapping.h mempools.h mstrings.h my-alloca.h object.h otable.h \
+    pkg-gnutls.h pkg-openssl.h pkg-python.h pkg-tls.h port.h prolang.h \
+    ptrtable.h random.h random/SFMT.h sent.h simul_efun.h simulate.h \
+    stdstrings.h strfuns.h structs.h svalue.h swap.h typedefs.h types.h \
+    wiz_list.h xalloc.h
 
 otable.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_info.h \
     backend.h bytecode.h bytecode_gen.h config.h driver.h gcollect.h hash.h \
-    machine.h main.h mstrings.h object.h otable.h port.h sent.h simulate.h \
-    strfuns.h svalue.h typedefs.h xalloc.h
+    iconv_opt.h machine.h main.h mstrings.h object.h otable.h port.h sent.h \
+    simulate.h strfuns.h svalue.h typedefs.h xalloc.h
 
 parse.o : actions.h array.h backend.h bytecode.h bytecode_gen.h config.h \
-    driver.h exec.h gcollect.h hash.h interpret.h lex.h machine.h main.h \
-    mstrings.h object.h parse.h port.h sent.h simulate.h stdstrings.h \
-    strfuns.h svalue.h typedefs.h types.h wiz_list.h xalloc.h
+    driver.h exec.h gcollect.h hash.h iconv_opt.h interpret.h lex.h \
+    machine.h main.h mstrings.h object.h parse.h port.h sent.h simulate.h \
+    stdstrings.h strfuns.h svalue.h typedefs.h types.h wiz_list.h xalloc.h
 
 parser.o : ../mudlib/sys/driver_hook.h array.h backend.h bytecode.h \
     bytecode_gen.h closure.h config.h driver.h exec.h gcollect.h hash.h \
-    i-eval_cost.h instrs.h interpret.h lang.c lex.h machine.h main.h \
-    mapping.h mstrings.h my-alloca.h object.h pkg-python.h port.h prolang.h \
-    ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h strfuns.h \
-    structs.h svalue.h swap.h switch.h typedefs.h types.h wiz_list.h \
-    xalloc.h
+    i-eval_cost.h iconv_opt.h instrs.h interpret.h lang.c lex.h machine.h \
+    main.h mapping.h mstrings.h my-alloca.h object.h pkg-python.h port.h \
+    prolang.h ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h \
+    strfuns.h structs.h svalue.h swap.h switch.h typedefs.h types.h \
+    wiz_list.h xalloc.h
 
 pkg-gcrypt.o : ../mudlib/sys/tls.h bytecode.h bytecode_gen.h config.h \
-    driver.h machine.h main.h pkg-gcrypt.h port.h sent.h simulate.h \
-    strfuns.h svalue.h typedefs.h xalloc.h
+    driver.h iconv_opt.h machine.h main.h pkg-gcrypt.h port.h sent.h \
+    simulate.h strfuns.h svalue.h typedefs.h xalloc.h
 
 pkg-gnutls.o : ../mudlib/sys/tls.h actions.h array.h backend.h bytecode.h \
     bytecode_gen.h comm.h config.h driver.h exec.h gcollect.h hash.h \
-    interpret.h machine.h main.h mstrings.h my-stdint.h object.h \
-    pkg-gnutls.h pkg-openssl.h pkg-tls.h port.h sent.h sha1.h simulate.h \
-    strfuns.h svalue.h typedefs.h types.h xalloc.h
+    iconv_opt.h interpret.h machine.h main.h mstrings.h my-stdint.h \
+    object.h pkg-gnutls.h pkg-openssl.h pkg-tls.h port.h sent.h sha1.h \
+    simulate.h strfuns.h svalue.h typedefs.h types.h xalloc.h
 
 pkg-idna.o : ../mudlib/sys/idn.h backend.h bytecode.h bytecode_gen.h \
-    config.h driver.h exec.h hash.h interpret.h machine.h main.h mstrings.h \
-    pkg-idna.h port.h sent.h simulate.h strfuns.h svalue.h typedefs.h \
-    types.h xalloc.h
+    config.h driver.h exec.h hash.h iconv_opt.h interpret.h machine.h \
+    main.h mstrings.h pkg-idna.h port.h sent.h simulate.h strfuns.h \
+    svalue.h typedefs.h types.h xalloc.h
 
 pkg-iksemel.o : ../mudlib/sys/xml.h array.h backend.h bytecode.h \
-    bytecode_gen.h config.h driver.h exec.h hash.h interpret.h machine.h \
-    main.h mapping.h mstrings.h pkg-iksemel.h port.h sent.h simulate.h \
-    strfuns.h svalue.h typedefs.h types.h xalloc.h
+    bytecode_gen.h config.h driver.h exec.h hash.h iconv_opt.h interpret.h \
+    machine.h main.h mapping.h mstrings.h pkg-iksemel.h port.h sent.h \
+    simulate.h strfuns.h svalue.h typedefs.h types.h xalloc.h
 
 pkg-json.o : array.h backend.h bytecode.h bytecode_gen.h config.h driver.h \
-    exec.h hash.h interpret.h machine.h main.h mapping.h mstrings.h \
-    pkg-json.h port.h sent.h simulate.h strfuns.h structs.h svalue.h \
-    typedefs.h types.h xalloc.h
+    exec.h hash.h iconv_opt.h interpret.h machine.h main.h mapping.h \
+    mstrings.h pkg-json.h port.h sent.h simulate.h strfuns.h structs.h \
+    svalue.h typedefs.h types.h xalloc.h
 
 pkg-mccp.o : ../mudlib/sys/telnet.h array.h bytecode.h bytecode_gen.h \
-    comm.h config.h driver.h hash.h machine.h main.h mstrings.h object.h \
-    pkg-gnutls.h pkg-mccp.h pkg-openssl.h pkg-tls.h port.h sent.h \
+    comm.h config.h driver.h hash.h iconv_opt.h machine.h main.h mstrings.h \
+    object.h pkg-gnutls.h pkg-mccp.h pkg-openssl.h pkg-tls.h port.h sent.h \
     simulate.h strfuns.h svalue.h typedefs.h xalloc.h
 
 pkg-mysql.o : array.h backend.h bytecode.h bytecode_gen.h config.h driver.h \
-    exec.h hash.h instrs.h interpret.h machine.h main.h mstrings.h \
-    my-alloca.h pkg-mysql.h port.h sent.h simulate.h stdstrings.h strfuns.h \
-    svalue.h typedefs.h types.h xalloc.h
-
-pkg-odbc.o : array.h config.h driver.h machine.h mapping.h pkg-odbc.h \
-    port.h strfuns.h svalue.h typedefs.h xalloc.h
+    exec.h hash.h iconv_opt.h instrs.h interpret.h machine.h main.h \
+    mstrings.h my-alloca.h pkg-mysql.h port.h sent.h simulate.h \
+    stdstrings.h strfuns.h svalue.h typedefs.h types.h xalloc.h
 
 pkg-openssl.o : ../mudlib/sys/tls.h actions.h array.h backend.h bytecode.h \
     bytecode_gen.h comm.h config.h driver.h exec.h gcollect.h hash.h \
+    iconv_opt.h interpret.h machine.h main.h mstrings.h my-stdint.h \
+    object.h pkg-gnutls.h pkg-openssl.h pkg-tls.h port.h sent.h sha1.h \
+    simulate.h strfuns.h svalue.h typedefs.h types.h xalloc.h
+
+pkg-pgsql.o : ../mudlib/sys/pgsql.h actions.h array.h backend.h bytecode.h \
+    bytecode_gen.h config.h driver.h exec.h gcollect.h hash.h iconv_opt.h \
+    instrs.h interpret.h machine.h main.h mapping.h mstrings.h my-alloca.h \
+    pkg-pgsql.h port.h sent.h simulate.h stdstrings.h strfuns.h svalue.h \
+    typedefs.h types.h xalloc.h
+
+pkg-python.o : actions.h array.h backend.h bytecode.h bytecode_gen.h \
+    closure.h config.h driver.h exec.h gcollect.h hash.h iconv_opt.h \
+    instrs.h interpret.h lex.h machine.h main.h mapping.h mstrings.h \
+    object.h pkg-python.h port.h prolang.h ptrtable.h sent.h simul_efun.h \
+    simulate.h stdstrings.h strfuns.h structs.h svalue.h swap.h typedefs.h \
+    types.h wiz_list.h xalloc.h
+
+pkg-sqlite.o : array.h backend.h bytecode.h bytecode_gen.h config.h \
+    driver.h exec.h hash.h iconv_opt.h interpret.h machine.h main.h \
+    mstrings.h my-alloca.h object.h port.h sent.h simulate.h stdstrings.h \
+    strfuns.h svalue.h typedefs.h types.h xalloc.h
+
+pkg-tls.o : ../mudlib/sys/tls.h actions.h array.h backend.h bytecode.h \
+    bytecode_gen.h comm.h config.h driver.h exec.h hash.h iconv_opt.h \
     interpret.h machine.h main.h mstrings.h my-stdint.h object.h \
     pkg-gnutls.h pkg-openssl.h pkg-tls.h port.h sent.h sha1.h simulate.h \
     strfuns.h svalue.h typedefs.h types.h xalloc.h
 
-pkg-pgsql.o : ../mudlib/sys/pgsql.h actions.h array.h backend.h bytecode.h \
-    bytecode_gen.h config.h driver.h exec.h gcollect.h hash.h instrs.h \
-    interpret.h machine.h main.h mapping.h mstrings.h my-alloca.h \
-    pkg-pgsql.h port.h sent.h simulate.h stdstrings.h strfuns.h svalue.h \
-    typedefs.h types.h xalloc.h
-
-pkg-python.o : array.h backend.h bytecode.h bytecode_gen.h closure.h \
-    config.h driver.h exec.h gcollect.h hash.h instrs.h interpret.h lex.h \
-    machine.h main.h mapping.h mstrings.h object.h pkg-python.h port.h \
-    prolang.h ptrtable.h sent.h simul_efun.h simulate.h strfuns.h structs.h \
-    svalue.h swap.h typedefs.h types.h wiz_list.h xalloc.h
-
-pkg-sqlite.o : array.h backend.h bytecode.h bytecode_gen.h config.h \
-    driver.h exec.h hash.h interpret.h machine.h main.h mstrings.h \
-    my-alloca.h object.h port.h sent.h simulate.h stdstrings.h strfuns.h \
-    svalue.h typedefs.h types.h xalloc.h
-
-pkg-tls.o : ../mudlib/sys/tls.h actions.h array.h backend.h bytecode.h \
-    bytecode_gen.h comm.h config.h driver.h exec.h hash.h interpret.h \
-    machine.h main.h mstrings.h my-stdint.h object.h pkg-gnutls.h \
-    pkg-openssl.h pkg-tls.h port.h sent.h sha1.h simulate.h strfuns.h \
-    svalue.h typedefs.h types.h xalloc.h
-
 pkg-xml2.o : ../mudlib/sys/xml.h array.h arraylist.h backend.h bytecode.h \
-    bytecode_gen.h config.h driver.h exec.h hash.h interpret.h machine.h \
-    main.h mapping.h mstrings.h pkg-xml2.h port.h sent.h simulate.h \
-    strfuns.h svalue.h typedefs.h types.h xalloc.h
+    bytecode_gen.h config.h driver.h exec.h hash.h iconv_opt.h interpret.h \
+    machine.h main.h mapping.h mstrings.h pkg-xml2.h port.h sent.h \
+    simulate.h strfuns.h svalue.h typedefs.h types.h xalloc.h
 
 port.o : backend.h config.h driver.h machine.h main.h my-rusage.h port.h \
     typedefs.h
 
-ptrtable.o : bytecode.h bytecode_gen.h config.h driver.h machine.h \
-    mempools.h port.h ptrtable.h sent.h simulate.h strfuns.h svalue.h \
-    typedefs.h
+ptrtable.o : bytecode.h bytecode_gen.h config.h driver.h iconv_opt.h \
+    machine.h mempools.h port.h ptrtable.h sent.h simulate.h strfuns.h \
+    svalue.h typedefs.h
 
 random.o : backend.h config.h driver.h machine.h main.h port.h random.h \
     random/SFMT-alti.h random/SFMT-params.h random/SFMT-params11213.h \
@@ -539,88 +525,77 @@ random.o : backend.h config.h driver.h machine.h main.h port.h random.h \
     random/SFMT.h typedefs.h
 
 regexp.o : backend.h bytecode.h bytecode_gen.h config.h driver.h exec.h \
-    i-eval_cost.h interpret.h machine.h main.h pkg-pcre.h port.h regexp.h \
-    sent.h simulate.h strfuns.h svalue.h typedefs.h types.h xalloc.h
+    i-eval_cost.h iconv_opt.h interpret.h machine.h main.h pkg-pcre.h \
+    port.h regexp.h sent.h simulate.h strfuns.h svalue.h typedefs.h types.h \
+    xalloc.h
 
 sha1.o : config.h driver.h machine.h my-stdint.h port.h sha1.h
 
 simul_efun.o : array.h backend.h bytecode.h bytecode_gen.h config.h \
-    driver.h exec.h gcollect.h hash.h interpret.h lex.h machine.h main.h \
-    mstrings.h my-alloca.h object.h pkg-python.h port.h prolang.h \
-    ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h strfuns.h \
-    svalue.h swap.h typedefs.h types.h xalloc.h
+    driver.h exec.h gcollect.h hash.h iconv_opt.h interpret.h lex.h \
+    machine.h main.h mstrings.h my-alloca.h object.h pkg-python.h port.h \
+    prolang.h ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h \
+    strfuns.h svalue.h swap.h typedefs.h types.h xalloc.h
 
 simulate.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_hook.h \
     ../mudlib/sys/driver_info.h ../mudlib/sys/files.h \
     ../mudlib/sys/regexp.h ../mudlib/sys/rtlimits.h actions.h array.h \
     backend.h bytecode.h bytecode_gen.h call_out.h closure.h comm.h \
     config.h driver.h ed.h exec.h filestat.h gcollect.h hash.h heartbeat.h \
-    i-eval_cost.h interpret.h lex.h machine.h main.h mapping.h mempools.h \
-    mregex.h mstrings.h my-alloca.h object.h otable.h patchlevel.h \
-    pkg-gnutls.h pkg-openssl.h pkg-python.h pkg-sqlite.h pkg-tls.h port.h \
-    prolang.h ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h \
-    strfuns.h structs.h svalue.h swap.h typedefs.h types.h wiz_list.h \
-    xalloc.h
-
-slaballoc.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_info.h \
-    array.h backend.h config.h driver.h hash.h machine.h main.h mstrings.h \
-    port.h slaballoc.h stdstrings.h svalue.h typedefs.h
-
-smalloc.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_info.h \
-    array.h backend.h config.h driver.h hash.h machine.h main.h mstrings.h \
-    port.h smalloc.h stdstrings.h svalue.h typedefs.h
+    i-eval_cost.h iconv_opt.h interpret.h lex.h machine.h main.h mapping.h \
+    mempools.h mregex.h mstrings.h my-alloca.h object.h otable.h \
+    patchlevel.h pkg-gnutls.h pkg-openssl.h pkg-python.h pkg-sqlite.h \
+    pkg-tls.h port.h prolang.h ptrtable.h sent.h simul_efun.h simulate.h \
+    stdstrings.h strfuns.h structs.h svalue.h swap.h typedefs.h types.h \
+    wiz_list.h xalloc.h
 
 sprintf.o : actions.h array.h backend.h bytecode.h bytecode_gen.h closure.h \
-    comm.h config.h driver.h exec.h hash.h interpret.h machine.h main.h \
-    mapping.h mstrings.h my-alloca.h object.h pkg-gnutls.h pkg-openssl.h \
-    pkg-tls.h port.h ptrtable.h random.h random/SFMT.h sent.h simul_efun.h \
-    simulate.h sprintf.h stdstrings.h strfuns.h structs.h svalue.h swap.h \
-    typedefs.h types.h xalloc.h
+    comm.h config.h driver.h exec.h hash.h iconv_opt.h interpret.h \
+    machine.h main.h mapping.h mstrings.h my-alloca.h object.h pkg-gnutls.h \
+    pkg-openssl.h pkg-tls.h port.h ptrtable.h random.h random/SFMT.h sent.h \
+    simul_efun.h simulate.h sprintf.h stdstrings.h strfuns.h structs.h \
+    svalue.h swap.h typedefs.h types.h xalloc.h
 
 stdstrings.o : config.h driver.h hash.h machine.h mstrings.h port.h \
     stdstrings.h typedefs.h
 
 strfuns.o : array.h backend.h bytecode.h bytecode_gen.h comm.h config.h \
-    driver.h exec.h hash.h interpret.h machine.h main.h mapping.h \
-    mstrings.h my-alloca.h object.h pkg-gnutls.h pkg-openssl.h pkg-tls.h \
-    port.h sent.h simulate.h stdstrings.h strfuns.h svalue.h typedefs.h \
-    types.h xalloc.h
+    driver.h exec.h hash.h iconv_opt.h interpret.h machine.h main.h \
+    mapping.h mstrings.h my-alloca.h object.h pkg-gnutls.h pkg-openssl.h \
+    pkg-tls.h port.h sent.h simulate.h stdstrings.h strfuns.h svalue.h \
+    typedefs.h types.h xalloc.h
 
 structs.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_info.h \
     ../mudlib/sys/lpctypes.h ../mudlib/sys/struct_info.h array.h backend.h \
     bytecode.h bytecode_gen.h config.h driver.h exec.h gcollect.h hash.h \
-    interpret.h machine.h main.h mapping.h mstrings.h object.h port.h \
-    sent.h simulate.h stdstrings.h strfuns.h structs.h svalue.h typedefs.h \
-    types.h wiz_list.h xalloc.h
+    iconv_opt.h interpret.h machine.h main.h mapping.h mstrings.h object.h \
+    port.h sent.h simulate.h stdstrings.h strfuns.h structs.h svalue.h \
+    typedefs.h types.h wiz_list.h xalloc.h
 
 swap.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_info.h array.h \
     backend.h bytecode.h bytecode_gen.h closure.h comm.h config.h driver.h \
-    exec.h gcollect.h hash.h interpret.h machine.h main.h mapping.h \
-    mempools.h mstrings.h object.h otable.h pkg-gnutls.h pkg-openssl.h \
-    pkg-tls.h port.h prolang.h ptrtable.h random.h random/SFMT.h sent.h \
-    simul_efun.h simulate.h stdstrings.h strfuns.h structs.h svalue.h \
-    swap.h typedefs.h types.h wiz_list.h xalloc.h
-
-sysmalloc.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_info.h \
-    config.h driver.h hash.h machine.h mstrings.h port.h stdstrings.h \
-    svalue.h sysmalloc.h typedefs.h
+    exec.h gcollect.h hash.h iconv_opt.h interpret.h machine.h main.h \
+    mapping.h mempools.h mstrings.h object.h otable.h pkg-gnutls.h \
+    pkg-openssl.h pkg-tls.h port.h prolang.h ptrtable.h random.h \
+    random/SFMT.h sent.h simul_efun.h simulate.h stdstrings.h strfuns.h \
+    structs.h svalue.h swap.h typedefs.h types.h wiz_list.h xalloc.h
 
 types.o : bytecode.h bytecode_gen.h config.h driver.h exec.h gcollect.h \
-    hash.h machine.h mstrings.h port.h sent.h simulate.h strfuns.h \
-    structs.h svalue.h typedefs.h types.h xalloc.h
+    hash.h iconv_opt.h machine.h mstrings.h port.h sent.h simulate.h \
+    strfuns.h structs.h svalue.h typedefs.h types.h xalloc.h
 
 wiz_list.o : ../mudlib/sys/wizlist.h array.h backend.h bytecode.h \
-    bytecode_gen.h config.h driver.h exec.h gcollect.h hash.h interpret.h \
-    machine.h main.h mapping.h mstrings.h my-alloca.h object.h port.h \
-    sent.h simulate.h stdstrings.h strfuns.h svalue.h typedefs.h types.h \
-    wiz_list.h xalloc.h
+    bytecode_gen.h config.h driver.h exec.h gcollect.h hash.h iconv_opt.h \
+    interpret.h machine.h main.h mapping.h mstrings.h my-alloca.h object.h \
+    port.h sent.h simulate.h stdstrings.h strfuns.h svalue.h typedefs.h \
+    types.h wiz_list.h xalloc.h
 
 xalloc.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_info.h \
     array.h backend.h bytecode.h bytecode_gen.h config.h driver.h exec.h \
-    gcollect.h hash.h interpret.h machine.h main.h mstrings.h object.h \
-    port.h sent.h simulate.h slaballoc.c slaballoc.h smalloc.c smalloc.h \
-    stdstrings.h strfuns.h svalue.h sysmalloc.c sysmalloc.h typedefs.h \
-    types.h valgrind/memcheck.h valgrind/valgrind.h xalloc.h
+    gcollect.h hash.h iconv_opt.h interpret.h machine.h main.h mstrings.h \
+    object.h port.h sent.h simulate.h slaballoc.c slaballoc.h smalloc.c \
+    smalloc.h stdstrings.h strfuns.h svalue.h sysmalloc.c sysmalloc.h \
+    typedefs.h types.h valgrind/memcheck.h valgrind/valgrind.h xalloc.h
 
 # --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS PRECEDE ---
 # --- DO NOT MODIFY THIS LINE -- SELECTED AUTO-DEPENDS FOLLOW ---
@@ -632,11 +607,11 @@ backend.o : stdstrings.h
 
 call_out.o : stdstrings.h
 
-closure.o : stdstrings.h instrs.h
+closure.o : instrs.h stdstrings.h
 
 comm.o : stdstrings.h
 
-dumpstat.o : stdstrings.h instrs.h
+dumpstat.o : instrs.h stdstrings.h
 
 ed.o : stdstrings.h
 
@@ -644,11 +619,11 @@ efuns.o : stdstrings.h
 
 files.o : stdstrings.h
 
-gcollect.o : stdstrings.h instrs.h
+gcollect.o : instrs.h stdstrings.h
 
-interpret.o : stdstrings.h instrs.h
+interpret.o : instrs.h stdstrings.h
 
-lex.o : efun_defs.c stdstrings.h lang.h instrs.h
+lex.o : efun_defs.c instrs.h lang.h stdstrings.h
 
 main.o : stdstrings.h
 
@@ -656,17 +631,17 @@ mkfunc.o : make_func.c
 
 mstrings.o : stdstrings.h
 
-object.o : stdstrings.h instrs.h
+object.o : instrs.h stdstrings.h
 
 parse.o : stdstrings.h
 
-parser.o : lang.c stdstrings.h instrs.h
+parser.o : instrs.h lang.c stdstrings.h
 
-pkg-mysql.o : stdstrings.h instrs.h
+pkg-mysql.o : instrs.h stdstrings.h
 
-pkg-pgsql.o : stdstrings.h instrs.h
+pkg-pgsql.o : instrs.h stdstrings.h
 
-pkg-python.o : instrs.h
+pkg-python.o : instrs.h stdstrings.h
 
 pkg-sqlite.o : stdstrings.h
 

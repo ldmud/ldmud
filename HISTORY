@@ -4,6 +4,29 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+28-Apr-2020 (LDMud Team) -- 3.6.2
+    - Language:
+      + Added the dot operator as a shortcut to call_strict() and
+        strict struct member access.
+      + Modified the arrow operator to be a relaxed struct member
+        access operator.
+      + Reimplement pragma strict_types.
+      + Calls to simul-efuns are now type checked.
+
+    - New Efuns:
+      + call_strict() and call_strict_direct() are similar to
+        call_other()/call_direct(), but raise an error if the
+        function does not exist.
+
+    - Changed Efuns:
+      + call_resolved() and call_direct_resolved() now also support
+        array calls.
+
+    - Other:
+      + Implemented support for function and variable inspection and
+        child processes in Python.
+      + Fix information leakage when snooping.
+
 08-Jan-2020 (LDMud Team) -- 3.6.1
     - Runtime:
        + Assignments to variables and declarative type casts are

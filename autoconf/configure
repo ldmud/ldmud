@@ -10483,7 +10483,7 @@ if test "x$ac_cv_lib_gcrypt_gcry_check_version" = xyes; then :
 fi
 
 
-        if test "x$tmp" == "x" && test "x$gcrypt_path" != "x"; then
+        if test "x$tmp" = "x" && test "x$gcrypt_path" != "x"; then
             unset ac_cv_lib_gcrypt_main
             if test -d "${gcrypt_path}/lib/gcrypt"; then
                 CFLAGS="$saveflags -L${gcrypt_path}/lib/gcrypt"
@@ -10614,7 +10614,7 @@ fi
             fi
         fi
 
-        if test "x$tmp" == "x"; then
+        if test "x$tmp" = "x"; then
             echo "libgcrypt library not found - disabling gcrypt support"
             if test "x$not_available" = "x"; then
     not_available="use-gcrypt"
@@ -11696,7 +11696,7 @@ if test "x$ac_cv_lib_pq_main" = xyes; then :
 fi
 
 
-    if test "x$pgsql_path" == "x"; then
+    if test "x$pgsql_path" = "x"; then
         unset ac_cv_lib_pq_main
         if test -d "${pgsql_path}/lib/pgsql"; then
             CFLAGS="$saveflags -L${pgsql_path}/lib/pgsql"
@@ -11809,7 +11809,7 @@ fi
         fi
     fi
 
-    if test "x$tmp" == "x"; then
+    if test "x$tmp" = "x"; then
         unset ac_cv_lib_pq_main
         if test -d "/usr/local/pgsql/lib"; then
             CFLAGS="$saveflags -L/usr/local/pgsql/lib"
@@ -11850,7 +11850,7 @@ fi
         fi
     fi
 
-    if test "x$tmp" == "x"; then
+    if test "x$tmp" = "x"; then
         echo "libpq library not found - disabling PostgreSQL support"
         if test "x$not_available" = "x"; then
     not_available="use-pgsql"
