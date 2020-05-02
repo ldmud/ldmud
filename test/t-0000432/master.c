@@ -556,6 +556,24 @@ void run_test()
                 return regmatch("\uff2c\uff24\uff2d\uff55\uff44", "\uff2c*\uff2c", RE_TRADITIONAL) == "\uff2c";
             :)
         }),
+        ({ "regmatch with builtin regexp and grapheme clusters", 0,
+            (:
+                foreach(string cluster: ({
+                    "A\u0308",
+                    "\U0001f600\ufe0f",
+                    "\U0001f3f3\ufe0f\u200d\U0001f308",
+                    "\U0001F1E9\U0001F1EA",
+                    "\u1100\u1161\u11ab",
+                    "\u0e01\u0e33",
+                }))
+                {
+                    if (regmatch(3 * cluster, "^\\X", RE_TRADITIONAL) != cluster)
+                        return 0;
+                }
+
+                return 1;
+            :)
+        }),
         ({ "regreplace with builtin regexp and unicode strings 1", 0,
             (:
                 return regreplace("\u216c\u216e\u216f\u2164\u216e", "(.)", " \\1 ", RE_TRADITIONAL | RE_GLOBAL) == " \u216c  \u216e  \u216f  \u2164  \u216e ";
@@ -579,6 +597,27 @@ void run_test()
         ({ "regreplace with PCRE and unicode strings 2", 0,
             (:
                 return regreplace("\u216c\u216e\u216f\u2164\u216e", "", "*", RE_PCRE | RE_GLOBAL) == "*\u216c*\u216e*\u216f*\u2164*\u216e*";
+            :)
+        }),
+        ({ "regexplode with builtin regexp and grapheme clusters", 0,
+            (:
+                foreach(string cluster: ({
+                    "A\u0308",
+                    "\U0001f600\ufe0f",
+                    "\U0001f3f3\ufe0f\u200d\U0001f308",
+                    "\U0001F1E9\U0001F1EA",
+                    "\u1100\u1161\u11ab",
+                    "\u0e01\u0e33",
+                }))
+                {
+                    foreach(int i: 3)
+                    {
+                        if (!deep_eq(regexplode(i * cluster, "\\X", RE_TRADITIONAL) - ({""}), i*({cluster})))
+                            return 0;
+                    }
+                }
+
+                return 1;
             :)
         }),
         ({ "sprintf with unicode string", 0,

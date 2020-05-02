@@ -72,6 +72,8 @@ REGULAR EXPRESSION DETAILS
 
           \B      not a word boundary
 
+          \X      match an extended grapheme cluster.
+
           \c      match character c even if it's one of the special
                   characters.
 

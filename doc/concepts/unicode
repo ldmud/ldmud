@@ -62,7 +62,10 @@ DESCRIPTION
         The grapheme cluster handling only applies to sprintf() and
         terminal_colour(). Other efun and operators like sizeof(), explode()
         and the index operator still work on single unicode codepoints and
-        thus allow to split such grapheme clusters.
+        thus allow to split such grapheme clusters. However the regular
+        expressions support \X to match a whole grapheme cluster. PCRE and
+        the traditional package differ in the handling of ANSI escape
+        sequences which the traditional package will treat also as a cluster.
 
 HISTORY
         Introduced in LDMud 3.6.

@@ -106,6 +106,7 @@
 #define WORDSTART 12   /* node  matching a start of a word          */
 #define WORDEND   13   /* node  matching an end of a word           */
 #define NOTEDGE   14   /* node  matching anything not at word edge  */
+#define GRAPHEME  15   /* node  match a grapheme cluster            */
 #define OPEN      20   /* no    Mark this point in input as start of #n. */
   /* OPEN+1 is number 1, etc. */
 #define CLOSE (OPEN+NSUBEXP)    /* no        Analogous to OPEN. */
@@ -167,6 +168,7 @@
 #define LSHBRAC  ('<'|SPECIAL)
 #define RSHBRAC  ('>'|SPECIAL)
 #define SLASHB   ('B'|SPECIAL)
+#define SLASHX   ('X'|SPECIAL)
 #define FAIL(m)   { *ppErrMsg = m; return(NULL); }
 #define XFREE(m)  { if (m) xfree(m); m = NULL; }
 #define ISMULT(c) ((c) == ASTERIX || (c) == CROSS)
@@ -197,8 +199,9 @@ static char   **ppErrMsg;       /* Place where to store an error message */
 
 /* Global variables for hs_regexec().
  */
-static unsigned char  *reginput;  /* String-input pointer. */
-static unsigned char  *regbol;    /* Beginning of input, for ^ check. */
+static unsigned char  *reginput;    /* String-input pointer. */
+static unsigned char  *reginputend; /* Pointer to the end of the string input. */
+static unsigned char  *regbol;      /* Beginning of input, for ^ check. */
 static char **regstartp;      /* Pointer to startp array. */
 static char **regendp;        /* Ditto for endp. */
 #ifdef DEBUG
@@ -486,6 +489,10 @@ regatom (int *flagp)
         break;
     case SLASHB:
         ret = regnode(NOTEDGE);
+        break;
+    case SLASHX:
+        ret = regnode(GRAPHEME);
+        *flagp |= HASWIDTH;
         break;
     case LSQBRAC:
       {
@@ -816,6 +823,7 @@ hs_regcomp (unsigned char *expr, Bool excompat
             case '<':
             case '>':
             case 'B':
+            case 'X':
                 *dest++ = c | SPECIAL;
                 break;
             case '{':
@@ -1006,6 +1014,7 @@ regtry (regexp *prog, char *string)
     char **ep;
 
     reginput = (unsigned char *)string;
+    reginputend = (unsigned char *)string + strlen(string);
     regstartp = prog->startp;
     regendp = prog->endp;
 
@@ -1057,7 +1066,7 @@ reg_previouschar (unsigned char* txt)
 
 /*-------------------------------------------------------------------------*/
 static ssize_t
-reg_strchr (unsigned char* chars, unsigned char* chptr)
+reg_strchr (unsigned char* chars, unsigned char* chptr, size_t remaining)
 
 /* Searches the first character of <ch> in the string <chars>.
  * Returns the number of bytes of this characters if found,
@@ -1066,7 +1075,7 @@ reg_strchr (unsigned char* chars, unsigned char* chptr)
 
 {
     bool error = false;
-    size_t len = char_to_byte_index((char*)chptr, 4, 1, &error);
+    size_t len = char_to_byte_index((char*)chptr, remaining, 1, &error);
     if (error)
         return 0;
 
@@ -1120,16 +1129,16 @@ regmatch (unsigned char *prog)
                 return RE_NOMATCH;
             break;
         case EOL:
-            if (*reginput != '\0')
+            if (reginput != reginputend)
                 return RE_NOMATCH;
             break;
         case ANY:
-            if (*reginput == '\0')
+            if (reginput == reginputend)
                 return RE_NOMATCH;
             else
             {
                 p_int c;
-                size_t len = utf8_to_unicode((char*)reginput, 4, &c);
+                size_t len = utf8_to_unicode((char*)reginput, reginputend - reginput, &c);
                 if (!len)
                     return RE_NOMATCH;
                 reginput += len;
@@ -1138,12 +1147,12 @@ regmatch (unsigned char *prog)
         case WORDSTART:
             if (reginput == regbol)
                 break;
-            if (*reginput == '\0'
+            if (reginput == reginputend
              || reg_iswordpart(reg_previouschar(reginput)) || !reg_iswordpart(reginput) )
                 return RE_NOMATCH;
             break;
         case WORDEND:
-            if (*reginput == '\0')
+            if (reginput == reginputend)
                 break;
             if ( reginput == regbol
              || !reg_iswordpart(reg_previouschar(reginput)) || reg_iswordpart(reginput) )
@@ -1159,6 +1168,18 @@ regmatch (unsigned char *prog)
             if ( reg_iswordpart(reg_previouschar(reginput)) != reg_iswordpart(reginput) )
                 return RE_NOMATCH;
             break;
+        case GRAPHEME:
+            if (reginput == reginputend)
+                return RE_NOMATCH;
+            else
+            {
+                int width;
+                size_t len = next_grapheme_break((char*)reginput, reginputend - reginput, &width);
+                if (!len)
+                    return RE_NOMATCH;
+                reginput += len;
+                break;
+            }
         case EXACTLY:
           {
             int    len;
@@ -1175,22 +1196,22 @@ regmatch (unsigned char *prog)
             break;
           }
         case ANYOF:
-            if (*reginput == '\0')
+            if (reginput == reginputend)
                 return RE_NOMATCH;
             else
             {
-                ssize_t len = reg_strchr(OPERAND(scan), reginput);
+                ssize_t len = reg_strchr(OPERAND(scan), reginput, reginputend - reginput);
                 if (len <= 0)
                     return RE_NOMATCH;
                 reginput += len;
                 break;
             }
         case ANYBUT:
-            if (*reginput == '\0')
+            if (reginput == reginputend)
                 return RE_NOMATCH;
             else
             {
-                ssize_t len = reg_strchr(OPERAND(scan), reginput);
+                ssize_t len = reg_strchr(OPERAND(scan), reginput, reginputend - reginput);
                 if (len >= 0)
                     return RE_NOMATCH;
                 reginput -= len;
@@ -1339,9 +1360,8 @@ regrepeat (unsigned char *p)
     {
         case ANY:
         {
-            size_t len = strlen((char *)scan);
-            count = byte_to_char_index((char*) scan, len, NULL);
-            scan += count;
+            count = byte_to_char_index((char*) scan, reginputend - scan, NULL);
+            scan = reginputend;
             break;
         }
 
@@ -1362,7 +1382,7 @@ regrepeat (unsigned char *p)
         {
             ssize_t len;
 
-            while (*scan != '\0' && (len = reg_strchr(opnd, scan)) > 0)
+            while (*scan != '\0' && (len = reg_strchr(opnd, scan, reginputend - scan)) > 0)
             {
                 count++;
                 scan += len;
@@ -1374,7 +1394,7 @@ regrepeat (unsigned char *p)
         {
             ssize_t len;
 
-            while (*scan != '\0' && (len = reg_strchr(opnd, scan)) < 0)
+            while (*scan != '\0' && (len = reg_strchr(opnd, scan, reginputend - scan)) < 0)
             {
                 count++;
                 scan += -len;
