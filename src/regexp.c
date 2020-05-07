@@ -1263,6 +1263,8 @@ regmatch (unsigned char *prog)
             no = regrepeat(OPERAND(scan));
             while (no >= minimum)
             {
+                unsigned char  *cur = reginput;
+
                 /* If it could work, try it. */
                 if (nextch == '\0' || *reginput == nextch)
                 {
@@ -1273,7 +1275,7 @@ regmatch (unsigned char *prog)
                 }
                 /* Couldn't or didn't -- back up. */
                 no--;
-                reginput = (unsigned char*) utf8_prev((char*) reginput, reginput - save);
+                reginput = (unsigned char*) utf8_prev((char*) cur, cur - save);
                 if (add_eval_cost(1))
                     return RE_ERROR_BACKTRACK;
             }

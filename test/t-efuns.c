@@ -351,6 +351,7 @@ mixed *tests = ({
     ({ "regmatch 8", 0, (: regmatch("abcd", "^$", RE_MATCH_SUBS) == 0 :) }),
     ({ "regmatch 9", 0, (: deep_eq(regmatch("", "^$", RE_MATCH_SUBS), ({"", 1})) :) }),
     ({ "regmatch 10", 0, (: deep_eq(regmatch("", "(a|)", RE_MATCH_SUBS), ({ "", "", 1})) :) }),
+    ({ "regmatch 11", 0, (: regmatch("--A--B--", "A.*.B") == "A--B" :) }),
 
     ({ "sscanf 1", 0, (: sscanf("A10", "A%~d") == 1 :) }),
     ({ "sscanf 2", 0, (: sscanf("B10", "A%~d") == 0 :) }),
