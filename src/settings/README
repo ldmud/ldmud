@@ -35,7 +35,8 @@ The provided settings:
   psycmuve:        settings for PSYC
   quovadis:        settings for Quo Vadis
   silberland:      settings for SilberLand
-  sticklib:        settings for StickLib
+  sticklib:        settings for StickLib (dist lib of StickMUD)
+  stickmud:        settings for StickMUD
   theland:         settings for The Land
   timewarp:        settings for TimeWarp
   traumland:       settings for Traumland
