@@ -1753,15 +1753,16 @@ static char buff[BUFF_SIZE];         /* For error messages */
                         if (*((*temp)->d.col-1) != '\n')
                             while (*((*temp)->d.col) == ' ')
                                 (*temp)->d.col++;
-                        i = (*temp)->start - (st->bpos - st->line_start);
-                        ADD_CHARN(st, ' ', i);
+                        i = (*temp)->start - get_string_width(st->buff + st->line_start, st->bpos - st->line_start, NULL);
+                        if (i > 0)
+                            ADD_CHARN(st, ' ', i);
                         column_stat = add_column(st, temp);
                         if (!column_stat)
                             temp = &((*temp)->next);
                     }
                     else
                     {
-                        i = (*temp)->start - (st->bpos - st->line_start);
+                        i = (*temp)->start - get_string_width(st->buff + st->line_start, st->bpos - st->line_start, NULL);
                         if (i > 0)
                             ADD_CHARN(st, ' ', i);
                         if (!add_table(st, temp))
@@ -2086,7 +2087,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
                             (*temp)->size = fs;
                             (*temp)->pres = (pres) ? (int)pres : (int)fs;
                             (*temp)->info = finfo;
-                            (*temp)->start = st->bpos - st->line_start;
+                            (*temp)->start = get_string_width(st->buff + st->line_start, st->bpos - st->line_start, NULL);
 
                             /* Format the first line from the column */
                             column_stat = add_column(st, temp);
@@ -2107,7 +2108,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
                                 ERROR(ERR_NOMEM);
                             (*temp)->pad = pad;
                             (*temp)->info = finfo;
-                            (*temp)->start = st->bpos - st->line_start;
+                            (*temp)->start = get_string_width(st->buff + st->line_start, st->bpos - st->line_start, NULL);
                             (*temp)->next = NULL;
 
                             /* Determine the size of the table */

@@ -705,6 +705,23 @@ void run_test()
                 return 1;
             :)
         }),
+        ({ "sprintf correctly calculating column sizes", 0,
+            (:
+                foreach(string cluster: ({
+                    "A\u0308",
+                    "\U0001f600\ufe0f",
+                    "\U0001f3f3\ufe0f\u200d\U0001f308",
+                    "\U0001F1E9\U0001F1EA",
+                    "\u1100\u1161\u11ab",
+                    "\u0e01\u0e33",
+                }))
+                {
+                    if (sprintf("%=-3@s\n", ({ "ABC " + cluster, "123 456" })) != "ABC123\n" + cluster + (" " * (3-text_width(cluster))) + "456\n")
+                        return 0;
+                }
+                return 1;
+            :)
+        }),
         ({ "terminal_colour wrapping unicode characters 1", 0,
             (:
                 return terminal_colour("\u266a"*20+"\n", 0, 19, 5) == "\u266a"*19 + "\n     \u266a\n";
