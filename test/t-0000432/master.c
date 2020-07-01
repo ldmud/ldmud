@@ -8,6 +8,8 @@
 #include "/inc/gc.inc"
 #include "/inc/deep_eq.inc"
 
+string* errors = ({});
+
 void run_test()
 {
     msg("\nRunning tests for #0000432:\n"
@@ -1018,8 +1020,20 @@ void run_test()
         }),
         ({ "Lexer handling of multi-byte characters.", 0,
             (:
-                object ob = load_object("/utf-8-on-boundary.c");
+                object ob = load_object("/utf-8-on-boundary");
                 return ob->run_test();
+            :)
+        }),
+        ({ "Compile error messages with multi-byte characters.", 0,
+            (:
+                errors = ({});
+                catch(load_object("/utf-8-in-error"));
+
+                foreach(string err: errors)
+                    if (catch(sizeof(err)))
+                        return 0;
+
+                return 1;
             :)
         }),
     }),
@@ -1047,6 +1061,11 @@ private string get_file_encoding(string filename)
         return "UTF-8";
 
     return enc[2];
+}
+
+void log_error(string file, string err, int warn)
+{
+    errors += ({err});
 }
 
 string *epilog(int eflag)

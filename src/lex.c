@@ -8297,14 +8297,16 @@ lex_error_context (void)
  */
 
 {
-    static char buf[21];
+    // " before '" + 10 characters (max. 4 bytes each) + "'\0"
+#define CONTEXT_LENGTH 10
+    static char buf[11 + 4*CONTEXT_LENGTH];
     char *end;
     mp_int len;
 
     if (lex_error_pos >= 0)
     {
         /* An encoding error, we just print the byte position. */
-        snprintf(buf, 21, " at byte %d", lex_error_pos);
+        snprintf(buf, sizeof(buf), " at byte %d", lex_error_pos);
         return buf;
     }
 
@@ -8331,10 +8333,12 @@ lex_error_context (void)
             buf[0] = '\0';
         else
         {
+            size_t num = char_to_byte_index(outp, left, CONTEXT_LENGTH, NULL);
+
             buf[len] = '\'';
-            strncpy(buf + len + 1, outp, left);
-            buf[len + left + 1] = '\'';
-            buf[len + left + 2] = '\0';
+            strncpy(buf + len + 1, outp, num);
+            buf[len + num + 1] = '\'';
+            buf[len + num + 2] = '\0';
             if ( NULL != (end = strchr(buf, '\n')) )
             {
                 *end = '\'';
@@ -8352,6 +8356,7 @@ lex_error_context (void)
         }
     }
     return buf;
+#undef CONTEXT_LENGTH
 } /* lex_error_context() */
 
 /*-------------------------------------------------------------------------*/
