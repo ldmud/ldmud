@@ -103,6 +103,7 @@ char *telcmds[] = {
 #define  TELOPT_AUTHENTICATION 37       /* authentication */
 #define  TELOPT_ENCRYPT       38        /* authentication */
 #define  TELOPT_NEWENV        39        /* Environment opt for Port ID */
+#define  TELOPT_CHARSET       42        /* Character encoding negotiation */
 #define  TELOPT_STARTTLS      46        /* Transport Layer Security */
 #define  TELOPT_KERMIT        47        /* Telnet KERMIT */
 #define  TELOPT_SEND_URL      48        /* Send URL */
@@ -135,7 +136,7 @@ char *telopts[NTELOPTS]
    , "TTYLOC", "3270 REGIME", "X.3 PAD", "NAWS"
    , "TSPEED", "LFLOW", "LINEMODE", "XDISPLOC"
    , "ENVIRON", "AUTH", "ENCRYPT", "NEWENV"
-   , "TELOPT 40", "TELOPT 41", "TELOPT 42", "TELOPT 43"
+   , "TELOPT 40", "TELOPT 41", "CHARSET", "TELOPT 43"
    , "TELOPT 44", "TELOPT 45", "STARTTLS", "KERMIT"
    , "SEND_URL", "TELOPT 49", "TELOPT 50", "TELOPT 51"
    , "TELOPT 52", "TELOPT 53", "TELOPT 54", "TELOPT 55"
