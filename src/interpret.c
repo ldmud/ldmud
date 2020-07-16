@@ -16805,42 +16805,43 @@ int_apply (string_t *fun, object_t *ob, int num_arg
         {
             /* We got a default method hook.
              * Now we have to rearrange the stack contents to
-             * make space for three more values.
+             * make space for four more values.
              */
-            svalue_t result;
             svalue_t * argp;
-            int num_extra = (hook->type == T_STRING) ? 2 : 3;
+            int num_extra = (hook->type == T_STRING) ? 3 : 4;
             int i, rc;
-
-            result = const0;
 
             argp = inter_sp - num_arg + 1;
             for (i = 0; i < num_arg; i++)
                 inter_sp[-i+num_extra] = inter_sp[-i];
             inter_sp += num_extra;
 
+            /* The first and second position on the stack will
+             * be the return lvalue. The first one is for us,
+             * the second one will be for the function call.
+             */
+            *argp = const0;
+            assign_protected_lvalue_no_free(argp+1, argp);
+
             /* Add the three new arguments: &result, ob, fun
              * to the arguments on the stack.
              */
-            /* This changes result into a protected lvalue. */
-            assign_protected_lvalue_no_free(argp, &result);
-
             if (hook->type == T_CLOSURE)
             {
-                put_ref_object(argp+1, ob, "int_apply");
-                put_ref_string(argp+2, fun);
+                put_ref_object(argp+2, ob, "int_apply");
+                put_ref_string(argp+3, fun);
             }
             else
-                put_ref_string(argp+1, fun);
+                put_ref_string(argp+2, fun);
 
             /* Call the function */
             if (hook->type == T_STRING)
             {
-                rc = apply_low(hook->u.str, ob, num_arg+num_extra, b_ign_prot);
+                rc = apply_low(hook->u.str, ob, num_arg+num_extra-1, b_ign_prot);
             }
             else /* hook->type == T_CLOSURE */
             {
-                int_call_lambda(hook, num_arg+num_extra, MY_TRUE);
+                int_call_lambda(hook, num_arg+num_extra-1, MY_TRUE);
                 rc = 1; /* This call obviously succeeds */
             }
 
@@ -16859,15 +16860,19 @@ int_apply (string_t *fun, object_t *ob, int num_arg
                 /* Default method found, but it denied executing the call.
                  */
                 inter_sp--;
-                free_svalue(&result);
+                _pop_stack(); /* Remove the result. */
                 rc = APPLY_NOT_FOUND;
             }
             else
             {
                 /* Default method found and executed.
-                 * Copy the result onto the stack.
+                 * Remove the call result, then the result value
+                 * will be the last remaining value on the stack.
                  */
-                transfer_svalue(inter_sp, &result);
+                _pop_stack();
+
+                /* Remove the lvalue. */
+                normalize_svalue(inter_sp, true);
                 rc = APPLY_DEFAULT_FOUND;
             }
 

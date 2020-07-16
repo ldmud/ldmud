@@ -120,6 +120,23 @@ mixed *tests = ({
           return 1;
       :)
    }),
+   ({ "Memory leak with default functions.", 0,
+      (:
+          // We provoke a runtime error in the default function.
+          set_driver_hook(H_DEFAULT_METHOD, function int(mixed result, object ob, string fun, varargs mixed* args)
+          {
+             raise_error("create garbage.\n");
+          });
+
+          // Call the function
+          catch(clone_object(this_object())->missing_function());
+
+          set_driver_hook(H_DEFAULT_METHOD, 0);
+
+          // And let the GC at the end do the check.
+          return 1;
+      :)
+   }),
 });
 
 void run_test()
