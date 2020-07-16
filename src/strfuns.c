@@ -2019,7 +2019,17 @@ sort_string (const string_t * p_in, size_t size, size_t *plen, long ** pos)
         {
             step = utf8_to_unicode(in + i, size - i, out + len);
             if (!step)
+            {
+                if (out)
+                    xfree(out);
+                if (tmp)
+                    xfree(tmp);
+                if (outpos)
+                    xfree(outpos);
+                if (tmppos)
+                    xfree(tmppos);
                 errorf("Invalid character in string at index %zd.\n", len);
+            }
             if (outpos)
                 outpos[len] = len;
             i += step;
@@ -2150,14 +2160,14 @@ intersect_strings (string_t * p_left, string_t * p_right, Bool bSubtract)
     if (!size_right)
         return ref_mstring(bSubtract ? p_left : p_right);
 
+    /* Sort the two strings */
+    left = sort_string(p_left, size_left, &len_left, &pos);
+    right = sort_string(p_right, size_right, &len_right, NULL);
+
     xallocate(matches, size_left, "intersection matches");
 
     for (ix_left = 0; ix_left < size_left; ix_left++)
         matches[ix_left] = bSubtract ? MY_TRUE : MY_FALSE;
-
-    /* Sort the two strings */
-    left = sort_string(p_left, size_left, &len_left, &pos);
-    right = sort_string(p_right, size_right, &len_right, NULL);
 
     rpos = xalloc(sizeof(long) * len_left);
     if (rpos == NULL)
