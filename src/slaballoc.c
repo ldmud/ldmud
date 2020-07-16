@@ -5016,16 +5016,16 @@ mem_free_unrefed_memory (void)
 #endif
 #ifdef MALLOC_TRACE
             dprintf3(gcollect_outfd, " %s %d size 0x%x\n",
-              p[XM_FILE+ML_OVERHEAD], p[XM_LINE+M_OVERHEAD], size & M_MASK
+              p[XM_FILE+M_OVERHEAD], p[XM_LINE+M_OVERHEAD], size & M_MASK
             );
 #endif
 #ifdef MALLOC_LPC_TRACE
-            write_lpc_trace(gcollect_outfd, p + ML_OVERHEAD, MY_FALSE);
+            write_lpc_trace(gcollect_outfd, p + M_OVERHEAD, MY_FALSE);
 #endif
-            print_block(gcollect_outfd, p + ML_OVERHEAD);
+            print_block(gcollect_outfd, p + M_OVERHEAD);
             size2 = p[size];
             flags2 = p[size + 1];
-            large_free((char *)(p+ML_OVERHEAD));
+            large_free((char *)(p+M_OVERHEAD));
             if ( !(flags2 & THIS_BLOCK) )
                 size += size2;
         }
