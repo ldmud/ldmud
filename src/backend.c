@@ -1393,6 +1393,7 @@ static Bool did_swap;
             CLEAR_EVAL_COST;
             command_giver = NULL;
             previous_ob = NULL;
+            current_object = obj;
             trace_level = 0;
             if (driver_hook[H_CLEAN_UP].type == T_CLOSURE)
             {
