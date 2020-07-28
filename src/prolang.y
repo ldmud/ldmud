@@ -13195,15 +13195,23 @@ function_call:
                       CURRENT_PROGRAM_SIZE += 3;
                   }
 
+                  $$.type = get_fulltype(ref_lpctype(funp->type)); /* Result type */
+
                   /* Verify that the function has been defined already.
                    * For inherited functions this is a no-brainer.
                    */
                   if (funp->flags & (NAME_UNDEFINED|NAME_HIDDEN))
                   {
-                      if ( !(funp->flags & (NAME_PROTOTYPE|NAME_INHERITED))
-                       && exact_types)
+                      if ( !(funp->flags & (NAME_PROTOTYPE|NAME_INHERITED)) )
                       {
-                          yyerrorf("Function %.50s undefined", get_txt(funp->name));
+                          if (exact_types)
+                              yyerrorf("Function %.50s undefined", get_txt(funp->name));
+
+                          /* Undefined functions will have lpctype_unknown,
+                           * change that to mixed so this won't cause any further errors.
+                           */
+                          free_fulltype($$.type);
+                          $$.type = get_fulltype(lpctype_mixed);
                       }
                       else if ((funp->flags
                                 & (NAME_PROTOTYPE|NAME_HIDDEN))
@@ -13216,9 +13224,6 @@ function_call:
                   if (funp->flags & TYPE_MOD_DEPRECATED)
                       yywarnf("Calling deprecated function \'%s\'",
                               get_txt(funp->name));
-
-
-                  $$.type = get_fulltype(ref_lpctype(funp->type)); /* Result type */
 
                   /* Check number of arguments.
                    */
