@@ -6670,8 +6670,19 @@ call_lpc_secure (CClosureFun fun, int num_arg, void* data)
 
     if (setjmp(error_recovery_info.con.text))
     {
-        PyErr_SetString(PyExc_RuntimeError, get_txt(current_error));
+        /* Although we propagate the error as a Python exception to the
+         * caller (which will result in another LPC error if the caller
+         * is LPC code), we also call secure_apply_error() here,
+         * so the error is logged with the full call trace.
+         *
+         * secure_apply_error will free current_error, so saving
+         * a reference here.
+         */
+        string_t *error = ref_mstring(current_error);
         secure_apply_error(save_sp, save_csp, python_is_external);
+
+        PyErr_SetString(PyExc_RuntimeError, get_txt(current_error));
+        free_mstring(error);
     }
     else
     {
