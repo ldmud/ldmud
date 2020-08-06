@@ -2218,9 +2218,7 @@ add_table_now:
                     {
                         Bool justifyString;
                         bool error = false;
-                        size_t reallen = (carg->u.str->info.unicode == STRING_UTF8)
-                                       ? get_string_width(get_txt(carg->u.str), slen, &error)
-                                       : slen;
+                        size_t reallen = get_string_width(get_txt(carg->u.str), slen, &error);
 
                         if (error)
                             ERROR(ERR_INVALID_CHAR);
@@ -2229,9 +2227,7 @@ add_table_now:
                         if (pres && pres < reallen)
                         {
                             reallen = pres;
-                            slen = (carg->u.str->info.unicode == STRING_UTF8)
-                                 ? get_string_up_to_width(get_txt(carg->u.str), slen, pres, NULL)
-                                 : pres;
+                            slen = get_string_up_to_width(get_txt(carg->u.str), slen, pres, NULL);
                         }
 
                         /* Determine whether to print this string
@@ -2262,7 +2258,7 @@ add_table_now:
                         {
                             add_justified(st, get_txt(carg->u.str), slen, fs);
                         }
-                        else if (fs && fs > (unsigned int)slen)
+                        else if (fs && fs > reallen)
                         {
                             add_aligned(st, get_txt(carg->u.str)
                                        , slen, pad, fs, finfo);

@@ -707,7 +707,7 @@ void run_test()
                 return 1;
             :)
         }),
-        ({ "sprintf correctly calculating column sizes", 0,
+        ({ "sprintf correctly calculating column sizes 1", 0,
             (:
                 foreach(string cluster: ({
                     "A\u0308",
@@ -719,6 +719,18 @@ void run_test()
                 }))
                 {
                     if (sprintf("%=-3@s\n", ({ "ABC " + cluster, "123 456" })) != "ABC123\n" + cluster + (" " * (3-text_width(cluster))) + "456\n")
+                        return 0;
+                }
+                return 1;
+            :)
+        }),
+        ({ "sprintf correctly calculating column sizes 2", 0,
+            (:
+                foreach(int spaces: 14)
+                {
+                    if (sprintf("%*s%s\n", 3 + spaces, "\e[34m\e[1mABC\e[0m", "123") != spaces * " " + "\e[34m\e[1mABC\e[0m123\n")
+                        return 0;
+                    if (sprintf("%-*s%s\n", 3 + spaces, "\e[34m\e[1mABC\e[0m", "123") != "\e[34m\e[1mABC\e[0m" + spaces * " " + "123\n")
                         return 0;
                 }
                 return 1;
