@@ -3874,7 +3874,7 @@ large_malloc ( word_t size, Bool force_more)
 {
     word_t real_size;
     word_t *ptr;
-#if defined(DEBUG) || defined(DEBUG_MALLOC_ALLOCS)
+#ifdef DEBUG_MALLOC_ALLOCS
     size_t orig_size = size;
 #endif
 
@@ -4156,55 +4156,21 @@ found_fit:
     remove_from_free_list(ptr);
     real_size = read_word(ptr+M_LSIZE);
 
-    if (real_size - size)
+    /* If the block is larger than needed, we need to split-off
+     * the remaining space, but only if it is large enough for
+     * a large block. Otherwise we just return a larger block.
+     */
+    if (real_size - size > SMALL_BLOCK_MAX)
     {
         /* split block pointed to by ptr into two blocks */
         write_word(ptr+size, 0); /* Init the header word */
         build_block(ptr+size, real_size-size);
-#ifdef DEBUG
-        if (real_size - size <= SMALL_BLOCK_MAX)
-        {
-            dprintf2(2,"DEBUG: lmalloc(%d / %d): "
-                      , orig_size, size * GRANULARITY);
-            dprintf2(2
-                    , "Split off block of %d bytes, small limit is %d bytes.\n"
-                    , (p_int)(real_size - size) * GRANULARITY
-                    , (p_int)SMALL_BLOCK_MAX * GRANULARITY);
-#ifdef DEBUG_MALLOC_ALLOCS
-            if (gcollect_outfd != 2)
-            {
-                dprintf2(gcollect_outfd
-                        ,"DEBUG: lmalloc(%d / %d): "
-                        , orig_size, size * GRANULARITY);
-                dprintf2(gcollect_outfd
-                        , "Split off block of %d bytes, small limit is %d bytes.\n"
-                        , (p_int)(real_size - size) * GRANULARITY
-                        , (p_int)SMALL_BLOCK_MAX * GRANULARITY);
-            }
-#endif
-        }
-#endif
 
-#       ifndef MALLOC_SBRK
-        /* When we allocate a new chunk, it might differ slightly in size from
-         * the desired size.
-         */
-        if (real_size - size <= SMALL_BLOCK_MAX)
-        {
-            mark_block(ptr+size);
-            clear_bit(ptr+size, M_GC_FREE); /* Hands off, GC! */
-            count_up(&large_wasted_stat, (read_word(ptr+size) & M_MASK) * GRANULARITY);
-        }
-        else
-#       endif
-        {
-            /* At this point, it shouldn't happen that the split-off
-             * block is too small to be allocated as a small block.
-             */
-            add_to_free_list(ptr+size);
-        }
+        add_to_free_list(ptr+size);
         build_block(ptr, size);
     }
+    else
+        size = real_size; /* For the statistics. */
 
     /* The block at ptr is all ours */
 

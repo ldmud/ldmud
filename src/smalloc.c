@@ -3251,7 +3251,11 @@ found_fit:
     remove_from_free_list(ptr);
     real_size = ptr[M_LSIZE];
 
-    if (real_size - size)
+    /* If the block is larger than needed, we need to split-off
+     * the remaining space, but only if it is large enough for
+     * a large block. Otherwise we just return a larger block.
+     */
+    if (real_size - size > SMALL_BLOCK_MAX)
     {
         /* split block pointed to by ptr into two blocks */
 
@@ -3281,26 +3285,11 @@ found_fit:
         }
 #endif
 
-#       ifndef MALLOC_SBRK
-        /* When we allocate a new chunk, it might differ slightly in size from
-         * the desired size.
-         */
-        if (real_size - size <= SMALL_BLOCK_MAX)
-        {
-            mark_block(ptr+size);
-            *(ptr+size) &= ~M_GC_FREE; /* Hands off, GC! */
-            count_up(&large_wasted_stat, (*(ptr+size) & M_MASK) * GRANULARITY);
-        }
-        else
-#       endif
-        {
-            /* At this point, it shouldn't happen that the split-off
-             * block is too small to be allocated as a small block.
-             */
-            add_to_free_list(ptr+size);
-        }
+        add_to_free_list(ptr+size);
         build_block(ptr, size);
     }
+    else
+        size = real_size; /* For the statistics. */
 
     /* The block at ptr is all ours */
 
