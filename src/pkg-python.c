@@ -6710,6 +6710,7 @@ call_lpc_secure (CClosureFun fun, int num_arg, void* data)
         if(python_is_external)
         {
             mark_end_evaluation();
+            python_save_context();
             current_object = save_ob;
         }
     }
