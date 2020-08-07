@@ -3076,7 +3076,12 @@ ldmud_closure_init (ldmud_closure_t *self, PyObject *args, PyObject *kwds)
     if(lfun_ob == NULL)
     {
         /* It shall be a (simul-)efun closure. */
+        object_t *prev_ob = current_object;
+
+        current_object = bound_ob->lpc_object;
         symbol_efun_str(name, length, &self->lpc_closure, OVERRIDE_NONE, true);
+        current_object = prev_ob;
+
         if (self->lpc_closure.type != T_CLOSURE)
         {
             PyErr_Format(PyExc_NameError, "unknown symbol '%s'", name);
