@@ -11237,6 +11237,7 @@ lvalue_reference:
           $$.type = $3.type.t_type;
           $$.vlvalue_inst = 0;
           $$.num_arg = 0;
+          $$.name = 0;
       }
 ; /* lvalue_reference */
 
