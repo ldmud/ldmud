@@ -219,14 +219,15 @@ tls_continue_handshake (interactive_t *ip)
         current_interactive = ip->ob;
         /* Set current_interactive as it would be for a normal logon() call. */
 
-        (void)apply_callback(handler->cb, 2);
+        (void)backend_callback(handler->cb, 2);
+        xfree(handler->cb); /* The callback is already gone. */
+        xfree(handler);
+        inter_sp--;         /* Remove the error handler without executing. */
 
         if (!(ip->ob->flags & O_DESTRUCTED))
             print_prompt();
 
         command_giver = NULL;
-
-        free_svalue(inter_sp); inter_sp--; /* free the callback */
     }
 
     return ret;
