@@ -1887,6 +1887,17 @@ void assign_rvalue_no_free (svalue_t *to, svalue_t *from)
 #define assign_rvalue_no_free(to,from) inl_assign_rvalue_no_free(to,from)
 
 /*-------------------------------------------------------------------------*/
+void assign_rvalue_no_free_no_collapse(svalue_t *to, svalue_t *from)
+
+/* Same as assign_rvalue_no_free(), but keeps the lvalues in <to>,
+ * even if it is the last reference.
+ */
+{
+    normalize_svalue(from, false);
+    internal_assign_rvalue_no_free(to, from);
+} /* assign_rvalue_no_free_no_collapse() */
+
+/*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
 inl_get_rvalue (svalue_t *v, bool *last_reference, bool collapse_lvalues)
 
@@ -1956,6 +1967,8 @@ inl_get_rvalue (svalue_t *v, bool *last_reference, bool collapse_lvalues)
 
 svalue_t * get_rvalue (svalue_t *v, bool *last_reference)
 { return inl_get_rvalue(v, last_reference, true); }
+svalue_t * get_rvalue_no_collapse (svalue_t *v, bool *last_reference)
+{ return inl_get_rvalue(v, last_reference, false); }
 
 #define get_rvalue(v, last_reference) inl_get_rvalue(v, last_reference, true)
 #define get_rvalue_no_collapse(v, last_reference) inl_get_rvalue(v, last_reference, false)

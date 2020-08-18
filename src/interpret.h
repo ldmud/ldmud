@@ -207,6 +207,7 @@ extern void free_svalue(svalue_t *v);
 extern void normalize_svalue(svalue_t *svp, bool collapse_lvalues);
 extern void assign_svalue_no_free(svalue_t *to, svalue_t *from);
 extern void assign_rvalue_no_free(svalue_t *to, svalue_t *from);
+extern void assign_rvalue_no_free_no_collapse(svalue_t *to, svalue_t *from);
 extern void assign_svalue(svalue_t *dest, svalue_t *v);
 extern void copy_svalue_no_free (svalue_t *to, svalue_t *from);
 extern void transfer_svalue_no_free(svalue_t *dest, svalue_t *v);
@@ -217,6 +218,7 @@ extern void assign_protected_char_lvalue_no_free(svalue_t *dest, struct protecte
 extern void assign_protected_range_lvalue_no_free(svalue_t *dest, struct protected_lvalue *var, svalue_t *vec, mp_int index1, mp_int index2);
 
 extern svalue_t *get_rvalue(svalue_t *v, bool *last_reference);
+extern svalue_t *get_rvalue_no_collapse(svalue_t *v, bool *last_reference);
 
 extern void put_c_string (svalue_t *sp, const char *p);
 extern void put_c_n_string (svalue_t *sp, const char *p, size_t len);

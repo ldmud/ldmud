@@ -395,6 +395,57 @@ class TestQuotedArray(unittest.TestCase):
         with self.assertRaises(TypeError):
             ldmud.QuotedArray(1.5, 1)
 
+class TestLvalue(unittest.TestCase):
+    def testLvalueInit(self):
+        lv = ldmud.Lvalue(10)
+        self.assertIsNotNone(lv)
+
+    def testLvalueValue(self):
+        lv = ldmud.Lvalue(10)
+        self.assertEqual(lv.value, 10)
+        lv.value = 20
+        self.assertEqual(lv.value, 20)
+
+    def testLvalueCompare(self):
+        lv1 = ldmud.Lvalue(10)
+        lv2 = ldmud.Lvalue(10)
+        self.assertEqual(lv1, lv1)
+        self.assertNotEqual(lv1, lv2)
+
+    def testLvalueArrayItem(self):
+        arr = ldmud.Array([10,11,12])
+        lv = ldmud.Lvalue(arr)
+        lv[2].value = 42
+        self.assertEqual(arr[2], 42)
+        arr[0] = 100
+        self.assertEqual(lv[0].value, 100)
+
+    def testLvalueStringItem(self):
+        lv = ldmud.Lvalue("Test \U0001f4a5!")
+        lv[5].value = 88
+        self.assertEqual(lv.value, "Test X!")
+
+    def testLvalueArrayRange(self):
+        arr = ldmud.Array([10,11,12])
+        lv = ldmud.Lvalue(arr)
+        lv[1:2].value = ldmud.Array([111, 112])
+        self.assertEqual(list(lv.value), [10, 111, 112, 12])
+
+    def testLvalueStringRange(self):
+        lv = ldmud.Lvalue("Teststring")
+        lv[4:7].value = "\uff33\uff54\uff52"
+        self.assertEqual(lv.value, "Test\uff33\uff54\uff52ing")
+        lv[4:8].value = ""
+        self.assertEqual(lv.value, "Testng")
+
+    def testLvalueMappingItem(self):
+        m = ldmud.Mapping({1:1, 2:4, 3:9, 4:16})
+        lv = ldmud.Lvalue(m)
+        lv[3].value = 27
+        self.assertEqual(m[3], 27)
+        m[3] = 81
+        self.assertEqual(lv[3,0].value, 81)
+
 class TestEfuns(unittest.TestCase):
     def testDir(self):
         self.assertGreater(len(dir(ldmud.efuns)), 200)

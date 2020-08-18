@@ -250,7 +250,8 @@ static ldmud_gc_var_t *gc_object_list = NULL,
                       *gc_struct_list = NULL,
                       *gc_closure_list = NULL,
                       *gc_symbol_list = NULL,
-                      *gc_quoted_array_list = NULL;
+                      *gc_quoted_array_list = NULL,
+                      *gc_lvalue_list = NULL;
 
 #ifdef USE_PYTHON_CONTEXT
 static PyObject * python_contextvar_current_object = NULL;
@@ -264,7 +265,8 @@ static PyObject * python_contextvar_command_giver = NULL;
 static PyObject* lpctype_to_pythontype(lpctype_t *type);
 static lpctype_t* pythontype_to_lpctype(PyObject* ptype);
 static const char* python_to_svalue(svalue_t *dest, PyObject* val);
-static PyObject* svalue_to_python (svalue_t *svp);
+static PyObject* svalue_to_python(svalue_t *svp);
+static PyObject* rvalue_to_python(svalue_t *svp);
 static bool python_eq_svalue(PyObject* pval, svalue_t *sval);
 static bool call_lpc_secure(CClosureFun fun, int num_arg, void* data);
 static void python_save_context();
@@ -828,6 +830,13 @@ struct ldmud_quoted_array_s
     svalue_t lpc_quoted_array;  /* Can be T_INVALID. */
 };
 
+struct ldmud_lvalue_s
+{
+    PyGCObject_HEAD
+
+    svalue_t lpc_lvalue;        /* Can be T_INVALID. */
+};
+
 typedef struct ldmud_array_s ldmud_array_t;
 typedef struct ldmud_mapping_s ldmud_mapping_t;
 typedef struct ldmud_struct_s ldmud_struct_t;
@@ -837,6 +846,7 @@ typedef struct ldmud_object_and_index_s ldmud_object_and_index_t;
 typedef struct ldmud_object_lfun_argument_s ldmud_object_lfun_argument_t;
 typedef struct ldmud_symbol_s ldmud_symbol_t;
 typedef struct ldmud_quoted_array_s ldmud_quoted_array_t;
+typedef struct ldmud_lvalue_s ldmud_lvalue_t;
 
 /*-------------------------------------------------------------------------*/
 /* GC Support */
@@ -1835,7 +1845,7 @@ ldmud_object_variable_get_value (ldmud_object_and_index_t *varob, void *closure)
     if (!ldmud_object_check_available(&varob->ob_base))
         return NULL;
 
-    return svalue_to_python(varob->ob_base.lpc_object->variables + varob->index);
+    return rvalue_to_python(varob->ob_base.lpc_object->variables + varob->index);
 } /* ldmud_object_variable_get_value() */
 
 /*-------------------------------------------------------------------------*/
@@ -2944,7 +2954,7 @@ ldmud_array_item (ldmud_array_t *val, Py_ssize_t idx)
         return NULL;
     }
 
-    result = svalue_to_python(val->lpc_array->item + idx);
+    result = rvalue_to_python(val->lpc_array->item + idx);
     if (result == NULL)
         PyErr_SetString(PyExc_ValueError, "Unsupported data type.");
 
@@ -3375,7 +3385,7 @@ ldmud_mapping_iter_next (ldmud_mapping_list_t* self)
     switch (self->mode)
     {
         case MappingIterator_Keys:
-            result = svalue_to_python(self->indices->item + self->pos);
+            result = rvalue_to_python(self->indices->item + self->pos);
             break;
 
         case MappingIterator_Items:
@@ -3395,7 +3405,7 @@ ldmud_mapping_iter_next (ldmud_mapping_list_t* self)
                 }
 
                 if (self->mode == MappingIterator_Values)
-                    result = svalue_to_python(values);
+                    result = rvalue_to_python(values);
                 else
                 {
                     PyObject *val;
@@ -3404,7 +3414,7 @@ ldmud_mapping_iter_next (ldmud_mapping_list_t* self)
                     if (result == NULL)
                         return NULL;
 
-                    val = svalue_to_python(self->indices->item + self->pos);
+                    val = rvalue_to_python(self->indices->item + self->pos);
                     if (val == NULL)
                     {
                         Py_DECREF(result);
@@ -3414,7 +3424,7 @@ ldmud_mapping_iter_next (ldmud_mapping_list_t* self)
                     PyTuple_SET_ITEM(result, 0, val);
                     for (int i = 0; i < self->map->num_values; i++)
                     {
-                        val = svalue_to_python(values + i);
+                        val = rvalue_to_python(values + i);
                         if (val == NULL)
                         {
                             Py_DECREF(result);
@@ -4062,7 +4072,7 @@ ldmud_mapping_subscript (ldmud_mapping_t *val, PyObject *key)
     if (values == &const0)
         return PyLong_FromLong(0);
 
-    result = svalue_to_python(values + idx);
+    result = rvalue_to_python(values + idx);
     if (result == NULL)
         PyErr_SetString(PyExc_ValueError, "Unsupported data type.");
 
@@ -4638,7 +4648,7 @@ ldmud_struct_getattr (ldmud_struct_t *obj, char *name)
         return NULL;
     }
 
-    result = svalue_to_python(obj->lpc_struct->member + idx);
+    result = rvalue_to_python(obj->lpc_struct->member + idx);
     if (result == NULL)
         PyErr_SetString(PyExc_ValueError, "Unsupported data type.");
 
@@ -5561,6 +5571,750 @@ ldmud_quoted_array_create (svalue_t* sym)
 } /* ldmud_quoted_array_create() */
 
 /*-------------------------------------------------------------------------*/
+/* Lvalues */
+
+static PyObject* ldmud_lvalue_create(svalue_t* lv);
+
+
+static void
+ldmud_lvalue_dealloc (ldmud_lvalue_t* self)
+
+/* Destroy the ldmud_lvalue_t object
+ */
+
+{
+    free_svalue(&self->lpc_lvalue);
+
+    remove_gc_object(&gc_lvalue_list, (ldmud_gc_var_t*)self);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_lvalue_dealloc() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_lvalue_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
+
+/* Implmenent __new__ for ldmud_lvalue_t, i.e. allocate and initialize
+ * the closure with null values.
+ */
+
+{
+    ldmud_lvalue_t *self;
+
+    self = (ldmud_lvalue_t *)type->tp_alloc(type, 0);
+    if (self == NULL)
+        return NULL;
+
+    self->lpc_lvalue.type = T_INVALID;
+    add_gc_object(&gc_lvalue_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_lvalue_new() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_lvalue_init (ldmud_lvalue_t *self, PyObject *args, PyObject *kwds)
+
+/* Implement __init__ for ldmud_lvalue_t, i.e. create a new lvalue.
+ */
+
+{
+    /* This function will convert a Python value to an LPC value, so it
+     * can be accessed as an lvalue in LPC. 
+     */
+
+    static char *kwlist[] = { "value", NULL};
+    PyObject *value = Py_None;
+    const char* err;
+    svalue_t lpcval;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O", kwlist, &value))
+        return -1;
+
+    err = python_to_svalue(&lpcval, value);
+    if (err)
+    {
+        PyErr_SetString(PyExc_ValueError, err);
+        return -1;
+    }
+
+    free_svalue(&(self->lpc_lvalue));
+    assign_protected_lvalue_no_free(&(self->lpc_lvalue), &lpcval);
+    free_svalue(&lpcval);
+
+    return 0;
+} /* ldmud_lvalue_init() */
+
+/*-------------------------------------------------------------------------*/
+static Py_hash_t
+ldmud_lvalue_hash (ldmud_lvalue_t *val)
+
+/* Return a hash of this closure.
+ */
+
+{
+    return _Py_HashPointer(val->lpc_lvalue.u.generic) ^ val->lpc_lvalue.x.lvalue_type;
+} /* ldmud_lvalue_hash() */
+
+/*-------------------------------------------------------------------------*/
+static bool ldmud_lvalue_check(PyObject *ob);
+
+static PyObject*
+ldmud_lvalue_richcompare (ldmud_lvalue_t *self, PyObject *other, int op)
+
+/* Compare <self> to <other> with the compare operation <op>.
+ */
+
+{
+    svalue_t *self_lv, *other_lv;
+    bool result;
+    PyObject* resultval;
+
+    if (!ldmud_lvalue_check(other))
+    {
+        Py_INCREF(Py_NotImplemented);
+        return Py_NotImplemented;
+    }
+
+    self_lv = &self->lpc_lvalue;
+    other_lv = &((ldmud_lvalue_t*)other)->lpc_lvalue;
+
+    if(self_lv->x.lvalue_type != other_lv->x.lvalue_type)
+    {
+        switch (op)
+        {
+            case Py_LT: result = self_lv->x.lvalue_type <  other_lv->x.lvalue_type; break;
+            case Py_LE: result = self_lv->x.lvalue_type <= other_lv->x.lvalue_type; break;
+            case Py_EQ: result = self_lv->x.lvalue_type == other_lv->x.lvalue_type; break;
+            case Py_NE: result = self_lv->x.lvalue_type != other_lv->x.lvalue_type; break;
+            case Py_GT: result = self_lv->x.lvalue_type >  other_lv->x.lvalue_type; break;
+            case Py_GE: result = self_lv->x.lvalue_type >= other_lv->x.lvalue_type; break;
+            default:
+            {
+                Py_INCREF(Py_NotImplemented);
+                return Py_NotImplemented;
+            }
+        }
+    }
+    else
+    {
+        switch (op)
+        {
+            case Py_LT: result = self_lv->u.generic <  other_lv->u.generic; break;
+            case Py_LE: result = self_lv->u.generic <= other_lv->u.generic; break;
+            case Py_EQ: result = self_lv->u.generic == other_lv->u.generic; break;
+            case Py_NE: result = self_lv->u.generic != other_lv->u.generic; break;
+            case Py_GT: result = self_lv->u.generic >  other_lv->u.generic; break;
+            case Py_GE: result = self_lv->u.generic >= other_lv->u.generic; break;
+            default:
+            {
+                Py_INCREF(Py_NotImplemented);
+                return Py_NotImplemented;
+            }
+        }
+    }
+
+    resultval = result ? Py_True : Py_False;
+    Py_INCREF(resultval);
+    return resultval;
+} /* ldmud_lvalue_richcompare() */
+
+/*-------------------------------------------------------------------------*/
+static Py_ssize_t
+ldmud_lvalue_length (ldmud_lvalue_t *self)
+
+/* Implement len() for ldmud_lvalue_t.
+ */
+
+{
+    svalue_t *vec;
+
+    if (self->lpc_lvalue.type == T_INVALID)
+    {
+        PyErr_SetString(PyExc_ValueError, "empty lvalue given");
+        return -1;
+    }
+
+    assert(self->lpc_lvalue.type == T_LVALUE);
+
+    vec = get_rvalue_no_collapse(&(self->lpc_lvalue), NULL);
+
+    if (vec != NULL
+     && vec->type != T_POINTER
+     && vec->type != T_STRING
+     && vec->type != T_BYTES)
+    {
+        PyErr_SetString(PyExc_TypeError, "lvalue has no length");
+        return -1;
+    }
+
+    if (vec == NULL)
+    {
+        /* We have a range lvalue. */
+        struct protected_range_lvalue *r;
+        Py_ssize_t len;
+
+        assert(self->lpc_lvalue.x.lvalue_type == LVALUE_PROTECTED_RANGE);
+        r = self->lpc_lvalue.u.protected_range_lvalue;
+
+        len = r->index2 - r->index1;
+        if (len <= 0)
+            return 0;
+
+        if (r->vec.type == T_STRING && r->vec.u.str->info.unicode == STRING_UTF8)
+            return (Py_ssize_t)byte_to_char_index(get_txt(r->vec.u.str) + r->index1, len, NULL);
+        else
+            return len;
+    }
+    else
+    {
+        switch (vec->type)
+        {
+            case T_POINTER:
+                return VEC_SIZE(vec->u.vec);
+                break;
+
+            case T_STRING:
+            case T_BYTES:
+                if (vec->u.str->info.unicode == STRING_UTF8)
+                    return byte_to_char_index(get_txt(vec->u.str), mstrsize(vec->u.str), NULL);
+                else
+                    return mstrsize(vec->u.str);
+                break;
+        }
+    }
+
+    return 0; /* Never reached. */
+} /* ldmud_lvalue_length() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_lvalue_item (ldmud_lvalue_t *self, Py_ssize_t idx)
+
+/* Implement item access for ldmud_lvalue_t.
+ *
+ * Here we just handle member access to bytes, strings and arrays.
+ * All other (slices of the above and mappings) are handled
+ * by ldmud_lvalue_subscript().
+ */
+
+{
+    svalue_t *vec;
+
+    if (self->lpc_lvalue.type == T_INVALID)
+    {
+        PyErr_SetString(PyExc_ValueError, "empty lvalue given");
+        return NULL;
+    }
+
+    assert(self->lpc_lvalue.type == T_LVALUE);
+
+    vec = get_rvalue_no_collapse(&(self->lpc_lvalue), NULL);
+    if (vec == NULL)
+    {
+        /* We have a range lvalue. */
+        struct protected_range_lvalue *r;
+        Py_ssize_t len;
+
+        assert(self->lpc_lvalue.x.lvalue_type == LVALUE_PROTECTED_RANGE);
+        r = self->lpc_lvalue.u.protected_range_lvalue;
+        len = r->index2 - r->index1;
+        if (len < 0)
+            len = 0;
+
+        switch (r->vec.type)
+        {
+            case T_POINTER:
+                if (idx < 0 || idx >= len)
+                {
+                    PyErr_SetString(PyExc_IndexError, "index out of range");
+                    return NULL;
+                }
+
+                return ldmud_lvalue_create(r->vec.u.vec->item + r->index1 + idx);
+
+            case T_STRING:
+            case T_BYTES:
+            {
+                PyObject* ob;
+                svalue_t result;
+                string_t *p;
+                ssize_t pos, num;
+
+                if (r->vec.u.str->info.unicode == STRING_UTF8)
+                    num = byte_to_char_index(get_txt(r->vec.u.str) + r->index1, len, NULL);
+                else
+                    num = len;
+
+                if (idx < 0 || idx >= num)
+                {
+                    PyErr_SetString(PyExc_IndexError, "index out of range");
+                    return NULL;
+                }
+
+                p = make_mutable(r->vec.u.str);
+                if (!p)
+                    return PyErr_NoMemory();
+
+                if (r->vec.u.str != p)
+                {
+                    if (r->var != NULL && r->var->val.type == r->vec.type && r->var->val.u.str == r->vec.u.str)
+                    {
+                        /* Update the corresponding variable. */
+                        free_mstring(r->var->val.u.str);
+                        r->var->val.u.str = ref_mstring(p);
+                    }
+                    r->vec.u.str = p;
+                }
+
+                if (r->vec.u.str->info.unicode == STRING_UTF8)
+                    pos = char_to_byte_index(get_txt(p) + r->index1, len, idx, NULL);
+                else
+                    pos = idx;
+
+                assign_protected_char_lvalue_no_free(&result, r->var, p, get_txt(p) + r->index1 + pos);
+                ob = ldmud_lvalue_create(&result);
+                free_svalue(&result);
+
+                return ob;
+            }
+
+            default:
+                fatal("Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+        }
+    }
+    else
+    {
+        switch (vec->type)
+        {
+            case T_POINTER:
+                if (idx < 0 || idx >= VEC_SIZE(vec->u.vec))
+                {
+                    PyErr_SetString(PyExc_IndexError, "index out of range");
+                    return NULL;
+                }
+
+                return ldmud_lvalue_create(vec->u.vec->item + idx);
+
+            case T_STRING:
+            case T_BYTES:
+            {
+                PyObject* ob;
+                svalue_t result;
+                string_t *p;
+                ssize_t pos, num, len = mstrsize(vec->u.str);
+
+                if (vec->u.str->info.unicode == STRING_UTF8)
+                    num = byte_to_char_index(get_txt(vec->u.str), len, NULL);
+                else
+                    num = len;
+
+                if (idx < 0 || idx >= num)
+                {
+                    PyErr_SetString(PyExc_IndexError, "index out of range");
+                    return NULL;
+                }
+
+                p = make_mutable(vec->u.str);
+                if (!p)
+                    return PyErr_NoMemory();
+
+                vec->u.str = p;
+
+                if (vec->u.str->info.unicode == STRING_UTF8)
+                    pos = char_to_byte_index(get_txt(p), len, idx, NULL);
+                else
+                    pos = idx;
+
+                assert(self->lpc_lvalue.x.lvalue_type == LVALUE_PROTECTED);
+                assign_protected_char_lvalue_no_free(&result, self->lpc_lvalue.u.protected_lvalue, p, get_txt(p) + pos);
+                ob = ldmud_lvalue_create(&result);
+                free_svalue(&result);
+
+                return ob;
+            }
+
+            default:
+            {
+                PyErr_SetString(PyExc_TypeError, "lvalue cannot be indexed");
+                return NULL;
+            }
+        }
+    }
+
+    return NULL;
+} /* ldmud_lvalue_item() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_lvalue_subscript (ldmud_lvalue_t *self, PyObject *key)
+
+/* Implement item access for ldmud_lvalue_t.
+ *
+ * Integer indices into arrays, strings and bytes are forwarded to
+ * ldmud_lvalue_item(). This function handles ranges and mapping indexing.
+ */
+
+{
+    svalue_t *vec;
+
+    if (self->lpc_lvalue.type == T_INVALID)
+    {
+        PyErr_SetString(PyExc_ValueError, "empty lvalue given");
+        return NULL;
+    }
+
+    assert(self->lpc_lvalue.type == T_LVALUE);
+
+    vec = get_rvalue_no_collapse(&(self->lpc_lvalue), NULL);
+    if (vec == NULL
+      || vec->type == T_POINTER
+      || vec->type == T_STRING
+      || vec->type == T_BYTES)
+    {
+        if (PyIndex_Check(key))
+        {
+            Py_ssize_t idx = PyNumber_AsSsize_t(key, PyExc_IndexError);
+            if (idx == -1 && PyErr_Occurred())
+                return NULL;
+            if (idx < 0)
+                idx += ldmud_lvalue_length(self);
+
+            return ldmud_lvalue_item(self, idx);
+        }
+        else if (PySlice_Check(key))
+        {
+            PyObject *ob;
+            struct protected_lvalue *var;
+            svalue_t result;
+            Py_ssize_t offset, length = 0, size = 0;
+            Py_ssize_t start, stop, step, slicelength;
+
+            if (vec == NULL)
+            {
+                /* We have a range lvalue. */
+                struct protected_range_lvalue *r;
+
+                assert(self->lpc_lvalue.x.lvalue_type == LVALUE_PROTECTED_RANGE);
+                r = self->lpc_lvalue.u.protected_range_lvalue;
+
+                vec = &(r->vec);
+                var = r->var;
+                offset = r->index1;
+                size = length = r->index2 - r->index1;
+                if (length <= 0)
+                    length = 0;
+
+                if (r->vec.type == T_STRING && r->vec.u.str->info.unicode == STRING_UTF8)
+                    length = (Py_ssize_t)byte_to_char_index(get_txt(r->vec.u.str) + offset, length, NULL);
+            }
+            else
+            {
+                assert(self->lpc_lvalue.x.lvalue_type == LVALUE_PROTECTED);
+
+                var = self->lpc_lvalue.u.protected_lvalue;
+                offset = 0;
+                switch (vec->type)
+                {
+                    case T_POINTER:
+                        size = length = VEC_SIZE(vec->u.vec);
+                        break;
+
+                    case T_STRING:
+                    case T_BYTES:
+                    {
+                        string_t *str = make_mutable(vec->u.str);
+                        if (!str)
+                            return PyErr_NoMemory();
+
+                        vec->u.str = str;
+                        size = length = mstrsize(str);
+                        if (str->info.unicode == STRING_UTF8)
+                            length = byte_to_char_index(get_txt(str), length, NULL);
+                        break;
+                    }
+                }
+            }
+
+            if (PySlice_GetIndicesEx(key, length, &start, &stop, &step, &slicelength) < 0)
+                return NULL;
+
+            if (step != 1)
+            {
+                PyErr_SetString(PyExc_ValueError, "step must be 1");
+                return NULL;
+            }
+
+            if (vec->type == T_STRING && vec->u.str->info.unicode == STRING_UTF8)
+            {
+                start = char_to_byte_index(get_txt(vec->u.str) + offset, size, start, NULL);
+                stop = char_to_byte_index(get_txt(vec->u.str) + offset, size, stop, NULL);
+            }
+
+            start += offset;
+            stop += offset;
+
+            assign_protected_range_lvalue_no_free(&result, var, vec, start, stop);
+            ob = ldmud_lvalue_create(&result);
+            free_svalue(&result);
+
+            return ob;
+        }
+        else
+        {
+            PyErr_Format(PyExc_TypeError, "indices must be integers, not %.200s",
+                        key->ob_type->tp_name);
+            return NULL;
+        }
+    }
+    else if (vec->type == T_MAPPING)
+    {
+        const char *err;
+        svalue_t *dest;
+        svalue_t skey;
+        Py_ssize_t idx = 0;
+
+        if (vec->u.map->num_values == 0)
+        {
+            PyErr_SetString(PyExc_ValueError, "indexing a mapping of width 0");
+            return NULL;
+        }
+
+        /* If it's a tuple, assume it's (key, index) */
+        if (PyTuple_Check(key))
+        {
+            PyObject* second;
+
+            if(PyTuple_Size(key) != 2)
+            {
+                PyErr_SetString(PyExc_IndexError, "index should be a 2-tuple");
+                return NULL;
+            }
+
+            second = PyTuple_GetItem(key, 1);
+            if (second==NULL || !PyIndex_Check(second))
+            {
+                PyErr_Format(PyExc_IndexError, "second index should be an integer, not %.200s", second->ob_type->tp_name);
+                return NULL;
+            }
+
+            idx = PyNumber_AsSsize_t(second, PyExc_IndexError);
+            if (idx == -1 && PyErr_Occurred())
+                return NULL;
+
+            if (idx < 0 || idx >= vec->u.map->num_values)
+            {
+                PyErr_SetString(PyExc_IndexError, "index out of range");
+                return NULL;
+            }
+
+            err = python_to_svalue(&skey, PyTuple_GetItem(key, 0));
+        }
+        else
+            err = python_to_svalue(&skey, key);
+
+        if (err != NULL)
+        {
+            PyErr_SetString(PyExc_ValueError, err);
+            return NULL;
+        }
+
+        dest = get_map_lvalue_unchecked(vec->u.map, &skey);
+        free_svalue(&skey);
+
+        if (dest == NULL)
+            return PyErr_NoMemory();
+
+        return ldmud_lvalue_create(dest + idx);
+    }
+    else
+    {
+        PyErr_SetString(PyExc_TypeError, "lvalue cannot be indexed");
+        return NULL;
+    }
+
+} /* ldmud_lvalue_subscript() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_lvalue_get_value (ldmud_lvalue_t *self, void *closure)
+
+/* Return the value of the lvalue.
+ */
+
+{
+    svalue_t *val;
+
+    if (self->lpc_lvalue.type == T_INVALID)
+    {
+        PyErr_SetString(PyExc_ValueError, "empty lvalue given");
+        return NULL;
+    }
+
+    assert(self->lpc_lvalue.type == T_LVALUE);
+    val = get_rvalue_no_collapse(&(self->lpc_lvalue), NULL);
+
+    if (val != NULL)
+        return svalue_to_python(val);
+    else
+    {
+        // Range lvalue
+        svalue_t vec;
+        PyObject *result;
+
+        assert(self->lpc_lvalue.x.lvalue_type == LVALUE_PROTECTED_RANGE);
+
+        assign_rvalue_no_free_no_collapse(&vec, &(self->lpc_lvalue));
+        result = svalue_to_python(val);
+        free_svalue(&vec);
+
+        return result;
+    }
+} /* ldmud_lvalue_get_value() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_lvalue_set_value (ldmud_lvalue_t *self, PyObject *newval, void *closure)
+
+/* Sets the value of the lvalue.
+ * Returns 0 on success, -1 on failure.
+ */
+
+{
+    const char* err;
+    svalue_t lpcval;
+
+    if (self->lpc_lvalue.type == T_INVALID)
+    {
+        PyErr_SetString(PyExc_ValueError, "empty lvalue given");
+        return -1;
+    }
+
+    assert(self->lpc_lvalue.type == T_LVALUE);
+
+    if (newval == NULL)
+        newval = Py_None;
+
+    err = python_to_svalue(&lpcval, newval);
+    if (err)
+    {
+        PyErr_SetString(PyExc_ValueError, err);
+        return -1;
+    }
+
+    transfer_svalue(&(self->lpc_lvalue), &lpcval);
+
+    return 0;
+} /* ldmud_lvalue_set_value() */
+
+/*-------------------------------------------------------------------------*/
+static PySequenceMethods ldmud_lvalue_as_sequence = {
+    (lenfunc)ldmud_lvalue_length,               /* sq_length */
+    0,                                          /* sq_concat */
+    0,                                          /* sq_repeat */
+    (ssizeargfunc)ldmud_lvalue_item,            /* sq_item */
+    0,                                          /* sq_slice */
+    0,                                          /* sq_ass_item */
+    0,                                          /* sq_ass_slice */
+    0,                                          /* sq_contains */
+    0,                                          /* sq_inplace_concat */
+    0,                                          /* sq_inplace_repeat */
+};
+
+/* This is needed for slicing. */
+static PyMappingMethods ldmud_lvalue_as_mapping = {
+    (lenfunc)ldmud_lvalue_length,               /*mp_length*/
+    (binaryfunc)ldmud_lvalue_subscript,         /*mp_subscript*/
+    0,                                          /*mp_ass_subscript*/
+};
+
+static PyMethodDef ldmud_lvalue_methods[] =
+{
+    {NULL}
+};
+
+static PyGetSetDef ldmud_lvalue_getset[] =
+{
+    {"value", (getter)ldmud_lvalue_get_value, (setter)ldmud_lvalue_set_value, NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_lvalue_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.Lvalue",                     /* tp_name */
+    sizeof(ldmud_lvalue_t),             /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_lvalue_dealloc,   /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    &ldmud_lvalue_as_sequence,          /* tp_as_sequence */
+    &ldmud_lvalue_as_mapping,           /* tp_as_mapping */
+    (hashfunc)ldmud_lvalue_hash,        /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC lvalue",                       /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    (richcmpfunc)ldmud_lvalue_richcompare, /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_lvalue_methods,               /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_lvalue_getset,                /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    (initproc)ldmud_lvalue_init,        /* tp_init */
+    0,                                  /* tp_alloc */
+    ldmud_lvalue_new,                   /* tp_new */
+};
+
+
+/*-------------------------------------------------------------------------*/
+static bool
+ldmud_lvalue_check (PyObject *ob)
+
+/* Returns true, when <ob> is of the LPC closure type.
+ */
+
+{
+    return Py_TYPE(ob) == &ldmud_lvalue_type;
+} /* ldmud_lvalue_check() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_lvalue_create (svalue_t* lv)
+
+/* Creates a new Python lvalue from an LPC lvalue.
+ * If the value is not an T_LVALUE, it will be made into one.
+ */
+
+{
+    ldmud_lvalue_t *self;
+
+    self = (ldmud_lvalue_t *)ldmud_lvalue_type.tp_alloc(&ldmud_lvalue_type, 0);
+    if (self == NULL)
+        return NULL;
+
+    assign_protected_lvalue_no_free(&(self->lpc_lvalue), lv);
+    add_gc_object(&gc_lvalue_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_lvalue_create() */
+
+/*-------------------------------------------------------------------------*/
 /* Interrupt exception */
 
 static PyTypeObject ldmud_interrupt_exception_type =
@@ -6018,6 +6772,8 @@ init_ldmud_module ()
         return NULL;
     if (PyType_Ready(&ldmud_quoted_array_type) < 0)
         return NULL;
+    if (PyType_Ready(&ldmud_lvalue_type) < 0)
+        return NULL;
 
     ldmud_interrupt_exception_type.tp_base = (PyTypeObject *) PyExc_RuntimeError;
     if (PyType_Ready(&ldmud_interrupt_exception_type) < 0)
@@ -6044,6 +6800,7 @@ init_ldmud_module ()
     PyModule_AddObject(module, "Closure", (PyObject*) &ldmud_closure_type);
     PyModule_AddObject(module, "Symbol", (PyObject*) &ldmud_symbol_type);
     PyModule_AddObject(module, "QuotedArray", (PyObject*) &ldmud_quoted_array_type);
+    PyModule_AddObject(module, "Lvalue", (PyObject*) &ldmud_lvalue_type);
     PyModule_AddObject(module, "InterruptException", (PyObject*) &ldmud_interrupt_exception_type);
 
     assert(PYTHON_HOOK_COUNT == sizeof(python_hook_names) / sizeof(python_hook_names[0]));
@@ -6342,15 +7099,7 @@ svalue_to_python (svalue_t *svp)
         }
 
         case T_LVALUE:
-        {
-            svalue_t* rval = get_rvalue(svp, NULL);
-
-            if (rval != NULL)
-                return svalue_to_python(svp);
-
-            PyErr_SetString(PyExc_NotImplementedError, "lvalue ranges are not supported");
-            return NULL;
-        }
+            return ldmud_lvalue_create(svp);
 
         default:
             PyErr_Format(PyExc_TypeError, "unsupported type %d", svp->type);
@@ -6359,6 +7108,25 @@ svalue_to_python (svalue_t *svp)
 
 } /* svalue_to_python() */
 
+
+/*-------------------------------------------------------------------------*/
+
+static PyObject*
+rvalue_to_python (svalue_t *svp)
+
+/* Creates a python value from an svalue_t, but unravels any lvalues.
+ */
+
+{
+    PyObject* ob = svalue_to_python(svp);
+    PyObject* rv;
+    if (!ob || !ldmud_lvalue_check(ob))
+        return ob;
+
+    rv = ldmud_lvalue_get_value((ldmud_lvalue_t*)ob, NULL);
+    Py_DECREF(ob);
+    return rv;
+} /* rvalue_to_python() */
 
 /*-------------------------------------------------------------------------*/
 
@@ -6420,6 +7188,12 @@ python_to_svalue (svalue_t *dest, PyObject* val)
     if (PyObject_TypeCheck(val, &ldmud_quoted_array_type))
     {
         assign_svalue_no_free(dest, &((ldmud_quoted_array_t*)val)->lpc_quoted_array);
+        return NULL;
+    }
+
+    if (PyObject_TypeCheck(val, &ldmud_lvalue_type))
+    {
+        assign_svalue_no_free(dest, &((ldmud_lvalue_t*)val)->lpc_lvalue);
         return NULL;
     }
 
@@ -7557,6 +8331,11 @@ python_clear_refs ()
     {
         clear_ref_in_vector(&((ldmud_quoted_array_t*)var)->lpc_quoted_array, 1);
     }
+
+    for(ldmud_gc_var_t* var = gc_lvalue_list; var != NULL; var = var->gcnext)
+    {
+        clear_ref_in_vector(&((ldmud_lvalue_t*)var)->lpc_lvalue, 1);
+    }
 } /* python_clear_refs() */
 
 /*-------------------------------------------------------------------------*/
@@ -7662,6 +8441,11 @@ python_count_refs ()
     {
         count_ref_in_vector(&((ldmud_quoted_array_t*)var)->lpc_quoted_array, 1);
     }
+
+    for(ldmud_gc_var_t* var = gc_lvalue_list; var != NULL; var = var->gcnext)
+    {
+        count_ref_in_vector(&((ldmud_lvalue_t*)var)->lpc_lvalue, 1);
+    }
 } /* python_count_refs() */
 
 #endif /* GC_SUPPORT */
@@ -7728,6 +8512,11 @@ count_python_extra_refs ()
     for(ldmud_gc_var_t* var = gc_quoted_array_list; var != NULL; var = var->gcnext)
     {
         count_extra_ref_in_vector(&((ldmud_quoted_array_t*)var)->lpc_quoted_array, 1);
+    }
+
+    for(ldmud_gc_var_t* var = gc_lvalue_list; var != NULL; var = var->gcnext)
+    {
+        count_extra_ref_in_vector(&((ldmud_lvalue_t*)var)->lpc_lvalue, 1);
     }
 } /* count_python_extra_refs() */
 
