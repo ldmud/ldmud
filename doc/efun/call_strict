@@ -3,8 +3,8 @@ SYNOPSIS
         unknown call_strict(object*|string* ob, string func, ...)
 
         ob.fun(...)
-        ob->"fun"(...)
-        ob->(fun)(...)
+        ob."fun"(...)
+        ob.(fun)(...)
 
 DESCRIPTION
         Similar to call_other(). Call a member function <fun> in another
