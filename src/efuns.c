@@ -6449,6 +6449,7 @@ v_to_struct (svalue_t *sp, int num_arg)
  *
  *   mixed to_struct(mixed *|mapping)
  *   mixed to_struct(mixed *|mapping, struct)
+ *   mixed to_struct(struct)
  *   mixed to_struct(struct, struct)
  *
  * An array is converted into a struct of the same length.
@@ -6663,12 +6664,14 @@ v_to_struct (svalue_t *sp, int num_arg)
             if (num_arg > 1)
             {
                 int rc;
-                p_int size;
+                p_int size = 0;
+                struct_type_t *oldbase, *newbase;
                 
                 struct_t *oldstruct = argp->u.strct;
                 struct_t *newstruct = argp[1].u.strct;
                 svalue_t *memberp; // pointer to the first member of the new struct
                 svalue_t *omemberp; // pointer to the first member of the old struct
+                struct_member_t *memberdef;
 
                 if (argp[1].type != T_STRUCT)
                     fatal("Bad arg 2 to to_struct(): type %s\n"
@@ -6687,8 +6690,75 @@ v_to_struct (svalue_t *sp, int num_arg)
                 }
                 if (rc == 1)
                     size = struct_size(newstruct); // newstruct is base and has <= members than oldstruct.
-                else if (struct_baseof(oldstruct->type, newstruct->type) == 1)
+                else if ((rc = struct_baseof(oldstruct->type, newstruct->type)) == 1)
                     size = struct_size(oldstruct); // oldstruct is base and has <= members than newstruct.
+
+                if (rc == 1)
+                {
+                    // Both types are directly related. We just need to copy the first
+                    // <size> members over.
+
+                    if (oldstruct->ref == 1
+                        && struct_size(newstruct) == struct_size(oldstruct))
+                    {
+                        // special case, the structs have the same number of members. Since it
+                        // is not possible to remove/change members inherited from a base struct,
+                        // the two structs have the same members. We can just exchange the types
+                        // of the structs.
+                        struct_free_type(oldstruct->type);
+                        oldstruct->type = ref_struct_type(newstruct->type);
+                        break;
+                    }
+
+                    newstruct = struct_new(newstruct->type);
+                    if (!newstruct)
+                        outofmemory("new struct in to_struct()");
+                    for (memberp = newstruct->member, omemberp = oldstruct->member;
+                         --size >= 0;
+                         ++memberp, ++omemberp)
+                    {
+                        // *_no_free, because the members of the new struct only contain 0,
+                        // which need not to be freed.
+                        assign_rvalue_no_free(memberp, omemberp);
+                    }
+                    // the new struct may have more members than the old one (if oldstruct was
+                    // the base. That is OK, the extra svalues just remain 0. On the other hand,
+                    // if the old struct has more members, we just ignore them.
+
+                    put_struct(argp, newstruct);
+                    break;
+                }
+
+                // Check whether both types are related by struct name.
+                oldbase = struct_baseof_name(newstruct->type->name, oldstruct->type);
+                if (oldbase)
+                    newbase = newstruct->type;
+                else if ((newbase = struct_baseof_name(oldstruct->type->name, newstruct->type)))
+                    oldbase = oldstruct->type;
+
+                if (oldbase && newbase)
+                {
+                    // Each member in <newbase> we look up using <oldbase> in <oldstruct>.
+                    newstruct = struct_new(newstruct->type);
+                    if (!newstruct)
+                        outofmemory("new struct in to_struct()");
+
+                    for (memberdef = newbase->member, memberp = newstruct->member, size = struct_t_size(newbase); size--; ++memberdef, ++memberp)
+                    {
+                        int idx = struct_find_member(oldbase, memberdef->name);
+                        if (idx < 0)
+                            continue;
+
+                        // We'll copy only if the types are compatible.
+                        if (!check_rtt_compatibility(memberdef->type, oldstruct->member + idx))
+                            continue;
+
+                        assign_rvalue_no_free(memberp, oldstruct->member + idx);
+                    }
+
+                    put_struct(argp, newstruct);
+                    break;
+                }
                 else
                 {
                     // completely unrelated structs? Then we don't convert.
@@ -6696,36 +6766,6 @@ v_to_struct (svalue_t *sp, int num_arg)
                            get_txt(struct_unique_name(argp->u.strct)), 
                            get_txt(struct_unique_name(argp[1].u.strct)));
                 }
-                
-                if (oldstruct->ref == 1 
-                    && struct_size(newstruct) == struct_size(oldstruct))
-                {
-                    // special case, the structs have the same number of members. Since it
-                    // is not possible to remove/change members inherited from a base struct,
-                    // the two structs have the same members. We can just exchange the types
-                    // of the structs.
-                    struct_free_type(oldstruct->type);
-                    oldstruct->type = ref_struct_type(newstruct->type);
-                    break;
-                }
-                
-                newstruct = struct_new(newstruct->type);
-                if (!newstruct)
-                    outofmemory("new struct in to_struct()");
-                for (memberp = newstruct->member, omemberp = oldstruct->member; 
-                     --size >= 0;
-                     ++memberp, ++omemberp)
-                {
-                    // *_no_free, because the members of the new struct only contain 0,
-                    // which need not to be freed.
-                    assign_rvalue_no_free(memberp, omemberp);
-                }
-                // the new struct may have more members than the old one (if oldstruct was
-                // the base. That is OK, the extra svalues just remain 0. On the other hand,
-                // if the old struct has more members, we just ignore them.
-                
-                put_struct(argp, newstruct);
-                break;
             }
             /* No conversion template given - good as it is, leave it on the stack. */
             break;

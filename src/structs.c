@@ -1534,26 +1534,20 @@ struct_baseof(struct_type_t *base, struct_type_t *st)
 } // baseof
 
 /*-------------------------------------------------------------------------*/
-int
+struct_type_t *
 struct_baseof_name(struct_name_t *base, struct_type_t *st)
-/* Test if the struct name <base> is a base of the struct type *st
- * Results are:
- *   0: <base> is not a base of <st>, nor is <base> of equal type as <st> 
- *      (though <st> might be a base of <base>).
- *   1: <base> is a true base of <st>
- *   2: <base> and <st> are the same struct type
+/* Test if the struct name <base> is a base of the struct type *st.
+ * If so return the base struct type, otherwise return NULL.
  */
 {
-    if (st->name == base)
-        return 2;
-
-    while ((st = st->base) != NULL)
+    do
     {
         if (st->name == base)
-            return 1;
+            return st;
     }
+    while ((st = st->base) != NULL);
 
-    return 0;
+    return NULL;
 } /* struct_baseof_name */
 
 /*-------------------------------------------------------------------------*/
@@ -1576,8 +1570,15 @@ f_baseof (svalue_t *sp)
     int rc;
 
     /* Get the arguments from the stack */
-    rc = struct_baseof(sp[-1].u.strct->type, sp[0].u.strct->type);
-    
+    struct_type_t *base = struct_baseof_name(sp[-1].u.strct->type->name, sp[0].u.strct->type);
+
+    if (!base)
+        rc = 0;
+    else if (base == sp[0].u.strct->type)
+        rc = 2;
+    else
+        rc = 1;
+
     /* Remove the arguments and push the result */
     free_svalue(sp); sp--;
     free_svalue(sp);

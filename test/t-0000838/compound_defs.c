@@ -10,7 +10,11 @@ struct compound
     struct base* member;
 };
 
+struct sub (base)
+{
+};
+
 /* After reactivation, <base> will be the old reactivated struct,
- * <compound> might not be reactivated and thus have the new <base>
- * as its member
+ * <compound> and <sub> might not be reactivated and thus have the
+ * new <base> as its member resp. base.
  */

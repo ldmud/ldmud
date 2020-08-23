@@ -133,7 +133,7 @@ extern void struct_driver_info(svalue_t *svp, int value) __attribute__((nonnull(
 extern string_t * struct_t_unique_name (struct_type_t *pSType);
 #define struct_unique_name(pStruct) struct_t_unique_name(pStruct->type)
 extern int struct_baseof(struct_type_t *base, struct_type_t *st) __attribute__((nonnull(1,2)));
-extern int struct_baseof_name(struct_name_t *base, struct_type_t *st) __attribute__((nonnull(1,2)));
+extern struct_type_t* struct_baseof_name(struct_name_t *base, struct_type_t *st) __attribute__((nonnull(1,2)));
 
 #ifdef GC_SUPPORT
 

@@ -31,3 +31,23 @@ int write_data_rt(struct mystruct data)
     /* Access to c shall yield an error. */
     return catch(data.("c") = "Hi!") && 1;
 }
+
+int baseof_super(struct mystruct data)
+{
+    return baseof(data, (<mystruct>));
+}
+
+int baseof_sub(struct mystruct data)
+{
+    return baseof(data, (<mysubstruct>));
+}
+
+struct mystruct conv_data_to_super(struct mystruct data)
+{
+    return to_struct(data, (<mystruct>));
+}
+
+struct mysubstruct conv_data_to_sub(struct mystruct data)
+{
+    return to_struct(data, (<mysubstruct>));
+}
