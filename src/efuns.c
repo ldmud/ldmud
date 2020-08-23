@@ -6705,7 +6705,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                         // is not possible to remove/change members inherited from a base struct,
                         // the two structs have the same members. We can just exchange the types
                         // of the structs.
-                        struct_free_type(oldstruct->type);
+                        free_struct_type(oldstruct->type);
                         oldstruct->type = ref_struct_type(newstruct->type);
                         break;
                     }
