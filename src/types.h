@@ -165,7 +165,8 @@ enum type_flags
 {
     /* Modifiers: */
     TYPE_MOD_REFERENCE        = 0x00000001,    /* Reference to a type */
-    TYPE_MOD_MASK             = 0x00000001,    /* All modifiers. */
+    TYPE_MOD_LITERAL          = 0x00000002,    /* A literal value. */
+    TYPE_MOD_MASK             = 0x00000003,    /* All modifiers. */
 
     /* Flag set in virtual variables, also interpreted as offset
      * in the variable index for virtual variables. */
@@ -286,6 +287,15 @@ static INLINE void free_lpctype(lpctype_t *t)
 static INLINE fulltype_t get_fulltype(lpctype_t *t)
 {
     return ((fulltype_t) { .t_type = t, .t_flags = 0 });
+}
+
+/* fulltype_t get_fulltype_flags(lpctype_t *t, typeflags_t f)
+ *   Given an lpctype_t return a fulltype_t
+ *   structure with <t> and <f> in it. No ref is added.
+ */
+static INLINE fulltype_t get_fulltype_flags(lpctype_t *t, typeflags_t f)
+{
+    return ((fulltype_t) { .t_type = t, .t_flags = f });
 }
 
 #ifdef GC_SUPPORT

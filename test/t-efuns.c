@@ -36,7 +36,7 @@ mixed *tests = ({
     ({ "[ 1", 0,        (: ({1,2,3,4,5})[4] == 5 :) }),
     ({ "[ 2", TF_ERROR, (: ({1,2,3,4,5})[5] :) }),
     ({ "[ 3", TF_ERROR, (: ({1,2,3,4,5})[-1] :) }),
-    ({ "[ 4", TF_ERROR, (: ({})[0] :) }),
+    ({ "[ 4", TF_ERROR, (: copy(({}))[0] :) }),
     ({ "[ 5", 0,        (: "Bla, bla, blup."[0] == 'B' :) }),
     ({ "[ 6", TF_ERROR, (: "Bla."[5] :) }),
     ({ "[ 7", TF_ERROR, (: "Bla."[-1] :) }),
@@ -44,7 +44,7 @@ mixed *tests = ({
     ({ "[< 2", TF_ERROR, (: ({1,2,3,4,5})[<6] :) }),
     ({ "[< 3", TF_ERROR, (: ({1,2,3,4,5})[<-1] :) }),
     ({ "[< 4", TF_ERROR, (: ({1,2,3,4,5})[<0] :) }),
-    ({ "[< 5", TF_ERROR, (: ({})[<1] :) }),
+    ({ "[< 5", TF_ERROR, (: copy(({}))[<1] :) }),
     ({ "[< 6", 0,        (: "Bla, bla, blup."[<1] == '.' :) }),
     ({ "[< 7", TF_ERROR, (: "Bla."[<-1] :) }),
     // TODO: #'[..], #'[<..], #'[..<], #'[<..<]
@@ -361,7 +361,7 @@ mixed *tests = ({
 
     ({ "to_text 1", 0, (: deep_eq(to_array(to_text( ({}) )), ({}) ) :) }),
     ({ "to_text 2", 0, (: deep_eq(to_array(to_text( ({0, 65, 66, 67}) )), ({0, 65, 66, 67}) ) :) }),
-    ({ "to_text 3", 0, (: deep_eq(to_array(to_text( ({65, 66, 67, "ABC"}) )), ({65, 66, 67}) ) :) }),
+    ({ "to_text 3", 0, (: deep_eq(to_array(to_text( copy(({65, 66, 67, "ABC"})) )), ({65, 66, 67}) ) :) }),
     ({ "to_text 4", 0, (: deep_eq(to_array(to_text( to_text(({65, 66, 67})) )), ({65, 66, 67}) ) :) }),
     ({ "to_text 5", 0, (: deep_eq(to_array(to_text( "ABC" )), ({65, 66, 67}) ) :) }),
     ({ "to_text 6", 0, (: deep_eq(to_array(to_text( ({ 195, 132, 195, 150, 195, 156 }), "utf-8" )), ({196, 214, 220}) ) :) }),
@@ -378,7 +378,7 @@ mixed *tests = ({
 
     ({ "to_bytes 1", 0, (: deep_eq(to_array(to_bytes( ({}) )), ({}) ) :) }),
     ({ "to_bytes 2", 0, (: deep_eq(to_array(to_bytes( ({0, 130, 150, 200, 255}) )), ({0, 130, 150, 200, 255}) ) :) }),
-    ({ "to_bytes 3", 0, (: deep_eq(to_array(to_bytes( ({1, 2, 3, "ABC"}) )), ({1, 2, 3}) ) :) }),
+    ({ "to_bytes 3", 0, (: deep_eq(to_array(to_bytes( copy(({1, 2, 3, "ABC"})) )), ({1, 2, 3}) ) :) }),
     ({ "to_bytes 4", 0, (: deep_eq(to_array(to_bytes( to_bytes(({1,2,3})) )), ({1, 2, 3}) ) :) }),
     ({ "to_bytes 5", 0, (: deep_eq(to_array(to_bytes( "ABC", "ascii" )), ({65, 66, 67}) ) :) }),
     ({ "to_bytes 6", 0, (: deep_eq(to_array(to_bytes( ({196, 214, 220}), "utf-8" )), ({ 195, 132, 195, 150, 195, 156 }) ) :) }),
