@@ -741,6 +741,26 @@ struct_type_equivalent (struct_type_t * pSType1, struct_type_t *pSType2)
 } /* struct_type_equivalent() */
 
 /*-------------------------------------------------------------------------*/
+void
+struct_type_update ( struct_type_t * pSType
+                   , struct_type_t * pOld
+                   , struct_type_t * pNew)
+
+/* In struct type <pSType>, replace all references to <pOld> by <pNew>.
+ */
+
+{
+    if (pOld == pNew)
+        return;
+
+    if (pSType->base == pOld)
+    {
+        free_struct_type(pSType->base);
+        pSType->base = ref_struct_type(pNew);
+    }
+} /* struct_type_update() */
+
+/*-------------------------------------------------------------------------*/
 struct_t *
 struct_new_anonymous (int num_members)
 

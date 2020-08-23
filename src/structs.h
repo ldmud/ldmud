@@ -124,6 +124,7 @@ extern void struct_free_name (struct_name_t *pSName);
 extern struct_type_t * struct_lookup_type ( struct_type_t * pSType );
 extern void struct_publish_type ( struct_type_t * pSType );
 extern Bool struct_type_equivalent (struct_type_t * pSType1, struct_type_t *pSType2);
+extern void struct_type_update ( struct_type_t * pSType, struct_type_t * pOld, struct_type_t * pNew);
 extern struct_type_t * struct_find (string_t *name, program_t * prog);
 extern int struct_find_member ( struct_type_t * ptype, string_t * name );
 extern int struct_find_direct_member ( struct_type_t * ptype, string_t * name );

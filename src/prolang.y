@@ -6119,6 +6119,11 @@ struct_epilog (void)
         /* pOld has the same structure as pSType, so lets
          * replace the latter with the former.
          */
+        for (int struct_idx = 0; (size_t)struct_idx < STRUCT_COUNT; struct_idx++)
+        {
+            if (struct_idx != i)
+                struct_type_update(STRUCT_DEF(struct_idx).type, pSType, pOld);
+        }
 
         free_struct_type(pSType);
         STRUCT_DEF(i).type = ref_struct_type(pOld);
