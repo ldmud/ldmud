@@ -153,7 +153,7 @@ extern string_t * mstring_append (string_t *left, const string_t *right MTRACE_D
 extern string_t * mstring_append_txt (string_t *left, const char *right, size_t len MTRACE_DECL);
 extern string_t * mstring_repeat(const string_t *base, size_t num MTRACE_DECL);
 extern string_t * mstring_extract (const string_t *str, size_t start, long end MTRACE_DECL);
-extern long       mstring_chr (const string_t *p, char c);
+extern long       mstring_chr (const string_t *p, char c, long pos);
 extern Bool       mstring_prefixed (const string_t *p, const string_t *s);
 
 #ifdef GC_SUPPORT
@@ -333,7 +333,8 @@ static INLINE void extract_cstr(char *d, const string_t *const s, size_t l)
 #define del_slash(pStr)                    mstring_del_slash(pStr MTRACE_ARG)
 #define del_dotc(pStr)                     mstring_del_dotc(pStr MTRACE_ARG)
 #define cvt_progname(pStr)                 mstring_cvt_progname(pStr MTRACE_ARG)
-#define mstrchr(pStr,c)                    mstring_chr(pStr, c)
+#define mstrchr(pStr,c)                    mstring_chr(pStr, c, 0)
+#define mstrchrpos(pStr,c,pos)             mstring_chr(pStr, c, pos)
 #define mstrprefixed(pStr1, pStr2)         mstring_prefixed(pStr1, pStr2)
 
 #endif /* MSTRINGS_H_ */

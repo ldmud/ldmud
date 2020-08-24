@@ -1796,18 +1796,19 @@ mstring_prefixed (const string_t *p, const string_t *s)
 
 /*-------------------------------------------------------------------------*/
 long
-mstring_chr (const string_t *p, char c)
+mstring_chr (const string_t *p, char c, long pos)
 
 /* Aliased to: mstrchr(p,c)
  *
- * Search character <c> in string <s> and return its position.
+ * Search character <c> in string <s> starting at <pos>
+ * and return its position.
  * Return -1 if not found.
  */
 
 {
     char *pp;
 
-    pp = memchr(get_txt((string_t *const)p), c, mstrsize(p));
+    pp = memchr(get_txt((string_t *const)p) + pos, c, mstrsize(p) - pos);
     if (pp != NULL)
         return pp - get_txt((string_t *const)p);
     return -1;

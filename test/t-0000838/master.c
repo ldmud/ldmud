@@ -78,6 +78,7 @@ void run_test()
                     ({ "Conversion from sub to super",                         0, (: ob2.conv_data_to_super(s2) :) }),
                     ({ "Conversion from super to sub",                         0, (: ob2.conv_data_to_sub(s1) :) }),
                     ({ "Conversion from sub to sub",                           0, (: ob2.conv_data_to_sub(s2) :) }),
+                    ({ "Save/Restore on an old struct",                        0, (: ob2.restore(s1) :) }),
                 }));
             :)
         }),

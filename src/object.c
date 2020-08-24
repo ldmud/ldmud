@@ -5631,11 +5631,12 @@ save_number (p_int num)
 
 /*-------------------------------------------------------------------------*/
 static void
-save_string (string_t *src, p_int start, p_int count)
+save_string (string_t *src, p_int start, p_int count, bool noquotes)
 
 /* Write string <src> to the write buffer, but escape all funny
  * characters.
  * If <start> is >= 0, then only write src[start..start+count-1].
+ * If <noquotes> is true, then don't print the quotation marks.
  */
 
 {
@@ -5658,8 +5659,11 @@ save_string (string_t *src, p_int start, p_int count)
 
     if (src->info.unicode == STRING_BYTES)
     {
-        L_PUTC('b')
-        L_PUTC('\"')
+        if (!noquotes)
+        {
+            L_PUTC('b')
+            L_PUTC('\"')
+        }
 
         while (len--)
         {
@@ -5671,11 +5675,13 @@ save_string (string_t *src, p_int start, p_int count)
             L_PUT_HEX(b & 0x0f);
         }
 
-        L_PUTC('\"')
+        if (!noquotes)
+            L_PUTC('\"')
     }
     else
     {
-        L_PUTC('\"')
+        if (!noquotes)
+            L_PUTC('\"')
 
         while ( len )
         {
@@ -5729,7 +5735,8 @@ save_string (string_t *src, p_int start, p_int count)
             }
             L_PUTC(c)
         }
-        L_PUTC('\"')
+        if (!noquotes)
+            L_PUTC('\"')
     }
 
     L_PUTC_EPILOG
@@ -5872,13 +5879,35 @@ save_struct (struct_t *st)
     /* The unique name (struct_name prog_name #id) as fake member */
     if (save_version < SAVE_FORMAT_CLOSURES || !recall_pointer(struct_unique_name(st)))
     {
-        save_string(struct_unique_name(st), -1, -1);
+        struct_type_t *stt = st->type;
+
+        MY_PUTC('\"')
+        save_string(struct_unique_name(st), -1, -1, true);
+
+        /* Add a list of the members, so we can restore them
+         * later even if the definition changed.
+         */
+        for (unsigned short ix = 0; ix < stt->num_members; ix++)
+        {
+            string_t *name = stt->member[ix].name;
+            long pos = mstrchr(name, ',');
+
+            if (ix)
+                MY_PUTC(',')
+            else
+                MY_PUTC(' ')
+
+            if (pos > 0)
+                save_string(name, 0, pos, true);
+            else if (pos == 0)
+                save_string(STR_ANONYMOUS, -1, -1, true);
+            else
+                save_string(name, -1, -1, true);
+        }
+
+        MY_PUTC('\"')
     }
-    {
-        L_PUTC_PROLOG
-        L_PUTC(',')
-        L_PUTC_EPILOG
-    }
+    MY_PUTC(',')
 
     /* ... the values ... */
     for (i = (long)struct_size(st), val = st->member; --i >= 0; )
@@ -6349,7 +6378,7 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
 
                         case T_STRING:
                         case T_BYTES:
-                            save_string(r->vec.u.str, r->index1, r->index2 - r->index1);
+                            save_string(r->vec.u.str, r->index1, r->index2 - r->index1, false);
                             break;
 
                         default:
@@ -6441,7 +6470,7 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
 
                     case T_STRING:
                     case T_BYTES:
-                        save_string(r->vec.u.str, r->index1, r->index2 - r->index1);
+                        save_string(r->vec.u.str, r->index1, r->index2 - r->index1, false);
                         break;
 
                     default:
@@ -6480,7 +6509,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
     {
     case T_STRING:
     case T_BYTES:
-        save_string(v->u.str, -1, -1);
+        save_string(v->u.str, -1, -1, false);
         break;
 
     case T_QUOTED_ARRAY:
@@ -6571,7 +6600,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         c = *source++;
         do L_PUTC(c) while ( '\0' != (c = *source++) );
         L_PUTC_EPILOG
-        save_string(v->u.str, -1, -1);
+        save_string(v->u.str, -1, -1, false);
         break;
       }
 
@@ -7919,11 +7948,13 @@ restore_struct (svalue_t *svp, char **str)
  */
 
 {
+    svalue_t name;
     struct_t *st;
     struct_type_t *stt;
     char *pt, *end;
-    int siz, extra;
+    int siz;
     Bool rtt_checks; // are RTT checks enabled for this objects program?
+    long memberpos;
 
     end = *str;
 
@@ -7937,11 +7968,8 @@ restore_struct (svalue_t *svp, char **str)
         return MY_FALSE;
     }
     
-    extra = 0;
-
     /* Get the name of the struct, and from it the type pointer */
     {
-        svalue_t name;
         string_t * structname;
         string_t * prog_name;
         long pos;
@@ -7955,14 +7983,18 @@ restore_struct (svalue_t *svp, char **str)
         }
         siz--;
 
-        /* Accept both 'structname' and 'structname prog_name #id'
-         * as formats.
+        /* The struct name can be given in the following variants:
+         *
+         * - "structname"
+         * - "structname progname #id"
+         * - "structname progname #id member1,member2,..."
          */
         pos = mstrchr(name.u.str, ' ');
         if (pos < 0)
         {
             structname = ref_mstring(name.u.str);
             prog_name = NULL;
+            memberpos = -1;
         }
         else
         {
@@ -7986,8 +8018,9 @@ restore_struct (svalue_t *svp, char **str)
                    prog_name = tmp;
                }
             }
+
+            memberpos = mstrchrpos(name.u.str, ' ', pos2);
         }
-        free_mstring(name.u.str);
 
         /* First, search the struct in the current program.
          * This allows to move inherited structs between modules without
@@ -7999,7 +8032,19 @@ restore_struct (svalue_t *svp, char **str)
             do {
                 /* Alternatively try to find the struct by its program name.
                  */
-                object_t *obj = get_object(prog_name);
+                object_t *obj;
+
+                /* Save the strings on the stack in case of errors. */
+                push_string(inter_sp, name.u.str);
+                push_string(inter_sp, structname);
+                if (prog_name)
+                    push_string(inter_sp, prog_name);
+
+                obj = get_object(prog_name);
+
+                inter_sp -= 2;
+                if (prog_name)
+                    inter_sp--;
 
                 if (!obj)
                     break;
@@ -8020,13 +8065,11 @@ restore_struct (svalue_t *svp, char **str)
             free_mstring(prog_name);
 
         if (!stt)
-            return MY_FALSE;
-
-        if (struct_t_size(stt) < siz)
         {
-            extra = siz - struct_t_size(stt);
-            siz = struct_t_size(stt);
+            free_mstring(name.u.str);
+            return MY_FALSE;
         }
+
     }
     /* Allocate the struct */
     st = struct_new(stt);
@@ -8035,34 +8078,106 @@ restore_struct (svalue_t *svp, char **str)
     // check if the objects program has RTT checks enabled.
     if (current_object->prog->flags & P_RTT_CHECKS)
         rtt_checks = MY_TRUE;
-    // get a pointer to the structs members in the struct_type_t for checking the types.
-    struct_member_t *member = stt->member;
-    
-    /* Restore the values */
-    for ( svp = st->member; --siz >= 0; ++svp, ++member)
-    {
-        if (!restore_svalue(svp, str, ','))
-        {
-            return MY_FALSE;
-        }
-        if (rtt_checks && !check_rtt_compatibility(member->type, svp))
-        {
-            return MY_FALSE;
-        }
-    }
 
-    /* If there are more values in the savefile than the struct
-     * has members, read and ignore the others.
-     */
-    while (extra-- > 0)
+    if (memberpos > 0)
     {
-        svalue_t tmp;
-      
-        if (!restore_svalue(&tmp, str, ','))
+        // We restore the struct by member name.
+
+        push_string(inter_sp, name.u.str); // Save the string in case of errors.
+
+        while (true)
         {
-            return MY_FALSE;
+            long nextpos = mstrchrpos(name.u.str, ',', memberpos + 1);
+            string_t *member_name;
+            int idx;
+
+            if (nextpos < 0)
+                member_name = find_tabled_str_n(get_txt(name.u.str) + memberpos + 1, mstrsize(name.u.str) - memberpos - 1, STRING_UTF8);
+            else
+                member_name = find_tabled_str_n(get_txt(name.u.str) + memberpos + 1, nextpos - memberpos - 1, STRING_UTF8);
+
+            idx = member_name ? struct_find_member(stt, member_name) : -1;
+            if (idx < 0)
+            {
+                // We don't have the member anymore, read and discard the value.
+                svalue_t tmp;
+
+                if (!restore_svalue(&tmp, str, ','))
+                {
+                    pop_stack();
+                    return MY_FALSE;
+                }
+
+                free_svalue(&tmp);
+            }
+            else
+            {
+                svalue_t *member_value = st->member + idx;
+
+                if (!restore_svalue(member_value, str, ','))
+                {
+                    pop_stack();
+                    return MY_FALSE;
+                }
+
+                if (rtt_checks && !check_rtt_compatibility(stt->member[idx].type, member_value))
+                {
+                    pop_stack();
+                    return MY_FALSE;
+                }
+            }
+
+            if (nextpos < 0)
+                break;
+            memberpos = nextpos;
         }
-        free_svalue(&tmp);
+
+        pop_stack(); // free name.u.str
+    }
+    else
+    {
+        // We don't have any member names,
+        // so we restore them by index.
+
+        // get a pointer to the structs members in the struct_type_t for checking the types.
+        struct_member_t *member = stt->member;
+        int extra = 0;
+
+        // We don't need that anymore.
+        free_mstring(name.u.str);
+
+        if (struct_t_size(stt) < siz)
+        {
+            extra = siz - struct_t_size(stt);
+            siz = struct_t_size(stt);
+        }
+
+        /* Restore the values */
+        for ( svp = st->member; --siz >= 0; ++svp, ++member)
+        {
+            if (!restore_svalue(svp, str, ','))
+            {
+                return MY_FALSE;
+            }
+            if (rtt_checks && !check_rtt_compatibility(member->type, svp))
+            {
+                return MY_FALSE;
+            }
+        }
+
+        /* If there are more values in the savefile than the struct
+         * has members, read and ignore the others.
+         */
+        while (extra-- > 0)
+        {
+            svalue_t tmp;
+
+            if (!restore_svalue(&tmp, str, ','))
+            {
+                return MY_FALSE;
+            }
+            free_svalue(&tmp);
+        }
     }
 
     /* Check for the trailing '>)' */

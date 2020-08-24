@@ -51,3 +51,9 @@ struct mysubstruct conv_data_to_sub(struct mystruct data)
 {
     return to_struct(data, (<mysubstruct>));
 }
+
+int restore(mixed data)
+{
+    struct mystruct d = restore_value(save_value(data));
+    return d.b == data.b;
+}
