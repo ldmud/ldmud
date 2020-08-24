@@ -159,12 +159,33 @@ DESCRIPTION
                 and has a width member.
 
           - Struct(object, name [, values])
-               Corresponds to an LPC struct.
-               On initialization the name of the struct definition and
-               the correspopnding object is required. It can be initialized
-               with a list of values or dict.
+                Corresponds to an LPC struct.
+                On initialization the name of the struct definition and
+                the correspopnding object is required. It can be initialized
+                with a list of values or dict.
 
-               Supports member access as regular python members.
+                Has the following members:
+
+                  name
+                      The name of the struct
+
+                  program_name
+                      The name of the program that defined the struct.
+
+                  members
+                      Contains all members as attributes. They contain the
+                      following attributes:
+
+                      name
+                          The name of the member
+
+                      value
+                          The value of the member. This attribute is writable
+                          to assign a new value.
+
+                      type
+                          The type as a Python object (maybe missing if
+                          unknown or mixed).
 
           - Closure(object [,name [, lfun_object]])
                Corresponds to an LPC closure.
@@ -190,11 +211,15 @@ DESCRIPTION
           - Lvalue(value)
               Creates an lvalue reference for the given value.
 
-              Has one member: value
+              Has two member: value and members.
 
               If the value is an array, mapping or string, then lvalues
               to its elements can be created with [].
 
+              If the value is a struct, then lvalues to its members can
+              be created with the members attribute. It contains all
+              the struct members as attributes and will return an Lvalue
+              object to the struct member.
 
         This module contains the following sub-namespaces:
 

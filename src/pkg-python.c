@@ -784,6 +784,13 @@ struct ldmud_struct_s
     struct_t *lpc_struct;       /* Can be NULL. */
 };
 
+struct ldmud_struct_and_index_s
+{
+    struct ldmud_struct_s struct_base;
+
+    unsigned short index;       /* Member index. */
+};
+
 struct ldmud_object_s
 {
     PyGCObject_HEAD
@@ -840,6 +847,7 @@ struct ldmud_lvalue_s
 typedef struct ldmud_array_s ldmud_array_t;
 typedef struct ldmud_mapping_s ldmud_mapping_t;
 typedef struct ldmud_struct_s ldmud_struct_t;
+typedef struct ldmud_struct_and_index_s ldmud_struct_and_index_t;
 typedef struct ldmud_object_s ldmud_object_t;
 typedef struct ldmud_closure_s ldmud_closure_t;
 typedef struct ldmud_object_and_index_s ldmud_object_and_index_t;
@@ -1638,7 +1646,7 @@ ldmud_object_functions_dir (ldmud_object_t *self)
 
     if (attrs == NULL)
     {
-        attrs = PySet_New(dict);
+        attrs = PySet_New(NULL);
         if (attrs == NULL)
             return NULL;
     }
@@ -2143,7 +2151,7 @@ ldmud_object_variables_dir (ldmud_object_t *self)
 
     if (attrs == NULL)
     {
-        attrs = PySet_New(dict);
+        attrs = PySet_New(NULL);
         if (attrs == NULL)
             return NULL;
     }
@@ -4347,6 +4355,435 @@ ldmud_mapping_create (mapping_t* map)
 /*-------------------------------------------------------------------------*/
 /* Structs */
 
+static PyObject*
+ldmud_struct_member_repr (ldmud_struct_and_index_t *self)
+
+/* Return a string representation of this member.
+ */
+
+{
+    struct_type_t *st;
+    struct_member_t *mem;
+
+    if(self->struct_base.lpc_struct == NULL)
+        return PyUnicode_FromString("<LPC uninitialized struct member>");
+
+    st = self->struct_base.lpc_struct->type;
+    mem = st->member + self->index;
+
+    return PyUnicode_FromFormat("<LPC struct member /%s::%s.%s>"
+                              , get_txt(st->name->prog_name)
+                              , get_txt(st->name->name)
+                              , get_txt(mem->name));
+} /* ldmud_struct_member_repr() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_struct_member_get_name (ldmud_struct_and_index_t *self, void *closure)
+
+/* Return the name for the struct member.
+ */
+
+{
+    struct_member_t *mem;
+
+    if(self->struct_base.lpc_struct == NULL)
+    {
+        PyErr_SetString(PyExc_TypeError, "uninitialized struct member");
+        return NULL;
+    }
+
+    mem = self->struct_base.lpc_struct->type->member + self->index;
+    return PyUnicode_FromStringAndSize(get_txt(mem->name), mstrsize(mem->name));
+} /* ldmud_struct_member_get_name() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_struct_member_get_value (ldmud_struct_and_index_t *self, void *closure)
+
+/* Return the value of the struct member.
+ */
+
+{
+    PyObject *result;
+
+    if(self->struct_base.lpc_struct == NULL)
+    {
+        PyErr_SetString(PyExc_TypeError, "uninitialized struct member");
+        return NULL;
+    }
+
+    result = rvalue_to_python(self->struct_base.lpc_struct->member + self->index);
+    if (result == NULL)
+        PyErr_SetString(PyExc_ValueError, "Unsupported data type.");
+
+    return result;
+} /* ldmud_struct_member_get_value() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_struct_member_set_value (ldmud_struct_and_index_t *self, PyObject *newval, void *closure)
+
+/* Sets the value for the struct member.
+ * Returns 0 on success, -1 on failure.
+ */
+
+{
+    const char* err;
+    svalue_t lpcval;
+
+    if(self->struct_base.lpc_struct == NULL)
+    {
+        PyErr_SetString(PyExc_TypeError, "uninitialized struct member");
+        return -1;
+    }
+
+    if (newval == NULL)
+        newval = Py_None;
+
+    err = python_to_svalue(&lpcval, newval);
+    if (err)
+    {
+        PyErr_SetString(PyExc_ValueError, err);
+        return -1;
+    }
+
+    transfer_svalue(self->struct_base.lpc_struct->member + self->index, &lpcval);
+
+    return 0;
+} /* ldmud_struct_member_set_value() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_struct_member_get_type (ldmud_struct_and_index_t *self, void *closure)
+
+/* Return the type for the struct member.
+ */
+
+{
+    struct_member_t *mem;
+    PyObject* result;
+
+    if(self->struct_base.lpc_struct == NULL)
+    {
+        PyErr_SetString(PyExc_TypeError, "uninitialized struct member");
+        return NULL;
+    }
+
+    mem = self->struct_base.lpc_struct->type->member + self->index;
+    result = lpctype_to_pythontype(mem->type);
+    if (!result)
+        PyErr_Format(PyExc_AttributeError, "Struct member '%s' has no type information or mixed type", mem->name);
+
+    return result;
+
+} /* ldmud_struct_member_get_type() */
+
+/*-------------------------------------------------------------------------*/
+static void ldmud_struct_dealloc(ldmud_struct_t* self);
+
+static PyGetSetDef ldmud_struct_member_getset [] = {
+    {"name",       (getter)ldmud_struct_member_get_name,       NULL,                                    NULL},
+    {"value",      (getter)ldmud_struct_member_get_value,      (setter)ldmud_struct_member_set_value, NULL},
+    {"type",       (getter)ldmud_struct_member_get_type,       NULL,                                    NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_struct_member_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.StructMember",               /* tp_name */
+    sizeof(ldmud_struct_and_index_t),   /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_struct_dealloc,   /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    (reprfunc)ldmud_struct_member_repr, /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC struct member",                /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    0,                                  /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_struct_member_getset,         /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,                                  /* tp_init */
+    0,                                  /* tp_alloc */
+    0,                                  /* tp_new */
+};
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_struct_members_repr (ldmud_struct_t *self)
+
+/* Return a string representation of this object.
+ */
+
+{
+    struct_type_t *st;
+
+    if(self->lpc_struct == NULL)
+        return PyUnicode_FromString("<LPC uninitialized struct member list>");
+
+    st = self->lpc_struct->type;
+    return PyUnicode_FromFormat("<LPC struct members of /%s::%s>"
+                              , get_txt(st->name->prog_name)
+                              , get_txt(st->name->name));
+} /* ldmud_struct_members_repr() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_struct_members_getattro (ldmud_struct_t *self, PyObject *name)
+
+/* Implement __getattr__ for ldmud_struct_t.
+ * This is a direct struct member lookup.
+ */
+
+{
+    PyObject *result, *utf8;
+    char* namebuf;
+    ssize_t namelength;
+    string_t* member_name;
+    int idx;
+
+    /* First check real attributes... */
+    result = PyObject_GenericGetAttr((PyObject *)self, name);
+    if (result || !PyErr_ExceptionMatches(PyExc_AttributeError))
+        return result;
+
+    if (!self->lpc_struct)
+        return NULL;
+
+    PyErr_Clear();
+
+    /* And now search for a member. */
+    if (!PyUnicode_Check(name))
+    {
+        PyErr_Format(PyExc_TypeError,
+                     "attribute name must be string, not '%.200s'",
+                     name->ob_type->tp_name);
+        return NULL;
+    }
+
+    utf8 = PyUnicode_AsEncodedString(name, "utf-8", "replace");
+    if (utf8 == NULL)
+    {
+        PyErr_SetString(PyExc_ValueError, "undecodable member name");
+        return NULL;
+    }
+
+    PyBytes_AsStringAndSize(utf8, &namebuf, &namelength);
+    member_name = find_tabled_str_n(namebuf, namelength, STRING_UTF8);
+    Py_DECREF(utf8);
+
+    idx = member_name ? struct_find_member(self->lpc_struct->type, member_name) : -1;
+    if (idx < 0)
+    {
+        PyErr_Format(PyExc_AttributeError, "Struct object has no member '%U'", name);
+        return NULL;
+    }
+    else
+    {
+        ldmud_struct_and_index_t* mem = (ldmud_struct_and_index_t*)ldmud_struct_member_type.tp_alloc(&ldmud_struct_member_type, 0);
+        if (mem == NULL)
+            return NULL;
+
+        mem->struct_base.lpc_struct = ref_struct(self->lpc_struct);
+        mem->index = idx;
+
+        add_gc_object(&gc_struct_list, (ldmud_gc_var_t*)mem);
+        return (PyObject*) mem;
+    }
+
+} /* ldmud_struct_members_getattro() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_struct_members_dir (ldmud_struct_t *self)
+
+/* Returns a list of all attributes, this includes all member names.
+ */
+
+{
+    PyObject *dict, *cls, *result;
+    PyObject *attrs = NULL;
+
+    /* First add the regular dictionaries. */
+    cls = PyObject_GetAttrString((PyObject*)self, "__class__");
+    if (cls != NULL)
+    {
+        dict = PyObject_Dir(cls);
+        Py_DECREF(cls);
+    }
+    else
+        dict = NULL;
+    if (dict == NULL)
+        PyErr_Clear();
+    else
+    {
+        attrs = PySet_New(dict);
+        if (attrs == NULL)
+            PyErr_Clear();
+        Py_DECREF(dict);
+    }
+
+    if (attrs == NULL)
+    {
+        attrs = PySet_New(NULL);
+        if (attrs == NULL)
+            return NULL;
+    }
+
+    /* Now add all the members. */
+    if (self->lpc_struct)
+    {
+        struct_type_t *st = self->lpc_struct->type;
+        for (int ix = 0; ix < st->num_members; ix++)
+        {
+            string_t *mem = st->member[ix].name;
+            PyObject *memname = PyUnicode_FromStringAndSize(get_txt(mem), mstrsize(mem));
+
+            if (memname == NULL)
+            {
+                PyErr_Clear();
+                continue;
+            }
+
+            if (PySet_Add(attrs, memname) < 0)
+                PyErr_Clear();
+            Py_DECREF(memname);
+        }
+    }
+
+    /* And return the keys of our dict. */
+    result = PySequence_List(attrs);
+    Py_DECREF(attrs);
+    return result;
+} /* ldmud_struct_members_dir() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_struct_members_dict (ldmud_struct_t *self, void *closure)
+
+/* Returns a list of all members.
+ */
+
+{
+    PyObject *result, *dict = PyDict_New();
+    if (!dict)
+        return NULL;
+
+    if (self->lpc_struct)
+    {
+        struct_type_t *st = self->lpc_struct->type;
+        for (unsigned short ix = 0; ix < st->num_members; ix++)
+        {
+            string_t *mem = st->member[ix].name;
+            PyObject *memname = PyUnicode_FromStringAndSize(get_txt(mem), mstrsize(mem));
+            ldmud_struct_and_index_t* memob;
+
+            if (memname == NULL)
+            {
+                PyErr_Clear();
+                continue;
+            }
+
+            memob = (ldmud_struct_and_index_t*)ldmud_struct_member_type.tp_alloc(&ldmud_struct_member_type, 0);
+            if (memob == NULL)
+            {
+                PyErr_Clear();
+                Py_DECREF(memname);
+                continue;
+            }
+
+            memob->struct_base.lpc_struct = ref_struct(self->lpc_struct);
+            memob->index = ix;
+            add_gc_object(&gc_struct_list, (ldmud_gc_var_t*)memob);
+
+            if (PyDict_SetItem(dict, memname, (PyObject*)memob) < 0)
+                PyErr_Clear();
+            Py_DECREF(memname);
+            Py_DECREF(memob);
+        }
+    }
+
+    result = PyDictProxy_New(dict);
+    Py_DECREF(dict);
+    return result;
+} /* ldmud_struct_members_dict() */
+
+/*-------------------------------------------------------------------------*/
+static PyMethodDef ldmud_struct_members_methods[] =
+{
+    {
+        "__dir__",
+        (PyCFunction)ldmud_struct_members_dir, METH_NOARGS,
+        "__dir__() -> List\n\n"
+        "Returns a list of all attributes."
+    },
+
+    {NULL}
+};
+
+static PyGetSetDef ldmud_struct_members_getset [] = {
+    {"__dict__", (getter)ldmud_struct_members_dict, NULL, NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_struct_members_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.StructMembers",              /* tp_name */
+    sizeof(ldmud_struct_t),             /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_struct_dealloc,   /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    (reprfunc)ldmud_struct_members_repr,/* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    (getattrofunc)ldmud_struct_members_getattro, /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC struct member list",           /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_struct_members_methods,       /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_struct_members_getset,        /* tp_getset */
+};
+
+/*-------------------------------------------------------------------------*/
 static void
 ldmud_struct_dealloc (ldmud_struct_t* self)
 
@@ -4622,76 +5059,85 @@ ldmud_struct_init (ldmud_struct_t *self, PyObject *args, PyObject *kwds)
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
-ldmud_struct_getattr (ldmud_struct_t *obj, char *name)
+ldmud_struct_repr (ldmud_struct_t *self)
 
-/* Implement __getattr__ for ldmud_struct_t.
- * This is a direct struct member lookup.
+/* Return a string representation of this object.
  */
 
 {
-    string_t *member_name;
-    int idx;
-    PyObject *result;
+    struct_type_t *st;
 
-    if(obj->lpc_struct == NULL)
-    {
-        PyErr_SetString(PyExc_TypeError, "uninitialized struct object");
-        return NULL;
-    }
+    if(self->lpc_struct == NULL)
+        return PyUnicode_FromString("<LPC uninitialized struct>");
 
-    member_name = find_tabled_str(name, STRING_UTF8);
-    idx = member_name ? struct_find_member(obj->lpc_struct->type, member_name) : -1;
-
-    if (idx < 0)
-    {
-        PyErr_Format(PyExc_AttributeError, "Struct object has no attribute '%.400s'", name);
-        return NULL;
-    }
-
-    result = rvalue_to_python(obj->lpc_struct->member + idx);
-    if (result == NULL)
-        PyErr_SetString(PyExc_ValueError, "Unsupported data type.");
-
-    return result;
-} /* ldmud_struct_getattr() */
+    st = self->lpc_struct->type;
+    return PyUnicode_FromFormat("<LPC struct /%s::%s>"
+                              , get_txt(st->name->prog_name)
+                              , get_txt(st->name->name));
+} /* ldmud_struct_repr() */
 
 /*-------------------------------------------------------------------------*/
-static int
-ldmud_struct_setattr (ldmud_struct_t *obj, char *name, PyObject *value)
+static PyObject *
+ldmud_struct_get_name (ldmud_struct_t *self, void *closure)
 
-/* Implement __setattr__ for ldmud_struct_t.
- * This is a direct struct member lookup.
+/* Return the value for the name member.
  */
 
 {
-    string_t *member_name;
-    int idx;
-    const char *err;
+    string_t *name;
 
-    if(obj->lpc_struct == NULL)
+    if(!self->lpc_struct)
     {
-        PyErr_SetString(PyExc_TypeError, "uninitialized struct object");
-        return -1;
+        Py_INCREF(Py_None);
+        return Py_None;
     }
 
-    member_name = find_tabled_str(name, STRING_UTF8);
-    idx = struct_find_member(obj->lpc_struct->type, member_name);
+    name = self->lpc_struct->type->name->name;
+    return PyUnicode_FromStringAndSize(get_txt(name), mstrsize(name));
+} /* ldmud_object_get_name() */
 
-    if (idx < 0)
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_struct_get_program_name (ldmud_struct_t *self, void *closure)
+
+/* Return the value for the program_name member.
+ */
+
+{
+    if(!self->lpc_struct)
     {
-        PyErr_Format(PyExc_AttributeError, "Struct object has no attribute '%.400s'", name);
-        return -1;
+        Py_INCREF(Py_None);
+        return Py_None;
     }
 
-    err = python_to_svalue(obj->lpc_struct->member + idx, value);
-    if (err != NULL)
+    return PyUnicode_FromFormat("/%s", get_txt(self->lpc_struct->type->name->prog_name));
+} /* ldmud_object_get_program_name() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_struct_get_members (ldmud_struct_t *self, void *closure)
+
+/* Return the value for the members member.
+ */
+
+{
+    ldmud_struct_t *result;
+
+    if(!self->lpc_struct)
     {
-        PyErr_SetString(PyExc_ValueError, err);
-        return -1;
+        Py_INCREF(Py_None);
+        return Py_None;
     }
 
-    return 0;
-} /* ldmud_struct_setattr() */
+    result = (ldmud_struct_t*)ldmud_struct_members_type.tp_alloc(&ldmud_struct_members_type, 0);
+    if (result == NULL)
+        return NULL;
+
+    result->lpc_struct = ref_struct(self->lpc_struct);
+    add_gc_object(&gc_struct_list, (ldmud_gc_var_t*)result);
+
+    return (PyObject *)result;
+} /* ldmud_struct_get_members() */
 
 /*-------------------------------------------------------------------------*/
 static PyMethodDef ldmud_struct_methods[] =
@@ -4699,7 +5145,13 @@ static PyMethodDef ldmud_struct_methods[] =
     {NULL}
 };
 
-
+static PyGetSetDef ldmud_struct_getset[] =
+{
+    {"name",         (getter)ldmud_struct_get_name,         NULL, NULL, NULL},
+    {"program_name", (getter)ldmud_struct_get_program_name, NULL, NULL, NULL},
+    {"members",      (getter)ldmud_struct_get_members,      NULL, NULL, NULL},
+    {NULL}
+};
 
 static PyTypeObject ldmud_struct_type =
 {
@@ -4709,10 +5161,10 @@ static PyTypeObject ldmud_struct_type =
     0,                                  /* tp_itemsize */
     (destructor)ldmud_struct_dealloc,   /* tp_dealloc */
     0,                                  /* tp_print */
-    (getattrfunc)ldmud_struct_getattr,  /* tp_getattr */
-    (setattrfunc)ldmud_struct_setattr,  /* tp_setattr */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
     0,                                  /* tp_reserved */
-    0,                                  /* tp_repr */
+    (reprfunc)ldmud_struct_repr,        /* tp_repr */
     0,                                  /* tp_as_number */
     0,                                  /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
@@ -4732,7 +5184,7 @@ static PyTypeObject ldmud_struct_type =
     0,                                  /* tp_iternext */
     ldmud_struct_methods,               /* tp_methods */
     0,                                  /* tp_members */
-    0,                                  /* tp_getset */
+    ldmud_struct_getset,                /* tp_getset */
     0,                                  /* tp_base */
     0,                                  /* tp_dict */
     0,                                  /* tp_descr_get */
@@ -5575,7 +6027,161 @@ ldmud_quoted_array_create (svalue_t* sym)
 
 static PyObject* ldmud_lvalue_create(svalue_t* lv);
 
+static PyObject*
+ldmud_lvalue_struct_members_getattro (ldmud_struct_t *self, PyObject *name)
 
+/* Implement __getattr__ for ldmud_struct_t.
+ * This is a direct struct member lookup.
+ */
+
+{
+    PyObject *result, *utf8;
+    char* namebuf;
+    ssize_t namelength;
+    string_t* member_name;
+    int idx;
+
+    /* First check real attributes... */
+    result = PyObject_GenericGetAttr((PyObject *)self, name);
+    if (result || !PyErr_ExceptionMatches(PyExc_AttributeError))
+        return result;
+
+    if (!self->lpc_struct)
+        return NULL;
+
+    PyErr_Clear();
+
+    /* And now search for a member. */
+    if (!PyUnicode_Check(name))
+    {
+        PyErr_Format(PyExc_TypeError,
+                     "attribute name must be string, not '%.200s'",
+                     name->ob_type->tp_name);
+        return NULL;
+    }
+
+    utf8 = PyUnicode_AsEncodedString(name, "utf-8", "replace");
+    if (utf8 == NULL)
+    {
+        PyErr_SetString(PyExc_ValueError, "undecodable member name");
+        return NULL;
+    }
+
+    PyBytes_AsStringAndSize(utf8, &namebuf, &namelength);
+    member_name = find_tabled_str_n(namebuf, namelength, STRING_UTF8);
+    Py_DECREF(utf8);
+
+    idx = member_name ? struct_find_member(self->lpc_struct->type, member_name) : -1;
+    if (idx < 0)
+    {
+        PyErr_Format(PyExc_AttributeError, "Struct object has no member '%U'", name);
+        return NULL;
+    }
+    else
+        return ldmud_lvalue_create(self->lpc_struct->member+idx);
+
+} /* ldmud_lvalue_struct_members_getattro() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_lvalue_struct_members_dict (ldmud_struct_t *self, void *closure)
+
+/* Returns a list of all members.
+ */
+
+{
+    PyObject *result, *dict = PyDict_New();
+    if (!dict)
+        return NULL;
+
+    if (self->lpc_struct)
+    {
+        struct_type_t *st = self->lpc_struct->type;
+        for (unsigned short ix = 0; ix < st->num_members; ix++)
+        {
+            string_t *mem = st->member[ix].name;
+            PyObject *memname = PyUnicode_FromStringAndSize(get_txt(mem), mstrsize(mem));
+            PyObject *memob;
+
+            if (memname == NULL)
+            {
+                PyErr_Clear();
+                continue;
+            }
+
+            memob = ldmud_lvalue_create(self->lpc_struct->member+ix);
+            if (memob == NULL)
+            {
+                PyErr_Clear();
+                Py_DECREF(memname);
+                continue;
+            }
+
+            if (PyDict_SetItem(dict, memname, memob) < 0)
+                PyErr_Clear();
+            Py_DECREF(memname);
+            Py_DECREF(memob);
+        }
+    }
+
+    result = PyDictProxy_New(dict);
+    Py_DECREF(dict);
+    return result;
+} /* ldmud_lvalue_struct_members_dict() */
+
+/*-------------------------------------------------------------------------*/
+static PyMethodDef ldmud_lvalue_struct_members_methods[] =
+{
+    {
+        "__dir__",
+        (PyCFunction)ldmud_struct_members_dir, METH_NOARGS,
+        "__dir__() -> List\n\n"
+        "Returns a list of all attributes."
+    },
+
+    {NULL}
+};
+
+static PyGetSetDef ldmud_lvalue_struct_members_getset [] = {
+    {"__dict__", (getter)ldmud_lvalue_struct_members_dict, NULL, NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_lvalue_struct_members_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.LvalueStructMembers",        /* tp_name */
+    sizeof(ldmud_struct_t),             /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_struct_dealloc,   /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    (reprfunc)ldmud_struct_members_repr,/* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    (getattrofunc)ldmud_lvalue_struct_members_getattro, /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC lvalue struct member list",    /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_lvalue_struct_members_methods,/* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_lvalue_struct_members_getset, /* tp_getset */
+};
+
+/*-------------------------------------------------------------------------*/
 static void
 ldmud_lvalue_dealloc (ldmud_lvalue_t* self)
 
@@ -6208,6 +6814,43 @@ ldmud_lvalue_set_value (ldmud_lvalue_t *self, PyObject *newval, void *closure)
 } /* ldmud_lvalue_set_value() */
 
 /*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_lvalue_get_members (ldmud_lvalue_t *self, void *closure)
+
+/* Return the value for the members member.
+ * This is only valid if the lvalue contains a struct.
+ */
+
+{
+    svalue_t *val;
+    ldmud_struct_t *result;
+
+    if (self->lpc_lvalue.type == T_INVALID)
+    {
+        PyErr_SetString(PyExc_ValueError, "empty lvalue given");
+        return NULL;
+    }
+
+    assert(self->lpc_lvalue.type == T_LVALUE);
+
+    val = get_rvalue_no_collapse(&(self->lpc_lvalue), NULL);
+    if (val == NULL || val->type != T_STRUCT)
+    {
+        PyErr_SetString(PyExc_TypeError, "lvalue doesn't contain a struct");
+        return NULL;
+    }
+
+    result = (ldmud_struct_t*)ldmud_lvalue_struct_members_type.tp_alloc(&ldmud_lvalue_struct_members_type, 0);
+    if (result == NULL)
+        return NULL;
+
+    result->lpc_struct = ref_struct(val->u.strct);
+    add_gc_object(&gc_struct_list, (ldmud_gc_var_t*)result);
+
+    return (PyObject *)result;
+} /* ldmud_lvalue_get_members() */
+
+/*-------------------------------------------------------------------------*/
 static PySequenceMethods ldmud_lvalue_as_sequence = {
     (lenfunc)ldmud_lvalue_length,               /* sq_length */
     0,                                          /* sq_concat */
@@ -6235,7 +6878,8 @@ static PyMethodDef ldmud_lvalue_methods[] =
 
 static PyGetSetDef ldmud_lvalue_getset[] =
 {
-    {"value", (getter)ldmud_lvalue_get_value, (setter)ldmud_lvalue_set_value, NULL},
+    {"value",   (getter)ldmud_lvalue_get_value,   (setter)ldmud_lvalue_set_value, NULL},
+    {"members", (getter)ldmud_lvalue_get_members, NULL,                           NULL},
     {NULL}
 };
 
@@ -6766,6 +7410,10 @@ init_ldmud_module ()
         return NULL;
     if (PyType_Ready(&ldmud_struct_type) < 0)
         return NULL;
+    if (PyType_Ready(&ldmud_struct_members_type) < 0)
+        return NULL;
+    if (PyType_Ready(&ldmud_struct_member_type) < 0)
+        return NULL;
     if (PyType_Ready(&ldmud_closure_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_symbol_type) < 0)
@@ -6773,6 +7421,8 @@ init_ldmud_module ()
     if (PyType_Ready(&ldmud_quoted_array_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_lvalue_type) < 0)
+        return NULL;
+    if (PyType_Ready(&ldmud_lvalue_struct_members_type) < 0)
         return NULL;
 
     ldmud_interrupt_exception_type.tp_base = (PyTypeObject *) PyExc_RuntimeError;

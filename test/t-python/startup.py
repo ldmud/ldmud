@@ -288,36 +288,53 @@ class TestStruct(unittest.TestCase):
         s = ldmud.Struct(self.master, "test_struct")
         self.assertIsNotNone(s)
 
+    def testStructInfo(self):
+        s = ldmud.Struct(self.master, "test_struct")
+        self.assertEqual(s.name, "test_struct")
+        self.assertEqual(s.program_name, "/master.c")
+
+    def testMemberInfo(self):
+        s = ldmud.Struct(self.master, "test_struct")
+        self.assertIsNotNone(s)
+
+        self.assertTrue('t_int' in dir(s.members))
+        self.assertTrue('t_int' in s.members.__dict__)
+
+        mem = s.members.t_int
+        self.assertIsNotNone(mem)
+        self.assertEqual(mem.name, "t_int")
+        self.assertEqual(mem.type, int)
+
     def testInitValueTuple(self):
         s = ldmud.Struct(self.master, "test_struct", (42, 1.5, 'Hi',))
         self.assertIsNotNone(s)
-        self.assertEqual(s.t_int, 42)
-        self.assertEqual(s.t_float, 1.5)
-        self.assertEqual(s.t_string, 'Hi')
+        self.assertEqual(s.members.t_int.value, 42)
+        self.assertEqual(s.members.t_float.value, 1.5)
+        self.assertEqual(s.members.t_string.value, 'Hi')
 
     def testInitValueList(self):
         s = ldmud.Struct(self.master, "test_struct", [42, 1.5, 'Hi'])
         self.assertIsNotNone(s)
-        self.assertEqual(s.t_int, 42)
-        self.assertEqual(s.t_float, 1.5)
-        self.assertEqual(s.t_string, 'Hi')
+        self.assertEqual(s.members.t_int.value, 42)
+        self.assertEqual(s.members.t_float.value, 1.5)
+        self.assertEqual(s.members.t_string.value, 'Hi')
 
     def testInitValueMap(self):
         s = ldmud.Struct(self.master, "test_struct", { 't_int': 42, 't_float': 1.5, 't_string': 'Hi'})
         self.assertIsNotNone(s)
-        self.assertEqual(s.t_int, 42)
-        self.assertEqual(s.t_float, 1.5)
-        self.assertEqual(s.t_string, 'Hi')
+        self.assertEqual(s.members.t_int.value, 42)
+        self.assertEqual(s.members.t_float.value, 1.5)
+        self.assertEqual(s.members.t_string.value, 'Hi')
 
     def testSetValue(self):
         s = ldmud.Struct(self.master, "test_struct")
         self.assertIsNotNone(s)
-        s.t_int = 123
-        s.t_float = 5.5
-        s.t_string = 'Hello!'
-        self.assertEqual(s.t_int, 123)
-        self.assertEqual(s.t_float, 5.5)
-        self.assertEqual(s.t_string, 'Hello!')
+        s.members.t_int.value = 123
+        s.members.t_float.value = 5.5
+        s.members.t_string.value = 'Hello!'
+        self.assertEqual(s.members.t_int.value, 123)
+        self.assertEqual(s.members.t_float.value, 5.5)
+        self.assertEqual(s.members.t_string.value, 'Hello!')
 
 class TestClosure(unittest.TestCase):
     def setUp(self):
@@ -445,6 +462,17 @@ class TestLvalue(unittest.TestCase):
         self.assertEqual(m[3], 27)
         m[3] = 81
         self.assertEqual(lv[3,0].value, 81)
+
+    def testLvalueStructItem(self):
+        s = ldmud.Struct(ldmud.get_master(), "test_struct", (10,))
+        self.assertIsNotNone(s)
+
+        lv = ldmud.Lvalue(s)
+        self.assertEqual(lv.members.t_int.value, 10)
+        lv.members.t_int.value = 100
+        self.assertEqual(s.members.t_int.value, 100)
+        s.members.t_int.value = 1000
+        self.assertEqual(lv.members.t_int.value, 1000)
 
 class TestEfuns(unittest.TestCase):
     def testDir(self):
