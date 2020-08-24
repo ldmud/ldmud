@@ -7954,6 +7954,7 @@ restore_struct (svalue_t *svp, char **str)
     char *pt, *end;
     int siz;
     Bool rtt_checks; // are RTT checks enabled for this objects program?
+    bool anonymous = false;
     long memberpos;
 
     end = *str;
@@ -8008,7 +8009,15 @@ restore_struct (svalue_t *svp, char **str)
             }
             structname = mstr_extract(name.u.str, 0, pos-1);
             prog_name = mstr_extract(name.u.str, pos+1, pos2-2);
-            if (!compat_mode)
+
+            if (mstreq(prog_name, STR_ANONYMOUS))
+            {
+                anonymous = true;
+
+                free_mstring(prog_name);
+                prog_name = NULL;
+            }
+            else if (!compat_mode)
             {
                string_t * tmp;
                tmp = add_slash(prog_name);
@@ -8026,7 +8035,10 @@ restore_struct (svalue_t *svp, char **str)
          * This allows to move inherited structs between modules without
          * breaking the savefiles.
          */
-        stt = struct_find(structname, current_object->prog);
+        if (anonymous)
+            stt = NULL;
+        else
+            stt = struct_find(structname, current_object->prog);
         if (!stt && prog_name != NULL)
         {
             do {
@@ -8064,7 +8076,7 @@ restore_struct (svalue_t *svp, char **str)
         if (prog_name)
             free_mstring(prog_name);
 
-        if (!stt)
+        if (!stt && !anonymous)
         {
             free_mstring(name.u.str);
             return MY_FALSE;
@@ -8072,14 +8084,50 @@ restore_struct (svalue_t *svp, char **str)
 
     }
     /* Allocate the struct */
-    st = struct_new(stt);
+    if (anonymous)
+        st = struct_new_anonymous(siz);
+    else
+        st = struct_new(stt);
     put_struct(svp, st);
 
     // check if the objects program has RTT checks enabled.
     if (current_object->prog->flags & P_RTT_CHECKS)
         rtt_checks = MY_TRUE;
 
-    if (memberpos > 0)
+    if (anonymous)
+    {
+        struct_member_t *member = st->type->member;
+        svalue_t *member_value = st->member;
+
+        push_string(inter_sp, name.u.str); // Save the string in case of errors.
+
+        while (siz--)
+        {
+            if (!restore_svalue(member_value, str, ','))
+            {
+                pop_stack();
+                return MY_FALSE;
+            }
+
+            if (memberpos > 0)
+            {
+                // We have the member names, change them in the anonymous struct.
+                long nextpos = mstrchrpos(name.u.str, ',', memberpos + 1);
+                string_t *member_name = mstr_extract(name.u.str, memberpos + 1, nextpos - 1);
+
+                free_mstring(member->name);
+                member->name = make_tabled(member_name);
+
+                memberpos = nextpos;
+            }
+
+            member++;
+            member_value++;
+        }
+
+        pop_stack(); // free name.u.str
+    }
+    else if (memberpos > 0)
     {
         // We restore the struct by member name.
 

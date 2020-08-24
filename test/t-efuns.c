@@ -494,6 +494,8 @@ mixed *tests = ({
                 ([:2]),
                 (["a":1;2;3, "b":4;5;6]),
                 ([1:"a";"b", 2:"c";"d"]),
+                to_struct((["a":1, "b": 4, "c": 16])),
+                to_struct(({1,2,3})),
             }))
             {
                 if(!deep_eq(val, restore_value(save_value(val))))
