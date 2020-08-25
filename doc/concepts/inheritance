@@ -145,6 +145,31 @@ ADVANCED USAGE
 
         Since LDMud 3.5.0 it is possible to pass arguments as well.
 
+        * Duplicate functions
+
+        When functions with the same name are inherited multiple times
+        (via multiple inheritance), the compiler chooses a dominant
+        definition that will finally be visible.
+
+        When both functions come from the same inherit that is inherited
+        virtually, then (and only then) they are considered the same
+        function. If this is not the case then the compiler chooses as
+        following (former rules have precedence over later rules):
+         1. Private definitions are ignored.
+         2. Nomask definitions have precedence.
+         3. The first inherited function has precedence.
+
+        The following table shows the result of these rules (if a function
+        is private and nomask, it is considered private here):
+
+        First       |      Second inherited function
+        inherited   |
+        function    |   private    |    nomask    |     other
+                    +--------------+--------------+--------------
+        private     |    none      |    second    |    second
+        nomask      |    first     |    error     |    first
+        other       |    first     |    second    |    first
+
 ADVANCED EXAMPLE
           inherit "foo";
           inherit "bar";
