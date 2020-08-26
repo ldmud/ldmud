@@ -2495,7 +2495,7 @@ lpctypestr (int n)
       case MF_TYPE_MOD_POINTER|BYTES:
                     p = "&_lpctype_bytes_array";  break;
       case MF_TYPE_MOD_POINTER|BYTES_OR_STRING:
-                    p = "&_lpctype_string_bytes_array";
+                    p = "&_lpctype_string_or_bytes_array";
                                                   break;
       case MF_TYPE_MOD_POINTER|OBJECT:
                     p = "&_lpctype_object_array"; break;

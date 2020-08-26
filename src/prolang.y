@@ -1045,7 +1045,7 @@ static const char * compiled_file;
 
 lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_float,
           _lpctype_int_array,     _lpctype_string_array, _lpctype_object_array,
-          _lpctype_bytes_array,   _lpctype_string_bytes, _lpctype_string_bytes_array,
+          _lpctype_bytes_array,   _lpctype_string_bytes, _lpctype_string_or_bytes_array,
           _lpctype_string_object, _lpctype_string_object_array;
 lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_any_array     = &_lpctype_any_array,
@@ -1055,7 +1055,7 @@ lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_object_array  = &_lpctype_object_array,
           *lpctype_bytes_array   = &_lpctype_bytes_array,
           *lpctype_string_bytes  = &_lpctype_string_bytes,
-          *lpctype_string_bytes_array = &_lpctype_string_bytes_array,
+          *lpctype_string_or_bytes_array = &_lpctype_string_or_bytes_array,
           *lpctype_string_object = &_lpctype_string_object,
           *lpctype_string_object_array = &_lpctype_string_object_array;
 
@@ -17445,7 +17445,7 @@ init_compiler ()
     make_static_type(get_array_type(lpctype_object),                &_lpctype_object_array);
     make_static_type(get_array_type(lpctype_bytes),                 &_lpctype_bytes_array);
     make_static_type(get_union_type(lpctype_string, lpctype_bytes), &_lpctype_string_bytes);
-    make_static_type(get_array_type(lpctype_string_bytes),          &_lpctype_string_bytes_array);
+    make_static_type(get_union_type(lpctype_string_array, lpctype_bytes_array), &_lpctype_string_or_bytes_array);
     make_static_type(get_union_type(lpctype_string, lpctype_object),&_lpctype_string_object);
     make_static_type(get_array_type(lpctype_string_object),         &_lpctype_string_object_array);
 } /* init_compiler() */
@@ -18482,7 +18482,7 @@ clear_compiler_refs (void)
     clear_lpctype_ref(lpctype_object_array);
     clear_lpctype_ref(lpctype_bytes_array);
     clear_lpctype_ref(lpctype_string_bytes);
-    clear_lpctype_ref(lpctype_string_bytes_array);
+    clear_lpctype_ref(lpctype_string_or_bytes_array);
     clear_lpctype_ref(lpctype_string_object);
     clear_lpctype_ref(lpctype_string_object_array);
 }
@@ -18507,7 +18507,7 @@ count_compiler_refs (void)
     count_lpctype_ref(lpctype_object_array);
     count_lpctype_ref(lpctype_bytes_array);
     count_lpctype_ref(lpctype_string_bytes);
-    count_lpctype_ref(lpctype_string_bytes_array);
+    count_lpctype_ref(lpctype_string_or_bytes_array);
     count_lpctype_ref(lpctype_string_object);
     count_lpctype_ref(lpctype_string_object_array);
 }
