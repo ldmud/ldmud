@@ -4,6 +4,44 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+01-Sep-2020 (LDMud Team) -- 3.6.3
+    - Fixed Crashes:
+       + slaballoc/smalloc forget to set the magic bytes when splitting
+         of a small block from a large block.
+       + When printing collected garbage blocks the access to malloc
+         information was off by one word.
+       + The compiler left a semantic value uninitialized when parsing
+         lvalue preserving calls.
+       + The current object was not set when setting up the call to
+         H_CLEAN_UP.
+       + to_struct() freed a struct definition when base and derived struct
+         had the same size.
+       + The Closure() constructor in Python crashed when used in the backend
+         loop.
+
+    - Language:
+      + The new pragma warn_unused_variables will warn about variables that
+        are not read from or not written to.
+      + The pragma strict_types will now raise errors.
+
+    - New Efuns:
+      + text_width() returns the approximate screen width of a given string.
+
+    - Changed Efuns:
+      + sprintf() and terminal_colour() respect extended grapheme clusters.
+      + restore_value() and restore_object() restore structs now by struct
+        member name when the names are available.
+      + restore_value() and restore_object() can now restore anonymous
+        structs.
+      + baseof() and to_struct() now detect or convert structs that are
+        based on an older or newer definition.
+      + regexp() didn't handle the star operator correctly.
+      + regexp() now supports \X (grapheme cluster) for traditional regular
+        expressions.
+
+    - Other:
+      + Implemented support for lvalues in Python.
+
 28-Apr-2020 (LDMud Team) -- 3.6.2
     - Language:
       + Added the dot operator as a shortcut to call_strict() and
