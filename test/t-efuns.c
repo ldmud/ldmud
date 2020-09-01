@@ -455,6 +455,8 @@ mixed *tests = ({
     }),
     ({ "save_/restore_value", 0,
         (:
+            mixed qa = '''({ 42 });
+
             foreach(mixed val:
             ({
                 __FLOAT_MIN__,
@@ -488,6 +490,7 @@ mixed *tests = ({
 
                 '({}),
                 ''({1,2,3}),
+                ({ qa, qa }),
 
                 ([:0]),
                 ([:1]),

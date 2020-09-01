@@ -7420,6 +7420,18 @@ skip_element (char **str)
 {
     char *pt = *str;
 
+    if (pt[0] == '#' && pt[1] >= '0' && pt[1] <= '9')
+    {
+        /* Symbol or quoted array.
+         * Just skip to header and parse it
+         * as a normal string or array.
+         */
+        pt = strchr(pt+2,':');
+        if (!pt)
+            return false;
+        pt++;
+    }
+
     if (*pt == '<')
     {
         /* A shared array/mapping/lvalue */
@@ -7434,18 +7446,6 @@ skip_element (char **str)
             *str = pt + 1;
             return true;
         }
-    }
-
-    if (pt[0] == '#' && pt[1] >= '0' && pt[1] <= '9')
-    {
-        /* Symbol or quoted array.
-         * Just skip to header and parse it
-         * as a normal string or array.
-         */
-        pt = strchr(pt+2,':');
-        if (!pt)
-            return false;
-        pt++;
     }
 
     switch(*pt)
