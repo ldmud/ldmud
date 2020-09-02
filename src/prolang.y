@@ -9268,6 +9268,8 @@ expr_decl:
           free_lpctype($1.type);
           free_fulltype($3.type);
 
+          $1.name->u.local.initializing = false;
+
           if (!res)
               YYACCEPT;
       }
@@ -9289,6 +9291,8 @@ expr_decl:
           res = add_lvalue_code(&$1, F_ASSIGN);
 
           free_lpctype($1.type);
+
+          $1.name->u.local.initializing = false;
 
           if (!res)
               YYACCEPT;
@@ -9380,6 +9384,12 @@ foreach:
                   mem_block[A_PROGRAM].block[scope->addr+2]
                     = (char)(scope->num_locals - scope->num_cleared);
               }
+          }
+
+          /* Mark all variables as initialized. */
+          for (ident_t *var = all_locals; var != NULL && var->u.local.depth == block_depth; var = var->next_all)
+          {
+              var->u.local.initializing = false;
           }
 
           /* Create the FOREACH instruction, leaving the branch field
@@ -12346,7 +12356,6 @@ local_name_lvalue:
       basic_type L_IDENTIFIER
       {
           $2 = define_local_variable($2, $1, &$$, $2->type == I_TYPE_LOCAL, MY_TRUE);
-          $2->u.local.initializing = false;
 
           ref_lpctype($$.type);
           free_lpctype($1);
