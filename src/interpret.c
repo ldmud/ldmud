@@ -7418,8 +7418,9 @@ setup_new_frame2 (bytecode_p funstart, svalue_t *sp
  * csp->num_local_variables is supposed to hold the number of actual
  * arguments on the stack.
  *
- * Result is the new stackpointer, the framepointer <inter_fp>,
- * csp->num_local_variables and <break_sp> are set up.
+ * Result is the new stackpointer, the framepointer <inter_fp>, the
+ * program counter <inter_pc>, csp->num_local_variables and
+ * <break_sp> are set up.
  * The context pointer <inter_context> is cleared.
  */
 
@@ -7447,13 +7448,38 @@ setup_new_frame2 (bytecode_p funstart, svalue_t *sp
         num_arg = l->function.code.num_arg;
         num_vars = l->function.code.num_locals;
         has_varargs = false;
+
+        inter_pc = funstart;
     }
     else
     {
+        int num_opt_arg; /* Number of optional formal arguments */
+
         function_t *header = current_prog->function_headers + FUNCTION_HEADER_INDEX(funstart);
         num_arg = header->num_arg;
+        num_opt_arg = header->num_opt_arg;
         num_vars = header->num_locals;
         has_varargs = (header->flags & TYPE_MOD_XVARARGS) != 0;
+
+        inter_pc = funstart;
+        if (num_opt_arg)
+        {
+            /* Modify inter_pc, depending on how many
+             * arguments are missing. */
+            int missing = num_arg - csp->num_local_variables;
+
+            if (has_varargs)
+                missing--;
+            if (missing < 0)
+                missing = 0;
+            else if (missing > num_opt_arg)
+                missing = num_opt_arg;
+
+            /* Skip the initial jump table. */
+            inter_pc += num_opt_arg * sizeof(unsigned short);
+            if (missing < num_opt_arg)
+                inter_pc += get_short(funstart + sizeof(unsigned short) * (num_opt_arg - missing - 1));
+        }
     }
 
     if (has_varargs)
@@ -13628,7 +13654,7 @@ again:
             current_variables += variable_index_offset;
         current_strings = current_prog->strings;
         fp = inter_fp;
-        pc = funstart;
+        pc = inter_pc;
         csp->extern_call = MY_FALSE;
 
         break;
@@ -13726,7 +13752,7 @@ again:
 
         /* Finish the setup */
         fp = inter_fp;
-        pc = funstart;
+        pc = inter_pc;
         current_variables = current_object->variables;
         if (current_variables)
             current_variables += variable_index_offset;
@@ -14479,6 +14505,7 @@ again:
 
         if (use_ap
          || (simul_efunp[code].flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
+         || simul_efunp[code].num_opt_arg
            )
         {
             use_ap = MY_FALSE;  /* Reset the flag */
@@ -14495,7 +14522,7 @@ again:
                 def_narg--;
 
             /* Add eventually missing arguments */
-            while (num_arg < def_narg)
+            while (num_arg < def_narg - simul_efunp[code].num_opt_arg)
             {
                 sp++;
                 put_number(sp, 0);
@@ -14578,7 +14605,7 @@ again:
             previous_ob = current_object;
             current_object = ob;
             current_strings = prog->strings;
-            eval_instruction(funstart, new_sp);
+            eval_instruction(inter_pc, new_sp);
             sp -= num_arg - 1;
             /*
              * The result of the function call is on the stack.
@@ -16607,7 +16634,7 @@ retry_for_shadow:
             previous_ob = current_object;
             current_object = ob;
             save_csp = csp;
-            eval_instruction(funstart, inter_sp);
+            eval_instruction(inter_pc, inter_sp);
 #ifdef DEBUG
             if (save_csp-1 != csp)
                 fatal("Bad csp after execution in apply_low\n");
@@ -16728,7 +16755,7 @@ retry_for_shadow:
                 previous_ob = current_object;
                 current_object = ob;
                 save_csp = csp;
-                eval_instruction(funstart, inter_sp);
+                eval_instruction(inter_pc, inter_sp);
 #ifdef DEBUG
                 if (save_csp-1 != csp)
                     fatal("Bad csp after execution in apply_low\n");
@@ -17717,9 +17744,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool external)
         if (l->function.lfun.context_size > 0)
             inter_context = l->context;
         if (external)
-            eval_instruction(csp->funstart, inter_sp);
-        else
-            inter_pc = csp->funstart;
+            eval_instruction(inter_pc, inter_sp);
 
         /* If l->ob selfdestructs during the call, l might have been
          * deallocated at this point!
@@ -17863,12 +17888,10 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool external)
         current_variables = current_object->variables;
         current_strings = current_prog->strings;
         if (external)
-            eval_instruction(funstart, sp);
+            eval_instruction(inter_pc, sp);
         else
-        {
-            inter_pc = funstart;
             inter_sp = sp;
-        }
+
         /* The result is on the stack (inter_sp). */
         return;
       }
@@ -18196,7 +18219,7 @@ call_function (program_t *progp, int fx)
     setup_new_frame(fx, NULL);
     previous_ob = current_object;
     tracedepth = 0;
-    eval_instruction(csp->funstart, inter_sp);
+    eval_instruction(inter_pc, inter_sp);
     free_svalue(inter_sp--);  /* Throw away the returned result */
 } /* call_function() */
 
@@ -18238,7 +18261,7 @@ call_function_args (object_t* ob, int fx, int num_arg)
     previous_ob = current_object;
     current_object = ob;
 
-    eval_instruction(csp->funstart, inter_sp);
+    eval_instruction(inter_pc, inter_sp);
 } /* call_function_args() */
 
 /*-------------------------------------------------------------------------*/

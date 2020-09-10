@@ -4630,15 +4630,34 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
      *    opt. RESTORE_ARG_FRAME    RESTORE_ARG_FRAME
      */
 
-    int simul_efun;
-    int i;
-    Bool needs_ap;
-    Bool needs_call_direct;
+    int simul_efun = type - CLOSURE_SIMUL_EFUN;
+    function_t *funp = &simul_efunp[simul_efun];
+    bool needs_ap = false;
+    bool needs_call_direct = (simul_efun >= SEFUN_TABLE_SIZE);
 
-    simul_efun = type - CLOSURE_SIMUL_EFUN;
-
-    needs_ap = MY_FALSE;
-    needs_call_direct = (simul_efun >= SEFUN_TABLE_SIZE);
+    /* First check the arguments. */
+    if (num_arg > funp->num_arg
+      && !(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
+       )
+    {
+        lambda_error(
+          "Too many arguments to simul_efun %s\n"
+         , get_txt(funp->name)
+        );
+        num_arg = funp->num_arg;
+    }
+    else
+    {
+        if (num_arg < funp->num_arg - funp->num_opt_arg - ((funp->flags & TYPE_MOD_XVARARGS)?1:0)
+          && !(funp->flags & TYPE_MOD_VARARGS)
+           )
+        {
+            lambda_error(
+              "Missing arguments to simul_efun %s\n"
+             , get_txt(funp->name)
+            );
+        }
+    }
 
     if (needs_call_direct)
     {
@@ -4649,14 +4668,15 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
             realloc_code();
         current.code_left -= 1;
         STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
-        needs_ap = MY_TRUE;
+        needs_ap = true;
 
         string_sv.u.str = query_simul_efun_file_name();
         compile_value(&string_sv, 0);
-        string_sv.u.str = simul_efunp[simul_efun].name;
+        string_sv.u.str = funp->name;
         compile_value(&string_sv, 0);
     }
-    else if (0 != (simul_efunp[simul_efun].flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS)))
+    else if (0 != (funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
+          || funp->num_opt_arg > 0)
     {
         /* varargs efuns need the arg frame */
 
@@ -4664,27 +4684,12 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
             realloc_code();
         current.code_left -= 1;
         STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
-        needs_ap = MY_TRUE;
+        needs_ap = true;
     }
 
     /* Compile the arguments */
 
-    if (!needs_call_direct)
-    {
-        function_t *funp = &simul_efunp[simul_efun];
-        if (num_arg > funp->num_arg
-          && !(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
-           )
-        {
-            lambda_error(
-              "Too many arguments to simul_efun %s\n"
-             , get_txt(funp->name)
-            );
-            num_arg = funp->num_arg;
-        }
-    }
-
-    for (i = num_arg; --i >= 0; )
+    for (int i = num_arg; --i >= 0; )
     {
         compile_value(argp++, REF_ACCEPTED);
     }
@@ -4706,25 +4711,12 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
     {
     	/* We can call by index */
     	
-        function_t *funp = &simul_efunp[simul_efun];
-
         if (!needs_ap)
         {
             /* The function takes fixed number of args:
              * push 0s onto the stack for missing args
              */
-
-            if (num_arg < funp->num_arg
-              && !(funp->flags & TYPE_MOD_VARARGS)
-               )
-            {
-                lambda_error(
-                  "Missing arguments to simul_efun %s\n"
-                 , get_txt(funp->name)
-                );
-            }
-
-            i = funp->num_arg - num_arg;
+            int i = funp->num_arg - num_arg;
             if (i > 1 && current.code_left < i + 4)
                 realloc_code();
             current.code_left -= i;

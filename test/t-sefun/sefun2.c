@@ -10,6 +10,11 @@ nomask mixed call_strict(object ob, string fun, int arg)
 
 int increment(int i) { return i+2; }
 
+int opt_args_sefun(int arg1, int arg2 = 2, int arg3 = 5)
+{
+    return arg1 + 10*arg2 + 100*arg3;
+}
+
 /* Some simul-efuns to fill the table. */
 int sefun0000() { return 0; }
 int sefunF000() { return 61440; }
@@ -4103,7 +4108,6 @@ int sefunFFF7() { return 65527; }
 int sefunFFF8() { return 65528; }
 int sefunFFF9() { return 65529; }
 int sefunFFFA() { return 65530; }
-int sefunFFFB() { return 65531; }
 
 nomask mixed call_other(object ob, string fun, int arg)
 {

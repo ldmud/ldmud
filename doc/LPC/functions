@@ -33,11 +33,19 @@ DESCRIPTION
           - name is the name of the function, e.g. "short", or "Nice_Try",
               under which it is made known.
           - <arguments> is a list of variable definitions in the
-              normal '<type> <name>' style, separated by comma.
+              normal '<type> <name> = <default value>' style, separated
+              by comma.
               Examples: () : no argument taken
                         (int a) : takes on integer argument
                         (mixed a, object *b): takes two arguments, one
                            arbitrary type, one array of objects.
+                        (int a = 42) : takes zero or one integer argument.
+                           if none is given, 42 is used instead.
+              If default values are given, they must be given for all
+              following arguments except a varargs argument. If a function
+              has a prototype, the default values should be specified
+              there instead of the definition (otherwise it might not
+              be known that these arguments are optional).
           - { statements... } defines the code for this function. This
               is a normal block (see block(LPC)) and as such can define
               its own local variables.
@@ -168,6 +176,9 @@ DESCRIPTION
         combined into one array used as final result. If there is no such
         function inherited at all, the statement will just return
         an empty array.
+
+HISTORY
+        LDMud 3.6.4 introduced default values for function arguments.
 
 SEE ALSO
         types(LPC), modifiers(LPC), varargs(LPC), references(LPC),

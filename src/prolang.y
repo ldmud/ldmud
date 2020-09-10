@@ -441,6 +441,18 @@ enum e_internal_areas {
      * into the program, because the lvalue code need to be there
      * after the code of the rhs expression.
      */
+
+ , A_DEFAULT_VALUES
+    /* (bytecode_t): Area where to put code that initializes function
+     * arguments with their default values. Each area starts with
+     * a short giving the length of the code block.
+     */
+
+ , A_DEFAULT_VALUES_POSITION
+    /* (p_int) Position of the code for default values in A_DEFAULT_VALUES
+     * for function <n>. This is only used for function prototypes.
+     */
+
  , NUMAREAS  /* Total number of areas */
 };
 
@@ -454,6 +466,8 @@ typedef bytecode_t        A_INLINE_PROGRAM_t;
 typedef inline_closure_t  A_INLINE_CLOSURE_t;
 typedef struct_member_t   A_STRUCT_MEMBERS_t;
 typedef bytecode_t        A_LVALUE_CODE_t;
+typedef bytecode_t        A_DEFAULT_VALUES_t;
+typedef p_int             A_DEFAULT_VALUES_POSITION_t;
 
 /* --- struct mem_block_s: One memory area ---
  * Every mem_block keeps one memory area. As it grows by using realloc(),
@@ -632,6 +646,24 @@ static mem_block_t mem_block[NUMAREAS];
 
 #define LVALUE_BLOCK_SIZE       GET_BLOCK_SIZE(A_LVALUE_CODE)
   /* The current size of the lvalue code.
+   */
+
+#define DEFAULT_VALUES_BLOCK    GET_BLOCK(A_DEFAULT_VALUES)
+  /* The current block for code for default values, propertly typed.
+   */
+
+#define DEFAULT_VALUES_BLOCK_SIZE GET_BLOCK_SIZE(A_DEFAULT_VALUES)
+  /* The current size of the code for default values.
+   */
+
+#define DEFAULT_VALUES_POS(n)     GET_BLOCK(A_DEFAULT_VALUES_POSITION)[n]
+  /* Lookup the start position of the default values code block
+   * function number <n>.
+   */
+
+#define DEFAULT_VALUES_POS_COUNT  GET_BLOCK_SIZE(A_DEFAULT_VALUES_POSITION)
+  /* The current number of functions who have a code block for
+   * default values.
    */
 
 #if MAX_LOCAL > 256
@@ -1407,10 +1439,12 @@ DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_STRUCT_MEMBER, A_STRUCT_MEMBERS)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INLINE_CLOSURE, A_INLINE_CLOSURE)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INCLUDE, A_INCLUDES)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INHERIT, A_INHERITS)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_DEFAULT_VALUE_POS, A_DEFAULT_VALUES_POSITION);
 
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_FUNCTIONS, A_FUNCTIONS);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_UPDATE_INDEX_MAP, A_UPDATE_INDEX_MAP);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_INHERITS, A_INHERITS);
+DEFINE_RESERVE_MEM_BLOCK(RESERVE_DEFAULT_VALUE_POS, A_DEFAULT_VALUES_POSITION);
 
 #define byte_to_mem_block(n, b) \
     ((void)((mem_block[n].current_size == mem_block[n].max_size \
@@ -4543,6 +4577,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
     fun.offset.pc = offset;
     fun.flags     = flags;
     fun.num_arg   = num_arg;
+    fun.num_opt_arg = 0;       /* will be updated later */
     fun.num_locals= num_local; /* will be updated later */
     // If the function has no type, it implicitly will be lpctype_mixed from
     // now on. Background: fun.type being NULL is a nasty source of NULL pointer
@@ -5130,6 +5165,7 @@ get_function_information (function_t * fun_p, program_t * prog, int ix)
     fun_p->type = ref_lpctype(header->type);
 
     fun_p->num_arg = header->num_arg;
+    fun_p->num_opt_arg = header->num_opt_arg;
     if (is_undef_function(inhprogp->program + (inhprogp->functions[inhfx] & FUNSTART_MASK)))
         fun_p->flags |= NAME_UNDEFINED;
 } /* get_function_information() */
@@ -5405,6 +5441,125 @@ def_function_complete ( p_int body_start, Bool is_inline)
     }
 
 } /* def_function_complete() */
+
+/*-------------------------------------------------------------------------*/
+static bool
+save_default_value (p_int start)
+
+/* Save the default value code from the A_PROGRAM block (starting at <start>)
+ * into the A_DEFAULT_VALUES block. Returns true on success.
+ */
+
+{
+    if (CURRENT_PROGRAM_SIZE - start > USHRT_MAX)
+    {
+        yyerrorf("Too complex default value");
+    }
+    else if (reserve_mem_block(A_DEFAULT_VALUES, sizeof(unsigned short) + CURRENT_PROGRAM_SIZE - start))
+    {
+        put_short(DEFAULT_VALUES_BLOCK + DEFAULT_VALUES_BLOCK_SIZE, (unsigned short)(CURRENT_PROGRAM_SIZE - start));
+        DEFAULT_VALUES_BLOCK_SIZE += sizeof(unsigned short);
+        memcpy(DEFAULT_VALUES_BLOCK + DEFAULT_VALUES_BLOCK_SIZE, PROGRAM_BLOCK + start, CURRENT_PROGRAM_SIZE - start);
+        DEFAULT_VALUES_BLOCK_SIZE += CURRENT_PROGRAM_SIZE - start;
+
+        CURRENT_PROGRAM_SIZE = start;
+        return true;
+    }
+
+    CURRENT_PROGRAM_SIZE = start;
+    return false;
+} /* save_default_value() */
+
+/*-------------------------------------------------------------------------*/
+static size_t
+reserve_default_value_block (int num_opt, p_int offset)
+
+/* Create space in the program for the default values of <num_opt> arguments.
+ * <offset> is the offset into the DEFAULT_VALUES_BLOCK, where the
+ * corresponding code is. The function returns the size of the reserved space.
+ */
+
+{
+    size_t size = 0;
+    bytecode_t *block;
+
+    if (!num_opt)
+        return 0;
+
+    /* Insert the code for default values. */
+    block = DEFAULT_VALUES_BLOCK + offset;
+    for (int i = 0; i < num_opt; i++)
+    {
+        unsigned short chunk = get_short(block);
+        block += sizeof(unsigned short) + chunk;
+        size += chunk;
+    }
+
+    if (size > USHRT_MAX)
+    {
+        yyerrorf("Too many/complex default values.");
+        return 0;
+    }
+    else
+    {
+        size += num_opt * sizeof(unsigned short);
+
+        if (!realloc_a_program(size))
+        {
+            yyerrorf("Out of memory: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE + size);
+            return 0;
+        }
+
+        CURRENT_PROGRAM_SIZE += size;
+    }
+
+    return size;
+} /* reserve_default_value_block() */
+
+/*-------------------------------------------------------------------------*/
+static p_int
+copy_default_value_block (int num_opt, p_int offset, p_int start, size_t size)
+
+/* Copy the code for initializing default values of <num_opt> arguments into
+ * the program. <offset> is the offset into the DEFAULT_VALUES_BLOCK, where the
+ * corresponding code is. <start> is the functions start address of the function,
+ * <size> the size of the default value code block (as returned by
+ * reserve_default_value_block()). Returns the new start address for the
+ * function.
+ */
+
+{
+    bytecode_t *funcode = PROGRAM_BLOCK;
+    bytecode_t *src, *dst;
+    p_int addr = start - size;
+    p_int pos = 0;
+
+    funcode += addr + FUNCTION_HDR_SIZE;
+    dst = funcode + sizeof(unsigned short) * num_opt;
+    src = DEFAULT_VALUES_BLOCK + offset;
+
+    for (int i = 0; i < num_opt; i++)
+    {
+        unsigned short chunk = get_short(src);
+        src += sizeof(unsigned short);
+
+        pos += chunk;
+
+        put_short(funcode + sizeof(unsigned short) * i, pos);
+        memcpy(dst, src, chunk);
+        src += chunk;
+        dst += chunk;
+    }
+
+    /* We should end up at the original beginning of the function. */
+    assert(start + FUNCTION_HDR_SIZE == dst - PROGRAM_BLOCK);
+
+    /* We can now discard the default values block. */
+    if (DEFAULT_VALUES_BLOCK + DEFAULT_VALUES_BLOCK_SIZE == src)
+        DEFAULT_VALUES_BLOCK_SIZE = offset;
+
+    return addr;
+} /* copy_default_value_block() */
 
 /* =============================   STRUCTS   ============================= */
 
@@ -7226,6 +7381,15 @@ delete_prog_string (void)
        * the argument parsing in a function call.
        */
 
+    struct
+    {
+        p_int start;          /* Starting position in A_DEFAULT_VALUES. */
+        short num;            /* Number of arguments. */
+        short num_opt;        /* Number of arguments with default values. */
+    } function_arguments;
+      /* Keeps track of formal arguments of a function.
+       */
+
     struct {
         int length;            /* Number of initializers parsed */
         /* Description of initializers parsed: */
@@ -7283,8 +7447,9 @@ delete_prog_string (void)
 %type <typeflags>    inheritance_modifier_list inheritance_modifier
 %type <lpctype>      inline_opt_type
 %type <lpctype>      decl_cast cast
-%type <address>      note_start
-%type <rvalue>       comma_expr expr0
+%type <address>      note_start new_arg_name
+%type <rvalue>       comma_expr expr0 opt_default_value
+%type <function_arguments> argument argument_list inline_opt_args
 %type <lrvalue>      expr4
 %type <rvalue>       inline_func
 %type <rvalue>       catch sscanf
@@ -7310,9 +7475,7 @@ delete_prog_string (void)
 %type <number> function_body
   /* program address or -1 */
 
-%type <number> argument argument_list lvalue_list
-%type <number> inline_opt_args
-  /* number of arguments */
+%type <number> lvalue_list
 
 %type <number> expr_list arg_expr_list arg_expr_list2 expr_list2
   /* Number of expressions in an expression list */
@@ -7407,13 +7570,87 @@ def:  type L_IDENTIFIER  /* Function definition or prototype */
       '(' argument ')'
 
       {
-          def_function_prototype($5, MY_FALSE);
+          int fnum, num_opt = 0;
+          p_int offset = 0;
+          function_t *funp;
+
+          def_function_prototype($5.num, MY_FALSE);
+
+          /* Remember the current size if we need to revert. */
+          $<address>3 = CURRENT_PROGRAM_SIZE;
+
+          fnum = def_function_ident->u.global.function;
+          funp = FUNCTION(fnum);
+
+          if ((num_opt = $5.num_opt) > 0)
+          {
+              /* We had some default values given in the argument list. */
+              offset = $5.start;
+              if (funp->num_opt_arg && fnum < DEFAULT_VALUES_POS_COUNT && DEFAULT_VALUES_POS(fnum) >= 0)
+                  yywarnf("Multiple declaration of default values for '%s' encountered", get_txt(funp->name));
+
+              funp->num_opt_arg = num_opt;
+          }
+          else
+          {
+              /* Where there any default values in a previous prototype? */
+              num_opt = funp->num_opt_arg;
+              if (num_opt)
+              {
+                  offset = (fnum < DEFAULT_VALUES_POS_COUNT) ? DEFAULT_VALUES_POS(fnum) : -1;
+                  if (offset < 0)
+                  {
+                      yywarnf("Redefinition of '%s' loses default values", get_txt(funp->name));
+                      funp->num_opt_arg = num_opt = 0;
+                  }
+              }
+          }
+
+          $<number>$ = reserve_default_value_block(num_opt, offset);
+          if (!$<number>$)
+              $5.num_opt = 0;
       }
 
       function_body
 
       {
-          def_function_complete($8, MY_FALSE);
+          p_int offset = $8;
+
+          if ($8 < 0 && $5.num_opt > 0)
+          {
+              /* It is just a prototype, but it has default values.
+               * Record the position for the implementation later on.
+               */
+              int fnum = def_function_ident->u.global.function;
+
+              if (RESERVE_DEFAULT_VALUE_POS(fnum - DEFAULT_VALUES_POS_COUNT + 1))
+              {
+                  for (int i = DEFAULT_VALUES_POS_COUNT; i < fnum; i++)
+                      ADD_DEFAULT_VALUE_POS(-1);
+                  ADD_DEFAULT_VALUE_POS($5.start);
+              }
+
+              FUNCTION(fnum)->num_opt_arg = $5.num_opt;
+              /* Undo the space reservation. */
+              CURRENT_PROGRAM_SIZE = $<address>3;
+          }
+          else if ($8 >= 0 && $<number>7)
+          {
+              /* Now we need to copy the initialization into the program code. */
+              int fnum = def_function_ident->u.global.function;
+              function_t *funp = FUNCTION(fnum);
+
+              offset = copy_default_value_block(
+                  funp->num_opt_arg,
+                  $5.num_opt > 0 ? $5.start : DEFAULT_VALUES_POS(fnum),
+                  offset, $<number>7);
+
+              if (!$5.num_opt)
+                  DEFAULT_VALUES_POS(fnum) = -1;
+          }
+
+          def_function_complete(offset, MY_FALSE);
+
           insert_pending_inline_closures();
           free_fulltype($1);
       }
@@ -7510,6 +7747,7 @@ printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROG
            * needs it where it points now. check_for_context_local() will take
            * care of finding the right type for context variables.
            */
+          $<address>$ = CURRENT_PROGRAM_SIZE;
       }
 
       inline_opt_context
@@ -7568,10 +7806,19 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
                   block_scope[current_inline->block_depth-1].clobbered = MY_TRUE;
           }
 
-          if (!inline_closure_prototype($4))
+          if (!inline_closure_prototype($4.num))
           {
               free_lpctype($2);
               YYACCEPT;
+          }
+
+          $<number>$ = reserve_default_value_block($4.num_opt, $4.start);
+          if (!$<number>$)
+              $4.num_opt = 0;
+          else
+          {
+              int fnum = current_inline->ident->u.global.function;
+              FUNCTION(fnum)->num_opt_arg = $4.num_opt;
           }
       }
 
@@ -7581,9 +7828,11 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
 #ifdef DEBUG_INLINES
 printf("DEBUG: After inline block: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
-         $$.start = current_inline->end;
+         $$.start = $<address>5;
          $$.type = get_fulltype(lpctype_closure);
          $$.name = NULL;
+
+         copy_default_value_block($4.num_opt, $4.start, current_inline->start + $<number>7, $<number>7);
 
          complete_inline_closure();
          free_lpctype($2);
@@ -7672,7 +7921,9 @@ inline_opt_args:
               use_variable(ident, VAR_USAGE_READWRITE);
           }
 
-          $$ = 9;
+          $$.num = 9;
+          $$.num_opt = 0;
+          $$.start = 0;
       }
     | '(' argument ')'  { $$ = $2; }
 ; /* inline_opt_args */
@@ -8344,18 +8595,64 @@ identifier:
  */
 
 argument:
-      /* empty */ { $$ = 0; }
-    | L_VOID { $$ = 0; }
+      /* empty */
+      {
+          $$.num = 0;
+          $$.num_opt = 0;
+          $$.start = 0;
+      }
+    | L_VOID
+      {
+          $$.num = 0;
+          $$.num_opt = 0;
+          $$.start = 0;
+      }
     | argument_list ;
 
 
 argument_list:
-      new_arg_name                   { $$ = 1; }
-    | argument_list ',' new_arg_name { $$ = $1 + 1; } ;
+      new_arg_name
+      {
+          $$.num = 1;
+          $$.num_opt = 0;
+          $$.start = 0;
+
+          if ($1 != UINT32_MAX)
+          {
+              /* We have a default value for this argument. */
+              $$.start = DEFAULT_VALUES_BLOCK_SIZE;
+
+              /* Now move the initialization code to the A_DEFAULT_VALUES block. */
+              if (save_default_value($1))
+                  $$.num_opt++;
+          }
+      }
+    | argument_list ',' new_arg_name
+      {
+          $$ = $1;
+          $$.num++;
+
+          if ($3 != UINT32_MAX)
+          {
+              /* We have a default value for the argument. */
+
+              if ($$.num_opt == 0)
+              {
+                  /* And this one is the first default value. */
+                  $$.start = DEFAULT_VALUES_BLOCK_SIZE;
+              }
+
+              /* Now move the initialization code to the A_DEFAULT_VALUES block. */
+              if (save_default_value($3))
+                  $$.num_opt++;
+          }
+          else if ($$.num_opt != 0 && !(local_variables[current_number_of_locals-1].type.t_flags & TYPE_MOD_VARARGS))
+              yyerrorf("Missing default value for argument");
+      } ;
 
 
 new_arg_name:
-      non_void_type L_IDENTIFIER
+      non_void_type L_IDENTIFIER opt_default_value
       {
           funflag_t illegal_flags = $1.t_flags & (TYPE_MOD_STATIC|TYPE_MOD_NO_MASK|TYPE_MOD_PRIVATE|TYPE_MOD_PUBLIC|TYPE_MOD_VIRTUAL|TYPE_MOD_PROTECTED|TYPE_MOD_NOSAVE|TYPE_MOD_VISIBLE);
           ident_t *varident = NULL;
@@ -8401,9 +8698,53 @@ new_arg_name:
           /* Arguments may be ignored,
            * thus will not show a warning if done so. */
           use_variable(varident, VAR_USAGE_READWRITE);
+
+          /* Default value. */
+          if ($3.start != UINT32_MAX && varident != NULL)
+          {
+              /* Check the types. */
+              if ($1.t_flags & TYPE_MOD_VARARGS)
+              {
+                  yyerrorf("varargs parameter must not have a default value");
+              }
+              else if (!check_assignment_types($3.type, $1.t_type))
+              {
+                  yyerrorf("Type mismatch %s for default value of %s"
+                      , get_two_lpctypes($1.t_type, $3.type.t_type)
+                      , get_txt(varident->name));
+              }
+
+              /* Add an lvalue and the assignment. */
+              add_type_check($1.t_type, TYPECHECK_VAR_INIT);
+
+              PREPARE_INSERT(3)
+              add_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
+              add_byte(varident->u.local.num);
+              add_f_code(F_VOID_ASSIGN);
+              CURRENT_PROGRAM_SIZE += 3;
+          }
+
+          free_fulltype($3.type);
+
+          $$ = $3.start;
       }
 ; /* new_arg_name */
 
+opt_default_value:
+      /* empty */
+      {
+        $$.start = UINT32_MAX;
+        $$.name = NULL;
+        $$.type = get_fulltype(NULL);
+      }
+    | L_ASSIGN expr0
+      {
+        use_variable($2.name, VAR_USAGE_READ);
+        if ($1 != F_ASSIGN)
+           yyerror("Illegal initialization");
+        $$ = $2;
+      }
+; /* opt_default_value */
 
 
 name_list:
@@ -13130,7 +13471,7 @@ function_call:
                           yyerrorf("Too many arguments to simul_efun %s"
                                   , get_txt(funp->name));
 
-                      if ($4 < funp->num_arg - ((funp->flags & TYPE_MOD_XVARARGS)?1:0) && !has_ellipsis)
+                      if ($4 < funp->num_arg - funp->num_opt_arg - ((funp->flags & TYPE_MOD_XVARARGS)?1:0) && !has_ellipsis)
                       {
                           if (pragma_pedantic)
                               yyerrorf("Missing arguments to simul_efun %s"
@@ -13150,6 +13491,7 @@ function_call:
                               get_txt(funp->name));
                       
                   if ((funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
+                   || funp->num_opt_arg
                    || has_ellipsis)
                       ap_needed = MY_TRUE;
 
@@ -13289,17 +13631,17 @@ function_call:
 
                   /* Check number of arguments.
                    */
-                  if (funp->num_arg != $4
+                  if ((($4 > funp->num_arg && !(funp->flags & TYPE_MOD_XVARARGS))
+                     || $4 < funp->num_arg - funp->num_opt_arg - ((funp->flags & TYPE_MOD_XVARARGS)?1:0))
                    && !(funp->flags & TYPE_MOD_VARARGS)
                    && (first_arg != INDEX_START_NONE)
                    && exact_types
                    && !has_ellipsis)
                   {
-                      if (funp->num_arg-1 > $4 || !(funp->flags & TYPE_MOD_XVARARGS))
-                        yyerrorf("Wrong number of arguments to %.60s: "
-                                 "expected %ld, got %ld"
-                                , get_txt($1.real->name)
-                                , (long)funp->num_arg, (long)$4);
+                      yyerrorf("Wrong number of arguments to %.60s: "
+                               "expected %ld, got %ld"
+                              , get_txt($1.real->name)
+                              , (long)(funp->num_arg - funp->num_opt_arg - ((funp->flags & TYPE_MOD_XVARARGS)?1:0)), (long)$4);
                   }
 
                   /* Check the argument types.
@@ -13767,6 +14109,7 @@ function_call:
                   }
 
                   if (!(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
+                   && !funp->num_opt_arg
                    && !has_ellipsis)
                       ap_needed = MY_FALSE;
 

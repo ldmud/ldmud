@@ -774,6 +774,7 @@ struct function_s
     lpctype_t    *type;       /* Return type of function (counted). */
     unsigned char num_locals; /* Number of local variables */
     unsigned char num_arg;    /* Number of arguments needed. */
+    unsigned char num_opt_arg;/* Number of optional arguments (with default values). */
 };
 
 /* --- Bytecodes used to encode line numbers ---

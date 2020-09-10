@@ -431,6 +431,7 @@ assert_simul_efun_object (void)
             simul_efunp[j].type       = funheader->type;
             simul_efunp[j].num_locals = funheader->num_locals;
             simul_efunp[j].num_arg    = num_arg;
+            simul_efunp[j].num_opt_arg= funheader->num_opt_arg;
 
             if (inherit_progp->type_start
              && (type_idx = inherit_progp->type_start[funheader->offset.fx]) != INDEX_START_NONE)

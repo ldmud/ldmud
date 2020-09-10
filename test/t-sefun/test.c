@@ -40,6 +40,14 @@ void run_test()
                 return deep_eq(ob->fun(20), ({"sefun", 20}));
             :)
         }),
+        ({ "Calling simul-efun with optional arguments", 0,
+            (:
+                return opt_args_sefun(1, 3) == 531;
+            :)
+        }),
+        ({ "Lambda: Calling simul-efun with optional arguments", 0,
+            lambda(0, ({#'==, ({#'opt_args_sefun, 1, 3}), 531})),
+        }),
     }), #'shutdown);
 
 }

@@ -1119,7 +1119,7 @@ ldmud_object_lfun_call (ldmud_object_and_index_t *lfun, PyObject *arg, PyObject 
 
         if (!(fun->flags & TYPE_MOD_VARARGS))
         {
-            if (num_arg < fun->num_arg - ((fun->flags & TYPE_MOD_XVARARGS) ? 1 : 0))
+            if (num_arg < fun->num_arg - fun->num_opt_arg - ((fun->flags & TYPE_MOD_XVARARGS) ? 1 : 0))
             {
                 PyErr_Format(PyExc_TypeError, "%.200s() missing %d required positional argument",
                              get_txt(fun->name), fun->num_arg - ((fun->flags & TYPE_MOD_XVARARGS) ? 1 : 0) - num_arg);

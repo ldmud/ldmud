@@ -29,11 +29,14 @@
  *
  * The bytecode itself is divided into functions: the code for every
  * function is (except for absolute jumps) selfcontained and prepended
- * by a header holding the name of the function, and the number and types
- * of expected arguments. The advantage is that for a given function
- * the driver does not need to know if it is part of a program or a
- * lambda closure compiled at runtime: in both cases all necessary
- * information about the function is right where its code is.
+ * by a header holding the index into the function table (which then
+ * contains the name of the function name and number of arguments).
+ * If the function has optional arguments (arguments with default values)
+ * then it is followed by a jump table containing the relative offsets
+ * (unsigned shorts) to the end of the initialization of optional arguments
+ * (so the first entry skips the initialization of the first optional
+ * variable, the second entry skips the second optional variable),
+ * there are .num_opt_arg entries.
  *
  * The maximum size of a program is limited by the biggest offset
  * that can be stored in the 'functions' array, currently 1 MByte.
