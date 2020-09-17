@@ -3258,6 +3258,11 @@ remove_interactive (object_t *ob, Bool force)
         xfree(tmp);
     }
 
+    if (iconv_valid(interactive->receive_cd))
+        iconv_close(interactive->receive_cd);
+    if (iconv_valid(interactive->send_cd))
+        iconv_close(interactive->send_cd);
+
     /* Unlink the interactive structure from the shadow sentence
      * of the object.
      */
