@@ -2197,6 +2197,7 @@ load_object (const char *lname, Bool create_super, int depth
         {
             warnf("Object '%s' was destroyed before initialization.\n"
                  , get_txt(ob->name));
+            pop_stack();
             return NULL;
         }
         init_object_variables(ob, NULL);
@@ -2205,6 +2206,7 @@ load_object (const char *lname, Bool create_super, int depth
         {
             warnf("Object '%s' was destroyed during initialization.\n"
                  , get_txt(ob->name));
+            pop_stack();
             return NULL;
         }
         reset_object(ob, create_super ? H_CREATE_SUPER : H_CREATE_OB);
