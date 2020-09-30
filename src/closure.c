@@ -3294,11 +3294,12 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 
                     /* Generate the FOREACH_NEXT, followed by F_FOREACH_END.
                      */
-                    if (current.code_left < 5)
+                    if (current.code_left < 7)
                         realloc_code();
-                    current.code_left -= 4;
+                    current.code_left -= 6;
                     STORE_CODE(current.codep, F_FOREACH_NEXT);
-                    STORE_SHORT(current.codep, offset+3);
+                    STORE_SHORT(current.codep, USHRT_MAX);
+                    STORE_SHORT(current.codep, offset+5);
                     STORE_CODE(current.codep, F_FOREACH_END);
 
                     /* If a result is required, compile a 0 */

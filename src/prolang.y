@@ -322,12 +322,6 @@ struct global_variable_s
    * things.
    */
 
-/* Values for %type <number> foreach_expr
- */
-#define FOREACH_LOOP  0  /* Normal foreach loop value */
-#define FOREACH_REF   1  /* Referenced foreach loop value */
-#define FOREACH_RANGE 2  /* Integer range as loop value */
-
 /*-------------------------------------------------------------------------*/
 /* The generated information (code and otherwise) is kept in several
  * memory areas, each of which can grow dynamically and independent
@@ -2204,6 +2198,18 @@ unary_op_types_t types_range_index[] = {
     { &_lpctype_string,                         &_lpctype_string,  NULL                  },
     { &_lpctype_bytes,                          &_lpctype_bytes,   NULL                  },
     { &_lpctype_any_array,                      NULL,              &get_argument_type    },
+    { NULL, NULL, NULL }
+};
+
+/* Type table for foreach iteration
+ */
+unary_op_types_t types_foreach_iteration[] = {
+    { &_lpctype_int,                            &_lpctype_int,     NULL                  },
+    { &_lpctype_string,                         &_lpctype_int,     NULL                  },
+    { &_lpctype_bytes,                          &_lpctype_int,     NULL                  },
+    { &_lpctype_any_array,                      NULL,              &get_array_member_type},
+    { &_lpctype_any_struct,                     &_lpctype_mixed,   NULL                  },
+    { &_lpctype_mapping,                        &_lpctype_mixed,   NULL                  },
     { NULL, NULL, NULL }
 };
 
@@ -7360,6 +7366,25 @@ delete_prog_string (void)
       /* Used to return the value of a 'case' label.
        */
 
+    struct
+    {
+        unsigned short num_vars; /* Number of lvalues in foreach clause. */
+        unsigned short type_idx; /* Index into A_ARGUMENT_TYPES of the first variable. */
+    } foreach_variables;
+      /* Used for the lvalue declaration in a foreach clause. */
+
+    struct
+    {
+        lpctype_t* expr_type; /* Type of the expression.       */
+        enum
+        {
+            FOREACH_LOOP,     /* Normal foreach loop value     */
+            FOREACH_REF,      /* Referenced foreach loop value */
+            FOREACH_RANGE     /* Integer range as loop value   */
+        } foreach_type;
+    } foreach_expression;
+      /* Used for the expressions to iterate over in a foreach clause. */
+
     char *string;
       /* An allocated string */
 
@@ -7426,6 +7451,7 @@ delete_prog_string (void)
 %destructor { free_fulltype($$.type); } <rvalue> <lrvalue> <struct_init_member>
 %destructor { free_fulltype($$.type1);
               free_fulltype($$.type2); } <index>
+%destructor { free_lpctype($$.expr_type); } <foreach_expression>
 
 /*-------------------------------------------------------------------------*/
 
@@ -7457,6 +7483,8 @@ delete_prog_string (void)
 %type <rvalue>       parse_command
 %endif
 %type <lvalue>       lvalue name_lvalue name_var_lvalue local_name_lvalue foreach_var_lvalue lvalue_reference
+%type <foreach_variables> foreach_vars
+%type <foreach_expression> foreach_expr
 %type <index>        index_range index_expr
 %type <case_label>   case_label
 %type <address>      optional_else
@@ -7485,16 +7513,6 @@ delete_prog_string (void)
 
 %type <number> L_ASSIGN
   /* Instruction code of the assignment, e.g. F_ADD_EQ */
-
-%type <number> foreach_expr
-  /* FOREACH_LOOP  (0) Normal foreach loop value
-   * FOREACH_REF   (1) Referenced foreach loop value
-   * FOREACH_RANGE (2) Integer range as loop value
-   */
-
-%type <number> foreach_vars
-  /* Number of variables given to foreach
-   */
 
 %type <number> opt_catch_mods opt_catch_mod_list opt_catch_modifier
   /* Bitflags for catch() modes: CATCH_FLAG_xxx from simulate.h
@@ -9679,7 +9697,7 @@ for_iter_expr:
  *       <expr>
  *       FOREACH(_REF) <numargs> c
  *    l: <body>
- *    c: FOREACH_NEXT l
+ *    c: FOREACH_NEXT <typeidx> l
  *    e: FOREACH_END
  *
  * continue's branch to c, break's to e.
@@ -9733,10 +9751,43 @@ foreach:
               var->u.local.initializing = false;
           }
 
+          if (!arg_types_exhausted)
+          {
+              lpctype_t *lvtype = ARGUMENT_TYPE($4.type_idx);
+              /* Let's check the argument types. */
+              if ($7.foreach_type == FOREACH_RANGE)
+              {
+                  /* The first lvalue need to be an integer.*/
+                  if (!lpctype_contains(lpctype_int, lvtype))
+                      yyerrorf("Wrong variable type to foreach range: got %s, expected int", get_lpctype_name(lvtype));
+
+                  /* We don't need the types on the A_ARGUMENT_TYPES anymore,
+                   * but foreach_expr might have used them already,
+                   * so we can't remove them now.
+                   */
+                  $4.type_idx = USHRT_MAX;
+              }
+              else
+              {
+                  /* We only need to check the first lvalue. Any further lvalues
+                   * are only used when iterating over mappings and there we
+                   * don't know the type anyway.
+                   */
+                  lpctype_t *expected = check_unary_op_type($7.expr_type, "foreach", types_foreach_iteration, lpctype_mixed);
+                  if (!has_common_type(expected, lvtype))
+                  {
+                      char buf[512];
+                      get_lpctype_name_buf(lvtype, buf, sizeof(buf));
+                      yyerrorf("Wrong variable type to foreach: got %s, expected %s", buf, get_lpctype_name(expected));
+                  }
+                  free_lpctype(expected);
+              }
+          }
+
           /* Create the FOREACH instruction, leaving the branch field
            * blank.
            */
-          switch ($7)
+          switch ($7.foreach_type)
           {
           case FOREACH_LOOP:
               ins_f_code(F_FOREACH); break;
@@ -9745,14 +9796,18 @@ foreach:
           case FOREACH_RANGE:
               ins_f_code(F_FOREACH_RANGE); break;
           default:
-              yyerrorf("Unknown foreach_expr type %ld.\n", (long)$7);
-              fatal("Unknown foreach_expr type %ld.\n", (long)$7);
+              yyerrorf("Unknown foreach_expr type %ld.\n", (long)$7.foreach_type);
+              fatal("Unknown foreach_expr type %ld.\n", (long)$7.foreach_type);
               /* NOTREACHED */
           }
-          ins_byte($4+1);
+          ins_byte($4.num_vars+1);
           ins_short(0);
 
           push_address(); /* Address to branch back to */
+
+          /* Deactivate rttc if we don't have the types or the pragma is not active */
+          if (arg_types_exhausted || !pragma_rtt_checks)
+              $4.type_idx = USHRT_MAX;
       }
 
       statement
@@ -9784,7 +9839,7 @@ foreach:
               bytecode_p src, dest;
 
               expr_addr = $<address>6;
-              start_addr = expr_addr - $4*2;
+              start_addr = expr_addr - $4.num_vars*2;
               current = start_addr + (addr - 4 - expr_addr);
               for ( src = PROGRAM_BLOCK + expr_addr,
                     dest = PROGRAM_BLOCK + start_addr
@@ -9794,7 +9849,7 @@ foreach:
               CURRENT_PROGRAM_SIZE = current;
               ins_f_code(F_POP_VALUE);
               current++;
-              if ($7 == FOREACH_RANGE)
+              if ($7.foreach_type == FOREACH_RANGE)
               {
                   ins_f_code(F_POP_VALUE);
                   current++;
@@ -9819,9 +9874,10 @@ foreach:
               upd_short(addr - 2, current - addr);
 
               ins_f_code(F_FOREACH_NEXT);
-              ins_short(current + 3 - addr);
+              ins_short($4.type_idx);
+              ins_short(current + 5 - addr);
 
-              current += 3;
+              current += 5;
 
               /* Finish up the breaks.
                */
@@ -9844,13 +9900,27 @@ foreach:
 
           /* and leave the scope */
           leave_block_scope(MY_FALSE);
+
+          free_lpctype($7.expr_type);
       }
 ; /* foreach */
 
 
 foreach_vars : /* Parse and count the number of lvalues */
-      foreach_var_decl                   { $$ = 1; }
-    | foreach_vars ',' foreach_var_decl  { $$ = $1 + 1; }
+      foreach_var_decl
+      {
+          $$.num_vars = 1;
+          $$.type_idx = ARGTYPE_COUNT-1;
+      }
+    | foreach_vars ',' foreach_var_decl
+      {
+          $$ = $1;
+          $$.num_vars++;
+
+          /* The variable count is stored in a byte at F_FOREACH. */
+          if ($$.num_vars == UCHAR_MAX)
+              yyerror("Too many variables in foreach");
+      }
 ; /* foreach_vars */
 
 
@@ -9868,7 +9938,27 @@ foreach_var_decl:  /* Generate the code for one lvalue */
 %line
           Bool res = add_lvalue_code(&$1, 0);
 
-          free_lpctype($1.type);
+          if (!arg_types_exhausted)
+          {
+              int arg_idx = ARGTYPE_COUNT;
+
+              /* We use USHRT_MAX to indicate that F_FOREACH should
+               * not check the types, therefore we warn at it.
+               */
+              if (arg_idx >= USHRT_MAX)
+              {
+                  arg_types_exhausted = true;
+                  yywarnf("Type buffer exhausted, cannot store and verify argument types");
+
+                  free_lpctype($1.type);
+              }
+              else
+              {
+                  ADD_ARGUMENT_TYPE($1.type); // Adapt ref
+              }
+          }
+          else
+              free_lpctype($1.type);
 
           /* We allow non-read variables without warnings for foreach,
              so mark them as read. */
@@ -9935,9 +10025,8 @@ foreach_expr:
               fulltype_error("Expression for foreach() of wrong type", $1.type);
           }
 
-          $$ = gen_refs ? FOREACH_REF : FOREACH_LOOP;
-
-          free_fulltype($1.type);
+          $$.foreach_type = gen_refs ? FOREACH_REF : FOREACH_LOOP;
+          $$.expr_type = $1.type.t_type;
       }
 
     | expr0 L_RANGE expr0
@@ -9974,7 +10063,8 @@ foreach_expr:
               fulltype_error("Expression for foreach() of wrong type", $3.type);
           }
 
-          $$ = FOREACH_RANGE;
+          $$.foreach_type = FOREACH_RANGE;
+          $$.expr_type = ref_lpctype(lpctype_int);
 
           free_fulltype($1.type);
           free_fulltype($3.type);

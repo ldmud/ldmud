@@ -15270,20 +15270,25 @@ again:
         break;
     }
 
-    CASE(F_FOREACH_NEXT);         /* --- foreach_next <offset> --- */
+    CASE(F_FOREACH_NEXT);         /* --- foreach_next <typeidx> <offset> --- */
     {
         /* Start the next (resp. the first) iteration of a foreach()
          * loop. ushort <offset> is the distance to branch back to the
          * loop body, counted from the first byte of the next instruction.
          * For the stack layout, see F_FOREACH.
+         *
+         * ushort <typeidx> indicates the offset into the argument types
+         * for the lvalue's type (<nargs>-1 entries). If it is USHRT_MAX
+         * there should be no typecheck. (For F_FOREACH_RANGE this is
+         * always the case, because we guarantee integers there.)
          */
 
-        unsigned short offset;
+        unsigned short typeidx, offset;
         p_int     ix;
         svalue_t *lvalue;  /* Pointer to the first lvalue */
         Bool      gen_refs;
 
-
+        LOAD_SHORT(typeidx, pc);
         LOAD_SHORT(offset, pc);
 
         ix = sp->u.number;
@@ -15328,8 +15333,37 @@ again:
                  * Start over with this instruction again, the
                  * index on the stack has been incremented already.
                  */
-                pc -= 3;
+                pc -= 5;
                 break;
+            }
+
+            /* Get the number of values we have to assign (in addition to the key). */
+            left = -(sp[-1].x.generic) - 2;
+            if (left > m->num_values)
+                left = m->num_values;
+
+            if (typeidx != USHRT_MAX && current_prog->argument_types)
+            {
+                /* Do runtime type checks. */
+                for (int i = 0; i <= left; i++)
+                {
+                    lpctype_t* exptype = current_prog->argument_types[typeidx + i];
+                    svalue_t * val = i ? (values + i - 1) : (indices->item + ix);
+                    if (!check_rtt_compatibility(exptype, val))
+                    {
+                        char buf[512];
+                        lpctype_t *realtype = get_rtt_type(exptype, val);
+                        get_lpctype_name_buf(realtype, buf, sizeof(buf));
+                        free_lpctype(realtype);
+
+                        if (current_prog->flags & P_WARN_RTT_CHECKS)
+                            warnf("Bad type for variable %d in foreach: got '%s', expected '%s'.\n",
+                               i+1, buf, get_lpctype_name(exptype));
+                        else
+                            errorf("Bad type for variable %d in foreach: got '%s', expected '%s'.\n",
+                               i+1, buf, get_lpctype_name(exptype));
+                    }
+                }
             }
 
             /* Assign the index we used */
@@ -15345,10 +15379,6 @@ again:
             }
 
             /* Loop over the values and assign them */
-            left = -(sp[-1].x.generic) - 2;
-            if (left > m->num_values)
-                left = m->num_values;
-
             for ( ; left > 0; left--, lvalue++, values++)
             {
 #ifdef DEBUG
@@ -15374,6 +15404,7 @@ again:
         else
         {
             svalue_t *arg;
+            svalue_t* val = NULL;
 
             if (sp[-1].x.generic < 0)
             {
@@ -15390,14 +15421,78 @@ again:
                 fatal("Bad argument to foreach(): not a lvalue\n");
                 /* TODO: Give type and value */
 #endif
+
+            /* Determine the value to assign. */
+            switch (arg->type)
+            {
+                case T_NUMBER:
+                {
+                    static svalue_t num = { T_NUMBER };
+                    num.u.number = ix;
+                    val = &num;
+                    break;
+                }
+
+                case T_STRING:
+                case T_BYTES:
+                    val = &const1; /* We do that later. */
+                    break;
+
+                case T_POINTER:
+                    if (ix >= VEC_SIZE(arg->u.vec))
+                        break;
+                        /* Oops, this array shrunk while we're looping over it.
+                         * We stop processing and continue with the following
+                         * FOREACH_END instruction.
+                         */
+
+                    val = arg->u.vec->item+ix;
+                    break;
+
+                case T_STRUCT:
+                    if (ix >= struct_size(arg->u.strct))
+                        break;
+                        /* Oops, somehow the struct managed to shring while
+                         * we're looping over it.
+                         * We stop processing and continue with the following
+                         * FOREACH_END instruction.
+                         */
+
+                    val = arg->u.strct->member+ix;
+                    break;
+
+                default:
+                  fatal("foreach() requires a string, array, struct or mapping.\n");
+                  /* If this happens, the check in F_FOREACH failed. */
+                  break;
+            }
+
+            if (!val)
+                break;
+
+            if (typeidx != USHRT_MAX && current_prog->argument_types)
+            {
+                /* Do runtime type checks. */
+                lpctype_t* exptype = current_prog->argument_types[typeidx];
+                if (!check_rtt_compatibility(exptype, val))
+                {
+                    char buf[512];
+                    lpctype_t *realtype = get_rtt_type(exptype, val);
+                    get_lpctype_name_buf(realtype, buf, sizeof(buf));
+                    free_lpctype(realtype);
+
+                    if (current_prog->flags & P_WARN_RTT_CHECKS)
+                        warnf("Bad type for variable 1 in foreach: got '%s', expected '%s'.\n",
+                           buf, get_lpctype_name(exptype));
+                    else
+                        errorf("Bad type for variable 1 in foreach: got '%s', expected '%s'.\n",
+                           buf, get_lpctype_name(exptype));
+                }
+            }
+
             lvalue = lvalue->u.lvalue;
 
-            if (arg->type == T_NUMBER)
-            {
-                  free_svalue(lvalue);
-                  put_number(lvalue, ix);
-            }
-            else if (arg->type == T_STRING || arg->type == T_BYTES)
+            if (arg->type == T_STRING || arg->type == T_BYTES)
             {
                 size_t chlen;
 
@@ -15452,48 +15547,19 @@ again:
                 }
 
             }
-            else if (arg->type == T_POINTER)
-            {
-                if (ix >= VEC_SIZE(arg->u.vec))
-                    break;
-                    /* Oops, this array shrunk while we're looping over it.
-                     * We stop processing and continue with the following
-                     * FOREACH_END instruction.
-                     */
-
-                free_svalue(lvalue);
-                if (!gen_refs)
-                {
-                    assign_svalue_no_free(lvalue, arg->u.vec->item+ix);
-                }
-                else
-                {
-                    assign_protected_lvalue_no_free(lvalue, arg->u.vec->item+ix);
-                }
-            }
-            else if (arg->type == T_STRUCT)
-            {
-                if (ix >= struct_size(arg->u.strct))
-                    break;
-                    /* Oops, somehow the struct managed to shring while
-                     * we're looping over it.
-                     * We stop processing and continue with the following
-                     * FOREACH_END instruction.
-                     */
-
-                free_svalue(lvalue);
-                if (!gen_refs)
-                {
-                    assign_svalue_no_free(lvalue, arg->u.strct->member+ix);
-                }
-                else
-                {
-                    assign_protected_lvalue_no_free(lvalue, arg->u.strct->member+ix);
-                }
-            }
             else
-              fatal("foreach() requires a string, array, struct or mapping.\n");
-              /* If this happens, the check in F_FOREACH failed. */
+            {
+                free_svalue(lvalue);
+
+                if (!gen_refs)
+                {
+                    assign_svalue_no_free(lvalue, val);
+                }
+                else
+                {
+                    assign_protected_lvalue_no_free(lvalue, val);
+                }
+            }
         }
 
         /* All that is left is to branch back. */
