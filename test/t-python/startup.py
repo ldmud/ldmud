@@ -344,17 +344,31 @@ class TestClosure(unittest.TestCase):
         s = ldmud.Closure(self.master, "this_object")
         self.assertIsNotNone(s)
         self.assertEqual(s(), self.master)
+        s2 = ldmud.Closure(self.master, "this_object")
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
 
     def testOperator(self):
         s = ldmud.Closure(self.master, ",")
         self.assertIsNotNone(s)
         with self.assertRaises(RuntimeError):
             s()
+        s2 = ldmud.Closure(self.master, ",")
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
 
     def testLfun(self):
         s = ldmud.Closure(self.master, "master_fun", self.master)
         self.assertIsNotNone(s)
         self.assertEqual(s(), 54321)
+        s2 = ldmud.Closure(self.master, "master_fun", self.master)
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+
+    def testEmpty(self):
+        s = ldmud.Closure.__new__(ldmud.Closure)
+        with self.assertRaises(Exception):
+            s()
 
 class TestSymbol(unittest.TestCase):
     def testSymbolInit(self):

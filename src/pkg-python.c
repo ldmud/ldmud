@@ -5332,7 +5332,21 @@ ldmud_closure_hash (ldmud_closure_t *val)
  */
 
 {
-    return _Py_HashPointer(val->lpc_closure.u.ob) ^ val->lpc_closure.x.closure_type;
+    ph_int closure_type;
+
+    if (val->lpc_closure.type != T_CLOSURE)
+        return 0;
+
+    closure_type = val->lpc_closure.x.closure_type;
+
+    /* Lambdas. */
+    if (CLOSURE_REFERENCES_CODE(closure_type))
+        return _Py_HashPointer(val->lpc_closure.u.lambda) ^ closure_type;
+    /* Lfun or identifier closures. */
+    if (CLOSURE_MALLOCED(closure_type))
+        return _Py_HashPointer(val->lpc_closure.u.lambda->ob) ^ closure_type;
+    /* Efun, simul-efun or operator closure. */
+    return closure_type;
 } /* ldmud_closure_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -5416,6 +5430,17 @@ ldmud_closure_call (ldmud_closure_t *cl, PyObject *arg, PyObject *kw)
     if (kw != NULL && PyDict_Size(kw) != 0)
     {
         PyErr_SetString(PyExc_TypeError, "closure call takes no keyword arguments");
+        return NULL;
+    }
+    else if (cl->lpc_closure.type == T_NUMBER)
+    {
+        /* The object was destroyed and the GC might have replaced it with a zero. */
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+    else if (cl->lpc_closure.type != T_CLOSURE)
+    {
+        PyErr_SetString(PyExc_TypeError, "uninitialized lpc closure");
         return NULL;
     }
     else
