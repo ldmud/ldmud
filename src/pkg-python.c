@@ -1472,6 +1472,21 @@ ldmud_object_lfun_get_visibility (ldmud_object_and_index_t *lfun, void *closure)
 
 /*-------------------------------------------------------------------------*/
 static void ldmud_object_dealloc(ldmud_object_t* self);
+static int ldmud_object_bool(ldmud_object_t *val);
+
+static PyNumberMethods ldmud_object_lfun_as_number =
+{
+    0,                                  /* nb_add */
+    0,                                  /* nb_subtract */
+    0,                                  /* nb_multiply */
+    0,                                  /* nb_remainder */
+    0,                                  /* nb_divmod */
+    0,                                  /* nb_power */
+    0,                                  /* nb_negative */
+    0,                                  /* nb_positive */
+    0,                                  /* nb_absolute */
+    (inquiry)ldmud_object_bool,         /* nb_bool */
+};
 
 static PyGetSetDef ldmud_object_lfun_getset [] = {
     {"name",        (getter)ldmud_object_lfun_get_name,        NULL, NULL},
@@ -1496,7 +1511,7 @@ static PyTypeObject ldmud_object_lfun_type =
     0,                                  /* tp_setattr */
     0,                                  /* tp_reserved */
     (reprfunc)ldmud_object_lfun_repr,   /* tp_repr */
-    0,                                  /* tp_as_number */
+    &ldmud_object_lfun_as_number,       /* tp_as_number */
     0,                                  /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
     (hashfunc)ldmud_object_and_index_hash, /* tp_hash  */
@@ -1978,6 +1993,20 @@ ldmud_object_variable_get_visibility (ldmud_object_and_index_t *varob, void *clo
 } /* ldmud_object_variable_get_visibility() */
 
 /*-------------------------------------------------------------------------*/
+static PyNumberMethods ldmud_object_variable_as_number =
+{
+    0,                                  /* nb_add */
+    0,                                  /* nb_subtract */
+    0,                                  /* nb_multiply */
+    0,                                  /* nb_remainder */
+    0,                                  /* nb_divmod */
+    0,                                  /* nb_power */
+    0,                                  /* nb_negative */
+    0,                                  /* nb_positive */
+    0,                                  /* nb_absolute */
+    (inquiry)ldmud_object_bool,         /* nb_bool */
+};
+
 static PyGetSetDef ldmud_object_variable_getset [] = {
     {"name",       (getter)ldmud_object_variable_get_name,       NULL,                                    NULL},
     {"value",      (getter)ldmud_object_variable_get_value,      (setter)ldmud_object_variable_set_value, NULL},
@@ -1999,7 +2028,7 @@ static PyTypeObject ldmud_object_variable_type =
     0,                                  /* tp_setattr */
     0,                                  /* tp_reserved */
     (reprfunc)ldmud_object_variable_repr, /* tp_repr */
-    0,                                  /* tp_as_number */
+    &ldmud_object_variable_as_number,   /* tp_as_number */
     0,                                  /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
     (hashfunc)ldmud_object_and_index_hash, /* tp_hash  */
@@ -2483,6 +2512,17 @@ ldmud_object_richcompare (ldmud_object_t *self, PyObject *other, int op)
 } /* ldmud_object_richcompare() */
 
 /*-------------------------------------------------------------------------*/
+static int
+ldmud_object_bool(ldmud_object_t *val)
+
+/* Return 0 (false) for destructed objects, 1 (true) for normal objects.
+ */
+
+{
+    return check_object(val->lpc_object) != NULL;
+} /* ldmud_object_bool() */
+
+/*-------------------------------------------------------------------------*/
 static PyObject *
 ldmud_object_get_name (ldmud_object_t *val, void *closure)
 
@@ -2526,6 +2566,20 @@ ldmud_object_get_list (ldmud_object_t *val, PyTypeObject *type)
 } /* ldmud_object_get_list() */
 
 /*-------------------------------------------------------------------------*/
+static PyNumberMethods ldmud_object_as_number =
+{
+    0,                                  /* nb_add */
+    0,                                  /* nb_subtract */
+    0,                                  /* nb_multiply */
+    0,                                  /* nb_remainder */
+    0,                                  /* nb_divmod */
+    0,                                  /* nb_power */
+    0,                                  /* nb_negative */
+    0,                                  /* nb_positive */
+    0,                                  /* nb_absolute */
+    (inquiry)ldmud_object_bool,         /* nb_bool */
+};
+
 static PyMethodDef ldmud_object_methods[] =
 {
     {NULL}
@@ -2551,7 +2605,7 @@ static PyTypeObject ldmud_object_type =
     0,                                  /* tp_setattr */
     0,                                  /* tp_reserved */
     (reprfunc)ldmud_object_repr,        /* tp_repr */
-    0,                                  /* tp_as_number */
+    &ldmud_object_as_number,            /* tp_as_number */
     0,                                  /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
     (hashfunc)ldmud_object_hash,        /* tp_hash  */
@@ -5403,6 +5457,19 @@ ldmud_closure_richcompare (ldmud_closure_t *self, PyObject *other, int op)
 } /* ldmud_closure_richcompare() */
 
 /*-------------------------------------------------------------------------*/
+static int
+ldmud_closure_bool(ldmud_closure_t *val)
+
+/* Return 0 (false) for closures of destructed objects, 1 (true) for normal objects.
+ */
+
+{
+    if (val->lpc_closure.type != T_CLOSURE)
+        return 0;
+    return !destructed_object_ref(&(val->lpc_closure));
+} /* ldmud_closure_bool() */
+
+/*-------------------------------------------------------------------------*/
 static void
 ldmud_closure_call_closure (int num_arg, ldmud_closure_t* closure)
 
@@ -5478,6 +5545,20 @@ ldmud_closure_call (ldmud_closure_t *cl, PyObject *arg, PyObject *kw)
 } /* ldmud_closure_call() */
 
 /*-------------------------------------------------------------------------*/
+static PyNumberMethods ldmud_closure_as_number =
+{
+    0,                                  /* nb_add */
+    0,                                  /* nb_subtract */
+    0,                                  /* nb_multiply */
+    0,                                  /* nb_remainder */
+    0,                                  /* nb_divmod */
+    0,                                  /* nb_power */
+    0,                                  /* nb_negative */
+    0,                                  /* nb_positive */
+    0,                                  /* nb_absolute */
+    (inquiry)ldmud_closure_bool,        /* nb_bool */
+};
+
 static PyMethodDef ldmud_closure_methods[] =
 {
     {NULL}
@@ -5500,7 +5581,7 @@ static PyTypeObject ldmud_closure_type =
     0,                                  /* tp_setattr */
     0,                                  /* tp_reserved */
     0,                                  /* tp_repr */
-    0,                                  /* tp_as_number */
+    &ldmud_closure_as_number,           /* tp_as_number */
     0,                                  /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
     (hashfunc)ldmud_closure_hash,       /* tp_hash  */

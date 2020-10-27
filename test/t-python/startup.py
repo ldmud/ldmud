@@ -13,6 +13,7 @@ class TestObject(unittest.TestCase):
     def testInitLoaded(self):
         ob = ldmud.Object("/master")
         self.assertIsNotNone(ob)
+        self.assertTrue(ob)
 
     def testInitLoad(self):
         oldob = ldmud.efuns.find_object("/testob")
@@ -72,6 +73,20 @@ class TestObject(unittest.TestCase):
         with self.assertRaises(TypeError):
             var.value = "42"
         self.assertEqual(var.value, 84)
+
+    def testDestructed(self):
+        ob = ldmud.Object("/testob")
+        ldmud.efuns.destruct(ob)
+        self.assertFalse(ob)
+
+    def testDestructedFunctionAndVariable(self):
+        ob = ldmud.Object("/testob")
+        lfun = ob.functions.testfun
+        var = ob.variables.testvar
+
+        ldmud.efuns.destruct(ob)
+        self.assertFalse(lfun)
+        self.assertFalse(var)
 
 class TestArray(unittest.TestCase):
     def testInitEmpty(self):
@@ -365,10 +380,18 @@ class TestClosure(unittest.TestCase):
         self.assertEqual(s2, s)
         self.assertIn(s2, set((s,)))
 
+    def testDestructedLfun(self):
+        ob = ldmud.Object("/testob")
+        c = ldmud.Closure(ob, "testfun", ob)
+        self.assertTrue(c)
+        ldmud.efuns.destruct(ob)
+        self.assertFalse(c)
+
     def testEmpty(self):
         s = ldmud.Closure.__new__(ldmud.Closure)
         with self.assertRaises(Exception):
             s()
+        self.assertFalse(s)
 
 class TestSymbol(unittest.TestCase):
     def testSymbolInit(self):
