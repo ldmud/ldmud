@@ -10321,7 +10321,9 @@ again:
          *   string      - string             -> string
          *   bytes       - bytes              -> bytes
          *   vector      - vector             -> vector
+         *   vector      - mapping            -> vector
          *   mapping     - mapping            -> mapping
+         *   mapping     - vector             -> mapping
          */
 
         p_int i;
@@ -10395,31 +10397,52 @@ again:
         }
         else if ((sp-1)->type == T_POINTER)
         {
-            vector_t *v;
-
-            TYPE_TEST_RIGHT(sp, T_POINTER);
-            v = sp->u.vec;
-            if (v->ref > 1)
+            if (sp->type == T_POINTER)
             {
-                deref_array(v);
-                v = slice_array(v, 0, (mp_int)VEC_SIZE(v) - 1 );
+                vector_t *v = sp->u.vec;
+                if (v->ref > 1)
+                {
+                    deref_array(v);
+                    v = slice_array(v, 0, (mp_int)VEC_SIZE(v) - 1 );
+                }
+                sp--;
+                /* subtract_array already takes care of destructed objects */
+                sp->u.vec = subtract_array(sp->u.vec, v);
+                break;
             }
-            sp--;
-            /* subtract_array already takes care of destructed objects */
-            sp->u.vec = subtract_array(sp->u.vec, v);
-            break;
+            if (sp->type == T_MAPPING)
+            {
+                sp[-1].u.vec = map_intersect_array(sp[-1].u.vec, sp->u.map, true);
+                sp--;
+                break;
+            }
+            OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp->type);
+            /* NOTREACHED */
         }
         else if ((sp-1)->type == T_MAPPING)
         {
-            mapping_t *m;
+            if (sp->type == T_MAPPING)
+            {
+                mapping_t *m;
 
-            TYPE_TEST_RIGHT(sp, T_MAPPING);
-            m = subtract_mapping(sp[-1].u.map, sp->u.map);
-            free_mapping(sp->u.map);
-            sp--;
-            free_mapping(sp->u.map);
-            sp->u.map = m;
-            break;
+                m = subtract_mapping(sp[-1].u.map, sp->u.map);
+                free_mapping(sp->u.map);
+                sp--;
+                free_mapping(sp->u.map);
+                sp->u.map = m;
+                break;
+            }
+            if (sp->type == T_POINTER)
+            {
+                mapping_t *m = copy_mapping(sp[-1].u.map);
+                map_subtract_eq_array(m, sp->u.vec);
+                free_array(sp->u.vec);
+                sp--;
+                free_mapping(sp->u.map);
+                sp->u.map = m;
+                break;
+            }
+            OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp->type);
         }
         else if ((sp-1)->type == T_STRING || (sp-1)->type == T_BYTES)
         {
@@ -11289,7 +11312,7 @@ again:
          && sp->type == T_MAPPING)
         {
             inter_sp = sp - 2;
-            (sp-1)->u.vec = map_intersect_array(sp[-1].u.vec, sp->u.map);
+            (sp-1)->u.vec = map_intersect_array(sp[-1].u.vec, sp->u.map, false);
             sp--;
             break;
         }
@@ -11864,7 +11887,9 @@ again:
          *   string      - string             -> string
          *   bytes       - bytes              -> bytes
          *   vector      - vector             -> vector
+         *   vector      - mapping            -> vector
          *   mapping     - mapping            -> mapping
+         *   mapping     - vector             -> mapping
          */
 
         short type2;         /* type and value of sp[-1] */
@@ -12006,6 +12031,11 @@ again:
                 argp->u.vec = subtract_array(argp->u.vec, v);
                 sp[-1].type = T_INVALID; /* subtract_array used that reference. */
             }
+            else if (type2 == T_MAPPING)
+            {
+                argp->u.vec = map_intersect_array(argp->u.vec, u2.map, true);
+                sp[-1].type = T_INVALID; /* map_intersect_array freed that alreay. */
+            }
             else
             {
                 OP_ARG_ERROR(2, TF_POINTER, type2);
@@ -12067,6 +12097,12 @@ again:
 
                 walk_mapping(m, sub_from_mapping_filter, argp->u.map);
                 free_mapping(m);
+                sp[-1].type = T_INVALID;
+            }
+            else if (type2 == T_POINTER)
+            {
+                map_subtract_eq_array(argp->u.map, u2.vec);
+                free_array(u2.vec);
                 sp[-1].type = T_INVALID;
             }
             else
@@ -12750,7 +12786,7 @@ again:
                 sp[-1].type = T_NUMBER;
 
                 inter_sp = sp;
-                argp->u.vec = map_intersect_array(vec, map);
+                argp->u.vec = map_intersect_array(vec, map, false);
                 free_array(vec);
             }
             else

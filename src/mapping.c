@@ -3511,6 +3511,22 @@ subtract_mapping (mapping_t *minuend, mapping_t *subtrahend)
 } /* subtract_mapping() */
 
 /*-------------------------------------------------------------------------*/
+void
+map_subtract_eq_array (mapping_t *m, vector_t * vec)
+
+/* Remove all entries from <m> which are also in <vec>.
+ *
+ * Called by interpret to implement F_SUBTRACT and F_SUB_EQ.
+ */
+
+{
+    p_int vecsize = VEC_SIZE(vec);
+
+    for (p_int i = 0; i < vecsize; i++)
+        remove_mapping(m, vec->item + i);
+} /* map_subtract_array() */
+
+/*-------------------------------------------------------------------------*/
 struct map_intersect_s
 {
     mapping_t * m;   /* Mapping to be intersected */
@@ -3636,15 +3652,19 @@ map_intersect (mapping_t *m, svalue_t * val)
  
 /*-------------------------------------------------------------------------*/
 vector_t *
-map_intersect_array (vector_t *vec, mapping_t *map)
+map_intersect_array (vector_t *vec, mapping_t *map, bool negate)
 
-/* OPERATOR & (array/map intersection)
+/* OPERATOR & (array/map intersection) and - (array/map difference)
  *
  * Perform an intersection of the vectors <vec> with the indices of
  * mapping <map>.
  *
  * The result is a new vector with all elements which are present in both
  * input vectors.
+ *
+ * If <negate> is true, then the difference of <vec> to <map> will be
+ * determined, so the result is a new vector with all elements from <vec>
+ * that are not in <map>.
  *
  * Both <vec> and <map> are freed.
  */
@@ -3680,7 +3700,7 @@ map_intersect_array (vector_t *vec, mapping_t *map)
     result_size = 0;
     for (i = 0; i < vec_size; ++i)
     {
-        if (get_map_value(map, vec->item+i) != &const0)
+        if ((get_map_value(map, vec->item+i) == &const0) == negate)
         {
             flags[i] = MY_TRUE;
             result_size++;

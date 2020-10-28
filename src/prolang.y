@@ -2047,6 +2047,8 @@ binary_op_types_t types_sub_assignment[] = {
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
     { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
     { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
+    { &_lpctype_mapping,   &_lpctype_any_array, &_lpctype_mapping, NULL                  , NULL                  },
+    { &_lpctype_any_array, &_lpctype_mapping,   NULL,              &get_first_type       , NULL                  },
     { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type       },
     { NULL, NULL, NULL, NULL, NULL }
 };
@@ -2149,6 +2151,8 @@ binary_op_types_t types_subtraction[] = {
     { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                  },
     { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
     { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
+    { &_lpctype_mapping,   &_lpctype_any_array, &_lpctype_mapping, NULL                  , NULL                  },
+    { &_lpctype_any_array, &_lpctype_mapping,   NULL,              &get_first_type       , NULL                  },
     { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type       },
     { NULL, NULL, NULL, NULL, NULL }
 };
