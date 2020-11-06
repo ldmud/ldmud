@@ -7606,9 +7606,9 @@ v_get_type_info (svalue_t *sp, int num_arg)
         {
             sp--;
 
-            str = struct_unique_name(sp->u.strct);
+            str = ref_mstring(struct_unique_name(sp->u.strct));
             free_svalue(sp);
-            put_ref_string(sp, str);
+            put_string(sp, str);
             return sp;
             /* NOTREACHED */
         }

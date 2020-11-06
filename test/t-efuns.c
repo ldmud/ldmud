@@ -413,6 +413,9 @@ mixed *tests = ({
                                    ({0, 1, 240, 178, 0, 1, 240, 179, 0, 1, 240, 180, 0, 1, 240, 181, 0, 1, 240, 182, 0, 1, 240, 183, 0, 1, 240, 184, 0, 1, 240, 185, 0, 1, 240, 186, 0, 1, 240, 187, 0, 1, 240, 188, 0, 1, 240, 189, 0, 1, 240, 190, 0, 1, 240, 177}), "utf-32be"), "utf-32be")),
                                    ({0, 1, 240, 178, 0, 1, 240, 179, 0, 1, 240, 180, 0, 1, 240, 181, 0, 1, 240, 182, 0, 1, 240, 183, 0, 1, 240, 184, 0, 1, 240, 185, 0, 1, 240, 186, 0, 1, 240, 187, 0, 1, 240, 188, 0, 1, 240, 189, 0, 1, 240, 190, 0, 1, 240, 177})) :) }),
 
+    ({ "get_type_info with temporary anonymous struct 1", 0, (: deep_eq(get_type_info(to_struct((["A": 10]))), ({ T_STRUCT, "anonymous" })) :) }),
+    ({ "get_type_info with temporary anonymous struct 2", 0, (: !strstr(get_type_info(to_struct((["A": 10])), 2), "anonymous ") :) }),
+
     ({ "transpose_array 1", 0, (: deep_eq(transpose_array(({})), ({})) :) }),
     ({ "transpose_array 2", 0, (: deep_eq(transpose_array(({ ({}), ({}), ({}) })), ({})) :) }),
     ({ "transpose_array 3", 0, (: deep_eq(transpose_array(({ ({1,2,3}), ({"A","B","C"}) })), ({ ({1, "A"}), ({2, "B"}), ({3, "C"}) })) :) }),
