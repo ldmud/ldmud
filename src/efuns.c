@@ -6479,29 +6479,23 @@ v_to_struct (svalue_t *sp, int num_arg)
     case T_POINTER:
       {
         struct_t *st;
-        size_t left;
+        size_t left = VEC_SIZE(argp->u.vec);
 
         if (num_arg > 1)
         {
             if (argp[1].type != T_STRUCT)
                 fatal("Bad arg 2 to to_struct(): type %s\n"
                      , typename(argp[1].type));
-            if (VEC_SIZE(argp->u.vec) > struct_size(argp[1].u.strct))
-            {
-                errorf("Too many elements for struct %s: %"PRIdPINT
-                       ", expected %ld\n"
-                     , get_txt(struct_name(argp[1].u.strct))
-                     , VEC_SIZE(argp->u.vec)
-                     , (long)struct_size(argp[1].u.strct)
-                    );
-                /* NOTREACHED */
-            }
+
+            if (left > struct_size(argp[1].u.strct))
+                left = struct_size(argp[1].u.strct);
+
             st = struct_new(argp[1].u.strct->type);
         }
         else
             st = struct_new_anonymous(VEC_SIZE(argp->u.vec));
 
-        for (left = VEC_SIZE(argp->u.vec); left-- > 0; )
+        for (; left-- > 0; )
             assign_rvalue_no_free(st->member+left, argp->u.vec->item+left);
         free_array(argp->u.vec);
         put_struct(argp, st);
@@ -6524,16 +6518,7 @@ v_to_struct (svalue_t *sp, int num_arg)
             if (argp[1].type != T_STRUCT)
                 fatal("Bad arg 2 to to_struct(): type %s\n"
                      , typename(argp[1].type));
-            if (VEC_SIZE(argp->u.vec) > struct_size(argp[1].u.strct))
-            {
-                errorf("Too many elements for struct %s: %"PRIdPINT
-                       ", expected %ld\n"
-                     , get_txt(struct_name(argp[1].u.strct))
-                     , VEC_SIZE(argp->u.vec)
-                     , (long)struct_size(argp[1].u.strct)
-                    );
-                /* NOTREACHED */
-            }
+
             st = struct_new(argp[1].u.strct->type);
 
             /* Now loop over all members and assign the data */

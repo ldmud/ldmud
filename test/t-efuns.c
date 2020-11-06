@@ -9,6 +9,11 @@
 
 #define TESTFILE "/log/testfile"
 
+struct test_struct
+{
+    int* arg;
+};
+
 mapping json_testdata = ([ "test 1": 42, "test 2": 42.0,
                           "test 3": "hello world\n",
                           "test 4": ({1,2,3,4,5,42.0,"teststring"}),
@@ -412,6 +417,18 @@ mixed *tests = ({
     ({ "to_bytes/to_text 6", 0, (: deep_eq(to_array(to_bytes(to_text(
                                    ({0, 1, 240, 178, 0, 1, 240, 179, 0, 1, 240, 180, 0, 1, 240, 181, 0, 1, 240, 182, 0, 1, 240, 183, 0, 1, 240, 184, 0, 1, 240, 185, 0, 1, 240, 186, 0, 1, 240, 187, 0, 1, 240, 188, 0, 1, 240, 189, 0, 1, 240, 190, 0, 1, 240, 177}), "utf-32be"), "utf-32be")),
                                    ({0, 1, 240, 178, 0, 1, 240, 179, 0, 1, 240, 180, 0, 1, 240, 181, 0, 1, 240, 182, 0, 1, 240, 183, 0, 1, 240, 184, 0, 1, 240, 185, 0, 1, 240, 186, 0, 1, 240, 187, 0, 1, 240, 188, 0, 1, 240, 189, 0, 1, 240, 190, 0, 1, 240, 177})) :) }),
+
+    ({ "to_struct anonymous from mapping", 0, (: mixed s = to_struct((["A": 10, "B": 20])); return sizeof(s) == 2 && s.("A") == 10 && s.("B") == 20; :) }),
+    ({ "to_struct templated from mapping 1", 0, (: deep_eq(to_struct((["arg": ({10, 20}),]), (<test_struct>)), (<test_struct> ({10,20}))) :) }),
+    ({ "to_struct templated from mapping 2", 0, (: deep_eq(to_struct((["arg": ({10, 20}), "superfluous": ({30, 40})]), (<test_struct>)), (<test_struct> ({10,20}))) :) }),
+    ({ "to_struct templated from mapping 3", 0, (: mapping* m = ({ (["arg": ({10, 20}) ]) }) * 10; return deep_eq(to_struct(m[0], (<test_struct>)), (<test_struct> ({10,20}))); :) }),
+    ({ "to_struct anonymous from wide mapping", 0, (: mixed s = to_struct((["A": 10; 11, "B": 20; 21])); return sizeof(s) == 2 && deep_eq(s.("A"), ({10, 11})) && deep_eq(s.("B"), ({20, 21})); :) }),
+    ({ "to_struct templated from wide mapping 1", 0, (: deep_eq(to_struct((["arg": 10; 20,]), (<test_struct>)), (<test_struct> ({10,20}))) :) }),
+    ({ "to_struct templated from wide mapping 2", 0, (: deep_eq(to_struct((["arg": 10; 20, "superfluous": 30; 40]), (<test_struct>)), (<test_struct> ({10,20}))) :) }),
+    ({ "to_struct templated from wide mapping 3", 0, (: mapping* m = ({ (["arg": 10; 20 ]) }) * 10; return deep_eq(to_struct(m[0], (<test_struct>)), (<test_struct> ({10,20}))); :) }),
+    ({ "to_struct anonymous from array", 0, (: mixed s = to_struct(({10, 20})); return sizeof(s) == 2 && s.(0) == 10 && s.(1) == 20; :) }),
+    ({ "to_struct templated from array 1", 0, (: deep_eq(to_struct(({({10, 20})}), (<test_struct>)), (<test_struct> ({10,20}))) :) }),
+    ({ "to_struct templated from array 2", 0, (: deep_eq(to_struct(({({10, 20}), ({30, 40})}), (<test_struct>)), (<test_struct> ({10,20}))) :) }),
 
     ({ "get_type_info with temporary anonymous struct 1", 0, (: deep_eq(get_type_info(to_struct((["A": 10]))), ({ T_STRUCT, "anonymous" })) :) }),
     ({ "get_type_info with temporary anonymous struct 2", 0, (: !strstr(get_type_info(to_struct((["A": 10])), 2), "anonymous ") :) }),
