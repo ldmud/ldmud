@@ -268,6 +268,9 @@ mixed *tests = ({
     ({ "regmatch 9", 0, (: deep_eq(regmatch("", "^$", RE_MATCH_SUBS), ({"", 1})) :) }),
     ({ "regmatch 10", 0, (: deep_eq(regmatch("", "(a|)", RE_MATCH_SUBS), ({ "", "", 1})) :) }),
 
+    ({ "get_type_info with temporary anonymous struct 1", 0, (: deep_eq(get_type_info(to_struct((["A": 10]))), ({ T_STRUCT, "anonymous" })) :) }),
+    ({ "get_type_info with temporary anonymous struct 2", 0, (: !strstr(get_type_info(to_struct((["A": 10])), 2), "anonymous ") :) }),
+
     ({ "transpose_array 1", 0, (: deep_eq(transpose_array(({})), ({})) :) }),
     ({ "transpose_array 2", 0, (: deep_eq(transpose_array(({ ({}), ({}), ({}) })), ({})) :) }),
     ({ "transpose_array 3", 0, (: deep_eq(transpose_array(({ ({1,2,3}), ({"A","B","C"}) })), ({ ({1, "A"}), ({2, "B"}), ({3, "C"}) })) :) }),
