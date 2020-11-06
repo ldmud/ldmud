@@ -707,6 +707,40 @@ lpctype_contains (lpctype_t* src, lpctype_t* dest)
     return true;
 } /* lpctype_contains() */
 
+/*-------------------------------------------------------------------------*/
+
+/* The same definitions are in sys/lpctypes.h for the mudlibs. */
+#define COMPAT_TYPE_STRUCT    11
+#define COMPAT_MOD_POINTER    0x0040
+
+int
+get_type_compat_int (lpctype_t *t)
+
+/* Calculates an integer for a type that can be returned by efuns
+ * as the compile-time type for a function or variable.
+ */
+
+{
+    switch(t->t_class)
+    {
+        case TCLASS_PRIMARY:
+            if (t->t_primary >= COMPAT_TYPE_STRUCT)
+                return t->t_primary + 1;
+            return t->t_primary;
+
+        case TCLASS_STRUCT:
+            return COMPAT_TYPE_STRUCT;
+
+        case TCLASS_ARRAY:
+            return get_type_compat_int(t->t_array.element) | COMPAT_MOD_POINTER;
+
+        case TCLASS_UNION:
+            return TYPE_ANY;
+    }
+
+    return TYPE_UNKNOWN; /* Shouldn't happen. */
+} /* get_type_compat_int() */
+
 #ifdef GC_SUPPORT
 
 /*-------------------------------------------------------------------------*/

@@ -4,8 +4,10 @@
 #include "/inc/deep_eq.inc"
 #include "/sys/tls.h"
 #include "/sys/configuration.h"
+#include "/sys/functionlist.h"
 #include "/sys/lpctypes.h"
 #include "/sys/regexp.h"
+#include "/sys/struct_info.h"
 
 #define TESTFILE "/log/testfile"
 
@@ -22,6 +24,8 @@ mapping json_testdata = ([ "test 1": 42, "test 2": 42.0,
                                       "e": ({10,11,12,13}) ])
                           ]);
 string json_teststring = "{ \"test 5\": { \"d\": { \"z\": 3, \"y\": 2, \"x\": 1 }, \"e\": [ 10, 11, 12, 13 ], \"b\": 27.000000, \"a\": 26, \"c\": \"letter\" }, \"test 1\": 42, \"test 3\": \"hello world\\n\", \"test 4\": [ 1, 2, 3, 4, 5, 42.000000, \"teststring\" ], \"test 2\": 42.000000 }";
+
+nomask bytes b = b"\x00";
 
 string dhe_testdata =
   "-----BEGIN DH PARAMETERS-----\n"
@@ -432,6 +436,22 @@ mixed *tests = ({
 
     ({ "get_type_info with temporary anonymous struct 1", 0, (: deep_eq(get_type_info(to_struct((["A": 10]))), ({ T_STRUCT, "anonymous" })) :) }),
     ({ "get_type_info with temporary anonymous struct 2", 0, (: !strstr(get_type_info(to_struct((["A": 10])), 2), "anonymous ") :) }),
+    ({ "struct_info of regular struct 1", 0, (: mixed info = struct_info((<test_struct> ({10,20})), SINFO_FLAT);
+                                                return info[SI_NAME] == "test_struct" && ("/"+info[SI_PROG_NAME]) == program_name() && sizeof(info) == SI_MEMBER+1 &&
+                                                       info[SI_MEMBER+0][SIM_NAME] == "arg" && info[SI_MEMBER+0][SIM_TYPE] == (TYPE_MOD_POINTER | TYPE_NUMBER);
+                                             :) }),
+    ({ "struct_info of regular struct 1", 0, (: mixed info = struct_info((<test_struct> ({10,20})), SINFO_NESTED);
+                                                return info[SI_NAME] == "test_struct" && "/"+info[SI_PROG_NAME] == program_name() && sizeof(info) == SI_MEMBER+1 &&
+                                                       info[SI_MEMBER+0][SIM_NAME] == "arg" && info[SI_MEMBER+0][SIM_TYPE] == (TYPE_MOD_POINTER | TYPE_NUMBER);
+                                             :) }),
+    ({ "struct_info of anonymous struct 1", 0, (: mixed info = struct_info(to_struct((["A": 10, "B": 20])), SINFO_FLAT);
+                                                  return !strstr(info[SI_NAME], "anonymous") && info[SI_PROG_NAME] == "anonymous" && sizeof(info) == SI_MEMBER+2 &&
+                                                         member((["A", "B"]), info[SI_MEMBER+0][SIM_NAME]) && member((["A", "B"]), info[SI_MEMBER+1][SIM_NAME]);
+                                               :) }),
+    ({ "struct_info of anonymous struct 2", 0, (: mixed info = struct_info(to_struct((["A": 10, "B": 20])), SINFO_NESTED);
+                                                  return !strstr(info[SI_NAME], "anonymous") && info[SI_PROG_NAME] == "anonymous" && sizeof(info) == SI_MEMBER+2 &&
+                                                         member((["A", "B"]), info[SI_MEMBER+0][SIM_NAME]) && member((["A", "B"]), info[SI_MEMBER+1][SIM_NAME]);
+                                               :) }),
 
     ({ "transpose_array 1", 0, (: deep_eq(transpose_array(({})), ({})) :) }),
     ({ "transpose_array 2", 0, (: deep_eq(transpose_array(({ ({}), ({}), ({}) })), ({})) :) }),
@@ -565,6 +585,15 @@ mixed *tests = ({
            return deep_eq(a, b) && deep_eq(a, ({0,1,2,3,4,5,6}) );
         :)
     }),
+
+    ({ "variable_list 1", 0, (: deep_eq(variable_list(this_object()),                        ({ "last_rt_warning",            "json_testdata", "json_teststring", "b",              "dhe_testdata", "clone",     "tests"                   })) :) }),
+    ({ "variable_list 2", 0, (: deep_eq(map(variable_list(this_object(), RETURN_FUNCTION_FLAGS), #'&, NAME_INHERITED|TYPE_MOD_NOSAVE|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|TYPE_MOD_VIRTUAL|TYPE_MOD_NO_MASK|TYPE_MOD_PUBLIC),
+                                                                                             ({ 0,                            0,               0,                 TYPE_MOD_NO_MASK, 0,              0,           0                         })) :) }),
+    ({ "variable_list 3", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_TYPE),  ({ TYPE_MOD_POINTER|TYPE_STRING, TYPE_MAPPING,    TYPE_STRING,       TYPE_BYTES,       TYPE_STRING,    TYPE_OBJECT, TYPE_MOD_POINTER|TYPE_ANY })) :) }),
+    ({ "variable_list 4", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_NAME | RETURN_FUNCTION_TYPE), 
+                                ({ "last_rt_warning", TYPE_MOD_POINTER|TYPE_STRING, "json_testdata", TYPE_MAPPING, "json_teststring", TYPE_STRING, "b", TYPE_BYTES, "dhe_testdata", TYPE_STRING, "clone", TYPE_OBJECT, "tests", TYPE_MOD_POINTER|TYPE_ANY })) :) }),
+    ({ "variable_list 5", 0, (: variable_list(this_object(), RETURN_VARIABLE_VALUE)[3] == b"\x00" :) }),
+
 #ifdef __JSON__
     ({ "json_parse/_serialize 1", 0,
         (: json_parse(json_serialize(1) ) == 1:) }),

@@ -1625,7 +1625,7 @@ single_struct_info (struct_type_t * st, Bool include_base)
     offset = 0;
     if (!include_base && st->base != NULL)
         offset = struct_t_size(st->base);
-    rc = allocate_array(struct_t_size(st) - offset + SI_MAX);
+    rc = allocate_array(struct_t_size(st) - offset + SI_MAX - 1); // SI_MAX contains one member
     put_ref_string(&rc->item[SI_NAME], struct_t_name(st));
     put_ref_string(&rc->item[SI_PROG_NAME], struct_t_pname(st));
     put_number(&rc->item[SI_PROG_ID], st->prog_id);
@@ -1639,7 +1639,7 @@ single_struct_info (struct_type_t * st, Bool include_base)
         member = allocate_array(SIM_MAX);
         put_array(&rc->item[SI_MEMBER+i-offset], member);
         put_ref_string(&member->item[SIM_NAME], pMember->name);
-        put_number(&member->item[SIM_TYPE], 0); /* TODO: Convert pMember->type to int */
+        put_number(&member->item[SIM_TYPE], get_type_compat_int(pMember->type));
 
         if (pMember->type->t_class == TCLASS_STRUCT)
             put_ref_string(&member->item[SIM_EXTRA]

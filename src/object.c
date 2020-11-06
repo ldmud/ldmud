@@ -1444,39 +1444,6 @@ renumber_programs (void)
     return ++current_id_number;
 }
 
-/*-------------------------------------------------------------------------*/
-
-/* The same definitions are in sys/lpctypes.h for the mudlibs. */
-#define COMPAT_TYPE_STRUCT    11
-#define COMPAT_MOD_POINTER    0x0040
-
-static int
-get_type_compat_int (lpctype_t *t)
-
-/* Calculates an integer for a type that can be
- * returned by function_exists() and functionlist()
- * as the function return type.
- */
-
-{
-    switch(t->t_class)
-    {
-        case TCLASS_PRIMARY:
-            return t->t_primary;
-
-        case TCLASS_STRUCT:
-            return COMPAT_TYPE_STRUCT;
-
-        case TCLASS_ARRAY:
-            return get_type_compat_int(t->t_array.element) | COMPAT_MOD_POINTER;
-
-        case TCLASS_UNION:
-            return TYPE_ANY;
-    }
-
-    return TYPE_UNKNOWN; /* Shouldn't happen. */
-}
-
 /*=========================================================================*/
 /*                                EFUNS                                    */
 
@@ -2427,7 +2394,7 @@ f_variable_list (svalue_t *sp)
         if (mode_flags & RETURN_FUNCTION_TYPE)
         {
             svp--;
-            svp->u.number = 0; /* TODO: convert var->type */
+            svp->u.number = get_type_compat_int(var->type.t_type);
         }
 
         if (mode_flags & RETURN_FUNCTION_FLAGS)

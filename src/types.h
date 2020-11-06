@@ -232,6 +232,7 @@ extern void update_struct_type(lpctype_t *t, struct_type_t *def);
 extern void clean_struct_type(lpctype_t *t);
 extern void _free_lpctype(lpctype_t *t);
 extern bool lpctype_contains(lpctype_t* src, lpctype_t* dest);
+extern int get_type_compat_int(lpctype_t *t);
 
 /* bool is_type_struct(lpctype_t *t)
  *   Returns true, iff <t> represents a specific or any struct type.

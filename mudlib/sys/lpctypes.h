@@ -15,6 +15,7 @@
 #define TYPE_SYMBOL     9
 #define TYPE_QUOTED_ARRAY 10
 #define TYPE_STRUCT     11
+#define TYPE_BYTES      12
 
 #define TYPE_MOD_POINTER        0x0040  /* Pointer to a basic type        */
 
