@@ -10,6 +10,11 @@ int c_calc(int x)
     return (calc(x) + a::calc(x))/2;
 }
 
+int c_wildcard_calc()
+{
+    return sizeof("*"::calc(0));
+}
+
 private string get_program()
 {
     return "c";

@@ -10,6 +10,11 @@ int b_calc(int x)
     return (calc(x) + a::calc(x))/2;
 }
 
+int b_wildcard_calc()
+{
+    return sizeof("*"::calc(0));
+}
+
 private string get_program()
 {
     return "b";

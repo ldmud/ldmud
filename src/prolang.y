@@ -15636,10 +15636,6 @@ insert_inherited (char *super_name, string_t *real_name
 
             ip = ip0; /* ip will be changed in the body */
 
-            if (ip->inherit_type & INHERIT_TYPE_DUPLICATE)
-                /* duplicate inherit */
-                continue;
-
             if (ip->inherit_depth > 1)
                 /* Only consider direct inherits, otherwise we would even
                  * call functions in sub-inherits which have been redefined.
@@ -15648,6 +15644,16 @@ insert_inherited (char *super_name, string_t *real_name
 
             if ( !match_string(super_name, get_txt(ip->prog->name), l) )
                 continue;
+
+            if (ip->inherit_type & INHERIT_TYPE_DUPLICATE)
+            {
+                /* This is a duplicate inherit, let's search for the original. */
+                for (ip = &(INHERIT(0)); ip < ip0; ip++)
+                    if (ip->prog == ip0->prog)
+                        break;
+
+                assert(ip != ip0); /* There must be an original. */
+            }
 
             if ( (fx = find_function(real_name, ip->prog)) < 0)
                 continue;

@@ -161,6 +161,16 @@ void run_test()
                         return d->get_b2_program() == "b2" && d->get_c2_program() == "c2";
                     :)
                 }),
+                ({ "Run " + testname + ": Check for wildcard calls in 'b'.", 0,
+                    (:
+                        return d.b_wildcard_calc() == 1;
+                    :)
+                }),
+                ({ "Run " + testname + ": Check for wildcard calls in 'c'.", 0,
+                    (:
+                        return d.c_wildcard_calc() == 1;
+                    :)
+                }),
             }));
         }
     }
