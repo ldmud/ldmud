@@ -234,6 +234,7 @@ AC_MY_ARG_WITH(tls-trustfile,no,,[Default filename holding trusted PEM certifica
 AC_MY_ARG_WITH(tls-trustdirectory,no,,[Default directory holding trusted PEM certificates])
 AC_MY_ARG_WITH(tls-crlfile,no,,[Default filename holding certificate revocation lists])
 AC_MY_ARG_WITH(tls-crldirectory,no,,[Default directory holding certificate revocation lists])
+AC_MY_ARG_WITH(tls-password,none,[pass:PASSWORD / env:VARIABLE / file:PATHNAME / fd:DESCRIPTOR / stdin / none],[Default password for the keyfile])
 AC_MY_ARG_ENABLE(use-gcrypt,yes,,[Enables support for libgcrypt])
 AC_MY_ARG_ENABLE(use-python,no,,[Enables Python extension])
 AC_MY_ARG_WITH(python-script,startup.py,,[Startup python script])
@@ -560,6 +561,7 @@ AC_STRING_VAL_FROM_WITH(tls_trustfile)
 AC_STRING_VAL_FROM_WITH(tls_trustdirectory)
 AC_STRING_VAL_FROM_WITH(tls_crlfile)
 AC_STRING_VAL_FROM_WITH(tls_crldirectory)
+AC_STRING_VAL_FROM_WITH(tls_password)
 
 AC_STRING_VAL_FROM_WITH(python_script)
 
@@ -711,6 +713,16 @@ fi
 
 if test "x$cdef_tls_crldirectory" = "x#undef"; then
   val_tls_crldirectory=
+fi
+
+if test "x$with_tls_password" != "xnone"; then
+  cdef_tls_password="#define"
+else
+  cdef_tls_password="#undef"
+fi
+
+if test "x$cdef_tls_password" = "x#undef"; then
+  val_tls_password=
 fi
 
 if test "x$with_python_script" != "xno"; then
@@ -2610,6 +2622,7 @@ AC_SUBST(cdef_tls_trustfile)
 AC_SUBST(cdef_tls_trustdirectory)
 AC_SUBST(cdef_tls_crlfile)
 AC_SUBST(cdef_tls_crldirectory)
+AC_SUBST(cdef_tls_password)
 
 AC_SUBST(cdef_python_script)
 
@@ -2693,6 +2706,7 @@ AC_SUBST(val_tls_trustfile)
 AC_SUBST(val_tls_trustdirectory)
 AC_SUBST(val_tls_crlfile)
 AC_SUBST(val_tls_crldirectory)
+AC_SUBST(val_tls_password)
 AC_SUBST(val_python_script)
 AC_SUBST(val_valgrind_redzone)
 

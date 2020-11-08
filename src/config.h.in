@@ -341,6 +341,7 @@
 @cdef_tls_trustdirectory@ TLS_DEFAULT_TRUSTDIRECTORY @val_tls_trustdirectory@
 @cdef_tls_crlfile@        TLS_DEFAULT_CRLFILE        @val_tls_crlfile@
 @cdef_tls_crldirectory@   TLS_DEFAULT_CRLDIRECTORY   @val_tls_crldirectory@
+@cdef_tls_password@       TLS_DEFAULT_PASSWORD       @val_tls_password@
 
 /* Define this if you want to use libgcrypt (and not OpenSSL).
  */

@@ -41,6 +41,7 @@ extern char * tls_trustdirectory;
 extern char * tls_trustfile;
 extern char * tls_crlfile;
 extern char * tls_crldirectory;
+extern char * tls_password;
 
 /* --- Prototypes of pkg-tls.c --- */
 
@@ -57,6 +58,7 @@ extern svalue_t *v_hash(svalue_t *sp, int num_arg);
 extern svalue_t *f_hmac(svalue_t *sp);
 extern Bool tls_opendir(const char * dir, const char * desc, struct tls_dir_s * info);
 extern const char * tls_readdir(struct tls_dir_s * info);
+extern ssize_t tls_get_password(char* buf, size_t size);
 
 /* --- Prototypes for TLS packages --- */
 

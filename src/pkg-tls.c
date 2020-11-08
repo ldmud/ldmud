@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <termios.h>
 
 #include "pkg-tls.h"
 
@@ -40,6 +41,9 @@ char * tls_crlfile = NULL;
 char * tls_crldirectory = NULL;
   /* The filenames of the x509 key and cert file, set by the argument
    * parser. If not set, the package will use defaults.
+   */
+char * tls_password = NULL;
+  /* The password command line argument for the key files.
    */
 
 /*-------------------------------------------------------------------------*/
@@ -142,6 +146,160 @@ tls_readdir (struct tls_dir_s * info)
     xfree(info->fname);
     return NULL;
 }
+
+/*-------------------------------------------------------------------------*/
+ssize_t
+tls_get_password (char* buf, size_t size)
+
+/* Read the TLS key password into <buf> which has <size> bytes.
+ * The password will be null-terminated, the size (without the null
+ * byte) will be returned, -1 for no password.
+ */
+
+{
+    FILE *file = NULL;
+    size_t len;
+    struct termios settings;
+    bool termios_changed = false;
+
+    if (tls_password == NULL)
+        return -1;
+    else if (!strcmp(tls_password, "none"))
+        return -1;
+    else if (!strncmp(tls_password, "pass:", 5))
+    {
+        len = strlen(tls_password + 5);
+        if (len >= size)
+        {
+            printf("%s TLS: Password too long.\n", time_stamp());
+            debug_message("%s TLS: Password too long.\n", time_stamp());
+
+            return -1;
+        }
+
+        memcpy(buf, tls_password + 5, len + 1);
+
+        return (ssize_t)len;
+    }
+    else if (!strncmp(tls_password, "env:", 4))
+    {
+        const char* pwd = getenv(tls_password + 4);
+        if (pwd == NULL)
+        {
+            printf("%s TLS: Can't read environment variable '%s' for password.\n", time_stamp(), tls_password + 4);
+            debug_message("%s TLS: Can't read environment variable '%s' for password.\n", time_stamp(), tls_password + 4);
+
+            return -1;
+        }
+        else
+        {
+            len = strlen(pwd);
+            if (len >= size)
+            {
+                printf("%s TLS: Password too long.\n", time_stamp());
+                debug_message("%s TLS: Password too long.\n", time_stamp());
+
+                return -1;
+            }
+
+            memcpy(buf, pwd, len + 1);
+
+            return (ssize_t)len;
+        }
+    }
+    else if (!strncmp(tls_password, "file:", 5))
+    {
+        file = fopen(tls_password + 5, "rt");
+        if (!file)
+        {
+            printf("%s TLS: Can't read password file '%s': %s.\n", time_stamp(), tls_password + 5, strerror(errno));
+            debug_message("%s TLS: Can't read password file '%s': %s.\n", time_stamp(), tls_password + 5, strerror(errno));
+
+            return -1;
+        }
+    }
+    else if (!strncmp(tls_password, "fd:", 3))
+    {
+        int fd = atoi(tls_password + 3);
+        if (fd < 0)
+        {
+            printf("%s TLS: Illegal file descriptor '%s' for password.\n", time_stamp(), tls_password + 3);
+            debug_message("%s TLS: Illegal file descriptor '%s' for password.\n", time_stamp(), tls_password + 3);
+
+            return -1;
+        }
+
+        file = fdopen(fd, "rt");
+        if (!file)
+        {
+            printf("%s TLS: Can't open file descriptor %d: %s.\n", time_stamp(), fd, strerror(errno));
+            debug_message("%s TLS: Can't open file descriptor %d: %s.\n", time_stamp(), fd, strerror(errno));
+
+            return -1;
+        }
+    }
+    else if (!strcmp(tls_password, "stdin"))
+    {
+        file = stdin;
+        if (!file)
+        {
+            printf("%s TLS: Standard input for password is not available.\n", time_stamp());
+            debug_message("%s TLS: Standard input for password is not available.\n", time_stamp());
+
+            return -1;
+        }
+
+        if (!tcgetattr(fileno(file), &settings))
+        {
+            if (settings.c_lflag & ECHO)
+            {
+                termios_changed = true;
+                settings.c_lflag &= ~ECHO;
+
+                tcsetattr(fileno(file), TCSANOW, &settings);
+            }
+        }
+        fprintf(stderr, "Please enter password for TLS key: ");
+    }
+    else
+    {
+        printf("%s TLS: Unknown scheme for the password.\n", time_stamp());
+        debug_message("%s TLS: Unknown scheme for the password.\n", time_stamp());
+
+        return -1;
+    }
+
+    if (!fgets(buf, size, file))
+        len = 0;
+    else
+    {
+        for (len = strlen(buf); len; len--)
+        {
+            if (buf[len-1] != '\n' && buf[len-1] != '\r')
+                break;
+        }
+        buf[len] = 0;
+    }
+
+    if (termios_changed)
+    {
+        settings.c_lflag |= ECHO;
+        tcsetattr(fileno(file), TCSANOW, &settings);
+    }
+
+    fclose(file);
+
+    if (len + 1 >= size)
+    {
+        printf("%s TLS: Password too long.\n", time_stamp());
+        debug_message("%s TLS: Password too long.\n", time_stamp());
+
+        return -1;
+    }
+
+    return (ssize_t)len;
+
+} /* tls_get_password() */
 
 /*-------------------------------------------------------------------------*/
 /* To protect the tls callback during it's execution, it is pushed onto

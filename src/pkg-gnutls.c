@@ -409,7 +409,7 @@ tls_read_file (const char * fname, const char * desc)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-tls_read_cert (int pos, const char * key, const char * cert)
+tls_read_cert (int pos, const char * key, const char * cert, const char * password)
 
 /* Reads a key and certificate from the given files into keys[pos].
  * <key> and <cert> should be absolute filenames
@@ -431,7 +431,7 @@ tls_read_cert (int pos, const char * key, const char * cert)
         return MY_FALSE;
 
     gnutls_x509_privkey_init(&keys[pos].key);
-    err = gnutls_x509_privkey_import(keys[pos].key, &data, GNUTLS_X509_FMT_PEM);
+    err = gnutls_x509_privkey_import2(keys[pos].key, &data, GNUTLS_X509_FMT_PEM, password, 0);
     if (err < 0)
     {
         printf("%s TLS: Error loading x509 key from '%s': %s\n"
@@ -588,9 +588,12 @@ tls_verify_init (void)
 
     if (num && keys)
     {
+        char password[1024];
+        size_t pwdlen = tls_get_password(password, sizeof(password));
+
         if (tls_keyfile)
         {
-            if (tls_read_cert(0, tls_keyfile, tls_certfile))
+            if (tls_read_cert(0, tls_keyfile, tls_certfile, pwdlen < 0 ? NULL : password))
                 num_keys++;
         }
 
@@ -605,7 +608,7 @@ tls_verify_init (void)
                 if (num_keys >= num)
                     continue;
 
-                if (tls_read_cert(num_keys, fname, NULL))
+                if (tls_read_cert(num_keys, fname, NULL, pwdlen < 0 ? NULL : password))
                     num_keys++;
             }
         }

@@ -368,8 +368,34 @@ tls_add_entropy()
 } /* tls_add_entropy */
 
 /*-------------------------------------------------------------------------*/
+struct known_passphrase
+{
+    char password[1024];
+    ssize_t len;
+};
+
+static int
+known_passphrase_callback (char* buf, int bufsize, int rwflag, void* data)
+
+/* Callback to return a password we already have.
+ * <data> is of struct known_passphrase.
+ */
+{
+    struct known_passphrase *known = (struct known_passphrase*) data;
+
+    if (known->len < 0)
+        return -1;
+
+    if (known->len >= bufsize)
+        return -1;
+
+    memcpy(buf, known->password, known->len+1);
+    return known->len;
+} /* known_passphrase_callback() */
+
+/*-------------------------------------------------------------------------*/
 static Bool
-tls_read_cert (int pos, const char * key, const char * cert)
+tls_read_cert (int pos, const char * key, const char * cert, struct known_passphrase* passphrase)
 
 /* Reads a key and certificate into keys[pos].
  * <key> and <cert> should be absolute filenames
@@ -395,7 +421,7 @@ tls_read_cert (int pos, const char * key, const char * cert)
         return MY_FALSE;
     }
 
-    keys[pos].key = PEM_read_PrivateKey(file, NULL, NULL, NULL);
+    keys[pos].key = PEM_read_PrivateKey(file, NULL, &known_passphrase_callback, passphrase);
     if (keys[pos].key == NULL)
     {
         int err = ERR_get_error();
@@ -587,9 +613,12 @@ tls_verify_init (void)
 
     if (num && keys)
     {
+        struct known_passphrase passphrase;
+        passphrase.len = tls_get_password(passphrase.password, sizeof(passphrase.password));
+
         if (tls_keyfile)
         {
-            if (tls_read_cert(0, tls_keyfile, tls_certfile))
+            if (tls_read_cert(0, tls_keyfile, tls_certfile, &passphrase))
                 num_keys++;
         }
 
@@ -604,7 +633,7 @@ tls_verify_init (void)
                 if (num_keys >= num)
                     continue;
 
-                if (tls_read_cert(num_keys, fname, NULL))
+                if (tls_read_cert(num_keys, fname, NULL, &passphrase))
                     num_keys++;
             }
         }

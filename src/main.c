@@ -1190,6 +1190,7 @@ typedef enum OptNumber {
  , cTLStrustfile    /* --tls-trustfile      */
  , cTLScrlfile	    /* --tls-crlfile        */
  , cTLScrldir       /* --tls-crldirectory   */
+ , cTLSpassword     /* --tls-password       */
 #endif
 #ifdef USE_PYTHON
  , cPythonScript    /* --python-script      */
@@ -1619,9 +1620,9 @@ static Option aOptions[]
       , "  --tls-trustfile <pathname>|none\n"
         "    Use <pathname> as the filename holding your trusted PEM certificates,\n"
 #  ifdef TLS_DEFAULT_TRUSTFILE
-       "     default is '" TLS_DEFAULT_TRUSTFILE "'.\n"
+        "    default is '" TLS_DEFAULT_TRUSTFILE "'.\n"
 #  else
-       "     default is 'none'.\n"
+        "    default is 'none'.\n"
 #  endif
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
@@ -1630,9 +1631,9 @@ static Option aOptions[]
       , "  --tls-trustdirectory <pathname>|none\n"
         "    Use <pathname> as the directory where your trusted PEM certificates reside,\n"
 #  ifdef TLS_DEFAULT_TRUSTDIRECTORY
-       "     default is '" TLS_DEFAULT_TRUSTDIRECTORY "'.\n"
+        "    default is '" TLS_DEFAULT_TRUSTDIRECTORY "'.\n"
 #  else
-       "     default is 'none'.\n"
+        "    default is 'none'.\n"
 #  endif
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
@@ -1641,9 +1642,9 @@ static Option aOptions[]
       , "  --tls-crlfile <pathname>|none\n"
         "    Use <pathname> as the filename holding your certificate revocation lists,\n"
 #  ifdef TLS_DEFAULT_CRLFILE
-       "     default is '" TLS_DEFAULT_CRLFILE "'.\n"
+        "    default is '" TLS_DEFAULT_CRLFILE "'.\n"
 #  else
-       "     default is 'none'.\n"
+        "    default is 'none'.\n"
 #  endif
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
@@ -1652,11 +1653,30 @@ static Option aOptions[]
       , "  --tls-crldirectory <pathname>|none\n"
         "    Use <pathname> as the directory where your certificate revocation lists reside,\n"
 #  ifdef TLS_DEFAULT_CRLDIRECTORY
-       "     default is '" TLS_DEFAULT_CRLDIRECTORY "'.\n"
+        "    default is '" TLS_DEFAULT_CRLDIRECTORY "'.\n"
 #  else
-       "     default is 'none'.\n"
+        "    default is 'none'.\n"
 #  endif
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+      }
+    , { 0,      "tls-password",      cTLSpassword,    MY_TRUE
+      , "  --tls-password pass:<password>|env:<variable>|file:<pathname>|fd:<number>|stdin|none\n"
+      , "  --tls-password pass:<password>|env:<variable>|file:<pathname>|fd:<number>|stdin|none\n"
+        "    Decode the TLS keyfile with the given password:\n"
+        "      - pass:<password>  Use the password given on the command line.\n"
+        "      - env:<variable>   Read the password from the environment variable.\n"
+        "      - file:<pathname>  Read the password from the given file.\n"
+        "      - fd:<number>      Read the password from the file descriptor.\n"
+        "      - stdin            Prompt for the password on standard input.\n"
+        "      - none             There is no password.\n"
+#  ifdef TLS_DEFAULT_CRLDIRECTORY
+        "    default is '" TLS_DEFAULT_PASSWORD "'.\n"
+#  else
+        "    default is 'none'.\n"
+#  endif
+        "    The password is read at program startup and upon calls to tls_refresh_certs().\n"
+        "    If relative, <pathname> is interpreted relative to <mudlib>. Only the first line\n"
+        "    will be read from files (file, fd and stdin).\n"
       }
 #endif /* USE_TLS */
 
@@ -2911,6 +2931,23 @@ eval_arg (int eOption, const char * pValue)
             tls_crldirectory = NULL;
         else
             tls_crldirectory = strdup(pValue);
+        break;
+    case cTLSpassword:
+        if (tls_password != NULL)
+            free(tls_password);
+        if (!strcmp(pValue, "none"))
+            tls_password = NULL;
+        else if (!strncmp(pValue, "pass:", 5)
+              || !strncmp(pValue, "env:", 4)
+              || !strncmp(pValue, "file:", 5)
+              || !strncmp(pValue, "fd:", 3)
+              || !strcmp(pValue, "stdin"))
+            tls_password = strdup(pValue);
+        else
+        {
+            fprintf(stderr, "Unknown scheme '%s' for --tls-password\n", pValue);
+            return hrError;
+        }
         break;
 #endif
 #ifdef USE_PYTHON
