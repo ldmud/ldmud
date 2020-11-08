@@ -793,28 +793,266 @@ free_replace_program_protector (replace_ob_t *r_ob)
 } /* free_replace_program_protector() */
 
 /*-------------------------------------------------------------------------*/
-void
-replace_program_lambda_adjust (replace_ob_t *r_ob)
+int
+replace_program_function_adjust (replace_ob_t *r_ob, int fun_idx)
 
-/* This function is called as the last step during the replacement of an
- * object's program, but only if the object has been marked to hold
- * closure references.
- *
- * The function is called in the backend context and catches errors during
- * its execution.
+/* Determines the new index of function <fun_idx> after program replacement.
+ * If the function is not found in the new program, -1 is returned.
  */
 
 {
-    static struct lambda_replace_program_protector *current_lrpp;
-      /* Copy of lrpp, static to survive errors */
+    if (fun_idx >= r_ob->fun_offset
+     && fun_idx < r_ob->fun_offset + r_ob->new_prog->num_functions)
+    {
+        /* Easy case, the lfun is within the new program's
+         * block of the function table.
+         */
+        return fun_idx - r_ob->fun_offset;
+    }
 
+    {
+        /* Let's see if there's a function in the new program's
+         * block that is cross-defined to our lfun.
+         */
+        funflag_t* oldflags = r_ob->ob->prog->functions + r_ob->fun_offset;
+        funflag_t* newflags = r_ob->new_prog->functions;
+
+        for (int newlfunidx = 0; newlfunidx < r_ob->new_prog->num_functions; newlfunidx++)
+        {
+            /* It must be cross-defined in the old program to the lfun. */
+            if (!(oldflags[newlfunidx] & NAME_CROSS_DEFINED)
+             || newlfunidx + CROSSDEF_NAME_OFFSET(oldflags[newlfunidx]) != fun_idx)
+                continue;
+
+            /* And must not be cross-defined in the new program. */
+            if (newflags[newlfunidx] & NAME_CROSS_DEFINED)
+                continue;
+
+            return newlfunidx;
+        }
+    }
+
+    {
+        /* Last try, let's look at virtual inherits.
+         * Look at whether our lfun is in an virtual inherit
+         * and if the target program has it, too.
+         */
+
+        int oldinhcount = r_ob->ob->prog->num_inherited;
+        for (inherit_t* oldinh = r_ob->ob->prog->inherit; oldinhcount-- > 0; oldinh++)
+        {
+            if (oldinh->inherit_type == INHERIT_TYPE_NORMAL)
+                continue;
+
+            if (fun_idx >= oldinh->function_index_offset
+             && fun_idx < oldinh->function_index_offset + oldinh->prog->num_functions)
+            {
+                int newinhcount = r_ob->new_prog->num_inherited;
+                for (inherit_t* newinh = r_ob->new_prog->inherit; newinhcount-- > 0; newinh++)
+                {
+                    if (newinh->inherit_type == INHERIT_TYPE_NORMAL)
+                        continue;
+                    if (newinh->inherit_type & (INHERIT_TYPE_DUPLICATE|INHERIT_TYPE_MAPPED))
+                        continue;
+                    if (newinh->prog != oldinh->prog)
+                        continue;
+
+                    /* Yeah, we found it. */
+                    return fun_idx - oldinh->function_index_offset + newinh->function_index_offset;
+                }
+
+                break;
+            }
+        }
+    }
+
+    return -1;
+
+} /* replace_program_function_adjust() */
+
+/*-------------------------------------------------------------------------*/
+int
+replace_program_variable_adjust (replace_ob_t *r_ob, int var_idx)
+
+/* Determines the new index of variable <var_idx> after program replacement.
+ * If the variable is not found in the new program, -1 is returned.
+ */
+
+{
+    program_t *oldprog = r_ob->ob->prog;
+    program_t *newprog = r_ob->new_prog;
+
+    if (var_idx >= r_ob->var_offset
+     && var_idx < r_ob->var_offset + newprog->num_variables - newprog->num_virtual_variables)
+    {
+        /* This is (at least in the new program) a regular variable, just adjust the index of the identifier.
+         */
+        return var_idx - r_ob->var_offset + newprog->num_virtual_variables;
+    }
+    else if (var_idx < oldprog->num_virtual_variables)
+    {
+        /* This is/was a virtual variable, we need to find the
+         * corresponding inherit in the new program.
+         */
+        int oldinhcount = oldprog->num_inherited;
+        for (inherit_t *oldinh = oldprog->inherit; oldinhcount-- > 0; oldinh++)
+        {
+            if (oldinh->inherit_type == INHERIT_TYPE_NORMAL)
+                continue;
+            if (oldinh->inherit_type & INHERIT_TYPE_DUPLICATE)
+                continue;
+            if (oldinh->inherit_type & INHERIT_TYPE_MAPPED)
+            {
+                int newinhcount;
+
+                /* Obsolete virtual inherit. */
+                if (var_idx < oldinh->variable_index_offset
+                 || var_idx >= oldinh->variable_index_offset + oldinh->num_additional_variables)
+                    continue;
+
+                /* And this is an obsoleted variable. */
+                newinhcount = newprog->num_inherited;
+                for (inherit_t *newinh = newprog->inherit; newinhcount-- > 0; newinh++)
+                {
+                    program_t* oldupdprog;
+                    int oldvaridx, origvaridx;
+
+                    if (newinh->inherit_type == INHERIT_TYPE_NORMAL)
+                        continue;
+                    if (newinh->inherit_type & INHERIT_TYPE_DUPLICATE)
+                        continue;
+                    if (newinh->prog != oldinh->prog)
+                        continue;
+
+                    /* Determine the original variable index. */
+                    oldupdprog = oldprog->inherit[oldinh->updated_inherit].prog;
+                    oldvaridx = var_idx - oldinh->variable_index_offset + oldupdprog->num_variables - oldupdprog->num_virtual_variables;
+
+                    for (origvaridx = oldinh->prog->num_variables - oldinh->prog->num_virtual_variables; origvaridx-- > 0;)
+                    {
+                        if (oldprog->update_index_map[oldinh->variable_map_offset + origvaridx] == oldvaridx)
+                        {
+                            if (newinh->inherit_type & INHERIT_TYPE_MAPPED)
+                            {
+                                /* It's obsolete in the new program as well. */
+                                int updvaridx = newprog->update_index_map[newinh->variable_map_offset + origvaridx];
+                                program_t * newupdprog = newprog->inherit[newinh->updated_inherit].prog;
+
+                                if (updvaridx >= newupdprog->num_variables - newupdprog->num_virtual_variables)
+                                    return newinh->variable_index_offset + updvaridx - (newupdprog->num_variables - newupdprog->num_virtual_variables);
+                                else
+                                    return newprog->inherit[newinh->updated_inherit].variable_index_offset + updvaridx;
+                            }
+                            else
+                            {
+                                return newinh->variable_index_offset + origvaridx;
+                            }
+
+                            /* NOTREACHED */
+                        }
+                    }
+
+                    /* We did not find the original variable. That should not happen. */
+                    return -1;
+                }
+            }
+            else
+            {
+                int newinhcount, updinhcount;
+
+                /* Regular virtual inherit. */
+                if (var_idx < oldinh->variable_index_offset
+                 || var_idx >= oldinh->variable_index_offset + oldinh->prog->num_variables - oldinh->prog->num_virtual_variables)
+                    continue;
+
+                /* We have found the entry, now search for the entry in the new program. */
+                if (oldinh->prog == newprog)
+                {
+                    /* Oh, we are the virtual program. Then the variable is
+                     * now in the block after our virtual variables.
+                     */
+                    return var_idx - oldinh->variable_index_offset + newprog->num_virtual_variables;
+                }
+
+                newinhcount = newprog->num_inherited;
+                for (inherit_t *newinh = newprog->inherit; newinhcount-- > 0; newinh++)
+                {
+                    if (newinh->inherit_type == INHERIT_TYPE_NORMAL)
+                        continue;
+                    if (newinh->inherit_type & INHERIT_TYPE_DUPLICATE)
+                        continue;
+                    if (newinh->prog != oldinh->prog)
+                        continue;
+
+                    return var_idx - oldinh->variable_index_offset + newinh->variable_index_offset;
+                }
+
+                /* If we have come here, then we haven't found the exact program.
+                 * Now we need to look for updated (obsolete) programs.
+                 */
+                updinhcount = oldprog->num_inherited;
+                for (inherit_t *updinh = oldprog->inherit; updinhcount-- > 0; updinh++)
+                {
+                    if (updinh->inherit_type & INHERIT_TYPE_DUPLICATE)
+                        continue;
+                    if (!(updinh->inherit_type & INHERIT_TYPE_MAPPED))
+                        continue;
+                    if (updinh->updated_inherit != oldinh - oldprog->inherit)
+                        continue;
+
+                    newinhcount = newprog->num_inherited;
+                    for (inherit_t *newinh = newprog->inherit; newinhcount-- > 0; newinh++)
+                    {
+                        int oldvaridx, newvaridx;
+
+                        if (newinh->inherit_type == INHERIT_TYPE_NORMAL)
+                            continue;
+                        if (newinh->inherit_type & INHERIT_TYPE_DUPLICATE)
+                            continue;
+                        if (newinh->prog != updinh->prog)
+                            continue;
+
+                        /* Okay, we have the obsolete inherit in the new program.
+                         * Get the original variable index.
+                         */
+                        oldvaridx = var_idx - oldinh->variable_index_offset;
+                        for (newvaridx = newinh->prog->num_variables - newinh->prog->num_virtual_variables; newvaridx-- > 0;)
+                        {
+                            if (oldprog->update_index_map[updinh->variable_map_offset + newvaridx] == oldvaridx)
+                                return newinh->variable_index_offset + newvaridx;
+                        }
+
+                        break;
+                    }
+                    break;
+
+                }
+            }
+
+            /* We did not found the virtual inherit in the new program. */
+            return -1;
+        }
+    }
+
+    return -1;
+
+} /* replace_program_variable_adjust() */
+
+/*-------------------------------------------------------------------------*/
+void
+replace_program_lfun_closure_adjust (replace_ob_t *r_ob)
+
+/* This function is called as one of the last steps during the replacement
+ * of an object's program, but only if the object has been marked to hold
+ * closure references.
+ *
+ * This function will handle lfun and variable closures. This will be
+ * done just before the program is replaced.
+ */
+
+{
     struct lambda_replace_program_protector *lrpp;
       /* Current protector */
-
-    struct lambda_replace_program_protector *next_lrpp;
-      /* Next protector */
-
-    struct error_recovery_info error_recovery_info;
 
     /* Loop through the list of lambda protectors, adjusting
      * the lfun closures. Vanished lfun closures are replaced by
@@ -833,119 +1071,125 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
 
             if (lrpp->l.x.closure_type == CLOSURE_LFUN)
             {
-                lambda_t *l;
-                int i;
+                lambda_t *l = lrpp->l.u.lambda;
 
                 /* Adjust the index of the lfun
                  * If the lfun closure is a reference to an inherited
                  * program we need to check if the inheritance relation
                  * changes.
                  */
-                l = lrpp->l.u.lambda;
 
-                if (!l->function.lfun.inhProg)
-                    i = l->function.lfun.index -= r_ob->fun_offset;
-                else if (l->function.lfun.inhProg == r_ob->new_prog)
+                int newidx = replace_program_function_adjust(r_ob, l->function.lfun.index);
+                if (newidx < 0)
                 {
-                    /* First possibility: the new program is the same
-                     * one the closure is pointing to.
-                     * In that case, convert the closure into a straight
-                     * lfun closure.
-                     */
-                     
-                     i = l->function.lfun.index -= r_ob->fun_offset;
+                    /* If the function vanished, replace it with a default */
+                    assert_master_ob_loaded();
+                    free_object( l->function.lfun.ob, "replace_program_lambda_adjust");
+                    if(l->function.lfun.inhProg)
+                        free_prog(l->function.lfun.inhProg, MY_TRUE);
 
+                    l->function.lfun.ob = ref_object(master_ob, "replace_program_lambda_adjust");
+                    newidx = find_function( STR_DANGLING_LFUN, master_ob->prog);
+                    l->function.lfun.index = (unsigned short)(newidx < 0 ? 0 : newidx);
+                    l->function.lfun.inhProg = NULL;
+                }
+                else
+                {
+                    l->function.lfun.index = newidx;
+                }
+
+                /* For inherited lfuns we might have to adjust the program. */
+                if (l->function.lfun.inhProg == r_ob->new_prog)
+                {
+                    /* Easy case: The new program is the same one the closure
+                     * is pointing to. Just concert the closure into a
+                     * straight lfun closure.
+                     */
                      free_prog(l->function.lfun.inhProg, MY_TRUE);
                      l->function.lfun.inhProg = NULL;
                 }
-                else if (l->function.lfun.index >= r_ob->fun_offset &&
-                         l->function.lfun.index <
-                            r_ob->fun_offset + r_ob->new_prog->num_functions)
+                else if (l->function.lfun.inhProg)
                 {
-                    program_t *prog;
-                    
-                    /* Second possibility: the new program still
-                     * inherits the program the closure is referencing.
-                     * In that case, just update the inhIndex.
-                     */
-                     
-                    i = l->function.lfun.index -= r_ob->fun_offset;
-                    
+                    program_t *prog = r_ob->new_prog;
+                    int fx = l->function.lfun.index;
+
                     /* Checkt hat inhProg is still in the inherit chain.
                      * If not, convert the closure into a straight
                      * lfun closure.
                      */
-                    
-                    prog = r_ob->new_prog;
-                    
+
                     while(prog != l->function.lfun.inhProg)
                     {
-                        inherit_t *inheritp;
-                        
-                        if (!prog->num_inherited)
+                        inherit_t *inheritp = prog->inherit;
+                        int inhcount = prog->num_inherited;
+
+                        for (; inhcount-- > 0; inheritp++)
+                        {
+                            if (fx >= inheritp->function_index_offset
+                             && fx <  inheritp->function_index_offset + inheritp->prog->num_functions)
+                                break;
+                        }
+
+                        if (inhcount < 0)
                         {
                             /* Didn't find it. */
+                            free_prog(l->function.lfun.inhProg, MY_TRUE);
                             l->function.lfun.inhProg = NULL;
                             break;
                         }
-                        
-                        inheritp = search_function_inherit(prog, i);
-                        i-= inheritp->function_index_offset;
+
+                        fx -= inheritp->function_index_offset;
                         prog = inheritp->prog;
-
-                        if (i >= prog->num_functions)
-                        {
-                            /* We didn't find inhProg. */
-                             l->function.lfun.inhProg = NULL;
-                            break;
-                        }
                     }
-                    
-                    i = l->function.lfun.index;
-                }
-                else
-                    i = -1;
-
-                /* If the function vanished, replace it with a default */
-                if (i < 0 || i >= r_ob->new_prog->num_functions)
-                {
-                    assert_master_ob_loaded();
-                    free_object( l->function.lfun.ob
-                               , "replace_program_lambda_adjust");
-                    if(l->function.lfun.inhProg)
-                        free_prog(l->function.lfun.inhProg, MY_TRUE);
-
-                    l->function.lfun.ob
-                        = ref_object(master_ob
-                                    , "replace_program_lambda_adjust");
-                    i = find_function( STR_DANGLING_LFUN
-                                     , master_ob->prog);
-                    l->function.lfun.index = (unsigned short)(i < 0 ? 0 :i);
-                    l->function.lfun.inhProg = NULL;
                 }
             }
             else /* CLOSURE_IDENTIFIER */
             {
-                lambda_t *l;
-                int i;
-
-                /* Adjust the index of the identifier */
-                l = lrpp->l.u.lambda;
-                i = l->function.var_index -= r_ob->var_offset;
-
-                /* If it vanished, mark it as such */
-                if (i >= r_ob->new_prog->num_variables)
+                lambda_t *l = lrpp->l.u.lambda;
+                int newidx = replace_program_variable_adjust(r_ob, l->function.var_index);
+                if (newidx < 0)
                 {
                     l->function.var_index = VANISHED_VARCLOSURE_INDEX;
                     /* TODO: This value should be properly publicized and
                      * TODO:: tested.
                      */
                 }
+                else
+                    l->function.var_index = newidx;
             }
         } /* if (!CLOSURE_HAS_CODE()) */
     } while ( NULL != (lrpp = lrpp->next) );
 
-    /* Second pass: now adjust the lambda closures.
+} /* replace_program_lfun_closure_adjust() */
+
+/*-------------------------------------------------------------------------*/
+void
+replace_program_lambda_adjust (replace_ob_t *r_ob)
+
+/* This function is called as one of the last steps during the replacement
+ * of an object's program, but only if the object has been marked to hold
+ * closure references.
+ *
+ * This function will handle lambda closures. It will be called just after
+ * the program has been replaced.
+ *
+ * The function is called in the backend context and catches errors during
+ * its execution.
+ */
+
+{
+    struct lambda_replace_program_protector *lrpp;
+      /* Current protector */
+
+    struct lambda_replace_program_protector *next_lrpp;
+      /* Next protector */
+
+    static struct lambda_replace_program_protector *current_lrpp;
+      /* Copy of lrpp, static to survive errors */
+
+    struct error_recovery_info error_recovery_info;
+
+    /* So, now adjust the lambda closures.
      * This is done by recompilation of every closure and comparison
      * with the original one. If the two closures differ, the closure
      * references now-vanished entities and has to be abandoned.
@@ -5969,6 +6213,7 @@ closure_to_string (svalue_t * sp, Bool compact)
         {
             strcat(buf, compact ? "<repl lvar>"
                                 : "<local variable from replaced program>");
+            break;
         }
 
         /* We need the program resident */

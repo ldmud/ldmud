@@ -36,12 +36,6 @@ BESCHREIBUNG
         verschwundene Lfuns des Objekts referenzieren. Das stellt allerdings
         kein Problem dar, solange diese Referenzen nicht ausgefuehrt werden.
 
-FEHLER
-        Wenn ein ersetzendes Programm virtuell geerbte Variablen enthaelt,
-        muss dieses Programm als erstes geerbt werden. Ohne diese
-        Einschraenkung ueberleben die falschen Variablen den
-        Ersetzungsprozess.
-
 GESCHICHTE
         LDMud 3.2.9 liess zu, dass das Argument <program> weggelassen wird,
         wenn nur ein Inherit existiert.

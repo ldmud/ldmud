@@ -932,7 +932,6 @@ replace_programs (void)
 {
     replace_ob_t *r_ob, *r_next;  /* List pointers */
     svalue_t *svp;
-    int i, j;
 
 #ifdef DEBUG
     if (d_flag)
@@ -942,6 +941,7 @@ replace_programs (void)
     for (r_ob = obj_list_replace; r_ob; r_ob = r_next)
     {
         program_t *old_prog;
+        int newinhcount;
 
         /* Don't bother with destructed objects. */
         if (r_ob->ob->flags & O_DESTRUCTED)
@@ -967,35 +967,127 @@ replace_programs (void)
             return; /* Hope for more memory next time... */
         }
 
-        /* If the number of variables changes, allocate a new variables
-         * block and copy the old values over as far as possible.
-         * Note that the change can only be a reduction, and that
-         * the new program may not have variables at all. However, if
-         * 'i' is not 0, the old program is guaranteed to have vars.
+        /* If the new program has variables, we need to create a new
+         * variable block. Even if the number doesn't change, the
+         * virtual variable blocks may have a different order.
          */
-        i = r_ob->ob->prog->num_variables - r_ob->new_prog->num_variables;
-        if (i)
+        if (r_ob->new_prog->num_variables)
         {
             svalue_t *new_vars;
+            program_t *oldprog = r_ob->ob->prog;
 
             /* Get the memory */
-
-            if (r_ob->new_prog->num_variables)
+            new_vars = xalloc(r_ob->new_prog->num_variables * sizeof *new_vars);
+            if (!new_vars)
             {
-                new_vars = xalloc(  r_ob->new_prog->num_variables
-                                  * sizeof *new_vars);
+                obj_list_replace = r_ob;
+                return; /* Hope for more memory next time... */
+            }
 
-                if (!new_vars)
+            svp = r_ob->ob->variables; /* the old variables */
+
+            /* First we are going to copy the virtual variables by inherit,
+             * then en-bloc all remaining non-virtual variables.
+             */
+            newinhcount = r_ob->new_prog->num_inherited;
+            for (inherit_t *newinh = r_ob->new_prog->inherit; newinhcount > 0; newinh++, newinhcount--)
+            {
+                inherit_t *oldinh;
+
+                if (newinh->inherit_type == INHERIT_TYPE_NORMAL)
+                    continue; /* Non-virtual come later. */
+
+                if (newinh->inherit_type & INHERIT_TYPE_DUPLICATE)
+                    continue; /* We already had that one. */
+
+                /* Search for the corresponding inherit in the old program. */
+                for (oldinh = oldprog->inherit;
+                     oldinh->prog != newinh->prog || oldinh->inherit_type == INHERIT_TYPE_NORMAL;
+                     oldinh++);
+
+                if (newinh->inherit_type & INHERIT_TYPE_MAPPED)
                 {
-                    obj_list_replace = r_ob;
-                    return; /* Hope for more memory next time... */
+                    /* An obsolete inherit. It also be an obsoleted inherit
+                     * in the to-be-replaced program. So just copy any
+                     * additional variables.
+                     */
+
+                    assert(oldinh->inherit_type & INHERIT_TYPE_MAPPED);
+
+                    for (int varidx = 0; varidx < oldinh->num_additional_variables; varidx++)
+                    {
+                        new_vars[newinh->variable_index_offset + varidx] = svp[oldinh->variable_index_offset + varidx];
+                        svp[oldinh->variable_index_offset + varidx].type = T_INVALID;
+                    }
+                }
+                else
+                {
+                    /* A regular virtual inherit. */
+                    if (oldinh->inherit_type & INHERIT_TYPE_MAPPED)
+                    {
+                        /* That virtual inherit is obsolete in the program we want to replace.
+                         * We have to reconstruct the variable block using the variable map.
+                         */
+                        inherit_t *update = oldprog->inherit + oldinh->updated_inherit;
+                        int updcount = update->prog->num_variables - update->prog->num_virtual_variables;
+
+                        for (int varidx = newinh->prog->num_variables - newinh->prog->num_virtual_variables; varidx-- > 0;)
+                        {
+                            int updidx = oldprog->update_index_map[varidx + oldinh->variable_map_offset];
+                            if (updidx >= updcount)
+                            {
+                                new_vars[newinh->variable_index_offset + varidx] = svp[oldinh->variable_index_offset + updidx - updcount];
+                                svp[oldinh->variable_index_offset + updidx - updcount].type = T_INVALID;
+                            }
+                            else
+                            {
+                                new_vars[newinh->variable_index_offset + varidx] = svp[update->variable_index_offset + updidx];
+                                svp[update->variable_index_offset + updidx].type = T_INVALID;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        for (int varidx = newinh->prog->num_variables - newinh->prog->num_virtual_variables; varidx-- > 0;)
+                        {
+                            new_vars[newinh->variable_index_offset + varidx] = svp[oldinh->variable_index_offset + varidx];
+                            svp[oldinh->variable_index_offset + varidx].type = T_INVALID;
+                        }
+                    }
                 }
             }
-            else
-                new_vars = NULL;
+
+            /* Now the non-virtual variables. */
+            for (int varidx = r_ob->new_prog->num_variables - r_ob->new_prog->num_virtual_variables; varidx-- > 0;)
+            {
+                new_vars[r_ob->new_prog->num_virtual_variables + varidx] = svp[r_ob->var_offset + varidx];
+                svp[r_ob->var_offset + varidx].type = T_INVALID;
+            }
+
+            /* Deref those variables of ob which we haven't copied. */
+            for (int varidx = oldprog->num_variables; varidx-- > 0; svp++)
+            {
+                free_svalue(svp);
+            }
+
+            /* Free the old variable block and set the new one */
+            xfree(r_ob->ob->variables);
+            r_ob->ob->variables = new_vars;
+        }
+        else
+        {
+            /* No variables. */
+            xfree(r_ob->ob->variables);
+            r_ob->ob->variables = NULL;
+        }
+
+        if (r_ob->ob->prog->num_variables != r_ob->new_prog->num_variables)
+        {
+            int diff = r_ob->ob->prog->num_variables - r_ob->new_prog->num_variables;
+
 #ifdef DEBUG
             if (d_flag)
-                debug_message("%s %d less variables\n", time_stamp(), i);
+                debug_message("%s %d less variables\n", time_stamp(), diff);
             r_ob->ob->extra_num_variables = r_ob->new_prog->num_variables;
 #endif
 
@@ -1005,64 +1097,23 @@ replace_programs (void)
             {
                 fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) rprog( %p '%s') sub %d vars : %"PRIuPINT" -> (%ld:%ld)\n"
                               , tot_alloc_object, tot_alloc_object_size, r_ob, r_ob->ob->name ? get_txt(r_ob->ob->name) : "<null>"
-                              , i
-                              , (p_uint)(i * sizeof(svalue_t))
-                              , tot_alloc_object, tot_alloc_object_size - (i * sizeof(svalue_t))
+                              , diff
+                              , (p_uint)(diff * sizeof(svalue_t))
+                              , tot_alloc_object, tot_alloc_object_size - (diff * sizeof(svalue_t))
                               );
             }
 #endif
-            tot_alloc_object_size -= i * sizeof(svalue_t);
+            tot_alloc_object_size -= diff * sizeof(svalue_t);
+        }
 
-            svp = r_ob->ob->variables; /* the old variables */
+        /* Handle a possible closure adjustment */
+        if (r_ob->lambda_rpp)
+            replace_program_lfun_closure_adjust(r_ob);
 
-            /* Deref those variables of ob which won't be copied */
-
-            j = r_ob->var_offset;      /* number of unique vars of ob */
-            i -= j;
-
-#ifdef DEBUG
-            if (d_flag)
-                debug_message("%s freeing %d variables:\n", time_stamp(), j);
+#ifdef USE_PYTHON
+        if (r_ob->python_rpp)
+            python_replace_program_adjust(r_ob);
 #endif
-            while (--j >= 0) 
-            {
-                free_svalue(svp++);
-            }
-#ifdef DEBUG
-            if (d_flag)
-                debug_message("%s freed.\n", time_stamp());
-#endif
-
-            /* Copy the others */
-            j = r_ob->new_prog->num_variables;
-            if (j)
-            {
-                memcpy(
-                    (char *)new_vars,
-                    (char *)svp,
-                    j * sizeof(svalue_t)
-                );
-                svp += j;
-            }
-#ifdef DEBUG
-            if (d_flag)
-                debug_message("%s freeing %d variables:\n", time_stamp(), i);
-#endif
-
-            /* Deref the remaining non-copied variables */
-            while (--i >= 0)
-            {
-                free_svalue(svp++);
-            }
-#ifdef DEBUG
-            if (d_flag)
-                debug_message("%s freed.\n", time_stamp());
-#endif
-
-            /* Free the old variable block and set the new one */
-            xfree(r_ob->ob->variables);
-            r_ob->ob->variables = new_vars;
-        } /* if (change in vars) */
 
         /* If the object modified is a blueprint object, NULL out the pointer
          * in its program, because after the replacement the blueprint nature
@@ -1089,11 +1140,6 @@ replace_programs (void)
             obj_list_replace = r_next;
             replace_program_lambda_adjust(r_ob);
         }
-
-#ifdef USE_PYTHON
-        if (r_ob->python_rpp)
-            python_replace_program_adjust(r_ob);
-#endif
 
         /* Remove current shadows */
 
@@ -1224,13 +1270,27 @@ search_inherited (string_t *str, program_t *prg, int *offpnt)
             if (d_flag)
                 debug_message("%s match found\n", ts);
 #endif
+            if (prg->inherit[i].inherit_type & INHERIT_TYPE_MAPPED)
+                i = prg->inherit[i].updated_inherit;
+
             offpnt[0] = prg->inherit[i].variable_index_offset;
             offpnt[1] = prg->inherit[i].function_index_offset;
             offpnt[2] = prg->inherit[i].inherit_type == INHERIT_TYPE_NORMAL;
             return prg->inherit[i].prog;
         }
-        else if ( NULL != (tmp = search_inherited(str, prg->inherit[i].prog,offpnt)) )
+    }
+
+    /* Now let's do that again for a deep search.
+     */
+    for ( i = 0; i < prg->num_inherited; i++)
+    {
+        /* We don't search in duplicate or obsolete virtual inherits. */
+        if ( prg->inherit[i].inherit_type & (INHERIT_TYPE_DUPLICATE|INHERIT_TYPE_MAPPED) )
+            continue;
+
+        if ( NULL != (tmp = search_inherited(str, prg->inherit[i].prog,offpnt)) )
         {
+            assert(offpnt[2]); /* We should have found virtual inherits as direct matches. */
 #ifdef DEBUG
             if (d_flag)
                 debug_message("%s deferred match found\n", ts);
@@ -3503,7 +3563,7 @@ v_replace_program (svalue_t *sp, int num_arg)
                        "replace_program.\n", name_len);
             }
             strcpy(name, get_txt(sp->u.str));
-            if (name[name_len-2] != '.' || name[name_len-1] != 'c')
+            if (name_len < 2 || name[name_len-2] != '.' || name[name_len-1] != 'c')
                 strcat(name,".c");
             if (*name == '/')
                 sname = new_mstring(name+1, sp->u.str->info.unicode);
@@ -3552,36 +3612,6 @@ v_replace_program (svalue_t *sp, int num_arg)
      */
     if (offsets[2])
         offsets[0] += curprog->num_virtual_variables;
-
-    /* We assume that the virtual variables are
-     * directly before that. (And check that
-     * assumption directly after this.)
-     */
-    offsets[0] -= new_prog->num_virtual_variables;
-
-    /* Program found, now check if it contains virtual variables.
-     * See b-030119 for an explanation.
-     */
-    if (offsets[0] != 0)
-    {
-        int i;
-
-        for (i = 0; i < new_prog->num_variables; i++)
-        {
-            if (new_prog->variables[i].type.t_flags & TYPE_MOD_VIRTUAL)
-            {
-                warnf("Object '%s', program '%s': Cannot schedule "
-                      "replace_program(): "
-                      "replacement program '%s' has virtual variables "
-                      "but is not the first inherited program\n"
-                     , get_txt(current_object->name)
-                     , get_txt(current_prog->name)
-                     , get_txt(new_prog->name)
-                );
-                return sp;
-            }
-        }
-    }
 
     /* Program ok, now create a new replace program entry, or
      * change an existing one.

@@ -8961,16 +8961,15 @@ python_free_replace_program_protector (replace_ob_t *r_ob)
 
 /*-------------------------------------------------------------------------*/
 static void
-python_replace_program_adjust_single_ref (ldmud_object_and_index_t* ref, int offset, int max_index)
+python_replace_program_adjust_single_ref (ldmud_object_and_index_t* ref, replace_ob_t *r_ob, int (*convert_idx)(replace_ob_t*, int))
 
 /* Update a single reference after a replace_program().
  */
 
 {
-    int index = ref->index;
+    int index = (*convert_idx)(r_ob, ref->index);
 
-    index -= offset;
-    if (index < 0 || index >= max_index)
+    if (index < 0)
     {
         /* We set the object to NULL. */
         free_object(ref->ob_base.lpc_object, "python_replace_program_adjust");
@@ -9000,12 +8999,12 @@ python_replace_program_adjust (replace_ob_t *r_ob)
         {
             if (Py_TYPE(prpp->ref) == &ldmud_object_lfun_type)
                 python_replace_program_adjust_single_ref((ldmud_object_and_index_t*)prpp->ref
-                                                       , r_ob->fun_offset
-                                                       , r_ob->new_prog->num_functions);
+                                                       , r_ob
+                                                       , replace_program_function_adjust);
             else if (Py_TYPE(prpp->ref) == &ldmud_object_variable_type)
                 python_replace_program_adjust_single_ref((ldmud_object_and_index_t*)prpp->ref
-                                                       , r_ob->var_offset
-                                                       , r_ob->new_prog->num_variables);
+                                                       , r_ob
+                                                       , replace_program_variable_adjust);
         }
 
         Py_DECREF(prpp->ref);
