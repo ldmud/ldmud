@@ -20,6 +20,8 @@
 #define II_INPUT_PENDING                -20
 #define II_EDITING                      -21
 #define II_IDLE                         -22
+#define II_NOECHO                       -23
+#define II_CHARMODE                     -24
 
 /* Output handling */
 #define II_SNOOP_NEXT                   -30

@@ -75,6 +75,17 @@ DESCRIPTION
           The number of seconds that the interactive object <ob> has been
           idle.
 
+        <what> == II_NOECHO:
+          The current no-echo mode of <ob>:
+            0: Normal echo mode
+            1: no-echo mode was requested (INPUT_NOECHO input is pending)
+            2: no-echo mode was acknowledged by the client (this does not
+               happen, if the mudlib handles this with the H_NOECHO hook).
+
+        <what> == II_CHARMODE:
+          Whether charmode is active for <ob>.
+          The values are similar to II_NOECHO.
+
 
 
         Output Handling:

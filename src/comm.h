@@ -313,8 +313,10 @@ struct interactive_s {
   /* Transform {CHARMODE, NOECHO}_REQ into {CHARMODE, NOECHO}
    */
 #define NOECHO_ACKSHIFT(x)   ((x) << 2)
+  /* Transform {CHARMODE, NOECHO} into {CHARMODE, NOECHO}_ACK
+   */
 #define NOECHO_ACKRSHIFT(x)  ((x) >> 2)
-  /* TODO: ???
+  /* Transform {CHARMODE, NOECHO}_ACK into {CHARMODE, NOECHO}
    */
 
 #define IGNORE_BANG    128

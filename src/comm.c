@@ -3739,13 +3739,13 @@ set_noecho (interactive_t *ip, char noecho, Bool local_change, Bool external)
     DTN(("  -> confirm: %02hhx %s\n"
        , confirm, decode_noecho(confirm)));
     DTN(("           -> %02hhx %s\n"
-       , confirm | NOECHO_ACKSHIFT(confirm)
-       , decode_noecho(confirm | NOECHO_ACKSHIFT(confirm))
+       , confirm | NOECHO_ACKSHIFT(confirm & (NOECHO|CHARMODE))
+       , decode_noecho(confirm | NOECHO_ACKSHIFT(confirm & (NOECHO|CHARMODE)))
        ));
 
     ip->noecho = confirm;
 
-    confirm |= NOECHO_ACKSHIFT(confirm);
+    confirm |= NOECHO_ACKSHIFT(confirm & (NOECHO|CHARMODE));
     if (((confirm ^ old) & (NOECHO_MASK|CHARMODE_MASK)) && ip->tn_enabled )
     {
         DTN(("set_noecho(): Mode changes\n"));
@@ -9012,6 +9012,17 @@ f_interactive_info (svalue_t *sp)
     case II_IDLE:
         put_number(&result, current_time - ip->last_time);
         break;
+
+    case II_NOECHO:
+    case II_CHARMODE:
+    {
+        int flag = (sp[0].u.number == II_NOECHO) ? NOECHO : CHARMODE;
+
+        put_number(&result,
+            !(ip->noecho & flag) ? 0 :
+            (ip->noecho & NOECHO_ACKSHIFT(flag)) ? 2 : 1);
+        break;
+    }
 
     /* Output handling */
     case II_SNOOP_NEXT:
