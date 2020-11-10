@@ -3322,9 +3322,11 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                   {
                     /* This is compiled as:
                      *
+                     *      SAVE_ARG_FRAME
                      *      CATCH l / CATCH_NO_LOG l
                      *      <body>
                      *   l: END_CATCH
+                     *      RESTORE_ARG_FRAME
                      */
 
                     mp_int start, offset;
@@ -3364,10 +3366,11 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                          "'reserve as catch-modifier.\n");
                     }
 
-                    if (current.code_left < 3)
+                    if (current.code_left < 4)
                         realloc_code();
-                    current.code_left -= 3;
+                    current.code_left -= 4;
 
+                    STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
                     STORE_CODE(current.codep, F_CATCH);
 
                     STORE_UINT8(current.codep, flags);
@@ -3376,13 +3379,14 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     start = current.code_max - current.code_left;
 
                     compile_value(++argp, REF_ACCEPTED);
-                    if (current.code_left < 1)
+                    if (current.code_left < 2)
                         realloc_code();
 
-                    current.code_left -= 1;
+                    current.code_left -= 2;
                     STORE_CODE(current.codep, F_END_CATCH);
+                    STORE_CODE(current.codep, F_RESTORE_ARG_FRAME);
 
-                    offset = current.code_max - current.code_left - start;
+                    offset = current.code_max - current.code_left - start - 1;
                     if (offset > 0xff)
                     {
                         UNIMPLEMENTED
