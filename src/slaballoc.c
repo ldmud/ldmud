@@ -4544,7 +4544,7 @@ mem_increment_size (void *vp, size_t size)
     if (start[M_SIZE] & M_SMALL)
     {
         /* Can't extend small blocks. */
-        noaccess_large_block(start);
+        noaccess_small_block(start);
         return NULL;
     }
 
