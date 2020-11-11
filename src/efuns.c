@@ -7315,6 +7315,43 @@ copy_svalue (svalue_t *dest, svalue_t *src
 
                 break;
             }
+
+            case LVALUE_PROTECTED_MAPENTRY:
+            {
+                struct protected_mapentry_lvalue *e = src->u.protected_mapentry_lvalue;
+                struct pointer_record *rec = find_add_pointer(ptable, e, MY_TRUE);
+
+                if (rec->ref_count++ < 0)
+                {
+                    svalue_t origmap = { T_MAPPING };
+                    svalue_t copymap;
+                    svalue_t copykey;
+
+#if defined(DYNAMIC_COSTS)
+                    add_eval_cost((depth+1) / 10);
+#endif
+
+                    origmap.u.map = e->map;
+                    copy_svalue(&copykey, &(e->key), ptable, depth+1);
+                    copy_svalue(&copymap, &origmap, ptable, depth+1);
+                    assign_protected_mapentry_lvalue_no_free(dest, copymap.u.map, &(copykey), e->index);
+                    free_svalue(&(copykey));
+                    free_svalue(&(copymap));
+
+                    rec->data = dest->u.protected_mapentry_lvalue;
+                }
+                else
+                {
+                    svalue_t sv;
+                    sv.type = T_LVALUE;
+                    sv.x.lvalue_type = LVALUE_PROTECTED_MAPENTRY;
+                    sv.u.protected_mapentry_lvalue = (struct protected_mapentry_lvalue *) rec->data;
+
+                    assign_svalue_no_free(dest, &sv);
+                }
+
+                break;
+            }
         }
         break;
 

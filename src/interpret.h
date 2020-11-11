@@ -148,6 +148,18 @@ struct protected_range_lvalue
     struct protected_range_lvalue* next; /* Next in the String's lvalue list. */
 };
 
+/* -- struct protected_mapentry_lvalue: An lvalue into a mapping.
+ * This is used when a map entry does not yet exist, so we don't
+ * need to add an entry prematurely.
+ */
+struct protected_mapentry_lvalue
+{
+    p_int      ref;                     /* Number of references.  */
+    mapping_t *map;                     /* The (counted) mapping. */
+    svalue_t   key;                     /* The key of the entry.  */
+    int        index;                   /* Column of the lvalue.  */
+};
+
 
 
 /* --- Constants --- */
@@ -216,6 +228,7 @@ extern void transfer_svalue(svalue_t *dest, svalue_t *v);
 extern void assign_protected_lvalue_no_free(svalue_t *dest, svalue_t *src);
 extern void assign_protected_char_lvalue_no_free(svalue_t *dest, struct protected_lvalue *var, string_t *src, char *charp);
 extern void assign_protected_range_lvalue_no_free(svalue_t *dest, struct protected_lvalue *var, svalue_t *vec, mp_int index1, mp_int index2);
+extern void assign_protected_mapentry_lvalue_no_free(svalue_t *dest, mapping_t *map, svalue_t *key, int index);
 
 extern svalue_t *get_rvalue(svalue_t *v, bool *last_reference);
 extern svalue_t *get_rvalue_no_collapse(svalue_t *v, bool *last_reference);

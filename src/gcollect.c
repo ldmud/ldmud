@@ -500,6 +500,18 @@ cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
                         cleanup_vector(&p->u.protected_range_lvalue->var->val, 1, context);
                     }
                     break;
+
+                case LVALUE_PROTECTED_MAPENTRY:
+                {
+                    struct protected_mapentry_lvalue *e = p->u.protected_mapentry_lvalue;
+                    svalue_t map = { T_MAPPING };
+
+                    map.u.map = e->map;
+                    cleanup_vector(&map, 1, context);
+                    cleanup_vector(&(e->key), 1, context);
+
+                    break;
+                }
             } /* switch (p->x.lvalue_type) */
         }
     } /* for */
@@ -1504,6 +1516,22 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
                     }
                     break;
                 }
+
+                case LVALUE_PROTECTED_MAPENTRY:
+                {
+                    struct protected_mapentry_lvalue *lv = p->u.protected_mapentry_lvalue;
+                    if (lv->ref)
+                    {
+                        svalue_t map = { T_MAPPING };
+                        map.u.map = lv->map;
+
+                        lv->ref = 0;
+
+                        clear_ref_in_vector(&(lv->key), 1);
+                        clear_ref_in_vector(&map, 1);
+                    }
+                    break;
+                }
             } /* switch (p->x.lvalue_type) */
         }
     }
@@ -1678,6 +1706,26 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
                         var->ref++;
 
                         num_protected_lvalues++;
+                    }
+                    lv->ref++;
+                    break;
+                }
+
+                case LVALUE_PROTECTED_MAPENTRY:
+                {
+                    struct protected_mapentry_lvalue *lv = p->u.protected_mapentry_lvalue;
+                    if (CHECK_REF(lv))
+                    {
+                        svalue_t map = { T_MAPPING };
+                        map.u.map = lv->map;
+
+#ifdef CHECK_OBJECT_GC_REF
+                        gc_count_ref_in_vector(&(lv->key), 1, file, line);
+                        gc_count_ref_in_vector(&map, 1, file, line);
+#else
+                        count_ref_in_vector(&(lv->key), 1);
+                        count_ref_in_vector(&map, 1);
+#endif
                     }
                     lv->ref++;
                     break;

@@ -6831,13 +6831,28 @@ ldmud_lvalue_subscript (ldmud_lvalue_t *self, PyObject *key)
             return NULL;
         }
 
-        dest = get_map_lvalue_unchecked(vec->u.map, &skey);
-        free_svalue(&skey);
+        dest = get_map_value(vec->u.map, &skey);
+        if (dest == &const0)
+        {
+            /* Non-existent, create a mapentry lvalue. */
+            svalue_t lv;
+            PyObject *ob;
 
-        if (dest == NULL)
-            return PyErr_NoMemory();
+            assign_protected_mapentry_lvalue_no_free(&lv, vec->u.map, &skey, idx);
+            free_svalue(&skey);
 
-        return ldmud_lvalue_create(dest + idx);
+            ob = ldmud_lvalue_create(&lv);
+            free_svalue(&lv);
+
+            return ob;
+        }
+        else
+        {
+            /* Ordinary lvalue to an svalue. */
+            free_svalue(&skey);
+
+            return ldmud_lvalue_create(dest + idx);
+        }
     }
     else
     {

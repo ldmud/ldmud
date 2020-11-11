@@ -675,6 +675,20 @@ struct unprotected_range
    *                    add_number_to_lvalue(), F_VOID_ASSIGN.
    */
 
+  /* --- struct unprotected_mapentry: an entry into a mapping */
+struct unprotected_mapentry
+{
+    mapping_t *map;               /* The mapping that'll get the entry.
+                                   * (not refcounted). */
+    svalue_t   key;               /* The key (refcounted) */
+    int        index;             /* The column. */
+} current_unprotected_mapentry =  /* Static buffer, because there is only */
+  { NULL, { T_INVALID }, 0 };     /* one unprotected lvalue at a time. */
+  /* This is used for assignments to mapping entries that do not(!)
+   * exist, yet. In contrast to protected mapping entries there is no
+   * time here, that an entry will appear.
+   */
+
 static svalue_t indexing_quickfix = { T_NUMBER };
   /* When indexing arrays and mappings with just one ref, especially
    * for the purpose of getting a lvalue, the indexed item is copied
@@ -1217,6 +1231,7 @@ int_free_svalue (svalue_t *v)
         case LVALUE_UNPROTECTED:
         case LVALUE_UNPROTECTED_CHAR:
         case LVALUE_UNPROTECTED_RANGE:
+        case LVALUE_UNPROTECTED_MAPENTRY:
             NOOP;
             break;
 
@@ -1282,6 +1297,20 @@ int_free_svalue (svalue_t *v)
                 num_protected_lvalues--;
             }
             break;
+
+        case LVALUE_PROTECTED_MAPENTRY:
+            if (--(v->u.protected_mapentry_lvalue->ref) <= 0)
+            {
+                struct protected_mapentry_lvalue *e = v->u.protected_mapentry_lvalue;
+
+                free_mapping(e->map);
+                free_svalue(&(e->key));
+                xfree(e);
+
+                num_protected_lvalues--;
+            }
+            break;
+
         } /* switch (v->x.lvalue_type) */
         break; /* case T_LVALUE */
 
@@ -1342,6 +1371,10 @@ free_svalue (svalue_t *v)
 
         case LVALUE_PROTECTED_RANGE:
             needs_deserializing = (v->u.protected_range_lvalue->ref == 1);
+            break;
+
+        case LVALUE_PROTECTED_MAPENTRY:
+            needs_deserializing = (v->u.protected_mapentry_lvalue->ref == 1);
             break;
         }
         break;
@@ -1570,6 +1603,10 @@ internal_assign_svalue_no_free (svalue_t *to, svalue_t *from)
             to->u.protected_range_lvalue->ref++;
             break;
 
+        case LVALUE_PROTECTED_MAPENTRY:
+            to->u.protected_mapentry_lvalue->ref++;
+            break;
+
         } /* switch */
         break;
     }
@@ -1654,7 +1691,7 @@ internal_assign_rvalue_no_free ( svalue_t *to, svalue_t *from )
  */
 
 {
-    if (from->type == T_LVALUE)
+    while (from->type == T_LVALUE)
     {
         switch (from->x.lvalue_type)
         {
@@ -1717,9 +1754,32 @@ internal_assign_rvalue_no_free ( svalue_t *to, svalue_t *from )
             }
             break;
 
+        case LVALUE_PROTECTED_MAPENTRY:
+            {
+                struct protected_mapentry_lvalue *e = from->u.protected_mapentry_lvalue;
+                svalue_t *val = get_map_value(e->map, &(e->key));
+
+                if (val == &const0)
+                    from = val;
+                else
+                {
+                    /* Entry exists, change the lvalue. */
+                    svalue_t temp = *from;
+                    assign_protected_lvalue_no_free(from, val + e->index);
+                    free_svalue(&(temp));
+                }
+
+                /* Handle from again. */
+                continue;
+            }
+            break;
+
         } /* switch (from->x.lvalue_type) */
+
+        break;
     }
-    else
+
+    if (from->type != T_LVALUE)
     {
         /* <from> is not an lvalue, so we can try to make
          * it constant again...
@@ -1754,6 +1814,8 @@ normalize_svalue (svalue_t *svp, bool collapse_lvalues)
  *    This is done only if <collapse_lvalues> is true.
  * 3. If this is a protected range lvalue, check whether the referenced
  *    variable is still valid. Otherwise replace it with NULL.
+ * 4. If this is a mapping entry lvalue, check whether the entry
+ *    appeared in the meanwhile and replace it with a ordinary lvalue.
  *
  * If <svp> is a reference to a destructed object, it will be replaced
  * by 0. In all other cases this is a no-op.
@@ -1825,6 +1887,28 @@ normalize_svalue (svalue_t *svp, bool collapse_lvalues)
                     r->var = NULL;
                 }
                 break;
+            }
+
+            case LVALUE_PROTECTED_MAPENTRY:
+            {
+                struct protected_mapentry_lvalue *e = svp->u.protected_mapentry_lvalue;
+                svalue_t *val = get_map_value(e->map, &(e->key));
+
+                if (val == &const0)
+                {
+                    /* Still no entry in the mapping. Keep it. */
+                    break;
+                }
+                else
+                {
+                    /* This key exists now, we can replace <lv>
+                     * with an lvalue into that.
+                     */
+                    svalue_t temp = *svp;
+                    assign_protected_lvalue_no_free(svp, val + e->index);
+                    free_svalue(&temp);
+                    continue;
+                }
             }
         }
         break;
@@ -1955,6 +2039,17 @@ inl_get_rvalue (svalue_t *v, bool *last_reference, bool collapse_lvalues)
 
                 return NULL;
 
+            case LVALUE_PROTECTED_MAPENTRY:
+            {
+                /* When we are here, there is not a corresponding entry
+                 * in the mapping. Otherwise the normalization would
+                 * have changed the lvalue to LVALUE_PROTECTED.
+                 */
+                if (last_reference != NULL && v->u.protected_mapentry_lvalue->ref == 1)
+                    *last_reference = true;
+
+                return &const0;
+            }
         } /* switch (v->x.lvalue_type) */
     }
     else
@@ -2053,6 +2148,12 @@ link_protected_lvalue (svalue_t *dest, svalue_t *lv)
                 case LVALUE_PROTECTED_RANGE:
                     /* char and range are incompatible. */
                     return false;
+
+                case LVALUE_PROTECTED_MAPENTRY:
+                    /* A normalized map entry is always a non-existent entry. */
+                    assign_protected_char(dest->u.protected_char_lvalue, 0);
+                    return true;
+
             } /* switch (lv->x.lvalue_type) */
             break;
 
@@ -2110,8 +2211,28 @@ link_protected_lvalue (svalue_t *dest, svalue_t *lv)
                      * is an assignment.
                      */
                     return false; /* For now. */
+
+                case LVALUE_PROTECTED_MAPENTRY:
+                    /* range and non-existent entry are incompatible. */
+                    return false;
+
             } /* switch (lv->x.lvalue_type) */
             break;
+
+        case LVALUE_PROTECTED_MAPENTRY:
+        {
+            /* We create the entry and assign <lv>. */
+            struct protected_mapentry_lvalue *e = dest->u.protected_mapentry_lvalue;
+            svalue_t *val = get_map_lvalue(e->map, &(e->key));
+            svalue_t temp = *dest;
+
+            /* Copy the lvalue into mapping. */
+            assert(val->type == T_NUMBER && val->u.number == 0);
+            internal_assign_svalue_no_free(val + e->index, lv);
+            internal_assign_svalue_no_free(dest, lv);
+            free_svalue(&temp);
+            break;
+        }
 
     } /* switch (dest->x.lvalue_type) */
 
@@ -2146,7 +2267,7 @@ assign_svalue (svalue_t *dest, svalue_t *v)
     normalize_svalue(v, false);
 
     /* First check whether we assign to an lvalue. */
-    if (dest->type == T_LVALUE)
+    while (dest->type == T_LVALUE)
     {
         /* If the final svalue in dest is one of these lvalues,
          * the assignment is done right here and now.
@@ -2191,6 +2312,19 @@ assign_svalue (svalue_t *dest, svalue_t *v)
             } /* switch() */
             /* NOTREACHED */
             return;
+
+        case LVALUE_UNPROTECTED_MAPENTRY:
+            {
+                /* We create the entry to assign to. */
+                svalue_t *val = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key));
+
+                /* The entry should not have existed. */
+                assert(val->type == T_NUMBER && val->u.number == 0);
+                dest = val + current_unprotected_mapentry.index;
+
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
+            }
 
         case LVALUE_PROTECTED:
             if (v->type == T_LVALUE)
@@ -2250,7 +2384,25 @@ assign_svalue (svalue_t *dest, svalue_t *v)
                 /* NOTREACHED */
                 return;
             }
+
+        case LVALUE_PROTECTED_MAPENTRY:
+            if (v->type == T_LVALUE)
+            {
+                normalize_svalue(dest, false);
+                link_protected_lvalue(dest, v);
+                return;
+            }
+            else
+            {
+                /* Let's create the entry if it doesn't exist already. */
+                struct protected_mapentry_lvalue *e = dest->u.protected_mapentry_lvalue;
+                dest = get_map_lvalue(e->map, &(e->key)) + e->index;
+                continue;
+            }
+
         } /* switch() */
+
+        break;
     }
 
     /* Now free the <dest> svalue, and assign the new value.
@@ -2330,7 +2482,7 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
     normalize_svalue(v, false);
 
     /* First check whether we assign to an lvalue. */
-    if (dest->type == T_LVALUE)
+    while (dest->type == T_LVALUE)
     {
         /* If the final svalue in dest is one of these lvalues,
          * the assignment is done right here and now.
@@ -2376,6 +2528,19 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
             } /* switch() */
             /* NOTREACHED */
             return;
+
+        case LVALUE_UNPROTECTED_MAPENTRY:
+            {
+                /* We create the entry to transfer to. */
+                svalue_t *val = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key));
+
+                /* The entry should not have existed. */
+                assert(val->type == T_NUMBER && val->u.number == 0);
+                dest = val + current_unprotected_mapentry.index;
+
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
+            }
 
         case LVALUE_PROTECTED:
             if (v->type == T_LVALUE)
@@ -2440,7 +2605,24 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
                 /* NOTREACHED */
                 return;
             }
+
+        case LVALUE_PROTECTED_MAPENTRY:
+            if (v->type == T_LVALUE)
+            {
+                normalize_svalue(dest, false);
+                link_protected_lvalue(dest, v);
+                free_svalue(v);
+                return;
+            }
+            else
+            {
+                struct protected_mapentry_lvalue *e = dest->u.protected_mapentry_lvalue;
+                dest = get_map_lvalue(e->map, &(e->key)) + e->index;
+                continue;
+            }
         } /* switch() */
+
+        break;
     }
 
     /* Free the <dest> svalue and transfer <v>. */
@@ -3279,44 +3461,62 @@ add_number_to_lvalue (char* op, svalue_t *dest, int i, svalue_t *pre, svalue_t *
         return;
     }
 
-    switch (dest->x.lvalue_type)
+    do
     {
-        default:
-            errorf("Bad arg to %s: got '%s', expected numeric type.\n", op, typename(dest->type));
-            break;
-
-        case LVALUE_UNPROTECTED:
-            dest = dest->u.lvalue;
-            break;
-
-        case LVALUE_UNPROTECTED_CHAR:
+        switch (dest->x.lvalue_type)
         {
-            p_int val = read_unprotected_char();
-            if (pre) put_number(pre, val);
+            default:
+                errorf("Bad arg to %s: got '%s', expected numeric type.\n", op, typename(dest->type));
+                break;
 
-            val = assign_unprotected_char(val + i);
+            case LVALUE_UNPROTECTED:
+                dest = dest->u.lvalue;
+                break;
 
-            if (post) put_number(post, val);
-            return;
-        }
+            case LVALUE_UNPROTECTED_CHAR:
+            {
+                p_int val = read_unprotected_char();
+                if (pre) put_number(pre, val);
 
-        case LVALUE_PROTECTED:
-            dest = &(dest->u.protected_lvalue->val);
-            break;
+                val = assign_unprotected_char(val + i);
 
-        case LVALUE_PROTECTED_CHAR:
-        {
-            struct protected_char_lvalue* lv = dest->u.protected_char_lvalue;
+                if (post) put_number(post, val);
+                return;
+            }
 
-            p_int val = read_protected_char(lv);
-            if (pre) put_number(pre, val);
+            case LVALUE_UNPROTECTED_MAPENTRY:
+                dest = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
 
-            val = assign_protected_char(lv, val + i);
+            case LVALUE_PROTECTED:
+                dest = &(dest->u.protected_lvalue->val);
+                break;
 
-            if (post) put_number(post, val);
-            return;
-        }
-    } /* switch() */
+            case LVALUE_PROTECTED_CHAR:
+            {
+                struct protected_char_lvalue* lv = dest->u.protected_char_lvalue;
+
+                p_int val = read_protected_char(lv);
+                if (pre) put_number(pre, val);
+
+                val = assign_protected_char(lv, val + i);
+
+                if (post) put_number(post, val);
+                return;
+            }
+
+            case LVALUE_PROTECTED_MAPENTRY:
+            {
+                struct protected_mapentry_lvalue *e = dest->u.protected_mapentry_lvalue;
+                dest = get_map_lvalue(e->map, &(e->key)) + e->index;
+                continue;
+            }
+        } /* switch() */
+
+        break;
+
+    } while (dest->type == T_LVALUE);
 
     /* Now increment the non-LVALUE */
     switch (dest->type)
@@ -4363,6 +4563,24 @@ assign_char_lvalue_no_free (svalue_t *dest, struct protected_lvalue *var, string
 } /* assign_char_lvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE void
+assign_mapentry_lvalue_no_free (svalue_t *dest, mapping_t *map, svalue_t *key, int index)
+
+/* Put an unprotected mapentry lvalue for map[key,index] into <dest>.
+ * <dest> is considered empty at the time of call.
+ */
+
+{
+    dest->type = T_LVALUE;
+    dest->x.lvalue_type = LVALUE_UNPROTECTED_MAPENTRY;
+
+    current_unprotected_mapentry.map = map;
+    free_svalue(&(current_unprotected_mapentry.key));
+    internal_assign_svalue_no_free(&(current_unprotected_mapentry.key), key);
+    current_unprotected_mapentry.index = index;
+} /* assign_protected_mapentry_lvalue_no_free() */
+
+/*-------------------------------------------------------------------------*/
 INLINE void
 assign_protected_lvalue_no_free (svalue_t *dest, svalue_t *src)
 
@@ -4467,6 +4685,32 @@ assign_protected_range_lvalue_no_free (svalue_t *dest, struct protected_lvalue *
 } /* assign_protected_range_lvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
+void
+assign_protected_mapentry_lvalue_no_free (svalue_t *dest, mapping_t *map, svalue_t *key, int index)
+
+/* Put a protected mapentry lvalue &(map[key,index]) into <dest>.
+ * <dest> is considered empty at the time of call.
+ */
+
+{
+    struct protected_mapentry_lvalue *lval;
+
+    memsafe(lval = xalloc(sizeof(*lval)), sizeof(*lval)
+           , "protected mapentry lvalue");
+
+    lval->ref = 1;
+    lval->map = ref_mapping(map);
+    internal_assign_svalue_no_free(&(lval->key), key);
+    lval->index = index;
+
+    dest->type = T_LVALUE;
+    dest->x.lvalue_type = LVALUE_PROTECTED_MAPENTRY;
+    dest->u.protected_mapentry_lvalue = lval;
+
+    num_protected_lvalues++;
+} /* assign_protected_mapentry_lvalue_no_free() */
+
+/*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
 push_protected_lvalue (svalue_t *sp)
 
@@ -4511,9 +4755,18 @@ push_protected_lvalue (svalue_t *sp)
                 current_unprotected_range.index1, current_unprotected_range.index2);
             break;
 
+        case LVALUE_UNPROTECTED_MAPENTRY:
+            assign_protected_mapentry_lvalue_no_free(sp,
+                current_unprotected_mapentry.map,
+                &(current_unprotected_mapentry.key),
+                current_unprotected_mapentry.index);
+            free_svalue(&(current_unprotected_mapentry.key));
+            break;
+
         case LVALUE_PROTECTED:
         case LVALUE_PROTECTED_CHAR:
         case LVALUE_PROTECTED_RANGE:
+        case LVALUE_PROTECTED_MAPENTRY:
             NOOP;
             break;
     }
@@ -4564,6 +4817,7 @@ get_unprotected_lvalue (svalue_t *lval)
         case LVALUE_UNPROTECTED:
         case LVALUE_UNPROTECTED_CHAR:
         case LVALUE_UNPROTECTED_RANGE:
+        case LVALUE_UNPROTECTED_MAPENTRY:
             return lval;
 
         case LVALUE_PROTECTED:
@@ -4582,6 +4836,19 @@ get_unprotected_lvalue (svalue_t *lval)
             current_unprotected_range.index1 = lval->u.protected_range_lvalue->index1;
             current_unprotected_range.index2 = lval->u.protected_range_lvalue->index2;
             return &unprotected_lvalue;
+
+        case LVALUE_PROTECTED_MAPENTRY:
+        {
+            struct protected_mapentry_lvalue *e = lval->u.protected_mapentry_lvalue;
+
+            unprotected_lvalue.type = T_LVALUE;
+            unprotected_lvalue.x.lvalue_type = LVALUE_UNPROTECTED_MAPENTRY;
+            current_unprotected_mapentry.map = e->map;
+            free_svalue(&(current_unprotected_mapentry.key));
+            internal_assign_svalue_no_free(&(current_unprotected_mapentry.key), &(e->key));
+            current_unprotected_mapentry.index = e->index;
+            return &unprotected_lvalue;
+        }
     }
 } /* get_unprotected_lvalue() */
 
@@ -4778,17 +5045,24 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool rese
                 }
 
                 /* Compute the element */
-                item = get_map_lvalue(m, idx);
-                if (!item)
-                {
-                    outofmemory("indexed lvalue");
-                    /* NOTREACHED */
-                    return NULL;
-                }
-
+                item = get_map_value(m, idx);
                 if (last_reference)
                     last_reference = (m->ref == 1);
 
+                if (item == &const0 && !last_reference)
+                {
+                    /* There is no entry, yet. We create a mapentry lvalue. */
+                    free_svalue(sp-1);
+                    assign_mapentry_lvalue_no_free(sp-1, m, idx, 0);
+
+                    free_svalue(sp--);
+
+                    return sp;
+                }
+
+                /* We either create the lvalue to the existing entry
+                 * or to const0, which will be transfered to indexing_quickfix.
+                 */
                 break;
             }
 
@@ -4863,30 +5137,46 @@ push_map_index_lvalue (svalue_t *sp, bytecode_p pc, bool reseating)
     }
 
     sp--; /* the key */
-    data = get_map_lvalue(m, sp);
-    if (!data)
-    {
-        outofmemory("indexed lvalue");
-        /* NOTREACHED */
-        return sp;
-    }
-    pop_stack();
+    data = get_map_value(m, sp);
 
-    if (m->ref == 1)
+    if (data == &const0)
     {
-        free_svalue(&indexing_quickfix);
-        assign_svalue_no_free(&indexing_quickfix, data + n);
-        if (reseating)
+        if (m->ref == 1)
+        {
+            /* The entry doesn't exist, but the mapping also going away. */
+            pop_stack();
+
+            free_svalue(&indexing_quickfix);
+            assign_svalue_no_free(&indexing_quickfix, data);
             assign_var_lvalue_no_free(sp, &indexing_quickfix);
+        }
         else
-            assign_lvalue_no_free(sp, &indexing_quickfix);
+        {
+            assign_mapentry_lvalue_no_free(sp-1, m, sp, n);
+
+            pop_stack();
+        }
     }
     else
     {
-        if (reseating)
-            assign_var_lvalue_no_free(sp, data + n);
+        pop_stack(); /* We don't need the key anymore. */
+
+        if (m->ref == 1)
+        {
+            free_svalue(&indexing_quickfix);
+            assign_svalue_no_free(&indexing_quickfix, data + n);
+            if (reseating)
+                assign_var_lvalue_no_free(sp, &indexing_quickfix);
+            else
+                assign_lvalue_no_free(sp, &indexing_quickfix);
+        }
         else
-            assign_lvalue_no_free(sp, data + n);
+        {
+            if (reseating)
+                assign_var_lvalue_no_free(sp, data + n);
+            else
+                assign_lvalue_no_free(sp, data + n);
+        }
     }
     free_mapping(m);
 
@@ -4981,8 +5271,11 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
     }
     else
     {
-        if (sp[-2].type == T_LVALUE)
+        if (sp[-2].type == T_LVALUE && vec->type != T_NUMBER)
         {
+            /* The assertion will not hold if vec is a number,
+             * then the lvalue could have been a char or mapentry lvalue.
+             */
             assert(sp[-2].x.lvalue_type == LVALUE_PROTECTED);
             var = sp[-2].u.protected_lvalue;
         }
@@ -7782,6 +8075,7 @@ free_interpreter_temporaries (void)
     apply_return_value.type = T_NUMBER;
     free_svalue(&struct_member_temporary);
     struct_member_temporary.type = T_NUMBER;
+    free_svalue(&current_unprotected_mapentry.key);
 
 #ifdef TRACE_CODE
     {
@@ -11640,6 +11934,11 @@ again:
             case LVALUE_UNPROTECTED_RANGE:
                 ERRORF(("Bad argument to +=: Addition to a range is not implemented.\n"));
                 break; /* NOTREACHED */
+
+            case LVALUE_UNPROTECTED_MAPENTRY:
+                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
         }
 
         if(argp == NULL) /* Already handled. */
@@ -11951,6 +12250,11 @@ again:
             case LVALUE_UNPROTECTED_RANGE:
                 ERRORF(("Bad argument to -=: Subtraction from a range is not implemented.\n"));
                 break; /* NOTREACHED */
+
+            case LVALUE_UNPROTECTED_MAPENTRY:
+                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
         }
 
         if(argp == NULL) /* Already handled. */
@@ -12220,6 +12524,11 @@ again:
             case LVALUE_UNPROTECTED_RANGE:
                 ERRORF(("Bad argument to *=: Multiplicating a range is not implemented.\n"));
                 break; /* NOTREACHED */
+
+            case LVALUE_UNPROTECTED_MAPENTRY:
+                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
         }
 
         if(argp == NULL) /* Already handled. */
@@ -12493,6 +12802,11 @@ again:
             case LVALUE_UNPROTECTED_RANGE:
                 OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, T_POINTER);
                 break; /* NOTREACHED */
+
+            case LVALUE_UNPROTECTED_MAPENTRY:
+                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
         }
 
         if(argp == NULL) /* Already handled. */
@@ -12641,6 +12955,11 @@ again:
             case LVALUE_UNPROTECTED_RANGE:
                 OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
                 break; /* NOTREACHED */
+
+            case LVALUE_UNPROTECTED_MAPENTRY:
+                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
         }
 
         if(argp == NULL) /* Already handled. */
@@ -12731,6 +13050,11 @@ again:
             case LVALUE_UNPROTECTED_RANGE:
                 ERRORF(("Bad argument to &=: Intersecting a range is not implemented.\n"));
                 break; /* NOTREACHED */
+
+            case LVALUE_UNPROTECTED_MAPENTRY:
+                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
         }
 
         if(argp == NULL) /* Already handled. */
@@ -12891,6 +13215,11 @@ again:
             case LVALUE_UNPROTECTED_RANGE:
                 ERRORF(("Bad argument to |=: Joining a range is not implemented.\n"));
                 break; /* NOTREACHED */
+
+            case LVALUE_UNPROTECTED_MAPENTRY:
+                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
         }
 
         if(argp == NULL) /* Already handled. */
@@ -12998,6 +13327,11 @@ again:
             case LVALUE_UNPROTECTED_RANGE:
                 ERRORF(("Bad argument to ^=: Symmetric difference with a range is not implemented.\n"));
                 break; /* NOTREACHED */
+
+            case LVALUE_UNPROTECTED_MAPENTRY:
+                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
         }
 
         if(argp == NULL) /* Already handled. */
@@ -13106,6 +13440,11 @@ again:
             case LVALUE_UNPROTECTED_RANGE:
                 OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
                 break; /* NOTREACHED */
+
+            case LVALUE_UNPROTECTED_MAPENTRY:
+                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
         }
 
         if(argp == NULL) /* Already handled. */
@@ -13194,6 +13533,11 @@ again:
             case LVALUE_UNPROTECTED_RANGE:
                 OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
                 break; /* NOTREACHED */
+
+            case LVALUE_UNPROTECTED_MAPENTRY:
+                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
         }
 
         if(argp == NULL) /* Already handled. */
@@ -13282,6 +13626,11 @@ again:
             case LVALUE_UNPROTECTED_RANGE:
                 OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
                 break; /* NOTREACHED */
+
+            case LVALUE_UNPROTECTED_MAPENTRY:
+                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
+                free_svalue(&(current_unprotected_mapentry.key));
+                break;
         }
 
         if(argp == NULL) /* Already handled. */
@@ -16029,6 +16378,10 @@ again:
 
                 case LVALUE_PROTECTED_RANGE:
                     i = (sp->u.protected_range_lvalue->ref > 2);
+                    break;
+
+                case LVALUE_PROTECTED_MAPENTRY:
+                    i = (sp->u.protected_mapentry_lvalue->ref > 2);
                     break;
             } /* switch (sp->x.lvalue_type) */
         }
@@ -20322,28 +20675,22 @@ expand_argument (svalue_t *sp)
 
 {
     vector_t *vec = NULL;
+    svalue_t *val = sp;
     p_int start = 0, size = 0;
     bool make_ref = false;
 
-    if (sp->type == T_POINTER)
+    while (val->type == T_LVALUE)
     {
-        vec = sp->u.vec;
-        start = 0;
-        size = VEC_SIZE(vec);
-        make_ref = false;
-    }
-    else if (sp->type == T_LVALUE)
-    {
-        switch(sp->x.lvalue_type)
+        switch(val->x.lvalue_type)
         {
             default:
-                fatal("(expand_argument) Illegal lvalue %p type %d\n", sp, sp->x.lvalue_type);
+                fatal("(expand_argument) Illegal lvalue %p type %d\n", val, val->x.lvalue_type);
                 /* NOTREACHED */
                 break;
 
             case LVALUE_PROTECTED:
             {
-                struct protected_lvalue *l = sp->u.protected_lvalue;
+                struct protected_lvalue *l = val->u.protected_lvalue;
 
                 if (l->val.type != T_POINTER) /* Nothing to do for non-arrays, pass it as-is. */
                     break;
@@ -20361,7 +20708,7 @@ expand_argument (svalue_t *sp)
 
             case LVALUE_PROTECTED_RANGE:
             {
-                struct protected_range_lvalue *r = sp->u.protected_range_lvalue;
+                struct protected_range_lvalue *r = val->u.protected_range_lvalue;
 
                 if (r->vec.type == T_STRING || r->vec.type == T_BYTES)
                     break;
@@ -20377,7 +20724,32 @@ expand_argument (svalue_t *sp)
                 make_ref = true;
                 break;
             }
+
+            case LVALUE_PROTECTED_MAPENTRY:
+            {
+                /* Let's see, whether an array appeared at that entry. */
+                struct protected_mapentry_lvalue *e = val->u.protected_mapentry_lvalue;
+                svalue_t *entry = get_map_value(e->map, &(e->key));
+
+                if (entry == &const0)
+                    break;
+                if (entry[e->index].type == T_LVALUE || entry[e->index].type == T_POINTER)
+                {
+                    val = entry + e->index;
+                    continue;
+                }
+                break;
+            }
         } /* switch */
+        break;
+    }
+
+    if (val->type == T_POINTER)
+    {
+        vec = val->u.vec;
+        start = 0;
+        size = VEC_SIZE(vec);
+        make_ref = false;
     }
 
     if (vec != NULL)

@@ -809,6 +809,10 @@ svalue_to_string ( fmt_state_t *st
                 }
                 break;
             }
+
+            case LVALUE_PROTECTED_MAPENTRY:
+                return svalue_to_string(st, get_rvalue(obj, NULL), str, indent, trailing, quoteStrings, compact, prefixed);
+
         } /* switch (obj->x.lvalue_type) */
 
         break;

@@ -6322,7 +6322,7 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
 
             case LVALUE_PROTECTED_RANGE:
             {
-                /* Format: <1>=&(<2>=&(vector)[index1..index2-1])
+                /* Format: <1>=&(<2>=&(vector),index1..index2-1)
                  *
                  * The <2>=&() only happens, when the lvalue still has a valid
                  * variable reference.
@@ -6431,6 +6431,33 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                 MY_PUTC(')')
                 break;
             }
+
+            case LVALUE_PROTECTED_MAPENTRY:
+            {
+                /* Format: <1>=&(<2>=map,key,index) */
+                struct protected_mapentry_lvalue *e = v->u.protected_mapentry_lvalue;
+
+                if(recall_pointer(e))
+                    break;
+
+                {
+                    L_PUTC_PROLOG
+                    L_PUTC('&')
+                    L_PUTC('(')
+                    L_PUTC_EPILOG
+                }
+
+                save_mapping(e->map);
+
+                MY_PUTC(',')
+
+                if (!save_svalue(&(e->key), ',', MY_FALSE))
+                    return MY_FALSE;
+                save_number(e->index);
+
+                MY_PUTC(')')
+                break;
+            }
         } /* switch() */
     }
 
@@ -6475,6 +6502,18 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                          break;
                 }
 
+                break;
+            }
+
+            case LVALUE_PROTECTED_MAPENTRY:
+            {
+                struct protected_mapentry_lvalue *e = v->u.protected_mapentry_lvalue;
+                svalue_t *item = get_map_value(e->map, &(e->key));
+
+                if (item == &const0)
+                    save_number(0);
+                else
+                    return save_svalue(item + e->index, delimiter, writable);
                 break;
             }
         } /* switch() */
@@ -6831,6 +6870,18 @@ register_svalue (svalue_t *svp)
                     }
                     else
                         register_svalue(&(r->vec));
+                }
+                break;
+            }
+
+            case LVALUE_PROTECTED_MAPENTRY:
+            {
+                struct protected_mapentry_lvalue *e = svp->u.protected_mapentry_lvalue;
+
+                if (register_pointer(ptable, e) != NULL)
+                {
+                    register_mapping(e->map);
+                    register_svalue(&(e->key));
                 }
                 break;
             }
@@ -8642,8 +8693,6 @@ restore_lvalue (svalue_t *svp, char **str)
 {
     svalue_t dummy = const0;
     svalue_t *val;
-    p_int idx1, idx2, size;
-    char *cp;
     struct protected_lvalue *lval = NULL;
 
     if (restore_ctx->restored_version < SAVE_FORMAT_LVALUES)
@@ -8662,7 +8711,7 @@ restore_lvalue (svalue_t *svp, char **str)
     ++*str;
 
     /* We first try to restore it into a protected lvalue.
-     * If it's a range lvalue, we convert it later.
+     * If it's a range or mapentry lvalue, we convert it later.
      */
     assign_protected_lvalue_no_free(svp, &dummy);
     free_svalue(&dummy);
@@ -8681,66 +8730,98 @@ restore_lvalue (svalue_t *svp, char **str)
         return true;
     }
 
-    /* So, it's either a range lvalue. */
-    cp = *str;
-    idx1 = strtol(*str, str, 10);
-    if (cp == *str || *((*str)++) != '.' || *((*str)++) != '.')
-    {
-        free_svalue(svp);
-        *svp = const0;
-        return false;
-    }
-
-    cp = *str;
-    idx2 = strtol(*str, str, 10);
-    if (cp == *str || *((*str)++) != ')')
-    {
-        free_svalue(svp);
-        *svp = const0;
-        return false;
-    }
-
+    /* So, it's either a range or mapentry lvalue. */
     if (val->type == T_LVALUE && val->x.lvalue_type == LVALUE_PROTECTED)
     {
         lval = val->u.protected_lvalue;
         val = &(lval->val);
     }
 
-    switch (val->type)
+    if (val->type == T_MAPPING)
     {
-        case T_POINTER:
-            size = VEC_SIZE(val->u.vec);
-            break;
+        svalue_t key;
+        int idx;
+        char * cp;
 
-        case T_STRING:
-        case T_BYTES:
-            size = mstrsize(val->u.str);
-            break;
-
-        default:
+        if (!restore_svalue(&key, str, ','))
+        {
             free_svalue(svp);
             *svp = const0;
             return false;
-    }
+        }
 
-    if (idx1 < 0 || idx1 > size || idx2 <= -1 || idx2 >= size || idx1 > idx2 + 1)
-    {
-        free_svalue(svp);
-        *svp = const0;
-        return false;
-    }
+        cp = *str;
+        idx = strtol(*str, str, 10);
+        if (cp == *str || *((*str)++) != ')')
+        {
+            free_svalue(&key);
+            free_svalue(svp);
+            *svp = const0;
+            return false;
+        }
 
-    /* Create our range lvalue and replace the normal
-     * lvalue reference in <svp>.
-     */
-    assign_protected_range_lvalue_no_free(&dummy, lval, val, idx1, idx2+1);
-    if (svp->u.protected_lvalue->ref != 1)
+        assign_protected_mapentry_lvalue_no_free(&dummy, val->u.map, &key, idx);
+        free_svalue(&key);
+    }
+    else
     {
-        /* There is already a second reference to it.
-         * Updating that one also.
+        p_int idx1, idx2, size;
+        char *cp = *str;
+
+        idx1 = strtol(*str, str, 10);
+        if (cp == *str || *((*str)++) != '.' || *((*str)++) != '.')
+        {
+            free_svalue(svp);
+            *svp = const0;
+            return false;
+        }
+
+        cp = *str;
+        idx2 = strtol(*str, str, 10);
+        if (cp == *str || *((*str)++) != ')')
+        {
+            free_svalue(svp);
+            *svp = const0;
+            return false;
+        }
+
+
+        switch (val->type)
+        {
+            case T_POINTER:
+                size = VEC_SIZE(val->u.vec);
+                break;
+
+            case T_STRING:
+            case T_BYTES:
+                size = mstrsize(val->u.str);
+                break;
+
+            default:
+                free_svalue(svp);
+                *svp = const0;
+                return false;
+        }
+
+        if (idx1 < 0 || idx1 > size || idx2 <= -1 || idx2 >= size || idx1 > idx2 + 1)
+        {
+            free_svalue(svp);
+            *svp = const0;
+            return false;
+        }
+
+        /* Create our range lvalue and replace the normal
+         * lvalue reference in <svp>.
          */
-        free_svalue(val);
-        assign_svalue_no_free(val, &dummy);
+        assign_protected_range_lvalue_no_free(&dummy, lval, val, idx1, idx2+1);
+        if (svp->u.protected_lvalue->ref != 1)
+        {
+            /* There is already a second reference to it.
+             * Updating that one also.
+             */
+            free_svalue(val);
+            assign_svalue_no_free(val, &dummy);
+        }
     }
 
     free_svalue(svp);

@@ -500,6 +500,17 @@ class TestLvalue(unittest.TestCase):
         m[3] = 81
         self.assertEqual(lv[3,0].value, 81)
 
+    def testLvalueMappingNewItem(self):
+        m = ldmud.Mapping()
+        lv = ldmud.Lvalue(m)
+        item = lv[3]
+        self.assertEqual(item.value, 0)
+        self.assertEqual(len(m), 0)
+        item.value = 9
+        self.assertEqual(len(m), 1)
+        self.assertEqual(m[3], 9)
+        self.assertEqual(item.value, 9)
+
     def testLvalueStructItem(self):
         s = ldmud.Struct(ldmud.get_master(), "test_struct", (10,))
         self.assertIsNotNone(s)

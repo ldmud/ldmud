@@ -93,6 +93,11 @@ union u {
        * (vector or string), the indices and a reference counter.
        */
 
+    struct protected_mapentry_lvalue *protected_mapentry_lvalue;
+      /* T_LVALUE/LVALUE_MAPENTRY: Contains a mapping, key, index
+       * and a reference counter.
+       */
+
     error_handler_t *error_handler;
       /* T_ERROR_HANDLER: the function error_handler->fun is
        * executed on a free_svalue(), receiving the error_handler_t*
@@ -319,6 +324,11 @@ struct svalue_s
    * <current_unprotected_range>.
    */
 
+#define LVALUE_UNPROTECTED_MAPENTRY         0x03
+  /* Doesn't have a value. The mapping, key and index are
+   * stored in <current_unprotected_mapentry>
+   */
+
 #define LVALUE_PROTECTED                    0x10
   /* .u.protected_lvalue points to the reference counted svalue. */
 
@@ -327,6 +337,9 @@ struct svalue_s
 
 #define LVALUE_PROTECTED_RANGE              0x12
   /* .u.protected_range contains the referenced vector and indices. */
+
+#define LVALUE_PROTECTED_MAPENTRY           0x13
+ /* .u.protected_mapentry contains the referenced mapping and key. */
 
 
 #define LVALUE_IS_UNPROTECTED(l)        ((l) < LVALUE_PROTECTED)

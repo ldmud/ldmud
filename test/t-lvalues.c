@@ -1528,6 +1528,213 @@ mixed *tests = ({
         :),
     }),
 
+    ({
+        "Unprotected lvalues to mapping entries 1", 0,
+        (:
+            mapping m = ([:1]);
+            int v = m["Hi"] = 22;
+
+            return deep_eq(m, (["Hi": 22])) && v == 22;
+        :)
+    }),
+    ({
+        "Unprotected lvalues to mapping entries 2", 0,
+        (:
+            mapping m = ([:2]);
+            int v = m["Hi",1] = 22;
+
+            return deep_eq(m, (["Hi": 0;22])) && v == 22;
+        :)
+    }),
+    ({
+        "Unprotected lvalues to mapping entries 3", 0,
+        (:
+            mapping m = (["Hi": ({11}) ]);
+            m["Hi"][0] = 22;
+
+            return deep_eq(m, (["Hi": ({22}) ]));
+        :)
+    }),
+    ({
+        "Unprotected lvalues to mapping entries 4", 0,
+        (:
+            mapping m = (["Hi": ({1,2,3,4,5})]);
+            m["Hi"][0..1] = ({22});
+
+            return deep_eq(m, (["Hi": ({22,3,4,5}) ]));
+        :)
+    }),
+    ({
+        "Unprotected lvalues to mapping entries 5", 0,
+        (:
+            mapping m = ([:1]);
+            catch(m["Hi"][0] = 22);
+
+            return sizeof(m) == 0;
+        :)
+    }),
+    ({
+        "Unprotected lvalues to mapping entries 6", 0,
+        (:
+            mapping m = ([:1]);
+            catch(m["Hi"][0..1] = ({22}));
+
+            return sizeof(m) == 0;
+        :)
+    }),
+    ({
+        "Unprotected lvalues to mapping entries 7", 0,
+        (:
+            mapping m = ([:2]);
+            int v = ++m["Hi",1];
+
+            return deep_eq(m, (["Hi": 0;1])) && v == 1;
+        :)
+    }),
+    ({
+        "Unprotected lvalues to mapping entries 8", 0,
+        (:
+            mapping m = ([:2]);
+            int v = m["Hi",1]--;
+
+            return deep_eq(m, (["Hi": 0;-1])) && v == 0;
+        :)
+    }),
+    ({
+        "Unprotected lvalues to mapping entries 9", 0,
+        (:
+            mapping m = ([:1]);
+            int v = m["Hi"] |= 22;
+
+            return deep_eq(m, (["Hi": 22])) && v == 22;
+        :)
+    }),
+    ({
+        "Protected lvalues to mapping entries 1", 0,
+        (:
+            mapping m = ([:1]);
+            int v = &(m["Hi"]);
+
+            v = 22;
+            return deep_eq(m, (["Hi": 22])) && v == 22;
+        :)
+    }),
+    ({
+        "Protected lvalues to mapping entries 2", 0,
+        (:
+            mapping m = ([:2]);
+            int v = &(m["Hi",1]);
+
+            v = 22;
+            return deep_eq(m, (["Hi": 0;22])) && v == 22;
+        :)
+    }),
+    ({
+        "Protected lvalues to mapping entries 3", 0,
+        (:
+            mapping m = (["Hi": ({11})]);
+            int* v = &(m["Hi"]);
+
+            v[0] = 22;
+            return deep_eq(m, (["Hi": ({22}) ])) && deep_eq(v, ({22}));
+        :)
+    }),
+    ({
+        "Protected lvalues to mapping entries 4", 0,
+        (:
+            mapping m = (["Hi": ({1,2,3,4,5})]);
+            int* v = &(m["Hi"]);
+
+            v[0..1] = ({22});
+            return deep_eq(m, (["Hi": ({22,3,4,5}) ])) && deep_eq(v, ({22,3,4,5}));
+        :)
+    }),
+    ({
+        "Protected lvalues to mapping entries 5", 0,
+        (:
+            mapping m = ([:1]);
+            int* v = &(m["Hi"]);
+
+            catch(v[0] = 22);
+            return sizeof(m) == 0 && v == 0;
+        :)
+    }),
+    ({
+        "Protected lvalues to mapping entries 6", 0,
+        (:
+            mapping m = ([:1]);
+            int* v = &(m["Hi"]);
+
+            catch(v[0..1] = ({22}));
+            return sizeof(m) == 0 && v == 0;
+        :)
+    }),
+    ({
+        "Protected lvalues to mapping entries 7", 0,
+        (:
+            mapping m = ([:2]);
+            int v = &(m["Hi",1]);
+
+            ++v;
+
+            return deep_eq(m, (["Hi": 0;1])) && v == 1;
+        :)
+    }),
+    ({
+        "Protected lvalues to mapping entries 8", 0,
+        (:
+            mapping m = ([:2]);
+            int v = &(m["Hi",0]);
+            int w = &(m["Hi",1]);
+
+            v--;
+            w++;
+
+            return deep_eq(m, (["Hi": -1;1])) && v == -1 && w == 1;
+        :)
+    }),
+    ({
+        "Protected lvalues to mapping entries 9", 0,
+        (:
+            mapping m = ([:1]);
+            int v = &(m["Hi"]);
+
+            v |= 22;
+            return deep_eq(m, (["Hi": 22])) && v == 22;
+        :)
+    }),
+    ({
+        "Protected lvalues to mapping entries 10", 0,
+        (:
+            mapping m = ([:1]);
+            <mapping|int>* pair1 = ({ m, &(m["Hi"]), &(m["Hi"]) });
+            <mapping|int>* pair2 = deep_copy(pair1);
+
+            pair1[1] = 11;
+            pair2[1] = 22;
+
+            return deep_eq(m, (["Hi": 11])) &&
+                   deep_eq(pair1, ({ (["Hi": 11]), 11, 11 })) &&
+                   deep_eq(pair2, ({ (["Hi": 22]), 22, 22 }));
+        :)
+    }),
+    ({
+        "Protected lvalues to mapping entries 11", 0,
+        (:
+            mapping m = ([:1]);
+            <mapping|int>* pair1 = ({ m, &(m["Hi"]), &(m["Hi"]) });
+            <mapping|int>* pair2 = restore_value(save_value(pair1));
+
+            pair1[1] = 11;
+            pair2[1] = 22;
+
+            return deep_eq(m, (["Hi": 11])) &&
+                   deep_eq(pair1, ({ (["Hi": 11]), 11, 11 })) &&
+                   deep_eq(pair2, ({ (["Hi": 22]), 22, 22 }));
+        :)
+    }),
+
+
     /* -------------------------------------------------------- *
      * And now the same tests again as lambda closures.         *
      * This is needed, because lambdas have their own compiler. *
@@ -2561,6 +2768,281 @@ mixed *tests = ({
             ({#'&&,
                 ({#'deep_eq, 's, (<teststruct> 200, 300, 500) }),
                 ({#'==, 'b, 101})
+            })
+        }))
+    }),
+
+    ({
+        "Lambda: Unprotected lvalues to mapping entries 1", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:1]) }),
+            ({#'=, 'v, ({#'=, ({#'[, 'm, "Hi"}), 22}) }),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": 22]) }),
+                ({#'==, 'v, 22 })
+            })
+        }))
+    }),
+    ({
+        "Lambda: Unprotected lvalues to mapping entries 2", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:2]) }),
+            ({#'=, 'v, ({#'=, ({#'[, 'm, "Hi", 1}), 22}) }),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": 0;22]) }),
+                ({#'==, 'v, 22 })
+            })
+        }))
+    }),
+    ({
+        "Lambda: Unprotected lvalues to mapping entries 3", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, (["Hi": ({11}) ]) }),
+            ({#'catch, ({#'=, ({#'[, ({#'[, 'm, "Hi"}), 0}), 22}) }),
+
+            ({#'deep_eq, 'm, (["Hi": ({22}) ]) })
+        }))
+    }),
+    ({
+        "Lambda: Unprotected lvalues to mapping entries 4", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, (["Hi": ({1,2,3,4,5}) ]) }),
+            ({#'catch, ({#'=, ({#'[..], ({#'[, 'm, "Hi"}), 0, 1}), '({22}) }) }),
+
+            ({#'deep_eq, 'm, (["Hi": ({22,3,4,5}) ]) })
+        }))
+    }),
+    ({
+        "Lambda: Unprotected lvalues to mapping entries 5", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:1]) }),
+            ({#'catch, ({#'=, ({#'[, ({#'[, 'm, "Hi"}), 0}), 22}) }),
+
+            ({#'==, ({#'sizeof, 'm}), 0 })
+        }))
+    }),
+    ({
+        "Lambda: Unprotected lvalues to mapping entries 6", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:1]) }),
+            ({#'catch, ({#'=, ({#'[..], ({#'[, 'm, "Hi"}), 0, 1}), '({22}) }) }),
+
+            ({#'==, ({#'sizeof, 'm}), 0 })
+        }))
+    }),
+    ({
+        "Lambda: Unprotected lvalues to mapping entries 7", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:2]) }),
+            ({#'=, 'v, ({#'++, ({#'[, 'm, "Hi", 1}) }) }),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": 0;1]) }),
+                ({#'==, 'v, 0 })
+            })
+        }))
+    }),
+    ({
+        "Lambda: Unprotected lvalues to mapping entries 8", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:2]) }),
+            ({#'=, 'v, ({#'-=, ({#'[, 'm, "Hi", 1}), 1 }) }),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": 0;-1]) }),
+                ({#'==, 'v, -1 })
+            })
+        }))
+    }),
+    ({
+        "Lambda: Unprotected lvalues to mapping entries 9", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:1]) }),
+            ({#'=, 'v, ({#'|=, ({#'[, 'm, "Hi"}), 22 }) }),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": 22]) }),
+                ({#'==, 'v, 22 })
+            })
+        }))
+    }),
+    ({
+        "Lambda: Protected lvalues to mapping entries 1", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:1]) }),
+            ({#'=, 'v, ({#'&, ({#'[, 'm, "Hi"}) }) }),
+            ({#'=, 'v, 22}),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": 22]) }),
+                ({#'==, 'v, 22 })
+            })
+        }))
+    }),
+    ({
+        "Lambda: Protected lvalues to mapping entries 2", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:2]) }),
+            ({#'=, 'v, ({#'&, ({#'[, 'm, "Hi", 1}) }) }),
+            ({#'=, 'v, 22}),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": 0;22]) }),
+                ({#'==, 'v, 22 })
+            })
+        }))
+    }),
+    ({
+        "Lambda: Protected lvalues to mapping entries 3", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, (["Hi": ({11}) ]) }),
+            ({#'=, 'v, ({#'[, 'm, "Hi"}) }),
+
+            ({#'=, ({#'[, 'v, 0}), 22}),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": ({22}) ]) }),
+                ({#'deep_eq, 'v, '({22}) })
+            }),
+        }))
+    }),
+    ({
+        "Lambda: Protected lvalues to mapping entries 4", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, (["Hi": ({1,2,3,4,5}) ]) }),
+            ({#'=, 'v, ({#'&, ({#'[, 'm, "Hi"}) }) }),
+
+            ({#'=, ({#'[..], 'v, 0, 1}), '({22}) }),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": ({22,3,4,5}) ]) }),
+                ({#'deep_eq, 'v, '({22,3,4,5}) })
+            }),
+        }))
+    }),
+    ({
+        "Lambda: Protected lvalues to mapping entries 5", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:1]) }),
+            ({#'=, 'v, ({#'&, ({#'[, 'm, "Hi"}) }) }),
+
+            ({#'catch, ({#'=, ({#'[, 'v, 0}), 22}) }),
+
+            ({#'&&,
+                ({#'==, ({#'sizeof, 'm}), 0 }),
+                ({#'==, 'v, 0 })
+            }),
+        }))
+    }),
+    ({
+        "Lambda: Protected lvalues to mapping entries 6", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:1]) }),
+            ({#'=, 'v, ({#'&, ({#'[, 'm, "Hi"}) }) }),
+
+            ({#'catch, ({#'=, ({#'[..], 'v, 0, 1}), '({22}) }) }),
+
+            ({#'&&,
+                ({#'==, ({#'sizeof, 'm}), 0 }),
+                ({#'==, 'v, 0 })
+            }),
+        }))
+    }),
+    ({
+        "Lambda: Protected lvalues to mapping entries 7", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:2]) }),
+            ({#'=, 'v, ({#'&, ({#'[, 'm, "Hi", 1}) }) }),
+            ({#'++, 'v}),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": 0;1]) }),
+                ({#'==, 'v, 1 })
+            })
+        }))
+    }),
+    ({
+        "Lambda: Protected lvalues to mapping entries 8", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:2]) }),
+            ({#'=, 'v, ({#'&, ({#'[, 'm, "Hi", 0}) }) }),
+            ({#'=, 'w, ({#'&, ({#'[, 'm, "Hi", 1}) }) }),
+            ({#'-=, 'v, 1 }),
+            ({#'+=, 'w, 1 }),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": -1;1]) }),
+                ({#'==, 'v, -1 }),
+                ({#'==, 'w,  1 })
+            })
+        }))
+    }),
+    ({
+        "Lambda: Protected lvalues to mapping entries 9", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:1]) }),
+            ({#'=, 'v, ({#'&, ({#'[, 'm, "Hi"}) }) }),
+            ({#'|=, 'v, 22}),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": 22]) }),
+                ({#'==, 'v, 22 })
+            })
+        }))
+    }),
+    ({
+        "Lambda: Protected lvalues to mapping entries 10", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:1]) }),
+            ({#'=, 'pair1, ({#'({, 'm, ({#'&, ({#'[, 'm, "Hi"}) }), ({#'&, ({#'[, 'm, "Hi"}) }) }) }),
+            ({#'=, 'pair2, ({#'deep_copy, 'pair1}) }),
+
+            ({#'=, ({#'[, 'pair1, 1}), 11 }),
+            ({#'=, ({#'[, 'pair2, 1}), 22 }),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": 11]) }),
+                ({#'deep_eq, 'pair1, '({ (["Hi": 11]), 11, 11 }) }),
+                ({#'deep_eq, 'pair2, '({ (["Hi": 22]), 22, 22 }) }),
+            })
+        }))
+    }),
+    ({
+        "Lambda: Protected lvalues to mapping entries 11", 0,
+        lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:1]) }),
+            ({#'=, 'pair1, ({#'({, 'm, ({#'&, ({#'[, 'm, "Hi"}) }), ({#'&, ({#'[, 'm, "Hi"}) }) }) }),
+            ({#'=, 'pair2, ({#'restore_value, ({#'save_value, 'pair1}) }) }),
+
+            ({#'=, ({#'[, 'pair1, 1}), 11 }),
+            ({#'=, ({#'[, 'pair2, 1}), 22 }),
+
+            ({#'&&,
+                ({#'deep_eq, 'm, (["Hi": 11]) }),
+                ({#'deep_eq, 'pair1, '({ (["Hi": 11]), 11, 11 }) }),
+                ({#'deep_eq, 'pair2, '({ (["Hi": 22]), 22, 22 }) }),
             })
         }))
     }),
