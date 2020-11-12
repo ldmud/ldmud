@@ -302,10 +302,7 @@ mixed *tests = ({
     ({ "Protected array range 2", 0, (: mixed a = ({1,2,3,4,5}); funcall((: $1[1] = "a"; :), &(a[1..2])); return deep_eq(a, ({1,2,"a",4,5})); :) }),
     ({ "Protected array range 3", 0, (: mixed a = ({0,1,2,3,4}); funcall((: $1 = ({}); :), &(a[0..1])); return deep_eq(a, ({2,3,4})); :) }),
     ({ "Protected array range 4", 0, (: mixed a = ({0,1,2,3,4}); funcall((: $1 = ({10,11,12,13}); :), &(a[2..3]));  return deep_eq(a, ({0,1,10,11,12,13,4})); :) }),
-
-#if 0 /* These need linked range lvalues */
-    // Some challenges:
-    ({ "Protected array range 5", 0, (: mixed a = ({1,2,3,4,5}); funcall((: $1 = $3; $2 = $3; :), &(a[1..2]), &(a[3..3]), &(a[4..4])); return deep_eq(a, ({1,5,5,5})); :) }),
+    ({ "Protected array range 5", 0, (: mixed a = ({1,2,3,4,5}); funcall((: $1 = $3; $2 = $3; :), &(a[2..2]), &(a[3..3]), &(a[4..4])); return deep_eq(a, ({1,2,5,5,5})); :) }),
     ({ "Protected array range 6", 0,
        (:
            mixed a = ({1,2,3,4,5}), b = ({6,7,8,9,0});
@@ -313,30 +310,27 @@ mixed *tests = ({
 
            x = &y;
 
-           y = ({10, 11, 12});
+           y = ({10, 11}); /* Size changes would break the link. */
 
-           return deep_eq(a, ({1,10,11,12,4,5})) && deep_eq(b, ({6,10,11,12,9,0}));
+           return deep_eq(a, ({1,10,11,4,5})) && deep_eq(b, ({6,10,11,9,0}));
        :)
     }),
-#endif
-    ({ "Protected string range 1", 0, (: string a = "12345"; funcall((: $1 = $2; :), &(a[1..2]), &(a[3..3])); return a == "1445"; :) }),
-    ({ "Protected string range 2a", 0, (: string a = "12345"; funcall((: $1[1] = 'a'; :), &(a[1..2])); return "X" + a == "X12a45"; :) }),
-    ({ "Protected string range 2b", 0, (: string a = "12345"; funcall((: $1[1] = 'a'; :), &(a[1..2])); return a == "12a45"; :) }),
-#if 0 /* These need linked range lvalues */
-    ({ "Protected string range 3", 0, (: string a = "12345"; funcall((: $1 = $3; $2 = $3; :), &(a[1..2]), &(a[3..3]), &(a[4..4])); return a == "1555"; :) }),
-    ({ "Protected string range 4", 0,
+    ({ "Protected array range 7", 0,
        (:
-           string a = "12345", b = "67890";
+           mixed a = ({1,2,3,4,5}), b = ({6,7,8,9,0});
            mixed x = &(a[1..2]), y = &(b[1..2]);
 
            x = &y;
 
-           y = "abc";
+           x[0] = 100;
 
-           return a == "1abc45" && b == "6abc90";
+           return deep_eq(a, ({1,100,8,4,5})) && deep_eq(b, ({6,100,8,9,0}));
        :)
     }),
-#endif
+    ({ "Protected string range 1", 0, (: string a = "12345"; funcall((: $1 = $2; :), &(a[1..2]), &(a[3..3])); return a == "1445"; :) }),
+    ({ "Protected string range 2a", 0, (: string a = "12345"; funcall((: $1[1] = 'a'; :), &(a[1..2])); return "X" + a == "X12a45"; :) }),
+    ({ "Protected string range 2b", 0, (: string a = "12345"; funcall((: $1[1] = 'a'; :), &(a[1..2])); return a == "12a45"; :) }),
+    ({ "Protected string range 3", 0, (: string a = "12345"; funcall((: $1 = $3; $2 = $3; :), &(a[1..2]), &(a[3..3]), &(a[4..4])); return a == "1555"; :) }),
     ({ "Volatile protected lvalues 1", 0,
         (:
             mixed val = 10;
@@ -2025,6 +2019,49 @@ mixed *tests = ({
             ({#'deep_eq, 'a, '({0,1,10,11,12,13,4}) })
         }))
     }),
+    ({ "Lambda: Protected array range 5", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'a, '({1,2,3,4,5}) }),
+            ({#'funcall,
+                lambda(({'arg1, 'arg2, 'arg3}), ({#',, ({#'=, 'arg1, 'arg3}), ({#'=, 'arg2, 'arg3})})),
+                ({#'&, ({#'[..], 'a, 2, 2}) }),
+                ({#'&, ({#'[..], 'a, 3, 3}) }),
+                ({#'&, ({#'[..], 'a, 4, 4}) }),
+            }),
+            ({#'deep_eq, 'a, '({1,2,5,5,5}) })
+        }))
+    }),
+    ({ "Lambda: Protected array range 6", 0,
+       lambda(0,
+       ({#',,
+            ({#'=, 'a, '({1,2,3,4,5}) }),
+            ({#'=, 'b, '({6,7,8,9,0}) }),
+            ({#'=, 'x, ({#'&, ({#'[..], 'a, 1, 2}) }) }),
+            ({#'=, 'y, ({#'&, ({#'[..], 'b, 1, 2}) }) }),
+            ({#'=, 'x, ({#'&, 'y}) }),
+            ({#'=, 'y, '({10, 11}) }),
+            ({#'&&,
+                ({#'deep_eq, 'a, '({1,10,11,4,5}) }),
+                ({#'deep_eq, 'b, '({6,10,11,9,0}) }),
+            })
+       }))
+    }),
+    ({ "Lambda: Protected array range 7", 0,
+       lambda(0,
+       ({#',,
+            ({#'=, 'a, '({1,2,3,4,5}) }),
+            ({#'=, 'b, '({6,7,8,9,0}) }),
+            ({#'=, 'x, ({#'&, ({#'[..], 'a, 1, 2}) }) }),
+            ({#'=, 'y, ({#'&, ({#'[..], 'b, 1, 2}) }) }),
+            ({#'=, 'x, ({#'&, 'y}) }),
+            ({#'=, ({#'[, 'x, 0}), 100 }),
+            ({#'&&,
+                ({#'deep_eq, 'a, '({1,100,8,4,5}) }),
+                ({#'deep_eq, 'b, '({6,100,8,9,0}) }),
+            })
+       }))
+    }),
     ({ "Lambda: Protected string range 1", 0,
        lambda(0,
         ({#',,
@@ -2057,6 +2094,19 @@ mixed *tests = ({
                 ({#'&, ({#'[..], 'a, 1, 2}) }),
             }),
             ({#'==, 'a, "12a45" })
+        }))
+    }),
+    ({ "Lambda: Protected string range 3", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'a, "12345" }),
+            ({#'funcall,
+                lambda(({'arg1, 'arg2, 'arg3}), ({#',, ({#'=, 'arg1, 'arg3}), ({#'=, 'arg2, 'arg3})})),
+                ({#'&, ({#'[..], 'a, 1, 2}) }),
+                ({#'&, ({#'[..], 'a, 3, 3}) }),
+                ({#'&, ({#'[..], 'a, 4, 4}) }),
+            }),
+            ({#'==, 'a, "1555" })
         }))
     }),
 

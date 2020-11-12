@@ -2202,15 +2202,73 @@ link_protected_lvalue (svalue_t *dest, svalue_t *lv)
                     return false;
 
                 case LVALUE_PROTECTED_RANGE:
-                    /* Are they the same? */
-                    if (lv->u.protected_range_lvalue == dest->u.protected_range_lvalue)
-                         return true;
+                {
+                    struct protected_range_lvalue *lvrange = lv->u.protected_range_lvalue;
+                    struct protected_range_lvalue *destrange = dest->u.protected_range_lvalue;
 
-                    /* TODO: We need to link them together, there is no other way,
-                     * because we would need to update both ranges every time there
-                     * is an assignment.
-                     */
-                    return false; /* For now. */
+                     /* Are they the same? */
+                    if (lvrange == destrange)
+                          return true;
+
+                    /* We can't process different types. */
+                    if (lvrange->vec.type != destrange->vec.type)
+                        return false;
+
+                    if (lvrange->vec.type == T_POINTER)
+                    {
+                        /* For vectors we need to handle also the elements. */
+                        if (lvrange->index2 - lvrange->index1 != destrange->index2 - destrange->index1)
+                        {
+                            /* Let's make them the same size, first.
+                             * We need to update all ranges in the linked list of dest.
+                             */
+                            vector_t *oldvec = destrange->vec.u.vec;
+                            vector_t *vec = allocate_array(VEC_SIZE(oldvec) + lvrange->index2 - lvrange->index1 + destrange->index1 - destrange->index2);
+                            svalue_t *srcitem = oldvec->item;
+                            svalue_t *dstitem = vec->item;
+
+                            for (int i = destrange->index1; i > 0; i--)
+                                assign_svalue_no_free(dstitem++, srcitem++);
+
+                            srcitem = lvrange->vec.u.vec->item + lvrange->index1;
+                            for (int i = lvrange->index2 - lvrange->index1; i > 0; i--)
+                                assign_protected_lvalue_no_free(dstitem++, srcitem++);
+
+                            srcitem = oldvec->item + destrange->index2;
+                            for (int i = VEC_SIZE(oldvec) - destrange->index2; i > 0; i--)
+                                assign_svalue_no_free(dstitem++, srcitem++);
+
+                            if (destrange->var != NULL
+                             && destrange->var->val.type == T_POINTER
+                             && destrange->var->val.u.vec == oldvec)
+                            {
+                                destrange->var->val.u.vec = ref_array(vec);
+                                free_array(oldvec);
+                            }
+                            destrange->index2 = destrange->index1 + lvrange->index2 - lvrange->index1;
+                            destrange->vec.u.vec = vec;
+                            free_array(oldvec);
+                        }
+                        else
+                        {
+                            /* Link the elements together. */
+                            svalue_t *srcitem = lvrange->vec.u.vec->item + lvrange->index1;
+                            svalue_t *dstitem = destrange->vec.u.vec->item + destrange->index1;
+
+                            for (int i = lvrange->index2 - lvrange->index1; i > 0; i--)
+                                assign_protected_lvalue(dstitem++, srcitem++);
+                        }
+                    }
+                    else
+                    {
+                        /* We can only do an assignment here. */
+                        svalue_t temp;
+                        internal_assign_rvalue_no_free(&temp, lv);
+                        assign_protected_string_range(destrange, &temp, true);
+                    }
+
+                    return true;
+                }
 
                 case LVALUE_PROTECTED_MAPENTRY:
                     /* range and non-existent entry are incompatible. */
@@ -4683,6 +4741,36 @@ assign_protected_range_lvalue_no_free (svalue_t *dest, struct protected_lvalue *
 
     num_protected_lvalues++;
 } /* assign_protected_range_lvalue_no_free() */
+
+/*-------------------------------------------------------------------------*/
+INLINE void
+assign_protected_lvalue (svalue_t *dest, svalue_t *src)
+
+/* Put a protected lvalue to <src> into <dest>.
+ * <dest> is considered a valid svalue and therefore freed
+ * before the assignment, unless it is already an lvalue.
+ * <src> is not allowed to be an unprotected lvalue.
+ */
+{
+    if (src->type == T_LVALUE)
+    {
+        assign_svalue(dest, src);
+    }
+    else if (dest->type == T_LVALUE)
+    {
+        /* Do the assignment and reversely put the
+         * lvalue into <src>.
+         */
+        assign_svalue(dest, src);
+        free_svalue(src);
+        assign_protected_lvalue_no_free(src, dest);
+    }
+    else
+    {
+        free_svalue(dest);
+        assign_protected_lvalue_no_free(dest, src);
+    }
+} /* assign_protected_lvalue_no() */
 
 /*-------------------------------------------------------------------------*/
 void

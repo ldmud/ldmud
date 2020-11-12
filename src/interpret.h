@@ -226,6 +226,7 @@ extern void transfer_svalue_no_free(svalue_t *dest, svalue_t *v);
 extern void transfer_rvalue_no_free(svalue_t *dest, svalue_t *v);
 extern void transfer_svalue(svalue_t *dest, svalue_t *v);
 extern void assign_protected_lvalue_no_free(svalue_t *dest, svalue_t *src);
+extern void assign_protected_lvalue(svalue_t *dest, svalue_t *src);
 extern void assign_protected_char_lvalue_no_free(svalue_t *dest, struct protected_lvalue *var, string_t *src, char *charp);
 extern void assign_protected_range_lvalue_no_free(svalue_t *dest, struct protected_lvalue *var, svalue_t *vec, mp_int index1, mp_int index2);
 extern void assign_protected_mapentry_lvalue_no_free(svalue_t *dest, mapping_t *map, svalue_t *key, int index);
