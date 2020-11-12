@@ -14152,7 +14152,8 @@ function_call:
 
                                   /* Break if types are compatible.
                                    */
-                                  if (check_assignment_types(*aargp, argp->t_type))
+                                  if (!((aargp->t_flags ^ argp->t_flags) & TYPE_MOD_REFERENCE)
+                                   && check_assignment_types(*aargp, argp->t_type))
                                       break;
                               } /* end for (efun_arg_types) */
                           }

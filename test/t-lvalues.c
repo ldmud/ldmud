@@ -454,7 +454,7 @@ mixed *tests = ({
             int a = 1;
             mapping m = ([:1]);
 
-            m_add(m, &a, 2);
+            funcall(#'m_add, m, &a, 2);
             a = 10;
 
             return member(m, 1) && !member(m, 10);
@@ -921,42 +921,42 @@ mixed *tests = ({
         "min with references in the array 1", 0,
         (:
             int a = 40, b = 10;
-            return min(&a, 20, &b) == 10;
+            return funcall(#'min, &a, 20, &b) == 10;
         :)
     }),
     ({
         "min with references in the array 2", 0,
         (:
             string a = "xyz", b = "abc";
-            return min(&a, "def", &b) == "abc";
+            return funcall(#'min, &a, "def", &b) == "abc";
         :)
     }),
     ({
         "min with string ranges", 0,
         (:
             string a = "xabc", b = "axyz";
-            return min(&(a[1..]), "def", &(b[1..])) == "abc";
+            return funcall(#'min, &(a[1..]), "def", &(b[1..])) == "abc";
         :)
     }),
     ({
         "max with references in the array 1", 0,
         (:
             int a = 40, b = 10;
-            return max(&a, 20, &b) == 40;
+            return funcall(#'max, &a, 20, &b) == 40;
         :)
     }),
     ({
         "max with references in the array 2", 0,
         (:
             string a = "xyz", b = "abc";
-            return max(&a, "def", &b) == "xyz";
+            return funcall(#'max, &a, "def", &b) == "xyz";
         :)
     }),
     ({
         "max with string ranges", 0,
         (:
             string a = "xabc", b = "axyz";
-            return max(&(a[1..]), "def", &(b[1..])) == "xyz";
+            return funcall(#'max, &(a[1..]), "def", &(b[1..])) == "xyz";
         :)
     }),
     ({
