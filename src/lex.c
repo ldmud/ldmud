@@ -505,14 +505,10 @@ static struct s_reswords reswords[]
    , { "nosave",         L_NOSAVE        }
    , { "deprecated",     L_DEPRECATED    }
    , { "object",         L_OBJECT        }
-#ifdef USE_PARSE_COMMAND
-   , { "parse_command",  L_PARSE_COMMAND }
-#endif
    , { "private",        L_PRIVATE       }
    , { "protected",      L_PROTECTED     }
    , { "public",         L_PUBLIC        }
    , { "return",         L_RETURN        }
-   , { "sscanf",         L_SSCANF        }
    , { "static",         L_STATIC        }
    , { "status",         L_STATUS        }
    , { "struct",         L_STRUCT        }
@@ -1519,7 +1515,6 @@ symbol_resword (ident_t *p)
  *   #'switch      -> F_SWITCH               
  *   #'break       -> F_BREAK                
  *   #'return      -> F_RETURN               
- *   #'sscanf      -> F_SSCANF               
  *   #'catch       -> F_CATCH                
  *
  * If ident <p> is not a reserved word, or a word without closure
@@ -1573,14 +1568,6 @@ symbol_resword (ident_t *p)
     case L_RETURN:
         code = F_RETURN;
         break;
-    case L_SSCANF:
-        code = F_SSCANF;
-        break;
-#ifdef USE_PARSE_COMMAND
-    case L_PARSE_COMMAND:
-        code = F_PARSE_COMMAND;
-        break;
-#endif
     case L_CATCH:
         code = F_CATCH;
         break;
@@ -1622,7 +1609,6 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, efun_override_t is_
  *   #'switch      -> F_SWITCH                 +CLOSURE_OPERATOR
  *   #'break       -> F_BREAK                  +CLOSURE_OPERATOR
  *   #'return      -> F_RETURN                 +CLOSURE_OPERATOR
- *   #'sscanf      -> F_SSCANF                 +CLOSURE_OPERATOR
  *   #'catch       -> F_CATCH                  +CLOSURE_OPERATOR
  *
  *   #'<efun>      -> F_<efun>                 +CLOSURE_EFUN

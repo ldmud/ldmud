@@ -692,6 +692,24 @@ mixed *tests = ({
            return nr == 2 && a == 6;
        :)
     }),
+    ({ "Special Efuns 2", 0,
+       (:
+           mixed a = ({ 1 });
+           int nr;
+           nr = funcall(#'sscanf, "5 6","%d %d", &(a[0]), &a);
+           return nr == 2 && a == 6;
+       :)
+    }),
+    ({ "Special Efuns 3", 0,
+       (:
+           mixed a = ({ 1 });
+           int nr;
+           mixed args = ({ &(a[0]), &a });
+
+           nr = sscanf("5 6","%d %d", args...);
+           return nr == 2 && a == 6 && deep_eq(args, ({5,6}));
+       :)
+    }),
     ({ "sort_array by value", 0,
        (:
            mixed arr = ({ 5,1,7,4,8,3,0 });

@@ -32,7 +32,7 @@ extern svalue_t *v_terminal_colour(svalue_t *, int num_arg);
 #ifdef USE_PROCESS_STRING
 extern svalue_t *f_process_string(svalue_t *sp);  /* optional */
 #endif
-extern int       e_sscanf(int num_arg, svalue_t *sp);
+extern svalue_t *v_sscanf(svalue_t *sp, int num_arg);
 
 extern svalue_t *f_abs (svalue_t *sp);
 extern svalue_t *f_sin (svalue_t *sp);

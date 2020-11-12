@@ -126,7 +126,9 @@
  *            ..(object default: F_THIS_OBJECT)
  *
  *        Alternatively, the last argument can be given as '...' if the
- *        efun can handle arbitrarily many arguments.
+ *        efun can handle arbitrarily many arguments. It can optionally
+ *        take also a type definition (mixed ...) and/or lvalue specifier
+ *        (&...).
  *
  *        If the efun is deprecated, <msg> is the warning message to
  *        print when the efun is used and pragma warn_deprecated is in
@@ -275,6 +277,7 @@
 
 #define MF_TYPE_MOD_POINTER   0x10000
 #define MF_TYPE_MOD_REFERENCE 0x20000
+#define MF_TYPE_MOD_LVALUE    0x40000
   /* Type modifier for array and reference types.
    * These values are bitflags which are |'ed onto the type values
    * produced by the parser (INT, STRING, etc).
@@ -670,6 +673,8 @@ check_for_duplicate_string (const char *key, const char *buf)
 
 %token UN_OP BIN_OP TRI_OP
 
+%token LVALUE
+
 %type <number> VOID MIXED UNKNOWN NUL STRUCT
 %type <number> INT STRING BYTES OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
 %type <number> basic arg_type
@@ -684,8 +689,14 @@ check_for_duplicate_string (const char *key, const char *buf)
   /* Value is the complete type, incl. *-  and &-modifier bitflags
    */
 
-%type <number> arg_list typel typel2
+%type <number> arg_list
   /* Value is the number of arguments (so far)
+   */
+
+%type <number> typel typel2
+  /* A single argument entry.
+   *   true (1):  The argument is the first optional value.
+   *   false (0): The argument is either not optional or not the first one.
    */
 
 %type <number>optional_optype
@@ -789,6 +800,17 @@ func: utype ID optional_ID '(' arg_list optional_default ')' optional_name ';'
 
         max_arg = $5;
 
+        if (unlimit_max)
+        {
+            /* Add an additional NULL entry to mark
+             * the end of the argument list.
+             */
+            curr_arg_types[curr_arg_type_size++] = 0;
+            if (curr_arg_type_size == NELEMS(curr_arg_types))
+                yyerror("Too many arguments");
+            curr_lpc_type_size++;
+        }
+
         /* Make the correct f_name and determine the code class
          */
         if ($3[0] == '\0')
@@ -880,8 +902,7 @@ func: utype ID optional_ID '(' arg_list optional_default ')' optional_name ';'
                 ; j+i < last_current_lpc_type && j < curr_lpc_type_size
                 ; j++)
             {
-                if ((j+1 < curr_lpc_type_size || curr_lpc_types[j] != 0)
-                 && (curr_lpc_types[j] != lpc_types[i+j]))
+                if (curr_lpc_types[j] != lpc_types[i+j])
                 {
                     mismatch = MY_TRUE;
                     break;
@@ -904,10 +925,8 @@ func: utype ID optional_ID '(' arg_list optional_default ')' optional_name ';'
 
             for (j = last_current_lpc_type - i; j < curr_lpc_type_size; j++)
             {
-                if (j+1 < curr_lpc_type_size || curr_lpc_types[j] != 0)
-                {
-                    lpc_types[last_current_lpc_type++] = curr_lpc_types[j];
-                }
+                lpc_types[last_current_lpc_type++] = curr_lpc_types[j];
+
                 if (last_current_lpc_type == NELEMS(lpc_types))
                     yyerror("Array 'lpc_types' is too small");
             }
@@ -978,8 +997,9 @@ basic: VOID | INT | STRING | BYTES | MAPPING | FLOAT | MIXED | OBJECT | CLOSURE 
 opt_star : '*' { $$ = MF_TYPE_MOD_POINTER; }
         |      { $$ = 0;                   } ;
 
-opt_ref : '&' { $$ = MF_TYPE_MOD_REFERENCE; }
-        |     { $$ = 0;                     } ;
+opt_ref : '&'    { $$ = MF_TYPE_MOD_REFERENCE; }
+        | LVALUE { $$ = MF_TYPE_MOD_LVALUE;    }
+        |        { $$ = 0;                     } ;
 
 arg_list: /* empty */             { $$ = 0; }
         | typel2                  { $$ = 1; if ($1) min_arg = 0; }
@@ -1016,9 +1036,34 @@ arg_type: type
         $$ = $1;
     } ;
 
-typel: arg_type              { $$ = ($1 == VOID && min_arg == -1); }
+typel: arg_type              { $$ = (min_arg == -1 && $1 == VOID); }
      | typel '|' arg_type    { $$ = (min_arg == -1 && ($1 || $3 == VOID));}
-     | '.' '.' '.'           { $$ = min_arg == -1 ; unlimit_max = MY_TRUE; } ;
+     | arg_type '.' '.' '.'  { $$ = min_arg == -1 ; unlimit_max = MY_TRUE; } ;
+     | opt_ref '.' '.' '.'
+        {
+            $$ = min_arg == -1 ; unlimit_max = MY_TRUE;
+
+            if (!$1)
+            {
+                /* This is the same as 'mixed|mixed& ...' */
+                if (curr_arg_type_size+2 >= NELEMS(curr_arg_types))
+                    yyerror("Too many arguments");
+                else
+                {
+                    curr_arg_types[curr_arg_type_size++] = MIXED;
+                    curr_arg_types[curr_arg_type_size++] = MIXED | MF_TYPE_MOD_REFERENCE;
+                }
+            }
+            else
+            {
+                curr_arg_types[curr_arg_type_size++] = MIXED | $1;
+                if (curr_arg_type_size == NELEMS(curr_arg_types))
+                    yyerror("Too many arguments");
+            }
+
+            curr_lpc_types[curr_lpc_type_size] |= type2flag(MIXED);
+        }
+     ;
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -2129,15 +2174,15 @@ type_str (int n)
     {
         if (types[i].num == type)
         {
-            if (n & MF_TYPE_MOD_REFERENCE)
+            if (n & (MF_TYPE_MOD_REFERENCE|MF_TYPE_MOD_LVALUE))
             {
                 static char buff[100];
                 const char *str;
 
-                str = type_str(n & ~MF_TYPE_MOD_REFERENCE);
+                str = type_str(n & ~(MF_TYPE_MOD_REFERENCE|MF_TYPE_MOD_LVALUE));
                 if (strlen(str) + 3 > sizeof buff)
                     fatal("Local buffer too small in type_str()!\n");
-                sprintf(buff, "%s &", str);
+                sprintf(buff, (n & MF_TYPE_MOD_LVALUE) ? "%s &&" : "%s &", str);
                 return buff;
             }
             if (n & MF_TYPE_MOD_POINTER)
@@ -2316,6 +2361,12 @@ yylex1 (void)
                 (void)ungetc(c, fpr);
                 return '/';
             }
+        case '&':
+            if ((c=getc(fpr)) == '&')
+                return LVALUE;
+            ungetc(c, fpr);
+            return '&';
+
         default:
             if (isalpha(c))
                 return ident((char)c);
@@ -2435,7 +2486,7 @@ type2flag (int n)
     if (n & MF_TYPE_MOD_POINTER)
         return LPC_T_POINTER;
 
-    n &= ~(MF_TYPE_MOD_REFERENCE|MF_TYPE_MOD_POINTER);
+    n &= ~(MF_TYPE_MOD_REFERENCE|MF_TYPE_MOD_LVALUE|MF_TYPE_MOD_POINTER);
 
     switch(n) {
       case VOID:    return 0;            break;
@@ -2519,7 +2570,8 @@ fulltypestr (int n)
     static char buff[100];        /* 100 is such a comfortable size :-) */
 
     if (snprintf(buff, sizeof(buff), "{ %s, %s }",
-        lpctypestr(n & ~MF_TYPE_MOD_REFERENCE),
+        lpctypestr(n & ~(MF_TYPE_MOD_REFERENCE|MF_TYPE_MOD_LVALUE)),
+        (n & MF_TYPE_MOD_LVALUE) ? "TYPE_MOD_LVALUE" :
         (n & MF_TYPE_MOD_REFERENCE) ? "TYPE_MOD_REFERENCE" : "0") >= sizeof(buff))
             fatal("Local buffer overwritten in fulltypestr()");
 

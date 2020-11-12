@@ -519,10 +519,6 @@ Table of Contents
            'publish and 'reserve may be given as additional arguments to
            modify the behaviour of the catch.
 
-      #'sscanf acts similar to how a funcall would, but passes the third
-           and following arguments as lvalues, that is, values which can
-           be assigned to.
-
       #'= and the #'<op>= variants are also special because the first
            argument has to be an lvalue.
 
@@ -651,7 +647,6 @@ Table of Contents
     #'do
     #'foreach
     #'return
-    #'sscanf
     #'switch
     #'while
     #'({

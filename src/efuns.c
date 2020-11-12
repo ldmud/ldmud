@@ -4315,8 +4315,8 @@ a_b_c_check_a:
 } /* sscanf_search() */
 
 /*-------------------------------------------------------------------------*/
-int
-e_sscanf (int num_arg, svalue_t *sp)
+svalue_t *
+v_sscanf (svalue_t *sp, int num_arg)
 
 /* EFUN sscanf()
  *
@@ -4476,8 +4476,10 @@ match_skipped:
     if (info.match_req && info.no_match && info.number_of_matches > 0)
         info.number_of_matches--;
 
-    return info.number_of_matches;
-} /* e_sscanf() */
+    sp = pop_n_elems(num_arg, sp);
+    push_number(sp, info.number_of_matches);
+    return sp;
+} /* v_sscanf() */
 
 
 /*=========================================================================*/

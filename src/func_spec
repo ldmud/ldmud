@@ -12,9 +12,12 @@
  * An argument is marked as optional if it also takes the type 'void'.
  * The type alternative 'null' denotes arguments which may take the
  * number 0 instead of values of the other types.
- * The return type might be annotated with a '&' to indicate, that the
- * efun might return an lvalue reference that must be converted to an
- * rvalue at the end.
+ *
+ * An argument type can be supplemented by a '&' or '&&'. The former needs
+ * protected lvalues to be passed, the later will automatically generate
+ * protected lvalues when compiling a functionc all. The return type might
+ * also be annotated with a '&' to indicate, that the efun might return an
+ * lvalue reference that must be converted to an rvalue at the end.
  *
  * Look at the end for the list of functions that are optionally available.
  * If you don't want them, simply comment out them. All other functions must
@@ -42,9 +45,6 @@
 
   /* These are the predefined functions and statements that have a direct
    * counterpart in LPC.
-   *
-   * The compiler needs to treat sscanf and parse_command specially because
-   * these two 'efuns' take lvalues as part of their arguments.
    */
         identifier
         string
@@ -67,10 +67,6 @@
         default_return
         break
         switch
-        sscanf
-#ifdef USE_PARSE_COMMAND
-        parse_command
-#endif
         local
         catch
 "++"    inc
@@ -392,6 +388,7 @@ mixed   regmatch(string,string, void|int, void|int);
 string  sha1(int*|string|bytes, void|int) "obsoleted by hash";
 void    printf(string, ...);
 string  sprintf(string, ...);
+int     sscanf(string, string, &&...);
 int     strstr(string|bytes, string|bytes, int default: F_CONST0);
 int     strrstr(string|bytes, string|bytes, int default: F_NCONST1);
 string  terminal_colour(string, null|mapping|closure, void|int, void|int );
@@ -599,6 +596,9 @@ mixed   query_notify_fail(int default: F_CONST0);
 string  query_verb(int default: F_CONST0);
 int     remove_action(int|string, object default: F_THIS_PLAYER);
 void    set_this_player(null|object);
+#ifdef USE_PARSE_COMMAND
+int     parse_command(string, object|object *, string, &&...);
+#endif
 
 
         /* uids and euids */

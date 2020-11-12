@@ -1610,13 +1610,8 @@ sub_parse ( vector_t *obvec   /* in: array of objects to match against */
 } /* sub_parse() */
 
 /*-------------------------------------------------------------------------*/
-Bool
-e_parse_command ( string_t *cmd          /* Command to parse */
-                , svalue_t *ob_or_array  /* Object or array of objects */
-                , string_t *pattern      /* Special parsing pattern */
-                , svalue_t *stack_args   /* Pointer to lvalue args on stack */
-                , int       num_arg      /* Number of lvalues on stack */
-                )
+svalue_t *
+v_parse_command (svalue_t *sp, int num_arg)
 
 /* EFUN parse_command()
  *
@@ -1627,6 +1622,10 @@ e_parse_command ( string_t *cmd          /* Command to parse */
 {
     static error_handler_t error_handler_addr;
 
+    svalue_t        *argp;          /* The first argument. */
+    string_t        *cmd;           /* Command to parse */
+    svalue_t        *ob_or_array;   /* Object or array of objects */
+    string_t        *pattern;       /* Special parsing pattern */
     vector_t        *obvec = NULL;  /* Objects to match against */
     vector_t        *patvec;        /* Elements in pattern <pattern> */
     vector_t        *wvec;          /* Words in command <cmd> */
@@ -1636,6 +1635,26 @@ e_parse_command ( string_t *cmd          /* Command to parse */
     size_t           cix;           /* Index in wvec */
     size_t           six;           /* Index to the lvalues on the stack */
     svalue_t        *pval;          /* Result from a subparse */
+
+    argp = sp - num_arg + 1;
+
+    /* Trim the command and pattern (and store them
+     * on the stack in case of errors).
+     */
+    cmd = trim_all_spaces(argp[0].u.str);
+    free_mstring(argp[0].u.str);
+    argp[0].u.str = cmd;
+
+    pattern = trim_all_spaces(argp[2].u.str);
+    free_mstring(argp[2].u.str);
+    argp[2].u.str = cmd;
+
+    ob_or_array = argp + 1;
+
+    /* The remaining arguments are the lvalues.
+     */
+    argp += 3;
+    num_arg -= 3;
 
     /* Pattern and commands can not be empty
      */
@@ -1773,7 +1792,7 @@ e_parse_command ( string_t *cmd          /* Command to parse */
                 do {
                     fail = MY_FALSE;
                     pval = sub_parse(obvec, patvec, &pix, wvec, &cix, &fail
-                                     , (six < (size_t)num_arg) ? stack_args[six].u.lvalue
+                                     , (six < (size_t)num_arg) ? argp[six].u.lvalue
                                                        : 0);
                     if (fail)
                     {
@@ -1789,9 +1808,9 @@ e_parse_command ( string_t *cmd          /* Command to parse */
                  */
                 if (!fail)
                 {
-                    stack_put(pval, stack_args, six+1, num_arg);
+                    stack_put(pval, argp, six+1, num_arg);
                     pval = slice_words(wvec, fword, ocix-1);
-                    stack_put(pval, stack_args, six++, num_arg);
+                    stack_put(pval, argp, six++, num_arg);
                     pval = NULL;
                 }
             }
@@ -1800,11 +1819,11 @@ e_parse_command ( string_t *cmd          /* Command to parse */
         {
             /* Everything else is handled by sub_parse() */
             pval = sub_parse( obvec, patvec, &pix, wvec, &cix, &fail
-                            , (six < (size_t)num_arg) ? stack_args[six].u.lvalue : 0);
+                            , (six < (size_t)num_arg) ? argp[six].u.lvalue : 0);
         }
 
         if (!fail && pval)
-            stack_put(pval, stack_args, six++, num_arg);
+            stack_put(pval, argp, six++, num_arg);
         else if (fail)
             break;
     } /* for() */
@@ -1814,10 +1833,12 @@ e_parse_command ( string_t *cmd          /* Command to parse */
     if ((p_int)cix < VEC_SIZE(wvec))
         fail = MY_TRUE;
 
-    pop_stack(); /* Clean up via the error handler */
+    /* Clean up via the error handler */
+    sp = pop_n_elems(num_arg + 4, sp);
+    push_number(sp, fail ? 0 : 1);
 
-    return !fail;
-} /* e_parse_command() */
+    return sp;
+} /* v_parse_command() */
 
 #endif /* USE_PARSE_COMMAND */
 

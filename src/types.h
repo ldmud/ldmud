@@ -166,7 +166,10 @@ enum type_flags
     /* Modifiers: */
     TYPE_MOD_REFERENCE        = 0x00000001,    /* Reference to a type */
     TYPE_MOD_LITERAL          = 0x00000002,    /* A literal value. */
-    TYPE_MOD_MASK             = 0x00000003,    /* All modifiers. */
+    TYPE_MOD_LVALUE           = 0x00000004,    /* This is only used in efun_arg_types[]
+                                                * to automatically generate lvalues.
+                                                */
+    TYPE_MOD_MASK             = 0x00000007,    /* All non-visibility modifiers. */
 
     /* Flag set in virtual variables, also interpreted as offset
      * in the variable index for virtual variables. */

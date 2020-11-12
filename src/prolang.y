@@ -804,6 +804,52 @@ static unsigned int inline_closure_id;
    */
 
 /*-------------------------------------------------------------------------*/
+/* Information for parsing functionc all arguments
+ */
+
+struct function_call_info_s
+{
+    string_t *fun_name;
+      /* The name of the function for error messages.
+       * (Not refcounted.)
+       */
+
+    fulltype_t *arg_types;
+      /* The next argument to be parsed. If NULL, then no information
+       * is available. This is only used for code generation, so at
+       * present only for deciding whether to generate lvalues.
+       */
+
+    int remaining_arg_types;
+      /* The number or remaining entries shown by .arg_types.
+       */
+
+    int arg_position;
+      /* The position of the current argument
+       * (= number of parsed arguments.)
+       */
+
+    bool unlimited_args;
+      /* The last argument in .arg_types can be repeated arbitrarily.
+       */
+
+    bool got_ellipsis;
+      /* Whether the current function arguments used the L_ELLIPSIS operator.
+       * TODO: This should be dynamic.
+       */
+};
+
+static int argument_level;
+  /* Nesting level of function call arguments.
+   * Used to detect nested function calls, like foo( bar () ).
+   */
+
+static struct function_call_info_s function_call_info[COMPILER_STACK_SIZE];
+  /* Indexed by <argument_level> contains information about the current
+   * function call arguments that are parsed.
+   */
+
+/*-------------------------------------------------------------------------*/
 /* Other Variables */
 
 static Bool disable_sefuns;
@@ -1046,17 +1092,6 @@ static p_uint last_include_start;
    * not generate information ('simple includes').
    */
 
-static int argument_level;
-  /* Nesting level of function call arguments.
-   * Used to detect nested function calls, like foo( bar () ).
-   */
-
-static Bool got_ellipsis[COMPILER_STACK_SIZE];
-  /* Flags indexed by <argument_level>, telling if the current function
-   * arguments used the L_ELLIPSIS operator.
-   * TODO: This should be dynamic.
-   */
-
 static const char * compiled_file;
   /* The name of the program to be compiled. While current_loc.file reflects
    * the name of the source file currently being read, this name is always
@@ -1095,7 +1130,7 @@ static ident_t* define_local_variable (ident_t* name, lpctype_t* actual_type, st
 static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2);
 static void use_variable (ident_t* name, enum variable_usage usage);
 static void warn_variable_usage (string_t* name, enum variable_usage usage, const char* prefix);
-static Bool add_lvalue_code ( struct lvalue_s * lv, int instruction);
+static Bool add_lvalue_code (lvalue_block_t lv, int instruction);
 static void insert_pop_value(void);
 static void add_type_check (lpctype_t *expected, enum type_check_operation op);
 static int insert_inherited(char *, string_t *, program_t **, function_t *, int, bytecode_p);
@@ -4207,6 +4242,47 @@ get_current_function_name()
 }
 
 /*-------------------------------------------------------------------------*/
+static typeflags_t
+read_current_function_arg_flags()
+
+/* Get the flags for the current function call argument
+ * according to function_call_info[argument_level]. Also
+ * advances the pointer in function_call_info[argument_level]
+ * to the next argument.
+ */
+
+{
+    typeflags_t flags = 0;
+
+    int remaining_arg_types = function_call_info[argument_level].remaining_arg_types;
+    if (remaining_arg_types != 0)
+    {
+        /* Collect the argument flags. */
+        fulltype_t *args = function_call_info[argument_level].arg_types;
+        if (!args)
+            return flags;
+
+        while (args->t_type != NULL)
+        {
+            flags |= args->t_flags;
+            args++;
+        }
+
+        /* Advance to the next, unless this is the last and can be repeated. */
+        args++;
+        if (remaining_arg_types > 1)
+        {
+            function_call_info[argument_level].remaining_arg_types--;
+            function_call_info[argument_level].arg_types = args;
+        }
+        else if (args->t_type != NULL)
+            function_call_info[argument_level].arg_types = args;
+    }
+
+    return flags;
+} /* read_current_function_arg_flags() */
+
+/*-------------------------------------------------------------------------*/
 static unsigned short
 store_argument_types ( int num_arg )
 
@@ -7139,9 +7215,6 @@ delete_prog_string (void)
 %token L_NOT
 %token L_NUMBER
 %token L_OBJECT
-%ifdef USE_PARSE_COMMAND
-%token L_PARSE_COMMAND
-%endif
 %token L_PRIVATE
 %token L_PROTECTED
 %token L_PUBLIC
@@ -7150,7 +7223,6 @@ delete_prog_string (void)
 %token L_RETURN
 %token L_RSH
 %token L_RSHL
-%token L_SSCANF
 %token L_STATIC
 %token L_STATUS
 %token L_STRING
@@ -7478,14 +7550,11 @@ delete_prog_string (void)
 %type <lpctype>      inline_opt_type
 %type <lpctype>      decl_cast cast
 %type <address>      note_start new_arg_name
-%type <rvalue>       comma_expr expr0 opt_default_value
+%type <rvalue>       comma_expr opt_default_value
 %type <function_arguments> argument argument_list inline_opt_args
-%type <lrvalue>      expr4
+%type <lrvalue>      expr4 expr0
 %type <rvalue>       inline_func
-%type <rvalue>       catch sscanf
-%ifdef USE_PARSE_COMMAND
-%type <rvalue>       parse_command
-%endif
+%type <rvalue>       catch
 %type <lvalue>       lvalue name_lvalue name_var_lvalue local_name_lvalue foreach_var_lvalue lvalue_reference
 %type <foreach_variables> foreach_vars
 %type <foreach_expression> foreach_expr
@@ -7507,9 +7576,7 @@ delete_prog_string (void)
 %type <number> function_body
   /* program address or -1 */
 
-%type <number> lvalue_list
-
-%type <number> expr_list arg_expr_list arg_expr_list2 expr_list2
+%type <number> expr_list arg_expr arg_expr_list arg_expr_list2 expr_list2
   /* Number of expressions in an expression list */
 
 %type <number> m_expr_values
@@ -8764,7 +8831,11 @@ opt_default_value:
         use_variable($2.name, VAR_USAGE_READ);
         if ($1 != F_ASSIGN)
            yyerror("Illegal initialization");
-        $$ = $2;
+
+        $$.start = $2.start;
+        $$.name = $2.name;
+        $$.type = $2.type;
+        free_lvalue_block($2.lvalue);
       }
 ; /* opt_default_value */
 
@@ -8802,6 +8873,7 @@ name_list:
           use_variable($5.name, VAR_USAGE_READ);
           init_global_variable($<number>3, $2, $1, $4, $5.type);
           free_fulltype($5.type);
+          free_lvalue_block($5.lvalue);
           $$ = $1;
       }
 
@@ -8839,6 +8911,7 @@ name_list:
 
           free_fulltype(type);
           free_fulltype($7.type);
+          free_lvalue_block($7.lvalue);
           $$ = $1;
       }
 
@@ -8904,6 +8977,7 @@ local_name_list:
           init_local_variable($2, &$<lvalue>3, $4, $5.type);
 
           free_fulltype($5.type);
+          free_lvalue_block($5.lvalue);
           $$ = $1;
       }
     | local_name_list ',' optional_stars L_IDENTIFIER
@@ -8926,6 +9000,7 @@ local_name_list:
           init_local_variable($4, &$<lvalue>5, $6, $7.type);
 
           free_fulltype($7.type);
+          free_lvalue_block($7.lvalue);
           $$ = $1;
       }
 ; /* local_name_list */
@@ -9596,6 +9671,7 @@ expr_decl:
       expr0 /* compile the expression as usual */
       {
           free_fulltype($1.type);
+          free_lvalue_block($1.lvalue);
       }
     | local_name_lvalue L_ASSIGN expr0
       {
@@ -9626,7 +9702,8 @@ expr_decl:
           /* Add the bytecode to create the lvalue and do the
            * assignment.
            */
-          res = add_lvalue_code(&$1, $2);
+          free_lvalue_block($3.lvalue);
+          res = add_lvalue_code($1.lvalue, $2);
 
           free_lpctype($1.type);
           free_fulltype($3.type);
@@ -9651,7 +9728,7 @@ expr_decl:
           /* Add the bytecode to create the lvalue and do the
            * assignment.
            */
-          res = add_lvalue_code(&$1, F_ASSIGN);
+          res = add_lvalue_code($1.lvalue, F_ASSIGN);
 
           free_lpctype($1.type);
 
@@ -9940,7 +10017,7 @@ foreach_var_decl:  /* Generate the code for one lvalue */
            */
 
 %line
-          Bool res = add_lvalue_code(&$1, 0);
+          Bool res = add_lvalue_code($1.lvalue, 0);
 
           if (!arg_types_exhausted)
           {
@@ -10031,6 +10108,8 @@ foreach_expr:
 
           $$.foreach_type = gen_refs ? FOREACH_REF : FOREACH_LOOP;
           $$.expr_type = $1.type.t_type;
+
+          free_lvalue_block($1.lvalue);
       }
 
     | expr0 L_RANGE expr0
@@ -10072,6 +10151,8 @@ foreach_expr:
 
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
       }
 ; /* foreach_expr */
 
@@ -10548,7 +10629,7 @@ bytes_constant:
 /* Expressions
  *
  * expr0 (with the help of the precedence and assoc specifications) handles
- * most of the expressions, and returns normal rvalues.
+ * most of the expressions, and returns full lrvalues.
  *
  * expr4 contains the expressions atoms (literal values), function calls
  * and expressions returning values which might be used as rvalues
@@ -10571,6 +10652,12 @@ bytes_constant:
 
 comma_expr:
       expr0
+      {
+        $$.start = $1.start;
+        $$.type = $1.type;
+        $$.name = $1.name;
+        free_lvalue_block($1.lvalue);
+      }
     | comma_expr
       {
           insert_pop_value();
@@ -10584,6 +10671,7 @@ comma_expr:
           $$.name = $4.name;
 
           free_fulltype($1.type);
+          free_lvalue_block($4.lvalue);
       }
 ; /* comma_expr */
 
@@ -10608,7 +10696,7 @@ expr0:
       {
           if ($2 == F_LAND_EQ || $2 == F_LOR_EQ)
           {
-              if (!add_lvalue_code(&$1, F_MAKE_PROTECTED))
+              if (!add_lvalue_code($1.lvalue, F_MAKE_PROTECTED))
               {
                   free_lpctype($1.type);
                   YYACCEPT;
@@ -10643,6 +10731,9 @@ expr0:
           fulltype_t type1, type2, restype;
 %line
           $$ = $4;
+          $$.lvalue = (lvalue_block_t) {0, 0};
+
+          free_lvalue_block($4.lvalue);
 
           type1.t_type = $1.type;
           type1.t_flags = 0;
@@ -10747,7 +10838,7 @@ expr0:
               if ($2 == F_ASSIGN)
                  add_type_check(type1.t_type, TYPECHECK_ASSIGNMENT);
 
-              if (!add_lvalue_code(&$1, $2))
+              if (!add_lvalue_code($1.lvalue, $2))
               {
                   free_lpctype($1.type);
                   free_fulltype($4.type);
@@ -10783,7 +10874,9 @@ expr0:
           $$ = $3;
           $$.type.t_type = lpctype_mixed;
           $$.type.t_flags = 0;
+          $$.lvalue = (lvalue_block_t) {0, 0};
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10891,6 +10984,7 @@ expr0:
           $$ = $1;
           $$.type = get_fulltype(get_union_type(type1.t_type, type2.t_type));
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($4.name, VAR_USAGE_READ);
           use_variable($7.name, VAR_USAGE_READ);
@@ -10898,6 +10992,9 @@ expr0:
           free_fulltype($1.type);
           free_fulltype($4.type);
           free_fulltype($7.type);
+          free_lvalue_block($7.lvalue);
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($1.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10926,9 +11023,12 @@ expr0:
           $$.type.t_type = get_union_type($1.type.t_type, $4.type.t_type);
           $$.type.t_flags = 0;
           $$.name = $4.name;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           free_fulltype($1.type);
           free_fulltype($4.type);
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($1.lvalue);
       } /* LOR */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10956,8 +11056,11 @@ expr0:
           /* Determine the result type */
           $$.type = $4.type; /* It's the second value or zero. */
           $$.name = $4.name;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           free_fulltype($1.type);
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($1.lvalue);
        } /* LAND */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10968,12 +11071,15 @@ expr0:
           $$ = $1;
           $$.type = get_fulltype(result);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
 
           ins_f_code(F_OR);
       }
@@ -10986,12 +11092,15 @@ expr0:
           $$ = $1;
           $$.type = get_fulltype(result);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
 
           ins_f_code(F_XOR);
       }
@@ -11004,12 +11113,15 @@ expr0:
           $$ = $1;
           $$.type = get_fulltype(result);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
 
           ins_f_code(F_AND);
       } /* end of '&' code */
@@ -11030,6 +11142,8 @@ expr0:
 
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
           free_lpctype(result);
 
           ins_f_code(F_EQ);
@@ -11037,6 +11151,7 @@ expr0:
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11055,6 +11170,8 @@ expr0:
 
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
           free_lpctype(result);
 
           ins_f_code(F_NE);
@@ -11062,6 +11179,7 @@ expr0:
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11073,12 +11191,15 @@ expr0:
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
 
           ins_f_code(F_GT);
       }
@@ -11090,12 +11211,15 @@ expr0:
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
 
           ins_f_code(F_GE);
       }
@@ -11107,12 +11231,15 @@ expr0:
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
 
           ins_f_code(F_LT);
       }
@@ -11124,12 +11251,15 @@ expr0:
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
 
           ins_f_code(F_LE);
       }
@@ -11143,12 +11273,15 @@ expr0:
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
 
           ins_f_code(F_LSH);
       }
@@ -11161,12 +11294,15 @@ expr0:
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
 
           ins_f_code(F_RSH);
       }
@@ -11179,12 +11315,15 @@ expr0:
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
 
           ins_byte(F_RSHL);
       }
@@ -11286,12 +11425,15 @@ expr0:
           }
 
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($4.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
           free_fulltype($4.type);
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($1.lvalue);
       } /* '+' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11302,6 +11444,7 @@ expr0:
           lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "-", types_subtraction, lpctype_mixed);
           $$.type = get_fulltype(result);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
@@ -11309,6 +11452,8 @@ expr0:
           ins_f_code(F_SUBTRACT);
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
       } /* '-' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11318,6 +11463,7 @@ expr0:
           lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "*", types_multiplication, lpctype_mixed);
           $$.type = get_fulltype(result);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
@@ -11325,6 +11471,8 @@ expr0:
           ins_f_code(F_MULTIPLY);
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
       } /* '*' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11334,6 +11482,7 @@ expr0:
           lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "%", types_modulus, lpctype_int);
           $$.type = get_fulltype(result);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
@@ -11341,6 +11490,8 @@ expr0:
           ins_f_code(F_MOD);
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
       }
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '/' expr0
@@ -11349,6 +11500,7 @@ expr0:
           lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "/", types_division, lpctype_int);
           $$.type = get_fulltype(result);
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($1.name, VAR_USAGE_READ);
           use_variable($3.name, VAR_USAGE_READ);
@@ -11356,6 +11508,8 @@ expr0:
           ins_f_code(F_DIVIDE);
           free_fulltype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
       } /* '/' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11373,6 +11527,7 @@ expr0:
            */
 
           $$ = $2;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           if ($2.type.t_type == lpctype_unknown || $2.type.t_type == lpctype_mixed)
           {
@@ -11403,6 +11558,7 @@ expr0:
           add_type_check($$.type.t_type, TYPECHECK_DECL_CAST);
 
           free_fulltype($2.type);
+          free_lvalue_block($2.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11410,6 +11566,7 @@ expr0:
       {
           $$ = $2;
           $$.type = get_fulltype($1);
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           /* We are trying to convert the value to the new type
            * and give an error, when we can't find a suitable conversion.
@@ -11480,6 +11637,7 @@ expr0:
           }
 
           free_fulltype($2.type);
+          free_lvalue_block($2.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11488,7 +11646,7 @@ expr0:
           lpctype_t *result;
           $$.start = $1.start;
 
-          if (!add_lvalue_code(&$2, $1.code))
+          if (!add_lvalue_code($2.lvalue, $1.code))
           {
               free_lpctype($2.type);
               YYACCEPT;
@@ -11503,6 +11661,7 @@ expr0:
 
           $$.type = get_fulltype(result);
           $$.name = $2.name;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           free_lpctype($2.type);
       }
@@ -11515,8 +11674,10 @@ expr0:
           last_expression = CURRENT_PROGRAM_SIZE;
           ins_f_code(F_NOT);        /* Any type is valid here. */
           $$.type = get_fulltype(lpctype_int);
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           free_fulltype($2.type);
+          free_lvalue_block($2.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11530,8 +11691,10 @@ expr0:
 
           ins_f_code(F_COMPL);
           $$.type = get_fulltype(lpctype_int);
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           free_fulltype($2.type);
+          free_lvalue_block($2.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11568,8 +11731,10 @@ expr0:
 
           $$ = $2;
           $$.type = get_fulltype(check_unary_op_type($2.type.t_type, "unary '-'", types_unary_math, lpctype_mixed));
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           free_fulltype($2.type);
+          free_lvalue_block($2.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11578,7 +11743,7 @@ expr0:
 %line
           /* Create the code to push the lvalue plus POST_INC */
           $$.start = CURRENT_PROGRAM_SIZE;
-          if (!add_lvalue_code(&$1, F_POST_INC))
+          if (!add_lvalue_code($1.lvalue, F_POST_INC))
           {
               free_lpctype($1.type);
               YYACCEPT;
@@ -11587,6 +11752,7 @@ expr0:
           /* Check the types */
           $$.type = get_fulltype(check_unary_op_type($1.type, "++", types_unary_math, lpctype_mixed));
           $$.name = $1.name;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           free_lpctype($1.type);
       } /* post-inc */
@@ -11598,7 +11764,7 @@ expr0:
           $$.start = CURRENT_PROGRAM_SIZE;
 
           /* Create the code to push the lvalue plus POST_DEC */
-          if (!add_lvalue_code(&$1, F_POST_DEC))
+          if (!add_lvalue_code($1.lvalue, F_POST_DEC))
           {
               free_lpctype($1.type);
               YYACCEPT;
@@ -11607,6 +11773,7 @@ expr0:
           /* Check the types */
           $$.type = get_fulltype(check_unary_op_type($1.type, "--", types_unary_math, NULL));
           $$.name = $1.name;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           free_lpctype($1.type);
       } /* post-dec */
@@ -11621,7 +11788,7 @@ expr0:
           {
               current = $1.lvalue.start;
           }
-          else if(!add_lvalue_code(&$1, F_MAKE_PROTECTED))
+          else if(!add_lvalue_code($1.lvalue, F_MAKE_PROTECTED))
           {
               free_lpctype($1.type);
               YYACCEPT;
@@ -11631,6 +11798,7 @@ expr0:
           $$.type = get_fulltype($1.type); /* Adapt the reference. */
           $$.type.t_flags |= TYPE_MOD_REFERENCE;
           $$.name = $1.name;
+          $$.lvalue = (lvalue_block_t) {0, 0};
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11677,7 +11845,7 @@ expr0:
           }
 
           add_type_check(type1.t_type, TYPECHECK_ASSIGNMENT);
-          if (!add_lvalue_code(&$1, $2))
+          if (!add_lvalue_code($1.lvalue, $2))
           {
               free_lpctype($1.type);
               free_fulltype($3.type);
@@ -11687,6 +11855,7 @@ expr0:
 
           $$.type = restype;
           $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
 
           use_variable($3.name, VAR_USAGE_READ);
           if ($3.type.t_flags & TYPE_MOD_REFERENCE)
@@ -11694,17 +11863,14 @@ expr0:
 
           free_lpctype($1.type);
           free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr4
       {
 %line
-          $$.start = $1.start;
-          $$.type = $1.type;
-          $$.name = $1.name;
-
-          free_lvalue_block($1.lvalue);
+          $$ = $1;
       }
 
 ; /* expr0 */
@@ -11774,22 +11940,6 @@ expr4:
           $$.type =   $1.type;
           $$.name =   NULL;
       }
-    | sscanf         %prec '~'
-      {
-          $$.lvalue = (lvalue_block_t) {0, 0};
-          $$.start =  $1.start;
-          $$.type =   $1.type;
-          $$.name =   NULL;
-      }
-%ifdef USE_PARSE_COMMAND
-    | parse_command  %prec '~'
-      {
-          $$.lvalue = (lvalue_block_t) {0, 0};
-          $$.start =  $1.start;
-          $$.type =   $1.type;
-          $$.name =   NULL;
-      }
-%endif /* USE_PARSE_COMMAND */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | L_STRING
@@ -12063,6 +12213,7 @@ expr4:
           $$.name = NULL;
 
           free_fulltype($6.type);
+          free_lvalue_block($6.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12427,6 +12578,8 @@ expr4:
            * a mapping, or a runtime error will occur.
            * Therefore we don't need its lvalue.
            */
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($3.lvalue);
           free_lvalue_block($1.lvalue);
           $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, F_MAP_INDEX_LVALUE);
           $$.type = get_fulltype(lpctype_mixed);
@@ -12618,6 +12771,8 @@ lvalue:
            * a mapping, or a runtime error will occur.
            * Therefore we don't need its lvalue.
            */
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($3.lvalue);
           free_lvalue_block($1.lvalue);
           $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, F_MAP_INDEX_LVALUE);
           $$.type = lpctype_mixed;
@@ -12820,6 +12975,8 @@ index_expr :
             }
 
             use_variable($2.name, VAR_USAGE_READ);
+
+            free_lvalue_block($2.lvalue);
         }
 
     | '[' '<' expr0 ']'
@@ -12838,6 +12995,8 @@ index_expr :
             }
 
             use_variable($3.name, VAR_USAGE_READ);
+
+            free_lvalue_block($3.lvalue);
         }
 
     | '[' '>' expr0 ']'
@@ -12856,6 +13015,8 @@ index_expr :
             }
 
             use_variable($3.name, VAR_USAGE_READ);
+
+            free_lvalue_block($3.lvalue);
         }
 
 ; /* index_expr */
@@ -12902,6 +13063,8 @@ index_range :
           $$.type2        = $3.type;
 
           use_variable($3.name, VAR_USAGE_READ);
+
+          free_lvalue_block($3.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12945,6 +13108,8 @@ index_range :
           $$.type2       = $4.type;
 
           use_variable($4.name, VAR_USAGE_READ);
+
+          free_lvalue_block($4.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -12988,6 +13153,8 @@ index_range :
           $$.type2       = $4.type;
 
           use_variable($4.name, VAR_USAGE_READ);
+
+          free_lvalue_block($4.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13005,6 +13172,9 @@ index_range :
 
           use_variable($2.name, VAR_USAGE_READ);
           use_variable($4.name, VAR_USAGE_READ);
+
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($2.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13022,6 +13192,9 @@ index_range :
 
           use_variable($2.name, VAR_USAGE_READ);
           use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13039,6 +13212,9 @@ index_range :
 
           use_variable($3.name, VAR_USAGE_READ);
           use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($3.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13056,6 +13232,9 @@ index_range :
 
           use_variable($3.name, VAR_USAGE_READ);
           use_variable($6.name, VAR_USAGE_READ);
+
+          free_lvalue_block($6.lvalue);
+          free_lvalue_block($3.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13073,6 +13252,9 @@ index_range :
 
           use_variable($2.name, VAR_USAGE_READ);
           use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13090,6 +13272,9 @@ index_range :
 
           use_variable($3.name, VAR_USAGE_READ);
           use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($3.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13107,6 +13292,9 @@ index_range :
 
           use_variable($3.name, VAR_USAGE_READ);
           use_variable($6.name, VAR_USAGE_READ);
+
+          free_lvalue_block($6.lvalue);
+          free_lvalue_block($3.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13124,6 +13312,9 @@ index_range :
 
           use_variable($3.name, VAR_USAGE_READ);
           use_variable($6.name, VAR_USAGE_READ);
+
+          free_lvalue_block($6.lvalue);
+          free_lvalue_block($3.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13141,6 +13332,9 @@ index_range :
 
           use_variable($3.name, VAR_USAGE_READ);
           use_variable($6.name, VAR_USAGE_READ);
+
+          free_lvalue_block($6.lvalue);
+          free_lvalue_block($3.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13157,6 +13351,8 @@ index_range :
           $$.type2       = get_fulltype(lpctype_int);
 
           use_variable($2.name, VAR_USAGE_READ);
+
+          free_lvalue_block($2.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13177,6 +13373,8 @@ index_range :
           $$.type2       = get_fulltype(lpctype_int);
 
           use_variable($3.name, VAR_USAGE_READ);
+
+          free_lvalue_block($3.lvalue);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13197,6 +13395,8 @@ index_range :
           $$.type2       = get_fulltype(lpctype_int);
 
           use_variable($3.name, VAR_USAGE_READ);
+
+          free_lvalue_block($3.lvalue);
       }
 ; /* index_range */
 
@@ -13214,8 +13414,8 @@ expr_list:
 ; /* expr_list */
 
 expr_list2:
-      expr0                 { $$ = 1;      add_arg_type($1.type); check_unknown_type($1.type.t_type); use_variable($1.name, VAR_USAGE_READ); }
-    | expr_list2 ',' expr0  { $$ = $1 + 1; add_arg_type($3.type); check_unknown_type($3.type.t_type); use_variable($3.name, VAR_USAGE_READ); }
+      expr0                 { $$ = 1;      add_arg_type($1.type); check_unknown_type($1.type.t_type); use_variable($1.name, VAR_USAGE_READ); free_lvalue_block($1.lvalue); }
+    | expr_list2 ',' expr0  { $$ = $1 + 1; add_arg_type($3.type); check_unknown_type($3.type.t_type); use_variable($3.name, VAR_USAGE_READ); free_lvalue_block($3.lvalue); }
 ; /* expr_list2 */
 
 
@@ -13229,11 +13429,19 @@ arg_expr_list:
 ; /* arg_expr_list */
 
 arg_expr_list2:
+      arg_expr
+    | arg_expr_list2 ',' arg_expr  { $$ = $1 + $3; }
+; /* arg_expr_list2 */
+
+arg_expr:
       expr0
       {
+          typeflags_t flags = read_current_function_arg_flags();
+
           $$ = 1;
-          use_variable($1.name, VAR_USAGE_READ);
-          if (!got_ellipsis[argument_level])
+          function_call_info[argument_level].arg_position++;
+
+          if (!function_call_info[argument_level].got_ellipsis)
               add_arg_type($1.type);
           else
           {
@@ -13244,46 +13452,94 @@ arg_expr_list2:
               add_arg_type(get_fulltype(lpctype_mixed));
               free_fulltype($1.type);
           }
-      }
 
-    | expr0 L_ELLIPSIS
-      {
-          PREPARE_INSERT(2);
+          if (flags & TYPE_MOD_LVALUE)
+          {
+              /* We need an lvalue. */
 
-          $$ = 0;
-          got_ellipsis[argument_level] = MY_TRUE;
-          add_f_code(F_FLATTEN_XARG);
-          use_variable($1.name, VAR_USAGE_READ);
-          free_fulltype($1.type);
-          CURRENT_PROGRAM_SIZE++;
-      }
-
-    | arg_expr_list2 ',' expr0
-      {
-          $$ = $1 + 1;
-          use_variable($3.name, VAR_USAGE_READ);
-          if (!got_ellipsis[argument_level])
-              add_arg_type($3.type);
+              if ($1.lvalue.size <= 0)
+              {
+                  yyerrorf("Bad argument %d to %s: not a reference",
+                        function_call_info[argument_level].arg_position,
+                        get_txt(function_call_info[argument_level].fun_name));
+              }
+              else
+              {
+                  CURRENT_PROGRAM_SIZE = $1.start; /* Remove the rvalue code. */
+                  add_lvalue_code($1.lvalue, F_MAKE_PROTECTED);
+              }
+              use_variable($1.name, VAR_USAGE_WRITE);
+          }
           else
           {
-              add_arg_type(get_fulltype(lpctype_mixed));
-              free_fulltype($3.type);
+              free_lvalue_block($1.lvalue);
+              use_variable($1.name, VAR_USAGE_READ);
           }
       }
-
-    | arg_expr_list2 ',' expr0 L_ELLIPSIS
+    | expr0 L_ELLIPSIS
       {
-          PREPARE_INSERT(2);
+          typeflags_t flags = read_current_function_arg_flags();
 
-          $$ = $1;
-          got_ellipsis[argument_level] = MY_TRUE;
-          add_f_code(F_FLATTEN_XARG);
-          use_variable($3.name, VAR_USAGE_READ);
-          free_fulltype($3.type);
-          CURRENT_PROGRAM_SIZE++;
+          $$ = 0;
+          function_call_info[argument_level].arg_position++;
+          function_call_info[argument_level].got_ellipsis = true;
+
+          if (flags & TYPE_MOD_LVALUE)
+          {
+              /* We need an lvalue. */
+              if ($1.lvalue.size <= 0)
+              {
+                  yyerrorf("Bad argument %d to %s: not a reference",
+                        function_call_info[argument_level].arg_position,
+                        get_txt(function_call_info[argument_level].fun_name));
+              }
+              else
+              {
+                  CURRENT_PROGRAM_SIZE = $1.start; /* Remove the rvalue code. */
+                  add_lvalue_code($1.lvalue, 0);
+                  /* The following F_FLATTEN_XARG will honor this. */
+              }
+
+              use_variable($1.name, VAR_USAGE_WRITE);
+          }
+          else
+          {
+              /* Check that no mandatory lvalue arguments come after that. */
+              int remaining_arg_types = function_call_info[argument_level].remaining_arg_types;
+              fulltype_t *args = function_call_info[argument_level].arg_types;
+
+              while (remaining_arg_types != 0 && args->t_type != NULL)
+              {
+                  do
+                  {
+                      if (args->t_flags & TYPE_MOD_LVALUE)
+                      {
+                          yyerrorf("Illegal ellipsis in call to %s: mixing reference and normal arguments",
+                                get_txt(function_call_info[argument_level].fun_name));
+                          args = NULL;
+                          break;
+                      }
+
+                      args++;
+                  } while (args->t_type != NULL);
+
+                  if (!args)
+                      break;
+
+                  args++;
+                  if (remaining_arg_types > 0)
+                      remaining_arg_types--;
+              }
+
+              free_lvalue_block($1.lvalue);
+
+              use_variable($1.name, VAR_USAGE_READ);
+          }
+
+          ins_f_code(F_FLATTEN_XARG);
+          free_fulltype($1.type);
       }
-; /* arg_expr_list2 */
-
+; /* arg_expr */
 
 m_expr_list:
       /* empty */          { $$[0] = 0; $$[1]= 1; }
@@ -13301,6 +13557,7 @@ m_expr_list2:
           add_arg_type($1.type); /* order doesn't matter */
           check_unknown_type($1.type.t_type);
           use_variable($1.name, VAR_USAGE_READ);
+          free_lvalue_block($1.lvalue);
       }
 
     | m_expr_list2 ',' expr0 m_expr_values
@@ -13313,12 +13570,13 @@ m_expr_list2:
           add_arg_type($3.type);
           check_unknown_type($3.type.t_type);
           use_variable($3.name, VAR_USAGE_READ);
+          free_lvalue_block($3.lvalue);
       }
 ; /* m_expr_list2 */
 
 m_expr_values:
-      ':' expr0                { $$ = 1;      add_arg_type($2.type); check_unknown_type($2.type.t_type); use_variable($2.name, VAR_USAGE_READ); }
-    | m_expr_values ';' expr0  { $$ = $1 + 1; add_arg_type($3.type); check_unknown_type($3.type.t_type); use_variable($3.name, VAR_USAGE_READ); }
+      ':' expr0                { $$ = 1;      add_arg_type($2.type); check_unknown_type($2.type.t_type); use_variable($2.name, VAR_USAGE_READ); free_lvalue_block($2.lvalue); }
+    | m_expr_values ';' expr0  { $$ = $1 + 1; add_arg_type($3.type); check_unknown_type($3.type.t_type); use_variable($3.name, VAR_USAGE_READ); free_lvalue_block($3.lvalue); }
 ; /* m_expr_values */
 
 
@@ -13348,6 +13606,7 @@ struct_member_name:
 
           use_variable($2.name, VAR_USAGE_READ);
           free_fulltype($2.type);
+          free_lvalue_block($2.lvalue);
       }
 
 ; /* struct_member_name */
@@ -13407,6 +13666,8 @@ struct_init:
           $$.type = $3.type;
 
           use_variable($3.name, VAR_USAGE_READ);
+
+          free_lvalue_block($3.lvalue);
       }
     | expr0
       {
@@ -13414,6 +13675,8 @@ struct_init:
           $$.type = $1.type;
 
           use_variable($1.name, VAR_USAGE_READ);
+
+          free_lvalue_block($1.lvalue);
       }
 ; /* struct_init */
 
@@ -13438,6 +13701,7 @@ function_call:
            */
 
           ident_t *real_name;
+          int efun_idx;
 
           /* Save the (simple) state */
           $<function_call_head>$.start = CURRENT_PROGRAM_SIZE;
@@ -13464,19 +13728,24 @@ function_call:
               CURRENT_PROGRAM_SIZE++;
           }
 
-          if (argument_level+1 == sizeof(got_ellipsis)/sizeof(got_ellipsis[0]))
+          if (argument_level+1 == sizeof(function_call_info)/sizeof(function_call_info[0]))
           {
               yyerror("Functions nested too deeply.");
               YYACCEPT;
           }
-          argument_level++;
-          got_ellipsis[argument_level] = MY_FALSE;
 
           real_name = $1.real;
             /* we rely on the fact that $1.real->type is either
              * I_TYPE_UNKNOWN or I_TYPE_GLOBAL here. All others are filtered
              * by the lexical analysis.
              */
+
+          argument_level++;
+          function_call_info[argument_level].fun_name = real_name->name;
+          function_call_info[argument_level].arg_position = 0;
+          function_call_info[argument_level].got_ellipsis = false;
+          function_call_info[argument_level].unlimited_args = false;
+          function_call_info[argument_level].remaining_arg_types = 0;
 
           if (real_name->type == I_TYPE_UNKNOWN)
           {
@@ -13514,6 +13783,24 @@ function_call:
                   CURRENT_PROGRAM_SIZE += 6;
               }
           }
+          else if ( real_name->type == I_TYPE_GLOBAL
+                && ($1.super ? ($<function_call_head>$.efun_override == OVERRIDE_EFUN)
+                             : (defined_function(real_name)) < 0)
+%ifdef USE_PYTHON
+                && !is_python_efun(real_name)
+%endif
+                && (efun_idx = lookup_predef(real_name)) != -1)
+          {
+              /* This is a normal efun.
+               * Let's fill function_call_info[].
+               */
+              if (instrs[efun_idx].arg_index >= 0)
+              {
+                  function_call_info[argument_level].arg_types = efun_arg_types + instrs[efun_idx].arg_index;
+                  function_call_info[argument_level].unlimited_args = instrs[efun_idx].max_arg < 0;
+                  function_call_info[argument_level].remaining_arg_types = instrs[efun_idx].max_arg;
+              }
+          }
       }
 
       '(' arg_expr_list ')'
@@ -13530,7 +13817,7 @@ function_call:
           Bool        ap_needed;         /* TRUE if arg frame is needed */
           Bool        has_ellipsis;      /* TRUE if '...' was used */
 
-          has_ellipsis = got_ellipsis[argument_level];
+          has_ellipsis = function_call_info[argument_level].got_ellipsis;
           ap_needed = MY_FALSE;
 
           $$.start = $<function_call_head>2.start;
@@ -13833,8 +14120,9 @@ function_call:
                   {
                       int         argn;
                       fulltype_t *aargp;
+                      fulltype_t *lastArgp;
 
-                      aargp = get_argument_types_start(num_arg);
+                      lastArgp = aargp = get_argument_types_start(num_arg);
 
                       /* Loop over all arguments and compare each given
                        * type against all allowed types in efun_arg_types()
@@ -13843,14 +14131,12 @@ function_call:
                       {
                           fulltype_t *beginArgp = argp;
 
-                          /* For varargs efuns just check for unknown,
-                           * when we run out of declared argument types. */
+                          /* For varargs efuns we repeat the last entry.
+                           */
                           if (max == -1 && argp->t_type == NULL)
-                          {
-                              check_unknown_type(aargp->t_type);
-                              aargp++;
-                              continue;
-                          }
+                              beginArgp = argp = lastArgp;
+                          else
+                              lastArgp = argp;
 
                           if (!check_unknown_type(aargp->t_type))
                           {
@@ -14049,14 +14335,18 @@ function_call:
               last_expression = -1;
           }
 
-          if (argument_level+1 == sizeof(got_ellipsis)/sizeof(got_ellipsis[0]))
+          if (argument_level+1 == sizeof(function_call_info)/sizeof(function_call_info[0]))
           {
               yyerror("Functions nested too deeply.");
               free_fulltype($1.type);
               YYACCEPT;
           }
           argument_level++;
-          got_ellipsis[argument_level] = MY_FALSE;
+          function_call_info[argument_level].fun_name = $3;
+          function_call_info[argument_level].arg_position = 0;
+          function_call_info[argument_level].got_ellipsis = false;
+          function_call_info[argument_level].unlimited_args = false;
+          function_call_info[argument_level].remaining_arg_types = 0;
 
           /* If call_other() has been replaced by a sefun, and
            * if we need to use F_CALL_DIRECT to call it, we have
@@ -14138,7 +14428,7 @@ function_call:
           Bool ap_needed;
           int sefun = $2.strict_member ? call_strict_sefun : call_other_sefun;
 
-          has_ellipsis = got_ellipsis[argument_level];
+          has_ellipsis = function_call_info[argument_level].got_ellipsis;
           ap_needed = MY_TRUE;
 
           $$.might_lvalue = true;
@@ -14311,6 +14601,7 @@ call_other_name:
            && !lpctype_contains(lpctype_string, $2.type.t_type))
               fulltype_error("Illegal type for lfun name", $2.type);
           free_fulltype($2.type);
+          free_lvalue_block($2.lvalue);
 
           use_variable($2.name, VAR_USAGE_READ);
       }
@@ -14635,113 +14926,9 @@ opt_catch_modifier :
 
           free_mstring($1);
           free_fulltype($2.type);
+          free_lvalue_block($2.lvalue);
       }
 ; /* opt_catch_modifier */
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-/* sscanf() and parse_command()
- *
- * Both sscanf() and parse_command() are special in that they take
- * unmarked lvalues as arguments. Parsing the lvalue arguments
- * is the biggest part of the problem.
- *
- * TODO: Make a special efun-argument type "lvalue" so that this
- * TODO:: problem can be solved generically?
- */
-
-sscanf:
-      L_SSCANF note_start '(' expr0 ',' expr0 lvalue_list ')'
-      {
-          if (!check_unknown_type($4.type.t_type)
-           && !lpctype_contains(lpctype_string, $4.type.t_type))
-          {
-              fulltype_t arg[] = { { lpctype_string, 0 }, { NULL, 0 } };
-              efun_argument_error(1, F_SSCANF, arg, $4.type);
-          }
-
-          if (!check_unknown_type($6.type.t_type)
-           && !lpctype_contains(lpctype_string, $6.type.t_type))
-          {
-              fulltype_t arg[] = { { lpctype_string, 0 }, { NULL, 0 } };
-              efun_argument_error(2, F_SSCANF, arg, $6.type);
-          }
-
-          ins_f_code(F_SSCANF);
-          ins_byte($7 + 2);
-          $$.start = $2;
-          $$.type = get_fulltype(lpctype_int);
-          $$.name = NULL;
-
-          use_variable($4.name, VAR_USAGE_READ);
-          use_variable($6.name, VAR_USAGE_READ);
-
-          free_fulltype($4.type);
-          free_fulltype($6.type);
-      }
-; /* sscanf */
-
-%ifdef USE_PARSE_COMMAND
-parse_command:
-      L_PARSE_COMMAND note_start
-      '(' expr0 ',' expr0 ',' expr0 lvalue_list ')'
-      {
-          if (!check_unknown_type($4.type.t_type)
-           && !lpctype_contains(lpctype_string, $4.type.t_type))
-          {
-              fulltype_t arg[] = { { lpctype_string, 0 }, { NULL, 0 } };
-              efun_argument_error(1, F_PARSE_COMMAND, arg, $4.type);
-          }
-
-          if (!check_unknown_type($6.type.t_type)
-           && !lpctype_contains(lpctype_object, $6.type.t_type)
-           && !lpctype_contains(lpctype_object_array, $6.type.t_type))
-          {
-              fulltype_t arg[] = { { lpctype_object, 0 }, { lpctype_object_array, 0 }, { NULL, 0 } };
-              efun_argument_error(2, F_PARSE_COMMAND, arg, $6.type);
-          }
-
-          if (!check_unknown_type($8.type.t_type)
-           && !lpctype_contains(lpctype_string, $8.type.t_type))
-          {
-              fulltype_t arg[] = { { lpctype_string, 0 }, { NULL, 0 } };
-              efun_argument_error(3, F_PARSE_COMMAND, arg, $8.type);
-          }
-
-          ins_f_code(F_PARSE_COMMAND);
-          ins_byte($9 + 3);
-          $$.start = $2;
-          $$.type = get_fulltype(lpctype_int);
-          $$.name = NULL;
-
-          use_variable($4.name, VAR_USAGE_READ);
-          use_variable($6.name, VAR_USAGE_READ);
-          use_variable($8.name, VAR_USAGE_READ);
-
-          free_fulltype($4.type);
-          free_fulltype($6.type);
-          free_fulltype($8.type);
-      }
-; /* parse_command */
-%endif /* USE_PARSE_COMMAND */
-
-
-lvalue_list:
-      /* empty */ { $$ = 0; }
-
-    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | lvalue_list ',' lvalue
-      {
-%line
-          Bool res = add_lvalue_code(&$3, F_MAKE_PROTECTED);
-
-          $$ = $1 + 1;
-          free_lpctype($3.type);
-
-          if (!res)
-              YYACCEPT;
-      }
-
-; /* lvalue_list */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -14905,7 +15092,7 @@ if (current_inline && current_inline->parse_context)
     add_type_check(lv->type, TYPECHECK_VAR_INIT);
     use_variable(name, (exprtype.t_flags & TYPE_MOD_REFERENCE) ? VAR_USAGE_READWRITE : VAR_USAGE_WRITE);
 
-    if (!add_lvalue_code(lv, F_VOID_ASSIGN))
+    if (!add_lvalue_code(lv->lvalue, F_VOID_ASSIGN))
         return;
 } /* init_local_variable() */
 
@@ -14976,9 +15163,9 @@ warn_variable_usage (string_t* name, enum variable_usage usage, const char* pref
 
 /*-------------------------------------------------------------------------*/
 static Bool
-add_lvalue_code ( struct lvalue_s * lv, int instruction)
+add_lvalue_code (lvalue_block_t lv, int instruction)
 
-/* Add the lvalue code held in * <lv> to the end of the program.
+/* Add the lvalue code held in <lv> to the end of the program.
  * If <instruction> is not zero, it is the code for an instruction
  * to be added after the lvalue code. The lvalue code block in <lv>
  * will be freed.
@@ -14987,10 +15174,10 @@ add_lvalue_code ( struct lvalue_s * lv, int instruction)
 
 {
     /* Create the code to push the lvalue */
-    if (!add_to_mem_block(A_PROGRAM, LVALUE_BLOCK + lv->lvalue.start, lv->lvalue.size))
+    if (!add_to_mem_block(A_PROGRAM, LVALUE_BLOCK + lv.start, lv.size))
         return MY_FALSE;
 
-    free_lvalue_block(lv->lvalue);
+    free_lvalue_block(lv);
     last_expression = CURRENT_PROGRAM_SIZE;
 
     if (instruction != 0)
@@ -18013,7 +18200,9 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", local_variables, context_variables 
     last_initializer_end = -4; /* To pass the test in transfer_init_control() */
     variables_initialized = 0;
     argument_level = 0;
-    got_ellipsis[0] = MY_FALSE;
+    function_call_info[0].got_ellipsis = false;
+    function_call_info[0].unlimited_args = false;
+    function_call_info[0].remaining_arg_types = 0;
     arg_types_exhausted = false;
 
     max_number_of_init_locals = 0;

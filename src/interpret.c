@@ -6496,10 +6496,15 @@ test_efun_args (int instr, int args, svalue_t *argp)
     long * typep;
 
     typep = &(efun_lpc_types[instrs[instr].lpc_arg_index]);
-    for (i = 1; i <= args; i++, typep++, argp++)
+    for (i = 1; i <= args; i++, argp++)
     {
         long exp_type = *typep;
         long act_type = argp->type;
+
+        if (!exp_type && instrs[instr].max_arg < 0)
+            exp_type = typep[-1];
+        else
+            typep++;
 
         if (argp->type == T_NUMBER && !argp->u.number && (exp_type & TF_NULL))
             continue;
@@ -8857,8 +8862,7 @@ again:
             ERRORF(("Too many args for %s: got %d, expected %d.\n"
                    , instrs[instruction].name, numarg, max_arg));
 
-        test_efun_args(instruction, max_arg >= 0 ? numarg : min_arg
-                      , sp-numarg+1);
+        test_efun_args(instruction, numarg, sp-numarg+1);
         sp = (*vefun_table[instruction-EFUNV_OFFSET])(sp, numarg);
 #ifdef CHECK_OBJECT_REF
         check_all_object_shadows();
@@ -9940,86 +9944,6 @@ again:
         pc += o1;
         break;
     }
-
-    CASE(F_SSCANF);                 /* --- sscanf <numarg>     --- */
-    {
-        /* EFUN sscanf()
-         *
-         *   int sscanf(string str, string fmt, mixed var1, mixed var2, ...)
-         *
-         * Scanf <str> according to <fmt> and store the resultes in var1...
-         * The compiler knows that var1... have to be passed as lvalues.
-         *
-         * Result is the number of variables assigned.
-         */
-        int i;
-        svalue_t *arg;
-
-        num_arg = LOAD_UINT8(pc);
-          /* GET_NUM_ARG doesn't work here. Trust me on that. */
-        inter_sp = sp;
-        inter_pc = pc;
-        arg = sp - num_arg + 1;
-        if (arg[0].type != T_STRING)
-            BAD_ARG_ERROR(1, T_STRING, arg[0].type);
-        if (arg[1].type != T_STRING)
-            BAD_ARG_ERROR(2, T_STRING, arg[1].type);
-        i = e_sscanf(num_arg, sp);
-        pop_n_elems(num_arg-1);
-        free_svalue(sp);
-        put_number(sp, i);
-        break;
-    }
-
-#ifdef USE_PARSE_COMMAND
-    CASE(F_PARSE_COMMAND);      /* --- parse_command <numargs> --- */
-    {
-        /* EFUN parse_command()
-         *
-         *   int parse_command(string cmd, object|object* objs
-         *                    , string fmt, mixed var1, mixed var2...)
-         *
-         * Parse the command <cmd> against <objs> and the format <fmt>
-         * and assign the parsed values to variables var1....
-         * The compiler knows that var1... have to be passed as lvalues.
-         *
-         * Result is TRUE if the pattern matches, and FALSE if not.
-         */
-        int i;
-        svalue_t *arg;
-        string_t *str;
-
-        assign_eval_cost_inl();
-        num_arg = LOAD_UINT8(pc);
-          /* GET_NUM_ARG doesn't work here either. */
-        arg = sp - num_arg + 1;
-        if (arg[0].type != T_STRING)
-            BAD_ARG_ERROR(1, T_STRING, arg[0].type);
-        if (arg[1].type != T_OBJECT && arg[1].type != T_POINTER)
-            RAISE_ARG_ERROR(2, TF_OBJECT|TF_POINTER, arg[1].type);
-        if (arg[2].type != T_STRING)
-            BAD_ARG_ERROR(3, T_STRING, arg[2].type);
-        if (arg[1].type == T_POINTER)
-            check_for_destr(arg[1].u.vec);
-
-        inter_sp = sp;
-        inter_pc = pc;
-
-        str = trim_all_spaces(arg[0].u.str);
-        free_mstring(arg[0].u.str);
-        arg[0].u.str = str;
-
-        str = trim_all_spaces(arg[2].u.str);
-        free_mstring(arg[2].u.str);
-        arg[2].u.str = str;
-
-        i = e_parse_command(arg[0].u.str, &arg[1], arg[2].u.str
-                           , &arg[3], num_arg-3);
-        pop_n_elems(num_arg);        /* Get rid of all arguments */
-        push_number(sp, i ? 1 : 0);      /* Push the result value */
-        break;
-    }
-#endif /* USE_PARSE_COMMAND */
 
     CASE(F_LOCAL);                  /* --- local <ix>          --- */
 
@@ -20670,7 +20594,8 @@ expand_argument (svalue_t *sp)
  * elements pushed (return 1, if <sp> stayed unchanged).
  *
  * If it's an array lvalue or array range lvalue, pass its
- * elements also as lvalues.
+ * elements also as lvalues. If it's an unprotected (non-array)
+ * lvalue, make it protected.
  */
 
 {
@@ -20686,6 +20611,46 @@ expand_argument (svalue_t *sp)
             default:
                 fatal("(expand_argument) Illegal lvalue %p type %d\n", val, val->x.lvalue_type);
                 /* NOTREACHED */
+                break;
+
+            case LVALUE_UNPROTECTED:
+            {
+                svalue_t *dest = val->u.lvalue;
+                if (dest->type != T_POINTER)
+                {
+                    push_protected_lvalue(val);
+                    break;
+                }
+
+                vec = dest->u.vec;
+                start = 0;
+                size = VEC_SIZE(vec);
+                make_ref = true;
+                break;
+            }
+
+            case LVALUE_UNPROTECTED_CHAR:
+                push_protected_lvalue(val);
+                break;
+
+            case LVALUE_UNPROTECTED_RANGE:
+                if (current_unprotected_range.vec->type == T_STRING || current_unprotected_range.vec->type == T_BYTES)
+                    break;
+                else if (current_unprotected_range.vec->type != T_POINTER)
+                {
+                    fatal("(expand_argument) Illegal range %p type %d\n", val, current_unprotected_range.vec->type);
+                    break;
+                }
+
+                vec = current_unprotected_range.vec->u.vec;
+                start = current_unprotected_range.index1;
+                size = current_unprotected_range.index2 - current_unprotected_range.index1;
+                make_ref = true;
+                break;
+
+            case LVALUE_UNPROTECTED_MAPENTRY:
+                /* Non-existent entry cannot be an array. */
+                push_protected_lvalue(val);
                 break;
 
             case LVALUE_PROTECTED:

@@ -3640,88 +3640,6 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     break;
                   }
 
-                /* ({#'sscanf, <data>, <fmt>, <lvalue1>, ..., <lvalueN> })
-                 */
-                case F_SSCANF:
-                  {
-                    /* This is compiled as:
-                     *
-                     *   <data>
-                     *   <fmt>
-                     *   <lvalue1>
-                     *   ...
-                     *   <lvalueN>
-                     *   SSCANF N+2
-                     */
-
-                    int lvalues;
-
-                    if ( (lvalues = block_size - 3) < 0)
-                        lambda_error("Missing argument(s) to #'sscanf\n");
-
-                    if (lvalues > 0xff - 2)
-                        lambda_error("Too many arguments to #'sscanf\n");
-
-                    compile_value(++argp, 0);
-                    compile_value(++argp, 0);
-
-                    while (--lvalues >= 0)
-                    {
-                        compile_lvalue(++argp, PROTECT_LVALUE);
-                    }
-
-                    if (current.code_left < 2)
-                        realloc_code();
-                    current.code_left -= 2;
-
-                    STORE_CODE(current.codep, F_SSCANF);
-                    STORE_CODE(current.codep, (bytecode_t)(block_size - 1));
-                    break;
-                  }
-
-#ifdef USE_PARSE_COMMAND
-                /* ({#'parse_command, <data>, <fmt>, <data>, <lvalue1>, ..., <lvalueN> })
-                 */
-                case F_PARSE_COMMAND:
-                  {
-                    /* This is compiled as:
-                     *
-                     *   <data>
-                     *   <fmt>
-                     *   <data>
-                     *   <lvalue1>
-                     *   ...
-                     *   <lvalueN>
-                     *   SSCANF N+2
-                     */
-
-                    int lvalues;
-
-                    if ( (lvalues = block_size - 3) < 0)
-                        lambda_error("Missing argument(s) to #'sscanf\n");
-
-                    if (lvalues > 0xff - 2)
-                        lambda_error("Too many arguments to #'sscanf\n");
-
-                    compile_value(++argp, 0);
-                    compile_value(++argp, 0);
-                    compile_value(++argp, 0);
-
-                    while (--lvalues >= 0)
-                    {
-                        compile_lvalue(++argp, PROTECT_LVALUE);
-                    }
-
-                    if (current.code_left < 2)
-                        realloc_code();
-                    current.code_left -= 2;
-
-                    STORE_CODE(current.codep, F_SSCANF);
-                    STORE_CODE(current.codep, (bytecode_t)(block_size - 1));
-                    break;
-                  }
-#endif
-
                 /* ({#'({, <expr1>, ..., <exprN> })
                  */
                 case F_AGGREGATE:
@@ -4679,11 +4597,23 @@ compile_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_val
     mp_int min;
     mp_int max;
     mp_int def;
+    mp_int remaining;
+    fulltype_t *argtypep;
 
     /* Get the instruction code */
     f = type - CLOSURE_EFUN;
     min = instrs[f].min_arg;
     max = instrs[f].max_arg;
+    if (instrs[f].arg_index >= 0)
+    {
+        argtypep = efun_arg_types + instrs[f].arg_index;
+        remaining = max;
+    }
+    else
+    {
+        argtypep = NULL;
+        remaining = 0;
+    }
 
     /* Handle the arg frame for varargs efuns */
     needs_ap = MY_FALSE;
@@ -4699,7 +4629,27 @@ compile_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_val
     /* Compile the arguments */
     for (i = num_arg; --i >= 0; )
     {
-        compile_value(argp++, REF_ACCEPTED);
+        typeflags_t flags = 0;
+        if (remaining != 0)
+        {
+            fulltype_t *last_argtypep = argtypep;
+            while (argtypep->t_type != NULL)
+            {
+                flags |= argtypep->t_flags;
+                argtypep++;
+            }
+
+            argtypep++;
+            if (remaining > 1)
+                remaining--;
+            else if (argtypep->t_type == NULL)
+                argtypep = last_argtypep;
+        }
+
+        if (flags & TYPE_MOD_LVALUE)
+            compile_lvalue(argp++, PROTECT_LVALUE);
+        else
+            compile_value(argp++, REF_ACCEPTED);
     }
 
     /* Get the instruction and check if it received the
