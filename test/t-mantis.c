@@ -415,6 +415,12 @@ nosave mixed *tests = ({
             return 1;
         :)
     }),
+    ({ "0000819", 0,
+        (:
+            // sprintf() table mode skips the last row if it's only party filled.
+            return sprintf("%#6.2s\n", "A\n\nB\nC\n") == "  A  B\n     C\n";
+        :)
+    }),
     ({ "0000836", 0,
         (:
            // load a program that dereferences an unknown struct. Should cause

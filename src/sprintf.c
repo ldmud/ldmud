@@ -1435,36 +1435,40 @@ add_table (fmt_state_t *st, cst **table)
  */
 
 {
-    unsigned int done, i;
+    unsigned int done, i, finished = 0;
 
 #define TAB (*table)
 #define TAB_D (TAB->d.tab[i])
 
     /* Loop over all columns of the table */
-    for (i = 0; i < TAB->nocols && TAB_D; i++)
+    for (i = 0; i < TAB->nocols; i++)
     {
+        if (!TAB_D)
+        {
+            ADD_CHARN(st, ' ', TAB->size);
+            finished++;
+            continue;
+        }
+
         /* Get the length to add */
         for (done = 0; (TAB_D[done]) && (TAB_D[done] != '\n'); done++) NOOP;
 
         add_aligned(st, TAB_D, done, TAB->pad, TAB->size, TAB->info);
 
         TAB_D += done; /* inc'ed next line ... */
-        if (!(*TAB_D) || !(*(++TAB_D)))
-            TAB_D = NULL;
-    }
 
-    /* Fill up the end of the table if required */
-    if (i < TAB->nocols)
-    {
-        done = TAB->size;
-        for (; i < TAB->nocols; i++)
+        /* In all but the last column a newline was removed.
+         * So even if we encounter a \0 after the newline,
+         * we still go one round.
+         */
+        if (!(*TAB_D) || (!(*(++TAB_D)) && i == TAB->nocols-1))
         {
-            /* TAB->size is not negative. */
-            ADD_CHARN(st, ' ', done);
+            TAB_D = NULL;
+            finished++;
         }
     }
 
-    if (!TAB->d.tab[0])
+    if (finished == TAB->nocols)
     {
         /* Table finished */
 
