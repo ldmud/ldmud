@@ -1740,7 +1740,7 @@ get_fulltype_name_buf (fulltype_t type, char *buf, size_t bufsize)
         bufsize -= 2;
     }
 
-    len = get_f_visibility_buf(type.t_flags, buf, bufsize);
+    len = get_f_visibility_buf(type.t_flags & ~TYPE_MOD_REFERENCE, buf, bufsize);
     if(len && len + 1 < bufsize)
         buf[len++] = ' ';
     len += get_lpctype_name_buf(type.t_type, buf + len, bufsize - len);
