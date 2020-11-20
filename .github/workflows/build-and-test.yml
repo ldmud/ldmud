@@ -7,9 +7,11 @@ jobs:
         strategy:
             matrix:
                 cc: [gcc, clang]
+                coverage: [false, true]
+        continue-on-error: ${{ matrix.coverage }}
         steps:
             - name: Install dependencies
-              run: sudo apt-get install -y --no-install-recommends ${{ matrix.cc }} bison autoconf autogen libgcrypt20-dev libgnutls28-dev libsqlite3-dev libpq-dev libmysqlclient-dev python3-dev libjson-c-dev libxml2-dev zlib1g-dev
+              run: sudo apt-get install -y --no-install-recommends ${{ matrix.cc }} bison autoconf autogen libgcrypt20-dev libgnutls28-dev libsqlite3-dev libpq-dev libmysqlclient-dev python3-dev libjson-c-dev libxml2-dev zlib1g-dev ${{ (matrix.cc == 'gcc' && matrix.coverage) && 'lcov' || ''}} ${{ (matrix.cc == 'clang' && matrix.coverage) && 'llvm' || ''}}
             - name: Checkout sources
               uses: actions/checkout@v2
             - name: Generate build files
@@ -23,11 +25,34 @@ jobs:
                                --enable-use-xml --enable-use-tls  --enable-use-gcrypt --enable-use-python
                                --enable-malloc-trace --enable-malloc-lpc-trace  --enable-dynamic-costs
                                --enable-eval-cost-trace --enable-trace-code
-                               EXTRA_CFLAGS="-DINSIDE_TRAVIS -Werror ${{ matrix.cc == 'gcc' && '-Wno-unused-result' || '' }}" CC=${{ matrix.cc }}
+                               ${{ matrix.coverage && '--with-optimize=no' || ''}}
+                               EXTRA_CFLAGS="-DINSIDE_TRAVIS -Werror ${{ matrix.cc == 'gcc' && '-Wno-unused-result' || '' }}"
+                               CC=${{ matrix.cc }}
             - name: Build driver
               working-directory: src
-              run: make
+              run: make ${{ matrix.cc == 'gcc' && matrix.coverage && 'PROFIL="--coverage"' || ''}} ${{ matrix.cc == 'clang' && matrix.coverage && 'PROFIL="-fprofile-instr-generate -fcoverage-mapping "' || ''}}
             - name: Run tests
               working-directory: test
               shell: sh
               run: ./run.sh
+            - name: Generate coverage reports (gcc)
+              if: matrix.cc == 'gcc' && matrix.coverage
+              shell: bash
+              working-directory: test
+              run: |
+                for dir in coverage/t-*; do ln ../src/*.gcno "$dir"; done
+                lcov --capture --directory coverage --base-directory ../src --no-external --output coverage.info
+                genhtml coverage.info --output-directory html
+            - name: Generate coverage reports (clang)
+              if: matrix.cc == 'clang' && matrix.coverage
+              shell: bash
+              working-directory: test
+              run: |
+                llvm-profdata merge -sparse coverage/*.profraw -o coverage.profdata
+                llvm-cov show ../src/ldmud -instr-profile=coverage.profdata -format=html -output-dir=html
+            - name: Upload coverage report
+              if: matrix.coverage
+              uses: actions/upload-artifact@v2
+              with:
+                name: coverage ${{ matrix.cc }}
+                path: test/html

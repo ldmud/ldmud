@@ -51,11 +51,14 @@ do
 done
 
 export DRIVER DRIVER_DEFAULTS
+export GCOV_PREFIX_STRIP=100
 
 for testdir in ${@:-t-*}
 do
     export TEST_LOGFILE=./log/result.${testdir}.log
     export TEST_OUTPUTFILE=./log/result.${testdir}.out
+    export GCOV_PREFIX="$PWD/coverage/${testdir}/"
+    export LLVM_PROFILE_FILE="$PWD/coverage/${testdir}.profraw"
 
     if [ -d "${testdir}" ]
     then
