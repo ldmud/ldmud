@@ -4442,7 +4442,7 @@ compile_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_val
 
     /* Handle the arg frame for varargs efuns */
     needs_ap = MY_FALSE;
-    if (f >= EFUNV_OFFSET || f == F_CALL_OTHER)
+    if (f >= EFUNV_OFFSET || f == F_CALL_OTHER || f == F_CALL_DIRECT)
     {
         needs_ap = MY_TRUE;
         if (current.code_left < 1)

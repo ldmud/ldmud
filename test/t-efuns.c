@@ -143,6 +143,7 @@ mixed *tests = ({
     ({ "asin 2", TF_ERROR, (: funcall(#'asin,"1.0") :) }),
     ({ "asin 3", TF_ERROR, (: asin(1.1) :) }),
     ({ "asin 4", TF_ERROR, (: asin(-1.1) :) }),
+    ({ "call_direct in lambda",  0, (: funcall(lambda(({'a}), ({#'call_direct, this_object(), "f", 10, '({ 20 })})), 100, 200) == 11 :) }),
     ({ "crypt", TF_ERROR,  (: crypt("ABC", "$$") :) }),
     ({ "ctime", TF_DONTCHECKERROR,  (: ctime(-1) :) }), /* This must be the first ctime call of this test suite. */
     ({ "save_object 1", 0, (: stringp(save_object()) :) }), /* Bug #594 */
