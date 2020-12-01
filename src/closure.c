@@ -4617,7 +4617,7 @@ compile_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_val
 
     /* Handle the arg frame for varargs efuns */
     needs_ap = MY_FALSE;
-    if (f >= EFUNV_OFFSET || f == F_CALL_OTHER)
+    if (f >= EFUNV_OFFSET)
     {
         needs_ap = MY_TRUE;
         if (current.code_left < 1)
@@ -4900,9 +4900,15 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
 
     if (needs_call_direct)
     {
-    	/* We need the call_other */
-        current.code_left -= 1;
-        STORE_CODE(current.codep, F_CALL_DIRECT);
+        /* We need the call_direct */
+        if (instrs[F_CALL_DIRECT].prefix)
+        {
+            STORE_CODE(current.codep, instrs[F_CALL_DIRECT].prefix);
+            current.code_left--;
+        }
+        STORE_CODE(current.codep, instrs[F_CALL_DIRECT].opcode);
+        current.code_left--;
+
         if (num_arg + 1 > 0xff)
             lambda_error("Argument number overflow\n");
     }

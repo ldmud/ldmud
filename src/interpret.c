@@ -16619,66 +16619,6 @@ again:
 
     /* --- Efuns: Functions and Closures --- */
 
-    CASE(F_CALL_DIRECT);            /* --- call_direct         --- */
-    CASE(F_CALL_OTHER);             /* --- call_other          --- */
-    {
-        /* EFUN call_other(), call_direct()
-         *
-         *     unknown call_other(object|string ob, string str, mixed arg, ...)
-         *     unknown ob->fun(mixed arg, ...)
-         *
-         *     unknown call_direct(object|string ob, string str, mixed arg, ...)
-         *
-         * Call a member function in another object with an argument. The
-         * return value is returned from the other object.  The object can be
-         * given directly or as a string (i.e. its file name). If it is given
-         * by a string and the object does not exist yet, it will be loaded.
-         *
-         *     unknown * call_other(object|string *ob, string str, mixed arg, ...)
-         *     unknown * ob->fun(mixed arg, ...)
-         *
-         * Call a member function in other objects with the given arguments.
-         * The return values is returned collected in an array.
-         * Every object can be given directly or as a string (i.e. its file name).
-         * If it is given by a string and the object does not exist yet, it will
-         * be loaded.
-         *
-         * The difference between call_other() and call_direct()
-         * is that the latter does not allow the evaluation of default
-         * methods.
-         *
-         * TODO: A VOID_CALL_OTHER would be nice to have when the result
-         * TODO:: is not used.
-         */
-
-        svalue_t *arg;
-
-        num_arg = sp - ap + 1;
-        inter_pc = pc;
-        inter_sp = sp;
-
-        arg = sp - num_arg + 1;
-
-        /* Test the arguments */
-        if (arg[0].type != T_OBJECT
-         && arg[0].type != T_STRING
-         && arg[0].type != T_POINTER
-           )
-        {
-            RAISE_ARG_ERROR(1, TF_OBJECT|TF_STRING|TF_POINTER, arg[0].type);
-        }
-
-        TYPE_TEST2(arg+1, T_STRING)
-
-        assign_eval_cost_inl();
-        if (instruction == F_CALL_DIRECT)
-            sp = int_call_other(false, CO_IGNORE, "call_direct", sp, num_arg);
-        else
-            sp = int_call_other(true, CO_IGNORE, "call_other", sp, num_arg);
-
-        break;
-    }
-
     CASE(F_EXTERN_CALL);               /* --- extern_call     --- */
       {
         /* EFUN extern_call()
@@ -21338,6 +21278,32 @@ int_call_other (bool b_use_default, enum call_other_error_handling error_handlin
     }
 
 } /* int_call_other() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_call_other (svalue_t *sp, int num_arg)
+
+/* EFUN call_other()
+ *
+ * This is just a wrapper around the real implementation.
+ */
+
+{
+    return int_call_other(true, CO_IGNORE, "call_other", sp, num_arg);
+} /* v_call_other() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_call_direct (svalue_t *sp, int num_arg)
+
+/* EFUN call_direct_direct()
+ *
+ * This is just a wrapper around the real implementation.
+ */
+
+{
+    return int_call_other(false, CO_IGNORE, "call_direct", sp, num_arg);
+} /* v_call_direct() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

@@ -174,6 +174,7 @@ mixed *tests = ({
     ({ "call_direct 4",          0,        (: call_direct(object_name(clone), "g", 10, ({ 20 })) == 0  :) }),
     ({ "call_direct 5",          0,        (: call_direct(clone,              "h", 10, ({ 20 })) == 0  :) }),
     ({ "call_direct 6",          0,        (: call_direct(object_name(clone), "h", 10, ({ 20 })) == 0  :) }),
+    ({ "call_direct in lambda",  0,        (: funcall(lambda(({'a}), ({#'call_direct, clone, "f", 10, '({ 20 })})), 100, 200) == 11 :) }),
     ({ "call_direct array 1",    0,        (: deep_eq(call_direct(({clone,clone,object_name(clone),this_object(),0}), "f", 10, ({ 20 })), ({ 11, 11, 11, 11, 0})) :) }),
     ({ "call_direct array 2",    0,        (: deep_eq(call_direct(({clone,clone,object_name(clone),this_object(),0}), "g", 10, ({ 20 })), ({  0,  0,  0,  0, 0})) :) }),
     ({ "call_direct array 3",    0,        (: deep_eq(call_direct(({clone,clone,object_name(clone),this_object(),0}), "h", 10, ({ 20 })), ({  0,  0,  0,  0, 0})) :) }),
