@@ -818,9 +818,9 @@ reset_object (object_t *ob, int arg)
  *
  * The value of the hooks can be function names (strings) or closures.
  *
- * For strings, the name is the function called in <ob>. It gets passed
- * one argument: 0 for H_CREATE_*, 1 for H_RESET. If on a H_RESET call
- * the function can not be found, the object will never be reset again.
+ * For strings, the name is the function called in <ob>. If on a
+ * H_RESET call the function can not be found, the object will never
+ * be reset again.
  *
  * For closures, the code distinguishes closures which take no arguments
  * (only for H_CREATE_* calls) from those which take at least one argument.
@@ -882,8 +882,7 @@ reset_object (object_t *ob, int arg)
         if (arg == H_RESET)
             previous_ob = current_object = ob;
 
-        push_number(inter_sp, arg == H_RESET);
-        if (!sapply_ign_prot(driver_hook[arg].u.str, ob, 1)
+        if (!sapply_ign_prot(driver_hook[arg].u.str, ob, 0)
          && arg == H_RESET)
             ob->time_reset = 0;
     }
