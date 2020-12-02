@@ -6,6 +6,55 @@ title: Overview
 
 <p>LDMud is a virtual machine, a telnet server and a compiler for the LPC language. It is a direct descendent of the original LPMud gamedriver.</p>
 
+<h2>Features</h2>
+
+<p>
+Foremost we strive for LDMud to be a stable and clean gamedriver.
+But furthermore it has also a lot of additional features compared to the original LPMud gamedriver, these are the major ones:
+</p>
+
+<ul>
+    <li>Runtime:
+    <ul>
+        <li><a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/driver/architectures">Support for 64-bit architectures</a></li>
+        <li><a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/concepts/unicode">Unicode support including recognition of extended grapheme clusters</a></li>
+    </ul>
+    </li>
+
+    <li>Language:
+    <ul>
+        <li><a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/types">Advanced type system</a>
+            <a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/unions">with union types</a>
+            <a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/pragma">and type checks at runtime</a></li>
+        <li><a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/structs">Compound data type named <code>struct</code></a></li>
+        <li><a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/inline-closures">Inline closures</a></li>
+        <li><a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/LPC/foreach"><code>foreach()</code> statement</a></li>
+    </ul>
+    </li>
+
+    <li>Networking:
+    <ul>
+        <li><a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/concepts/tls">Support for TLS</a></li>
+        <li>Support for IPv6</li>
+        <li><a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/hook/telnet_neg">Forwarding of telnet negotiations to the mudlib</a></li>
+        <li><a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/concepts/mccp">Support for the MCCP protocol</a></li>
+    </ul>
+    </li>
+
+    <li>Extensions:
+    <ul>
+        <li><a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/concepts/python">Support for efuns written in Python</a></li>
+        <li>Support for
+            <a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/efun/sl_exec">SQLite</a>,
+            <a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/concepts/mysql">MySQL</a> and
+            <a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/concepts/pgsql">PostgreSQL</a></li>
+        <li>Serialization with
+            <a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/efun/xml_generate">XML</a> and
+            <a class="normal" href="https://github.com/ldmud/ldmud/blob/master/doc/efun/json_serialize">JSON</a></li>
+    </ul>
+    </li>
+</ul>
+
 <h2>License</h2>
 
 <p>
