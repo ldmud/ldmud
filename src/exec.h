@@ -390,6 +390,15 @@ struct variable_s
 };
 
 
+/* Constants for inherit_type in inherit_s */
+enum inherit_types {
+    INHERIT_TYPE_NORMAL    = 0x0000,  /* Type: Normal inherit */
+    INHERIT_TYPE_VIRTUAL   = 0x0001,  /* Type: Virtual inherit */
+    INHERIT_TYPE_EXTRA     = 0x0002,  /* Type: Extra inherit added by
+                                       * copy_variables()
+                                       */
+};
+
 /* --- struct inherit: description of one inherited program
  *
  * The information about inherited programs ("objects") for a given
@@ -400,6 +409,16 @@ struct variable_s
 struct inherit_s
 {
     program_t *prog;  /* Pointer to the inherited program */
+
+    struct
+    {
+        unsigned short inherit_depth    : 16;  /* Depth of inherit */
+        enum inherit_types inherit_type :  2;  /* Type of inherit  */
+        bool inherit_duplicate          :  1;  /* Flag: Duplicate virt inherit   */
+        bool inherit_mapped             :  1;  /* Flag: Obsoleted virt inherit   */
+        bool inherit_hidden             :  1;  /* Flag: Not visible to outsiders */
+        bool inherit_public             :  1;  /* Flag: Cannot be hidden         */
+    };
 
     unsigned short function_index_offset;
       /* Offset of the inherited program's function block within the
@@ -414,10 +433,6 @@ struct inherit_s
        * The NON_VIRTUAL_OFFSET_TAG marks the variables of non-virtual
        * inherits temporarily during compiles.
        */
-
-    unsigned short inherit_type;            /* Type of inherit */
-
-    unsigned short inherit_depth;           /* Depth of inherit */
 
     unsigned short updated_inherit;
       /* When INHERIT_TYPE_MAPPED this it the index of a newer, also
@@ -463,20 +478,6 @@ struct inherit_s
        *   function_map_offset = variable_map_offset + prog->num_variables,
        * but we have the space now, so we'll make it explicit.
        */
-};
-
-/* Constants for inherit_type in inherit_s */
-enum inherit_types {
-    INHERIT_TYPE_NORMAL    = 0x0000,  /* Type: Normal inherit */
-    INHERIT_TYPE_VIRTUAL   = 0x0001,  /* Type: Virtual inherit */
-    INHERIT_TYPE_EXTRA     = 0x0002,  /* Type: Extra inherit added by
-                                       * copy_variables()
-                                       */
-
-    INHERIT_TYPE_MASK      = 0x0003,  /* Bitmask for the pure inherit type */
-
-    INHERIT_TYPE_DUPLICATE = 0x0004,  /* Flag: Duplicate virt inherit */
-    INHERIT_TYPE_MAPPED    = 0x0008,  /* Flag: Obsoleted virt inherit */
 };
 
 /* --- struct struct_def: description of one struct

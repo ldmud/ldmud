@@ -374,8 +374,14 @@ DESCRIPTION
         <what> == DI_NUM_REGEX_TABLE_SLOTS:
           Number of slots in the regexp cache table.
 
-        <what> == DI_NUM_LVALUES
+        <what> == DI_NUM_LVALUES:
           Number of lvalues (values referenced by &var).
+
+        <what> == DI_NUM_NAMED_OBJECT_TYPES:
+          Number of named object types.
+
+        <what> == DI_NUM_NAMED_OBJECT_TYPES_TABLE_SLOTS:
+          Number of table entries for named object types.
 
         <what> == DI_SIZE_ACTIONS:
           Total size of allocated actions.
@@ -446,6 +452,9 @@ DESCRIPTION
 
         <what> == DI_SIZE_BUFFER_SWAP:
           The size of the memory buffer for the swap file.
+
+        <what> == DI_SIZE_NAMED_OBJECT_TYPES_TABLE:
+          The size of the table for named object types.
 
 
 

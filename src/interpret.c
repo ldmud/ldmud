@@ -6103,7 +6103,7 @@ translate_virtual_variable_index (int num)
        ; inheritp++) NOOP;
 
     /* Handle obsoleted inherited programs */
-    while (inheritp->inherit_type & INHERIT_TYPE_MAPPED)
+    while (inheritp->inherit_mapped)
     {
         inherit_t *new_inheritp = current_object->prog->inherit + inheritp->updated_inherit;
         num = current_object->prog->update_index_map[num + inheritp->variable_map_offset];
@@ -6758,7 +6758,7 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
             break;
 
         case T_OBJECT:
-            valuetype = lpctype_object;
+            valuetype = lpctype_any_object;
             break;
 
         case T_STRUCT:
@@ -6768,10 +6768,29 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
 
     if (valuetype)
     {
-        Bool result = lpctype_contains(valuetype, formaltype);
+        Bool result;
 
-        if (svptype)
-            *svptype = ref_lpctype(valuetype);
+        if (bsvp->type == T_OBJECT)
+        {
+            result = is_compatible_object(bsvp->u.ob, formaltype);
+
+            if (svptype)
+            {
+                if (result)
+                    *svptype = ref_lpctype(valuetype);
+                else
+                    *svptype = get_object_type(bsvp->u.ob->prog->name);
+
+                if (*svptype == NULL)
+                    *svptype = lpctype_any_object;
+            }
+        }
+        else
+        {
+            result = lpctype_contains(valuetype, formaltype);
+            if (svptype)
+                *svptype = ref_lpctype(valuetype);
+        }
 
         clean_struct_type(valuetype);
         free_lpctype(valuetype);
@@ -7670,7 +7689,7 @@ setup_inherited_call (unsigned short inhIndex, unsigned short *fx)
             function_index_offset = 0;
 
             /* Check for obsoleted inherited programs. */
-            while (inheritp->inherit_type & INHERIT_TYPE_MAPPED)
+            while (inheritp->inherit_mapped)
             {
                 unsigned short prevfx = *fx;
 
@@ -7756,7 +7775,7 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
         inherit_t *inheritp;
 
         inheritp = &progp->inherit[flags & INHERIT_MASK];
-        assert(!(inheritp->inherit_type & INHERIT_TYPE_MAPPED));
+        assert(!inheritp->inherit_mapped);
 
         if(inheritp->inherit_type != INHERIT_TYPE_NORMAL)
         {
@@ -8015,7 +8034,7 @@ setup_new_frame (int fx, program_t *inhProg)
                 var_ix_offs = 0;
 
                 /* Check for obsoleted inherited programs. */
-                while (inheritp->inherit_type & INHERIT_TYPE_MAPPED)
+                while (inheritp->inherit_mapped)
                 {
                     fx = current_object->prog->update_index_map[fx + inheritp->function_map_offset];
                     if (fx == USHRT_MAX)

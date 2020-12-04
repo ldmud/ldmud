@@ -273,7 +273,7 @@ extern void deep_destruct (object_t *ob);
 extern void handle_newly_destructed_objects(void);
 extern void remove_destructed_objects (Bool force);
 extern void print_svalue(svalue_t *arg);
-extern const char *make_name_sane(const char *pName, Bool addSlash);
+extern const char *make_name_sane(const char *pName, bool addSlash, bool addDotC);
 extern object_t *lookfor_object(string_t *str, Bool bLoad);
 #define find_object(str) lookfor_object((str), MY_FALSE)
 #define get_object(str) lookfor_object((str), MY_TRUE)

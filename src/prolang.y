@@ -1568,8 +1568,8 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
  */
 {
     static char *type_name[] = { "unknown", "int", "string", "void",
-                                 "object", "mapping", "float", "mixed",
-                                 "closure", "symbol", "quoted_array", "bytes" };
+                                 "mapping", "float", "mixed", "closure",
+                                 "symbol", "quoted_array", "bytes" };
 
     if (bufsize <= 0)
         return 0;
@@ -1628,6 +1628,32 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
                 return strlen(buf);
             }
 
+        }
+
+    case TCLASS_OBJECT:
+        {
+            if (type->t_object.program_name)
+            {
+                size_t len = 10 + mstrsize(type->t_object.program_name);
+                if(len < bufsize)
+                {
+                    memcpy(buf, "object \"/", 9);
+                    memcpy(buf+9, get_txt(type->t_object.program_name), len-10);
+                    buf[len-1] = '"';
+                    buf[len] = 0;
+                    return len;
+                }
+                else
+                {
+                    buf[0] = '\0';
+                    return 0;
+                }
+            }
+            else // any object
+            {
+                snprintf(buf, bufsize, "object");
+                return strlen(buf);
+            }
         }
 
     case TCLASS_ARRAY:
@@ -8902,12 +8928,18 @@ single_basic_non_void_type:
     | L_INT          { $$ = lpctype_int;        }
     | L_BYTES_DECL   { $$ = lpctype_bytes;      }
     | L_STRING_DECL  { $$ = pragma_no_bytes_type ? lpctype_string_bytes : lpctype_string; }
-    | L_OBJECT       { $$ = lpctype_object;     }
     | L_CLOSURE_DECL { $$ = lpctype_closure;    }
     | L_SYMBOL_DECL  { $$ = lpctype_symbol;     }
     | L_FLOAT_DECL   { $$ = lpctype_float;      }
     | L_MAPPING      { $$ = lpctype_mapping;    }
     | L_MIXED        { $$ = lpctype_mixed;      }
+    | L_OBJECT       { $$ = lpctype_any_object; }
+    | L_OBJECT simple_string_constant
+      {
+          $$ = get_object_type(last_string_constant);
+          free_mstring(last_string_constant);
+          last_string_constant = NULL;
+      }
     | L_STRUCT identifier
       {
           int num;
@@ -11035,6 +11067,29 @@ constant:
 ; /* constant */
 
 
+/* The simple_string_constant is similar to string_constant, but
+ * forbids the use of paranthesis to avoid shift/reduce conflicts,
+ * for example between
+ *    function object ("/i/room") () {}
+ *    function object             () {}
+ */
+simple_string_constant:
+      L_STRING
+      {
+          last_string_constant = last_lex_string;
+          last_lex_string = NULL;
+      }
+    | simple_string_constant '+' L_STRING
+      {
+          add_string_constant();
+      }
+    | L_STRING L_STRING
+      { fatal("L_STRING LSTRING: presence of rule should prevent its reduction\n"); }
+    | simple_string_constant '+' L_STRING L_STRING
+      { fatal("L_STRING LSTRING: presence of rule should prevent its reduction\n"); }
+; /* simple_string_constant */
+
+
 string_constant:
       L_STRING
       {
@@ -12145,7 +12200,7 @@ expr0:
           {
               ins_f_code(F_TO_STRING);
           }
-          else if($1 == lpctype_object)
+          else if($1 == lpctype_any_object)
           {
               ins_f_code(F_TO_OBJECT);
           }
@@ -16050,7 +16105,7 @@ adjust_virtually_inherited ( unsigned short *pFX, inherit_t **pIP)
             fx -= ip2->function_index_offset;
 
             /* Is there an update for this program? */
-            while (ip->inherit_type & INHERIT_TYPE_MAPPED)
+            while (ip->inherit_mapped)
             {
                 fx = GET_BLOCK(A_UPDATE_INDEX_MAP)[fx + ip->function_map_offset];
                 if (fx == USHRT_MAX)
@@ -16136,7 +16191,7 @@ lookup_inherited (const char *super_name, string_t *real_name
         unsigned short found_ix;
         short i;
 
-        if (ip->inherit_type & INHERIT_TYPE_MAPPED)
+        if (ip->inherit_mapped)
             /* this is an old inherit */
             continue;
 
@@ -16388,7 +16443,7 @@ insert_inherited (char *super_name, string_t *real_name
             if ( !match_string(super_name, get_txt(ip->prog->name), l) )
                 continue;
 
-            if (ip->inherit_type & INHERIT_TYPE_DUPLICATE)
+            if (ip->inherit_duplicate)
             {
                 /* This is a duplicate inherit, let's search for the original. */
                 for (ip = &(INHERIT(0)); ip < ip0; ip++)
@@ -16415,7 +16470,7 @@ insert_inherited (char *super_name, string_t *real_name
             /* The (new) ip might be duplicate inherit, or point to
              * a virtually inherited function we called already.
              */
-            if ((ip->inherit_type & INHERIT_TYPE_DUPLICATE)
+            if (ip->inherit_duplicate
              || was_called[ip_index])
                 /* duplicate inherit */
                 continue;
@@ -17038,12 +17093,12 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
     updateinherit.inherit_depth = oldinheritp->inherit_depth;
 
     if (update_existing)
-        newinheritp->inherit_type |= INHERIT_TYPE_DUPLICATE;
+        newinheritp->inherit_duplicate = true;
     else
-        updateinherit.inherit_type |= INHERIT_TYPE_DUPLICATE;
+        updateinherit.inherit_duplicate = true;
 
     oldinheritp->updated_inherit = INHERIT_COUNT;
-    oldinheritp->inherit_type |= INHERIT_TYPE_MAPPED;
+    oldinheritp->inherit_mapped = true;
     oldinheritp->num_additional_variables = 0;
     oldinheritp->variable_map_offset = UPDATE_INDEX_MAP_COUNT;
     oldinheritp->function_map_offset = UPDATE_INDEX_MAP_COUNT + num_old_variables;
@@ -17390,14 +17445,14 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
                 inherit_t dupupdate;
 
                 /* If this is a virtual inherit, it must be a duplicate. */
-                assert((dupinheritp->inherit_type & (INHERIT_TYPE_DUPLICATE|INHERIT_TYPE_MAPPED)) == INHERIT_TYPE_DUPLICATE);
+                assert(dupinheritp->inherit_duplicate && !dupinheritp->inherit_mapped);
 
                 dupupdate = updateinherit;
-                dupupdate.inherit_type |= INHERIT_TYPE_DUPLICATE;
+                dupupdate.inherit_duplicate = true;
                 dupupdate.inherit_depth = dupinheritp->inherit_depth;
                 dupupdate.function_index_offset = FUNCTION_COUNT;
 
-                dupinheritp->inherit_type |= INHERIT_TYPE_MAPPED;
+                dupinheritp->inherit_mapped = true;
                 dupinheritp->updated_inherit = INHERIT_COUNT;
                 dupinheritp->variable_index_offset = oldinheritp->variable_index_offset;
                 dupinheritp->num_additional_variables = oldinheritp->num_additional_variables;
@@ -17437,7 +17492,8 @@ copy_updated_inherit (inherit_t *oldinheritp, inherit_t *newinheritp, program_t 
     /* We need to duplate the update inherit entry. */
     inherit_t inheritupdate = INHERIT(oldinheritp->updated_inherit);
 
-    newinheritp->inherit_type |= INHERIT_TYPE_DUPLICATE|INHERIT_TYPE_MAPPED;
+    newinheritp->inherit_duplicate = true;
+    newinheritp->inherit_mapped = true;
     newinheritp->variable_index_offset = oldinheritp->variable_index_offset;
     newinheritp->num_additional_variables = oldinheritp->num_additional_variables;
     newinheritp->variable_map_offset = oldinheritp->variable_map_offset;
@@ -17463,13 +17519,13 @@ copy_updated_inherit (inherit_t *oldinheritp, inherit_t *newinheritp, program_t 
             }
 
             inheritvar = inheritnext;
-        } while (inheritvar->inherit_type & INHERIT_TYPE_MAPPED);
+        } while (inheritvar->inherit_mapped);
 
         if (!inherit_variable(from->variables + j, varmodifier, inheritvar->variable_index_offset + varidx))
             return false;
     }
 
-    inheritupdate.inherit_type |= INHERIT_TYPE_DUPLICATE;
+    inheritupdate.inherit_duplicate = true;
     inheritupdate.inherit_depth = newinheritp->inherit_depth;
 
     /* Add the update function table. */
@@ -17484,12 +17540,12 @@ copy_updated_inherit (inherit_t *oldinheritp, inherit_t *newinheritp, program_t 
     ADD_INHERIT(&inheritupdate);
 
     /* Resolve further inherit mappings. */
-    while (inheritupdate.inherit_type & INHERIT_TYPE_MAPPED)
+    while (inheritupdate.inherit_mapped)
     {
         INHERIT(INHERIT_COUNT-1).updated_inherit = INHERIT_COUNT;
 
         inheritupdate = INHERIT(inheritupdate.updated_inherit);
-        inheritupdate.inherit_type |= INHERIT_TYPE_DUPLICATE;
+        inheritupdate.inherit_duplicate = true;
         inheritupdate.inherit_depth = newinheritp->inherit_depth;
         ADD_INHERIT(&inheritupdate);
     }
@@ -17532,13 +17588,13 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
             continue;
 
         /* Ignore inherits we already looked at. */
-        if(inheritdup->inherit_type & INHERIT_TYPE_DUPLICATE)
+        if(inheritdup->inherit_duplicate)
             continue;
 
         if (inheritdup->prog != progp)
             continue;
 
-        if(inheritdup->inherit_type & INHERIT_TYPE_MAPPED)
+        if(inheritdup->inherit_mapped)
         {
             /* Found it, but is obsolete.
              * We use its function and variable map and additional variables.
@@ -17551,7 +17607,7 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
         {
             /* Found it, use their variables. */
             newinheritp->variable_index_offset = inheritdup->variable_index_offset;
-            newinheritp->inherit_type |= INHERIT_TYPE_DUPLICATE;
+            newinheritp->inherit_duplicate = true;
 
             /* Adjust modifier and identifier. */
             for (int j = first_variable_index; j < last_variable_index; j++)
@@ -17572,7 +17628,7 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
             continue;
 
         /* We are only interested in the newest one. */
-        if(inheritdup->inherit_type & INHERIT_TYPE_MAPPED)
+        if(inheritdup->inherit_mapped)
             continue;
 
         if (!mstreq(inheritdup->prog->name, progp->name))
@@ -17593,7 +17649,7 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
              * We'll use their variables but also create
              * a mapping from old to new variable indices.
              */
-            if (inheritdup->inherit_type & INHERIT_TYPE_DUPLICATE)
+            if (inheritdup->inherit_duplicate)
                 continue; /* The original will come later. */
 
             update_virtual_program(from
@@ -17610,7 +17666,7 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
 
             found = true;
         }
-        else if (!(inheritdup->inherit_type & INHERIT_TYPE_DUPLICATE))
+        else if (!inheritdup->inherit_duplicate)
         {
             /* Damn, we've inherited an old program.
              * We'll have to fix that one now.
@@ -17640,9 +17696,9 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
              * Use that mapping.
              */
             assert(inheritorig != NULL);
-            assert(inheritorig->inherit_type & INHERIT_TYPE_MAPPED);
+            assert(inheritorig->inherit_mapped);
 
-            inheritdup->inherit_type |= INHERIT_TYPE_MAPPED;
+            inheritdup->inherit_mapped = true;
             inheritdup->variable_index_offset = inheritorig->variable_index_offset;
             inheritdup->num_additional_variables = inheritorig->num_additional_variables;
             inheritdup->variable_map_offset = inheritorig->variable_map_offset;
@@ -17651,7 +17707,7 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
 
             /* We need to duplicate the update inherit as well. */
             inherit_t inheritupdate = INHERIT(inheritorig->updated_inherit);
-            inheritupdate.inherit_type |= INHERIT_TYPE_DUPLICATE;
+            inheritupdate.inherit_duplicate = true;
             inheritupdate.inherit_depth = inheritdup->inherit_depth;
 
             /* And now we need to cross-define its functions. */
@@ -17666,7 +17722,7 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
             ADD_INHERIT(&inheritupdate);
 
             /* The update inherit cannot already be obsoleted, too. */
-            assert(!(inheritupdate.inherit_type & INHERIT_TYPE_MAPPED));
+            assert(!inheritupdate.inherit_mapped);
 
             /* Continue to other duplicates. */
             found = false;
@@ -17884,23 +17940,27 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
         /* Create a new inherit entry. */
         inherit_t newinherit;
         newinherit = *inheritp;
-        newinherit.inherit_type = INHERIT_TYPE_EXTRA | (inheritp->inherit_type & INHERIT_TYPE_DUPLICATE);
+        newinherit.inherit_type = INHERIT_TYPE_EXTRA;
+        newinherit.inherit_duplicate = inheritp->inherit_duplicate;
+        newinherit.inherit_mapped = false;
+        newinherit.inherit_hidden = true;
+        newinherit.inherit_public = false;
         newinherit.inherit_depth++;
         newinherit.function_index_offset += first_func_index;
         newinherit.variable_index_offset += V_VARIABLE_COUNT - last_bound_variable;
 
-        assert((inheritp->inherit_type & INHERIT_TYPE_DUPLICATE) || (last_bound_variable == inheritp->variable_index_offset));
+        assert(inheritp->inherit_duplicate || (last_bound_variable == inheritp->variable_index_offset));
 
-        if (inheritp->inherit_type & INHERIT_TYPE_MAPPED)
+        if (inheritp->inherit_mapped)
         {
-            if (!(inheritp->inherit_type & INHERIT_TYPE_DUPLICATE))
+            if (!inheritp->inherit_duplicate)
                 inherit_obsoleted_variables(&newinherit, from, last_bound_variable, varmodifier);
-            newinherit.inherit_type |= INHERIT_TYPE_MAPPED;
+            newinherit.inherit_mapped = true;
             /* The corresponding updated_inherit entry will
              * be corrected in the loop below.
              */
 
-            if (!(inheritp->inherit_type & INHERIT_TYPE_DUPLICATE))
+            if (!inheritp->inherit_duplicate)
                 last_bound_variable = inheritp->variable_index_offset + inheritp->num_additional_variables;
         }
         else
@@ -17911,7 +17971,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
                 newinherit.function_index_offset - first_func_index,
                 inheritp->variable_index_offset, next_bound_variable, varmodifier, first_inh_index);
 
-            if (!(inheritp->inherit_type & INHERIT_TYPE_DUPLICATE))
+            if (!inheritp->inherit_duplicate)
                 last_bound_variable = next_bound_variable;
 
             /* Now adjust the function inherit index.
@@ -17952,7 +18012,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
         inherit_t *cur_old_inheritp;
         int num_vars, num_funs;
 
-        if (!(from_old_inheritp->inherit_type & INHERIT_TYPE_MAPPED))
+        if (!from_old_inheritp->inherit_mapped)
             continue;
 
         cur_old_inheritp = &INHERIT(new_inherit_indices[inheritidx]);
@@ -17987,6 +18047,10 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
     frominherit.prog = from;
     frominherit.function_index_offset = first_func_index;
     frominherit.inherit_depth = 1;
+    frominherit.inherit_duplicate = false;
+    frominherit.inherit_mapped = false;
+    frominherit.inherit_hidden = (funmodifier & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|TYPE_MOD_PRIVATE)) != 0;
+    frominherit.inherit_public = (funmodifier & TYPE_MOD_PUBLIC) != 0;
 
     /* We're done with the virtual extra inherits,
      * copy the remaining variables (variable indices from
@@ -18685,11 +18749,11 @@ init_compiler ()
     make_static_type(get_union_type(lpctype_int, lpctype_float),    &_lpctype_int_float);
     make_static_type(get_array_type(lpctype_int),                   &_lpctype_int_array);
     make_static_type(get_array_type(lpctype_string),                &_lpctype_string_array);
-    make_static_type(get_array_type(lpctype_object),                &_lpctype_object_array);
+    make_static_type(get_array_type(lpctype_any_object),            &_lpctype_object_array);
     make_static_type(get_array_type(lpctype_bytes),                 &_lpctype_bytes_array);
     make_static_type(get_union_type(lpctype_string, lpctype_bytes), &_lpctype_string_bytes);
     make_static_type(get_union_type(lpctype_string_array, lpctype_bytes_array), &_lpctype_string_or_bytes_array);
-    make_static_type(get_union_type(lpctype_string, lpctype_object),&_lpctype_string_object);
+    make_static_type(get_union_type(lpctype_string, lpctype_any_object),&_lpctype_string_object);
     make_static_type(get_array_type(lpctype_string_object),         &_lpctype_string_object_array);
 } /* init_compiler() */
 
@@ -18941,13 +19005,13 @@ epilog (void)
             inh->function_index_offset,
             get_txt(inh->prog->name));
 
-        if (inh->inherit_type & INHERIT_TYPE_MAPPED)
+        if (inh->inherit_mapped)
             printf("(mapped to %d)\n", inh->updated_inherit);
-        else if (inh->inherit_type & INHERIT_TYPE_DUPLICATE)
+        else if (inh->inherit_duplicate)
             printf("(duplicate)\n");
-        else if (inh->inherit_type & INHERIT_TYPE_EXTRA)
+        else if (inh->inherit_type == INHERIT_TYPE_EXTRA)
             printf("(extra)\n");
-        else if (inh->inherit_type & INHERIT_TYPE_VIRTUAL)
+        else if (inh->inherit_type == INHERIT_TYPE_VIRTUAL)
             printf("(virtual)\n");
         else
             printf("(regular)\n");
@@ -19346,7 +19410,7 @@ epilog (void)
         *prog = NULL_program;
 
         /* Set up the program structure */
-        if ( !(prog->name = new_unicode_mstring(current_loc.file->name)) )
+        if ( !(prog->name = new_unicode_tabled(current_loc.file->name)) )
         {
             xfree(prog);
             yyerrorf("Out of memory: filename '%s'", current_loc.file->name);

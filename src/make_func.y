@@ -2526,7 +2526,7 @@ lpctypestr (int n)
       case BYTES_OR_STRING:
                     p = "&_lpctype_string_bytes"; break;
       case INT:     p = "&_lpctype_int";          break;
-      case OBJECT:  p = "&_lpctype_object";       break;
+      case OBJECT:  p = "&_lpctype_any_object";   break;
       case MAPPING: p = "&_lpctype_mapping";      break;
       case FLOAT:   p = "&_lpctype_float";        break;
       case CLOSURE: p = "&_lpctype_closure";      break;

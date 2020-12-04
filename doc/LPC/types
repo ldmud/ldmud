@@ -95,7 +95,13 @@ DESCRIPTION
                 unicode escape sequences.
 
     o object    Pointer to an object. Objects are always passed by
-                reference.
+                reference. The type specification can include a program
+                name that is a mandatory inherit of the given object:
+
+                    object "/std/room" var;
+
+                This program name is only verified during runtime when
+                runtime type checks are activated. See pragma(LPC).
 
     o array     Pointer to a vector of values, which could also
                 be an alist. Arrays take the form ({ n1, n2, n3 })

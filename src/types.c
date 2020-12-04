@@ -7,15 +7,18 @@
 #include <assert.h>
 
 #include "gcollect.h"
+#include "main.h"
+#include "object.h"
 #include "types.h"
 #include "simulate.h"
 #include "structs.h"
 #include "xalloc.h"
 
+#include "../mudlib/sys/driver_info.h"
+
 /* Base types are statically allocated. */
 lpctype_t _lpctype_int          = { 0, { TCLASS_PRIMARY, true }, {TYPE_NUMBER},       NULL, NULL };
 lpctype_t _lpctype_string       = { 0, { TCLASS_PRIMARY, true }, {TYPE_STRING},       NULL, NULL };
-lpctype_t _lpctype_object       = { 0, { TCLASS_PRIMARY, true }, {TYPE_OBJECT},       NULL, NULL };
 lpctype_t _lpctype_mapping      = { 0, { TCLASS_PRIMARY, true }, {TYPE_MAPPING},      NULL, NULL };
 lpctype_t _lpctype_float        = { 0, { TCLASS_PRIMARY, true }, {TYPE_FLOAT},        NULL, NULL };
 lpctype_t _lpctype_mixed        = { 0, { TCLASS_PRIMARY, true }, {TYPE_ANY},          NULL, NULL };
@@ -26,11 +29,11 @@ lpctype_t _lpctype_void         = { 0, { TCLASS_PRIMARY, true }, {TYPE_VOID},   
 lpctype_t _lpctype_bytes        = { 0, { TCLASS_PRIMARY, true }, {TYPE_BYTES},        NULL, NULL };
 lpctype_t _lpctype_unknown      = { 0, { TCLASS_PRIMARY, true }, {TYPE_UNKNOWN},      NULL, NULL };
 lpctype_t _lpctype_any_struct   = { 0, { TCLASS_STRUCT,  true }, {.t_struct = {NULL, NULL}},  NULL, NULL };
+lpctype_t _lpctype_any_object   = { 0, { TCLASS_OBJECT,  true }, {.t_object = {NULL}},        NULL, NULL };
 
 /* And are used via pointer. */
 lpctype_t *lpctype_int          = &_lpctype_int;
 lpctype_t *lpctype_string       = &_lpctype_string;
-lpctype_t *lpctype_object       = &_lpctype_object;
 lpctype_t *lpctype_mapping      = &_lpctype_mapping;
 lpctype_t *lpctype_float        = &_lpctype_float;
 lpctype_t *lpctype_mixed        = &_lpctype_mixed;
@@ -38,9 +41,22 @@ lpctype_t *lpctype_closure      = &_lpctype_closure;
 lpctype_t *lpctype_symbol       = &_lpctype_symbol;
 lpctype_t *lpctype_quoted_array = &_lpctype_quoted_array;
 lpctype_t *lpctype_any_struct   = &_lpctype_any_struct;
+lpctype_t *lpctype_any_object   = &_lpctype_any_object;
 lpctype_t *lpctype_void         = &_lpctype_void;
 lpctype_t *lpctype_bytes        = &_lpctype_bytes;
 lpctype_t *lpctype_unknown      = &_lpctype_unknown;
+
+static lpctype_t **object_type_table = NULL;
+  /* The hash table of all used named object types.
+   */
+
+static size_t object_type_table_size = 0;
+  /* Number of buckets in the table.
+   */
+
+static size_t num_object_types = 0;
+  /* Number of named object types in the table.
+   */
 
 /*-------------------------------------------------------------------------*/
 static lpctype_t *
@@ -137,6 +153,194 @@ clean_struct_type (lpctype_t *t)
 
     t->t_struct.def = NULL;
 } /* clean_struct_type */
+
+/*-------------------------------------------------------------------------*/
+static lpctype_t *
+find_object_type (string_t *prog)
+
+/* Lookup the object type for <prog> in the hash table. <prog> must be
+ * tabled string. If found, move it to the head of its chain and return
+ * the type pointer. If not found, return NULL.
+ */
+
+{
+    lpctype_t *this, *prev;
+    size_t ix;
+
+    if (!object_type_table || !object_type_table_size)
+        return NULL;
+
+    ix = mstr_get_hash(prog) & (object_type_table_size-1);
+
+    prev = NULL;
+    this = object_type_table[ix];
+    while (this != NULL)
+    {
+        if (this->t_object.program_name == prog)
+        {
+            if (prev != NULL)
+            {
+                prev->t_object.next = this->t_object.next;
+                this->t_object.next = object_type_table[ix];
+                object_type_table[ix] = this;
+            }
+            break;
+        }
+
+        prev = this;
+        this = this->t_object.next;
+    }
+
+    return this;
+} /* find_object_type() */
+
+/*-------------------------------------------------------------------------*/
+static bool
+add_object_type (lpctype_t *type)
+
+/* Add the named object type <type> to the hash table.
+ * Returns false when the type could not be entered into the table.
+ */
+
+{
+    size_t ix;
+
+    if (!object_type_table)
+    {
+        object_type_table = pxalloc(sizeof(*object_type_table));
+        if (object_type_table == NULL)
+            return false;
+
+        object_type_table_size = 1;
+        object_type_table[0] = type;
+        type->t_object.next = NULL;
+
+        num_object_types = 1;
+        return true;
+    }
+
+    ix = mstr_get_hash(type->t_object.program_name) & (object_type_table_size-1);
+    type->t_object.next = object_type_table[ix];
+    object_type_table[ix] = type;
+    num_object_types++;
+
+    /* If we have twice the entries than the table size, we resize.
+     */
+    if (num_object_types > 2 * object_type_table_size && object_type_table_size * 2 <= TTABLE_SIZE)
+    {
+        size_t new_size = 2 * object_type_table_size;
+        lpctype_t **new_table = pxalloc(new_size * sizeof(*new_table));
+
+        if (!new_table)
+            return true; /* We were successful nevertheless. */
+
+        memset(new_table, 0, new_size * sizeof(*new_table));
+
+        /* Rehash all existing entries */
+        for (ix = 0; ix < object_type_table_size; ix++)
+        {
+            lpctype_t *this = object_type_table[ix];
+
+            while (this != NULL)
+            {
+                lpctype_t *next = this->t_object.next;
+                size_t new_ix = mstr_get_hash(this->t_object.program_name) & (new_size-1);
+
+                this->t_object.next = new_table[new_ix];
+                new_table[new_ix] = this;
+
+                this = next;
+            }
+        }
+
+        pfree(object_type_table);
+        object_type_table = new_table;
+        object_type_table_size = new_size;
+     }
+
+     return true;
+
+} /* add_object_type() */
+
+/*-------------------------------------------------------------------------*/
+lpctype_t *
+get_object_type (string_t *prog)
+
+/* Create an lpctype_t for an object having <prog> in its program.
+ * The name is normalized (removing a leading '/', check for double
+ * slashes and add a trailing '.c' if it's not already there), so it
+ * will match the program names easily. This name will then looked
+ * up in our table, to ensure unique type objects.
+ *
+ * Returns NULL when out of memory.
+ */
+
+{
+    const char *normalized;
+    string_t *s;
+    size_t len = mstrsize(prog);
+    lpctype_t *result;
+
+    assert(prog->info.unicode != STRING_BYTES);
+
+    /* Let's normalize the filename. */
+    if (!len)
+        return lpctype_any_object;
+
+    normalized = make_name_sane(get_txt(prog), false, true);
+    if (normalized)
+        s = new_tabled(normalized, prog->info.unicode);
+    else
+        s = make_tabled_from(prog);
+
+    /* Now look at our table. */
+    result = find_object_type(s);
+    if (result)
+    {
+        free_mstring(s);
+        return ref_lpctype(result);
+    }
+
+    result = lpctype_new();
+    result->t_class = TCLASS_OBJECT;
+    result->t_object.program_name = s;
+
+    if (!add_object_type(result))
+    {
+        /* So free_lpctype() won't look into the table. */
+        result->t_object.program_name = NULL;
+        free_mstring(s);
+        free_lpctype(result);
+
+        return NULL;
+    }
+
+    return result;
+} /* get_object_type() */
+
+/*-------------------------------------------------------------------------*/
+static void
+remove_object_type (lpctype_t *type)
+
+/* Remove the named object type <type> from the hash table,
+ * if it's in there.
+ */
+
+{
+    size_t ix;
+
+    if (type->t_object.program_name == NULL)
+        return;
+
+    if (!find_object_type(type->t_object.program_name))
+         return;
+
+    /* Now that entry should be at the top of the chain. */
+    ix = mstr_get_hash(type->t_object.program_name) & (object_type_table_size-1);
+    object_type_table[ix] = type->t_object.next;
+
+    num_object_types--;
+} /* remove_object_type() */
 
 /*-------------------------------------------------------------------------*/
 lpctype_t *
@@ -392,6 +596,16 @@ internal_get_common_type(lpctype_t *t1, lpctype_t* t2, bool find_one)
         else
             return NULL;
 
+    case TCLASS_OBJECT:
+        if (t2->t_class != TCLASS_OBJECT)
+            return NULL;
+        else if (t1->t_object.program_name == NULL)
+            return ref_lpctype(t2);
+        else if (t2->t_object.program_name == NULL)
+            return ref_lpctype(t1);
+        else
+            return NULL;
+
     case TCLASS_ARRAY:
         if (t2->t_class != TCLASS_ARRAY)
             return NULL;
@@ -462,13 +676,6 @@ get_common_type(lpctype_t *t1, lpctype_t* t2)
 } /* get_common_type() */
 
 /*-------------------------------------------------------------------------*/
-
-/* Determine the intersection of both types.
- * Returns NULL if there is no common type.
- * If one of both types is TYPE_UNKNOWN, then
- * the result will by TYPE_UNKNOWN, too.
- */
-
 void
 make_static_type (lpctype_t *src, lpctype_t *dest)
 
@@ -495,6 +702,11 @@ make_static_type (lpctype_t *src, lpctype_t *dest)
     case TCLASS_STRUCT:
         if (src->t_struct.name)
             src->t_struct.name->lpctype = dest;
+        break;
+
+    case TCLASS_OBJECT:
+        remove_object_type(src);
+        add_object_type(dest);
         break;
 
     case TCLASS_ARRAY:
@@ -571,6 +783,12 @@ _free_lpctype (lpctype_t *t)
             t->t_struct.name->lpctype = NULL;
             free_struct_name(t->t_struct.name);
         }
+        break;
+
+    case TCLASS_OBJECT:
+        remove_object_type(t);
+        if (t->t_object.program_name)
+            free_mstring(t->t_object.program_name);
         break;
 
     case TCLASS_ARRAY:
@@ -653,6 +871,15 @@ lpctype_contains (lpctype_t* src, lpctype_t* dest)
                 }
                 break;
 
+            case TCLASS_OBJECT:
+                if (destbase->t_class == TCLASS_OBJECT)
+                {
+                    if (srcbase == destbase
+                     || destbase->t_object.program_name == NULL) /* Matches any object */
+                        found = true;
+                }
+                break;
+
             case TCLASS_ARRAY:
                 if (destbase->t_class == TCLASS_ARRAY)
                 {
@@ -708,9 +935,70 @@ lpctype_contains (lpctype_t* src, lpctype_t* dest)
 } /* lpctype_contains() */
 
 /*-------------------------------------------------------------------------*/
+static bool
+has_inherit (program_t *prog, string_t *name, bool only_public)
+
+/* Check whether the given program <prog> has an inherit <name>.
+ * If <only_public> is true, then only public inherits are considered.
+ */
+
+{
+    int num;
+
+    if (prog->name == name)
+        return !only_public;
+
+    num = prog->num_inherited;
+    for (inherit_t *inheritp = prog->inherit; --num >= 0; inheritp++)
+    {
+        if (has_inherit(inheritp->prog, name,
+            inheritp->inherit_hidden ? true  :
+            inheritp->inherit_public ? false :
+            only_public))
+            return true;
+    }
+
+    return false;
+} /* has_inherit() */
+
+/*-------------------------------------------------------------------------*/
+bool
+is_compatible_object (object_t* ob, lpctype_t *t)
+
+/* Checks whether the given object <ob> matches the type <t>.
+ */
+
+{
+    if (t == NULL)
+        return true;
+
+    /* Walk through the union of t (until it isn't a union anymore). */
+    while (true)
+    {
+        lpctype_t *base = t->t_class == TCLASS_UNION ? t->t_union.member : t;
+
+        if (base->t_class == TCLASS_OBJECT)
+        {
+            if (base->t_object.program_name == NULL)
+                return true;
+            if (has_inherit(ob->prog, base->t_object.program_name, false))
+                return true;
+        }
+
+        if (t->t_class == TCLASS_UNION)
+            t = t->t_union.head;
+        else
+            break;
+    }
+
+    return false;
+} /* is_compatible_object() */
+
+/*-------------------------------------------------------------------------*/
 
 /* The same definitions are in sys/lpctypes.h for the mudlibs. */
 #define COMPAT_TYPE_STRUCT    11
+#define COMPAT_TYPE_OBJECT     4
 #define COMPAT_MOD_POINTER    0x0040
 
 int
@@ -724,12 +1012,20 @@ get_type_compat_int (lpctype_t *t)
     switch(t->t_class)
     {
         case TCLASS_PRIMARY:
-            if (t->t_primary >= COMPAT_TYPE_STRUCT)
-                return t->t_primary + 1;
-            return t->t_primary;
+        {
+            int val = t->t_primary;
+            if (val >= COMPAT_TYPE_OBJECT)
+                val++;
+            if (val >= COMPAT_TYPE_STRUCT)
+                val++;
+            return val;
+        }
 
         case TCLASS_STRUCT:
             return COMPAT_TYPE_STRUCT;
+
+        case TCLASS_OBJECT:
+            return COMPAT_TYPE_OBJECT;
 
         case TCLASS_ARRAY:
             return get_type_compat_int(t->t_array.element) | COMPAT_MOD_POINTER;
@@ -740,6 +1036,36 @@ get_type_compat_int (lpctype_t *t)
 
     return TYPE_UNKNOWN; /* Shouldn't happen. */
 } /* get_type_compat_int() */
+
+/*-------------------------------------------------------------------------*/
+void
+types_driver_info (svalue_t *svp, int value)
+
+/* Returns the types information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+    switch (value)
+    {
+        case DI_NUM_NAMED_OBJECT_TYPES:
+            put_number(svp, num_object_types);
+            break;
+
+        case DI_NUM_NAMED_OBJECT_TYPES_TABLE_SLOTS:
+            put_number(svp, object_type_table_size);
+            break;
+
+        case DI_SIZE_NAMED_OBJECT_TYPES_TABLE:
+            put_number(svp, object_type_table_size * sizeof(*object_type_table));
+            break;
+
+        default:
+            fatal("Unknown option for types_driver_info(): %d\n", value);
+            break;
+    }
+
+} /* types_driver_info() */
 
 #ifdef GC_SUPPORT
 
@@ -776,6 +1102,11 @@ clear_lpctype_ref (lpctype_t *t)
         if (t->t_struct.name)
             clear_struct_name_ref(t->t_struct.name);
         t->t_struct.def = NULL;
+        break;
+
+    case TCLASS_OBJECT:
+        if (t->t_object.program_name)
+            t->t_object.program_name->info.ref = 0;
         break;
 
     case TCLASS_ARRAY:
@@ -834,6 +1165,11 @@ count_lpctype_ref (lpctype_t *t)
                 }
                 break;
 
+            case TCLASS_OBJECT:
+                if (t->t_object.program_name)
+                    count_ref_from_string(t->t_object.program_name);
+                break;
+
             case TCLASS_ARRAY:
                 count_lpctype_ref(t->t_array.element);
                 break;
@@ -852,6 +1188,7 @@ count_lpctype_ref (lpctype_t *t)
         {
         case TCLASS_PRIMARY:
         case TCLASS_STRUCT:
+        case TCLASS_OBJECT:
             break; /* Nothing to do. */
 
         case TCLASS_ARRAY:
@@ -870,4 +1207,78 @@ count_lpctype_ref (lpctype_t *t)
     }
 } /* count_lpctype_ref() */
 
+/*-------------------------------------------------------------------------*/
+void
+clear_object_type_table_refs ()
+
+/* Clear all references held by the named object types in the hash table.
+ */
+
+{
+    if (!object_type_table || !object_type_table_size)
+        return;
+
+    for (size_t ix = 0; ix < object_type_table_size; ix++)
+    {
+        for (lpctype_t *this = object_type_table[ix]; this != NULL; this = this->t_object.next)
+            clear_lpctype_ref(this);
+    }
+} /* clear_object_type_table_refs() */
+
+/*-------------------------------------------------------------------------*/
+void
+remove_unreferenced_object_types ()
+
+/* Free all named object types from the hash table which are not marked
+ * as referenced. This function must be called before freeing all
+ * unreferenced strings (which we need for the debug output).
+ */
+
+{
+    if (!object_type_table || !object_type_table_size)
+        return;
+
+    for (size_t ix = 0; ix < object_type_table_size; ix++)
+    {
+        lpctype_t **prev = object_type_table + ix;
+
+        for (lpctype_t *this = object_type_table[ix]; this != NULL;)
+        {
+            lpctype_t *next = this->t_object.next;
+
+            if (!test_memory_reference(this))
+            {
+                *prev = this;
+                prev = &(this->t_object.next);
+            }
+            else
+            {
+                /* Deallocate the memory. */
+                num_object_types--;
+
+                dprintf2(gcollect_outfd, "object type %x '%s' was left "
+                                         "unreferenced, freeing now.\n"
+                                       , (p_int) this
+                                       , (p_int) get_txt(this->t_object.program_name)
+                        );
+
+                /* Reference the string and free it to avoid unnecessary
+                 * 'string unreferenced' diagnostics.
+                 */
+                count_ref_from_string(this->t_object.program_name);
+                free_mstring(this->t_object.program_name);
+
+                /* Reference the memory (to update its flags) and free it */
+                note_malloced_block_ref(this);
+                xfree(this);
+            }
+
+            this = next;
+        }
+
+        *prev = NULL;
+    }
+} /* remove_unreferenced_object_types() */
+
+/*-------------------------------------------------------------------------*/
 #endif /* GC_SUPPORT */

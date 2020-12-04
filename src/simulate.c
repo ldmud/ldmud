@@ -1599,14 +1599,14 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
 
 /*-------------------------------------------------------------------------*/
 const char *
-make_name_sane (const char *pName, Bool addSlash)
+make_name_sane (const char *pName, bool addSlash, bool addDotC)
 
 /* Make a given object name sane.
  *
  * The function removes leading '/' (if addSlash is true, all but one leading
- * '/' are removed), a trailing '.c', and folds consecutive
- * '/' into just one '/'. The '.c' removal does not work when given
- * clone object names (i.e. names ending in '#<number>').
+ * '/' are removed), a trailing '.c' (unless addDotC is true), and folds
+ * consecutive '/' into just one '/'. The '.c' removal does not work when
+ * given clone object names (i.e. names ending in '#<number>').
  *
  * The function returns a pointer to a static(!) buffer with the cleant
  * up name, or NULL if the given name already was sane.
@@ -1616,7 +1616,7 @@ make_name_sane (const char *pName, Bool addSlash)
     static char buf[MAXPATHLEN+1];
     const char *from = pName;
     char *to;
-    short bDiffers = MY_FALSE;
+    bool bDiffers = false;
 
     to = buf;
 
@@ -1627,12 +1627,12 @@ make_name_sane (const char *pName, Bool addSlash)
         if (*from == '/')
             from++;
         else
-            bDiffers = MY_TRUE;
+            bDiffers = true;
     }
 
     while (*from == '/' || (from[0] == '.' && from[1] == '/'))
     {
-        bDiffers = MY_TRUE;
+        bDiffers = true;
         from++;
     }
     /* addSlash or not: from now points to the first non-'/' */
@@ -1646,19 +1646,26 @@ make_name_sane (const char *pName, Bool addSlash)
             *to = '/';
             while (*from == '/' || (from[0] == '.' && from[1] == '/'))
             {
-                bDiffers = MY_TRUE;
+                bDiffers = true;
                 from++;
             }
 
             from--;
         }
-        else if ('.' == *from && 'c' == *(from+1) && '\0' == *(from+2))
+        else if (!addDotC && '.' == *from && 'c' == *(from+1) && '\0' == *(from+2))
         {
-            bDiffers = MY_TRUE;
+            bDiffers = true;
             break;
         }
         else
             *to = *from;
+    }
+
+    if (addDotC && (to < buf+2 || to[-2] != '.' || to[-1] != 'c'))
+    {
+        *to++ = '.';
+        *to++ = 'c';
+        bDiffers = true;
     }
     *to = '\0';
 
@@ -2047,7 +2054,7 @@ load_object (const char *lname, Bool create_super, int depth
             char * pInherited;
             const char * tmp;
 
-            tmp = make_name_sane(get_txt(inherit_file), MY_FALSE);
+            tmp = make_name_sane(get_txt(inherit_file), false, false);
             if (!tmp)
             {
                 pInherited = get_txt(inherit_file);
@@ -2479,7 +2486,7 @@ lookfor_object (string_t * str, Bool bLoad)
      * TODO:: and move the make_name_sane() into those where it can
      * TODO:: be dirty.
      */
-    pName = make_name_sane(get_txt(str), MY_FALSE);
+    pName = make_name_sane(get_txt(str), false, false);
     if (!pName)
         pName = get_txt(str);
 
@@ -2515,7 +2522,7 @@ find_object_str (const char * str)
      * TODO:: and move the make_name_sane() into those where it can
      * TODO:: be dirty.
      */
-    pName = make_name_sane(str, MY_FALSE);
+    pName = make_name_sane(str, false, false);
     if (!pName)
         pName = str;
 

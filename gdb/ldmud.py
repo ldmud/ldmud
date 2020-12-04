@@ -402,33 +402,34 @@ class TypePrinter:
 
     TCLASS_PRIMARY    = 0
     TCLASS_STRUCT     = 1
-    TCLASS_ARRAY      = 2
-    TCLASS_UNION      = 3
+    TCLASS_OBJECT     = 2
+    TCLASS_ARRAY      = 3
+    TCLASS_UNION      = 4
 
     TYPE_UNKNOWN      =  0
     TYPE_NUMBER       =  1
     TYPE_STRING       =  2
     TYPE_VOID         =  3
-    TYPE_OBJECT       =  4
-    TYPE_MAPPING      =  5
-    TYPE_FLOAT        =  6
-    TYPE_ANY          =  7
-    TYPE_CLOSURE      =  8
-    TYPE_SYMBOL       =  9
-    TYPE_QUOTED_ARRAY = 10
+    TYPE_MAPPING      =  4
+    TYPE_FLOAT        =  5
+    TYPE_ANY          =  6
+    TYPE_CLOSURE      =  7
+    TYPE_SYMBOL       =  8
+    TYPE_QUOTED_ARRAY =  9
+    TYPE_BYTES        = 10
 
     type_names = {
         TYPE_UNKNOWN:      "unknown",
         TYPE_NUMBER:       "int",
         TYPE_STRING:       "string",
         TYPE_VOID:         "void",
-        TYPE_OBJECT:       "object",
         TYPE_MAPPING:      "mapping",
         TYPE_FLOAT:        "float",
         TYPE_ANY:          "mixed",
         TYPE_CLOSURE:      "closure",
         TYPE_SYMBOL:       "symbol",
         TYPE_QUOTED_ARRAY: "quoted_array",
+        TYPE_BYTES:        "bytes",
     }
 
     def __init__(self, val):
@@ -457,6 +458,13 @@ class TypePrinter:
             return "struct %s:%s" % (
                 progname["txt"].string(length = progname["size"]),
                 basename["txt"].string(length = basename["size"]))
+
+        elif tclass == self.TCLASS_OBJECT:
+            progname = val["t_object"]["program_name"].dereference()
+            if progname.address == 0:
+                return "any object"
+
+            return 'object "%s"' % (progname["txt"].string(length = progname["size"]))
 
         elif tclass == self.TCLASS_ARRAY:
             return self.calc_name(val["t_array"]["base"].dereference()) + "*"*int(val["t_array"]["depth"])

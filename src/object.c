@@ -1012,7 +1012,7 @@ replace_programs (void)
                 if (newinh->inherit_type == INHERIT_TYPE_NORMAL)
                     continue; /* Non-virtual come later. */
 
-                if (newinh->inherit_type & INHERIT_TYPE_DUPLICATE)
+                if (newinh->inherit_duplicate)
                     continue; /* We already had that one. */
 
                 /* Search for the corresponding inherit in the old program. */
@@ -1020,14 +1020,14 @@ replace_programs (void)
                      oldinh->prog != newinh->prog || oldinh->inherit_type == INHERIT_TYPE_NORMAL;
                      oldinh++);
 
-                if (newinh->inherit_type & INHERIT_TYPE_MAPPED)
+                if (newinh->inherit_mapped)
                 {
                     /* An obsolete inherit. It also be an obsoleted inherit
                      * in the to-be-replaced program. So just copy any
                      * additional variables.
                      */
 
-                    assert(oldinh->inherit_type & INHERIT_TYPE_MAPPED);
+                    assert(oldinh->inherit_mapped);
 
                     for (int varidx = 0; varidx < oldinh->num_additional_variables; varidx++)
                     {
@@ -1038,7 +1038,7 @@ replace_programs (void)
                 else
                 {
                     /* A regular virtual inherit. */
-                    if (oldinh->inherit_type & INHERIT_TYPE_MAPPED)
+                    if (oldinh->inherit_mapped)
                     {
                         /* That virtual inherit is obsolete in the program we want to replace.
                          * We have to reconstruct the variable block using the variable map.
@@ -1276,7 +1276,7 @@ search_inherited (string_t *str, program_t *prg, int *offpnt)
         }
 #endif
         /* Duplicate virtual inherits don't count */
-        if ( prg->inherit[i].inherit_type & INHERIT_TYPE_DUPLICATE )
+        if ( prg->inherit[i].inherit_duplicate )
             continue;
 
         if (mstreq(str, prg->inherit[i].prog->name ))
@@ -1285,7 +1285,7 @@ search_inherited (string_t *str, program_t *prg, int *offpnt)
             if (d_flag)
                 debug_message("%s match found\n", ts);
 #endif
-            if (prg->inherit[i].inherit_type & INHERIT_TYPE_MAPPED)
+            if (prg->inherit[i].inherit_mapped)
                 i = prg->inherit[i].updated_inherit;
 
             offpnt[0] = prg->inherit[i].variable_index_offset;
@@ -1300,7 +1300,8 @@ search_inherited (string_t *str, program_t *prg, int *offpnt)
     for ( i = 0; i < prg->num_inherited; i++)
     {
         /* We don't search in duplicate or obsolete virtual inherits. */
-        if ( prg->inherit[i].inherit_type & (INHERIT_TYPE_DUPLICATE|INHERIT_TYPE_MAPPED) )
+        if ( prg->inherit[i].inherit_duplicate
+          || prg->inherit[i].inherit_mapped)
             continue;
 
         if ( NULL != (tmp = search_inherited(str, prg->inherit[i].prog,offpnt)) )
@@ -3117,7 +3118,7 @@ f_load_name (svalue_t *sp)
     if (!hash)
     {
         /* No '#' at all: make the name sane directly */
-        name = (char *)make_name_sane(get_txt(s), !compat_mode);
+        name = (char *)make_name_sane(get_txt(s), !compat_mode, false);
         if (!name)
             name = get_txt(s);
     }
@@ -3150,7 +3151,7 @@ f_load_name (svalue_t *sp)
         p[len] = '\0';
 
         /* Now make the name sane */
-        name = (char *)make_name_sane(p, !compat_mode);
+        name = (char *)make_name_sane(p, !compat_mode, false);
         if (!name)
             name = p;
     }
@@ -3545,8 +3546,7 @@ v_replace_program (svalue_t *sp, int num_arg)
             for ( ; replace_index < curprog->num_inherited
                   ; replace_index++)
             {
-                if (!(curprog->inherit[replace_index].inherit_type
-                      & INHERIT_TYPE_EXTRA))
+                if (curprog->inherit[replace_index].inherit_type != INHERIT_TYPE_EXTRA)
                     break;
             }
             /* replace_index must now be the last inherit for the
@@ -8544,7 +8544,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
                     {
                         int l;
                     
-                        if (inheritp->inherit_type & INHERIT_TYPE_DUPLICATE)
+                        if (inheritp->inherit_duplicate)
                             continue;
                     
                         l = mstrsize(inheritp->prog->name)-2;

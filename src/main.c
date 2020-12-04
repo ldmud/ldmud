@@ -555,7 +555,7 @@ main (int argc, char **argv)
          * this the strings module has to be initialized).
          */
         {
-            const char *pName = make_name_sane(master_name, MY_FALSE);
+            const char *pName = make_name_sane(master_name, false, false);
             if (pName)
                 strcpy(master_name, pName);
             master_name_str = new_unicode_tabled(master_name);

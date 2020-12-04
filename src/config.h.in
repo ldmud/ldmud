@@ -510,6 +510,13 @@
  */
 #define OTABLE_SIZE               @val_otable_size@
 
+/* Maximum named object type hash table size.
+ * This is the maximum size, the table size will only grow when needed.
+ * As this table should seldom outgrow the object table, you could use
+ * the same value here.
+ */
+#define TTABLE_SIZE               @val_ttable_size@
+
 /* Define the size of the ident_table. It contains all global identifiers
  * (efuns and permanent defines) as well as the identifiers of a compiled
  * program which are removed from the ident_table after compilation.

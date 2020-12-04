@@ -132,6 +132,7 @@
 #endif /* USE_TLS */
 #include "swap.h"
 #include "svalue.h"
+#include "types.h"
 #include "wiz_list.h"
 #include "xalloc.h"
 
@@ -5399,7 +5400,7 @@ v_present_clone (svalue_t *sp, int num_arg)
             name0 = tmpbuf;
         
         /* Now make the name sane */
-        sane_name = (char *)make_name_sane(name0, !compat_mode);
+        sane_name = (char *)make_name_sane(name0, !compat_mode, false);
 
         if (sane_name)
             name = find_tabled_str(sane_name, STRING_UTF8);
@@ -9684,6 +9685,14 @@ f_driver_info (svalue_t *sp)
 
         case DI_NUM_LVALUES:
             put_number(&result, num_protected_lvalues);
+            break;
+
+        case DI_NUM_NAMED_OBJECT_TYPES:
+            /* FALLTHROUGH */
+        case DI_NUM_NAMED_OBJECT_TYPES_TABLE_SLOTS:
+            /* FALLTHROUGH */
+        case DI_SIZE_NAMED_OBJECT_TYPES_TABLE:
+            types_driver_info(&result, what);
             break;
 
         case DI_SIZE_ACTIONS:

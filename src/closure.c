@@ -852,7 +852,7 @@ replace_program_function_adjust (replace_ob_t *r_ob, int fun_idx)
                 {
                     if (newinh->inherit_type == INHERIT_TYPE_NORMAL)
                         continue;
-                    if (newinh->inherit_type & (INHERIT_TYPE_DUPLICATE|INHERIT_TYPE_MAPPED))
+                    if (newinh->inherit_duplicate || newinh->inherit_mapped)
                         continue;
                     if (newinh->prog != oldinh->prog)
                         continue;
@@ -899,9 +899,9 @@ replace_program_variable_adjust (replace_ob_t *r_ob, int var_idx)
         {
             if (oldinh->inherit_type == INHERIT_TYPE_NORMAL)
                 continue;
-            if (oldinh->inherit_type & INHERIT_TYPE_DUPLICATE)
+            if (oldinh->inherit_duplicate)
                 continue;
-            if (oldinh->inherit_type & INHERIT_TYPE_MAPPED)
+            if (oldinh->inherit_mapped)
             {
                 int newinhcount;
 
@@ -919,7 +919,7 @@ replace_program_variable_adjust (replace_ob_t *r_ob, int var_idx)
 
                     if (newinh->inherit_type == INHERIT_TYPE_NORMAL)
                         continue;
-                    if (newinh->inherit_type & INHERIT_TYPE_DUPLICATE)
+                    if (newinh->inherit_duplicate)
                         continue;
                     if (newinh->prog != oldinh->prog)
                         continue;
@@ -932,7 +932,7 @@ replace_program_variable_adjust (replace_ob_t *r_ob, int var_idx)
                     {
                         if (oldprog->update_index_map[oldinh->variable_map_offset + origvaridx] == oldvaridx)
                         {
-                            if (newinh->inherit_type & INHERIT_TYPE_MAPPED)
+                            if (newinh->inherit_mapped)
                             {
                                 /* It's obsolete in the new program as well. */
                                 int updvaridx = newprog->update_index_map[newinh->variable_map_offset + origvaridx];
@@ -979,7 +979,7 @@ replace_program_variable_adjust (replace_ob_t *r_ob, int var_idx)
                 {
                     if (newinh->inherit_type == INHERIT_TYPE_NORMAL)
                         continue;
-                    if (newinh->inherit_type & INHERIT_TYPE_DUPLICATE)
+                    if (newinh->inherit_duplicate)
                         continue;
                     if (newinh->prog != oldinh->prog)
                         continue;
@@ -993,9 +993,9 @@ replace_program_variable_adjust (replace_ob_t *r_ob, int var_idx)
                 updinhcount = oldprog->num_inherited;
                 for (inherit_t *updinh = oldprog->inherit; updinhcount-- > 0; updinh++)
                 {
-                    if (updinh->inherit_type & INHERIT_TYPE_DUPLICATE)
+                    if (updinh->inherit_duplicate)
                         continue;
-                    if (!(updinh->inherit_type & INHERIT_TYPE_MAPPED))
+                    if (!updinh->inherit_mapped)
                         continue;
                     if (updinh->updated_inherit != oldinh - oldprog->inherit)
                         continue;
@@ -1007,7 +1007,7 @@ replace_program_variable_adjust (replace_ob_t *r_ob, int var_idx)
 
                         if (newinh->inherit_type == INHERIT_TYPE_NORMAL)
                             continue;
-                        if (newinh->inherit_type & INHERIT_TYPE_DUPLICATE)
+                        if (newinh->inherit_duplicate)
                             continue;
                         if (newinh->prog != updinh->prog)
                             continue;

@@ -2250,6 +2250,7 @@ garbage_collection(void)
     clear_comm_refs();
     clear_rxcache_refs();
     clear_tabled_struct_refs();
+    clear_object_type_table_refs();
 #ifdef USE_PGSQL
     pg_clear_refs();
 #endif /* USE_PGSQL */
@@ -2503,6 +2504,7 @@ garbage_collection(void)
      */
 
     remove_unreferenced_structs();
+    remove_unreferenced_object_types();
     mstring_walk_table(mark_unreferenced_string);
     mstring_gc_table();
 

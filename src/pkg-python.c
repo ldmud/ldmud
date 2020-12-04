@@ -7762,10 +7762,6 @@ lpctype_to_pythontype (lpctype_t *type)
                     Py_INCREF(Py_None);
                     return Py_None;
 
-                case TYPE_OBJECT:
-                    Py_INCREF(&ldmud_object_type);
-                    return (PyObject *)&ldmud_object_type;
-
                 case TYPE_MAPPING:
                     Py_INCREF(&ldmud_mapping_type);
                     return (PyObject *)&ldmud_mapping_type;
@@ -7799,6 +7795,10 @@ lpctype_to_pythontype (lpctype_t *type)
         case TCLASS_STRUCT:
             Py_INCREF(&ldmud_struct_type);
             return (PyObject *)&ldmud_struct_type;
+
+        case TCLASS_OBJECT:
+            Py_INCREF(&ldmud_object_type);
+            return (PyObject *)&ldmud_object_type;
 
         case TCLASS_ARRAY:
             Py_INCREF(&ldmud_array_type);
@@ -7876,7 +7876,7 @@ pythontype_to_lpctype (PyObject* ptype)
          * need to ref-count them.
          */
         if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_object_type))
-            return lpctype_object;
+            return lpctype_any_object;
 
         if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_array_type))
             return get_array_type(lpctype_mixed);
