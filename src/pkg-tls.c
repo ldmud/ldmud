@@ -453,7 +453,9 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
     }
     else
     {
-        obj = ref_object(current_object, "tls_init_connection");
+        if (current_object.type != T_OBJECT)
+            errorf("tls_init_connection() for lightweight object.\n");
+        obj = ref_object(current_object.u.ob, "tls_init_connection");
     }
 
     if (!O_SET_INTERACTIVE(ip, obj))

@@ -180,9 +180,11 @@ short hook_type_map[NUM_DRIVER_HOOKS] =
     H_MOVE_OBJECT1: 0, \
     H_LOAD_UIDS:      SH(T_CLOSURE), \
     H_CLONE_UIDS:     SH(T_CLOSURE), \
+    H_LWOBJECT_UIDS:  SH(T_CLOSURE), \
     H_CREATE_SUPER:                 SH(T_STRING), \
     H_CREATE_OB:                    SH(T_STRING), \
     H_CREATE_CLONE:                 SH(T_STRING), \
+    H_CREATE_LWOBJECT:              SH(T_STRING), \
     H_RESET:                        SH(T_STRING), \
     H_CLEAN_UP:       SH(T_CLOSURE) SH(T_STRING), \
     H_MODIFY_COMMAND: SH(T_CLOSURE) SH(T_STRING) SH(T_MAPPING), \
@@ -1090,6 +1092,14 @@ static int simple_includes;
   /* Number of simple includes since the last real one.
    */
 
+static int num_lwo_calls;
+  /* Number of needed entries in the lightweight object call cache.
+   */
+
+static bool uses_non_lightweight_efuns;
+  /* The program calls efuns that are not suitable for lightweight objects.
+   */
+
 static p_uint last_include_start;
   /* Address in A_LINENUMBERS of the last include information.
    * It is used to remove information about includes which do
@@ -1111,7 +1121,10 @@ static const char * compiled_file;
 lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_float,
           _lpctype_int_array,     _lpctype_string_array, _lpctype_object_array,
           _lpctype_bytes_array,   _lpctype_string_bytes, _lpctype_string_or_bytes_array,
-          _lpctype_string_object, _lpctype_string_object_array;
+          _lpctype_string_object, _lpctype_string_object_array,
+          _lpctype_lwobject_array,_lpctype_any_object_or_lwobject,
+          _lpctype_any_object_or_lwobject_array,
+          _lpctype_any_object_or_lwobject_array_array;
 lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_any_array     = &_lpctype_any_array,
           *lpctype_int_float     = &_lpctype_int_float,
@@ -1122,7 +1135,11 @@ lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_string_bytes  = &_lpctype_string_bytes,
           *lpctype_string_or_bytes_array = &_lpctype_string_or_bytes_array,
           *lpctype_string_object = &_lpctype_string_object,
-          *lpctype_string_object_array = &_lpctype_string_object_array;
+          *lpctype_string_object_array = &_lpctype_string_object_array,
+          *lpctype_lwobject_array= &_lpctype_lwobject_array,
+          *lpctype_any_object_or_lwobject = &_lpctype_any_object_or_lwobject,
+          *lpctype_any_object_or_lwobject_array = &_lpctype_any_object_or_lwobject_array,
+          *lpctype_any_object_or_lwobject_array_array = &_lpctype_any_object_or_lwobject_array_array;
 
 
 /*-------------------------------------------------------------------------*/
@@ -1632,13 +1649,22 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
 
     case TCLASS_OBJECT:
         {
+            const char* obtypename = (type->t_object.type == OBJECT_REGULAR) ? "object" : "lwobject";
+            size_t obtypenamelen = strlen(obtypename);
+
             if (type->t_object.program_name)
             {
-                size_t len = 10 + mstrsize(type->t_object.program_name);
-                if(len < bufsize)
+                size_t proglen =  mstrsize(type->t_object.program_name);
+                size_t len = proglen + obtypenamelen + 4;
+                if (len < bufsize)
                 {
-                    memcpy(buf, "object \"/", 9);
-                    memcpy(buf+9, get_txt(type->t_object.program_name), len-10);
+                    char *bufptr = buf + obtypenamelen;
+
+                    memcpy(buf, obtypename, obtypenamelen);
+                    memcpy(bufptr, " \"/", 3);
+                    bufptr += 3;
+
+                    memcpy(bufptr, get_txt(type->t_object.program_name), proglen);
                     buf[len-1] = '"';
                     buf[len] = 0;
                     return len;
@@ -1651,7 +1677,7 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
             }
             else // any object
             {
-                snprintf(buf, bufsize, "object");
+                snprintf(buf, bufsize, "%s", obtypename);
                 return strlen(buf);
             }
         }
@@ -7446,6 +7472,7 @@ delete_prog_string (void)
 %token L_LE
 %token L_LOR
 %token L_LSH
+%token L_LWOBJECT
 %token L_MAPPING
 %token L_MIXED
 %token L_NE
@@ -8937,6 +8964,13 @@ single_basic_non_void_type:
     | L_OBJECT simple_string_constant
       {
           $$ = get_object_type(last_string_constant);
+          free_mstring(last_string_constant);
+          last_string_constant = NULL;
+      }
+    | L_LWOBJECT     { $$ = lpctype_any_lwobject; }
+    | L_LWOBJECT simple_string_constant
+      {
+          $$ = get_lwobject_type(last_string_constant);
           free_mstring(last_string_constant);
           last_string_constant = NULL;
       }
@@ -12667,6 +12701,25 @@ expr4:
                   GLOBAL_VARIABLE(varidx).usage = VAR_USAGE_READWRITE;
               }
           }
+          else if (ix >= CLOSURE_EFUN_OFFS && ix < CLOSURE_SIMUL_EFUN_OFFS)
+          {
+              /* Warn for lightweight objects */
+              if (instrs[ix - CLOSURE_EFUN_OFFS].no_lightweight)
+              {
+                  uses_non_lightweight_efuns = true;
+                  if (!pragma_no_lightweight && pragma_warn_lightweight)
+                      yywarnf("#'%s cannot be called from lightweight objects"
+                             , instrs[ix - CLOSURE_EFUN_OFFS].name);
+
+              }
+
+              /* Warn if the efun is deprecated */
+              if (pragma_warn_deprecated && instrs[ix - CLOSURE_EFUN_OFFS].deprecated != NULL)
+                  yywarnf("#'%s is deprecated: %s"
+                        , instrs[ix - CLOSURE_EFUN_OFFS].name
+                        , instrs[ix - CLOSURE_EFUN_OFFS].deprecated);
+          }
+
           ins_f_code(F_CLOSURE);
           ins_short(ix);
           ins_short(inhIndex);
@@ -14696,6 +14749,15 @@ function_call:
                   $$.type = get_fulltype(ref_lpctype(instrs[f].ret_type));
                   argp = &efun_arg_types[instrs[f].arg_index];
 
+                  /* Warn for lightweight objects */
+                  if (instrs[f].no_lightweight)
+                  {
+                      uses_non_lightweight_efuns = true;
+                      if (!pragma_no_lightweight && pragma_warn_lightweight)
+                          yywarnf("%s() cannot be called from lightweight objects"
+                                 , instrs[f].name);
+                  }
+
                   /* Warn if the efun is deprecated */
                   if (pragma_warn_deprecated && instrs[f].deprecated != NULL)
                       yywarnf("%s() is deprecated: %s"
@@ -15127,8 +15189,26 @@ function_call:
           else /* true call_other */
           {
               int call_instr = $2.strict_member ? F_CALL_STRICT : F_CALL_OTHER;
-              add_f_code(call_instr);
-              CURRENT_PROGRAM_SIZE++;
+
+              if ($1.type.t_type->t_class == TCLASS_OBJECT
+               && $1.type.t_type->t_object.type == OBJECT_LIGHTWEIGHT
+               && $3
+               && num_lwo_calls <= USHRT_MAX)
+              {
+                  /* Call to a single lightweight object with a constant function name
+                   * and we have space in the call cache, then we use the cached call
+                   * instruction here.
+                   */
+                  add_f_code($2.strict_member ? F_CALL_STRICT_CACHED : F_CALL_OTHER_CACHED);
+                  add_short(num_lwo_calls);
+                  CURRENT_PROGRAM_SIZE += 3;
+                  num_lwo_calls++;
+              }
+              else
+              {
+                  add_f_code(call_instr);
+                  CURRENT_PROGRAM_SIZE++;
+              }
               $$.type = get_fulltype(instrs[call_instr].ret_type);
 
               if (!check_unknown_type($1.type.t_type)
@@ -18423,6 +18503,15 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
 
     copy_structs(from, funmodifier & ~(TYPE_MOD_STATIC|TYPE_MOD_VIRTUAL));
 
+    if (from->flags & P_USE_NONLW_EFUNS)
+    {
+        uses_non_lightweight_efuns = true;
+
+        if (!pragma_no_lightweight && pragma_warn_lightweight)
+            yywarnf("program '%s' uses efuns that cannot be called from lightweight objects"
+                   , get_txt(from->name));
+    }
+
     return initializer;
 
 } /* inherit_program() */
@@ -18755,6 +18844,10 @@ init_compiler ()
     make_static_type(get_union_type(lpctype_string_array, lpctype_bytes_array), &_lpctype_string_or_bytes_array);
     make_static_type(get_union_type(lpctype_string, lpctype_any_object),&_lpctype_string_object);
     make_static_type(get_array_type(lpctype_string_object),         &_lpctype_string_object_array);
+    make_static_type(get_array_type(lpctype_any_lwobject),          &_lpctype_lwobject_array);
+    make_static_type(get_union_type(lpctype_any_object, lpctype_any_lwobject), &_lpctype_any_object_or_lwobject);
+    make_static_type(get_array_type(lpctype_any_object_or_lwobject), &_lpctype_any_object_or_lwobject_array);
+    make_static_type(get_array_type(lpctype_any_object_or_lwobject_array), &_lpctype_any_object_or_lwobject_array_array);
 } /* init_compiler() */
 
 /*-------------------------------------------------------------------------*/
@@ -18868,6 +18961,8 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", local_variables, context_variables 
     warned_deprecated_in = false;
 
     max_number_of_init_locals = 0;
+    num_lwo_calls = 0;
+    uses_non_lightweight_efuns = false;
 
     /* Check if call_other() has been replaced by a sefun.
      */
@@ -19397,6 +19492,7 @@ epilog (void)
         size += align(num_function_names * sizeof *prog->function_names);
         size += align(num_functions * sizeof *prog->functions);
         size += align(num_function_headers * sizeof *prog->function_headers);
+        size += align(num_lwo_calls * sizeof *prog->lwo_call_cache);
 
         /* Get the program structure */
         if ( !(p = xalloc(size)) )
@@ -19423,11 +19519,13 @@ epilog (void)
         prog->id_number =
           ++current_id_number ? current_id_number : renumber_programs();
         prog->flags = (pragma_no_clone ? P_NO_CLONE : 0)
+                    | (pragma_no_lightweight ? P_NO_LIGHTWEIGHT : 0)
                     | (pragma_no_inherit ? P_NO_INHERIT : 0)
                     | (pragma_no_shadow ? P_NO_SHADOW : 0)
                     | (pragma_share_variables ? P_SHARE_VARIABLES : 0)
                     | (pragma_rtt_checks ? P_RTT_CHECKS : 0)
                     | (pragma_warn_rtt_checks ? P_WARN_RTT_CHECKS : 0)
+                    | (uses_non_lightweight_efuns ? P_USE_NONLW_EFUNS : 0)
                     ;
 
         prog->load_time = current_time;
@@ -19596,6 +19694,19 @@ epilog (void)
             for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
                 free_lpctype(ARGUMENT_TYPE(i));
         }
+
+        /* Add the lightweight object call cache.
+         */
+        if (num_lwo_calls)
+        {
+            size_t block = align(num_lwo_calls * sizeof *prog->lwo_call_cache);
+
+            prog->lwo_call_cache = (call_cache_t*)p;
+            memset(p, 0, block);
+            p += block;
+        }
+        else
+            prog->lwo_call_cache = NULL;
 
         /* Add the linenumber information.
          */
@@ -19795,6 +19906,10 @@ clear_compiler_refs (void)
     clear_lpctype_ref(lpctype_string_or_bytes_array);
     clear_lpctype_ref(lpctype_string_object);
     clear_lpctype_ref(lpctype_string_object_array);
+    clear_lpctype_ref(lpctype_lwobject_array);
+    clear_lpctype_ref(lpctype_any_object_or_lwobject);
+    clear_lpctype_ref(lpctype_any_object_or_lwobject_array);
+    clear_lpctype_ref(lpctype_any_object_or_lwobject_array_array);
 }
 
 void
@@ -19820,6 +19935,10 @@ count_compiler_refs (void)
     count_lpctype_ref(lpctype_string_or_bytes_array);
     count_lpctype_ref(lpctype_string_object);
     count_lpctype_ref(lpctype_string_object_array);
+    count_lpctype_ref(lpctype_lwobject_array);
+    count_lpctype_ref(lpctype_any_object_or_lwobject);
+    count_lpctype_ref(lpctype_any_object_or_lwobject_array);
+    count_lpctype_ref(lpctype_any_object_or_lwobject_array_array);
 }
 
 #endif

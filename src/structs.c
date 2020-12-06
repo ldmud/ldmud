@@ -183,6 +183,8 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
+
 #include "../mudlib/sys/driver_info.h"
 #include "../mudlib/sys/struct_info.h"
 
@@ -470,9 +472,8 @@ struct_new (struct_type_t *pSType)
 
         pStruct->ref = 1;
         pStruct->type = ref_struct_type(pSType);
-        if (current_object)
-            pStruct->user = current_object->user;
-        else
+        pStruct->user = get_current_user();
+        if (!pStruct->user)
             pStruct->user = &default_wizlist_entry;
         for (num = pSType->num_members, svp = pStruct->member
             ; num-- > 0 ; svp++)
@@ -1497,13 +1498,13 @@ x_map_struct (svalue_t *sp, int num_arg)
         /* Loop through arr and res, mapping the values from arr */
         for (w = st->member, x = res->member; --cnt >= 0; w++, x++)
         {
-            if (current_object->flags & O_DESTRUCTED)
+            if (is_current_object_destructed())
                 continue;
 
             if (destructed_object_ref(w))
                 assign_svalue(w, &const0);
 
-            if (!callback_object(cb))
+            if (!valid_callback_object(cb))
                 errorf("object used by map_array destructed");
 
             push_svalue(w);

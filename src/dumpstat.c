@@ -23,6 +23,7 @@
 #include "filestat.h"
 #include "instrs.h"  /* F_RETURN, F_RETURN0 for overhead computation */
 #include "interpret.h"
+#include "lwobject.h"
 #include "mapping.h"
 #include "mstrings.h"
 #include "object.h"
@@ -229,6 +230,46 @@ svalue_size (svalue_t *v, mp_int * pTotal)
                  */
                 record->ref_count++;
                 return record->id_number / st->ref;
+            }
+        }
+        else
+            return 0;
+    }
+
+    case T_LWOBJECT:
+    {
+        lwobject_t *lwob = v->u.lwob;
+
+        if (lwob->ref)
+        {
+            struct pointer_record* record = find_add_pointer(ptable, lwob, MY_TRUE);
+            if (record->ref_count < 0)
+            {
+                /* New entry, determine the size. */
+                record->ref_count = 1;
+                record->id_number = 0;
+
+                overhead = sizeof *lwob
+                         + sizeof(svalue_t) * lwob->prog->num_variables;
+                for (i=0; i < lwob->prog->num_variables; i++)
+                {
+                    composite += svalue_size(&lwob->variables[i], &total);
+                    *pTotal += total;
+                }
+
+                *pTotal += overhead;
+
+                /* Record it for later occurrences. */
+                record->id_number = overhead + composite;
+                return record->id_number * record->ref_count / lwob->ref;
+            }
+            else
+            {
+                /* We have seen it. Don't need to add to the total,
+                 * but the the shared result.
+                 */
+                record->ref_count++;
+                return record->id_number / lwob->ref;
             }
         }
         else
@@ -474,6 +515,42 @@ svalue_size (svalue_t *v, mp_int * pTotal)
 
 /*-------------------------------------------------------------------------*/
 mp_int
+data_size_vec (svalue_t *vec, int size, mp_int * pTotal)
+
+/* Compute the memory usage of the data held by the vector <vec> of
+ * size <size> and return it. Shared data will only count according
+ * to its share.
+ *
+ * If <pTotal> is given, *<pTotal> is set to the raw datasize.
+ */
+
+{
+    mp_int total = 0;
+
+    if (pTotal != NULL)
+        *pTotal = 0;
+
+    if (!size)
+        return 0;
+
+    ptable = new_pointer_table();
+    if (!ptable)
+        errorf("(dumpstat) Out of memory for new pointer table.\n");
+
+    for (; size-- > 0; vec++)
+    {
+        mp_int tmp;
+        total += svalue_size(vec, &tmp) + sizeof (svalue_t);
+        if (pTotal != NULL)
+            *pTotal += tmp + sizeof(svalue_t);
+    }
+
+    free_pointer_table(ptable);
+    return total;
+} /* data_size_vec() */
+
+/*-------------------------------------------------------------------------*/
+mp_int
 data_size (object_t *ob, mp_int * pTotal)
 
 /* Compute the memory usage (modified to reflect shared data use)
@@ -484,27 +561,15 @@ data_size (object_t *ob, mp_int * pTotal)
  */
 
 {
-    mp_int total = sizeof(p_int); /* smalloc overhead */
-    int i;
-    svalue_t *svp;
-
-    if (pTotal != NULL)
-        *pTotal = total;
-
-    if (ob->flags & O_SWAPPED || !(i = ob->prog->num_variables) )
-        return 0;
-    ptable = new_pointer_table();
-    if (!ptable)
-        errorf("(dumpstat) Out of memory for new pointer table.\n");
-    for (svp = ob->variables; --i >= 0; svp++)
+    if ((ob->flags & O_SWAPPED) || !ob->prog->num_variables)
     {
-        mp_int tmp;
-        total += svalue_size(svp, &tmp) + sizeof (svalue_t);
         if (pTotal != NULL)
-            *pTotal += tmp + sizeof(svalue_t);
+            *pTotal = 0;
+
+        return 0;
     }
-    free_pointer_table(ptable);
-    return total;
+
+    return data_size_vec(ob->variables, ob->prog->num_variables, pTotal);
 } /* data_size() */
 
 /*-------------------------------------------------------------------------*/

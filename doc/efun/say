@@ -3,9 +3,9 @@ SYNOPSIS
         void say(string str, object exclude)
         void say(string str, object *excludes)
 
-        void say(mixed *|mapping|struct|object msg)
-        void say(mixed *|mapping|struct|object msg, object exclude)
-        void say(mixed *|mapping|struct|object msg, object *excludes)
+        void say(mixed *|mapping|struct|object|lwobject msg)
+        void say(mixed *|mapping|struct|object|lwobject msg, object exclude)
+        void say(mixed *|mapping|struct|object|lwobject msg, object *excludes)
 
 DESCRIPTION
         There are two major modes of calling:

@@ -1,13 +1,13 @@
 GESCHUETZT
 SYNOPSIS
-        mixed get_extra_wizinfo(object|string|int wiz)
+        mixed get_extra_wizinfo(object|lwobject|string|int wiz)
 
 BESCHREIBUNG
         Liefert die <extra> Information, die in der Wizlist fuer den
         angegebenen Gott <wiz> angegeben wurde.
 
-        Ist <wiz> ein Objekt, so wird der Eintrag des Erzeugers (UID)
-        verwendet.
+        Ist <wiz> ein normales oder leichtgewichtiges Objekt, so wird
+        der Eintrag des Erzeugers (UID) verwendet.
         Ist <wiz> ein String (ein Erzeuger oder eine UID), so bezeichnet er
         den Namen des Eintrags in der Wizlist, der gelesen werden soll.
         Ist <wiz> 0, wird der Standardeintrag aus der Wizlist genommen.

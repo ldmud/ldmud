@@ -5,7 +5,7 @@ SYNOPSIS
 
 DESCRIPTION
         Sets the option <what> to the value <data> on the object <ob>
-        or the default for all interactives if <ob> is 0.
+        or the default for all objects if <ob> is 0.
 
         If the first argument <ob> is not this_object(), the privilege
         violation ("configure_object", this_object(), ob, what, data)
@@ -46,4 +46,5 @@ HISTORY
         Introduced in LDMud 3.5.0.
 
 SEE ALSO
-        object_info(E), configure_interactive(E), configure_driver(E)
+        object_info(E), configure_interactive(E), configure_lwobject(E),
+        configure_driver(E)

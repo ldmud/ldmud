@@ -1,0 +1,35 @@
+SYNOPSIS
+        #include <sys/driver_hooks.h>
+
+        set_driver_hook(H_LWOBJECT_UIDS, value)
+
+        <value> being:
+
+          mixed <closure>(object blueprint)
+
+DESCRIPTION
+        Mandatory hook to determine the uid and euid of a lightweight
+        object. Hook setting can be any closure.
+
+        When a lightweight object is created, the H_LWOBJECT_UIDS hook
+        is called with the blueprint object as its argument.
+
+        For the result, the following possibilities exist (<num> is
+        a non-zero number, <no-string> is anything but a string):
+
+           "<uid>"                    -> uid = "<uid>", euid = "<uid>"
+           ({ "<uid>", "<euid>" })    -> uid = "<uid>", euid = "<euid>"
+           ({ "<uid>", <no-string> }) -> uid = "<uid>", euid = 0
+
+        If strict-euids is not active, the following results are
+        possible, too:
+
+           <num>                      -> uid = 0, euid = 0
+           ({ <num>, "<euid>" })      -> uid = 0, euid = "<euid>"
+           ({ <num>, <no-string> })   -> uid = 0, euid = 0
+
+HISTORY
+        LDMud 3.6.5 introduced lightweight objects.
+
+SEE ALSO
+        hooks(C), uids(C), load_uids(H), clone_uids(H)

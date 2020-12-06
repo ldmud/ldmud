@@ -135,7 +135,9 @@ DESCRIPTION
                                       the code.
 
                string[TRACE_OBJECT]:  The name of the object for which the code
-                                      was executed.
+                                      was executed. For lightweight objects
+                                      this is 0.
+
                int[TRACE_LOC]:
                    _TYPE_LAMBDA: current program offset from the start of the
                                  closure code.

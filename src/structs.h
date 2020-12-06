@@ -312,4 +312,14 @@ static INLINE void free_struct_member_data(struct_member_t *v)
     free_lpctype(v->type);
 }
 
+static INLINE void put_ref_struct(svalue_t * const dest, struct_t * const s)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_ref_struct(svalue_t * const dest, struct_t * const s)
+/* Put the struct <s> into <dest>, which is considered empty,
+ * and increment the refcount of <s>.
+ */
+{
+    *dest = svalue_struct(ref_struct(s));
+}
+
 #endif /* STRUCTS_H_ */

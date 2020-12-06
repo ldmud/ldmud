@@ -243,7 +243,8 @@ extern int total_lines;
 extern source_loc_t current_loc;
 extern pragma_cttype_checks_e pragma_strict_types;
 extern Bool pragma_save_types;
-extern Bool pragma_no_clone;
+extern bool pragma_no_clone;
+extern bool pragma_no_lightweight;
 extern Bool pragma_no_inherit;
 extern Bool pragma_no_shadow;
 extern Bool pragma_pedantic;
@@ -258,6 +259,7 @@ extern Bool pragma_rtt_checks;
 extern Bool pragma_warn_rtt_checks;
 extern bool pragma_no_bytes_type;
 extern bool pragma_warn_unused_variables;
+extern bool pragma_warn_lightweight;
 extern string_t *last_lex_string;
 extern ident_t *all_efuns;
 

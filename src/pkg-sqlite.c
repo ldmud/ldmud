@@ -265,7 +265,9 @@ f_sl_open (svalue_t *sp)
     sqlite_dbs_t *tmp;
     int err;
 
-    tmp = find_db (current_object);
+    if (current_object.type != T_OBJECT)
+        errorf("sl_open() without current object.\n");
+    tmp = find_db (current_object.u.ob);
     if (tmp)
         errorf("The current object already has a database open.\n");
 
@@ -288,8 +290,8 @@ f_sl_open (svalue_t *sp)
     }
    
     tmp->db = db;
-    tmp->obj = current_object;
-    current_object->open_sqlite_db = MY_TRUE;
+    tmp->obj = current_object.u.ob;
+    current_object.u.ob->open_sqlite_db = MY_TRUE;
 
     /* Synchronous is damn slow. Forget it. */
     sqlite3_exec(db, "PRAGMA synchronous = OFF", NULL, NULL, NULL);
@@ -359,7 +361,9 @@ v_sl_exec (svalue_t * sp, int num_arg)
 
     argp = sp - num_arg + 1; /* First argument: the SQL query */
     
-    db = find_db (current_object);
+    if (current_object.type != T_OBJECT)
+        errorf("sl_exec() without current object.\n");
+    db = find_db (current_object.u.ob);
     if (!db)
         errorf("The current object doesn't have a database open.\n");
     else if (db->busy)
@@ -563,7 +567,9 @@ f_sl_insert_id (svalue_t * sp)
  */
 
 {
-    sqlite_dbs_t *db = find_db(current_object);
+    if (current_object.type != T_OBJECT)
+        errorf("sl_insert_id() without current object.\n");
+    sqlite_dbs_t *db = find_db(current_object.u.ob);
     int id;
    
     if (!db)
@@ -591,13 +597,15 @@ f_sl_close (svalue_t * sp)
 
 {
     sqlite_dbs_t *db;
-    db = find_db(current_object);
+    if (current_object.type != T_OBJECT)
+        errorf("sl_close() without current object.\n");
+    db = find_db(current_object.u.ob);
     if (!db)
         errorf("The current object doesn't have a database open.\n");
     else if (db->busy)
         errorf("Reentrant call to the same database.\n");
 
-    sl_close(current_object);
+    sl_close(current_object.u.ob);
     return sp;
 } /* f_sl_close() */
 
@@ -718,12 +726,12 @@ sl_log (void* data UNUSED, int rc, const char* msg)
  */
 
 {
-    if (!current_object)
+    if (current_object.type != T_OBJECT)
         debug_message("%s SQLite: %s (rc=%d)\n", time_stamp(), msg, rc);
     else if ((rc & 0xff) == SQLITE_WARNING)
         warnf("SQLite: %s\n", msg);
     else
-        debug_message("%s SQLite (%s): %s (rc=%d)\n", time_stamp(), get_txt(current_object->name), msg, rc);
+        debug_message("%s SQLite (%s): %s (rc=%d)\n", time_stamp(), get_txt(current_object.u.ob->name), msg, rc);
 } /* sl_log() */
 
 /*-------------------------------------------------------------------------*/

@@ -1,0 +1,63 @@
+SYNOPSIS
+        lwobject new_lwobject(string name, ...)
+
+DESCRIPTION
+        Creates a new lightweight object from the program <name> and
+        returns it. The program will be loaded as a regular object,
+        called a blueprint, first, and then a lightweight object will
+        be created therefrom.
+
+        Note that the pathname must be complete, which means there are no
+        relative paths allowed. Any further arguments will be passed to
+        the H_CREATE_LWOBJECT hook to initialize the lightweight object.
+
+        If strict euids are enforced, the calling object must have a
+        non-zero euid.
+
+        Variable initialization is done similar to cloned objects with a call
+        to the internal lfun __INIT(). However, if #pragma share_variables is
+        in effect, the values for a lightweight object's variables are taken
+        from the current variables of the blueprint.
+
+        In the absence of share_variables, variables without explicit
+        initializers are initialized to 0.
+
+
+EXAMPLES
+        --- /lwo/stack.c ---
+        mixed* stack = ({});
+
+        int empty()
+        {
+            return sizeof(stack) == 0;
+        }
+
+        void push(mixed val)
+        {
+            stack += ({ val });
+        }
+
+        mixed pop()
+        {
+            mixed result;
+
+            if (empty())
+                raise_error("stack is empty.\n");
+
+            result = stack[<1];
+            stack = stack[..<2];
+            return result;
+        }
+
+        --- usage: ---
+        lwobject stack = new_lwobject("/lwo/stack");
+
+        stack.push("A");
+        return stack.pop();
+
+
+HISTORY
+        LDMud 3.6.5 introduced lightweight objects.
+
+SEE ALSO
+        blueprint(E), lwobjectp(E), load_name(E), uids(C), pragma(LPC)

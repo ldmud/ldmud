@@ -2,6 +2,7 @@
 #define MSTRINGS_H_ 1
 
 #include "driver.h"
+#include "svalue.h"
 #include "typedefs.h"
 
 #include "hash.h"
@@ -292,6 +293,36 @@ static INLINE void extract_cstr(char *d, const string_t *const s, size_t l)
         d[mstrsize(s)] = '\0';
     else
         d[l-1] = '\0';
+}
+
+static INLINE void put_ref_string(svalue_t * const dest, string_t * const str)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_ref_string(svalue_t * const dest, string_t * const str)
+/* Put the string <str> into <dest>, which is considered empty,
+ * and increment the refcount of <str>.
+ */
+{
+    *dest = svalue_string(ref_mstring(str));
+}
+
+static INLINE void put_ref_bytes(svalue_t * const dest, string_t * const str)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_ref_bytes(svalue_t * const dest, string_t * const str)
+/* Put the byte sequence <str> into <dest>, which is considered empty,
+ * and increment the refcount of <str>.
+ */
+{
+    *dest = svalue_bytes(ref_mstring(str));
+}
+
+static INLINE void put_ref_symbol(svalue_t * const dest, string_t * const str, const ph_int numquotes)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_ref_symbol(svalue_t * const dest, string_t * const str, const ph_int numquotes)
+/* Put the symbol <str> with <numquotes> number of quotes into <dest>,
+ * which is considered empty, and increment the refcount of <str>.
+ */
+{
+    *dest = svalue_symbol(ref_mstring(str), numquotes);
 }
 
 /* A handful of shorthands for commonly used functions */

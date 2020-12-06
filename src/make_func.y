@@ -275,9 +275,10 @@
   /* Size of the arg_types[] array.
    */
 
-#define MF_TYPE_MOD_POINTER   0x10000
-#define MF_TYPE_MOD_REFERENCE 0x20000
-#define MF_TYPE_MOD_LVALUE    0x40000
+#define MF_TYPE_MOD_POINTER         0x10000
+#define MF_TYPE_MOD_POINTER_POINTER 0x20000
+#define MF_TYPE_MOD_REFERENCE       0x40000
+#define MF_TYPE_MOD_LVALUE          0x80000
   /* Type modifier for array and reference types.
    * These values are bitflags which are |'ed onto the type values
    * produced by the parser (INT, STRING, etc).
@@ -431,6 +432,7 @@ static long lpc_types[MAX_ARGTYPES];
 #    define LPC_T_STRUCT        (1 << 11)
 #    define LPC_T_NULL          (1 << 12)
 #    define LPC_T_BYTES         (1 << 13)
+#    define LPC_T_LWOBJECT      (1 << 14)
 
 
 static int last_current_type = 0;
@@ -665,9 +667,9 @@ check_for_duplicate_string (const char *key, const char *buf)
 %token NAME ID
 
 %token VOID INT STRING BYTES BYTES_OR_STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
-%token MIXED UNKNOWN NUL STRUCT
+%token MIXED UNKNOWN NUL STRUCT LWOBJECT OBJECT_OR_LWOBJECT
 
-%token DEFAULT
+%token DEFAULT NO_LIGHTWEIGHT
 
 %token CODES EFUNS TEFUNS END
 
@@ -676,7 +678,7 @@ check_for_duplicate_string (const char *key, const char *buf)
 %token LVALUE
 
 %type <number> VOID MIXED UNKNOWN NUL STRUCT
-%type <number> INT STRING BYTES OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
+%type <number> INT STRING BYTES OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY LWOBJECT
 %type <number> basic arg_type
   /* Value is the basic type value
    */
@@ -708,6 +710,8 @@ check_for_duplicate_string (const char *key, const char *buf)
 %type <string> ID optional_ID optional_default NAME optional_name
   /* Value is the parsed identifier or NULL (resp. "" for optional_ID).
    */
+
+%type <number> optional_no_lightweight
 
 %%
 
@@ -751,12 +755,12 @@ code:     optional_name ID optional_optype
         num_instr[current_code_class]++;
 
         if ($3 == 0)
-            sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, NULL , -1, -1, false, \"%s\", NULL },\n"
+            sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, NULL , -1, -1, false, false, \"%s\", NULL },\n"
                         , classprefix[instr[num_buff].code_class]
                         , f_name, classtag[instr[num_buff].code_class]
                         , $1);
         else
-            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, 0, &_lpctype_mixed, -1, -1, false, \"%s\", NULL },\n"
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, 0, &_lpctype_mixed, -1, -1, false, false, \"%s\", NULL },\n"
                         , classprefix[instr[num_buff].code_class]
                         , f_name, classtag[instr[num_buff].code_class]
                         , $3, $3
@@ -783,7 +787,10 @@ optional_ID:   ID
 optional_default:   DEFAULT ':' ID { $$ = $3; }
                   | /* empty */    { $$ = "0"; } ;
 
-func: utype ID optional_ID '(' arg_list optional_default ')' optional_name ';'
+optional_no_lightweight: NO_LIGHTWEIGHT { $$ = 1; }
+                       | /* empty */    { $$ = 0; }
+
+func: utype ID optional_ID '(' arg_list optional_default ')' optional_no_lightweight optional_name ';'
     {
         char buff[500];
         char *f_name;
@@ -942,29 +949,31 @@ func: utype ID optional_ID '(' arg_list optional_default ')' optional_name ';'
 
             tag = (code_class == C_EFUN) ? classtag[C_CODE] : classtag[code_class];
 
-            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, %s, %d, %d, %s, \"%s\""
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, %s, %d, %d, %s, %s, \"%s\""
                         , f_prefix, f_name, tag
                         , unlimit_max ? -1 : max_arg, min_arg
                         , $6, lpctypestr($1 & ~MF_TYPE_MOD_REFERENCE)
                         , arg_index, lpc_index
                         , ($1 & MF_TYPE_MOD_REFERENCE) ? "true" : "false"
+                        , $8 ? "true" : "false"
                         , $2
                    );
 
         }
         else
         {
-            sprintf(buff, "{ 0, 0, %d, %d, %s, %s, %d, %d, %s, \"%s\""
+            sprintf(buff, "{ 0, 0, %d, %d, %s, %s, %d, %d, %s, %s, \"%s\""
                         , unlimit_max ? -1 : max_arg, min_arg
                         , $6, lpctypestr($1 & ~MF_TYPE_MOD_REFERENCE)
                         , arg_index, lpc_index
                         , ($1 & MF_TYPE_MOD_REFERENCE) ? "true" : "false"
+                        , $8 ? "true" : "false"
                         , $2
                    );
         }
 
-        if ($8 != NULL)
-            sprintf(buff+strlen(buff), ", \"%s\"", $8);
+        if ($9 != NULL)
+            sprintf(buff+strlen(buff), ", \"%s\"", $9);
         else
             strcat(buff, ", NULL");
 
@@ -992,10 +1001,11 @@ func: utype ID optional_ID '(' arg_list optional_default ')' optional_name ';'
 type: basic opt_star opt_ref { $$ = $1 | $2 | $3; };
 
 basic: VOID | INT | STRING | BYTES | MAPPING | FLOAT | MIXED | OBJECT | CLOSURE |
-        UNKNOWN | SYMBOL | QUOTED_ARRAY | STRUCT | NUL ;
+        UNKNOWN | SYMBOL | QUOTED_ARRAY | STRUCT | LWOBJECT | NUL ;
 
-opt_star : '*' { $$ = MF_TYPE_MOD_POINTER; }
-        |      { $$ = 0;                   } ;
+opt_star : '*'     { $$ = MF_TYPE_MOD_POINTER;         }
+        |  '*' '*' { $$ = MF_TYPE_MOD_POINTER_POINTER; }
+        |          { $$ = 0;                           } ;
 
 opt_ref : '&'    { $$ = MF_TYPE_MOD_REFERENCE; }
         | LVALUE { $$ = MF_TYPE_MOD_LVALUE;    }
@@ -1008,6 +1018,8 @@ arg_list: /* empty */             { $$ = 0; }
 basic_utype: basic
            | STRING '|' BYTES     { $$ = BYTES_OR_STRING; };
            | BYTES  '|' STRING    { $$ = BYTES_OR_STRING; };
+           | OBJECT '|' LWOBJECT  { $$ = OBJECT_OR_LWOBJECT; }
+           | LWOBJECT '|' OBJECT  { $$ = OBJECT_OR_LWOBJECT; }
 
 utype: basic_utype opt_star opt_ref  { $$ = $1 | $2 | $3; };
 
@@ -1138,6 +1150,7 @@ static struct type types[]
     , { "null",         NUL }
     , { "unknown",      UNKNOWN }
     , { "struct",       STRUCT }
+    , { "lwobject",     LWOBJECT }
     };
 
 /*-------------------------------------------------------------------------*/
@@ -1613,12 +1626,16 @@ name_to_hook(char *name)
         return H_LOAD_UIDS;
     if ( !strcmp(name, "CLONE_UIDS") )
         return H_CLONE_UIDS;
+    if ( !strcmp(name, "LWOBJECT_UIDS") )
+        return H_LWOBJECT_UIDS;
     if ( !strcmp(name, "CREATE_SUPER") )
         return H_CREATE_SUPER;
     if ( !strcmp(name, "CREATE_OB") )
         return H_CREATE_OB;
     if ( !strcmp(name, "CREATE_CLONE") )
         return H_CREATE_CLONE;
+    if ( !strcmp(name, "CREATE_LWOBJECT") )
+        return H_CREATE_LWOBJECT;
     if ( !strcmp(name, "RESET") )
         return H_RESET;
     if ( !strcmp(name, "CLEAN_UP") )
@@ -2143,6 +2160,8 @@ ident (char c)
         }
         if (strcmp(buff, "default") == 0)
             return DEFAULT;
+        if (strcmp(buff, "no_lightweight") == 0)
+            return NO_LIGHTWEIGHT;
     }
 
     if ( parsetype == PARSE_FUNC_SPEC && C_IS_CODE(current_code_class) )
@@ -2192,6 +2211,16 @@ type_str (int n)
                 if (strlen(types[i].name) + 3 > sizeof buff)
                     fatal("Local buffer too small in type_str()!\n");
                 sprintf(buff, "%s *", types[i].name);
+                return buff;
+            }
+
+            if (n & MF_TYPE_MOD_POINTER_POINTER)
+            {
+                static char buff[100];
+
+                if (strlen(types[i].name) + 4 > sizeof buff)
+                    fatal("Local buffer too small in type_str()!\n");
+                sprintf(buff, "%s **", types[i].name);
                 return buff;
             }
             return types[i].name;
@@ -2457,6 +2486,7 @@ etype (long n)
     CONVERT(LPC_T_QUOTED_ARRAY, "TF_QUOTED_ARRAY");
     CONVERT(LPC_T_NULL, "TF_NULL");
     CONVERT(LPC_T_STRUCT, "TF_STRUCT");
+    CONVERT(LPC_T_LWOBJECT, "TF_LWOBJECT");
 
 #   undef CONVERT
 
@@ -2483,10 +2513,10 @@ type2flag (int n)
     if (n & MF_TYPE_MOD_REFERENCE)
         return LPC_T_LVALUE;
 
-    if (n & MF_TYPE_MOD_POINTER)
+    if (n & (MF_TYPE_MOD_POINTER|MF_TYPE_MOD_POINTER_POINTER))
         return LPC_T_POINTER;
 
-    n &= ~(MF_TYPE_MOD_REFERENCE|MF_TYPE_MOD_LVALUE|MF_TYPE_MOD_POINTER);
+    n &= ~(MF_TYPE_MOD_REFERENCE|MF_TYPE_MOD_LVALUE|MF_TYPE_MOD_POINTER|MF_TYPE_MOD_POINTER);
 
     switch(n) {
       case VOID:    return 0;            break;
@@ -2504,6 +2534,7 @@ type2flag (int n)
       case QUOTED_ARRAY:
         return LPC_T_QUOTED_ARRAY; break;
       case STRUCT:  return LPC_T_STRUCT;  break;
+      case LWOBJECT:return LPC_T_LWOBJECT; break;
     default: yyerror("(type2flag) Bad type!"); return 0;
     }
 } /* type2flag() */
@@ -2527,7 +2558,9 @@ lpctypestr (int n)
                     p = "&_lpctype_string_bytes"; break;
       case INT:     p = "&_lpctype_int";          break;
       case OBJECT:  p = "&_lpctype_any_object";   break;
+      case LWOBJECT:p = "&_lpctype_any_lwobject"; break;
       case MAPPING: p = "&_lpctype_mapping";      break;
+      case STRUCT:  p = "&_lpctype_any_struct";   break;
       case FLOAT:   p = "&_lpctype_float";        break;
       case CLOSURE: p = "&_lpctype_closure";      break;
       case SYMBOL:  p = "&_lpctype_symbol";       break;
@@ -2536,6 +2569,9 @@ lpctypestr (int n)
       case NUL:     p = "NULL";                   break;
       case QUOTED_ARRAY:
                     p = "&_lpctype_quoted_array"; break;
+      case OBJECT_OR_LWOBJECT:
+                    p = "&_lpctype_any_object_or_lwobject";
+                                                  break;
 
       case MF_TYPE_MOD_POINTER|MIXED:
                     p = "&_lpctype_any_array";    break;
@@ -2550,8 +2586,16 @@ lpctypestr (int n)
                                                   break;
       case MF_TYPE_MOD_POINTER|OBJECT:
                     p = "&_lpctype_object_array"; break;
+      case MF_TYPE_MOD_POINTER|LWOBJECT:
+                    p = "&_lpctype_lwobject_array";
+                                                  break;
+      case MF_TYPE_MOD_POINTER|OBJECT_OR_LWOBJECT:
+                    p = "&_lpctype_any_object_or_lwobject_array";
+                                                  break;
 
-      case STRUCT:  p = "&_lpctype_any_struct";   break;
+      case MF_TYPE_MOD_POINTER_POINTER|OBJECT_OR_LWOBJECT:
+                    p = "&_lpctype_any_object_or_lwobject_array_array";
+                                                  break;
       default: yyerror("(lpctypestr) Bad type!"); return 0;
     }
 

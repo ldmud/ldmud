@@ -132,5 +132,15 @@ static INLINE p_int deref_array(vector_t *a) {
     return --a->ref;
 }
 
+static INLINE void put_ref_array(svalue_t * const dest, vector_t * const vec)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_ref_array(svalue_t * const dest, vector_t * const vec)
+/* Put the array <vec> into <dest>, which is considered empty,
+ * and increment the refcount of <vec>.
+ */
+{
+    *dest = svalue_array(ref_array(vec));
+}
+
 
 #endif /* ARRAY_H__ */

@@ -1,5 +1,5 @@
 SYNOPSIS
-        string getuid(object ob)
+        string getuid(object|lwobject ob)
 
 DESCRIPTION
         User-ids are not used in compat mode.

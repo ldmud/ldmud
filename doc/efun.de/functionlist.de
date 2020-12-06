@@ -3,7 +3,7 @@ SYNOPSIS
         #include <functionlist.h>
         #include <lpctypes.h>
 
-        mixed * functionlist(object ob, int flags)
+        mixed * functionlist(object|lwobject|string ob, int flags)
 
 BESCHREIBUNG
         Liefert ein Array mit Informationen zu den Lfuns von <ob>. Fuer jede
@@ -14,8 +14,9 @@ BESCHREIBUNG
           - den Rueckgabetyp (aufgelistet in <lpctypes.h>)
           - die Anzahl Argumente, die die Funktion akzeptiert.
 
-        <ob> kann als echtes Objekt oder als Objektname uebergeben werden. Im
-        zweiten Fall versucht die Efun nicht, das Objekt vorher zu laden.
+        <ob> kann als normales oder leichtgewichtiges Objekt oder als
+        Objektname uebergeben werden. Im zweiten Fall versucht die Efun
+        nicht, das Objekt vorher zu laden.
 
         <flags> bestimmt sowohl, welche Informationen im Ergebnis gesammelt
         werden, als auch, fuer welche Funktionen die Pruefung durchgefuehrt

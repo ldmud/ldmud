@@ -143,6 +143,7 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/comm.h"
@@ -717,16 +718,24 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
     fprintf(stderr, "%s ", ts);
     vfprintf(stderr, fmt, va);
     fflush(stderr);
-    if (current_object)
-        fprintf(stderr, "%s Current object was %s\n"
-                      , ts, current_object->name
-                            ? get_txt(current_object->name) : "<null>");
     debug_message("%s ", ts);
     vdebug_message(fmt, va);
-    if (current_object)
+    if (current_object.type == T_OBJECT)
+    {
+        fprintf(stderr, "%s Current object was %s\n"
+                      , ts, current_object.u.ob->name
+                            ? get_txt(current_object.u.ob->name) : "<null>");
         debug_message("%s Current object was %s\n"
-                     , ts, current_object->name
-                           ? get_txt(current_object->name) : "<null>");
+                     , ts, current_object.u.ob->name
+                           ? get_txt(current_object.u.ob->name) : "<null>");
+    }
+    else if (current_object.type == T_LWOBJECT)
+    {
+        fprintf(stderr, "%s Current object was lightweight from %s\n"
+                      , ts, get_txt(current_object.u.ob->name));
+        debug_message("%s Current object was lightweight from %s\n"
+                     , ts, get_txt(current_object.u.lwob->prog->name));
+    }
     debug_message("%s Dump of the call chain:\n", ts);
     (void)dump_trace(MY_TRUE, NULL, NULL); fflush(stdout);
 
@@ -1587,8 +1596,8 @@ add_discarded_message (interactive_t *ip)
     {
         if (driver_hook[H_MSG_DISCARDED].x.closure_type == CLOSURE_LAMBDA)
         {
-            free_object(driver_hook[H_MSG_DISCARDED].u.lambda->ob, "add_discarded_message");
-            driver_hook[H_MSG_DISCARDED].u.lambda->ob = ref_object(ip->ob, "add_discarded_message");
+            free_svalue(&(driver_hook[H_MSG_DISCARDED].u.lambda->ob));
+            put_ref_object(&(driver_hook[H_MSG_DISCARDED].u.lambda->ob), ip->ob, "add_discarded_message");
         }
 
         push_ref_valid_object(inter_sp, ip->ob, "add_discarded_message");
@@ -2530,15 +2539,13 @@ get_message (char *buff, size_t *bufflength)
                            )
                         {
                             svalue_t *erqp = &pending_erq[handle].fun;
-                            object_t *ob;
+                            svalue_t ob;
                             wiz_list_t *user;
                             int num_arg;
 
                             command_giver = 0;
                             current_interactive = 0;
-                            ob = !CLOSURE_MALLOCED(erqp->x.closure_type)
-                                 ? erqp->u.ob
-                                 : erqp->u.lambda->ob;
+                            ob = get_bound_object(*erqp);
                             if (pending_erq[handle].string_arg)
                             {
                                 string_t * str;
@@ -2556,7 +2563,7 @@ get_message (char *buff, size_t *bufflength)
 
                                 current_object = ob;
                                 v = allocate_array(rest);
-                                current_object = NULL;
+                                clear_current_object();
                                 push_array(inter_sp, v);
                                 push_number(inter_sp, rest);
                                 cp = (unsigned char *)rp + 8;
@@ -2568,7 +2575,7 @@ get_message (char *buff, size_t *bufflength)
                                 num_arg = 2;
                             }
 
-                            user = ob->user;
+                            user = (ob.type == T_OBJECT) ? ob.u.ob->user : ob.u.lwob->user;
                             if (user->last_call_out != current_time)
                             {
                                 user->last_call_out = current_time;
@@ -2579,7 +2586,8 @@ get_message (char *buff, size_t *bufflength)
                             RESET_LIMITS;
                             secure_callback_lambda(erqp, num_arg);
                             user->call_out_cost = eval_cost;
-                            if (!keep_handle || (ob->flags & O_DESTRUCTED))
+                            if (!keep_handle
+                             || (ob.type == T_OBJECT && (ob.u.ob->flags & O_DESTRUCTED)))
                             {
                                 free_svalue(erqp);
                                 erqp->type = T_INVALID;
@@ -2690,7 +2698,7 @@ get_message (char *buff, size_t *bufflength)
                 {
                     command_giver = NULL;
                     current_interactive = NULL;
-                    current_object = NULL;
+                    clear_current_object();
                     trace_level = 0;
 #ifndef USE_IPV6
                     ipaddr_str = inet_ntoa(addr.sin_addr);
@@ -3103,7 +3111,7 @@ remove_interactive (object_t *ob, Bool force)
     object_t *save = command_giver;
     int i;
     interactive_t *interactive;
-    object_t * curobj_save = current_object;
+    svalue_t curobj_save = current_object;
     int save_privilege;
 
     interactive = O_GET_INTERACTIVE(ob);
@@ -3119,7 +3127,7 @@ remove_interactive (object_t *ob, Bool force)
         fatal("Double call to remove_interactive()\n");
 
     interactive->closing = MY_TRUE;
-    current_object = ob;
+    set_current_object(ob);
 
     /* If the object is not destructed, save any ed buffers. */
 
@@ -3704,7 +3712,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
         }
 
         xallocate(cb, sizeof(*cb), "logon tls-callback structure");
-        setup_function_callback(cb, current_interactive, STR_LOGON, 0, NULL);
+        setup_function_callback(cb, svalue_object(current_interactive), STR_LOGON, 0, NULL);
         new_interactive->tls_cb = cb;
 
     }
@@ -3774,10 +3782,8 @@ set_noecho (interactive_t *ip, char noecho, Bool local_change, Bool external)
                 {
                     if (driver_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
                     {
-                        free_object(driver_hook[H_NOECHO].u.lambda->ob
-                                   , "set_noecho");
-                        driver_hook[H_NOECHO].u.lambda->ob
-                          = ref_object(ob, "set_noecho");
+                        free_svalue(&(driver_hook[H_NOECHO].u.lambda->ob));
+                        put_ref_object(&(driver_hook[H_NOECHO].u.lambda->ob), ob, "set_noecho");
                     }
                     secure_call_lambda(&driver_hook[H_NOECHO], 3, external);
                 }
@@ -3941,24 +3947,30 @@ call_input_to (interactive_t *i, char *str, size_t length, input_to_t *it)
       /* Current input_to, static so that longjmp() won't clobber it. */
 
     struct error_recovery_info error_recovery_info;
-    object_t   *ob;   /* object holding <function> */
+    svalue_t ob;   /* object holding <function> */
 
 
     /* We got the right input_to_t. Check if it's still valid. */
     ob = callback_object(&(it->fun));
-    if (!ob)
+    switch (ob.type)
     {
-        /* Sorry, the object has selfdestructed ! */
-        free_input_to(it);
-        return MY_FALSE;
-    }
+        case T_OBJECT:
+            if (O_PROG_SWAPPED(ob.u.ob) && load_ob_from_swap(ob.u.ob) < 0)
+            {
+                free_input_to(it);
+                errorf("Out of memory: unswap object '%s'.\n", get_txt(ob.u.ob->name));
+                return MY_FALSE;
+            }
+            break;
 
-    if (O_PROG_SWAPPED(ob)
-     && load_ob_from_swap(ob) < 0)
-    {
-        free_input_to(it);
-        errorf("Out of memory: unswap object '%s'.\n", get_txt(ob->name));
-        return MY_FALSE;
+        case T_LWOBJECT:
+            break;
+
+        case T_NUMBER:
+        default:
+            /* Sorry, the object has selfdestructed ! */
+            free_input_to(it);
+            return MY_FALSE;
     }
 
     /* Clear the input_to() reference in case the function called
@@ -4204,26 +4216,23 @@ print_prompt_string (string_t *prompt)
 
     if (hook->type == T_CLOSURE)
     {
-        object_t *ob;
+        svalue_t ob;
 
         /* Needed for clean error recovery */
 
-        previous_ob = 0;
-        current_object = command_giver;
+        previous_ob = const0;
+        set_current_object(command_giver);
 
         /* Check if the object the closure is bound to still exists.
          * If not, erase the hook, print the prompt using add_message(),
          * then throw an error.
          */
-        ob = !CLOSURE_MALLOCED(hook->x.closure_type)
-             ? hook->u.ob
-             : hook->u.lambda->ob;
-
-        if (ob->flags & O_DESTRUCTED)
+        ob = get_bound_object(*hook);
+        if (ob.type == T_OBJECT && (ob.u.ob->flags & O_DESTRUCTED))
         {
             free_svalue(hook);
             put_number(hook, 0);
-            current_object = NULL; /* So that catch_tell() can see it */
+            clear_current_object(); /* So that catch_tell() can see it */
             add_message_str(prompt);
             errorf("H_PRINT_PROMPT for %s was a closure bound to a "
                    "now-destructed object - hook removed.\n", 
@@ -4242,7 +4251,7 @@ print_prompt_string (string_t *prompt)
     }
     else
     {
-        current_object = NULL; /* So that catch_tell() can see it */
+        clear_current_object(); /* So that catch_tell() can see it */
         add_message_str(prompt);
     }
 } /* print_prompt_string() */
@@ -4260,8 +4269,8 @@ print_prompt (void)
 {
     interactive_t *ip;
     svalue_t *prompt = NULL;
-    object_t * save_current = current_object;
-    object_t * save_previous = previous_ob;
+    svalue_t save_current = current_object;
+    svalue_t save_previous = previous_ob;
     Bool usingDefaultPrompt = MY_FALSE;
 
 #ifdef DEBUG
@@ -4288,22 +4297,19 @@ print_prompt (void)
 
     if (prompt->type == T_CLOSURE)
     {
-        object_t *ob;
+        svalue_t ob;
 
         /* Needed for clean error recovery */
 
-        previous_ob = 0;
-        current_object = command_giver;
+        previous_ob = const0;
+        set_current_object(command_giver);
 
         /* Check if the object the closure is bound to still exists.
          * If not, restore the prompt to the default (this also works with
          * the default prompt driver hook), then throw an error.
          */
-        ob = !CLOSURE_MALLOCED(prompt->x.closure_type)
-             ? prompt->u.ob
-             : prompt->u.lambda->ob;
-
-        if (ob && ob->flags & O_DESTRUCTED)
+        ob = get_bound_object(*prompt);
+        if (ob.type == T_OBJECT && (ob.u.ob->flags & O_DESTRUCTED))
         {
             free_svalue(prompt);
             put_ref_string(prompt, STR_DEFAULT_PROMPT);
@@ -4774,8 +4780,8 @@ h_telnet_neg (int n)
     {
         if (driver_hook[H_TELNET_NEG].x.closure_type == CLOSURE_LAMBDA)
         {
-            free_object(driver_hook[H_TELNET_NEG].u.lambda->ob, "h_telnet_neg");
-            driver_hook[H_TELNET_NEG].u.lambda->ob = ref_object(command_giver, "h_telnet_neg");
+            free_svalue(&(driver_hook[H_TELNET_NEG].u.lambda->ob));
+            put_ref_object(&(driver_hook[H_TELNET_NEG].u.lambda->ob), command_giver, "h_telnet_neg");
         }
         svp = secure_callback_lambda(&driver_hook[H_TELNET_NEG], n);
     }
@@ -5500,7 +5506,7 @@ telnet_neg (interactive_t *ip)
 
                         if (size >= 0
                          && (size <= (mp_int)max_array_size || !max_array_size)
-                         && (current_object = ip->ob,  v = allocate_array(size)))
+                         && (set_current_object(ip->ob),  v = allocate_array(size)))
                         {
                             unsigned char *str = (unsigned char *)ip->text + ip->tn_start;
                             svalue_t *svp;
@@ -5871,7 +5877,7 @@ f_attach_erq_demon (svalue_t *sp)
         put_number(sp, 0);
         /* we need to read sp[1] below, thus don't overwrite it now. */
         if (privilege_violation4(STR_ATTACH_ERQ_DEMON,
-            ob, 0, sp[1].u.number, sp+1))
+            svalue_object(ob), 0, sp[1].u.number, sp+1))
         {
             if (erq_demon != FLAG_NO_ERQ) {
                 if (sp[1].u.number & 1) {
@@ -5904,7 +5910,7 @@ f_attach_erq_demon (svalue_t *sp)
         sp--;
         n = 0;
         if (privilege_violation4(STR_ATTACH_ERQ_DEMON,
-            0, suffix, sp[1].u.number, sp+1))
+            const0, suffix, sp[1].u.number, sp+1))
         {
             char *native = convert_path_str_to_native_or_throw(suffix);
             if (erq_demon != FLAG_NO_ERQ)
@@ -6055,7 +6061,7 @@ f_send_erq (svalue_t *sp)
 
     /* Test if this call is allowed. */
 
-    if (!privilege_violation4(STR_SEND_ERQ, 0, STR_EMPTY
+    if (!privilege_violation4(STR_SEND_ERQ, const0, STR_EMPTY
                              , erq_request & (~ERQ_CB_STRING)
                              , sp))
     {
@@ -6282,8 +6288,7 @@ remove_stale_player_data (void)
             if (ih->type == INPUT_TO)
             {
                 input_to_t *tmp = (input_to_t*) ih;
-                ob = callback_object(&(tmp->fun));
-                if (ob)
+                if (valid_callback_object(&(tmp->fun)))
                 {
                     prev = ih;
                     ih = ih->next;
@@ -6825,6 +6830,7 @@ f_binary_message (svalue_t *sp)
     mp_int wrote = 0, i;
     svalue_t *svp;
     interactive_t *ip;
+    object_t *ob;
     object_t *save_command_giver;
 
     /* Set message to the data to be sent, and size to its length. */
@@ -6862,11 +6868,13 @@ f_binary_message (svalue_t *sp)
     /* Send the message */
 
     i = 0;
-    if (O_SET_INTERACTIVE(ip, current_object)
+    if ((ob = get_current_object()) != NULL
+     && O_SET_INTERACTIVE(ip, ob)
      && !ip->do_close)
     {
         save_command_giver = command_giver;
-        command_giver = current_object;
+        command_giver = ob;
+        set_current_object(ob);
 
         if (sp->u.number & 1)
         {
@@ -7184,7 +7192,7 @@ v_input_to (svalue_t *sp, int num_arg)
     }
 
     if ((flags & IGNORE_BANG)
-     && !privilege_violation4(STR_INPUT_TO, command_giver, 0, flags, sp))
+     && !privilege_violation4(STR_INPUT_TO, svalue_object(command_giver), 0, flags, sp))
     {
         do
         {
@@ -7199,7 +7207,7 @@ v_input_to (svalue_t *sp, int num_arg)
      * the current object or the command_giver - return as if the call was
      * denied.
      */
-    if (!check_object(current_object) || !check_object(command_giver))
+    if (is_current_object_destructed() || !check_object(command_giver))
     {
 	do
 	{
@@ -7253,7 +7261,7 @@ v_input_to (svalue_t *sp, int num_arg)
     /* At this point the call back should be bound to an existing object - but
      * as a sanity check we test it.
      */
-    if (NULL == callback_object(&(it->fun)))
+    if (!valid_callback_object(&(it->fun)))
     {
         free_input_to(it);
 	put_number(arg, 0); /* arg should equal sp+1 */
@@ -7423,7 +7431,7 @@ v_find_input_to (svalue_t *sp, int num_arg)
 
 /* EFUN: find_input_to()
  *
- *   int find_input_to (object player, string|closure|object fun)
+ *   int find_input_to (object player, string|closure|object|lwobject fun)
  *   int find_input_to (object player, object ob, string fun)
  *
  * Find the input_to most recently added to the interactive <player> object
@@ -7447,17 +7455,16 @@ v_find_input_to (svalue_t *sp, int num_arg)
 
     if (num_arg > 2)
     {
-        if (arg[1].type == T_OBJECT && num_arg > 2 && arg[2].type != T_STRING)
+        if (arg[1].type != T_OBJECT && arg[1].type != T_LWOBJECT)
         {
-            vefun_bad_arg(3, sp);
+            vefun_bad_arg(2, sp);
             /* NOTREACHED */
             return NULL;
         }
 
-        if (arg[1].type != T_OBJECT
-           )
+        if (arg[2].type != T_STRING)
         {
-            vefun_bad_arg(2, sp);
+            vefun_bad_arg(3, sp);
             /* NOTREACHED */
             return NULL;
         }
@@ -7505,7 +7512,7 @@ v_find_input_to (svalue_t *sp, int num_arg)
             case T_OBJECT:
                 if (num_arg > 2)
                 {
-                    if (callback_object(&(it->fun)) == arg[1].u.ob
+                    if (object_svalue_eq(callback_object(&(it->fun)), arg[1])
                      && !it->fun.is_lambda
                      && it->fun.function.named.name == arg[2].u.str
                        )
@@ -7513,7 +7520,7 @@ v_find_input_to (svalue_t *sp, int num_arg)
                 }
                 else
                 {
-                    if (callback_object(&(it->fun)) == arg[1].u.ob)
+                    if (object_svalue_eq(callback_object(&(it->fun)), arg[1]))
                         found = MY_TRUE;
                 }
                 break;
@@ -7562,8 +7569,8 @@ v_remove_input_to (svalue_t *sp, int num_arg)
 /* EFUN: remove_input_to()
  *
  *   int remove_input_to (object player)
- *   int remove_input_to (object player, string|closure|object fun)
- *   int remove_input_to (object player, object ob, string fun)
+ *   int remove_input_to (object player, string|closure|object|lwobject fun)
+ *   int remove_input_to (object player, object|lwobject ob, string fun)
  *
  * Remove a pending input_to from the interactive <player> object.
  * If the optional <fun> is not given, the most recently added input_to
@@ -7593,15 +7600,16 @@ v_remove_input_to (svalue_t *sp, int num_arg)
 
     if (num_arg > 2)
     {
-        if (arg[1].type == T_OBJECT && arg[2].type != T_STRING)
+        if (arg[1].type != T_OBJECT && arg[1].type != T_LWOBJECT)
         {
-            vefun_bad_arg(3, sp);
+            vefun_bad_arg(2, sp);
             /* NOTREACHED */
             return NULL;
         }
-        if (arg[1].type != T_OBJECT)
+
+        if (arg[2].type != T_STRING)
         {
-            vefun_bad_arg(2, sp);
+            vefun_bad_arg(3, sp);
             /* NOTREACHED */
             return NULL;
         }
@@ -7658,7 +7666,7 @@ v_remove_input_to (svalue_t *sp, int num_arg)
             case T_OBJECT:
                 if (num_arg > 2)
                 {
-                    if (callback_object(&(it->fun)) == arg[1].u.ob
+                    if (object_svalue_eq(callback_object(&(it->fun)), arg[1])
                      && !it->fun.is_lambda
                      && it->fun.function.named.name == arg[2].u.str
                        )
@@ -7666,7 +7674,7 @@ v_remove_input_to (svalue_t *sp, int num_arg)
                 }
                 else
                 {
-                    if (callback_object(&(it->fun)) == arg[1].u.ob)
+                    if (object_svalue_eq(callback_object(&(it->fun)), arg[1]))
                         found = MY_TRUE;
                 }
                 break;
@@ -7780,8 +7788,8 @@ f_input_to_info (svalue_t *sp)
             )
         {
             vector_t   *vv;
-            object_t   *ob;
             input_to_t *it;
+            svalue_t    ob;
 
             if (ih->type != INPUT_TO)
             {
@@ -7792,7 +7800,7 @@ f_input_to_info (svalue_t *sp)
             it = (input_to_t*) ih;
 
             ob = callback_object(&(it->fun));
-            if (!ob)
+            if (ob.type == T_NUMBER)
                 continue;
 
             /* Get the subarray */
@@ -7802,16 +7810,14 @@ f_input_to_info (svalue_t *sp)
             if (it->fun.is_lambda)
             {
                 if (it->fun.function.lambda.x.closure_type == CLOSURE_LFUN)
-                    put_ref_object( vv->item
-                                  , it->fun.function.lambda.u.lambda->function.lfun.ob
-                                  , "input_to_info");
+                    assign_object_svalue_no_free(vv->item, it->fun.function.lambda.u.lambda->function.lfun.ob, "input_to_info");
                 else
-                    put_ref_object(vv->item, ob, "input_to_info");
+                    assign_object_svalue_no_free(vv->item, ob, "input_to_info");
                 assign_svalue_no_free(&vv->item[1], &it->fun.function.lambda);
             }
             else
             {
-                put_ref_object(vv->item, ob, "input_to_info");
+                assign_object_svalue_no_free(vv->item, ob, "input_to_info");
                 put_ref_string(vv->item + 1, it->fun.function.named.name);
             }
 
@@ -8222,13 +8228,17 @@ f_net_connect (svalue_t *sp)
     char * host;
     int    port;
     int    rc;
+    object_t *ob = get_current_object();
+
+    if (!ob)
+        errorf("net_connect() without current object.\n");
 
     /* get the arguments */
     
     host = get_txt(sp[-1].u.str);
     port = sp->u.number;
 
-    if (!privilege_violation4(STR_NET_CONNECT, NULL, sp[-1].u.str, port, sp))
+    if (!privilege_violation4(STR_NET_CONNECT, const0, sp[-1].u.str, port, sp))
     {
         sp = pop_n_elems(2, sp);
         push_number(sp, -1);
@@ -8385,7 +8395,7 @@ f_net_connect (svalue_t *sp)
          */
         outconn[n].socket = sfd;
         outconn[n].target = *((struct sockaddr_in *)rp->ai_addr);
-        outconn[n].curr_obj = ref_object(current_object, "net_conect");
+        outconn[n].curr_obj = ref_object(ob, "net_conect");
 
         // no longer need the results from getaddrinfo()
         freeaddrinfo(result);
@@ -8405,7 +8415,7 @@ f_net_connect (svalue_t *sp)
 
         user = command_giver;
         inter_sp = sp;
-        new_player(current_object, sfd, (struct sockaddr_in *)rp->ai_addr, sizeof(struct sockaddr_in), 0);
+        new_player(ob, sfd, (struct sockaddr_in *)rp->ai_addr, sizeof(struct sockaddr_in), 0);
         command_giver = user;
 
         /* All done - clean up */
@@ -8460,9 +8470,9 @@ f_configure_interactive (svalue_t *sp)
         ip = NULL;
     }
 
-    if ((current_object->flags & O_DESTRUCTED)
-     || (ob != current_object
-      && !privilege_violation_n(STR_CONFIGURE_INTERACTIVE, ob, sp, 2)))
+    if (is_current_object_destructed()
+     || ((!ob || ob != get_current_object())
+      && !privilege_violation_n(STR_CONFIGURE_INTERACTIVE, svalue_object(ob), sp, 2)))
     {
         sp = pop_n_elems(3, sp);
         return sp;
@@ -8755,7 +8765,7 @@ valid_query_snoop (object_t *ob)
  */
 {
     assert_master_ob_loaded();
-    if (current_object != master_ob)
+    if (get_current_object() != master_ob)
     {
         svalue_t *valid;
 
@@ -9017,9 +9027,8 @@ f_interactive_info (svalue_t *sp)
 
             if (ih)
             {
-                object_t *cb = callback_object(&(((input_to_t*)ih)->fun));
-                if (cb)
-                    put_ref_object(&result, cb, "interactive_info(II_INPUT_PENDING)");
+                svalue_t cb = callback_object(&(((input_to_t*)ih)->fun));
+                assign_object_svalue_no_free(&result, cb, "interactive_info(II_INPUT_PENDING)");
             }
         }
         break;

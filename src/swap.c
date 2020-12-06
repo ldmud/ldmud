@@ -77,6 +77,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <assert.h>
 #include <stddef.h>
 #include <stdio.h>
 
@@ -104,6 +105,8 @@
 #include "svalue.h"
 #include "wiz_list.h"
 #include "xalloc.h"
+
+#include "i-current_object.h"
 
 #include "../mudlib/sys/driver_info.h"
 
@@ -1067,6 +1070,7 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
         case T_NUMBER:
         case T_FLOAT:
         case T_OBJECT:
+        case T_LWOBJECT:
         case T_CLOSURE:
         case T_LVALUE:
 swap_opaque:
@@ -1225,6 +1229,7 @@ check_swapped_values (mp_int num, unsigned char * p)
         case T_NUMBER:
         case T_FLOAT:
         case T_OBJECT:
+        case T_LWOBJECT:
         case T_CLOSURE:
         case T_LVALUE:
             p += sizeof sv.x;
@@ -1387,6 +1392,7 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
         case T_NUMBER:
         case T_FLOAT:
         case T_OBJECT:
+        case T_LWOBJECT:
         case T_CLOSURE:
         case T_LVALUE:
             p += sizeof sv.x;
@@ -1566,6 +1572,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
               }
             }
 
+        case T_LWOBJECT:
         case T_STRING:
         case T_BYTES:
         case T_SYMBOL:
@@ -1914,7 +1921,8 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             p += sizeof size;
             memcpy(&user, p, sizeof user);
             p += sizeof user;
-            current_object->user = user;
+            assert(current_object.type == T_OBJECT); /* Our dummy_ob. */
+            current_object.u.ob->user = user;
             v = allocate_array_unlimited(size);
             svp->u.vec = v;
             if (!v)
@@ -1953,7 +1961,8 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             p += sizeof stt;
             memcpy(&user, p, sizeof user);
             p += sizeof user;
-            current_object->user = user;
+            assert(current_object.type == T_OBJECT); /* Our dummy_ob. */
+            current_object.u.ob->user = user;
             st = struct_new(stt);
             (void)deref_struct_type(stt); /* just reactivate the old ref */
             svp->u.strct = st;
@@ -2039,12 +2048,10 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             else
             {
                 mp_int i;
-                wiz_list_t *save;
 
-                save = current_object->user;
-                current_object->user = user;
+                assert(current_object.type == T_OBJECT); /* Our dummy_ob. */
+                current_object.u.ob->user = user;
                 m = allocate_mapping(num_keys, num_values);
-                current_object->user = save;
                 if (!m)
                 {
                     clear_svalues(svp, num + 1);
@@ -2086,6 +2093,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_NUMBER:
         case T_FLOAT:
         case T_OBJECT:
+        case T_LWOBJECT:
         case T_CLOSURE:
         case T_LVALUE:
             memcpy(&svp->x, p, sizeof svp->x);
@@ -2217,7 +2225,7 @@ load_ob_from_swap (object_t *ob)
         mp_int size;
         svalue_t *variables;
         object_t dummy;
-        object_t *save_current = current_object;
+        svalue_t save_current = current_object;
         void (*save_handler)(const char *, ...);
 
         swap_num &= ~1;
@@ -2256,7 +2264,7 @@ load_ob_from_swap (object_t *ob)
         fread(block, size, 1, swap_file);
 
         /* Prepare to restore */
-        current_object = &dummy;
+        set_current_object(&dummy);
 #ifdef MALLOC_LPC_TRACE
         dummy.name = ob->name;
         dummy.prog = ob->prog;

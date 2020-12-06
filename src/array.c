@@ -70,6 +70,7 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
 #include "i-svalue_cmp.h"
 
 /*-------------------------------------------------------------------------*/
@@ -151,10 +152,10 @@ _allocate_array(mp_int n MTRACE_DECL)
 
     p->ref = 1;
     p->size = n;
-    if (current_object)
-        (p->user = current_object->user)->size_array += n;
-    else
-        (p->user = &default_wizlist_entry)->size_array += n;
+    p->user = get_current_user();
+    if (!p->user)
+        p->user = &default_wizlist_entry;
+    p->user->size_array += n;
 
     svp = p->item;
     for (i = n; --i >= 0; )
@@ -210,10 +211,10 @@ _allocate_array_unlimited(mp_int n MTRACE_DECL)
 
     p->ref = 1;
     p->size = n;
-    if (current_object)
-        (p->user = current_object->user)->size_array += n;
-    else
-        (p->user = &default_wizlist_entry)->size_array += n;
+    p->user = get_current_user();
+    if (!p->user)
+        p->user = &default_wizlist_entry;
+    p->user->size_array += n;
 
     svp = p->item;
     for (i = n; --i >= 0; )
@@ -266,10 +267,10 @@ _allocate_uninit_array (mp_int n MTRACE_DECL)
 
     p->ref = 1;
     p->size = n;
-    if (current_object)
-        (p->user = current_object->user)->size_array += n;
-    else
-        (p->user = &default_wizlist_entry)->size_array += n;
+    p->user = get_current_user();
+    if (!p->user)
+        p->user = &default_wizlist_entry;
+    p->user->size_array += n;
 
     return p;
 }
@@ -2188,7 +2189,7 @@ x_filter_array (svalue_t *sp, int num_arg)
         {
             flags[cnt] = 0;
 
-            if (current_object->flags & O_DESTRUCTED)
+            if (is_current_object_destructed())
                 continue;
                 /* Don't call the filter anymore, but fill the
                  * flags array with 0es.
@@ -2197,7 +2198,7 @@ x_filter_array (svalue_t *sp, int num_arg)
             if (destructed_object_ref(w))
                 assign_svalue(w, &const0);
 
-            if (!callback_object(cb))
+            if (!valid_callback_object(cb))
             {
                 inter_sp = sp;
                 errorf("object used by filter(array) destructed");
@@ -2344,13 +2345,13 @@ x_map_array (svalue_t *sp, int num_arg)
         /* Loop through arr and res, mapping the values from arr */
         for (w = arr->item, x = res->item; --cnt >= 0; w++, x++)
         {
-            if (current_object->flags & O_DESTRUCTED)
+            if (is_current_object_destructed())
                 continue;
 
             if (destructed_object_ref(w))
                 assign_svalue(w, &const0);
 
-            if (!callback_object(cb))
+            if (!valid_callback_object(cb))
                 errorf("object used by map(array) destructed");
 
             push_rvalue(w);
@@ -2553,7 +2554,7 @@ v_sort_array (svalue_t * sp, int num_arg)
             {
                 svalue_t *d;
 
-                if (!callback_object(cb))
+                if (!valid_callback_object(cb))
                     errorf("object used by sort_array destructed");
 
                 push_svalue(source+index1);
@@ -2598,7 +2599,8 @@ v_filter_objects (svalue_t *sp, int num_arg)
 
 /* EFUN filter_objects()
  *
- *   object *filter_objects (object *arr, string fun, mixed extra, ...)
+ *   <object|lwobject> *filter_objects (<object|lwobject> *arr,
+ *                                      string fun, mixed extra, ...)
  *
  * Filter the objects in <arr> by calling the lfun obj-><fun>(<extra>...)
  * and return an array of those objects for which the lfun call yields
@@ -2619,7 +2621,6 @@ v_filter_objects (svalue_t *sp, int num_arg)
     vector_t *w;          /* Result vector */
     CBool *flags = NULL;  /* Flag array, one flag for each element of <p> */
     int res;              /* Count of objects to return */
-    object_t *ob;         /* Object to call */
     mp_int p_size;        /* Size of <p> */
     int cnt = 0;
     svalue_t *v;
@@ -2664,7 +2665,11 @@ v_filter_objects (svalue_t *sp, int num_arg)
             return NULL;
         }
 
-        for (cnt = 0; cnt < p_size; cnt++) {
+        for (cnt = 0; cnt < p_size; cnt++)
+        {
+            object_t *ob = NULL;        /* Object to call */
+            lwobject_t *lwob = NULL;    /* Lightweight object to call */
+
             flags[cnt] = MY_FALSE;
             v = get_rvalue(p->item + cnt, NULL);
 
@@ -2674,13 +2679,8 @@ v_filter_objects (svalue_t *sp, int num_arg)
              */
             if (v == NULL)
                 continue;
-            if (v->type != T_OBJECT)
+            if (v->type == T_OBJECT)
             {
-                if (v->type != T_STRING)
-                    continue;
-                if ( !(ob = get_object(v->u.str)) )
-                    continue;
-            } else {
                 ob = v->u.ob;
                 if (ob->flags & O_DESTRUCTED)
                 {
@@ -2688,16 +2688,31 @@ v_filter_objects (svalue_t *sp, int num_arg)
                     continue;
                 }
             }
+            else if (v->type == T_LWOBJECT)
+            {
+                lwob = v->u.lwob;
+            }
+            else if (v->type == T_STRING)
+            {
+                if ( !(ob = get_object(v->u.str)) )
+                    continue;
+            }
+            else
+                continue;
 
             /* Abort the efun if this_object is destructed (slightly
              * strange place to check for it).
              */
-            if (current_object->flags & O_DESTRUCTED)
+            if (is_current_object_destructed())
                 continue;
 
             /* Call the filter lfun and record the result. */
             push_svalue_block(num_arg, arguments);
-            v = sapply (func, ob, num_arg);
+            if (lwob)
+                v = sapply_lwob(func, lwob, num_arg);
+            else
+                v = sapply(func, ob, num_arg);
+
             if ((v) && (v->type!=T_NUMBER || v->u.number) ) {
                 flags[cnt] = MY_TRUE;
                 res++;
@@ -2723,19 +2738,9 @@ v_filter_objects (svalue_t *sp, int num_arg)
         for (;;) {
             if (flags[--cnt])
             {
-                svalue_t sv;
-
                 /* Copy the element and update the ref-count */
 
-                *--v = sv = p->item[cnt];
-                if (sv.type == T_STRING)
-                {
-                    (void)ref_mstring(sv.u.str);
-                }
-                else
-                {
-                    (void)ref_object(sv.u.ob, "filter");
-                }
+                assign_svalue_no_free(--v, p->item+cnt);
 
                 /* Loop termination check moved in here to save cycles */
                 if (v == w->item)
@@ -2761,7 +2766,7 @@ v_map_objects (svalue_t *sp, int num_arg)
 
 /* EFUN map_objects()
  *
- *   mixed *map_objects (object *arr, string fun, mixed extra, ...)
+ *   mixed *map_objects (<object|lwobject> *arr, string fun, mixed extra, ...)
  *
  * Map the objects in <arr> by calling the lfun obj-><fun>(<extra>...)
  * and return an array of the function call results.
@@ -2779,7 +2784,6 @@ v_map_objects (svalue_t *sp, int num_arg)
     string_t *func;       /* The <fun> argument */
     svalue_t *arguments;  /* Beginning of 'extra' arguments on vm stack */
     vector_t *r;          /* Result vector */
-    object_t *ob;         /* Object to call */
     mp_int size;          /* Size of <p> */
     int cnt;
     svalue_t *w, *v, *x;
@@ -2812,6 +2816,8 @@ v_map_objects (svalue_t *sp, int num_arg)
         for (cnt = size, v = p->item, x = r->item; --cnt >= 0; v++, x++)
         {
             svalue_t * ob_sv = get_rvalue(v, NULL);
+            object_t *ob = NULL;        /* Object to call */
+            lwobject_t *lwob = NULL;    /* Lightweight object to call */
 
             /* Coerce <v> into a (non-destructed) object ob (if necessary
              * by loading it). If that doesn't work, simply continue
@@ -2819,28 +2825,39 @@ v_map_objects (svalue_t *sp, int num_arg)
              */
             if (ob_sv == NULL)
                 continue;
-            if (ob_sv->type != T_OBJECT) {
-                if (ob_sv->type != T_STRING)
-                    continue;
-                if ( !(ob = get_object(ob_sv->u.str)) )
-                    continue;
-            } else {
+            if (ob_sv->type == T_OBJECT)
+            {
                 ob = ob_sv->u.ob;
-                if (ob->flags & O_DESTRUCTED) {
+                if (ob->flags & O_DESTRUCTED)
+                {
                     assign_svalue(ob_sv, &const0);
                     continue;
                 }
             }
+            else if (ob_sv->type == T_LWOBJECT)
+            {
+                lwob = ob_sv->u.lwob;
+            }
+            else if (ob_sv->type == T_STRING)
+            {
+                if ( !(ob = get_object(ob_sv->u.str)) )
+                    continue;
+            }
+            else
+                continue;
 
             /* Abort the efun if this_object is destructed (slightly
              * strange place to check for it).
              */
-            if (current_object->flags & O_DESTRUCTED)
+            if (is_current_object_destructed())
                 continue;
 
             /* Call the lfun and record the result */
             push_svalue_block(num_arg, arguments);
-            w = sapply (func, ob, num_arg);
+            if (lwob)
+                w = sapply_lwob(func, lwob, num_arg);
+            else
+                w = sapply (func, ob, num_arg);
             if (w)
             {
                 *x = *w;
@@ -3014,7 +3031,7 @@ f_transpose_array (svalue_t *sp)
 
 /* EFUN unique_array()
  *
- *   mixed *unique_array (object *obarr, string seperator, mixed skip = 0)
+ *   <object|lwobject> **unique_array (<object|lwobject> *obarr, string seperator, mixed skip = 0)
  *
  * Group all those objects from <obarr> together for which the
  * <separator> function (which is called in every object) returns the
@@ -3097,6 +3114,8 @@ sameval (svalue_t *arg1, svalue_t *arg2)
         return mstreq(arg1->u.str, arg2->u.str);
     } else if (arg1->type == T_OBJECT && arg2->type == T_OBJECT) {
         return arg1->u.ob == arg2->u.ob;
+    } else if (arg1->type == T_LWOBJECT && arg2->type == T_LWOBJECT) {
+        return arg1->u.lwob == arg2->u.lwob;
     } else
         return 0;
 } /* sameval() */
@@ -3264,14 +3283,15 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
     for (cnt = 0; cnt < arr_size; cnt++)
     {
         svalue_t *item;
-        if (current_object->flags & O_DESTRUCTED)
+        if (is_current_object_destructed())
             break;
             /* Don't call the filters anymore */
 
         item = get_rvalue(arr->item + cnt, NULL);
-        if (item != NULL && item->type == T_OBJECT
-         && !destructed_object_ref(item)
-           )
+        if (item == NULL)
+            continue;
+
+        if (item->type == T_OBJECT && !destructed_object_ref(item))
         {
             /* It's usually done the other way around, but not here: if
              * it's a closure, we pass the object analyzed; otherwise we
@@ -3282,6 +3302,17 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
                 callback_change_object(cb, item->u.ob);
             else
                 push_ref_object(inter_sp, item->u.ob, "unique_array");
+
+            v = apply_callback(cb, cb->is_lambda ? 1 : 0);
+            if (v && !sameval(v, skipnum))
+                ant = put_in(pool, &head, v, item);
+        }
+        else if (item->type == T_LWOBJECT)
+        {
+            if (!cb->is_lambda)
+                callback_change_lwobject(cb, item->u.lwob);
+            else
+                push_ref_lwobject(inter_sp, item->u.lwob);
 
             v = apply_callback(cb, cb->is_lambda ? 1 : 0);
             if (v && !sameval(v, skipnum))
@@ -3327,9 +3358,9 @@ v_unique_array (svalue_t *sp, int num_arg)
 
 /* EFUN unique_array()
  *
- *   mixed unique_array(object *obarr, string|closure fun)
- *   mixed unique_array(object *obarr, string|closure fun, mixed skip)
- *   mixed unique_array(object *obarr, string|closure fun, mixed extra..., mixed skip)
+ *   <object|lwobject>** unique_array(<object|lwobject> *obarr, string|closure fun)
+ *   <object|lwobject>** unique_array(<object|lwobject> *obarr, string|closure fun, mixed skip)
+ *   <object|lwobject>** unique_array(<object|lwobject> *obarr, string|closure fun, mixed extra..., mixed skip)
  *
  * Groups objects together for which the separator function
  * returns the same value. obarr should be an array of objects,

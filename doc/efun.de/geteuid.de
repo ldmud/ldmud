@@ -1,5 +1,5 @@
 SYNOPSIS
-        string geteuid(object ob)
+        string geteuid(object|lwobject ob)
 
 BESCHREIBUNG
         Liefert die effektive User-ID des Objekts <obj> (normalerweise ein

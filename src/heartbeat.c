@@ -57,6 +57,7 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/driver_info.h"
@@ -245,7 +246,7 @@ call_heart_beat (void)
             /* Prepare to call <ob>->heart_beat().
              */
             current_prog = obj->prog;
-            current_object = obj;
+            set_current_object(obj);
             current_heart_beat = obj;
 
             /* Determine the command_giver. Usually it's the object

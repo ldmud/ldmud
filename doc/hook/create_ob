@@ -33,4 +33,4 @@ HISTORY
         LDMud 3.6.5 removed the argument given for the lfun call.
 
 SEE ALSO
-        hooks(C), create_super(H), create_clone(H)
+        hooks(C), create_super(H), create_clone(H), create_lwobject(H)

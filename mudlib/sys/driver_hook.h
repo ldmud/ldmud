@@ -30,8 +30,10 @@
 #define H_REGEXP_PACKAGE        23
 #define H_MSG_DISCARDED         24
 #define H_FILE_ENCODING         25
+#define H_LWOBJECT_UIDS         26
+#define H_CREATE_LWOBJECT       27
 
-#define NUM_DRIVER_HOOKS        26  /* Number of hooks */
+#define NUM_DRIVER_HOOKS        28  /* Number of hooks */
 
 #endif /* LPC_DRIVER_HOOK_ */
 

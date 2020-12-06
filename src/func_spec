@@ -232,6 +232,8 @@
         pop_n
         put_array_element
         type_check
+        call_other_cached
+        call_strict_cached
 #ifdef USE_PYTHON
         python_efun
 #endif
@@ -241,6 +243,11 @@
  *
  * These efuns share the code space with the normal codes, and like these
  * are implemented directly in the interpreter-switch().
+ *
+ * The declarations can the following attributes (in this order!):
+ *  - no_lightweight: This efun cannot be called by a lightweight object.
+ *                    (Only checked for tabled efuns at runtime.)
+ *  - "text":         Deprecated message.
  */
 
 %efuns
@@ -253,6 +260,7 @@ int     floatp(mixed);
 int     intp(mixed);
 int     mappingp(mixed);
 int     objectp(mixed);
+int     lwobjectp(mixed);
 int     pointerp(mixed);
 int     referencep(mixed &);
 int     stringp(mixed);
@@ -278,8 +286,8 @@ int     extern_call();
 
 object  master(int default: F_CONST0);
 object  this_interactive();
-object  this_object();
 object  this_player();
+object|lwobject this_object();
 
         /* Technical efuns */
 
@@ -337,7 +345,7 @@ int     baseof(struct, struct);
 
 mixed   copy(mixed);
 mixed   deep_copy(mixed);
-int     ed(void|string, void|null|string);
+int     ed(void|string, void|null|string) no_lightweight;
 mixed   get_type_info(mixed, void|int);
 mixed   quote(mixed *|quoted_array|symbol|string);
 mixed   unquote(quoted_array|symbol);
@@ -355,8 +363,8 @@ mixed  *gmtime(int*|int default: F_TIME);
 mixed  *localtime(int*|int default: F_TIME);
 
 mixed  *wizlist_info();
-mixed   get_extra_wizinfo(null|object|string);
-void    set_extra_wizinfo(null|object|string, mixed);
+mixed   get_extra_wizinfo(null|object|lwobject|string);
+void    set_extra_wizinfo(null|object|lwobject|string, mixed);
 
 
         /* Strings */
@@ -412,7 +420,7 @@ mixed  *filter_objects(mixed *, string, ...);
 mixed  *map_objects(mixed *, string, ...);
 mixed  *sort_array(mixed *|mixed *&, string|closure, ...);
 mixed  *transpose_array(mixed *);
-mixed  *unique_array(mixed *, string|closure, ...);
+object|lwobject **unique_array(mixed *, string|closure, ...);
 
 mixed   filter(mapping|mixed *|string|bytes, string|closure|mapping, ...);
 mapping filter_indices(mapping, string|closure,  ...);
@@ -441,9 +449,9 @@ int     widthof(null|mapping);
 mixed&  apply(mixed|closure, ...);
 mixed&  funcall(mixed|closure, ...);
 
-closure bind_lambda(closure, object|void);
+closure bind_lambda(closure, object|lwobject|void);
 closure lambda(null|mixed *, mixed);
-closure symbol_function(symbol|string, null|string|object default: F_CONST0);
+closure symbol_function(symbol|string, null|string|object|lwobject default: F_CONST0);
 closure symbol_variable(symbol|string|int);
 closure unbound_lambda(null|mixed *, mixed);
 
@@ -452,25 +460,25 @@ mixed  *call_out_info();
 int     find_call_out(string|closure);
 int     remove_call_out(string|closure);
 
-object *caller_stack(int default: F_CONST0);
+object|lwobject *caller_stack(int default: F_CONST0);
 int     caller_stack_depth();
-int     call_resolved(mixed &, null|object|string|object*|string*, string, ...);
-int     call_direct_resolved(mixed &, null|object|string|object*|string*, string, ...);
-unknown& call_other(object|string|object *|string *, string, ...);
-unknown& call_direct(object|string|object *|string *, string, ...);
-unknown& call_strict(object|string|object*|string*, string, ...);
-unknown& call_direct_strict(object|string|object*|string*, string, ...);
+int     call_resolved(mixed &, null|object|lwobject|string|object*|lwobject*|string*, string, ...);
+int     call_direct_resolved(mixed &, null|object|lwobject|string|object*|lwobject*|string*, string, ...);
+unknown& call_other(object|lwobject|string|object *|lwobject *|string *, string, ...);
+unknown& call_direct(object|lwobject|string|object *|lwobject *|string *, string, ...);
+unknown& call_strict(object|lwobject|string|object*|lwobject *|string*, string, ...);
+unknown& call_direct_strict(object|lwobject|string|object*|lwobject*|string*, string, ...);
           /* The lexer switches the return type between 'unknown'
            * and 'any' depending on the _types pragmas.
            */
-object  previous_object(int);
+object|lwobject  previous_object(int);
 
 mixed  *heart_beat_info();
 
 
         /* Objects */
 
-object  blueprint(string|object default: F_THIS_OBJECT); /* PRELIMINARY */
+object  blueprint(string|object|lwobject default: F_THIS_OBJECT); /* PRELIMINARY */
 object  clone_object(string|object, ...);
 object *clones(void|int|string|object, void|int);
 void    configure_interactive(null|object, int, mixed);
@@ -478,46 +486,53 @@ void    configure_object(null|object, int, mixed);
 void    destruct(null|object);
 int     exec(object, object);
 object  find_object(string);
-mixed  *functionlist(object|string, int default: F_CONST1);
-mixed   function_exists(string, void|int|object, void|int);
-string *include_list(void|object, void|int);
-string *inherit_list(void|object, void|int);
+mixed  *functionlist(object|lwobject|string, int default: F_CONST1);
+mixed   function_exists(string, void|int|object|lwobject, void|int);
+string *include_list(void|object|lwobject, void|int);
+string *inherit_list(void|object|lwobject, void|int);
 int     input_to(string|closure, void|int, ...);
 int     interactive(object default: F_THIS_OBJECT);
 mixed   interactive_info(null|object, int);
-string  load_name(null|string|object default: F_THIS_OBJECT);
+string  load_name(null|string|object|lwobject default: F_THIS_OBJECT);
 object  load_object(string);
 object *objects(...);
 mixed   object_info(null|object, int);
 string  object_name(null|object default: F_THIS_OBJECT);
 int     object_time(object default: F_THIS_OBJECT);
 object  present_clone(object|string, object|int|void, int|void);
-string  program_name(null|object default: F_THIS_OBJECT);
-int     program_time(object default: F_THIS_OBJECT);
-void    replace_program(void|string);
+string  program_name(null|object|lwobject default: F_THIS_OBJECT);
+int     program_time(object|lwobject default: F_THIS_OBJECT);
+void    replace_program(void|string) no_lightweight;
 int     find_input_to(object, object|string|closure, void|string);
 mixed * input_to_info(object);
 int     remove_input_to(object, void|object|string|closure, void|string);
 void    remove_interactive(object);
 void    rename_object(object, string);
-int     restore_object(string);
-mixed   save_object(void|string|int, void|int);
-int     set_next_reset(int);
-void    set_this_object(object);
-int     shadow(object);
+int     restore_object(string) no_lightweight;
+mixed   save_object(void|string|int, void|int) no_lightweight;
+int     set_next_reset(int) no_lightweight;
+void    set_this_object(object|lwobject);
+int     shadow(object) no_lightweight;
 int     snoop(object, void|object);
-void    tell_object(object|string, string|mixed*|mapping|struct|object);
+void    tell_object(object|string, string|mixed*|mapping|struct|object|lwobject);
 
-void    unshadow();
-string  variable_exists(string, void|int|object, void|int);
-mixed  *variable_list(object|string, int default: F_CONST1);
+void    unshadow() no_lightweight;
+string  variable_exists(string, void|int|object|lwobject, void|int);
+mixed  *variable_list(object|lwobject|string, int default: F_CONST1);
+
+
+        /* Lightweight Objects */
+
+lwobject new_lwobject(string, ...);
+void     configure_lwobject(null|lwobject, int, mixed);
+mixed    lwobject_info(null|lwobject, int);
 
 
         /* Network IO */
 
 int     binary_message(int *|bytes, int default: F_CONST0);
 
-int     net_connect(string, int);
+int     net_connect(string, int) no_lightweight;
 
 int     send_udp(string, int, bytes|int*);
 
@@ -576,26 +591,26 @@ object  first_inventory(object|string default: F_THIS_OBJECT);
 object  next_inventory(object default: F_THIS_OBJECT);
 void    move_object(object|string, object|string);
 object  present(object|string, void|int|object, void|object);
-void    say(string|mixed *|object|mapping|struct, void|object|object *);
+void    say(string|mixed *|object|lwobject|mapping|struct, void|object|object *) no_lightweight;
 void    set_environment(object, null|object);
-void    tell_room(object|string, string|mixed *|object|mapping|struct, void|object *);
+void    tell_room(object|string, string|mixed *|object|lwobject|mapping|struct, void|object *);
 
 
         /* Verbs and Commands (TODO: should be optional) */
 
-void    add_action(string|closure, string, void|int);
+void    add_action(string|closure, string, void|int) no_lightweight;
 int     command(string, void|object);
 mixed  *command_stack();
 int     command_stack_depth();
 mixed * match_command(string, object);
 int     execute_command(string, object, object);
 int     living(null|object);
-int     notify_fail(string|closure);
+int     notify_fail(string|closure) no_lightweight;
 mixed  *query_actions(object|string, int|object|string default: F_CONST1);
 string  query_command();
 mixed   query_notify_fail(int default: F_CONST0);
 string  query_verb(int default: F_CONST0);
-int     remove_action(int|string, object default: F_THIS_PLAYER);
+int     remove_action(int|string, object default: F_THIS_PLAYER) no_lightweight;
 void    set_this_player(null|object);
 #ifdef USE_PARSE_COMMAND
 int     parse_command(string, object|object *, string, &&...);
@@ -604,8 +619,8 @@ int     parse_command(string, object|object *, string, &&...);
 
         /* uids and euids */
 
-string  geteuid(object default: F_THIS_OBJECT);
-string  getuid(object default: F_THIS_OBJECT);
+string  geteuid(object|lwobject default: F_THIS_OBJECT);
+string  getuid(object|lwobject default: F_THIS_OBJECT);
 
 
         /* Technical efuns */
@@ -615,7 +630,7 @@ string  getuid(object default: F_THIS_OBJECT);
          * When running in native mode, both are invisible.
          */
 
-string  creator F_GETUID (object);
+string  creator F_GETUID (object|lwobject);
 
 
         /* --- Packages --- */
@@ -646,20 +661,20 @@ int     db_insert_id(int);
 
 #ifdef USE_PGSQL
 
-int      pg_connect(string, string|closure, ...);
+int      pg_connect(string, string|closure, ...) no_lightweight;
 string   pg_conv_string(string);
 int      pg_pending(object default: F_THIS_OBJECT);
-int      pg_query(string, void|int);
-void     pg_close();
+int      pg_query(string, void|int) no_lightweight;
+void     pg_close() no_lightweight;
 
 #endif /* USE_PGSQL */
 
 #ifdef USE_SQLITE
 
-int      sl_open(string);
-mixed    sl_exec(string, ...);
-int      sl_insert_id();
-void     sl_close();
+int      sl_open(string) no_lightweight;
+mixed    sl_exec(string, ...) no_lightweight;
+int      sl_insert_id() no_lightweight;
+void     sl_close() no_lightweight;
 
 #endif /* USE_SQLITE */
 

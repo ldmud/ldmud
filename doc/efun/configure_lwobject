@@ -1,0 +1,33 @@
+SYNOPSIS
+        #include <configuration.h>
+
+        void configure_lwobject(lwobject lwob, int what, mixed data)
+
+DESCRIPTION
+        Sets the option <what> to the value <data> on the object <lwob>
+        or the default for all lightweight objects if <lwob> is 0.
+
+        If the first argument <lwob> is not this_object(), the privilege
+        violation ("configure_lwobject", this_object(), lwob, what, data)
+        occurs.
+
+        As <what>, the following arguments are accepted:
+
+        <what> == LC_EUID
+          Set effective uid to <data>. <data> must be a string or 0.
+          This call will always trigger a privilege violation check,
+          even if <lwob> is this_object().
+
+          If strict euid usage is enforced, lightweight objects with
+          euid 0 cannot load or clone other objects or do any file
+          operations.
+
+
+        The current values for these options can be queried using
+        lwobject_info().
+
+HISTORY
+        Introduced in LDMud 3.6.5.
+
+SEE ALSO
+        lwobject_info(E), configure_object(E), configure_driver(E)

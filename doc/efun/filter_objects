@@ -1,5 +1,6 @@
 SYNOPSIS
-        object * filter_objects(object *arr, string fun, mixed extra, ...)
+        <object|lwobject> * filter_objects(<object|lwobject> *arr,
+                                           string fun, mixed extra, ...)
 
 DESCRIPTION
         Similar to filter_array() but calls arr[n]->fun(extra, ...).

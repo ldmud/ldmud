@@ -1,0 +1,102 @@
+SYNOPSIS
+        #include <lwobject_info.h>
+
+        mixed lwobject_info(lwobject lwob, int what)
+
+DESCRIPTION
+        Returns some internal information about the lightweight
+        object <lwob>. The  Argument <what> determines which
+        information is returned.
+
+        It can be either a configuration option as given to
+        configure_object() or one of the following options:
+
+
+
+        Lightweight Object Information:
+
+        <what> == LI_LWOBJECT_REFS:
+           The number of references to <lwob>.
+
+        <what> == LI_DATA_SIZE:
+           The total size of the values held in the object's variables,
+           scaled down according to the extend of data sharing.
+
+        <what> == LI_DATA_SIZE_TOTAL:
+           The unmodified total size of the values held in the
+           object's variables
+
+
+
+        Program Flags:
+
+        <what> == LI_NO_INHERIT:
+           1 if the program can't be inherited.
+
+        <what> == LI_NO_CLONE:
+           1 if the program/blueprint can't be cloned.
+
+        <what> == LI_SHARE_VARIABLES:
+           1 if lightweight objects of this program share their
+           initial variable values with the blueprint.
+
+
+
+        Program Statistics:
+
+        <what> == LI_PROG_REFS:
+           The number of references to <lwob>'s program.
+
+        <what> == LI_NUM_FUNCTIONS:
+           The number of functions in the program.
+
+        <what> == LI_NUM_VARIABLES:
+           The number of variables in the program.
+
+        <what> == LI_NUM_STRINGS:
+           The number of strings in the program.
+
+        <what> == LI_NUM_INHERITED:
+           The number of explicitely inherited programs.
+
+        <what> == LI_NUM_INCLUDED:
+           The number of included files in the program.
+
+        <what> == LI_SIZE_FUNCTIONS:
+           The size needed for the function structures.
+           Note that this does not include size of the function code.
+
+        <what> == LI_SIZE_VARIABLES:
+           The size needed for the variable structures.
+           Note that this does not include size of the variable data,
+           See LI_DATA_SIZE/LI_DATA_SIZE_TOTAL for that.
+
+        <what> == LI_SIZE_STRINGS:
+           The size needed for the string pointers.
+
+        <what> == LI_SIZE_STRINGS_DATA:
+           The size needed for the string values,
+           scaled down according to the extend of data sharing.
+
+        <what> == LI_SIZE_STRINGS_DATA_TOTAL:
+           The unmodified size needed for the string values.
+
+        <what> == LI_SIZE_INHERITED:
+           The size needed for the inherit structures.
+
+        <what> == LI_SIZE_INCLUDED:
+           The size needed for the include structures.
+
+        <what> == LI_PROG_SIZE:
+           The size of the program structure.
+
+        <what> == LI_PROG_SIZE_TOTAL:
+           The total size of the program.
+
+
+HISTORY
+        Introduced in LDMud 3.6.5.
+
+SEE ALSO
+        configure_lwobject(E), object_info(E), interactive_info(E),
+        driver_info(E)

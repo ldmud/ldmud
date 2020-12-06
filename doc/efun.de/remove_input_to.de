@@ -2,8 +2,8 @@ SYNOPSIS
         int remove_input_to(object player)
         int remove_input_to(object player, string fun)
         int remove_input_to(object player, closure fun)
-        int remove_input_to(object player, object fun)
-        int remove_input_to(object player, object obj, string fun)
+        int remove_input_to(object player, object|lwobject fun)
+        int remove_input_to(object player, object|lwobject obj, string fun)
 
 BESCHREIBUNG
         Entfernt ein anhaengiges input_to() aus dem interaktiven Playerobjekt.

@@ -136,6 +136,7 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/driver_hook.h"
@@ -3350,13 +3351,14 @@ process_value (const char *str, Bool original)
     char     *arg;     /* NULL or points to the first arg in <func> */
     char     *narg;    /* Next argument while pushing them */
     int       numargs; /* Number of arguments to the call */
-    object_t *ob;
+    object_t *ob = NULL;
+    lwobject_t *lwob = NULL;
 
     /* Simple check if the argument is valid */
     if (strlen(str) < 1 || !isalpha((unsigned char)(str[0])))
         return NULL;
 
-    if (current_object->flags & O_DESTRUCTED)
+    if (is_current_object_destructed())
         return NULL;
 
     /* If necessary, copy the argument so that we can separate the various
@@ -3393,9 +3395,7 @@ process_value (const char *str, Bool original)
 
 
     /* Get the object */
-    if (!obj)
-        ob = current_object;
-    else
+    if (obj)
     {
         string_t *objstr;
 
@@ -3403,8 +3403,12 @@ process_value (const char *str, Bool original)
         ob = find_object(objstr);
         free_mstring(objstr);
     }
+    else if (current_object.type == T_OBJECT)
+        ob = current_object.u.ob;
+    else if (current_object.type == T_LWOBJECT)
+        lwob = current_object.u.lwob;
 
-    if (!ob || (ob->flags & O_DESTRUCTED))
+    if (!lwob && (!ob || (ob->flags & O_DESTRUCTED)))
     {
         /* free the error handler if necessary. */
         if (original)
@@ -3429,7 +3433,10 @@ process_value (const char *str, Bool original)
     }
     
     /* Apply the function */
-    ret = apply(func2, ob, numargs);
+    if (lwob)
+        ret = sapply_lwob(func2, lwob, numargs);
+    else
+        ret = sapply(func2, ob, numargs);
 
     /* Free func by freeing the error handler (if we allocated func).
      * Has to be done now, after the arguments have been popped by apply().
@@ -3472,8 +3479,6 @@ f_process_string(svalue_t *sp)
 
 {
     vector_t   *vec;           /* Arg string exploded by '@@' */
-    object_t   *old_cur;       /* Old current object */
-    wiz_list_t *old_eff_user;  /* Old euid */
     int         il;            /* Index in vec */
     Bool        changed;       /* True if there was a replacement */
     Bool        ch_last;       /* True if the last vec-entry was replaced */
@@ -3484,37 +3489,6 @@ f_process_string(svalue_t *sp)
 
     if (NULL == strchr(get_txt(str), '@'))
         return sp;  /* Nothing to do */
-
-    old_eff_user = NULL;
-    old_cur = current_object;
-
-    if (!current_object)
-    {
-        /* This means we are called from notify_ in comm1
-         * We must temporary set eff_user to backbone uid for
-         * security reasons.
-         */
-
-        svalue_t *ret;
-
-        current_object = command_giver;
-        ret = apply_master(STR_GET_BB_UID,0);
-        if (!ret)
-            return sp;
-
-        if (ret->type != T_STRING
-         && (strict_euids || ret->type != T_NUMBER || ret->u.number))
-            return sp;
-
-        if (current_object->eff_user)
-        {
-            old_eff_user = current_object->eff_user;
-            if (ret->type == T_STRING)
-                current_object->eff_user = add_name(ret->u.str);
-            else
-                current_object->eff_user = NULL;
-        }
-    }
 
     /* Explode the argument by the '@@' */
     vec = explode_string(str, STR_ATAT);
@@ -3573,13 +3547,6 @@ f_process_string(svalue_t *sp)
     /* Clean up */
     inter_sp--;
     free_array(vec);
-
-    if (old_eff_user)
-    {
-        current_object->eff_user = old_eff_user;
-    }
-
-    current_object = old_cur;
 
     /* Return the result */
     if (buf)
@@ -4562,7 +4529,7 @@ f_blueprint (svalue_t *sp)
 /* EFUN blueprint()
  *
  *   object blueprint ()
- *   object blueprint (string|object ob)
+ *   object blueprint (string|object|lwobject ob)
  *
  * The efuns returns the blueprint for the given object <ob>, or for
  * the current object if <ob> is not specified.
@@ -4573,10 +4540,17 @@ f_blueprint (svalue_t *sp)
  */
 
 {
-    object_t * obj, * blueprint;
+    object_t *obj = NULL, *blueprint = NULL;
+    program_t *prog = NULL;
 
     if (sp->type == T_OBJECT)
+    {
         obj = sp->u.ob;
+    }
+    else if (sp->type == T_LWOBJECT)
+    {
+        prog = sp->u.lwob->prog;
+    }
     else if (sp->type == T_STRING)
     {
         obj = get_object(sp->u.str);
@@ -4594,15 +4568,19 @@ f_blueprint (svalue_t *sp)
         return sp;
     }
 
-    if ((obj->flags & O_SWAPPED) && load_ob_from_swap(obj) < 0)
-        errorf("Out of memory: unswap object '%s'.\n", get_txt(obj->name));
+    if (obj)
+    {
+        if ((obj->flags & O_SWAPPED) && load_ob_from_swap(obj) < 0)
+            errorf("Out of memory: unswap object '%s'.\n", get_txt(obj->name));
+        prog = obj->prog;
+    }
 
     blueprint = NULL;
-    if (obj->prog != NULL
-     && obj->prog->blueprint != NULL
-     && !(obj->prog->blueprint->flags & O_DESTRUCTED)
+    if (prog != NULL
+     && prog->blueprint != NULL
+     && !(prog->blueprint->flags & O_DESTRUCTED)
        )
-        blueprint = ref_object(obj->prog->blueprint, "blueprint()");
+        blueprint = ref_object(prog->blueprint, "blueprint()");
 
     free_svalue(sp);
     if (blueprint != NULL)
@@ -4663,7 +4641,7 @@ v_clones (svalue_t *sp, int num_arg)
         object_t * reference;
 
         /* Defaults */
-        reference = current_object;
+        reference = get_current_object();
         what = 0;
 
         if (num_arg == 1)
@@ -4720,6 +4698,9 @@ v_clones (svalue_t *sp, int num_arg)
                 /* NOTREACHED */
             }
         }
+
+        if (!reference)
+            errorf("clones() for lightweight object.\n");
 
         name = reference->load_name;
 
@@ -4870,9 +4851,9 @@ f_configure_object (svalue_t *sp)
     else
         ob = NULL;
 
-    if ((current_object->flags & O_DESTRUCTED)
-     || ((ob != current_object || sp[-1].u.number == OC_EUID)
-      && !privilege_violation_n(STR_CONFIGURE_OBJECT, ob, sp, 2)))
+    if (is_current_object_destructed()
+     || ((!ob || ob != get_current_object() || sp[-1].u.number == OC_EUID)
+      && !privilege_violation_n(STR_CONFIGURE_OBJECT, sp[-2], sp, 2)))
     {
         sp = pop_n_elems(3, sp);
         return sp;
@@ -5026,6 +5007,11 @@ f_object_info (svalue_t *sp)
     case OI_NO_CLONE:
         assert_ob_not_swapped(ob);
         put_number(&result, (ob->prog->flags & P_NO_CLONE) ? 1 : 0);
+        break;
+
+    case OI_NO_LIGHTWEIGHT:
+        assert_ob_not_swapped(ob);
+        put_number(&result, (ob->prog->flags & P_NO_LIGHTWEIGHT) ? 1 : 0);
         break;
 
     case OI_NO_SHADOW:
@@ -5257,6 +5243,7 @@ f_object_info (svalue_t *sp)
         assert_ob_not_swapped(ob);
         put_number(&result, (p_int)
             ( ob->prog->num_includes       * sizeof(*ob->prog->includes)));
+        break;
 
     case OI_PROG_SIZE:
         assert_ob_not_swapped(ob);
@@ -5301,7 +5288,7 @@ v_present_clone (svalue_t *sp, int num_arg)
 
     /* Get the arguments */
     svalue_t *arg = sp - num_arg + 1;   // first argument
-    env = current_object;  // default
+    env = get_current_object();  // default
     count = -1;
     if (num_arg == 3)
     {
@@ -5347,6 +5334,8 @@ v_present_clone (svalue_t *sp, int num_arg)
     /* if no number given and count is still ==-1, the for loop below searches
      * implicitly for the first object */
 
+    if (!env)
+        errorf("present_clone() within lightweight object.\n");
 
     /* Get the name/object to search for */
     if (arg->type == T_STRING)
@@ -6294,6 +6283,24 @@ f_to_string (svalue_t *sp)
         free_object_svalue(sp);
         break;
 
+    case T_LWOBJECT:
+      {
+        size_t size;
+        string_t *result;
+        string_t *name = sp->u.lwob->prog->name;
+        const char * fmt = "<lightweight object /%s>";
+
+        size = strlen(fmt) + mstrsize(name)-2;
+        memsafe(result = alloc_mstring(size), size, "lwobject name");
+        sprintf(get_txt(result), fmt, get_txt(name));
+        if (!is_ascii(get_txt(name), mstrsize(name)))
+            result->info.unicode = STRING_UTF8;
+
+        free_lwobject(sp->u.lwob);
+        put_string(sp, result);
+        break;
+      }
+
     case T_POINTER:
         /* Alias for to_text(array). */
         return v_to_text(sp, 1);
@@ -6310,7 +6317,7 @@ f_to_string (svalue_t *sp)
 
         memsafe(rc = alloc_mstring(size), size, "converted struct");
         sprintf(get_txt(rc), fmt, get_txt(name));
-        if (!is_ascii(get_txt(name), size))
+        if (!is_ascii(get_txt(name), mstrsize(name)))
             rc->info.unicode = STRING_UTF8;
         free_struct(sp->u.strct);
         put_string(sp, rc);
@@ -6873,7 +6880,6 @@ f_to_object (svalue_t *sp)
 
     case T_CLOSURE:
         n = sp->x.closure_type;
-        o = sp->u.ob;
         if (is_undef_closure(sp)) /* this shouldn't happen */
             o = NULL;
         else if (CLOSURE_MALLOCED(n))
@@ -6883,8 +6889,16 @@ f_to_object (svalue_t *sp)
                 errorf("Bad arg 1 to to_object(): unbound lambda.\n");
                 /* NOTREACHED */
             }
-            o = sp->u.lambda->ob;
+            if (sp->u.lambda->ob.type == T_OBJECT)
+                o = sp->u.lambda->ob.u.ob;
+            else
+                o = NULL;
         }
+        else if (n < CLOSURE_LWO)
+            o = NULL;
+        else
+            o = sp->u.ob;
+
         if (o && o->flags & O_DESTRUCTED)
             o = NULL;
         free_closure(sp);
@@ -6949,6 +6963,19 @@ f_copy (svalue_t *sp)
         }
         break;
       }
+
+    case T_LWOBJECT:
+      {
+        lwobject_t *old = sp->u.lwob;
+        if (old->ref != 1)
+        {
+            lwobject_t *new = copy_lwobject(old, true);
+            free_lwobject(old);
+            sp->u.lwob = new;
+        }
+        break;
+      }
+
     case T_STRUCT:
       {
         struct_t *old;
@@ -7121,6 +7148,35 @@ copy_svalue (svalue_t *dest, svalue_t *src
         }
         break;
       }
+
+    case T_LWOBJECT:
+      {
+        lwobject_t *old = src->u.lwob;
+        struct pointer_record *rec = find_add_pointer(ptable, old, MY_TRUE);
+
+        if (rec->ref_count++ < 0) /* Not encountered yet. */
+        {
+            int num_var = old->prog->num_variables;
+            lwobject_t *new;
+
+            DYN_ARRAY_COST(num_var);
+#if defined(DYNAMIC_COSTS)
+            add_eval_cost((depth+1) / 10);
+#endif
+
+            new = copy_lwobject(old, false); /* variables will be zero-initialized. */
+            put_lwobject(dest, new);
+            rec->data = new;
+
+            /* Copy the variables. */
+            for (int i = 0; i < num_var; i++)
+                copy_svalue(new->variables + i, old->variables + i, ptable, depth+1);
+        }
+        else /* shared object we already encountered */
+            put_ref_lwobject(dest, (lwobject_t*)rec->data);
+        break;
+      }
+
     case T_STRUCT:
       {
         struct pointer_record *rec;
@@ -7482,6 +7538,7 @@ f_deep_copy (svalue_t *sp)
         if (sp->u.vec == &null_vector)
             break;
         /* FALLTHROUGH */
+    case T_LWOBJECT:
     case T_STRUCT:
     case T_MAPPING:
     case T_LVALUE:
@@ -7611,15 +7668,17 @@ v_get_type_info (svalue_t *sp, int num_arg)
     case T_CLOSURE:
         if (flag == 2)
         {
-            object_t *ob;
+            svalue_t ob;
 
-            ob = NULL;
             sp--;
             switch(sp->x.closure_type)
             {
             default:
                 /* efun, simul-efun, operator closure */
-                ob = sp->u.ob;
+                if (sp->x.closure_type < CLOSURE_LWO)
+                    ob = svalue_lwobject(sp->u.lwob);
+                else
+                    ob = svalue_object(sp->u.ob);
                 break;
             case CLOSURE_IDENTIFIER:
             case CLOSURE_BOUND_LAMBDA:
@@ -7630,14 +7689,11 @@ v_get_type_info (svalue_t *sp, int num_arg)
                 ob = sp->u.lambda->function.lfun.ob;
                 break;
             case CLOSURE_UNBOUND_LAMBDA:
-                ob = NULL;
+                ob = const0;
                 break;
             }
             free_svalue(sp);
-            if (!ob || ob->flags & O_DESTRUCTED)
-                put_number(sp, 0);
-            else
-                put_ref_object(sp, ob, "get_type_info");
+            assign_svalue_no_free(sp, &ob);
             return sp;
             /* NOTREACHED */
         }
@@ -7689,7 +7745,10 @@ v_get_type_info (svalue_t *sp, int num_arg)
             return sp;
             /* NOTREACHED */
         }
-        /* FALLTHROUGH */
+        secondary = argp->x.closure_type;
+        if (secondary < CLOSURE_LWO) /* Mask the LWO flag. */
+            secondary -= CLOSURE_LWO;
+        break;
 
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
@@ -7999,6 +8058,7 @@ v_member (svalue_t *sp, int num_arg)
 
             case T_MAPPING:
             case T_OBJECT:
+            case T_LWOBJECT:
             case T_POINTER:
             case T_STRUCT:
               {
@@ -8302,6 +8362,7 @@ v_rmember (svalue_t *sp, int num_arg)
 
         case T_MAPPING:
         case T_OBJECT:
+        case T_LWOBJECT:
         case T_POINTER:
         case T_STRUCT:
           {
@@ -8932,7 +8993,7 @@ f_configure_driver (svalue_t *sp)
 {
 
     // Check for privilege_violation.
-    if ((current_object->flags & O_DESTRUCTED)
+    if (is_current_object_destructed()
      || !privilege_violation2(STR_CONFIGURE_DRIVER, sp-1, sp, sp))
     {
         return pop_n_elems(2, sp);

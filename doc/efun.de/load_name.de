@@ -1,13 +1,14 @@
 SYNOPSIS
         string load_name()
-        string load_name(object|string obj)
+        string load_name(object|lwobject|string obj)
 
 BESCHREIBUNG
         Die Funktion liefert den Namen, mit dem <obj> geladen wurde. <obj>
-        kann direkt als Objekt oder als String mit seinem Namen angegeben
-        werden.
+        kann direkt als normales oder leichtgewichtiges Objekt oder als String
+        mit dem Namen des Objektes angegeben werden.
 
-        Wenn <obj> ein Clon ist, liefert die Funktion den Namen des Blueprints.
+        Wenn <obj> ein Clon oder ein leichtgewichtiges Objekt ist, liefert die
+        Funktion den Namen des Blueprints.
         Wenn <obj> ein Blueprint ist, liefert die Funktion den Namen des Files,
         aus dem der Blueprint kompiliert wurde.
 

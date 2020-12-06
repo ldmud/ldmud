@@ -1,13 +1,15 @@
 SYNOPSIS
         string load_name()
         string load_name(object obj)
+        string load_name(lwobject obj)
         string load_name(string obj)
 
 DESCRIPTION
-        Return the load name for the object <obj> which may be given
-        directly or by its name.
+        Return the load name for the object <obj> which may be a regular
+        or lightweight object or the name of an object.
 
-        If <obj> is a clone, return the load_name() of <obj>'s blueprint.
+        If <obj> is a clone or a lightweight object, return the
+        load_name() of <obj>'s blueprint.
         If <obj> is a blueprint, return the filename from which the
         blueprint was compiled.
 

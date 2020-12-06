@@ -1,8 +1,8 @@
 SYNOPSIS
         int find_input_to(object player, string fun)
         int find_input_to(object player, closure fun)
-        int find_input_to(object player, object fun)
-        int find_input_to(object player, object ob, string fun)
+        int find_input_to(object player, object|lwobject fun)
+        int find_input_to(object player, object|lwobject ob, string fun)
 
 BESCHREIBUNG
         Findet den zuletzt fuer <player> gestarteten input_to(), abhaengig vom

@@ -1,5 +1,5 @@
 SYNOPSIS
-        closure bind_lambda(closure cl, object ob)
+        closure bind_lambda(closure cl, object|lwobject ob)
 
 BESCHREIBUNG
         Bindet eine ungebundene Lambda-Closure (die von unbound_lambda()

@@ -209,8 +209,11 @@ find_current_connection (object_t * obj)
 
 {
    dbconn_t *ptr = head;
-   
-   while (ptr && callback_object(&ptr->callback) != obj)
+   svalue_t cbob;
+
+   while (ptr
+       && ((cbob = callback_object(&ptr->callback)).type != T_OBJECT
+        || cbob.u.ob != obj))
         ptr = ptr->next;
    
    return ptr;
@@ -386,7 +389,7 @@ pgreset (dbconn_t *pgconn)
     {
         pgclose(pgconn);
         
-        if (callback_object(&pgconn->callback))
+        if (valid_callback_object(&pgconn->callback))
         {
             push_number(inter_sp, PGCONN_ABORTED);
             push_ref_string(inter_sp, STR_PG_RESET_FAILED);
@@ -417,7 +420,7 @@ pgnotice (dbconn_t *pgconn, const char *msg)
     command_giver = 0;
     current_interactive = 0;
     
-    if (current_object != NULL)
+    if (current_object.type != T_NUMBER)
     {
         push_number(inter_sp, PGRES_NOTICE);
         push_c_string(inter_sp, msg);
@@ -561,7 +564,7 @@ pgresult (dbconn_t *pgconn, PGresult *res)
         return;
     }
     
-    if (callback_object(&pgconn->callback))
+    if (valid_callback_object(&pgconn->callback))
     {
         push_number(inter_sp, pgconn->queue->id);
         (void)apply_callback(&pgconn->callback, 3);
@@ -681,7 +684,7 @@ pg_process_connect_reset (dbconn_t *pgconn)
         }
         else
         {
-            if (callback_object(&pgconn->callback))
+            if (valid_callback_object(&pgconn->callback))
             {
                 push_number(inter_sp, reset ? PGCONN_ABORTED : PGCONN_FAILED);
                 push_c_string(inter_sp, PQerrorMessage(pgconn->conn));
@@ -699,7 +702,7 @@ pg_process_connect_reset (dbconn_t *pgconn)
         if (!reset)
         {
            /* The program should not notice a successful reset */
-            if (callback_object(&pgconn->callback))
+            if (valid_callback_object(&pgconn->callback))
             {
                 push_number(inter_sp, PGCONN_SUCCESS);
                 push_ref_string(inter_sp, STR_SUCCESS);
@@ -853,7 +856,7 @@ pg_process_all (void)
     
     while (ptr)
     {
-        if (!callback_object(&ptr->callback)
+        if (!valid_callback_object(&ptr->callback)
          && ptr->state != PG_UNCONNECTED
            )
         {
@@ -885,7 +888,7 @@ pg_purge_connections (void)
     while (head)
     {
         if (head->state != PG_UNCONNECTED
-         && !callback_object(&head->callback)
+         && !valid_callback_object(&head->callback)
            )
         {
             debug_message("%s PG connection object destructed.\n", time_stamp());
@@ -903,7 +906,7 @@ pg_purge_connections (void)
         while (prev->next)
         {
             if (prev->next->state != PG_UNCONNECTED
-             && !callback_object(&prev->next->callback)
+             && !valid_callback_object(&prev->next->callback)
                )
             {
                 debug_message("%s PG connection object destructed.\n", time_stamp());
@@ -990,8 +993,11 @@ v_pg_connect (svalue_t *sp, int num_arg)
     int         st;
     int         error_index;
     callback_t *cb;
-    object_t   *cb_object;
+    svalue_t    cb_object;
     svalue_t   *arg = sp - num_arg + 1;
+
+    if (current_object.type != T_OBJECT)
+        errorf("pg_connect() without current object.\n");
 
     check_privilege(instrs[F_PG_CONNECT].name, MY_TRUE, sp);
 
@@ -1010,7 +1016,7 @@ v_pg_connect (svalue_t *sp, int num_arg)
     put_callback(sp, cb);
 
     cb_object = callback_object(cb);
-    if (!cb_object)
+    if (cb_object.type != T_OBJECT)
     {
         errorf("pgconnect(): Callback object is destructed.\n");
         /* NOTREACHED */
@@ -1019,7 +1025,7 @@ v_pg_connect (svalue_t *sp, int num_arg)
 
     /* Check the callback object if it has a connection already */
 
-    db = find_current_connection(cb_object);
+    db = find_current_connection(cb_object.u.ob);
     if (db)
     {
         if (db->state == PG_UNCONNECTED)
@@ -1105,7 +1111,10 @@ v_pg_query (svalue_t *sp, int numarg)
     dbconn_t *db;
     query_queue_t *q;
     int flags = PG_RESULT_ARRAY;
-    
+
+    if (current_object.type != T_OBJECT)
+        errorf("pg_query() without current object.\n");
+
     check_privilege(instrs[F_PG_QUERY].name, MY_TRUE, sp);
 
     if (numarg == 2)
@@ -1113,8 +1122,8 @@ v_pg_query (svalue_t *sp, int numarg)
         flags = sp->u.number;
         sp--;
     }
-    
-    db = find_current_connection(current_object);
+
+    db = find_current_connection(current_object.u.ob);
     if (!db)
         errorf("pgquery(): not connected\n");
 
@@ -1141,10 +1150,13 @@ f_pg_close (svalue_t *sp)
 
 {
     dbconn_t *db;
-    
+
+    if (current_object.type != T_OBJECT)
+        errorf("pg_close() without current object.\n");
+
     check_privilege(instrs[F_PG_CLOSE].name, MY_TRUE, sp);
 
-    db = find_current_connection(current_object);
+    db = find_current_connection(current_object.u.ob);
     if (db)
         pgclose(db);
     

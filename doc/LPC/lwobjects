@@ -1,0 +1,72 @@
+CONCEPT
+        lwobjects
+
+INTRODUCTION
+        Lightweight objects are a cross between regular objects and structs.
+        Like regular objects they are build from programs (.c files) and
+        encapsulate data und functions. Like structs they are automatically
+        destructed, they can be copied and saved.
+
+        As with regular objects its variables are hidden from outside
+        objects, its functions can be called with call_other() and related
+        efuns.
+
+        Lightweight objects are passed by reference.
+
+
+DEFINITION
+        Lightweight objects are created from a program, i.e. an LPC file.
+        This file needs to have the pragma
+
+            #pragma lightweight
+
+        to allow being used as a lightweight object. This pragma implies
+        the no_clone pragma (which can be overridden with the clone pragma).
+
+        There are no restriction on the program itself. It can inherit
+        other programs. Those programs don't need to have that pragma,
+        but the compiler might warn about unsuitable programs.
+
+
+USAGE
+        A lightweight objects is created by calling the efun new_lwobject():
+
+            lwobject lwo = new_lwobject("/obj/foo");
+
+        The efun new_lwobject() will load the file to create a blueprint
+        from it (which is a regular object) and then creates a lightweight
+        object therefrom.
+
+        The efun can be given optional arguments that are passed to the
+        H_CREATE_LWOBJECT driver hook.
+
+        Functions of the lightweight object can be called with the efuns
+        call_other() and its companions and operators:
+
+            lwo->fun();
+            lwo.fun();
+
+
+MISCELLANEOUS
+        Only declarative casts to lwobject are possible, there is no
+        conversion of any other type to lwobjects available (therefore
+        there is no to_lwobject() efun).
+
+        Support for lightweight objects is signaled by the macro
+        __LPC_LWOBJECTS__.
+
+        Lightweight objects have a UID and EUID and therefore can also
+        do file operations or create new objects themselves.
+
+        Lightweight objects can be serialized with save_value(), so
+        any outside program can inspect its variables. To really hide
+        variable contents they must be nosave.
+
+
+HISTORY
+        Lightweight objects were introduced in LDMud 3.6.5.
+
+
+SEE ALSO
+        structs(LPC), new_lwobject(E), call_other(E), configure_lwobject(E),
+        lwobject_info(E)

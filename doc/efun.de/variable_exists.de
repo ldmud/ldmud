@@ -2,7 +2,7 @@ SYNOPSIS
         #include <functionlist.h>
 
         string variable_exists(string str [, int flags])
-        string variable_exists(string str, object obj [, int flags])
+        string variable_exists(string str, object|lwobject obj [, int flags])
 
 BESCHREIBUNG
         Sucht eine Varialbe <str> in this_object() oder (falls angegeben)

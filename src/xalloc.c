@@ -25,6 +25,7 @@
 #include "simulate.h"
 
 #include "exec.h"
+#include "lwobject.h"
 #include "object.h"
 #include "mstrings.h"
 
@@ -85,7 +86,7 @@ typedef p_uint word_t;
 
 enum xalloc_header_fields {
 #ifdef MALLOC_LPC_TRACE
-    XM_OBJ  = 0,  /* (object_t*) the allocating object */
+    XM_OBJ  = 0,  /* (object_t* or lwobject_t*) the allocating object */
     XM_PROG = 1,  /* (int32) allocating program's id-number */
     XM_PC   = 2,  /* (bytecode_p) inter_pc at the allocation */
 #    ifdef MALLOC_TRACE
@@ -105,6 +106,10 @@ enum xalloc_header_fields {
 #    endif /* MALLOC_TRACE */
 #endif /* MALLOC_LPC_TRACE */
     XM_OVERHEAD_SIZE = XM_OVERHEAD * sizeof(word_t),
+
+    /* Flags set at the XM_OBJ entry. */
+    XM_OBJ_MASK             = 0x01,     /* All flags together.     */
+    XM_OBJ_FLAG_LIGHTWEIGHT = 0x01      /* Points to a lwobject_t. */
 };
 
 /*-------------------------------------------------------------------------*/
@@ -157,7 +162,7 @@ static int going_to_exit = MY_FALSE;
 #ifdef MALLOC_SBRK_TRACE
 
 static size_t mdb_size;
-static object_t *mdb_object;
+static svalue_t mdb_object;
 #    if defined(MALLOC_TRACE)
         static const char * mdb_file;
         static int mdb_line;
@@ -210,7 +215,9 @@ mem_debug_log (const char * name, p_int size)
                 );
       dprintf3(1, " , '%s':%d , obj %s\n"
                 , (p_int)mdb_file, (p_int)mdb_line
-                , (p_int)(mdb_object ? ( mdb_object->name ? get_txt(mdb_object->name) : "<?>"): "<null>")
+                , (p_int)(mdb_object.type == T_OBJECT   ? ( mdb_object.u.ob->name ? get_txt(mdb_object.u.ob->name) : "<?>")
+                        : mdb_object.type == T_LWOBJECT ? mdb_object.u.lwob->prog->name)
+                        : "<null>")
                 );
 #else
       dprintf4(1, "%s %s(%d) for %d"
@@ -218,7 +225,9 @@ mem_debug_log (const char * name, p_int size)
                 , (p_int)size, (p_int)mdb_size
                 );
       dprintf1(1, " , obj %s\n"
-                , (p_int)(mdb_object ? ( mdb_object->name ? get_txt(mdb_object->name) : "<?>"): "<null>")
+                , (p_int)(mdb_object.type == T_OBJECT   ? ( mdb_object.u.ob->name ? get_txt(mdb_object.u.ob->name) : "<?>")
+                        : mdb_object.type == T_LWOBJECT ? mdb_object.u.lwob->prog->name)
+                        : "<null>")
                 );
 #endif /* MALLOC_TRACE */
 } /* mem_debug_log() */
@@ -507,7 +516,9 @@ retry_alloc (size_t size MTRACE_DECL)
     writes(2, mess_d6);
 #endif
     writes(2, mess_d4);
-    writes(2, current_object ? get_txt(current_object->name) : "<null>");
+    writes(2, current_object.type == T_OBJECT   ? get_txt(current_object.u.ob->name)
+            : current_object.type == T_LWOBJECT ? get_txt(current_object.u.lwob->prog->name)
+            : "<null>");
     writes(2, mess_d7);
     writes(2, current_prog ? get_txt(current_prog->name) : "<null>");
     writes(2, mess_d6);
@@ -632,7 +643,19 @@ xalloc_traced (size_t size MTRACE_DECL)
         p[XM_LINE] = (word_t)malloc_trace_line;
 #endif
 #ifdef MALLOC_LPC_TRACE
-        p[XM_OBJ]  = (word_t)current_object;
+        switch (current_object.type)
+        {
+            case T_OBJECT:
+                p[XM_OBJ]  = (word_t)(current_object.u.ob);
+                break;
+            case T_LWOBJECT:
+                p[XM_OBJ]  = (word_t)(current_object.u.lwob) | XM_OBJ_FLAG_LIGHTWEIGHT;
+                break;
+            case T_NUMBER:
+            default:
+                p[XM_OBJ] = 0;
+                break;
+        }
         p[XM_PROG] = current_prog ? current_prog->id_number : 0;
         p[XM_PC]   = (word_t)inter_pc;
 #endif
@@ -1108,7 +1131,15 @@ write_lpc_trace (int d, word_t *p, int oneline)
     /* Try to find the object which allocated this block */
     if (!oneline)
     {
-        if ( NULL != (obj = (object_t *)p[XM_OBJ]) )
+        if (p[XM_OBJ] & XM_OBJ_FLAG_LIGHTWEIGHT)
+        {
+            lwobject_t *lwob = (lwobject_t*)(p[XM_OBJ] & ~XM_OBJ_MASK);
+            /* We can't verify the validity of the lightweight object,
+             * so just printing its former address.
+             */
+            dprintf1(d, "  By lightweight object: 0x%x", (p_int)lwob);
+        }
+        else if ( NULL != (obj = (object_t *)(p[XM_OBJ] & ~XM_OBJ_MASK)) )
         {
             writes(d, "  By object: ");
             if (obj->flags & O_DESTRUCTED)
@@ -1125,7 +1156,15 @@ write_lpc_trace (int d, word_t *p, int oneline)
     }
     else
     {
-        if ( NULL != (obj = (object_t *)p[XM_OBJ]) )
+        if (p[XM_OBJ] & XM_OBJ_FLAG_LIGHTWEIGHT)
+        {
+            lwobject_t *lwob = (lwobject_t*)(p[XM_OBJ] & ~XM_OBJ_MASK);
+            /* We can't verify the validity of the lightweight object,
+             * so just printing its former address.
+             */
+            dprintf1(d, "lightweight(0x%x)", (p_int)lwob);
+        }
+        else if ( NULL != (obj = (object_t *)(p[XM_OBJ] & ~XM_OBJ_MASK)) )
         {
             for (o = obj_list; o && o != obj; o = o->next_all) NOOP;
             if (!o || !o->name)

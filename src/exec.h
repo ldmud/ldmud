@@ -242,6 +242,9 @@ struct instr_s
                          /* The efun might return an lvalue reference,
                           * which must be unravalled at the end.
                           */
+    bool no_lightweight; /* The efun is not allowed for lightweight
+                          * objects.
+                          */
     char *name;          /* The printable name of the instruction. */
     char *deprecated;    /* Usually NULL, for deprecated efuns this is
                           * the warning message to print.
@@ -520,6 +523,41 @@ struct include_s
 };
 
 
+/* --- struct call_cache_s: A cache entry for calls into objects
+ *
+ * This structure contains call information for fast calls into objects.
+ * It is used in the program for calls to lightweight objects with the
+ * F_CALL_OTHER/STRICT_CACHED opcode and as general cache in the
+ * interpreter for all objects.
+ */
+
+struct call_cache_s
+{
+    string_t *name;
+      /* The name of the cached function, shared for existing functions,
+       * allocated if the object does not have the function.
+       * This pointer counts as reference.
+       * NULL for uninitialized entries.
+       */
+    program_t *progp;
+      /* The pointer to the program code of the function, or NULL if the
+       * object does not implement the function.
+       */
+    bytecode_p funstart;
+      /* Pointer to the function.
+       */
+    int32 id;
+      /* The id_number of the program. */
+    funflag_t flags;
+      /* Copy of the _MOD_STATIC and _MOD_PROTECTED flags of the function.
+       */
+    int function_index_offset;
+    int variable_index_offset;
+      /* Function and variable index offset.
+       */
+};
+
+
 /* --- struct program_s: the program head structure
  *
  * This structure is actually just the head of the memory block
@@ -597,6 +635,10 @@ struct program_s
     variable_t *variables;
       /* Array [.num_variables] with the flags, types and names of all
        * variables.
+       */
+    call_cache_t *lwo_call_cache;
+      /* The cache for lightweight object calls. The index is given
+       * with the F_CALL_OTHER/STRICT_CACHED opcode.
        */
     inherit_t *inherit;
       /* Array [.num_inherited] of descriptors for (directly) inherited programs.
@@ -681,11 +723,14 @@ enum program_flags {
        */
     P_NO_INHERIT      = 0x0002, /* Program must not be inherited */
     P_NO_CLONE        = 0x0004, /* No clones allowed */
-    P_NO_SHADOW       = 0x0008, /* No shadows allowed */
-    P_SHARE_VARIABLES = 0x0010, /* Clone vars are assigned from 
+    P_NO_LIGHTWEIGHT  = 0x0008, /* No lightweight objects allowed */
+    P_NO_SHADOW       = 0x0010, /* No shadows allowed */
+    P_SHARE_VARIABLES = 0x0020, /* Clone vars are assigned from
                                  * the current blueprint vars. */
-    P_RTT_CHECKS      = 0x0020, /* enable runtime type checks */
-    P_WARN_RTT_CHECKS = 0x0040, /* enable runtime type check warnings */
+    P_RTT_CHECKS      = 0x0040, /* enable runtime type checks */
+    P_WARN_RTT_CHECKS = 0x0080, /* enable runtime type check warnings */
+    P_USE_NONLW_EFUNS = 0x0100, /* the program uses efuns that are
+                                 * not suitable for lightweight objects. */
 };
 /* Special value for type_start in program_s designating that the function has
  * no type info. */

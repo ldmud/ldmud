@@ -1,6 +1,6 @@
 GESCHUETZT
 SYNOPSIS
-        void set_this_object(object objekt-an-stelle-von-originalobjekt)
+        void set_this_object(object|lwobject objekt-an-stelle-von-originalobjekt)
 
 BESCHREIBUNG
         Dies ist eine geschuetzte Funktion, die nur vom Master-Objekt und im

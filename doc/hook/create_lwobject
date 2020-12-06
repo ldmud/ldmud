@@ -1,0 +1,31 @@
+SYNOPSIS
+        #include <sys/driver_hooks.h>
+
+        set_driver_hook(H_CREATE_LWOBJECT, value)
+
+        <value> being:
+
+          void <name>    (...)
+          void <closure> ()
+          void <closure> (lwobject obj_to_init, ...)
+
+DESCRIPTION
+        Optional hooks to initialize a lightweight object after creation.
+        Hook setting can be unbound lambda closures, or the name of the
+        function (static or public) to call in the object.
+
+        If the hook is a closure expecting arguments, it is bound to the
+        current object and called with the created object as the first
+        argument and any further arguments from the new_lwobject() call.
+        If the hook is a closure without arguments, it is bound to
+        the object to be initalized and called.
+
+        If the hook is defined as the name of an lfun in the lightweight
+        object, it is called in the new lwobject with any further arguments
+        from the new_lwobject() call.
+
+HISTORY
+        LDMud 3.6.5 introduced lightweight objects.
+
+SEE ALSO
+        hooks(C), create_ob(H), create_super(H), create_clone(H)

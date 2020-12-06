@@ -191,6 +191,8 @@
 
 #include "pkg-python.h"
 
+#include "i-current_object.h"
+
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/functionlist.h"
 #include "../mudlib/sys/include_list.h"
@@ -483,7 +485,8 @@ init_object_variables (object_t *ob, object_t *templ)
             if (!templ_vars)
                 errorf("Can't initialize object '%s': no blueprint given.\n"
                      , get_txt(ob->name));
-            assign_svalue_no_free(&ob_vars[i], &templ_vars[i]);
+            free_svalue(&ob_vars[i]);
+            assign_rvalue_no_free(&ob_vars[i], &templ_vars[i]);
         }
     }
 
@@ -710,13 +713,13 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
 
 /*-------------------------------------------------------------------------*/
 static string_t *
-function_exists (string_t *fun, object_t *ob, Bool show_hidden
+function_exists (string_t *fun, program_t *progp, funflag_t inacceptable_flags
                 , string_t ** prog_name, uint32 * prog_line
                 , int * num_arg,  uint32 * fun_flags
                 , lpctype_t ** fun_type
                 )
 
-/* Search for the function <fun> in the object <ob>. If existing, return
+/* Search for the function <fun> in the program <prog>. If existing, return
  * the name of the program (without added reference), if not return NULL.
  *
  * If <prog_name> and <prog_line> are both non-NULL, they are set to
@@ -726,22 +729,16 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
  * *<num_arg>, *<fun_flags>,  *<fun_type> are set to the number of
  * arguments, the function flags and the function return type respectively.
  *
- * Visibility rules apply: static and protected functions can't be
- * found from the outside unless <show_hidden> is true.
+ * If a function contains one of the flags in <inacceptable_flags>
+ * NULL is returned (i.e. the function is not found).
  */
 
 {
     string_t *shared_name;
     bytecode_p funstart;
-    program_t *progp;
     function_t  *header;
     int ix;
     funflag_t flags;
-
-#ifdef DEBUG
-    if (ob->flags & O_DESTRUCTED)
-        fatal("function_exists() on destructed object\n");
-#endif
 
     memset(fun_type, 0, sizeof(*fun_type));
     *num_arg = 0;
@@ -750,16 +747,7 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
     if (prog_name)
         *prog_name = NULL;
 
-    /* Make the program resident */
-    if (O_PROG_SWAPPED(ob))
-    {
-        ob->time_of_ref = current_time;
-        if (load_ob_from_swap(ob) < 0)
-            errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
-    }
-
     shared_name = find_tabled(fun);
-    progp = ob->prog;
 
     /* Check if the function exists at all */
     if ( (ix = find_function(shared_name, progp)) < 0)
@@ -769,10 +757,7 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
     flags = progp->functions[ix];
     *fun_flags = (flags & ~INHERIT_MASK);
 
-    if (!show_hidden
-     && (   flags & TYPE_MOD_PRIVATE
-         || (flags & TYPE_MOD_STATIC && current_object != ob))
-       )
+    if (flags & inacceptable_flags)
         return NULL;
 
     /* Resolve inheritance */
@@ -848,17 +833,19 @@ reset_object (object_t *ob, int arg, int num_arg)
         lambda_t *l;
 
         if (arg == H_RESET)
-            previous_ob = current_object = ob;
+        {
+            set_current_object(ob);
+            previous_ob = current_object;
+        }
 
         l = driver_hook[arg].u.lambda;
-        free_object(l->ob, "reset_object");
         if (l->function.code.num_arg && arg != H_RESET)
         {
             /* closure accepts arguments, presumably one, so
              * give it the target object and bind to the current
              * object.
              */
-            l->ob = ref_object(current_object, "reset_object");
+            assign_current_object(&(l->ob), "reset_object");
 
             /* We need to insert the object before the other arguments. */
             inter_sp++;
@@ -869,7 +856,8 @@ reset_object (object_t *ob, int arg, int num_arg)
         else
         {
             /* no arguments, just bind to target */
-            l->ob = ref_object(ob, "reset_object");
+            free_svalue(&(l->ob));
+            put_ref_object(&(l->ob), ob, "reset_object");
             call_lambda(&driver_hook[arg], 0);
             inter_sp = pop_n_elems(num_arg, inter_sp);
         }
@@ -887,7 +875,10 @@ reset_object (object_t *ob, int arg, int num_arg)
     else if (driver_hook[arg].type == T_STRING)
     {
         if (arg == H_RESET)
-            previous_ob = current_object = ob;
+        {
+            set_current_object(ob);
+            previous_ob = current_object;
+        }
 
         if (!sapply_ign_prot(driver_hook[arg].u.str, ob, num_arg)
          && arg == H_RESET)
@@ -911,9 +902,9 @@ logon_object (object_t *ob, p_int flag)
 
 {
     svalue_t *ret;
-    object_t *save = current_object;
+    svalue_t  save = current_object;
 
-    current_object = ob;
+    set_current_object(ob);
     mark_start_evaluation();
 
     /* Only pass the flag, when != 0. */
@@ -1220,9 +1211,12 @@ retrieve_replace_program_entry (void)
 {
     replace_ob_t *r_ob;
 
+    /* replace_program() can only be used for real objects. */
+    assert(current_object.type == T_OBJECT);
+
     for (r_ob = obj_list_replace; r_ob; r_ob = r_ob->next)
     {
-        if (r_ob->ob == current_object)
+        if (r_ob->ob == current_object.u.ob)
             return r_ob;
     }
     return NULL;
@@ -1416,7 +1410,7 @@ shadow_catch_message (object_t *ob, const char *str)
 
     ip = O_GET_INTERACTIVE(ob);
 
-    if (!ip || !ip->catch_tell_activ || ob == current_object)
+    if (!ip || !ip->catch_tell_activ || ob == get_current_object())
         return MY_FALSE;
 
     trace_level |= ip->trace_level;
@@ -1428,9 +1422,9 @@ shadow_catch_message (object_t *ob, const char *str)
      * (e.g. destructed and set to 0 ) .
      * !current_object is true when a prompt is given.
      */
-    if (!current_object
-     || !(current_object->flags & O_SHADOW)
-     || !O_GET_SHADOW(current_object)->shadowing)
+    if (current_object.type != T_OBJECT
+     || !(current_object.u.ob->flags & O_SHADOW)
+     || !O_GET_SHADOW(current_object.u.ob)->shadowing)
     {
         ip->catch_tell_activ = MY_FALSE;
     }
@@ -1530,7 +1524,7 @@ v_function_exists (svalue_t *sp, int num_arg)
 /* EXEC function_exists()
  *
  *   mixed function_exists (string str [, int flags])
- *   mixed function_exists (string str , object ob, [, int flags])
+ *   mixed function_exists (string str , object|lwobject ob, [, int flags])
  *
  * Look up a function <str> in the current object, respectively
  * in the object <ob>. Depending on the value of <flags>, one
@@ -1575,7 +1569,8 @@ v_function_exists (svalue_t *sp, int num_arg)
     uint32 prog_line = 0;
     p_int flags;
     svalue_t *argp;
-    object_t *ob;
+    svalue_t  ob;
+    program_t *prog;
 
     uint32    fun_flags;
     int       fun_num_arg;
@@ -1584,7 +1579,6 @@ v_function_exists (svalue_t *sp, int num_arg)
     /* Evaluate arguments */
     argp = sp - num_arg + 1;
 
-    ob = NULL;
     flags = 0;
 
     if (num_arg < 2)
@@ -1612,9 +1606,9 @@ v_function_exists (svalue_t *sp, int num_arg)
                 return sp;
             }
         }
-        else if (argp[1].type == T_OBJECT)
+        else /* argp[1].type == T_OBJECT || argp[1].type == T_LWOBJECT */
         {
-            ob = argp[1].u.ob;
+            ob = argp[1];
             flags = 0;
         }
     }
@@ -1624,7 +1618,7 @@ v_function_exists (svalue_t *sp, int num_arg)
         /* The last argument must be a number. On the other
          * side, we can't have two numbers at once.
          */
-        if (argp[1].type != T_OBJECT)
+        if (argp[1].type != T_OBJECT && argp[1].type != T_LWOBJECT)
         {
             errorf("Bad argument 2 to function_exists(): got %s, expected object.\n", typename(argp[1].type));
             /* NOTREACHED */
@@ -1645,16 +1639,38 @@ v_function_exists (svalue_t *sp, int num_arg)
         }
     }
 
-    if (ob->flags & O_DESTRUCTED)
+    if (ob.type == T_OBJECT)
     {
-        errorf("Bad argument to function_exists(): Object is destructed.\n");
-        /* NOTREACHED */
-        return sp;
+        if (ob.u.ob->flags & O_DESTRUCTED)
+        {
+            errorf("Bad argument to function_exists(): Object is destructed.\n");
+            /* NOTREACHED */
+            return sp;
+        }
+
+        /* Make the program resident */
+        if (O_PROG_SWAPPED(ob.u.ob))
+        {
+            ob.u.ob->time_of_ref = current_time;
+            if (load_ob_from_swap(ob.u.ob) < 0)
+                errorf("Out of memory: unswap object '%s'\n", get_txt(ob.u.ob->name));
+        }
+
+        prog = ob.u.ob->prog;
     }
+    else if (ob.type == T_LWOBJECT)
+    {
+        prog = ob.u.lwob->prog;
+    }
+    else
+        errorf("Missing object for function_exists().\n");
+
 
     /* Get the information */
     prog_name = NULL;
-    str = function_exists(argp->u.str, ob, (flags & NAME_HIDDEN)
+    str = function_exists(argp->u.str, prog
+                         , (flags & NAME_HIDDEN) ? 0
+                                                 : (TYPE_MOD_PROTECTED | (is_current_object(ob) ? 0 : TYPE_MOD_STATIC))
                          , &prog_name, &prog_line
                          , &fun_num_arg, &fun_flags, &fun_type);
     sp = pop_n_elems(num_arg, sp);
@@ -1753,7 +1769,7 @@ f_functionlist (svalue_t *sp)
 
 /* EFUN functionlist()
  *
- *   mixed *functionlist (object ob, int flags = RETURN_FUNCTION_NAME)
+ *   mixed *functionlist (object|lwobject ob, int flags = RETURN_FUNCTION_NAME)
  *
  * Return an array with information about <ob>s lfunctions. For every
  * function, 1 to 4 values (depending on <flags>) are stored in
@@ -1808,9 +1824,9 @@ f_functionlist (svalue_t *sp)
  */
 
 {
-    object_t *ob;         /* <ob> argument to list */
+    object_t *ob = NULL;  /* <ob> argument to list */
     mp_int mode_flags;    /* <flags> argument */
-    program_t *prog;      /* <ob>'s program */
+    program_t *prog = NULL;        /* <ob>'s program */
     unsigned short num_functions;  /* Number of functions to list */
     char *vis_tags;
       /* Bitflag array describing the visibility of every function in prog
@@ -1835,25 +1851,29 @@ f_functionlist (svalue_t *sp)
 
     /* Extract the arguments from the vm stack.
      */
-    if (sp[-1].type != T_OBJECT)
+    if (sp[-1].type == T_OBJECT)
+        ob = sp[-1].u.ob;
+    else if (sp[-1].type == T_LWOBJECT)
+        prog = sp[-1].u.lwob->prog;
+    else
     {
         if (!(ob = find_object(sp[-1].u.str)))
             errorf("Object '%s' not found.\n", get_txt(sp[-1].u.str));
     }
-    else
-        ob = sp[-1].u.ob;
 
     mode_flags = sp->u.number;
 
-    if (O_PROG_SWAPPED(ob))
-        if (load_ob_from_swap(ob) < 0)
+    if (ob)
+    {
+        if (O_PROG_SWAPPED(ob) && load_ob_from_swap(ob) < 0)
         {
             errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
             /* NOTREACHED */
             return NULL;
         }
 
-    prog = ob->prog;
+        prog = ob->prog;
+    }
 
     /* Initialize the vistag[] flag array.
      */
@@ -2047,7 +2067,7 @@ v_variable_exists (svalue_t *sp, int num_arg)
 /* EXEC variable_exists()
  *
  *   string variable_exists (string str [, int flags])
- *   string variable_exists (string str , object ob, [, int flags])
+ *   string variable_exists (string str , object|lwobject ob, [, int flags])
  *
  * Look up a variable <str> in the current object, respectively
  * in the object <ob>.
@@ -2067,13 +2087,14 @@ v_variable_exists (svalue_t *sp, int num_arg)
 {
     string_t *str;
     svalue_t *argp;
-    object_t *ob;
+    svalue_t ob;
+    program_t *progp;
     p_int mode_flags;
+    bool is_current_ob;
 
     /* Evaluate arguments */
     argp = sp - num_arg + 1;
 
-    ob = NULL;
     mode_flags = 0;
 
     if (num_arg < 2)
@@ -2099,9 +2120,9 @@ v_variable_exists (svalue_t *sp, int num_arg)
                 return sp;
             }
         }
-        else if (argp[1].type == T_OBJECT)
+        else /* argp[1].type == T_OBJECT || argp[1].type == T_LWOBJECT */
         {
-            ob = argp[1].u.ob;
+            ob = argp[1];
             mode_flags = 0;
         }
     }
@@ -2111,10 +2132,10 @@ v_variable_exists (svalue_t *sp, int num_arg)
         /* The last argument must be a number. On the other
          * side, we can't have two numbers at once.
          */
-        if (argp[1].type != T_OBJECT)
+        if (argp[1].type != T_OBJECT && argp[1].type != T_LWOBJECT)
         {
             errorf("Bad argument 2 to variable_exists(): "
-                  "got %s, expected object.\n", typename(argp[1].type));
+                  "got %s, expected object/lwobject.\n", typename(argp[1].type));
             /* NOTREACHED */
             return sp;
         }
@@ -2132,21 +2153,33 @@ v_variable_exists (svalue_t *sp, int num_arg)
         }
     }
 
+    if (ob.type == T_OBJECT)
+    {
+        if (ob.u.ob->flags & O_DESTRUCTED)
+        {
+            errorf("Bad argument to variable_exists(): Object is destructed.\n");
+            /* NOTREACHED */
+            return sp;
+        }
 
-    if (ob->flags & O_DESTRUCTED)
-    {
-        errorf("Bad argument to variable_exists(): Object is destructed.\n");
-        /* NOTREACHED */
-        return sp;
+        /* Make the program resident */
+        if (O_PROG_SWAPPED(ob.u.ob))
+        {
+            ob.u.ob->time_of_ref = current_time;
+            if (load_ob_from_swap(ob.u.ob) < 0)
+                errorf("Out of memory: unswap object '%s'\n", get_txt(ob.u.ob->name));
+        }
+
+        progp = ob.u.ob->prog;
+        is_current_ob = (get_current_object() == ob.u.ob);
     }
- 
-    /* Make the program resident */
-    if (O_PROG_SWAPPED(ob))
+    else if (ob.type == T_LWOBJECT)
     {
-        ob->time_of_ref = current_time;
-        if (load_ob_from_swap(ob) < 0)
-            errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+        progp = ob.u.lwob->prog;
+        is_current_ob = (get_current_lwobject() == ob.u.lwob);
     }
+    else
+        errorf("Missing object for variable_exists().\n");
 
     /* Get the information */
     str = NULL;
@@ -2154,7 +2187,6 @@ v_variable_exists (svalue_t *sp, int num_arg)
     do
     {
         string_t *shared_name;
-        program_t *progp;
         int ix;
         typeflags_t flags;
         bool virtualvar;
@@ -2162,8 +2194,6 @@ v_variable_exists (svalue_t *sp, int num_arg)
         shared_name = find_tabled(argp->u.str);
         if (!shared_name)
             break;
-
-        progp = ob->prog;
 
         /* Check if the variable exists at all */
         for (ix = 0; ix < progp->num_variables; ix++)
@@ -2184,7 +2214,7 @@ v_variable_exists (svalue_t *sp, int num_arg)
 
         if (!(mode_flags & NAME_HIDDEN)
          && (   (flags & TYPE_MOD_PRIVATE)
-             || ((flags & TYPE_MOD_PROTECTED) && current_object != ob))
+             || ((flags & TYPE_MOD_PROTECTED) && !is_current_ob))
            )
             break;
 
@@ -2300,10 +2330,12 @@ f_variable_list (svalue_t *sp)
  */
 
 {
-    object_t *ob;         /* <ob> argument to list */
+    object_t *ob = NULL;  /* <ob> argument to list */
     mp_int mode_flags;    /* <flags> argument */
-    program_t *prog;      /* <ob>'s program */
+    program_t *prog = NULL;        /* <ob>'s program */
+    svalue_t *variables = NULL;    /* <ob>'s variables */
     unsigned short num_variables;  /* Number of variables to list */
+    bool is_current_ob = false;    /* whether <ob> is the current object */
     char *vis_tags;
       /* Bitflag array describing the visibility of every variable in prog
        * in relation to the passed <flags>: */
@@ -2324,17 +2356,26 @@ f_variable_list (svalue_t *sp)
 
     /* Extract the arguments from the vm stack.
      */
-    if (sp[-1].type != T_OBJECT)
+    if (sp[-1].type == T_OBJECT)
+        ob = sp[-1].u.ob;
+    else if (sp[-1].type == T_LWOBJECT)
+    {
+        prog = sp[-1].u.lwob->prog;
+        variables = sp[-1].u.lwob->variables;
+        is_current_ob = (get_current_lwobject() == sp[-1].u.lwob);
+    }
+    else
     {
         if (!(ob = find_object(sp[-1].u.str)))
             errorf("Object '%s' not found.\n", get_txt(sp[-1].u.str));
     }
-    else
-        ob = sp[-1].u.ob;
+
+    if (ob)
+        is_current_ob = (get_current_object() == ob);
 
     mode_flags = sp->u.number;
 
-    if (ob != current_object && (mode_flags & RETURN_VARIABLE_VALUE))
+    if (!is_current_ob && (mode_flags & RETURN_VARIABLE_VALUE))
     {
         assert_master_ob_loaded();
         if (privilege_violation(STR_VARIABLE_LIST, sp-1, sp) <= 0)
@@ -2348,20 +2389,22 @@ f_variable_list (svalue_t *sp)
         }
     }
 
-    // We need the program and if the values of variables are requested we additionally
-    // need the variables block.
-    if (O_PROG_SWAPPED(ob)
-     || ((mode_flags & RETURN_VARIABLE_VALUE) && O_VAR_SWAPPED(ob))
-       )
+    if (ob)
     {
-        if (load_ob_from_swap(ob) < 0)
+        // We need the program and if the values of variables are requested we additionally
+        // need the variables block.
+        if ((O_PROG_SWAPPED(ob)
+          || ((mode_flags & RETURN_VARIABLE_VALUE) && O_VAR_SWAPPED(ob)))
+         && load_ob_from_swap(ob) < 0)
         {
             errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
             /* NOTREACHED */
             return NULL;
         }
+
+        prog = ob->prog;
+        variables = ob->variables;
     }
-    prog = ob->prog;
 
     /* Initialize the vistag[] flag array.
      */
@@ -2469,7 +2512,7 @@ f_variable_list (svalue_t *sp)
         if (mode_flags & RETURN_VARIABLE_VALUE)
         {
             svp--;
-            assign_svalue_no_free(svp, &ob->variables[i]);
+            assign_svalue_no_free(svp, variables+i);
         }
 
         if (mode_flags & RETURN_FUNCTION_TYPE)
@@ -2513,15 +2556,16 @@ v_include_list (svalue_t *sp, int num_arg)
 /* EFUN include_list()
  *
  *   string* include_list ()
- *   string* include_list (object ob)
- *   string* include_list (object ob, int flags)
+ *   string* include_list (object|lwobject ob)
+ *   string* include_list (object|lwobject ob, int flags)
  *
  * Return a list with the names of all files included by the program
  * of object <ob>, including <ob>'s program file itself.
  */
 
 {
-    object_t  *ob;          /* Analyzed object */
+    svalue_t   ob;          /* Analyzed object */
+    program_t *prog;        /* Its program */
     vector_t  *vec;         /* Result vector */
     int        count;       /* Total number of includes */
     svalue_t  *argp;        /* Arguments */
@@ -2532,7 +2576,7 @@ v_include_list (svalue_t *sp, int num_arg)
     argp = sp - num_arg + 1;
 
     if (num_arg >= 1)
-        ob = argp[0].u.ob;
+        ob = argp[0];
     else
         ob = current_object;
 
@@ -2541,13 +2585,19 @@ v_include_list (svalue_t *sp, int num_arg)
     else
         flags = 0;
 
-    if (O_PROG_SWAPPED(ob))
-        if (load_ob_from_swap(ob) < 0)
+    if (ob.type == T_OBJECT)
+    {
+        if (O_PROG_SWAPPED(ob.u.ob) && load_ob_from_swap(ob.u.ob) < 0)
         {
-            errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+            errorf("Out of memory: unswap object '%s'\n", get_txt(ob.u.ob->name));
             /* NOTREACHED */
             return NULL;
         }
+
+        prog = ob.u.ob->prog;
+    }
+    else /* ob.type == T_LWOBJECT */
+        prog = ob.u.lwob->prog;
 
     /* Create the result.
      * Depending on the flags value, this can be a flat list or a tree.
@@ -2558,14 +2608,14 @@ v_include_list (svalue_t *sp, int num_arg)
         svalue_t *svp;
 
         /* Get the result array */
-        vec = allocate_array((ob->prog->num_includes+1) * 3);
+        vec = allocate_array((prog->num_includes+1) * 3);
         svp = vec->item;
 
         /* Walk the includes information and copy it into the result vector
          */
         for (  svp = vec->item+3
-             , count = ob->prog->num_includes
-             , includes = ob->prog->includes
+             , count = prog->num_includes
+             , includes = prog->includes
             ; count > 0
             ; count--, includes++, svp += 3
             )
@@ -2631,8 +2681,8 @@ v_include_list (svalue_t *sp, int num_arg)
         end = begin;
         last = begin;
 
-        includes = ob->prog->includes;
-        count = ob->prog->num_includes;
+        includes = prog->includes;
+        count = prog->num_includes;
 
         for ( ; count > 0; count--, includes++)
         {
@@ -2760,12 +2810,12 @@ v_include_list (svalue_t *sp, int num_arg)
         string_t *str;
         size_t slen;  /* Also used for error reporting */
 
-        slen = mstrsize(ob->prog->name);
+        slen = mstrsize(prog->name);
 
         if (compat_mode)
-            str = ref_mstring(ob->prog->name);
+            str = ref_mstring(prog->name);
         else
-            str = add_slash(ob->prog->name);
+            str = add_slash(prog->name);
 
         if (!str)
         {
@@ -2794,8 +2844,8 @@ v_inherit_list (svalue_t *sp, int num_arg)
 /* EFUN inherit_list()
  *
  *   string* inherit_list ()
- *   string* inherit_list (object ob)
- *   string* inherit_list (object ob, int flags)
+ *   string* inherit_list (object|lwobject ob)
+ *   string* inherit_list (object|lwobject ob, int flags)
  *
  * Return a list with the filenames of all programs inherited by <ob>, include
  * <ob>'s program itself.
@@ -2817,7 +2867,8 @@ v_inherit_list (svalue_t *sp, int num_arg)
     struct iinfo * next;    /* Next program to analyze */
 
     Mempool   pool;         /* The memory pool to allocate from */
-    object_t *ob;           /* Analyzed object */
+    svalue_t  ob;           /* Analyzed object */
+    program_t*prog;         /* Its program */
     vector_t *vec;          /* Result vector */
     svalue_t *svp;          /* Pointer to next vec entry to fill in */
     int       count;        /* Total number of inherits found */
@@ -2828,7 +2879,7 @@ v_inherit_list (svalue_t *sp, int num_arg)
     argp = sp - num_arg + 1;
 
     if (num_arg >= 1)
-        ob = argp[0].u.ob;
+        ob = argp[0];
     else
         ob = current_object;
 
@@ -2837,12 +2888,19 @@ v_inherit_list (svalue_t *sp, int num_arg)
     else
         flags = 0;
 
-    if (O_PROG_SWAPPED(ob))
-        if (load_ob_from_swap(ob) < 0) {
-            errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+    if (ob.type == T_OBJECT)
+    {
+        if (O_PROG_SWAPPED(ob.u.ob) && load_ob_from_swap(ob.u.ob) < 0)
+        {
+            errorf("Out of memory: unswap object '%s'\n", get_txt(ob.u.ob->name));
             /* NOTREACHED */
             return NULL;
         }
+
+        prog = ob.u.ob->prog;
+    }
+    else /* ob.type == T_LWOBJECT */
+        prog = ob.u.lwob->prog;
 
     /* Get the memory pool */
     memsafe(pool = new_mempool(size_mempool(sizeof(*begin)))
@@ -2861,7 +2919,7 @@ v_inherit_list (svalue_t *sp, int num_arg)
 
     /* Root node for the object's program itself */
     begin->next = NULL;
-    begin->prog = ob->prog;
+    begin->prog = prog;
     begin->virtual = MY_FALSE;
     begin->count = 0;
     begin->parent = NULL;
@@ -3047,7 +3105,7 @@ f_load_name (svalue_t *sp)
 /* EFUN load_name()
  *
  *   string load_name()
- *   string load_name(object obj)
+ *   string load_name(object|lwobject obj)
  *   string load_name(string obj)
  *
  * Return the load name for the object <obj> which may be given
@@ -3097,15 +3155,30 @@ f_load_name (svalue_t *sp)
         put_ref_string(sp, s);
         return sp;
     }
+    else if (sp->type == T_LWOBJECT)
+    {
+        /* We look at the blueprint. */
+        ob = sp->u.lwob->prog->blueprint;
+        if (ob)
+        {
+            free_svalue(sp);
+            put_ref_string(sp, ob->load_name);
+            return sp;
+        }
+
+        /* We create the name from the program's name. */
+        s = sp->u.lwob->prog->name;
+    }
+    else
+        s = sp->u.str;
 
     /* Argument is a string: try to find the object for it */
-    s = sp->u.str;
     ob = find_object(s);
     if (ob)
     {
         /* Got it */
         s = ob->load_name;
-        free_string_svalue(sp);
+        free_svalue(sp);
         put_ref_string(sp, s);
         return sp;
     }
@@ -3168,9 +3241,9 @@ f_load_name (svalue_t *sp)
         name = "/";
 
     /* Now return the result */
-    if (get_txt(s) != name)
+    if (sp->type != T_STRING || get_txt(sp->u.str) != name)
     {
-        free_string_svalue(sp);
+        free_svalue(sp);
         put_c_string(sp, name);
     }
 
@@ -3263,7 +3336,7 @@ f_program_name (svalue_t *sp)
 /* EFUN program_name()
  *
  *   string program_name()
- *   string program_name(object obj)
+ *   string program_name(object|lwobject obj)
  *
  * Returns the name of the program of <obj>, resp. the name of the
  * program of the current object if <obj> is omitted.
@@ -3280,7 +3353,7 @@ f_program_name (svalue_t *sp)
 
 {
     string_t *name, *res;
-    object_t *ob;
+    program_t *prog;
 
     /* If the argument is 0, just return 0. */
     if (sp->type == T_NUMBER)
@@ -3288,23 +3361,32 @@ f_program_name (svalue_t *sp)
         return sp;
     }
 
-    ob = sp->u.ob;
-    if (O_PROG_SWAPPED(ob))
+    if (sp->type == T_OBJECT)
     {
-        ob->time_of_ref = current_time;
-        if (load_ob_from_swap(ob) < 0)
+        object_t *ob = sp->u.ob;
+
+        if (O_PROG_SWAPPED(ob))
         {
-            errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+            ob->time_of_ref = current_time;
+            if (load_ob_from_swap(ob) < 0)
+            {
+                errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+            }
         }
+
+        prog = ob->prog;
     }
-    name = ob->prog->name;
+    else /* sp->type == T_LWOBJECT */
+        prog = sp->u.lwob->prog;
+
+    name = prog->name;
     if (compat_mode)
         res = ref_mstring(name);
     else
         res = add_slash(name);
     if (!res)
         errorf("Out of memory\n");
-    free_object_svalue(sp);
+    free_svalue(sp);
     put_string(sp, res);
 
     return sp;
@@ -3317,7 +3399,7 @@ f_program_time (svalue_t *sp)
 /* EFUN program_time()
  *
  *   int program_time()
- *   int program_time(object ob)
+ *   int program_time(object|lwobject ob)
  *
  * Returns the creation (compilation) time of the object's
  * program. Default is this_object(), if no arg is given.
@@ -3325,19 +3407,30 @@ f_program_time (svalue_t *sp)
 
 {
     mp_int load_time;
+    program_t *prog;
 
-    if (O_PROG_SWAPPED(sp->u.ob))
+    if (sp->type == T_OBJECT)
     {
-        sp->u.ob->time_of_ref = current_time;
-        if (load_ob_from_swap(sp->u.ob) < 0)
-        {
-            sp--;
-            errorf("Out of memory: unswap object '%s'\n", get_txt(sp->u.ob->name));
-        }
-    }
-    load_time = sp->u.ob->prog->load_time;
+        object_t *ob = sp->u.ob;
 
-    free_object_svalue(sp);
+        if (O_PROG_SWAPPED(ob))
+        {
+            ob->time_of_ref = current_time;
+            if (load_ob_from_swap(ob) < 0)
+            {
+                sp--;
+                errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+            }
+        }
+
+        prog = ob->prog;
+    }
+    else /* sp->type == T_LWOBJECT */
+        prog = sp->u.lwob->prog;
+
+    load_time = prog->load_time;
+
+    free_svalue(sp);
     put_number(sp, load_time);
 
     return sp;
@@ -3448,7 +3541,7 @@ f_rename_object (svalue_t *sp)
                get_txt(m_name));
     }
 
-    if (privilege_violation4(STR_RENAME_OBJECT, ob, m_name, 0, sp)
+    if (privilege_violation4(STR_RENAME_OBJECT, svalue_object(ob), m_name, 0, sp)
      && check_object(ob)
        )
     {
@@ -3508,24 +3601,24 @@ v_replace_program (svalue_t *sp, int num_arg)
     program_t *curprog;   /* the current program */
     int offsets[3];       /* the offsets of the replacing prog */
 
-    if (!current_object)
-        errorf("replace_program called with no current object\n");
-    if (current_object == simul_efun_object)
-        errorf("replace_program on simul_efun object\n");
-    
-    if (current_object->flags & O_LAMBDA_REFERENCED)
+    if (current_object.type != T_OBJECT)
+        errorf("replace_program() called with no current object.\n");
+    if (current_object.u.ob == simul_efun_object)
+        errorf("replace_program() on simul_efun object.\n");
+
+    if (current_object.u.ob->flags & O_LAMBDA_REFERENCED)
     {
         inter_sp = sp;
         warnf("Object '%s', program '%s': Cannot schedule "
               "replace_program() after binding lambda closures.\n"
-             , get_txt(current_object->name)
+             , get_txt(current_object.u.ob->name)
              , get_txt(current_prog->name)
              );
         sp = pop_n_elems(num_arg, sp);
         return sp;
     }
 
-    curprog = current_object->prog;
+    curprog = current_object.u.ob->prog;
 
     if (num_arg < 1)
     {
@@ -3601,7 +3694,7 @@ v_replace_program (svalue_t *sp, int num_arg)
             }
         } /* scope of name ends here */
         
-        new_prog = search_inherited(sname, current_object->prog, offsets);
+        new_prog = search_inherited(sname, current_object.u.ob->prog, offsets);
         if (!new_prog)
         {
             /* Given program not inherited, maybe it's the current already.
@@ -3644,7 +3737,7 @@ v_replace_program (svalue_t *sp, int num_arg)
 #ifdef USE_PYTHON
         tmp->python_rpp = NULL;
 #endif
-        tmp->ob = current_object;
+        tmp->ob = current_object.u.ob;
         tmp->next = obj_list_replace;
         obj_list_replace = tmp;
         curprog->flags |= P_REPLACE_ACTIVE;
@@ -3678,15 +3771,16 @@ f_set_next_reset (svalue_t *sp)
     int new_time;
 
     new_time = sp->u.number;
-    if (current_object->flags & O_DESTRUCTED)
+    if (current_object.type != T_OBJECT
+     || (current_object.u.ob->flags & O_DESTRUCTED))
             sp->u.number = 0;
     else
     {
-        sp->u.number = current_object->time_reset - current_time;
+        sp->u.number = current_object.u.ob->time_reset - current_time;
         if (new_time < 0)
-            current_object->time_reset = 0;
+            current_object.u.ob->time_reset = 0;
         else if (new_time > 0)
-            current_object->time_reset = new_time + current_time;
+            current_object.u.ob->time_reset = new_time + current_time;
     }
     return sp;
 } /* f_set_next_reset() */
@@ -3749,7 +3843,7 @@ f_geteuid (svalue_t *sp)
 
 /* EFUN geteuid()
  *
- *   string geteuid(object ob)
+ *   string geteuid(object|lwobject ob)
  *
  * Get the effective user-id of the object (mostly a wizard or
  * domain name). Standard objects cloned by this object will get
@@ -3758,22 +3852,18 @@ f_geteuid (svalue_t *sp)
  */
 
 {
-    object_t *ob;
+    wiz_list_t *eff_user;
 
-     ob = sp->u.ob;
+    if (sp->type == T_OBJECT)
+        eff_user = sp->u.ob->eff_user;
+    else /* sp->type == T_LWOBJECT */
+        eff_user = sp->u.lwob->eff_user;
 
-    if (ob->eff_user && ob->eff_user->name)
-    {
-        string_t *tmp;
-        tmp = ref_mstring(ob->eff_user->name);
-        free_svalue(sp);
-        put_string(sp, tmp);
-    }
+    free_svalue(sp);
+    if (eff_user && eff_user->name)
+        put_ref_string(sp, eff_user->name);
     else
-    {
-        free_svalue(sp);
         put_number(sp, 0);
-    }
 
     return sp;
 } /* f_geteuid() */
@@ -3796,13 +3886,16 @@ f_getuid (svalue_t *sp)
  */
 
 {
-    object_t *ob;
-    string_t *name;
+    wiz_list_t *user;
 
-    ob = sp->u.ob;
-    deref_object(ob, "getuid");
-    if ( NULL != (name = ob->user->name) )
-        put_ref_string(sp, name);
+    if (sp->type == T_OBJECT)
+        user = sp->u.ob->user;
+    else /* sp->type == T_LWOBJECT */
+        user = sp->u.lwob->user;
+
+    free_svalue(sp);
+    if (user && user->name)
+        put_ref_string(sp, user->name);
     else
         put_number(sp, 0);
 
@@ -3830,14 +3923,13 @@ move_object (void)
 
     if (NULL != ( l = driver_hook[H_MOVE_OBJECT1].u.lambda) )
     {
-        free_object(l->ob, "move_object");
-        l->ob = ref_object(inter_sp[-1].u.ob, "move_object");
+        free_svalue(&(l->ob));
+        put_ref_object(&(l->ob), inter_sp[-1].u.ob, "move_object");
         call_lambda(&driver_hook[H_MOVE_OBJECT1], 2);
     }
     else if (NULL != ( l = driver_hook[H_MOVE_OBJECT0].u.lambda) )
     {
-        free_object(l->ob, "move_object");
-        l->ob = ref_object(current_object, "move_object");
+        assign_current_object(&(l->ob), "move_object");
         call_lambda(&driver_hook[H_MOVE_OBJECT0], 2);
     }
     else
@@ -3877,7 +3969,9 @@ v_all_environment (svalue_t *sp, int num_arg)
     }
     else
     {
-        o = current_object;
+        o = get_current_object();
+        if (!o)
+            errorf("all_environment() for lightweight object.\n");
         sp++;
     }
 
@@ -4144,7 +4238,11 @@ v_deep_inventory (svalue_t *sp, int num_arg)
 
     /* If no object was given, push the current object onto the stack */
     if (num_arg < 1)
-        push_ref_object(sp, current_object, "deep_inventory");
+    {
+        if (current_object.type == T_LWOBJECT)
+            errorf("deep_inventory() for lightweight object.\n");
+        push_current_object(sp, "deep_inventory");
+    }
     inter_sp = sp;
 
     vec = deep_inventory(sp->u.ob, MY_FALSE, depth);
@@ -4192,9 +4290,11 @@ v_environment (svalue_t *sp, int num_arg)
             free_string_svalue(sp);
         }
     }
-    else if (!(current_object->flags & O_DESTRUCTED))
+    else if (current_object.type == T_LWOBJECT)
+        errorf("environment() for lightweight object.\n");
+    else if (!is_current_object_destructed())
     {
-        ob = current_object->super;
+        ob = current_object.u.ob->super;
         sp++;
     }
     else
@@ -4401,7 +4501,7 @@ e_object_present (svalue_t *v, object_t *ob, p_int num)
 
     /* Search where? */
     if (!ob)
-        ob = current_object;
+        ob = current_object.u.ob;
     else
         specific = MY_TRUE;
 
@@ -4517,6 +4617,9 @@ v_present (svalue_t *sp, int num_arg)
         num_arg--;
     }
 
+    if (!ob && current_object.type == T_LWOBJECT)
+        errorf("present() for lightweight object.\n");
+
     /* If the string is in the form "<id> <number>" and no explicit
      * number was given, parse the <number> out of the string.
      */
@@ -4603,14 +4706,14 @@ e_say (svalue_t *v, vector_t *avoid)
        */
 
     /* Determine the command_giver to use */
-    if (current_object->flags & O_ENABLE_COMMANDS)
+    if (current_object.u.ob->flags & O_ENABLE_COMMANDS)
     {
-        command_giver = current_object;
+        command_giver = current_object.u.ob;
     }
-    else if (current_object->flags & O_SHADOW
-          && O_GET_SHADOW(current_object)->shadowing)
+    else if (current_object.u.ob->flags & O_SHADOW
+          && O_GET_SHADOW(current_object.u.ob)->shadowing)
     {
-        command_giver = O_GET_SHADOW(current_object)->shadowing;
+        command_giver = O_GET_SHADOW(current_object.u.ob)->shadowing;
     }
 
     /* Determine the originating object */
@@ -4631,7 +4734,7 @@ e_say (svalue_t *v, vector_t *avoid)
         }
     }
     else
-        origin = current_object;
+        origin = current_object.u.ob;
 
     /* Sort the avoid vector for fast lookups.
      * The caller will free the original <avoid>.
@@ -4708,6 +4811,7 @@ e_say (svalue_t *v, vector_t *avoid)
         break;
 
     case T_OBJECT:
+    case T_LWOBJECT:
     case T_POINTER:
     case T_MAPPING:
     case T_STRUCT:
@@ -4731,7 +4835,7 @@ e_say (svalue_t *v, vector_t *avoid)
 
     default:
         errorf("Invalid argument to say(): expected '%s', got '%s'.\n"
-              , efun_arg_typename(T_POINTER|T_MAPPING|T_STRUCT|T_STRING|T_OBJECT)
+              , efun_arg_typename(TF_POINTER|TF_MAPPING|TF_STRUCT|TF_STRING|TF_OBJECT|TF_LWOBJECT)
               , typename(v->type));
     }
 
@@ -4791,6 +4895,9 @@ v_say (svalue_t *sp, int num_arg)
  */
 
 {
+    if (current_object.type != T_OBJECT)
+        errorf("say() without current object.\n");
+
     if (num_arg == 1)
     {
         /* No objects to exclude */
@@ -4907,6 +5014,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
         break;
 
     case T_OBJECT:
+    case T_LWOBJECT:
     case T_POINTER:
     case T_MAPPING:
     case T_STRUCT:
@@ -4914,9 +5022,10 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
         /* say()s evil brother: send <v> to all recipients'
          * catch_msg() lfun
          */
-        object_t *origin = command_giver;
-
-        if (!origin)
+        svalue_t origin;
+        if (command_giver)
+            origin = svalue_object(command_giver);
+        else
             origin = current_object;
 
         for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
@@ -4927,7 +5036,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
             if (lookup_key(&stmp, avoid) >= 0)
                 continue;
             assign_svalue_no_free(++inter_sp, v);
-            push_ref_object(inter_sp, origin, "tell_room");
+            assign_object_svalue_no_free(++inter_sp, origin, "tell_room");
             sapply(STR_CATCH_MSG, ob, 2);
         }
         return;
@@ -4935,7 +5044,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
 
     default:
         errorf("Invalid argument to tell_room(): expected '%s', got '%s'.\n"
-              , efun_arg_typename(T_POINTER|T_MAPPING|T_STRUCT|T_STRING|T_OBJECT)
+              , efun_arg_typename(TF_POINTER|TF_MAPPING|TF_STRUCT|TF_STRING|TF_OBJECT)
               , typename(v->type));
     }
 
@@ -5870,6 +5979,73 @@ save_array (vector_t *v, p_int start, p_int count)
 
 /*-------------------------------------------------------------------------*/
 static void
+save_lwobject (lwobject_t *lwob)
+
+/* Serialize the lightweight object <lwob> into the write buffer.
+ *
+ * The format will be: (*"ProgramName VariableName,...",VariableValues,...*)
+ */
+
+{
+    int num;
+
+    /* Recall the struct from the pointer table.
+     * If it is a shared one, there's nothing else to do.
+     */
+    if (recall_pointer(lwob))
+        return;
+
+    /* Write the '(*"/' */
+    {
+        L_PUTC_PROLOG
+        L_PUTC('(')
+        L_PUTC('*')
+        L_PUTC('\"')
+        L_PUTC('/')
+        L_PUTC_EPILOG
+    }
+
+    /* The program name and the variables names. */
+    save_string(lwob->prog->name, -1, -1, true);
+
+    /* Add a list of the variable names, so we can restore
+     * them later even if the definition changed.
+     */
+    num = lwob->prog->num_variables;
+    for (int i = 0; i < num; i++)
+    {
+        if (i)
+            MY_PUTC(',')
+        else
+            MY_PUTC(' ')
+
+        save_string(lwob->prog->variables[i].name, -1, -1, true);
+    }
+
+    {
+        L_PUTC_PROLOG
+        L_PUTC('\"')
+        L_PUTC(',')
+        L_PUTC_EPILOG
+    }
+
+    /* And now ... the variable values. */
+    for (int i = 0; i < num; i++)
+    {
+        save_svalue(lwob->variables + i, ',', MY_FALSE);
+    }
+
+    /* ... and the '*)' */
+    {
+        L_PUTC_PROLOG
+        L_PUTC('*')
+        L_PUTC(')')
+        L_PUTC_EPILOG
+    }
+} /* save_lwobject() */
+
+/*-------------------------------------------------------------------------*/
+static void
 save_struct (struct_t *st)
 
 /* Encode the struct <st> and write it to the write buffer.
@@ -5963,24 +6139,28 @@ save_closure (svalue_t *cl, Bool writable)
         if (recall_pointer(cl->u.lambda))
             break;
 
-        if (cl->u.lambda->function.lfun.ob == current_object
-         && cl->u.lambda->ob == current_object
+        if (is_current_object(cl->u.lambda->function.lfun.ob)
+         && is_current_object(cl->u.lambda->ob)
            )
         {
             lambda_t       *l;
-            program_t      *prog;
+            program_t      *prog, *obprog;
             program_t      *inhProg = 0;
             int             ix;
             char           *source, c;
-            object_t       *ob;
+            svalue_t        ob;
 
             l = cl->u.lambda;
             ob = l->function.lfun.ob;
             ix = l->function.lfun.index;
             inhProg = l->function.lfun.inhProg;
 
-            prog = ob->prog;
+            if (ob.type == T_OBJECT)
+                obprog = ob.u.ob->prog;
+            else /* ob.type == T_LWOBJECT */
+                obprog = ob.u.lwob->prog;
 
+            prog = obprog;
             if (inhProg)
             {
                 /* An inherited lfun closure. Go to the inherit. */
@@ -6014,7 +6194,7 @@ save_closure (svalue_t *cl, Bool writable)
             /* For inherited lfun closures, add the '|<inheritpath>' */
             if (inhProg)
             {
-                prog = ob->prog;
+                prog = obprog;
                 ix = l->function.lfun.index;
                 
                 while(prog != inhProg)
@@ -6101,6 +6281,7 @@ save_closure (svalue_t *cl, Bool writable)
     case CLOSURE_IDENTIFIER:
       {
         lambda_t *l;
+        program_t *prog = NULL;;
         char * source, c;
 
         if (recall_pointer(cl->u.lambda))
@@ -6112,15 +6293,36 @@ save_closure (svalue_t *cl, Bool writable)
             rc = MY_FALSE;
             break;
         }
-        if (l->ob->flags & O_DESTRUCTED
-         || l->ob != current_object
-           )
+
+        switch (l->ob.type)
+        {
+            case T_OBJECT:
+                if (l->ob.u.ob->flags & O_DESTRUCTED
+                 || l->ob.u.ob != get_current_object()
+                   )
+                   break;
+
+                prog = l->ob.u.ob->prog;
+                break;
+
+            case T_LWOBJECT:
+                if (l->ob.u.lwob != get_current_lwobject())
+                    break;
+
+                prog = l->ob.u.lwob->prog;
+                break;
+
+            default:
+                break;
+        }
+
+        if (!prog)
         {
             rc = MY_FALSE;
             break;
         }
 
-        source = get_txt(l->ob->prog->variables[l->function.var_index].name);
+        source = get_txt(prog->variables[l->function.var_index].name);
 
         {
             L_PUTC_PROLOG
@@ -6139,6 +6341,9 @@ save_closure (svalue_t *cl, Bool writable)
     default:
         if (type < 0)
         {
+            if (type < CLOSURE_LWO)
+                type -= CLOSURE_LWO;
+
             switch(type & -0x0800)
             {
 #ifdef USE_PYTHON
@@ -6585,6 +6790,10 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         save_array(v->u.vec, -1, -1);
         break;
 
+    case T_LWOBJECT:
+        save_lwobject(v->u.lwob);
+        break;
+
     case T_STRUCT:
         save_struct(v->u.strct);
         break;
@@ -6714,6 +6923,25 @@ register_array (vector_t *vec)
 
 /*-------------------------------------------------------------------------*/
 static void
+register_lwobject (lwobject_t *lwob)
+
+/* Register the lightweight object <lwob> in the pointer table.
+ * If it was not in there, also register all its variables.
+ */
+
+{
+    svalue_t *v;
+
+    if (NULL == register_pointer(ptable, lwob))
+        return;
+
+    v = lwob->variables;
+    for (int i = lwob->prog->num_variables; i > 0; v++, i--)
+        register_svalue(v);
+} /* register_lwobject() */
+
+/*-------------------------------------------------------------------------*/
+static void
 register_struct (struct_t *st)
 
 /* Register the struct <st> in the pointer table. If it was not
@@ -6793,8 +7021,8 @@ register_closure (svalue_t *cl)
     }
 
     if (type == CLOSURE_LFUN
-     && cl->u.lambda->function.lfun.ob == current_object
-     && cl->u.lambda->ob == current_object
+     && is_current_object(cl->u.lambda->function.lfun.ob)
+     && is_current_object(cl->u.lambda->ob)
      && cl->u.lambda->function.lfun.context_size
        )
     {
@@ -6831,6 +7059,10 @@ register_svalue (svalue_t *svp)
       case T_POINTER:
       case T_QUOTED_ARRAY:
         register_array(svp->u.vec);
+        break;
+
+      case T_LWOBJECT:
+        register_lwobject(svp->u.lwob);
         break;
 
       case T_STRUCT:
@@ -7047,8 +7279,8 @@ v_save_object (svalue_t *sp, int numarg)
 
     /* No need in saving destructed objects */
 
-    ob = current_object;
-    if (ob->flags & O_DESTRUCTED)
+    ob = get_current_object();
+    if (!ob || (ob->flags & O_DESTRUCTED))
     {
         if (numarg)
             sp = pop_n_elems(numarg, sp);
@@ -7067,7 +7299,7 @@ v_save_object (svalue_t *sp, int numarg)
 
         /* Get a valid filename */
 
-        sfile = check_valid_path(sp->u.str, ob, STR_SAVE_OBJECT, MY_TRUE);
+        sfile = check_valid_path(sp->u.str, svalue_object(ob), STR_SAVE_OBJECT, MY_TRUE);
         if (sfile == NULL)
         {
             errorf("Illegal use of save_object('%s')\n", get_txt(sp->u.str));
@@ -8004,6 +8236,155 @@ restore_array (svalue_t *svp, char **str)
 } /* restore_array() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE bool
+restore_lwobject (svalue_t *svp, char **str)
+
+/* Restore a lightweight object from the text starting at *<str> (which
+ * points just after the leading '(*') and store it into *<svp>.
+ * Return true if the restore was successful, false otherwise
+ * (*<svp> is set to const0 in that case).
+ * On a successful return, *<str> is set to point after the restored
+ * lightweight object's text.
+ */
+
+{
+    lwobject_t *lwob;
+    object_t *blueprint;
+    program_t *prog;
+    string_t *prog_name;
+    svalue_t name;
+    long pos;
+    bool rtt_checks;
+    int cur_var_idx = 0;
+
+    *svp = const0; /* In case of errors */
+
+    /* Get the program name and variable names. */
+    if (!restore_svalue(&name, str, ','))
+        return false;
+    if (name.type != T_STRING)
+    {
+        free_svalue(&name);
+        return false;
+    }
+    pos = mstrchr(name.u.str, ' ');
+    if (pos < 0) /* No variables? */
+        prog_name = ref_mstring(name.u.str);
+    else
+        prog_name = mstr_extract(name.u.str, 0, pos-1);
+
+    /* Get the blueprint. */
+    push_string(inter_sp, name.u.str);  /* In case of errors. */
+    push_string(inter_sp, prog_name);
+    blueprint = get_object(prog_name);
+    pop_stack(); /* Freeing prog_name. */
+    if ((!blueprint)
+     || (O_PROG_SWAPPED(blueprint) && load_ob_from_swap(blueprint) < 0))
+    {
+        pop_stack(); /* Freeing name. */
+        return false;
+    }
+    prog = blueprint->prog;
+
+    /* And create the object. */
+    lwob = create_lwobject(blueprint);
+    put_lwobject(svp, lwob);
+
+    /* Coming to the minor details: variables. */
+    rtt_checks = (prog->flags & P_RTT_CHECKS);
+
+    while (**str != '*')
+    {
+        string_t *var_name = NULL;
+        svalue_t *variable = NULL;
+        lpctype_t *vartype = NULL;
+        long nextpos;
+
+        if (pos < 0)
+        {
+            pop_stack();
+            return false;
+        }
+
+        nextpos = mstrchrpos(name.u.str, ',', pos+1);
+        if (nextpos < 0)
+            var_name = find_tabled_str_n(get_txt(name.u.str) + pos + 1, mstrsize(name.u.str) - pos - 1, STRING_UTF8);
+        else
+            var_name = find_tabled_str_n(get_txt(name.u.str) + pos + 1, nextpos - pos - 1, STRING_UTF8);
+        pos = nextpos;
+
+        if (var_name && prog->num_variables)
+        {
+            /* Search the variable starting at <cur_var_idx>. */
+            int next_var_idx = cur_var_idx;
+            while (true)
+            {
+                if (prog->variables[next_var_idx].name == var_name)
+                {
+                    variable = lwob->variables + next_var_idx;
+                    vartype = prog->variables[next_var_idx].type.t_type;
+                    cur_var_idx = (next_var_idx + 1) % prog->num_variables;
+                    break;
+                }
+
+                next_var_idx++;
+                if (next_var_idx == prog->num_variables)
+                    next_var_idx = 0;
+                if (next_var_idx == cur_var_idx)
+                    break;
+            }
+        }
+
+        if (!variable)
+        {
+            /* The variable doesn't exist anymore, read and discard. */
+            svalue_t tmp;
+            if (!restore_svalue(&tmp, str, ','))
+            {
+                pop_stack();
+                free_svalue(svp);
+                *svp = const0;
+                return false;
+            }
+
+            free_svalue(&tmp);
+        }
+        else
+        {
+            if (!restore_svalue(variable, str, ','))
+            {
+                pop_stack();
+                free_svalue(svp);
+                *svp = const0;
+                return false;
+            }
+
+            if (rtt_checks && !check_rtt_compatibility(vartype, variable))
+            {
+                pop_stack();
+                free_svalue(svp);
+                *svp = const0;
+                return false;
+            }
+        }
+    }
+
+    pop_stack(); /* Freeing name. */
+
+    (*str)++;
+    if (**str != ')')
+    {
+        free_svalue(svp);
+        *svp = const0;
+        return false;
+    }
+
+    (*str)++;
+    return true;
+
+} /* restore_lwobject() */
+
+/*-------------------------------------------------------------------------*/
 static INLINE Bool
 restore_struct (svalue_t *svp, char **str)
 
@@ -8106,7 +8487,7 @@ restore_struct (svalue_t *svp, char **str)
         if (anonymous)
             stt = NULL;
         else
-            stt = struct_find(structname, current_object->prog);
+            stt = struct_find(structname, get_current_object_program());
         if (!stt && prog_name != NULL)
         {
             do {
@@ -8159,7 +8540,7 @@ restore_struct (svalue_t *svp, char **str)
     put_struct(svp, st);
 
     // check if the objects program has RTT checks enabled.
-    if (current_object->prog->flags & P_RTT_CHECKS)
+    if (get_current_object_program()->flags & P_RTT_CHECKS)
         rtt_checks = MY_TRUE;
 
     if (anonymous)
@@ -8395,18 +8776,18 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
 
     case 'v': /* A variable closure */
       {
+        svalue_t *obvars = get_current_object_variables();
+        program_t *obprog = get_current_object_program();
         string_t *s;
-        object_t *ob;
         variable_t *var;
         program_t *prog;
         int num_var;
         int n;
 
-        ob = current_object;
         if (!current_variables
-         || !ob->variables
-         || current_variables < ob->variables
-         || current_variables >= ob->variables + ob->prog->num_variables)
+         || !obvars
+         || current_variables < obvars
+         || current_variables >= obvars + obprog->num_variables)
         {
             /* efun closures are called without changing current_prog
              * nor current_variables. This keeps the program scope for
@@ -8414,8 +8795,8 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
              * give trouble with calling from other ones if it were
              * not for this test.
              */
-            current_prog = ob->prog;
-            current_variables = ob->variables;
+            current_prog = obprog;
+            current_variables = obvars;
         }
 
         /* If the variable exists, it must exist as shared
@@ -8446,7 +8827,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         n = num_var - n - 1;
 
         /* Check for virtual variables */
-        if (current_prog == ob->prog)
+        if (current_prog == obprog)
         {
             /* No translation necessary. */
         }
@@ -8463,7 +8844,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
              * variable block.
              */
             n = n - current_prog->num_virtual_variables
-                  + (current_variables - current_object->variables);
+                  + (current_variables - get_current_object_variables());
         }
 
         closure_identifier(svp, current_object
@@ -8494,7 +8875,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
             int last_num_functions = 0;
             
             /* An inherited lfun closure */
-            inhProg = current_object->prog;
+            inhProg = get_current_object_program();
             
             do
             {
@@ -8625,7 +9006,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         /* Although s is NULL, we parse to the end. */
 
         if (s)
-            i = find_function(s, inhProg?inhProg:current_object->prog);
+            i = find_function(s, inhProg?inhProg:get_current_object_program());
         else
             i = -1;
         
@@ -9122,6 +9503,13 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
             break;
           }
 
+        case '*':
+         {
+            if (!restore_lwobject(svp, pt))
+                return false;
+            break;
+         }
+
         default:
             *svp = const0;
             return MY_FALSE;
@@ -9513,8 +9901,8 @@ static int nesting = 0;  /* Used to detect recursive calls */
      * with no variables. Do this check now before we allocate
      * any memory.
      */
-    ob = current_object;
-    if (ob->flags & O_DESTRUCTED)
+    ob = get_current_object();
+    if (!ob || (ob->flags & O_DESTRUCTED))
     {
         sp = pop_n_elems(2, sp); /* pop and free error handler + argument */
         sp++;
@@ -9567,7 +9955,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
         /* Get a valid filename */
 
-        sfile = check_valid_path(arg->u.str, ob, STR_RESTORE_OBJECT, MY_FALSE);
+        sfile = check_valid_path(arg->u.str, svalue_object(ob), STR_RESTORE_OBJECT, MY_FALSE);
         if (sfile == NULL)
         {
             errorf("Illegal use of restore_object('%s')\n", get_txt(arg->u.str));
@@ -9712,10 +10100,10 @@ static int nesting = 0;  /* Used to detect recursive calls */
             if (file)
                 errorf("Illegal format (version line) when restoring %s "
                       "from %s line %d.\n"
-                      , get_txt(current_object->name), name, lineno);
+                      , get_txt(ob->name), name, lineno);
             else
                 errorf("Illegal format (version line) when restoring %s.\n"
-                      , get_txt(current_object->name));
+                      , get_txt(ob->name));
             /* NOTREACHED */
             return sp;
         }
@@ -9788,10 +10176,10 @@ static int nesting = 0;  /* Used to detect recursive calls */
                     if (file)
                         errorf("Out of memory when restoring %s "
                               "from %s line %d.\n"
-                              , get_txt(current_object->name), name, lineno);
+                              , get_txt(ob->name), name, lineno);
                     else
                         errorf("Out of memory when restoring %s.\n"
-                              , get_txt(current_object->name));
+                              , get_txt(ob->name));
                     /* NOTREACHED */
                     return sp;
                 }
@@ -9826,10 +10214,10 @@ static int nesting = 0;  /* Used to detect recursive calls */
             if (file)
                 errorf("Illegal format (value string) when restoring %s "
                       "from %s line %d.\n"
-                      , get_txt(current_object->name), name, lineno);
+                      , get_txt(ob->name), name, lineno);
             else
                 errorf("Illegal format (value string) when restoring %s.\n"
-                      , get_txt(current_object->name));
+                      , get_txt(ob->name));
             /* NOTREACHED */
             return sp;
         }
@@ -9850,7 +10238,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
                 if (ob->prog->flags & P_WARN_RTT_CHECKS)
                     warnf("Bad type when restoring %s from %s line %d. Expected "
                        "%s, got %s.\n",
-                       get_txt(current_object->name), name, lineno,
+                       get_txt(ob->name), name, lineno,
                        get_lpctype_name(vtype.t_type), realtypebuf);
                 else
                 {
@@ -9859,7 +10247,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
                     errorf("Bad type when restoring %s from %s line %d. Expected "
                        "%s, got %s.\n",
-                       get_txt(current_object->name), name, lineno,
+                       get_txt(ob->name), name, lineno,
                        get_lpctype_name(vtype.t_type), realtypebuf);
                 }
             }

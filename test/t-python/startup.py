@@ -14,6 +14,9 @@ class TestObject(unittest.TestCase):
         ob = ldmud.Object("/master")
         self.assertIsNotNone(ob)
         self.assertTrue(ob)
+        self.assertIn("master", repr(ob))
+        self.assertEqual(ob, ldmud.Object("/master"))
+        self.assertEqual(hash(ob), hash(ldmud.Object("/master")))
 
     def testInitLoad(self):
         oldob = ldmud.efuns.find_object("/testob")
@@ -22,6 +25,7 @@ class TestObject(unittest.TestCase):
         ob = ldmud.Object("/testob")
         self.assertIsNotNone(ob)
         self.assertEqual(ob.name, "/testob")
+        self.assertIn("testob", repr(ob))
 
     def testInitNonExisting(self):
         with self.assertRaises(RuntimeError):
@@ -38,9 +42,14 @@ class TestObject(unittest.TestCase):
         self.assertIsNotNone(fun)
         self.assertEqual(fun.name, "testfun")
         self.assertEqual(fun.file_name, "/testob.c")
+        self.assertGreater(fun.line_number, 0)
         self.assertEqual(fun.return_type, int)
         self.assertEqual(fun.flags, ldmud.LF_NOMASK)
         self.assertEqual(fun.visibility, ldmud.VIS_PROTECTED)
+        self.assertTrue("testfun" in repr(fun) and "testob" in repr(fun))
+        self.assertEqual(hash(fun), hash(ob.functions.testfun))
+        self.assertEqual(fun, ob.functions.testfun)
+        self.assertNotEqual(fun, ob.functions.fun_testob)
 
         args = fun.arguments
         self.assertEqual(len(args), 2)
@@ -66,6 +75,10 @@ class TestObject(unittest.TestCase):
         self.assertSetEqual(set(var.type), set((int, float,)))
         self.assertEqual(var.flags, ldmud.VF_NOSAVE)
         self.assertEqual(var.visibility, ldmud.VIS_PROTECTED)
+        self.assertTrue("testvar" in repr(var) and "testob" in repr(var))
+        self.assertEqual(hash(var), hash(ob.variables.testvar))
+        self.assertEqual(var, ob.variables.testvar)
+        self.assertNotEqual(var, ob.variables.var_testob)
 
         var.value = 84
         self.assertEqual(var.value, 84)
@@ -97,6 +110,85 @@ class TestObject(unittest.TestCase):
         self.assertEqual(ob.testvalue, "42")
         with self.assertRaises(AttributeError):
             ob.doesntExist
+
+class TestLWObject(unittest.TestCase):
+    def testInitLoaded(self):
+        blueprint = ldmud.Object("/testob")
+        lwob = ldmud.LWObject("/testob")
+        self.assertIsNotNone(lwob)
+        self.assertTrue(lwob)
+        self.assertIn("testob", repr(lwob))
+
+    def testInitLoad(self):
+        oldob = ldmud.efuns.find_object("/testob")
+        if oldob:
+            ldmud.efuns.destruct(oldob)
+        lwob = ldmud.LWObject("/testob")
+        self.assertIsNotNone(lwob)
+        self.assertEqual(lwob.program_name, "/testob.c")
+        self.assertIn("testob", repr(lwob))
+
+    def testInitNonExisting(self):
+        with self.assertRaises(RuntimeError):
+            lwob = ldmud.LWObject("/imnotthere")
+
+    def testFunctionInfo(self):
+        lwob = ldmud.LWObject("/testob")
+        self.assertIsNotNone(lwob)
+
+        self.assertTrue('testfun' in dir(lwob.functions))
+        self.assertTrue('testfun' in lwob.functions.__dict__)
+
+        fun = lwob.functions.testfun
+        self.assertIsNotNone(fun)
+        self.assertTrue(fun)
+        self.assertEqual(fun.name, "testfun")
+        self.assertEqual(fun.file_name, "/testob.c")
+        self.assertGreater(fun.line_number, 0)
+        self.assertEqual(fun.return_type, int)
+        self.assertEqual(fun.flags, ldmud.LF_NOMASK)
+        self.assertEqual(fun.visibility, ldmud.VIS_PROTECTED)
+        self.assertTrue("testfun" in repr(fun) and "testob" in repr(fun))
+        self.assertEqual(hash(fun), hash(lwob.functions.testfun))
+        self.assertEqual(fun, lwob.functions.testfun)
+        self.assertNotEqual(fun, lwob.functions.fun_testob)
+
+        args = fun.arguments
+        self.assertEqual(len(args), 2)
+        self.assertEqual(args[0].position, 1)
+        self.assertSetEqual(set(args[0].type), set((int, float,)))
+        self.assertEqual(args[1].position, 2)
+        self.assertEqual(args[1].flags, ldmud.LA_VARARGS)
+        self.assertEqual(args[1].type, ldmud.Array)
+
+        self.assertEqual(fun(10, "A", "B", "C"), 3)
+
+    def testVariableInfo(self):
+        lwob = ldmud.LWObject("/testob")
+        self.assertIsNotNone(lwob)
+
+        self.assertTrue('testvar' in dir(lwob.variables))
+        self.assertTrue('testvar' in lwob.variables.__dict__)
+
+        var = lwob.variables.testvar
+        self.assertIsNotNone(var)
+        self.assertTrue(var)
+        self.assertEqual(var.name, "testvar")
+        self.assertEqual(var.value, 42)
+        self.assertSetEqual(set(var.type), set((int, float,)))
+        self.assertEqual(var.flags, ldmud.VF_NOSAVE)
+        self.assertEqual(var.visibility, ldmud.VIS_PROTECTED)
+        self.assertTrue("testvar" in repr(var) and "testob" in repr(var))
+        self.assertEqual(hash(var), hash(lwob.variables.testvar))
+        self.assertEqual(var, lwob.variables.testvar)
+        self.assertNotEqual(var, lwob.variables.var_testob)
+
+        var.value = 84
+        self.assertEqual(var.value, 84)
+
+        with self.assertRaises(TypeError):
+            var.value = "42"
+        self.assertEqual(var.value, 84)
 
 class TestArray(unittest.TestCase):
     def testInitEmpty(self):
@@ -373,6 +465,15 @@ class TestClosure(unittest.TestCase):
         self.assertEqual(s2, s)
         self.assertIn(s2, set((s,)))
 
+    def testLWOEfun(self):
+        lwob = ldmud.LWObject("/testob")
+        s = ldmud.Closure(lwob, "this_object")
+        self.assertIsNotNone(s)
+        self.assertEqual(s(), lwob)
+        s2 = ldmud.Closure(lwob, "this_object")
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+
     def testOperator(self):
         s = ldmud.Closure(self.master, ",")
         self.assertIsNotNone(s)
@@ -396,6 +497,15 @@ class TestClosure(unittest.TestCase):
         self.assertTrue(c)
         ldmud.efuns.destruct(ob)
         self.assertFalse(c)
+
+    def testLWOLfun(self):
+        lwob = ldmud.LWObject("/testob")
+        s = ldmud.Closure(lwob, "testfun", lwob)
+        self.assertIsNotNone(s)
+        self.assertEqual(s(42, "A", "B", "C"), 3)
+        s2 = ldmud.Closure(lwob, "testfun", lwob)
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
 
     def testEmpty(self):
         s = ldmud.Closure.__new__(ldmud.Closure)

@@ -8,6 +8,7 @@ struct test_struct
     float   t_float;
     string  t_string;
     object  t_object;
+    lwobject t_lwobject;
     mixed*  t_array;
     mapping t_mapping;
     symbol  t_symbol;
@@ -58,6 +59,13 @@ void run_test()
         ({ "passing objects", 0,
             (:
                 return python_return(this_object()) == this_object();
+            :)
+        }),
+        ({ "passing lightweight objects", 0,
+            (:
+                lwobject lwob = new_lwobject("/testob");
+                destruct(find_object("/testob"));
+                return lwobjectp(lwob) && python_return(lwob) == lwob;
             :)
         }),
         ({ "passing arrays", 0,
@@ -210,6 +218,7 @@ void run_test()
                 -1000000.0,
                 "Garbage",
                 this_object(),
+                new_lwobject("/testob"),
                 ({ 5, 3, 1}),
                 ([2,3,5]),
                 quote("abc"+"gc"),
@@ -238,6 +247,7 @@ void run_test()
                     val->t_float != -1000000.0 ||
                     val->t_string != "Garbage" ||
                     val->t_object != this_object() ||
+                    !lwobjectp(val->t_lwobject) || program_name(val->t_lwobject) != "/testob.c" ||
                     val->t_array[0] != 5 || val->t_array[1] != 3 || val->t_array[2] != 1 ||
                     sizeof(val->t_mapping) != 3 || widthof(val->t_mapping) != 0 ||
                     !member(val->t_mapping, 2) || !member(val->t_mapping, 3) || !member(val->t_mapping, 5) ||

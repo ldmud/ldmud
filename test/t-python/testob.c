@@ -1,4 +1,4 @@
-#pragma save_types, rtt_checks
+#pragma save_types, rtt_checks, lightweight, clone
 
 nosave protected int|float testvar = 42;
 

@@ -1,5 +1,5 @@
 SYNOPSIS
-        object this_object(void)
+        object|lwobject this_object(void)
 
 DESCRIPTION
         Return the object pointer for this object. This is not to be

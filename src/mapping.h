@@ -167,6 +167,17 @@ struct mvf_info
 
 #define deref_mapping(m) (--(m)->ref)
 
+static INLINE void put_ref_mapping(svalue_t * const dest, mapping_t * const map)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_ref_mapping(svalue_t * const dest, mapping_t * const map)
+/* Put the mapping <map> into <dest>, which is considered empty,
+ * and increment the refcount of <map>.
+ */
+{
+    *dest = svalue_mapping(ref_mapping(map));
+}
+
+
 /* --- Variables --- */
 
 extern mp_int num_mappings;

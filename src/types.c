@@ -7,6 +7,7 @@
 #include <assert.h>
 
 #include "gcollect.h"
+#include "lwobject.h"
 #include "main.h"
 #include "object.h"
 #include "types.h"
@@ -29,7 +30,8 @@ lpctype_t _lpctype_void         = { 0, { TCLASS_PRIMARY, true }, {TYPE_VOID},   
 lpctype_t _lpctype_bytes        = { 0, { TCLASS_PRIMARY, true }, {TYPE_BYTES},        NULL, NULL };
 lpctype_t _lpctype_unknown      = { 0, { TCLASS_PRIMARY, true }, {TYPE_UNKNOWN},      NULL, NULL };
 lpctype_t _lpctype_any_struct   = { 0, { TCLASS_STRUCT,  true }, {.t_struct = {NULL, NULL}},  NULL, NULL };
-lpctype_t _lpctype_any_object   = { 0, { TCLASS_OBJECT,  true }, {.t_object = {NULL}},        NULL, NULL };
+lpctype_t _lpctype_any_object   = { 0, { TCLASS_OBJECT,  true }, {.t_object = {NULL, NULL, OBJECT_REGULAR}},     NULL, NULL };
+lpctype_t _lpctype_any_lwobject = { 0, { TCLASS_OBJECT,  true }, {.t_object = {NULL, NULL, OBJECT_LIGHTWEIGHT}}, NULL, NULL };
 
 /* And are used via pointer. */
 lpctype_t *lpctype_int          = &_lpctype_int;
@@ -42,6 +44,7 @@ lpctype_t *lpctype_symbol       = &_lpctype_symbol;
 lpctype_t *lpctype_quoted_array = &_lpctype_quoted_array;
 lpctype_t *lpctype_any_struct   = &_lpctype_any_struct;
 lpctype_t *lpctype_any_object   = &_lpctype_any_object;
+lpctype_t *lpctype_any_lwobject = &_lpctype_any_lwobject;
 lpctype_t *lpctype_void         = &_lpctype_void;
 lpctype_t *lpctype_bytes        = &_lpctype_bytes;
 lpctype_t *lpctype_unknown      = &_lpctype_unknown;
@@ -156,11 +159,11 @@ clean_struct_type (lpctype_t *t)
 
 /*-------------------------------------------------------------------------*/
 static lpctype_t *
-find_object_type (string_t *prog)
+find_object_type (string_t *prog, object_types_t otype)
 
-/* Lookup the object type for <prog> in the hash table. <prog> must be
- * tabled string. If found, move it to the head of its chain and return
- * the type pointer. If not found, return NULL.
+/* Lookup the object type for <prog>/<otype> in the hash table.
+ * <prog> must be tabled string. If found, move it to the head of its chain
+ * and return the type pointer. If not found, return NULL.
  */
 
 {
@@ -170,13 +173,13 @@ find_object_type (string_t *prog)
     if (!object_type_table || !object_type_table_size)
         return NULL;
 
-    ix = mstr_get_hash(prog) & (object_type_table_size-1);
+    ix = (mstr_get_hash(prog) + otype) & (object_type_table_size-1);
 
     prev = NULL;
     this = object_type_table[ix];
     while (this != NULL)
     {
-        if (this->t_object.program_name == prog)
+        if (this->t_object.program_name == prog && this->t_object.type == otype)
         {
             if (prev != NULL)
             {
@@ -219,7 +222,7 @@ add_object_type (lpctype_t *type)
         return true;
     }
 
-    ix = mstr_get_hash(type->t_object.program_name) & (object_type_table_size-1);
+    ix = (mstr_get_hash(type->t_object.program_name) + type->t_object.type) & (object_type_table_size-1);
     type->t_object.next = object_type_table[ix];
     object_type_table[ix] = type;
     num_object_types++;
@@ -244,7 +247,7 @@ add_object_type (lpctype_t *type)
             while (this != NULL)
             {
                 lpctype_t *next = this->t_object.next;
-                size_t new_ix = mstr_get_hash(this->t_object.program_name) & (new_size-1);
+                size_t new_ix = (mstr_get_hash(this->t_object.program_name) + this->t_object.type) & (new_size-1);
 
                 this->t_object.next = new_table[new_ix];
                 new_table[new_ix] = this;
@@ -263,10 +266,10 @@ add_object_type (lpctype_t *type)
 } /* add_object_type() */
 
 /*-------------------------------------------------------------------------*/
-lpctype_t *
-get_object_type (string_t *prog)
+static lpctype_t *
+internal_get_object_type (string_t *prog, object_types_t otype)
 
-/* Create an lpctype_t for an object having <prog> in its program.
+/* Create an lpctype_t for an (lw)object having <prog> in its program.
  * The name is normalized (removing a leading '/', check for double
  * slashes and add a trailing '.c' if it's not already there), so it
  * will match the program names easily. This name will then looked
@@ -285,7 +288,7 @@ get_object_type (string_t *prog)
 
     /* Let's normalize the filename. */
     if (!len)
-        return lpctype_any_object;
+        return (otype == OBJECT_REGULAR) ? lpctype_any_object : lpctype_any_lwobject;
 
     normalized = make_name_sane(get_txt(prog), false, true);
     if (normalized)
@@ -294,7 +297,7 @@ get_object_type (string_t *prog)
         s = make_tabled_from(prog);
 
     /* Now look at our table. */
-    result = find_object_type(s);
+    result = find_object_type(s, otype);
     if (result)
     {
         free_mstring(s);
@@ -304,6 +307,7 @@ get_object_type (string_t *prog)
     result = lpctype_new();
     result->t_class = TCLASS_OBJECT;
     result->t_object.program_name = s;
+    result->t_object.type = otype;
 
     if (!add_object_type(result))
     {
@@ -319,6 +323,32 @@ get_object_type (string_t *prog)
 } /* get_object_type() */
 
 /*-------------------------------------------------------------------------*/
+lpctype_t *
+get_object_type (string_t *prog)
+
+/* Create an lpctype_t for an object having <prog> in its program.
+ *
+ * Returns NULL when out of memory.
+ */
+
+{
+    return internal_get_object_type(prog, OBJECT_REGULAR);
+} /* get_object_type() */
+
+/*-------------------------------------------------------------------------*/
+lpctype_t *
+get_lwobject_type (string_t *prog)
+
+/* Create an lpctype_t for an lwobject having <prog> in its program.
+ *
+ * Returns NULL when out of memory.
+ */
+
+{
+    return internal_get_object_type(prog, OBJECT_LIGHTWEIGHT);
+} /* get_lwobject_type() */
+
+/*-------------------------------------------------------------------------*/
 static void
 remove_object_type (lpctype_t *type)
 
@@ -332,11 +362,12 @@ remove_object_type (lpctype_t *type)
     if (type->t_object.program_name == NULL)
         return;
 
-    if (!find_object_type(type->t_object.program_name))
+    if (!find_object_type(type->t_object.program_name, type->t_object.type))
          return;
 
     /* Now that entry should be at the top of the chain. */
-    ix = mstr_get_hash(type->t_object.program_name) & (object_type_table_size-1);
+    ix = (mstr_get_hash(type->t_object.program_name) + type->t_object.type) & (object_type_table_size-1);
+    assert(object_type_table[ix] == type);
     object_type_table[ix] = type->t_object.next;
 
     num_object_types--;
@@ -962,10 +993,11 @@ has_inherit (program_t *prog, string_t *name, bool only_public)
 } /* has_inherit() */
 
 /*-------------------------------------------------------------------------*/
-bool
-is_compatible_object (object_t* ob, lpctype_t *t)
+static bool
+is_compatible_program (program_t* prog, object_types_t otype, lpctype_t *t)
 
-/* Checks whether the given object <ob> matches the type <t>.
+/* Checks whether the an object of type <otype> and with program <prog>
+ * matches the type <t>.
  */
 
 {
@@ -977,11 +1009,11 @@ is_compatible_object (object_t* ob, lpctype_t *t)
     {
         lpctype_t *base = t->t_class == TCLASS_UNION ? t->t_union.member : t;
 
-        if (base->t_class == TCLASS_OBJECT)
+        if (base->t_class == TCLASS_OBJECT && base->t_object.type == otype)
         {
             if (base->t_object.program_name == NULL)
                 return true;
-            if (has_inherit(ob->prog, base->t_object.program_name, false))
+            if (has_inherit(prog, base->t_object.program_name, false))
                 return true;
         }
 
@@ -995,10 +1027,33 @@ is_compatible_object (object_t* ob, lpctype_t *t)
 } /* is_compatible_object() */
 
 /*-------------------------------------------------------------------------*/
+bool
+is_compatible_object (object_t* ob, lpctype_t *t)
+
+/* Checks whether the given object <ob> matches the type <t>.
+ */
+
+{
+    return is_compatible_program(ob->prog, OBJECT_REGULAR, t);
+} /* is_compatible_object() */
+
+/*-------------------------------------------------------------------------*/
+bool
+is_compatible_lwobject (lwobject_t* lwob, lpctype_t *t)
+
+/* Checks whether the given lwobject <ob> matches the type <t>.
+ */
+
+{
+    return is_compatible_program(lwob->prog, OBJECT_LIGHTWEIGHT, t);
+} /* is_compatible_lwobject() */
+
+/*-------------------------------------------------------------------------*/
 
 /* The same definitions are in sys/lpctypes.h for the mudlibs. */
-#define COMPAT_TYPE_STRUCT    11
-#define COMPAT_TYPE_OBJECT     4
+#define COMPAT_TYPE_OBJECT       4
+#define COMPAT_TYPE_STRUCT      11
+#define COMPAT_TYPE_LWOBJECT    13
 #define COMPAT_MOD_POINTER    0x0040
 
 int
@@ -1025,7 +1080,7 @@ get_type_compat_int (lpctype_t *t)
             return COMPAT_TYPE_STRUCT;
 
         case TCLASS_OBJECT:
-            return COMPAT_TYPE_OBJECT;
+            return t->t_object.type == OBJECT_REGULAR ? COMPAT_TYPE_OBJECT : COMPAT_TYPE_LWOBJECT;
 
         case TCLASS_ARRAY:
             return get_type_compat_int(t->t_array.element) | COMPAT_MOD_POINTER;

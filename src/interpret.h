@@ -30,8 +30,8 @@
  */
 
 struct control_stack {
-    object_t   *ob;         /* Current object */
-    object_t   *prev_ob;    /* Save previous object */
+    svalue_t    ob;         /* Current object (not counted) */
+    svalue_t    prev_ob;    /* Save previous object (not counted) */
     program_t  *prog;       /* Current program, NULL in the bottom entry */
     svalue_t    lambda;     /* Current lambda, counted, or svalue-0 if none */
     bytecode_p  pc;         /* Program counter, points to next bytecode */
@@ -73,8 +73,8 @@ struct control_stack {
       /* Points to address to branch to at next F_BREAK, which is also
        * the actual bottom of the break stack.
        */
-    object_t *pretend_to_be;
-      /* After set_this_object(), the this_object imposter.
+    svalue_t pretend_to_be;
+      /* After set_this_object(), the this_object imposter (refcounted).
        * TODO: This should be mirrored in the current_object global variable,
        * TODO:: to avoid accesses to wrong functions/variables.
        */
@@ -261,25 +261,30 @@ extern void vefun_arg_error (int arg, int expected, int got, svalue_t *sp) NORET
 extern void vefun_exp_arg_error (int arg, long expected, int got, svalue_t *sp) NORETURN;
 extern Bool privilege_violation(string_t *what, svalue_t *arg, svalue_t *sp);
 extern Bool privilege_violation2(string_t *what, svalue_t *arg, svalue_t *arg2, svalue_t *sp);
-extern Bool privilege_violation4(string_t *what, object_t *whom, string_t *how_str, int how_num, svalue_t *sp);
-extern Bool privilege_violation_n(string_t *what, object_t *whom, svalue_t *sp, int num_arg);
+extern Bool privilege_violation4(string_t *what, svalue_t whom, string_t *how_str, int how_num, svalue_t *sp);
+extern Bool privilege_violation_n(string_t *what, svalue_t whom, svalue_t *sp, int num_arg);
 
 extern Bool check_rtt_compatibility(lpctype_t *formaltype, svalue_t *svp) __attribute__((nonnull(2)));
 extern lpctype_t* get_rtt_type(lpctype_t *formaltype, svalue_t *svp) __attribute__((nonnull(2)));
 extern int translate_virtual_variable_index(int num);
 
+extern svalue_t *sapply_lwob_int(string_t *fun, lwobject_t *lwob, int num_arg, bool b_find_static);
+#define sapply_lwob(f,o,n) sapply_lwob_int(f,o,n,false)
+#define sapply_lwob_ign_prot(f,o,n) sapply_lwob_int(f,o,n,true)
 extern svalue_t *sapply_int(string_t *fun, object_t *ob, int num_arg, Bool b_ign_prot, Bool b_use_default);
 #define sapply(f,o,n) sapply_int(f,o,n, MY_FALSE, MY_TRUE)
 #define sapply_ign_prot(f,o,n) sapply_int(f,o,n, MY_TRUE, MY_TRUE)
 extern svalue_t *apply(string_t *fun, object_t *ob, int num_arg);
 extern void call_function(program_t *progp, int fx);
-extern void call_function_args(object_t* ob, int fx, int num_arg);
+extern void call_ob_function_args(object_t* ob, int fx, int num_arg);
+extern void call_lwob_function_args(lwobject_t* lwob, int fx, int num_arg);
 extern int get_line_number(bytecode_p p, program_t *progp, string_t **namep);
 extern string_t *collect_trace(strbuf_t * sbuf, vector_t ** rvec);
 extern string_t *dump_trace(Bool how, vector_t **rvec, string_t ** rstr);
 extern int get_line_number_if_any(string_t **name);
 extern void reset_machine(Bool first);
 extern void secure_apply_error(svalue_t *save_sp, struct control_stack *save_csp, Bool clear_costs);
+extern svalue_t *secure_apply_lwob(string_t *fun, lwobject_t *lwob, int num_arg);
 extern svalue_t *secure_apply_ob(string_t *fun, object_t *ob, int num_arg, Bool external);
 #define secure_apply(fun, ob, num_arg) secure_apply_ob(fun, ob, num_arg, MY_FALSE)
 #define secure_callback(fun, ob, num_arg) secure_apply_ob(fun, ob, num_arg, MY_TRUE)
@@ -296,7 +301,7 @@ extern svalue_t *secure_call_lambda(svalue_t *closure, int num_arg, Bool externa
 extern void remove_object_from_stack(object_t *ob);
 extern void int_call_lambda(svalue_t *lsvp, int num_arg, Bool external);
 #define call_lambda(lsvp, num_arg) int_call_lambda(lsvp, num_arg, MY_TRUE)
-extern inherit_t *adjust_variable_offsets(const inherit_t *inheritp, const program_t *prog, const object_t *obj);
+extern inherit_t *adjust_variable_offsets(const inherit_t *inheritp, const program_t *prog, const program_t *obprog);
 extern void free_interpreter_temporaries(void);
 extern void invalidate_apply_low_cache(void);
 extern void m_indices_filter (svalue_t *key, svalue_t *data, void *extra);
@@ -304,6 +309,8 @@ extern void m_values_filter (svalue_t *key, svalue_t *data, void *extra);
 extern void m_unmake_filter ( svalue_t *key, svalue_t *data, void *extra);
 extern svalue_t *v_apply (svalue_t *sp, int num_arg);
 extern svalue_t *v_funcall (svalue_t *sp, int num_arg);
+extern svalue_t *v_call_other (svalue_t *sp, int num_arg);
+extern svalue_t *v_call_strict (svalue_t *sp, int num_arg);
 extern svalue_t *v_call_direct_resolved (svalue_t *sp, int num_arg);
 extern svalue_t *v_call_resolved (svalue_t *sp, int num_arg);
 extern svalue_t *f_caller_stack_depth (svalue_t *sp);

@@ -143,6 +143,25 @@ DESCRIPTION
                           One of the following:
                           VIS_PRIVATE, VIS_PROTECTED, VIS_VISIBLE, VIS_PUBLIC
 
+          - LWObject(filename)
+                Corresponds to the LPC lwobject type.
+                On instantiation a filename of a blueprint to create
+                a lightweight object from is required.
+
+                Has the following members:
+
+                  program_name
+                      The program name (file name it was created from)
+
+                  functions
+                      Contains all the visible functions (private functions
+                      are excluded) as attributes. They are similar to the
+                      same member of the Object type.
+
+                  variables
+                      Contains all variables as attributes. They are similar
+                      to the same member of the Object type.
+
           - Array([values | size])
                 Corresponds to an LPC array.
                 Can either be initialized with a list of values

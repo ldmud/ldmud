@@ -128,7 +128,7 @@ struct callback_s {
     union {               /* The function to call: by name or the closure */
         struct {
             string_t *name;  /* the tabled function name */
-            object_t *ob;    /* reference to the object to call */
+            svalue_t  ob;    /* reference to the object to call */
         } named;
         svalue_t lambda;     /* the closure to call */
     } function;
@@ -141,7 +141,6 @@ struct callback_s {
        *   - T_LVALUE with u.lvalue pointing to the svalue_t[] with
        *     the arguments (which shall be freed together with
        *     the callback_s structure).
-       * No argument can be a LVALUE itself.
        */
 };
 
@@ -218,9 +217,18 @@ extern long num_destructed;
 extern long num_newly_destructed;
 extern uint32_t destructed_ob_counter;
 
-extern object_t *current_object;
+/* Current and previous object are svalues of those types:
+ *  - T_NUMBER:   No code is running
+ *  - T_OBJECT:   Code from an object is executed
+ *  - T_LWOBJECT: Code from a lightweight object is executed
+ * In current_object these are counted references, because
+ * for lightweight objects this may be the last reference of it.
+ * previous_object however has uncounted references, because
+ * it's just a shortcut for looking into the csp.
+ */
+extern svalue_t  current_object;
+extern svalue_t  previous_ob;
 extern object_t *current_interactive;
-extern object_t *previous_ob;
 
 extern svalue_t driver_hook[];
 
@@ -246,7 +254,7 @@ extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** vola
 extern void check_shadow_sent (object_t *ob);
 extern void assert_shadow_sent (object_t *ob);
 extern void init_empty_callback (callback_t *cb);
-extern int  setup_function_callback(callback_t *cb, object_t* ob, string_t *fun, int nargs, svalue_t * args);
+extern int  setup_function_callback(callback_t *cb, svalue_t ob, string_t *fun, int nargs, svalue_t * args);
 extern int  setup_closure_callback(callback_t *cb, svalue_t *cl, int nargs, svalue_t * args);
 extern int  setup_efun_callback_base ( callback_t **cb, svalue_t *args, int nargs, Bool bNoObj);
 #define setup_efun_callback(cb,args,nargs)       setup_efun_callback_base(cb,args,nargs,MY_FALSE)
@@ -255,9 +263,11 @@ extern void free_callback (callback_t *cb);
 extern svalue_t *execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel);
 #define apply_callback(cb,nargs)   execute_callback(cb,nargs,MY_TRUE,MY_FALSE)
 #define backend_callback(cb,nargs) execute_callback(cb,nargs,MY_FALSE,MY_TRUE)
-extern object_t *callback_object(callback_t *cb);
+extern bool valid_callback_object(callback_t *cb);
+extern svalue_t  callback_object(callback_t *cb);
 extern svalue_t *callback_function (callback_t *cb);
 extern void callback_change_object (callback_t *cb, object_t *obj);
+extern void callback_change_lwobject (callback_t *cb, lwobject_t *lwobj);
 #ifdef DEBUG
 extern void count_callback_extra_refs (callback_t *cb);
 #endif
@@ -272,6 +282,7 @@ extern void deep_destruct (object_t *ob);
 extern void handle_newly_destructed_objects(void);
 extern void remove_destructed_objects (Bool force);
 extern void print_svalue(svalue_t *arg);
+extern bool give_uid_to_lwobject(lwobject_t *lwob, object_t* blueprint);
 extern const char *make_name_sane(const char *pName, bool addSlash, bool addDotC);
 extern object_t *lookfor_object(string_t *str, Bool bLoad);
 #define find_object(str) lookfor_object((str), MY_FALSE)
@@ -295,7 +306,7 @@ extern char *convert_path_str_to_native_or_throw(string_t *path);
 extern size_t convert_path_from_native_buf(const char* path, size_t len, char* buf, size_t buflen);
 extern char * convert_path_from_native(const char* path, size_t len);
 extern char * convert_path_from_native_or_throw(const char* path, size_t len);
-extern string_t *check_valid_path(string_t *path, object_t *caller, string_t *call_fun, Bool writeflg);
+extern string_t *check_valid_path(string_t *path, svalue_t caller, string_t *call_fun, Bool writeflg);
 extern Bool match_string(const char *match, const char *str, mp_int len);
 
 extern svalue_t *f_write(svalue_t *sp);

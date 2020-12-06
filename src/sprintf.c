@@ -80,6 +80,7 @@
 #include "closure.h"
 #include "comm.h"
 #include "interpret.h"
+#include "lwobject.h"
 #include "main.h"
 #include "mapping.h"
 #include "mstrings.h"
@@ -1081,6 +1082,16 @@ svalue_to_string ( fmt_state_t *st
         break;
       }
 
+    case T_LWOBJECT:
+      {
+        stradd(st, &str, "(");
+        if (!compat_mode)
+            stradd(st, &str, "/");
+        stradd(st, &str, get_txt(obj->u.lwob->prog->name));
+        stradd(st, &str, ")");
+        break;
+      }
+
     case T_SYMBOL:
         i = obj->x.quotes;
         do {
@@ -2023,7 +2034,9 @@ static char buff[BUFF_SIZE];         /* For error messages */
                   {
                     /* never reached... */
                     fprintf(stderr, "%s: (s)printf: INFO_T_NULL.... found.\n"
-                                  , get_txt(current_object->name));
+                                  , current_object.type == T_OBJECT   ? get_txt(current_object.u.ob->name)
+                                  : current_object.type == T_LWOBJECT ? get_txt(current_object.u.lwob->prog->name)
+                                  : "<unknown object>");
                     ADD_CHAR(st, '%');
                     break;
                   }

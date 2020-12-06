@@ -102,6 +102,7 @@
 #include "pkg-python.h"
 #endif
 
+#include "i-current_object.h"
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/regexp.h"
@@ -638,7 +639,7 @@ main (int argc, char **argv)
         install_signal_handlers();
         
         (void)signal(SIGFPE, SIG_IGN);
-        current_object = &dummy_current_object_for_loads;
+        set_current_object(&dummy_current_object_for_loads);
         if (setjmp(toplevel_context.con.text)) {
             clear_state();
             add_message("Anomaly in the fabric of world space.\n");
@@ -648,7 +649,7 @@ main (int argc, char **argv)
             toplevel_context.rt.type = ERROR_RECOVERY_BACKEND;
             master_ob = get_object(master_name_str);
         }
-        current_object = master_ob;
+        set_current_object(master_ob);
         toplevel_context.rt.type = ERROR_RECOVERY_NONE;
         if (master_ob == NULL) {
             printf("%s The file %s must be loadable.\n"

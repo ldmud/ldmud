@@ -2,8 +2,8 @@ SYNOPSIS
         #include <include_list.h>
 
         string * include_list()
-        string * include_list(object ob)
-        string * include_list(object ob, int flags)
+        string * include_list(object|lwobject ob)
+        string * include_list(object|lwobject ob, int flags)
 
 BESCHREIBUNG
         Diese Funktion liefert Informationen ueber alle Dateien, die bei der

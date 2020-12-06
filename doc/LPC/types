@@ -103,6 +103,16 @@ DESCRIPTION
                 This program name is only verified during runtime when
                 runtime type checks are activated. See pragma(LPC).
 
+    o lwobject  Pointer to an lightweight object. Similar to objects
+                lightweight objects are always passed by reference.
+                The type specification can include a program name that
+                is a mandatory inherit of the given object:
+
+                    lwobject "/lwo/data" var;
+
+                This program name is only verified during runtime when
+                runtime type checks are activated. See pragma(LPC).
+
     o array     Pointer to a vector of values, which could also
                 be an alist. Arrays take the form ({ n1, n2, n3 })
                 and may contain any type or a mix of types. Arrays

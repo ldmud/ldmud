@@ -74,6 +74,7 @@ DESCRIPTION
 
         __LPC_NOSAVE__             : always defined.
         __LPC_STRUCTS__            : always defined.
+        __LPC_LWOBJECTS__          : always defined.
         __LPC_INLINE_CLOSURES__    : always defined.
         __LPC_ARRAY_CALLS__        : always defined.
         __BOOT_TIME__              : the time() the driver was started.

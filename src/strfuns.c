@@ -56,6 +56,7 @@
 #include "unidata.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
 
 #define MAX_UNICODE_CHAR 0x10ffff
     /* Per definition the unicode character with the highest codepoint. */
@@ -2431,13 +2432,13 @@ x_filter_string (svalue_t *sp, int num_arg)
 
             flags[cnt] = 0;
 
-            if (current_object->flags & O_DESTRUCTED)
+            if (is_current_object_destructed())
                 continue;
                 /* Don't call the filter anymore, but fill the
                  * flags array with 0es.
                  */
 
-            if (!callback_object(cb))
+            if (!valid_callback_object(cb))
             {
                 inter_sp = sp;
                 errorf("object used by filter(array) destructed");
@@ -2689,13 +2690,13 @@ x_map_string (svalue_t *sp, int num_arg)
                 chlen = 1;
             }
 
-            if (current_object->flags & O_DESTRUCTED)
+            if (is_current_object_destructed())
             {
                 src += chlen;
                 continue;
             }
 
-            if (!callback_object(cb))
+            if (!valid_callback_object(cb))
                 errorf("object used by map(string) destructed");
 
             push_number(inter_sp, num);

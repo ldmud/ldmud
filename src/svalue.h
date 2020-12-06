@@ -39,6 +39,9 @@ union u {
        * T_CLOSURE: efun-, simul_efun-, operator closures: the object
        *            the closure is bound to.
        */
+    lwobject_t *lwob;
+      /* T_LWOBJECT: pointer to the lightweight object structure.
+       */
     vector_t *vec;
       /* T_POINTER, T_QUOTED_ARRAY: pointer to the vector structure.
        */
@@ -188,27 +191,28 @@ struct svalue_s
 #define T_QUOTED_ARRAY  0xa  /* a quoted array */
 #define T_STRUCT        0xb  /* a struct */
 #define T_BYTES         0xc  /* a byte string */
+#define T_LWOBJECT      0xd  /* a lightweight object */
 
-#define T_CALLBACK      0xd
+#define T_CALLBACK      0xe
   /* A callback structure referenced from the stack to allow
    * proper cleanup during error recoveries. The interpreter
    * knows how to free it, but that's all.
    */
 
-#define T_ERROR_HANDLER 0xe
+#define T_ERROR_HANDLER 0xf
   /* Not an actual value, this is used internally for cleanup
    * operations. See the description of the error_handler() member
    * for details.
    */
 
-#define T_BREAK_ADDR    0xf
+#define T_BREAK_ADDR    0x10
   /* Not an actual type, it's used internally for saving
    * the address where break statements within switch statements
    * should branch to.
    */
 
 #undef T_NULL /* There is some T_NULL definition in system headers. */
-#define T_NULL          0x10
+#define T_NULL          0x11
   /* Not an actual type, this is used in the efun_lpc_types[] table
    * to encode the acceptance of '0' instead of the real datatype.
    */
@@ -220,21 +224,33 @@ struct svalue_s
 
 /* T_CLOSURE secondary information. */
 
-  /* For closures of operators (internal machine codes), efuns and
-   * simul_efuns, the x.closure_type is a negative number defining
-   * which operator/efun/simul_efun to call.
-   * The values given here are just the limits of the usable number
-   * ranges.
-   * The relations are:
-   *   Operator-closure index = CLOSURE_OPERATOR_OFFS + instruction index
-   *   Efun-closure index     = CLOSURE_EFUN_OFFS + instruction index
-   *   Simul_efun index       = CLOSURE_SIMUL_EFUN_OFFS + function index
-   * Yes, the operator range could be overlaid onto the efun range without
-   * collision, distinguishing them by the struct instr[].Default fields
-   * (the 'closure' instruction does that to save space), but this way they
-   * are easier to distinguish.
-   * TODO: Note: Some code interprets these values as unsigned shorts.
+  /* The secondary information (.x.closure_type) defines the type
+   * of closure and the data structure used in the .u union.
+   *
+   * Positive numbers have an allocated data structure in .u.lambda:
+   *
+   *    CLOSURE_LFUN           uses .u.lambda->function.lfun
+   *    CLOSURE_IDENTIFIER     uses .u.lambda->function.var_index
+   *    CLOSURE_BOUND_LAMBDA   uses .u.lambda->function.lambda
+   *    CLOSURE_LAMBDA         uses .u.lambda->function.code
+   *    CLOSURE_UNBOUND_LAMBDA uses .u.lambda->function.code
+   *
+   * Negative numbers consist of an index and the corresponding
+   * object in .u.ob or .u.lwob. The index (operator, efun or
+   * simul-efun index) must be less than 0x0800 (2048). The
+   * secondary information is then as follows:
+   *
+   *    CLOSURE_OPERATOR + operator index   for operator closures
+   *    CLOSURE_PYTHON_EFUN + efun index    for python efuns
+   *    CLOSURE_EFUN + efun index           for native efuns
+   *    CLOSURE_SIMUL_EFUN + function index for simul-efuns
+   *
+   * The object the closure is bound to is stord in .u.ob.
+   * If it is a lightweight object, then CLOSURE_LWO is added
+   * to the secondary information and .u.lwob is used instead.
    */
+
+#define CLOSURE_LWO             (-0x4000)  /* == 0xc000 */
 
 #ifdef USE_PYTHON
 #  define CLOSURE_OPERATOR      (-0x2000)  /* == 0xe000 */
@@ -245,6 +261,7 @@ struct svalue_s
 #define CLOSURE_EFUN            (-0x1000)  /* == 0xf000 */
 #define CLOSURE_SIMUL_EFUN      (-0x0800)  /* == 0xf800 */
 
+#define CLOSURE_LWO_OFFS        (CLOSURE_LWO & 0xffff)
 #define CLOSURE_OPERATOR_OFFS   (CLOSURE_OPERATOR & 0xffff)
 #ifdef USE_PYTHON
 #  define CLOSURE_PYTHON_EFUN_OFFS (CLOSURE_PYTHON_EFUN & 0xffff)
@@ -281,9 +298,10 @@ struct svalue_s
 #  define CLOSURE_IDENTIFIER_OFFS 0xe800
 #endif
   /* When creating lfun/variable closures, the lfun/variable to bind
-   * is given as unsigned number:
+   * is given as unsigned number in the bytecode:
    *   number < C_I_OFFS:  number is index into function table
    *   number >= C_I_OFFS: (number-C_I_OFFS) is index into variable table.
+   *   nummer >= C_OPERATOR_OFFS: operator or efun closure.
    */
 
 /* Predicates operating on T_CLOSURE secondary information */
@@ -371,6 +389,7 @@ struct svalue_s
 #define TF_NULL          (1 << T_NULL)
 #define TF_STRUCT        (1 << T_STRUCT)
 #define TF_BYTES         (1 << T_BYTES)
+#define TF_LWOBJECT      (1 << T_LWOBJECT)
 
 #define TF_ANYTYPE       (~0)
   /* This is used in the efun_lpc_types[]
@@ -449,12 +468,14 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
     }
 #endif // FLOAT_FORMAT_2
 
-/* --- svalue macros --- */
+/* --- svalue helper functions and macros --- */
 
 #define addref_closure(sp, from) \
   MACRO( svalue_t * p = sp; \
          if (CLOSURE_MALLOCED(p->x.closure_type)) \
              p->u.lambda->ref++; \
+         else if (p->x.closure_type < CLOSURE_LWO) \
+            ref_lwobject(p->u.lwob); \
          else \
              (void)ref_object(p->u.ob, from); \
   )
@@ -463,7 +484,9 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
    */
 
 
-/* void put_<type>(sp, value): Initialise svalue *sp with value of <type>.
+/* svalue_t svalue_<type>(value): Creates a svalue_t value of <type>.
+ *
+ * void put_<type>(sp, value): Initialise svalue *sp with value of <type>.
  *   'sp' is evaluated several times and must point to an otherwise
  *   empty svalue. If <value> is a refcounted value, its refcount is
  *   NOT incremented.
@@ -472,6 +495,8 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
  *   of <type>. 'sp' is evaluated several times and must point to an
  *   otherwise empty svalue. <value> must be a refcounted value, and
  *   its refcount is incremented.
+ *   These functions are not defined here, but in the header files
+ *   of the corresponding types.
  *
  * void push_<type>(), void push_ref_<type>()
  *   As the put_() macros, but <sp> is incremented once first.
@@ -489,57 +514,211 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
  * TODO:: retrieve the type from the *sp and set sp->type to T_INVALID.
  */
 
-#define put_number(sp,num) \
-    ( (sp)->type = T_NUMBER, (sp)->u.number = (num) )
+static INLINE svalue_t svalue_number(const p_int num)
+                                                    __attribute__((const));
+static INLINE svalue_t svalue_number(const p_int num)
+/* Return an svalue for the number <num>.
+ */
+{
+    return (svalue_t){ T_NUMBER, {}, {.number = num } };
+}
 
-#define put_float(sp,fnum) \
-    do { STORE_DOUBLE_USED; (sp)->type = T_FLOAT; STORE_DOUBLE((sp), fnum); }while(0)
+static INLINE svalue_t svalue_float(const double val)
+                                                    __attribute__((const));
+static INLINE svalue_t svalue_float(const double val)
+/* Return an svalue for the floating point value <val.>
+ */
+{
+#ifdef FLOAT_FORMAT_2
+    return (svalue_t){ T_FLOAT, {}, {.float_number = val } };
+#else
+    int exponent;
+    int32_t mantissa = SPLIT_DOUBLE(val, &exponent)
 
-#define put_ref_array(sp,arr) \
-    ( (sp)->type = T_POINTER, (sp)->u.vec = ref_array(arr) )
-#define put_array(sp,arr) \
-    ( (sp)->type = T_POINTER, (sp)->u.vec = arr )
+    return (svalue_t){ T_FLOAT, {.exponent = exponent}, {.mantissa = mantissa } };
+#endif
+}
 
-#define put_ref_struct(sp,st) \
-    ( (sp)->type = T_STRUCT, (sp)->u.strct = ref_struct(st) )
-#define put_struct(sp,st) \
-    ( (sp)->type = T_STRUCT, (sp)->u.strct = st )
+static INLINE svalue_t svalue_string(string_t * const str)
+                        __attribute__((nonnull(1))) __attribute__((const));
+static INLINE svalue_t svalue_string(string_t * const str)
+/* Return an svalue for the string <str>.
+ */
+{
+    return (svalue_t){ T_STRING, {}, {.str = str } };
+}
 
-#define put_ref_mapping(sp,val) \
-    ( (sp)->type = T_MAPPING, (sp)->u.map = ref_mapping(val) )
-#define put_mapping(sp,val) \
-    ( (sp)->type = T_MAPPING, (sp)->u.map = val )
+static INLINE svalue_t svalue_bytes(string_t * const str)
+                        __attribute__((nonnull(1))) __attribute__((const));
+static INLINE svalue_t svalue_bytes(string_t * const str)
+/* Return an svalue for the byte sequence <str>.
+ */
+{
+    return (svalue_t){ T_BYTES, {}, {.str = str } };
+}
 
-#define put_ref_object(sp,val,from) \
-    ( (sp)->type = T_OBJECT, (sp)->u.ob = ref_object(val, from) )
-#define put_object(sp,val) \
-    ( (sp)->type = T_OBJECT, (sp)->u.ob = val )
+static INLINE svalue_t svalue_symbol(string_t * const str, const ph_int numquotes)
+                        __attribute__((nonnull(1))) __attribute__((const));
+static INLINE svalue_t svalue_symbol(string_t * const str, const ph_int numquotes)
+/* Return an svalue for the symbol <str> with <numquotes> number of quotes.
+ */
+{
+    return (svalue_t){ T_SYMBOL, {.quotes = numquotes}, {.str = str } };
+}
 
-#define put_ref_valid_object(sp,val,from) \
-    ( ((val) && !((val)->flags & O_DESTRUCTED)) \
-      ? (put_ref_object(sp,val,from), 0) : put_number(sp, 0))
+static INLINE svalue_t svalue_array(vector_t * const vec)
+                        __attribute__((nonnull(1))) __attribute__((const));
+static INLINE svalue_t svalue_array(vector_t * const vec)
+/* Return an svalue for the array <vec>.
+ */
+{
+    return (svalue_t){ T_POINTER, {}, {.vec = vec } };
+}
 
-#define put_valid_object(sp,val) \
-    ( ((val) && !((val)->flags & O_DESTRUCTED)) \
-      ? (put_object(sp,val), 0) : put_number(sp, 0))
+static INLINE svalue_t svalue_mapping(mapping_t * const map)
+                        __attribute__((nonnull(1))) __attribute__((const));
+static INLINE svalue_t svalue_mapping(mapping_t * const map)
+/* Return an svalue for the mapping <map>.
+ */
+{
+    return (svalue_t){ T_MAPPING, {}, {.map = map } };
+}
 
-#define put_ref_string(sp,val) \
-    ( (sp)->type = T_STRING, (sp)->u.str = ref_mstring(val) )
-#define put_string(sp,val) \
-    ( (sp)->type = T_STRING, (sp)->u.str = val )
+static INLINE svalue_t svalue_struct(struct_t * const s)
+                        __attribute__((nonnull(1))) __attribute__((const));
+static INLINE svalue_t svalue_struct(struct_t * const s)
+/* Return an svalue for the struct <s>.
+ */
+{
+    return (svalue_t){ T_STRUCT, {}, {.strct = s } };
+}
 
-#define put_ref_bytes(sp,val) \
-    ( (sp)->type = T_BYTES, (sp)->u.str = ref_mstring(val) )
-#define put_bytes(sp,val) \
-    ( (sp)->type = T_BYTES, (sp)->u.str = val )
+static INLINE svalue_t svalue_object(object_t * const obj)
+                        __attribute__((nonnull(1))) __attribute__((const));
+static INLINE svalue_t svalue_object(object_t * const obj)
+/* Return an svalue for the object <obj>.
+ */
+{
+    return (svalue_t){ T_OBJECT, {}, {.ob = obj } };
+}
 
-#define put_ref_symbol(sp,val,numquotes) \
-    ( (sp)->type = T_SYMBOL, (sp)->u.str = ref_mstring(val), (sp)->x.quotes = (numquotes) )
-#define put_symbol(sp,val,numquotes) \
-    ( (sp)->type = T_SYMBOL, (sp)->u.str = val, (sp)->x.quotes = (numquotes) )
+static INLINE svalue_t svalue_lwobject(lwobject_t * const lwobj)
+                        __attribute__((nonnull(1))) __attribute__((const));
+static INLINE svalue_t svalue_lwobject(lwobject_t * const lwobj)
+/* Return an svalue for the lightweight object <lwobj>.
+ */
+{
+    return (svalue_t){ T_LWOBJECT, {}, {.lwob = lwobj } };
+}
 
-#define put_callback(sp,val) \
-    ( (sp)->type = T_CALLBACK, (sp)->u.cb = val )
+static INLINE svalue_t svalue_callback(callback_t * const cb)
+                        __attribute__((nonnull(1))) __attribute__((const));
+static INLINE svalue_t svalue_callback(callback_t * const cb)
+/* Return an svalue for the callback <cb>.
+ */
+{
+    return (svalue_t){ T_CALLBACK, {}, {.cb = cb } };
+}
+
+static INLINE void put_number(svalue_t * const dest, const p_int num)
+                                                __attribute__((nonnull(1)));
+static INLINE void put_number(svalue_t * const dest, const p_int num)
+/* Put the number <num> into <dest>, which is considered empty.
+ */
+{
+    *dest = svalue_number(num);
+}
+
+static INLINE void put_float(svalue_t * const dest, const double val)
+                                                __attribute__((nonnull(1)));
+static INLINE void put_float(svalue_t * const dest, const double val)
+/* Put the floating point number <num> into <dest>, which is considered empty.
+ */
+{
+    *dest = svalue_float(val);
+}
+
+static INLINE void put_string(svalue_t * const dest, string_t * const str)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_string(svalue_t * const dest, string_t * const str)
+/* Put the string <str> into <dest>, which is considered empty.
+ */
+{
+    *dest = svalue_string(str);
+}
+
+static INLINE void put_bytes(svalue_t * const dest, string_t * const str)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_bytes(svalue_t * const dest, string_t * const str)
+/* Put the byte sequence <str> into <dest>, which is considered empty.
+ */
+{
+    *dest = svalue_bytes(str);
+}
+
+static INLINE void put_symbol(svalue_t * const dest, string_t * const str, const ph_int numquotes)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_symbol(svalue_t * const dest, string_t * const str, const ph_int numquotes)
+/* Put the symbol <str> with <numquotes> number of quotes into <dest>,
+ * which is considered empty.
+ */
+{
+    *dest = svalue_symbol(str, numquotes);
+}
+
+static INLINE void put_array(svalue_t * const dest, vector_t * const vec)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_array(svalue_t * const dest, vector_t * const vec)
+/* Put the array <vec> into <dest>, which is considered empty.
+ */
+{
+    *dest = svalue_array(vec);
+}
+
+static INLINE void put_mapping(svalue_t * const dest, mapping_t * const map)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_mapping(svalue_t * const dest, mapping_t * const map)
+/* Put the mapping <map> into <dest>, which is considered empty.
+ */
+{
+    *dest = svalue_mapping(map);
+}
+
+static INLINE void put_struct(svalue_t * const dest, struct_t * const s)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_struct(svalue_t * const dest, struct_t * const s)
+/* Put the struct <s> into <dest>, which is considered empty.
+ */
+{
+    *dest = svalue_struct(s);
+}
+
+static INLINE void put_object(svalue_t * const dest, object_t * const obj)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_object(svalue_t * const dest, object_t * const obj)
+/* Put the object <obj> into <dest>, which is considered empty.
+ */
+{
+    *dest = svalue_object(obj);
+}
+
+static INLINE void put_lwobject(svalue_t * const dest, lwobject_t * const lwobj)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_lwobject(svalue_t * const dest, lwobject_t * const lwobj)
+/* Put the lightweight object <lwobj> into <dest>, which is considered empty.
+ */
+{
+    *dest = svalue_lwobject(lwobj);
+}
+
+static INLINE void put_callback(svalue_t * const dest, callback_t * const cb)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_callback(svalue_t * const dest, callback_t * const cb)
+/* Put the callback <cb> into <dest>, which is considered empty.
+ */
+{
+    *dest = svalue_callback(cb);
+}
 
 #define push_number(sp,num) \
     ( (sp)++, put_number(sp, num) )
@@ -557,7 +736,7 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
 #define push_struct(sp,st) \
     ( (sp)++, put_struct(sp, st) )
 
-#define psh_ref_mapping(sp,val) \
+#define push_ref_mapping(sp,val) \
     ( (sp)++, put_ref_mapping(sp,val) )
 #define push_mapping(sp,val) \
     ( (sp)++, put_mapping(sp,val) )
@@ -571,6 +750,9 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
     ( (sp)++, put_ref_valid_object(sp,val,from) )
 #define push_valid_object(sp,val) \
     ( (sp)++, put_valid_object(sp,val) )
+
+#define push_lwobject(sp,val) \
+    ( (sp)++, put_lwobject(sp,val) )
 
 #define push_ref_string(sp,val) \
     ( (sp)++, put_ref_string(sp,val) )
@@ -586,7 +768,7 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
 #define push_bytes(sp,val) \
     ( (sp)++, put_bytes(sp,val) )
 
-#define psh_callback(sp,val) \
+#define push_callback(sp,val) \
     ( (sp)++, put_callback(sp,val) )
 
 /* The following macros implement the dynamic cost evaluations:

@@ -1,5 +1,5 @@
 SYNOPSIS
-        closure bind_lambda(closure, object ob)
+        closure bind_lambda(closure, object|lwobject ob)
 
 DESCRIPTION
         Binds an unbound lambda closure to an object and return it.

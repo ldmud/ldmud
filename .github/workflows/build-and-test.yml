@@ -52,7 +52,7 @@ jobs:
               working-directory: test
               run: |
                 llvm-profdata merge -sparse coverage/*.profraw -o coverage.profdata
-                llvm-cov show ../src/ldmud -instr-profile=coverage.profdata -format=html -output-dir=html
+                llvm-cov show ../src/ldmud -instr-profile=coverage.profdata -format=html -output-dir=html -show-instantiations=false
             - name: Upload coverage report
               if: matrix.coverage
               uses: actions/upload-artifact@v2

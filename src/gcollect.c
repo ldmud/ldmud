@@ -101,6 +101,7 @@
 #include "instrs.h" /* Need F_ALLOCATE for setting up print dispatcher */
 #endif
 #include "lex.h"
+#include "lwobject.h"
 #include "main.h"
 #include "mapping.h"
 #include "mempools.h"
@@ -124,6 +125,7 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/driver_hook.h"
@@ -420,6 +422,10 @@ cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
             break;
           }
 
+        case T_LWOBJECT:
+            cleanup_vector(p->u.lwob->variables, p->u.lwob->prog->num_variables, context);
+            break;
+
         case T_POINTER:
         case T_QUOTED_ARRAY:
             /* Don't clean the null vector */
@@ -614,8 +620,8 @@ cleanup_structures (cleanup_t * context)
                 {
                     lambda_t * l = driver_hook[i].u.lambda;
 
-                    free_object(l->ob, "cleanup_structures");
-                    l->ob = ref_object(master_ob, "cleanup_structures");
+                    free_svalue(&(l->ob));
+                    put_ref_object(&(l->ob), master_ob, "cleanup_structures");
                 }
             }
             else
@@ -1406,6 +1412,10 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
             clear_object_ref(p->u.ob);
             continue;
 
+        case T_LWOBJECT:
+            clear_lwobject_ref(p->u.lwob);
+            continue;
+
         case T_STRING:
         case T_BYTES:
         case T_SYMBOL:
@@ -1459,6 +1469,8 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
                     clear_ref_in_closure(l, p->x.closure_type);
                 }
             }
+            else if (p->x.closure_type < CLOSURE_LWO)
+                clear_lwobject_ref(p->u.lwob);
             else
                 clear_object_ref(p->u.ob);
             continue;
@@ -1574,6 +1586,10 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
             continue;
           }
 
+        case T_LWOBJECT:
+            count_lwobject_ref(p->u.lwob);
+            continue;
+
         case T_POINTER:
         case T_QUOTED_ARRAY:
             /* Don't use CHECK_REF on the null vector */
@@ -1617,6 +1633,10 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
                 {
                     count_ref_in_closure(p);
                 }
+            }
+            else if (p->x.closure_type < CLOSURE_LWO)
+            {
+                count_lwobject_ref(p->u.lwob);
             }
             else
             {
@@ -1826,33 +1846,34 @@ gc_count_ref_in_closure (svalue_t *csvp)
 
     if (type != CLOSURE_UNBOUND_LAMBDA)
     {
-        object_t *ob;
-
-        ob = l->ob;
-        if (ob->flags & O_DESTRUCTED
+        if ((l->ob.type == T_OBJECT && (l->ob.u.ob->flags & O_DESTRUCTED))
          || (   type == CLOSURE_LFUN
-             && l->function.lfun.ob->flags & O_DESTRUCTED) )
+             && l->function.lfun.ob.type == T_OBJECT
+             && l->function.lfun.ob.u.ob->flags & O_DESTRUCTED))
         {
+            object_t *ob = (l->ob.type == T_OBJECT && (l->ob.u.ob->flags & O_DESTRUCTED)) ? l->ob.u.ob : NULL;
+
             l->ref = -1;
             if (type == CLOSURE_LAMBDA)
             {
-                l->ob = (object_t *)stale_lambda_closures;
+                l->ob.u.lambda = stale_lambda_closures;
                 stale_lambda_closures = l;
             }
             else
             {
-                l->ob = (object_t *)stale_misc_closures;
+                l->ob.u.lambda = stale_misc_closures;
                 stale_misc_closures = l;
                 if (type == CLOSURE_LFUN)
                 {
-                    if (l->function.lfun.ob->flags & O_DESTRUCTED)
+                    if (l->function.lfun.ob.type == T_OBJECT
+                     && l->function.lfun.ob.u.ob->flags & O_DESTRUCTED)
                     {
-                        reference_destructed_object(l->function.lfun.ob);
+                        reference_destructed_object(l->function.lfun.ob.u.ob);
                     }
                 }
             }
 
-            if (ob->flags & O_DESTRUCTED)
+            if (ob)
             {
                 reference_destructed_object(ob);
             }
@@ -1870,11 +1891,11 @@ gc_count_ref_in_closure (svalue_t *csvp)
         else
         {
              /* Object exists: count reference */
+            count_ref_in_vector(&(l->ob), 1);
 
-            ob->ref++;
             if (type == CLOSURE_LFUN)
             {
-                l->function.lfun.ob->ref++;
+                count_ref_in_vector(&(l->function.lfun.ob), 1);
                 if(l->function.lfun.inhProg)
                     mark_program_ref(l->function.lfun.inhProg);
             }
@@ -1967,11 +1988,11 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
     }
 
     if (type != CLOSURE_UNBOUND_LAMBDA)
-        clear_object_ref(l->ob);
+        clear_ref_in_vector(&(l->ob), 1);
 
     if (type == CLOSURE_LFUN)
     {
-        clear_object_ref(l->function.lfun.ob);
+        clear_ref_in_vector(&(l->function.lfun.ob), 1);
         if (l->function.lfun.inhProg)
             clear_program_ref(l->function.lfun.inhProg, MY_TRUE);
     }
@@ -2526,18 +2547,18 @@ garbage_collection(void)
     {
         svalue_t sv;
 
-        next_l = (lambda_t *)l->ob;
+        next_l = l->ob.u.lambda;
         l->ref = 1;
         sv.type = T_CLOSURE;
         sv.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
         sv.u.lambda = l;
-        l = (lambda_t *)l->ob;
+        l = l->ob.u.lambda;
         free_closure(&sv);
     }
 
     for (l = stale_misc_closures; l; l = next_l)
     {
-        next_l = (lambda_t *)l->ob;
+        next_l = l->ob.u.lambda;
         xfree((char *)l);
     }
 
@@ -2658,12 +2679,12 @@ show_mstring_data (int d, void *block, int depth UNUSED)
     WRITES(d, ")\"");
     if (str->size < 50)
     {
-        write(d, block, str->size);
+        write(d, str->txt, str->size);
         WRITES(d, "\"");
     }
     else
     {
-        write(d, block, 50);
+        write(d, str->txt, 50);
         WRITES(d, "\" (truncated)");
     }
 } /* show_mstring_data() */
@@ -2739,6 +2760,24 @@ show_object (int d, void *block, int depth)
 
 /*-------------------------------------------------------------------------*/
 static void
+show_lwobject (int d, void *block, int depth)
+
+/* Print the data about lightweight object <block> on filedescriptor <d>.
+ */
+
+{
+    lwobject_t *lwob;
+
+    lwob = (lwobject_t *)block;
+    WRITES(d, "Lightweight object from ");
+    show_mstring(d, lwob->prog->name, 0);
+    WRITES(d, ", uid: ");
+    show_string(d, lwob->user->name ? get_txt(lwob->user->name) : "0", 0);
+    WRITES(d, "\n");
+} /* show_lwobject() */
+
+/*-------------------------------------------------------------------------*/
+static void
 show_cl_literal (int d, void *block, int depth UNUSED)
 
 /* Print the data about literal closure <block> on filedescriptor <d>.
@@ -2749,24 +2788,40 @@ show_cl_literal (int d, void *block, int depth UNUSED)
 #    pragma unused(depth)
 #endif
     lambda_t *l;
-    object_t *obj;
 
     l = (lambda_t *)block;
 
     WRITES(d, "Closure literal: Object ");
 
-    obj = l->ob;
-    if (obj)
+    switch (l->ob.type)
     {
-        if (obj->name)
-            show_mstring(d, obj->name, 0);
-        else
-            WRITES(d, "(no name)");
-        if (obj->flags & O_DESTRUCTED)
-            WRITES(d, " (destructed)");
+        case T_OBJECT:
+        {
+            object_t *obj = l->ob.u.ob;
+            if (obj->name)
+                show_mstring(d, obj->name, 0);
+            else
+                WRITES(d, "(no name)");
+            if (obj->flags & O_DESTRUCTED)
+                WRITES(d, " (destructed)");
+            break;
+        }
+
+        case T_LWOBJECT:
+        {
+            lwobject_t *lwob = l->ob.u.lwob;
+            if (lwob->prog && lwob->prog->name)
+                show_mstring(d, lwob->prog->name, 0);
+            else
+                WRITES(d, "(no name)");
+            break;
+        }
+
+        case T_NUMBER:
+        default:
+            WRITES(d, "<null>");
+            break;
     }
-    else
-        WRITES(d, "<null>");
 
     WRITES(d, ", index ");
     writed(d, l->function.var_index);
@@ -2892,6 +2947,10 @@ show_array(int d, void *block, int depth)
 
         case T_OBJECT:
             show_object(d, (char *)svp->u.ob, 1);
+            break;
+
+        case T_LWOBJECT:
+            show_lwobject(d, (char *)svp->u.lwob, 1);
             break;
 
         default:
@@ -3020,6 +3079,10 @@ show_struct(int d, void *block, int depth)
             show_object(d, (char *)svp->u.ob, 1);
             break;
 
+        case T_LWOBJECT:
+            show_lwobject(d, (char *)svp->u.lwob, 1);
+            break;
+
         default:
             WRITES(d, "Svalue type ");writed(d, svp->type);WRITES(d, "\n");
             break;
@@ -3045,6 +3108,7 @@ setup_print_block_dispatcher (void)
 {
     svalue_t tmp_closure;
     vector_t *a, *b;
+    lwobject_t *lw;
 
     assert_master_ob_loaded();
 
@@ -3078,6 +3142,9 @@ setup_print_block_dispatcher (void)
     note_object_allocation_info((char*)master_ob);
     note_program_allocation_info((char*)(master_ob->prog));
 #endif
+    lw = new_sample_lwobject();
+    store_print_block_dispatch_info((char *)lw, show_lwobject);
+    free_sample_lwobject(lw);
 
     tmp_closure.type = T_CLOSURE;
     tmp_closure.x.closure_type = CLOSURE_EFUN + F_ALLOCATE;
@@ -3087,7 +3154,7 @@ setup_print_block_dispatcher (void)
     store_print_block_dispatch_info(inter_sp->u.vec, show_array);
     free_svalue(inter_sp--);
 
-    current_object = master_ob;
+    set_current_object(master_ob);
     closure_literal(&tmp_closure, 0, 0, 0);
     store_print_block_dispatch_info(tmp_closure.u.lambda, show_cl_literal);
     free_svalue(&tmp_closure);

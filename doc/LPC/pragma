@@ -6,10 +6,18 @@ DESCRIPTION
         several compilation options. Multiple options can be selected
         in one #pragma directive by separating them with commas.
 
-        no_clone: The blueprint object can't be cloned.
         no_inherit: The program can't be inherited.
         no_shadow: The program can't be shadowed (similar to declaring
                 all functions as 'nomask').
+
+        clone: The blueprint object can be cloned (default, implies
+                no_lightweight).
+        no_clone: The blueprint object can't be cloned.
+
+        lightweight: Lightweight objects may be created from the
+                blueprint (implies no_clone and warn_lightweight).
+        no_lightweight: Lightweight object cannot be created from it
+                (default).
 
         init_variables: Clone variables are initialized by __INIT().
         share_variables: Clone variables are initialized from the
@@ -99,6 +107,10 @@ DESCRIPTION
                 This applies to local variables and private global variables.
         no_warn_unused_variables: Turn off warn_unused_variables
                 (the default).
+
+        warn_lightweight: Warn about efuns that are not suitable for
+                lightweight objects.
+        no_warn_lightweight: Turn off warn_lightweight.
 
         When an object is compiled with type testing (#pragma
         strict_types), all types are saved of the arguments for that

@@ -103,6 +103,7 @@
 #include "backend.h"
 #include "gcollect.h"
 #include "interpret.h"
+#include "lwobject.h"
 #include "main.h"
 #include "mapping.h"
 #include "mstrings.h"
@@ -542,9 +543,9 @@ f_set_extra_wizinfo (svalue_t *sp)
 
 /* EFUN set_extra_wizinfo()
  *
- *   void set_extra_wizinfo (object wiz, mixed extra)
- *   void set_extra_wizinfo (string wiz, mixed extra)
- *   void set_extra_wizinfo (int    wiz, mixed extra)
+ *   void set_extra_wizinfo (object|lwobject wiz, mixed extra)
+ *   void set_extra_wizinfo (string          wiz, mixed extra)
+ *   void set_extra_wizinfo (int             wiz, mixed extra)
  *
  * Set the value <extra> as the 'extra' information for the wizlist
  * entry of <wiz>.
@@ -564,11 +565,15 @@ f_set_extra_wizinfo (svalue_t *sp)
 
 {
     wiz_list_t *user;
-    short type;
+    short type = sp[-1].type;
 
-    if ((type = sp[-1].type) == T_OBJECT)
+    if (type == T_OBJECT)
     {
         user = sp[-1].u.ob->user;
+    }
+    else if (type == T_LWOBJECT)
+    {
+        user = sp[-1].u.lwob->user;
     }
     else if (type != T_STRING || !(user = find_wiz(sp[-1].u.str)))
     {
@@ -594,9 +599,9 @@ f_get_extra_wizinfo (svalue_t *sp)
 
 /* EFUN get_extra_wizinfo()
  *
- *   mixed get_extra_wizinfo (object wiz)
- *   mixed get_extra_wizinfo (string wiz)
- *   mixed get_extra_wizinfo (int    wiz)
+ *   mixed get_extra_wizinfo (object|lwobject wiz)
+ *   mixed get_extra_wizinfo (string          wiz)
+ *   mixed get_extra_wizinfo (int             wiz)
  *
  * Returns the 'extra' information that was set for the given
  * wizard <wiz> in the wizlist.
@@ -613,11 +618,15 @@ f_get_extra_wizinfo (svalue_t *sp)
 
 {
     wiz_list_t *user;
-    short type;
+    short type = sp->type;
 
-    if ((type = sp->type) == T_OBJECT)
+    if (type == T_OBJECT)
     {
         user = sp->u.ob->user;
+    }
+    else if (type == T_LWOBJECT)
+    {
+        user = sp->u.lwob->user;
     }
     else if (type != T_STRING || !(user = find_wiz(sp->u.str)))
     {

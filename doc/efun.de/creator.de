@@ -1,5 +1,5 @@
 SYNOPSIS
-        string creator(object ob)
+        string creator(object|lwobject ob)
 
 BESCHREIBUNG
         Diese Funktion ist nur im COMPAT-Modus verfuegbar.

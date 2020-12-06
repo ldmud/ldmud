@@ -2,7 +2,7 @@ SYNOPSIS
         #include <functionlist.h>
         #include <lpctypes.h>
 
-        mixed * functionlist(object ob, int flags)
+        mixed * functionlist(object|lwobject|string ob, int flags)
 
 DESCRIPTION
         Returns an array with information about <ob>s lfunctions. For every
@@ -13,8 +13,9 @@ DESCRIPTION
           - the return type (listed in <lpctypes.h>)
           - the number of accepted argumens
 
-        <ob> may be given as true object or as a filename. In the latter
-        case, the efun does not try to load the object before proceeding.
+        <ob> may be given as regular or lightweight object or as a filename.
+        In the latter case, the efun does not try to load the object before
+        proceeding.
 
         <flags> determines both which information is returned for every
         function, and which functions should be considered at all.

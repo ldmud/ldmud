@@ -235,6 +235,7 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
 #include "i-svalue_cmp.h"
 
 #define TIME_TO_COMPACT (600) /* 10 Minutes */
@@ -557,7 +558,7 @@ allocate_mapping (mp_int size, mp_int num_values)
  */
 
 {
-    return get_new_mapping(current_object->user, num_values, size, 0);
+    return get_new_mapping(get_current_user(), num_values, size, 0);
 } /* allocate_mapping() */
 
 /*-------------------------------------------------------------------------*/
@@ -710,7 +711,9 @@ mhash (svalue_t * svp)
         }
         else if (CLOSURE_MALLOCED(svp->x.closure_type))
         {
-            i = (p_int)(svp->u.lambda->ob) ^ *SVALUE_FULLTYPE(svp);
+            i = (svp->u.lambda->ob.type == T_OBJECT
+               ? (p_int)svp->u.lambda->ob.u.ob
+               : (p_int)svp->u.lambda->ob.u.lwob) ^ *SVALUE_FULLTYPE(svp);
         }
         else /* Efun, Simul-Efun, Operator closure */
         {
@@ -1558,7 +1561,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
             if (m->hash)
                 cm_size -= m->hash->cond_deleted;
         }
-        m2 = get_new_mapping(current_object->user, new_width, 0, cm_size);
+        m2 = get_new_mapping(get_current_user(), new_width, 0, cm_size);
         if (!m2)
         {
             outofmem(sizeof *m2 + (mp_int)sizeof(svalue_t) * m->num_entries * new_width
@@ -1781,7 +1784,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
         if (m1->cond) cm3size += m1->cond->size;
         if (m2->cond) cm3size += m2->cond->size;
 
-        m3 = get_new_mapping(current_object->user, num_values, hsize, cm3size);
+        m3 = get_new_mapping(get_current_user(), num_values, hsize, cm3size);
 
         if (!m3)
         {
@@ -2723,7 +2726,7 @@ handle_destructed_key (svalue_t *key)
              */
             l->function.lambda->ob = l->ob;
             l->ref = -1;
-            l->ob = (object_t *)stale_misc_closures;
+            l->ob.u.lambda = stale_misc_closures;
             stale_misc_closures = l;
         }
         else
@@ -2740,7 +2743,7 @@ handle_destructed_key (svalue_t *key)
             if (gc_obj_list_destructed)
                 fatal("gc_obj_list_destructed is NULL\n");
 #endif
-            l->function.lambda->ob = gc_obj_list_destructed;
+            l->function.lambda->ob.u.ob = gc_obj_list_destructed;
         }
     }
     count_ref_in_vector(key, 1);
@@ -3820,7 +3823,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
         p_int j;
         svalue_t *sp2, *data;
 
-        if (!callback_object(cb))
+        if (!valid_callback_object(cb))
             errorf("Object used by walk_mapping destructed\n");
 
         /* Push the key */
@@ -4007,7 +4010,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
             }
         }
 
-        if (!callback_object(cb))
+        if (!valid_callback_object(cb))
             errorf("Object used by %s destructed"
                  , bFull ? "filter" : "filter_mapping");
 
@@ -4246,7 +4249,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
             return NULL;
         }
 
-        if (!callback_object(cb))
+        if (!valid_callback_object(cb))
             errorf("Object used by %s destructed"
                  , bFull ? "map" : "map_mapping");
 

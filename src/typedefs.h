@@ -15,6 +15,7 @@ typedef struct action_s           action_t;           /* sent.h */
 // NOTE: mk_bytecode_gen.sh assumes that sizeof(bytecode_t) == 1
 typedef unsigned char             bytecode_t;         /* bytecode.h */
 typedef bytecode_t              * bytecode_p;         /* bytecode.h */
+typedef struct call_cache_s       call_cache_t;       /* exec.h */
 typedef struct callback_s         callback_t;         /* simulate.h */
 typedef struct case_list_entry_s  case_list_entry_t;  /* switch.h */
 typedef struct case_state_s       case_state_t;       /* switch.h */
@@ -30,6 +31,7 @@ typedef struct instr_s            instr_t;            /* exec.h */
 typedef struct lambda_s           lambda_t;           /* closure.h */
 typedef struct linenumbers_s      linenumbers_t;      /* exec.h */
 typedef struct lpctype_s          lpctype_t;          /* types.h */
+typedef struct lwobject_s         lwobject_t;         /* lwobject.h */
 typedef struct mapping_s          mapping_t;          /* mapping.h */
 typedef struct object_s           object_t;           /* object.h */
 typedef struct program_s          program_t;          /* exec.h */

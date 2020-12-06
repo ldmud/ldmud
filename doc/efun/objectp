@@ -5,5 +5,6 @@ DESCRIPTION
         Return 1 if arg is an object.
 
 SEE ALSO
-        bytesp(E), clonep(E), closurep(E), floatp(E), mappingp(E), intp(E),
-        referencep(E), pointerp(E), stringp(E), symbolp(E), structp(E)
+        bytesp(E), clonep(E), closurep(E), floatp(E), intp(E), lwobjectp(E),
+        mappingp(E), pointerp(E), referencep(E), stringp(E), structp(E),
+        symbolp(E)

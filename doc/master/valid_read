@@ -1,5 +1,5 @@
 SYNOPSIS
-        string valid_read(string path, string uid, string func, object ob)
+        string valid_read(string path, string uid, string func, object|lwobject ob)
 
 DESCRIPTION
         This function is called to check if the object ob with the

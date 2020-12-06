@@ -22,6 +22,8 @@ DESCRIPTION
                                  default (<arg>==0) or for object <arg>.
         configure_object       : Set option <arg2> with value <arg3> for
                                  object <arg>.
+        configure_lwobject     : Set option <arg2> with value <arg3> for
+                                 lwobject <arg>.
         configure_driver       : Set option <arg1> to value(s) <arg2>.
         enable_telnet          : Enable/disable telnet (<arg2>) for object
                                  <arg>.

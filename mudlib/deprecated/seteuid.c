@@ -8,18 +8,24 @@
 
 int seteuid(string str)
 {
-    object ob = efun::previous_object();
+    object|lwobject ob = efun::previous_object();
 
     if (!str)
     {
-        efun::configure_object(ob, OC_EUID, 0);
+        if (lwobjectp(ob))
+            efun::configure_lwobject(ob, LC_EUID, 0);
+        else
+            efun::configure_object(ob, OC_EUID, 0);
         return 1;
     }
 
     if (efun::call_direct(__MASTER_OBJECT__, "valid_seteuid", ob, str) != 1)
         return 0;
 
-    efun::configure_object(ob, OC_EUID, str);
+    if (lwobjectp(ob))
+        efun::configure_lwobject(ob, LC_EUID, str);
+    else
+        efun::configure_object(ob, OC_EUID, str);
     return 1;
 }
 

@@ -375,4 +375,41 @@ static INLINE object_t* check_object(object_t *const o)
 #define free_prog(p,f) _free_prog(p,f, __FILE__, __LINE__)
 #endif
 
+static INLINE void put_ref_object(svalue_t * const dest, object_t * const obj, const char * const from)
+                                                __attribute__((nonnull(1,2,3)));
+static INLINE void put_ref_object(svalue_t * const dest, object_t * const obj, const char * const from)
+/* Put the object <obj> into <dest>, which is considered empty,
+ * and increment the refcount of <obj>.
+ */
+{
+    *dest = svalue_object(ref_object(obj, from));
+}
+
+static INLINE void put_valid_object(svalue_t * const dest, object_t * const obj)
+                                                __attribute__((nonnull(1)));
+static INLINE void put_valid_object(svalue_t * const dest, object_t * const obj)
+/* Put the object <obj> into <dest>, which is considered empty.
+ * If <obj> is a destructed object or NULL, put the number 0 there instead.
+ */
+{
+    if (obj && !(obj->flags & O_DESTRUCTED))
+        put_object(dest, obj);
+    else
+        put_number(dest, 0);
+}
+
+static INLINE void put_ref_valid_object(svalue_t * const dest, object_t * const obj, const char * const from)
+                                                __attribute__((nonnull(1,3)));
+static INLINE void put_ref_valid_object(svalue_t * const dest, object_t * const obj, const char * const from)
+/* Put the object <obj> into <dest>, which is considered empty,
+ * and increment the refcount of <obj>.
+ * If <obj> is a destructed object or NULL, put the number 0 there instead.
+ */
+{
+    if (obj && !(obj->flags & O_DESTRUCTED))
+        put_ref_object(dest, obj, from);
+    else
+        put_number(dest, 0);
+}
+
 #endif /* OBJECT_H__ */

@@ -1,15 +1,16 @@
 GESCHUETZT
 SYNOPSIS
-        void set_extra_wizinfo(object wiz, mixed extra)
-        void set_extra_wizinfo(string wiz, mixed extra)
-        void set_extra_wizinfo(int    wiz, mixed extra)
+        void set_extra_wizinfo(object   wiz, mixed extra)
+        void set_extra_wizinfo(lwobject wiz, mixed extra)
+        void set_extra_wizinfo(string   wiz, mixed extra)
+        void set_extra_wizinfo(int      wiz, mixed extra)
 
 BESCHREIBUNG
         Setzt den Wert <extra> als Eintrag im 'Extra' Feld in der Wizlist fuer
         den Gott <wiz>.
 
-        Ist <wiz> ein Objekt, wird der Eintrag vom Erzeuger des Objekts (also
-        dessen UID) verwendet.
+        Ist <wiz> ein normales oder leichtgewichtiges Objekt, so wird der
+        Eintrag vom Erzeuger des Objekts (also dessen UID) verwendet.
         Ist <wiz> ein String (ein Erzeuger bzw. eine UID), bezeichnet dieser
         den Eintrag, dem <extra> zugewiesen wird.
         Ist <wiz> 0, wird <extra> im Standardeintrag der Wizlist gesetzt.

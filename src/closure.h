@@ -33,9 +33,9 @@ struct lambda_s
      */
 
     p_int ref;          /* ref count */
-    object_t *ob;
-      /* Object the closure is bound to (for bound UNBOUND_LAMBDAs just
-       * during the execution of the lambda).
+    svalue_t ob;
+      /* Normal or lightweight object the closure is bound to
+       * (for bound UNBOUND_LAMBDAs just during the execution of the lambda).
        */
 
     object_t   *prog_ob;
@@ -58,14 +58,14 @@ struct lambda_s
 
         struct {
             /* CLOSURE_LFUN */
-            object_t       *ob;          /* Originating object */
-            unsigned short index;        /* Index in the object's function
-                                          * table */
+            svalue_t        ob;          /* Originating object */
             program_t      *inhProg;     /* NULL or the program containing
                                           * the function for closure
                                           * referencing inherited functions
                                           * (even if overloaded).
                                           */
+            unsigned short index;        /* Index in the object's function
+                                          * table */
             unsigned short context_size; /* Number of context vars */
         } lfun;
 
@@ -114,11 +114,11 @@ extern int       replace_program_function_adjust(replace_ob_t *r_ob, int fun_idx
 extern int       replace_program_variable_adjust(replace_ob_t *r_ob, int var_idx);
 extern void      replace_program_lfun_closure_adjust(replace_ob_t *r_ob);
 extern void      replace_program_lambda_adjust(replace_ob_t *r_ob);
-extern void      closure_init_lambda (lambda_t * l, object_t * obj);
-extern lambda_t *closure_new_lambda (object_t * obj, unsigned short context_size, Bool raise_error);
-extern void      closure_lfun (svalue_t *dest, object_t *obj, program_t *prog, int ix, unsigned short num, Bool raise_error);
+extern void      closure_init_lambda (lambda_t * l, svalue_t obj);
+extern lambda_t *closure_new_lambda (svalue_t obj, unsigned short context_size, Bool raise_error);
+extern void      closure_lfun (svalue_t *dest, svalue_t obj, program_t *prog, int ix, unsigned short num, Bool raise_error);
 extern void      closure_literal(svalue_t *dest, int ix, unsigned short inhIndex, unsigned short num);
-extern void      closure_identifier (svalue_t *dest, object_t * obj, int ix, Bool raise_error);
+extern void      closure_identifier (svalue_t *dest, svalue_t obj, int ix, Bool raise_error);
 extern void      free_closure(svalue_t *svp);
 extern Bool      is_undef_closure (svalue_t *sp);
 extern void      closure_lookup_lfun_prog ( lambda_t * l , program_t ** pProg , string_t ** pName , Bool * pIsInherited);
@@ -132,5 +132,18 @@ extern svalue_t *f_symbol_function(svalue_t *sp);
 extern svalue_t *f_symbol_variable(svalue_t *sp);
 extern svalue_t *f_unbound_lambda(svalue_t *sp);
 extern void      align_switch(bytecode_p pc);
+
+/* --- helper functions --- */
+
+static INLINE svalue_t get_bound_object(const svalue_t cl)
+/* Return the object, the closure is bound to.
+ */
+{
+    return CLOSURE_MALLOCED(cl.x.closure_type)
+            ? cl.u.lambda->ob
+            : cl.x.closure_type < CLOSURE_LWO
+            ? svalue_lwobject(cl.u.lwob)
+            : svalue_object(cl.u.ob);
+} /* get_bound_object() */
 
 #endif /* CLOSURE_H__ */
