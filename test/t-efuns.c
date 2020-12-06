@@ -351,6 +351,11 @@ mixed *tests = ({
     ({ "map mapping 5", 0, (: deep_eq(map(([1,2,3]), "f"), ([1:2,2:3,3:4])) :) }),
     ({ "map mapping 6", TF_ERROR, (: map(([]), unbound_lambda(0,0), ([1,2,3])) :) }),
 
+    ({ "load_object 1", 0, (: load_object(__FILE__) == this_object() :) }),
+    ({ "load_object 2", 0, (: load_object("/" __FILE__) == this_object() :) }),
+    ({ "load_object 3", 0, (: load_object("./" __FILE__) == this_object() :) }),
+    ({ "load_object 4", 0, (: load_object("/./" __FILE__) == this_object() :) }),
+
     ({ "regmatch 1", 0, (: regmatch("abcd", "abc") == "abc" :) }),
     ({ "regmatch 2", 0, (: regmatch("abcd", "abcdef") == 0 :) }),
     ({ "regmatch 3", 0, (: regmatch("abcd", "^$") == 0 :) }),

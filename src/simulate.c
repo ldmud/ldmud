@@ -1620,26 +1620,19 @@ make_name_sane (const char *pName, Bool addSlash)
     to = buf;
 
     /* Skip leading '/' */
-    if (!addSlash)
-    {
-        while (*from == '/') {
-            bDiffers = MY_TRUE;
-            from++;
-        }
-    }
-    else
+    if (addSlash)
     {
         *to++ = '/';
-        if (*from != '/')
-            bDiffers = MY_TRUE;
-        else
-        {
+        if (*from == '/')
             from++;
-            while (*from == '/') {
-                bDiffers = MY_TRUE;
-                from++;
-            }
-        }
+        else
+            bDiffers = MY_TRUE;
+    }
+
+    while (*from == '/' || (from[0] == '.' && from[1] == '/'))
+    {
+        bDiffers = MY_TRUE;
+        from++;
     }
     /* addSlash or not: from now points to the first non-'/' */
 
@@ -1650,9 +1643,10 @@ make_name_sane (const char *pName, Bool addSlash)
         if ('/' == *from)
         {
             *to = '/';
-            while ('/' == *from) {
-                from++;
+            while (*from == '/' || (from[0] == '.' && from[1] == '/'))
+            {
                 bDiffers = MY_TRUE;
+                from++;
             }
 
             from--;
