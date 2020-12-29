@@ -266,8 +266,9 @@ struct svalue_s
 
 #define CLOSURE_IDENTIFIER      2  /* variable in this object */
 
-#define CLOSURE_PRELIMINARY     3
-    /* Efun closure used in a static initialization */
+    /* Code 3 was used for preliminary closures, that were efun closures
+     * used in static initialization of variables in LDMud 3.2 and before.
+     */
 
 #define CLOSURE_BOUND_LAMBDA    4  /* Bound unbound-lambda closure */
 #define CLOSURE_LAMBDA          5  /* normal lambda closure */
@@ -296,7 +297,7 @@ struct svalue_s
   /* TRUE if the closure is of the #'<lfun> type.
    */
 
-#define CLOSURE_REFERENCES_CODE(c) ((c) > CLOSURE_PRELIMINARY)
+#define CLOSURE_REFERENCES_CODE(c) ((c) >= CLOSURE_BOUND_LAMBDA)
   /* TRUE if the closure may have or reference code.
    */
 

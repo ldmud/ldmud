@@ -266,7 +266,6 @@ extern void clear_ref_in_callback (callback_t *cb);
 extern void count_ref_in_callback (callback_t *cb);
 #endif
 extern void init_driver_hooks(void);
-extern void set_svalue_user(svalue_t *svp, object_t *owner);
 extern void destruct_object(svalue_t *v);
 extern void destruct(object_t *ob);
 extern void deep_destruct (object_t *ob);

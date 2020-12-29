@@ -109,7 +109,6 @@ struct lambda_s
 extern long      find_function(const string_t *name, const program_t *prog);
 extern Bool      closure_eq (svalue_t * left, svalue_t * right);
 extern int       closure_cmp (svalue_t * left, svalue_t * right);
-extern void      set_closure_user(svalue_t *svp, object_t *owner);
 extern void      free_replace_program_protector (replace_ob_t *r_ob);
 extern int       replace_program_function_adjust(replace_ob_t *r_ob, int fun_idx);
 extern int       replace_program_variable_adjust(replace_ob_t *r_ob, int var_idx);

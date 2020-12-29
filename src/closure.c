@@ -39,25 +39,22 @@
  *   Reference to a lfun in an object.
  *   u.lambda points to the lambda structure with the detailed data.
  *
- * identifier closure:     type = CLOSURE_IDENTIFIER (1)
+ * identifier closure:     type = CLOSURE_IDENTIFIER (2)
  *   Reference to a variable in this object.
  *   u.lambda points to the lambda structure with the detailed data.
  *
- * preliminary closure:    type = CLOSURE_PRELIMINARY (2)
- *   TODO: ???
- *
- * bound lambda closure:   type = CLOSURE_BOUND_LAMBDA (3)
+ * bound lambda closure:   type = CLOSURE_BOUND_LAMBDA (4)
  *   This is an unbound lambda closure which was bound to an object.
  *   To allow binding the same unbound lambda to different objects
  *   at the same time, this construct uses a double indirection:
  *   u.lambda points to a lambda structure with the binding information,
  *   which then points to the actual unbound lambda structure.
  *
- * lambda closure:         type = CLOSURE_LAMBDA (4)
+ * lambda closure:         type = CLOSURE_LAMBDA (5)
  *   Lambda closure bound to an object at compilation time.
  *   u.lambda points to the lambda structure with the compiled function.
  *
- * unbound lambda closure: type = CLOSURE_UNBOUND_LAMBDA (5)
+ * unbound lambda closure: type = CLOSURE_UNBOUND_LAMBDA (6)
  *   Unbound lambda closure, which is not bound to any object at
  *   compile time.
  *   u.lambda points to the lambda structure with the compiled function.
@@ -676,94 +673,6 @@ lambda_ref_replace_program( object_t * curobj, lambda_t *l, int type
     /* No replacement found: return false */
     return MY_FALSE;
 } /* lambda_ref_replace_program() */
-
-/*-------------------------------------------------------------------------*/
-void
-set_closure_user (svalue_t *svp, object_t *owner)
-
-/* Set <owner> as the new user of the closure stored in <svp> if the closure
- * is an operator-, sefun- or efun-closure, or if the closure is under
- * construction ("preliminary"). Finished lambda closures can't be rebound.
- *
- * Sideeffect: for preliminary closures, the function also determines the
- * proper svp->x.closure_type and updates the closures .function.index.
- */
-
-{
-    int type;        /* Type of the closure */
-
-    if ( !CLOSURE_MALLOCED(type = svp->x.closure_type) )
-    {
-    	/* Operator-, sefun-, efun-closure: just rebind */
-
-        free_object(svp->u.ob, "set_closure_user");
-        svp->u.ob = ref_object(owner, "set_closure_user");
-    }
-    else if (type == CLOSURE_PRELIMINARY)
-    {
-    	/* lambda closure under construction: rebind, but take care
-    	 * of possible program replacement
-    	 */
-    	
-        int ix;
-        lambda_t *l;
-        funflag_t flags;
-        program_t *prog;
-
-        prog = owner->prog;
-        l = svp->u.lambda;
-        ix = l->function.lfun.index;
-
-        /* If the program is scheduled for replacement (or has been replaced),
-         * create the protector for the closure, otherwise mark the object
-         * as referenced by a lambda.
-         */
-        if ( !(prog->flags & P_REPLACE_ACTIVE)
-         || !lambda_ref_replace_program( owner, l
-                                       , ix >= CLOSURE_IDENTIFIER_OFFS
-                                         ? CLOSURE_IDENTIFIER
-                                         : CLOSURE_LFUN
-                                       , 0, NULL, NULL)
-           )
-        {
-            owner->flags |= O_LAMBDA_REFERENCED;
-        }
-
-        /* Set the svp->x.closure_type to the type of the closure. */
-
-        if (ix >= CLOSURE_IDENTIFIER_OFFS)
-        {
-            /* Identifier closure */
-            ix -= CLOSURE_IDENTIFIER_OFFS;
-            svp->x.closure_type = CLOSURE_IDENTIFIER;
-
-            /* Update the closure index */
-            l->function.var_index = (unsigned short)ix;
-        }
-        else
-        {
-            /* lfun closure. Be careful to handle cross-defined lfuns
-             * correctly.
-             */
-
-            flags = prog->functions[ix];
-            if (flags & NAME_CROSS_DEFINED)
-            {
-                ix += CROSSDEF_NAME_OFFSET(flags);
-            }
-            svp->x.closure_type = CLOSURE_LFUN;
-
-            /* Update the closure index */
-            l->function.lfun.ob = ref_object(owner, "closure");
-            l->function.lfun.index = (unsigned short)ix;
-            l->function.lfun.context_size = 0;
-        }
-
-        /* (Re)Bind the closure */
-        free_object(l->ob, "closure");
-        l->ob = ref_object(owner, "set_closure_user");
-    }
-} /* set_closure_user() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -4387,9 +4296,6 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
             result_flags = compile_sefun_call(type, block_size - 1, argp+1, opt_flags);
             break;
 
-        case CLOSURE_PRELIMINARY:
-            lambda_error("Unimplemented closure type for lambda()\n");
-
         case CLOSURE_UNBOUND_LAMBDA:
         case CLOSURE_BOUND_LAMBDA:
         case CLOSURE_LAMBDA:
@@ -5799,7 +5705,7 @@ free_closure (svalue_t *svp)
         }
     }
 
-    /* else CLOSURE_LFUN || CLOSURE_IDENTIFIER || CLOSURE_PRELIMINARY:
+    /* else CLOSURE_LFUN || CLOSURE_IDENTIFIER:
      * no further references held.
      */
     xfree(l);
@@ -6157,14 +6063,10 @@ closure_to_string (svalue_t * sp, Bool compact)
       }
 
     case CLOSURE_UNBOUND_LAMBDA: /* Unbound-Lambda Closure */
-    case CLOSURE_PRELIMINARY:    /* Preliminary Lambda Closure */
       {
         l = sp->u.lambda;
 
-        if (sp->x.closure_type == CLOSURE_PRELIMINARY)
-            sprintf(buf, compact ? "<pre %p>" : "<prelim lambda %p>", l);
-        else
-            sprintf(buf, compact ? "<free %p>" : "<free lambda %p>", l);
+        sprintf(buf, compact ? "<free %p>" : "<free lambda %p>", l);
         break;
       }
 
@@ -6323,7 +6225,6 @@ v_bind_lambda (svalue_t *sp, int num_arg)
     {
     case CLOSURE_LAMBDA:
     case CLOSURE_IDENTIFIER:
-    case CLOSURE_PRELIMINARY:
         /* Unbindable closures. Free the ob reference and
          * throw an error (unless <ob> has been omitted)
          */

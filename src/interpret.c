@@ -18361,13 +18361,6 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool external)
         return;
       }
 
-    case CLOSURE_PRELIMINARY:
-        /* no valid current_object: fall out of the switch
-         * and let the error handling clean up the control
-         * stack.
-         */
-        break;
-
     case CLOSURE_BOUND_LAMBDA:  /* --- bound lambda closure --- */
       {
         lambda_t *l2;

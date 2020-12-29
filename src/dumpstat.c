@@ -246,7 +246,7 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         {
             if (v->x.closure_type == CLOSURE_LFUN)
                 composite = SIZEOF_LAMBDA(v->u.lambda->function.lfun.context_size);
-            else /* CLOSURE_IDENTIFIER || CLOSURE_PRELIMINARY */
+            else /* CLOSURE_IDENTIFIER */
                 composite = sizeof *v->u.lambda;
 
             composite += sizeof(char *);

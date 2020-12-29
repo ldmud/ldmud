@@ -1430,33 +1430,6 @@ throw_error (svalue_t *v)
 } /* throw_error() */
 
 /*-------------------------------------------------------------------------*/
-void
-set_svalue_user (svalue_t *svp, object_t *owner)
-
-/* Set the owner of <svp> to object <owner>, if the svalue knows of
- * this concept. This may cause a recursive call to this function again.
- */
-
-{
-    switch(svp->type)
-    {
-    case T_POINTER:
-    case T_QUOTED_ARRAY:
-        set_vector_user(svp->u.vec, owner);
-        break;
-    case T_MAPPING:
-      {
-        set_mapping_user(svp->u.map, owner);
-        break;
-      }
-    case T_CLOSURE:
-      {
-        set_closure_user(svp, owner);
-      }
-    }
-} /* set_svalue_user() */
-
-/*-------------------------------------------------------------------------*/
 static void
 give_uid_error_handler (error_handler_t *arg)
 
@@ -2168,31 +2141,13 @@ load_object (const char *lname, Bool create_super, int depth
     push_ref_string(inter_sp, ob->name);
     if (give_uid_to_object(ob, H_LOAD_UIDS, 1))
     {
-        /* The object has an uid - now we can update the .user
-         * of its initializers.
-         */
-        svalue_t *svp;
-        int j;
         object_t *save_current;
 
         save_current = current_object;
-        current_object = ob; /* just in case */
-        svp = ob->variables;
-        for (j = ob->prog->num_variables;  --j >= 0; svp++)
-        {
-            if (svp->type == T_NUMBER)
-                continue;
-            set_svalue_user(svp, ob);
-        }
-
-        if (save_current == &dummy_current_object_for_loads)
+        if (current_object == &dummy_current_object_for_loads)
         {
             /* The master object is loaded with no current object */
             current_object = NULL;
-        }
-        else
-        {
-            current_object = save_current;
         }
 
         if (ob->flags & O_DESTRUCTED)
@@ -3968,9 +3923,7 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
     cb->is_lambda = MY_TRUE;
     transfer_svalue_no_free(&(cb->function.lambda), cl);
 
-    if (cb->function.lambda.x.closure_type == CLOSURE_UNBOUND_LAMBDA
-     || cb->function.lambda.x.closure_type == CLOSURE_PRELIMINARY
-       )
+    if (cb->function.lambda.x.closure_type == CLOSURE_UNBOUND_LAMBDA)
     {
         /* Uncalleable closure  */
         error_index = 0;

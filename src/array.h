@@ -97,7 +97,6 @@ extern svalue_t *v_filter_objects(svalue_t *sp, int num_arg);
 extern svalue_t *v_map_objects(svalue_t *sp, int num_arg);
 extern svalue_t *v_unique_array(svalue_t *sp, int num_arg);
 
-extern void set_vector_user(vector_t *p, object_t *owner);
 extern long total_array_size(void);
 
 #if defined(GC_SUPPORT)

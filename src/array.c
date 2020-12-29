@@ -326,29 +326,6 @@ free_empty_vector (vector_t *p)
 
 /*-------------------------------------------------------------------------*/
 void
-set_vector_user (vector_t *p, object_t *owner)
-
-/* Wizlist statistics: take vector <p> from its former owner and account it
- * under its new <owner>.
- */
-
-{
-    svalue_t *svp;
-    mp_int i;
-
-    i = (mp_int)VEC_SIZE(p);
-    if (p->user)
-        p->user->size_array -= i;
-    if ( NULL != (p->user = owner->user) )
-        p->user->size_array += i;
-    svp = p->item;
-    for (; --i >= 0; svp++) {
-        set_svalue_user(svp, owner);
-    }
-}
-
-/*-------------------------------------------------------------------------*/
-void
 check_for_destr (vector_t *v)
 
 /* Check the vector <v> for destructed objects and closures on destructed
