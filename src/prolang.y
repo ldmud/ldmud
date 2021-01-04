@@ -162,6 +162,10 @@ Bool variables_defined;
   /* TRUE: Variable definitions have been encountered.
    */
 
+bool disable_sefuns;
+  /* TRUE: Sefuns will be ignored.
+   */
+
 /*-------------------------------------------------------------------------*/
 /* Table which hook may be of which type.
  * It is here because make_func has to touch this file anyway, but
@@ -851,10 +855,6 @@ static struct function_call_info_s function_call_info[COMPILER_STACK_SIZE];
 
 /*-------------------------------------------------------------------------*/
 /* Other Variables */
-
-static Bool disable_sefuns;
-  /* TRUE: Sefuns will be ignored.
-   */
 
 static char *last_yalloced = NULL;
   /* Head of blocklist allocated with yalloc().

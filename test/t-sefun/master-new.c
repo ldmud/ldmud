@@ -22,5 +22,7 @@ string *epilog(int eflag)
 
 int is_old_master()
 {
-    return 1;
+    // Closure to simul-efun, shouldn't load.
+    closure cl = #'increment;
+    return 0;
 }

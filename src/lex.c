@@ -4585,7 +4585,7 @@ closure (char *in_yyp)
         efun_override = OVERRIDE_EFUN;
         super_name = NULL;
     }
-    else if (super_name != NULL && !strncmp(super_name, "sefun::", 7))
+    else if (super_name != NULL && !disable_sefuns && !strncmp(super_name, "sefun::", 7))
     {
         efun_override = OVERRIDE_SEFUN;
         super_name = NULL;
@@ -4694,7 +4694,7 @@ closure (char *in_yyp)
       || is_python_efun(p)
 #endif
         )
-     && master_ob
+     && master_ob && !disable_sefuns
      && (!EVALUATION_TOO_LONG())
        )
     {
@@ -4751,7 +4751,7 @@ closure (char *in_yyp)
         }
 
         /* simul-efun? */
-        if (efun_override != OVERRIDE_EFUN && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER)
+        if (efun_override != OVERRIDE_EFUN && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER && !disable_sefuns)
         {
             yylval.closure.number =
               p->u.global.sim_efun + CLOSURE_SIMUL_EFUN_OFFS;

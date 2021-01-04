@@ -45,8 +45,29 @@ void run_test()
                 return opt_args_sefun(1, 3) == 531;
             :)
         }),
+        ({ "Calling simul-efun closure with optional arguments", 0,
+            (:
+                return funcall(#'opt_args_sefun, 1, 3) == 531;
+            :)
+        }),
         ({ "Lambda: Calling simul-efun with optional arguments", 0,
             lambda(0, ({#'==, ({#'opt_args_sefun, 1, 3}), 531})),
+        }),
+        ({
+           "Loading master using simul-efun closure", 0,
+           (:
+               object ob = find_object("/master");
+               rename("/master.c", "/master-old.c");
+               copy_file("/master-new.c", "/master.c");
+
+               destruct(ob);
+
+               catch(master());
+               rm("/master.c");
+               rename("/master-old.c", "/master.c");
+
+               return find_object("/master").is_old_master();
+           :)
         }),
     }), #'shutdown);
 
