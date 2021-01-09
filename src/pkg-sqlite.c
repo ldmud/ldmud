@@ -697,10 +697,12 @@ sl_log (void* data UNUSED, int rc, const char* msg)
  */
 
 {
-    if (current_object)
-        debug_message("%s SQLite (%s): %s (rc=%d)\n", time_stamp(), get_txt(current_object->name), msg, rc);
-    else
+    if (!current_object)
         debug_message("%s SQLite: %s (rc=%d)\n", time_stamp(), msg, rc);
+    else if ((rc & 0xff) == SQLITE_WARNING)
+        warnf("SQLite: %s\n", msg);
+    else
+        debug_message("%s SQLite (%s): %s (rc=%d)\n", time_stamp(), get_txt(current_object->name), msg, rc);
 } /* sl_log() */
 
 /*-------------------------------------------------------------------------*/
