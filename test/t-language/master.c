@@ -73,6 +73,8 @@ void run_test()
 
 string *epilog(int eflag)
 {
+    set_driver_hook(H_INCLUDE_DIRS, ({"/sys/"}) );
+
     run_test();
     return 0;
 }

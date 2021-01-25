@@ -651,6 +651,7 @@ static char *get_memory_limit_buf(char **);
 static void lexerrorf VARPROT((char *, ...), printf, 1, 2);
 static void lexerror(char *);
 static ident_t *lookup_define(char *);
+static void skip_comment(void);
 
 /*-------------------------------------------------------------------------*/
 
@@ -2660,6 +2661,21 @@ lexerror (char *s)
 }
 
 /*-------------------------------------------------------------------------*/
+static void
+warn_trailing_chars (const char* stmt)
+
+/* Give a warning (or error when pedantic) about trailing characters
+ * in a preprocessor statement.
+ */
+
+{
+    if (pragma_pedantic)
+        yyerrorf("Unrecognized #%s (trailing characters)", stmt);
+    else
+        yywarnf("Unrecognized #%s (trailing characters)", stmt);
+} /* warn_trailing_chars() */
+
+/*-------------------------------------------------------------------------*/
 static Bool
 skip_to (char *token, char *atoken)
 
@@ -2723,6 +2739,23 @@ skip_to (char *token, char *atoken)
             {
                 if (len == strlen(token) && strncmp(q, token, len) == 0)
                 {
+                    char *end = skip_white(q+len);
+                    while (end + 1 < p)
+                    {
+                        if (end[0] == '/' && end[1] == '/')
+                            break;
+                        if (end[0] == '/' && end[1] == '*')
+                        {
+                            outp = end + 2;
+                            skip_comment();
+                            end = skip_white(outp);
+                            continue;
+                        }
+
+                        warn_trailing_chars(token);
+                        break;
+                    }
+
                     outp = p;
                     if (!*p)
                         _myfilbuf();
@@ -2733,6 +2766,23 @@ skip_to (char *token, char *atoken)
                 {
                     if (len == strlen(atoken) && strncmp(q, atoken, len) == 0)
                     {
+                        char *end = skip_white(q+len);
+                        while (end + 1 < p)
+                        {
+                            if (end[0] == '/' && end[1] == '/')
+                                break;
+                            if (end[0] == '/' && end[1] == '*')
+                            {
+                                outp = end + 2;
+                                skip_comment();
+                                end = skip_white(outp);
+                                continue;
+                            }
+
+                            warn_trailing_chars(atoken);
+                            break;
+                        }
+
                         outp = p;
                         if (!*p)
                             _myfilbuf();
@@ -3500,6 +3550,16 @@ handle_include (char *name)
             }
         } /* for (;;) */
     } /* if (delim == '"') */
+    else
+    {
+        /* Check that only whitespaces come after the <>. Comments
+         * have already been removed by handle_preprocessor_statement().
+         */
+        char *q = skip_white(p+1);
+
+        if (*q && *q != '\n')
+            warn_trailing_chars("include");
+    }
 
     /* p now points to the character after the parsed filename */
 
@@ -3638,11 +3698,11 @@ skip_pp_comment (char *p)
 
 /*-------------------------------------------------------------------------*/
 static void
-deltrail (char *sp)
+checktrail (char *sp, const char* stmt)
 
-/* Look for the first blank character in the text starting at <sp> and
- * set it to '\0'. The function is used to isolate the next word
- * in '#' statements.
+/* Check that only one word is contained in <sp>. Remove any whitespaces
+ * after it by setting the first whitespace to '\0'. If there are any
+ * non-whitespace characters give a warning or (when pedantic) error.
  */
 
 {
@@ -3653,9 +3713,13 @@ deltrail (char *sp)
     else
     {
         char *p = skip_nonspace(sp);
+        char *q = skip_white(p);
         *p = '\0';
+
+        if (*q && *q != '\n')
+            warn_trailing_chars(stmt);
     }
-} /* deltrail() */
+} /* checktrail() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -4990,23 +5054,18 @@ handle_preprocessor_statement (char * in_yyp)
     }
     else if (strncmp("ifdef", yytext, wlen) == 0)
     {
-        deltrail(sp);
+        checktrail(sp, "ifdef");
         handle_cond(lookup_define(sp) != 0);
     }
     else if (strncmp("ifndef", yytext, wlen) == 0)
     {
-        deltrail(sp);
+        checktrail(sp, "ifndef");
         handle_cond(lookup_define(sp) == 0);
     }
     else if (strncmp("else", yytext, wlen) == 0)
     {
         if (*sp != '\0')
-        {
-            if (pragma_pedantic)
-                yyerror("Unrecognized #else (trailing characters)");
-            else
-                yywarn("Unrecognized #else (trailing characters)");
-        }
+            warn_trailing_chars("else");
 
         if (iftop && iftop->state == EXPECT_ELSE)
         {
@@ -5039,12 +5098,7 @@ handle_preprocessor_statement (char * in_yyp)
     else if (strncmp("endif", yytext, wlen) == 0)
     {
         if (*sp != '\0')
-        {
-            if (pragma_pedantic)
-                yyerror("Unrecognized #endif (trailing characters)");
-            else
-                yywarn("Unrecognized #endif (trailing characters)");
-        }
+            warn_trailing_chars("endif");
 
         if (iftop
          && (   iftop->state == EXPECT_ENDIF
@@ -5065,7 +5119,7 @@ handle_preprocessor_statement (char * in_yyp)
         ident_t *p, **q;
         int h;
 
-        deltrail(sp);
+        checktrail(sp, "undef");
 
         /* Lookup identifier <sp> in the ident_table and
          * remove it there if it is a #define'd identifier.
@@ -5137,7 +5191,7 @@ handle_preprocessor_statement (char * in_yyp)
         char * end;
         long new_line;
 
-        deltrail(sp);
+        checktrail(sp, "line");
         new_line = strtol(sp, &end, 0);
         if (end == sp || *end != '\0')
             yyerror("Unrecognised #line directive");
