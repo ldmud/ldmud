@@ -15522,11 +15522,9 @@ lookup_inherited (const char *super_name, string_t *real_name
  * of the inherits. <real_name> must be shared string.
  */
 {
-    inherit_t *ip, *foundp;
+    inherit_t *ip;
     int num_inherits, super_length;
-    unsigned short found_ix;
 
-    found_ix = USHRT_MAX;
     *pIP = NULL;
     *pFlags = 0;
 
@@ -15568,13 +15566,21 @@ lookup_inherited (const char *super_name, string_t *real_name
      * from the back in order to get the topmost definition; however,
      * with virtual inherits the order gets messed up.
      */
-    ip = GET_BLOCK(A_INHERITS);
-    for ( foundp = NULL ; num_inherits > 0 ; ip++, num_inherits--)
+    for (ip = GET_BLOCK(A_INHERITS); num_inherits > 0 ; ip++, num_inherits--)
     {
+        inherit_t *foundp;
+        unsigned short found_ix;
         short i;
 
         if (ip->inherit_type & INHERIT_TYPE_MAPPED)
             /* this is an old inherit */
+            continue;
+
+        if (ip->inherit_depth > 1)
+            /* Only consider direct inherits, otherwise we would call
+             * hidden functions (i.e. function made private through the
+             * inherit hierarchy).
+             */
             continue;
 
         /* Test if super_name matches the end of the name of the inherit. */
@@ -15601,34 +15607,19 @@ lookup_inherited (const char *super_name, string_t *real_name
             continue;
 
         /* Found one */
-        if (foundp == NULL
-         || ip->inherit_depth < foundp->inherit_depth
-           )
+        foundp = ip;
+        found_ix = i;
+        if (adjust_virtually_inherited(&found_ix, &foundp))
         {
-            foundp = ip;
-            found_ix = i;
-
-            if (foundp->inherit_depth < 2) /* toplevel inherit */
-                break;
+            *pIP = foundp;
+            *pFlags = foundp->prog->functions[found_ix];
+            return found_ix;
         }
+        /* else search for another one. */
     } /* for (all inherits) */
 
-    if (foundp != NULL)
-    {
-        if (!adjust_virtually_inherited(&found_ix, &foundp))
-        {
-            *pIP = NULL;
-            *pFlags = 0;
-            return -1;
-        }
-
-        /* Found it! */
-        *pIP = foundp;
-        *pFlags = foundp->prog->functions[found_ix];
-
-    } /* if (foundp) */
-
-    return found_ix;
+    /* Not found. */
+    return USHRT_MAX;
 } /* lookup_inherited() */
 
 /*-------------------------------------------------------------------------*/

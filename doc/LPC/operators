@@ -201,7 +201,7 @@ DESCRIPTION
                         'ident' may be given as string containing the
                         full pathname, or as identifier containing the
                         pure basename.
-                        If 'ident' is omitted, the last inherited
+                        If 'ident' is omitted, the first inherited
                         function of this 'name' is called.
 
         ({ })                Array constructor.
