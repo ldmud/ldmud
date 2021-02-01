@@ -720,6 +720,23 @@ reg (Bool paren, int *flagp)
 } /* reg() */
 
 /*-------------------------------------------------------------------------*/
+static char*
+reg_nextchar (char* txt)
+
+/* Returns the pointer to the next character at <txt>.
+ * It is assumed that <txt> is not the end of the string.
+ */
+
+{
+    bool error = false;
+    size_t next = char_to_byte_index(txt, 4, 1, &error);
+    if (error || !next)
+        return txt+1;
+
+    return txt+next;
+} /* reg_nextchar() */
+
+/*-------------------------------------------------------------------------*/
 regexp *
 hs_regcomp (unsigned char *expr, Bool excompat
            , char ** errmsg, int * erridx)
@@ -966,7 +983,7 @@ hs_regexec (regexp *prog, char *string, char *start)
         {
             if (strncmp(s, (char *)(prog->regmust), prog->regmlen) == 0)
                 break;                /* Found it. */
-            s++;
+            s = reg_nextchar(s);
         }
         if (s == NULL)                /* Not present. */
             return RE_NOMATCH;
@@ -987,15 +1004,19 @@ hs_regexec (regexp *prog, char *string, char *start)
             rc = regtry(prog,s);
             if (rc != RE_NOMATCH)
                 return rc;
-            s++;
+            s = reg_nextchar(s);
         }
     else
         /* We don't -- general case. */
-        do {
+        while (true)
+        {
             rc = regtry(prog,s);
             if (rc != RE_NOMATCH)
                 return rc;
-        } while (*s++ != '\0');
+            if (*s == '\0')
+                break;
+            s = reg_nextchar(s);
+        }
 
     /* Failure. */
     return RE_NOMATCH;

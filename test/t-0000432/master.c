@@ -601,6 +601,26 @@ void run_test()
                 return regreplace("\u216c\u216e\u216f\u2164\u216e", "", "*", RE_PCRE | RE_GLOBAL) == "*\u216c*\u216e*\u216f*\u2164*\u216e*";
             :)
         }),
+        ({ "regexplode with builtin regexp and unicode strings 1", 0,
+            (:
+                return deep_eq(regexplode("\u216c\u216e\u216f\u2164\u216e", ".", RE_TRADITIONAL), ({"", "\u216c", "", "\u216e", "", "\u216f", "", "\u2164", "", "\u216e", ""}));
+            :)
+        }),
+        ({ "regexplode with builtin regexp and unicode strings 2", 0,
+            (:
+                return deep_eq(regexplode("a\u00e5", "[a\u00e4]+", RE_TRADITIONAL), ({"", "a", "\u00e5"}));
+            :)
+        }),
+        ({ "regexplode with builtin regexp and unicode strings 3", 0,
+            (:
+                return deep_eq(regexplode("Sch\u00f6ne \u00c4ra", "\\<", RE_TRADITIONAL), ({"", "", "Sch\u00f6ne ", "", "\u00c4ra"}));
+            :)
+        }),
+        ({ "regexplode with builtin regexp and unicode strings 4", 0,
+            (:
+                return deep_eq(regexplode("Sch\u00f6ne \u00c4ra", "\\>", RE_TRADITIONAL), ({"Sch\u00f6ne", "", " \u00c4ra", "", ""}));
+            :)
+        }),
         ({ "regexplode with builtin regexp and grapheme clusters", 0,
             (:
                 foreach(string cluster: ({
@@ -620,6 +640,21 @@ void run_test()
                 }
 
                 return 1;
+            :)
+        }),
+        ({ "regexplode with PCRE and unicode strings 1", 0,
+            (:
+                return deep_eq(regexplode("\u216c\u216e\u216f\u2164\u216e", ".", RE_PCRE), ({"", "\u216c", "", "\u216e", "", "\u216f", "", "\u2164", "", "\u216e", ""}));
+            :)
+        }),
+        ({ "regexplode with PCRE and unicode strings 2", 0,
+            (:
+                return deep_eq(regexplode("a\u00e5", "[a\u00e4]+", RE_PCRE), ({"", "a", "\u00e5"}));
+            :)
+        }),
+        ({ "regexplode with PCRE and unicode strings 3", 0,
+            (:
+                return deep_eq(regexplode("Sch\u00f6ne \u00c4ra", "\\b", RE_PCRE), ({"", "", "Sch\u00f6ne", "", " ", "", "\u00c4ra", "", ""}));
             :)
         }),
         ({ "sprintf with unicode string", 0,

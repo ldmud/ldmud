@@ -1241,9 +1241,20 @@ f_regexplode (svalue_t *sp)
         matchp = &match->next;
         num_match++;
         
-        if (start == mstrsize(text)
-         || (match->start == start && ++start == mstrsize(text)) )
+        if (start == mstrsize(text))
             break;
+        if (start == match->start)
+        {
+            /* Empty match, we have to skip the character. */
+            bool error = false;
+            size_t next = char_to_byte_index(get_txt(text) + start, mstrsize(text) - start, 1, &error);
+            if (error || !next)
+                break;
+
+            start += next;
+            if (start == mstrsize(text))
+                break;
+        }
     }
 
     if (rc < 0) /* Premature abort on error */
