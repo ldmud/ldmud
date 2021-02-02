@@ -2676,6 +2676,24 @@ warn_trailing_chars (const char* stmt)
 } /* warn_trailing_chars() */
 
 /*-------------------------------------------------------------------------*/
+static int
+wordcmp (const char* word, const char* against, size_t wordlen)
+
+/* Compares the word <wordlen> bytes of <word> against <against>.
+ * <against> is a null-terminated string and must be of size <wordlen>,
+ * otherwise the comparison fails.
+ * Returns 0 for a match and values smaller or greater than zero,
+ * if <word> is smaller or greater than <against>.
+ */
+
+{
+    int result = strncmp(word, against, wordlen);
+    if (result)
+        return result;
+    return wordlen - strlen(against);
+} /* wordcmp() */
+
+/*-------------------------------------------------------------------------*/
 static Bool
 skip_to (char *token, char *atoken)
 
@@ -2724,20 +2742,20 @@ skip_to (char *token, char *atoken)
 
             /* Evaluate the token at <q> */
 
-            if ((len == 2 && strncmp(q, "if", len) == 0)
-             || (len == 5 && strncmp(q, "ifdef", len) == 0)
-             || (len == 6 && strncmp(q, "ifndef", len) == 0))
+            if ((wordcmp(q, "if", len) == 0)
+             || (wordcmp(q, "ifdef", len) == 0)
+             || (wordcmp(q, "ifndef", len) == 0))
             {
                 nest++;
             }
             else if (nest > 0)
             {
-                if (len == 5 && strncmp(q, "endif", len) == 0)
+                if (wordcmp(q, "endif", len) == 0)
                     nest--;
             }
             else
             {
-                if (len == strlen(token) && strncmp(q, token, len) == 0)
+                if (wordcmp(q, token, len) == 0)
                 {
                     char *end = skip_white(q+len);
                     while (end + 1 < p)
@@ -2764,7 +2782,7 @@ skip_to (char *token, char *atoken)
                 }
                 else if (atoken)
                 {
-                    if (len == strlen(atoken) && strncmp(q, atoken, len) == 0)
+                    if (wordcmp(q, atoken, len) == 0)
                     {
                         char *end = skip_white(q+len);
                         while (end + 1 < p)
@@ -2789,7 +2807,7 @@ skip_to (char *token, char *atoken)
 
                         return MY_FALSE;
                     }
-                    else if (len == 4 && strncmp(q, "elif", len) == 0)
+                    else if (wordcmp(q, "elif", len) == 0)
                     {
                         /* Morph the 'elif' into '#if' and reparse it */
                         current_loc.line--;
@@ -3780,7 +3798,7 @@ handle_pragma (char *str)
             }
             validPragma = MY_TRUE; /* Since we already issued a warning */
         }
-        else if (strncmp(base, "strict_types", namelen) == 0)
+        else if (wordcmp(base, "strict_types", namelen) == 0)
         {
             pragma_strict_types = PRAGMA_STRICT_TYPES;
             instrs[F_CALL_OTHER].ret_type = lpctype_unknown;
@@ -3789,7 +3807,7 @@ handle_pragma (char *str)
             instrs[F_CALL_DIRECT_STRICT].ret_type = lpctype_unknown;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "strong_types", namelen) == 0)
+        else if (wordcmp(base, "strong_types", namelen) == 0)
         {
             pragma_strict_types = PRAGMA_STRONG_TYPES;
             instrs[F_CALL_OTHER].ret_type = lpctype_mixed;
@@ -3798,7 +3816,7 @@ handle_pragma (char *str)
             instrs[F_CALL_DIRECT_STRICT].ret_type = lpctype_mixed;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "weak_types", namelen) == 0)
+        else if (wordcmp(base, "weak_types", namelen) == 0)
         {
             pragma_strict_types = PRAGMA_WEAK_TYPES;
             instrs[F_CALL_OTHER].ret_type = lpctype_mixed;
@@ -3807,140 +3825,140 @@ handle_pragma (char *str)
             instrs[F_CALL_DIRECT_STRICT].ret_type = lpctype_mixed;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "save_types", namelen) == 0)
+        else if (wordcmp(base, "save_types", namelen) == 0)
         {
             pragma_save_types = MY_TRUE;
             validPragma = MY_TRUE;
         }
         // the following two pragmas are ignored.
-        else if (strncmp(base, "combine_strings", namelen) == 0)
+        else if (wordcmp(base, "combine_strings", namelen) == 0)
         {
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "no_combine_strings", namelen) == 0)
+        else if (wordcmp(base, "no_combine_strings", namelen) == 0)
         {
             validPragma = MY_TRUE;
         }
         // verbose_error is ignored, its behaviour is always enabled.
-        else if (strncmp(base, "verbose_errors", namelen) == 0)
+        else if (wordcmp(base, "verbose_errors", namelen) == 0)
         {
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "no_clone", namelen) == 0)
+        else if (wordcmp(base, "no_clone", namelen) == 0)
         {
             pragma_no_clone = MY_TRUE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "no_inherit", namelen) == 0)
+        else if (wordcmp(base, "no_inherit", namelen) == 0)
         {
             pragma_no_inherit = MY_TRUE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "no_shadow", namelen) == 0)
+        else if (wordcmp(base, "no_shadow", namelen) == 0)
         {
             pragma_no_shadow = MY_TRUE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "pedantic", namelen) == 0)
+        else if (wordcmp(base, "pedantic", namelen) == 0)
         {
             pragma_pedantic = MY_TRUE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "sloppy", namelen) == 0)
+        else if (wordcmp(base, "sloppy", namelen) == 0)
         {
             pragma_pedantic = MY_FALSE;
             validPragma = MY_TRUE;
         }
         // These two pragmas are ignored.
-        else if (strncmp(base, "no_local_scopes", namelen) == 0)
+        else if (wordcmp(base, "no_local_scopes", namelen) == 0)
         {
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "local_scopes", namelen) == 0)
+        else if (wordcmp(base, "local_scopes", namelen) == 0)
         {
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "warn_missing_return", namelen) == 0)
+        else if (wordcmp(base, "warn_missing_return", namelen) == 0)
         {
             pragma_warn_missing_return = MY_TRUE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "no_warn_missing_return", namelen) == 0)
+        else if (wordcmp(base, "no_warn_missing_return", namelen) == 0)
         {
             pragma_warn_missing_return = MY_FALSE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "warn_function_inconsistent", namelen) == 0)
+        else if (wordcmp(base, "warn_function_inconsistent", namelen) == 0)
         {
             pragma_check_overloads = MY_TRUE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "no_warn_function_inconsistent", namelen) == 0)
+        else if (wordcmp(base, "no_warn_function_inconsistent", namelen) == 0)
         {
             pragma_check_overloads = MY_FALSE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "warn_deprecated", namelen) == 0)
+        else if (wordcmp(base, "warn_deprecated", namelen) == 0)
         {
             pragma_warn_deprecated = MY_TRUE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "no_warn_deprecated", namelen) == 0)
+        else if (wordcmp(base, "no_warn_deprecated", namelen) == 0)
         {
             pragma_warn_deprecated = MY_FALSE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "range_check", namelen) == 0)
+        else if (wordcmp(base, "range_check", namelen) == 0)
         {
             pragma_range_check = MY_TRUE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "no_range_check", namelen) == 0)
+        else if (wordcmp(base, "no_range_check", namelen) == 0)
         {
             pragma_range_check = MY_FALSE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "warn_empty_casts", namelen) == 0)
+        else if (wordcmp(base, "warn_empty_casts", namelen) == 0)
         {
             pragma_warn_empty_casts = MY_TRUE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "no_warn_empty_casts", namelen) == 0)
+        else if (wordcmp(base, "no_warn_empty_casts", namelen) == 0)
         {
             pragma_warn_empty_casts = MY_FALSE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "rtt_checks", namelen) == 0)
+        else if (wordcmp(base, "rtt_checks", namelen) == 0)
         {
             pragma_rtt_checks = MY_TRUE;
             pragma_save_types = MY_TRUE;
             pragma_warn_rtt_checks = MY_FALSE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "warn_rtt_checks", namelen) == 0)
+        else if (wordcmp(base, "warn_rtt_checks", namelen) == 0)
         {
             pragma_rtt_checks = MY_TRUE;
             pragma_save_types = MY_TRUE;
             pragma_warn_rtt_checks = MY_TRUE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "no_rtt_checks", namelen) == 0)
+        else if (wordcmp(base, "no_rtt_checks", namelen) == 0)
         {
             pragma_rtt_checks = MY_FALSE;
             pragma_warn_rtt_checks = MY_FALSE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "warn_unused_variables", namelen) == 0)
+        else if (wordcmp(base, "warn_unused_variables", namelen) == 0)
         {
             pragma_warn_unused_variables = true;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "no_warn_unused_variables", namelen) == 0)
+        else if (wordcmp(base, "no_warn_unused_variables", namelen) == 0)
         {
             pragma_warn_unused_variables = false;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "share_variables", namelen) == 0)
+        else if (wordcmp(base, "share_variables", namelen) == 0)
         {
             if (variables_defined)
             {
@@ -3951,7 +3969,7 @@ handle_pragma (char *str)
                 pragma_share_variables = MY_TRUE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "init_variables", namelen) == 0)
+        else if (wordcmp(base, "init_variables", namelen) == 0)
         {
             if (variables_defined)
             {
@@ -3962,7 +3980,7 @@ handle_pragma (char *str)
                 pragma_share_variables = MY_FALSE;
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "no_bytes_type", namelen) == 0)
+        else if (wordcmp(base, "no_bytes_type", namelen) == 0)
         {
             if (!pragma_no_bytes_type)
             {
@@ -3983,7 +4001,7 @@ handle_pragma (char *str)
 
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "bytes_type", namelen) == 0)
+        else if (wordcmp(base, "bytes_type", namelen) == 0)
         {
             if (pragma_no_bytes_type)
             {
@@ -4021,12 +4039,12 @@ handle_pragma (char *str)
             validPragma = MY_TRUE;
         }
 #if defined( DEBUG ) && defined ( TRACE_CODE )
-        else if (strncmp(base, "set_code_window", namelen) == 0)
+        else if (wordcmp(base, "set_code_window", namelen) == 0)
         {
             set_code_window();
             validPragma = MY_TRUE;
         }
-        else if (strncmp(base, "show_code_window", namelen) == 0)
+        else if (wordcmp(base, "show_code_window", namelen) == 0)
         {
             show_code_window();
             validPragma = MY_TRUE;
@@ -5003,7 +5021,7 @@ handle_preprocessor_statement (char * in_yyp)
     }
 
     /* Evaluate the preprocessor statement */
-    if (strncmp("include", yytext, wlen) == 0)
+    if (wordcmp(yytext, "include", wlen) == 0)
     {
         /* Calling myfilbuf() before handle_include() is a waste
          * of time and memory. However, since the include
@@ -5023,14 +5041,14 @@ handle_preprocessor_statement (char * in_yyp)
        myfilbuf();
        current_loc.line--;
 
-    if (strncmp("define", yytext, wlen) == 0)
+    if (wordcmp(yytext, "define", wlen) == 0)
     {
         if (*sp == '\0')
             yyerror("Missing definition in #define");
         else
             handle_define(sp, quote);
     }
-    else if (strncmp("if", yytext, wlen) == 0)
+    else if (wordcmp(yytext, "if", wlen) == 0)
     {
         int cond;
         svalue_t sv;
@@ -5052,17 +5070,17 @@ handle_preprocessor_statement (char * in_yyp)
             handle_cond(cond);
         }
     }
-    else if (strncmp("ifdef", yytext, wlen) == 0)
+    else if (wordcmp(yytext, "ifdef", wlen) == 0)
     {
         checktrail(sp, "ifdef");
         handle_cond(lookup_define(sp) != 0);
     }
-    else if (strncmp("ifndef", yytext, wlen) == 0)
+    else if (wordcmp(yytext, "ifndef", wlen) == 0)
     {
         checktrail(sp, "ifndef");
         handle_cond(lookup_define(sp) == 0);
     }
-    else if (strncmp("else", yytext, wlen) == 0)
+    else if (wordcmp(yytext, "else", wlen) == 0)
     {
         if (*sp != '\0')
             warn_trailing_chars("else");
@@ -5080,7 +5098,7 @@ handle_preprocessor_statement (char * in_yyp)
             yyerror("Unexpected #else");
         }
     }
-    else if (strncmp("elif", yytext, wlen) == 0)
+    else if (wordcmp(yytext, "elif", wlen) == 0)
     {
         if (iftop && iftop->state == EXPECT_ELSE)
         {
@@ -5095,7 +5113,7 @@ handle_preprocessor_statement (char * in_yyp)
             yyerror("Unexpected #elif");
         }
     }
-    else if (strncmp("endif", yytext, wlen) == 0)
+    else if (wordcmp(yytext, "endif", wlen) == 0)
     {
         if (*sp != '\0')
             warn_trailing_chars("endif");
@@ -5114,7 +5132,7 @@ handle_preprocessor_statement (char * in_yyp)
             yyerror("Unexpected #endif");
         }
     }
-    else if (strncmp("undef", yytext, wlen) == 0)
+    else if (wordcmp(yytext, "undef", wlen) == 0)
     {
         ident_t *p, **q;
         int h;
@@ -5178,15 +5196,15 @@ handle_preprocessor_statement (char * in_yyp)
             }
         }
     }
-    else if (strncmp("echo", yytext, wlen) == 0)
+    else if (wordcmp(yytext, "echo", wlen) == 0)
     {
         fprintf(stderr, "%s %s\n", time_stamp(), sp);
     }
-    else if (strncmp("pragma", yytext, wlen) == 0)
+    else if (wordcmp(yytext, "pragma", wlen) == 0)
     {
         handle_pragma(sp);
     }
-    else if (strncmp("line", yytext, wlen) == 0)
+    else if (wordcmp(yytext, "line", wlen) == 0)
     {
         char * end;
         long new_line;
