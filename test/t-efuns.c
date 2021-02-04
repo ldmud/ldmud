@@ -373,6 +373,28 @@ mixed *tests = ({
     ({ "sscanf 3", 0, (: sscanf("A10", "A%!d") == 0 :) }),
     ({ "sscanf 4", 0, (: int x; return sscanf("A10", "A%d", x) == 1 && x == 10; :) }),
     ({ "sscanf 5", 0, (: int x; return sscanf("B10", "A%d", x) == 0 && x == 0; :) }),
+    ({ "sscanf 6", 0, (: int x; return sscanf("A-10", "A%d", x) == 1 && x == -10; :) }),
+    ({ "sscanf 7", 0, (: int x; return sscanf(to_string(__INT_MAX__), "%d", x) == 1 && x == __INT_MAX__; :) }),
+    ({ "sscanf 8", 0, (: int x; return sscanf(to_string(__INT_MIN__), "%d", x) == 1 && x == __INT_MIN__; :) }),
+    ({ "sscanf overflow 1", 0, (: int x; return sscanf(to_string(__INT_MIN__)-"-", "%d", x) == 0; :) }),
+    ({ "sscanf overflow 2", 0, (: int x;
+                                  string v = to_string(__INT_MIN__);
+                                  for (int i = sizeof(v)-1; i>=0; i--) /* Increment the value. */
+                                  {
+                                      if (!i)
+                                      {
+                                          v[0..0] = "-1";
+                                          break;
+                                      }
+                                      if (v[i] != '9')
+                                      {
+                                         v[i]++;
+                                         break;
+                                      }
+                                      v[i] = '0';
+                                  }
+                                  return sscanf(v, "%d", x) == 0;
+                               :) }),
 
     ({ "to_text 1", 0, (: deep_eq(to_array(to_text( ({}) )), ({}) ) :) }),
     ({ "to_text 2", 0, (: deep_eq(to_array(to_text( ({0, 65, 66, 67}) )), ({0, 65, 66, 67}) ) :) }),

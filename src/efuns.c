@@ -3624,6 +3624,30 @@ struct sscanf_info
 };
 
 /*-------------------------------------------------------------------------*/
+static INLINE mp_int
+sscanf_add_digit (mp_int num, char c, struct sscanf_info *info, bool *overflow)
+
+/* Add the digit <c> to the numer <num> and return the result.
+ * If there is a numeric overflow, set *<overflow> to true.
+ */
+
+{
+    c -= '0';
+    if (info->sign)
+    {
+        if (num < (PINT_MIN + c) / 10)
+            *overflow = true;
+        return num * 10 - c;
+    }
+    else
+    {
+        if (num > (PINT_MAX - c) / 10)
+            *overflow = true;
+        return num * 10 + c;
+    }
+} /* sscanf_add_digit() */
+
+/*-------------------------------------------------------------------------*/
 static void
 sscanf_decimal (char *str, struct sscanf_info *info)
 
@@ -3638,7 +3662,8 @@ sscanf_decimal (char *str, struct sscanf_info *info)
     static svalue_t tmp_svalue = { T_NUMBER };
 
     mp_int i, num;
-    char c;
+    char c, *strp = str;
+    bool overflow = false;
 
     num = 0;
 
@@ -3649,21 +3674,25 @@ sscanf_decimal (char *str, struct sscanf_info *info)
         info->field -= i;
         do
         {
-            if (!lexdigit(c = *str))
+            if (!lexdigit(c = *strp))
             {
                 if (info->fmt_end[-1] != 'd')
                 {
+                    /* Signal no match for this %D/%U,
+                     * so that a previous %s can retry.
+                     */
                     info->match_end = NULL;
                 }
                 else
                 {
+                    /* Stop the whole sscanf(). */
                     info->match_end = str;
                     info->fmt_end = "d"+1;
                 }
                 return;
             }
-            str++;
-            num = num * 10 + c - '0';
+            strp++;
+            num = sscanf_add_digit(num, c, info, &overflow);
         } while (--i);
     }
 
@@ -3671,13 +3700,26 @@ sscanf_decimal (char *str, struct sscanf_info *info)
     i = (mp_int)info->field;
     while  (--i >= 0)
     {
-        if (!lexdigit(c = *str))
+        if (!lexdigit(c = *strp))
             break;
-        str++;
-        num = num * 10 + c - '0';
+        strp++;
+        num = sscanf_add_digit(num, c, info, &overflow);
     }
 
-    info->match_end = str;
+    if (overflow)
+    {
+        debug_message("%s Numeric overflow: sscanf for %s%.*s\n",
+            time_stamp(), info->sign ? "-" : "", (int)(strp - str), str);
+
+        /* Stop matching.
+         * fmt_end needs to point to zero character after a format specifier.
+         */
+        info->match_end = str;
+        info->fmt_end = "d"+1;
+        return;
+    }
+
+    info->match_end = strp;
 
     if (info->flags.do_assign)
     {
@@ -3685,7 +3727,7 @@ sscanf_decimal (char *str, struct sscanf_info *info)
         if (info->arg_current >= info->arg_end)
             return;
 
-        tmp_svalue.u.number = (p_int)((num ^ info->sign) - info->sign);
+        tmp_svalue.u.number = num;
         transfer_svalue(info->arg_current++, &tmp_svalue);
     }
 

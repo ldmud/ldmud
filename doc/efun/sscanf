@@ -46,6 +46,9 @@ DESCRIPTION
         %D/%U will still not skip whitespace, use %.0t%D to skip optional
         whitespace.
 
+        If a number is matched that exceeds the numerical limits of
+        integers the match is deemed unsuccessful.
+
         The number of matched arguments will be returned.
 
         The function sscanf is special, in that arguments are passed

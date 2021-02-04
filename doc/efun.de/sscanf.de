@@ -48,6 +48,9 @@ BESCHREIBUNG
         fuer %s zu erzielen. Trotzdem ueberspringt %D/%U keine Whitespaces,
         dazu muss %.0t%D gesetzt werden.
 
+        Wenn eine Zahl erkannt wird, welche ausserhalb des Zahlenbereiches
+        von Integers ist, so wird dies nicht als Treffer betrachtet.
+
         Zurueck gegeben wird die Anzahl Treffer.
 
         Die Funktion sscanf() ist insofern ein Spezialfall, als dass
