@@ -9,9 +9,9 @@ DESCRIPTION
         Unassigned entry values default to 0, extraneous <data> arguments
         are ignored.
 
-        The difference between m_add() and the operator += is that the
-        latter creates a duplicate of the target mapping if it has
-        several references (see EXAMPLES).
+        The difference between m_add() and the operator += is that for
+        the latter you might need to create a temporary mapping that
+        contains the entries to add, which m_add() doesn't.
 
 EXAMPLES
         mapping m;

@@ -3,9 +3,17 @@ SYNOPSIS
 
 BESCHREIBUNG
         Fuegt einen neuen Eintrag mit Index <key> zum Mapping <map> hinzu
-        oder ersetzt diesen. Das veraenderte Mapping wird als Ergebnis
-        zurueck geliefert. Werte, die nicht zugeordnet werden koennen, werden
-        als 0 interpretiert, irrelevante Argumente werden ignoriert.
+        oder ersetzt diesen. Das veraenderte Mapping wird auch als Ergebnis
+        zurueckgeliefert.
+
+        Die zugehoerigen Werte fuer diesen Eintrag werden aus den weiteren
+        Parametern entnommen. Fehlende Parameter werden als 0 interpretiert,
+        ueberzaehlige Parameter werden ignoriert.
+
+        Der Unterschied zwischen m_add() und dem '+='-Operator besteht darin,
+        dass fuer letzterem gegebenenfalls erst ein temporaeres Mapping,
+        welches die hinzuzufuegenden Eintraege enthaelt, erstellt werden
+        muesste, wogegen m_add() ohne ein solches auskommt.
 
 BEISPIELE
         mapping m;
