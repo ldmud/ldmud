@@ -38,6 +38,14 @@ DESCRIPTION
         out the original version of the method. You can even apply other
         modifiers to it as the original.
 
+        These are the rules for overloading when using pragma strong_types:
+          - nomask and private functions cannot be overloaded.
+          - If the original function is varargs, so must the new method.
+          - The new method must have at least as many arguments as the
+            original method has non-optional arguments.
+          - The return types and types of common arguments must each be
+            compatible (i.e. there is a type that matches both)
+
         * Calling inherited methods
 
                 int method_that_also_exists_in_the_model() {

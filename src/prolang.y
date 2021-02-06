@@ -4454,11 +4454,19 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
                 // Then check the number of arguments and varargs flags and determine
                 // if we should check the argument types (later).
-                if (funp->num_arg > num_arg && !(funp->flags & TYPE_MOD_VARARGS))
-                    yyerrorf("Incorrect number of arguments in redefinition of '%s'", get_txt(p->name));
-                else if (funp->num_arg == num_arg
-                      && ((funp->flags ^ flags) & TYPE_MOD_XVARARGS)
-                      && !(funp->flags & TYPE_MOD_VARARGS))
+
+                // For a new declaration of a prototype we require the same arguments.
+                if (!(old_fflags & NAME_INHERITED)
+                 && ((funp->num_arg != num_arg)
+                  || ((old_fflags ^ new_fflags) & TYPE_MOD_XVARARGS)))
+                    yyerrorf("Incorrect number of arguments in redeclaration of '%s'", get_txt(p->name));
+                // For a redefinition of an inherited function the number of non-optional
+                // arguments of the original function must not exceed the number of all
+                // arguments of the new function.
+                else if ((old_fflags & NAME_INHERITED)
+                 && !(old_fflags & TYPE_MOD_VARARGS)  // No non-optional arguments?
+                 && !(new_fflags & TYPE_MOD_XVARARGS) // Arbitrary number of arguments?
+                 && (funp->num_arg - funp->num_opt_arg - ((old_fflags & TYPE_MOD_XVARARGS) ? 1 : 0)) > num_arg)
                     yyerrorf("Incorrect number of arguments in redefinition of '%s'", get_txt(p->name));
                 else
                 {
@@ -4530,20 +4538,29 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                     lpctype_t **argp;
                     int num_args = num_arg;
 
-                    /* Don't check newly added arguments */
-                    if (num_args > funp->num_arg)
-                        num_args = funp->num_arg;
-
                     first_arg = ARGUMENT_INDEX(num);
                     argp = GET_BLOCK(A_ARGUMENT_TYPES) + first_arg;
 
-                    if (old_fflags & TYPE_MOD_XVARARGS)
-                        num_args--; /* last argument is ok */
+                    if ((new_fflags & TYPE_MOD_XVARARGS) && (old_fflags & NAME_INHERITED))
+                        num_args--; /* Compare our varargs argument later. */
 
                     for (i = 0; i < num_args; i++ )
                     {
                         new_type = local_variables[i].type.t_type;
-                        old_type = argp[i];
+
+                        if ((old_fflags & TYPE_MOD_XVARARGS) && i >= funp->num_arg-1)
+                        {
+                            /* We are comparing against a varargs argument. */
+                            if (i == num_arg-1 && (new_fflags & TYPE_MOD_XVARARGS))
+                                old_type = ref_lpctype(argp[funp->num_arg-1]);
+                            else
+                                old_type = get_flattened_type(argp[funp->num_arg-1]);
+                        }
+                        else if (i >= funp->num_arg)
+                            break;
+                        else
+                            old_type = ref_lpctype(argp[i]);
+
                         if (new_type != old_type)
                         {
                             args_differ = MY_TRUE;
@@ -4568,9 +4585,46 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                                 yyerrorf("Inconsistent declaration of '%s': argument type mismatch in definition: arg %d %s"
                                          , get_txt(p->name), i+1, get_two_lpctypes(new_type, old_type));
                             }
-
                         }
+
+                        free_lpctype(old_type);
                     } /* for (all args) */
+
+                    if ((new_fflags & TYPE_MOD_XVARARGS) && (old_fflags & NAME_INHERITED))
+                    {
+                        /* Compare our varargs argument against the remainder
+                         * of the old function's arguments.
+                         */
+                        new_type = get_flattened_type(local_variables[num_arg-1].type.t_type);
+
+                        for (; i < funp->num_arg; i++)
+                        {
+                            old_type = argp[i];
+
+                            if ((old_fflags & TYPE_MOD_XVARARGS) && i == funp->num_arg-1)
+                            {
+                                /* Both are varargs. */
+                                free_lpctype(new_type);
+                                new_type = ref_lpctype(local_variables[num_arg-1].type.t_type);
+                            }
+
+                            if (new_type != old_type)
+                            {
+                                args_differ = MY_TRUE;
+                                if (!has_common_type(new_type, old_type))
+                                {
+                                    if (pragma_pedantic)
+                                        yyerrorf("Argument type mismatch in redefinition of '%s': arg %d %s"
+                                            , get_txt(p->name), i+1, get_two_lpctypes(new_type, old_type));
+                                    else if (pragma_check_overloads)
+                                        yywarnf("Argument type mismatch in redefinition of '%s': arg %d %s"
+                                            , get_txt(p->name), i+1, get_two_lpctypes(new_type, old_type));
+                                }
+                            }
+                        }
+
+                        free_lpctype(new_type);
+                    }
 
                 } /* if (compare_args) */
 
@@ -7689,7 +7743,6 @@ def:  type L_IDENTIFIER  /* Function definition or prototype */
                   offset = (fnum < DEFAULT_VALUES_POS_COUNT) ? DEFAULT_VALUES_POS(fnum) : -1;
                   if (offset < 0)
                   {
-                      yywarnf("Redefinition of '%s' loses default values", get_txt(funp->name));
                       funp->num_opt_arg = num_opt = 0;
                   }
               }
