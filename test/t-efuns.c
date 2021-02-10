@@ -225,6 +225,26 @@ mixed *tests = ({
     ({ "call_direct_resolved array 3",  0, (: int* result; return deep_eq(call_direct_resolved(&result, ({clone,clone,object_name(clone),this_object(),0}), "h", 10, ({ 20 })), ({0, 0, 0, 0, 0})) && deep_eq(result, ({  0,  0,  0,  0, 0})); :) }),
     ({ "crypt", TF_ERROR,  (: crypt("ABC", "$$") :) }),
     ({ "ctime", TF_DONTCHECKERROR,  (: ctime(-1) :) }), /* This must be the first ctime call of this test suite. */
+    ({ "get_type_info(int,0)", 0, (: get_type_info(10,              0) == T_NUMBER       :) }),
+    ({ "get_type_info(str,0)", 0, (: get_type_info("10",            0) == T_STRING       :) }),
+    ({ "get_type_info(str,1)", 0, (: get_type_info("10",            1) == 0              :) }), /* Shared string */
+    ({ "get_type_info(vec,0)", 0, (: get_type_info(({10}),          0) == T_POINTER      :) }),
+    ({ "get_type_info(obj,0)", 0, (: get_type_info(this_object(),   0) == T_OBJECT       :) }),
+    ({ "get_type_info(map,0)", 0, (: get_type_info(([10:2;3]),      0) == T_MAPPING      :) }),
+    ({ "get_type_info(map,1)", 0, (: get_type_info(([10:2;3]),      1) == 2              :) }), /* Mapping width */
+    ({ "get_type_info(fpn,0)", 0, (: get_type_info(10.0,            0) == T_FLOAT        :) }),
+    ({ "get_type_info(cls,0)", 0, (: get_type_info(#'f,             0) == T_CLOSURE      :) }),
+    ({ "get_type_info(cls,1)", 0, (: get_type_info(#'f,             1) == CLOSURE_LFUN   :) }), /* Closure type */
+    ({ "get_type_info(cls,2)", 0, (: get_type_info(#'f,             2) == this_object()  :) }), /* Lfun object */
+    ({ "get_type_info(cls,3)", 0, (: get_type_info(#'f,             3) == load_name()    :) }), /* Lfun program */
+    ({ "get_type_info(cls,4)", 0, (: get_type_info(#'f,             4) == "f"            :) }), /* Lfun name */
+    ({ "get_type_info(sym,0)", 0, (: get_type_info('''f,            0) == T_SYMBOL       :) }),
+    ({ "get_type_info(sym,1)", 0, (: get_type_info('''f,            1) == 3              :) }), /* Number of quotes */
+    ({ "get_type_info(qar,0)", 0, (: get_type_info('''({10}),       0) == T_QUOTED_ARRAY :) }),
+    ({ "get_type_info(qar,1)", 0, (: get_type_info('''({10}),       1) == 3              :) }), /* Number of quotes */
+    ({ "get_type_info(str,0)", 0, (: get_type_info((<test_struct>), 0) == T_STRUCT       :) }),
+    ({ "get_type_info(str,1)", 0, (: get_type_info((<test_struct>), 1) == "test_struct"  :) }), /* Struct name */
+    ({ "get_type_info(byt,0)", 0, (: get_type_info(b"10",           0) == T_BYTES        :) }),
     ({ "save_object 1", 0, (: stringp(save_object()) :) }), /* Bug #594 */
     ({ "strstr 01", 0, (: strstr("","") == 0 :) }), /* Bug #536 */
     ({ "strstr 02", 0, (: strstr("","", 1) == -1 :) }),

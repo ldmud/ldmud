@@ -7568,28 +7568,28 @@ v_get_type_info (svalue_t *sp, int num_arg)
  */
 
 {
-    mp_int i, j;
-    string_t *str; /* != NULL: to use instead of j */
+    mp_int primary, secondary;
+    string_t *str; /* != NULL: to use instead of secondary */
     svalue_t *argp;
     p_int flag = -1;
 
     argp = sp - num_arg + 1;
-    i = argp->type;
-    j = -1;
+    primary = argp->type;
+    secondary = -1;
     str = NULL;
 
     if (num_arg == 2 && sp->type == T_NUMBER)
         flag = sp->u.number;
 
     /* Determine the second return value */
-    switch(i)
+    switch(primary)
     {
     case T_STRING:
     case T_BYTES:
-        j = (mstr_tabled(sp[-1].u.str)) ? 0 : 1;
+        secondary = (mstr_tabled(sp[-1].u.str)) ? 0 : 1;
         break;
     case T_MAPPING:
-        j = argp->u.map->num_values;
+        secondary = argp->u.map->num_values;
         break;
     case T_CLOSURE:
         if (flag == 2)
@@ -7676,7 +7676,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
 
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
-        j = argp->x.generic;
+        secondary = argp->x.generic;
         break;
     case T_STRUCT:
         if (flag == 2)
@@ -7705,38 +7705,39 @@ v_get_type_info (svalue_t *sp, int num_arg)
     {
         free_svalue(sp--);
         free_svalue(sp);
-        if (flag == 2)
-        if (flag != 1) /* 0 or else */
-        {
-            if (flag) /* neither 0 nor 1 */
-            {
-                j = -1;
-            }
-            else
-            {
-                j = i;
-            }
-            if (str != NULL)
-            {
-                free_mstring(str); str = NULL;
-            }
-        }
 
-        if (str != NULL)
-            put_string(sp, str);
-        else
-            put_number(sp, j);
+        /* flag is 0, 1 or unsupported. */
+        switch (flag)
+        {
+            case 0:
+                put_number(sp, primary);
+                if (str)
+                    free_mstring(str);
+                break;
+
+            case 1:
+                if (str)
+                    put_string(sp, str);
+                else
+                    put_number(sp, secondary);
+                break;
+
+            default:
+                put_number(sp, -1);
+                if (str)
+                    free_mstring(str);
+        }
     }
     else
     {
         vector_t *v;
 
         v = allocate_array(2);
-        v->item[0].u.number = i;
+        v->item[0].u.number = primary;
         if (str != NULL)
             put_string(v->item+1, str);
         else
-            v->item[1].u.number = j;
+            v->item[1].u.number = secondary;
         if (num_arg == 2)
             free_svalue(sp--);
         free_svalue(sp);
