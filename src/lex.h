@@ -276,13 +276,14 @@ extern int  symbol_operator(const char *symbol, const char **endp);
 extern void symbol_efun_str(const char *str, size_t len, svalue_t *sp, efun_override_t is_efun, bool privileged);
 extern void symbol_efun(string_t *name, svalue_t *sp);
 extern void init_global_identifier (ident_t * ident, Bool bVariable);
-extern ident_t *lookfor_shared_identifier(const char *, size_t, int, int, Bool);
-#define make_shared_identifier(s,n,d) lookfor_shared_identifier(s,strlen(s),n,d, MY_TRUE)
-#define find_shared_identifier(s,n,d) lookfor_shared_identifier(s,strlen(s),n,d, MY_FALSE)
-#define make_shared_identifier_n(s,l,n,d) lookfor_shared_identifier(s,l,n,d, MY_TRUE)
-#define find_shared_identifier_n(s,l,n,d) lookfor_shared_identifier(s,l,n,d, MY_FALSE)
-#define make_shared_identifier_mstr(s,n,d) lookfor_shared_identifier(get_txt(s),mstrsize(s),n,d, MY_TRUE)
-#define find_shared_identifier_mstr(s,n,d) lookfor_shared_identifier(get_txt(s),mstrsize(s),n,d, MY_FALSE)
+extern ident_t *lookfor_shared_identifier(const char *s, size_t len, int n, int depth, bool bCreate, bool bExactDepth);
+#define make_shared_identifier(s,n,d) lookfor_shared_identifier(s,strlen(s),n,d, true, false)
+#define find_shared_identifier(s,n,d) lookfor_shared_identifier(s,strlen(s),n,d, false, false)
+#define make_shared_identifier_n(s,l,n,d) lookfor_shared_identifier(s,l,n,d, true, false)
+#define find_shared_identifier_n(s,l,n,d) lookfor_shared_identifier(s,l,n,d, false, false)
+#define make_shared_identifier_mstr(s,n,d) lookfor_shared_identifier(get_txt(s),mstrsize(s),n,d, true, false)
+#define find_shared_identifier_mstr(s,n,d) lookfor_shared_identifier(get_txt(s),mstrsize(s),n,d, false, false)
+#define insert_shared_identifier_mstr(s,n,d) lookfor_shared_identifier(get_txt(s),mstrsize(s),n,d, true, true)
 extern ident_t *make_global_identifier(char *, int);
 extern void free_shared_identifier(ident_t*);
 extern int yylex(void);

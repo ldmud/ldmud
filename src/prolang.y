@@ -3942,7 +3942,7 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n",
         {
             /* We're overlaying some other definition, but that's ok.
              */
-            ident = make_shared_identifier_mstr(ident->name, I_TYPE_LOCAL, depth);
+            ident = insert_shared_identifier_mstr(ident->name, I_TYPE_LOCAL, depth);
             assert (ident->type == I_TYPE_UNKNOWN);
         }
 

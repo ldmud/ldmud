@@ -1907,10 +1907,11 @@ init_global_identifier (ident_t * ident, Bool bVariable)
 
 /*-------------------------------------------------------------------------*/
 ident_t *
-lookfor_shared_identifier (const char *s, size_t len, int n, int depth, Bool bCreate)
+lookfor_shared_identifier (const char *s, size_t len, int n, int depth, bool bCreate, bool bExactDepth)
 
-/* Aliases: make_shared_identifier(): bCreate passed as MY_TRUE
- *          find_shared_identifier(): bCreate passed as MY_FALSE
+/* Aliases: make_shared_identifier():   bCreate passed as true, bExactDepth as false
+ *          find_shared_identifier():   bCreate and bExactDepth passed as false
+ *          insert_shared_identifier(): bCreate and bExactDepth passed true
  *
  * Find and/or add identifier <s> with size <len> of type <n> to the
  * ident_table, and return a pointer to the found/generated struct ident.
@@ -1922,18 +1923,20 @@ lookfor_shared_identifier (const char *s, size_t len, int n, int depth, Bool bCr
  * is an entry in the table for this very name, and with a type equal
  * or greater than <n>. If <n> is LOCAL and the found identifier is LOCAL
  * as well, the identifier is considered found if <depth> is equal or smaller
- * than the depth of the found identifier. The result is the pointer to the
- * found identifier, or NULL if not found.
+ * than the depth of the found identifier. If <bExactDepth> is true, then
+ * the depth must match exactly. The result is the pointer to the found
+ * identifier, or NULL if not found.
  *
  * If bCreate is TRUE, the identifier is created if not found. If an
  * identifier with the same name but a lower type exists in the table,
  * it is shifted down: a new entry for this name created and put into the
  * table, the original entry is referenced by the .inferior pointer in the
  * new entry. The same happens when a new LOCAL of greater depth is
- * added to an existing LOCAL of smaller depth.  New generated
- * entries have their type set to I_TYPE_UNKNOWN regardless of <n>.
- * The result is the pointer to the found/new entry, or NULL when out
- * of memory.
+ * added to an existing LOCAL of smaller depth. If bExactDepth is true,
+ * the depth must match exactly, otherwise an identifier will be inserted
+ * into the hierarchy. Newly generated entries have their type set to
+ * I_TYPE_UNKNOWN regardless of <n>. The result is the pointer to the
+ * found/new entry, or NULL when out of memory.
  */
 
 {
@@ -1996,6 +1999,40 @@ lookfor_shared_identifier (const char *s, size_t len, int n, int depth, Bool bCr
                 }
                 else
                     curr = NULL;
+            }
+
+            if (bExactDepth
+             && I_TYPE_LOCAL == curr->type && I_TYPE_LOCAL == n
+             && depth != curr->u.local.depth)
+            {
+                /* We have an identifier with a greater depth
+                 * than was requested. Look for an inferior identifier.
+                 */
+                do
+                {
+                    prev = curr;
+                    curr = curr->inferior;
+                }
+                while (curr->type == I_TYPE_LOCAL && curr->u.local.depth > depth);
+
+                if (curr->type != I_TYPE_LOCAL || curr->u.local.depth != depth)
+                {
+                    /* We haven't found the requested identifier. */
+                    if (bCreate)
+                    {
+                        curr = xalloc(sizeof *curr);
+                        if ( NULL != curr )
+                        {
+                            curr->name = ref_mstring(prev->name);
+                            curr->type = I_TYPE_UNKNOWN;
+                            curr->inferior = prev->inferior;
+                            curr->hash = h;
+                            prev->inferior = curr;
+                        }
+                    }
+                    else
+                        curr = NULL;
+                }
             }
 
             /* Return the found (or generated) entry */
