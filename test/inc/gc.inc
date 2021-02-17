@@ -2,13 +2,13 @@
 
 static void start_gc(closure callback)
 {
-    garbage_collection("/gc.log");
+    garbage_collection(__MASTER_OBJECT__ ".gc.log");
     call_out("check_gc", 1, 0, callback);
 }
 
 static void check_gc(int nr, closure callback)
 {
-    string s = read_file("/gc.log");
+    string s = read_file(__MASTER_OBJECT__ ".gc.log");
     int error = 1;
     
     if(!stringp(s))
@@ -37,6 +37,6 @@ static void check_gc(int nr, closure callback)
 	    msg("FAILURE: Found lost block during garbage collection.\n");
     }
     
-    rm("/gc.log");
+    rm(__MASTER_OBJECT__ ".gc.log");
     funcall(callback, error);
 }
