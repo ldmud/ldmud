@@ -16133,14 +16133,14 @@ copy_structs (program_t *from, funflag_t flags)
         funflag_t f;
 
         /* Combine the visibility flags. */
-        f = flags;
+        f = flags | pdef->flags;
         if (pdef->flags & TYPE_MOD_PUBLIC)
             f &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED);
-
-        f |= pdef->flags;
+        else if (pdef->flags & TYPE_MOD_PRIVATE)
+            f |= NAME_HIDDEN;
 
         if (f & (TYPE_MOD_PRIVATE | NAME_HIDDEN))
-            f = (f | NAME_HIDDEN) & ~(TYPE_MOD_PROTECTED | TYPE_MOD_PUBLIC);
+            f &= ~(TYPE_MOD_PROTECTED | TYPE_MOD_PUBLIC);
         else if (f & TYPE_MOD_PROTECTED)
             f &= ~(TYPE_MOD_PUBLIC);
 
