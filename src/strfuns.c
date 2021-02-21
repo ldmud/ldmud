@@ -686,7 +686,7 @@ unicode_to_utf8 (p_int code, char* buf)
         return 1;
     }
 
-    if (code > MAX_UNICODE_CHAR)
+    if (code < 0 || code > MAX_UNICODE_CHAR)
         return 0;
 
     /* At most 3 continuation bytes are allowed. */
@@ -766,7 +766,7 @@ utf8_to_unicode (const char* buf, size_t len, p_int *code)
     }
 
     return 0; /* NOTREACHED. */
-} /* unicode_to_utf8() */
+} /* utf8_to_unicode() */
 
 /*--------------------------------------------------------------------*/
 
@@ -2288,9 +2288,10 @@ x_filter_string (svalue_t *sp, int num_arg)
     mp_int    slen;   /* Argument string length */
     char     *src, *dest; /* String text work pointers */
 
-    char     *flags;  /* Flag array, one flag for each element of <str>
-                       * (in reverse order). */
-    mp_int    res;    /* Number of surviving elements */
+    char     *flags;  /* Flag array, one flag for each element of <str>. */
+    mp_int    res;    /* Final length in bytes. */
+    bool      utf8_out = false; /* Whether the result has non-ASCII chars. */
+    bool      utf8_in;          /* Whether the source has non-ASCII chars. */
 
     res = 0;
 
@@ -2301,6 +2302,7 @@ x_filter_string (svalue_t *sp, int num_arg)
 
     str = arg->u.str;
     slen = (mp_int)mstrsize(str);
+    utf8_in = str->info.unicode == STRING_UTF8;
 
     /* Every element in flags is associated by index number with an
      * element in the vector to filter. The filter function is evaluated
@@ -2313,6 +2315,7 @@ x_filter_string (svalue_t *sp, int num_arg)
     if (arg[1].type == T_MAPPING)
     {
         mp_int cnt;
+        size_t pos;
 
         /* --- Filter by mapping query --- */
         mapping_t *m;
@@ -2333,27 +2336,45 @@ x_filter_string (svalue_t *sp, int num_arg)
 
         m = arg[1].u.map;
         
-        for (src = get_txt(str), cnt = slen; --cnt >= 0; src++)
+        for (src = get_txt(str), cnt = 0, pos = 0; pos < slen; cnt++)
         {
-            svalue_t key;
+            svalue_t key = { T_NUMBER };
+            size_t chlen;
 
-            put_number(&key,  *src);
+            if (utf8_in)
+            {
+                chlen = utf8_to_unicode(src, slen - pos, &(key.u.number));
+                if (!chlen)
+                    errorf("Invalid character in string at index %zd.\n", pos);
+            }
+            else
+            {
+                chlen = 1;
+                key.u.number = *(unsigned char*)src;
+            }
+
+            pos += chlen;
+            src += chlen;
+
             if (get_map_value(m, &key) == &const0)
             {
                 flags[cnt] = 0;
                 continue;
             }
             flags[cnt] = 1;
-            res++;
+            res += chlen;
         }
 
-    } else {
+    }
+    else
+    {
 
         /* --- Filter by function call --- */
 
         int         error_index;
         callback_t *cb;
         mp_int cnt;
+        size_t pos;
 
         assign_eval_cost();
         inter_sp = sp;
@@ -2387,9 +2408,26 @@ x_filter_string (svalue_t *sp, int num_arg)
         /* Loop over all elements in p and call the filter.
          * w is the current element filtered.
          */
-        for (src = get_txt(str), cnt = slen; --cnt >= 0; src++)
+        for (src = get_txt(str), cnt = 0, pos = 0; pos < slen; cnt++)
         {
+            p_int num;
+            size_t chlen;
             svalue_t *v;
+
+            if (utf8_in)
+            {
+                chlen = utf8_to_unicode(src, slen - pos, &num);
+                if (!chlen)
+                    errorf("Invalid character in string at index %zd.\n", pos);
+            }
+            else
+            {
+                chlen = 1;
+                num = *(unsigned char*)src;
+            }
+
+            pos += chlen;
+            src += chlen;
 
             flags[cnt] = 0;
 
@@ -2405,19 +2443,19 @@ x_filter_string (svalue_t *sp, int num_arg)
                 errorf("object used by filter(array) destructed");
             }
 
-            push_number(inter_sp, *src);
+            push_number(inter_sp, num);
 
             v = apply_callback(cb, 1);
             if (!v || (v->type == T_NUMBER && !v->u.number) )
                 continue;
 
             flags[cnt] = 1;
-            res++;
+            res += chlen;
         }
     }
 
-    /* flags[] holds the filter results, res is the number of
-     * elements to keep. Now create the result vector.
+    /* flags[] holds the filter results, res is the resulting
+     * string length in bytes. Now create that string.
      */
     rc = alloc_mstring(res);
     if (!rc)
@@ -2426,16 +2464,32 @@ x_filter_string (svalue_t *sp, int num_arg)
             slen+1);
     }
   
-    for (src = get_txt(str), dest = get_txt(rc), flags = &flags[slen]
-       ; res > 0 ; src++)
+    for (src = get_txt(str), dest = get_txt(rc); res > 0; flags++)
     {
-        if (*--flags)
+        p_int num;
+        size_t chlen = 1;
+
+        if (utf8_in)
+            chlen = utf8_to_unicode(src, 4, &num);
+        else
+            num = *(unsigned char*)src;
+
+        if (*flags)
         {
-            *dest++ = *src;
-            res--;
+            memcpy(dest, src, chlen);
+            dest += chlen;
+            res -= chlen;
+
+            if (chlen > 1)
+                utf8_out = true;
         }
+        src += chlen;
     }
-  
+
+    rc->info.unicode = utf8_out ? STRING_UTF8 : (str->info.unicode == STRING_BYTES) ? STRING_BYTES : STRING_ASCII;
+
+    assert(dest == get_txt(rc) + mstrsize(rc));
+
     /* Cleanup. Arguments for the closure have already been removed. On the
      * stack are now the string, the mapping or callback structure and the
      * error handler. (Not using pop_n_elems() for 2 elements for saving loop 
@@ -2478,15 +2532,31 @@ x_map_string (svalue_t *sp, int num_arg)
     string_t *res;
     string_t *str;
     svalue_t *arg;
-    mp_int    len;
-    char     *src, *dest;
+    mp_int    len;              /* Length of source string in characters. */
+    mp_int    reslen;           /* Length of the result string in bytes. */
+    bool      utf8_out = false; /* Whether the result has non-ASCII chars. */
+    bool      utf8_in;          /* Whether the source has non-ASCII chars. */
+    bool      bytes_in;         /* Whether the source is a byte sequence. */
+    char     *src, *srcend, *dest;
 
     inter_sp = sp;
 
     arg = sp - num_arg + 1;
 
     str = arg->u.str;
+    src = get_txt(str);
     len = mstrsize(str);
+    srcend = src + len;
+    utf8_in = str->info.unicode == STRING_UTF8;
+    bytes_in = str->info.unicode == STRING_BYTES;
+
+    if (utf8_in)
+    {
+        bool error = false;
+        len = byte_to_char_index(get_txt(str), len, &error);
+        if (error)
+            errorf("Invalid character in string at index %" PRIdMPINT ".\n", len);
+    }
 
     if (arg[1].type == T_MAPPING)
     {
@@ -2500,21 +2570,42 @@ x_map_string (svalue_t *sp, int num_arg)
         if (num_arg > 2)
             column = arg[2].u.number;
 
-        res = alloc_mstring(len);
+        res = alloc_mstring(bytes_in ? len : (4 * len));
         if (!res)
             errorf("(map_string) Out of memory: string[%"PRIdMPINT
                    "] for result\n", len);
-      
+
         push_string(inter_sp, res); /* In case of errors */
 
-        for (src = get_txt(str), dest = get_txt(res); --len >= 0; src++, dest++)
+        reslen = 0;
+        for (dest = get_txt(res); len > 0; len--)
         {
-            svalue_t key, *v;
+            svalue_t key = { T_NUMBER };
+            size_t chlen;
+            svalue_t *v;
 
-            put_number(&key, *src);
+            if (utf8_in)
+            {
+                chlen = utf8_to_unicode(src, srcend - src, &(key.u.number));
+                if (!chlen)
+                    errorf("Invalid character in string at index %zd.\n", src - get_txt(str));
+            }
+            else
+            {
+                key.u.number = *(unsigned char*)src;
+                chlen = 1;
+            }
+
             v = get_map_value(m, &key);
             if (v == &const0)
-                *dest = *src;
+            {
+                memcpy(dest, src, chlen);
+                dest += chlen;
+                reslen += chlen;
+
+                if (chlen > 1)
+                    utf8_out = true;
+            }
             else
             {
                 if (v[column].type != T_NUMBER)
@@ -2523,9 +2614,31 @@ x_map_string (svalue_t *sp, int num_arg)
                          , typename(v[column].type)
                          );
                 }
-                *dest = (v[column].u.number & 0xFF);
+
+                if (bytes_in)
+                {
+                    *dest = v[column].u.number;
+                    dest++;
+                    reslen++;
+                }
+                else
+                {
+                    size_t newchlen = unicode_to_utf8(v[column].u.number, dest);
+                    if (!newchlen)
+                        errorf("Invalid resulting character: %"PRIdPINT"\n", v[column].u.number);
+                    dest += newchlen;
+                    reslen += newchlen;
+
+                    if (newchlen > 1)
+                        utf8_out = true;
+                }
             }
+
+            src += chlen;
         }
+
+        assert(src == srcend);
+        assert(dest <= get_txt(res) + mstrsize(res));
 
         if (num_arg > 2)
             free_svalue(arg+2);
@@ -2550,24 +2663,42 @@ x_map_string (svalue_t *sp, int num_arg)
         put_callback(sp, cb);
         num_arg = 2;
 
-        res = alloc_mstring(len);
+        res = alloc_mstring(bytes_in ? len : (4 * len));
         if (!res)
             errorf("(map_string) Out of memory: string[%"PRIdMPINT
                    "] for result\n", len);
         
         push_string(inter_sp, res); /* In case of errors */
 
-        for (src = get_txt(str), dest = get_txt(res); --len >= 0; src++, dest++)
+        reslen = 0;
+        for (dest = get_txt(res); len > 0; len--)
         {
+            p_int num;
+            size_t chlen;
             svalue_t *v;
 
+            if (utf8_in)
+            {
+                chlen = utf8_to_unicode(src, srcend - src, &num);
+                if (!chlen)
+                    errorf("Invalid character in string at index %zd.\n", src - get_txt(str));
+            }
+            else
+            {
+                num = *(unsigned char*)src;
+                chlen = 1;
+            }
+
             if (current_object->flags & O_DESTRUCTED)
+            {
+                src += chlen;
                 continue;
+            }
 
             if (!callback_object(cb))
                 errorf("object used by map(string) destructed");
 
-            push_number(inter_sp, *src);
+            push_number(inter_sp, num);
 
             v = apply_callback(cb, 1);
 
@@ -2579,18 +2710,50 @@ x_map_string (svalue_t *sp, int num_arg)
                          , typename(v->type)
                          );
                 }
-                *dest = (v->u.number & 0xFF);
+
+                if (bytes_in)
+                {
+                    *dest = v->u.number;
+                    dest++;
+                    reslen++;
+                }
+                else
+                {
+                    size_t newchlen = unicode_to_utf8(v->u.number, dest);
+                    if (!newchlen)
+                        errorf("Invalid resulting character: %"PRIdPINT"\n", v->u.number);
+                    dest += newchlen;
+                    reslen += newchlen;
+
+                    if (newchlen > 1)
+                        utf8_out = true;
+                }
             }
+            else
+            {
+                memcpy(dest, src, chlen);
+                dest += chlen;
+                reslen += chlen;
+
+                if (chlen > 1)
+                    utf8_out = true;
+            }
+
+            src += chlen;
         }
+
+        assert(src == srcend);
+        assert(dest <= get_txt(res) + mstrsize(res));
 
         free_svalue(sp); /* The callback structure. */
     }
 
     /* The arguments have been removed already, now just replace
-     * the arr on the stack with the result.
+     * the string on the stack with the result.
      */
     free_mstring(str);
-    arg->u.str = res; /* Keep svalue type: T_POINTER */
+    res->info.unicode = utf8_out ? STRING_UTF8 : bytes_in ? STRING_BYTES : STRING_ASCII;
+    arg->u.str = resize_mstring(res, reslen); /* Keep svalue type: T_STRING/T_BYTES */
 
     return arg;
 } /* x_map_string () */

@@ -7515,7 +7515,7 @@ v_filter (svalue_t *sp, int num_arg)
 {
     if (sp[-num_arg+1].type == T_MAPPING)
         return x_filter_mapping(sp, num_arg, MY_TRUE);
-    else if (sp[-num_arg+1].type == T_STRING)
+    else if (sp[-num_arg+1].type == T_STRING || sp[-num_arg+1].type == T_BYTES)
         return x_filter_string(sp, num_arg);
     else
         return x_filter_array(sp, num_arg);
@@ -7807,7 +7807,7 @@ v_map (svalue_t *sp, int num_arg)
 
     if (arg[0].type == T_MAPPING)
         return x_map_mapping(sp, num_arg, MY_TRUE);
-    else if (arg[0].type == T_STRING)
+    else if (arg[0].type == T_STRING || arg[0].type == T_BYTES)
         return x_map_string(sp, num_arg);
     else if (arg[0].type == T_STRUCT)
         return x_map_struct(sp, num_arg);

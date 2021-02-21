@@ -488,6 +488,75 @@ void run_test()
                         to_bytes("\u2745\u2744","UTF-8");
             :)
         }),
+        ({ "map widening characters 1", 0,
+            (:
+                string str = map("LDMud", #'+, 0xfee0);
+                return sizeof(str) == 5 && str == "\uff2c\uff24\uff2d\uff55\uff44";
+            :)
+        }),
+        ({ "map widening characters 2", 0,
+            (:
+                string str = map("HL", (['H': 0x210c, 'L': 0x2112]));
+                return sizeof(str) == 2 && str == "\u210c\u2112";
+            :)
+        }),
+        ({ "map narrowing characters 1", 0,
+            (:
+                string str = map("\uff2c\uff24\uff2d\uff55\uff44", #'-, 0xfee0);
+                return sizeof(str) == 5 && str == "LDMud";
+            :)
+        }),
+        ({ "map narrowing characters 2", 0,
+            (:
+                string str = map("\u210c\u2112", ([ 0x210c: 'H', 0x2112: 'L']));
+                return sizeof(str) == 2 && str == "HL";
+            :)
+        }),
+        ({ "map with bytes 1", 0,
+            (:
+                bytes str = map(b"LDMud", #'+, 128);
+                return sizeof(str) == 5 && str == b"\xcc\xc4\xcd\xf5\xe4";
+            :)
+        }),
+        ({ "map with bytes 2", 0,
+            (:
+                bytes str = map(b"\xcc\xc4\xcd\xf5\xe4", #'-, 128);
+                return sizeof(str) == 5 && str == b"LDMud";
+            :)
+        }),
+        ({ "map with bytes 3", 0,
+            (:
+                bytes str = map(b"\x20\x40\x60\x80\xa0\xc0\xe0",
+                                ([ 0x20: 0xf0, 0x40: 0xd0, 0x60: 0xb0, 0x80: 0x90, 0xa0: 0x70, 0xc0: 0x50, 0xe0: 0x30 ]));
+                return str == b"\xf0\xd0\xb0\x90\x70\x50\x30";
+            :)
+        }),
+        ({ "filter with unicode strings 1", 0,
+            (:
+                return filter("\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439, LDMud!", function int(int ch)
+                {
+                    return ch >= 0x400 && ch < 0x500;
+                }) == "\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439";
+            :)
+        }),
+        ({ "filter with unicode strings 2", 0,
+            (:
+                return filter("123 \u2460\u2461\u2462", ([ '1', 0x2461 ])) == "1\u2461";
+            :)
+        }),
+        ({ "filter with bytes 1", 0,
+            (:
+                return filter(b"-> \xcc\xc4\xcd\xf5\xe4 <-", function int(int ch)
+                {
+                    return ch < 128;
+                }) == b"->  <-";
+            :)
+        }),
+        ({ "filter with bytes 2", 0,
+            (:
+                return filter(b"\x20\x40\x60\x80\xa0\xc0\xe0", ([ 0x20, 0x60, 0xa0, 0xe0 ])) == b"\x20\x60\xa0\xe0";
+            :)
+        }),
         ({ "member with unicode strings 1", 0,
             (:
                 return member("\u2160\u2161\u2162\u2163\u2164\u2165\u2166\u2167\u2168\u2169\u216a\u216b", 8548) == 4;

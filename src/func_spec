@@ -413,10 +413,10 @@ mixed  *sort_array(mixed *|mixed *&, string|closure, ...);
 mixed  *transpose_array(mixed *);
 mixed  *unique_array(mixed *, string|closure, ...);
 
-mixed   filter(mapping|mixed *|string, string|closure|mapping, ...);
+mixed   filter(mapping|mixed *|string|bytes, string|closure|mapping, ...);
 mapping filter_indices(mapping, string|closure,  ...);
 
-mixed   map(mixed *|mapping|struct|string, mapping|string|closure, ...);
+mixed   map(mixed *|mapping|struct|string|bytes, mapping|string|closure, ...);
 mapping map_indices(mapping, string|closure, ...);
 
 mapping m_allocate(int, int default: F_CONST1);
