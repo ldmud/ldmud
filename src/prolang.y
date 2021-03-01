@@ -16473,7 +16473,7 @@ update_duplicate_functions (program_t* from, int first_function_index, inherit_t
 
 /*-------------------------------------------------------------------------*/
 static bool
-update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newinheritp, int num_old_variables, int num_new_variables, int first_function_index, int first_variable_index, bool update_existing, funflag_t varmodifier)
+update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newinheritp, int num_old_variables, int num_new_variables, int first_function_index, int first_variable_index, bool update_existing, funflag_t varmodifier, int num_existing_inherits)
 
 /* Patch the inherited old program in <oldinheritp> to the new program in
  * <newinheritp>. We may either have already inherited the new program
@@ -16486,6 +16486,8 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
  * <first_variable_index> denotes the index of the first variable
  * of <oldinheritp> (when <update_existing> == false) resp.
  * <newinheritp> (<update_existing> == true) in <from>.
+ * <num_existing_inherits> denotes the number of inherits in our current
+ * program without <from>'s inherit.
  *
  * These steps need to be done in these cases:
  * 1. Create a table that maps each variable from the old
@@ -16848,7 +16850,10 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
          * duplicate inherit entry of the old program.
          * But now we can use the update map for that.
          */
-        inherit_t* last_inherit = &INHERIT(INHERIT_COUNT);
+        inherit_t* last_inherit = &INHERIT(num_existing_inherits);
+        /* We ignore any inherits from the inherited program,
+         * they already are updated.
+         */
 
         for (inherit_t* dupinheritp = oldinheritp + 1; dupinheritp < last_inherit; dupinheritp++)
         {
@@ -16966,7 +16971,7 @@ copy_updated_inherit (inherit_t *oldinheritp, inherit_t *newinheritp, program_t 
 
 /*-------------------------------------------------------------------------*/
 static bool
-inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_function_index, int first_variable_index, int last_variable_index, funflag_t varmodifier)
+inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_function_index, int first_variable_index, int last_variable_index, funflag_t varmodifier, int num_existing_inherits)
 
 /* Copy the virtual variables from <from> into our program.
  * <newinheritp> is the inherit structure that is going to be inserted into
@@ -16976,6 +16981,8 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
  * <first_variable_index> and <last_variable_index> are indices into <from>'s
  * variable corresponding to this virtual inherit (last_variable_index really
  * points one variable behind the last inherit's variable).
+ * <num_existing_inherits> denotes the number of inherits in our current
+ * program without <from>'s inherit.
  *
  * Returns true on success, false otherwise (out of memory).
  */
@@ -17030,7 +17037,7 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
 
     /* Then we search for a program with the same name (also virtually inherited). */
     inheritdup = first_inherit;
-    for (int i = INHERIT_COUNT; !found && --i >= 0; inheritdup++)
+    for (int i = num_existing_inherits; !found && --i >= 0; inheritdup++)
     {
         /* Non-Virtual? */
         if(inheritdup->variable_index_offset & NON_VIRTUAL_OFFSET_TAG)
@@ -17070,6 +17077,7 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
                                   , first_variable_index
                                   , false
                                   , varmodifier
+                                  , num_existing_inherits
                                   );
 
             found = true;
@@ -17088,6 +17096,7 @@ inherit_virtual_variables (inherit_t *newinheritp, program_t *from, int first_fu
                                   , first_variable_index
                                   , true
                                   , varmodifier
+                                  , num_existing_inherits
                                   );
 
             /* Remember this, in case we meet some duplicates. */
@@ -17235,6 +17244,9 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
                                                 * <from> remember the index
                                                 * in the current program.
                                                 */
+    int first_inh_index = INHERIT_COUNT;       /* Index of the first inherited
+                                                * program.
+                                                */
 
    /*                                *
     *   Preparations for functions   *
@@ -17356,6 +17368,9 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
             if (!(inheritp->inherit_type & INHERIT_TYPE_DUPLICATE))
                 inherit_obsoleted_variables(&newinherit, from, last_bound_variable, varmodifier);
             newinherit.inherit_type |= INHERIT_TYPE_MAPPED;
+            /* The corresponding updated_inherit entry will
+             * be corrected in the loop below.
+             */
 
             if (!(inheritp->inherit_type & INHERIT_TYPE_DUPLICATE))
                 last_bound_variable = inheritp->variable_index_offset + inheritp->num_additional_variables;
@@ -17366,7 +17381,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
 
             inherit_virtual_variables(&newinherit, from,
                 newinherit.function_index_offset - first_func_index,
-                inheritp->variable_index_offset, next_bound_variable, varmodifier);
+                inheritp->variable_index_offset, next_bound_variable, varmodifier, first_inh_index);
 
             if (!(inheritp->inherit_type & INHERIT_TYPE_DUPLICATE))
                 last_bound_variable = next_bound_variable;
@@ -17458,7 +17473,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
         frominherit.variable_index_offset = V_VARIABLE_COUNT;
 
         inherit_virtual_variables(&frominherit, from, 0, last_bound_variable,
-            from->num_variables, varmodifier);
+            from->num_variables, varmodifier, first_inh_index);
     }
     else
     {

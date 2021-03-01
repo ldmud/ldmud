@@ -39,7 +39,7 @@ void run_test()
         load_object("b");
         destruct(find_object("a"));
 
-        for(int i=1; i <= 11; i++)
+        for(int i=1; i <= 13; i++)
         {
             string testname = sprintf("%d%c", testnum + 1, 'a' + i - 1);
             object d;
