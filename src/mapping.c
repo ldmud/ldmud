@@ -1647,7 +1647,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
         /* Plug the new hash into the new mapping */
         m2->hash = hm2;
         LOG_ALLOC("copy_mapping - hash", SIZEOF_MH(hm2), sizeof *hm - sizeof *mcp + sizeof *mcp * size);
-        m->user->mapping_total += SIZEOF_MH(hm2);
+        m2->user->mapping_total += SIZEOF_MH(hm2);
         check_total_mapping_size();
         if (m->cond)
             num_dirty_mappings++;
