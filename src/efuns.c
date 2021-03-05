@@ -251,7 +251,11 @@ f_crypt(svalue_t *sp)
         errorf("Bad argument 2 to crypt(): string too short.\n");
 
     res = crypt(get_txt((sp-1)->u.str), salt);
-    if (!res)
+    /* According to POSIX crypt shall return NULL upon error,
+     * but there are some strange implementations out there
+     * returning a string starting with '*' instead.
+     */
+    if (!res || *res == '*')
     {
         if (errno == EINVAL && sp->type == T_STRING)
             errorf("Bad argument 2 to crypt(): Invalid salt.\n");
