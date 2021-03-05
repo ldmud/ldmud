@@ -1781,7 +1781,13 @@ fi
 
 # --- PYTHON ---
 
-AC_MY_SEARCH_LIB(PYTHON,python3,lp_cv_has_python3,python3,python_path,
+# Newer versions use python3-embed instead of python3 in pkg-config.
+python3_pkg_name=python3
+ifdef([PKG_CHECK_MODULES],[
+    PKG_CHECK_MODULES([PYTHON_EMBED],[python3-embed],python3_pkg_name=python3-embed,python3_pkg_name=python3)
+])
+
+AC_MY_SEARCH_LIB(PYTHON,"$python3_pkg_name",lp_cv_has_python3,python3,python_path,
 [
     #include <Python.h>
 
