@@ -151,6 +151,12 @@ string_t *last_ctime_result = NULL;
   /* points to the result of the last f_ctime() call. If the caller asks for 
    * the same timestamp, it will be returned. */
 
+static char* sscanf_format_str_end;
+  /* This will point to the zero byte (string end) after a harmless
+   * type specifier ('d'). The sscanf() routines use that to abort
+   * parsing the format string.
+   */
+
 /* Forward declarations */
 static void copy_svalue (svalue_t *dest, svalue_t *, struct pointer_table *, int);
 
@@ -3687,7 +3693,7 @@ sscanf_decimal (char *str, struct sscanf_info *info)
                 {
                     /* Stop the whole sscanf(). */
                     info->match_end = str;
-                    info->fmt_end = "d"+1;
+                    info->fmt_end = sscanf_format_str_end;
                 }
                 return;
             }
@@ -3715,7 +3721,7 @@ sscanf_decimal (char *str, struct sscanf_info *info)
          * fmt_end needs to point to zero character after a format specifier.
          */
         info->match_end = str;
-        info->fmt_end = "d"+1;
+        info->fmt_end = sscanf_format_str_end;
         return;
     }
 
@@ -3917,7 +3923,7 @@ sscanf_match (char *str, char *fmt, struct sscanf_info *info)
         if ( !(c = *fmt) )
         {
             info->match_end = str;
-            info->fmt_end = "d"+1;
+            info->fmt_end = sscanf_format_str_end;
             return;
         }
 
@@ -3973,7 +3979,7 @@ sscanf_search (char *str, char *fmt, struct sscanf_info *info)
     if (!a)
     {
         /* End of format: match all */
-        info->fmt_end = "d"+1;
+        info->fmt_end = sscanf_format_str_end;
         info->arg_current = info->arg_start;
         return info->match_end = str + strlen(str);
     }
@@ -4425,6 +4431,11 @@ v_sscanf (svalue_t *sp, int num_arg)
     svalue_t *arg0;        /* The first argument */
     struct sscanf_flags flags;  /* local copy of info.flags */
     struct sscanf_info info;    /* scan information packet */
+
+    /* Initialize sscanf_format_str_end.
+     */
+    sscanf_format_str_end = "d";
+    sscanf_format_str_end++;
 
     inter_sp = sp; /* we can have an errorf() deep inside */
     arg0 = sp - num_arg + 1;
