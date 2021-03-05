@@ -3577,7 +3577,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     mp_int start, offset;
                     int flags, i;
 
-                    if (block_size < 2 && block_size > 6)
+                    if (block_size < 2 || block_size > 6)
                         lambda_error("Wrong number of arguments to #'catch\n");
 
                     flags = 0;
