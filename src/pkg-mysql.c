@@ -507,7 +507,7 @@ v_db_connect (svalue_t *sp, int num_args)
      */
 #if MYSQL_VERSION_ID >= 50003
     {
-        my_bool my_true = MY_TRUE;
+        bool my_true = true;
         if (mysql_options(tmp->mysql_dat, MYSQL_OPT_RECONNECT, &my_true))
         {
             raise_db_error(tmp);
