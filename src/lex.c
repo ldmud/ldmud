@@ -7126,7 +7126,10 @@ _expand_define (struct defn *p, ident_t * macro)
             for (argnum = 0;;)
             {
                 char c;
-                if (argptr >= expbuf + DEFMAX - 5)
+                /* expbuf holds DEFMAX bytes and we need space
+                 * for at least one unicode character.
+                 */
+                if ((argptr-expbuf) >= DEFMAX - 5)
                 {
                     lexerrorf("Macro '%s': argument overflow", get_txt(macro->name));
                     DEMUTEX;
@@ -7155,24 +7158,28 @@ _expand_define (struct defn *p, ident_t * macro)
 
                             inptr = skip_alunum(inptr);
 
-                            if (wordstart != inptr)
+                            if (wordstart == inptr)
                             {
-                                /* Copy the whole word. */
-                                memcpy(argptr, wordstart, inptr - wordstart);
-                                argptr += inptr - wordstart;
-                            }
-                            else
-                            {
+                                /* Not a word, it's an operator? */
                                 const char *end;
 
                                 if (symbol_operator(inptr, &end) < 0)
                                 {
                                     yyerror("Missing function name after #'");
                                 }
-                                memcpy(argptr, inptr, (size_t)(end - inptr));
-                                argptr += end - inptr;
                                 inptr = (char *)end;
                             }
+
+                            /* Copy the whole symbol name. */
+                            if (argptr - expbuf + inptr - wordstart >= DEFMAX - 1)
+                            {
+                                lexerrorf("Macro '%s': argument overflow", get_txt(macro->name));
+                                DEMUTEX;
+                                return MY_FALSE;
+                            }
+
+                            memcpy(argptr, wordstart, inptr - wordstart);
+                            argptr += inptr - wordstart;
                         }
                         continue;
 
