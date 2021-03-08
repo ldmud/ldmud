@@ -12601,10 +12601,10 @@ again:
                 STORE_DOUBLE_USED
                 double product;
 
-                product = argp->u.number * READ_DOUBLE(sp);
+                product = argp->u.number * READ_DOUBLE(sp-1);
                 if (product < (-DBL_MAX) || product > DBL_MAX)
                     ERRORF(("Numeric overflow: %"PRIdPINT" * %g\n"
-                           , argp->u.number, READ_DOUBLE(sp)));
+                           , argp->u.number, READ_DOUBLE(sp-1)));
                 argp->type = T_FLOAT;
                 STORE_DOUBLE(argp, product);
             }

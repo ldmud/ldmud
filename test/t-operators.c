@@ -4,6 +4,16 @@
 #include "/inc/deep_eq.inc"
 
 mixed *tests = ({
+    ({ "int + float", 0,          (: float val = 1 + 2.5; return val >  3.4999 && val <  3.5001; :) }),
+    ({ "int - float", 0,          (: float val = 1 - 2.5; return val > -1.5001 && val < -1.4999; :) }),
+    ({ "int * float", 0,          (: float val = 1 * 2.5; return val >  2.4999 && val <  2.5001; :) }),
+    ({ "int / float", 0,          (: float val = 1 / 2.5; return val >  0.3999 && val <  0.4001; :) }),
+
+    ({ "int += float", 0,          (: int|float val = 1; val += 2.5; return val >  3.4999 && val <  3.5001; :) }),
+    ({ "int -= float", 0,          (: int|float val = 1; val -= 2.5; return val > -1.5001 && val < -1.4999; :) }),
+    ({ "int *= float", 0,          (: int|float val = 1; val *= 2.5; return val >  2.4999 && val <  2.5001; :) }),
+    ({ "int /= float", 0,          (: int|float val = 1; val /= 2.5; return val >  0.3999 && val <  0.4001; :) }),
+
     ({ "int* + int*", 0,          (: deep_eq(({0,1,2,3}) + ({4,2,1}), ({0,1,2,3,4,2,1})) :) }),
     ({ "int* - int*", 0,          (: deep_eq(({0,1,2,3}) - ({4,2,1}), ({0,3}))           :) }),
     ({ "int* & int*", 0,          (: deep_eq(({0,1,2,3}) & ({4,2,1}), ({1,2}))           :) }),
