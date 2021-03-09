@@ -1915,6 +1915,13 @@ struct binary_op_types_s
        * return a suggested type, that will be printed in the
        * error message.
        */
+
+    lpctype_t* (*rttcfun)(lpctype_t* t1, lpctype_t* t2);
+      /* This is used for assigment operations to create the
+       * type used to check the second operand at runtime.
+       * The function shall return the type used for the check.
+       * If NULL then t2 in this entry is used.
+       */
 };
 
 static lpctype_t*
@@ -1971,6 +1978,33 @@ get_union_array_type (lpctype_t* t1, lpctype_t* t2)
         member = ref_lpctype(element1);
     else
         member = get_union_type(element1, element2);
+    result = get_array_type(member);
+
+    free_lpctype(member);
+    free_lpctype(element1);
+    free_lpctype(element2);
+
+    return result;
+}
+
+static lpctype_t*
+get_common_array_type (lpctype_t* t1, lpctype_t* t2)
+
+/* <t1> and <t2> are arrays. This function creates an array type
+ * of the intersection of the members of both types.
+ */
+
+{
+    lpctype_t *member, *result;
+    lpctype_t *element1 = get_array_member_type(t1),
+              *element2 = get_array_member_type(t2);
+
+    if (element1 == lpctype_unknown)
+        member = ref_lpctype(element2);
+    else if (element2 == lpctype_unknown)
+        member = ref_lpctype(element1);
+    else
+        member = get_common_type(element1, element2);
     result = get_array_type(member);
 
     free_lpctype(member);
@@ -2063,164 +2097,172 @@ check_unknown_type (lpctype_t* t)
 /* Operator type table for assignment with addition.
  */
 binary_op_types_t types_add_assignment[] = {
-    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_string,    &_lpctype_float,     &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
-    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
-    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_union_array_type , NULL                  },
-    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_string,    &_lpctype_float,     &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type        , &get_common_array_type },
+    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for assignment with subtraction.
  */
 binary_op_types_t types_sub_assignment[] = {
-    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
-    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
-    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
-    { &_lpctype_mapping,   &_lpctype_any_array, &_lpctype_mapping, NULL                  , NULL                  },
-    { &_lpctype_any_array, &_lpctype_mapping,   NULL,              &get_first_type       , NULL                  },
-    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type       },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                   , NULL                   },
+    { &_lpctype_mapping,   &_lpctype_any_array, &_lpctype_mapping, NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_mapping,   NULL,              &get_first_type       , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type        , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for assignment with multiplication.
  */
 binary_op_types_t types_mul_assignment[] = {
-    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
-    { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_bytes,     &_lpctype_int,       &_lpctype_bytes,   NULL                  , NULL                  },
-    { &_lpctype_any_array, &_lpctype_int,       NULL,              &get_first_type       , NULL                  },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_bytes,     &_lpctype_int,       &_lpctype_bytes,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_int,       NULL,              &get_first_type       , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for assignment with division.
  */
 binary_op_types_t types_div_assignment[] = {
-    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for assignment with the binary and.
  */
 binary_op_types_t types_binary_and_assignment[] = {
-    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
-    { &_lpctype_mapping,   &_lpctype_any_array, &_lpctype_mapping, NULL                  , NULL                  },
-    { &_lpctype_any_array, &_lpctype_mapping,   NULL,              &get_first_type       , NULL                  },
-    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_common_type      , NULL                  },
-    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                   , NULL                   },
+    { &_lpctype_mapping,   &_lpctype_any_array, &_lpctype_mapping, NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_mapping,   NULL,              &get_first_type       , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_common_type      , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for assignment with the binary or and xor.
+ */
+binary_op_types_t types_binary_or_assignment[] = {
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type        , &get_common_array_type },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for the binary or and xor,
  * allowing <int>|<int> and <mixed*>|<mixed*>.
  */
 binary_op_types_t types_binary_or[] = {
-    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_union_array_type , NULL                  },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_union_array_type , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for the binary and.
  */
 binary_op_types_t types_binary_and[] = {
-    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
-    { &_lpctype_mapping,   &_lpctype_any_array, &_lpctype_mapping, NULL                  , NULL                  },
-    { &_lpctype_any_array, &_lpctype_mapping,   NULL,              &get_first_type       , NULL                  },
-    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_common_type      , NULL                  },
-    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                   , NULL                   },
+    { &_lpctype_mapping,   &_lpctype_any_array, &_lpctype_mapping, NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_mapping,   NULL,              &get_first_type       , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_common_type      , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for equality tests.
  * Basically there must be a common type, but ints can be compared with floats also.
  */
 binary_op_types_t types_equality[] = {
-    { &_lpctype_mixed,     &_lpctype_mixed,     &_lpctype_int,     &get_common_type      , NULL                  },
-    { &_lpctype_int,       &_lpctype_float,     &_lpctype_int,     NULL                  , NULL                  },
-    { &_lpctype_float,     &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_mixed,     &_lpctype_mixed,     &_lpctype_int,     &get_common_type      , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_float,     &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_float,     &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for shift operations.
  * Only ints are allowed.
  */
 binary_op_types_t types_shift[] = {
-    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for addition.
  */
 binary_op_types_t types_addition[] = {
-    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_string,    &_lpctype_float,     &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
-    { &_lpctype_int,       &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                  },
-    { &_lpctype_float,     &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
-    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_union_array_type , NULL                  },
-    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_string,    &_lpctype_float,     &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_float,     &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_union_array_type , NULL                   , NULL                   },
+    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for subtraction.
  */
 binary_op_types_t types_subtraction[] = {
-    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
-    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                  },
-    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
-    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                  },
-    { &_lpctype_mapping,   &_lpctype_any_array, &_lpctype_mapping, NULL                  , NULL                  },
-    { &_lpctype_any_array, &_lpctype_mapping,   NULL,              &get_first_type       , NULL                  },
-    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type       },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_mapping,   &_lpctype_mapping,   &_lpctype_mapping, NULL                  , NULL                   , NULL                   },
+    { &_lpctype_mapping,   &_lpctype_any_array, &_lpctype_mapping, NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_mapping,   NULL,              &get_first_type       , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type        , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for multiplication.
  */
 binary_op_types_t types_multiplication[] = {
-    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                  },
-    { &_lpctype_int,       &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_int,       &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                  },
-    { &_lpctype_int,       &_lpctype_any_array, NULL,              &get_second_type      , NULL                  },
-    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
-    { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                  },
-    { &_lpctype_bytes,     &_lpctype_int,       &_lpctype_bytes,   NULL                  , NULL                  },
-    { &_lpctype_any_array, &_lpctype_int,       NULL,              &get_first_type       , NULL                  },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_any_array, NULL,              &get_second_type      , NULL                   , NULL                   },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_string,    &_lpctype_int,       &_lpctype_string,  NULL                  , NULL                   , NULL                   },
+    { &_lpctype_bytes,     &_lpctype_int,       &_lpctype_bytes,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_int,       NULL,              &get_first_type       , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for the modulus operation.
  */
 binary_op_types_t types_modulus[] = {
-    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for division.
  */
 binary_op_types_t types_division[] = {
-    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                  },
-    { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                  },
-    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                  },
-    { NULL, NULL, NULL, NULL, NULL }
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_float,     &_lpctype_float,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_float,     &_lpctype_int_float, &_lpctype_float,   NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 /* Operator type table for the unary minus, increment and decrement operation.
@@ -2340,17 +2382,31 @@ check_unary_op_type (lpctype_t* t, const char* op_name, unary_op_types_t* type_t
 
 /*-------------------------------------------------------------------------*/
 static lpctype_t*
-check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary_op_types_t* type_table, lpctype_t *error_type)
+check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary_op_types_t* type_table, lpctype_t *error_type, lpctype_t **rttc2, bool t2_literal)
 
 /* Checks the arguments <t1> and <t2> against the possible combinations
  * in type_table. The result is the union of all result types of
  * matching entries. If there are no matching entries, a compile error
  * is thrown (unless <op_name> is NULL) and <error_type> is returned.
+ *
+ * If <rttc2> is not NULL a type suitable for a runtime type check on the
+ * second argument is stored there (a union of all allowed types for the
+ * second argument that are a subset of <t2>).
+ *
+ * If <t2_literal> is true, the second operand must be fully handled.
+ * To check this, the <rttc2> type will be calculated even if NULL was given.
+ * Otherwise an error will be thrown as well.
  */
 
 {
     Bool t1_matched = MY_FALSE;
     lpctype_t* result = NULL;
+    lpctype_t* t2check = NULL;
+
+    if (rttc2)
+        *rttc2 = NULL;
+    else if (t2_literal)
+        rttc2 = &t2check;
 
     /* No type info? Use the fallback as a shortcut. */
     if (t1 == NULL && t2 == NULL)
@@ -2408,10 +2464,40 @@ check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary
 
         oldresult = result;
         result = get_union_type(result, mresult);
+
+        if (rttc2)
+        {
+            lpctype_t *rttcadd;
+
+            if (entry->rttcfun != NULL)
+                rttcadd = (*entry->rttcfun)(m1, m2);
+            else
+                rttcadd = ref_lpctype(entry->t2);
+
+            if (rttcadd)
+            {
+                lpctype_t *oldrttc2 = *rttc2;
+                *rttc2 = get_union_type(*rttc2, rttcadd);
+                free_lpctype(rttcadd);
+                free_lpctype(oldrttc2);
+            }
+        }
+
         free_lpctype(m1);
         free_lpctype(m2);
         free_lpctype(mresult);
         free_lpctype(oldresult);
+    }
+
+    if (t2_literal)
+    {
+        if (!lpctype_contains(t2, *rttc2))
+        {
+            free_lpctype(result);
+            result = NULL;
+        }
+
+        free_lpctype(t2check);
     }
 
     if (result != NULL || op_name == NULL)
@@ -2658,7 +2744,7 @@ get_flattened_type (lpctype_t* t)
 
     return result;
 
-} /* check_binary_op_types() */
+} /* get_flattened_type() */
 
 /*-------------------------------------------------------------------------*/
 static bool
@@ -10782,6 +10868,9 @@ expr0:
 
       {
           fulltype_t type1, type2, restype;
+          const char* op_name;
+          binary_op_types_t* op_table = NULL;
+          lpctype_t *rttc2 = NULL;
 %line
           $$ = $4;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -10809,58 +10898,109 @@ expr0:
            *  a = b = 0;
            */
           if (check_unknown_type(type2.t_type))
-              restype.t_type = lpctype_mixed;
-          else if(type2.t_type == lpctype_mixed && !type2.t_flags)
-              restype.t_type = lpctype_mixed;
-          else
-              restype.t_type = get_common_type(type1.t_type, type2.t_type);
-          restype.t_flags = type2.t_flags;
-          if (exact_types && !restype.t_type)
+              type2.t_type = lpctype_mixed;
+
+          switch($2)
           {
-              switch($2)
-              {
+              case F_ASSIGN:
               case F_LAND_EQ:
               case F_LOR_EQ:
                   break;
 
               case F_ADD_EQ:
-                  free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, "+=", types_add_assignment, NULL));
+                  op_name = "+=";
+                  op_table = types_add_assignment;
                   break;
 
               case F_SUB_EQ:
-                  free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, "-=", types_sub_assignment, NULL));
+                  op_name = "-=";
+                  op_table = types_sub_assignment;
                   break;
 
               case F_MULT_EQ:
-                  free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, "*=", types_mul_assignment, NULL));
+                  op_name = "*=";
+                  op_table = types_mul_assignment;
                   break;
 
               case F_DIV_EQ:
-                  free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, "/=", types_div_assignment, NULL));
+                  op_name = "/=";
+                  op_table = types_div_assignment;
+                  break;
+
+              case F_MOD_EQ:
+                  op_name = "%=";
+                  op_table = types_modulus;
                   break;
 
               case F_AND_EQ:
-                  free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, "&=", types_binary_and_assignment, NULL));
+                  op_name = "&=";
+                  op_table = types_binary_and_assignment;
+                  break;
+
+              case F_OR_EQ:
+                  op_name = "|=";
+                  op_table = types_binary_or_assignment;
+                  break;
+
+              case F_XOR_EQ:
+                  op_name = "^=";
+                  op_table = types_binary_or_assignment;
+                  break;
+
+              case F_LSH_EQ:
+                  op_name = "<<=";
+                  op_table = types_shift;
+                  break;
+
+              case F_RSH_EQ:
+                  op_name = ">>=";
+                  op_table = types_shift;
+                  break;
+
+              case F_RSHL_EQ:
+                  op_name = ">>>=";
+                  op_table = types_shift;
                   break;
 
               default:
-                  yyerrorf("Bad assignment %s", get_two_fulltypes(type1, type2));
+                  fatal("Unknown assignment operation %"PRIdPINT".\n", $2);
+                  break;
+          } /* switch(assign op) */
 
-              } /* switch(assign op) */
-
+          if (op_table)
+          {
               /* Operator assignment: result type is determined by assigned-to
                * type.
                */
               restype = ref_fulltype(type1);
+
+              free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, op_name, op_table, NULL,
+                pragma_rtt_checks ? &rttc2 : NULL, (type2.t_flags & TYPE_MOD_LITERAL) ? true : false));
           }
-          else if ((type2.t_flags & TYPE_MOD_LITERAL) && !lpctype_contains(type2.t_type, type1.t_type))
+          else
           {
-              yyerrorf("Bad assignment %s", get_two_fulltypes(type1, type2));
+              /* No operator table, then both types must be compatible. */
+
+              if(type2.t_type == lpctype_mixed && !type2.t_flags)
+              {
+                  restype.t_type = lpctype_mixed;
+                  rttc2 = ref_lpctype(type1.t_type);
+              }
+              else
+              {
+                  restype.t_type = get_common_type(type1.t_type, type2.t_type);
+                  if (!restype.t_type)
+                      yyerrorf("Bad assignment %s", get_two_fulltypes(type1, type2));
+                  else if ((type2.t_flags & TYPE_MOD_LITERAL) && !lpctype_contains(type2.t_type, type1.t_type))
+                      yyerrorf("Bad assignment %s", get_two_fulltypes(type1, type2));
+                  else
+                      rttc2 = ref_lpctype(type1.t_type);
+              }
+              restype.t_flags = type2.t_flags;
           }
 
           /* Special checks for struct assignments */
-          if (is_type_struct(type1.t_type) || is_type_struct(type2.t_type)
-             )
+          if (is_type_struct(type1.t_type) || is_type_struct(type2.t_type))
           {
               free_fulltype(restype);
               restype = ref_fulltype(type1);
@@ -10881,6 +11021,9 @@ expr0:
                   update_lop_branch($<address>3, F_LBRANCH_WHEN_NON_ZERO);
               }
 
+              if (rttc2)
+                 add_type_check(rttc2, TYPECHECK_ASSIGNMENT);
+
               /* Insert the SWAP and the ASSIGN */
 
               ins_f_code(F_SWAP_VALUES);
@@ -10888,17 +11031,20 @@ expr0:
           }
           else
           {
-              if ($2 == F_ASSIGN)
-                 add_type_check(type1.t_type, TYPECHECK_ASSIGNMENT);
+              if (rttc2)
+                 add_type_check(rttc2, TYPECHECK_ASSIGNMENT);
 
               if (!add_lvalue_code($1.lvalue, $2))
               {
                   free_lpctype($1.type);
                   free_fulltype($4.type);
                   free_fulltype(restype);
+                  free_lpctype(rttc2);
                   YYACCEPT;
               }
           }
+          free_lpctype(rttc2);
+
           $$.type = restype;
 
           /* For a normal assignment the lvalue is not marked as
@@ -11119,7 +11265,7 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '|' expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "|", types_binary_or, lpctype_mixed);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "|", types_binary_or, lpctype_mixed, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -11140,7 +11286,7 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '^' expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "^", types_binary_or, lpctype_mixed);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "^", types_binary_or, lpctype_mixed, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -11161,7 +11307,7 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '&' expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "&", types_binary_and, lpctype_mixed);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "&", types_binary_and, lpctype_mixed, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -11182,7 +11328,7 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_EQ expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality, NULL);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality, NULL, NULL, false);
 
           if (result == NULL)
           {
@@ -11210,7 +11356,7 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_NE expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality, NULL);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality, NULL, NULL, false);
 
           if (result == NULL)
           {
@@ -11321,7 +11467,7 @@ expr0:
     | expr0 L_LSH expr0
       {
           /* Just check the types. */
-          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, "<<", types_shift, NULL));
+          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, "<<", types_shift, NULL, NULL, false));
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
@@ -11342,7 +11488,7 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_RSH expr0
       {
-          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, ">>", types_shift, NULL));
+          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, ">>", types_shift, NULL, NULL, false));
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
@@ -11363,7 +11509,7 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_RSHL expr0
       {
-          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, ">>>", types_shift, NULL));
+          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, ">>>", types_shift, NULL, NULL, false));
 
           $$ = $1;
           $$.type = get_fulltype(lpctype_int);
@@ -11471,7 +11617,7 @@ expr0:
           else
           {
               /* Just add */
-              lpctype_t *result = check_binary_op_types($1.type.t_type, $4.type.t_type, "+", types_addition, lpctype_mixed);
+              lpctype_t *result = check_binary_op_types($1.type.t_type, $4.type.t_type, "+", types_addition, lpctype_mixed, NULL, false);
               $$.type = get_fulltype(result);
 
               ins_f_code(F_ADD);
@@ -11494,7 +11640,7 @@ expr0:
       {
 %line
           $$ = $1;
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "-", types_subtraction, lpctype_mixed);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "-", types_subtraction, lpctype_mixed, NULL, false);
           $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -11513,7 +11659,7 @@ expr0:
     | expr0 '*' expr0
       {
           $$ = $1;
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "*", types_multiplication, lpctype_mixed);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "*", types_multiplication, lpctype_mixed, NULL, false);
           $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -11532,7 +11678,7 @@ expr0:
     | expr0 '%' expr0
       {
           $$ = $1;
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "%", types_modulus, lpctype_int);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "%", types_modulus, lpctype_int, NULL, false);
           $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -11550,7 +11696,7 @@ expr0:
     | expr0 '/' expr0
       {
           $$ = $1;
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "/", types_division, lpctype_int);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "/", types_division, lpctype_int, NULL, false);
           $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
