@@ -35,6 +35,7 @@ int|string      g_int_str;
 <int|string>**  g_int_str_arrr;
 int*|string*    g_intarr_strarr;
 <int*|string*>* g_intarr_strarr_arr;
+< <int|string>*| symbol>* g_int_str_arr_symbol_arr;
 int|float       g_nr;
 struct base     g_s1;
 
@@ -45,6 +46,7 @@ int|string      f_return_int_str          (int|string val)      { return val; }
 <int|string>**  f_return_int_str_arrr     (<int|string>** val)  { return val; }
 int*|string*    f_return_intarr_strarr    (int*|string* val)    { return val; }
 <int*|string*>* f_return_intarr_strarr_arr(<int*|string*>* val) { return val; }
+< <int|string>*| symbol>* f_return_int_str_arr_symbol_arr(< <int|string>*| symbol>* val) { return val; }
 int|float       f_return_nr               (int|float val)       { return val; }
 int             f_return_member           (struct sub1|struct sub2|struct indep val) { return val->member; }
 
@@ -54,7 +56,7 @@ int run_test()
 {
     /* Initialize variables of different types with zero.
      */
-    g_str = g_int = g_int_str_arr = 0;
+    g_str = g_int = g_int_str_arr = g_int_str_arr_symbol_arr = 0;
 
     /* Initialize them with values of their own kind.
      */
@@ -65,6 +67,7 @@ int run_test()
     g_int_str_arrr = ({ g_int_str_arr, ({}) });
     g_intarr_strarr = ({ 1, 1, 2, 3, 5, 8, 13 });
     g_intarr_strarr_arr = ({ g_intarr_strarr, ({ 3, 1, 4, 1 }), ({ "you" }), ({}) });
+    g_int_str_arr_symbol_arr = ({ ({ 1, 2, 3, "hey" }) });
     g_nr = -1.5;
     g_s1 = (<sub1> 42, 1);
 
@@ -77,6 +80,7 @@ int run_test()
     g_int_str_arrr      = f_return_int_str_arrr(g_int_str_arrr);
     g_intarr_strarr     = f_return_intarr_strarr(g_intarr_strarr);
     g_intarr_strarr_arr = f_return_intarr_strarr_arr(g_intarr_strarr_arr);
+    g_int_str_arr_symbol_arr = f_return_int_str_arr_symbol_arr(g_int_str_arr_symbol_arr);
     g_nr                = f_return_nr(g_nr) + f_return_member(g_s1);
 
     /* Mix compatible types. */
@@ -85,6 +89,7 @@ int run_test()
     g_int_str_arr = g_intarr_strarr;
     g_intarr_strarr = ({int*|string*})g_int_str_arr;
                       /* Would work without a cast, just for testing. */
+    g_int_str_arr_symbol_arr = g_int_str_arrr;
 
     /* Try some selected operations */
     g_nr += 10;

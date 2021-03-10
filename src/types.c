@@ -661,7 +661,7 @@ lpctype_contains (lpctype_t* src, lpctype_t* dest)
                     else if (destbase->t_array.depth > srcbase->t_array.depth)
                     {
                         lpctype_t *destelem = destbase->t_array.element;
-                        int i = srcbase->t_array.depth;
+                        int i = srcbase->t_array.depth - 1; /* We already did one in the line above. */
 
                         for (;i;i--)
                             destelem = destelem->t_array.element;
@@ -671,7 +671,7 @@ lpctype_contains (lpctype_t* src, lpctype_t* dest)
                     else
                     {
                         lpctype_t *srcelem = srcbase->t_array.element;
-                        int i = destbase->t_array.depth;
+                        int i = destbase->t_array.depth - 1;
 
                         for (;i;i--)
                             srcelem = srcelem->t_array.element;
