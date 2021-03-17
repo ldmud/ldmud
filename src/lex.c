@@ -4709,6 +4709,16 @@ closure (char *in_yyp)
         efun_override = OVERRIDE_SEFUN;
         super_name = NULL;
     }
+    else if (super_name != NULL && !strncmp(super_name, "lfun::", 6))
+    {
+        efun_override = OVERRIDE_LFUN;
+        super_name = NULL;
+    }
+    else if (super_name != NULL && !strncmp(super_name, "var::", 5))
+    {
+        efun_override = OVERRIDE_VAR;
+        super_name = NULL;
+    }
 
     outp = yyp;
 
@@ -4760,7 +4770,8 @@ closure (char *in_yyp)
      */
     while (p->type > I_TYPE_GLOBAL)
     {
-        if (p->type == I_TYPE_RESWORD && efun_override != OVERRIDE_SEFUN)
+        if (p->type == I_TYPE_RESWORD
+         && (efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_EFUN))
         {
             int code = symbol_resword(p);
 
@@ -4793,7 +4804,7 @@ closure (char *in_yyp)
         if (p && p->type == I_TYPE_UNKNOWN)
             free_shared_identifier(p);
         *yyp = '\0';
-        yyerrorf("Undefined function: %.50s", wordstart);
+        yyerrorf(efun_override == OVERRIDE_VAR ? "Undefined variable: %.50s" : "Undefined function: %.50s", wordstart);
         *yyp = c;
         yylval.closure.number = CLOSURE_EFUN_OFFS;
         yylval.closure.inhIndex = 0;
@@ -4855,7 +4866,8 @@ closure (char *in_yyp)
     switch(0) { default:
 
         /* lfun? */
-        if (efun_override == OVERRIDE_NONE && p->u.global.function != I_GLOBAL_FUNCTION_OTHER)
+        if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_LFUN)
+         && p->u.global.function != I_GLOBAL_FUNCTION_OTHER)
         {
             int i;
 
@@ -4870,7 +4882,8 @@ closure (char *in_yyp)
         }
 
         /* simul-efun? */
-        if (efun_override != OVERRIDE_EFUN && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER && !disable_sefuns)
+        if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_SEFUN)
+         && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER && !disable_sefuns)
         {
             yylval.closure.number =
               p->u.global.sim_efun + CLOSURE_SIMUL_EFUN_OFFS;
@@ -4879,7 +4892,8 @@ closure (char *in_yyp)
 
 #ifdef USE_PYTHON
         /* python-defined efun? */
-        if (efun_override != OVERRIDE_SEFUN && is_python_efun(p))
+        if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_EFUN)
+         && is_python_efun(p))
         {
             yylval.closure.number = p->u.global.python_efun + CLOSURE_PYTHON_EFUN_OFFS;
             break;
@@ -4887,7 +4901,8 @@ closure (char *in_yyp)
 #endif
 
         /* efun? */
-        if (efun_override != OVERRIDE_SEFUN && p->u.global.efun != I_GLOBAL_EFUN_OTHER)
+        if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_EFUN)
+         && p->u.global.efun != I_GLOBAL_EFUN_OTHER)
         {
             yylval.closure.number =
               p->u.global.efun + CLOSURE_EFUN_OFFS;
@@ -4904,7 +4919,8 @@ closure (char *in_yyp)
         }
 
         /* object variable? */
-        if (p->u.global.variable != I_GLOBAL_VARIABLE_OTHER
+        if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_VAR)
+         && p->u.global.variable != I_GLOBAL_VARIABLE_OTHER
          && p->u.global.variable != I_GLOBAL_VARIABLE_FUN)
         {
             if (p->u.global.variable & VIRTUAL_VAR_TAG) {
@@ -4927,7 +4943,7 @@ closure (char *in_yyp)
         {
             char c = *yyp;
             *yyp = 0;
-            yyerrorf("Undefined function: %.50s", wordstart);
+            yyerrorf(efun_override == OVERRIDE_VAR ? "Undefined variable: %.50s" : "Undefined function: %.50s", wordstart);
             *yyp = c;
             yylval.closure.number = CLOSURE_EFUN_OFFS;
 

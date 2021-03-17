@@ -266,6 +266,8 @@ enum efun_override_e
     OVERRIDE_NONE  = 0,
     OVERRIDE_EFUN  = 1,
     OVERRIDE_SEFUN = 2,
+    OVERRIDE_LFUN  = 3,
+    OVERRIDE_VAR   = 4,
 };
 typedef enum efun_override_e efun_override_t;
 

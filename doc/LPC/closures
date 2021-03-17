@@ -34,6 +34,17 @@ DESCRIPTION
         this_player().  Of course, this is only a rather simple
         application.
 
+        Closure literals can have prefixes to specify which type
+        of closure shall be created:
+
+            #'efun::function_name:  closure to an efun
+            #'sefun::function_name: closure to a simul-efun
+            #'lfun::function_name:  closure to an lfun
+            #'var::variable_name:   closure to a global variable
+
+        Inherited programs can be given as prefixes, too. But they
+        can not be combined with the prefixes above.
+
         Inline closures are a variant of lfun closures, the difference
         being that the function text is written right where the
         closure is used.  Since they are pretty powerful by

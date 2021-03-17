@@ -6563,6 +6563,7 @@ f_symbol_function (svalue_t *sp)
 {
     object_t *ob;
     program_t *prog;
+    string_t *fun;
     int i;
 
     /* If 'arg' is not a symbol, make sure it's a shared string. */
@@ -6619,7 +6620,19 @@ f_symbol_function (svalue_t *sp)
 
     /* Find the function in the program */
     prog = ob->prog;
-    i = find_function(sp[-1].u.str, prog);
+
+    /* Remove any lfun:: prefix from the name. */
+    fun = sp[-1].u.str;
+    if (mstrsize(fun) >=6 && !strncmp(get_txt(fun), "lfun::", 6))
+        fun = find_tabled_str_n(get_txt(fun)+6, mstrsize(fun)-6, fun->info.unicode);
+    if (fun)
+    {
+        i = find_function(fun, prog);
+        if (fun != sp[-1].u.str)
+            free_mstring(fun);
+    }
+    else
+        i = -1;
 
     /* If the function exists and is visible, create the closure
      */
