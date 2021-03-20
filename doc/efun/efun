@@ -15,15 +15,13 @@ DESCRIPTION
            A mud's maintainer is free to deactivate these efuns when
            compiling the driver:
 
-             assoc()
              break_point()
              db_*()
-             insert_alist()
-             intersect_alist()
+             pg_*()
+             sl_*()
              parse_command()
              process_string()
              rusage()
-             set_is_wizard()
              transfer()
              tls_available()
              tls_check_certificate()
@@ -35,6 +33,8 @@ DESCRIPTION
              tls_refresh_certs()
              xml_generate()
              xml_parse()
+             json_serialize()
+             json_parse()
 
          - 'preliminary' or 'experimental'
 

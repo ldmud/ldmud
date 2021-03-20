@@ -1,4 +1,4 @@
-VERALTET
+ENTFERNTE EFUN
 SYNOPSIS
     void add_xverb(string str)
 
@@ -11,6 +11,9 @@ BESCHREIBUNG
         add_xverb() nur die vorangehenden Zeichen der Eingabezeile mit <str>
         uebereinstimmen muessen. Das entspricht im Wesentlichen einer
         add_action() mit gesetzen Flag.
+
+GESCHICHTE
+        Entfernt in LDmud 3.3, ersetzt durch add_action().
 
 SIEHE AUCH
         add_action(E), query_verb(E), add_verb(E)

@@ -14,15 +14,13 @@ BESCHREIBUNG
 
            Es steht dem Mud-Betreiber frei, diese Efuns zu deaktivieren.
 
-             assoc()
              break_point()
              db_*()
-             insert_alist()
-             intersect_alist()
+             pg_*()
+             sl_*()
              parse_command()
              process_string()
              rusage()
-             set_is_wizard()
              transfer()
              tls_available()
              tls_check_certificate()
@@ -34,6 +32,8 @@ BESCHREIBUNG
              tls_refresh_certs()
              xml_generate()
              xml_parse()
+             json_serialize()
+             json_parse()
 
          - 'Vorlaeufig'
 

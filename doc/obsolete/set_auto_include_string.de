@@ -1,4 +1,4 @@
-GESCHUETZT, VERALTET
+ENTFERNTE EFUN
 SYNOPSIS
         void set_auto_include_string(string arg)
 
@@ -16,6 +16,7 @@ GESCHICHTE
         LDMud 3.2.9 ersetzte set_auto_include_string() durch den Driver
             Hook H_AUTO_INCLUDE. Diese alte Version ist nur verfuegbar,
             wenn der Treiber mit USE_DEPRECATED kompiliert wurde.
+        Entfernt in LDmud 3.3.
 
 SIEHE AUCH
         set_driver_hook(E), privilege_violation(M), pragma(LPC), master(M)
