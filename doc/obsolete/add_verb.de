@@ -1,4 +1,4 @@
-VERALTET
+ENTFERNTE EFUN
 SYNOPSIS
         void add_verb(string str)
 
@@ -13,6 +13,9 @@ BESCHREIBUNG
 
         [marion Sun Jan 19 1992 Don't use it. This file is retained
         because of somewhat nostalgic reasons.]
+
+GESCHICHTE
+        Entfernt in LDmud 3.3, ersetzt durch add_action().
 
 SIEHE AUCH
         add_action(E), query_verb(E), add_xverb(E), remove_action(E)

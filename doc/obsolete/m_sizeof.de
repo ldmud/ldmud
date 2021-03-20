@@ -1,4 +1,4 @@
-VERALTET
+ENTFERNTE EFUN
 SYNOPSIS
         int m_sizeof(mapping map)
 
@@ -9,3 +9,4 @@ BESCHREIBUNG
 GESCHICHTE
         Seit LDMud 3.2.9 ist m_sizeof() nur noch verfuegbar, wenn der Treiber
             mit USE_DEPRECATED kompiliert wurde.
+        Entfernt in LDmud 3.3.
