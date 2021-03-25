@@ -106,12 +106,12 @@ mixed debug_info(int what, varargs mixed* args)
         case DINFO_OBJLIST:
         {
             if (sizeof(args) == 0)
-                raise_error("bad number of arguments to debug_info\n");
+                return efun::objects(0, 1)[0];
 
             if (sizeof(args) == 1)
             {
                 object * obs = efun::objects(args[0], 1);
-                return obs[0];
+                return sizeof(obs) && obs[0];
             }
             else
                 return efun::objects(args[0], args[1]);
