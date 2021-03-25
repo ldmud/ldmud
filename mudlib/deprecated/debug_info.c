@@ -199,6 +199,8 @@ mixed debug_info(int what, varargs mixed* args)
                     return 0;
             }
 
+            // set object for valid_write() master apply...
+            set_this_object(previous_object());
             return efun::dump_driver_info(opt, args[1..1]...);
         }
 
