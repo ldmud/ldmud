@@ -221,7 +221,7 @@ AC_MY_ARG_ENABLE(use-mysql,no,,[Enables mySQL support])
 AC_MY_ARG_ENABLE(use-pgsql,no,,[Enables PostgreSQL support])
 AC_MY_ARG_ENABLE(use-sqlite,no,,[Enables SQLite support])
 AC_MY_ARG_ENABLE(use-json,no,,[Enables JSON-C Support])
-AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE: no/yes])
+AC_MY_ARG_ENABLE(use-pcre,yes,,[Use PCRE per default: no/yes])
 AC_MY_ARG_ENABLE(use-xml,no,,[Enables XML support: no/xml2/iksemel/yes])
 AC_MY_ARG_WITH(xml-path,,,[Optional location of the XML include/ and lib/ directory])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
@@ -374,7 +374,6 @@ fi
 AC_UPDATE_VAR(enable_use_pcre)
 if test "x$enable_use_pcre" = "x" || test "x$enable_use_pcre" = "xyes"; then
   cdef_use_pcre="#define"
-  enable_use_builtin_pcre="yes"
 else
   cdef_use_pcre="#undef"
   enable_use_pcre="no"
@@ -1297,6 +1296,11 @@ int main(void)
         AC_DEFINE(HAS_PCRE, 1, [Does the machine offer PCRE?])
         PKGLIBS="$PKGLIBS -lpcre"
     fi
+else
+    lp_cv_has_pcre=no
+fi
+if test "$lp_cv_has_pcre" = "no" && test "x$enable_use_pcre" = "xyes"; then
+  AC_NOT_AVAILABLE(use-pcre)
 fi
 
 # --- iconv ---
