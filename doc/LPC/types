@@ -5,8 +5,8 @@ DESCRIPTION
 
     Variables can have the following types:
 
-    o int       An integer. Normally full 32 bits signed, yielding a
-                range of at least -2,147,483,648 to 2,147,483,647. The
+    o int       An integer. Normally 32 bits or 64 bits signed, yielding
+                a range of at least -2,147,483,648 to 2,147,483,647. The
                 exact available range is given by the predefined
                 macros __INT_MIN__ and __INT_MAX__.
 
@@ -120,9 +120,9 @@ DESCRIPTION
                 create the closure as ({ ..., foo, ... })
 
     o float     A floating point number in the absolute range
-                __FLOAT_MIN__ to __FLOAT_MAX__ (typically 1e-38 to 1e+38).
-                Floating point numbers are signified by a '.'
-                appearing, e.g. '1' is integer 1, but '1.' is
+                __FLOAT_MIN__ to __FLOAT_MAX__ (typically 2.2e-308 to
+                1.8e+308). Floating point numbers are signified by
+                a '.' appearing, e.g. '1' is integer 1, but '1.' is
                 floating-point 1 .
 
     o mixed     A variable allowed to take a value of any type (int,
