@@ -9,6 +9,19 @@
 
 #include "/inc/base.inc"
 
+int got_warning;
+
+void log_error(string file, string err, int warn)
+{
+    if (warn)
+        got_warning++;
+}
+
+int warning_occured()
+{
+    return got_warning;
+}
+
 void run_test()
 {
     int errors;
@@ -23,6 +36,7 @@ void run_test()
 	
 	msg("Running Test %s...", file[0..<3]);
 	
+	got_warning = 0;
 	if((err = catch(res = load_object(file[0..<3])->run_test();nolog)))
 	{
 	    errors++;
