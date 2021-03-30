@@ -26,7 +26,7 @@ jobs:
                                --enable-malloc-trace --enable-malloc-lpc-trace  --enable-dynamic-costs
                                --enable-eval-cost-trace --enable-trace-code
                                ${{ matrix.coverage && '--with-optimize=no' || ''}}
-                               EXTRA_CFLAGS="-DINSIDE_TRAVIS -Werror ${{ matrix.cc == 'gcc' && '-Wno-unused-result' || '' }}"
+                               EXTRA_CFLAGS="-DINSIDE_TRAVIS -Werror ${{ matrix.cc == 'gcc' && '-Wno-unused-result' || '' }} ${{ matrix.cc == 'gcc' && !matrix.coverage && '-D_FORTIFY_SOURCE=2' || '' }}"
                                CC=${{ matrix.cc }}
             - name: Build driver
               working-directory: src

@@ -19004,7 +19004,7 @@ get_line_number_if_any (string_t **name)
             string_t * location, *tmp;
             lambda_t * l;
 
-            sprintf(name_buffer, "<lambda 0x%6p>", csp->funstart);
+            sprintf(name_buffer, "<lambda %6p>", csp->funstart);
             memsafe(*name = new_mstring(name_buffer, STRING_ASCII), strlen(name_buffer)
                    , "lambda name");
             /* Find the beginning of the lambda structure.*/
