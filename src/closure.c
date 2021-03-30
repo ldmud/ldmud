@@ -6808,7 +6808,15 @@ f_symbol_variable (svalue_t *sp)
     }
 
     /* Check for virtual variables */
-    if (n < current_prog->num_virtual_variables)
+    if (current_prog == ob->prog)
+    {
+        /* When called from a lambda, variable_index_offset is 0,
+         * even though there might be virtual variables.
+         * But in these and all other cases, where current_prog
+         * is the top program, no translation is necessary.
+         */
+    }
+    else if (n < current_prog->num_virtual_variables)
     {
         /* Search for the virtual variable in the current_object's
          * variable block.

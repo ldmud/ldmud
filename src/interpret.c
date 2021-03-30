@@ -530,6 +530,14 @@ int function_index_offset;
 static int variable_index_offset;
   /* Index of current program's non-virtual variable block within
    * the variables of the current object (needed for inheritance).
+   *
+   * Note that when executing lambda closures, the offset will
+   * always be zero, even though the program has virtual variables.
+   * This is because indices for F_IDENTIFIER in the lambda code
+   * are always relative to the whole variable block.
+   * Also note that when executing efun closures, this offset won't
+   * be changed at all. Efuns accessing variables will need to
+   * update variable_index_offset and current_variables themselves.
    */
 
 svalue_t *current_variables;

@@ -8426,7 +8426,11 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         n = num_var - n - 1;
 
         /* Check for virtual variables */
-        if (n < current_prog->num_virtual_variables)
+        if (current_prog == ob->prog)
+        {
+            /* No translation necessary. */
+        }
+        else if (n < current_prog->num_virtual_variables)
         {
             /* Search for the virtual variable in the current_object's
              * variable block.
