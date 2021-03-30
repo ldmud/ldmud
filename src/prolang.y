@@ -10765,22 +10765,29 @@ expr0:
            * CSTRINGx instructions.
            * TODO: handle F_STRING as well.
            */
+          string_t *str1 = NULL, *str2 = NULL;
           if (last_expression + 2 == current_size
            && $<numbers>3[0] + 4 == (mp_int)current_size
            && ((p[-2]-(F_CSTRING0)) & ~3) == 0
            && ((p[-4]-(F_CSTRING0)) & ~3) == 0
              )
           {
-              /* Yup, we can combine the two strings.
-               */
-              string_t *str1, *str2, *sum;
-              int i;
-
               /* Retrieve both strings from the A_STRINGS area
-               * and catenate them.
                */
               str1 = PROG_STRING( p[-3] | (p[-4]-(F_CSTRING0))<<8 );
               str2 = PROG_STRING( p[-1] | (p[-2]-(F_CSTRING0))<<8 );
+          }
+          if (str1 && str2
+           && (str1->info.unicode == STRING_BYTES) == (str2->info.unicode == STRING_BYTES)
+            )
+          {
+              /* Yup, we can combine the two strings.
+               */
+              string_t *sum;
+              int i;
+
+              /* Catenate the strings.
+               */
               sum = mstr_add(str1, str2);
               if (!sum)
               {
