@@ -24,7 +24,7 @@ jobs:
                                --enable-use-mysql --enable-use-pgsql --enable-use-sqlite
                                --enable-use-xml --enable-use-tls  --enable-use-gcrypt --enable-use-python
                                --enable-malloc-trace --enable-malloc-lpc-trace  --enable-dynamic-costs
-                               --enable-eval-cost-trace --enable-trace-code
+                               --enable-eval-cost-trace --enable-trace-code --enable-swap-efun
                                ${{ matrix.coverage && '--with-optimize=no' || ''}}
                                EXTRA_CFLAGS="-DINSIDE_TRAVIS -Werror ${{ matrix.cc == 'gcc' && '-Wno-unused-result' || '' }} ${{ matrix.cc == 'gcc' && !matrix.coverage && '-D_FORTIFY_SOURCE=2' || '' }}"
                                CC=${{ matrix.cc }}

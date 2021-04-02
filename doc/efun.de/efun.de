@@ -21,6 +21,7 @@ BESCHREIBUNG
              parse_command()
              process_string()
              rusage()
+             swap()
              transfer()
              tls_available()
              tls_check_certificate()
