@@ -23,7 +23,7 @@ DESCRIPTION
              parse_command()
              process_string()
              rusage()
-             set_is_wizard()
+             swap()
              transfer()
              tls_available()
              tls_check_certificate()

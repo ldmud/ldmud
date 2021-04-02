@@ -2301,14 +2301,19 @@ f_variable_list (svalue_t *sp)
         }
     }
 
-    if (O_PROG_SWAPPED(ob))
+    // We need the program and if the values of variables are requested we additionally
+    // need the variables block.
+    if (O_PROG_SWAPPED(ob)
+     || ((mode_flags & RETURN_VARIABLE_VALUE) && O_VAR_SWAPPED(ob))
+       )
+    {
         if (load_ob_from_swap(ob) < 0)
         {
             errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
             /* NOTREACHED */
             return NULL;
         }
-
+    }
     prog = ob->prog;
 
     /* Initialize the vistag[] flag array.

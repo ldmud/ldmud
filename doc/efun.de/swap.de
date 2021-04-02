@@ -1,7 +1,19 @@
-GESCHUETZT
+OPTIONAL
 SYNOPSIS
-        void swap(object obj)
+        void swap(object obj, int flags)
 
 BESCHREIBUNG
         Lagert ein Objekt aus. Diese Efun ist nur fuer systeminternes
         Debugging und kann einen Absturz verursachen.
+
+        <flags> kann angegeben werden, um festzulegen, welcher Teil von <obj>
+        ausgelagert werden soll. Es ist eine Bitmaske aus folgenden:
+
+            1: Programm auslagern
+            2: Variablen auslagern
+
+        Standardmaessig (auch wenn 0 angegeben wurde) wird beides (3)
+        ausgelagert.
+
+GESCHICHTE
+        LDMud 3.6.4 fuehrte den zweiten Parameter ein.

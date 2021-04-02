@@ -1,7 +1,18 @@
+OPTIONAL
 SYNOPSIS
-        void swap(object obj)
+        void swap(object obj, int flags = 0)
 
 DESCRIPTION
         Swap out an object. This efun is only used for system internal
         debugging and can cause a crash.
 
+        <flags> can be given to specify which parts of <obj> to swap.
+        It is a bitmask of the following:
+
+            1: Swap program
+            2: Swap variables
+
+        The default (also when 0 given) is both (3).
+
+HISTORY
+        LDMud 3.6.4 introduced the second argument.

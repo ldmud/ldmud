@@ -287,8 +287,8 @@ object  this_player();
         /* Technical efuns */
 
 /* void break_point(); */
-#if 0
-void swap(object);
+#ifdef ENABLE_SWAP_EFUN
+void swap(object, int default: F_CONST0);
 #endif
 
         /* Obsolete and deprecated functions */

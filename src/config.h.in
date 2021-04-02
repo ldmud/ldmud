@@ -570,6 +570,13 @@
  */
 @cdef_debug_malloc_allocs@ DEBUG_MALLOC_ALLOCS
 
+/* Enable the swap() efun.
+ *
+ * This is used for debugging and testing purposes and
+ * should not be used in a production environment.
+ */
+@cdef_swap_efun@ ENABLE_SWAP_EFUN
+
 /* The DEBUG level for the ERQ daemon:
  *  0 : no debug output
  *  1 : standard debug output

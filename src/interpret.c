@@ -15559,28 +15559,41 @@ again:
       {
         /* EFUN swap()
          *
-         *   void swap(object obj)
+         *   void swap(object obj, int parts = 0)
          *
          * Swap out an object. This efun is only used for system internal
          * debugging and can cause a crash.
+         *
+         * <parts> is a bitmask:
+         *  0x01: Swap program
+         *  0x02: Swap variables
+         * The default (also when 0 given) is both (3).
          */
 
         object_t *ob;
+        int flags;
 
         /* Test the arguments */
-        if (sp->type != T_OBJECT)
-            RAISE_ARG_ERROR(1, TF_OBJECT, sp->type);
+        if (sp[-1].type != T_OBJECT)
+            RAISE_ARG_ERROR(1, TF_OBJECT, sp[-1].type);
+        if (sp[0].type != T_NUMBER)
+            RAISE_ARG_ERROR(1, TF_NUMBER, sp[0].type);
 
-        ob = sp->u.ob;
+        ob = sp[-1].u.ob;
+        flags = sp[0].u.number;
+        if (!flags)
+            flags = 3;
+
         if (ob != current_object
          && !(ob->flags & O_DESTRUCTED)
           ) /* should also check csp */
         {
-            if (!O_PROG_SWAPPED(ob))
+            if ((flags&1) && !O_PROG_SWAPPED(ob))
                 (void)swap_program(ob);
-            if (!O_VAR_SWAPPED(ob))
+            if ((flags&2) && !O_VAR_SWAPPED(ob))
                 (void)swap_variables(ob);
         }
+        sp--; /* T_NUMBER */
         free_svalue(sp--);
         break;
       }
