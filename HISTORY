@@ -4,6 +4,69 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+06-Apr-2021 (LDMud Team) -- 3.6.4
+    - Fixed Crashes:
+       + Assertion failure when adding string contants to byte constants.
+       + Fixed a crash when a virtual inherited program was updated twice.
+       + Fixed out-of-bounds write on errors in lambda closures.
+       + lambda() compiled #'catch and #'call_direct without the needed
+         argument frame.
+       + Python call operator on uninitialized closure could crash.
+       + variable_list() failed to swap the variable block in when the
+         values were requested.
+
+    - Language:
+       + Function arguments can now have default argument values.
+       + Added prefixes #'lfun:: and #'var:: for closure literals.
+       + Preprocessor statements and pragmas need now to be written fully.
+       + Warn about trailing characters in all preprocessor statements.
+       + A for/foreach variable cannot be used in its initializer anymore.
+       + Added compile and runtime type checks for foreach().
+       + Added compile and runtime type checks for all types of assignment
+         operations.
+       + Inherited function calls will no longer call indirectly inherited
+         virtual programs.
+       + Check efun arguments for references.
+       + Extended function overload type checks to include optional
+         arguments.
+       + Fixed type comparison of arrays with different depths.
+       + Structs in a privately inherited program are now still visible in
+         the directly inheriting program.
+
+    - Runtime:
+       + Added subtraction of mappings from arrays and vice versa.
+       + Failed assignments to mapping entries will not leave a zero entry.
+       + Fixed int *= float operation.
+       + Fixed a resource leak for interactive connections.
+       + Fixed a memory leak when an object is destroyed in __INIT.
+       + Fixed use after free in get_type_info() for anonymous structs.
+
+    - Changed Efuns:
+       + get_type_info(x,0) will now return the numeric type as documented.
+       + interactive_info() now also gives noecho and charmode information.
+       + map()/filter() got support for Unicode strings and byte sequences.
+       + regexplode() will not split UTF-8 sequences anymore.
+       + replace_program() can now handle virtual inherits.
+       + restore_object() can now correctly handle quoted arrays.
+       + sscanf() and parse_commands() are now real efuns.
+       + sscanf() will not match upon numeric overflows.
+       + struct_info() and variable_list() now return type information
+         once again.
+       + symbol_variable() returned wrong value when called as a closure.
+       + to_struct() now accepts arrays that are greater as the template
+         struct.
+
+    - Other:
+       + Fixed missing security check in debug_info() simul-efun
+         implementation.
+       + Added support for password protected TLS keys with the
+         --tls-password command line option.
+       + Disallow the use of simul-efun closure literals when compiling
+         the master object.
+       + Implemented Python bool operator for objects and closures.
+       + Fixed Python hash operator on closures.
+       + Pass SQLite warnings to the master object.
+
 01-Sep-2020 (LDMud Team) -- 3.6.3
     - Fixed Crashes:
        + slaballoc/smalloc forget to set the magic bytes when splitting

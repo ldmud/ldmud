@@ -31,6 +31,7 @@ Prerequisites
   - OpenSSL or GnuTLS for TLS support
   - libxml2 or libiksemel for XML support
   - json-c (libjson0) for JSON support
+  - libpython3 for the Python package (Python 3.7 or later recommended)
 
 
 Unix or Unix-like system

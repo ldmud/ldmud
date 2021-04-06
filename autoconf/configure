@@ -630,6 +630,7 @@ PKGLIBS
 erq_sub
 val_valgrind_redzone
 val_python_script
+val_tls_password
 val_tls_crldirectory
 val_tls_crlfile
 val_tls_trustdirectory
@@ -699,6 +700,7 @@ cdef_check_object_gc_ref
 cdef_check_object_ref
 cdef_check_mapping_total
 cdef_check_object_stat
+cdef_swap_efun
 cdef_debug_malloc_allocs
 cdef_debug_telnet
 cdef_no_inlines
@@ -707,6 +709,7 @@ cdef_debug
 cdef_verbose_opcprof
 cdef_opcprof
 cdef_python_script
+cdef_tls_password
 cdef_tls_crldirectory
 cdef_tls_crlfile
 cdef_tls_trustdirectory
@@ -764,6 +767,8 @@ XML2_LIBS
 XML2_CFLAGS
 PYTHON_LIBS
 PYTHON_CFLAGS
+PYTHON_EMBED_LIBS
+PYTHON_EMBED_CFLAGS
 JSONC_LIBS
 JSONC_CFLAGS
 SQLITE3_LIBS
@@ -855,6 +860,7 @@ with_tls_trustfile
 with_tls_trustdirectory
 with_tls_crlfile
 with_tls_crldirectory
+with_tls_password
 enable_use_gcrypt
 enable_use_python
 with_python_script
@@ -880,6 +886,7 @@ enable_yydebug
 enable_no_inlines
 enable_debug_telnet
 enable_debug_malloc_allocs
+enable_swap_efun
 enable_check_object_stat
 enable_check_mapping_total
 enable_check_object_ref
@@ -962,6 +969,8 @@ SQLITE3_CFLAGS
 SQLITE3_LIBS
 JSONC_CFLAGS
 JSONC_LIBS
+PYTHON_EMBED_CFLAGS
+PYTHON_EMBED_LIBS
 PYTHON_CFLAGS
 PYTHON_LIBS
 XML2_CFLAGS
@@ -1615,7 +1624,7 @@ Optional Features:
   --enable-use-json  default=disabled
         Enables JSON-C Support
   --enable-use-pcre  default=enabled
-        Enables PCRE: no/yes
+        Use PCRE per default: no/yes
   --enable-use-xml  default=disabled
         Enables XML support: no/xml2/iksemel/yes
   --enable-use-deprecated  default=enabled
@@ -1670,6 +1679,8 @@ Optional Features:
         enable telnet machine diagnostics
   --enable-debug-malloc-allocs  default=disabled
         enable small block diagnostics
+  --enable-swap-efun  default=disabled
+        Enable swap() efun for testing purposes
   --enable-check-object-stat  default=disabled
         trace changes to the object statistics
   --enable-check-mapping-total  default=disabled
@@ -1704,6 +1715,8 @@ Optional Packages:
         Default filename holding certificate revocation lists
   --with-tls-crldirectory=VALUE  default=no
         Default directory holding certificate revocation lists
+  --with-tls-password=pass:PASSWORD / env:VARIABLE / file:PATHNAME / fd:DESCRIPTOR / stdin / none  default=none
+        Default password for the keyfile
   --with-python-script=VALUE  default=startup.py
         Startup python script
   --with-optimize=VALUE  default=med
@@ -1845,6 +1858,10 @@ Some influential environment variables:
   JSONC_CFLAGS
               C compiler flags for JSONC, overriding pkg-config
   JSONC_LIBS  linker flags for JSONC, overriding pkg-config
+  PYTHON_EMBED_CFLAGS
+              C compiler flags for PYTHON_EMBED, overriding pkg-config
+  PYTHON_EMBED_LIBS
+              linker flags for PYTHON_EMBED, overriding pkg-config
   PYTHON_CFLAGS
               C compiler flags for PYTHON, overriding pkg-config
   PYTHON_LIBS linker flags for PYTHON, overriding pkg-config
@@ -3207,6 +3224,14 @@ if test "${with_tls_crldirectory+set}" = set; then :
 fi
 
 
+DEFAULTwith_tls_password=none
+
+# Check whether --with-tls-password was given.
+if test "${with_tls_password+set}" = set; then :
+  withval=$with_tls_password;
+fi
+
+
 DEFAULTenable_use_gcrypt=yes
 # Check whether --enable-use-gcrypt was given.
 if test "${enable_use_gcrypt+set}" = set; then :
@@ -3382,6 +3407,13 @@ DEFAULTenable_debug_malloc_allocs=no
 # Check whether --enable-debug-malloc-allocs was given.
 if test "${enable_debug_malloc_allocs+set}" = set; then :
   enableval=$enable_debug_malloc_allocs;
+fi
+
+
+DEFAULTenable_swap_efun=no
+# Check whether --enable-swap-efun was given.
+if test "${enable_swap_efun+set}" = set; then :
+  enableval=$enable_swap_efun;
 fi
 
 
@@ -3948,7 +3980,6 @@ fi
 
 if test "x$enable_use_pcre" = "x" || test "x$enable_use_pcre" = "xyes"; then
   cdef_use_pcre="#define"
-  enable_use_builtin_pcre="yes"
 else
   cdef_use_pcre="#undef"
   enable_use_pcre="no"
@@ -4421,6 +4452,16 @@ else
   cdef_debug_malloc_allocs="#undef"
 fi
 
+if test "x$enable_swap_efun" = "x" && test "x$DEFAULTenable_swap_efun" != "x"; then
+  enable_swap_efun=$DEFAULTenable_swap_efun
+fi
+
+if test "x$enable_swap_efun" = "xyes"; then
+  cdef_swap_efun="#define"
+else
+  cdef_swap_efun="#undef"
+fi
+
 
 if test "x$enable_check_object_stat" = "x" && test "x$DEFAULTenable_check_object_stat" != "x"; then
   enable_check_object_stat=$DEFAULTenable_check_object_stat
@@ -4623,6 +4664,16 @@ if test "x$with_tls_crldirectory" = "x" && test "x$DEFAULTwith_tls_crldirectory"
 fi
 
 val_tls_crldirectory="\"$with_tls_crldirectory\""
+
+if test "x$with_tls_password" != "x"; then
+  with_tls_password=`echo $with_tls_password|
+             sed -e 's/^\([^"]*\)\?.*$/\1/'`
+fi
+if test "x$with_tls_password" = "x" && test "x$DEFAULTwith_tls_password" != "x"; then
+  with_tls_password=$DEFAULTwith_tls_password
+fi
+
+val_tls_password="\"$with_tls_password\""
 
 
 if test "x$with_python_script" != "x"; then
@@ -5243,6 +5294,16 @@ fi
 
 if test "x$cdef_tls_crldirectory" = "x#undef"; then
   val_tls_crldirectory=
+fi
+
+if test "x$with_tls_password" != "xnone"; then
+  cdef_tls_password="#define"
+else
+  cdef_tls_password="#undef"
+fi
+
+if test "x$cdef_tls_password" = "x#undef"; then
+  val_tls_password=
 fi
 
 if test "x$with_python_script" != "xno"; then
@@ -10734,6 +10795,15 @@ $as_echo "#define HAS_PCRE 1" >>confdefs.h
 
         PKGLIBS="$PKGLIBS -lpcre"
     fi
+else
+    lp_cv_has_pcre=no
+fi
+if test "$lp_cv_has_pcre" = "no" && test "x$enable_use_pcre" = "xyes"; then
+  if test "x$not_available" = "x"; then
+    not_available="use-pcre"
+else
+    not_available="$not_available, use-pcre"
+fi
 fi
 
 # --- iconv ---
@@ -12685,27 +12755,24 @@ fi
 
 # --- PYTHON ---
 
-
-    if test "x$enable_use_python" = "xyes"; then
-        saveflags="$CFLAGS"
-        saveeflags="$EXTRA_CFLAGS"
-
+# Newer versions use python3-embed instead of python3 in pkg-config.
+python3_pkg_name=python3
 
 
 pkg_failed=no
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for PYTHON" >&5
-$as_echo_n "checking for PYTHON... " >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for PYTHON_EMBED" >&5
+$as_echo_n "checking for PYTHON_EMBED... " >&6; }
 
-if test -n "$PYTHON_CFLAGS"; then
-    pkg_cv_PYTHON_CFLAGS="$PYTHON_CFLAGS"
+if test -n "$PYTHON_EMBED_CFLAGS"; then
+    pkg_cv_PYTHON_EMBED_CFLAGS="$PYTHON_EMBED_CFLAGS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"python3\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "python3") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"python3-embed\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "python3-embed") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_PYTHON_CFLAGS=`$PKG_CONFIG --cflags "python3" 2>/dev/null`
+  pkg_cv_PYTHON_EMBED_CFLAGS=`$PKG_CONFIG --cflags "python3-embed" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -12713,16 +12780,16 @@ fi
  else
     pkg_failed=untried
 fi
-if test -n "$PYTHON_LIBS"; then
-    pkg_cv_PYTHON_LIBS="$PYTHON_LIBS"
+if test -n "$PYTHON_EMBED_LIBS"; then
+    pkg_cv_PYTHON_EMBED_LIBS="$PYTHON_EMBED_LIBS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"python3\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "python3") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"python3-embed\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "python3-embed") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_PYTHON_LIBS=`$PKG_CONFIG --libs "python3" 2>/dev/null`
+  pkg_cv_PYTHON_EMBED_LIBS=`$PKG_CONFIG --libs "python3-embed" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -12743,9 +12810,88 @@ else
         _pkg_short_errors_supported=no
 fi
         if test $_pkg_short_errors_supported = yes; then
-	        PYTHON_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "python3" 2>&1`
+	        PYTHON_EMBED_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "python3-embed" 2>&1`
         else
-	        PYTHON_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "python3" 2>&1`
+	        PYTHON_EMBED_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "python3-embed" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$PYTHON_EMBED_PKG_ERRORS" >&5
+
+	python3_pkg_name=python3
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	python3_pkg_name=python3
+else
+	PYTHON_EMBED_CFLAGS=$pkg_cv_PYTHON_EMBED_CFLAGS
+	PYTHON_EMBED_LIBS=$pkg_cv_PYTHON_EMBED_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	python3_pkg_name=python3-embed
+fi
+
+
+
+    if test "x$enable_use_python" = "xyes"; then
+        saveflags="$CFLAGS"
+        saveeflags="$EXTRA_CFLAGS"
+
+
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for PYTHON" >&5
+$as_echo_n "checking for PYTHON... " >&6; }
+
+if test -n "$PYTHON_CFLAGS"; then
+    pkg_cv_PYTHON_CFLAGS="$PYTHON_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"\"\$python3_pkg_name\"\""; } >&5
+  ($PKG_CONFIG --exists --print-errors ""$python3_pkg_name"") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_PYTHON_CFLAGS=`$PKG_CONFIG --cflags ""$python3_pkg_name"" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$PYTHON_LIBS"; then
+    pkg_cv_PYTHON_LIBS="$PYTHON_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"\"\$python3_pkg_name\"\""; } >&5
+  ($PKG_CONFIG --exists --print-errors ""$python3_pkg_name"") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_PYTHON_LIBS=`$PKG_CONFIG --libs ""$python3_pkg_name"" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        PYTHON_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs ""$python3_pkg_name"" 2>&1`
+        else
+	        PYTHON_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs ""$python3_pkg_name"" 2>&1`
         fi
 	# Put the nasty error message in config.log where it belongs
 	echo "$PYTHON_PKG_ERRORS" >&5
@@ -14404,6 +14550,9 @@ fi
 val_malloc="$with_malloc"
 
 fi
+
+
+
 
 
 

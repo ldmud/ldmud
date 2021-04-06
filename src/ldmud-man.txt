@@ -1,9 +1,13 @@
 [COPYRIGHT]
-Copyright 1997-2004 by Lars Duening.
+Copyright 1997-2007 by Lars Düning.
+.br
+Copyright 2008-2021 by Bertram Felgenhauer, Alexander Motzkau and Dominik Schäfer.
 
 LDMud is based on LPmud, which is
-Copyright 1989-1991 by Lars Pensj|, and, starting with version 3.1.2,
-Copyright 1991-1997 by Joern Rennecke.
+.br
+Copyright 1989-1991 by Lars Pensjö, and, starting with version 3.1.2,
+.br
+Copyright 1991-1997 by Jörn Rennecke.
 
 Source code herein refers to the source code, and any executables
 created from the same source code.
@@ -16,8 +20,8 @@ LDMud contains additional code which are copyright by their respective
 authors - see the files COPYRIGHT and CREDITS for details.
 
 [AUTHOR]
-Maintained by Lars Duening (lars@bearnip.com).
+Maintained by the LDMud team (ldmud-dev@unitopia.de).
 
 [REPORTING BUGS]
 Bug reports and feature suggestions are tracked online at
-http://mantis.bearnip.com/ .
+https://mantis.ldmud.eu/mantis/.
