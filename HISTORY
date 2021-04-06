@@ -4,6 +4,18 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+06-Apr-2021 (LDMud Team) -- 3.5.4
+    - Fixed Crashes:
+       + Fixed a crash when a virtual inherited program was updated twice.
+       + Fixed out-of-bounds write on errors in lambda closures.
+       + lambda() compiled #'catch and #'call_direct without the needed
+         argument frame.
+       + variable_list() failed to swap the variable block in when the
+         values were requested.
+
+    - Runtime:
+       + Fixed use after free in get_type_info() for anonymous structs.
+
 01-Sep-2020 (LDMud Team) -- 3.5.3
    - Fixed Crashes:
        + slaballoc/smalloc forget to set the magic bytes when splitting

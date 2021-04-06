@@ -697,6 +697,7 @@ cdef_check_object_gc_ref
 cdef_check_object_ref
 cdef_check_mapping_total
 cdef_check_object_stat
+cdef_swap_efun
 cdef_debug_malloc_allocs
 cdef_debug_telnet
 cdef_no_inlines
@@ -884,6 +885,7 @@ enable_yydebug
 enable_no_inlines
 enable_debug_telnet
 enable_debug_malloc_allocs
+enable_swap_efun
 enable_check_object_stat
 enable_check_mapping_total
 enable_check_object_ref
@@ -1676,6 +1678,8 @@ Optional Features:
         enable telnet machine diagnostics
   --enable-debug-malloc-allocs  default=disabled
         enable small block diagnostics
+  --enable-swap-efun  default=disabled
+        Enable swap() efun for testing purposes
   --enable-check-object-stat  default=disabled
         trace changes to the object statistics
   --enable-check-mapping-total  default=disabled
@@ -3395,6 +3399,13 @@ if test "${enable_debug_malloc_allocs+set}" = set; then :
 fi
 
 
+DEFAULTenable_swap_efun=no
+# Check whether --enable-swap-efun was given.
+if test "${enable_swap_efun+set}" = set; then :
+  enableval=$enable_swap_efun;
+fi
+
+
 
 DEFAULTenable_check_object_stat=no
 # Check whether --enable-check-object-stat was given.
@@ -4414,6 +4425,16 @@ if test "x$enable_debug_malloc_allocs" = "xyes"; then
   cdef_debug_malloc_allocs="#define"
 else
   cdef_debug_malloc_allocs="#undef"
+fi
+
+if test "x$enable_swap_efun" = "x" && test "x$DEFAULTenable_swap_efun" != "x"; then
+  enable_swap_efun=$DEFAULTenable_swap_efun
+fi
+
+if test "x$enable_swap_efun" = "xyes"; then
+  cdef_swap_efun="#define"
+else
+  cdef_swap_efun="#undef"
 fi
 
 
@@ -14725,6 +14746,7 @@ fi
 val_malloc="$with_malloc"
 
 fi
+
 
 
 
