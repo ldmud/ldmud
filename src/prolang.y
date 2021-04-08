@@ -14263,7 +14263,8 @@ function_call:
                   ap_needed = MY_TRUE;
               }
 %endif
-              else if ( (f = lookup_predef($1.real)) != -1 )
+              else if ( (f = lookup_predef($1.real)) != -1
+                     && instrs[f].arg_index >= 0)
               {
                   /* EFUN */
 
