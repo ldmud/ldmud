@@ -98,24 +98,24 @@
 ">>"    rsh       binary
 ">>>"   rshl      binary
 "!"     not       unary
-        index     binary
-        rindex    binary
-        aindex    binary
-        map_index ternary
-        s_index   binary
-        sx_index   binary
-".."    range     ternary
-"..<"   nr_range  ternary
-"<.."   rn_range  ternary
-"<..<"  rr_range  ternary
-"..>"   na_range  ternary
-"<..>"  ra_range  ternary
-">.."   an_range  ternary
-">..<"  ar_range  ternary
-">..>"  aa_range  ternary
-        nx_range  binary
-        rx_range  binary
-        ax_range  binary
+"["     index     binary
+"[<"    rindex    binary
+"[>"    aindex    binary
+"[,]"   map_index ternary
+"."     s_index   binary
+"->"    sx_index   binary
+"[..]"     range     ternary
+"[..<]"    nr_range  ternary
+"[<..]"    rn_range  ternary
+"[<..<]"   rr_range  ternary
+"[..>]"    na_range  ternary
+"[<..>]"   ra_range  ternary
+"[>..]"    an_range  ternary
+"[>..<]"   ar_range  ternary
+"[>..>]"   aa_range  ternary
+"[.."      nx_range  binary
+"[<.."     rx_range  binary
+"[>.."     ax_range  binary
 "(void)+=" void_add_eq
 "+="    add_eq
 "-="    sub_eq
@@ -140,7 +140,7 @@
  * called from LPC.
  */
 
-        pop_value
+","     pop_value
         pop_second
         dup
         ldup
@@ -155,8 +155,8 @@
         lbranch_when_zero
         lbranch_when_non_zero
         branch
-        branch_when_zero
-        branch_when_non_zero
+"?"     branch_when_zero
+"?!"    branch_when_non_zero
         bbranch_when_zero
         bbranch_when_non_zero
         call_function
@@ -206,10 +206,10 @@
         sx_index_vlvalue
         map_index_vlvalue
         simul_efun
-        aggregate
+"({"    aggregate
         m_aggregate
-        m_caggregate
-        s_aggregate
+"(["    m_caggregate
+"(<"    s_aggregate
         s_m_aggregate
         previous_object0
         lambda_cconstant

@@ -6022,55 +6022,10 @@ closure_efun_to_string (int type)
  */
 
 {
-    const char *str = NULL;
-
     if ((type & -0x0800) == CLOSURE_EFUN)
-    {
-        switch(type - CLOSURE_EFUN)
-        {
-        case F_INDEX:
-            str = "[";
-            break;
+        return instrs[type - CLOSURE_EFUN].name;
 
-        case F_RINDEX:
-            str = "[<";
-            break;
-
-        case F_RANGE:
-            str = "[..]";
-            break;
-
-        case F_NR_RANGE:
-            str = "[..<]";
-            break;
-
-        case F_RR_RANGE:
-            str = "[<..<]";
-            break;
-
-        case F_RN_RANGE:
-            str = "[<..]";
-            break;
-
-        case F_MAP_INDEX:
-            str = "[,]";
-            break;
-
-        case F_NX_RANGE:
-            str = "[..";
-            break;
-
-        case F_RX_RANGE:
-            str = "[<..";
-            break;
-
-        default:
-            str = instrs[type - CLOSURE_EFUN].name;
-            break;
-        } /* switch() */
-    } /* if() */
-
-    return str;
+    return NULL;
 } /* closure_operator_to_string() */
 
 /*-------------------------------------------------------------------------*/
