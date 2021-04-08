@@ -415,6 +415,15 @@ mixed *tests = ({
                                   }
                                   return sscanf(v, "%d", x) == 0;
                                :) }),
+    ({ "sscanf percent 1", 0, (: string x, y; return sscanf("te%st",     "%s%%%s",   x, y) == 2 && x == "te" && y == "st"; :) }),
+    ({ "sscanf percent 2", 0, (: string x, y; return sscanf("te%%st",    "%s%%%%%s", x, y) == 2 && x == "te" && y == "st"; :) }),
+    ({ "sscanf percent 3", 0, (: string x, y; return sscanf("%%s",       "%s%%%s",   x, y) == 2 && x == ""   && y == "%s"; :) }),
+    ({ "sscanf percent 4", 0, (: string x;    return sscanf("s%%%%%t%%", "%s%%t",    x) == 1    && x == "s%%%%";           :) }),
+    ({ "sscanf percent 5", 0, (: string x;    return sscanf("s%",        "%s%%",     x) == 1    && x == "s";               :) }),
+    ({ "sscanf percent 6", 0, (: string x;    return sscanf("s%%",       "%s%%%%",   x) == 1    && x == "s";               :) }),
+    ({ "sscanf percent 7", 0, (: string x;    return sscanf("s%%",       "%s%%%%%%", x) == 0;                              :) }),
+    ({ "sscanf percent 8", 0, (: string x;    return sscanf("%%s",       "%%%s",     x) == 1    && x == "%s";              :) }),
+    ({ "sscanf percent 9", 0, (: string x;    return sscanf("%s",        "%%%s",     x) == 1    && x == "s";               :) }),
     ({ "sprintf 1", 0, (: sprintf("%=-4s\n", "A B C\n") == "A B\nC\n" :) }),
     ({ "sprintf 2", 0, (: sprintf("%=-4s\n%s", "A B C\n", "X\n") == "A B\nC\nX\n" :) }),
     ({ "sprintf 3", 0, (: sprintf("%=-4s %=-4s\n%s", "A B C\n", "1 2 3\n", "X\n") == "A B  1 2\nC    3\nX\n" :) }),

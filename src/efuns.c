@@ -4028,7 +4028,7 @@ sscanf_search (char *str, char *fmt, struct sscanf_info *info)
      * don't start a %-spec.
      */
 
-    if (b == a)
+    if (b == a && (b != '%' || *fmt == '%'))
     {
         /* A run of identical characters: set n to the length */
 
@@ -4043,8 +4043,9 @@ sscanf_search (char *str, char *fmt, struct sscanf_info *info)
             /* n fmt-'%' represent (n/2) real '%'s */
             if (n & 1)
             {
+                /* The last '%' belongs to a %-spec. */
                 n >>= 1;
-                fmt--;
+                fmt-=2;
                 goto a_na_search;
             }
             n >>= 1;
