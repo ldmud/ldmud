@@ -1785,6 +1785,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
 
             if (column_stat == 2 && format_str[fpos] != '\n')
                 ADD_CHAR(st, '\n');
+            column_stat = 0;
 
             if (!format_str[fpos])
                 break;
