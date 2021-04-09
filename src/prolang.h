@@ -22,6 +22,24 @@ struct lvalue_block_s
     p_int size;
 };
 
+/* --- struct statement_s: Information about a statement block ---
+ *
+ * Here we keep track of some control flow information, that we'll
+ * use for proper diagnostics.
+ */
+
+struct statement_s
+{
+    bool may_return         : 1;  /* The statement may issue a return.   */
+    bool may_break          : 1;  /* The statement may issue a break.    */
+    bool may_continue       : 1;  /* The statement may issue a continue. */
+    bool may_finish         : 1;  /* The statement may finish without
+                                   * a break or return.
+                                   */
+    bool is_empty           : 1;  /* There is no real statement.         */
+    bool warned_dead_code   : 1;  /* We already warned about dead code.  */
+};
+
 
 /* --- Variables --- */
 

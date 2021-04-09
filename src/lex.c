@@ -155,6 +155,10 @@ Bool pragma_warn_missing_return;
    * does end with an explicit return statement.
    */
 
+Bool pragma_warn_dead_code;
+  /* True: generate a warning if dead code was detected.
+   */
+
 Bool pragma_check_overloads;
   /* TRUE if function redefinitions have to match the originals in their
    * types. This pragma is meant mainly to ease the adaption of old
@@ -3925,6 +3929,16 @@ handle_pragma (char *str)
             pragma_warn_missing_return = MY_FALSE;
             validPragma = MY_TRUE;
         }
+        else if (wordcmp(base, "warn_dead_code", namelen) == 0)
+        {
+            pragma_warn_dead_code = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "no_warn_dead_code", namelen) == 0)
+        {
+            pragma_warn_dead_code = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
         else if (wordcmp(base, "warn_function_inconsistent", namelen) == 0)
         {
             pragma_check_overloads = MY_TRUE;
@@ -6193,6 +6207,7 @@ start_new_file (int fd, const char * fname)
     pragma_no_shadow = MY_FALSE;
     pragma_pedantic = MY_FALSE;
     pragma_warn_missing_return = MY_TRUE;
+    pragma_warn_dead_code = MY_FALSE;
     pragma_warn_deprecated = MY_TRUE;
     pragma_range_check = MY_FALSE;
     pragma_warn_empty_casts = MY_TRUE;

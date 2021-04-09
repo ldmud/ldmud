@@ -75,6 +75,12 @@ DESCRIPTION
                 type other than 'void'.
         no_warn_missing_return: Turn off warn_missing_return.
 
+        warn_dead_code: Warn about dead code. Code is considered dead if
+                it can never be executed. The driver has only limited
+                analysis capabilities and cannot detect all instances
+                of dead code.
+        no_warn_dead_code: Turn off warn_dead_code (the default).
+
         warn_function_inconsistent: If an inherited function is
                 overloaded with inconsistent return types or arguments,
                 a warning is generated; or if pragma_pedantic is in effect,

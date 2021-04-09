@@ -248,6 +248,7 @@ extern Bool pragma_no_shadow;
 extern Bool pragma_pedantic;
 extern Bool pragma_range_check;
 extern Bool pragma_warn_missing_return;
+extern Bool pragma_warn_dead_code;
 extern Bool pragma_warn_deprecated;
 extern Bool pragma_warn_empty_casts;
 extern Bool pragma_check_overloads;
