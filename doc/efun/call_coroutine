@@ -1,0 +1,23 @@
+SYNOPSIS
+        mixed call_coroutine(coroutine cr, mixed value = 0)
+
+DESCRIPTION
+        Continues execution of the coroutine.
+
+        The value will be passed as the result of its last suspension
+        point (the previous yield() call of its execution). If the
+        coroutine is at its start, the value will be discarded.
+
+        The coroutine may pass execution to other coroutines through
+        await() and yield() calls. A yield() call without a coroutine,
+        a return statement or simply the end of the statement block
+        will return to the caller.
+
+        The result of the call will be the value given to the yield()
+        or return statement.
+
+HISTORY
+        Coroutines were introduced in LDMud 3.6.5.
+
+SEE ALSO
+        coroutines(LPC), this_coroutine(E)

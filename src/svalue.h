@@ -54,6 +54,9 @@ union u {
     lambda_t *lambda;
       /* T_CLOSURE: allocated closures: the closure structure.
        */
+    coroutine_t *coroutine;
+      /* T_COROUTINE: pointer to the coroutine structure.
+       */
 #ifdef FLOAT_FORMAT_2
     double  float_number;
     /* T_FLOAT: the double value for this float in FLOAT_FORMAT_2.
@@ -192,27 +195,34 @@ struct svalue_s
 #define T_STRUCT        0xb  /* a struct */
 #define T_BYTES         0xc  /* a byte string */
 #define T_LWOBJECT      0xd  /* a lightweight object */
+#define T_COROUTINE     0xe
 
-#define T_CALLBACK      0xe
+#define T_CALLBACK      0xf
   /* A callback structure referenced from the stack to allow
    * proper cleanup during error recoveries. The interpreter
    * knows how to free it, but that's all.
    */
 
-#define T_ERROR_HANDLER 0xf
+#define T_ERROR_HANDLER 0x10
   /* Not an actual value, this is used internally for cleanup
    * operations. See the description of the error_handler() member
    * for details.
    */
 
-#define T_BREAK_ADDR    0x10
+#define T_BREAK_ADDR    0x11
   /* Not an actual type, it's used internally for saving
    * the address where break statements within switch statements
    * should branch to.
    */
 
+#define T_ARG_FRAME     0x12
+  /* Not an actual type, it's used internally for saving
+   * the surrounding argument frame pointer, when a new
+   * argument frame is created.
+   */
+
 #undef T_NULL /* There is some T_NULL definition in system headers. */
-#define T_NULL          0x11
+#define T_NULL          0x13
   /* Not an actual type, this is used in the efun_lpc_types[] table
    * to encode the acceptance of '0' instead of the real datatype.
    */
@@ -390,6 +400,7 @@ struct svalue_s
 #define TF_STRUCT        (1 << T_STRUCT)
 #define TF_BYTES         (1 << T_BYTES)
 #define TF_LWOBJECT      (1 << T_LWOBJECT)
+#define TF_COROUTINE     (1 << T_COROUTINE)
 
 #define TF_ANYTYPE       (~0)
   /* This is used in the efun_lpc_types[]
@@ -611,6 +622,15 @@ static INLINE svalue_t svalue_lwobject(lwobject_t * const lwobj)
     return (svalue_t){ T_LWOBJECT, {}, {.lwob = lwobj } };
 }
 
+static INLINE svalue_t svalue_coroutine(coroutine_t * const cr)
+                        __attribute__((nonnull(1))) __attribute__((const));
+static INLINE svalue_t svalue_coroutine(coroutine_t * const cr)
+/* Return an svalue for the coroutine <cr>.
+ */
+{
+    return (svalue_t){ T_COROUTINE, {}, {.coroutine = cr } };
+}
+
 static INLINE svalue_t svalue_callback(callback_t * const cb)
                         __attribute__((nonnull(1))) __attribute__((const));
 static INLINE svalue_t svalue_callback(callback_t * const cb)
@@ -711,6 +731,15 @@ static INLINE void put_lwobject(svalue_t * const dest, lwobject_t * const lwobj)
     *dest = svalue_lwobject(lwobj);
 }
 
+static INLINE void put_coroutine(svalue_t * const dest, coroutine_t * const cr)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_coroutine(svalue_t * const dest, coroutine_t * const cr)
+/* Put the coroutine <cr> into <dest>, which is considered empty.
+ */
+{
+    *dest = svalue_coroutine(cr);
+}
+
 static INLINE void put_callback(svalue_t * const dest, callback_t * const cb)
                                                 __attribute__((nonnull(1,2)));
 static INLINE void put_callback(svalue_t * const dest, callback_t * const cb)
@@ -767,6 +796,9 @@ static INLINE void put_callback(svalue_t * const dest, callback_t * const cb)
     ( (sp)++, put_ref_bytes(sp,val) )
 #define push_bytes(sp,val) \
     ( (sp)++, put_bytes(sp,val) )
+
+#define push_coroutine(sp,val) \
+    ( (sp)++, put_coroutine(sp,val) )
 
 #define push_callback(sp,val) \
     ( (sp)++, put_callback(sp,val) )

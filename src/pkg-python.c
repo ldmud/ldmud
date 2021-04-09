@@ -73,6 +73,7 @@ enum python_structmember_type
 #include "actions.h"
 #include "array.h"
 #include "closure.h"
+#include "coroutine.h"
 #include "exec.h"
 #include "gcollect.h"
 #include "instrs.h"
@@ -253,6 +254,7 @@ static ldmud_gc_var_t *gc_object_list = NULL,
                       *gc_mapping_list_list = NULL,
                       *gc_struct_list = NULL,
                       *gc_closure_list = NULL,
+                      *gc_coroutine_list = NULL,
                       *gc_symbol_list = NULL,
                       *gc_quoted_array_list = NULL,
                       *gc_lvalue_list = NULL;
@@ -841,6 +843,13 @@ struct ldmud_closure_s
     svalue_t lpc_closure;       /* Can be T_INVALID. */
 };
 
+struct ldmud_coroutine_s
+{
+    PyGCObject_HEAD
+
+    coroutine_t *lpc_coroutine; /* Can be NULL. */
+};
+
 struct ldmud_symbol_s
 {
     PyGCObject_HEAD
@@ -870,6 +879,7 @@ typedef struct ldmud_program_s ldmud_program_t;
 typedef struct ldmud_object_s ldmud_object_t;
 typedef struct ldmud_lwobject_s ldmud_lwobject_t;
 typedef struct ldmud_closure_s ldmud_closure_t;
+typedef struct ldmud_coroutine_s ldmud_coroutine_t;
 typedef struct ldmud_program_and_index_s ldmud_program_and_index_t;
 typedef struct ldmud_program_lfun_argument_s ldmud_program_lfun_argument_t;
 typedef struct ldmud_symbol_s ldmud_symbol_t;
@@ -6311,6 +6321,394 @@ ldmud_closure_create (svalue_t* cl)
 } /* ldmud_closure_create() */
 
 /*-------------------------------------------------------------------------*/
+/* Coroutines */
+
+static void
+ldmud_coroutine_dealloc (ldmud_coroutine_t* self)
+
+/* Destroy the ldmud_coroutine_t object
+ */
+
+{
+    free_coroutine(self->lpc_coroutine);
+
+    remove_gc_object(&gc_coroutine_list, (ldmud_gc_var_t*)self);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_coroutine_dealloc() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_coroutine_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
+
+/* Implmenent __new__ for ldmud_coroutine_t, i.e. allocate and initialize
+ * the coroutine with null values.
+ */
+
+{
+    ldmud_coroutine_t *self;
+
+    self = (ldmud_coroutine_t *)type->tp_alloc(type, 0);
+    if (self == NULL)
+        return NULL;
+
+    self->lpc_coroutine = NULL;
+    add_gc_object(&gc_coroutine_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_coroutine_new() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_coroutine_repr (ldmud_coroutine_t *val)
+
+/* Return a string representation of this coroutine.
+ */
+
+{
+    function_t *fun;
+    if (val->lpc_coroutine == NULL)
+        return PyUnicode_FromString("<LPC uninitialized coroutine>");
+    if (val->lpc_coroutine->prog == NULL)
+        return PyUnicode_FromString("<LPC destructed coroutine>");
+
+    fun = val->lpc_coroutine->prog->function_headers + FUNCTION_HEADER_INDEX(val->lpc_coroutine->funstart);
+
+    switch (val->lpc_coroutine->ob.type)
+    {
+        case T_OBJECT:
+            return PyUnicode_FromFormat("<LPC coroutine /%s->%s()>", get_txt(val->lpc_coroutine->ob.u.ob->name), get_txt(fun->name));
+        case T_LWOBJECT:
+            return PyUnicode_FromFormat("<LPC coroutine /%s->%s()>", get_txt(val->lpc_coroutine->ob.u.lwob->prog->name), get_txt(fun->name));
+        default:
+            return PyUnicode_FromString("<LPC destructed coroutine>");
+    }
+} /* ldmud_coroutine_repr() */
+
+/*-------------------------------------------------------------------------*/
+static Py_hash_t
+ldmud_coroutine_hash (ldmud_coroutine_t *val)
+
+/* Return a hash of this coroutine.
+ */
+
+{
+    return _Py_HashPointer(val->lpc_coroutine);
+} /* ldmud_coroutine_hash() */
+
+/*-------------------------------------------------------------------------*/
+static bool ldmud_coroutine_check(PyObject *ob);
+
+static PyObject*
+ldmud_coroutine_richcompare (ldmud_coroutine_t *self, PyObject *other, int op)
+
+/* Compare <self> to <other> with the compare operation <op>.
+ */
+
+{
+    coroutine_t *self_cr, *other_cr;
+    bool result;
+    PyObject* resultval;
+
+    if (!ldmud_coroutine_check(other))
+    {
+        Py_INCREF(Py_NotImplemented);
+        return Py_NotImplemented;
+    }
+
+    self_cr = self->lpc_coroutine;
+    other_cr = ((ldmud_coroutine_t*)other)->lpc_coroutine;
+
+    if(self_cr == NULL && other_cr == NULL)
+        result = op == Py_LE || op == Py_EQ || op == Py_GE;
+    else if(self_cr == NULL)
+        result = op == Py_LT || op == Py_LE || op == Py_NE;
+    else if(other_cr == NULL)
+        result = op == Py_GT || op == Py_GE || op == Py_NE;
+    else
+    {
+        switch (op)
+        {
+            case Py_LT: result = self_cr <  other_cr; break;
+            case Py_LE: result = self_cr <= other_cr; break;
+            case Py_EQ: result = self_cr == other_cr; break;
+            case Py_NE: result = self_cr != other_cr; break;
+            case Py_GT: result = self_cr >  other_cr; break;
+            case Py_GE: result = self_cr >= other_cr; break;
+            default:
+            {
+                Py_INCREF(Py_NotImplemented);
+                return Py_NotImplemented;
+            }
+        }
+    }
+
+    resultval = result ? Py_True : Py_False;
+    Py_INCREF(resultval);
+    return resultval;
+} /* ldmud_coroutine_richcompare() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_coroutine_bool(ldmud_coroutine_t *val)
+
+/* Return 0 (false) for coroutines of destructed objects, 1 (true) for normal objects.
+ */
+
+{
+    if (!val->lpc_coroutine)
+        return 0;
+    return valid_coroutine(val->lpc_coroutine);
+} /* ldmud_coroutine_bool() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_get_object (ldmud_coroutine_t *val, void *closure)
+
+/* Return the value for the object member.
+ */
+
+{
+    if(!val->lpc_coroutine)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    return svalue_to_python(&(val->lpc_coroutine->ob));
+} /* ldmud_coroutine_get_object() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_get_program_name (ldmud_coroutine_t *val, void *closure)
+
+/* Return the value for the program_name member.
+ */
+
+{
+    if(!val->lpc_coroutine || !val->lpc_coroutine->prog)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    return PyUnicode_FromFormat("/%s", get_txt(val->lpc_coroutine->prog->name));
+} /* ldmud_coroutine_get_program_name() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_get_function_name (ldmud_coroutine_t *val, void *closure)
+
+/* Return the value for the function_name member.
+ */
+
+{
+    string_t * name;
+    if(!val->lpc_coroutine || !val->lpc_coroutine->prog)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    name = val->lpc_coroutine->prog->function_headers[FUNCTION_HEADER_INDEX(val->lpc_coroutine->funstart)].name;
+    return PyUnicode_FromStringAndSize(get_txt(name), mstrsize(name));
+} /* ldmud_coroutine_get_function_name() */
+
+/*-------------------------------------------------------------------------*/
+static void
+ldmud_coroutine_call_coroutine (int num_arg, void* data)
+
+/* Helper function for ldmud_coroutine_call().
+ */
+
+{
+    inter_sp = f_call_coroutine(inter_sp);
+} /* ldmud_coroutine_call_coroutine() */
+
+
+static PyObject*
+ldmud_coroutine_call (ldmud_coroutine_t *cr, PyObject *arg, PyObject *kw)
+
+/* Implement the call operator for coroutines.
+ */
+
+{
+    int num_arg = (int)PyTuple_GET_SIZE(arg);
+    coroutine_t * target = cr->lpc_coroutine;
+
+    if(python_is_external ? (!master_ob) : (current_object.type == T_NUMBER))
+    {
+        PyErr_SetString(PyExc_RuntimeError, "can't call a coroutine without a current object");
+        return NULL;
+    }
+
+    if (kw != NULL && PyDict_Size(kw) != 0)
+    {
+        PyErr_SetString(PyExc_TypeError, "coroutine call takes no keyword arguments");
+        return NULL;
+    }
+    else if (num_arg > 1)
+    {
+        PyErr_SetString(PyExc_TypeError, "coroutine call takes only a single argument");
+        return NULL;
+    }
+    else if (target == NULL)
+    {
+        PyErr_SetString(PyExc_TypeError, "uninitialized lpc coroutine");
+        return NULL;
+    }
+    else if (!valid_coroutine(target))
+    {
+        PyErr_SetString(PyExc_TypeError, "expired lpc coroutine");
+        return NULL;
+    }
+    else if (!(target = get_resumable_coroutine(target)))
+    {
+        PyErr_SetString(PyExc_TypeError, "coroutine is not resumable");
+        return NULL;
+    }
+    else
+    {
+        svalue_t *sp = inter_sp;
+        PyObject *result;
+        const char* err;
+
+        /* Put all arguments on the stack. */
+        push_ref_coroutine(sp, target);
+
+        if (num_arg == 1)
+        {
+            err = python_to_svalue(++sp, PyTuple_GetItem(arg, 0));
+            if (err != NULL)
+            {
+                free_coroutine(target);
+
+                PyErr_SetString(PyExc_ValueError, err);
+                return NULL;
+            }
+        }
+        else
+            push_number(sp, 0);
+
+        inter_sp = sp;
+
+        if(call_lpc_secure((CClosureFun)ldmud_coroutine_call_coroutine, 2, NULL))
+        {
+            result = svalue_to_python(inter_sp);
+            pop_stack();
+        }
+        else
+            result = NULL;
+
+        return result;
+    }
+
+    return NULL;
+} /* ldmud_coroutine_call() */
+
+/*-------------------------------------------------------------------------*/
+static PyNumberMethods ldmud_coroutine_as_number =
+{
+    0,                                  /* nb_add */
+    0,                                  /* nb_subtract */
+    0,                                  /* nb_multiply */
+    0,                                  /* nb_remainder */
+    0,                                  /* nb_divmod */
+    0,                                  /* nb_power */
+    0,                                  /* nb_negative */
+    0,                                  /* nb_positive */
+    0,                                  /* nb_absolute */
+    (inquiry)ldmud_coroutine_bool,      /* nb_bool */
+};
+
+static PyMethodDef ldmud_coroutine_methods[] =
+{
+    {NULL}
+};
+
+static PyGetSetDef ldmud_coroutine_getset[] =
+{
+    {"object",        (getter)ldmud_coroutine_get_object,        NULL, NULL, NULL},
+    {"program_name",  (getter)ldmud_coroutine_get_program_name,  NULL, NULL, NULL},
+    {"function_name", (getter)ldmud_coroutine_get_function_name, NULL, NULL, NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_coroutine_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.Coroutine",                  /* tp_name */
+    sizeof(ldmud_coroutine_t),          /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_coroutine_dealloc,/* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    (reprfunc)ldmud_coroutine_repr,     /* tp_repr */
+    &ldmud_coroutine_as_number,         /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    (hashfunc)ldmud_coroutine_hash,     /* tp_hash  */
+    (ternaryfunc)ldmud_coroutine_call,  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC coroutine",                    /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    (richcmpfunc)ldmud_coroutine_richcompare, /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_coroutine_methods,            /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_coroutine_getset,             /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,                                  /* tp_init */
+    0,                                  /* tp_alloc */
+    ldmud_coroutine_new,                /* tp_new */
+};
+
+
+/*-------------------------------------------------------------------------*/
+static bool
+ldmud_coroutine_check (PyObject *ob)
+
+/* Returns true, when <ob> is of the LPC coroutine type.
+ */
+
+{
+    return Py_TYPE(ob) == &ldmud_coroutine_type;
+} /* ldmud_coroutine_check() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_coroutine_create (coroutine_t* cr)
+
+/* Creates a new Python coroutine from an LPC coroutine.
+ */
+
+{
+    ldmud_coroutine_t *self;
+
+    self = (ldmud_coroutine_t *)ldmud_coroutine_type.tp_alloc(&ldmud_coroutine_type, 0);
+    if (self == NULL)
+        return NULL;
+
+    self->lpc_coroutine = ref_coroutine(cr);
+    add_gc_object(&gc_coroutine_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_coroutine_create() */
+
+/*-------------------------------------------------------------------------*/
 /* Symbols */
 static bool ldmud_symbol_check(PyObject *ob);
 
@@ -6974,7 +7372,7 @@ static PyObject*
 ldmud_lvalue_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 /* Implmenent __new__ for ldmud_lvalue_t, i.e. allocate and initialize
- * the closure with null values.
+ * the lvalue with null values.
  */
 
 {
@@ -7028,7 +7426,7 @@ ldmud_lvalue_init (ldmud_lvalue_t *self, PyObject *args, PyObject *kwds)
 static Py_hash_t
 ldmud_lvalue_hash (ldmud_lvalue_t *val)
 
-/* Return a hash of this closure.
+/* Return a hash of this lvalue.
  */
 
 {
@@ -7718,7 +8116,7 @@ static PyTypeObject ldmud_lvalue_type =
 static bool
 ldmud_lvalue_check (PyObject *ob)
 
-/* Returns true, when <ob> is of the LPC closure type.
+/* Returns true, when <ob> is of the LPC lvalue type.
  */
 
 {
@@ -8277,6 +8675,8 @@ init_ldmud_module ()
         return NULL;
     if (PyType_Ready(&ldmud_closure_type) < 0)
         return NULL;
+    if (PyType_Ready(&ldmud_coroutine_type) < 0)
+        return NULL;
     if (PyType_Ready(&ldmud_symbol_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_quoted_array_type) < 0)
@@ -8302,6 +8702,7 @@ init_ldmud_module ()
     Py_INCREF(&ldmud_mapping_type);
     Py_INCREF(&ldmud_struct_type);
     Py_INCREF(&ldmud_closure_type);
+    Py_INCREF(&ldmud_coroutine_type);
     Py_INCREF(&ldmud_symbol_type);
     Py_INCREF(&ldmud_quoted_array_type);
     Py_INCREF(&ldmud_interrupt_exception_type);
@@ -8311,6 +8712,7 @@ init_ldmud_module ()
     PyModule_AddObject(module, "Mapping", (PyObject*) &ldmud_mapping_type);
     PyModule_AddObject(module, "Struct", (PyObject*) &ldmud_struct_type);
     PyModule_AddObject(module, "Closure", (PyObject*) &ldmud_closure_type);
+    PyModule_AddObject(module, "Coroutine", (PyObject*) &ldmud_coroutine_type);
     PyModule_AddObject(module, "Symbol", (PyObject*) &ldmud_symbol_type);
     PyModule_AddObject(module, "QuotedArray", (PyObject*) &ldmud_quoted_array_type);
     PyModule_AddObject(module, "Lvalue", (PyObject*) &ldmud_lvalue_type);
@@ -8390,6 +8792,10 @@ lpctype_to_pythontype (lpctype_t *type)
                 case TYPE_CLOSURE:
                     Py_INCREF(&ldmud_closure_type);
                     return (PyObject *)&ldmud_closure_type;
+
+                case TYPE_COROUTINE:
+                    Py_INCREF(&ldmud_coroutine_type);
+                    return (PyObject *)&ldmud_coroutine_type;
 
                 case TYPE_SYMBOL:
                     Py_INCREF(&ldmud_symbol_type);
@@ -8519,6 +8925,9 @@ pythontype_to_lpctype (PyObject* ptype)
         if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_closure_type))
             return lpctype_closure;
 
+        if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_coroutine_type))
+            return lpctype_coroutine;
+
         if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_symbol_type))
             return lpctype_symbol;
 
@@ -8610,6 +9019,9 @@ svalue_to_python (svalue_t *svp)
 
         case T_CLOSURE:
             return ldmud_closure_create(svp);
+
+        case T_COROUTINE:
+            return ldmud_coroutine_create(svp->u.coroutine);
 
         case T_SYMBOL:
             return ldmud_symbol_create(svp);
@@ -8710,6 +9122,12 @@ python_to_svalue (svalue_t *dest, PyObject* val)
     if (PyObject_TypeCheck(val, &ldmud_closure_type))
     {
         assign_svalue_no_free(dest, &((ldmud_closure_t*)val)->lpc_closure);
+        return NULL;
+    }
+
+    if (PyObject_TypeCheck(val, &ldmud_coroutine_type))
+    {
+        put_ref_coroutine(dest, ((ldmud_coroutine_t*)val)->lpc_coroutine);
         return NULL;
     }
 
@@ -8854,6 +9272,14 @@ python_eq_svalue (PyObject* pval, svalue_t *sval)
     {
         if (sval->type == T_CLOSURE)
             return closure_cmp(sval, &((ldmud_closure_t*)pval)->lpc_closure) == 0;
+        else
+            return false;
+    }
+
+    if (PyObject_TypeCheck(pval, &ldmud_coroutine_type))
+    {
+        if (sval->type == T_COROUTINE)
+            return sval->u.coroutine == ((ldmud_coroutine_t*)pval)->lpc_coroutine;
         else
             return false;
     }
@@ -9951,6 +10377,13 @@ python_clear_refs ()
         clear_ref_in_vector(&((ldmud_closure_t*)var)->lpc_closure, 1);
     }
 
+    for(ldmud_gc_var_t* var = gc_coroutine_list; var != NULL; var = var->gcnext)
+    {
+        coroutine_t *cr = ((ldmud_coroutine_t*)var)->lpc_coroutine;
+        if(cr != NULL)
+            clear_coroutine_ref(cr);
+    }
+
     for(ldmud_gc_var_t* var = gc_symbol_list; var != NULL; var = var->gcnext)
     {
         clear_ref_in_vector(&((ldmud_symbol_t*)var)->lpc_symbol, 1);
@@ -10089,6 +10522,13 @@ python_count_refs ()
         count_ref_in_vector(&((ldmud_closure_t*)var)->lpc_closure, 1);
     }
 
+    for(ldmud_gc_var_t* var = gc_coroutine_list; var != NULL; var = var->gcnext)
+    {
+        coroutine_t *cr = ((ldmud_coroutine_t*)var)->lpc_coroutine;
+        if(cr != NULL)
+            count_coroutine_ref(cr);
+    }
+
     for(ldmud_gc_var_t* var = gc_symbol_list; var != NULL; var = var->gcnext)
     {
         count_ref_in_vector(&((ldmud_symbol_t*)var)->lpc_symbol, 1);
@@ -10174,6 +10614,16 @@ count_python_extra_refs ()
     for(ldmud_gc_var_t* var = gc_closure_list; var != NULL; var = var->gcnext)
     {
         count_extra_ref_in_vector(&((ldmud_closure_t*)var)->lpc_closure, 1);
+    }
+
+    for(ldmud_gc_var_t* var = gc_coroutine_list; var != NULL; var = var->gcnext)
+    {
+        coroutine_t* cr = ((ldmud_coroutine_t*)var)->lpc_coroutine;
+        if(cr != NULL)
+        {
+            svalue_t sv = { T_COROUTINE, {}, { .coroutine = cr } };
+            count_extra_ref_in_vector(&sv, 1);
+        }
     }
 
     for(ldmud_gc_var_t* var = gc_symbol_list; var != NULL; var = var->gcnext)

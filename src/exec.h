@@ -279,6 +279,7 @@ enum function_flags {
     TYPE_MOD_PROTECTED = 0x01000000,  /* cannot be called externally    */
     TYPE_MOD_XVARARGS  = 0x00800000,  /* accepts optional arguments     */
     TYPE_MOD_NOSAVE    = 0x00400000,  /* vars: can't be saved           */
+    TYPE_MOD_COROUTINE = 0x00400000,  /* lfun: is a coroutine           */
     NAME_CROSS_DEFINED = 0x00200000,
     TYPE_MOD_DEPRECATED  = 0x00100000, /* lfun is marked deprecated     */
   /* Two functions with the same name inherited from A and B into C.

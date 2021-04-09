@@ -1,0 +1,32 @@
+NAME
+        async
+
+SYNTAX
+        /* function */
+        async <modifiers> <type> name ( <arguments> )
+        {
+             statements...
+        }
+
+        /* inline closure */
+        async function <type> ( ) : <context>
+        {
+            statements...
+        }
+
+DESCRIPTION
+        The async modifer turns a function or inline closure into a coroutine.
+
+        If the function is called it will immediately return a coroutine
+        object that will represent the remainder of the function's execution.
+
+        The inline closure notation will not result in a closure, but a
+        coroutine object.
+
+HISTORY
+        Coroutines were introduced in LDMud 3.6.5.
+
+SEE ALSO
+        coroutines(LPC), await(LPC), yield(LPC), foreach(LPC),
+        call_coroutine(E), this_coroutine(E)
+

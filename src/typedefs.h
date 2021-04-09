@@ -19,6 +19,7 @@ typedef struct call_cache_s       call_cache_t;       /* exec.h */
 typedef struct callback_s         callback_t;         /* simulate.h */
 typedef struct case_list_entry_s  case_list_entry_t;  /* switch.h */
 typedef struct case_state_s       case_state_t;       /* switch.h */
+typedef struct coroutine_s        coroutine_t;        /* coroutine.h */
 typedef struct error_handler_s    error_handler_t;    /* interpret.h */
 typedef struct fulltype_s         fulltype_t;         /* types.h */
 typedef struct function_s         function_t;         /* exec.h */

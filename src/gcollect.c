@@ -93,6 +93,7 @@
 #include "call_out.h"
 #include "closure.h"
 #include "comm.h"
+#include "coroutine.h"
 #include "efuns.h"
 #include "filestat.h"
 #include "heartbeat.h"
@@ -472,6 +473,26 @@ cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
 
         case T_CLOSURE:
             cleanup_closure(p, context);
+            break;
+
+        case T_COROUTINE:
+            if (valid_coroutine(p->u.coroutine))
+            {
+                coroutine_t *cr = p->u.coroutine;
+                int num_vars = cr->num_variables;
+
+                if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
+                    cleanup_vector(cr->variables[cr->num_variables].u.lvalue, cr->num_values, context);
+                else
+                    num_vars += cr->num_values;
+
+                cleanup_vector(cr->variables, num_vars, context);
+            }
+            else
+            {
+                free_coroutine(p->u.coroutine);
+                put_number(p, 0);
+            }
             break;
 
         case T_LVALUE:
@@ -1475,6 +1496,10 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
                 clear_object_ref(p->u.ob);
             continue;
 
+        case T_COROUTINE:
+            clear_coroutine_ref(p->u.coroutine);
+            continue;
+
         case T_LVALUE:
             switch (p->x.lvalue_type)
             {
@@ -1653,6 +1678,10 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
                     ob->ref++;
                 }
             }
+            continue;
+
+        case T_COROUTINE:
+            count_coroutine_ref(p->u.coroutine);
             continue;
 
         case T_SYMBOL:
@@ -2778,6 +2807,27 @@ show_lwobject (int d, void *block, int depth)
 
 /*-------------------------------------------------------------------------*/
 static void
+show_coroutine (int d, void *block, int depth)
+
+/* Print the data about the coroutine structure <block> on filedescriptor <d>.
+ */
+
+{
+    coroutine_t *cr;
+
+    cr = (coroutine_t *)block;
+    if (cr->prog)
+    {
+        WRITES(d, "Coroutine from ");
+        show_mstring(d, cr->prog->name, 0);
+        WRITES(d, "\n");
+    }
+    else
+        WRITES(d, "Finished coroutine\n");
+} /* show_coroutine() */
+
+/*-------------------------------------------------------------------------*/
+static void
 show_cl_literal (int d, void *block, int depth UNUSED)
 
 /* Print the data about literal closure <block> on filedescriptor <d>.
@@ -2953,6 +3003,10 @@ show_array(int d, void *block, int depth)
             show_lwobject(d, (char *)svp->u.lwob, 1);
             break;
 
+        case T_COROUTINE:
+            show_coroutine(d, (char *)svp->u.coroutine, 1);
+            break;
+
         default:
             WRITES(d, "Svalue type ");writed(d, svp->type);WRITES(d, "\n");
             break;
@@ -3083,6 +3137,10 @@ show_struct(int d, void *block, int depth)
             show_lwobject(d, (char *)svp->u.lwob, 1);
             break;
 
+        case T_COROUTINE:
+            show_coroutine(d, (char *)svp->u.coroutine, 1);
+            break;
+
         default:
             WRITES(d, "Svalue type ");writed(d, svp->type);WRITES(d, "\n");
             break;
@@ -3109,6 +3167,7 @@ setup_print_block_dispatcher (void)
     svalue_t tmp_closure;
     vector_t *a, *b;
     lwobject_t *lw;
+    coroutine_t *cr;
 
     assert_master_ob_loaded();
 
@@ -3145,6 +3204,9 @@ setup_print_block_dispatcher (void)
     lw = new_sample_lwobject();
     store_print_block_dispatch_info((char *)lw, show_lwobject);
     free_sample_lwobject(lw);
+    cr = new_sample_coroutine();
+    store_print_block_dispatch_info((char *)cr, show_coroutine);
+    free_sample_coroutine(cr);
 
     tmp_closure.type = T_CLOSURE;
     tmp_closure.x.closure_type = CLOSURE_EFUN + F_ALLOCATE;

@@ -4812,6 +4812,7 @@ e_say (svalue_t *v, vector_t *avoid)
 
     case T_OBJECT:
     case T_LWOBJECT:
+    case T_COROUTINE:
     case T_POINTER:
     case T_MAPPING:
     case T_STRUCT:
@@ -5015,6 +5016,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
 
     case T_OBJECT:
     case T_LWOBJECT:
+    case T_COROUTINE:
     case T_POINTER:
     case T_MAPPING:
     case T_STRUCT:

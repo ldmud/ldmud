@@ -762,6 +762,9 @@ struct inline_closure_s
     Bool parse_context;
       /* TRUE if the context variable definitions are parsed.
        */
+    bool coroutine;
+      /* True if it is a coroutine.
+       */
     int start_line;
       /* Starting line number, used to adjust the generated linenumbers.
        */
@@ -899,10 +902,12 @@ static ident_t * global_variable_initializing;
 static fulltype_t def_function_returntype;
 static ident_t *  def_function_ident;
 static int        def_function_num_args;
+static bool       def_function_coroutine;
   /* Globals to keep the state while a function is parsed:
    *   _returntype: the returntype (uncounted reference)
    *   _ident:      the function's identifier.
    *   _num_args:   number of formal arguments.
+   *   _coroutine:  true, if it is a coroutine.
    */
 
 static mem_block_t type_of_arguments;
@@ -1592,7 +1597,8 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
 {
     static char *type_name[] = { "unknown", "int", "string", "void",
                                  "mapping", "float", "mixed", "closure",
-                                 "symbol", "quoted_array", "bytes" };
+                                 "symbol", "quoted_array", "bytes",
+                                 "coroutine" };
 
     if (bufsize <= 0)
         return 0;
@@ -2417,6 +2423,7 @@ unary_op_types_t types_foreach_iteration[] = {
     { &_lpctype_any_array,                      NULL,              &get_array_member_type},
     { &_lpctype_any_struct,                     &_lpctype_mixed,   NULL                  },
     { &_lpctype_mapping,                        &_lpctype_mixed,   NULL                  },
+    { &_lpctype_coroutine,                      &_lpctype_mixed,   NULL                  },
     { NULL, NULL, NULL }
 };
 
@@ -3955,6 +3962,7 @@ free_all_local_names (void)
     max_break_stack_need = 0;
     def_function_ident = NULL;
     global_variable_initializing = NULL;
+    def_function_coroutine = false;
 } /* free_all_local_names() */
 
 /*-------------------------------------------------------------------------*/
@@ -4637,8 +4645,27 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
              * function. In both cases, we now consider this to be THE new
              * definition. It might also have been a prototype to an already
              * defined function.
-             *
-             * Check arguments only when types are supposed to be tested,
+             */
+
+            /* Check the 'async' modifier. */
+            if (((funp->flags) ^ flags) & TYPE_MOD_COROUTINE)
+            {
+                /* This is just a warning in case of re-defining inherited
+                 * functions, but always an error when differing from a
+                 * prototype.
+                 */
+                if ((funp->flags) & NAME_INHERITED)
+                {
+                    if (pragma_check_overloads)
+                        yywarnf("Redefinition of '%s' loses 'async' modifier"
+                                , get_txt(p->name));
+                }
+                else
+                    yyerrorf("Inconsistent declaration of '%s': 'async' modifier lost"
+                            , get_txt(p->name));
+            }
+
+            /* Check arguments only when types are supposed to be tested,
              * and if this function really has been defined already.
              *
              * 'nomask' functions may not be redefined.
@@ -5619,17 +5646,20 @@ def_function_prototype (int num_args, Bool is_inline)
 {
     ident_t * ident;
     fulltype_t * returntype;
+    bool coroutine;
     int fun;
 
     if (is_inline)
     {
         ident = current_inline->ident;
         returntype = &current_inline->returntype;
+        coroutine = current_inline->coroutine;
     }
     else
     {
         ident = def_function_ident;
         returntype = &def_function_returntype;
+        coroutine = def_function_coroutine;
     }
 
     /* We got the complete prototype: define it */
@@ -5660,7 +5690,7 @@ def_function_prototype (int num_args, Bool is_inline)
      * prototype will be updated below.
      */
     fun = define_new_function( MY_FALSE, ident, num_args, 0, 0
-                             , NAME_UNDEFINED|NAME_PROTOTYPE
+                             , NAME_UNDEFINED|NAME_PROTOTYPE|(coroutine?TYPE_MOD_COROUTINE:0)
                              , *returntype);
 
     /* Store the data */
@@ -5693,18 +5723,21 @@ def_function_complete (bool has_code, p_uint body_start, struct statement_s stat
     ident_t    * ident;
     fulltype_t   returntype;
     int          num_args;
+    bool         coroutine;
 
     if (is_inline)
     {
         ident = current_inline->ident;
         returntype = current_inline->returntype;
         num_args = current_inline->num_args;
+        coroutine = current_inline->coroutine;
     }
     else
     {
         ident = def_function_ident;
         returntype = def_function_returntype;
         num_args = def_function_num_args;
+        coroutine = def_function_coroutine;
     }
 
     if (!has_code)
@@ -5740,7 +5773,8 @@ def_function_complete (bool has_code, p_uint body_start, struct statement_s stat
                             , num_args
                             , num_vars
                             , body_start + FUNCTION_PRE_HDR_SIZE
-                            , 0, returntype);
+                            , coroutine?TYPE_MOD_COROUTINE:0
+                            , returntype);
 
         /* Catch a missing return if the function has a return type */
         if (returntype.t_type != lpctype_void
@@ -6724,6 +6758,7 @@ printf("DEBUG: new inline #%"PRIuMPINT": prev %"PRIdMPINT"\n", INLINE_CLOSURE_CO
     ict.returntype.t_type = NULL;
     ict.num_args = 0;
     ict.parse_context = MY_FALSE;
+    ict.coroutine = false;
     ict.start_line = stored_lines;
     ict.end_line = stored_lines;
 
@@ -6991,7 +7026,7 @@ printf("DEBUG:        li_start %"PRIuMPINT", li_length %"PRIuMPINT
 
 /*-------------------------------------------------------------------------*/
 static Bool
-prepare_inline_closure (lpctype_t *returntype)
+prepare_inline_closure (lpctype_t *returntype, bool coroutine)
 
 /* Called after parsing 'func <type>', this creates the identifier
  * with the synthetic function name. The function also sets up the inline
@@ -7039,6 +7074,7 @@ prepare_inline_closure (lpctype_t *returntype)
     funtype.t_flags |= TYPE_MOD_NO_MASK | TYPE_MOD_PRIVATE;
 
     def_function_typecheck(funtype, ident, MY_TRUE);
+    current_inline->coroutine = coroutine;
 #ifdef DEBUG_INLINES
 printf("DEBUG: New inline closure name: '%s'\n", name);
 printf("DEBUG:   current_inline->depth: %d\n", current_inline->block_depth);
@@ -7444,7 +7480,9 @@ delete_prog_string (void)
 /*-------------------------------------------------------------------------*/
 
 %token L_ASSIGN
+%token L_ASYNC
 %token L_ARROW
+%token L_AWAIT
 %token L_BREAK
 %token L_BYTES
 %token L_BYTES_DECL
@@ -7454,6 +7492,7 @@ delete_prog_string (void)
 %token L_CLOSURE_DECL
 %token L_COLON_COLON
 %token L_CONTINUE
+%token L_COROUTINE
 %token L_DEC
 %token L_DEFAULT
 %token L_DO
@@ -7510,6 +7549,7 @@ delete_prog_string (void)
 %token L_VISIBLE
 %token L_VOID
 %token L_WHILE
+%token L_YIELD
 
 /* Textbook solution to the 'dangling else' shift/reduce conflict.
  */
@@ -7864,8 +7904,8 @@ delete_prog_string (void)
 %type <lpctype>      decl_cast cast
 %type <statement>    statement statements statements_block block inline_block inline_comma_expr cond while do for foreach switch return
 %type <switch_block> switch_block switch_statements
-%type <address>      note_start
-%type <rvalue>       comma_expr opt_default_value
+%type <address>      note_start coroutine_call
+%type <rvalue>       comma_expr opt_expr opt_default_value
 %type <function_argument> new_arg_name
 %type <function_arguments> argument argument_list inline_opt_args
 %type <function_block> function_body
@@ -7889,6 +7929,9 @@ delete_prog_string (void)
 %type <struct_member_operator> member_operator
 
 /* Special uses of <number> */
+
+%type <number> inline_opt_async
+  /* 1 for async, 0 otherwise. */
 
 %type <number> switch_label
   /* 1 for default, 0 otherwise. */
@@ -7967,7 +8010,22 @@ note_start: { $$ = CURRENT_PROGRAM_SIZE; };
  * Default visibility
  */
 
-def:  type L_IDENTIFIER  /* Function definition or prototype */
+def:  function_def
+    | coroutine_def
+    | name_list ';' /* Variable definition */
+      {
+          insert_pending_inline_closures();
+          free_fulltype($1);
+      }
+
+    | struct_decl
+    | inheritance
+    | default_visibility
+; /* def */
+
+
+function_def:
+      type L_IDENTIFIER  /* Function definition or prototype */
 
       {
           check_identifier($2);
@@ -8160,17 +8218,7 @@ def:  type L_IDENTIFIER  /* Function definition or prototype */
           insert_pending_inline_closures();
           free_fulltype($1);
       }
-
-    | name_list ';' /* Variable definition */
-      {
-          insert_pending_inline_closures();
-          free_fulltype($1);
-      }
-
-    | struct_decl
-    | inheritance
-    | default_visibility
-; /* def */
+; /* function_def */
 
 
 function_body:
@@ -8182,7 +8230,7 @@ function_body:
 %line
           CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
           $<address>$ = CURRENT_PROGRAM_SIZE;
-          if (realloc_a_program(FUNCTION_HDR_SIZE))
+          if (realloc_a_program(FUNCTION_HDR_SIZE+1))
           {
               CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE;
           }
@@ -8191,6 +8239,13 @@ function_body:
               yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                       , mem_block[A_PROGRAM].current_size + FUNCTION_HDR_SIZE);
               YYACCEPT;
+          }
+
+          if (def_function_coroutine)
+          {
+              ins_f_code(F_TRANSFORM_TO_COROUTINE);
+              /* The first call_coroutine() value will be ignored. */
+              ins_f_code(F_POP_VALUE);
           }
       }
 
@@ -8211,20 +8266,32 @@ function_body:
 ; /* function_body */
 
 
+coroutine_def:
+      L_ASYNC
+      {
+          def_function_coroutine = true;
+      }
+      function_def
+; /* coroutine_def */
+
+
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* Inline functions
  */
 
 inline_func:
-      L_FUNC inline_opt_type
+      inline_opt_async L_FUNC inline_opt_type
 
       {
 #ifdef DEBUG_INLINES
 printf("DEBUG: After inline_opt_type: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
-          if (!prepare_inline_closure($2))
+          if ($1)
+              ins_f_code(F_SAVE_ARG_FRAME);
+
+          if (!prepare_inline_closure($3, $1))
           {
-              free_lpctype($2);
+              free_lpctype($3);
               YYACCEPT;
           }
       }
@@ -8263,6 +8330,9 @@ printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROG
            * care of finding the right type for context variables.
            */
           $<address>$ = CURRENT_PROGRAM_SIZE;
+
+          if ($1 && $5.num > 0)
+              yyerror("async inline closure may not have arguments");
       }
 
       inline_opt_context
@@ -8321,19 +8391,25 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
                   block_scope[current_inline->block_depth-1].clobbered = MY_TRUE;
           }
 
-          if (!inline_closure_prototype($4.num))
+          if (!inline_closure_prototype($5.num))
           {
-              free_lpctype($2);
+              free_lpctype($3);
               YYACCEPT;
           }
 
-          $<number>$ = reserve_default_value_block($4.num_opt, $4.start);
+          $<number>$ = reserve_default_value_block($5.num_opt, $5.start);
           if (!$<number>$)
-              $4.num_opt = 0;
+              $5.num_opt = 0;
           else
           {
               int fnum = current_inline->ident->u.global.function;
-              FUNCTION(fnum)->num_opt_arg = $4.num_opt;
+              FUNCTION(fnum)->num_opt_arg = $5.num_opt;
+          }
+
+          if ($1)
+          {
+              ins_f_code(F_TRANSFORM_TO_COROUTINE);
+              ins_f_code(F_POP_VALUE);
           }
       }
 
@@ -8343,14 +8419,21 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
 #ifdef DEBUG_INLINES
 printf("DEBUG: After inline block: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
-         $$.start = $<address>5;
-         $$.type = get_fulltype(lpctype_closure);
+         $$.start = $<address>6;
+         $$.type = get_fulltype($1 ? lpctype_coroutine : lpctype_closure);
          $$.name = NULL;
 
-         copy_default_value_block($4.num_opt, $4.start, current_inline->start + $<number>7, $<number>7);
+         copy_default_value_block($5.num_opt, $5.start, current_inline->start + $<number>8, $<number>8);
 
-         complete_inline_closure($8);
-         free_lpctype($2);
+         complete_inline_closure($9);
+         free_lpctype($3);
+
+         if ($1)
+         {
+             /* Now we have built a closure, call it, to generate the coroutine. */
+             ins_f_code(F_FUNCALL);
+             ins_f_code(F_RESTORE_ARG_FRAME);
+         }
       }
 
 
@@ -8362,7 +8445,7 @@ printf("DEBUG: After inline block: program size %"PRIuMPINT"\n", CURRENT_PROGRAM
 #ifdef DEBUG_INLINES
 printf("DEBUG: After L_BEGIN_INLINE: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
-          if (!prepare_inline_closure(lpctype_mixed))
+          if (!prepare_inline_closure(lpctype_mixed, false))
               YYACCEPT;
 
           /* Synthesize $1..$9 as arguments */
@@ -8426,6 +8509,11 @@ printf("DEBUG: After L_END_INLINE: program size %"PRIuMPINT"\n", CURRENT_PROGRAM
       }
 
 ; /* inline_func */
+
+inline_opt_async:
+      /* empty */       { $$ = 0; }
+    | L_ASYNC           { $$ = 1; }
+; /* inline_opt_async */
 
 inline_opt_args:
       /* empty */
@@ -9060,6 +9148,7 @@ single_basic_non_void_type:
     | L_BYTES_DECL   { $$ = lpctype_bytes;      }
     | L_STRING_DECL  { $$ = pragma_no_bytes_type ? lpctype_string_bytes : lpctype_string; }
     | L_CLOSURE_DECL { $$ = lpctype_closure;    }
+    | L_COROUTINE    { $$ = lpctype_coroutine;  }
     | L_SYMBOL_DECL  { $$ = lpctype_symbol;     }
     | L_FLOAT_DECL   { $$ = lpctype_float;      }
     | L_MAPPING      { $$ = lpctype_mapping;    }
@@ -10662,6 +10751,7 @@ foreach_expr:
            && !lpctype_contains(lpctype_string, dtype)
            && !lpctype_contains(lpctype_bytes, dtype)
            && !lpctype_contains(lpctype_mapping, dtype)
+           && !lpctype_contains(lpctype_coroutine, dtype)
            && (gen_refs || !lpctype_contains(lpctype_int, dtype))
            && (exact_types || dtype != lpctype_unknown)
              )
@@ -11287,6 +11377,14 @@ bytes_constant:
  *
  * index_expr and index_range are used to parse and compile the two
  * forms of array indexing operations.
+ *
+ * comma_expr parsed a comma separated list of expr0 (at least one),
+ * all of the results but the last one are discarded, returns
+ * an rvalue for the whole block.
+ *
+ * opt_expr parses an optional expr0 which must start with a comma.
+ * If no expression is given, F_CONST0 will be issued instead.
+ * It returns an rvalue.
  */
 
 comma_expr:
@@ -11313,6 +11411,24 @@ comma_expr:
           free_lvalue_block($4.lvalue);
       }
 ; /* comma_expr */
+
+
+opt_expr:
+      /* Empty */
+      {
+          $$.start = last_expression = CURRENT_PROGRAM_SIZE;
+          $$.type = get_fulltype(lpctype_mixed);
+          $$.name = NULL;
+          ins_f_code(F_CONST0);
+      }
+    | ',' expr0
+      {
+          $$.start = $2.start;
+          $$.type = $2.type;
+          $$.name = $2.name;
+          free_lvalue_block($2.lvalue);
+      }
+; /* opt_expr */
 
 
 expr0:
@@ -14458,7 +14574,7 @@ struct_init:
 ; /* struct_init */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-/* Function calls and inline functions.
+/* Function calls, coroutine calls and inline functions.
  */
 
 function_call:
@@ -14673,7 +14789,10 @@ function_call:
                       add_short(simul_efun);
                       CURRENT_PROGRAM_SIZE += 3;
                   }
-                  $$.type = get_fulltype(ref_lpctype(funp->type));
+                  if (funp->flags & TYPE_MOD_COROUTINE)
+                      $$.type = get_fulltype(lpctype_coroutine);
+                  else
+                      $$.type = get_fulltype(ref_lpctype(funp->type));
               } /* if (simul-efun) */
 
               else if ($1.super ? ($<function_call_head>2.efun_override == OVERRIDE_NONE)
@@ -14751,7 +14870,11 @@ function_call:
                       CURRENT_PROGRAM_SIZE += 3;
                   }
 
-                  $$.type = get_fulltype(ref_lpctype(funp->type)); /* Result type */
+                  /* Result type */
+                  if (funp->flags & TYPE_MOD_COROUTINE)
+                      $$.type = get_fulltype(lpctype_coroutine);
+                  else
+                      $$.type = get_fulltype(ref_lpctype(funp->type));
 
                   /* Verify that the function has been defined already.
                    * For inherited functions this is a no-brainer.
@@ -15369,7 +15492,12 @@ function_call:
 
           free_fulltype($1.type);
       }
-
+    | coroutine_call
+      {
+          $$.type = get_fulltype(lpctype_mixed);
+          $$.start = $1;
+          $$.might_lvalue = true;
+      }
 ; /* function_call */
 
 
@@ -15538,6 +15666,75 @@ anchestor:
           last_lex_string = NULL;
       }
 ; /* anchestor */
+
+
+coroutine_call:
+      L_AWAIT '(' expr0 opt_expr ')'
+      {
+          $$ = $3.start;
+
+          use_variable($3.name, VAR_USAGE_READ);
+          use_variable($4.name, VAR_USAGE_READ);
+
+          if (!(current_inline ? current_inline->coroutine : def_function_coroutine))
+              yyerror("await statement outside coroutine");
+
+          if (!check_unknown_type($3.type.t_type)
+           && !lpctype_contains(lpctype_coroutine, $3.type.t_type))
+              fulltype_error("Bad argument to await()", $3.type);
+
+          check_unknown_type($4.type.t_type);
+
+          free_fulltype($3.type);
+          free_fulltype($4.type);
+
+          ins_f_code(F_AWAIT);
+      }
+    | L_YIELD '(' expr0 ',' expr0 ')'
+      {
+          $$ = $3.start;
+
+          use_variable($3.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+
+          if (!(current_inline ? current_inline->coroutine : def_function_coroutine))
+              yyerror("yield statement outside coroutine");
+
+          check_unknown_type($3.type.t_type);
+          if (!check_unknown_type($5.type.t_type)
+           && !lpctype_contains(lpctype_coroutine, $5.type.t_type))
+              fulltype_error("Bad argument 2 to yield()", $5.type);
+
+          free_fulltype($3.type);
+          free_fulltype($5.type);
+
+          ins_f_code(F_YIELD_TO_COROUTINE);
+      }
+    | L_YIELD '(' expr0 ')'
+      {
+          $$ = $3.start;
+
+          use_variable($3.name, VAR_USAGE_READ);
+
+          if (!(current_inline ? current_inline->coroutine : def_function_coroutine))
+              yyerror("yield statement outside coroutine");
+
+          check_unknown_type($3.type.t_type);
+          free_fulltype($3.type);
+
+          ins_f_code(F_YIELD_RETURN);
+      }
+    | L_YIELD '(' ')'
+      {
+          $$ = CURRENT_PROGRAM_SIZE;
+
+          if (!(current_inline ? current_inline->coroutine : def_function_coroutine))
+              yyerror("yield statement outside coroutine");
+
+          ins_f_code(F_CONST0);
+          ins_f_code(F_YIELD_RETURN);
+      }
+; /* coroutine_call */
 
 
 

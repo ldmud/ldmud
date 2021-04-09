@@ -64,6 +64,7 @@ enum primary_types
     TYPE_SYMBOL       =  8,
     TYPE_QUOTED_ARRAY =  9,
     TYPE_BYTES        = 10,
+    TYPE_COROUTINE    = 11,
 };
 
 /* -- Object types -- */
@@ -238,14 +239,16 @@ struct fulltype_s
 /* Basic types */
 extern lpctype_t *lpctype_int, *lpctype_string, *lpctype_bytes,
                  *lpctype_mapping, *lpctype_float, *lpctype_mixed,
-                 *lpctype_closure, *lpctype_symbol, *lpctype_quoted_array,
+                 *lpctype_closure, *lpctype_symbol, *lpctype_coroutine,
+                 *lpctype_quoted_array,
                  *lpctype_any_struct, *lpctype_any_object,
                  *lpctype_any_lwobject, *lpctype_void, *lpctype_unknown;
 
 /* For use in initializers */
 extern lpctype_t _lpctype_int, _lpctype_string, _lpctype_bytes,
                  _lpctype_mapping, _lpctype_float, _lpctype_mixed,
-                 _lpctype_closure, _lpctype_symbol, _lpctype_quoted_array,
+                 _lpctype_closure, _lpctype_symbol, _lpctype_coroutine,
+                 _lpctype_quoted_array,
                  _lpctype_any_struct, _lpctype_any_object,
                  _lpctype_any_lwobject, _lpctype_void, _lpctype_unknown;
 

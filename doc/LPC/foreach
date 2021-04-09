@@ -52,8 +52,13 @@ DESCRIPTION
             the variables. This allows the loop body to change the contents
             of the original data.
 
-            If <expr> evalutes to an integer, the loop will count up <var>
+            If <expr> evaluates to an integer, the loop will count up <var>
             from 0 to <expr>-1, basically implementing a count loop.
+
+            If <expr> evaluates to a coroutine, the loop will call the
+            coroutine until the coroutine finishes execution. All values
+            from the coroutine's yield() calls will be assigned to <var>,
+            essentially using the coroutine as a generator function.
 
             If there are more variables than necessary, the unneeded ones
             are not changed.
@@ -126,7 +131,8 @@ HISTORY
         LDMud 3.3.44 introduced the use of references, the loop over
           an integer expression, and the loop over an integer range.
         LDMud 3.3.266 added support for structs.
+        LPMud 3.6.5 added support for coroutines.
 
 
 SEE ALSO
-        for(LPC)
+        for(LPC), yield(LPC)

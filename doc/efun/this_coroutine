@@ -1,0 +1,12 @@
+SYNOPSIS
+        coroutine this_coroutine()
+
+DESCRIPTION
+        Returns the innermost coroutine in the caller stack.
+        Returns 0 if there is no coroutine.
+
+HISTORY
+        Coroutines were introduced in LDMud 3.6.5.
+
+SEE ALSO
+        coroutines(LPC), call_coroutine(E)

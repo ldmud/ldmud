@@ -19,6 +19,7 @@
 #include "dumpstat.h"
 #include "array.h"
 #include "closure.h"
+#include "coroutine.h"
 #include "exec.h"
 #include "filestat.h"
 #include "instrs.h"  /* F_RETURN, F_RETURN0 for overhead computation */
@@ -333,6 +334,46 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         *pTotal += overhead;
         if (l->ref)
             return (overhead + composite) / l->ref;
+        else
+            return 0;
+    }
+
+    case T_COROUTINE:
+    {
+        coroutine_t *cr = v->u.coroutine;
+
+        if (cr->ref)
+        {
+            struct pointer_record* record = find_add_pointer(ptable, cr, MY_TRUE);
+            if (record->ref_count < 0)
+            {
+                /* New entry, determine the size. */
+                record->ref_count = 1;
+                record->id_number = 0;
+
+                overhead = sizeof *cr
+                         + sizeof(svalue_t) * cr->num_variables;
+                for (i=0; i < cr->num_variables; i++)
+                {
+                    composite += svalue_size(cr->variables+i, &total);
+                    *pTotal += total;
+                }
+
+                *pTotal += overhead;
+
+                /* Record it for later occurrences. */
+                record->id_number = overhead + composite;
+                return record->id_number * record->ref_count / cr->ref;
+            }
+            else
+            {
+                /* We have seen it. Don't need to add to the total,
+                 * but the the shared result.
+                 */
+                record->ref_count++;
+                return record->id_number / cr->ref;
+            }
+        }
         else
             return 0;
     }

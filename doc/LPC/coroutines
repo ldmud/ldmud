@@ -1,0 +1,130 @@
+CONCEPT
+        coroutines
+
+INTRODUCTION
+        Regular LPC functions have a short life span. They must finish,
+        before a new event like a player command can be processed.
+        Coroutines are a special type of functions, whose execution can
+        be suspended and continued at a later time. At each suspension
+        point values can be exchanged with another coroutine or the caller.
+
+        Coroutines are passed by reference. When a coroutine finishes
+        it decays to the number zero.
+
+
+DEFINITION
+        Coroutines can be created by calling a function that was declared
+        with the async modifier:
+
+            async void fun()
+            {
+                ...
+            }
+
+            coroutine cr = fun();
+
+        Alternatively inline coroutines are created with the inline closure
+        syntax:
+
+            coroutine cr = async function void() { ... };
+
+        Normal coroutines can get parameters, inline coroutines cannot.
+        (They however can use context variables.)
+
+
+OPERATIONS
+        These operations can be used from within a coroutine:
+
+        await(coroutine[, value])
+
+            Call another coroutine, pass on the given value and wait for
+            this coroutine to finish with a return statement.
+            Until then the current coroutine is suspended. Any operation
+            on this coroutine will be passed to the called coroutine.
+            The result of the await() call is the return value from the
+            called coroutine.
+
+        yield([value])
+
+            Suspend execution of the current coroutine and pass the given
+            value to the caller. The result of the yield() call is the
+            value that will be passed in when the coroutine will be
+            continued.
+
+        yield(value, coroutine)
+
+            Suspend execution of the current coroutine and continue the
+            given coroutine, thereby passing the value in. The result of
+            the yield() call is the value that will be passed in when the
+            coroutine will be continued.
+
+        return [value]
+
+            Destroy the current coroutine. If any coroutine is waiting,
+            continue its execution. Otherwise return to the caller.
+
+
+EFUNS
+        call_coroutine(coroutine[, value])
+
+            Call the given coroutine, pass on the given value.
+
+            In contrast to await() and yield() the current execution will
+            only be suspended for the call (just like any other function
+            call) and be continued when the coroutine suspends execution
+            with yield() or finishes execution with return.
+
+            Therefore this efun can also be used from regular functions.
+
+            The result of the efun call is the value of the yield() or
+            return call that suspended the execution of the called coroutine.
+
+        this_coroutine()
+
+            Returns the current coroutine. If it's not called from a
+            coroutine, the innermost coroutine in the caller stack will
+            be returned. Returns 0 if there is no coroutine in the caller
+            stack.
+
+
+EXAMPLE
+        /* Coroutine that sleeps a given amount of time. */
+        async void sleep(int sec)
+        {
+            /* Start a call_out that will wake this coroutine. */
+            call_out(#'call_coroutine, sec, this_coroutine());
+
+            /* Suspend and wait. */
+            yield();
+        }
+
+        /* Use of the sleep() function. */
+        async void fun()
+        {
+            write("Starting...\n");
+            await(sleep(10));
+            write("Finishing after 10s.\n");
+        }
+
+
+MISCELLANEOUS
+        Support for coroutines is signaled by the macro __LPC_COROUTINES__.
+
+        Only declarative casts to coroutine are possible, there is no
+        conversion of any other type to coroutine available (therefore
+        there is no to_coroutine() efun).
+
+        Coroutines can not be copied or serialized with save_value().
+        Coroutines are bound to their object. If the object is destroyed,
+        the coroutines will be as well (and any awaiting coroutines).
+
+        foreach() can be used to call coroutines repeatedly.
+
+
+HISTORY
+        Coroutines were introduced in LDMud 3.6.5.
+
+
+SEE ALSO
+        async(LPC), await(LPC), yield(LPC), foreach(LPC),
+        call_coroutine(E), this_coroutine(E)

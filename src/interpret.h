@@ -34,6 +34,7 @@ struct control_stack {
     svalue_t    prev_ob;    /* Save previous object (not counted) */
     program_t  *prog;       /* Current program, NULL in the bottom entry */
     svalue_t    lambda;     /* Current lambda, counted, or svalue-0 if none */
+    coroutine_t*coroutine;  /* Current coroutine, counted, or NULL if none */
     bytecode_p  pc;         /* Program counter, points to next bytecode */
     svalue_t   *fp;         /* Frame pointer: first arg on stack */
     svalue_t   *context;    /* Context pointer */
@@ -176,7 +177,9 @@ extern int trace_level;
 extern bytecode_p inter_pc;
 extern struct control_stack *csp;
 extern svalue_t * inter_sp;
+extern svalue_t * inter_context;
 extern int function_index_offset;
+extern int variable_index_offset;
 extern svalue_t *current_variables;
 extern int32  eval_cost;
 extern int32  assigned_eval_cost;
@@ -311,6 +314,7 @@ extern void m_values_filter (svalue_t *key, svalue_t *data, void *extra);
 extern void m_unmake_filter ( svalue_t *key, svalue_t *data, void *extra);
 extern svalue_t *v_apply (svalue_t *sp, int num_arg);
 extern svalue_t *v_funcall (svalue_t *sp, int num_arg);
+extern svalue_t *f_call_coroutine (svalue_t *sp);
 extern svalue_t *v_call_other (svalue_t *sp, int num_arg);
 extern svalue_t *v_call_strict (svalue_t *sp, int num_arg);
 extern svalue_t *v_call_direct_resolved (svalue_t *sp, int num_arg);

@@ -14,21 +14,22 @@ DESCRIPTION
         (i.e. the data type) is returned (as int). If <flag> is 1, the
         second element is returned.
 
-        If <arg> is a closure, the <flag> setting 2 lets the efun
-        return the object of the closure (which for 'lfun closures' is
-        the object the lfun is defined in, which is not necessarily the object
-        the closure is bound to).
+        If <arg> is a closure or coroutine, the <flag> setting 2 lets the
+        efun return the object of the closure resp. coroutine (which for
+        'lfun closures' is the object the lfun is defined in, which is not
+        necessarily the object the closure is bound to).
 
         If <arg> is a struct, the <flag> setting 2 lets the efun
         return the base name of the struct.
 
-        If <arg> is a lfun or context closure, the <flag> setting 3 lets the
-        efun return the name of the program the closure was defined in. For
-        other closures, <flag> setting 3 returns 0.
+        If <arg> is a lfun, context closure or coroutine, the <flag>
+        setting 3 lets the efun return the name of the program the closure
+        resp. coroutine was defined in. For other closures, <flag>
+        setting 3 returns 0.
 
-        If <arg> is a lfun or context closure, the <flag> setting 4 lets the
-        efun return the name of the function. For other closures, <flag>
-        setting 4 returns 0.
+        If <arg> is a lfun, context closure or coroutine, the <flag>
+        setting 4 lets the efun return the name of the function.
+        For other closures, <flag> setting 4 returns 0.
 
         For every other <flag> setting, -1 is returned.
 

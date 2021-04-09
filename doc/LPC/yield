@@ -1,0 +1,29 @@
+NAME
+        yield
+
+SYNTAX
+        yield()
+        yield(<value>)
+        yield(<value>, <coroutine>)
+
+DESCRIPTION
+        The instruction is only allowed in a coroutine and suspends its
+        execution.
+
+        The first two forms return to the caller (i.e. the function that
+        continued the execution of the coroutine with call_coroutine()),
+        the third form resumes execution of the given coroutine, which
+        must currently be in a suspended state.
+
+        The value will be passed to the caller as the result of the
+        call_coroutine() call resp. to the target coroutine as the result
+        of its yield() instruction that suspended its execution before.
+        If the coroutine had just started, the value will be discarded.
+        In the first form, 0 will be passed to the caller.
+
+HISTORY
+        Coroutines were introduced in LDMud 3.6.5.
+
+SEE ALSO
+        coroutines(LPC), async(LPC), await(LPC), foreach(LPC),
+        call_coroutine(E), this_coroutine(E)

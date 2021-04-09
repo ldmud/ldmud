@@ -13,6 +13,7 @@ struct test_struct
     mapping t_mapping;
     symbol  t_symbol;
     mixed   t_quoted_array;
+    coroutine t_coroutine;
 };
 
 void run_test()
@@ -94,6 +95,15 @@ void run_test()
                        python_return(#'this_object) == #'this_object &&
                        python_return(cl) == cl &&
                        python_return(#',) == #',;
+            :)
+        }),
+        ({ "passing coroutines", 0,
+            (:
+                coroutine cr = "/testob"->testcoroutine();
+                int result = python_return(cr) == cr;
+                destruct(find_object("/testob"));
+
+                return result;
             :)
         }),
         ({ "passing symbols", 0,
@@ -222,7 +232,8 @@ void run_test()
                 ({ 5, 3, 1}),
                 ([2,3,5]),
                 quote("abc"+"gc"),
-                quote(({11, 13, 17}))
+                quote(({11, 13, 17})),
+                "/testob"->testcoroutine(),
             ));
 
             python_remember_testob(load_object("/testrp"));
@@ -252,7 +263,8 @@ void run_test()
                     sizeof(val->t_mapping) != 3 || widthof(val->t_mapping) != 0 ||
                     !member(val->t_mapping, 2) || !member(val->t_mapping, 3) || !member(val->t_mapping, 5) ||
                     unquote(val->t_symbol) != "ab" + "cgc" ||
-                    sizeof(unquote(val->t_quoted_array)) != 3
+                    sizeof(unquote(val->t_quoted_array)) != 3 ||
+                    !coroutinep(val->t_coroutine)
                   )
                 {
                     msg("Wrong value returned from python_get() after GC.!\n");

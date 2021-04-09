@@ -17,6 +17,7 @@
 #define TYPE_STRUCT     11
 #define TYPE_BYTES      12
 #define TYPE_LWOBJECT   13
+#define TYPE_COROUTINE  14
 
 #define TYPE_MOD_POINTER        0x0040  /* Pointer to a basic type        */
 
@@ -36,6 +37,7 @@
 #define T_STRUCT        0xb
 #define T_BYTES         0xc
 #define T_LWOBJECT      0xd
+#define T_COROUTINE     0xe
 
 /* Closure types, stored as secondary type info */
 

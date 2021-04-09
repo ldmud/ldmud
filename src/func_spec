@@ -166,6 +166,10 @@
         call_closure
         context_closure
         context_identifier
+        transform_to_coroutine
+        await
+        yield_to_coroutine
+        yield_return
         push_context_lvalue
         context_identifier16
         push_context16_lvalue
@@ -256,6 +260,7 @@
 
 int     clonep(mixed default: F_THIS_OBJECT);
 int     closurep(mixed);
+int     coroutinep(mixed);
 int     floatp(mixed);
 int     intp(mixed);
 int     mappingp(mixed);
@@ -281,6 +286,7 @@ int     sizeof(null|string|bytes|mixed|mixed *|mapping|struct);
         /* Functions and Closures */
 
 int     extern_call();
+coroutine this_coroutine();
 
         /* Objects */
 
@@ -448,6 +454,7 @@ int     widthof(null|mapping);
 
 mixed&  apply(mixed|closure, ...);
 mixed&  funcall(mixed|closure, ...);
+mixed&  call_coroutine(coroutine, mixed default: F_CONST0);
 
 closure bind_lambda(closure, object|lwobject|void);
 closure lambda(null|mixed *, mixed);

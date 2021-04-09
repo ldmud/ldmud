@@ -224,10 +224,11 @@ class SValuePrinter:
     T_STRUCT                         = 0xb
     T_BYTES                          = 0xc
     T_LWOBJECT                       = 0xd
-    T_CALLBACK                       = 0xe
-    T_ERROR_HANDLER                  = 0xf
-    T_BREAK_ADDR                     = 0x10
-    T_NULL                           = 0x11
+    T_COROUTINE                      = 0xe
+    T_CALLBACK                       = 0xf
+    T_ERROR_HANDLER                  = 0x10
+    T_BREAK_ADDR                     = 0x11
+    T_NULL                           = 0x12
 
     LVALUE_UNPROTECTED               = 0x00
     LVALUE_UNPROTECTED_CHAR          = 0x01
@@ -251,6 +252,7 @@ class SValuePrinter:
         T_STRUCT:                         "T_STRUCT",
         T_BYTES:                          "T_BYTES",
         T_LWOBJECT:                       "T_LWOBJECT",
+        T_COROUTINE:                      "T_COROUTINE",
         T_CALLBACK:                       "T_CALLBACK",
         T_ERROR_HANDLER:                  "T_ERROR_HANDLER",
         T_BREAK_ADDR:                     "T_BREAK_ADDR",
@@ -322,6 +324,8 @@ class SValuePrinter:
         elif stype == self.T_CLOSURE:
             return [(".u.lambda", val["u"]["lambda"]),
                     (".x.closure_type", val["x"]["closure_type"])]
+        elif stype == self.T_COROUTINE:
+            return [(".u.coroutine", val["u"]["coroutine"])]
         elif stype == self.T_SYMBOL:
             return [(".u.str", val["u"]["str"]),
                     (".x.quotes", val["x"]["quotes"])]

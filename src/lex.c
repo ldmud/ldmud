@@ -506,12 +506,15 @@ struct s_reswords
 };
 
 static struct s_reswords reswords[]
- = { { "break",          L_BREAK         }
+ = { { "async",          L_ASYNC         }
+   , { "await",          L_AWAIT         }
+   , { "break",          L_BREAK         }
    , { "bytes",          L_BYTES_DECL    }
    , { "case",           L_CASE          }
    , { "catch",          L_CATCH         }
    , { "closure",        L_CLOSURE_DECL  }
    , { "continue",       L_CONTINUE      }
+   , { "coroutine",      L_COROUTINE     }
    , { "default",        L_DEFAULT       }
    , { "do",             L_DO            }
    , { "else",           L_ELSE          }
@@ -547,6 +550,7 @@ static struct s_reswords reswords[]
    , { "visible",        L_VISIBLE       }
    , { "void",           L_VOID          }
    , { "while",          L_WHILE         }
+   , { "yield",          L_YIELD         }
    };
 
 /*-------------------------------------------------------------------------*/
@@ -885,6 +889,7 @@ init_lexer(void)
     add_permanent_define_str("__LPC_STRUCTS__", -1, "1");
     add_permanent_define_str("__LPC_LWOBJECTS__", -1, "1");
     add_permanent_define_str("__LPC_INLINE_CLOSURES__", -1, "1");
+    add_permanent_define_str("__LPC_COROUTINES__", -1, "1");
     add_permanent_define_str("__LPC_ARRAY_CALLS__", -1, "1");
 #ifdef USE_TLS
     add_permanent_define_str("__TLS__", -1, "1");

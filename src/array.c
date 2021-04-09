@@ -3116,6 +3116,8 @@ sameval (svalue_t *arg1, svalue_t *arg2)
         return arg1->u.ob == arg2->u.ob;
     } else if (arg1->type == T_LWOBJECT && arg2->type == T_LWOBJECT) {
         return arg1->u.lwob == arg2->u.lwob;
+    } else if (arg1->type == T_COROUTINE && arg2->type == T_COROUTINE) {
+        return arg1->u.coroutine == arg2->u.coroutine;
     } else
         return 0;
 } /* sameval() */

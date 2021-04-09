@@ -4673,6 +4673,8 @@ print_svalue (svalue_t *arg)
         add_message("<MAPPING>");
     else if (arg->type == T_CLOSURE)
         add_message("<CLOSURE>");
+    else if (arg->type == T_COROUTINE)
+        add_message("<COROUTINE>");
     else
         add_message("<OTHER:%"PRIdPHINT">", arg->type);
 } /* print_svalue() */

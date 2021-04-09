@@ -21,3 +21,8 @@ nomask protected int testfun(<int|float> value, varargs string* args)
 {
     return sizeof(args);
 }
+
+async string* testcoroutine(varargs string* args)
+{
+    return args + ({ yield(sizeof(args)) });
+}

@@ -79,6 +79,7 @@
 #include "array.h"
 #include "closure.h"
 #include "comm.h"
+#include "coroutine.h"
 #include "interpret.h"
 #include "lwobject.h"
 #include "main.h"
@@ -1110,6 +1111,15 @@ svalue_to_string ( fmt_state_t *st
 
         break;
     } /* case T_CLOSURE */
+
+    case T_COROUTINE:
+      {
+        string_t *rc = coroutine_to_string(obj->u.coroutine);
+        stradd(st, &str, get_txt(rc));
+        free_mstring(rc);
+
+        break;
+      }
 
   default:
       stradd(st, &str, "!ERROR: GARBAGE SVALUE (");

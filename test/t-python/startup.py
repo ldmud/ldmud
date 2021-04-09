@@ -513,6 +513,63 @@ class TestClosure(unittest.TestCase):
             s()
         self.assertFalse(s)
 
+class TestCoroutine(unittest.TestCase):
+    def setUp(self):
+        self.ob = ldmud.Object("/testob");
+        self.lwob = ldmud.LWObject("/testob")
+
+    def testCRBlueprint(self):
+        cr = self.ob.functions.testcoroutine("A", "B", "C")
+
+        self.assertIn("testob", repr(cr))
+        self.assertIn("testcoroutine", repr(cr))
+
+        self.assertEqual(cr.object, self.ob)
+        self.assertEqual(cr.program_name, "/testob.c")
+        self.assertEqual(cr.function_name, "testcoroutine")
+
+        self.assertTrue(cr)
+        self.assertEqual(cr(), 3);
+        self.assertTrue(cr)
+        self.assertEqual(list(cr("D")), ["A", "B", "C", "D"])
+        self.assertFalse(cr)
+
+    def testCRClone(self):
+        ob = ldmud.efuns.clone_object(self.ob)
+        cr = ob.functions.testcoroutine("A", "B", "C")
+
+        self.assertIn("testob", repr(cr))
+        self.assertIn("testcoroutine", repr(cr))
+
+        self.assertEqual(cr.object, ob)
+        self.assertEqual(cr.program_name, "/testob.c")
+        self.assertEqual(cr.function_name, "testcoroutine")
+
+        ldmud.efuns.destruct(ob)
+        self.assertFalse(cr)
+
+    def testCRLWObject(self):
+        cr = self.lwob.functions.testcoroutine("A", "B", "C")
+
+        self.assertIn("testob", repr(cr))
+        self.assertIn("testcoroutine", repr(cr))
+
+        self.assertEqual(cr.object, self.lwob)
+        self.assertEqual(cr.program_name, "/testob.c")
+        self.assertEqual(cr.function_name, "testcoroutine")
+
+        self.assertTrue(cr)
+        self.assertEqual(cr(),3);
+        self.assertTrue(cr)
+        self.assertEqual(list(cr("D")), ["A", "B", "C", "D"])
+        self.assertFalse(cr)
+
+    def testEmpty(self):
+        c = ldmud.Coroutine.__new__(ldmud.Coroutine)
+        with self.assertRaises(Exception):
+            c()
+        self.assertFalse(c)
+
 class TestSymbol(unittest.TestCase):
     def testSymbolInit(self):
         s = ldmud.Symbol("sym")

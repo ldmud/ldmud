@@ -212,6 +212,7 @@
 #include "call_out.h"
 #include "closure.h"
 #include "comm.h"
+#include "coroutine.h"
 #include "efuns.h"
 #include "filestat.h"
 #include "gcollect.h"
@@ -434,9 +435,11 @@ static const char * svalue_typename[]
    , /* T_STRUCT */         "struct"
    , /* T_BYTES  */         "bytes"
    , /* T_LWOBJECT */       "lwobject"
+   , /* T_COROUTINE */      "coroutine"
    , /* T_CALLBACK */       "callback"
    , /* T_ERROR_HANDLER */  "error-handler"
    , /* T_BREAK_ADDR */     "break-address"
+   , /* T_ARG_FRAME */      "argument-frame"
    , /* T_NULL */           "null"
    };
 
@@ -462,7 +465,7 @@ static svalue_t *inter_fp;
   /* Framepointer: pointer to first argument.
    */
 
-static svalue_t *inter_context;
+svalue_t *inter_context;
   /* Contextpointer: pointer to first context variable.
    * May be NULL if no context is available.
    */
@@ -488,6 +491,11 @@ static svalue_t current_lambda;
    * still executing.
    */
 
+static coroutine_t *current_coroutine;
+  /* If the VM is executing a coroutine, this variable holds a counted
+   * reference to it.
+   */
+
 static string_t **current_strings;
   /* Pointer to the string literal block of the current program for
    * faster access.
@@ -498,7 +506,7 @@ int function_index_offset;
    * the current objects program (needed for inheritance).
    */
 
-static int variable_index_offset;
+int variable_index_offset;
   /* Index of current program's non-virtual variable block within
    * the variables of the current object (needed for inheritance).
    *
@@ -1198,6 +1206,10 @@ int_free_svalue (svalue_t *v)
         free_closure(v);
         break;
 
+    case T_COROUTINE:
+        free_coroutine(v->u.coroutine);
+        break;
+
     case T_CALLBACK:
         free_callback(v->u.cb);
         xfree(v->u.cb);
@@ -1208,6 +1220,7 @@ int_free_svalue (svalue_t *v)
         break;
 
     case T_BREAK_ADDR:
+    case T_ARG_FRAME:
         NOOP;
         break;
 
@@ -1349,6 +1362,10 @@ free_svalue (svalue_t *v)
         needs_deserializing = (v->u.lwob->ref == 1);
         break;
 
+    case T_COROUTINE:
+        needs_deserializing = (v->u.coroutine->ref == 1);
+        break;
+
     case T_STRUCT:
         needs_deserializing = (struct_ref(v->u.strct) == 1);
         break;
@@ -1450,41 +1467,49 @@ _destructed_object_ref (svalue_t *svp)
  */
 
 {
-    lambda_t *l;
-    int type;
-
-    if (svp->type != T_OBJECT && svp->type != T_CLOSURE)
-        return MY_FALSE;
-
-    if (svp->type == T_OBJECT)
-        return (svp->u.ob->flags & O_DESTRUCTED) ? MY_TRUE : MY_FALSE;
-
-    if (!CLOSURE_MALLOCED(type = svp->x.closure_type))
+    switch (svp->type)
     {
-        if (type < CLOSURE_LWO)
-            return MY_FALSE;
-        else
+        case T_OBJECT:
             return (svp->u.ob->flags & O_DESTRUCTED) ? MY_TRUE : MY_FALSE;
+
+        case T_CLOSURE:
+        {
+            lambda_t *l;
+            int type;
+
+            if (!CLOSURE_MALLOCED(type = svp->x.closure_type))
+            {
+                if (type < CLOSURE_LWO)
+                    return MY_FALSE;
+                else
+                    return (svp->u.ob->flags & O_DESTRUCTED) ? MY_TRUE : MY_FALSE;
+            }
+
+            /* Lambda closure */
+
+            l = svp->u.lambda;
+
+            if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
+                return MY_FALSE;
+
+            if (type == CLOSURE_LFUN
+             && l->function.lfun.ob.type == T_OBJECT
+             && (l->function.lfun.ob.u.ob->flags & O_DESTRUCTED))
+                return MY_TRUE;
+
+            if (l->ob.type == T_OBJECT
+             && (l->ob.u.ob->flags & O_DESTRUCTED))
+                return MY_TRUE;
+
+            return MY_FALSE;
+        }
+
+        case T_COROUTINE:
+            return !valid_coroutine(svp->u.coroutine);
+
+        default:
+            return MY_FALSE;
     }
-
-    /* Lambda closure */
-
-    l = svp->u.lambda;
-
-    if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
-        return MY_FALSE;
-
-    if (type == CLOSURE_LFUN
-     && l->function.lfun.ob.type == T_OBJECT
-     && (l->function.lfun.ob.u.ob->flags & O_DESTRUCTED))
-        return MY_TRUE;
-
-    if (l->ob.type == T_OBJECT
-     && (l->ob.u.ob->flags & O_DESTRUCTED))
-        return MY_TRUE;
-
-    return MY_FALSE;
-
 } /* _destructed_object_ref() */
 
 Bool destructed_object_ref (svalue_t *v) { return _destructed_object_ref(v); }
@@ -1500,41 +1525,63 @@ inl_object_ref (svalue_t *svp, object_t *obj)
  */
 
 {
-    lambda_t *l;
-    int type;
-
-    if (svp->type != T_OBJECT && svp->type != T_CLOSURE)
-        return MY_FALSE;
-
-    if (svp->type == T_OBJECT)
-        return svp->u.ob == obj;
-
-    if (!CLOSURE_MALLOCED(type = svp->x.closure_type))
+    switch (svp->type)
     {
-        if (type < CLOSURE_LWO)
-            return MY_FALSE;
-        else
+        case T_OBJECT:
             return svp->u.ob == obj;
+
+        case T_CLOSURE:
+        {
+            lambda_t *l;
+            int type;
+
+            if (!CLOSURE_MALLOCED(type = svp->x.closure_type))
+            {
+                if (type < CLOSURE_LWO)
+                    return MY_FALSE;
+                else
+                    return svp->u.ob == obj;
+            }
+
+            /* Lambda closure */
+
+            l = svp->u.lambda;
+
+            if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
+                return MY_FALSE;
+
+            if (type == CLOSURE_LFUN
+             && l->function.lfun.ob.type == T_OBJECT
+             && l->function.lfun.ob.u.ob == obj)
+                return MY_TRUE;
+
+            if (l->ob.type == T_OBJECT
+             && l->ob.u.ob == obj)
+                return MY_TRUE;
+
+            return MY_FALSE;
+        }
+
+        case T_COROUTINE:
+        {
+            coroutine_t *cr = svp->u.coroutine;
+
+            while (cr)
+            {
+                if (cr->ob.type == T_OBJECT && cr->ob.u.ob == obj)
+                    return MY_TRUE;
+
+                if (cr->state != CS_AWAITING)
+                    break;
+                cr = cr->awaitee;
+            }
+
+            return MY_FALSE;
+        }
+
+        default:
+            return MY_FALSE;
     }
-
-    /* Lambda closure */
-
-    l = svp->u.lambda;
-
-    if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
-        return MY_FALSE;
-
-    if (type == CLOSURE_LFUN
-     && l->function.lfun.ob.type == T_OBJECT
-     && l->function.lfun.ob.u.ob == obj)
-        return MY_TRUE;
-
-    if (l->ob.type == T_OBJECT
-     && l->ob.u.ob == obj)
-        return MY_TRUE;
-
-    return MY_FALSE;
-
 } /* inl_object_ref() */
 // exporting the function als object_ref() is currently not necessary, because
 // it is only used in this file.
@@ -1603,6 +1650,13 @@ internal_assign_svalue_no_free (svalue_t *to, svalue_t *from)
 
     case T_CLOSURE:
         addref_closure(to, "ass to var");
+        break;
+
+    case T_COROUTINE:
+        if (!valid_coroutine(to->u.coroutine))
+            put_number(to, 0);
+        else
+            ref_coroutine(to->u.coroutine);
         break;
 
     case T_MAPPING:
@@ -6664,6 +6718,7 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
         case T_CALLBACK:
         case T_ERROR_HANDLER:
         case T_BREAK_ADDR:
+        case T_ARG_FRAME:
         case T_LVALUE:
             if (svptype)
                 *svptype = lpctype_unknown;
@@ -6785,6 +6840,10 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
 
         case T_LWOBJECT:
             valuetype = lpctype_any_lwobject;
+            break;
+
+        case T_COROUTINE:
+            valuetype = lpctype_coroutine;
             break;
 
         case T_STRUCT:
@@ -7489,12 +7548,21 @@ pull_error_context (svalue_t *sp, svalue_t *msg)
         }
     }
 
-    /* If there was a lambda call, we have to restore current_lambda */
+    /* If there was a lambda call, we have to restore current_lambda.
+     * Same for coroutines.
+     */
     for (csp2 = csp; csp2 >p->save_csp; csp2--)
     {
         if (current_lambda.type == T_CLOSURE)
             free_closure(&current_lambda);
         current_lambda = csp2->lambda;
+
+        if (current_coroutine)
+        {
+            abort_coroutine(current_coroutine);
+            free_coroutine(current_coroutine);
+        }
+        current_coroutine = csp2->coroutine;
     }
 
     /* Restore the global variables and the evaluator stack */
@@ -7563,6 +7631,7 @@ push_control_stack ( svalue_t   *sp
     csp->context = context;
     csp->prog = current_prog;
     csp->lambda = current_lambda; put_number(&current_lambda, 0);
+    csp->coroutine = current_coroutine; current_coroutine = NULL;
     /* csp->extern_call = MY_FALSE; It is set by eval_instruction() */
     csp->catch_call = MY_FALSE;
     csp->pc = pc;
@@ -7601,6 +7670,16 @@ pop_control_stack (void)
         free_closure(&current_lambda);
     free_svalue(&csp->pretend_to_be);
     current_lambda = csp->lambda;
+    if (current_coroutine)
+    {
+        /* When the coroutine is still running,
+         * we are in error handling.
+         */
+        if (current_coroutine->state == CS_RUNNING)
+            abort_coroutine(current_coroutine);
+        free_coroutine(current_coroutine);
+    }
+    current_coroutine = csp->coroutine;
     inter_pc = csp->pc;
     inter_fp = csp->fp;
     inter_context = csp->context;
@@ -8145,6 +8224,7 @@ reset_machine (Bool first)
         inter_sp = VALUE_STACK - 1;
         tracedepth = 0;
         put_number(&current_lambda, 0);
+        current_coroutine = NULL;
     }
     else
     {
@@ -8152,10 +8232,18 @@ reset_machine (Bool first)
         if (current_lambda.type == T_CLOSURE)
             free_closure(&current_lambda);
         put_number(&current_lambda, 0);
+        if (current_coroutine)
+        {
+            if (current_coroutine->state == CS_RUNNING)
+                abort_coroutine(current_coroutine);
+            free_coroutine(current_coroutine);
+            current_coroutine = NULL;
+        }
         while (csp >= CONTROL_STACK)
         {
             if (csp->lambda.type == T_CLOSURE)
                 free_closure(&csp->lambda);
+            free_coroutine(csp->coroutine);
             free_svalue(&(csp->pretend_to_be));
             csp--;
         }
@@ -8270,6 +8358,55 @@ remove_object_from_stack (object_t *ob)
         }
     } /* foreach svp in stack */
 } /* remove_object_from_stack() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+save_argument_frames (svalue_t *sp, svalue_t *ap)
+
+/* Convert the argument frames on the stack from absolute pointers
+ * to relative offsets. This is needed prior to storing the stack
+ * in a coroutine.
+ */
+
+{
+    /* If there are no additional values on the stack
+     * we don't need that.
+     */
+    if (sp < inter_fp + csp->num_local_variables)
+        return sp;
+
+    sp++;
+    sp->type = T_ARG_FRAME;
+    sp->u.lvalue = ap;
+
+    return sp;
+} /* save_argument_frames() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+restore_argument_frames (svalue_t *sp, svalue_t **ap)
+
+/* Convert the argument frames on the stack from relative offsets
+ * to absolute pointers. This is needed after restoring the stack
+ * from a coroutine. The new arg pointer will be returned in *<ap>.
+ */
+
+{
+    /* If there are no additional values on the stack
+     * we don't need that.
+     */
+    if (sp <= inter_fp + csp->num_local_variables)
+    {
+        *ap = inter_fp;
+        return sp;
+    }
+
+    assert(sp->type == T_ARG_FRAME);
+    *ap = sp->u.lvalue;
+    sp--;
+
+    return sp;
+} /* save_argument_frames() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -8501,6 +8638,13 @@ eval_instruction (bytecode_p first_instruction
     use_ap = MY_FALSE;
     runtime_no_warn_deprecated = MY_FALSE;
     runtime_array_range_check = MY_FALSE;
+    if (current_coroutine)
+    {
+        /* There is one additional value above the last argument pointer. */
+        sp = restore_argument_frames(sp-1, &ap)+1;
+        if (sp < inter_sp)
+            *sp = *inter_sp;
+    }
     SET_TRACE_EXEC();
 
     /* ------ The evaluation loop ------ */
@@ -9391,6 +9535,7 @@ again:
         svalue_t *efp = fp+csp->num_local_variables; /* Expected end of frame */
 
         pResult = sp;
+        bool extern_call;
 
         /* Remove any intermediate error contexts */
         while (csp->catch_call)
@@ -9463,44 +9608,63 @@ again:
                        get_lpctype_name(header->type));
             }
         }
-        
-        /* Restore the previous execution context */
-        current_prog = csp->prog;
-        if ( NULL != current_prog ) /* is 0 when we reach the bottom */
+
+        if (current_coroutine)
         {
-            current_strings = current_prog->strings;
+            /* Is there some coroutine waiting? Then continue there. */
+            coroutine_t *next = finish_coroutine(current_coroutine);
+            if (next)
+            {
+                svalue_t value = *sp;
+
+                inter_sp = sp-1;
+
+                ref_coroutine(next);
+
+                if (!resume_coroutine(next))
+                {
+                    free_coroutine(next);
+                    ERROR("Out of memory\n");
+                }
+
+                current_strings = current_prog->strings;
+
+                free_coroutine(current_coroutine);
+                current_coroutine = next; /* Adopt reference. */
+                sp = inter_sp;
+                pc = inter_pc;
+
+                sp = restore_argument_frames(sp, &ap);
+
+                /* Push the value back on the stack and continue execution. */
+                *(++sp) = value;
+                break;
+            }
         }
 
-        function_index_offset = csp->function_index_offset;
-        variable_index_offset = csp->variable_index_offset;
-        current_variables     = csp->current_variables;
-        break_sp = csp->break_sp;
-        inter_context = csp->context;
-        if (current_lambda.type == T_CLOSURE)
-            free_closure(&current_lambda);
-        current_lambda = csp->lambda;
-        free_svalue(&(csp->pretend_to_be));
-
-        tracedepth--; /* We leave this level */
-
-        if (csp->extern_call)
+        /* Restore the previous execution context */
+        extern_call = csp->extern_call;
+        if (extern_call)
         {
             /* eval_instruction() must be left - setup the globals */
-
             assign_eval_cost_inl();
+
             current_object = csp->ob;
             previous_ob = csp->prev_ob;
-            inter_pc = csp->pc;
-            inter_fp = csp->fp;
+        }
 
-            if (trace_level)
-            {
-                do_trace_return(sp);
-                if (csp == CONTROL_STACK - 2)
-                    /* TODO: This can't be legal according to ISO C */
-                    traceing_recursion = -1;
-            }
-            csp--;
+        tracedepth--; /* We leave this level */
+        if (trace_level)
+            do_trace_return(sp);
+
+        pop_control_stack();
+
+        if (extern_call)
+        {
+            if (trace_level && csp == CONTROL_STACK - 2)
+                /* TODO: This can't be legal according to ISO C */
+                traceing_recursion = -1;
+
             inter_sp = sp;
 #ifdef CHECK_OBJECT_REF
             check_all_object_shadows();
@@ -9509,13 +9673,246 @@ again:
         }
 
         /* We stay in eval_instruction() */
+        pc = inter_pc;
+        fp = inter_fp;
 
+        break;
+    }
+
+    CASE(F_TRANSFORM_TO_COROUTINE); /* --- transform_to_coroutine --- */
+    {
+        /* Create a new coroutine structure and save the state of the
+         * current function (esp. its variables) therein.
+         */
+        coroutine_t *cr;
+        bool extern_call;
+
+        /* create_coroutine() will use and change the global state. */
+        inter_sp = sp;
+        inter_pc = pc;
+
+        assert(current_coroutine == NULL);
+
+        /* When we are within a closure, then this is called by the automatic
+         * funcall(). So we know that on top of the stack is the closure
+         * itself (the only argument to funcall()) and the local variables.
+         */
+        cr = create_coroutine(inter_context ? (inter_sp - csp->num_local_variables) : NULL);
+        if (!cr)
+            ERROR("Out of memory.\n");
+
+        /* We should now be at the beginning of the stack frame. */
+        sp = inter_sp;
+        push_coroutine(sp, cr);
+        assert(sp == fp);
+
+        /* Restore the previous execution context */
+        extern_call = csp->extern_call;
+        if (extern_call)
+        {
+            /* eval_instruction() must be left - setup the globals */
+            assign_eval_cost_inl();
+
+            current_object = csp->ob;
+            previous_ob = csp->prev_ob;
+        }
+
+        tracedepth--; /* We leave this level */
         if (trace_level)
             do_trace_return(sp);
-        pc = csp->pc;
-        fp = csp->fp;
-        csp--;
+
+        pop_control_stack();
+
+        if (extern_call)
+        {
+            if (trace_level && csp == CONTROL_STACK - 2)
+                /* TODO: This can't be legal according to ISO C */
+                traceing_recursion = -1;
+
+            inter_sp = sp;
+#ifdef CHECK_OBJECT_REF
+            check_all_object_shadows();
+#endif /* CHECK_OBJECT_REF */
+            return MY_FALSE;
+        }
+
+        /* We stay in eval_instruction() */
+        pc = inter_pc;
+        fp = inter_fp;
+
         break;
+    }
+
+    CASE(F_AWAIT);                  /* --- await               --- */
+    {
+        /* Suspend the current coroutine and call the coroutine <sp-1>.
+         * Register the current coroutine as a waiting for <sp-1>.
+         * <sp> is a value to pass to the coroutine.
+         */
+        svalue_t value = *sp;
+        coroutine_t *target, *cr;
+
+        if (csp->catch_call)
+            ERROR("await within catch is not supported.\n");
+        if (sp[-1].type != T_COROUTINE)
+            ERRORF(("Bad type '%s' for await.\n", typename(sp[-1].type)));
+
+        assert(current_coroutine != NULL);
+        target = sp[-1].u.coroutine;
+        cr = get_resumable_coroutine(target);
+        if (!cr)
+        {
+            ERROR("Coroutine not resumable.\n");
+        }
+        else if (target->awaiter != NULL)
+        {
+            ERROR("Coroutine will already be awaited.\n");
+        }
+
+        ref_coroutine(cr); /* Keep it alive for later. */
+        sp -= 2;
+
+        sp = save_argument_frames(sp, ap);
+
+        inter_sp = sp;
+        inter_pc = pc;
+
+        if (!suspend_coroutine(current_coroutine, fp))
+        {
+            free_svalue(&value);
+            free_coroutine(target);
+            free_coroutine(cr);
+            ERROR("Out of memory.\n");
+        }
+
+        await_coroutine(current_coroutine, target);
+        free_coroutine(target);
+
+        if (!resume_coroutine(cr))
+        {
+            free_svalue(&value);
+            free_coroutine(cr);
+            ERROR("Out of memory\n");
+        }
+        current_strings = current_prog->strings;
+
+        free_coroutine(current_coroutine);
+        current_coroutine = cr; /* Adopt reference. */
+        sp = inter_sp;
+        pc = inter_pc;
+
+        sp = restore_argument_frames(sp, &ap);
+
+        /* Push the value back on the stack and continue execution. */
+        *(++sp) = value;
+
+        break;
+    }
+
+    CASE(F_YIELD_TO_COROUTINE);     /* --- yield_to_coroutine  --- */
+    {
+        /* Suspend the current coroutine and call the coroutine <sp>.
+         * <sp-1> is a value to pass to the coroutine.
+         */
+        svalue_t value = sp[-1];
+        coroutine_t *target, *cr;
+
+        if (csp->catch_call)
+            ERROR("yield within catch is not supported.\n");
+        if (sp[0].type != T_COROUTINE)
+            ERRORF(("Bad arg 2 type '%s' for yield.\n", typename(sp[0].type)));
+
+        assert(current_coroutine != NULL);
+        target = sp[0].u.coroutine;
+        cr = get_resumable_coroutine(target);
+        if (!cr)
+        {
+            ERROR("Coroutine not resumable.\n");
+        }
+
+        ref_coroutine(cr); /* Keep it alive for later. */
+        free_coroutine(target); /* Don't need it. */
+        sp-=2;
+
+        sp = save_argument_frames(sp, ap);
+
+        inter_sp = sp;
+        inter_pc = pc;
+
+        if (!suspend_coroutine(current_coroutine, fp))
+        {
+            free_svalue(&value);
+            free_coroutine(cr);
+            ERROR("Out of memory.\n");
+        }
+
+        if (!resume_coroutine(cr))
+        {
+            free_svalue(&value);
+            free_coroutine(cr);
+            ERROR("Out of memory\n");
+        }
+        current_strings = current_prog->strings;
+
+        free_coroutine(current_coroutine);
+        current_coroutine = cr; /* Adopt reference. */
+        sp = inter_sp;
+        pc = inter_pc;
+
+        sp = restore_argument_frames(sp, &ap);
+
+        /* Push the value back on the stack and continue execution. */
+        *(++sp) = value;
+
+        break;
+    }
+
+    CASE(F_YIELD_RETURN);           /* --- yield_return        --- */
+    {
+        /* Suspend the current coroutine and return <sp>. */
+
+        svalue_t value = *sp;
+
+        if (csp->catch_call)
+            ERROR("yield within catch is not supported.\n");
+        assert(current_coroutine != NULL);
+
+        sp--;
+        sp = save_argument_frames(sp, ap);
+
+        inter_sp = sp;
+        inter_pc = pc;
+
+        if (!suspend_coroutine(current_coroutine, fp))
+        {
+            free_svalue(&value);
+            ERROR("Out of memory.\n");
+        }
+
+        /* Now do a return. */
+        *++inter_sp = value;
+
+        /* A coroutine is always an extern call. */
+        assert(csp->extern_call);
+
+        assign_eval_cost_inl();
+        current_object = csp->ob;
+        previous_ob = csp->prev_ob;
+
+        tracedepth--; /* We leave this level */
+        if (trace_level)
+            do_trace_return(sp);
+
+        pop_control_stack();
+
+        if (trace_level && csp == CONTROL_STACK - 2)
+            /* TODO: This can't be legal according to ISO C */
+            traceing_recursion = -1;
+
+#ifdef CHECK_OBJECT_REF
+        check_all_object_shadows();
+#endif /* CHECK_OBJECT_REF */
+        return MY_FALSE;
     }
 
     CASE(F_BREAK);                  /* --- break               --- */
@@ -11575,6 +11972,10 @@ again:
                 i = closure_eq(sp-1, sp);
                 break;
 
+            case T_COROUTINE:
+                i = (sp-1)->u.coroutine == sp->u.coroutine;
+                break;
+
             case T_SYMBOL:
             case T_QUOTED_ARRAY:
                 i = (sp-1)->u.generic  == sp->u.generic &&
@@ -11652,6 +12053,10 @@ again:
 
             case T_CLOSURE:
                 i = !closure_eq(sp-1, sp);
+                break;
+
+            case T_COROUTINE:
+                i = (sp-1)->u.coroutine != sp->u.coroutine;
                 break;
 
             case T_SYMBOL:
@@ -13960,7 +14365,7 @@ again:
          */
 
         ++sp;
-        sp->type = T_INVALID;
+        sp->type = T_ARG_FRAME;
         sp->u.lvalue = ap;
         ap = sp+1;
         break;
@@ -13971,7 +14376,7 @@ again:
         /* While sp points at a function result, restore the value
          * of ap from sp[-1]; then move the result down there.
          */
-
+        assert(sp[-1].type == T_ARG_FRAME);
         ap = sp[-1].u.lvalue;
         sp[-1] = sp[0];
         sp--;
@@ -15669,8 +16074,8 @@ again:
         break;
     }
 
-    CASE(F_FOREACH);       /* --- foreach     <nargs> <offset> --- */
-    CASE(F_FOREACH_REF);   /* --- foreach_ref <nargs> <offset> --- */
+    CASE(F_FOREACH);       /* --- foreach       <nargs> <offset> --- */
+    CASE(F_FOREACH_REF);   /* --- foreach_ref   <nargs> <offset> --- */
     CASE(F_FOREACH_RANGE); /* --- foreach_range <nargs> <offset> --- */
     {
         /* Initialize a foreach() loop. On the stack are <nargs>-1
@@ -15732,19 +16137,23 @@ again:
         /* Unravel the lvalue chain (if any) to get to the actual value
          * to loop over.
          */
-        if (gen_refs)
+        if (sp->type == T_COROUTINE)
+        {
+            /* Coroutines are not passed as lvalues. Do nothing. */
+        }
+        else if (gen_refs)
         {
             svalue_t argval;
             struct protected_lvalue* argvar = NULL;
 
             if (sp->type != T_LVALUE)
-                ERRORF(("foreach() got a %s, expected a &(string/array/mapping).\n"
+                ERRORF(("foreach() got a %s, expected a &(string/array/mapping/struct/coroutine).\n"
                        , typename(sp->type)
                        ));
 
             arg = get_rvalue_no_collapse(sp, &last_reference);
             if (arg && arg->type == T_NUMBER)
-                ERROR("foreach() got a &number, expected a (&)string/array/mapping/struct or number.\n");
+                ERROR("foreach() got a &number, expected a (&)string/array/mapping/struct/coroutine or number.\n");
 
             if (arg == NULL)
             {
@@ -15853,8 +16262,9 @@ again:
          && arg->type != T_POINTER
          && arg->type != T_NUMBER
          && arg->type != T_STRUCT
-         && arg->type != T_MAPPING)
-            ERRORF(("foreach() got a %s, expected a (&)string/bytes/array/mapping/struct or number.\n"
+         && arg->type != T_MAPPING
+         && arg->type != T_COROUTINE)
+            ERRORF(("foreach() got a %s, expected a (&)string/bytes/array/mapping/struct/coroutine or number.\n"
                    , typename(sp->type)
                    ));
 
@@ -15882,6 +16292,10 @@ again:
         {
             struct_check_for_destr(arg->u.strct);
             count = struct_size(arg->u.strct);
+        }
+        else if (arg->type == T_COROUTINE)
+        {
+            /* Nothing to initialize. */
         }
         else
         {
@@ -16144,8 +16558,50 @@ again:
                     val = arg->u.strct->member+ix;
                     break;
 
+                case T_COROUTINE:
+                {
+                    coroutine_t *cr = arg->u.coroutine;
+
+                    if (is_current_object_destructed())
+                        break;
+
+                    /* coroutine still living? */
+                    if (!valid_coroutine(cr))
+                        break;
+                    cr = get_resumable_coroutine(cr);
+                    if (!cr)
+                        break;
+
+                    /* Now call the coroutine. */
+                    inter_sp = sp;
+                    push_control_stack(inter_sp, inter_pc, inter_fp, inter_context);
+                    csp->ob = current_object;
+                    csp->prev_ob = previous_ob;
+                    csp->extern_call = true;
+                    previous_ob = current_object;
+
+                    inter_fp = inter_sp + 1;
+                    current_coroutine = ref_coroutine(cr);
+                    if (!resume_coroutine(cr))
+                    {
+                        pop_control_stack();
+                        errorf("Out of memory\n");
+                    }
+                    current_strings = current_prog->strings;
+                    push_number(inter_sp, 0);
+                    eval_instruction(inter_pc, inter_sp);
+
+                    /* If the coroutine finished, we don't do an iteration. */
+                    if (valid_coroutine(arg->u.coroutine))
+                        val = inter_sp;
+                    else
+                        free_svalue(inter_sp--);
+                    sp = inter_sp;
+                    break;
+                }
+
                 default:
-                  fatal("foreach() requires a string, array, struct or mapping.\n");
+                  fatal("foreach() requires a string, array, struct, mapping or coroutine.\n");
                   /* If this happens, the check in F_FOREACH failed. */
                   break;
             }
@@ -16236,12 +16692,15 @@ again:
 
                 if (!gen_refs)
                 {
-                    assign_svalue_no_free(lvalue, val);
+                    assign_rvalue_no_free(lvalue, val);
                 }
                 else
                 {
                     assign_protected_lvalue_no_free(lvalue, val);
                 }
+
+                if (arg->type == T_COROUTINE)
+                    pop_stack();
             }
         }
 
@@ -16550,6 +17009,23 @@ again:
         int i;
 
         i = sp->type == T_CLOSURE;
+        free_svalue(sp);
+        put_number(sp, i);
+        break;
+    }
+
+    CASE(F_COROUTINEP);             /* --- coroutinep           --- */
+    {
+        /* EFUN coroutinep()
+         *
+         *   int coroutinep(mixed)
+         *
+         * Returns 1 if the argument is a coroutine.
+         */
+
+        int i;
+
+        i = sp->type == T_COROUTINE;
         free_svalue(sp);
         put_number(sp, i);
         break;
@@ -16940,6 +17416,32 @@ again:
 
         while (pt->catch_call) pt--;
         push_number(sp, (pt->extern_call & ~CS_PRETEND) ? 1 : 0);
+        break;
+      }
+
+    CASE(F_THIS_COROUTINE);            /* --- this_coroutine  --- */
+      {
+        /* EFUN this_coroutine()
+         *
+         *   coroutine this_coroutine();
+         *
+         * Search for the innermost coroutine and return that.
+         */
+
+        if (current_coroutine != NULL)
+            push_ref_coroutine(sp, current_coroutine);
+        else
+        {
+            push_number(sp, 0);
+            for (struct control_stack * pt = csp; pt > CONTROL_STACK; --pt)
+            {
+                if (pt->coroutine)
+                {
+                    put_ref_valid_coroutine(sp, pt->coroutine);
+                    break;
+                }
+            }
+        }
         break;
       }
 
@@ -20959,6 +21461,29 @@ count_extra_ref_in_vector (svalue_t *svp, size_t num)
             }
             continue;
 
+        case T_COROUTINE:
+        {
+            coroutine_t *cr = p->u.coroutine;
+
+            if (NULL == register_pointer(ptable, cr))
+                continue;
+            if (cr->prog)
+            {
+                cr->prog->extra_ref++;
+                count_extra_ref_in_prog(cr->prog);
+            }
+            count_extra_ref_in_vector(&cr->ob, 1);
+            if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
+            {
+                count_extra_ref_in_vector(cr->variables, cr->num_variables);
+                count_extra_ref_in_vector(cr->variables[cr->num_variables].u.lvalue, cr->num_values);
+            }
+            else
+                count_extra_ref_in_vector(cr->variables, cr->num_variables
+                                                       + cr->num_values);
+            continue;
+        }
+
         case T_OBJECT:
             count_extra_ref_in_object(p->u.ob);
             continue;
@@ -21015,6 +21540,23 @@ check_extra_ref_in_vector (svalue_t *svp, size_t num)
     {
         switch(p->type)
         {
+        case T_COROUTINE:
+          {
+            coroutine_t *cr = p->u.coroutine;
+
+            if (NULL == register_pointer(ptable, cr))
+                continue;
+            if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
+            {
+                check_extra_ref_in_vector(cr->variables, cr->num_variables);
+                check_extra_ref_in_vector(cr->variables[cr->num_variables].u.lvalue, cr->num_values);
+            }
+            else
+                check_extra_ref_in_vector(cr->variables, cr->num_variables
+                                                       + cr->num_values);
+            continue;
+          }
+
         case T_LWOBJECT:
             if (NULL == register_pointer(ptable, p->u.lwob))
                 continue;
@@ -21525,6 +22067,65 @@ v_funcall (svalue_t *sp, int num_arg)
 
     return sp;
 } /* v_funcall() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_call_coroutine (svalue_t *sp)
+
+/* EFUN call_coroutine()
+ *
+ *   mixed call_coroutine(coroutine cr, mixed value = 0)
+ *
+ * Continue the execution of the coroutine <cr>.
+ * The routine must be in the state Sleeping or waiting for some
+ * coroutine that is Sleeping.
+ */
+
+{
+    coroutine_t *cr;
+    svalue_t value;
+
+    if (is_current_object_destructed())
+    {
+        pop_n_elems(2);
+        push_number(sp, 0);
+        inter_sp = sp;
+
+        warnf("Call from destructed object '%s' ignored.\n"
+             , get_txt(current_object.u.ob->name));
+        return sp;
+    }
+
+    cr = get_resumable_coroutine(sp[-1].u.coroutine);
+    if (cr == NULL)
+        errorf("Bad arg 1 to call_coroutine(): coroutine not resumable.\n");
+    ref_coroutine(cr);
+
+    value = sp[0];
+    free_coroutine(sp[-1].u.coroutine);
+    inter_sp = sp-2;
+
+    push_control_stack(inter_sp, inter_pc, inter_fp, inter_context);
+    csp->ob = current_object;
+    csp->prev_ob = previous_ob;
+    csp->extern_call = true;
+    previous_ob = current_object;
+
+    inter_fp = inter_sp + 1;
+    current_coroutine = cr; /* Adopt reference. */
+    if (!resume_coroutine(cr))
+    {
+        pop_control_stack();
+        free_svalue(&value);
+        errorf("Out of memory\n");
+    }
+    current_strings = current_prog->strings;
+
+    *(++inter_sp) = value;
+    eval_instruction(inter_pc, inter_sp);
+
+    return inter_sp;
+} /* f_call_coroutine() */
 
 /*-------------------------------------------------------------------------*/
 static svalue_t *

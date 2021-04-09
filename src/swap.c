@@ -1072,6 +1072,7 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
         case T_OBJECT:
         case T_LWOBJECT:
         case T_CLOSURE:
+        case T_COROUTINE:
         case T_LVALUE:
 swap_opaque:
             /* opaque swapped data must be prevented from recursive freeing */
@@ -1231,6 +1232,7 @@ check_swapped_values (mp_int num, unsigned char * p)
         case T_OBJECT:
         case T_LWOBJECT:
         case T_CLOSURE:
+        case T_COROUTINE:
         case T_LVALUE:
             p += sizeof sv.x;
             p += sizeof sv.u;
@@ -1394,6 +1396,7 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
         case T_OBJECT:
         case T_LWOBJECT:
         case T_CLOSURE:
+        case T_COROUTINE:
         case T_LVALUE:
             p += sizeof sv.x;
             p += sizeof sv.u;
@@ -1572,6 +1575,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
               }
             }
 
+        case T_COROUTINE:
         case T_LWOBJECT:
         case T_STRING:
         case T_BYTES:
@@ -2095,6 +2099,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_OBJECT:
         case T_LWOBJECT:
         case T_CLOSURE:
+        case T_COROUTINE:
         case T_LVALUE:
             memcpy(&svp->x, p, sizeof svp->x);
             p += sizeof svp->x;
