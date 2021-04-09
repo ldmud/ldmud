@@ -7874,7 +7874,9 @@ def:  type L_IDENTIFIER  /* Function definition or prototype */
                */
               int fnum = def_function_ident->u.global.function;
 
-              if (RESERVE_DEFAULT_VALUE_POS(fnum - DEFAULT_VALUES_POS_COUNT + 1))
+              if (fnum < DEFAULT_VALUES_POS_COUNT)
+                  DEFAULT_VALUES_POS(fnum) = $5.start;
+              else if (RESERVE_DEFAULT_VALUE_POS(fnum - DEFAULT_VALUES_POS_COUNT + 1))
               {
                   for (int i = DEFAULT_VALUES_POS_COUNT; i < fnum; i++)
                       ADD_DEFAULT_VALUE_POS(-1);
