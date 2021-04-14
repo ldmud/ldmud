@@ -21693,14 +21693,41 @@ int_call_other (bool b_use_default, enum call_other_error_handling error_handlin
         svp = arg->u.vec->item;
         for ( ; size != 0; size--, svp++, rcp++)
         {
+            svalue_t *item;
             int i;
-
-            svalue_t * item = get_rvalue(svp, NULL);
-            if(!item)
-                item = svp;
 
             assign_eval_cost_inl();
             inter_sp = sp; /* Might be clobbered from previous loop */
+
+            if (is_current_object_destructed())
+            {
+                if (error_handling == CO_ERROR)
+                    errorf("%s() from destructed object.\n", efunname);
+
+                /* Fill the remaining values with 0 and break. */
+                for ( ; size != 0; size--, svp++, rcp++)
+                {
+                    item = get_rvalue(svp, NULL);
+                    if (!item)
+                        item = svp;
+
+                    free_svalue(item);
+                    put_number(item, 0);
+
+                    free_svalue(svp);
+                    put_number(svp, 0);
+                    put_number(rcp, 0);
+                }
+
+                warnf("Call from destructed object '%s' ignored.\n"
+                     , get_txt(current_object.u.ob->name));
+                break;
+            }
+
+            item = get_rvalue(svp, NULL);
+            if(!item)
+                item = svp;
+
             ob = NULL;
             lwob = NULL;
 

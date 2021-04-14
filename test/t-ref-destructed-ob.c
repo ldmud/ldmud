@@ -2,6 +2,7 @@
  * destructed objects multiple times.
  */
 #include "/inc/base.inc"
+#include "/inc/deep_eq.inc"
 
 int dest_prev()
 {
@@ -9,24 +10,28 @@ int dest_prev()
     return 1;
 }
 
-void kill_me()
+int kill_me()
 {
     object ob = clone_object(this_object());
-    (({ob})*4096)->dest_prev();
+    int* result = (({ob})*4096)->dest_prev();
+
+    return deep_eq(result, ({1}) + ({0}) * 4095);
 }
 
 void run_test()
 {
+    int result;
+
     msg("\nRunning test for references to destructed objects:\n"
           "--------------------------------------------------\n");
 
-    clone_object(this_object()).kill_me();
+    result = clone_object(this_object()).kill_me();
 
     /* Clear the trace log. */
     foreach(int i: 4096)
         funcall(1,2,3);
 
-    shutdown(0);
+    shutdown(!result);
 }
 
 string *epilog(int eflag)
