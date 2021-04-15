@@ -107,11 +107,17 @@ DESCRIPTION
                 (the default).
 
         warn_unused_variables: Warn about variables that are not used.
-                If will warn about variables never written to, variables
+                It will warn about variables never written to, variables
                 never read from or variables never used at all.
                 This applies to local variables and private global variables.
         no_warn_unused_variables: Turn off warn_unused_variables
                 (the default).
+
+        warn_unused_values: Warn about values that are not used.
+                It will warn about values that are created without
+                side-effects (eg. a literal value or created by some
+                operation) and are not used afterwards.
+        no_warn_unused_values: Turn off warn_unused_values (the default).
 
         warn_lightweight: Warn about efuns that are not suitable for
                 lightweight objects.

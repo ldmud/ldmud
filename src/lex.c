@@ -241,6 +241,10 @@ bool pragma_warn_unused_variables;
   /* True: Warn about declared but never used variables.
    */
 
+bool pragma_warn_unused_values;
+  /* True: Warn about created but not used values.
+   */
+
 bool pragma_warn_lightweight;
   /* True: Warn about efuns not suitable for lightweight objects.
    */
@@ -4095,6 +4099,16 @@ handle_pragma (char *str)
             pragma_warn_unused_variables = false;
             validPragma = MY_TRUE;
         }
+        else if (wordcmp(base, "warn_unused_values", namelen) == 0)
+        {
+            pragma_warn_unused_values = true;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "no_warn_unused_values", namelen) == 0)
+        {
+            pragma_warn_unused_values = false;
+            validPragma = MY_TRUE;
+        }
         else if (wordcmp(base, "warn_lightweight", namelen) == 0)
         {
             pragma_warn_lightweight = true;
@@ -6340,6 +6354,7 @@ start_new_file (int fd, const char * fname)
     pragma_warn_rtt_checks = MY_FALSE;
     pragma_no_bytes_type = false;
     pragma_warn_unused_variables = false;
+    pragma_warn_unused_values = false;
     pragma_warn_lightweight = true;
 
     nexpands = 0;
