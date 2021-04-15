@@ -9,4 +9,4 @@ else:
 import ldmud
 ldmud.register_printers()
 
-print("LDMud 3.5 pretty printers loaded.")
+print("LDMud 3.6 pretty printers loaded.")

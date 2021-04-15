@@ -517,4 +517,6 @@ ptr_printers = {
     'protected_range_lvalue': ProtRangePrinter,
 }
 
-direct_printers = {}
+direct_printers = {
+    'svalue_s':      SValuePrinter,
+}
