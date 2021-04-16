@@ -707,7 +707,7 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
     /* Allocate the string; cop out if there's nothing to implode.
      */
     if (size <= 0)
-        return ref_mstring(STR_EMPTY);
+        return ref_mstring(stringtype == T_STRING ? STR_EMPTY : empty_byte_string);
 
     result = mstring_alloc_string(size MTRACE_PASS);
     if (!result)

@@ -521,6 +521,7 @@ mixed *tests = ({
     ({ "implode 1", 0, (: implode(({ "foo", "bar", "" }), "*") == "foo*bar*":) }),
     ({ "implode 2", 0, (: implode(({ "a", 2, this_object(), "c" }), "b") == "abc" :) }),
     ({ "implode 3", 0, (: implode(({ "", "" }), "") == "":) }),
+    ({ "implode 4", 0, (: implode(({ b"" }), b"abc") == b"" :) }),
     ({ "random", 0,
         (:
             /* Let's check every 8 bits for some randomness. */
