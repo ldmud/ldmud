@@ -353,12 +353,12 @@ interpret.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_hook.h \
     ../mudlib/sys/driver_info.h ../mudlib/sys/trace.h actions.h array.h \
     backend.h bytecode.h bytecode_gen.h call_out.h closure.h comm.h \
     config.h driver.h efuns.h exec.h filestat.h gcollect.h hash.h \
-    heartbeat.h i-eval_cost.h iconv_opt.h instrs.h interpret.h lex.h \
-    machine.h main.h mapping.h mstrings.h my-alloca.h object.h otable.h \
-    parse.h pkg-gcrypt.h pkg-gnutls.h pkg-openssl.h pkg-python.h pkg-tls.h \
-    port.h prolang.h ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h \
-    strfuns.h structs.h svalue.h swap.h switch.h typedefs.h types.h \
-    wiz_list.h xalloc.h
+    heartbeat.h i-eval_cost.h i-svalue_cmp.h iconv_opt.h instrs.h \
+    interpret.h lex.h machine.h main.h mapping.h mstrings.h my-alloca.h \
+    object.h otable.h parse.h pkg-gcrypt.h pkg-gnutls.h pkg-openssl.h \
+    pkg-python.h pkg-tls.h port.h prolang.h ptrtable.h sent.h simul_efun.h \
+    simulate.h stdstrings.h strfuns.h structs.h svalue.h swap.h switch.h \
+    typedefs.h types.h wiz_list.h xalloc.h
 
 lex.o : ../mudlib/sys/driver_hook.h array.h backend.h bytecode.h \
     bytecode_gen.h closure.h comm.h config.h driver.h efun_defs.c exec.h \

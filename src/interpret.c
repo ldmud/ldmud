@@ -236,6 +236,7 @@
 #include "xalloc.h"
 
 #include "i-eval_cost.h"
+#include "i-svalue_cmp.h"
 
 #include "pkg-python.h"
 
@@ -11587,6 +11588,123 @@ again:
         pop_stack();
         free_svalue(sp);
         put_number(sp, i);
+        break;
+    }
+
+    CASE(F_IN);                     /* --- in                  --- */
+    {
+        /* Do a membership test for sp[-1] in sp[0].
+         * Leave 1 for success, 0 for failure on the stack.
+         */
+        int result = 0;
+        svalue_t *container = get_rvalue(sp, NULL);
+        struct protected_range_lvalue *container_range = NULL;
+        svalue_t *item = get_rvalue(sp-1, NULL);
+
+        if (item == NULL)
+            item = sp-1;
+
+        if (container == NULL)
+        {
+            /* string or pointer range. */
+            container_range = sp->u.protected_range_lvalue;
+            container = &(container_range->vec);
+        }
+
+        switch (container->type)
+        {
+            case T_POINTER:
+            {
+                vector_t *vec = container->u.vec;
+                p_int start = container_range == NULL ? 0 : container_range->index1;
+                p_int count = container_range == NULL ? VEC_SIZE(vec) : (container_range->index2 - container_range->index1);
+
+                for (svalue_t *entry = container->u.vec->item + start; count != 0; entry++, count--)
+                {
+                    if (rvalue_eq(item, entry) == 0)
+                    {
+                        result = 1;
+                        break;
+                    }
+                }
+                break;
+            }
+
+            case T_MAPPING:
+                result = get_map_value(container->u.map, item) != &const0;
+                break;
+
+            case T_STRING:
+            case T_BYTES:
+            {
+                string_t *str = container->u.str;
+                p_int start = container_range == NULL ? 0 : container_range->index1;
+                p_int len = container_range == NULL ? mstrsize(str) : (container_range->index2 - container_range->index1);
+                struct protected_range_lvalue *item_range = NULL;
+
+                if (item->type == T_LVALUE)
+                {
+                    item_range = item->u.protected_range_lvalue;
+                    item = &(item_range->vec);
+                }
+
+                switch (item->type)
+                {
+                    case T_NUMBER:
+                        if (str->info.unicode == STRING_UTF8)
+                        {
+                            char* s = get_txt(str) + start;
+                            p_int ch = item->u.number;
+
+                            while (len > 0)
+                            {
+                                p_int elem;
+                                size_t elemlen = utf8_to_unicode(s, len, &elem);
+                                if (!elemlen)
+                                    break;
+                                if (elem == ch)
+                                {
+                                    result = 1;
+                                    break;
+                                }
+
+                                s += elemlen;
+                                len -= elemlen;
+                            }
+                        }
+                        else if (item->u.number & ~0xff)
+                            result = 0;
+                        else
+                            result = memchr(get_txt(str) + start, item->u.number, len) != NULL;
+                        break;
+
+                    case T_STRING:
+                    case T_BYTES:
+                        if (item->type == container->type)
+                        {
+                            p_int itemlen = item_range == NULL ? mstrsize(item->u.str) : (item_range->index2 - item_range->index1);
+                            const char* found = mstring_mstr_n_str(str, start
+                                                                 , get_txt(item->u.str) + (item_range == NULL ? 0 : item_range->index1)
+                                                                 , itemlen);
+                            result = found != NULL
+                                  && found - get_txt(str) + itemlen <= start + len;
+                            break;
+                        }
+                        /* else FALLTHROUGH */
+                    default:
+                        OP_ARG_ERROR(1, TF_NUMBER|(container->type == T_STRING ? TF_STRING : TF_BYTES), item->type);
+                }
+                break;
+            }
+
+            default:
+                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING|TF_STRING|TF_BYTES, sp->type);
+                /* NOTREACHED */
+        }
+
+        pop_stack();
+        free_svalue(sp);
+        put_number(sp, result);
         break;
     }
 

@@ -80,14 +80,19 @@ DESCRIPTION
         expr1 == expr2        Compare values. Valid for strings, numbers,
                               objects and closures.
 
-        expr1 != expr1        Compare values. Valid for strings, numbers,
+        expr1 != expr2        Compare values. Valid for strings, numbers,
                               objects and closures.
 
-        expr1 > expr2        Valid for strings and numbers.
+        expr1 in expr2        Check whether 'expr1' is contained in 'expr2':
+                              a value in an array, a key in a mapping,
+                              a character or substring in a string, or a
+                              a byte or byte sequence in a byte sequence.
+
+        expr1 > expr2         Valid for strings and numbers.
 
         expr1 >= expr2        Valid for strings and numbers.
 
-        expr1 < expr2        Valid for strings and numbers.
+        expr1 < expr2         Valid for strings and numbers.
 
         expr1 <= expr2        Valid for strings and numbers.
 
@@ -215,6 +220,7 @@ HISTORY
         LDMud 3.2.10 extended '&' to mappings.
         LDMud 3.3 extended '|' and '^' to arrays.
         LDMud 3.6.2 added '.'.
+        LDMud 3.6.5 added 'in'.
 
 SEE ALSO
         arrays(LPC), alists(LPC), mappings(LPC), closures(LPC)

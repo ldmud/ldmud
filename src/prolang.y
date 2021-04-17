@@ -2038,6 +2038,24 @@ get_sub_array_type (lpctype_t* t1, lpctype_t* t2)
     return ref_lpctype(t1);
 }
 
+static lpctype_t*
+is_array_member_type (lpctype_t* member, lpctype_t* array)
+
+/* This function checks whether <member> is a valid member
+ * type of <array>. If so, it returns the common member
+ * type, otherwise this function fails.
+ */
+
+{
+    lpctype_t *common;
+    lpctype_t *element = get_array_member_type(array);
+
+    common = get_common_type(member, element);
+
+    free_lpctype(element);
+
+    return common;
+}
 
 static lpctype_t*
 get_first_type (lpctype_t* t1, lpctype_t* t2)
@@ -2049,6 +2067,15 @@ get_first_type (lpctype_t* t1, lpctype_t* t2)
     return ref_lpctype(t1);
 }
 
+static lpctype_t*
+get_first_array_type (lpctype_t* t1, lpctype_t* t2)
+
+/* Return an array of <t1> as the result type in the type table.
+ */
+
+{
+    return get_array_type(t1);
+}
 
 static lpctype_t*
 get_second_type (lpctype_t* t1, lpctype_t* t2)
@@ -2191,6 +2218,18 @@ binary_op_types_t types_equality[] = {
     { &_lpctype_mixed,     &_lpctype_mixed,     &_lpctype_int,     &get_common_type      , NULL                   , NULL                   },
     { &_lpctype_int,       &_lpctype_float,     &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { &_lpctype_float,     &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for membership tests.
+ */
+binary_op_types_t types_in[] = {
+    { &_lpctype_mixed,     &_lpctype_any_array, &_lpctype_int,     &is_array_member_type , &get_first_array_type  , NULL                   },
+    { &_lpctype_mixed,     &_lpctype_mapping,   &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_string,    &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_int,       &_lpctype_bytes,     &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -7780,7 +7819,7 @@ delete_prog_string (void)
 %left     '|'
 %left     '^'
 %left     '&'
-%left     L_EQ    L_NE
+%left     L_EQ    L_NE  L_IDENTIFIER
 %left     '<'     L_LE  '>' L_GE
 %left     L_LSH   L_RSH L_RSHL
 %left     '+'     '-'
@@ -10333,21 +10372,8 @@ foreach_var_lvalue:  /* Gather the code for one lvalue */
 ; /* foreach_var_lvalue */
 
 foreach_in:
-    /* The purpose of this rule is to avoid making "in" a reserved
-     * word. Instead we require an identifier/local with the
-     * name "in" as alternative to ":". Main reason to allow "in"
-     * is MudOS compatibility.
-     * TODO: Make MudOS-compats switchable.
-     */
-
-      identifier
-
-      {
-          if (!mstreq($1, STR_IN))
-              yyerror("Expected keyword 'in' in foreach()");
-          free_mstring($1);
-      }
-
+    /* TODO: Make MudOS-compats switchable. */
+      keyword_in
     | ':'
 ; /* foreach_in */
 
@@ -10428,6 +10454,17 @@ foreach_expr:
           free_lvalue_block($1.lvalue);
       }
 ; /* foreach_expr */
+
+keyword_in:
+      /* The purpose of this rule is to avoid making "in" a reserved word.
+       * Instead we require an identifier/local with the name "in".
+       */
+      L_IDENTIFIER
+      {
+          if (!mstreq($1->name, STR_IN))
+              yyerror("Expected keyword 'in'");
+      }
+; /* keyword_in */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* The switch statement.
@@ -11554,6 +11591,27 @@ expr0:
           $$.type = get_fulltype(lpctype_int);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr0 keyword_in expr0 %prec L_EQ
+      {
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "in", types_in, lpctype_int, NULL, false);
+
+          $$ = $1;
+          $$.type = get_fulltype(result);
+          $$.name = NULL;
+          $$.lvalue = (lvalue_block_t) {0, 0};
+
+          use_variable($1.name, VAR_USAGE_READ);
+          use_variable($3.name, VAR_USAGE_READ);
+
+          free_fulltype($1.type);
+          free_fulltype($3.type);
+          free_lvalue_block($3.lvalue);
+          free_lvalue_block($1.lvalue);
+
+          ins_f_code(F_IN);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/

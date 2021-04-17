@@ -90,6 +90,7 @@
 "<="    le        binary
 "=="    eq        binary
 "!="    ne        binary
+        in        binary
 "~"     compl     unary
 "&"     and       binary
 "|"     or        binary
