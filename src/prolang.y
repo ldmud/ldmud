@@ -953,6 +953,10 @@ static bool arg_types_exhausted;
    * and a warning was already given about that.
    */
 
+static bool warned_deprecated_in;
+  /* Already warned about 'in' being deprecated as an identifier.
+   */
+
 static funflag_t default_varmod;
 static funflag_t default_funmod;
   /* Default visibility modifiers for variables resp. function.
@@ -4348,6 +4352,21 @@ leave_block_scope (Bool dontclobber)
             block_scope[block_depth-1].clobbered = MY_TRUE;
         }
 } /* leave_block_scope() */
+
+/*-------------------------------------------------------------------------*/
+static void
+check_identifier (ident_t *name)
+
+/* Check the used identifier for deprecated names.
+ */
+
+{
+    if (pragma_warn_deprecated && !warned_deprecated_in && mstreq(name->name, STR_IN))
+    {
+        warned_deprecated_in = true;
+        yywarn("Usage of 'in' as an identifier is deprecated, it will be a reserved word in future versions");
+    }
+} /* check_identifier() */
 
 
 /* ======================   GLOBALS and FUNCTIONS   ====================== */
@@ -7855,6 +7874,7 @@ note_start: { $$ = CURRENT_PROGRAM_SIZE; };
 def:  type L_IDENTIFIER  /* Function definition or prototype */
 
       {
+          check_identifier($2);
           def_function_typecheck($1, $2, MY_FALSE);
       }
 
@@ -8313,11 +8333,14 @@ inline_block:
 struct_decl:
       type_modifier_list L_STRUCT L_IDENTIFIER ';'
       {
+          check_identifier($3);
           (void)define_new_struct(MY_TRUE, $3, compiled_file, $1);
       }
     | type_modifier_list L_STRUCT L_IDENTIFIER
       {
           size_t i;
+
+          check_identifier($3);
 
           /* Free any struct members left over from a previous
            * struct parse. This should happen only in case
@@ -8346,6 +8369,8 @@ opt_base_struct:
           /* Look up the struct id for the given identifier */
 
           int num = -1;
+
+          check_identifier($2);
 
           if ($2->type == I_TYPE_UNKNOWN)
           {
@@ -8416,12 +8441,15 @@ member:
 member_name_list:
       basic_non_void_type L_IDENTIFIER
       {
+          check_identifier($2);
+
           add_struct_member($2->name, $1, NULL);
           $$ = $1;
       }
     | member_name_list ',' optional_stars L_IDENTIFIER
       {
           lpctype_t* type = get_array_type_with_depth($1, $3);
+          check_identifier($4);
           add_struct_member($4->name, type, NULL);
           free_lpctype(type);
           $$ = $1;
@@ -8902,6 +8930,7 @@ identifier:
       {
           /* Extract the string from the ident structure */
           $$ = ref_mstring($1->name);
+          check_identifier($1);
       }
 ;
 
@@ -8973,6 +9002,8 @@ new_arg_name:
       {
           funflag_t illegal_flags = $1.t_flags & (TYPE_MOD_STATIC|TYPE_MOD_NO_MASK|TYPE_MOD_PRIVATE|TYPE_MOD_PUBLIC|TYPE_MOD_VIRTUAL|TYPE_MOD_PROTECTED|TYPE_MOD_NOSAVE|TYPE_MOD_VISIBLE);
           ident_t *varident = NULL;
+
+          check_identifier($2);
 
           if (illegal_flags)
           {
@@ -9073,6 +9104,8 @@ name_list:
       type L_IDENTIFIER
       {
 %line
+          check_identifier($2);
+
           if ($1.t_type == NULL)
           {
               yyerror("Missing type");
@@ -9087,6 +9120,8 @@ name_list:
 
     | type L_IDENTIFIER
       {
+          check_identifier($2);
+
           if ($1.t_type == NULL)
           {
               yyerror("Missing type");
@@ -9111,6 +9146,7 @@ name_list:
           type.t_type = get_array_type_with_depth($1.t_type, $3);
           type.t_flags = $1.t_flags;
 
+          check_identifier($4);
           define_global_variable($4, type, MY_FALSE);
           free_fulltype(type);
           $$ = $1;
@@ -9124,6 +9160,7 @@ name_list:
           type.t_type = get_array_type_with_depth($1.t_type, $3);
           type.t_flags = $1.t_flags;
 
+          check_identifier($4);
           $<number>$ = define_global_variable($4, type, MY_TRUE); 
           free_fulltype(type);
       }
@@ -9229,12 +9266,14 @@ statements:
 local_name_list:
       basic_type L_IDENTIFIER
       {
+          check_identifier($2);
           define_local_variable($2, $1, NULL, $2->type == I_TYPE_LOCAL, MY_FALSE);
 
           $$ = $1;
       }
     | basic_type L_IDENTIFIER
       {
+          check_identifier($2);
           $2 = define_local_variable($2, $1, &$<lvalue>$, $2->type == I_TYPE_LOCAL, MY_TRUE);
       }
       L_ASSIGN expr0
@@ -9249,6 +9288,7 @@ local_name_list:
     | local_name_list ',' optional_stars L_IDENTIFIER
       {
           lpctype_t* type = get_array_type_with_depth($1, $3);
+          check_identifier($4);
           define_local_variable($4, type, NULL, $4->type == I_TYPE_LOCAL, MY_FALSE);
           free_lpctype(type);
 
@@ -9257,6 +9297,7 @@ local_name_list:
     | local_name_list ',' optional_stars  L_IDENTIFIER
       {
           lpctype_t* type = get_array_type_with_depth($1, $3);
+          check_identifier($4);
           $4 = define_local_variable($4, type, &$<lvalue>$, $4->type == I_TYPE_LOCAL, MY_TRUE);
           free_lpctype(type);
       }
@@ -12762,6 +12803,7 @@ expr4:
           bytecode_p p;
           ident_t *varident;
 %line
+          check_identifier($1);
           varident = get_initialized_variable($1);
           if (!varident)
               /* variable not declared */
@@ -13050,6 +13092,7 @@ name_lvalue:
           /* Generate the lvalue for a local or global variable */
           ident_t *varident;
 %line
+          check_identifier($1);
           varident = get_initialized_variable($1);
           if (!varident)
               /* variable not declared */
@@ -13377,6 +13420,7 @@ name_var_lvalue:
 local_name_lvalue:
       basic_type L_IDENTIFIER
       {
+          check_identifier($2);
           $2 = define_local_variable($2, $1, &$$, $2->type == I_TYPE_LOCAL, MY_TRUE);
 
           ref_lpctype($$.type);
@@ -15048,6 +15092,7 @@ function_name:
       {
           ident_t *fun = $1;
 
+          check_identifier($1);
           if (fun->type == I_TYPE_LOCAL)
           {
               fun = find_shared_identifier_mstr(fun->name, I_TYPE_UNKNOWN, 0);
@@ -15072,6 +15117,7 @@ function_name:
 
     | L_COLON_COLON L_IDENTIFIER
       {
+          check_identifier($2);
           *($$.super = yalloc(1)) = '\0';
           $$.real  = $2;
       }
@@ -15081,6 +15127,7 @@ function_name:
 %line
           ident_t *fun = $3;
 
+          check_identifier($3);
           if (fun->type == I_TYPE_LOCAL)
           {
               fun = find_shared_identifier_mstr(fun->name, I_TYPE_UNKNOWN, 0);
@@ -15157,6 +15204,7 @@ function_name:
 anchestor:
       L_IDENTIFIER
       {
+          check_identifier($1);
           $$ = ystring_copy(get_txt($1->name));
       }
 
@@ -18644,6 +18692,7 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", local_variables, context_variables 
     function_call_info[0].unlimited_args = false;
     function_call_info[0].remaining_arg_types = 0;
     arg_types_exhausted = false;
+    warned_deprecated_in = false;
 
     max_number_of_init_locals = 0;
 
