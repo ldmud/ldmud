@@ -2237,6 +2237,15 @@ binary_op_types_t types_in[] = {
     { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
+/* Operator type table for comparisons.
+ */
+binary_op_types_t types_comparison[] = {
+    { &_lpctype_int_float, &_lpctype_int_float, &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_string,    &_lpctype_string,    &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
+};
+
 /* Operator type table for shift operations.
  * Only ints are allowed.
  */
@@ -11658,11 +11667,10 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '>'  expr0
       {
-          check_unknown_type($1.type.t_type);
-          check_unknown_type($3.type.t_type);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">", types_comparison, lpctype_int, NULL, false);
 
           $$ = $1;
-          $$.type = get_fulltype(lpctype_int);
+          $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
 
@@ -11678,11 +11686,10 @@ expr0:
       }
     | expr0 L_GE  expr0
       {
-          check_unknown_type($1.type.t_type);
-          check_unknown_type($3.type.t_type);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">=", types_comparison, lpctype_int, NULL, false);
 
           $$ = $1;
-          $$.type = get_fulltype(lpctype_int);
+          $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
 
@@ -11698,11 +11705,10 @@ expr0:
       }
     | expr0 '<'  expr0
       {
-          check_unknown_type($1.type.t_type);
-          check_unknown_type($3.type.t_type);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "<", types_comparison, lpctype_int, NULL, false);
 
           $$ = $1;
-          $$.type = get_fulltype(lpctype_int);
+          $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
 
@@ -11718,11 +11724,10 @@ expr0:
       }
     | expr0 L_LE  expr0
       {
-          check_unknown_type($1.type.t_type);
-          check_unknown_type($3.type.t_type);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "<=", types_comparison, lpctype_int, NULL, false);
 
           $$ = $1;
-          $$.type = get_fulltype(lpctype_int);
+          $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
 
