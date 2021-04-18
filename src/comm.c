@@ -501,6 +501,7 @@ static void mccp_telnet_neg(int);
 static void free_input_to(input_to_t *);
 static void free_input_handler(input_t *);
 static void telnet_neg(interactive_t *);
+static void telnet_neg_reset(interactive_t *);
 static void send_will(int);
 static void send_wont(int);
 static void send_do(int);
@@ -2229,6 +2230,11 @@ get_message (char *buff, size_t *bufflength)
                     continue;
                 }
 
+                /* Process telnet negotiations up to the point where the
+                 * next input is ready, if possible.
+                 */
+                telnet_neg(ip);
+
                 if (ip->tn_state == TS_READY || ip->tn_state == TS_CHAR_READY)
                 {
                     /* If telnet is ready for commands, react quickly. */
@@ -2833,12 +2839,11 @@ get_message (char *buff, size_t *bufflength)
                  * outportal instead of returning it.
                  */
 
+                /* Process telnet negotiations up to the point where the
+                 * next input is ready, if possible.
+                 */
                 telnet_neg(ip);
             } /* if (cmdgiver socket ready) */
-
-            /* if ip->command[0] does not hold a valid character, the outcome
-             * of the comparison to input_escape does not matter.
-             */
 
             /* telnet_neg() might have destroyed this one. */
             if (ip->ob->flags & O_DESTRUCTED)
@@ -2878,6 +2883,9 @@ get_message (char *buff, size_t *bufflength)
             {
                 DTN(("CHARMODE_REQ\n"));
 
+                /* if ip->command[0] does not hold a valid character, the
+                 * outcome of the comparison to input_escape does not matter.
+                 */
                 if (ip->command[0] != input_escape
                  || find_no_bang(ip) & IGNORE_BANG )
                 {
@@ -2938,7 +2946,7 @@ get_message (char *buff, size_t *bufflength)
                          * Continue the telnet machine.
                          */
                         DTN(("    out of chars: reinit telnet machine\n"));
-                        telnet_neg(ip);
+                        telnet_neg_reset(ip);
                     }
 
                     command_giver = ip->ob;
@@ -2997,7 +3005,7 @@ get_message (char *buff, size_t *bufflength)
                 /* Reinitialize the telnet machine, possibly already
                  * producing the next command in .text[].
                  */
-                telnet_neg(ip);
+                telnet_neg_reset(ip);
 
                 /* telnet_neg() might have destroyed this one. */
                 if (ip->ob->flags & O_DESTRUCTED)
@@ -4950,6 +4958,11 @@ telnet_neg (interactive_t *ip)
  * as soon as characters are available for processing, the state is changed
  * to TS_CHAR_READY, when a newline es encountered it is changed to TS_READY.
  *
+ * A call to telnet_neg_reset() (see below) is required to return from the
+ * TS_*READY states to TS_DATA. This is to avoid accidentally processing
+ * data in line mode when the mudlib is about to switch to char mode, and
+ * vice versa.
+ *
  * The function starts at .tn_end and goes on until it reaches .text_end or
  * a full newline.
  *
@@ -5013,33 +5026,6 @@ telnet_neg (interactive_t *ip)
     char *last = ip->text + ip->text_end;       /* End of the data to process. */
 
     DTN(("telnet_neg: state %hhd\n", ip->tn_state));
-
-    /* When called after a TS_READY reset the pointers
-     * to process the next command.
-     */
-    if (ip->tn_state == TS_READY)
-    {
-        memmove(ip->command, ip->command + ip->command_end, ip->command_unprocessed_end - ip->command_end);
-        ip->command_unprocessed_end -= ip->command_end;
-        ip->command_start = ip->command_end = ip->command_printed = 0;
-        set_tn_state(ip, TS_DATA);
-    }
-    else if (ip->tn_state == TS_CHAR_READY)
-    {
-        /* Remove any processed characters, but leave the first character
-         * to make input escape last.
-         */
-        if (ip->command_start > 1)
-        {
-            memmove(ip->command + 1, ip->command + ip->command_start, ip->command_unprocessed_end - ip->command_start);
-            ip->command_unprocessed_end -= ip->command_start - 1;
-            ip->command_end -= ip->command_start - 1;
-            ip->command_printed -= ip->command_start - 1;
-            ip->command_start = 1;
-        }
-
-        set_tn_state(ip, TS_DATA);
-    }
 
     while (source < last || (ip->tn_state == TS_DATA && ip->command_end != ip->command_unprocessed_end))
     {
@@ -5599,6 +5585,44 @@ telnet_neg (interactive_t *ip)
         ip->text_end = ip->tn_end = ip->text_prefix;
     }
 } /* telnet_neg() */
+
+/*-------------------------------------------------------------------------*/
+static void
+telnet_neg_reset (interactive_t *ip)
+
+/* Reset telnet state back to TS_DATA. This function is invoked when
+ * the processed command buffer is consumed, allowing telnet_neg()
+ * (see above) to proceed with the unprocessed part.
+ */
+
+{
+    /* When called after a TS_READY reset the pointers
+     * to process the next command.
+     */
+    if (ip->tn_state == TS_READY)
+    {
+        memmove(ip->command, ip->command + ip->command_end, ip->command_unprocessed_end - ip->command_end);
+        ip->command_unprocessed_end -= ip->command_end;
+        ip->command_start = ip->command_end = ip->command_printed = 0;
+        set_tn_state(ip, TS_DATA);
+    }
+    else if (ip->tn_state == TS_CHAR_READY)
+    {
+        /* Remove any processed characters, but leave the first character
+         * to make input escape last.
+         */
+        if (ip->command_start > 1)
+        {
+            memmove(ip->command + 1, ip->command + ip->command_start, ip->command_unprocessed_end - ip->command_start);
+            ip->command_unprocessed_end -= ip->command_start - 1;
+            ip->command_end -= ip->command_start - 1;
+            ip->command_printed -= ip->command_start - 1;
+            ip->command_start = 1;
+        }
+
+        set_tn_state(ip, TS_DATA);
+    }
+}
 
 /* End of Telnet support */
 /*=========================================================================*/
