@@ -424,9 +424,72 @@ mixed *tests = ({
     ({ "sscanf percent 7", 0, (: string x;    return sscanf("s%%",       "%s%%%%%%", x) == 0;                              :) }),
     ({ "sscanf percent 8", 0, (: string x;    return sscanf("%%s",       "%%%s",     x) == 1    && x == "%s";              :) }),
     ({ "sscanf percent 9", 0, (: string x;    return sscanf("%s",        "%%%s",     x) == 1    && x == "s";               :) }),
+
     ({ "sprintf 1", 0, (: sprintf("%=-4s\n", "A B C\n") == "A B\nC\n" :) }),
     ({ "sprintf 2", 0, (: sprintf("%=-4s\n%s", "A B C\n", "X\n") == "A B\nC\nX\n" :) }),
     ({ "sprintf 3", 0, (: sprintf("%=-4s %=-4s\n%s", "A B C\n", "1 2 3\n", "X\n") == "A B  1 2\nC    3\nX\n" :) }),
+    ({ "sprintf 4", 0, (: sprintf("abc%cdef", 0) == "abc\x00def" :) }),
+    ({ "sprintf 5", 0, (: sprintf("abc\x00def") == "abc\x00def" :) }),
+    ({ "sprintf 6", 0, (: sprintf("%s", "abc\x00def") == "abc\x00def" :) }),
+    ({ "sprintf 7", 0, (: sprintf("%-6s", "abc\x00def") == "abc\x00def" :) }),
+    ({ "sprintf 8", 0, (: sprintf("%-=6s", "abc\x00def") == "abc\x00def" :) }),
+    ({ "sprintf 9", 0, (: sprintf("%-#6.1s", "abc\x00def") == "abc\x00def" :) }),
+    ({ "sprintf 10", 0, (: sprintf("%-'\x00'6s", "abc") == "abc\x00\x00\x00" :) }),
+
+    ({ "sprintf doc01", 0, (: sprintf("foo")                     == "foo"           :) }),
+    ({ "sprintf doc02", 0, (: sprintf("%s","foo")                == "foo"           :) }),
+    ({ "sprintf doc03", 0, (: sprintf("%7s","foo")               == "    foo"       :) }),
+    ({ "sprintf doc04", 0, (: sprintf("%-7s","foo")              == "foo    "       :) }),
+    ({ "sprintf doc05", 0, (: sprintf("%|7s","foo")              == "  foo  "       :) }),
+    ({ "sprintf doc06", 0, (: sprintf("%7'.'s","foo")            == "....foo"       :) }),
+    ({ "sprintf doc07", 0, (: sprintf("%-7'+-'s","foo")          == "foo+-+-"       :) }),
+    ({ "sprintf doc08", 0, (: sprintf("%|9'-+'s","foo")          == "-+-foo-+-"     :) }),
+    ({ "sprintf doc09", 0, (: sprintf("%3s","foobarbloh")        == "foobarbloh"    :) }),
+    ({ "sprintf doc10", 0, (: sprintf("%3.6s","foobarbloh")      == "foobar"        :) }),
+    ({ "sprintf doc11", 0, (: sprintf("%6.3s","foobarbloh")      == "   foo"        :) }),
+    ({ "sprintf doc12", 0, (: sprintf("%:6s","foobarbloh")       == "foobar"        :) }),
+    ({ "sprintf doc13", 0, (: sprintf("%:3s","foobarbloh")       == "foo"           :) }),
+    ({ "sprintf doc14", 0, (: sprintf("%*.*s",-7,2,"foobarbloh") == "fo     "       :) }),
+    ({ "sprintf doc15", 0, (: sprintf("%=12s","this is a very long sentence\n")
+                              == "   this is a\n   very long\n    sentence\n"       :) }),
+    ({ "sprintf doc16", 0, (: sprintf("%=-12s","this is a very long sentence\n")
+                              == "this is a\nvery long\nsentence\n"                 :) }),
+    ({ "sprintf doc17", 0, (: sprintf("%=|12s","this is a very long sentence\n")
+                              == "  this is a\n  very long\n  sentence\n"           :) }),
+    ({ "sprintf doc18", 0, (: sprintf("%=10.6s","this is a very long sentence\n")
+                              == "      this\n      is a\n      very\n"
+                                 "      long\n    senten\n        ce\n"             :) }),
+    ({ "sprintf doc19", 0, (: sprintf("%#-40.3s\n", "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n")
+                              == "one          five         nine\n"
+                                 "two          six          ten\n"
+                                 "three        seven        \n"
+                                 "four         eight        \n"                     :) }),
+    ({ "sprintf doc20", 0, (: sprintf("%#-40s\n", "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n")
+                              == "one     three   five    seven   nine\n"
+                                 "two     four    six     eight   ten\n"            :) }),
+    ({ "sprintf doc21", 0, (: sprintf("%@-5s",({"foo","bar","bloh"}))
+                              == "foo  bar  bloh "                                  :) }),
+    ({ "sprintf doc22", 0, (: sprintf("%d",123)                  == "123"           :) }),
+    ({ "sprintf doc23", 0, (: sprintf("%7d",123)                 == "    123"       :) }),
+    ({ "sprintf doc24", 0, (: sprintf("%-7d",123)                == "123    "       :) }),
+    ({ "sprintf doc25", 0, (: sprintf("%d/%d",123,-123)          == "123/-123"      :) }),
+    ({ "sprintf doc26", 0, (: sprintf("% d/% d",123,-123)        == " 123/-123"     :) }),
+    ({ "sprintf doc27", 0, (: sprintf("%+d/%+d",123,-123)        == "+123/-123"     :) }),
+    ({ "sprintf doc28", 0, (: sprintf("%+5d/%5d",123,123)        == " +123/  123"   :) }),
+    ({ "sprintf doc29", 0, (: sprintf("%|6d",123)                == "  123 "        :) }),
+    ({ "sprintf doc30", 0, (: sprintf("%|10d",123)               == "    123   "    :) }),
+    ({ "sprintf doc31", 0, (: sprintf("%|10d%3s",123,"foo")      == "    123   foo" :) }),
+    ({ "sprintf doc32", 0, (: sprintf("%o",16)                   == "20"            :) }),
+    ({ "sprintf doc33", 0, (: sprintf("%'0'3o",8)                == "010"           :) }),
+    ({ "sprintf doc34", 0, (: sprintf("%x",123)                  == "7b"            :) }),
+    ({ "sprintf doc35", 0, (: sprintf("%X",123)                  == "7B"            :) }),
+    ({ "sprintf doc36", 0, (: sprintf("%f",123.5)                == "124"           :) }),
+    ({ "sprintf doc37", 0, (: sprintf("%8.3f",123.5)             == " 123.500"      :) }),
+    ({ "sprintf doc38", 0, (: sprintf("%E",123.5)                == "1E+02"         :) }),
+    ({ "sprintf doc39", 0, (: sprintf("%12.4e",123.5)            == "  1.2350e+02"  :) }),
+    ({ "sprintf doc40", 0, (: sprintf("%g",123.5)                == "1e+02"         :) }),
+    ({ "sprintf doc41", 0, (: sprintf("%8.3G",123.5)             == "     124"      :) }),
+    ({ "sprintf doc42", 0, (: sprintf("%8.6g",123.5)             == "   123.5"      :) }),
 
     ({ "to_text 1", 0, (: deep_eq(to_array(to_text( ({}) )), ({}) ) :) }),
     ({ "to_text 2", 0, (: deep_eq(to_array(to_text( ({0, 65, 66, 67}) )), ({0, 65, 66, 67}) ) :) }),

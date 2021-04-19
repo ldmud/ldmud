@@ -36,8 +36,8 @@ extern string_t * trim_all_spaces (const string_t * txt);
 extern char * xstrncpy(char * dest, const char * src, size_t num);
 extern size_t get_escaped_character(p_int c, char* buf, size_t buflen);
 
-extern size_t byte_to_char_index(char* text, size_t pos, bool* error);
-extern size_t char_to_byte_index(char* text, size_t len, size_t pos, bool* error);
+extern size_t byte_to_char_index(const char* text, size_t pos, bool* error);
+extern size_t char_to_byte_index(const char* text, size_t len, size_t pos, bool* error);
 extern bool is_ascii(const char* text, size_t len);
 extern size_t utf8_size (p_int code);
 extern char* utf8_prev (char* text, size_t pos);
@@ -46,9 +46,9 @@ extern size_t utf8_to_unicode(const char* buf, size_t len, p_int *code);
 
 extern char* get_illegal_sequence(char* buf, size_t len, iconv_t cd);
 
-extern size_t next_grapheme_break(char* str, size_t len, int* width) __attribute__((nonnull(1,3)));
-extern int get_string_width(char* str, size_t len, bool* error) __attribute__((nonnull(1)));
-extern size_t get_string_up_to_width(char* str, size_t len, int width, bool* error) __attribute__((nonnull(1)));
+extern size_t next_grapheme_break(const char* str, size_t len, int* width) __attribute__((nonnull(1,3)));
+extern int get_string_width(const char* str, size_t len, bool* error) __attribute__((nonnull(1)));
+extern size_t get_string_up_to_width(const char* str, size_t len, int width, bool* error) __attribute__((nonnull(1)));
 
 extern svalue_t * v_to_bytes(svalue_t *sp, int num_arg);
 extern svalue_t * v_to_text(svalue_t *sp, int num_arg);
