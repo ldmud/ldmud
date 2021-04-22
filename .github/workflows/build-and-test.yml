@@ -11,7 +11,7 @@ jobs:
         continue-on-error: ${{ matrix.coverage }}
         steps:
             - name: Install dependencies
-              run: sudo apt-get install -y --no-install-recommends ${{ matrix.cc }} bison autoconf autogen libgcrypt20-dev libgnutls28-dev libsqlite3-dev libpq-dev libmysqlclient-dev python3-dev libjson-c-dev libxml2-dev zlib1g-dev ${{ (matrix.cc == 'gcc' && matrix.coverage) && 'lcov' || ''}} ${{ (matrix.cc == 'clang' && matrix.coverage) && 'llvm' || ''}}
+              run: sudo apt-get install -y --no-install-recommends ${{ matrix.cc }} bison autoconf autogen libgcrypt20-dev libgnutls28-dev libsqlite3-dev libpq-dev libmysqlclient-dev python3-dev libjson-c-dev libxml2-dev zlib1g-dev ${{ (matrix.cc == 'gcc' && matrix.coverage) && 'lcov python3-pip' || ''}} ${{ (matrix.cc == 'clang' && matrix.coverage) && 'llvm' || ''}}
             - name: Checkout sources
               uses: actions/checkout@v2
             - name: Generate build files
@@ -40,8 +40,9 @@ jobs:
               shell: bash
               working-directory: test
               run: |
+                pip3 install fastcov
                 for dir in coverage/t-*; do ln ../src/*.gcno "$dir"; done
-                lcov --capture --directory coverage --base-directory ../src --no-external --output coverage.info
+                fastcov -d coverage -c ../src -e /usr/include --lcov -o coverage.info
                 genhtml coverage.info --output-directory html
             - name: Generate coverage reports (clang)
               if: matrix.cc == 'clang' && matrix.coverage
